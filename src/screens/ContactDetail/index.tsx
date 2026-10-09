@@ -31,6 +31,7 @@ import {
   DropdownMenuItem, DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu'
 import { StageTimeline, SegmentedTabs, Eyebrow, StampNumber } from '../../components/v3'
+import { tabPanelProps } from '../../lib/tabs.ts'
 import { useJobData } from './hooks/useJobData.ts'
 import { resolveNextAction } from './lib/jobNextAction.ts'
 import { computeJobHealth } from './lib/jobHealth.ts'
@@ -863,10 +864,11 @@ export default function ContactDetail() {
         onChange={setTab}
         tabs={visibleTabs}
         ariaLabel={`${detailBackLabel.slice(0, -1) || 'Job'} detail tabs`}
+        idBase="fh-job-tabs"
       />
 
       {/* TAB ROUTER */}
-      <div>
+      <div {...tabPanelProps('fh-job-tabs', tab)}>
         {tabPanels}
       </div>
       </>

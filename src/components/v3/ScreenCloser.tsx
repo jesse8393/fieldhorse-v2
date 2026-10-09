@@ -77,6 +77,8 @@ export default function ScreenCloser({
           onClick={onCta}
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 8,
+            // 44px tall so it is an easy thumb target.
+            minHeight: 44,
             padding: '8px 16px',
             borderRadius: 10,
             background: 'transparent',

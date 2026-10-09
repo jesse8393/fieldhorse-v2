@@ -15,6 +15,7 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } f
 import { SkeletonList } from '../components/Skeleton.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
 import { SegmentedTabs, Eyebrow, StampNumber } from '../components/v3'
+import { tabPanelProps } from '../lib/tabs.ts'
 import { supabase } from '../lib/supabase.ts'
 import { useClientDetail, useInvalidateClientDetail, useInvalidateClients } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
@@ -510,10 +511,11 @@ export default function ClientDetail() {
         onChange={setTab}
         tabs={TABS}
         ariaLabel="Client tabs"
+        idBase="fh-client-tabs"
       />
 
       {/* TAB CONTENT */}
-      <div style={{ padding: '0 24px' }}>
+      <div {...tabPanelProps('fh-client-tabs', tab)} style={{ padding: '0 24px' }}>
         {tab === 'overview' && (
           isEditing
             ? <OverviewEdit client={client} onCommit={saveClientEdits} onCancel={() => setIsEditing(false)} />

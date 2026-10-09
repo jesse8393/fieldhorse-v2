@@ -8,9 +8,8 @@ import { useTheme } from '../contexts/ThemeContext.tsx'
  * replay toasts fired while no Toaster is mounted.
  *
  * The legacy fh:toast banner rendered the SAME event a second time (top
- * banner + bottom card for one action), which read as debris.
- * lib/toast.ts still dispatches fh:toast for any listener, but nothing
- * renders it. Desktop: compact bottom-right cards, offset left of the
+ * banner + bottom card for one action), which read as debris, so
+ * lib/toast.ts no longer dispatches that event at all. Desktop: compact bottom-right cards, offset left of the
  * FAB column (FAB is fixed right:20 / 56px wide) so toasts never cover
  * it. Mobile: full-width banner above the bottom nav.
  *

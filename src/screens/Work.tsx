@@ -414,7 +414,10 @@ export default function Work() {
 
       {/* STAGE CHIPS, the whole pipeline in one row. */}
       <motion.div className="fh-work__chips" variants={item} style={{ padding: '0 var(--v3-gutter) 12px' }}>
-        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }} role="tablist" aria-label="Stage filters">
+        {/* A labelled group of toggle buttons (FilterPill sets aria-pressed).
+            Not a tablist: the pills filter one list rather than switching
+            panels, and every pill stays in the Tab order. */}
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }} role="group" aria-label="Stage filters">
           {visibleChips.filter((c) => c.id !== 'lost' || lostCount > 0).map((c) => (
             <FilterPill
               key={c.id}

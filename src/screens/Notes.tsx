@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import {
   FileText, Briefcase, Mic, MicOff, Sparkles, Trash2,
   AlertTriangle, ClipboardCheck, Package, Calendar, Clock,
@@ -44,6 +44,9 @@ const SYSTEM = `You are Fieldhorse, a construction operations AI. You receive ro
    ============================================================ */
 
 export default function Notes() {
+  // The listening bars pulse forever; people who ask for reduced motion
+  // get still bars (the mic button already shows the listening state).
+  const reduceMotion = useReducedMotion()
   const { user } = useAuth()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -440,7 +443,7 @@ export default function Notes() {
                   height: 10,
                   borderRadius: 10,
                   background: 'var(--v3-danger)',
-                  animation: `fh-pulse-dot 900ms ${i * 110}ms infinite ease-in-out`
+                  animation: reduceMotion ? 'none' : `fh-pulse-dot 900ms ${i * 110}ms infinite ease-in-out`
                 }}
               />
             ))}

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { SegmentedTabs } from '../../../components/v3'
+import { tabPanelProps } from '../../../lib/tabs.ts'
 import SubsSection from '../sections/Subs.tsx'
 import ExpensesSection from '../sections/Expenses.tsx'
 import InvoiceSection from '../sections/Invoice.tsx'
@@ -66,11 +67,16 @@ export default function FinancialsTab({
             tabs={subTabsWithCounts}
             variant="pill"
             ariaLabel="Financials sub-tabs"
+            idBase="fh-job-financials"
           />
         </div>
       )}
 
-      <div className="v3-section" style={{ margin: '12px var(--v3-gutter) 24px' }}>
+      <div
+        className="v3-section"
+        {...(subTabsWithCounts.length > 1 ? tabPanelProps('fh-job-financials', sub) : {})}
+        style={{ margin: '12px var(--v3-gutter) 24px' }}
+      >
         {sub === 'subs' && (
           <SubsSection contact={contact} subs={subs} userId={userId} fetchAll={fetchAll} />
         )}

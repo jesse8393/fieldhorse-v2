@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { SegmentedTabs } from '../../../components/v3'
+import { tabPanelProps } from '../../../lib/tabs.ts'
 import PhotosSection from '../sections/Photos.tsx'
 import FilesSection from '../sections/Files.tsx'
 import MessagesSection from '../sections/Messages.tsx'
@@ -29,10 +30,11 @@ export default function FilesTab({ contact, notes = [], userId, fetchAll }: any)
           tabs={SUB_TABS}
           variant="pill"
           ariaLabel="Files sub-tabs"
+          idBase="fh-job-files"
         />
       </div>
 
-      <div className="v3-section" style={{ margin: '12px var(--v3-gutter) 24px' }}>
+      <div className="v3-section" {...tabPanelProps('fh-job-files', sub)} style={{ margin: '12px var(--v3-gutter) 24px' }}>
         {sub === 'photos' && (
           <PhotosSection jobId={contact?.id} userId={userId} />
         )}

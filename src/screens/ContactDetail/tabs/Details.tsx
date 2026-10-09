@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { SegmentedTabs } from '../../../components/v3'
+import { tabPanelProps } from '../../../lib/tabs.ts'
 import MilestonesSection from '../sections/Milestones.tsx'
 import TodosSection from '../sections/Todos.tsx'
 import ScheduledSection from '../sections/Scheduled.tsx'
@@ -72,10 +73,11 @@ export default function DetailsTab({
           tabs={subTabsWithCounts}
           variant="pill"
           ariaLabel="Details sub-tabs"
+          idBase="fh-job-details"
         />
       </div>
 
-      <div className="v3-section" style={{ margin: '12px var(--v3-gutter) 24px' }}>
+      <div className="v3-section" {...tabPanelProps('fh-job-details', sub)} style={{ margin: '12px var(--v3-gutter) 24px' }}>
         {sub === 'milestones' && (
           <MilestonesSection contact={contact} patch={patch} />
         )}
