@@ -24,7 +24,6 @@
 //   RESEND_API_KEY              — required if send_email=true is honored
 //   SEND_EMAIL_FROM             — required, e.g. notifications@fieldhorse.io
 //   SEND_EMAIL_FROM_NAME        — optional, default 'FieldHorse'
-//   APP_BASE_URL                — optional, default https://fieldhorse.io
 
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'node:crypto'

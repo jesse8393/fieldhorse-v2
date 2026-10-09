@@ -25,7 +25,6 @@
 //   SEND_EMAIL_FROM_NAME        — optional, default "Notifications" (used
 //                                  ONLY when the contractor has no
 //                                  company_name on file)
-//   APP_BASE_URL                — optional, default https://fieldhorse.io
 //   SUPABASE_URL                — required for service-role lookups
 //   SUPABASE_SERVICE_ROLE_KEY   — required, bypasses RLS for owner check
 //

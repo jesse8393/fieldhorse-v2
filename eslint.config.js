@@ -17,12 +17,14 @@
 //   list keys, duplicate props, comments rendered as text, state mutated
 //   directly). Its style rules stay off.
 //
+// * Plain .js and .mjs files are not typechecked, so no-undef runs on them
+//   with the globals each one really has: Node for the Netlify functions,
+//   scripts and build config, the browser for src/lib/pdf.js, and both for
+//   the QA scripts, whose page callbacks run in the browser.
+//
 // What it leaves off:
-// * no-undef for every file, and no-redeclare for .ts and .tsx. The
-//   TypeScript compiler reports undefined names and clashing declarations
-//   in .ts and .tsx. Plain .js files (Netlify functions, scripts, build
-//   config, src/lib/pdf.js) are not typechecked, so nothing checks them
-//   for undefined names yet.
+// * no-undef and no-redeclare for .ts and .tsx. The TypeScript compiler
+//   reports undefined names and clashing declarations there.
 // * no-unused-vars for every file. Unused names are untidy rather than
 //   broken, and tsconfig leaves noUnusedLocals off too.
 // * Reports of unused disable comments. Several comments name rules that
@@ -34,6 +36,7 @@ import js from '@eslint/js'
 import tseslint from 'typescript-eslint'
 import reactHooks from 'eslint-plugin-react-hooks'
 import react from 'eslint-plugin-react'
+import globals from 'globals'
 
 export default [
   {
@@ -70,6 +73,21 @@ export default [
       'no-unused-vars': 'off',
       'no-empty': ['error', { allowEmptyCatch: true }],
     },
+  },
+  {
+    files: ['netlify/**/*.js', '*.js', 'scripts/**/*.{js,mjs}'],
+    languageOptions: { globals: { ...globals.node } },
+    rules: { 'no-undef': 'error' },
+  },
+  {
+    // Playwright QA scripts: page.evaluate callbacks run in the browser.
+    files: ['scripts/qa-*.mjs'],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+  },
+  {
+    files: ['src/**/*.js'],
+    languageOptions: { globals: { ...globals.browser } },
+    rules: { 'no-undef': 'error' },
   },
   {
     files: ['**/*.{ts,tsx}'],
