@@ -5,12 +5,15 @@
 // every pipeline stage, today's schedule, AI-parsed notes, todos,
 // expenses) instead of an empty Home with em-dashes.
 //
-// All inserts are RLS-scoped to the caller's user_id. Settings → "Reset
-// everything" wipes them.
+// Every row is stamped with the caller's user_id and the org being
+// seeded, and the seed refuses to run unless the caller OWNS that org:
+// an invited teammate must never drop fake clients and jobs (with
+// contract amounts that feed the pipeline) into the employer's book.
+// Settings → "Reset everything" wipes them.
 //
 // Usage:
 //   import { seedDemoData } from '../lib/demoSeed.ts'
-//   const counts = await seedDemoData(supabase, user.id)
+//   const counts = await seedDemoData(supabase, user.id, orgId)
 //   // counts: { clients, jobs, events, notes, todos, expenses }
 //
 // Returns counts; throws on any insert error.
@@ -34,8 +37,21 @@ function daysAgo(n: number) {
   return d.toISOString()
 }
 
-export async function seedDemoData(supabase: any, userId: string | undefined) {
+export async function seedDemoData(supabase: any, userId: string | undefined, orgId: string | null | undefined) {
   if (!userId) throw new Error('seedDemoData: userId required')
+  if (!orgId) throw new Error('seedDemoData: orgId required')
+
+  const { data: membership, error: membershipErr } = await supabase
+    .from('org_members')
+    .select('role')
+    .eq('org_id', orgId)
+    .eq('user_id', userId)
+    .is('revoked_at', null)
+    .maybeSingle()
+  if (membershipErr) throw membershipErr
+  if (membership?.role !== 'owner') {
+    throw new Error('Sample data can only be added to a workspace you own.')
+  }
 
   const counts = { clients: 0, jobs: 0, events: 0, notes: 0, todos: 0, expenses: 0 }
 
@@ -47,6 +63,7 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
     .insert([
       {
         user_id: userId,
+        org_id: orgId,
         source: 'demo',
         name: 'Henderson Family',
         company_name: null,
@@ -57,6 +74,7 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
       },
       {
         user_id: userId,
+        org_id: orgId,
         source: 'demo',
         name: 'McCarthy Construction LLC',
         company_name: 'McCarthy Construction',
@@ -67,6 +85,7 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
       },
       {
         user_id: userId,
+        org_id: orgId,
         source: 'demo',
         name: 'Jane Patel',
         company_name: null,
@@ -91,6 +110,7 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
     .insert([
       {
         user_id: userId,
+        org_id: orgId,
         source: 'demo',
         client_id: henderson.id,
         name: 'Henderson Family',
@@ -106,6 +126,7 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
       },
       {
         user_id: userId,
+        org_id: orgId,
         source: 'demo',
         client_id: henderson.id,
         name: 'Henderson Family',
@@ -121,6 +142,7 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
       },
       {
         user_id: userId,
+        org_id: orgId,
         source: 'demo',
         client_id: mccarthy.id,
         name: 'McCarthy office build out',
@@ -137,6 +159,7 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
       },
       {
         user_id: userId,
+        org_id: orgId,
         source: 'demo',
         client_id: patel.id,
         name: 'Jane Patel',
@@ -152,6 +175,7 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
       },
       {
         user_id: userId,
+        org_id: orgId,
         source: 'demo',
         client_id: null,
         name: 'Davis driveway',
@@ -167,6 +191,7 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
       },
       {
         user_id: userId,
+        org_id: orgId,
         source: 'demo',
         client_id: null,
         name: 'Murray garage addition',
@@ -196,10 +221,10 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
   const { data: events, error: eventsErr } = await supabase
     .from('fh_schedule')
     .insert([
-      { user_id: userId, contact_id: henKitchen.id, title: 'Site visit for counter template', start_at: todayAt(9, 0) },
-      { user_id: userId, contact_id: murray.id,    title: 'Concrete pour, slab',           start_at: todayAt(13, 0) },
-      { user_id: userId, contact_id: mccOffice.id, title: 'Final walkthrough w/ client',    start_at: dayAt(1, 8, 30) },
-      { user_id: userId, contact_id: patelYard.id, title: 'Quote review on site',           start_at: dayAt(3, 10, 0) }
+      { user_id: userId, org_id: orgId, contact_id: henKitchen.id, title: 'Site visit for counter template', start_at: todayAt(9, 0) },
+      { user_id: userId, org_id: orgId, contact_id: murray.id,    title: 'Concrete pour, slab',           start_at: todayAt(13, 0) },
+      { user_id: userId, org_id: orgId, contact_id: mccOffice.id, title: 'Final walkthrough w/ client',    start_at: dayAt(1, 8, 30) },
+      { user_id: userId, org_id: orgId, contact_id: patelYard.id, title: 'Quote review on site',           start_at: dayAt(3, 10, 0) }
     ])
     .select('id')
   if (eventsErr) throw eventsErr
@@ -213,12 +238,14 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
     .insert([
       {
         user_id: userId,
+        org_id: orgId,
         contact_id: henKitchen.id,
         text: 'Called Henderson. Going with quartz over the granite option. Reorder counters Monday.',
         category: 'note'
       },
       {
         user_id: userId,
+        org_id: orgId,
         contact_id: murray.id,
         text: 'Need shingles ordered by Friday or framing slips a week. Owner ok with the upgrade if it adds <$400.',
         category: 'note',
@@ -232,6 +259,7 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
       },
       {
         user_id: userId,
+        org_id: orgId,
         contact_id: patelYard.id,
         text: 'Patel mentioned budget around 10K, watch creep. She loved the Henderson driveway look.',
         category: 'note'
@@ -245,9 +273,9 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
       const { data: notes2, error: notes2Err } = await supabase
         .from('fh_notes')
         .insert([
-          { user_id: userId, contact_id: henKitchen.id, text: 'Called Henderson. Going with quartz over the granite option. Reorder counters Monday.', category: 'note' },
-          { user_id: userId, contact_id: murray.id, text: 'Need shingles ordered by Friday or framing slips a week. Owner ok with the upgrade if it adds <$400.', category: 'note' },
-          { user_id: userId, contact_id: patelYard.id, text: 'Patel mentioned budget around 10K, watch creep. She loved the Henderson driveway look.', category: 'note' }
+          { user_id: userId, org_id: orgId, contact_id: henKitchen.id, text: 'Called Henderson. Going with quartz over the granite option. Reorder counters Monday.', category: 'note' },
+          { user_id: userId, org_id: orgId, contact_id: murray.id, text: 'Need shingles ordered by Friday or framing slips a week. Owner ok with the upgrade if it adds <$400.', category: 'note' },
+          { user_id: userId, org_id: orgId, contact_id: patelYard.id, text: 'Patel mentioned budget around 10K, watch creep. She loved the Henderson driveway look.', category: 'note' }
         ])
         .select('id')
       if (notes2Err) throw notes2Err
@@ -265,11 +293,11 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
   const { data: todos, error: todosErr } = await supabase
     .from('fh_job_todos')
     .insert([
-      { user_id: userId, job_id: henKitchen.id, text: 'Order cabinets',                          done: true,  completed_at: daysAgo(8) },
-      { user_id: userId, job_id: henKitchen.id, text: 'Demo old appliances',                     done: true,  completed_at: daysAgo(6) },
-      { user_id: userId, job_id: henKitchen.id, text: 'Get plumbing rough in inspection booked', done: false },
-      { user_id: userId, job_id: henKitchen.id, text: 'Confirm tile pick with homeowner',         done: false },
-      { user_id: userId, job_id: henKitchen.id, text: 'Schedule electrician for week of 5/5',     done: false }
+      { user_id: userId, org_id: orgId, job_id: henKitchen.id, text: 'Order cabinets',                          done: true,  completed_at: daysAgo(8) },
+      { user_id: userId, org_id: orgId, job_id: henKitchen.id, text: 'Demo old appliances',                     done: true,  completed_at: daysAgo(6) },
+      { user_id: userId, org_id: orgId, job_id: henKitchen.id, text: 'Get plumbing rough in inspection booked', done: false },
+      { user_id: userId, org_id: orgId, job_id: henKitchen.id, text: 'Confirm tile pick with homeowner',         done: false },
+      { user_id: userId, org_id: orgId, job_id: henKitchen.id, text: 'Schedule electrician for week of 5/5',     done: false }
     ])
     .select('id')
   if (todosErr) {
@@ -285,10 +313,10 @@ export async function seedDemoData(supabase: any, userId: string | undefined) {
   const { data: expenses, error: expensesErr } = await supabase
     .from('fh_expenses')
     .insert([
-      { user_id: userId, contact_id: mccOffice.id, description: 'Drywall + mud',  amount: 3850, category: 'Materials', expense_date: daysAgo(14) },
-      { user_id: userId, contact_id: mccOffice.id, description: 'Subfloor pad',   amount: 1200, category: 'Materials', expense_date: daysAgo(12) },
-      { user_id: userId, contact_id: mccOffice.id, description: 'Permit fee',     amount: 480,  category: 'Permits',   expense_date: daysAgo(20) },
-      { user_id: userId, contact_id: henKitchen.id, description: 'Cabinet deposit', amount: 7400, category: 'Materials', expense_date: daysAgo(5) }
+      { user_id: userId, org_id: orgId, contact_id: mccOffice.id, description: 'Drywall + mud',  amount: 3850, category: 'Materials', expense_date: daysAgo(14) },
+      { user_id: userId, org_id: orgId, contact_id: mccOffice.id, description: 'Subfloor pad',   amount: 1200, category: 'Materials', expense_date: daysAgo(12) },
+      { user_id: userId, org_id: orgId, contact_id: mccOffice.id, description: 'Permit fee',     amount: 480,  category: 'Permits',   expense_date: daysAgo(20) },
+      { user_id: userId, org_id: orgId, contact_id: henKitchen.id, description: 'Cabinet deposit', amount: 7400, category: 'Materials', expense_date: daysAgo(5) }
     ])
     .select('id')
   if (expensesErr) throw expensesErr

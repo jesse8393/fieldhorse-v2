@@ -16,11 +16,12 @@ export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 30_000,
-      // 24h (was 5min): queries must outlive the moment for the offline
-      // persistence layer (main.tsx PersistQueryClientProvider) to have
-      // anything to rehydrate on a no-signal cold open. Memory cost is
-      // modest, these are row lists, not blobs.
-      gcTime: 24 * 60 * 60 * 1000,
+      // Seven days, matching the persister's maxAge in main.tsx. TanStack's
+      // persistence guidance is gcTime at least as long as maxAge, or a
+      // query collected from memory drops out of the next persisted
+      // snapshot and an offline cold open finds nothing. Memory cost is
+      // modest: these are row lists, not blobs.
+      gcTime: 7 * 24 * 60 * 60 * 1000,
       retry: 1,
       refetchOnWindowFocus: true,
       refetchOnReconnect: true

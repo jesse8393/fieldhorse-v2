@@ -37,7 +37,7 @@ function isFatalError(msg: any) {
  */
 export default function PartnerInvite() {
   const { token } = useParams()
-  const { session, loading } = useAuth()
+  const { session, loading, signOut } = useAuth()
   const navigate = useNavigate()
   const [info, setInfo] = useState<any>(null)
   const [infoErr, setInfoErr] = useState('')
@@ -210,6 +210,21 @@ export default function PartnerInvite() {
           >
             {infoErr}
           </div>
+        )}
+
+        {/* Signed in with a different email than the invite: offer the way
+            out instead of a dead end. */}
+        {showSoftError && session && infoErr === friendlyError('email_mismatch') && (
+          <button
+            type="button"
+            onClick={async () => {
+              await signOut()
+              navigate(`/login?partner_invite=${encodeURIComponent(token || '')}`, { replace: true })
+            }}
+            style={{ width: '100%', padding: '12px 16px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule, rgba(242, 237, 228,0.08))', color: 'var(--ink-strong, #F2EDE4)', fontFamily: 'var(--font-body, "DM Sans", sans-serif)', fontSize: 14, fontWeight: 700, cursor: 'pointer', marginBottom: 14 }}
+          >
+            Switch account
+          </button>
         )}
 
         {showSignIn && (

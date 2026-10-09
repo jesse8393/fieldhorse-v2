@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { motion } from 'framer-motion'
@@ -30,12 +30,13 @@ import { canHover } from '../lib/hover.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import DataErrorState from '../components/DataErrorState.tsx'
 import { useHomeDashboard, useHomeDashboardRealtime } from '../lib/homeDashboard.ts'
+import { lazyWithRetry } from '../lib/lazyWithRetry.ts'
 // Lazy, desktop-only variant. Home itself is an eager route (loaded
 // with the main bundle) so any static import here ships SnowHome to
 // mobile users too even though they never render it. Lazy keeps the
 // main bundle lean; desktop sees a near-instant suspense flash since
 // the chunk fetches in parallel with first paint.
-const SnowHome = lazy(() => import('../components/desktop/SnowHomeBuild.tsx'))
+const SnowHome = lazyWithRetry(() => import('../components/desktop/SnowHomeBuild.tsx'))
 
 const EMPTY_PHOTO_URLS: Record<string, string> = {}
 
@@ -179,8 +180,10 @@ export default function Home() {
   // Sub-only redirect: an authenticated user with NO org membership
   // is, in practice, somebody who accepted a partner invite (or
   // signed up without onboarding). Land them on /sub-portal, the
-  // owner dashboard would 403 every query they made.
-  if (!membership.loading && !membership.role && !membership.orgId) {
+  // owner dashboard would 403 every query they made. Only on a clean
+  // answer: a failed membership fetch (offline cold open) also leaves
+  // no role, and the cached dashboard is what that owner needs.
+  if (!membership.loading && !membership.error && !membership.role && !membership.orgId) {
     return <Navigate to="/sub-portal" replace />
   }
 

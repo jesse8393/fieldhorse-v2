@@ -1,15 +1,20 @@
 import React from 'react'
+import { isChunkLoadError, reloadOnceForStaleChunk } from '../lib/lazyWithRetry.ts'
 
 /**
  * Top-level error boundary. Any render/runtime error below this point
  * surfaces as a visible fallback with the error text + a Reload button.
  * Without this, a thrown error anywhere in the tree would unmount the
  * entire app and the user sees a blank white/dark screen.
+ *
+ * A chunk that no longer exists after a deploy (a lazy screen outside
+ * the app shell, like onboarding or an invite) triggers one page reload
+ * to fetch the new build (lib/lazyWithRetry.ts) instead of this screen.
  */
-export default class AppErrorBoundary extends React.Component<{ children?: React.ReactNode }, { error: any }> {
+export default class AppErrorBoundary extends React.Component<{ children?: React.ReactNode }, { error: any; reloading: boolean }> {
   constructor(props: any) {
     super(props)
-    this.state = { error: null }
+    this.state = { error: null, reloading: false }
   }
 
   static getDerivedStateFromError(error: any) {
@@ -19,6 +24,7 @@ export default class AppErrorBoundary extends React.Component<{ children?: React
   componentDidCatch(error: any, info: any) {
     // eslint-disable-next-line no-console
     console.error('[fieldhorse] app crash', error, info)
+    if (isChunkLoadError(error) && reloadOnceForStaleChunk()) this.setState({ reloading: true })
   }
 
   handleReload = () => {
@@ -28,6 +34,7 @@ export default class AppErrorBoundary extends React.Component<{ children?: React
 
   render() {
     if (!this.state.error) return this.props.children
+    if (this.state.reloading) return null
     const msg = this.state.error?.message || String(this.state.error)
     return (
       <div

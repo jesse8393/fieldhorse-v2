@@ -4,12 +4,14 @@
 // required to LOAD the page; the user is bounced to /login if they
 // hit Accept while signed out). Calls org-invite-info to render a
 // preview banner; the operator clicks Accept, the screen calls
-// org-invite-accept and routes to / on success.
+// org-invite-accept and routes to / on success. Signing in (or signing
+// up) from here comes back to this page through Login's ?next=.
 
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
+import { useProfile } from '../contexts/ProfileContext.tsx'
 import { orgInviteAccept, orgInviteInfo, type OrgInviteInfo } from '../lib/orgApi.ts'
 
 type Phase =
@@ -17,6 +19,7 @@ type Phase =
   | 'preview'
   | 'accepting'
   | 'accepted'
+  | 'used'
   | 'sign_in_required'
   | 'expired'
   | 'mismatch'
@@ -26,12 +29,14 @@ type Phase =
 export default function OrgInvite() {
   const { token } = useParams<{ token: string }>()
   const navigate = useNavigate()
-  const { user, session } = useAuth()
-  const { refresh } = useMembership()
+  const { user, session, signOut } = useAuth()
+  const { refresh: refreshMembership } = useMembership()
+  const { refresh: refreshProfile } = useProfile()
 
   const [phase, setPhase] = useState<Phase>('loading')
   const [invite, setInvite] = useState<OrgInviteInfo | null>(null)
   const [errMsg, setErrMsg] = useState<string>('')
+  const loginToAccept = `/login?next=${encodeURIComponent(`/invite/${token || ''}`)}`
 
   // 1. Fetch the invite preview on mount.
   useEffect(() => {
@@ -42,7 +47,7 @@ export default function OrgInvite() {
         if (cancelled) return
         setInvite(res.invite)
         if (res.invite.expired) setPhase('expired')
-        else if (res.invite.accepted) setPhase('accepted')
+        else if (res.invite.accepted) setPhase('used')
         else setPhase('preview')
       })
       .catch((e: any) => {
@@ -59,15 +64,26 @@ export default function OrgInvite() {
     setPhase('accepting')
     try {
       await orgInviteAccept(token)
-      await refresh()
+      // The server added the membership and marked the profile as set
+      // up. Reload both, or the app would still send this teammate to
+      // onboarding (or the sub portal) on the way in.
+      await Promise.all([refreshMembership(), refreshProfile()])
       setPhase('accepted')
       // Tiny pause so the user sees the success state before the redirect.
       window.setTimeout(() => navigate('/', { replace: true }), 800)
     } catch (e: any) {
       if (e?.status === 403 && e?.message === 'email_mismatch') setPhase('mismatch')
+      else if (e?.status === 410 && e?.message === 'invite_already_used') setPhase('used')
       else if (e?.status === 410) setPhase('expired')
       else { setPhase('error'); setErrMsg(e?.detail || e?.message || 'Accept failed.') }
     }
+  }
+
+  // Signed in as someone else: sign out first, or Login would bounce the
+  // current session straight back into the app.
+  async function handleSwitchAccount() {
+    await signOut()
+    navigate(loginToAccept, { replace: true })
   }
 
   return (
@@ -108,7 +124,7 @@ export default function OrgInvite() {
                 you're signed in as <strong style={hiStyle}>{user?.email}</strong>. Sign out
                 and sign in with the invited address.
               </p>
-              <PrimaryBtn onClick={() => navigate('/login')}>Switch account</PrimaryBtn>
+              <PrimaryBtn onClick={handleSwitchAccount}>Switch account</PrimaryBtn>
             </>
           )}
 
@@ -119,7 +135,7 @@ export default function OrgInvite() {
                 This invite was issued to <strong style={hiStyle}>{invite?.email}</strong>.
                 Sign in with that email to join.
               </p>
-              <PrimaryBtn onClick={() => navigate(`/login?next=/invite/${token}`)}>Sign in</PrimaryBtn>
+              <PrimaryBtn onClick={() => navigate(loginToAccept)}>Sign in</PrimaryBtn>
             </>
           )}
 
@@ -153,6 +169,18 @@ export default function OrgInvite() {
               <p style={pStyle}>
                 Welcome to {invite?.org_name || 'the team'}. Redirecting…
               </p>
+            </>
+          )}
+
+          {phase === 'used' && (
+            <>
+              <h1 style={titleStyle}>Invite already used</h1>
+              <p style={pStyle}>
+                This invite has already been used. If you accepted it, you're all set.
+              </p>
+              <PrimaryBtn onClick={() => navigate(session ? '/' : '/login')}>
+                {session ? 'Go to app' : 'Sign in'}
+              </PrimaryBtn>
             </>
           )}
 

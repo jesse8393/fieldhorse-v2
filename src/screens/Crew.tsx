@@ -25,6 +25,7 @@ import {
 } from '../lib/timePunches.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { recalcCost } from '../lib/stages.ts'
+import OrgSwitcher from '../components/OrgSwitcher.tsx'
 
 type ScheduleRow = {
   id: string
@@ -253,6 +254,11 @@ export default function Crew() {
           <div>
             <div className="fh-build-good">{fmtDayHeading(new Date())}</div>
             <h1 className="fh-build-title">CREW</h1>
+            {/* Only shows for people in more than one company, so a crew
+                member can switch back to their own workspace on mobile. */}
+            <div style={{ marginTop: 12, maxWidth: 320 }}>
+              <OrgSwitcher />
+            </div>
           </div>
 
           <div className={`fh-build-focus fh-build-window-card is-${activePunch ? 'good' : 'neutral'}`}>

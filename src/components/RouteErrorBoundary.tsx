@@ -1,4 +1,5 @@
 import React from 'react'
+import { isChunkLoadError, reloadOnceForStaleChunk } from '../lib/lazyWithRetry.ts'
 
 /**
  * Screen-level error boundary. Wraps the routed <Outlet /> inside
@@ -8,11 +9,15 @@ import React from 'react'
  * Reset on navigation: parent passes the current location.key as
  * resetKey; when it changes, the boundary clears its error state so
  * the new route can render normally.
+ *
+ * A screen chunk that no longer exists after a deploy triggers one page
+ * reload to fetch the new build (lib/lazyWithRetry.ts) instead of the
+ * error card; a second failure in the same build shows the card.
  */
-export default class RouteErrorBoundary extends React.Component<{ children?: React.ReactNode; resetKey?: any }, { error: any }> {
+export default class RouteErrorBoundary extends React.Component<{ children?: React.ReactNode; resetKey?: any }, { error: any; reloading: boolean }> {
   constructor(props: any) {
     super(props)
-    this.state = { error: null }
+    this.state = { error: null, reloading: false }
   }
 
   static getDerivedStateFromError(error: any) {
@@ -25,13 +30,14 @@ export default class RouteErrorBoundary extends React.Component<{ children?: Rea
     // user clicks away to a healthy route.
     if (this.state.error && prevProps.resetKey !== this.props.resetKey) {
       // eslint-disable-next-line react/no-did-update-set-state
-      this.setState({ error: null })
+      this.setState({ error: null, reloading: false })
     }
   }
 
   componentDidCatch(error: any, info: any) {
     // eslint-disable-next-line no-console
     console.error('[fieldhorse] route crash', error, info)
+    if (isChunkLoadError(error) && reloadOnceForStaleChunk()) this.setState({ reloading: true })
   }
 
   handleHome = () => {
@@ -48,6 +54,7 @@ export default class RouteErrorBoundary extends React.Component<{ children?: Rea
 
   render() {
     if (!this.state.error) return this.props.children
+    if (this.state.reloading) return null
 
     const msg = this.state.error?.message || String(this.state.error)
 

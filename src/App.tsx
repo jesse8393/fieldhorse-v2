@@ -1,9 +1,10 @@
-import { lazy, Suspense } from 'react'
+import { Suspense } from 'react'
 import type { ReactNode } from 'react'
 import { Routes, Route, Navigate, useParams, useSearchParams, useLocation } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext.tsx'
 import { useProfile } from './contexts/ProfileContext.tsx'
 import { useMediaQuery } from './lib/useMediaQuery.ts'
+import { lazyWithRetry as lazy } from './lib/lazyWithRetry.ts'
 import AppShell from './components/AppShell.tsx'
 
 // Eager, must be in main bundle
@@ -16,7 +17,8 @@ import Login from './screens/Login.tsx'
 
 // Lazy, every other route. Each becomes its own chunk.
 // Initial JS bundle drops from ~1.47 MB to ~400 KB on first paint;
-// remaining chunks fetch on-demand as the user navigates.
+// remaining chunks fetch on-demand as the user navigates. lazyWithRetry
+// reloads once when a deploy has replaced a chunk (see lib/lazyWithRetry.ts).
 const ResetPassword  = lazy(() => import('./screens/ResetPassword.tsx'))
 const Onboarding     = lazy(() => import('./screens/Onboarding.tsx'))
 const PartnerInvite  = lazy(() => import('./screens/PartnerInvite.tsx'))
@@ -124,12 +126,15 @@ function AppLoading({ label }: { label: string }) {
  * ContactDetailRoute, master-detail shell for /leads/:id, /quotes/:id,
  * /jobs/:id.
  *
- * ≥1200px: a persistent list rail renders beside the detail so the
+ * ≥1680px: a persistent list rail renders beside the detail so the
  * operator flips between records without bouncing back to the board.
  * The rail lives OUTSIDE the keyed ContactDetail, so its scroll +
- * search survive record switches. Below 1200px nothing changes, the
+ * search survive record switches. Below 1680px nothing changes, the
  * detail renders full-width exactly as before (the rail isn't even
- * mounted, so phones/tablets pay zero cost).
+ * mounted, so it costs nothing). The breakpoint must match the CSS:
+ * fixes-2026-07.css hides the rail from 1440 to 1679px, and a mounted
+ * but hidden rail still fetches the whole jobs list and listens for
+ * every job change.
  *
  * key={id} gives every record a clean ContactDetail remount. This also
  * fixes a latent stale-state bug: navigating detail→detail (command
@@ -164,7 +169,7 @@ function LegacyBoardRedirect({ defaultStage }: { defaultStage?: string }) {
 
 function ContactDetailRoute() {
   const { id } = useParams()
-  const isWide = useMediaQuery('(min-width: 1440px)')
+  const isWide = useMediaQuery('(min-width: 1680px)')
   return (
     <div className="fh-detail-split">
       {isWide && (

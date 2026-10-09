@@ -171,7 +171,7 @@ const SERVICES = [
 export default function Onboarding() {
   const { user, signOut } = useAuth()
   const { profile, loading, isOnboarded, upsertProfile } = useProfile()
-  const { refresh: refreshMembership } = useMembership()
+  const { memberships, loading: membershipLoading, refresh: refreshMembership } = useMembership()
   const navigate = useNavigate()
 
   // Onboarding is for fresh signups. Never read from an existing profile :
@@ -182,14 +182,23 @@ export default function Onboarding() {
   const [locStatus, setLocStatus] = useState('idle') // idle | requesting | ok | error
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [fullName, setFullName] = useState('')
 
   const canSubmit = useMemo(
     () => companyName.trim().length >= 2 && services.length >= 1,
     [companyName, services]
   )
 
-  if (loading) return null
+  if (loading || membershipLoading) return null
   if (isOnboarded) return <Navigate to="/" replace />
+
+  // An invited teammate (any membership that is not an owner's) already
+  // has a company: the one that invited them. Setting up shop would make
+  // them a company of their own, or seed sample jobs into the
+  // employer's book, so they only get a short welcome. Memberships come
+  // newest first, so this is the team they joined most recently.
+  const joinedTeam = memberships.find((m) => m.role !== 'owner')
+  const isInvitee = Boolean(joinedTeam)
 
   function toggleService(key: any) {
     setServices((prev) => (prev.includes(key) ? prev.filter((s) => s !== key) : [...prev, key]))
@@ -216,19 +225,21 @@ export default function Onboarding() {
   // Settings → Reset everything is the explicit undo path. Default true
   // because the empty-state churn rate is brutal; user can opt out.
   async function finish({ withSeed }: any) {
-    if (!canSubmit || busy) return
+    if (!canSubmit || busy || isInvitee) return
     setBusy(true)
     setError('')
     // Create the caller's org + owner membership first (idempotent RPC).
     // Every downstream insert depends on it: fh_set_org_id stamps rows
     // from org_members, and Home routes members-without-an-org to the
-    // sub portal. Without this, a brand-new signup dead-ends.
-    const { error: orgErr } = await supabase.rpc('create_own_org', {
+    // sub portal. Without this, a brand-new signup dead-ends. When the
+    // caller already belongs to an org it returns that org instead;
+    // seedDemoData checks the caller owns it before adding anything.
+    const { data: ownOrgId, error: orgErr } = await supabase.rpc('create_own_org', {
       p_name: companyName.trim()
     })
-    if (orgErr) {
+    if (orgErr || !ownOrgId) {
       setBusy(false)
-      setError(orgErr.message || 'Could not create your workspace')
+      setError(orgErr?.message || 'Could not create your workspace')
       return
     }
     // Membership context fetched before the org existed, refresh it so
@@ -255,7 +266,7 @@ export default function Onboarding() {
     }
     if (withSeed && user?.id) {
       try {
-        const counts = await seedDemoData(supabase, user.id)
+        const counts = await seedDemoData(supabase, user.id, ownOrgId)
         hapticSuccess()
         toastSuccess(
           'Workspace ready',
@@ -276,6 +287,85 @@ export default function Onboarding() {
     // Form's default submit (Enter key) seeds, matches the recommended path.
     e.preventDefault()
     finish({ withSeed: true })
+  }
+
+  async function finishInvitee(e: any) {
+    e.preventDefault()
+    if (busy) return
+    setBusy(true)
+    setError('')
+    const name = fullName.trim()
+    const { error: profErr } = await upsertProfile({
+      ...(name ? { full_name: name } : {}),
+      onboarded_at: new Date().toISOString()
+    })
+    setBusy(false)
+    if (profErr) {
+      setError(profErr.message || 'Could not save your profile')
+      return
+    }
+    navigate('/', { replace: true })
+  }
+
+  async function handleSignOut() {
+    await signOut()
+    navigate('/login', { replace: true })
+  }
+
+  if (isInvitee) {
+    return (
+      <main className="fh-onb">
+        <header className="fh-onb__top">
+          <Wordmark size="1.6rem" />
+        </header>
+
+        <section className="fh-onb__hero" style={{ animationDelay: '40ms' }}>
+          <p className="fh-onb__eyebrow">Welcome</p>
+          <h1 className="fh-onb__title fh-font-serif" style={{ fontWeight: 400 }}>
+            You're on<br />
+            the team.
+          </h1>
+          <p className="fh-onb__lede">
+            You joined {joinedTeam?.orgName || 'your team'}. Add your name so everyone knows who you are.
+          </p>
+        </section>
+
+        <form className="fh-onb__form" onSubmit={finishInvitee} noValidate>
+          <section className="fh-onb__section" style={{ animationDelay: '120ms' }}>
+            <label className="fh-field">
+              <span className="fh-field__label">Your name</span>
+              <input
+                className="fh-field__input"
+                type="text"
+                autoComplete="name"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="First and last name"
+                disabled={busy}
+              />
+            </label>
+          </section>
+
+          {error && (
+            <p className="fh-auth__error" role="alert" style={{ marginTop: 'var(--space-4)' }}>
+              {error}
+            </p>
+          )}
+
+          <div className="fh-onb__cta" style={{ animationDelay: '200ms' }}>
+            <button type="submit" className="fh-btn fh-btn--primary fh-onb__submit" disabled={busy}>
+              {busy ? 'Saving…' : 'Continue'}
+            </button>
+            <p className="fh-onb__meta" style={{ marginTop: 14 }}>
+              Signed in as <span>{user?.email}</span> ·{' '}
+              <button type="button" className="fh-onb__link" onClick={handleSignOut}>
+                sign out
+              </button>
+            </p>
+          </div>
+        </form>
+      </main>
+    )
   }
 
   return (
@@ -479,10 +569,7 @@ export default function Onboarding() {
             <button
               type="button"
               className="fh-onb__link"
-              onClick={async () => {
-                await signOut()
-                navigate('/login', { replace: true })
-              }}
+              onClick={handleSignOut}
             >
               sign out
             </button>

@@ -5,9 +5,22 @@ import { Mail, Lock, ArrowRight } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
 import { isSupabaseConfigured } from '../lib/supabase.ts'
+import { safeNextPath } from '../lib/nextPath.ts'
 
 function getErrorMessage(err: unknown, fallback: string) {
   return err instanceof Error ? err.message : fallback
+}
+
+const SR_ONLY: React.CSSProperties = {
+  position: 'absolute',
+  width: 1,
+  height: 1,
+  margin: -1,
+  padding: 0,
+  border: 0,
+  overflow: 'hidden',
+  clip: 'rect(0 0 0 0)',
+  whiteSpace: 'nowrap'
 }
 
 export default function Login() {
@@ -16,6 +29,9 @@ export default function Login() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const partnerInviteToken = params.get('partner_invite') || ''
+  // Where to land after auth, for example the org invite a signed out
+  // teammate was trying to accept. Same origin paths only.
+  const nextPath = safeNextPath(params.get('next'))
   const initialMode = params.get('mode') === 'signup' ? 'signup' : 'signin'
   const [mode, setMode] = useState(initialMode)
   const [email, setEmail] = useState('')
@@ -35,14 +51,18 @@ export default function Login() {
   const controlsDisabled = busy
   const submitDisabled = busy || !isSupabaseConfigured
 
-  // After-auth destination: partner invite flow > root.
+  // After-auth destination: partner invite flow > ?next= > root.
   const afterAuthTarget = partnerInviteToken
     ? `/partner-invite/${partnerInviteToken}`
-    : '/'
+    : nextPath || '/'
+  // A fresh signup with somewhere to be (an invite to accept) goes there
+  // first, not to onboarding: accepting an org invite is what sets up an
+  // invited teammate, and onboarding would make them a company of their own.
+  const hasExplicitTarget = Boolean(partnerInviteToken || nextPath)
 
   if (loading) return null
   if (session) {
-    const dest = justSignedUp && !partnerInviteToken ? '/onboarding' : afterAuthTarget
+    const dest = justSignedUp && !hasExplicitTarget ? '/onboarding' : afterAuthTarget
     return <Navigate to={dest} replace />
   }
 
@@ -88,14 +108,17 @@ export default function Login() {
         // re-render this component with a live session before this
         // handler resumes after the await.
         setJustSignedUp(true)
-        const { data, error } = await signUp(email, password)
+        // The confirmation link (when email confirmation is on) lands
+        // back on the invite instead of the home page.
+        const { data, error } = await signUp(email, password, hasExplicitTarget ? afterAuthTarget : undefined)
         if (error) throw error
         if (!data.session) {
-          // Email-confirmation flow, no session yet, no redirect.
+          // Email-confirmation flow, no session yet, no redirect. The
+          // ?next= stays in the URL for the sign in that follows.
           setJustSignedUp(false)
           setNotice('Check your email to confirm, then sign in.')
           setMode('signin')
-        } else if (partnerInviteToken) {
+        } else if (hasExplicitTarget) {
           navigate(afterAuthTarget, { replace: true })
         } else {
           navigate('/onboarding', { replace: true })
@@ -275,8 +298,12 @@ export default function Login() {
               {error}
             </p>
           )}
+          {/* Screen readers announce the notice (reset link sent, confirm
+              your email) from this region. It stays mounted, because a
+              live region added together with its text is often skipped. */}
+          <p role="status" style={SR_ONLY}>{notice}</p>
           {notice && (
-            <p style={{ margin: 0, fontSize: 12, color: 'var(--v3-success-bright)', fontFamily: 'var(--font-body)' }}>
+            <p aria-hidden="true" style={{ margin: 0, fontSize: 12, color: 'var(--v3-success-bright)', fontFamily: 'var(--font-body)' }}>
               {notice}
             </p>
           )}
