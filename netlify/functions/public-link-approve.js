@@ -28,6 +28,9 @@
 import { createClient } from '@supabase/supabase-js'
 import { clientIp as rateLimitIp, hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
 import { sendPushToUser } from './lib/push.js'
+import { linkScope } from './lib/linkScope.js'
+import { brandingUserIdFor } from './lib/orgAccess.js'
+import { proposalNumber } from './lib/docNumbers.js'
 
 const CLOSED_STAGES = new Set(['lost', 'closed'])
 
@@ -52,10 +55,6 @@ function moneyFmt(n) {
   })
 }
 
-function quoteNumberFor(id) {
-  if (!id) return null
-  return `Q-${String(id).slice(0, 8).toUpperCase()}`
-}
 
 export default async function handler(req) {
   if (req.method !== 'POST') {
@@ -112,7 +111,7 @@ export default async function handler(req) {
     .from('fh_contacts')
     .select('*')
     .eq('id', link.contact_id)
-    .eq('user_id', link.user_id)
+    .match(linkScope(link))
     .maybeSingle()
   if (!contact) return json({ error: 'gone' }, 404)
   if ((contact.proposal_status || 'draft').toLowerCase() === 'approved') {
@@ -140,6 +139,9 @@ export default async function handler(req) {
 
   // 2. Snapshot the live items + the profile branding so the approved
   //    version is independent of future edits.
+  // Branding comes from the company owner's profile, the same profile the
+  // customer page renders, so the snapshot matches what the customer saw.
+  const brandUserId = await brandingUserIdFor(supabase, link)
   const [{ data: items }, { data: profile }] = await Promise.all([
     supabase
       .from('fh_quote_items')
@@ -149,7 +151,7 @@ export default async function handler(req) {
     supabase
       .from('profiles')
       .select('*')
-      .eq('user_id', link.user_id)
+      .eq('user_id', brandUserId)
       .maybeSingle()
   ])
   const itemRows = items || []
@@ -199,7 +201,9 @@ export default async function handler(req) {
   })
 
   const snapshot = {
-    quote_number: quoteNumberFor(contact.id),
+    // The number printed on the proposal (src/components/documents/numbers.ts),
+    // not a separate Q-XXXXXXXX code the customer never saw.
+    quote_number: proposalNumber(company.name, contact.id, contact.quote_sent_at || contact.created_at),
     snapshot_taken_at: new Date().toISOString(),
     company,
     contact: {

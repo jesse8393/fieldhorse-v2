@@ -25,6 +25,8 @@ import { createClient } from '@supabase/supabase-js'
 import { createHash } from 'node:crypto'
 import { sendPushToUser } from './lib/push.js'
 import { clientIp, hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
+import { linkScope } from './lib/linkScope.js'
+import { brandingUserIdFor } from './lib/orgAccess.js'
 
 function trimHeader(value, max = 500) {
   const text = String(value || '').trim()
@@ -140,7 +142,9 @@ export default async function handler(req) {
     return handleStatement(supabase, req, link)
   }
 
-  // 2. Load the contact + related data in parallel
+  // 2. Load the contact + related data in parallel. Branding comes from the
+  // company owner's profile so every teammate's links look the same.
+  const brandUserId = await brandingUserIdFor(supabase, link)
   const [
     { data: contact },
     { data: profile },
@@ -151,8 +155,8 @@ export default async function handler(req) {
     { data: invoices },
     { data: photoRows }
   ] = await Promise.all([
-    supabase.from('fh_contacts').select('*').eq('id', link.contact_id).eq('user_id', link.user_id).maybeSingle(),
-    supabase.from('profiles').select('*').eq('user_id', link.user_id).maybeSingle(),
+    supabase.from('fh_contacts').select('*').eq('id', link.contact_id).match(linkScope(link)).maybeSingle(),
+    supabase.from('profiles').select('*').eq('user_id', brandUserId).maybeSingle(),
     supabase.from('fh_quote_items').select('*').eq('contact_id', link.contact_id).order('sort_order', { ascending: true }),
     // Projected to what the customer documents render (PaymentHistoryBlock).
     supabase
@@ -337,18 +341,19 @@ function buildCompany(profile) {
 }
 
 // Statement path — client-scoped rollup of every open job. Loads the
-// client, all their jobs (scoped by user_id for tenant isolation),
+// client, all their jobs (scoped to the link's company),
 // and the payments + approved change orders across those jobs, then
 // returns the shape the public StatementView renders.
 async function handleStatement(supabase, req, link) {
+  const brandUserId = await brandingUserIdFor(supabase, link)
   const [{ data: client }, { data: profile }, { data: jobs }] = await Promise.all([
-    supabase.from('fh_clients').select('*').eq('id', link.client_id).eq('user_id', link.user_id).maybeSingle(),
-    supabase.from('profiles').select('*').eq('user_id', link.user_id).maybeSingle(),
+    supabase.from('fh_clients').select('*').eq('id', link.client_id).match(linkScope(link)).maybeSingle(),
+    supabase.from('profiles').select('*').eq('user_id', brandUserId).maybeSingle(),
     supabase
       .from('fh_contacts')
       .select('id, name, job_title, job_type, stage, amount, address, created_at')
       .eq('client_id', link.client_id)
-      .eq('user_id', link.user_id)
+      .match(linkScope(link))
       .order('created_at', { ascending: true })
   ])
 

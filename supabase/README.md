@@ -53,20 +53,22 @@ and `automation-worker`.
 Applied directly to production, written without any statement that removes
 data, and not recorded in `supabase_migrations.schema_migrations`:
 
-- 062 tenant boundary hardening
-- 063 storage access for teammates and bucket limits
-- 064 role and recipient boundaries (crew and foreman lose money tables,
+* 062 tenant boundary hardening
+* 063 storage access for teammates and bucket limits
+* 064 role and recipient boundaries (crew and foreman lose money tables,
   notifications are recipient only)
-- 065 sub portal binding, sub document access, workspace aware org stamping,
-  missing indexes
+* 065 sub portal binding, sub document access, workspace aware org stamping,
+  quote approval and customer link management for managers, missing indexes
+* 067 crew and foreman cannot change a job's stage, value, approval or
+  completion, or delete jobs
 
 055 (public rate limits) was applied with the migration tool and is recorded.
 
 Not applied yet:
 
-- 059a only matters for a fresh build (production already has the split
+* 059a only matters for a fresh build (production already has the split
   time punch policies).
-- 066 purges expired rate limit windows and old public link events every
+* 066 purges expired rate limit windows and old public link events every
   night. Apply it from the SQL editor.
 
 ## Bringing the repo back in sync

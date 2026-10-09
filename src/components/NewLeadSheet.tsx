@@ -9,6 +9,7 @@ import DocIntakeButton from './DocIntakeButton.tsx'
 import { supabase } from '../lib/supabase.ts'
 import { resilientInsert } from '../lib/outbox.ts'
 import { findOrCreateClient } from '../lib/clients.ts'
+import { lastKnownOrg } from '../lib/orgScope.ts'
 import { claudeMessage } from '../lib/anthropic.ts'
 import { parseLeadFromImage } from '../lib/docIntelligence.ts'
 import { toastSuccess } from '../lib/toast.ts'
@@ -402,13 +403,14 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
     // edit), mirrors the Universal Capture lead path in captureActions.
     let resolvedClientId: string | null = client?.id || null
     if (!resolvedClientId && (typeof navigator === 'undefined' || navigator.onLine !== false)) {
+      // Dedupe against the whole company's clients, not only this user's.
       resolvedClientId = await findOrCreateClient(userId, {
         name: form.name,
         phone: form.phone,
         email: form.email,
         address: form.address,
         company: form.company
-      })
+      }, lastKnownOrg(userId) ?? null)
     }
 
     const payload = {

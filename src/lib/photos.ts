@@ -4,36 +4,55 @@
 // Photos sit in the PRIVATE `job-photos` Supabase Storage bucket, so we
 // need signed URLs (1h TTL) to render them in <img>.
 //
-// Strategy for list views (Jobs, Home Live Feed): one query for all the
-// user's photos + ONE batch signed-URL call. No N+1.
+// Strategy for list views (Home cards): one query for the newest photo
+// of each job on screen + ONE batch signed-URL call. No N+1, and no scan
+// of the whole photo table.
 
 import { supabase } from './supabase.ts'
 
 const SIGN_TTL_SECONDS = 3600 // 1 hour, long enough for a session, short enough that leaked URLs expire
 
+type CoverRow = {
+  id: string
+  fh_job_files: { storage_path: string | null; uploaded_at: string | null }[] | null
+}
+
 /**
- * Fetch the latest cover photo per job for the given user, returning a map
- * keyed by contact (job) id → signed URL.
+ * Fetch the latest cover photo for each of the given jobs, returning a
+ * map keyed by contact (job) id → signed URL. Jobs without a photo are
+ * left out.
+ *
+ * Bounded by the ids the caller renders. It used to read every photo
+ * row the user had and reduce in JS, which PostgREST silently capped at
+ * max-rows (1000), so jobs whose newest photo was older than the 1000th
+ * lost their cover. The embedded read below returns at most one photo
+ * per job: PostgREST applies an embedded limit per parent row.
  */
-export async function fetchCoverPhotosByJob(userId: string | undefined): Promise<Record<string, string>> {
-  if (!userId) return {}
+export async function fetchCoverPhotosByJob(jobIds: readonly string[]): Promise<Record<string, string>> {
+  const ids = Array.from(new Set(jobIds.filter(Boolean)))
+  if (ids.length === 0) return {}
 
-  // Latest-first so the reduce naturally keeps the newest per job.
-  const { data: photos, error: qErr } = await supabase
-    .from('fh_job_files')
-    .select('job_id, storage_path, uploaded_at')
-    .eq('user_id', userId)
-    .eq('kind', 'photo')
-    .order('uploaded_at', { ascending: false })
+  const { data, error } = await supabase
+    .from('fh_contacts')
+    .select('id, fh_job_files(storage_path, uploaded_at)')
+    .in('id', ids)
+    .eq('fh_job_files.kind', 'photo')
+    .order('uploaded_at', { referencedTable: 'fh_job_files', ascending: false })
+    .limit(1, { referencedTable: 'fh_job_files' })
 
-  if (qErr || !photos || photos.length === 0) return {}
+  if (error || !data) return {}
 
-  // Reduce to latest path per job.
+  // Newest path per job. The embedded limit already leaves one row; the
+  // compare keeps this correct if a response ever carries more.
   const pathByJob = new Map<string, string>()
-  for (const p of photos) {
-    if (p.job_id && p.storage_path && !pathByJob.has(p.job_id)) {
-      pathByJob.set(p.job_id, p.storage_path)
+  for (const row of data as unknown as CoverRow[]) {
+    let newest: { path: string; at: string } | null = null
+    for (const f of row.fh_job_files ?? []) {
+      if (!f?.storage_path) continue
+      const at = f.uploaded_at || ''
+      if (!newest || at > newest.at) newest = { path: f.storage_path, at }
     }
+    if (row.id && newest) pathByJob.set(row.id, newest.path)
   }
 
   const uniquePaths = Array.from(new Set(pathByJob.values()))

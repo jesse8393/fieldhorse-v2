@@ -1,9 +1,10 @@
-import { useEffect } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useCallback, useEffect } from 'react'
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from './supabase.ts'
 import { ACTIVE_STAGES } from './stages.ts'
 import { fetchCoverPhotosByJob } from './photos.ts'
 import { fetchAllRows } from './queries.ts'
+import { useOrgScope } from './orgScope.ts'
 import type { Database } from './database.types.ts'
 
 // Local-calendar year month day (NOT UTC) so evening follow-ups don't read
@@ -174,6 +175,23 @@ export type HomeDashboardSource = {
 
 export const homeDashboardKey = (userId: string | undefined, orgId?: string | null) =>
   ['homeDashboard', userId, orgId ?? null] as const
+
+// Cover photos live in their own query keyed by the jobs on screen, so a
+// bundle refetch (realtime fires one after most writes) does not re-read
+// and re-sign every photo.
+export const homeCoversKey = (userId: string | undefined, jobIds: readonly string[]) =>
+  ['homeCovers', userId, [...jobIds]] as const
+
+/** The jobs whose rows show a thumbnail on Home, sorted for a stable key. */
+export function coverPhotoJobIds(
+  bundle: Pick<HomeDashboardBundle, 'nextActions' | 'todayOnSite' | 'topPipeline'>
+): string[] {
+  const ids = new Set<string>()
+  for (const action of bundle.nextActions) if (action.contactId) ids.add(action.contactId)
+  for (const row of bundle.todayOnSite) if (row.contactId) ids.add(row.contactId)
+  for (const deal of bundle.topPipeline) if (deal.id) ids.add(deal.id)
+  return Array.from(ids).sort()
+}
 
 function startOfWeek(now: Date) {
   const d = new Date(now)
@@ -592,6 +610,23 @@ function assertOk(label: string, result: { error: { message?: string } | null })
   }
 }
 
+// fetchAllRows (pages past PostgREST's 1000 row max-rows) with the same
+// error wording as assertOk.
+async function fetchAllLabelled<T>(label: string, build: Parameters<typeof fetchAllRows>[0]): Promise<T[]> {
+  try {
+    return await fetchAllRows<T>(build)
+  } catch (err) {
+    const message = (err as { message?: string } | null)?.message
+    throw new Error(`Home dashboard ${label} failed: ${message || 'Unknown Supabase error'}`)
+  }
+}
+
+const CONTACT_COLUMNS =
+  'id, name, amount, stage, updated_at, created_at, completed_at, follow_up_on, proposal_status, quote_change_request_note, quote_change_requested_at'
+
+// Cover photos are not part of this fetch (photoUrlByJob comes back
+// empty): useHomeDashboard loads them in their own query once the bundle
+// names the jobs that render a thumbnail.
 export async function fetchHomeDashboard(
   userId: string,
   now = new Date(),
@@ -615,7 +650,7 @@ export async function fetchHomeDashboard(
   // A week-scoped fetch here made every downstream consumer treat
   // "payments since Sunday" as "all payments ever", wrong paid state
   // on every job paid before this week.
-  const paymentsPromise = fetchAllRows<PaymentRow>((from, to) =>
+  const paymentsPromise = fetchAllLabelled<PaymentRow>('payments', (from, to) =>
     (orgId
       ? supabase.from('fh_payments').select('contact_id, amount, created_at, paid_on').eq('org_id', orgId)
       : supabase.from('fh_payments').select('contact_id, amount, created_at, paid_on').eq('user_id', userId)
@@ -624,11 +659,32 @@ export async function fetchHomeDashboard(
       .range(from, to)
   )
 
-  const approvedCoQuery = (orgId
-    ? supabase.from('fh_change_orders').select('contact_id, amount, status').eq('org_id', orgId)
-    : supabase.from('fh_change_orders').select('contact_id, amount, status').eq('user_id', userId)
+  // Every set that feeds money math or the action queue is paged the
+  // same way. Capped at 1000 unordered rows, the pipeline, stage rail,
+  // deals at risk and balanceFor() were computed from an arbitrary
+  // subset of a large book.
+  const contactsPromise = fetchAllLabelled<ContactRow>('contacts', (from, to) =>
+    // Scope contacts the same way as every sibling query (org, else user).
+    // Left unscoped this pulled the whole RLS-visible table to the phone AND
+    // mixed in partner-shared rows the other signals exclude, inflating the
+    // pipeline total and not scaling.
+    (orgId
+      ? supabase.from('fh_contacts').select(CONTACT_COLUMNS).eq('org_id', orgId)
+      : supabase.from('fh_contacts').select(CONTACT_COLUMNS).eq('user_id', userId)
+    )
+      .order('id', { ascending: true })
+      .range(from, to)
   )
-    .eq('status', 'approved')
+
+  const approvedCoPromise = fetchAllLabelled<ApprovedCoRow>('approved change orders', (from, to) =>
+    (orgId
+      ? supabase.from('fh_change_orders').select('contact_id, amount, status').eq('org_id', orgId)
+      : supabase.from('fh_change_orders').select('contact_id, amount, status').eq('user_id', userId)
+    )
+      .eq('status', 'approved')
+      .order('id', { ascending: true })
+      .range(from, to)
+  )
 
   const todayScheduleQuery = (orgId
     ? supabase.from('fh_schedule').select('id, contact_id, start_at, end_at, title, fh_contacts(name, stage)').eq('org_id', orgId)
@@ -639,91 +695,116 @@ export async function fetchHomeDashboard(
     .order('start_at', { ascending: true })
     .limit(6)
 
-  const proposalViewsQuery = (orgId
-    ? supabase.from('fh_public_links').select('contact_id, last_viewed_at').eq('org_id', orgId)
-    : supabase.from('fh_public_links').select('contact_id, last_viewed_at').eq('user_id', userId)
+  const proposalViewsPromise = fetchAllLabelled<PublicLinkRow>('proposal views', (from, to) =>
+    (orgId
+      ? supabase.from('fh_public_links').select('contact_id, last_viewed_at').eq('org_id', orgId)
+      : supabase.from('fh_public_links').select('contact_id, last_viewed_at').eq('user_id', userId)
+    )
+      .eq('kind', 'proposal')
+      .not('last_viewed_at', 'is', null)
+      .order('id', { ascending: true })
+      .range(from, to)
   )
-    .eq('kind', 'proposal')
-    .not('last_viewed_at', 'is', null)
 
-  const sentChangeOrdersQuery = (orgId
-    ? supabase.from('fh_change_orders').select('id, contact_id, sequence_number, title, amount, updated_at').eq('org_id', orgId)
-    : supabase.from('fh_change_orders').select('id, contact_id, sequence_number, title, amount, updated_at').eq('user_id', userId)
+  const sentChangeOrdersPromise = fetchAllLabelled<ChangeOrderRow>('sent change orders', (from, to) =>
+    (orgId
+      ? supabase.from('fh_change_orders').select('id, contact_id, sequence_number, title, amount, updated_at').eq('org_id', orgId)
+      : supabase.from('fh_change_orders').select('id, contact_id, sequence_number, title, amount, updated_at').eq('user_id', userId)
+    )
+      .eq('status', 'sent')
+      .order('id', { ascending: true })
+      .range(from, to)
   )
-    .eq('status', 'sent')
 
-  const openInvoicesQuery = (orgId
-    ? supabase.from('fh_invoices').select('id, contact_id, title, amount, due_at, status').eq('org_id', orgId)
-    : supabase.from('fh_invoices').select('id, contact_id, title, amount, due_at, status').eq('user_id', userId)
+  const openInvoicesPromise = fetchAllLabelled<InvoiceRow>('open invoices', (from, to) =>
+    (orgId
+      ? supabase.from('fh_invoices').select('id, contact_id, title, amount, due_at, status').eq('org_id', orgId)
+      : supabase.from('fh_invoices').select('id, contact_id, title, amount, due_at, status').eq('user_id', userId)
+    )
+      .in('status', ['sent', 'overdue'])
+      .order('id', { ascending: true })
+      .range(from, to)
   )
-    .in('status', ['sent', 'overdue'])
 
   const [
-    contactsRes,
+    contacts,
     overdueSchedRes,
     payments,
     todaySchedRes,
-    photoUrlByJob,
-    proposalViewsRes,
-    sentChangeOrdersRes,
-    openInvoicesRes,
-    approvedCoRes,
+    proposalViews,
+    sentChangeOrders,
+    openInvoices,
+    approvedChangeOrders,
   ] = await Promise.all([
-    // Scope contacts the same way as every sibling query (org, else user).
-    // Left unscoped this pulled the whole RLS-visible table to the phone AND
-    // mixed in partner-shared rows the other signals exclude, inflating the
-    // pipeline total and not scaling.
-    (orgId
-      ? supabase.from('fh_contacts').select('id, name, amount, stage, updated_at, created_at, completed_at, follow_up_on, proposal_status, quote_change_request_note, quote_change_requested_at').eq('org_id', orgId)
-      : supabase.from('fh_contacts').select('id, name, amount, stage, updated_at, created_at, completed_at, follow_up_on, proposal_status, quote_change_request_note, quote_change_requested_at').eq('user_id', userId)
-    ),
+    contactsPromise,
     overdueScheduleQuery,
     paymentsPromise,
     todayScheduleQuery,
-    fetchCoverPhotosByJob(userId).catch(() => ({} as Record<string, string>)),
-    proposalViewsQuery,
-    sentChangeOrdersQuery,
-    openInvoicesQuery,
-    approvedCoQuery,
+    proposalViewsPromise,
+    sentChangeOrdersPromise,
+    openInvoicesPromise,
+    approvedCoPromise,
   ])
 
-  assertOk('contacts', contactsRes)
   assertOk('overdue schedule', overdueSchedRes)
   assertOk('today schedule', todaySchedRes)
-  assertOk('proposal views', proposalViewsRes)
-  assertOk('sent change orders', sentChangeOrdersRes)
-  assertOk('open invoices', openInvoicesRes)
-  assertOk('approved change orders', approvedCoRes)
 
   return buildHomeDashboardBundle({
     now,
-    contacts: (contactsRes.data ?? []) as ContactRow[],
+    contacts,
     overdueSchedules: (overdueSchedRes.data ?? []) as Pick<ScheduleRow, 'contact_id'>[],
     payments,
     todaySchedules: (todaySchedRes.data ?? []) as unknown as ScheduleWithContact[],
-    photoUrlByJob: photoUrlByJob || {},
-    proposalViews: (proposalViewsRes.data ?? []) as PublicLinkRow[],
-    sentChangeOrders: (sentChangeOrdersRes.data ?? []) as ChangeOrderRow[],
-    openInvoices: (openInvoicesRes.data ?? []) as InvoiceRow[],
-    approvedChangeOrders: (approvedCoRes.data ?? []) as ApprovedCoRow[],
+    photoUrlByJob: {},
+    proposalViews,
+    sentChangeOrders,
+    openInvoices,
+    approvedChangeOrders,
   })
 }
 
-export function useHomeDashboard(userId: string | undefined, orgId?: string | null) {
-  return useQuery({
+// The second argument is accepted for compatibility and ignored: the
+// tenant scope comes from MembershipContext via useOrgScope. Home passes
+// membership.orgId, which reads null while membership loads, and that
+// used to fire a user scoped bundle first and an org scoped one after.
+export function useHomeDashboard(userId: string | undefined, _orgId?: string | null) {
+  const orgId = useOrgScope(userId)
+  const bundleQuery = {
     queryKey: homeDashboardKey(userId, orgId),
     queryFn: () => fetchHomeDashboard(userId as string, new Date(), orgId),
-    enabled: !!userId,
+    enabled: !!userId && orgId !== undefined,
     staleTime: 30_000,
     refetchOnWindowFocus: true,
-  })
+  }
+  // Same cached bundle, selecting only the jobs that show a thumbnail.
+  const coverIds = useQuery({ ...bundleQuery, select: coverPhotoJobIds }).data
+  const covers = useQuery({
+    queryKey: homeCoversKey(userId, coverIds ?? []),
+    queryFn: () => fetchCoverPhotosByJob(coverIds ?? []),
+    enabled: !!userId && !!coverIds && coverIds.length > 0,
+    // Signed URLs live an hour; refresh well before they lapse.
+    staleTime: 30 * 60_000,
+    // Keep the current thumbnails while a changed job list loads.
+    placeholderData: keepPreviousData,
+  }).data
+  const withCovers = useCallback(
+    (bundle: HomeDashboardBundle): HomeDashboardBundle =>
+      covers ? { ...bundle, photoUrlByJob: covers } : bundle,
+    [covers]
+  )
+  return useQuery({ ...bundleQuery, select: withCovers })
 }
 
-export function useHomeDashboardRealtime(userId: string | undefined, orgId?: string | null) {
+// The second argument is accepted for compatibility and ignored, as in
+// useHomeDashboard.
+export function useHomeDashboardRealtime(userId: string | undefined, _orgId?: string | null) {
   const queryClient = useQueryClient()
+  const orgId = useOrgScope(userId)
 
   useEffect(() => {
-    if (!userId) return
+    // Wait for the tenant scope so the channel is not opened user scoped,
+    // then torn down and reopened org scoped once membership resolves.
+    if (!userId || orgId === undefined) return
 
     // Coalesce bursts. The dashboard listens to 7 tables; a single busy
     // moment (log a payment → contact, payment, invoice, schedule all fire)
@@ -736,6 +817,14 @@ export function useHomeDashboardRealtime(userId: string | undefined, orgId?: str
         queryClient.invalidateQueries({ queryKey: homeDashboardKey(userId, orgId) })
       }, 1500)
     }
+    // Photo uploads only change the covers, not the bundle.
+    let coverDebounce: ReturnType<typeof setTimeout> | null = null
+    const invalidateCovers = () => {
+      if (coverDebounce) clearTimeout(coverDebounce)
+      coverDebounce = setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['homeCovers', userId] })
+      }, 1500)
+    }
 
     const scopeFilter = orgId ? `org_id=eq.${orgId}` : `user_id=eq.${userId}`
     const channel = supabase
@@ -746,11 +835,12 @@ export function useHomeDashboardRealtime(userId: string | undefined, orgId?: str
       .on('postgres_changes', { event: '*', schema: 'public', table: 'fh_public_links', filter: scopeFilter }, invalidate)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'fh_change_orders', filter: scopeFilter }, invalidate)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'fh_invoices', filter: scopeFilter }, invalidate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'fh_job_files', filter: scopeFilter }, invalidate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fh_job_files', filter: scopeFilter }, invalidateCovers)
       .subscribe()
 
     return () => {
       if (debounce) clearTimeout(debounce)
+      if (coverDebounce) clearTimeout(coverDebounce)
       supabase.removeChannel(channel)
     }
   }, [orgId, queryClient, userId])

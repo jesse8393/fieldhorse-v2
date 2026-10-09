@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildHomeDashboardBundle, type HomeDashboardSource } from './homeDashboard.ts'
+import { buildHomeDashboardBundle, coverPhotoJobIds, homeCoversKey, type HomeDashboardSource } from './homeDashboard.ts'
 
 function baseSource(overrides: Partial<HomeDashboardSource> = {}): HomeDashboardSource {
   return {
@@ -255,5 +255,29 @@ describe('buildHomeDashboardBundle', () => {
     }))
     const health = bundle.jobHealth.find((row) => row.id === 'job-1')
     expect(health?.billing).toBe('Outstanding') // the $2K CO is still owed
+  })
+})
+
+describe('coverPhotoJobIds', () => {
+  it('lists each job that renders a thumbnail once, sorted', () => {
+    const ids = coverPhotoJobIds({
+      nextActions: [
+        { contactId: 'job-b' },
+        { contactId: 'job-a' },
+      ] as never,
+      todayOnSite: [
+        { contactId: 'job-c' },
+        { contactId: null },
+      ] as never,
+      topPipeline: [
+        { id: 'job-a' },
+        { id: 'job-d' },
+      ] as never,
+    })
+    expect(ids).toEqual(['job-a', 'job-b', 'job-c', 'job-d'])
+  })
+
+  it('keys covers by user and job list', () => {
+    expect(homeCoversKey('user-1', ['job-a', 'job-b'])).toEqual(['homeCovers', 'user-1', ['job-a', 'job-b']])
   })
 })

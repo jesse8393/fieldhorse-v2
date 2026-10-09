@@ -18,6 +18,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { clientIp, hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
 import { sendPushToUser } from './lib/push.js'
+import { linkScope } from './lib/linkScope.js'
 
 function corsHeaders() {
   return {
@@ -72,7 +73,7 @@ export default async function handler(req) {
   // 1. Resolve + validate the link.
   const { data: link } = await supabase
     .from('fh_public_links')
-    .select('id, user_id, contact_id, change_order_id, kind, revoked_at, expires_at')
+    .select('id, user_id, org_id, contact_id, change_order_id, kind, revoked_at, expires_at')
     .eq('token', token)
     .maybeSingle()
   if (!link || link.kind !== 'change_order' || !link.change_order_id) {
@@ -88,7 +89,7 @@ export default async function handler(req) {
     .from('fh_change_orders')
     .select('id, contact_id, user_id, sequence_number, title, amount, status')
     .eq('id', link.change_order_id)
-    .eq('user_id', link.user_id)
+    .match(linkScope(link))
     .maybeSingle()
   if (!co) return json({ error: 'gone' }, 404)
   if (co.status === 'approved') return json({ error: 'already_approved' }, 409)
@@ -109,7 +110,7 @@ export default async function handler(req) {
       approved_at: approvedAt
     })
     .eq('id', co.id)
-    .eq('user_id', link.user_id)
+    .match(linkScope(link))
     .neq('status', 'approved')
     .select('id')
   if (upErr) {

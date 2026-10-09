@@ -8,6 +8,7 @@
 import { supabase } from './supabase.ts'
 import { resilientInsert } from './outbox.ts'
 import { findOrCreateClient } from './clients.ts'
+import { lastKnownOrg } from './orgScope.ts'
 import { logPayment, recalcCost } from './stages.ts'
 import type { CaptureIntent } from './captureIntelligence.ts'
 
@@ -127,12 +128,14 @@ export async function commitCapture({ intent, userId, contacts }: {
       // lookups need the network); the lead still saves via the outbox.
       let clientId: string | null = null
       if (typeof navigator === 'undefined' || navigator.onLine !== false) {
+        // Dedupe against the whole company's clients, not only the ones
+        // this user created.
         clientId = await findOrCreateClient(userId, {
           name,
           phone: intent.phone,
           email: intent.email,
           address: intent.address
-        })
+        }, lastKnownOrg(userId) ?? null)
       }
       // resilientInsert mints the id client-side, so the success link
       // works even when the row is still queued for sync.
