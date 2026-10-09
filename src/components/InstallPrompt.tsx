@@ -122,8 +122,10 @@ export default function InstallPrompt() {
   const isIosMode = iosHint && !deferredPrompt
 
   return (
+    // A passive, unsolicited banner, so a labelled region rather than a
+    // dialog: it must not claim or trap focus while someone is working.
     <div
-      role="dialog"
+      role="region"
       aria-label="Install Fieldhorse"
       style={{
         position: 'fixed',
@@ -132,7 +134,9 @@ export default function InstallPrompt() {
         // Sit above the mobile BottomNav (it ranges ~64–80px tall) and
         // safe-area inset on notched devices.
         bottom: 'calc(var(--fh-mobile-dock-height) + 16px)',
-        zIndex: 9000,
+        // Above the nav, below every sheet and dialog (tokens.css), so an
+        // open sheet's commit button is never covered.
+        zIndex: 'var(--z-banner)',
         display: 'flex',
         alignItems: 'center',
         gap: 12,
@@ -143,7 +147,9 @@ export default function InstallPrompt() {
         border: '1px solid rgba(201, 150, 58, 0.35)',
         borderRadius: 10,
         boxShadow: '0 20px 50px rgba(20, 20, 20, 0.45)',
-        color: 'var(--ink-strong, #F2EDE4)',
+        // The banner stays dark in both themes, so its ink is pinned to
+        // linen; the theme's ink turns onyx in daylight.
+        color: 'var(--linen)',
         maxWidth: 520,
         margin: '0 auto',
       }}
@@ -201,7 +207,7 @@ export default function InstallPrompt() {
         style={{
           padding: 8,
           background: 'transparent',
-          color: 'var(--ink-strong, #F2EDE4)',
+          color: 'var(--linen)',
           opacity: 0.5,
           border: 'none',
           borderRadius: 10,

@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react'
+import { Children, cloneElement, isValidElement, useEffect, useId, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence, useDragControls } from 'framer-motion'
 import { lockDocumentScroll } from '../lib/documentScrollLock.ts'
+import { useModalFocus } from '../lib/useModalFocus.ts'
 
 const EASE = [0.16, 1, 0.3, 1]
 const DUR = 0.5
@@ -48,6 +49,10 @@ export default function ActionSheet({
   const sheetRef = useRef<any>(null)
   const bodyRef = useRef<any>(null)
   const dragControls = useDragControls()
+
+  // role="dialog" aria-modal: move focus into the sheet on open, keep Tab
+  // inside it, and hand focus back to the trigger on close.
+  useModalFocus(sheetRef, !!open)
 
   useEffect(() => {
     if (!open) return
@@ -239,13 +244,28 @@ export default function ActionSheet({
 export function SheetField({ label, code, children }: any) {
   // Wrapper is a <div>, not a <label>. iOS Safari redirects taps inside a
   // <label> to the first form control, which silently swallows clicks on
-  // nested buttons (e.g. ClientPicker rows in NewLeadSheet).
+  // nested buttons (e.g. ClientPicker rows in NewLeadSheet). The label is
+  // tied to the control with aria-labelledby instead, so screen readers
+  // announce "Vendor, text field" rather than a bare "text field". A lone
+  // child element gets the reference; anything else is wrapped in a
+  // labelled group.
+  const labelId = useId()
+  const only = Children.count(children) === 1 && isValidElement(children) ? (children as any) : null
+  const labelled = only && !only.props['aria-label']
+    ? cloneElement(only, {
+        'aria-labelledby': [labelId, only.props['aria-labelledby']].filter(Boolean).join(' ')
+      })
+    : null
   return (
-    <div className="fh-asheet-field">
-      <span className="fh-asheet-field__k">
+    <div
+      className="fh-asheet-field"
+      role={labelled ? undefined : 'group'}
+      aria-labelledby={labelled ? undefined : labelId}
+    >
+      <span className="fh-asheet-field__k" id={labelId}>
         {label}
       </span>
-      {children}
+      {labelled ?? children}
     </div>
   )
 }
