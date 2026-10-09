@@ -36,6 +36,8 @@ function sameDay(a: any, b: any) { return a.toDateString() === b.toDateString() 
 function fmtDate(d: any) { return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) }
 function fmtTime(iso: any) { return iso ? new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '' }
 
+const WEATHERBAR_TONE: Record<string, string> = { go: 'good', warn: 'ok', stop: 'poor' }
+
 export default function Schedule() {
   const { user } = useAuth()
   const { profile } = useProfile()
@@ -104,6 +106,7 @@ export default function Schedule() {
   const loadUpcoming = invalidateSchedule
 
   const [weather, setWeather] = useState<any>(null)
+  const [weatherFailed, setWeatherFailed] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
   const [editEvent, setEditEvent] = useState<any>(null)
   // Destructive-confirm sheet for delete event. pendingDeleteEvt is the
@@ -203,7 +206,10 @@ export default function Schedule() {
 
   useEffect(() => {
     if (!hasCoords) return
-    getWeather(profile.location_lat as any, profile.location_lon as any).then(setWeather).catch(() => {})
+    setWeatherFailed(false)
+    getWeather(profile.location_lat as any, profile.location_lon as any)
+      .then(setWeather)
+      .catch(() => setWeatherFailed(true))
   }, [hasCoords, profile?.location_lat, profile?.location_lon])
 
   function shift(n: any) {
@@ -340,11 +346,13 @@ export default function Schedule() {
         )}
       </motion.div>
 
-      {/* WEATHER STRIP */}
+      {/* WEATHER STRIP. The stylesheet names its tones good, ok and poor;
+          the work window reports go, warn and stop, so map them, and stay
+          neutral until a forecast has actually loaded. */}
       {hasCoords && (
-        <motion.div variants={item} className={`fh-weatherbar fh-weatherbar--${windowRead.status}`} style={{ margin: '10px 20px 0' }}>
-          <span className="fh-weatherbar__dot" />
-          <span className="fh-weatherbar__label">{windowRead.label}</span>
+        <motion.div variants={item} className={`fh-weatherbar${weather?.current ? ` fh-weatherbar--${WEATHERBAR_TONE[windowRead.status] || 'good'}` : ''}`} style={{ margin: '10px 20px 0' }}>
+          <span className="fh-weatherbar__dot" aria-hidden="true" />
+          <span className="fh-weatherbar__label">{weather?.current ? windowRead.label : weatherFailed ? 'Forecast unavailable' : 'Loading forecast'}</span>
           {windowRead.reasons.length > 0 && <span className="fh-weatherbar__reason">{windowRead.reasons.join(' · ')}</span>}
         </motion.div>
       )}
