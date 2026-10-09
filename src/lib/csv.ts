@@ -3,10 +3,18 @@
 // duplicated verbatim, an escaping fix must land once, not twice).
 
 /** RFC-4180-style field escaping: quote when the value contains a
- *  delimiter, quote, or newline; double any embedded quotes. */
+ *  delimiter, quote, or line break; double any embedded quotes.
+ *
+ *  Formula injection guard: names and notes can come from the public
+ *  lead webhook or an import, and a cell such as =HYPERLINK(...) runs
+ *  as a formula when the export is opened in Excel or Sheets. Text that
+ *  starts with = + - @ or a tab or line break gets a leading apostrophe
+ *  so it opens as plain text. Plain numbers such as -150.00 are left
+ *  alone so money columns stay numeric. */
 export function escapeCsvField(v: unknown): string {
-  const s = String(v ?? '')
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  let s = String(v ?? '')
+  if (/^[=+\-@\t\r\n]/.test(s) && !/^[+-]?(\d+\.?\d*|\.\d+)$/.test(s)) s = `'${s}`
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
 
 /** Assemble a CSV string from a header row + data rows. Cells are

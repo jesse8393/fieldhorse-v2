@@ -11,7 +11,8 @@ import { supabase } from '../lib/supabase.ts'
 import { useNotesBundle, notesKey } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { claudeMessage } from '../lib/anthropic.ts'
-import { toastSuccess, toastUndo, toastError } from '../lib/toast.ts'
+import { toastSuccess, toastUndo, toastError, toastInfo } from '../lib/toast.ts'
+import { speechErrorFeedback } from '../lib/speech.ts'
 import { hapticTap, hapticSuccess } from '../lib/haptics.ts'
 import { canHover } from '../lib/hover.ts'
 import { resilientInsert } from '../lib/outbox.ts'
@@ -75,25 +76,57 @@ export default function Notes() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Stop a recognition session for good: detach its handlers so a late
+  // result or end event can't touch state, then abort.
+  function abortVoice() {
+    const rec = recognitionRef.current
+    recognitionRef.current = null
+    if (!rec) return
+    rec.onresult = null
+    rec.onend = null
+    rec.onerror = null
+    try { rec.abort() } catch {}
+  }
+
+  // Release the mic when the screen unmounts; a continuous session
+  // otherwise keeps listening after navigating away.
+  useEffect(() => abortVoice, [])
+
   function startVoice() {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     if (!SR) {
       setVoiceState('error')
+      toastInfo('Voice not supported here', 'Type the note instead.')
       return
     }
+    abortVoice()
     const rec = new SR()
     rec.continuous = true
     rec.interimResults = true
     rec.lang = 'en-US'
+    // With interimResults the same phrase arrives many times as it grows,
+    // so rebuild the dictated text from the draft as it was when the mic
+    // opened instead of appending every partial hypothesis.
+    const base = draft.trim() ? draft.trimEnd() + ' ' : ''
+    let final = ''
     rec.onresult = (e: any) => {
-      let chunk = ''
+      let interim = ''
       for (let i = e.resultIndex; i < e.results.length; i++) {
-        chunk += e.results[i][0].transcript
+        const t = e.results[i][0].transcript
+        if (e.results[i].isFinal) final += t
+        else interim += t
       }
-      setDraft((d) => (d ? d + ' ' : '') + chunk)
+      setDraft(base + (final + interim).trim())
     }
-    rec.onend = () => setVoiceState('idle')
-    rec.onerror = () => setVoiceState('error')
+    rec.onend = () => {
+      if (recognitionRef.current === rec) recognitionRef.current = null
+      setVoiceState('idle')
+    }
+    rec.onerror = (e: any) => {
+      setVoiceState('error')
+      const fb = speechErrorFeedback(e?.error)
+      if (fb) (fb.tone === 'info' ? toastInfo : toastError)(fb.title, fb.description)
+    }
     rec.start()
     recognitionRef.current = rec
     setVoiceState('listening')
@@ -148,15 +181,30 @@ export default function Notes() {
     // resilientInsert mints the id client-side, so the optimistic row
     // below is the same row that lands in the DB (online or queued).
     const { queued, error, id } = await resilientInsert('fh_notes', payload)
-    setSaving(false)
     if (error) {
+      setSaving(false)
       // resilientInsert only surfaces a non-network error here (dead zones
       // queue instead), a real failure the user must see, not a silent
       // no-op that looks like the note was saved.
       toastError("Couldn't save note", error.message || 'Try again')
       return
     }
-    const localRow = { ...payload, id, created_at: new Date().toISOString(), done: false }
+    // Keep the AI parse with the note so the AI badge, risk spine and
+    // action items survive a reload. It is written as a separate update
+    // because fh_notes.parsed comes from optional migration 003: where
+    // the column is missing the update fails and the note still stands,
+    // just without the parse. Queued (offline) notes skip it.
+    let savedParsed: any = null
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && !queued) {
+      const { data: stored, error: parsedErr } = await (supabase.from('fh_notes') as any)
+        .update({ parsed })
+        .eq('id', id)
+        .select('id')
+      if (parsedErr) console.warn('[notes] AI parse not stored with the note', parsedErr)
+      else if (stored?.length) savedParsed = parsed
+    }
+    setSaving(false)
+    const localRow = { ...payload, id, created_at: new Date().toISOString(), done: false, ...(savedParsed ? { parsed: savedParsed } : {}) }
     setDraft('')
     setParsed(null)
     setContactId('')

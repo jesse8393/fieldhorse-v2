@@ -18,7 +18,7 @@ const SnowForecast = lazy(() => import('../components/desktop/SnowForecastBuild.
 const TONE: Record<string, any> = {
   go:   { fg: '#2D7A4F', bg: 'rgba(45,122,79,0.16)',  border: 'rgba(45, 122, 79,0.35)', label: 'Clear to work' },
   warn: { fg: '#C9963A', bg: 'rgba(201,150,58,0.14)', border: 'rgba(201,150,58,0.35)', label: 'Tight window' },
-  stop: { fg: '#C9963A', bg: 'rgba(192,57,43,0.15)',  border: 'rgba(192,57,43,0.35)',  label: 'Stand down' }
+  stop: { fg: '#C0392B', bg: 'rgba(192,57,43,0.15)',  border: 'rgba(192,57,43,0.35)',  label: 'Stand down' }
 }
 
 function statusTone(status: any) { return TONE[status] || TONE.go }
@@ -108,8 +108,10 @@ useEffect(() => {
     () => workWindow(weather?.current, services),
     [weather, services]
   )
+  // Anchor "Next 24 hours" on the forecast's own clock (current.time is
+  // local to the forecast spot) so it starts at the hour in progress.
   const strip = useMemo(
-    () => hourlyStrip(weather?.hourly, services, 24),
+    () => hourlyStrip(weather?.hourly, services, 24, weather?.current?.time),
     [weather, services]
   )
   const daily = useMemo(() => {

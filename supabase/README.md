@@ -61,6 +61,7 @@ data, and not recorded in `supabase_migrations.schema_migrations`:
   quote approval and customer link management for managers, missing indexes
 * 067 crew and foreman cannot change a job's stage, value, approval or
   completion, or delete jobs
+* 068 adds fh_notes.parsed, which the Notes screen writes
 
 055 (public rate limits) was applied with the migration tool and is recorded.
 

@@ -131,15 +131,15 @@ export function tradeStatus(trade: string, snapshot: WeatherSnapshot | null | un
   return { status, reasons }
 }
 
-// Aggregate across all selected trades. Worst status wins.
+// Aggregate across all selected trades. Worst status wins. With no trades
+// picked, read the general contractor rules (the same fallback the
+// Forecast trade list uses) instead of calling every hour clear.
 export function workWindow(snapshot: WeatherSnapshot | null | undefined, services: string[] = []): { status: 'go' | 'warn' | 'stop'; label: string; reasons: string[] } {
   if (!snapshot) return { status: 'go', label: 'Awaiting forecast', reasons: [] }
-  if (!services.length) {
-    return { status: 'go', label: 'Clear to work', reasons: [] }
-  }
+  const trades = services.length ? services : ['gc']
   let worst: 'go' | 'warn' | 'stop' = 'go'
   const allReasons = new Set<string>()
-  for (const s of services) {
+  for (const s of trades) {
     const { status, reasons } = tradeStatus(s, snapshot)
     reasons.forEach((r) => allReasons.add(r))
     if (status === 'stop') worst = 'stop'
@@ -152,11 +152,29 @@ export function workWindow(snapshot: WeatherSnapshot | null | undefined, service
   return { status: worst, label, reasons: [...allReasons] }
 }
 
-// Hourly go/warn/stop dots for the next N hours across selected trades.
-export function hourlyStrip(hourly: any, services: string[] = [], hours = 24) {
+// Index of the hourly slot that holds `now`, or -1 when every slot is
+// already over. Open-Meteo's hourly arrays start at local midnight today,
+// so reading from index 0 shows hours that are gone. `now` is either the
+// forecast's own current.time ("2026-10-09T16:15", local to the forecast
+// spot, compared by hour as text) or epoch ms.
+function currentHourIndex(times: string[], now: string | number): number {
+  if (typeof now === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}/.test(now)) {
+    const hour = now.slice(0, 13)
+    return times.findIndex((t) => String(t).slice(0, 13) >= hour)
+  }
+  const ms = typeof now === 'number' && Number.isFinite(now) ? now : Date.now()
+  return times.findIndex((t) => new Date(t).getTime() + 3_600_000 > ms)
+}
+
+// Hourly go/warn/stop dots for the next N hours across selected trades,
+// starting with the hour in progress.
+export function hourlyStrip(hourly: any, services: string[] = [], hours = 24, now: string | number = Date.now()) {
   if (!hourly?.time) return []
+  const start = currentHourIndex(hourly.time, now)
+  if (start < 0) return []
+  const end = Math.min(start + hours, hourly.time.length)
   const out: { time: string; status: string; temp: number | undefined; rain: number }[] = []
-  for (let i = 0; i < Math.min(hours, hourly.time.length); i++) {
+  for (let i = start; i < end; i++) {
     const snap = {
       temperature_2m: hourly.temperature_2m?.[i],
       precipitation: hourly.precipitation?.[i],

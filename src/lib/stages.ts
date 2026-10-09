@@ -322,10 +322,20 @@ export async function recalcCost(contactId: string | undefined, userId: string |
   // and then no-op'd the write behind a user_id filter.
   const { data: contactRow } = await supabase
     .from('fh_contacts')
-    .select('id, user_id')
+    .select('id, user_id, org_id')
     .eq('id', contactId)
     .maybeSingle()
   const ownerId = contactRow?.user_id || userId
+  // Crew and foreman can read only their own time punches, so a recalc
+  // they trigger (clocking out, logging an expense) would write a cost
+  // missing everyone else's labor. Leave the cached cost alone for them;
+  // the next recalc by an owner, admin or manager (timesheet approval,
+  // expense or sub edits) brings it up to date.
+  if (contactRow?.org_id) {
+    // fh_money_visible is newer than the generated types (database.types.ts).
+    const { data: moneyVisible, error: visErr } = await (supabase.rpc as any)('fh_money_visible', { p_org_id: contactRow.org_id })
+    if (!visErr && moneyVisible === false) return null
+  }
   // No user_id filter on the sums: the job screen shows ALL fh_subs /
   // fh_expenses rows on the contact (org RLS), so the cached cost must
   // count them all too, filtering to the caller's own rows dropped

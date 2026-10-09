@@ -21,6 +21,7 @@ import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { canHover } from '../lib/hover.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
+import { startOfWeek } from '../lib/scheduleDates.ts'
 const SnowSchedule = lazy(() => import('../components/desktop/SnowScheduleBuild.tsx'))
 
 const VIEWS = [
@@ -64,13 +65,17 @@ export default function Schedule() {
     try { window.localStorage.setItem('fh:schedule:view', view) } catch {}
   }, [view])
   const [cursor, setCursor] = useState(initialCursor)
+  const isDesktop = useIsDesktop()
 
   // Range bounds for the current day/week/month grid. Only depends on
   // view + cursor; feeds the scheduled-events query below.
   const range = useMemo(() => {
     if (view === 'day') return { start: cursor, end: addDays(cursor, 1) }
     if (view === 'week') {
-      const s = addDays(cursor, -cursor.getDay())
+      // Fetch the same seven days the visible grid draws. The mobile
+      // WeekView and dispatch strip start the week on Monday; the desktop
+      // planner (SnowScheduleBuild) starts it on Sunday.
+      const s = startOfWeek(cursor, isDesktop ? 0 : 1)
       return { start: s, end: addDays(s, 7) }
     }
     const monthStart = new Date(cursor.getFullYear(), cursor.getMonth(), 1)
@@ -78,7 +83,7 @@ export default function Schedule() {
     const gridStart = addDays(monthStart, -monthStart.getDay())
     const gridEnd = addDays(gridStart, 42)
     return { start: gridStart, end: gridEnd, monthStart, monthEnd }
-  }, [view, cursor])
+  }, [view, cursor, isDesktop])
 
   // TanStack Query replaces the manual events/upcoming/loading useState
   // + load()/loadUpcoming() callbacks. keepPreviousData inside the hook
@@ -138,15 +143,19 @@ export default function Schedule() {
     // Recurring series: delete every occurrence sharing the series id
     // (stored in `recurring`) so we don't orphan the other rows, and
     // restore the whole series on Undo.
+    // No user_id filter: the schedule is company wide (RLS scopes the
+    // org), so a teammate's event must delete too. .select('id') turns a
+    // zero row delete into a visible failure instead of a false success.
     const seriesId = (snapshot as any)?.recurring
     if (seriesId) {
       const { data: seriesRows } = await supabase
-        .from('fh_schedule').select('*').eq('user_id', user!.id).eq('recurring', seriesId)
-      const { error: serr } = await supabase
-        .from('fh_schedule').delete().eq('user_id', user!.id).eq('recurring', seriesId)
+        .from('fh_schedule').select('*').eq('recurring', seriesId)
+      const { data: removed, error: serr } = await supabase
+        .from('fh_schedule').delete().eq('recurring', seriesId).select('id')
       if (serr) { toastError("Couldn't delete", serr.message); return }
-      for (const r of (seriesRows || [])) dropScheduleEvent((r as any).id)
-      const n = (seriesRows || []).length || 1
+      if (!removed?.length) { toastError("Couldn't delete", 'This series was not removed. Refresh and try again.'); return }
+      for (const r of removed) dropScheduleEvent((r as any).id)
+      const n = removed.length
       toastUndo(`Series deleted · ${n} event${n === 1 ? '' : 's'}`, {
         description: snapshot?.title || 'Tap Undo to restore',
         onUndo: async () => {
@@ -163,9 +172,13 @@ export default function Schedule() {
       return
     }
 
-    const { error } = await supabase.from('fh_schedule').delete().eq("id", evtId).eq("user_id", user!.id)
+    const { data: removed, error } = await supabase.from('fh_schedule').delete().eq('id', evtId).select('id')
     if (error) {
       toastError("Couldn't delete", error.message)
+      return
+    }
+    if (!removed?.length) {
+      toastError("Couldn't delete", 'This event was not removed. Refresh and try again.')
       return
     }
     // Optimistic cache removal so the row vanishes immediately, before
@@ -248,7 +261,10 @@ export default function Schedule() {
   }
 
   const { stagger, item } = useFhMotion()
-  const isDesktop = useIsDesktop()
+
+  // The header names one day, so count that day's visits, not every
+  // event in the fetched week or month grid.
+  const cursorDayCount = (events || []).filter((e: any) => sameDay(new Date(e.start_at), cursor)).length
 
   // Phase 7, desktop-first composition. At >=900px the planner +
   // upcoming rail workspace replaces the narrow mobile dispatch
@@ -298,8 +314,8 @@ export default function Schedule() {
         <Eyebrow as="div" tone="gold" style={{ marginBottom: 6 }}>
           {cursor.toLocaleDateString(undefined, { weekday: 'short' })} ·{' '}
           {cursor.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-          {(events && events.length > 0) && (
-            <> · {events.length} {events.length === 1 ? 'visit' : 'visits'}</>
+          {cursorDayCount > 0 && (
+            <> · {cursorDayCount} {cursorDayCount === 1 ? 'visit' : 'visits'}</>
           )}
         </Eyebrow>
         <h1 style={{
@@ -494,7 +510,7 @@ export default function Schedule() {
           )}
           {events != null && view === 'week' && (
             <WeekView
-              start={addDays(cursor, -((cursor.getDay() + 6) % 7))}
+              start={range.start}
               events={events}
               onClick={(id: any) => navigate(`/jobs/${id}`)}
               onDelete={requestDeleteEvent}

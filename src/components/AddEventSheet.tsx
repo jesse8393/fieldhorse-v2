@@ -15,9 +15,11 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } f
 import { Calendar as CalendarIcon, Check, X } from 'lucide-react'
 import { hapticTap } from '../lib/haptics.ts'
 import { supabase } from '../lib/supabase.ts'
+import { useOrgScope } from '../lib/orgScope.ts'
 import { toastError } from '../lib/toast.ts'
 import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.ts'
 import { todayYmd, toYmd } from '../lib/dates.ts'
+import { localDateTimeMs, eventDurationMs } from '../lib/scheduleDates.ts'
 import { countNoun } from '../lib/format.ts'
 import { Eyebrow } from './v3'
 
@@ -38,18 +40,21 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
   const titleRef = useRef<HTMLInputElement | null>(null)
   const { formRef, drawerStyle, formStyle } = useDrawerKeyboard(open)
 
+  // The picker lists the company's jobs, not only the ones this user
+  // created, so editing a teammate's event keeps its job selected.
+  const orgScope = useOrgScope(userId)
   useEffect(() => {
-    if (!userId) return
+    if (!userId || orgScope === undefined) return
     // Enough fields to tell two "Justin Bryan" jobs apart in the picker
     // (UI audit #10): project title / address / stage disambiguate.
-    supabase
+    const base = supabase
       .from('fh_contacts')
       .select('id, name, job_title, address, stage')
-      .eq('user_id', userId)
+    ;(orgScope ? base.eq('org_id', orgScope) : base.eq('user_id', userId))
       .neq('stage', 'lost')
       .order('updated_at', { ascending: false })
       .then(({ data }: any) => setContacts(data || []))
-  }, [userId])
+  }, [userId, orgScope])
 
   useEffect(() => {
     if (!open) {
@@ -85,51 +90,70 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
       return
     }
     setTitleError(false)
+    // Check the date and time before locking the sheet: a cleared input
+    // used to throw on toISOString after saving was set, leaving the
+    // drawer stuck on SAVING with Cancel disabled.
+    const startMs = localDateTimeMs(date, time)
+    if (startMs == null) {
+      toastError('Pick a date and time', 'Both are needed to schedule the event.')
+      return
+    }
     setSaving(true)
-    const startMs = new Date(`${date}T${time}:00`).getTime()
-    // EDIT: update the single row in place.
-    if (editing) {
-      const { error } = await supabase.from('fh_schedule').update({
-        title: title.trim(),
-        contact_id: contactId || null,
-        start_at: new Date(startMs).toISOString(),
-        end_at: new Date(startMs + 60 * 60 * 1000).toISOString()
-      }).eq('id', event.id).eq('user_id', userId)
-      setSaving(false)
-      if (error) { toastError("Couldn't update the event", error.message || 'Try again.'); return }
-      onSaved?.()
-      return
-    }
-    // Default a 1-hour end_at so deriveStatus / Live / Done filters have
-    // a window to work with (they broke on events with a null end_at).
-    // Shared series id (stored in the `recurring` text column) so every
-    // occurrence knows it belongs to one series, the Schedule screen
-    // uses it to offer "delete this / delete the whole series" instead
-    // of orphaning the other 4 rows.
-    const seriesId = recurs ? (crypto.randomUUID?.() || `series-${startMs}`) : null
-    const mkRow = (s: number) => ({
-      user_id: userId,
-      contact_id: contactId || null,
-      title: title.trim(),
-      start_at: new Date(s).toISOString(),
-      end_at: new Date(s + 60 * 60 * 1000).toISOString(),
-      recurring: seriesId
-    })
-    const rows = [mkRow(startMs)]
-    if (recurs) {
-      for (let i = 1; i <= 4; i++) {
-        rows.push(mkRow(startMs + recurDays * i * 86400000))
+    try {
+      // EDIT: update the single row in place, keeping the event's length
+      // (a 3 hour inspection stays 3 hours when only the title changes).
+      // Matched by id only: RLS scopes the company, so a teammate's event
+      // is editable, and .select('id') turns a zero row update into a
+      // visible failure instead of a silent no-op.
+      if (editing) {
+        const { data: updated, error } = await supabase.from('fh_schedule').update({
+          title: title.trim(),
+          contact_id: contactId || null,
+          start_at: new Date(startMs).toISOString(),
+          end_at: new Date(startMs + eventDurationMs(event)).toISOString()
+        }).eq('id', event.id).select('id')
+        if (error) { toastError("Couldn't update the event", error.message || 'Try again.'); return }
+        if (!updated?.length) { toastError("Couldn't update the event", 'The event was not changed. Refresh and try again.'); return }
+        onSaved?.()
+        return
       }
+      // Default a 1-hour end_at so deriveStatus / Live / Done filters have
+      // a window to work with (they broke on events with a null end_at).
+      // Shared series id (stored in the `recurring` text column) so every
+      // occurrence knows it belongs to one series, the Schedule screen
+      // uses it to offer "delete this / delete the whole series" instead
+      // of orphaning the other 4 rows.
+      const seriesId = recurs ? (crypto.randomUUID?.() || `series-${startMs}`) : null
+      const mkRow = (s: number) => ({
+        user_id: userId,
+        contact_id: contactId || null,
+        title: title.trim(),
+        start_at: new Date(s).toISOString(),
+        end_at: new Date(s + 60 * 60 * 1000).toISOString(),
+        recurring: seriesId
+      })
+      const rows = [mkRow(startMs)]
+      if (recurs) {
+        // Step by calendar days so every occurrence keeps the same local
+        // start time across a daylight saving change.
+        for (let i = 1; i <= 4; i++) {
+          const s = localDateTimeMs(date, time, recurDays * i)
+          if (s != null) rows.push(mkRow(s))
+        }
+      }
+      // Capture the error, a silent insert failure previously closed the
+      // sheet as "saved" and lost the event.
+      const { error } = await supabase.from('fh_schedule').insert(rows)
+      if (error) {
+        toastError("Couldn't save the event", error.message || 'Try again.')
+        return
+      }
+      onSaved?.()
+    } catch (ex: any) {
+      toastError("Couldn't save the event", ex?.message || 'Try again.')
+    } finally {
+      setSaving(false)
     }
-    // Capture the error, a silent insert failure previously closed the
-    // sheet as "saved" and lost the event.
-    const { error } = await supabase.from('fh_schedule').insert(rows)
-    setSaving(false)
-    if (error) {
-      toastError("Couldn't save the event", error.message || 'Try again.')
-      return
-    }
-    onSaved?.()
   }
 
   const labelStyle = { fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: 'var(--ink-muted)' }

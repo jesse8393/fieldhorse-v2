@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 // @ts-ignore -- papaparse ships no types
 import Papa from 'papaparse'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -16,6 +16,13 @@ import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import BuildTopbar from '../components/desktop/BuildTopbar.tsx'
 import MiniMetric from '../components/MiniMetric.tsx'
 import { Button } from '../ui/index.ts'
+import { parseAmount } from '../lib/amount.ts'
+import { leadKeys, markRepeats } from '../lib/importDedupe.ts'
+import { fetchAllRows } from '../lib/queries.ts'
+
+// Rows per insert. One giant insert for a big export can hit request
+// size or statement time limits and fails as a whole.
+const IMPORT_CHUNK = 200
 
 // Importable target fields, in display order. Used by the mapping
 // review UI + the AI mapper prompt.
@@ -94,6 +101,10 @@ export default function Importer() {
   // Audit caught the full webhook key rendered in plain text. Default
   // to masked; user reveals on demand.
   const [webhookRevealed, setWebhookRevealed] = useState(false)
+  // Dedupe keys for leads already on file (null until loaded) and the
+  // operator's choice to import matching rows anyway.
+  const [existingKeys, setExistingKeys] = useState<Set<string> | null>(null)
+  const [includeRepeats, setIncludeRepeats] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -101,6 +112,36 @@ export default function Importer() {
       setWebhookKey(data?.webhook_key || '')
     })
   }, [user])
+
+  // Once a file is loaded, read the leads already in the pipeline (every
+  // row RLS lets this user see) so re-running an export skips them
+  // instead of doubling the pipeline. A failed read falls back to no
+  // repeat check rather than blocking the import.
+  useEffect(() => {
+    if (!user || rows.length === 0 || existingKeys) return
+    let cancelled = false
+    fetchAllRows<{ name: string | null; phone: string | null; email: string | null; job_title: string | null }>((from, to) =>
+      supabase
+        .from('fh_contacts')
+        .select('id, name, phone, email, job_title')
+        .order('id', { ascending: true })
+        .range(from, to)
+    )
+      .then((existing) => { if (!cancelled) setExistingKeys(new Set(existing.flatMap(leadKeys))) })
+      .catch((e) => {
+        console.warn('[importer] repeat check unavailable', e)
+        if (!cancelled) setExistingKeys(new Set())
+      })
+    return () => { cancelled = true }
+  }, [user, rows.length, existingKeys])
+
+  const checkingRepeats = rows.length > 0 && existingKeys == null
+  const repeatFlags = useMemo(
+    () => (existingKeys ? markRepeats(mapped, existingKeys) : mapped.map(() => false)),
+    [mapped, existingKeys]
+  )
+  const repeatCount = repeatFlags.filter(Boolean).length
+  const toImport = includeRepeats ? mapped : mapped.filter((_, i) => !repeatFlags[i])
 
   async function ensureWebhookKey() {
     if (webhookKey) return webhookKey
@@ -118,6 +159,7 @@ export default function Importer() {
       skipEmptyLines: true,
       complete: (r: any) => {
         setRows(r.data)
+        setIncludeRepeats(false)
         remap(r.data, preset)
       }
     })
@@ -142,7 +184,9 @@ export default function Importer() {
       address: pick(r, hm.address),
       job_title: pick(r, hm.job_title),
       job_type: pick(r, hm.job_type),
-      amount: Number(pick(r, hm.amount) || 0),
+      // Exports format totals as "$4,500.00"; Number() made that NaN,
+      // which saved as null and showed $0.
+      amount: parseAmount(pick(r, hm.amount)) ?? 0,
       stage: 'lead'
     })).filter((r) => r.name)
     setMapped(out)
@@ -204,26 +248,47 @@ export default function Importer() {
   }
 
   async function doImport() {
-    if (!user || mapped.length === 0) return
+    if (!user || toImport.length === 0 || checkingRepeats) return
     setImporting(true)
     setProgress(10)
-    const payload = mapped.map((m) => ({ ...m, user_id: user.id }))
-    // Cosmetic progress ramp while the single insert runs. Supabase returns
-    // atomically for a batch insert; there's no native per-row progress.
-    const tick = setInterval(() => setProgress((p) => (p < 85 ? p + 6 : p)), 120)
-    const { error, count } = await supabase.from('fh_contacts').insert(payload, { count: 'exact' })
-    clearInterval(tick)
+    const payload = toImport.map((m) => ({ ...m, user_id: user.id }))
+    // Insert in chunks so a large export doesn't fail as one giant
+    // request, and so the bar shows real progress.
+    let finalCount = 0
+    let landed = 0
+    let error: { message: string } | null = null
+    for (let i = 0; i < payload.length; i += IMPORT_CHUNK) {
+      const batch = payload.slice(i, i + IMPORT_CHUNK)
+      const res = await supabase.from('fh_contacts').insert(batch, { count: 'exact' })
+      if (res.error) { error = res.error; break }
+      landed += batch.length
+      finalCount += res.count ?? batch.length
+      setProgress(10 + Math.round((90 * landed) / payload.length))
+    }
+    // Rows that landed are now on file: a retry or a second file in this
+    // session must treat them as repeats.
+    if (landed > 0) {
+      setExistingKeys((prev) => {
+        const next = new Set(prev || [])
+        for (const row of payload.slice(0, landed)) for (const k of leadKeys(row)) next.add(k)
+        return next
+      })
+    }
     setProgress(100)
     setTimeout(() => setProgress(0), 400)
     setImporting(false)
-    const finalCount = count ?? payload.length
     if (error) {
       // Failure path previously only set the red banner, no toast, no
       // haptic, and the one-liner `if (!error) hapticSuccess(); setDone(...)`
       // read like the haptic was conditional on the whole line. Split
       // for symmetry with the success path.
-      setDone({ err: error.message })
-      toastError("Import failed", error.message)
+      const msg = landed > 0
+        ? `Imported ${landed} of ${payload.length}. The rest did not import: ${error.message}`
+        : error.message
+      // The rows that landed now read as repeats; skip them on a retry.
+      setIncludeRepeats(false)
+      setDone({ err: msg })
+      toastError("Import failed", msg)
       return
     }
     hapticSuccess()
@@ -232,6 +297,7 @@ export default function Importer() {
     setMapped([])
     setCsvHeaders([])
     setHeaderMap({})
+    setIncludeRepeats(false)
     toastSuccess(`Imported ${finalCount} ${countNoun(finalCount, 'contact')}`, 'Now in your Pipeline')
   }
 
@@ -454,13 +520,14 @@ export default function Importer() {
             </Eyebrow>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
               {mapped.slice(0, 5).map((m, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
+                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', opacity: repeatFlags[i] && !includeRepeats ? 0.55 : 1 }}>
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, color: 'var(--ink-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {m.name}
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 2 }}>
                       {m.job_title || '\u2003'} · {m.phone || m.email || 'no contact'}
+                      {repeatFlags[i] ? ' · already in pipeline' : ''}
                     </div>
                   </div>
                   <div style={{ fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: 0, color: 'var(--field-gold-bright)' }}>
@@ -469,6 +536,27 @@ export default function Importer() {
                 </div>
               ))}
             </div>
+            {checkingRepeats && (
+              <div style={{ marginTop: 12, fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--ink-muted)' }}>
+                Checking your pipeline for leads you already have…
+              </div>
+            )}
+            {repeatCount > 0 && (
+              <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8, fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--ink-muted)' }}>
+                <span>
+                  {repeatCount} {countNoun(repeatCount, 'row')} {repeatCount === 1 ? 'matches a lead' : 'match leads'} already in your pipeline and will be {includeRepeats ? 'imported again' : 'skipped'}.
+                </span>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: 'var(--ink-strong)', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={includeRepeats}
+                    disabled={importing}
+                    onChange={(e) => setIncludeRepeats(e.target.checked)}
+                  />
+                  Import them anyway
+                </label>
+              </div>
+            )}
             {importing && (
               <div style={{ marginTop: 14 }}>
                 <Eyebrow as="div" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, color: 'var(--ink-muted)' }}>
@@ -482,7 +570,7 @@ export default function Importer() {
               type="button"
               whileTap={{ scale: 0.97 }}
               onClick={doImport}
-              disabled={importing}
+              disabled={importing || checkingRepeats || toImport.length === 0}
               style={{
                 marginTop: 14,
                 width: '100%',
@@ -494,17 +582,17 @@ export default function Importer() {
                 fontFamily: 'var(--font-display)',
                 fontSize: 14,
                 letterSpacing: 0,
-                cursor: importing ? 'default' : 'pointer',
+                cursor: importing || checkingRepeats || toImport.length === 0 ? 'default' : 'pointer',
                 boxShadow: '0 8px 20px rgba(201,150,58,0.35)',
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 8,
-                opacity: importing ? 0.65 : 1
+                opacity: importing || checkingRepeats || toImport.length === 0 ? 0.65 : 1
               }}
             >
               <Upload size={16} />
-              {importing ? 'IMPORTING…' : `IMPORT ${mapped.length} CONTACTS`}
+              {importing ? 'IMPORTING…' : `IMPORT ${toImport.length} CONTACTS`}
             </motion.button>
           </div>
         )}

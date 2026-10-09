@@ -17,6 +17,7 @@ import CountUp from '../components/fx/CountUp.tsx'
 import SectionHeader from '../components/v3/SectionHeader.tsx'
 import { FilterPill, Eyebrow } from '../components/v3'
 import { useConfirm } from '../components/ConfirmSheet.tsx'
+import { parseAmount } from '../lib/amount.ts'
 
 // White-label: internal-only tool but no app-attributable phrasing
 // just in case any of the output is shown to a customer downstream.
@@ -27,6 +28,30 @@ const SYSTEM = `You are an estimating assistant for a contractor's business. Giv
 // via the merged rate card; we just don't surface them as suggested
 // pre-checks because they're user-specific.
 const TRADES = Object.keys(RATE_CARD)
+
+// The model is asked for JSON numbers but can answer "12,000" or
+// "$4,500", which made totals NaN ("$NaN" headline, null job amount).
+// Coerce every money and quantity field once, on the way in. Missing or
+// unreadable values become null so the `|| 1` and `??` fallbacks below
+// still apply.
+function normalizeBid(raw: any) {
+  if (!raw || typeof raw !== 'object') return raw
+  return {
+    ...raw,
+    total_low: parseAmount(raw.total_low),
+    total_high: parseAmount(raw.total_high),
+    line_items: Array.isArray(raw.line_items)
+      ? raw.line_items
+        .filter((li: any) => li && typeof li === 'object')
+        .map((li: any) => ({
+          ...li,
+          qty: parseAmount(li.qty),
+          rate_low: parseAmount(li.rate_low),
+          rate_high: parseAmount(li.rate_high)
+        }))
+      : []
+  }
+}
 
 function money(n: any) { return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) }
 function formatThousands(n: any) { return Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 }) }
@@ -102,7 +127,7 @@ export default function Bid() {
       const text = res?.content?.[0]?.text || ''
       const match = text.match(/\{[\s\S]*\}/)
       if (match) {
-        const parsedBid = JSON.parse(match[0])
+        const parsedBid = normalizeBid(JSON.parse(match[0]))
         hapticSuccess(); setBid(parsedBid)
         const low = parsedBid.total_low || parsedBid.line_items?.reduce((s: any, li: any) => s + (li.rate_low * (li.qty || 1)), 0) || 0
         const high = parsedBid.total_high || parsedBid.line_items?.reduce((s: any, li: any) => s + (li.rate_high * (li.qty || 1)), 0) || 0
@@ -263,14 +288,15 @@ export default function Bid() {
   // round trip entirely. The operator can refine + push to a job
   // from there as if they'd just generated it.
   function loadTemplate(t: any) {
-    setBid({
+    // Templates hold saved model output, so normalize them the same way.
+    setBid(normalizeBid({
       summary: t.description || t.name,
       line_items: t.line_items || [],
       total_low:  t.total_low,
       total_high: t.total_high,
       assumptions: [],
       risks: []
-    })
+    }))
     if (t.job_type) setJobType(t.job_type)
     setScope(`Loaded from template: ${t.name}`)
     setPickerOpen(false)
