@@ -10,21 +10,21 @@
 // Security: DocuSign Connect sends an HMAC signature header
 // (X-DocuSign-Signature-1) when an HMAC key is configured.
 //
-//   • If DOCUSIGN_CONNECT_HMAC_KEY is set we always verify — a
-//     mismatch is 401 regardless of mode.
-//   • Enforcement of the key itself (rejecting unsigned events when
-//     the key is absent) is opt-in via DOCUSIGN_REQUIRE_HMAC=1. This
-//     keeps the merge cost-free: the verification code ships now, and
-//     you flip enforcement on later by setting two env vars
-//     (DOCUSIGN_CONNECT_HMAC_KEY + DOCUSIGN_REQUIRE_HMAC=1) after
-//     configuring DocuSign Connect HMAC signing.
-//   • Default (REQUIRE_HMAC unset) accepts unsigned events but logs
-//     loudly so the warning shows up in monitoring — you'll notice if
-//     it gets noisy.
+//   * DOCUSIGN_CONNECT_HMAC_KEY set: every event is verified, and a
+//     missing or wrong signature gets 401 bad_signature.
+//   * Key not set: events are rejected by default with 401
+//     hmac_not_configured. Without a signature, anyone who knows an
+//     envelope id could post a forged "completed" event.
+//   * DOCUSIGN_ALLOW_UNSIGNED=1 opts out while Connect HMAC is not set up
+//     yet: unsigned events are accepted and a warning is logged. Events
+//     can then be forged, so set the key as soon as possible.
+//   * DOCUSIGN_REQUIRE_HMAC=1 turns a missing key into 500
+//     hmac_key_missing, even when DOCUSIGN_ALLOW_UNSIGNED=1 is set.
 //
-// Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
-//      DOCUSIGN_CONNECT_HMAC_KEY (optional; required iff REQUIRE_HMAC=1),
-//      DOCUSIGN_REQUIRE_HMAC (optional opt-in to enforce)
+// Env: SUPABASE_URL (or VITE_SUPABASE_URL), SUPABASE_SERVICE_ROLE_KEY,
+//      DOCUSIGN_CONNECT_HMAC_KEY (needed to accept events),
+//      DOCUSIGN_ALLOW_UNSIGNED (optional, not recommended),
+//      DOCUSIGN_REQUIRE_HMAC (optional)
 
 import crypto from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
