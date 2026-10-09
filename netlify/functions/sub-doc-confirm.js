@@ -4,7 +4,8 @@
 //
 // Called by the client after a successful upload to the sub-docs
 // bucket. Writes the storage_path into the right column on every
-// fh_sub_profiles row matching the caller's email.
+// fh_sub_profiles row for the caller's email in orgs where the caller
+// accepted a job invite (see lib/subAccess.js).
 //
 // Server-side validation:
 //   - kind must be one of coi / w9 / license
@@ -14,6 +15,7 @@
 //     own document.
 
 import { createClient } from '@supabase/supabase-js'
+import { boundSubOrgIds, normalizeEmail } from './lib/subAccess.js'
 
 const VALID_KINDS = ['coi', 'w9', 'license']
 
@@ -56,7 +58,7 @@ export default async (request) => {
   const { data: userData, error: authErr } = await authClient.auth.getUser(bearer)
   if (authErr || !userData?.user) return json({ error: 'invalid_token' }, 401)
   const authUserId = userData.user.id
-  const authEmail = String(userData.user.email || '').toLowerCase()
+  const authEmail = normalizeEmail(userData.user.email)
   if (!authEmail) return json({ error: 'no_auth_email' }, 400)
 
   // Ownership guard: the path must start with the caller's user_id.
@@ -70,21 +72,32 @@ export default async (request) => {
     auth: { autoRefreshToken: false, persistSession: false }
   })
 
+  const { orgIds, error: scopeErr } = await boundSubOrgIds(admin, authUserId)
+  if (scopeErr) {
+    console.error('[sub-doc-confirm] scope lookup failed', scopeErr)
+    return json({ error: 'scope_lookup_failed', detail: 'Could not load your contractors. Try again shortly.' }, 500)
+  }
+  if (orgIds.length === 0) {
+    return json({ error: 'no_linked_contractor', detail: 'Accept a job invite from your contractor first, then upload documents.' }, 403)
+  }
+
   const col = COLUMN_BY_KIND[kind]
   const patch = { [col]: storagePath }
 
-  // Exact (case-insensitive) match, NOT .ilike: authEmail is caller-controlled
-  // and LIKE metacharacters (`_`, `%`) in their own address would match OTHER
-  // subs' rows and let them stamp a doc path onto foreign profiles. authEmail
-  // is already lowercased above and sub emails are stored lowercased, so .eq
-  // is both correct and wildcard-safe.
+  // Exact match, NOT .ilike: LIKE metacharacters (`_`, `%`) in a caller's
+  // own address would match other subs' rows. Stored emails are lowercased
+  // by a trigger (migration 065).
   const { data: updated, error: updErr } = await admin
     .from('fh_sub_profiles')
     .update(patch)
     .eq('email', authEmail)
+    .in('org_id', orgIds)
     .select('id')
 
-  if (updErr) return json({ error: 'confirm_failed', message: updErr.message }, 500)
+  if (updErr) {
+    console.error('[sub-doc-confirm] update failed', updErr)
+    return json({ error: 'confirm_failed', detail: 'Could not save the document. Try again shortly.' }, 500)
+  }
 
   return json({
     ok: true,

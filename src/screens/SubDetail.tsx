@@ -21,6 +21,8 @@ import DataErrorState from '../components/DataErrorState.tsx'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { EmptyState } from '../ui/index.ts'
+import { parseDateOnly } from '../lib/dates.ts'
+import { useConfirm } from '../components/ConfirmSheet.tsx'
 
 // SubDetail, vendor profile surface at /subs/:key.
 //
@@ -63,18 +65,33 @@ function fmtRelativeDate(d: any) {
   return `${Math.floor(days / 365)}y ago`
 }
 
+// Insurance expiry is a date only column. Parse it as a local calendar date
+// (new Date('2026-12-31') is UTC midnight, the evening before in the US) and
+// count whole days from the start of today, so a policy reads as current
+// through its expiry date instead of expiring a day early.
 function daysUntil(dateStr: any) {
-  if (!dateStr) return null
-  const d = new Date(dateStr)
-  if (Number.isNaN(d.getTime())) return null
-  return Math.floor((d.getTime() - Date.now()) / 86400000)
+  const d = parseDateOnly(dateStr)
+  if (!d) return null
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return Math.round((d.getTime() - today.getTime()) / 86400000)
 }
 
 function fmtDate(dateStr: any) {
-  if (!dateStr) return '\u2003'
-  const d = new Date(dateStr)
-  if (Number.isNaN(d.getTime())) return '\u2003'
+  const d = parseDateOnly(dateStr)
+  if (!d) return '\u2003'
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+// Documents a contractor uploads live under org/<org_id>/<profile_id>/ so any
+// manager in the org can replace them (storage policies, migration 065).
+// Older uploads sit under the uploader's own folder. A document the sub
+// uploaded is shared by every contractor that has the sub on file, so a
+// contractor clears it from their profile without deleting the file.
+function contractorOwnsDoc(path: string, profile: any, userId: string | undefined) {
+  if (!path) return false
+  if (profile?.org_id && path.startsWith(`org/${profile.org_id}/${profile.id}/`)) return true
+  return !!userId && path.startsWith(`${userId}/${profile?.id}/`)
 }
 
 export default function SubDetail() {
@@ -130,6 +147,8 @@ export default function SubDetail() {
     const seedName = (subRows[0]?.name || '').trim() || displayName.trim() || 'New sub'
     const seedPhone = (subRows[0]?.phone || '').trim() || null
     const seedTrade = subRows[0]?.trade ? [subRows[0].trade] : []
+    // identity_key records the directory key this profile was created from,
+    // so it stays linked after its phone or name is edited (migration 065).
     const { error: insErr, data } = await supabase
       .from('fh_sub_profiles')
       .insert({
@@ -137,8 +156,9 @@ export default function SubDetail() {
         org_id: scopeOrgId ?? null,
         name: seedName,
         phone: seedPhone,
-        trades: seedTrade
-      })
+        trades: seedTrade,
+        identity_key: key || null,
+      } as any)
       .select()
       .maybeSingle()
     setCreating(false)
@@ -806,7 +826,9 @@ function ProfileEditor({ profile, onSaved }: any) {
       name: form.name.trim(),
       company: form.company.trim() || null,
       phone: form.phone.trim() || null,
-      email: form.email.trim() || null,
+      // Stored lowercased: the sub portal matches this exactly against the
+      // sub's sign in email (a database trigger enforces it too).
+      email: form.email.trim().toLowerCase() || null,
       address: form.address.trim() || null,
       trades,
       ein: form.ein.trim() || null,
@@ -949,23 +971,49 @@ function ProfileEditor({ profile, onSaved }: any) {
 
 /* ============================================================
    DocumentsSection, three doc slots (W9, COI, License). Each
-   slot uploads to sub-docs/<user>/<profile>/<slot>.<ext> and
-   stores the path in the profile row. View opens a 60-sec
+   slot uploads to sub-docs/org/<org>/<profile>/<slot>.<ext> and
+   stores the path in the profile row. View opens a 60 second
    signed URL.
    ============================================================ */
+// The sub-docs bucket accepts only these types (migration 063).
+const DOC_TYPES: Record<string, string> = {
+  'application/pdf': 'pdf',
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+}
+
+function docType(file: File): string | null {
+  if (file.type && DOC_TYPES[file.type]) return file.type
+  const ext = (file.name.split('.').pop() || '').toLowerCase()
+  if (ext === 'pdf') return 'application/pdf'
+  if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg'
+  if (ext === 'png') return 'image/png'
+  return null
+}
+
 function DocumentsSection({ profile, onChanged }: any) {
+  const { user } = useAuth()
+  const confirm = useConfirm()
   const [busySlot, setBusySlot] = useState<any>(null)
   const fileInputs = useRef({})
 
   async function handleUpload(slotId: any, pathField: any, file: any) {
     if (!file) return
+    const type = docType(file)
+    if (!type) {
+      toastError('Use a PDF, JPG or PNG file', 'Other file types cannot be stored.')
+      return
+    }
     setBusySlot(slotId)
     try {
-      const ext = (file.name.split('.').pop() || 'bin').toLowerCase()
-      const path = `${profile.user_id}/${profile.id}/${slotId}.${ext}`
+      const ext = DOC_TYPES[type]
+      const previousPath = profile[pathField] || null
+      const path = profile.org_id
+        ? `org/${profile.org_id}/${profile.id}/${slotId}.${ext}`
+        : `${user?.id}/${profile.id}/${slotId}.${ext}`
       const { error: upErr } = await supabase.storage
         .from('sub-docs')
-        .upload(path, file, { upsert: true, contentType: file.type || undefined })
+        .upload(path, file, { upsert: true, contentType: type })
       if (upErr) throw upErr
 
       const { data, error } = await supabase
@@ -975,6 +1023,11 @@ function DocumentsSection({ profile, onChanged }: any) {
         .select()
         .maybeSingle()
       if (error) throw error
+      // A replaced contractor upload with a different extension would
+      // otherwise linger in storage. Files the sub uploaded stay put.
+      if (previousPath && previousPath !== path && contractorOwnsDoc(previousPath, profile, user?.id)) {
+        await supabase.storage.from('sub-docs').remove([previousPath])
+      }
       onChanged?.(data)
       toastSuccess('Uploaded', `${slotId.toUpperCase()} on file`)
       hapticSuccess()
@@ -987,11 +1040,19 @@ function DocumentsSection({ profile, onChanged }: any) {
 
   async function handleRemove(slotId: any, pathField: any, currentPath: any) {
     if (!currentPath) return
+    const label = DOC_SLOTS.find((s) => s.id === slotId)?.label || slotId.toUpperCase()
+    const owned = contractorOwnsDoc(currentPath, profile, user?.id)
+    const ok = await confirm({
+      title: `Remove the ${label}?`,
+      body: owned
+        ? 'The file is deleted from this vendor profile. Upload it again if you need it later.'
+        : 'This clears it from your vendor profile. The sub keeps their copy.',
+      confirmLabel: 'Remove',
+      destructive: true,
+    })
+    if (!ok) return
     setBusySlot(slotId)
     try {
-      // Best-effort delete; clear the DB path even if storage delete
-      // fails (orphan files are tolerable, dangling DB pointers are not).
-      await supabase.storage.from('sub-docs').remove([currentPath])
       const { data, error } = await supabase
         .from('fh_sub_profiles')
         .update({ [pathField]: null } as any)
@@ -999,8 +1060,15 @@ function DocumentsSection({ profile, onChanged }: any) {
         .select()
         .maybeSingle()
       if (error) throw error
+      // Clear the pointer first, then delete the file only when this
+      // contractor owns it. An orphaned file is tolerable; a profile that
+      // points at a deleted file is not.
+      if (owned) {
+        const { error: rmErr } = await supabase.storage.from('sub-docs').remove([currentPath])
+        if (rmErr) console.warn('[sub-docs] file removal failed', rmErr)
+      }
       onChanged?.(data)
-      toastSuccess('Removed', `${slotId.toUpperCase()} cleared`)
+      toastSuccess('Removed', `${label} cleared`)
     } catch (e: any) {
       toastError("Couldn't remove", e?.message || 'Try again')
     } finally {
@@ -1057,7 +1125,7 @@ function DocumentsSection({ profile, onChanged }: any) {
               <input
                 ref={(el) => { (fileInputs.current as any)[slot.id] = el }}
                 type="file"
-                accept=".pdf,.png,.jpg,.jpeg,.heic"
+                accept="application/pdf,image/jpeg,image/png"
                 onChange={(e) => {
                   const f = e.target.files?.[0]
                   e.target.value = ''

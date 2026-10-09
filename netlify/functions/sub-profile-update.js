@@ -1,30 +1,21 @@
-// Netlify Function — Sub-side profile update.
+// Netlify Function: sub side profile update.
 // POST /api/sub-profile-update  { fields: {...} }
 // Authorization: Bearer <supabase access token>
 //
-// Updates the sub-side-editable fields on EVERY fh_sub_profiles row
-// whose email matches the caller. A sub working for three GCs sees
-// the same self-updated insurance info on all three records.
+// Updates the sub editable fields on every fh_sub_profiles row for the
+// caller's email in orgs where the caller accepted a job invite, so a sub
+// working for three contractors keeps one set of insurance details current.
+// See lib/subAccess.js for why the accepted invite is required.
 //
-// Fields the SUB controls:
-//   phone, address, ein, trades (array),
-//   insurance_carrier, insurance_policy, insurance_expires_on,
-//   license_number,
-//   payment_handle, payment_method, notes
+// Fields the sub controls: phone, address, ein, trades, insurance_carrier,
+// insurance_policy, insurance_expires_on, license_number, payment_handle,
+// payment_method.
 //
-// Fields the OWNER controls (NOT writable here):
-//   name, company, email, coi_path, w9_path, license_path
-//   (storage paths are managed via /api/sub-doc-confirm)
+// Fields the contractor controls (never writable here): name, company,
+// email, notes, and the document paths (managed through /api/sub-doc-confirm).
 
 import { createClient } from '@supabase/supabase-js'
-
-const ALLOWED = [
-  'phone', 'address', 'ein', 'trades',
-  'insurance_carrier', 'insurance_policy', 'insurance_expires_on',
-  'license_number',
-  'payment_handle', 'payment_method',
-  'notes',
-]
+import { boundSubOrgIds, normalizeEmail, sanitizeSubProfilePatch } from './lib/subAccess.js'
 
 export default async (request) => {
   if (request.method === 'OPTIONS') {
@@ -45,62 +36,48 @@ export default async (request) => {
 
   let body
   try { body = await request.json() } catch { return json({ error: 'invalid_json' }, 400) }
-  const fields = (body && typeof body.fields === 'object') ? body.fields : null
-  if (!fields) return json({ error: 'missing_fields' }, 400)
 
-  // Whitelist + sanitize.
-  const patch = {}
-  for (const key of ALLOWED) {
-    if (!(key in fields)) continue
-    let v = fields[key]
-    if (typeof v === 'string') v = v.trim()
-    if (v === '') v = null
-    // Date guard: keep YYYY-MM-DD only.
-    if (key === 'insurance_expires_on' && v !== null) {
-      const d = new Date(v)
-      if (!Number.isFinite(d.getTime())) {
-        return json({ error: 'invalid_expires', detail: 'insurance_expires_on must be a valid date.' }, 400)
-      }
-      v = d.toISOString().slice(0, 10)
-    }
-    // Trades guard: array of strings only.
-    if (key === 'trades' && v !== null) {
-      if (!Array.isArray(v)) return json({ error: 'invalid_trades' }, 400)
-      v = v.map((x) => String(x || '').trim()).filter(Boolean)
-    }
-    patch[key] = v
-  }
-  if (Object.keys(patch).length === 0) {
-    return json({ error: 'no_writable_fields' }, 400)
-  }
+  const { patch, error: patchError, detail } = sanitizeSubProfilePatch(body?.fields)
+  if (patchError) return json({ error: patchError, detail }, 400)
 
-  // Verify caller + grab their email.
+  // Verify the caller and read their email.
   const authClient = createClient(SUPABASE_URL, ANON_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
     global: { headers: { Authorization: `Bearer ${bearer}` } }
   })
   const { data: userData, error: authErr } = await authClient.auth.getUser(bearer)
   if (authErr || !userData?.user) return json({ error: 'invalid_token' }, 401)
-  const authEmail = String(userData.user.email || '').toLowerCase()
+  const authUserId = userData.user.id
+  const authEmail = normalizeEmail(userData.user.email)
   if (!authEmail) return json({ error: 'no_auth_email' }, 400)
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false }
   })
 
-  // Update all matching rows.
-  // Exact (case-insensitive) match, NOT .ilike: authEmail is caller-controlled
-  // and LIKE metacharacters (`_`, `%`) in their own address would match OTHER
-  // subs' rows and let them overwrite foreign profiles. authEmail is already
-  // lowercased above and sub emails are stored lowercased, so .eq is both
-  // correct and wildcard-safe.
+  const { orgIds, error: scopeErr } = await boundSubOrgIds(admin, authUserId)
+  if (scopeErr) {
+    console.error('[sub-profile-update] scope lookup failed', scopeErr)
+    return json({ error: 'scope_lookup_failed', detail: 'Could not load your contractors. Try again shortly.' }, 500)
+  }
+  if (orgIds.length === 0) {
+    return json({ error: 'no_linked_contractor', detail: 'Accept a job invite from your contractor first, then update your profile.' }, 403)
+  }
+
+  // Exact match, NOT .ilike: LIKE metacharacters (`_`, `%`) in a caller's
+  // own address would match other subs' rows. Stored emails are lowercased
+  // by a trigger (migration 065).
   const { data: updated, error: updErr } = await admin
     .from('fh_sub_profiles')
     .update(patch)
     .eq('email', authEmail)
+    .in('org_id', orgIds)
     .select('id')
 
-  if (updErr) return json({ error: 'update_failed', message: updErr.message }, 500)
+  if (updErr) {
+    console.error('[sub-profile-update] update failed', updErr)
+    return json({ error: 'update_failed', detail: 'Could not save your profile. Try again shortly.' }, 500)
+  }
 
   return json({
     ok: true,
