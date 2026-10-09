@@ -15,6 +15,7 @@ import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { loadLogoForPdf, loadImageForPdf } from './pdfLogo.ts'
 import { safePayUrl } from './payLink.ts'
+import { installWinAnsiText } from './pdfText.ts'
 import {
   invoiceNumber as docInvoiceNumber,
   invoiceNumberFromSequence as docInvoiceNumberFromSequence,
@@ -22,14 +23,39 @@ import {
   companyPrefix as docCompanyPrefix
 } from '../components/documents/numbers.ts'
 import { mapItemsToScope } from '../components/documents/mapItems.ts'
-import { DEFAULT_PAYMENT_SCHEDULE } from '../components/documents/PaymentTermsBlock.tsx'
+import { DOC_COLORS, THEME_PALETTES, hexToRgb } from '../components/documents/tokens.ts'
+import { groupPhotosByTag } from '../components/documents/photoGroups.ts'
 
-const FIELD_GOLD = [200, 161, 84]      // #C9963A
-const ONYX = [18, 18, 18]              // #141414
-const RAW_LINEN = [244, 240, 232]      // #F2EDE4
-const INK_MUTED = [106, 102, 94]       // #5C5C5C
-const ALERT_RED = [179, 58, 58]        // #C0392B
-const SIGNAL_GREEN = [72, 130, 95]     // #2D7A4F
+// Palette colors from tokens.ts, the same values the HTML documents use, so
+// the PDF matches the preview the contractor approved.
+const FIELD_GOLD = hexToRgb(DOC_COLORS.gold)
+const ONYX = hexToRgb(DOC_COLORS.ink)
+const RAW_LINEN = hexToRgb(DOC_COLORS.paper)
+const INK_MUTED = hexToRgb(DOC_COLORS.inkMuted)
+const SIGNAL_GREEN = hexToRgb(DOC_COLORS.signalGreen)
+
+const MM_PER_PT = 25.4 / 72
+// Baseline of the first line on a continuation page.
+const PAGE_TOP = 18
+// Clearance between flowing content and the fine print at the page foot.
+const FOOTER_GAP = 5
+// Table text size in print points. This is a PDF measurement, separate from
+// the app's screen type scale; at 12pt a $2,500.00 amount no longer fit its
+// column and wrapped mid number.
+const TABLE_FONT_PT = 10
+
+// DocuSign places the customer's Sign Here and Date Signed fields on these
+// tokens (netlify/functions/docusign-send.js anchors on the same strings).
+// They are drawn in the page color, invisible on screen and on paper but
+// present in the text layer DocuSign searches.
+export const ESIGN_SIGN_ANCHOR = '\\s1\\'
+export const ESIGN_DATE_ANCHOR = '\\d1\\'
+
+// Every generator creates its document here so that all text it measures or
+// draws goes through the WinAnsi filter in pdfText.ts.
+function createPdfDoc() {
+  return installWinAnsiText(new jsPDF({ unit: 'mm', format: 'letter' }))
+}
 
 function money(n) {
   return Number(n || 0).toLocaleString(undefined, {
@@ -40,12 +66,59 @@ function money(n) {
   })
 }
 
-function today() {
-  return new Date().toLocaleDateString(undefined, {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric'
-  })
+// Fine print repeated at the foot of every page. Measured once per document
+// so the footer and the content above it agree on where the footer starts:
+// tables, text blocks and photos must stay above `contentBottom`.
+function footerLayout(doc, { pageWidth, pageHeight, margin, text, pointSize = 9, bottomOffset = 14 }) {
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(pointSize)
+  const lines = text ? doc.splitTextToSize(text, pageWidth - margin * 2) : []
+  const lineHeight = pointSize * doc.getLineHeightFactor() * MM_PER_PT
+  const firstBaseline = pageHeight - bottomOffset - Math.max(0, lines.length - 1) * lineHeight
+  // Capitals rise about 0.72 of the font size above the baseline.
+  const capHeight = pointSize * MM_PER_PT * 0.72
+  return { lines, pointSize, x: margin, firstBaseline, contentBottom: firstBaseline - capHeight - FOOTER_GAP }
+}
+
+function drawFooterText(doc, footer, color) {
+  if (!footer.lines.length) return
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(footer.pointSize)
+  doc.setTextColor(...color)
+  doc.text(footer.lines, footer.x, footer.firstBaseline)
+}
+
+// Starts a new page and returns the y to continue at. `onNewPage` paints a
+// themed page background before anything is drawn on the page.
+function newPage(doc, onNewPage) {
+  doc.addPage()
+  if (onNewPage) onNewPage()
+  return PAGE_TOP
+}
+
+// Draws wrapped lines one at a time, starting a new page whenever the next
+// baseline would pass `bottom`. jsPDF draws a string array in one call and
+// never paginates it, which cut long payment terms and notes off the page.
+// Returns the y below the last line.
+function drawFlowingLines(doc, lines, { x, y, lineHeight, bottom, onNewPage }) {
+  let cursor = y
+  for (const line of lines) {
+    if (cursor > bottom) cursor = newPage(doc, onNewPage)
+    doc.text(line, x, cursor)
+    cursor += lineHeight
+  }
+  return cursor
+}
+
+// Shortens `text` to one line of `width` at the current font, ending in an
+// ellipsis when it had to cut. `track` is the charSpace it will be drawn
+// with; getTextWidth ignores charSpace, and PDF adds it after every glyph.
+function fitOneLine(doc, text, width, track = 0) {
+  const measure = (s) => doc.getTextWidth(s) + s.length * track
+  let s = String(text || '')
+  if (measure(s) <= width) return s
+  while (s.length > 1 && measure(`${s}...`) > width) s = s.slice(0, -1)
+  return `${s.trimEnd()}...`
 }
 
 function itemAmount(it) {
@@ -57,310 +130,11 @@ function itemAmount(it) {
 // plain prose while "320 sf" still surfaces. Mirrors the HTML preview's
 // scopeLine() so both surfaces render the same text.
 function proposalScopeLine(it) {
-  const desc = (it.description || '\u2003').trim()
+  const desc = (it.description || '').trim()
   const qty = Number(it.qty || 1)
   const unit = (it.unit || '').trim()
   if (qty > 1) return `${desc} · ${qty}${unit ? ` ${unit}` : ''}`
   return desc
-}
-
-/**
- * Derive a 2-3 letter document-number prefix from the contractor's
- * company name. "Parker Construction Company" → "PCC". "Acme Roofing"
- * → "AR". Single-word or unparseable → fallback.
- *
- * Skip-words ("the", "of", "and", "&", "a", "an") are ignored so the
- * prefix lands on the actual brand initials.
- */
-function deriveCompanyPrefix(companyName, fallback) {
-  if (!companyName || !String(companyName).trim()) return fallback
-  const skip = new Set(['the', 'of', 'and', '&', 'a', 'an'])
-  const initials = String(companyName)
-    .trim()
-    .split(/\s+/)
-    .filter((w) => w && !skip.has(w.toLowerCase()))
-    .map((w) => w[0])
-    .filter(Boolean)
-    .join('')
-    .toUpperCase()
-    .replace(/[^A-Z]/g, '')
-    .slice(0, 3)
-  return initials.length >= 2 ? initials : fallback
-}
-
-/**
- * Build a document number "{PREFIX}-{YYMM}-{4CHAR}". Prefix derives from
- * the company name (or a neutral fallback like "INV" / "PROPOSAL" when
- * the name is missing or unparseable). Seed is the source row id so
- * repeat-renders produce stable numbers.
- *
- * NEVER prefixes with the app's name, that's why this function exists.
- */
-function documentNumber(prefix, seed) {
-  const d = new Date()
-  const y = d.getFullYear().toString().slice(-2)
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const tail = seed ? String(seed).slice(-4).toUpperCase() : Math.random().toString(36).slice(2, 6).toUpperCase()
-  return `${prefix}-${y}${m}-${tail}`
-}
-
-/**
- * Render a header on the current invoice page (4D-2D extended).
- * Logo or wordmark left, doc meta block right, brand-accent gold bar.
- *
- * @param {object} doc
- * @param {object} opts
- * @param {object} opts.company         { name, address, phone, email, website }
- * @param {string} opts.documentType    e.g. 'Invoice'
- * @param {string} opts.documentNumber
- * @param {string} opts.date
- * @param {object} [opts.logo]          { dataUrl, format, width, height } | null
- * @param {[number,number,number]} [opts.brandGold]  RGB tuple, defaults FIELD_GOLD
- * @param {string} [opts.trustLine]     pre-formatted micro-cap trust string
- */
-function drawHeader(doc, {
-  company,
-  documentType,
-  documentNumber,
-  date,
-  logo = null,
-  brandGold = FIELD_GOLD,
-  trustLine = ''
-}) {
-  const pageWidth = doc.internal.pageSize.getWidth()
-
-  // Brand-accent bar across the top
-  doc.setFillColor(...brandGold)
-  doc.rect(0, 0, pageWidth, 4, 'F')
-
-  // Company mark (left), logo image when available, else wordmark text
-  if (logo && logo.dataUrl && logo.width > 0 && logo.height > 0) {
-    const maxW = 60
-    const maxH = 22
-    const aspect = logo.width / logo.height
-    let w = maxW
-    let h = w / aspect
-    if (h > maxH) {
-      h = maxH
-      w = h * aspect
-    }
-    try {
-      doc.addImage(logo.dataUrl, logo.format || 'PNG', 14, 8, w, h)
-    } catch {
-      drawInvoiceWordmark(doc, company)
-    }
-  } else {
-    drawInvoiceWordmark(doc, company)
-  }
-
-  // Contact lines under the mark
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(9)
-  doc.setTextColor(...INK_MUTED)
-  let y = 33
-  if (company?.address) { doc.text(company.address, 14, y); y += 4.5 }
-  if (company?.phone)   { doc.text(company.phone, 14, y);   y += 4.5 }
-  if (company?.email)   { doc.text(company.email, 14, y);   y += 4.5 }
-  if (company?.website) { doc.text(company.website, 14, y); y += 4.5 }
-
-  // Optional trust line, license + insured
-  if (trustLine) {
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(7.5)
-    doc.setTextColor(...INK_MUTED)
-    doc.setCharSpace(0.4)
-    doc.text(trustLine, 14, y + 0.5)
-    doc.setCharSpace(0)
-    y += 4.5
-  }
-
-  // Doc meta (right), aligned right
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(10)
-  doc.setTextColor(...brandGold)
-  doc.text(documentType.toUpperCase(), pageWidth - 14, 20, { align: 'right' })
-
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(9)
-  doc.setTextColor(...ONYX)
-  doc.text(`No. ${documentNumber}`, pageWidth - 14, 26, { align: 'right' })
-  doc.setTextColor(...INK_MUTED)
-  doc.text(date, pageWidth - 14, 30.5, { align: 'right' })
-
-  // Header divider sits below the longest left column. Pin to a stable
-  // y so the table below always starts at a predictable position even
-  // when the contact block is thin.
-  const dividerY = Math.max(46, y + 2)
-  doc.setDrawColor(220, 215, 205)
-  doc.setLineWidth(0.3)
-  doc.line(14, dividerY, pageWidth - 14, dividerY)
-
-  return dividerY + 6  // y cursor after header
-}
-
-function drawInvoiceWordmark(doc, company) {
-  doc.setTextColor(...ONYX)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(24)
-  doc.text((company?.name || 'My Company').toUpperCase(), 14, 22)
-}
-
-function drawBillTo(doc, y, contact) {
-  doc.setTextColor(...INK_MUTED)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(8)
-  doc.text('BILL TO', 14, y)
-
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(12)
-  doc.setTextColor(...ONYX)
-  doc.text(contact?.name || '\u2003', 14, y + 5)
-
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(9)
-  doc.setTextColor(...INK_MUTED)
-  let yy = y + 10
-  if (contact?.address) { doc.text(contact.address, 14, yy); yy += 4.5 }
-  if (contact?.phone)   { doc.text(contact.phone, 14, yy);   yy += 4.5 }
-  if (contact?.email)   { doc.text(contact.email, 14, yy);   yy += 4.5 }
-
-  return yy + 4
-}
-
-function drawFooter(doc, tagline = '') {
-  const pageWidth = doc.internal.pageSize.getWidth()
-  const pageHeight = doc.internal.pageSize.getHeight()
-
-  doc.setDrawColor(220, 215, 205)
-  doc.setLineWidth(0.2)
-  doc.line(14, pageHeight - 16, pageWidth - 14, pageHeight - 16)
-
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(8)
-  doc.setTextColor(...INK_MUTED)
-  doc.text(tagline, 14, pageHeight - 10)
-
-  const pageCount = doc.internal.getNumberOfPages()
-  const current = doc.internal.getCurrentPageInfo().pageNumber
-  doc.text(`Page ${current} of ${pageCount}`, pageWidth - 14, pageHeight - 10, { align: 'right' })
-}
-
-/**
- * Generate a branded invoice PDF, v3 letterhead (Phase 4 parity).
- *
- * Mirrors src/components/documents/InvoiceTemplate.tsx section-for-
- * section so the customer sees the same render whether the contractor
- * previewed it on-screen or received it as an email attachment.
- *
- * Layout, top → bottom:
- *   1. Thin brand-accent rule
- *   2. Letterhead row, logo block (left) + company name + tagline
- *      (center) + status pill (right)
- *   3. Title block, INVOICE eyebrow + project title (Times bold)
- *   4. Meta grid, CLIENT / ISSUED / DUE / INVOICE #
- *   5. Bill to + Project snapshot (two-column)
- *   6. Invoice items table (Description / Qty / Rate / Amount)
- *   7. Totals card (right-aligned: subtotal / tax / AMOUNT DUE)
- *   8. Payment history (when payments.length > 0)
- *   9. Balance summary, Contract / Paid / This invoice with the
- *      Balance Remaining hero in brand-accent gold (or "PAID")
- *  10. Payment instructions paragraph
- *  11. Footer, contact line + LIC + INSURED trust line
- *
- * White-label: company.name / company.logo_url / company.brand_accent_hex
- * drive every customer-visible byte. The app's name never appears.
- *
- * @param {object}  opts
- * @param {object}  opts.company        { name, address, phone, email, website,
- *                                          logo_url, brand_accent_hex,
- *                                          license_number, insured_text }
- * @param {object}  opts.contact        { id, name, address, phone, email, job_title }
- * @param {Array}   opts.lineItems      [{ description, qty, rate, amount, unit, notes }]
- * @param {number}  [opts.taxRate]      decimal, e.g. 0.0725
- * @param {string}  [opts.notes]        appended under Payment Instructions
- * @param {string}  [opts.dueDate]      human-formatted; empty → "On receipt"
- * @param {string}  [opts.invoiceId]    seed for the stable doc number
- * @param {Array}   [opts.payments]     [{ amount, method, reference, paid_on, note }]
- * @param {number}  [opts.contractTotal] when omitted: subtotal+tax
- * @param {number}  [opts.previouslyPaid] when omitted: sum(payments)
- * @returns {{ doc: jsPDF, filename: string, number: string }}
- */
-// ============================================================
-// V4 shared PDF helpers, restrained-editorial layout matching the
-// "Estimate #62" reference. Used by BOTH generateInvoice and
-// generateQuote so they look like siblings.
-//
-//   drawDocLogo       , square brand-color block, logo image or monogram
-//   drawDocLetterhead , logo + "{TYPE} #{N}" + Sent on date
-//   drawDocParties    , RECIPIENT / SENDER two-column
-//   drawDocItemsTable , dark-bar autoTable with multi-line desc
-//   drawDocTotalsBlock, right-aligned subtotal stack + boxed Total
-//   drawDocDisclaimer , bottom fine-print paragraph
-// ============================================================
-
-function drawDocLogo(doc, { x, y, size, company, logo, brandRGB }) {
-  // Brand-color filled square. Logo image centered when available;
-  // monogram fallback in white when not.
-  doc.setFillColor(...brandRGB)
-  doc.setDrawColor(...brandRGB)
-  doc.roundedRect(x, y, size, size, 1.5, 1.5, 'F')
-
-  if (logo && logo.dataUrl && logo.width > 0 && logo.height > 0) {
-    const pad = 4
-    const maxW = size - pad * 2
-    const maxH = size - pad * 2
-    const aspect = logo.width / logo.height
-    let w = maxW
-    let h = w / aspect
-    if (h > maxH) { h = maxH; w = h * aspect }
-    try {
-      doc.addImage(logo.dataUrl, logo.format || 'PNG', x + (size - w) / 2, y + (size - h) / 2, w, h)
-      return
-    } catch {
-      // fall through to monogram
-    }
-  }
-  const initials = (company?.name || 'MC')
-    .split(/\s+/).filter(Boolean).map((w) => w[0])
-    .join('').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 2) || 'MC'
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(20)
-  doc.setTextColor(255, 255, 255)
-  doc.text(initials, x + size / 2, y + size / 2 + 3, { align: 'center' })
-}
-
-function drawDocLetterhead(doc, opts) {
-  const { pageWidth, margin, docType, number, issuedAt, company, logo, brandRGB } = opts
-  const logoSize = 26 // mm
-  const topY = 18
-
-  // Logo (left)
-  drawDocLogo(doc, { x: margin, y: topY, size: logoSize, company, logo, brandRGB })
-
-  // Right column, doc type + number + horizontal rule + "Sent on" + date
-  const rightCol = pageWidth - margin
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(20)
-  doc.setTextColor(...ONYX)
-  doc.text(`${docType.toUpperCase()} #${number}`, rightCol, topY + 6, { align: 'right' })
-
-  // Rule
-  doc.setDrawColor(...ONYX)
-  doc.setLineWidth(0.4)
-  doc.line(margin + logoSize + 12, topY + 9, rightCol, topY + 9)
-
-  // SENT ON
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(8)
-  doc.setTextColor(...ONYX)
-  doc.setCharSpace(0.8)
-  doc.text('SENT ON:', rightCol, topY + 15, { align: 'right' })
-  doc.setCharSpace(0)
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(11)
-  doc.text(formatDocDate(issuedAt), rightCol, topY + 21, { align: 'right' })
-
-  return topY + logoSize + 10 // returned cursor Y
 }
 
 function drawDocParties(doc, opts) {
@@ -388,7 +162,7 @@ function drawDocParties(doc, opts) {
   // doesn't overprint the adjacent column or run off the page.
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(13)
-  const recipNameLines = doc.splitTextToSize(String(recipient?.name || '\u2003'), colW)
+  const recipNameLines = doc.splitTextToSize(String(recipient?.name || ''), colW)
   const compNameLines = doc.splitTextToSize(String(company?.name || 'My Company'), colW)
   doc.text(recipNameLines, leftX, y + 13)
   doc.text(compNameLines, rightX, y + 13)
@@ -423,8 +197,26 @@ function drawDocParties(doc, opts) {
   return Math.max(leftY, rightY) + 6
 }
 
+// autoTable margins. The bottom margin stops rows above the page footer;
+// without it rows ran to autoTable's 14mm default and printed over the
+// fine print on every page break.
+function tableMargin({ margin, pageHeight, bottom }) {
+  return { left: margin, right: margin, bottom: pageHeight - bottom }
+}
+
+// Hairline under each body row, drawn after the cell.
+function rowRule(color) {
+  return (data) => {
+    if (data.section !== 'body') return
+    const { doc: d, cell } = data
+    d.setDrawColor(...color)
+    d.setLineWidth(0.15)
+    d.line(cell.x, cell.y + cell.height, cell.x + cell.width, cell.y + cell.height)
+  }
+}
+
 function drawDocItemsTable(doc, opts) {
-  const { startY, rows, brandRGB, margin, pageWidth, layout = 'detailed' } = opts
+  const { startY, rows, brandRGB, margin, pageWidth, pageHeight, bottom, layout = 'detailed' } = opts
 
   const commonStyles = {
     theme: 'plain',
@@ -432,25 +224,18 @@ function drawDocItemsTable(doc, opts) {
       fillColor: brandRGB,
       textColor: [255, 255, 255],
       fontStyle: 'bold',
-      fontSize: 12,
-      cellPadding: { top: 4, right: 5, bottom: 4, left: 5 }
+      fontSize: TABLE_FONT_PT,
+      cellPadding: { top: 4, right: 3, bottom: 4, left: 3 }
     },
     bodyStyles: {
-      fontSize: 12,
+      fontSize: TABLE_FONT_PT,
       textColor: ONYX,
-      cellPadding: { top: 5, right: 5, bottom: 5, left: 5 },
+      cellPadding: { top: 5, right: 3, bottom: 5, left: 3 },
       lineWidth: 0,
       valign: 'top'
     },
-    didDrawCell: function (data) {
-      if (data.section === 'body') {
-        const { doc: d, cell } = data
-        d.setDrawColor(232, 228, 216)
-        d.setLineWidth(0.15)
-        d.line(cell.x, cell.y + cell.height, cell.x + cell.width, cell.y + cell.height)
-      }
-    },
-    margin: { left: margin, right: margin }
+    didDrawCell: rowRule([232, 228, 216]),
+    margin: tableMargin({ margin, pageHeight, bottom })
   }
 
   // Sectioned: one row per trade, Scope | Description | Amount. Drops
@@ -466,8 +251,8 @@ function drawDocItemsTable(doc, opts) {
         const amount = Number(r.amount != null ? r.amount : Number(r.qty || 1) * Number(r.rate || 0))
         const desc = r.descriptionLines && r.descriptionLines.length > 0
           ? r.descriptionLines.join('\n')
-          : (r.description || '\u2003')
-        return [r.title || '\u2003', desc, money(amount)]
+          : (r.description || '')
+        return [r.title || '', desc, money(amount)]
       }),
       ...commonStyles,
       columnStyles: {
@@ -479,6 +264,8 @@ function drawDocItemsTable(doc, opts) {
     return doc.lastAutoTable.finalY
   }
 
+  // Money columns are sized for 10pt amounts up to $9,999,999.99 on one
+  // line, and every header fits on one line.
   autoTable(doc, {
     startY,
     head: [['Product/Service', 'Description', 'Qty.', 'Unit Price', 'Total']],
@@ -488,9 +275,9 @@ function drawDocItemsTable(doc, opts) {
       const amount = Number(r.amount != null ? r.amount : qty * rate)
       const desc = r.descriptionLines && r.descriptionLines.length > 0
         ? r.descriptionLines.join('\n')
-        : (r.description || '\u2003')
+        : (r.description || '')
       return [
-        r.title || '\u2003',
+        r.title || '',
         desc,
         `${qty}${r.unit ? ` ${r.unit}` : ''}`,
         money(rate),
@@ -501,18 +288,22 @@ function drawDocItemsTable(doc, opts) {
     columnStyles: {
       0: { cellWidth: 36, fontStyle: 'bold' },
       1: { cellWidth: 'auto' },
-      2: { halign: 'right', cellWidth: 16 },
-      3: { halign: 'right', cellWidth: 26 },
-      4: { halign: 'right', cellWidth: 26, fontStyle: 'bold' }
+      2: { halign: 'right', cellWidth: 18 },
+      3: { halign: 'right', cellWidth: 32 },
+      4: { halign: 'right', cellWidth: 32, fontStyle: 'bold' }
     }
   })
   return doc.lastAutoTable.finalY
 }
 
 function drawDocTotalsBlock(doc, opts) {
-  const { startY, pageWidth, margin, label, total, rows = [] } = opts
+  const { startY, pageWidth, margin, label, total, rows = [], bottom } = opts
   const rightX = pageWidth - margin
-  let cursor = startY + 4
+  // Keep the block together: below the table it totals, or at the top of
+  // the next page when it would reach the page footer.
+  const blockH = 4 + (rows.length > 0 ? rows.length * 6 + 2 : 0) + 11
+  let cursor = (bottom != null && startY + blockH > bottom) ? newPage(doc) - 4 : startY
+  cursor += 4
 
   // Stack of optional sub-rows on the right
   if (rows.length > 0) {
@@ -556,7 +347,7 @@ function drawDocTotalsBlock(doc, opts) {
 // instructions, rendered as a soft-tinted panel with a clickable link.
 // Returns the new cursor Y. No-op (returns startY) when neither set.
 function drawDocPayBlock(doc, opts) {
-  const { startY, margin, pageWidth, pageHeight, brandRGB, company } = opts
+  const { startY, margin, pageWidth, bottom, brandRGB, company } = opts
   const link = (company?.payment_link || '').trim()
   const instructions = (company?.payment_instructions || '').trim()
   if (!link && !instructions) return startY
@@ -566,12 +357,13 @@ function drawDocPayBlock(doc, opts) {
 
   const innerW = pageWidth - margin * 2
   // Measure: heading + optional link line + wrapped instructions.
+  doc.setFont('helvetica', 'normal')
   doc.setFontSize(10)
   const instrLines = instructions ? doc.splitTextToSize(instructions, innerW - 12) : []
   const bodyH = 7 + (url ? 6 : 0) + instrLines.length * 4.6
   const panelH = bodyH + 8
   let y = startY + 6
-  if (y + panelH > pageHeight - 22) { doc.addPage(); y = 18 }
+  if (y + panelH > bottom) y = newPage(doc)
 
   // Soft brand-tinted panel
   const [r, g, b] = brandRGB || FIELD_GOLD
@@ -594,7 +386,7 @@ function drawDocPayBlock(doc, opts) {
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(11)
     doc.setTextColor(r, g, b)
-    doc.textWithLink(`Pay online → ${display}`, margin + 6, ty, { url })
+    doc.textWithLink(`Pay online at ${display}`, margin + 6, ty, { url })
     ty += 6
   }
   if (instrLines.length > 0) {
@@ -607,17 +399,6 @@ function drawDocPayBlock(doc, opts) {
   return y + panelH
 }
 
-function drawDocDisclaimer(doc, opts) {
-  const { pageWidth, pageHeight, margin, text } = opts
-  if (!text) return
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(9)
-  doc.setTextColor(...INK_MUTED)
-  const lines = doc.splitTextToSize(text, pageWidth - margin * 2)
-  // Anchor near the bottom margin
-  doc.text(lines, margin, pageHeight - 14 - (lines.length - 1) * 4)
-}
-
 // ============================================================
 // Project photos block, embeds tagged section photos into the PDF.
 // Pre-fetches each signed URL through loadImageForPdf (same loader as
@@ -626,7 +407,7 @@ function drawDocDisclaimer(doc, opts) {
 // can split across pages without truncating the last row.
 // ============================================================
 async function drawProjectPhotosBlock(doc, opts) {
-  const { photos, margin, pageWidth, pageHeight, startY, brandRGB, compact = false } = opts
+  const { photos, margin, pageWidth, bottom, startY, brandRGB, compact = false, onNewPage } = opts
   if (!Array.isArray(photos) || photos.length === 0) return startY
 
   // Pre-load all images in parallel. Drops any failures so a single
@@ -642,25 +423,23 @@ async function drawProjectPhotosBlock(doc, opts) {
   const valid = loaded.filter(Boolean)
   if (valid.length === 0) return startY
 
-  // Group by section_tag, empty tag falls into a single 'Project
-  // photos' bucket so untagged uploads still surface.
-  const groups = new Map()
-  for (const p of valid) {
-    const tag = (p.section_tag || '').trim() || 'Project photos'
-    if (!groups.has(tag)) groups.set(tag, [])
-    groups.get(tag).push(p)
-  }
+  // Group by section tag. Untagged photos, and photos whose "tag" is just
+  // their caption, share one 'Project photos' bucket.
+  const groups = groupPhotosByTag(valid)
 
   const cols = compact ? 2 : 3
   const gap = 4
   const innerWidth = pageWidth - margin * 2
   const cellW = (innerWidth - gap * (cols - 1)) / cols
   const cellH = cellW * 0.75 // 4:3 aspect
+  const captioned = valid.some((p) => p.caption)
+  const rowH = cellH + (captioned ? 6 : 4)
 
   let cursor = startY
 
-  // Section header, gold-rule + label, same idiom as the certificate
-  if (cursor > pageHeight - 50) { doc.addPage(); cursor = 18 }
+  // Section header, gold-rule + label, same idiom as the certificate.
+  // Kept on the same page as the first row of photos.
+  if (cursor + 10 + (groups.size > 1 ? 6 : 0) + rowH > bottom) cursor = newPage(doc, onNewPage)
   doc.setDrawColor(...brandRGB)
   doc.setLineWidth(0.6)
   doc.line(margin, cursor, margin + 18, cursor)
@@ -677,12 +456,14 @@ async function drawProjectPhotosBlock(doc, opts) {
     // Per-section sub-label only when there's more than one group :
     // a single bucket reads cleanly without a noisy header.
     if (groups.size > 1) {
-      if (cursor > pageHeight - 30) { doc.addPage(); cursor = 18 }
+      if (cursor + 6 + rowH > bottom) cursor = newPage(doc, onNewPage)
       doc.setFont('helvetica', 'bold')
       doc.setFontSize(8)
       doc.setTextColor(...INK_MUTED)
+      // One line, cut with an ellipsis: a long tag used to run off the page.
+      const label = fitOneLine(doc, String(tag).toUpperCase(), innerWidth, 0.6)
       doc.setCharSpace(0.6)
-      doc.text(String(tag).toUpperCase(), margin, cursor + 3)
+      doc.text(label, margin, cursor + 3)
       doc.setCharSpace(0)
       cursor += 6
     }
@@ -692,10 +473,7 @@ async function drawProjectPhotosBlock(doc, opts) {
     for (let i = 0; i < display.length; i += cols) {
       const row = display.slice(i, i + cols)
       // Page-break check, leave room for the image + caption line.
-      if (cursor + cellH + 8 > pageHeight - 20) {
-        doc.addPage()
-        cursor = 18
-      }
+      if (cursor + rowH > bottom) cursor = newPage(doc, onNewPage)
       row.forEach((p, j) => {
         const x = margin + j * (cellW + gap)
         try {
@@ -707,14 +485,13 @@ async function drawProjectPhotosBlock(doc, opts) {
           doc.rect(x, cursor, cellW, cellH, 'F')
         }
         if (p.caption) {
-          const cap = doc.splitTextToSize(p.caption, cellW)
           doc.setFont('helvetica', 'normal')
           doc.setFontSize(7)
           doc.setTextColor(...INK_MUTED)
-          doc.text(cap.slice(0, 1), x, cursor + cellH + 3)
+          doc.text(fitOneLine(doc, p.caption, cellW), x, cursor + cellH + 3)
         }
       })
-      cursor += cellH + (display.some((p) => p.caption) ? 6 : 4)
+      cursor += rowH
     }
     cursor += 2
   }
@@ -745,12 +522,6 @@ function formatDocDate(d) {
   const dt = parseDateLocal(d)
   if (!dt) return ''
   return dt.toLocaleDateString(undefined, { month: 'long', day: '2-digit', year: 'numeric' })
-}
-
-function shortDocNumber(num) {
-  if (!num) return ''
-  const parts = String(num).split('-')
-  return parts[parts.length - 1] || String(num)
 }
 
 // money() above uses 2 decimals always; this overload allows compact display.
@@ -856,7 +627,7 @@ function drawModernLetterhead(doc, {
     doc.setFont('helvetica', r.strong ? 'bold' : 'normal')
     doc.setFontSize(9.5)
     doc.setTextColor(...(r.strong ? ONYX : [58, 56, 51]))
-    doc.text(String(r.value || '\u2003'), rightCol, ry + 4, { align: 'right' })
+    doc.text(String(r.value || ''), rightCol, ry + 4, { align: 'right' })
     ry += 6
   }
   const rightBottom = ry
@@ -942,7 +713,15 @@ function drawHeroBand(doc, {
 // due, amount, Paid/Due). Mirrors InvoiceTemplate's BillingSchedule.
 // Void AND draft rows are filtered by the caller (never shown to
 // customers). Returns the new cursor Y.
-function drawBillingSchedule(doc, { startY, margin, pageWidth, brandRGB, company, currentId, rows, jobSeed }) {
+// Short date for table cells ("Sep 30, 2026"), the same format the HTML
+// billing schedule uses, so a date fits its column on one line.
+function shortDocDate(d) {
+  const dt = parseDateLocal(d)
+  if (!dt) return ''
+  return dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function drawBillingSchedule(doc, { startY, margin, pageHeight, bottom, brandRGB, company, currentId, rows, jobSeed }) {
   let cursor = drawModernSectionLabel(doc, { margin, y: startY, text: 'Billing schedule' })
   cursor += 4
   autoTable(doc, {
@@ -958,8 +737,8 @@ function drawBillingSchedule(doc, { startY, margin, pageWidth, brandRGB, company
       const marked = currentId != null && inv.id === currentId
       return [
         marked ? `${label}  (this invoice)` : label,
-        formatDocDate(inv.issued_at || inv.created_at) || '\u2003',
-        isPaid ? '\u2003' : (formatDocDate(inv.due_at) || '\u2003'),
+        shortDocDate(inv.issued_at || inv.created_at),
+        isPaid ? '' : shortDocDate(inv.due_at),
         money(Number(inv.amount || 0)),
         isPaid ? 'Paid' : 'Due'
       ]
@@ -969,30 +748,23 @@ function drawBillingSchedule(doc, { startY, margin, pageWidth, brandRGB, company
       fillColor: brandRGB,
       textColor: [255, 255, 255],
       fontStyle: 'bold',
-      fontSize: 12,
-      cellPadding: { top: 4, right: 5, bottom: 4, left: 5 }
+      fontSize: TABLE_FONT_PT,
+      cellPadding: { top: 4, right: 3, bottom: 4, left: 3 }
     },
     bodyStyles: {
-      fontSize: 12,
+      fontSize: TABLE_FONT_PT,
       textColor: [40, 38, 35],
-      cellPadding: { top: 4, right: 5, bottom: 4, left: 5 }
+      cellPadding: { top: 4, right: 3, bottom: 4, left: 3 }
     },
-    didDrawCell: (data) => {
-      if (data.section === 'body') {
-        const { doc: d, cell } = data
-        d.setDrawColor(232, 228, 216)
-        d.setLineWidth(0.15)
-        d.line(cell.x, cell.y + cell.height, cell.x + cell.width, cell.y + cell.height)
-      }
-    },
+    didDrawCell: rowRule([232, 228, 216]),
     columnStyles: {
       0: { cellWidth: 'auto', fontStyle: 'bold' },
-      1: { cellWidth: 26 },
-      2: { cellWidth: 26 },
-      3: { halign: 'right', cellWidth: 24, fontStyle: 'bold' },
-      4: { halign: 'right', cellWidth: 18 }
+      1: { cellWidth: 28 },
+      2: { cellWidth: 28 },
+      3: { halign: 'right', cellWidth: 32, fontStyle: 'bold' },
+      4: { halign: 'right', cellWidth: 20 }
     },
-    margin: { left: margin, right: margin }
+    margin: tableMargin({ margin, pageHeight, bottom })
   })
   return doc.lastAutoTable.finalY
 }
@@ -1000,7 +772,7 @@ function drawBillingSchedule(doc, { startY, margin, pageWidth, brandRGB, company
 // Insurance-claim card, 3-col field grid in a brand-bordered soft
 // panel. Mirrors InsuranceModeBlock.tsx. Renders only when the payload
 // carries at least one field. Returns the new cursor Y.
-function drawModernInsurance(doc, { startY, margin, pageWidth, pageHeight, brandRGB, insurance }) {
+function drawModernInsurance(doc, { startY, margin, pageWidth, bottom, brandRGB, insurance }) {
   if (!insurance) return startY
   const fields = [
     { label: 'Claim number',     value: insurance.claim_number },
@@ -1019,7 +791,7 @@ function drawModernInsurance(doc, { startY, margin, pageWidth, pageHeight, brand
   const gridRows = Math.ceil(fields.length / 3)
   const cardH = gridRows * 14 + 12
   let cursor = startY + 8
-  if (cursor + cardH + 12 > pageHeight - 20) { doc.addPage(); cursor = 18 }
+  if (cursor + cardH + 8 > bottom) cursor = newPage(doc)
 
   cursor = drawModernSectionLabel(doc, { margin, y: cursor, text: 'Insurance claim' })
   cursor += 6
@@ -1058,15 +830,23 @@ function drawModernInsurance(doc, { startY, margin, pageWidth, pageHeight, brand
 // (never pre-fills the customer's name as cursive, that reads as a
 // forged signature). Returns the new cursor Y.
 function drawModernApproval(doc, {
-  startY, margin, pageWidth, pageHeight, company, contact, approval, status
+  startY, margin, pageWidth, bottom, company, contact, approval, status
 }) {
   const stamped = String(status || '').toLowerCase() === 'approved'
     && approval
     && (approval.clientSignatureDataUrl || approval.signature || approval.signatureDataUrl ||
         approval.clientName || approval.approvedByName)
 
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(10)
+  const copy = `Signing below (or approving through the secure link this estimate was delivered with) authorizes ${company?.name || 'the contractor'} to perform the work described above and forms a binding agreement under the stated terms.`
+  const copyLines = doc.splitTextToSize(copy, pageWidth - margin * 2)
+
+  // The label, the copy, both signature cells and the approval note stay
+  // together on one page.
+  const blockH = 7 + copyLines.length * 4.6 + 12 + 30 + (stamped ? 8 : 0)
   let cursor = startY + 14
-  if (cursor + 66 > pageHeight - 18) { doc.addPage(); cursor = 18 }
+  if (cursor + blockH > bottom) cursor = newPage(doc)
 
   cursor = drawModernSectionLabel(doc, { margin, y: cursor, text: 'Acceptance' })
   cursor += 5
@@ -1074,8 +854,6 @@ function drawModernApproval(doc, {
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(10)
   doc.setTextColor(58, 56, 51)
-  const copy = `Signing below (or approving through the secure link this estimate was delivered with) authorizes ${company?.name || 'the contractor'} to perform the work described above and forms a binding agreement under the stated terms.`
-  const copyLines = doc.splitTextToSize(copy, pageWidth - margin * 2)
   doc.text(copyLines, margin, cursor)
   cursor += copyLines.length * 4.6 + 12
 
@@ -1087,7 +865,8 @@ function drawModernApproval(doc, {
     x: leftX, y: cursor, w: colW, label: 'Customer',
     dataUrl: stamped ? (approval.clientSignatureDataUrl || approval.signature || approval.signatureDataUrl) : null,
     name: stamped ? (approval.clientName || approval.approvedByName || contact?.name) : null,
-    date: stamped ? (approval.clientApprovedAt || approval.approvedAt || approval.approved_at) : null
+    date: stamped ? (approval.clientApprovedAt || approval.approvedAt || approval.approved_at) : null,
+    esignAnchorColor: [255, 255, 255]
   })
   drawSigCell(doc, {
     x: rightX, y: cursor, w: colW, label: 'Contractor',
@@ -1108,7 +887,19 @@ function drawModernApproval(doc, {
   return cursor
 }
 
-function drawSigCell(doc, { x, y, w, label, dataUrl, name, date }) {
+// DocuSign anchors for a customer signature line, drawn in the page color:
+// Sign Here at the left end of the line, Date Signed toward the right end.
+// DocuSign lines a field's bottom edge up with the bottom of its anchor, so
+// both fields sit just above the line.
+function drawEsignAnchors(doc, { x, lineY, width, color }) {
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(6)
+  doc.setTextColor(...color)
+  doc.text(ESIGN_SIGN_ANCHOR, x + 1, lineY - 1.5)
+  doc.text(ESIGN_DATE_ANCHOR, x + width - 32, lineY - 1.5)
+}
+
+function drawSigCell(doc, { x, y, w, label, dataUrl, name, date, esignAnchorColor = null }) {
   if (dataUrl) {
     try {
       doc.addImage(dataUrl, 'PNG', x, y, Math.min(w, 60), 16)
@@ -1125,6 +916,7 @@ function drawSigCell(doc, { x, y, w, label, dataUrl, name, date }) {
   doc.setDrawColor(...ONYX)
   doc.setLineWidth(0.4)
   doc.line(x, y + 20, x + w, y + 20)
+  if (esignAnchorColor) drawEsignAnchors(doc, { x, lineY: y + 20, width: w, color: esignAnchorColor })
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(7.5)
   doc.setTextColor(...INK_MUTED)
@@ -1165,10 +957,12 @@ export async function generateInvoice({
   currentInvoice = null,
   photos = []
 } = {}) {
-  const doc = new jsPDF({ unit: 'mm', format: 'letter' })
+  const doc = createPdfDoc()
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()
   const margin = 16
+  const footer = footerLayout(doc, { pageWidth, pageHeight, margin, text: INVOICE_DISCLAIMER })
+  const bottom = footer.contentBottom
 
   // Sequence-aware, company-unique, per-job number so the emailed PDF
   // number matches the web link. Rendered in FULL (not truncated).
@@ -1192,7 +986,7 @@ export async function generateInvoice({
   const dueDisplay = dueRaw ? formatDocDate(dueRaw) : (dueDate || '')
 
   // 1. Letterhead (premium company-name chrome + Issued/Due meta)
-  const metaRows = [{ label: 'Issued', value: formatDocDate(issuedAt) || '\u2003' }]
+  const metaRows = [{ label: 'Issued', value: formatDocDate(issuedAt) }]
   if (dueDisplay) metaRows.push({ label: 'Due', value: dueDisplay, strong: true })
   let cursor = drawModernLetterhead(doc, {
     pageWidth, margin, docType: 'Invoice', number, company, logo, brandRGB, metaRows
@@ -1259,11 +1053,12 @@ export async function generateInvoice({
 
   // 4. Items, only when the invoice actually carries line items.
   if (rows.length > 0) {
+    if (cursor + 30 > bottom) cursor = newPage(doc)
     cursor = drawModernSectionLabel(doc, { margin, y: cursor, text: 'Billed this invoice' })
-    cursor = drawDocItemsTable(doc, { startY: cursor + 4, rows, brandRGB, margin, pageWidth })
+    cursor = drawDocItemsTable(doc, { startY: cursor + 4, rows, brandRGB, margin, pageWidth, pageHeight, bottom })
     if (taxRate > 0) {
       cursor = drawDocTotalsBlock(doc, {
-        startY: cursor, pageWidth, margin,
+        startY: cursor, pageWidth, margin, bottom,
         label: 'This invoice', total: thisInvoice,
         rows: [
           { label: 'Subtotal', value: moneyCompact(subtotal) },
@@ -1280,9 +1075,10 @@ export async function generateInvoice({
   )
   if (scheduleRows.length > 0) {
     cursor += 8
-    if (cursor > pageHeight - 50) { doc.addPage(); cursor = 18 }
+    // Label, header row and the first draw together.
+    if (cursor + 30 > bottom) cursor = newPage(doc)
     cursor = drawBillingSchedule(doc, {
-      startY: cursor, margin, pageWidth, brandRGB, company,
+      startY: cursor, margin, pageHeight, bottom, brandRGB, company,
       currentId: currentInvoice?.id || null, rows: scheduleRows,
       jobSeed: contact?.id
     })
@@ -1291,22 +1087,25 @@ export async function generateInvoice({
   // 6. Balance summary / contract position, the one reconciliation the
   //    customer can check (contract → COs → this invoice → paid → balance).
   if (ct > 0 || pp > 0) {
+    // Plain ASCII signs: the standard PDF fonts cannot draw U+2212, and a
+    // string holding it printed as junk, losing the sign on credits.
+    const balanceRows = []
+    balanceRows.push(['Original contract', moneyCompact(rawContract)])
+    if (approvedCO !== 0) {
+      balanceRows.push(['Approved change orders', `${approvedCO >= 0 ? '+' : '-'}${moneyCompact(Math.abs(approvedCO))}`])
+      balanceRows.push(['Contract to date', moneyCompact(ct)])
+    }
+    balanceRows.push(['This invoice', moneyCompact(thisInvoice)])
+    balanceRows.push(['Paid to date', pp > 0 ? `-${moneyCompact(pp)}` : moneyCompact(0)])
+
     cursor += 10
-    if (cursor > pageHeight - 60) { doc.addPage(); cursor = 18 }
+    // The whole reconciliation stays on one page.
+    if (cursor + 14 + balanceRows.length * 6 > bottom) cursor = newPage(doc)
     cursor = drawModernSectionLabel(doc, { margin, y: cursor, text: 'Contract position' })
     doc.setDrawColor(213, 207, 190)
     doc.setLineWidth(0.3)
     doc.line(margin, cursor + 2, pageWidth - margin, cursor + 2)
     cursor += 8
-
-    const balanceRows = []
-    balanceRows.push(['Original contract', moneyCompact(rawContract)])
-    if (approvedCO !== 0) {
-      balanceRows.push(['Approved change orders', `${approvedCO >= 0 ? '+' : '−'}${moneyCompact(Math.abs(approvedCO))}`])
-      balanceRows.push(['Contract to date', moneyCompact(ct)])
-    }
-    balanceRows.push(['This invoice', moneyCompact(thisInvoice)])
-    balanceRows.push(['Paid to date', pp > 0 ? `−${moneyCompact(pp)}` : moneyCompact(0)])
 
     const labelX = margin
     const valueX = pageWidth - margin
@@ -1334,13 +1133,13 @@ export async function generateInvoice({
 
   // 7. Insurance claim (roofing / restoration jobs), dead code before.
   cursor = drawModernInsurance(doc, {
-    startY: cursor, margin, pageWidth, pageHeight, brandRGB, insurance
+    startY: cursor, margin, pageWidth, bottom, brandRGB, insurance
   })
 
-  // 8. Notes / payment instructions
+  // 8. Notes / payment instructions, flowing across pages when long.
   if (notes) {
     cursor += 8
-    if (cursor > pageHeight - 40) { doc.addPage(); cursor = 18 }
+    if (cursor + 5 + 4.5 > bottom) cursor = newPage(doc)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(9)
     doc.setTextColor(...ONYX)
@@ -1351,19 +1150,18 @@ export async function generateInvoice({
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(10)
     const wrapped = doc.splitTextToSize(notes, pageWidth - margin * 2)
-    doc.text(wrapped, margin, cursor)
-    cursor += wrapped.length * 4.5
+    cursor = drawFlowingLines(doc, wrapped, { x: margin, y: cursor, lineHeight: 4.5, bottom })
   }
 
   // 6a. How to pay, the contractor's bring-your-own pay link.
-  cursor = drawDocPayBlock(doc, { startY: cursor, margin, pageWidth, pageHeight, brandRGB, company })
+  cursor = drawDocPayBlock(doc, { startY: cursor, margin, pageWidth, bottom, brandRGB, company })
 
   // 6b. Project photos, quiet 2-up strip, capped at 4. Invoice tone
   // is "here's the work you paid for", not the proposal's sales pitch.
   if (Array.isArray(photos) && photos.length > 0) {
     cursor = await drawProjectPhotosBlock(doc, {
       photos: photos.slice(0, 4),
-      margin, pageWidth, pageHeight, startY: cursor + 8, brandRGB,
+      margin, pageWidth, bottom, startY: cursor + 8, brandRGB,
       compact: true
     })
   }
@@ -1372,7 +1170,7 @@ export async function generateInvoice({
   const total_pages = doc.internal.getNumberOfPages()
   for (let p = 1; p <= total_pages; p++) {
     doc.setPage(p)
-    drawDocDisclaimer(doc, { pageWidth, pageHeight, margin, text: INVOICE_DISCLAIMER })
+    drawFooterText(doc, footer, INK_MUTED)
   }
 
   return {
@@ -1400,10 +1198,15 @@ export async function generateStatement({
   lines = [],
   statementId
 } = {}) {
-  const doc = new jsPDF({ unit: 'mm', format: 'letter' })
+  const doc = createPdfDoc()
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()
   const margin = 16
+  const footer = footerLayout(doc, {
+    pageWidth, pageHeight, margin,
+    text: 'Statement of open invoices across all properties. Please remit the total due or contact us with any questions.'
+  })
+  const bottom = footer.contentBottom
 
   const number = docInvoiceNumber(company?.name, statementId || client?.id)
   const logo = company?.logo_url
@@ -1442,7 +1245,7 @@ export async function generateStatement({
     head: [['Property / Project', 'Contract', 'Paid', 'Balance Due']],
     body: lines.length > 0
       ? lines.map((l) => [
-          l.property || '\u2003',
+          l.property || '',
           money(Number(l.contract || 0)),
           money(Number(l.paid || 0)),
           money(Number(l.balance || 0))
@@ -1453,52 +1256,42 @@ export async function generateStatement({
       fillColor: brandRGB,
       textColor: [255, 255, 255],
       fontStyle: 'bold',
-      fontSize: 12,
-      cellPadding: { top: 4, right: 5, bottom: 4, left: 5 }
+      fontSize: TABLE_FONT_PT,
+      cellPadding: { top: 4, right: 3, bottom: 4, left: 3 }
     },
     bodyStyles: {
-      fontSize: 12,
+      fontSize: TABLE_FONT_PT,
       textColor: [40, 38, 35],
-      cellPadding: { top: 4, right: 5, bottom: 4, left: 5 }
+      cellPadding: { top: 4, right: 3, bottom: 4, left: 3 }
     },
-    didDrawCell: (data) => {
-      if (data.section === 'body') {
-        const { doc: d, cell } = data
-        d.setDrawColor(232, 228, 216)
-        d.setLineWidth(0.15)
-        d.line(cell.x, cell.y + cell.height, cell.x + cell.width, cell.y + cell.height)
-      }
-    },
+    didDrawCell: rowRule([232, 228, 216]),
     columnStyles: {
       0: { cellWidth: 'auto', fontStyle: 'bold' },
-      1: { halign: 'right', cellWidth: 28 },
-      2: { halign: 'right', cellWidth: 26 },
-      3: { halign: 'right', cellWidth: 30, fontStyle: 'bold' }
+      1: { halign: 'right', cellWidth: 32 },
+      2: { halign: 'right', cellWidth: 32 },
+      3: { halign: 'right', cellWidth: 32, fontStyle: 'bold' }
     },
-    margin: { left: margin, right: margin }
+    margin: tableMargin({ margin, pageHeight, bottom })
   })
   cursor = doc.lastAutoTable.finalY
 
   // 4. Total due block
   cursor = drawDocTotalsBlock(doc, {
     startY: cursor + 2,
-    pageWidth, margin,
+    pageWidth, margin, bottom,
     label: 'TOTAL DUE',
     total: totalDue,
     rows: [{ label: `${lines.length} ${lines.length === 1 ? 'property' : 'properties'}`, value: money(totalDue), muted: true }]
   })
 
   // 4b. How to pay, bring-your-own pay link.
-  cursor = drawDocPayBlock(doc, { startY: cursor, margin, pageWidth, pageHeight, brandRGB, company })
+  cursor = drawDocPayBlock(doc, { startY: cursor, margin, pageWidth, bottom, brandRGB, company })
 
   // 5. Disclaimer footer on every page
   const total_pages = doc.internal.getNumberOfPages()
   for (let p = 1; p <= total_pages; p++) {
     doc.setPage(p)
-    drawDocDisclaimer(doc, {
-      pageWidth, pageHeight, margin,
-      text: 'Statement of open invoices across all properties. Please remit the total due or contact us with any questions.'
-    })
+    drawFooterText(doc, footer, INK_MUTED)
   }
 
   return {
@@ -1508,146 +1301,6 @@ export async function generateStatement({
     totalDue
   }
 }
-
-
-
-function shortDate(iso) {
-  const d = parseDateLocal(iso)
-  if (!d) return ''
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-function drawLetterheadLogo(doc, { x, y, size, company, logo, brandGold }) {
-  // Bordered cream square. Holds the logo image when available; falls
-  // back to a brand-accent monogram of the company initials.
-  doc.setFillColor(255, 252, 246)
-  doc.setDrawColor(...brandGold)
-  doc.setLineWidth(0.4)
-  doc.roundedRect(x, y, size, size, 1.5, 1.5, 'FD')
-
-  if (logo && logo.dataUrl && logo.width > 0 && logo.height > 0) {
-    const pad = 2
-    const maxW = size - pad * 2
-    const maxH = size - pad * 2
-    const aspect = logo.width / logo.height
-    let w = maxW
-    let h = w / aspect
-    if (h > maxH) { h = maxH; w = h * aspect }
-    try {
-      doc.addImage(logo.dataUrl, logo.format || 'PNG', x + (size - w) / 2, y + (size - h) / 2, w, h)
-      return
-    } catch {
-      // fall through to monogram
-    }
-  }
-
-  const initials = (company?.name || 'MC')
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((w) => w[0])
-    .join('')
-    .toUpperCase()
-    .replace(/[^A-Z]/g, '')
-    .slice(0, 2) || 'MC'
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(11)
-  doc.setTextColor(...brandGold)
-  doc.text(initials, x + size / 2, y + size / 2 + 2, { align: 'center' })
-}
-
-function buildLetterheadTagline(company) {
-  const addr = (company?.address || '').trim()
-  if (!addr) return ''
-  const parts = addr.split(',').map((s) => s.trim()).filter(Boolean)
-  return parts.length >= 2 ? parts.slice(-2).join(', ') : addr
-}
-
-function drawStatusPill(doc, { x, y, label, brandGold }) {
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(8)
-  doc.setCharSpace(0.6)
-  const text = label.toUpperCase()
-  const textWidth = doc.getTextWidth(text)
-  const padX = 5
-  const w = textWidth + padX * 2
-  const h = 7
-  doc.setFillColor(255, 248, 236)
-  doc.setDrawColor(...brandGold)
-  doc.setLineWidth(0.35)
-  doc.roundedRect(x - w, y - h / 2, w, h, 3.2, 3.2, 'FD')
-  doc.setTextColor(...brandGold)
-  doc.text(text, x - w / 2, y + 0.7, { align: 'center' })
-  doc.setCharSpace(0)
-}
-
-function drawMetaGrid(doc, { x, y, width, cols }) {
-  if (!cols?.length) return
-  const colWidth = width / cols.length
-
-  doc.setDrawColor(213, 207, 190)
-  doc.setLineWidth(0.2)
-  doc.line(x, y - 4, x + width, y - 4)
-
-  cols.forEach((col, i) => {
-    const cx = x + colWidth * i
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(7)
-    doc.setTextColor(...INK_MUTED)
-    doc.setCharSpace(0.6)
-    doc.text(col.label, cx, y)
-    doc.setCharSpace(0)
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(11)
-    doc.setTextColor(...(col.valueColor || ONYX))
-    if (col.stamp) doc.setCharSpace(0.4)
-    doc.text(col.value || '\u2003', cx, y + 6)
-    if (col.stamp) doc.setCharSpace(0)
-  })
-}
-
-function drawTwoColumnPanel(doc, { x, y, width, leftLabel, leftLines, rightLabel, rightLines }) {
-  const colW = width / 2
-  // Left
-  drawColumn(doc, { x, y, colW, label: leftLabel, lines: leftLines })
-  // Right
-  drawColumn(doc, { x: x + colW, y, colW, label: rightLabel, lines: rightLines })
-}
-
-function drawColumn(doc, { x, y, colW, label, lines }) {
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(7)
-  doc.setTextColor(...INK_MUTED)
-  doc.setCharSpace(0.6)
-  doc.text(label, x, y)
-  doc.setCharSpace(0)
-  let ly = y + 6
-  lines.forEach((line, i) => {
-    const isFirst = i === 0
-    doc.setFont('helvetica', isFirst ? 'bold' : 'normal')
-    doc.setFontSize(isFirst ? 12 : 9.5)
-    doc.setTextColor(...(isFirst ? ONYX : INK_MUTED))
-    const wrapped = doc.splitTextToSize(line, colW - 8)
-    doc.text(wrapped, x, ly)
-    ly += wrapped.length * (isFirst ? 5 : 4.5)
-  })
-}
-
-function drawSectionHeading(doc, { x, y, width, eyebrow, title, brandGold }) {
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(7.5)
-  doc.setTextColor(...brandGold)
-  doc.setCharSpace(0.8)
-  doc.text(eyebrow, x, y)
-  doc.setCharSpace(0)
-  doc.setFont('times', 'bold')
-  doc.setFontSize(14)
-  doc.setTextColor(...ONYX)
-  doc.text(title, x, y + 7)
-  doc.setDrawColor(232, 228, 216)
-  doc.setLineWidth(0.2)
-  doc.line(x, y + 10, x + width, y + 10)
-}
-
 
 /**
  * Parse `profile.brand_accent_hex` and return an [r, g, b] tuple
@@ -1679,35 +1332,6 @@ function parseBrandAccentRgb(hex) {
   return [r, g, b]
 }
 
-/**
- * Generate a premium proposal PDF from fh_quote_items + the customer-
- * facing prose blocks on fh_contacts.
- *
- * Single-price line items. is_optional rows render in their own table
- * on page 3 tagged "not included in the quoted price." is_excluded
- * rows render as a bullet list in the EXCLUDED column on page 4.
- *
- * @param {object} opts
- * @param {object} opts.company     { name, address, phone, email }
- * @param {object} opts.contact     { id, name, address, phone, email, job_title }
- * @param {Array}  opts.items       fh_quote_items rows
- * @param {string} opts.scope       scope_text (prose)
- * @param {string} opts.terms       terms_text (payment terms prose)
- * @param {string} opts.exclusions  exclusions_text (out-of-scope prose)
- * @param {string} opts.expiresAt   quote_expires_at ISO timestamp (or null)
- * @param {string} opts.status      proposal_status (accepted; not currently
- *                                  rendered, see opts.approval for the
- *                                  approval-stamped variant)
- * @param {string} opts.quoteId     contact id for number fingerprinting
- * @param {object} [opts.approval]  Phase 4C-3. When present, renders the
- *                                  approved-snapshot variant: a green
- *                                  APPROVED seal on the cover and a
- *                                  certificate block on the final page.
- *                                  Shape: { versionNumber, quoteNumber,
- *                                  method, approvedByName, approvedByEmail,
- *                                  approvalNote, baseTotal, approvedAt }
- * @returns {{ doc: jsPDF, filename: string, number: string }}
- */
 // ============================================================
 // Themed proposal PDFs, slate / mint / editorial. These mirror the
 // HTML themes in src/components/documents/proposalThemes.tsx: a
@@ -1716,25 +1340,36 @@ function parseBrandAccentRgb(hex) {
 // signatures). Individual line items, not the trade-level rollup.
 // ============================================================
 
-const PDF_THEMES = {
-  slate: {
-    headFill: [26, 24, 20], headText: [255, 255, 255], accent: [63, 70, 81],
-    ink: [26, 24, 20], mid: [58, 56, 51], muted: [107, 106, 102], bg: null
-  },
-  mint: {
-    headFill: [79, 122, 99], headText: [255, 255, 255], accent: [79, 122, 99],
-    ink: [26, 24, 20], mid: [58, 56, 51], muted: [107, 106, 102], bg: null, soft: [234, 241, 237]
-  },
-  editorial: {
-    headFill: null, headText: [43, 38, 32], accent: [154, 123, 79],
-    ink: [43, 38, 32], mid: [74, 68, 59], muted: [138, 122, 96], bg: [237, 230, 218]
+// RGB versions of THEME_PALETTES in tokens.ts, the colors the on screen
+// themes use, so the emailed or signed PDF matches the preview. Slate fills
+// its table header with ink, mint with its accent, editorial has no header
+// fill and paints its paper on every page.
+function pdfTheme(name, headFillHex) {
+  const p = THEME_PALETTES[name]
+  return {
+    headFill: headFillHex ? hexToRgb(headFillHex) : null,
+    headText: hexToRgb(headFillHex ? p.onAccent : p.ink),
+    accent: hexToRgb(p.accent),
+    onAccent: hexToRgb(p.onAccent),
+    ink: hexToRgb(p.ink),
+    mid: hexToRgb(p.mid),
+    muted: hexToRgb(p.muted),
+    rule: hexToRgb(p.rule),
+    soft: hexToRgb(p.accentSoft),
+    bg: p.paper ? hexToRgb(p.paper) : null
   }
 }
 
+const PDF_THEMES = {
+  slate: pdfTheme('slate', THEME_PALETTES.slate.ink),
+  mint: pdfTheme('mint', THEME_PALETTES.mint.accent),
+  editorial: pdfTheme('editorial', null)
+}
+
 function fmtShortPdf(d) {
-  if (!d) return '\u2003'
+  if (!d) return ''
   const dt = d instanceof Date ? d : new Date(d)
-  if (Number.isNaN(dt.getTime())) return '\u2003'
+  if (Number.isNaN(dt.getTime())) return ''
   return dt.toLocaleDateString(undefined, { month: '2-digit', day: '2-digit', year: 'numeric' })
 }
 
@@ -1761,6 +1396,8 @@ async function drawThemedProposal(doc, ctx) {
   } = ctx
   const t = PDF_THEMES[template]
   const innerW = pageWidth - margin * 2
+  const footer = footerLayout(doc, { pageWidth, pageHeight, margin, text: PROPOSAL_DISCLAIMER, pointSize: 8, bottomOffset: 12 })
+  const bottom = footer.contentBottom
 
   // Page background (editorial). Idempotent per page so it paints each
   // page exactly once *before* content, calling it again on an
@@ -1793,7 +1430,7 @@ async function drawThemedProposal(doc, ctx) {
     const cw = innerW / 3
     cells.forEach(([label, val], i) => {
       const cx = margin + cw * i
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(255, 255, 255); doc.setCharSpace(0.5)
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(...t.onAccent); doc.setCharSpace(0.5)
       doc.text(label, cx, cursor + 6); doc.setCharSpace(0)
       doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.text(String(val), cx, cursor + 12)
     })
@@ -1811,14 +1448,18 @@ async function drawThemedProposal(doc, ctx) {
     drawPlainLogo(doc, { x: pageWidth - margin, y: cursor, maxW: 50, maxH: 18, logo, company, align: 'right', monoColor: t.accent })
     cursor = Math.max(cy, cursor + 22)
     // ESTIMATE wordmark, right
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(34); doc.setTextColor(...t.accent); doc.setCharSpace(1.5)
-    doc.text('ESTIMATE', pageWidth - margin, cursor + 6, { align: 'right' }); doc.setCharSpace(0)
+    // align:'right' ignores charSpace, so left-anchor at the tracked width
+    // to keep the wordmark inside the margin.
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(34); doc.setTextColor(...t.accent)
+    const wordmarkW = doc.getTextWidth('ESTIMATE') + 'ESTIMATE'.length * 1.5
+    doc.setCharSpace(1.5)
+    doc.text('ESTIMATE', pageWidth - margin - wordmarkW, cursor + 6); doc.setCharSpace(0)
     cursor += 16
     // To + meta
     doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(...t.accent)
     doc.text('TO', margin, cursor)
     doc.setFont('helvetica', 'normal'); doc.setFontSize(12); doc.setTextColor(...t.ink)
-    doc.text(contact?.name || '\u2003', margin, cursor + 6)
+    doc.text(contact?.name || '', margin, cursor + 6)
     doc.setFontSize(9); doc.setTextColor(...t.muted)
     let ty = cursor + 11
     for (const l of themedAddressLines(contact)) { const w = doc.splitTextToSize(l, innerW * 0.5); doc.text(w, margin, ty); ty += w.length * 4.2 }
@@ -1872,42 +1513,47 @@ async function drawThemedProposal(doc, ctx) {
       doc.text('SCOPE OF WORK', margin, cursor); cursor += 6
       doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(...t.mid)
       const sl = doc.splitTextToSize(scope.trim(), innerW)
-      doc.text(sl, margin, cursor); cursor += sl.length * 4.6 + 4
+      cursor = drawFlowingLines(doc, sl, { x: margin, y: cursor, lineHeight: 4.6, bottom, onNewPage: paintBg }) + 4
     }
+    // Heading, table header and first row together.
+    if (cursor + 30 > bottom) cursor = newPage(doc, paintBg)
     doc.setFont('times', 'normal'); doc.setFontSize(13); doc.setTextColor(...t.accent)
     doc.text('COST BREAKDOWN', margin, cursor); cursor += 3
   }
 
   // ---- Line items table (individual) ----
-  cursor = drawThemedItemsTable(doc, { startY: cursor + 2, items: lineItems, margin, pageWidth, t, paintBg })
+  cursor = drawThemedItemsTable(doc, { startY: cursor + 2, items: lineItems, margin, pageWidth, pageHeight, bottom, t, paintBg })
 
   // ---- Totals ----
-  cursor = drawThemedTotals(doc, { startY: cursor + 4, pageWidth, margin, subtotal, total, t, template })
+  cursor = drawThemedTotals(doc, { startY: cursor + 4, pageWidth, margin, bottom, subtotal, total, t, template, paintBg })
 
   // ---- Optional upgrades ----
   if (upgradeItems.length > 0) {
     cursor += 6
-    if (cursor > pageHeight - 60) { doc.addPage(); paintBg(); cursor = 18 }
+    if (cursor + 30 > bottom) cursor = newPage(doc, paintBg)
     doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(...t.accent); doc.setCharSpace(0.6)
     doc.text('OPTIONAL UPGRADES', margin, cursor); doc.setCharSpace(0); cursor += 3
-    cursor = drawThemedItemsTable(doc, { startY: cursor + 2, items: upgradeItems, margin, pageWidth, t, paintBg })
+    cursor = drawThemedItemsTable(doc, { startY: cursor + 2, items: upgradeItems, margin, pageWidth, pageHeight, bottom, t, paintBg })
   }
 
   // ---- Photos ----
   if (Array.isArray(photos) && photos.length > 0) {
-    cursor = await drawProjectPhotosBlock(doc, { photos, margin, pageWidth, pageHeight, startY: cursor + 6, brandRGB: t.accent })
+    cursor = await drawProjectPhotosBlock(doc, { photos, margin, pageWidth, bottom, startY: cursor + 6, brandRGB: t.accent, onNewPage: paintBg })
   }
 
   // ---- Supporting tail (scope for slate/mint, payment terms, warranty, exclusions) ----
+  // Each block flows line by line across pages, so long contract terms are
+  // never cut off the bottom of the page.
   const tailBlock = (label, body) => {
     if (!body) return
     cursor += 8
-    if (cursor > pageHeight - 40) { doc.addPage(); paintBg(); cursor = 18 }
+    // Keep the label with the first two lines of its text.
+    if (cursor + 5 + 4.5 > bottom) cursor = newPage(doc, paintBg)
     doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(...t.accent); doc.setCharSpace(0.8)
     doc.text(String(label).toUpperCase(), margin, cursor); doc.setCharSpace(0); cursor += 5
     doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(...t.mid)
     const lines = doc.splitTextToSize(body, innerW)
-    doc.text(lines, margin, cursor); cursor += lines.length * 4.5
+    cursor = drawFlowingLines(doc, lines, { x: margin, y: cursor, lineHeight: 4.5, bottom, onNewPage: paintBg })
   }
   if (template !== 'editorial' && scope && scope.trim()) tailBlock('Scope of work', scope.trim())
   tailBlock('Payment terms', paymentTerms)
@@ -1915,17 +1561,20 @@ async function drawThemedProposal(doc, ctx) {
   if (exclusions.length) tailBlock('Exclusions', exclusions.join(' · '))
 
   // ---- Signatures ----
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(10)
+  const al = doc.splitTextToSize('By signing below, the customer authorizes the company to perform the work outlined in this estimate and agrees to the terms and conditions contained herein.', innerW)
   cursor += 14
-  if (cursor > pageHeight - 50) { doc.addPage(); paintBg(); cursor = 18 }
+  // The label, the copy and both signature lines stay together.
+  if (cursor + 5 + al.length * 4.5 + 16 + 6 > bottom) cursor = newPage(doc, paintBg)
   doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(...t.accent); doc.setCharSpace(0.8)
   doc.text('APPROVAL', margin, cursor); doc.setCharSpace(0); cursor += 5
   doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(...t.mid)
-  const al = doc.splitTextToSize('By signing below, the customer authorizes the company to perform the work outlined in this estimate and agrees to the terms and conditions contained herein.', innerW)
   doc.text(al, margin, cursor); cursor += al.length * 4.5 + 16
   const colW = (innerW - 16) / 2
   doc.setDrawColor(...t.ink); doc.setLineWidth(0.4)
   doc.line(margin, cursor, margin + colW, cursor)
   doc.line(margin + colW + 16, cursor, pageWidth - margin, cursor)
+  drawEsignAnchors(doc, { x: margin, lineY: cursor, width: colW, color: t.bg || [255, 255, 255] })
   doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(...t.muted); doc.setCharSpace(0.6)
   doc.text('CLIENT SIGNATURE', margin, cursor + 5)
   doc.text('CONTRACTOR SIGNATURE', margin + colW + 16, cursor + 5); doc.setCharSpace(0)
@@ -1937,9 +1586,7 @@ async function drawThemedProposal(doc, ctx) {
   const pages = doc.internal.getNumberOfPages()
   for (let p = 1; p <= pages; p++) {
     doc.setPage(p)
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...t.muted)
-    const lines = doc.splitTextToSize(PROPOSAL_DISCLAIMER, pageWidth - margin * 2)
-    doc.text(lines, margin, pageHeight - 12 - (lines.length - 1) * 3.5)
+    drawFooterText(doc, footer, t.muted)
   }
 }
 
@@ -1961,7 +1608,7 @@ function drawThemedParties(doc, { pageWidth, margin, y, company, recipient, t, l
   doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(...t.ink); doc.setCharSpace(0.8)
   doc.text(labels[0], leftX, y + 6); doc.text(labels[1], rightX, y + 6); doc.setCharSpace(0)
   doc.setFont('helvetica', 'bold'); doc.setFontSize(12)
-  doc.text(company?.name || 'My Company', leftX, y + 12); doc.text(recipient?.name || '\u2003', rightX, y + 12)
+  doc.text(company?.name || 'My Company', leftX, y + 12); doc.text(recipient?.name || '', rightX, y + 12)
   doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...t.mid)
   let ly = y + 17.5, ry = y + 17.5
   for (const l of themedAddressLines(company)) { doc.text(doc.splitTextToSize(l, colW), leftX, ly); ly += 4.4 }
@@ -1977,13 +1624,12 @@ function drawThemedProjectTitle(doc, { margin, y, title, t }) {
   return y + 12
 }
 
-function drawThemedItemsTable(doc, { startY, items, margin, pageWidth, t, paintBg }) {
-  const innerW = pageWidth - margin * 2
+function drawThemedItemsTable(doc, { startY, items, margin, pageHeight, bottom, t, paintBg }) {
   autoTable(doc, {
     startY,
     head: [['Description', 'Qty', 'Unit Price', 'Amount']],
     body: items.map((it) => [
-      it.description || '\u2003',
+      it.description || '',
       it.qty ? `${it.qty}${it.unit ? ` ${it.unit}` : ''}` : '',
       money(it.rate),
       money(it.amount)
@@ -1993,40 +1639,37 @@ function drawThemedItemsTable(doc, { startY, items, margin, pageWidth, t, paintB
       fillColor: t.headFill || false,
       textColor: t.headText,
       fontStyle: 'bold',
-      fontSize: 12,
-      cellPadding: { top: 4, right: 5, bottom: 4, left: 5 },
+      fontSize: TABLE_FONT_PT,
+      cellPadding: { top: 4, right: 3, bottom: 4, left: 3 },
       lineWidth: t.headFill ? 0 : { bottom: 0.5 },
       lineColor: t.accent
     },
     bodyStyles: {
-      fontSize: 12, textColor: t.ink, valign: 'top',
-      cellPadding: { top: 4.5, right: 5, bottom: 4.5, left: 5 }, lineWidth: 0
+      fontSize: TABLE_FONT_PT, textColor: t.ink, valign: 'top',
+      cellPadding: { top: 4.5, right: 3, bottom: 4.5, left: 3 }, lineWidth: 0
     },
     columnStyles: {
       0: { cellWidth: 'auto' },
       1: { halign: 'right', cellWidth: 20 },
-      2: { halign: 'right', cellWidth: 28 },
-      3: { halign: 'right', cellWidth: 28, fontStyle: 'bold' }
+      2: { halign: 'right', cellWidth: 32 },
+      3: { halign: 'right', cellWidth: 32, fontStyle: 'bold' }
     },
-    didDrawCell: (data) => {
-      if (data.section === 'body') {
-        const { doc: d, cell } = data
-        d.setDrawColor(228, 224, 216); d.setLineWidth(0.15)
-        d.line(cell.x, cell.y + cell.height, cell.x + cell.width, cell.y + cell.height)
-      }
-    },
+    didDrawCell: rowRule(t.rule),
     willDrawPage: () => { if (paintBg) paintBg() },
-    margin: { left: margin, right: margin }
+    margin: tableMargin({ margin, pageHeight, bottom })
   })
   return doc.lastAutoTable.finalY
 }
 
-function drawThemedTotals(doc, { startY, pageWidth, margin, subtotal, total, t, template }) {
+function drawThemedTotals(doc, { startY, pageWidth, margin, bottom, subtotal, total, t, template, paintBg }) {
   const rightX = pageWidth - margin
   const labelX = rightX - 40
-  let cursor = startY + 6
+  const showSubtotal = Math.abs(subtotal - total) > 0.005
+  // Keep the totals together, below the table or at the top of the next page.
+  const blockH = 6 + (showSubtotal ? 6 : 0) + 11
+  let cursor = (startY + blockH > bottom ? newPage(doc, paintBg) - 6 : startY) + 6
   // Subtotal (only meaningful if it differs from total)
-  if (Math.abs(subtotal - total) > 0.005) {
+  if (showSubtotal) {
     doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(...t.muted)
     doc.text('Subtotal', labelX, cursor, { align: 'right' })
     doc.setTextColor(...t.ink); doc.text(money(subtotal), rightX, cursor, { align: 'right' })
@@ -2049,23 +1692,13 @@ function drawThemedTotals(doc, { startY, pageWidth, margin, subtotal, total, t, 
 }
 
 /**
- * Generate a branded proposal PDF, v3 letterhead (Phase 4b parity).
- *
- * Mirrors src/components/documents/ProposalTemplate.tsx section-for-
- * section so the customer sees the same render whether the contractor
- * previewed it on-screen or received it as an email attachment.
- *
- * Sections (multi-page flowing layout, letterhead repeats per page):
- *   1. Letterhead + title + meta grid (page 1 only)
- *   2. Project overview               (boilerplate copy or override)
- *   3. Scope of work                  (per-trade cards from fh_quote_items)
- *   4. Optional upgrades              (is_optional=true items, with pricing)
- *   5. Pricing summary                (Project Investment hero in serif)
- *   6. Payment terms                  (50/40/10 default, configurable)
- *   7. Warranty                       (company.warranty_default when set)
- *   8. Exclusions                     (is_excluded items + exclusions text)
- *   9. Insurance (optional, hidden when no payload)
- *  10. Approval / signature           (blank by default; stamped when approved)
+ * Generate a branded proposal PDF. company.estimate_template picks the
+ * design: 'slate', 'mint' and 'editorial' render drawThemedProposal (the
+ * proposalThemes.tsx designs); 'classic' and anything else render the
+ * letterhead layout below, mirroring ProposalTemplate.tsx:
+ *   letterhead, parties, project title, items grouped by trade, totals,
+ *   optional upgrades, photos, payment terms, warranty, exclusions,
+ *   insurance, acceptance (blank lines, or the recorded approval).
  *
  * White-label: company.name / logo_url / brand_accent_hex drive every
  * customer-visible byte. The app's name never appears.
@@ -2085,10 +1718,9 @@ export async function generateQuote({
   approval = null,
   photos = [],
   insurance = null,
-  paymentSchedule = null,
   changeOrders = []
 } = {}) {
-  const doc = new jsPDF({ unit: 'mm', format: 'letter' })
+  const doc = createPdfDoc()
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()
   const margin = 16
@@ -2120,7 +1752,6 @@ export async function generateQuote({
     .reduce((s, co) => s + Number(co.amount || 0), 0)
 
   const baseTotal = Number(mapped.baseTotal || 0)
-  const upgradeTotal = Number(mapped.upgradeTotal || 0)
   const grandTotal = Math.max(0, baseTotal + approvedCOAdjustment)
 
   // Themed templates (slate / mint / editorial), distinct designs with
@@ -2130,7 +1761,7 @@ export async function generateQuote({
   if (template === 'slate' || template === 'mint' || template === 'editorial') {
     const lineItems = (mapped.scopeSections || []).flatMap((sec) =>
       (sec.items || []).map((it) => ({
-        description: (it.description || '\u2003').trim(),
+        description: (it.description || '').trim(),
         qty: Number(it.qty || 1),
         unit: (it.unit || '').trim(),
         rate: Number(it.rate || 0),
@@ -2139,7 +1770,7 @@ export async function generateQuote({
     )
     const upgradeItems = (mapped.upgrades || []).flatMap((sec) =>
       (sec.items || []).map((it) => ({
-        description: (it.description || '\u2003').trim(),
+        description: (it.description || '').trim(),
         qty: Number(it.qty || 1),
         unit: (it.unit || '').trim(),
         rate: Number(it.rate || 0),
@@ -2171,6 +1802,9 @@ export async function generateQuote({
       number
     }
   }
+
+  const footer = footerLayout(doc, { pageWidth, pageHeight, margin, text: PROPOSAL_DISCLAIMER })
+  const bottom = footer.contentBottom
 
   // Letterhead (premium company-name chrome + Issued / Valid until meta)
   const estMetaRows = [{ label: 'Issued', value: formatDocDate(new Date()) }]
@@ -2207,7 +1841,7 @@ export async function generateQuote({
 
   // Items
   if (baseRows.length > 0) {
-    cursor = drawDocItemsTable(doc, { startY: cursor + 4, rows: baseRows, brandRGB, margin, pageWidth, layout: 'sectioned' })
+    cursor = drawDocItemsTable(doc, { startY: cursor + 4, rows: baseRows, brandRGB, margin, pageWidth, pageHeight, bottom, layout: 'sectioned' })
   }
 
   // Totals
@@ -2217,14 +1851,15 @@ export async function generateQuote({
     totalsRows.push({ label: 'Approved change orders', value: `${approvedCOAdjustment >= 0 ? '+' : ''}${moneyCompact(approvedCOAdjustment)}` })
   }
   cursor = drawDocTotalsBlock(doc, {
-    startY: cursor, pageWidth, margin,
+    startY: cursor, pageWidth, margin, bottom,
     label: 'Total', total: grandTotal, rows: totalsRows
   })
 
   // Optional upgrades
   if (upgradeRows.length > 0) {
     cursor += 6
-    if (cursor > pageHeight - 80) { doc.addPage(); cursor = 18 }
+    // Label, table header and the first upgrade together.
+    if (cursor + 30 > bottom) cursor = newPage(doc)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(11)
     doc.setTextColor(...ONYX)
@@ -2232,15 +1867,15 @@ export async function generateQuote({
     doc.text('OPTIONAL UPGRADES', margin, cursor)
     doc.setCharSpace(0)
     cursor += 4
-    cursor = drawDocItemsTable(doc, { startY: cursor, rows: upgradeRows, brandRGB, margin, pageWidth, layout: 'sectioned' })
+    cursor = drawDocItemsTable(doc, { startY: cursor, rows: upgradeRows, brandRGB, margin, pageWidth, pageHeight, bottom, layout: 'sectioned' })
   }
 
-  // Project photos, pre-load the signed URLs into base64 PNGs through
-  // the same logo loader so the PDF carries embedded imagery. Renders
-  // a grouped grid by section_tag below the items + upgrades tables.
+  // Project photos, loaded through loadImageForPdf so the PDF carries
+  // embedded imagery. Renders a grouped grid by section_tag below the
+  // items + upgrades tables.
   if (Array.isArray(photos) && photos.length > 0) {
     cursor = await drawProjectPhotosBlock(doc, {
-      photos, margin, pageWidth, pageHeight, startY: cursor + 6, brandRGB
+      photos, margin, pageWidth, bottom, startY: cursor + 6, brandRGB
     })
   }
 
@@ -2251,10 +1886,13 @@ export async function generateQuote({
     ...((exclusions || '').split(/\n+/).map((s) => s.trim()).filter(Boolean))
   ]
 
+  // Each block flows line by line across pages, so long contract terms
+  // are never cut off the bottom of the page.
   function drawDetailBlock(label, body) {
     if (!body) return
     cursor += 8
-    if (cursor > pageHeight - 40) { doc.addPage(); cursor = 18 }
+    // Keep the label with the first two lines of its text.
+    if (cursor + 5 + 4.5 > bottom) cursor = newPage(doc)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(9)
     doc.setTextColor(...ONYX)
@@ -2266,8 +1904,7 @@ export async function generateQuote({
     doc.setFontSize(10)
     doc.setTextColor(58, 56, 51)
     const lines = doc.splitTextToSize(body, pageWidth - margin * 2)
-    doc.text(lines, margin, cursor)
-    cursor += lines.length * 4.5
+    cursor = drawFlowingLines(doc, lines, { x: margin, y: cursor, lineHeight: 4.5, bottom })
   }
 
   // Payment terms, the contractor's own terms_text when provided,
@@ -2284,14 +1921,14 @@ export async function generateQuote({
 
   // Insurance claim card (restoration jobs), hidden for cash jobs.
   cursor = drawModernInsurance(doc, {
-    startY: cursor, margin, pageWidth, pageHeight, brandRGB, insurance
+    startY: cursor, margin, pageWidth, bottom, brandRGB, insurance
   })
 
   // Acceptance, honest signatures: the recorded approval when the
   // estimate is approved, blank lines otherwise (never a filled
   // cursive name, which reads as a forged signature).
   cursor = drawModernApproval(doc, {
-    startY: cursor, margin, pageWidth, pageHeight,
+    startY: cursor, margin, pageWidth, bottom,
     company, contact, approval, status
   })
 
@@ -2299,7 +1936,7 @@ export async function generateQuote({
   const total_pages = doc.internal.getNumberOfPages()
   for (let p = 1; p <= total_pages; p++) {
     doc.setPage(p)
-    drawDocDisclaimer(doc, { pageWidth, pageHeight, margin, text: PROPOSAL_DISCLAIMER })
+    drawFooterText(doc, footer, INK_MUTED)
   }
 
   return {
@@ -2309,764 +1946,6 @@ export async function generateQuote({
   }
 }
 
-// ============================================================
-// V3 proposal section drawers
-// All take `ctx` (the shared render context) and `cursor` (current Y
-// position) and return the new cursor Y. Each handles its own page-
-// break check via ensureSpace(ctx, neededHeight).
-// ============================================================
-
-function drawProposalLetterhead(ctx, { page }) {
-  const { doc, pageWidth, margin, brandGold, company, logo, contact, number, issuedAt, expiresAt, status, contentWidth } = ctx
-
-  // Top brand-accent rule
-  doc.setFillColor(...brandGold)
-  doc.rect(0, 0, pageWidth, 1.6, 'F')
-
-  const letterheadY = 10
-  const logoBoxSize = 18
-
-  drawLetterheadLogo(doc, {
-    x: margin, y: letterheadY, size: logoBoxSize, company, logo, brandGold
-  })
-
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(16)
-  doc.setTextColor(...ONYX)
-  doc.setCharSpace(0.6)
-  doc.text((company?.name || 'MY COMPANY').toUpperCase(), margin + logoBoxSize + 6, letterheadY + 7.5)
-  doc.setCharSpace(0)
-
-  const tagline = buildLetterheadTagline(company)
-  if (tagline) {
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(9)
-    doc.setTextColor(...INK_MUTED)
-    doc.text(tagline, margin + logoBoxSize + 6, letterheadY + 13)
-  }
-
-  drawStatusPill(doc, {
-    x: pageWidth - margin, y: letterheadY + 6,
-    label: proposalStatusLabel(status), brandGold
-  })
-
-  // Continuation pages skip the title + meta block (just letterhead +
-  // a thin "PROPOSAL · #" eyebrow so the reader knows what they're in).
-  if (page > 1) {
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(7.5)
-    doc.setTextColor(...INK_MUTED)
-    doc.setCharSpace(0.8)
-    doc.text(`PROPOSAL · ${number} · CONTINUED`, margin, letterheadY + logoBoxSize + 8)
-    doc.setCharSpace(0)
-    return letterheadY + logoBoxSize + 16
-  }
-
-  // Title block
-  const titleY = letterheadY + logoBoxSize + 12
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(7.5)
-  doc.setTextColor(...brandGold)
-  doc.setCharSpace(0.8)
-  doc.text('PROPOSAL', margin, titleY)
-  doc.setCharSpace(0)
-
-  const titleText = (contact?.job_title || 'Construction services').trim()
-  doc.setFont('times', 'bold')
-  let titleSize = 22
-  doc.setFontSize(titleSize)
-  while (doc.getTextWidth(titleText) > contentWidth && titleSize > 14) {
-    titleSize -= 1
-    doc.setFontSize(titleSize)
-  }
-  doc.setTextColor(...ONYX)
-  doc.text(titleText, margin, titleY + 9)
-
-  if (contact?.address) {
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(10)
-    doc.setTextColor(...INK_MUTED)
-    doc.text(String(contact.address), margin, titleY + 15)
-  }
-
-  // Meta grid
-  const metaY = titleY + 26
-  drawMetaGrid(doc, {
-    x: margin, y: metaY, width: contentWidth,
-    cols: [
-      { label: 'CLIENT',       value: contact?.name || '\u2003' },
-      { label: 'ISSUED',       value: today() },
-      { label: 'VALID UNTIL',  value: expiresAt ? formatLongDate(new Date(expiresAt)) : 'Open' },
-      { label: 'PROPOSAL #',   value: number, stamp: true, valueColor: brandGold }
-    ]
-  })
-  return metaY + 18
-}
-
-function proposalStatusLabel(status) {
-  switch (String(status || 'draft').toLowerCase()) {
-    case 'approved': return 'APPROVED'
-    case 'sent':     return 'SENT'
-    case 'expired':  return 'EXPIRED'
-    case 'rejected': return 'REJECTED'
-    default:         return 'PROPOSAL'
-  }
-}
-
-// Page-break helper. If the requested block height doesn't fit before
-// the page bottom (with footer clearance), open a new page, redraw the
-// continuation letterhead, and return the fresh cursor Y.
-function ensureSpace(ctx, cursor, needed) {
-  const { doc, pageHeight } = ctx
-  const footerClearance = 16
-  if (cursor + needed <= pageHeight - footerClearance) return cursor
-  doc.addPage()
-  return drawProposalLetterhead(ctx, { page: 2 })
-}
-
-function drawProjectOverviewSection(ctx, cursor) {
-  const { doc, margin, contentWidth, brandGold, company, contact, scope } = ctx
-
-  cursor += 6
-  cursor = ensureSpace(ctx, cursor, 40)
-
-  drawSectionHeading(doc, {
-    x: margin, y: cursor, width: contentWidth,
-    eyebrow: 'PROJECT OVERVIEW',
-    title: "What we'll build",
-    brandGold
-  })
-  cursor += 14
-
-  const body = scope?.trim()
-    || buildProposalOverviewCopy(company?.name, contact?.address)
-
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(10.5)
-  doc.setTextColor(...ONYX)
-  const wrapped = doc.splitTextToSize(body, contentWidth)
-  // Page-break for very long overview
-  cursor = drawTextWithPageBreak(ctx, wrapped, cursor, 5)
-  return cursor + 6
-}
-
-function buildProposalOverviewCopy(companyName, address) {
-  const c = (companyName && String(companyName).trim()) || 'Our company'
-  const a = (address && String(address).trim()) || 'the project site'
-  return `${c} proposes the following scope of work for the improvement and restoration of the property located at ${a}. Our team will provide labor, materials, project coordination, site protection, cleanup, and installation services necessary to complete the project in accordance with manufacturer standards and applicable code requirements.`
-}
-
-function drawScopeOfWorkSection(ctx, cursor) {
-  const { doc, margin, contentWidth, brandGold, scopeSections } = ctx
-
-  cursor += 6
-  cursor = ensureSpace(ctx, cursor, 60)
-
-  drawSectionHeading(doc, {
-    x: margin, y: cursor, width: contentWidth,
-    eyebrow: `SCOPE OF WORK · ${scopeSections.length} SECTION${scopeSections.length === 1 ? '' : 'S'}`,
-    title: 'Trades and materials',
-    brandGold
-  })
-  cursor += 14
-
-  for (const section of scopeSections) {
-    const sectionPhotos = ctx.photosBySection?.get?.(section.title) || []
-    cursor = drawScopeCard(ctx, cursor, {
-      title: section.title,
-      items: section.items,
-      photos: sectionPhotos,
-      showPricing: false
-    })
-    cursor += 6
-  }
-  return cursor
-}
-
-function drawUpgradesSection(ctx, cursor) {
-  const { doc, margin, contentWidth, brandGold, upgrades } = ctx
-
-  cursor += 6
-  cursor = ensureSpace(ctx, cursor, 60)
-
-  drawSectionHeading(doc, {
-    x: margin, y: cursor, width: contentWidth,
-    eyebrow: 'OPTIONAL UPGRADES',
-    title: 'Add at any time',
-    brandGold
-  })
-  cursor += 14
-
-  for (const section of upgrades) {
-    cursor = drawScopeCard(ctx, cursor, {
-      title: section.title,
-      items: section.items,
-      showPricing: true
-    })
-    cursor += 6
-  }
-  return cursor
-}
-
-// Per-trade scope card. Mirrors ScopeSectionCard.tsx visually:
-//   - title row
-//   - line items list (with optional pricing column)
-function drawScopeCard(ctx, cursor, { title, items, photos = [], showPricing }) {
-  const { doc, margin, contentWidth, brandGold } = ctx
-
-  // Estimate card height: header (10) + per-item (≈ 8) + photo strip
-  // when present (≈ 38) + padding (10).
-  const photoStripHeight = photos.length > 0 ? 38 : 0
-  const estimated = 20 + (items.length * 9) + photoStripHeight
-  cursor = ensureSpace(ctx, cursor, estimated)
-
-  const cardX = margin
-  const cardY = cursor
-  const cardW = contentWidth
-  const padding = 6
-
-  // Card title bar
-  doc.setFont('times', 'bold')
-  doc.setFontSize(13)
-  doc.setTextColor(...ONYX)
-  doc.text(title || 'Untitled section', cardX + padding, cardY + 8)
-
-  let rowY = cardY + 14
-  doc.setDrawColor(...brandGold)
-  doc.setLineWidth(0.4)
-  doc.line(cardX, rowY, cardX + cardW, rowY)
-  rowY += 4
-
-  // Items
-  for (const it of items) {
-    const qty = Number(it.qty || 1)
-    const rate = Number(it.rate || 0)
-    const amount = Number(it.amount != null ? it.amount : qty * rate)
-    const subline = [
-      qty !== 1 ? `${qty}${it.unit ? ` ${it.unit}` : ''} × ${money(rate)}` : '',
-      it.notes
-    ].filter(Boolean).join(' · ')
-
-    // Title (wrap)
-    const titleMax = showPricing ? cardW - padding * 2 - 36 : cardW - padding * 2
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(10.5)
-    doc.setTextColor(...ONYX)
-    const wrapped = doc.splitTextToSize(it.description || '\u2003', titleMax)
-    doc.text(wrapped, cardX + padding, rowY + 4)
-    let bottom = rowY + 4 + (wrapped.length - 1) * 5
-
-    if (subline) {
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(9)
-      doc.setTextColor(...INK_MUTED)
-      doc.text(subline, cardX + padding, bottom + 4.5)
-      bottom += 4.5
-    }
-
-    if (showPricing) {
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(10.5)
-      doc.setTextColor(...ONYX)
-      doc.text(money(amount), cardX + cardW - padding, rowY + 4, { align: 'right' })
-    }
-
-    rowY = bottom + 5
-    // Inter-item hairline
-    doc.setDrawColor(232, 228, 216)
-    doc.setLineWidth(0.15)
-    doc.line(cardX + padding, rowY - 2.5, cardX + cardW - padding, rowY - 2.5)
-  }
-
-  // Photos, render up to 3 thumbnails along the bottom of the card.
-  // Skipped silently if no photos tagged to this section.
-  if (photos.length > 0) {
-    const slots = Math.min(3, photos.length)
-    const slotGap = 4
-    const totalGap = slotGap * (slots - 1)
-    const slotW = (cardW - padding * 2 - totalGap) / slots
-    const slotH = 28
-    rowY += 2
-    for (let i = 0; i < slots; i++) {
-      const p = photos[i]
-      const px = cardX + padding + (slotW + slotGap) * i
-      const py = rowY
-      // Frame (renders even if image fails)
-      doc.setDrawColor(232, 228, 216)
-      doc.setFillColor(251, 248, 241)
-      doc.setLineWidth(0.2)
-      doc.roundedRect(px, py, slotW, slotH, 1, 1, 'FD')
-      if (p?.dataUrl) {
-        try {
-          // Center-cover the image inside the slot. jsPDF can't crop,
-          // so we letterbox by computing the aspect-fit dimensions and
-          // centering. Bad images (decode failures) fall through to the
-          // empty cream frame above.
-          const aspect = (p.width || 4) / (p.height || 3)
-          let drawW = slotW - 2
-          let drawH = drawW / aspect
-          if (drawH > slotH - 2) {
-            drawH = slotH - 2
-            drawW = drawH * aspect
-          }
-          doc.addImage(p.dataUrl, p.format || 'PNG', px + (slotW - drawW) / 2, py + (slotH - drawH) / 2, drawW, drawH)
-        } catch {
-          // empty frame stays
-        }
-      }
-    }
-    rowY += slotH + 4
-  }
-
-  // Card border (drawn last so it overlays cleanly)
-  const cardH = rowY - cardY + 2
-  doc.setDrawColor(232, 228, 216)
-  doc.setLineWidth(0.3)
-  doc.roundedRect(cardX, cardY, cardW, cardH, 1.5, 1.5, 'S')
-
-  return cardY + cardH + 2
-}
-
-function drawPaymentTermsSection(ctx, cursor) {
-  const { doc, margin, contentWidth, brandGold, paymentSchedule, grandTotal } = ctx
-
-  cursor += 6
-  cursor = ensureSpace(ctx, cursor, 30 + paymentSchedule.length * 12)
-
-  drawSectionHeading(doc, {
-    x: margin, y: cursor, width: contentWidth,
-    eyebrow: 'PAYMENT TERMS',
-    title: 'Milestone schedule',
-    brandGold
-  })
-  cursor += 14
-
-  for (let i = 0; i < paymentSchedule.length; i++) {
-    const row = paymentSchedule[i]
-    const pct = Number(row.pct || 0)
-    const amt = Math.round(grandTotal * (pct / 100))
-
-    const rowY = cursor + 7
-
-    // Stamped percent
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(13)
-    doc.setTextColor(...brandGold)
-    doc.text(`${pct}%`, margin, rowY)
-
-    // Label + sub
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(10.5)
-    doc.setTextColor(...ONYX)
-    doc.text(row.label || '\u2003', margin + 22, rowY)
-    if (row.sub) {
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(9)
-      doc.setTextColor(...INK_MUTED)
-      doc.text(row.sub, margin + 22, rowY + 5)
-    }
-
-    // Amount
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(10.5)
-    doc.setTextColor(...ONYX)
-    doc.text(money(amt), margin + contentWidth, rowY, { align: 'right' })
-
-    cursor += 13
-    if (i < paymentSchedule.length - 1) {
-      doc.setDrawColor(232, 228, 216)
-      doc.setLineWidth(0.15)
-      doc.line(margin, cursor - 1, margin + contentWidth, cursor - 1)
-    }
-  }
-  return cursor + 6
-}
-
-function drawWarrantySection(ctx, cursor) {
-  const { doc, margin, contentWidth, brandGold, warranty } = ctx
-
-  cursor += 6
-  cursor = ensureSpace(ctx, cursor, 40)
-
-  drawSectionHeading(doc, {
-    x: margin, y: cursor, width: contentWidth,
-    eyebrow: 'WARRANTY',
-    title: 'What we stand behind',
-    brandGold
-  })
-  cursor += 14
-
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(10.5)
-  doc.setTextColor(...ONYX)
-  const wrapped = doc.splitTextToSize(warranty, contentWidth)
-  cursor = drawTextWithPageBreak(ctx, wrapped, cursor, 5)
-  return cursor + 6
-}
-
-function drawExclusionsSection(ctx, cursor) {
-  const { doc, margin, contentWidth, brandGold, exclusionsArray } = ctx
-
-  cursor += 6
-  cursor = ensureSpace(ctx, cursor, 30 + exclusionsArray.length * 7)
-
-  drawSectionHeading(doc, {
-    x: margin, y: cursor, width: contentWidth,
-    eyebrow: 'EXCLUSIONS',
-    title: 'Not included in this proposal',
-    brandGold
-  })
-  cursor += 14
-
-  for (const exclusion of exclusionsArray) {
-    cursor = ensureSpace(ctx, cursor, 8)
-    // Bullet dot
-    doc.setFillColor(...INK_MUTED)
-    doc.circle(margin + 1.5, cursor + 1, 0.8, 'F')
-    // Text (wrap)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(10)
-    doc.setTextColor(...ONYX)
-    const wrapped = doc.splitTextToSize(exclusion, contentWidth - 8)
-    doc.text(wrapped, margin + 6, cursor + 2)
-    cursor += Math.max(6, wrapped.length * 4.5) + 1
-  }
-  return cursor + 4
-}
-
-function drawInsuranceSection(ctx, cursor) {
-  const { doc, margin, contentWidth, brandGold, insurance } = ctx
-
-  const fields = [
-    { label: 'Claim number',     value: insurance.claim_number },
-    { label: 'Carrier',          value: insurance.carrier },
-    { label: 'Adjuster',         value: insurance.adjuster },
-    { label: 'Deductible',       value: insurance.deductible != null ? money(insurance.deductible) : '' },
-    { label: 'RCV',              value: insurance.rcv != null ? money(insurance.rcv) : '' },
-    { label: 'ACV',              value: insurance.acv != null ? money(insurance.acv) : '' },
-    { label: 'Depreciation',     value: insurance.depreciation != null ? money(insurance.depreciation) : '' },
-    { label: 'Supplement',       value: insurance.supplement_amount != null ? money(insurance.supplement_amount) : '' },
-    { label: 'Mortgage company', value: insurance.mortgage_company }
-  ].filter((f) => f.value)
-  if (!fields.length) return cursor
-
-  cursor += 6
-  cursor = ensureSpace(ctx, cursor, 50 + Math.ceil(fields.length / 3) * 14)
-
-  drawSectionHeading(doc, {
-    x: margin, y: cursor, width: contentWidth,
-    eyebrow: 'INSURANCE CLAIM',
-    title: 'Carrier details',
-    brandGold
-  })
-  cursor += 14
-
-  // Card backdrop
-  const cardY = cursor
-  const cardH = Math.ceil(fields.length / 3) * 14 + 6
-  doc.setFillColor(251, 248, 241)
-  doc.setDrawColor(...brandGold)
-  doc.setLineWidth(0.4)
-  doc.roundedRect(margin, cardY, contentWidth, cardH, 1.5, 1.5, 'FD')
-
-  // 3-col grid
-  const colW = contentWidth / 3
-  fields.forEach((f, i) => {
-    const col = i % 3
-    const row = Math.floor(i / 3)
-    const cx = margin + colW * col + 8
-    const cy = cardY + 7 + row * 14
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(7)
-    doc.setTextColor(...INK_MUTED)
-    doc.setCharSpace(0.6)
-    doc.text(f.label.toUpperCase(), cx, cy)
-    doc.setCharSpace(0)
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(10)
-    doc.setTextColor(...ONYX)
-    doc.text(String(f.value), cx, cy + 5)
-  })
-
-  return cardY + cardH + 6
-}
-
-function drawApprovalSection(ctx, cursor) {
-  const { doc, margin, contentWidth, brandGold, company, contact, approval } = ctx
-
-  cursor += 8
-  cursor = ensureSpace(ctx, cursor, 90)
-
-  drawSectionHeading(doc, {
-    x: margin, y: cursor, width: contentWidth,
-    eyebrow: 'APPROVAL',
-    title: 'Authorization to proceed',
-    brandGold
-  })
-  cursor += 14
-
-  // Authorization paragraph
-  const copy = 'By signing below, the customer authorizes the company to perform the work outlined in this proposal and agrees to the terms and conditions contained herein.'
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(10)
-  doc.setTextColor(...ONYX)
-  const wrapped = doc.splitTextToSize(copy, contentWidth)
-  doc.text(wrapped, margin, cursor)
-  cursor += wrapped.length * 4.8 + 8
-
-  // Two signature fields side by side
-  const colW = (contentWidth - 12) / 2
-  const sigY = cursor + 22
-  const labelY = sigY + 4
-
-  // Left, Client
-  drawSignatureField(ctx, {
-    x: margin, y: cursor, w: colW,
-    label: 'Client signature',
-    name: approval?.clientName || contact?.name,
-    dataUrl: approval?.mode === 'approved' ? approval?.clientSignatureDataUrl : null,
-    date: approval?.mode === 'approved' && approval?.clientApprovedAt
-      ? formatLongDate(new Date(approval.clientApprovedAt)) : ''
-  })
-
-  // Right, Contractor
-  drawSignatureField(ctx, {
-    x: margin + colW + 12, y: cursor, w: colW,
-    label: 'Contractor signature',
-    name: company?.name,
-    dataUrl: approval?.mode === 'approved' ? approval?.contractorSignatureDataUrl : null,
-    date: approval?.mode === 'approved' && approval?.contractorApprovedAt
-      ? formatLongDate(new Date(approval.contractorApprovedAt)) : ''
-  })
-
-  return cursor + 40
-}
-
-function drawSignatureField(ctx, { x, y, w, label, name, dataUrl, date }) {
-  const { doc } = ctx
-
-  // Stamped signature image (if approved)
-  if (dataUrl) {
-    try {
-      doc.addImage(dataUrl, 'PNG', x, y, Math.min(w, 60), 18)
-    } catch {
-      // fall through to typed name
-      doc.setFont('times', 'italic')
-      doc.setFontSize(18)
-      doc.setTextColor(...INK_MUTED)
-      doc.text(name || '', x, y + 14)
-    }
-  } else if (name) {
-    // Typed name in italic when present
-    doc.setFont('times', 'italic')
-    doc.setFontSize(16)
-    doc.setTextColor(...INK_MUTED)
-    doc.text(name, x, y + 16)
-  }
-
-  // Signature line
-  doc.setDrawColor(...ONYX)
-  doc.setLineWidth(0.4)
-  doc.line(x, y + 22, x + w, y + 22)
-
-  // Label + date row
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(7)
-  doc.setTextColor(...INK_MUTED)
-  doc.setCharSpace(0.6)
-  doc.text(label.toUpperCase(), x, y + 27)
-  doc.setCharSpace(0)
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(9)
-  doc.text(`Date${date ? `: ${date}` : ''}`, x + w, y + 27, { align: 'right' })
-}
-
-function drawTextWithPageBreak(ctx, lines, cursor, lineHeight) {
-  for (const line of lines) {
-    cursor = ensureSpace(ctx, cursor, lineHeight + 1)
-    ctx.doc.text(line, ctx.margin, cursor + lineHeight - 1)
-    cursor += lineHeight
-  }
-  return cursor
-}
-
-// Drawn last after all sections so we know totalPages.
-function drawProposalFooters(ctx) {
-  const { doc, pageWidth, pageHeight, company } = ctx
-
-  const trustParts = [
-    company?.license_number ? `LIC #${String(company.license_number).trim()}` : '',
-    company?.insured_text ? String(company.insured_text).trim() : ''
-  ].filter(Boolean)
-  const contactParts = [
-    company?.name,
-    company?.phone,
-    company?.email,
-    company?.website
-  ]
-    .map((s) => (s && String(s).trim()) || '')
-    .filter(Boolean)
-  const trustLine = trustParts.join(' · ').toUpperCase()
-  const contactLine = contactParts.join(' · ')
-
-  const total = doc.internal.getNumberOfPages()
-  for (let p = 1; p <= total; p++) {
-    doc.setPage(p)
-
-    // Hairline
-    doc.setDrawColor(220, 215, 205)
-    doc.setLineWidth(0.2)
-    doc.line(16, pageHeight - 16, pageWidth - 16, pageHeight - 16)
-
-    // Left, contact line
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(8)
-    doc.setTextColor(...INK_MUTED)
-    if (contactLine) doc.text(contactLine, 16, pageHeight - 10)
-
-    // Right, page number + trust (alternate lines)
-    doc.text(`Page ${p} of ${total}`, pageWidth - 16, pageHeight - 10, { align: 'right' })
-    if (trustLine && p === total) {
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(7)
-      doc.text(trustLine, pageWidth - 16, pageHeight - 6, { align: 'right' })
-    }
-  }
-}
-
-// Renders the Change Orders section on both the invoice + proposal PDFs.
-// Mirrors ChangeOrdersBlock.tsx visually: CO # · title · description ·
-// amount (positive = additive, negative = credit in signal-green).
-function drawChangeOrdersSection(ctx, cursor) {
-  const { doc, margin, contentWidth, brandGold, changeOrders } = ctx
-  if (!changeOrders?.length) return cursor
-
-  cursor += 6
-  cursor = ensureSpace(ctx, cursor, 30 + changeOrders.length * 18)
-
-  drawSectionHeading(doc, {
-    x: margin, y: cursor, width: contentWidth,
-    eyebrow: `CHANGE ORDERS · ${changeOrders.length} ORDER${changeOrders.length === 1 ? '' : 'S'}`,
-    title: 'Contract amendments',
-    brandGold
-  })
-  cursor += 14
-
-  for (let i = 0; i < changeOrders.length; i++) {
-    const co = changeOrders[i]
-    cursor = ensureSpace(ctx, cursor, 18)
-    const amt = Number(co.amount || 0)
-    const isCredit = amt < 0
-
-    // CO # stamp
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(10)
-    doc.setTextColor(...brandGold)
-    doc.text(`CO #${co.sequence_number || (i + 1)}`, margin, cursor + 4)
-
-    // Title
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(11)
-    doc.setTextColor(...ONYX)
-    const titleX = margin + 22
-    const amountX = margin + contentWidth
-    const titleMax = amountX - titleX - 26
-    const titleLines = doc.splitTextToSize(co.title || 'Change order', titleMax)
-    doc.text(titleLines, titleX, cursor + 4)
-    let rowBottom = cursor + 4 + (titleLines.length - 1) * 5
-
-    // Status badge (only when not draft, keeps the row tight)
-    if (co.status === 'approved') {
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(7)
-      doc.setTextColor(...SIGNAL_GREEN)
-      doc.setCharSpace(0.6)
-      const stamp = co.approved_at
-        ? `APPROVED · ${shortDate(co.approved_at).toUpperCase()}`
-        : 'APPROVED'
-      doc.text(stamp, titleX, rowBottom + 4)
-      doc.setCharSpace(0)
-      rowBottom += 4
-    } else if (co.status === 'draft') {
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(7)
-      doc.setTextColor(...INK_MUTED)
-      doc.setCharSpace(0.6)
-      doc.text('DRAFT', titleX, rowBottom + 4)
-      doc.setCharSpace(0)
-      rowBottom += 4
-    }
-
-    // Description (truncated)
-    if (co.description) {
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(9)
-      doc.setTextColor(...INK_MUTED)
-      const descLines = doc.splitTextToSize(co.description, titleMax)
-      const descShow = descLines.slice(0, 2)
-      doc.text(descShow, titleX, rowBottom + 4.5)
-      rowBottom += descShow.length * 4
-    }
-
-    // Amount (right)
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(11)
-    doc.setTextColor(...(isCredit ? SIGNAL_GREEN : ONYX))
-    doc.text(
-      isCredit ? `-${money(Math.abs(amt))}` : `+${money(amt)}`,
-      amountX, cursor + 4, { align: 'right' }
-    )
-
-    cursor = rowBottom + 6
-    doc.setDrawColor(232, 228, 216)
-    doc.setLineWidth(0.15)
-    doc.line(margin, cursor - 2, margin + contentWidth, cursor - 2)
-  }
-  return cursor + 4
-}
-
-function groupPhotosBySection(photos = []) {
-  const map = new Map()
-  for (const p of photos || []) {
-    const key = (p.section_tag || 'General').trim() || 'General'
-    if (!map.has(key)) map.set(key, [])
-    map.get(key).push(p)
-  }
-  return map
-}
-
-/* ============================================================
-   buildProposalCtx, computes the immutable render context once.
-   Carries pageWidth/Height, brand spacing, derived items / totals,
-   resolved fallback strings, and the formatted number/date.
-   ============================================================ */
-/**
- * Preload a list of project photos into jsPDF-ready descriptors. Each
- * input entry can be a string (URL) or an object { url, section_tag,
- * caption }. Returns an array in the same order with { dataUrl, format,
- * width, height, section_tag, caption } | null. Null entries are
- * filtered downstream so a single bad URL never blocks the rest.
- */
-async function preloadProposalPhotos(input) {
-  if (!Array.isArray(input) || input.length === 0) return []
-  const entries = input.map((p) => (typeof p === 'string' ? { url: p } : p)).filter((p) => p && p.url)
-  // Cap at 8 photos to keep generated PDF size sane. Cover takes 1, up
-  // to 7 scope sections benefit from one each. Excess gets dropped.
-  const capped = entries.slice(0, 8)
-  const loaded = await Promise.all(
-    capped.map((p) => loadImageForPdf(p.url, { maxDimension: 1400 }).then((img) => ({
-      img,
-      section_tag: p.section_tag || null,
-      caption: p.caption || null
-    })))
-  )
-  return loaded
-    .filter((entry) => entry.img)
-    .map((entry) => ({ ...entry.img, section_tag: entry.section_tag, caption: entry.caption }))
-}
-
-/**
- * Utility: save a jsPDF doc from the result of generate* functions.
 /**
  * Generate a one-page Certificate of Completion PDF from a saved
  * fh_closeouts row, in the same design language as the redesigned
@@ -3095,7 +1974,7 @@ export async function generateCertificate({
   closeout = {},
   options = {}
 } = {}) {
-  const doc = new jsPDF({ unit: 'mm', format: 'letter' })
+  const doc = createPdfDoc()
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()
   const margin = 18
@@ -3201,8 +2080,8 @@ export async function generateCertificate({
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(12)
   doc.setTextColor(...ONYX)
-  doc.text(contact.name || '\u2003', margin, cursor)
-  const jobLines = doc.splitTextToSize(contact.job_title || contact.name || '\u2003', colW)
+  doc.text(contact.name || '', margin, cursor)
+  const jobLines = doc.splitTextToSize(contact.job_title || contact.name || '', colW)
   doc.text(jobLines, rightX, cursor)
   let pLeft = cursor + 5
   let pRight = cursor + jobLines.length * 5
@@ -3231,8 +2110,8 @@ export async function generateCertificate({
     rows: months > 0
       ? [
           { k: 'Coverage', v: months === 12 ? '1 year' : months === 24 ? '2 years' : `${months} months` },
-          { k: 'Starts', v: warrantyStart ? formatDocDate(warrantyStart) : '\u2003' },
-          { k: 'Through', v: warrantyEnd ? formatDocDate(warrantyEnd) : '\u2003' }
+          { k: 'Starts', v: warrantyStart ? formatDocDate(warrantyStart) : '' },
+          { k: 'Through', v: warrantyEnd ? formatDocDate(warrantyEnd) : '' }
         ]
       : [
           { k: 'Coverage', v: 'No express warranty included.' }
@@ -3250,7 +2129,7 @@ export async function generateCertificate({
     margin, pageWidth, pageHeight, paintPage, y: cursor,
     label: 'Customer approval',
     rows: [
-      { k: 'Signed by', v: closeout.signoff_name || contact.name || '\u2003' },
+      { k: 'Signed by', v: closeout.signoff_name || contact.name || '' },
       { k: 'Method', v: methodLabel },
       { k: 'Signed on', v: closeout.signoff_at ? formatDocDate(closeout.signoff_at) : formatDocDate(closedAt) }
     ]
@@ -3372,7 +2251,7 @@ function drawCertSection(doc, opts) {
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(10.5)
     doc.setTextColor(...(row.green ? SIGNAL_GREEN : ONYX))
-    doc.text(String(row.v || '\u2003'), pageWidth - margin, cursor + 4, { align: 'right' })
+    doc.text(String(row.v || ''), pageWidth - margin, cursor + 4, { align: 'right' })
     cursor += 6.5
   }
   return cursor + 4

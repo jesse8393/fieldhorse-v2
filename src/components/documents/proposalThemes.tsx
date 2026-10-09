@@ -4,7 +4,9 @@
 // letter-paper render of the same normalized `view` produced by
 // ProposalTemplate, so the contractor can pick the look that fits their
 // brand (Settings → Estimate template) and every surface, in-app
-// preview and the public /p/:token page, renders it identically.
+// preview and the public /p/:token page, renders it identically. Theme
+// colors come from THEME_PALETTES in tokens.ts, which the PDF export
+// (src/lib/pdf.js) reads too, so the emailed or signed PDF matches.
 //
 // Themes here all share three principles that distinguish them from the
 // legacy 'classic' layout:
@@ -18,7 +20,7 @@
 // by the shared <SupportingSections> block so the themes stay focused
 // and feature-complete without duplicating that machinery three times.
 
-import { DOC_FONTS } from './tokens.ts'
+import { DOC_COLORS, DOC_FONTS, THEME_PALETTES } from './tokens.ts'
 import { money } from './format.ts'
 import InsuranceModeBlock from './InsuranceModeBlock.tsx'
 import ChangeOrdersBlock from './ChangeOrdersBlock.tsx'
@@ -124,7 +126,7 @@ function fmtLongDate(d: any) {
 /* ─── Shared supporting sections (scope prose, terms, exclusions,
    photos, insurance, change orders, signature). Accent-tinted so it
    reads as part of each theme. ─── */
-function SupportingSections({ view, accent, muted = '#5C5C5C', mid = '#141414' }: any) {
+function SupportingSections({ view, accent, muted = '#5C5C5C', mid = '#141414', rule = DOC_COLORS.rule }: any) {
   const { scopeText, paymentTerms, warrantyText, exclusions = [], photos = [], insurance, changeOrders = [], company, recipient, approval, upgrades = [], status } = view
   const Label = ({ children }: any) => (
     <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: accent, marginBottom: 6 }}>
@@ -170,7 +172,7 @@ function SupportingSections({ view, accent, muted = '#5C5C5C', mid = '#141414' }
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
             <tbody>
               {upgrades.flatMap((g: any) => g.items).map((it: any, i: number) => (
-                <tr key={i} style={{ borderBottom: '1px solid #F2EDE4' }}>
+                <tr key={i} style={{ borderBottom: `1px solid ${rule}` }}>
                   <td style={{ ...tdL, color: mid }}>{it.description}</td>
                   <td style={{ ...tdR, color: mid }}>{qtyLabel(it)}</td>
                   <td style={{ ...tdR, color: mid }}>{money(it.rate, { cents: true })}</td>
@@ -296,20 +298,21 @@ function Totline({ label, value }: any) {
    ============================================================ */
 export function SlateProposal({ view }: { view: ProposalView }) {
   const { company, recipient } = view
-  const bar = '#5C5C5C'
+  const pal = THEME_PALETTES.slate
+  const bar = pal.accent
   return (
     <Page>
       <div style={{ marginBottom: 28 }}>
         <LogoMark company={company} maxHeight={64} />
       </div>
 
-      <div style={{ background: bar, color: '#F2EDE4', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, padding: '12px 24px', margin: `0 -${PAD - 0}px`, paddingLeft: PAD, paddingRight: PAD }}>
+      <div style={{ background: bar, color: pal.onAccent, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, padding: '12px 24px', margin: `0 -${PAD - 0}px`, paddingLeft: PAD, paddingRight: PAD }}>
         <MetaCell label="Estimate No." value={view.number} />
         <MetaCell label="Issue Date" value={fmtDate(view.issuedAt) || '\u2003'} />
         <MetaCell label="Valid Until" value={fmtDate(view.expiresAt) || '\u2003'} />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, padding: '24px 0 24px', borderBottom: '1px solid #F2EDE4' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, padding: '24px 0 24px', borderBottom: `1px solid ${pal.rule}` }}>
         <PartyCol label="From" name={company?.name} lines={addressLines(company)} />
         <PartyCol label="For" name={recipient?.name} lines={addressLines(recipient)} />
       </div>
@@ -327,7 +330,7 @@ export function SlateProposal({ view }: { view: ProposalView }) {
         </thead>
         <tbody>
           {view.lineItems.map((it, i) => (
-            <tr key={i} style={{ borderBottom: '1px solid #F2EDE4' }}>
+            <tr key={i} style={{ borderBottom: `1px solid ${pal.rule}` }}>
               <td style={tdL}>{it.description}</td>
               <td style={tdR}>{qtyLabel(it)}</td>
               <td style={tdR}>{money(it.rate, { cents: true })}</td>
@@ -341,7 +344,7 @@ export function SlateProposal({ view }: { view: ProposalView }) {
         <div style={{ minWidth: 300 }}><TotalsRows view={view} /></div>
       </div>
 
-      <SupportingSections view={view} accent={bar} />
+      <SupportingSections view={view} accent={bar} mid={pal.mid} muted={pal.muted} rule={pal.rule} />
     </Page>
   )
 }
@@ -351,8 +354,9 @@ export function SlateProposal({ view }: { view: ProposalView }) {
    ============================================================ */
 export function MintProposal({ view }: { view: ProposalView }) {
   const { company, recipient } = view
-  const green = '#5C5C5C'
-  const greenSoft = '#F2EDE4'
+  const pal = THEME_PALETTES.mint
+  const green = pal.accent
+  const greenSoft = pal.accentSoft
   return (
     <Page>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, gap: 16 }}>
@@ -388,17 +392,17 @@ export function MintProposal({ view }: { view: ProposalView }) {
 
       <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 14, fontSize: 14 }}>
         <thead>
-          <tr style={{ background: green, color: '#F2EDE4' }}>
-            <th style={{ ...thR, color: '#F2EDE4', padding: '12px 12px', width: '12%' }}>Qty</th>
-            <th style={{ ...thL, color: '#F2EDE4', padding: '12px 12px' }}>Description</th>
-            <th style={{ ...thR, color: '#F2EDE4', padding: '12px 12px', width: '20%' }}>Unit Price</th>
-            <th style={{ ...thR, color: '#F2EDE4', padding: '12px 12px', width: '20%' }}>Amount</th>
+          <tr style={{ background: green, color: pal.onAccent }}>
+            <th style={{ ...thR, color: pal.onAccent, padding: '12px 12px', width: '12%' }}>Qty</th>
+            <th style={{ ...thL, color: pal.onAccent, padding: '12px 12px' }}>Description</th>
+            <th style={{ ...thR, color: pal.onAccent, padding: '12px 12px', width: '20%' }}>Unit Price</th>
+            <th style={{ ...thR, color: pal.onAccent, padding: '12px 12px', width: '20%' }}>Amount</th>
           </tr>
         </thead>
         <tbody>
           {view.lineItems.map((it, i) => (
-            <tr key={i} style={{ borderBottom: '1px solid #F2EDE4' }}>
-              <td style={{ ...tdR, paddingLeft: 12 }}>{qtyLabel(it)}</td>
+            <tr key={i} style={{ borderBottom: `1px solid ${pal.rule}` }}>
+              <td style={{ ...tdR, paddingLeft: 12, paddingRight: 12 }}>{qtyLabel(it)}</td>
               <td style={tdL}>{it.description}</td>
               <td style={tdR}>{money(it.rate, { cents: true })}</td>
               <td style={{ ...tdR, fontWeight: 600 }}>{money(it.amount, { cents: true })}</td>
@@ -411,7 +415,7 @@ export function MintProposal({ view }: { view: ProposalView }) {
         <div style={{ minWidth: 300 }}><TotalsRows view={view} accentText={green} boxed={greenSoft} /></div>
       </div>
 
-      <SupportingSections view={view} accent={green} />
+      <SupportingSections view={view} accent={green} mid={pal.mid} muted={pal.muted} rule={pal.rule} />
     </Page>
   )
 }
@@ -421,9 +425,10 @@ export function MintProposal({ view }: { view: ProposalView }) {
    ============================================================ */
 export function EditorialProposal({ view }: { view: ProposalView }) {
   const { company, recipient } = view
-  const sand = '#F2EDE4'
-  const tan = '#C9963A'
-  const ink = '#141414'
+  const pal = THEME_PALETTES.editorial
+  const sand = pal.paper || DOC_COLORS.paper
+  const tan = pal.accent
+  const ink = pal.ink
   return (
     <Page background={sand} color={ink}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -449,7 +454,7 @@ export function EditorialProposal({ view }: { view: ProposalView }) {
       {view.scopeText && view.scopeText.trim() && (
         <section style={{ marginBottom: 26 }}>
           <div style={{ fontFamily: DOC_FONTS.serif, fontSize: 20, color: tan, marginBottom: 8, letterSpacing: 0 }}>SCOPE OF WORK</div>
-          <p style={{ margin: 0, fontSize: 12, lineHeight: 1.7, color: '#5C5C5C', whiteSpace: 'pre-wrap' }}>{view.scopeText.trim()}</p>
+          <p style={{ margin: 0, fontSize: 12, lineHeight: 1.7, color: pal.mid, whiteSpace: 'pre-wrap' }}>{view.scopeText.trim()}</p>
         </section>
       )}
 
@@ -465,7 +470,7 @@ export function EditorialProposal({ view }: { view: ProposalView }) {
         </thead>
         <tbody>
           {view.lineItems.map((it, i) => (
-            <tr key={i} style={{ borderBottom: '1px solid rgba(201, 150, 58,0.25)' }}>
+            <tr key={i} style={{ borderBottom: `1px solid ${pal.rule}` }}>
               <td style={{ ...tdL, color: ink }}>{it.description}</td>
               <td style={{ ...tdR, color: ink }}>{qtyLabel(it)}</td>
               <td style={{ ...tdR, color: ink }}>{money(it.rate, { cents: true })}</td>
@@ -480,7 +485,7 @@ export function EditorialProposal({ view }: { view: ProposalView }) {
         <span style={{ fontFamily: DOC_FONTS.serif, fontSize: 20, color: ink, fontVariantNumeric: 'tabular-nums' }}>{money(view.total, { cents: true })}</span>
       </div>
 
-      <SupportingSections view={view} accent={tan} mid="#5C5C5C" muted="#5C5C5C" />
+      <SupportingSections view={view} accent={tan} mid={pal.mid} muted={pal.muted} rule={pal.rule} />
     </Page>
   )
 }

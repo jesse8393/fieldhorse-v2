@@ -16,30 +16,92 @@
 // proposal. Black, paper, slate, restrained warm gold. No saturated
 // gradients, no badge soup.
 
+// The six locked palette colors (scripts/audit-design-system.mjs). Every
+// document color is one of these or a mix of two of them.
+const GOLD = '#C9963A'
+const INK = '#141414'
+const PAPER = '#F2EDE4'
+const MUTED = '#5C5C5C'
+const RED = '#C0392B'
+const GREEN = '#2D7A4F'
+
+/** '#RRGGBB' to an [r, g, b] tuple for jsPDF. Malformed input gives black. */
+export function hexToRgb(hex: string): [number, number, number] {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '').trim())
+  if (!m) return [0, 0, 0]
+  const n = parseInt(m[1], 16)
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+}
+
+/**
+ * Mix two '#RRGGBB' colors, `weight` (0 to 1) of `a` over `b`, with the same
+ * arithmetic as CSS color-mix(in srgb, a weight%, b). Derived tones are
+ * computed here instead of written out as new hex values, so they stay on
+ * the palette and the jsPDF export (which cannot read color-mix) can share
+ * them with the HTML documents.
+ */
+export function mixHex(a: string, b: string, weight: number): string {
+  const [ar, ag, ab] = hexToRgb(a)
+  const [br, bg, bb] = hexToRgb(b)
+  const w = Math.max(0, Math.min(1, weight))
+  const channel = (x: number, y: number) => Math.round(x * w + y * (1 - w)).toString(16).padStart(2, '0')
+  return `#${channel(ar, br)}${channel(ag, bg)}${channel(ab, bb)}`
+}
+
 export const DOC_COLORS = {
   // Page surface
-  paper:        '#F2EDE4',
-  paperSoft:    '#F2EDE4',  // light-cream block bg (totals card, terms)
+  paper:        PAPER,
+  paperSoft:    mixHex(INK, PAPER, 0.04),   // soft block bg (totals card, terms), one shade off the page
 
   // Ink
-  ink:          '#141414',  // body text, headings
-  inkMid:       '#141414',  // bold values, table cells
-  inkMuted:     '#5C5C5C',  // labels, secondary lines
-  inkFaint:     '#C9963A',  // captions, hairline meta
+  ink:          INK,                        // body text, headings
+  inkMid:       INK,                        // bold values, table cells
+  inkMuted:     MUTED,                      // labels, secondary lines
+  inkFaint:     MUTED,                      // captions, meta, fine print. Gold measured 2.3:1 on paper, below WCAG AA.
 
-  // Lines
-  rule:         '#F2EDE4',  // hairline dividers
-  ruleStrong:   '#F2EDE4',  // section separators
+  // Lines. These must differ from the paper or every divider disappears.
+  rule:         mixHex(INK, PAPER, 0.12),   // hairline dividers
+  ruleStrong:   mixHex(INK, PAPER, 0.22),   // section separators
 
   // Brand
-  gold:         '#C9963A',  // default brand accent (overridable per company)
-  goldBright:   '#C9963A',
-  goldSoft:     '#F2EDE4',  // pill backgrounds
+  gold:         GOLD,                       // default brand accent (overridable per company)
+  goldBright:   GOLD,
+  goldSoft:     mixHex(GOLD, PAPER, 0.16),  // pill backgrounds
 
   // States
-  alertRed:     '#C0392B',  // overdue
-  signalGreen:  '#2D7A4F',  // paid / approved
-  slate:        '#5C5C5C'   // neutral status pill
+  alertRed:     RED,                        // overdue
+  signalGreen:  GREEN,                      // paid / approved
+  slate:        MUTED                       // neutral status pill
+}
+
+export type ThemePalette = {
+  accent: string       // header bar, wordmark, labels
+  accentSoft: string   // tinted total box
+  onAccent: string     // text drawn on an accent fill
+  ink: string          // primary text
+  mid: string          // body copy in the supporting sections
+  muted: string        // secondary text
+  rule: string         // row dividers
+  paper: string | null // page color; null keeps the default page (cream on screen, white in the PDF)
+}
+
+// Colors for the selectable estimate themes (Settings, Estimate template).
+// proposalThemes.tsx renders them on screen and pdf.js converts the same
+// values to RGB for the PDF, so the emailed or signed PDF matches the
+// preview the contractor picked.
+export const THEME_PALETTES: Record<'slate' | 'mint' | 'editorial', ThemePalette> = {
+  slate: {
+    accent: MUTED, accentSoft: mixHex(MUTED, PAPER, 0.12), onAccent: PAPER,
+    ink: INK, mid: INK, muted: MUTED, rule: DOC_COLORS.rule, paper: null
+  },
+  mint: {
+    accent: GREEN, accentSoft: mixHex(GREEN, PAPER, 0.12), onAccent: PAPER,
+    ink: INK, mid: INK, muted: MUTED, rule: DOC_COLORS.rule, paper: null
+  },
+  editorial: {
+    accent: GOLD, accentSoft: mixHex(GOLD, PAPER, 0.16), onAccent: INK,
+    ink: INK, mid: MUTED, muted: MUTED, rule: mixHex(GOLD, PAPER, 0.25), paper: PAPER
+  }
 }
 
 export const DOC_FONTS: Record<string, string> = {
@@ -84,30 +146,6 @@ export const DOC_SPACE = {
   gutter:       16,    // section internal padding
   blockGap:     24,    // gap between major sections
   cardGap:      12     // gap between cards within a section
-}
-
-// jsPDF-friendly mirror of the palette in [r, g, b] tuples + mm margins.
-// pdf.js can import this so the export path and the preview share one
-// source of truth. Hex → RGB on the few used in PDF code.
-export const DOC_PDF = {
-  marginMm:   16,
-  format:     'letter',
-  unit:       'mm',
-  rgb: {
-    ink:        [26, 24, 20],
-    inkMid:     [58, 56, 51],
-    inkMuted:   [107, 106, 102],
-    inkFaint:   [163, 159, 149],
-    rule:       [232, 228, 216],
-    ruleStrong: [213, 207, 190],
-    gold:       [200, 161, 84],
-    goldBright: [232, 184, 101],
-    goldSoft:   [244, 236, 216],
-    paper:      [255, 255, 255],
-    paperSoft:  [251, 248, 241],
-    alertRed:   [179, 58, 58],
-    signalGreen:[72, 130, 95]
-  }
 }
 
 /**

@@ -325,13 +325,16 @@ function Party({ label, name, lines }: any) {
 }
 
 export function StatusChip({ label, tone = 'neutral' }: any) {
+  // Neutral chips need a visible edge: a border in the paper color
+  // disappeared into the page.
+  const neutral = { bg: DOC_COLORS.paperSoft, fg: '#5C5C5C', br: DOC_COLORS.ruleStrong }
   const palette = ({
-    neutral: { bg: '#F2EDE4', fg: '#5C5C5C', br: '#F2EDE4' },
+    neutral,
     gold:    { bg: '#F2EDE4', fg: '#5C5C5C', br: '#C9963A' },
     green:   { bg: '#F2EDE4', fg: '#2D7A4F', br: '#2D7A4F' },
     red:     { bg: '#F2EDE4', fg: '#C0392B', br: '#C0392B' },
-    slate:   { bg: '#F2EDE4', fg: '#5C5C5C', br: '#F2EDE4' }
-  } as Record<string, { bg: string; fg: string; br: string }>)[tone] || { bg: '#F2EDE4', fg: '#5C5C5C', br: '#F2EDE4' }
+    slate:   neutral
+  } as Record<string, { bg: string; fg: string; br: string }>)[tone] || neutral
   return (
     <span
       style={{

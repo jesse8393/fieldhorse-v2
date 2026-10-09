@@ -29,6 +29,45 @@
 
 import crypto from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
+import { loadAccessibleRow } from './lib/orgAccess.js'
+import { hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
+import { textField } from './lib/email.js'
+
+// Every proposal PDF draws these tokens, in the page color, on the
+// customer signature line (src/lib/pdf.js ESIGN_SIGN_ANCHOR and
+// ESIGN_DATE_ANCHOR). The old anchor, 'Client signature', only existed in
+// the themed templates, so the default (classic) proposal failed envelope
+// creation with ANCHOR_TAB_STRING_NOT_FOUND.
+export const SIGN_ANCHOR = '\\s1\\'
+export const DATE_ANCHOR = '\\d1\\'
+
+/**
+ * Sign Here and Date Signed fields for the customer. DocuSign lines a
+ * field's bottom edge up with the bottom of its anchor text, so both sit on
+ * the signature line. anchorIgnoreIfNotPresent keeps a PDF without the
+ * tokens (one exported before they existed) from failing the whole
+ * envelope; DocuSign then lets the signer place the signature.
+ */
+export function customerSignerTabs() {
+  const anchored = (anchorString) => ({
+    anchorString,
+    anchorUnits: 'mms',
+    anchorXOffset: '0',
+    anchorYOffset: '0',
+    anchorIgnoreIfNotPresent: 'true'
+  })
+  return {
+    signHereTabs: [anchored(SIGN_ANCHOR)],
+    dateSignedTabs: [anchored(DATE_ANCHOR)]
+  }
+}
+
+/** Email subject for the signing request. Plain punctuation only. */
+export function envelopeSubject(subject, jobTitle) {
+  const custom = textField(subject)
+  const title = textField(jobTitle)
+  return (custom || (title ? `Please sign your proposal for ${title}` : 'Please sign your proposal')).slice(0, 100)
+}
 
 export default async (request) => {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors() })
@@ -66,11 +105,17 @@ export default async (request) => {
 
   let body
   try { body = await request.json() } catch { return json({ error: 'invalid_json' }, 400) }
-  const { contact_id, sender_user_id, recipient_email, recipient_name, storage_path, subject } = body || {}
-  if (!contact_id || !sender_user_id || !recipient_email || !storage_path) {
+  // Every field goes through textField: a number, object or null from a
+  // malformed client reads as empty instead of throwing on .slice() and
+  // surfacing as an opaque 500. Required fields that are not non empty
+  // strings get a 400.
+  const contact_id = textField(body?.contact_id)
+  const sender_user_id = textField(body?.sender_user_id)
+  const storage_path = textField(body?.storage_path)
+  const email = textField(body?.recipient_email).toLowerCase()
+  if (!contact_id || !sender_user_id || !email || !storage_path) {
     return json({ error: 'missing_fields', required: ['contact_id', 'sender_user_id', 'recipient_email', 'storage_path'] }, 400)
   }
-  const email = String(recipient_email).toLowerCase().trim()
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: 'invalid_email' }, 400)
 
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } })
@@ -83,15 +128,23 @@ export default async (request) => {
     return json({ error: 'forbidden', detail: 'sender_user_id must match the signed-in user.' }, 403)
   }
 
-  // 1. Ownership check
-  const { data: contact, error: cErr } = await supabase
-    .from('fh_contacts')
-    .select('id, name, job_title, user_id')
-    .eq('id', contact_id)
-    .eq('user_id', sender_user_id)
-    .maybeSingle()
-  if (cErr) return json({ error: 'contact_lookup_failed', detail: cErr.message }, 500)
-  if (!contact) return json({ error: 'forbidden_or_not_found' }, 403)
+  // Per sender cap shared by every send-* function (see send-quote.js).
+  const rlOk = await checkRateLimit(supabase, {
+    scope: 'send-email', identifier: hashIdentifier(sender_user_id), limit: 30, windowSeconds: 600,
+  })
+  if (!rlOk) {
+    return json({ error: 'rate_limited', message: 'Too many emails sent in a short time. Try again in a few minutes.' }, 429)
+  }
+
+  // 1. Access check: the job's creator, or an owner, admin or manager of
+  // its company.
+  const access = await loadAccessibleRow(supabase, {
+    table: 'fh_contacts', id: contact_id, callerId: sender_user_id,
+    select: 'name, job_title'
+  })
+  if (access.error === 'lookup_failed') return json({ error: 'contact_lookup_failed', message: 'Could not load this job. Try again.' }, 500)
+  if (!access.row) return json({ error: 'forbidden_or_not_found' }, 403)
+  const contact = access.row
 
   // 2. Download PDF → base64
   // Tenant guard: service role bypasses the per-user folder RLS, and every
@@ -99,11 +152,14 @@ export default async (request) => {
   // in src/screens/**). A path that doesn't start with the caller's own id
   // belongs to another tenant — reject it so a forged storage_path can't
   // exfiltrate another user's PDF.
-  if (!String(storage_path).startsWith(`${sender_user_id}/`)) {
+  if (!storage_path.startsWith(`${sender_user_id}/`)) {
     return json({ error: 'forbidden_path', detail: 'storage_path is outside your namespace.' }, 403)
   }
   const { data: blob, error: dlErr } = await supabase.storage.from('job-files').download(storage_path)
-  if (dlErr || !blob) return json({ error: 'pdf_download_failed', detail: dlErr?.message || 'not found' }, 500)
+  if (dlErr || !blob) {
+    console.error('[docusign-send] pdf download failed', dlErr)
+    return json({ error: 'pdf_download_failed', detail: 'Could not read the proposal PDF. Try sending again.' }, 500)
+  }
   const base64Pdf = Buffer.from(await blob.arrayBuffer()).toString('base64')
 
   // 3. JWT auth → access token
@@ -111,19 +167,23 @@ export default async (request) => {
   try {
     token = await getAccessToken(cfg)
   } catch (e) {
-    // Most common: consent not granted yet. Surface the consent URL so
-    // the operator can authorize the integration once.
+    // Most common: consent not granted yet. The consent URL is DocuSign's
+    // own authorization page for this integration (the integration key is
+    // the public OAuth client id, not a secret); the account owner opens it
+    // once. The provider's error text stays in the function log.
+    console.error('[docusign-send] DocuSign token request failed', e?.message || e)
     const consentUrl = `https://${cfg.authBase}/oauth/auth?response_type=code&scope=signature%20impersonation&client_id=${cfg.integrationKey}&redirect_uri=https://www.docusign.com`
     return json({
       error: 'docusign_auth_failed',
-      detail: e?.message || 'JWT grant failed',
+      detail: 'Could not connect to DocuSign. If this is the first send, the account owner needs to approve access once.',
       hint: 'If this is the first send, grant consent once by visiting the consent URL.',
       consent_url: consentUrl
     }, 502)
   }
 
   // 4. Create envelope
-  const docSubject = (subject || `Proposal${contact.job_title ? ` — ${contact.job_title}` : ''} for signature`).slice(0, 100)
+  const docSubject = envelopeSubject(body?.subject, contact.job_title)
+  const recipientName = textField(body?.recipient_name) || textField(contact.name)
   const envelopeDef = {
     emailSubject: docSubject,
     documents: [{
@@ -135,21 +195,10 @@ export default async (request) => {
     recipients: {
       signers: [{
         email,
-        name: (recipient_name || contact.name || 'Customer').slice(0, 100),
+        name: (recipientName || 'Customer').slice(0, 100),
         recipientId: '1',
         routingOrder: '1',
-        tabs: {
-          signHereTabs: [{
-            // Anchor on the literal text in the proposal's signature
-            // block. Falls back gracefully if the anchor isn't found —
-            // DocuSign places nothing and the signer can adopt-and-sign
-            // via the free-form flow.
-            anchorString: 'Client signature',
-            anchorUnits: 'pixels',
-            anchorXOffset: '0',
-            anchorYOffset: '-22'
-          }]
-        }
+        tabs: customerSignerTabs()
       }]
     },
     status: 'sent'
@@ -164,11 +213,13 @@ export default async (request) => {
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
-      return json({ error: 'envelope_create_failed', provider_status: res.status, detail: data?.message || JSON.stringify(data) }, 502)
+      console.error('[docusign-send] envelope create failed', { status: res.status, error: data?.errorCode, message: data?.message })
+      return json({ error: 'envelope_create_failed', provider_status: res.status, detail: 'DocuSign could not create the signing request. Try again in a few minutes.' }, 502)
     }
     envelopeId = data.envelopeId
   } catch (e) {
-    return json({ error: 'envelope_create_failed', detail: e?.message || 'network error' }, 502)
+    console.error('[docusign-send] envelope request failed', e?.message || e)
+    return json({ error: 'envelope_create_failed', detail: 'Could not reach DocuSign. Try again in a few minutes.' }, 502)
   }
 
   // 5. Record it. The envelope is already at DocuSign — we can't
@@ -185,7 +236,7 @@ export default async (request) => {
     provider: 'docusign',
     status: 'sent',
     recipient_email: email,
-    recipient_name: recipient_name || contact.name || null,
+    recipient_name: recipientName || null,
     subject: docSubject
   })
   if (envelopeRowErr) {

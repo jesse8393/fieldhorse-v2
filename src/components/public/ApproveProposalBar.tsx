@@ -9,6 +9,7 @@
 // for messaging. Caller doesn't need to know about the server contract.
 
 import { useState } from 'react'
+import { DOC_COLORS } from '../documents/tokens.ts'
 
 export default function ApproveProposalBar({
   token,
@@ -139,7 +140,7 @@ export default function ApproveProposalBar({
         </h3>
         <p style={bodyStyle}>
           {companyName ? `${companyName} has been notified` : 'The contractor has been notified'} of your approval{contactName ? ` for ${contactName}` : ''}.
-          A signed copy stays in your inbox for reference.
+          You can reopen this link to view the approved {docLabel}.
         </p>
         <div style={metaRowStyle}>
           <span>Signed as</span>
@@ -425,7 +426,8 @@ const metaRowStyle: import('react').CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
   fontSize: 12, color: '#5C5C5C',
   paddingTop: 12, marginTop: 16,
-  borderTop: '1px solid #F2EDE4'
+  // A paper colored divider on the paper colored panel was invisible.
+  borderTop: `1px solid ${DOC_COLORS.rule}`
 }
 
 const dotStyle: import('react').CSSProperties = {

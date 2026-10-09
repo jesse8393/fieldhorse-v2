@@ -1,48 +1,60 @@
-// PDF logo embed helper, Phase 4D-2B.
+// PDF image embed helper, Phase 4D-2B.
 //
-// Loads a contractor's logo from a Supabase signed URL and converts it
-// into a jsPDF-ready PNG data URL. Used by generateQuote() (Phase 4D-2C)
-// and generateInvoice() (Phase 4D-2D) to brand customer facing PDFs
-// with the contractor's mark.
+// Loads a contractor's logo or a project photo from a Supabase signed URL
+// and converts it into a jsPDF-ready data URL. Used by generateQuote() and
+// generateInvoice() to brand customer facing PDFs with the contractor's
+// mark and to embed jobsite photos.
 //
 // Strategy, single path for all formats:
 //   1. fetch() the signed URL with an AbortController timeout
 //   2. blob → object URL (same-origin)
 //   3. <img> with crossOrigin="anonymous"
 //   4. drawImage() onto an offscreen canvas, scaled to maxDimension
-//   5. canvas.toDataURL('image/png'), taint-safe because data was
-//      ingested via fetch() (already in our origin's memory)
+//   5. canvas.toDataURL(), taint-safe because data was ingested via
+//      fetch() (already in our origin's memory)
 //
-// Supports PNG and SVG (the canonical upload formats), plus JPEG and
-// WebP defensively. Returns null on any failure so the caller can
-// fall back to a typographic wordmark, logo never blocks a PDF.
+// Output format: the logo is re-encoded as PNG so its transparency
+// survives. Photos are re-encoded as JPEG (loadImageForPdf): a 900px
+// jobsite photo is roughly 1 MB as PNG against about 120 KB as JPEG, and
+// jsPDF also has to parse and deflate PNG data on the main thread, so PNG
+// photos made multi MB proposals that were slow to build on a phone and
+// heavy to email.
 //
-// Cache: module-level Map keyed by `${maxDimension}:${url}`. Stores
-// promises (so concurrent calls share one fetch) and the resolved value
-// is { dataUrl, format, width, height } | null. Negative results are
+// Supports PNG and SVG (the canonical logo upload formats), plus JPEG and
+// WebP. Returns null on any failure so the caller can fall back to a
+// typographic wordmark, an image never blocks a PDF.
+//
+// Cache: module-level Map keyed by `${format}:${maxDimension}:${url}`.
+// Stores promises (so concurrent calls share one fetch) and the resolved
+// value is { dataUrl, format, width, height } | null. Negative results are
 // cached for the session, a transient failure won't retry on every
 // Preview / Download / Send. Operators can refresh to retry.
 
-export type LogoDescriptor = { dataUrl: string; format: 'PNG'; width: number; height: number }
+export type ImageFormat = 'png' | 'jpeg'
+export type LogoDescriptor = { dataUrl: string; format: 'PNG' | 'JPEG'; width: number; height: number }
+type LoadOptions = { maxDimension?: number; timeoutMs?: number; format?: ImageFormat }
+
+const JPEG_QUALITY = 0.82
 
 const cache = new Map<string, Promise<LogoDescriptor | null>>()
 
 /**
- * Load a logo and return a jsPDF-compatible image descriptor.
+ * Load an image and return a jsPDF-compatible image descriptor. PNG by
+ * default, which keeps a logo's transparent background.
  */
-export function loadLogoForPdf(logoUrl: string | null | undefined, { maxDimension = 720, timeoutMs = 8000 }: { maxDimension?: number; timeoutMs?: number } = {}): Promise<LogoDescriptor | null> {
+export function loadLogoForPdf(logoUrl: string | null | undefined, { maxDimension = 720, timeoutMs = 8000, format = 'png' }: LoadOptions = {}): Promise<LogoDescriptor | null> {
   if (!logoUrl || typeof logoUrl !== 'string') return Promise.resolve(null)
 
-  const key = `${maxDimension}:${logoUrl}`
+  const key = `${format}:${maxDimension}:${logoUrl}`
   const cached = cache.get(key)
   if (cached) return cached
 
-  const p = doLoad(logoUrl, maxDimension, timeoutMs).catch(() => null)
+  const p = doLoad(logoUrl, maxDimension, timeoutMs, format).catch(() => null)
   cache.set(key, p)
   return p
 }
 
-async function doLoad(url: string, maxDimension: number, timeoutMs: number): Promise<LogoDescriptor | null> {
+async function doLoad(url: string, maxDimension: number, timeoutMs: number, format: ImageFormat): Promise<LogoDescriptor | null> {
   const blob = await fetchWithTimeout(url, timeoutMs)
   if (!blob) return null
 
@@ -64,6 +76,12 @@ async function doLoad(url: string, maxDimension: number, timeoutMs: number): Pro
     canvas.height = targetH
     const ctx = canvas.getContext('2d')
     if (!ctx) return null
+    // JPEG has no alpha channel: paint white first so a transparent
+    // region comes out white instead of black.
+    if (format === 'jpeg') {
+      ctx.fillStyle = 'white'
+      ctx.fillRect(0, 0, targetW, targetH)
+    }
     // High-quality scaling, better-than-default smoothing for the
     // common "square brand mark scaled down to 80mm wide" case.
     ctx.imageSmoothingEnabled = true
@@ -76,7 +94,9 @@ async function doLoad(url: string, maxDimension: number, timeoutMs: number): Pro
 
     let dataUrl: string
     try {
-      dataUrl = canvas.toDataURL('image/png')
+      dataUrl = format === 'jpeg'
+        ? canvas.toDataURL('image/jpeg', JPEG_QUALITY)
+        : canvas.toDataURL('image/png')
     } catch (e) {
       // Tainted canvas (extremely rare for SVGs that reference external
       // resources). One warning here is acceptable per spec.
@@ -85,7 +105,7 @@ async function doLoad(url: string, maxDimension: number, timeoutMs: number): Pro
     }
     if (!dataUrl || dataUrl === 'data:,') return null
 
-    return { dataUrl, format: 'PNG' as const, width: targetW, height: targetH }
+    return { dataUrl, format: format === 'jpeg' ? 'JPEG' : 'PNG', width: targetW, height: targetH }
   } finally {
     URL.revokeObjectURL(objectUrl)
   }
@@ -143,12 +163,11 @@ export function clearLogoCache() {
 }
 
 /**
- * Same loader, semantic alias for project photos. The implementation is
- * already content-agnostic, it just needs a URL that returns image
- * bytes. Exporting a separate name so call sites read clearly:
+ * Project photos and hero images. Same loader, cache and null-on-failure
+ * contract as loadLogoForPdf, but re-encoded as JPEG (see the header).
  *   loadLogoForPdf(...)  for the contractor's brand mark
  *   loadImageForPdf(...) for project photos / hero images
- *
- * Same cache, same null-on-failure contract.
  */
-export const loadImageForPdf = loadLogoForPdf
+export function loadImageForPdf(url: string | null | undefined, options: LoadOptions = {}): Promise<LogoDescriptor | null> {
+  return loadLogoForPdf(url, { ...options, format: options.format || 'jpeg' })
+}
