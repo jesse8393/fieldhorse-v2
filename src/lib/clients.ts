@@ -15,6 +15,7 @@
 
 import { supabase } from './supabase.ts'
 import { normalizePhoneKey } from './subIdentity.ts'
+import { queryClient } from './queryClient.ts'
 
 // Candidates fetched per lookup before the exact compare in JS.
 const CANDIDATES = 25
@@ -94,6 +95,9 @@ export async function findOrCreateClient(
       address: fields.address || null,
       company_name: company || null
     }).select('id').single()
+    // Every caller (new lead, capture, picker) should see the new client in
+    // the Clients list without a reload. Prefix match covers every scope.
+    if (created?.id) void queryClient.invalidateQueries({ queryKey: ['clients'] })
     return created?.id || null
   } catch (e) {
     // Non-fatal, caller proceeds with a null client_id.

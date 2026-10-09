@@ -1,11 +1,25 @@
 // src/lib/partners.ts
 //
 // Partner-roster helpers for the InvitePartnerSheet "past partners"
-// suggestion strip. RLS already scopes fh_job_partners to the inviter,
-// so the query needs no extra owner filter, we just dedupe by email
-// and prefer the most recent name/role for each partner.
+// suggestion strip. RLS scopes fh_job_partners to the caller's company,
+// but it ALSO returns the rows where the caller is the invited partner
+// on another contractor's job (fh_job_partners_partner_read). Those are
+// not part of the caller's roster, so the loaders drop them (see
+// withoutOwnPartnerRows); otherwise we just dedupe by email and prefer
+// the most recent name/role for each partner.
 
 import { supabase } from './supabase.ts'
+
+async function signedInUserId(): Promise<string | null> {
+  const { data } = await supabase.auth.getSession()
+  return data.session?.user?.id ?? null
+}
+
+// Leave out rows where the signed in user is the partner. A pending invite
+// has no partner_user_id yet, so a plain neq would drop every one of them.
+function withoutOwnPartnerRows<Q extends { or(filters: string): Q }>(query: Q, uid: string | null): Q {
+  return uid ? query.or(`partner_user_id.is.null,partner_user_id.neq.${uid}`) : query
+}
 
 export const PARTNER_ROLES = ['Foreman', 'Sub', 'Estimator', 'Other']
 
@@ -73,9 +87,10 @@ export async function loadPartnerDirectory({ includeRevoked = true, limitRows = 
     'fh_contacts!fh_job_partners_job_id_fkey ( id, name, job_title, stage )'
   ].join(', ')
 
-  const { data, error } = await supabase
+  const uid = await signedInUserId()
+  const { data, error } = await withoutOwnPartnerRows(supabase
     .from('fh_job_partners')
-    .select(sel)
+    .select(sel), uid)
     .order('invited_at', { ascending: false })
     .limit(limitRows)
 
@@ -127,23 +142,26 @@ function rollupStatus(a: string, b: string | null | undefined) {
 }
 
 // Flip a single partner row to status='revoked'. RLS keeps cross-tenant
-// updates from succeeding; we still scope by partnerId only because the
-// caller already proved ownership by being signed in.
+// updates from succeeding, and it does so silently (zero rows, no error),
+// so an empty result is a failure, not "Access revoked".
 export async function revokePartnerRow(partnerId: string | undefined) {
   if (!partnerId) throw new Error('revokePartnerRow: partnerId required')
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('fh_job_partners')
     .update({ status: 'revoked' })
     .eq('id', partnerId)
+    .select('id')
   if (error) throw error
+  if (!data?.length) throw new Error("That invite isn't on one of your jobs anymore. Refresh and try again.")
 }
 
 // Returns at most `limit` distinct past partners (by email), newest-first.
 // Each entry: { email, name, role, lastInvitedAt, status, jobCount }.
 export async function loadPastPartners({ excludeJobId = null, limit = 8 }: { excludeJobId?: string | null; limit?: number } = {}): Promise<PastPartner[]> {
-  const { data, error } = await supabase
+  const uid = await signedInUserId()
+  const { data, error } = await withoutOwnPartnerRows(supabase
     .from('fh_job_partners')
-    .select('partner_email, partner_name, partner_role, status, invited_at, accepted_at, job_id')
+    .select('partner_email, partner_name, partner_role, status, invited_at, accepted_at, job_id'), uid)
     .order('accepted_at', { ascending: false, nullsFirst: false })
     .order('invited_at', { ascending: false })
     .limit(200)

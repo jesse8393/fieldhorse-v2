@@ -62,6 +62,8 @@ data, and not recorded in `supabase_migrations.schema_migrations`:
 * 067 crew and foreman cannot change a job's stage, value, approval or
   completion, or delete jobs
 * 068 adds fh_notes.parsed, which the Notes screen writes
+* 069 lets a user read their own files in the logos bucket, which Storage
+  needs before it will remove or replace a logo
 
 055 (public rate limits) was applied with the migration tool and is recorded.
 

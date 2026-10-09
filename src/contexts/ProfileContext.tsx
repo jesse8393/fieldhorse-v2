@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { supabase } from '../lib/supabase.ts'
+import { legacyLogoPath, migrateLegacyLogo } from '../lib/logoMigration.ts'
 import { useAuth } from './AuthContext.tsx'
 import type { Database } from '../lib/database.types.ts'
 
@@ -42,6 +43,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const fetchSeqRef = useRef(0)
   const latestFetchRef = useRef<Promise<void> | null>(null)
   const lastFetchFailedRef = useRef(false)
+  const logoMigrationRef = useRef(false)
 
   const runFetch = useCallback(async (seq: number) => {
     const uid = userId
@@ -85,8 +87,23 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     // Multi-tenant guard: only accept the row if it actually belongs to
     // the current auth user. Prevents a stale cross-user profile from
     // leaking into state during a fast sign-out→sign in transition.
-    setProfile(data && data.user_id === uid ? data : null)
+    const own = data && data.user_id === uid ? data : null
+    setProfile(own)
     setLoading(false)
+    // One time move of an old expiring logo link to the public bucket
+    // (lib/logoMigration.ts). Background and best effort; a failure keeps
+    // the old link and the next load tries again.
+    if (own && legacyLogoPath(own.logo_url, uid) && !logoMigrationRef.current) {
+      logoMigrationRef.current = true
+      void migrateLegacyLogo(supabase as any, uid, own.logo_url)
+        .then((publicUrl) => {
+          if (publicUrl && activeUserIdRef.current === uid) {
+            setProfile((prev) => (prev && prev.user_id === uid ? { ...prev, logo_url: publicUrl } : prev))
+          }
+        })
+        .catch(() => {})
+        .finally(() => { logoMigrationRef.current = false })
+    }
   }, [userId])
 
   // Resolves once the newest fetch has settled, so a caller of refresh()

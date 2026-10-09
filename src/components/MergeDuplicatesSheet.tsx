@@ -7,12 +7,17 @@
 // the parent screen only needs to reload its rows.
 //
 // Each cluster is committed independently, partial merges are fine.
+// Clusters link transitively (A shares a phone with B, B an email with
+// C), so a member can be unticked: it is left out of the merge and
+// reported through onMarkedDistinct as a different client from the one
+// kept. Unticking everyone keeps the whole cluster apart.
 // The sheet keeps itself open until every cluster is resolved or the
 // user closes manually.
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Users, Check, AlertTriangle, X } from 'lucide-react'
 import { hapticTap, hapticMedium, hapticError } from '../lib/haptics.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
@@ -35,32 +40,83 @@ function fmtDate(s: any) {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-export default function MergeDuplicatesSheet({ open, userId, clusters, onClose, onMerged }: any) {
-  const [selected, setSelected] = useState<any>({})
+function oldestMemberId(cluster: any): string | undefined {
+  return [...cluster.members].sort((a: any, b: any) => {
+    const da = a.created_at ? new Date(a.created_at).getTime() : 0
+    const db = b.created_at ? new Date(b.created_at).getTime() : 0
+    return da - db
+  })[0]?.id
+}
+
+export default function MergeDuplicatesSheet({ open, userId, clusters, onClose, onMerged, onMarkedDistinct }: any) {
+  const [selected, setSelected] = useState<Record<string, string>>({})
+  // Members unticked per cluster key: left out of the merge, kept apart.
+  const [skipped, setSkipped] = useState<Record<string, string[]>>({})
   const [busyKey, setBusyKey] = useState<any>(null)
   const [resolved, setResolved] = useState(() => new Set())
+  // Ids merged away this session. Until the clients list refetches, the
+  // rows are still in `clusters` and could show up as a new cluster.
+  const [mergedAway, setMergedAway] = useState<Set<string>>(() => new Set())
+  const wasOpen = useRef(false)
 
-  // Reset whenever the sheet opens with a new batch
+  // Each cluster's survivor defaults to its oldest record. Picks the
+  // operator made survive a refetch of the clients list (one follows every
+  // merge, another comes on window focus): resetting them here swapped a
+  // chosen survivor back to the oldest record, so the next tap deleted the
+  // record they meant to keep. The rest resets only when the sheet opens.
   useEffect(() => {
-    if (!open) return
-    const next: Record<string, any> = {}
-    for (const c of clusters || []) {
-      const oldest = [...c.members].sort((a, b) => {
-        const da = a.created_at ? new Date(a.created_at).getTime() : 0
-        const db = b.created_at ? new Date(b.created_at).getTime() : 0
-        return da - db
-      })[0]
-      if (oldest) next[c.key] = oldest.id
+    if (!open) {
+      wasOpen.current = false
+      return
     }
-    setSelected(next)
-    setResolved(new Set())
-    setBusyKey(null)
+    const opening = !wasOpen.current
+    wasOpen.current = true
+    setSelected((prev) => {
+      const next: Record<string, string> = {}
+      for (const c of clusters || []) {
+        const kept = opening ? undefined : prev[c.key]
+        const pick = kept && c.members.some((m: any) => m.id === kept) ? kept : oldestMemberId(c)
+        if (pick) next[c.key] = pick
+      }
+      return next
+    })
+    if (opening) {
+      setSkipped({})
+      setResolved(new Set())
+      setMergedAway(new Set())
+      setBusyKey(null)
+    }
   }, [open, clusters])
 
   const remaining = useMemo(
-    () => (clusters || []).filter((c: any) => !resolved.has(c.key)),
-    [clusters, resolved]
+    () => (clusters || []).filter((c: any) =>
+      !resolved.has(c.key) && !c.members.some((m: any) => mergedAway.has(m.id))
+    ),
+    [clusters, resolved, mergedAway]
   )
+
+  function markResolved(key: string) {
+    setResolved((prev) => {
+      const next = new Set(prev)
+      next.add(key)
+      return next
+    })
+  }
+
+  function pickSurvivor(cluster: any, id: string) {
+    hapticTap()
+    setSelected((s) => ({ ...s, [cluster.key]: id }))
+    // The record you keep is never left out.
+    setSkipped((s) => (s[cluster.key]?.includes(id) ? { ...s, [cluster.key]: s[cluster.key].filter((x) => x !== id) } : s))
+  }
+
+  function toggleSkipped(cluster: any, id: string) {
+    hapticTap()
+    setSkipped((s) => {
+      const current = s[cluster.key] || []
+      return { ...s, [cluster.key]: current.includes(id) ? current.filter((x) => x !== id) : [...current, id] }
+    })
+  }
 
   async function commitMerge(cluster: any) {
     const survivorId = selected[cluster.key]
@@ -70,8 +126,21 @@ export default function MergeDuplicatesSheet({ open, userId, clusters, onClose, 
       toastError('Pick a survivor', 'Tap the client to keep.')
       return
     }
-    const losers = cluster.members.filter((m: any) => m.id !== survivor.id)
-    if (losers.length === 0) return
+    const skippedIds = new Set(skipped[cluster.key] || [])
+    const others = cluster.members.filter((m: any) => m.id !== survivor.id)
+    const losers = others.filter((m: any) => !skippedIds.has(m.id))
+    const keptApart: Array<[string, string]> = others
+      .filter((m: any) => skippedIds.has(m.id))
+      .map((m: any) => [survivor.id, m.id])
+
+    if (losers.length === 0) {
+      if (keptApart.length === 0) return
+      onMarkedDistinct?.(keptApart)
+      hapticMedium()
+      toastSuccess('Kept as separate clients', "They won't be flagged as duplicates again on this device.")
+      markResolved(cluster.key)
+      return
+    }
 
     setBusyKey(cluster.key)
     try {
@@ -83,11 +152,9 @@ export default function MergeDuplicatesSheet({ open, userId, clusters, onClose, 
           ? `${result.reassigned} ${countNoun(result.reassigned, 'job')} reassigned`
           : 'No jobs needed reassigning'
       )
-      setResolved((prev) => {
-        const next = new Set(prev)
-        next.add(cluster.key)
-        return next
-      })
+      if (keptApart.length > 0) onMarkedDistinct?.(keptApart)
+      setMergedAway((prev) => new Set([...prev, ...losers.map((m: any) => m.id)]))
+      markResolved(cluster.key)
       onMerged?.()
     } catch (err: any) {
       hapticError()
@@ -174,12 +241,22 @@ export default function MergeDuplicatesSheet({ open, userId, clusters, onClose, 
               No duplicate clusters left. Nice cleanup.
             </div>
           )}
+          {remaining.length > 0 && (
+            <p style={{
+              margin: 0, fontFamily: 'var(--font-body)', fontSize: 12,
+              color: 'var(--v3-text-muted)', lineHeight: 1.45
+            }}>
+              Tap the record to keep. Untick anyone who is a different client and they stay separate.
+            </p>
+          )}
           {remaining.map((cluster: any) => (
             <ClusterCard
               key={cluster.key}
               cluster={cluster}
               survivorId={selected[cluster.key]}
-              onPick={(id: any) => { hapticTap(); setSelected((s: any) => ({ ...s, [cluster.key]: id })) }}
+              skippedIds={skipped[cluster.key] || []}
+              onPick={(id: string) => pickSurvivor(cluster, id)}
+              onToggleSkip={(id: string) => toggleSkipped(cluster, id)}
               onCommit={() => commitMerge(cluster)}
               busy={busyKey === cluster.key}
               disabled={!!busyKey && busyKey !== cluster.key}
@@ -191,8 +268,11 @@ export default function MergeDuplicatesSheet({ open, userId, clusters, onClose, 
   )
 }
 
-function ClusterCard({ cluster, survivorId, onPick, onCommit, busy, disabled }: any) {
+function ClusterCard({ cluster, survivorId, skippedIds, onPick, onToggleSkip, onCommit, busy, disabled }: any) {
   const matchedOn = cluster.matchedOn?.length ? cluster.matchedOn.join(' & ') : 'phone/email'
+  const others = cluster.members.length - 1
+  const keptApart = cluster.members.filter((m: any) => m.id !== survivorId && skippedIds.includes(m.id)).length
+  const toDelete = others - keptApart
   return (
     <section style={{
       borderRadius: 10,
@@ -215,25 +295,32 @@ function ClusterCard({ cluster, survivorId, onPick, onCommit, busy, disabled }: 
       <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
         {cluster.members.map((m: any, i: any) => {
           const isSurvivor = m.id === survivorId
+          const isSkipped = !isSurvivor && skippedIds.includes(m.id)
           return (
-            <li key={m.id}>
+            <li key={m.id} style={{
+              display: 'flex',
+              alignItems: 'stretch',
+              borderTop: i === 0 ? 'none' : '1px solid var(--v3-border)',
+              background: isSurvivor ? 'color-mix(in srgb, var(--v3-primary) 8%, transparent)' : 'transparent'
+            }}>
               <button
                 type="button"
                 onClick={() => onPick(m.id)}
                 disabled={busy || disabled}
                 style={{
-                  width: '100%',
+                  flex: 1,
+                  minWidth: 0,
                   display: 'grid',
                   gridTemplateColumns: '22px 1fr auto',
                   alignItems: 'center',
                   gap: 12,
                   padding: '12px 12px',
-                  background: isSurvivor ? 'color-mix(in srgb, var(--v3-primary) 8%, transparent)' : 'transparent',
+                  background: 'transparent',
                   border: 'none',
-                  borderTop: i === 0 ? 'none' : '1px solid var(--v3-border)',
                   textAlign: 'left',
                   color: 'inherit',
                   cursor: busy || disabled ? 'wait' : 'pointer',
+                  opacity: isSkipped ? 0.55 : 1,
                   WebkitTapHighlightColor: 'transparent'
                 }}
               >
@@ -259,6 +346,11 @@ function ClusterCard({ cluster, survivorId, onPick, onCommit, busy, disabled }: 
                         Keep
                       </Eyebrow>
                     )}
+                    {isSkipped && (
+                      <Eyebrow style={{ marginLeft: 8 }}>
+                        Separate
+                      </Eyebrow>
+                    )}
                   </div>
                   <div style={{
                     marginTop: 2,
@@ -280,6 +372,27 @@ function ClusterCard({ cluster, survivorId, onPick, onCommit, busy, disabled }: 
                   {fmtDate(m.created_at)}
                 </div>
               </button>
+              {/* Ticked members merge into the kept record; unticking one
+                  marks it as a different client. The kept record has no box.
+                  The label widens the tap target around the small box. */}
+              {isSurvivor ? (
+                <span aria-hidden="true" style={{ flexShrink: 0, width: 48 }} />
+              ) : (
+                <label style={{
+                  flexShrink: 0,
+                  width: 48,
+                  display: 'grid', placeItems: 'center',
+                  cursor: busy || disabled ? 'wait' : 'pointer',
+                  WebkitTapHighlightColor: 'transparent'
+                }}>
+                  <Checkbox
+                    checked={!isSkipped}
+                    onCheckedChange={() => onToggleSkip(m.id)}
+                    disabled={busy || disabled}
+                    aria-label={`Merge ${m.name || 'this client'} into the record you keep`}
+                  />
+                </label>
+              )}
             </li>
           )
         })}
@@ -298,7 +411,9 @@ function ClusterCard({ cluster, survivorId, onPick, onCommit, busy, disabled }: 
           color: 'var(--v3-text-muted)',
           lineHeight: 1.35
         }}>
-          {cluster.members.length - 1} {cluster.members.length - 1 === 1 ? 'duplicate' : 'duplicates'} will be deleted. Jobs move to the kept client.
+          {toDelete > 0
+            ? `${toDelete} ${toDelete === 1 ? 'duplicate' : 'duplicates'} will be deleted. Jobs and notes move to the kept client.${keptApart > 0 ? ` ${keptApart} ${keptApart === 1 ? 'stays' : 'stay'} separate.` : ''}`
+            : "Nothing will be deleted. These stay separate and won't be flagged again on this device."}
         </span>
         <motion.button
           type="button"
@@ -316,7 +431,7 @@ function ClusterCard({ cluster, survivorId, onPick, onCommit, busy, disabled }: 
             opacity: busy || disabled ? 0.7 : 1
           }}
         >
-          {busy ? 'Merging…' : 'Merge cluster'}
+          {busy ? 'Merging…' : toDelete > 0 ? 'Merge cluster' : 'Keep separate'}
         </motion.button>
       </div>
     </section>

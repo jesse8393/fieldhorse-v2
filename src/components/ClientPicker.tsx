@@ -2,6 +2,29 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Search, UserPlus, Check, X } from 'lucide-react'
 import { supabase } from '../lib/supabase.ts'
 import { canHover } from '../lib/hover.ts'
+import { useOrgScope } from '../lib/orgScope.ts'
+import { useInvalidateClients } from '../lib/queries.ts'
+import { escapeLikeText, ilikeAnyOf } from '../lib/searchFilter.ts'
+import { toastError } from '../lib/toast.ts'
+
+const CLIENT_COLUMNS = 'id, name, company_name, phone, email, address, active_jobs_count'
+const SEARCH_COLUMNS = ['name', 'company_name', 'email', 'phone']
+const RECENT_LIMIT = 60
+const SEARCH_LIMIT = 25
+const SEARCH_DEBOUNCE_MS = 250
+
+// fh_clients in the same scope as the Clients list: the active company's
+// book, or the user's own rows when they have no company.
+function clientRows(userId: string, orgScope: string | null) {
+  const query = supabase.from('fh_clients').select(CLIENT_COLUMNS)
+  return orgScope ? query.eq('org_id', orgScope) : query.eq('user_id', userId)
+}
+
+function sameName(name: string | null | undefined, typed: string) {
+  return (name || '').trim().toLowerCase() === typed.toLowerCase()
+}
+
+type ServerSearch = { term: string; rows: any[]; failed: boolean }
 
 /**
  * ClientPicker, inline autocomplete + inline-create, built on the
@@ -11,7 +34,8 @@ import { canHover } from '../lib/hover.ts'
  * Controlled API:
  *   value:        { id, name } | null   , currently selected client
  *   onChange:     (nextValue) => void   , fires on pick / clear / inline-create
- *   userId:       auth.uid, required; scopes the lookup
+ *   userId:       auth.uid, required; the lookup covers the active
+ *                 company's clients (the user's own with no company)
  */
 export default function ClientPicker({ userId, value, onChange }: any) {
   const [q, setQ] = useState('')
@@ -19,21 +43,55 @@ export default function ClientPicker({ userId, value, onChange }: any) {
   const [rows, setRows] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [search, setSearch] = useState<ServerSearch | null>(null)
   const ref = useRef<any>(null)
+  // undefined until the membership resolves; the lookups wait for it.
+  const orgScope = useOrgScope(userId)
+  const invalidateClients = useInvalidateClients()
+  const trimmed = q.trim()
 
   useEffect(() => {
-    if (!open || !userId) return
+    if (!open || !userId || orgScope === undefined) return
     let cancelled = false
     setLoading(true)
-    supabase
-      .from('fh_clients')
-      .select('id, name, company_name, phone, email, address, active_jobs_count')
-      .eq('user_id', userId)
+    clientRows(userId, orgScope)
       .order('last_activity_at', { ascending: false, nullsFirst: false })
-      .limit(60)
+      .limit(RECENT_LIMIT)
       .then(({ data }: any) => { if (!cancelled) { setRows(data || []); setLoading(false) } })
     return () => { cancelled = true }
-  }, [open, userId])
+  }, [open, userId, orgScope])
+
+  // The list above is only the 60 most recently active clients, so a
+  // returning customer outside it never matched and "Create" made a
+  // duplicate of them. Search the whole book on the server as the
+  // operator types, plus an exact name lookup, before offering Create.
+  useEffect(() => {
+    if (!open || !trimmed || !userId || orgScope === undefined) return
+    let cancelled = false
+    const timer = setTimeout(async () => {
+      let next: ServerSearch
+      try {
+        const [matches, exact] = await Promise.all([
+          clientRows(userId, orgScope)
+            .or(ilikeAnyOf(SEARCH_COLUMNS, trimmed))
+            .order('last_activity_at', { ascending: false, nullsFirst: false })
+            .limit(SEARCH_LIMIT),
+          clientRows(userId, orgScope)
+            .ilike('name', escapeLikeText(trimmed))
+            .limit(1)
+        ])
+        next = {
+          term: trimmed,
+          rows: [...(exact.data ?? []), ...(matches.data ?? [])],
+          failed: !!(matches.error || exact.error)
+        }
+      } catch {
+        next = { term: trimmed, rows: [], failed: true }
+      }
+      if (!cancelled) setSearch(next)
+    }, SEARCH_DEBOUNCE_MS)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [open, trimmed, userId, orgScope])
 
   useEffect(() => {
     function onDocPointer(e: any) {
@@ -46,19 +104,35 @@ export default function ClientPicker({ userId, value, onChange }: any) {
     return () => document.removeEventListener('pointerdown', onDocPointer)
   }, [open])
 
+  // Server results for the current text, once they are in.
+  const searched = trimmed && search?.term === trimmed ? search : null
+
   const filtered = useMemo(() => {
-    const needle = q.trim().toLowerCase()
+    const needle = trimmed.toLowerCase()
     if (!needle) return rows
-    return rows.filter((r) =>
+    const local = rows.filter((r) =>
       (r.name || '').toLowerCase().includes(needle)
       || (r.company_name || '').toLowerCase().includes(needle)
       || (r.email || '').toLowerCase().includes(needle)
       || (r.phone || '').toLowerCase().includes(needle)
     )
-  }, [rows, q])
+    if (!searched) return local
+    // Recent matches first (they show instantly), then the rest of the book.
+    const seen = new Set(local.map((r) => r.id))
+    const merged = [...local]
+    for (const r of searched.rows) {
+      if (seen.has(r.id)) continue
+      seen.add(r.id)
+      merged.push(r)
+    }
+    return merged
+  }, [rows, trimmed, searched])
 
-  const trimmed = q.trim()
-  const exactMatch = rows.find((r) => (r.name || '').toLowerCase() === trimmed.toLowerCase())
+  const exactMatch = filtered.find((r) => sameName(r.name, trimmed))
+  // Create waits for the server lookup so it is only offered when no
+  // client in the whole book already has this name.
+  const lookupPending = !!trimmed && !searched
+  const listLoading = loading || orgScope === undefined
 
   async function createInline() {
     if (!trimmed || !userId || creating) return
@@ -66,8 +140,8 @@ export default function ClientPicker({ userId, value, onChange }: any) {
     try {
       const { data, error } = await supabase
         .from('fh_clients')
-        .insert({ user_id: userId, name: trimmed })
-        .select('id, name, company_name, phone, email, address, active_jobs_count')
+        .insert({ user_id: userId, ...(orgScope ? { org_id: orgScope } : {}), name: trimmed })
+        .select(CLIENT_COLUMNS)
         .single()
       if (error) throw error
       // Pass the full row so the lead form can hydrate from it. A bare
@@ -78,6 +152,10 @@ export default function ClientPicker({ userId, value, onChange }: any) {
       setOpen(false)
       setQ('')
       setRows((r) => [data, ...r])
+      // The Clients list is cached; make the new client show up there.
+      void invalidateClients()
+    } catch (err: any) {
+      toastError("Couldn't add client", err?.message || 'Try again in a moment.')
     } finally {
       setCreating(false)
     }
@@ -146,11 +224,11 @@ export default function ClientPicker({ userId, value, onChange }: any) {
             boxShadow: '0 8px 24px rgba(20, 20, 20,0.5)'
           }}
         >
-          {loading && <div style={{ padding: '12px 12px', fontSize: 12, color: 'var(--ink-muted)' }}>Loading…</div>}
-          {!loading && filtered.length === 0 && !trimmed && (
+          {listLoading && <div style={{ padding: '12px 12px', fontSize: 12, color: 'var(--ink-muted)' }}>Loading…</div>}
+          {!listLoading && filtered.length === 0 && !trimmed && (
             <div style={{ padding: '12px 12px', fontSize: 12, color: 'var(--ink-muted)' }}>No clients yet. Type a name to add one.</div>
           )}
-          {!loading && filtered.map((r) => (
+          {!listLoading && filtered.map((r) => (
             <button
               key={r.id}
               type="button"
@@ -187,7 +265,13 @@ export default function ClientPicker({ userId, value, onChange }: any) {
               </span>
             </button>
           ))}
-          {!loading && trimmed && !exactMatch && (
+          {!listLoading && lookupPending && (
+            <div style={{ padding: '12px 12px', fontSize: 12, color: 'var(--ink-muted)' }}>Searching all clients…</div>
+          )}
+          {!listLoading && searched?.failed && (
+            <div style={{ padding: '12px 12px', fontSize: 12, color: 'var(--ink-muted)' }}>Couldn't search all your clients. Check your connection.</div>
+          )}
+          {!listLoading && trimmed && !lookupPending && !exactMatch && (
             <button
               type="button"
               onPointerDown={(ev) => { ev.preventDefault(); ev.stopPropagation(); createInline() }}

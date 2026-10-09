@@ -10,7 +10,7 @@ import { useFhMotion } from '../lib/motion.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useClientsBundle, useInvalidateClients } from '../lib/queries.ts'
 import { rollupByClient } from '../lib/rollups.ts'
-import { findDuplicateClusters } from '../lib/clientMerge.ts'
+import { findDuplicateClusters, loadNotDuplicates, rememberNotDuplicates } from '../lib/clientMerge.ts'
 import NewClientSheet from '../components/NewClientSheet.tsx'
 // Lazy, sheet only mounts when the operator opens the merge flow.
 const MergeDuplicatesSheet = lazy(() => import('../components/MergeDuplicatesSheet.tsx'))
@@ -65,7 +65,13 @@ export default function Clients() {
 
   // Duplicate detection, runs every time the client roster changes.
   // Match policy lives in lib/clientMerge.ts (phone or email normalized).
-  const duplicateClusters = useMemo(() => findDuplicateClusters(rows), [rows])
+  // Pairs the operator marked as different clients in the merge sheet
+  // stop being flagged (remembered on this device).
+  const [notDuplicates, setNotDuplicates] = useState<ReadonlySet<string>>(() => loadNotDuplicates(user?.id))
+  const markDistinct = (pairs: Array<[string, string]>) => {
+    setNotDuplicates(rememberNotDuplicates(user?.id, notDuplicates, pairs))
+  }
+  const duplicateClusters = useMemo(() => findDuplicateClusters(rows, notDuplicates), [rows, notDuplicates])
   const duplicateCount = useMemo(
     () => duplicateClusters.reduce((s, c) => s + c.members.length, 0),
     [duplicateClusters]
@@ -205,8 +211,10 @@ export default function Clients() {
           onClose={() => setAddOpen(false)}
           onSaved={(client: any) => {
             setAddOpen(false)
+            // Refresh the cached list either way, so the new client is
+            // there when the operator comes back from its detail page.
+            load()
             if (client?.id) navigate(`/clients/${client.id}`)
-            else load()
           }}
         />
         <Suspense fallback={null}>
@@ -216,6 +224,7 @@ export default function Clients() {
             clusters={duplicateClusters}
             onClose={() => setMergeOpen(false)}
             onMerged={load}
+            onMarkedDistinct={markDistinct}
           />
         </Suspense>
       </>
@@ -528,8 +537,10 @@ export default function Clients() {
         onClose={() => setAddOpen(false)}
         onSaved={(client: any) => {
           setAddOpen(false)
+          // Refresh the cached list either way, so the new client is
+          // there when the operator comes back from its detail page.
+          load()
           if (client?.id) navigate(`/clients/${client.id}`)
-          else load()
         }}
       />
       <Suspense fallback={null}>
@@ -539,6 +550,7 @@ export default function Clients() {
           clusters={duplicateClusters}
           onClose={() => setMergeOpen(false)}
           onMerged={load}
+          onMarkedDistinct={markDistinct}
         />
       </Suspense>
       <FloatingActionButton

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  CommandDialog,
+  Command,
   CommandEmpty,
   CommandGroup,
   CommandInput,
@@ -9,6 +9,7 @@ import {
   CommandList,
   CommandSeparator,
 } from '@/components/ui/command'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   BarChart3,
   Briefcase,
@@ -237,46 +238,63 @@ export default function CommandPalette() {
   const revenueItems = REVENUE_ITEMS.filter(itemAllowed)
   const systemItems = SYSTEM_ITEMS.filter(itemAllowed)
 
+  // Same shell as ui/command's CommandDialog, which can't pass props to
+  // its inner Command. shouldFilter is off because universalSearch has
+  // already filtered on the server: cmdk's own fuzzy matcher only sees
+  // each row's title and subtitle, so it hid jobs and clients found by
+  // address, phone or email. With an empty query nothing is filtered
+  // anyway, so the menu below is unchanged.
   return (
-    <CommandDialog open={open} onOpenChange={setOpen} className="fh-command-dialog">
-      <CommandInput
-        placeholder="Search leads, jobs, clients, notes, events, files..."
-        value={query}
-        onValueChange={setQuery}
-      />
-      <CommandList>
-        {hasQuery ? (
-          <>
-            {searching && !hasResults && (
-              <div className="ui:py-6 ui:text-center ui:text-sm ui:text-muted-foreground">
-                Searching...
-              </div>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogHeader className="ui:sr-only">
+        <DialogTitle>Command Palette</DialogTitle>
+        <DialogDescription>Search for a command to run...</DialogDescription>
+      </DialogHeader>
+      <DialogContent className="ui:overflow-hidden ui:p-0 fh-command-dialog" showCloseButton>
+        <Command
+          shouldFilter={false}
+          className="ui:**:data-[slot=command-input-wrapper]:h-12 ui:[&_[cmdk-group-heading]]:px-2 ui:[&_[cmdk-group-heading]]:font-medium ui:[&_[cmdk-group-heading]]:text-muted-foreground ui:[&_[cmdk-group]]:px-2 ui:[&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 ui:[&_[cmdk-input-wrapper]_svg]:h-5 ui:[&_[cmdk-input-wrapper]_svg]:w-5 ui:[&_[cmdk-input]]:h-12 ui:[&_[cmdk-item]]:px-2 ui:[&_[cmdk-item]]:py-3 ui:[&_[cmdk-item]_svg]:h-5 ui:[&_[cmdk-item]_svg]:w-5"
+        >
+          <CommandInput
+            placeholder="Search leads, jobs, clients, notes, events, files..."
+            value={query}
+            onValueChange={setQuery}
+          />
+          <CommandList>
+            {hasQuery ? (
+              <>
+                {searching && !hasResults && (
+                  <div className="ui:py-6 ui:text-center ui:text-sm ui:text-muted-foreground">
+                    Searching...
+                  </div>
+                )}
+                {!searching && searchError && <CommandEmpty>{searchError}</CommandEmpty>}
+                {!searching && !searchError && !hasResults && <CommandEmpty>Nothing matched.</CommandEmpty>}
+                {renderEntityGroup('Jobs', results.jobs)}
+                {results.jobs.length > 0 && (results.clients.length || results.notes.length || results.events.length || results.files.length) > 0 && <CommandSeparator />}
+                {renderEntityGroup('Clients', results.clients)}
+                {results.clients.length > 0 && (results.notes.length || results.events.length || results.files.length) > 0 && <CommandSeparator />}
+                {renderEntityGroup('Notes', results.notes)}
+                {results.notes.length > 0 && (results.events.length || results.files.length) > 0 && <CommandSeparator />}
+                {renderEntityGroup('Schedule', results.events)}
+                {results.events.length > 0 && results.files.length > 0 && <CommandSeparator />}
+                {renderEntityGroup('Files', results.files)}
+              </>
+            ) : (
+              <>
+                <CommandEmpty>Type to search across everything.</CommandEmpty>
+                {renderNavGroup('Quick actions', quickActions)}
+                <CommandSeparator />
+                {renderNavGroup('CRM workspace', navItems)}
+                <CommandSeparator />
+                {renderNavGroup('Revenue tools', revenueItems)}
+                <CommandSeparator />
+                {renderNavGroup('System', systemItems)}
+              </>
             )}
-            {!searching && searchError && <CommandEmpty>{searchError}</CommandEmpty>}
-            {!searching && !searchError && !hasResults && <CommandEmpty>Nothing matched.</CommandEmpty>}
-            {renderEntityGroup('Jobs', results.jobs)}
-            {results.jobs.length > 0 && (results.clients.length || results.notes.length || results.events.length || results.files.length) > 0 && <CommandSeparator />}
-            {renderEntityGroup('Clients', results.clients)}
-            {results.clients.length > 0 && (results.notes.length || results.events.length || results.files.length) > 0 && <CommandSeparator />}
-            {renderEntityGroup('Notes', results.notes)}
-            {results.notes.length > 0 && (results.events.length || results.files.length) > 0 && <CommandSeparator />}
-            {renderEntityGroup('Schedule', results.events)}
-            {results.events.length > 0 && results.files.length > 0 && <CommandSeparator />}
-            {renderEntityGroup('Files', results.files)}
-          </>
-        ) : (
-          <>
-            <CommandEmpty>Type to search across everything.</CommandEmpty>
-            {renderNavGroup('Quick actions', quickActions)}
-            <CommandSeparator />
-            {renderNavGroup('CRM workspace', navItems)}
-            <CommandSeparator />
-            {renderNavGroup('Revenue tools', revenueItems)}
-            <CommandSeparator />
-            {renderNavGroup('System', systemItems)}
-          </>
-        )}
-      </CommandList>
-    </CommandDialog>
+          </CommandList>
+        </Command>
+      </DialogContent>
+    </Dialog>
   )
 }

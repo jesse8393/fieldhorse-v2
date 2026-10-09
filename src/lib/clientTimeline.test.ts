@@ -1,5 +1,11 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { composeClientTimeline } from './clientTimeline.ts'
+
+// paid_on is date only; the day shift only shows west of UTC, so pin a
+// US timezone for the whole file.
+const originalTz = process.env.TZ
+beforeAll(() => { process.env.TZ = 'America/Chicago' })
+afterAll(() => { process.env.TZ = originalTz })
 
 const jobs = [
   { id: 'a', job_title: 'Sidewalk', stage: 'job', created_at: '2026-06-01T08:00:00Z' },
@@ -20,9 +26,10 @@ const files = [
 describe('composeClientTimeline', () => {
   it('merges payments, jobs, notes, files into one feed, newest first', () => {
     const feed = composeClientTimeline(jobs, payments, notes, files)
-    // Sorted desc by time. Newest is the 2026-06-10 payment.
+    // Sorted desc by time. Newest is the 2026-06-10 payment, at local
+    // midnight of that day.
     expect(feed[0].kind).toBe('payment')
-    expect(feed[0].at).toBe(new Date('2026-06-10').getTime())
+    expect(feed[0].at).toBe(new Date(2026, 5, 10).getTime())
     // Monotonic non-increasing timestamps.
     for (let i = 1; i < feed.length; i++) {
       expect(feed[i - 1].at).toBeGreaterThanOrEqual(feed[i].at)
@@ -48,6 +55,19 @@ describe('composeClientTimeline', () => {
     const photo = feed.find((e) => e.kind === 'file')!
     expect(photo.title).toBe('Photo added')
     expect(photo.contactId).toBe('a')
+  })
+
+  it('keeps a date only paid_on on its own local calendar day', () => {
+    const [pay] = composeClientTimeline([], [{ contact_id: 'a', amount: 500, paid_on: '2026-06-10' }], [], [])
+    const shown = new Date(pay.atIso)
+    // A UTC parse put this at 7 PM on June 9 in Chicago.
+    expect([shown.getFullYear(), shown.getMonth(), shown.getDate()]).toEqual([2026, 5, 10])
+  })
+
+  it('uses the logged time when the payment was recorded that same day', () => {
+    // 3:20 PM Chicago on Oct 9, logged the day it was paid.
+    const [pay] = composeClientTimeline([], [{ contact_id: 'a', amount: 500, paid_on: '2026-10-09', created_at: '2026-10-09T20:20:00Z' }], [], [])
+    expect(pay.atIso).toBe('2026-10-09T20:20:00.000Z')
   })
 
   it('respects the limit and handles empties', () => {

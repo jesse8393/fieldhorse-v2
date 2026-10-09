@@ -5,6 +5,8 @@
 // files/photos added. Pure over the data ClientDetail already loads, so
 // it needs no extra queries and is trivially unit-tested.
 
+import { paymentEventTime } from './activityTime.ts'
+
 export type TimelineEventKind = 'payment' | 'job' | 'note' | 'file'
 
 export type TimelineEvent = {
@@ -71,7 +73,11 @@ export function composeClientTimeline(
 
   // Payments, money in.
   ;(payments || []).forEach((p, i) => {
-    const at = ms(p.paid_on || p.created_at)
+    // paid_on is a date only column. Read as a timestamp it landed on UTC
+    // midnight, the evening before in US time zones, so a payment logged
+    // today showed under yesterday. paymentEventTime keeps the local
+    // calendar day (and the logged time when it was recorded that day).
+    const at = paymentEventTime(p.paid_on, p.created_at).when?.getTime() ?? 0
     if (!at) return
     const job = p.contact_id ? byId.get(p.contact_id) : undefined
     const amt = Number(p.amount || 0)

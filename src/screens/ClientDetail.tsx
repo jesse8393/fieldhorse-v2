@@ -13,11 +13,12 @@ import { hapticTap, hapticMedium, hapticError } from '../lib/haptics.ts'
 import ActionSheet from '../components/ActionSheet.tsx'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 import { SkeletonList } from '../components/Skeleton.tsx'
+import DataErrorState from '../components/DataErrorState.tsx'
 import { SegmentedTabs, Eyebrow, StampNumber } from '../components/v3'
 import { supabase } from '../lib/supabase.ts'
-import { useClientDetail, useInvalidateClientDetail } from '../lib/queries.ts'
+import { useClientDetail, useInvalidateClientDetail, useInvalidateClients } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
-import { toast, toastSuccess, toastInfo } from '../lib/toast.ts'
+import { toastError, toastInfo } from '../lib/toast.ts'
 import { stageColor } from '../lib/stages.ts'
 import StatementSheet from '../components/StatementSheet.tsx'
 import { gatherStatement } from '../lib/statement.ts'
@@ -53,9 +54,12 @@ export default function ClientDetail() {
   const { user } = useAuth()
   const navigate = useNavigate()
 
-  const { data: bundle, isPending: loading } = useClientDetail(id, user?.id)
+  const { data: bundle, isPending: loading, isError, refetch } = useClientDetail(id, user?.id)
   const invalidateClientDetail = useInvalidateClientDetail()
   const fetchClient = () => invalidateClientDetail(id)
+  // The Clients list is a separate cached query; refresh it after any
+  // change here so a deleted, renamed or edited client isn't stale there.
+  const invalidateClients = useInvalidateClients()
   const client = bundle?.client ?? null
   const jobs = bundle?.jobs ?? []
   const notes = bundle?.notes ?? []
@@ -101,18 +105,37 @@ export default function ClientDetail() {
     setDeleteOpen(true)
   }
 
+  // Writes match the client by id only. RLS keeps them inside the
+  // company, and a user_id filter made a teammate's client silently
+  // refuse every edit and delete. An empty result means nothing changed.
   async function confirmDelete() {
     if (!client?.id || deleting) return
     setDeleting(true)
-    const { error } = await supabase.from('fh_clients').delete().eq('id', client.id).eq('user_id', user!.id)
-    if (error) {
+    const { data, error } = await supabase.from('fh_clients').delete().eq('id', client.id).select('id')
+    if (error || !data?.length) {
       setDeleting(false)
       setDeleteOpen(false)
-      toast({ kind: 'error', title: "Couldn't delete", body: error.message } as any)
+      toastError("Couldn't delete", error?.message || 'This client may already be gone. Refresh and try again.')
       return
     }
     toastInfo('Client deleted', 'Linked jobs unlinked')
+    void invalidateClients()
     navigate('/clients')
+  }
+
+  // Save from OverviewEdit. A failed save keeps the editor open with the
+  // typed values (it used to close as if saved and show the old ones).
+  async function saveClientEdits(patch: any) {
+    if (!client?.id) return
+    const { data, error } = await supabase.from('fh_clients').update(patch).eq('id', client.id).select('id')
+    if (error || !data?.length) {
+      hapticError()
+      toastError("Couldn't save", error?.message || 'This client may have been removed. Refresh and try again.')
+      return
+    }
+    await fetchClient()
+    void invalidateClients()
+    setIsEditing(false)
   }
 
   // Create a new deal under this client at the chosen kind, prefilled
@@ -138,7 +161,7 @@ export default function ClientDetail() {
     const { data, error } = await supabase.from('fh_contacts').insert(payload).select().single()
     if (error) {
       setCreating(false)
-      toast({ kind: 'error', title: "Couldn't create", body: error.message } as any)
+      toastError("Couldn't create", error.message)
       return
     }
     hapticMedium()
@@ -162,6 +185,23 @@ export default function ClientDetail() {
     )
   }
 
+  // A failed load is not a missing client: say so and offer a retry
+  // instead of "Client not found."
+  if (isError && !bundle) {
+    return (
+      <div className="v3-screen" style={{ padding: '24px 24px 48px', background: 'var(--v3-bg)' }}>
+        <button type="button" onClick={() => navigate('/clients')} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--v3-primary)', fontWeight: 700, cursor: 'pointer' }}>← Back to clients</button>
+        <div style={{ marginTop: 12 }}>
+          <DataErrorState
+            title="Couldn't load this client"
+            message="Check your connection and retry. Nothing was lost."
+            onRetry={() => { void refetch() }}
+          />
+        </div>
+      </div>
+    )
+  }
+
   if (!client) {
     return (
       <div className="v3-screen" style={{ padding: '24px 24px 48px', background: 'var(--v3-bg)' }}>
@@ -181,14 +221,14 @@ export default function ClientDetail() {
     <>
       {tab === 'overview' && (
         isEditing
-          ? <OverviewEdit client={client} onCommit={async (patch: any) => { await supabase.from('fh_clients').update(patch).eq('id', client.id).eq('user_id', user!.id); await fetchClient(); setIsEditing(false) }} onCancel={() => setIsEditing(false)} />
+          ? <OverviewEdit client={client} onCommit={saveClientEdits} onCancel={() => setIsEditing(false)} />
           : <OverviewRead client={client} lifetime={lifetime} outstanding={outstanding} activeCount={activeCount} jobs={jobs} payments={payments} onJump={() => setTab('projects')} />
       )}
       {tab === 'activity' && (
         <ClientTimeline jobs={jobs} payments={payments} notes={notes} files={files} onOpen={(jobId: any) => jobId && navigate(`/jobs/${jobId}`)} />
       )}
       {tab === 'projects' && (
-        <ProjectsList jobs={jobs} payments={payments} onOpen={(jobId: any) => navigate(`/jobs/${jobId}`)} />
+        <ProjectsList jobs={jobs} payments={payments} changeOrders={changeOrders} onOpen={(jobId: any) => navigate(`/jobs/${jobId}`)} />
       )}
       {tab === 'files' && <FilesList rows={files} />}
       {tab === 'notes' && <NotesList notes={notes} />}
@@ -476,14 +516,14 @@ export default function ClientDetail() {
       <div style={{ padding: '0 24px' }}>
         {tab === 'overview' && (
           isEditing
-            ? <OverviewEdit client={client} onCommit={async (patch: any) => { await supabase.from('fh_clients').update(patch).eq('id', client.id).eq('user_id', user!.id); await fetchClient(); setIsEditing(false) }} onCancel={() => setIsEditing(false)} />
+            ? <OverviewEdit client={client} onCommit={saveClientEdits} onCancel={() => setIsEditing(false)} />
             : <OverviewRead client={client} lifetime={lifetime} outstanding={outstanding} activeCount={activeCount} jobs={jobs} payments={payments} onJump={() => setTab('projects')} />
         )}
         {tab === 'activity' && (
           <ClientTimeline jobs={jobs} payments={payments} notes={notes} files={files} onOpen={(jobId: any) => jobId && navigate(`/jobs/${jobId}`)} />
         )}
         {tab === 'projects' && (
-          <ProjectsList jobs={jobs} payments={payments} onOpen={(jobId: any) => navigate(`/jobs/${jobId}`)} />
+          <ProjectsList jobs={jobs} payments={payments} changeOrders={changeOrders} onOpen={(jobId: any) => navigate(`/jobs/${jobId}`)} />
         )}
         {tab === 'files' && <FilesList rows={files} />}
         {tab === 'notes' && <NotesList notes={notes} />}
@@ -876,6 +916,12 @@ function OverviewEdit({ client, onCommit, onCancel }: any) {
     color: 'var(--v3-text-muted)'
   }
   async function commit() {
+    // fh_clients.name is required; a cleared name always failed to save.
+    if (!String(form.name ?? '').trim()) {
+      hapticError()
+      toastError('Add a name', 'A client needs a name before you can save.')
+      return
+    }
     const EDITABLE = ['name', 'company_name', 'phone', 'email', 'address', 'notes']
     const patch: Record<string, any> = {}
     for (const k of EDITABLE) {
@@ -1112,6 +1158,14 @@ function relTime(input: any) {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
+// relTime gives "now", a short span ("5m", "3d") or a date ("Mar 5"),
+// so "ago" only fits the spans.
+function updatedLabel(stamp: string) {
+  if (stamp === 'now') return 'Updated just now'
+  if (/^\d+[mhdw]$/.test(stamp)) return `Updated ${stamp} ago`
+  return `Updated ${stamp}`
+}
+
 /* ============================================================
    ClientTimeline, one chronological feed across all the client's
    properties: payments, projects, notes, files. Newest first.
@@ -1193,7 +1247,7 @@ function timelineDate(iso: string) {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...(sameYear ? {} : { year: 'numeric' }) })
 }
 
-function ProjectsList({ jobs, payments = [], onOpen }: any) {
+function ProjectsList({ jobs, payments = [], changeOrders = [], onOpen }: any) {
   const [filter, setFilter] = useState('all')
 
   const paidByJob = useMemo(() => {
@@ -1204,6 +1258,18 @@ function ProjectsList({ jobs, payments = [], onOpen }: any) {
     }
     return m
   }, [payments])
+
+  // Approved change orders add to what each job is owed, the same rule
+  // the cockpit (rollups.ts) and the statement use. Without them a fully
+  // paid base contract read "Paid in full" while the CO was still due.
+  const coByJob = useMemo(() => {
+    const m = new Map()
+    for (const co of changeOrders || []) {
+      if (co?.status !== 'approved' || !co.contact_id) continue
+      m.set(co.contact_id, (m.get(co.contact_id) || 0) + Number(co.amount || 0))
+    }
+    return m
+  }, [changeOrders])
 
   const filtered = useMemo(() => {
     if (filter === 'all') return jobs
@@ -1264,11 +1330,13 @@ function ProjectsList({ jobs, payments = [], onOpen }: any) {
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
           {filtered.map((j: any) => {
             const c = stageColor(j.stage)
-            const amount = Number(j.amount || 0)
+            const contract = Number(j.amount || 0) + (coByJob.get(j.id) || 0)
             const paid = paidByJob.get(j.id) || 0
             const billable = j.stage === 'job' || j.stage === 'invoice' || j.stage === 'closed'
-            const balance = Math.max(0, amount - paid)
-            const pct = amount > 0 ? Math.min(100, Math.round((paid / amount) * 100)) : 0
+            // Under 50 cents is rounding dust, as in rollups.ts.
+            const balance = Math.max(0, contract - paid)
+            const due = balance > 0.5
+            const pct = contract > 0 ? Math.min(100, Math.round((paid / contract) * 100)) : 0
             const stamp = relTime(j.updated_at)
             return (
               <li key={j.id}>
@@ -1334,7 +1402,7 @@ function ProjectsList({ jobs, payments = [], onOpen }: any) {
                         fontVariantNumeric: 'tabular-nums',
                         lineHeight: 1
                       }}>
-                        {money(amount)}
+                        {money(contract)}
                       </div>
                       <Eyebrow as="div" style={{ marginTop: 4, color: c }}>
                         {j.stage}
@@ -1343,7 +1411,7 @@ function ProjectsList({ jobs, payments = [], onOpen }: any) {
                   </div>
 
                   {/* Row 2, paid bar (only when there's money to track) */}
-                  {amount > 0 && billable && (
+                  {contract > 0 && billable && (
                     <div>
                       <div style={{
                         height: 4, borderRadius: 10,
@@ -1370,8 +1438,8 @@ function ProjectsList({ jobs, payments = [], onOpen }: any) {
                         <span>
                           {money(paid)} paid{paid > 0 ? ` · ${pct}%` : ''}
                         </span>
-                        <span style={{ color: balance > 0 ? 'var(--v3-danger-bright, #C0392B)' : 'var(--v3-success-bright, #2D7A4F)' }}>
-                          {balance > 0 ? `${money(balance)} due` : 'Paid in full'}
+                        <span style={{ color: due ? 'var(--v3-danger-bright, #C0392B)' : 'var(--v3-success-bright, #2D7A4F)' }}>
+                          {due ? `${money(balance)} due` : 'Paid in full'}
                         </span>
                       </div>
                     </div>
@@ -1380,7 +1448,7 @@ function ProjectsList({ jobs, payments = [], onOpen }: any) {
                   {/* Row 3, last-touch stamp */}
                   {stamp && (
                     <Eyebrow as="div" style={{ color: 'var(--v3-text-faint, var(--v3-text-muted))', fontVariantNumeric: 'tabular-nums' }}>
-                      Updated {stamp} ago
+                      {updatedLabel(stamp)}
                     </Eyebrow>
                   )}
                 </motion.button>
@@ -1483,7 +1551,7 @@ function FilesList({ rows }: any) {
     const bucket = row.kind === 'photo' ? 'job-photos' : 'job-files'
     const { data, error } = await supabase.storage.from(bucket).createSignedUrl(row.storage_path, 60 * 60)
     if (error || !data?.signedUrl) {
-      toast({ kind: 'error', title: 'Could not open', body: error?.message || 'Try again' } as any)
+      toastError('Could not open', error?.message || 'Try again')
       return
     }
     window.open(data.signedUrl, '_blank', 'noopener')

@@ -6,10 +6,13 @@ import { supabase } from '../lib/supabase.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { Eyebrow } from './v3'
 
-const BUCKET = 'company-logos'
+// Public bucket (the one onboarding's LogoUploader uses), so the stored
+// URL never expires.
+const BUCKET = 'logos'
+// Where this picker used to keep logos, behind one year signed URLs.
+const LEGACY_BUCKET = 'company-logos'
 const MAX_BYTES = 1 * 1024 * 1024 // 1 MB per spec
 const ACCEPT = 'image/png,image/svg+xml'
-const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 * 365 // 1 year
 
 function extFromType(type: any, fallback = 'png') {
   if (type === 'image/svg+xml') return 'svg'
@@ -21,16 +24,50 @@ function mimeOk(type: any) {
   return type === 'image/png' || type === 'image/svg+xml'
 }
 
+// Storage path of a logo in our public bucket, read from its public URL,
+// when it sits in this user's folder; null for anything else.
+function ownLogoPath(url: string | null | undefined, userId: string): string | null {
+  if (!url) return null
+  try {
+    const marker = `/storage/v1/object/public/${BUCKET}/`
+    const { pathname } = new URL(url)
+    const at = pathname.indexOf(marker)
+    if (at < 0) return null
+    const path = decodeURIComponent(pathname.slice(at + marker.length))
+    return path.startsWith(`${userId}/`) ? path : null
+  } catch {
+    return null
+  }
+}
+
+// Best effort cleanup of a logo that is no longer in use: the file behind
+// `url` plus anything left in the legacy private bucket. Never throws; a
+// leftover file costs a little storage and nothing points at it.
+async function removeOldLogoFiles(userId: string, url: string | null | undefined) {
+  const tasks: PromiseLike<unknown>[] = [
+    supabase.storage.from(LEGACY_BUCKET).remove(['png', 'svg'].map((e) => `${userId}/logo.${e}`))
+  ]
+  const path = ownLogoPath(url, userId)
+  if (path) tasks.push(supabase.storage.from(BUCKET).remove([path]))
+  await Promise.allSettled(tasks)
+}
+
 /**
  * BrandLogoPicker, Phase 16 branding control.
  *
- * - Private supabase bucket `company-logos` (migration 005).
+ * - Public supabase bucket `logos`. profiles.logo_url is rendered as is on
+ *   proposals, invoices, statements, public pages and the header, so it
+ *   must be a URL that never expires. The old private bucket stored a one
+ *   year signed URL, and every document lost the logo when it ran out.
  * - 1 MB cap, PNG / SVG only, per spec.
  * - Live preview in a simulated dark header card before saving.
- * - Save uploads to company-logos/<user_id>/logo.<ext> and persists a
- *   signed URL (1 yr TTL) to profiles.logo_url via onSaved(url).
- * - Remove deletes all logo.* objects in the user's folder and clears
- *   profiles.logo_url via onRemoved().
+ * - Save uploads to logos/<user_id>/logo-<time>.<ext> and persists its
+ *   public URL to profiles.logo_url via onSaved(url). A new name per
+ *   upload means the URL changes with the logo (no stale cached image)
+ *   and an upload never overwrites a file. The previous file is then
+ *   removed, best effort.
+ * - Remove clears profiles.logo_url via onRemoved(), then deletes the
+ *   file. onSaved and onRemoved throw when the profile write fails.
  */
 export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSaved, onRemoved }: any) {
   const { user } = useAuth()
@@ -82,24 +119,23 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
   async function save() {
     if (!pendingFile || !user?.id) return
     setBusy(true)
+    const previousUrl = logoUrl
     try {
       const ext = extFromType(pendingFile.type)
-      const path = `${user.id}/logo.${ext}`
+      const path = `${user.id}/logo-${Date.now()}.${ext}`
       const { error: upErr } = await supabase.storage
         .from(BUCKET)
         .upload(path, pendingFile, {
-          upsert: true,
           cacheControl: '3600',
           contentType: pendingFile.type
         })
       if (upErr) throw upErr
-      const { data, error: signErr } = await supabase.storage
-        .from(BUCKET)
-        .createSignedUrl(path, SIGNED_URL_TTL_SECONDS)
-      if (signErr || !data?.signedUrl) throw signErr || new Error('No signed URL')
-      await onSaved?.(data.signedUrl)
+      const { data } = supabase.storage.from(BUCKET).getPublicUrl(path)
+      if (!data?.publicUrl) throw new Error('No public URL for the logo')
+      await onSaved?.(data.publicUrl)
       toastSuccess('Logo saved', 'Header updated across the app')
       resetPicker()
+      void removeOldLogoFiles(user.id, previousUrl)
     } catch (ex: any) {
       toastError("Couldn't upload logo", ex?.message || 'Try again in a moment.')
     } finally {
@@ -110,13 +146,14 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
   async function remove() {
     if (!user?.id) return
     setBusy(true)
+    const previousUrl = logoUrl
     try {
-      // Delete all possible extensions we might have written
-      const paths = ['png', 'svg'].map((e) => `${user.id}/logo.${e}`)
-      await supabase.storage.from(BUCKET).remove(paths)
+      // Clear the profile first: deleting the file first would leave a
+      // broken image everywhere if clearing it then failed.
       await onRemoved?.()
       toastSuccess('Logo removed', 'Header reverts to your company name')
       resetPicker()
+      void removeOldLogoFiles(user.id, previousUrl)
     } catch (ex: any) {
       toastError("Couldn't remove logo", ex?.message || 'Try again in a moment.')
     } finally {
