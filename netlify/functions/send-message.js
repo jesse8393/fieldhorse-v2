@@ -236,7 +236,7 @@ function renderMessageHtml({ body, senderLine, companyName }) {
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#F2EDE4;padding:32px 16px;">
     <tr><td align="center">
       <table role="presentation" width="560" cellspacing="0" cellpadding="0" style="max-width:560px;background:#F2EDE4;border-radius:10px;border:1px solid #5C5C5C;overflow:hidden;">
-        <tr><td style="padding:32px 32px 22px;">
+        <tr><td style="padding:32px 32px 24px;">
           <div style="font-size:16px;color:#141414;">${bodyHtml}</div>
         </td></tr>
         <tr><td style="padding:8px 32px 32px;">
