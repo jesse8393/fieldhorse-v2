@@ -25,6 +25,12 @@ const TONE: Record<string, any> = {
 
 function statusTone(status: any) { return TONE[status] || TONE.go }
 
+// Before a forecast arrives (loading, or the request failed) the screen must
+// not wear the green "clear to work" tone.
+const NEUTRAL_TONE = { fg: '#5C5C5C', ink: 'var(--v3-text-muted)', bg: 'var(--surface-2)', border: 'var(--rule)', label: '' }
+
+const FORECAST_ERROR = "Couldn't load the forecast. Check your connection and try again."
+
 function fmtTemp(t: any) {
   return t == null ? '\u2003' : `${Math.round(t)}°`
 }
@@ -67,6 +73,10 @@ export default function PourWindow() {
   const [weather, setWeather] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
+  // True when the forecast request itself failed (not a location error), so
+  // the screen can offer a retry and stop showing a work status.
+  const [forecastFailed, setForecastFailed] = useState(false)
+  const [reloadTick, setReloadTick] = useState(0)
   const [cityName, setCityName] = useState('')
 
   const hasCoords = profile?.location_lat != null && profile?.location_lon != null
@@ -76,13 +86,19 @@ export default function PourWindow() {
     let cancelled = false
     const lat = profile?.location_lat ?? MURFREESBORO.lat
     const lon = profile?.location_lon ?? MURFREESBORO.lon
-    setLoading(true); setErr('')
+    setLoading(true); setErr(''); setForecastFailed(false)
     getWeather(lat, lon)
       .then((d) => { if (!cancelled) setWeather(d) })
-      .catch((e) => { if (!cancelled) setErr(e.message || 'Forecast unavailable') })
+      .catch(() => {
+        if (cancelled) return
+        setErr(FORECAST_ERROR)
+        setForecastFailed(true)
+      })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [profile?.location_lat, profile?.location_lon])
+  }, [profile?.location_lat, profile?.location_lon, reloadTick])
+
+  function retryForecast() { setReloadTick((n) => n + 1) }
 useEffect(() => {
     let cancelled = false
     const lat = profile?.location_lat ?? MURFREESBORO.lat
@@ -95,13 +111,13 @@ useEffect(() => {
 
 
   function pinLocation() {
-    if (!('geolocation' in navigator)) return setErr('Geolocation not supported')
+    if (!('geolocation' in navigator)) return setErr("This device can't share its location.")
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         await upsertProfile({ location_lat: pos.coords.latitude, location_lon: pos.coords.longitude })
         refresh()
       },
-      () => setErr('Location denied'),
+      () => setErr('Location access is off. Allow it for this site to pin your spot.'),
       { enableHighAccuracy: false, timeout: 8000, maximumAge: 60 * 60 * 1000 }
     )
   }
@@ -145,12 +161,17 @@ useEffect(() => {
     return list.map((t) => ({ trade: t, ...tradeStatus(t, snap) }))
   }, [weather, services])
 
-  const tone = statusTone(currentWindow?.status || 'go')
+  const tone = weather ? statusTone(currentWindow?.status || 'go') : NEUTRAL_TONE
+  const statusLabel = weather
+    ? (currentWindow.label || tone.label)
+    : loading ? 'Loading forecast' : forecastFailed ? 'Forecast unavailable' : 'Awaiting forecast'
   const currentCode = weather?.current?.weather_code
   const currentTemp = weather?.current?.temperature_2m
   const currentWind = weather?.current?.wind_speed_10m
   const currentHumidity = weather?.current?.relative_humidity_2m
-  const currentRain = weather?.current?.precipitation ?? 0
+  // Null until a forecast arrives, so the tile stays blank instead of
+  // claiming 0.00 in/h of rain.
+  const currentRain = weather?.current ? (weather.current.precipitation ?? 0) : null
 
   const { stagger, item } = useFhMotion()
   const isDesktop = useIsDesktop()
@@ -168,6 +189,7 @@ useEffect(() => {
           daily={daily}
           tradeRows={tradeRows}
           onPinLocation={pinLocation}
+          onRetry={forecastFailed ? retryForecast : undefined}
           onGoToSchedule={() => navigate('/schedule')}
         />
       </Suspense>
@@ -223,8 +245,18 @@ useEffect(() => {
             : (cityName || 'Murfreesboro, TN')}
         </div>
         {err && (
-          <div role="alert" style={{ marginTop: 8, fontSize: 12, color: 'var(--v3-danger-text)', fontFamily: 'var(--font-body)' }}>
-            {err}
+          <div role="alert" style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', fontSize: 12, color: 'var(--v3-danger-text)', fontFamily: 'var(--font-body)' }}>
+            <span>{err}</span>
+            {forecastFailed && (
+              <button
+                type="button"
+                onClick={() => { hapticTap(); retryForecast() }}
+                disabled={loading}
+                style={{ minHeight: 44, padding: '0 16px', borderRadius: 10, border: '1px solid var(--rule-bold)', background: 'var(--surface-2)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, cursor: loading ? 'wait' : 'pointer' }}
+              >
+                {loading ? 'Trying again' : 'Try again'}
+              </button>
+            )}
           </div>
         )}
       </motion.div>
@@ -249,7 +281,7 @@ useEffect(() => {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', position: 'relative', gap: 12 }}>
           <div style={{ minWidth: 0, flex: 1 }}>
             <Eyebrow as="div" style={{ color: 'var(--ink-muted)' }}>
-              Today · {weatherLabel(currentCode)}
+              {currentCode == null ? 'Today' : `Today · ${weatherLabel(currentCode)}`}
             </Eyebrow>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 10 }}>
               <span style={{ fontFamily: 'var(--font-display)', fontSize: 24, letterSpacing: 0, lineHeight: 0.9, color: 'var(--ink-strong)' }}>
@@ -286,7 +318,7 @@ useEffect(() => {
           />
           <div style={{ minWidth: 0, flex: 1 }}>
             <Eyebrow as="div" style={{ color: tone.ink }}>
-              {currentWindow.label || tone.label}
+              {statusLabel}
             </Eyebrow>
             {currentWindow.reasons?.length > 0 && (
               <div style={{ marginTop: 2, fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--ink-muted)' }}>
@@ -299,7 +331,7 @@ useEffect(() => {
         {/* Metric trio */}
         <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, position: 'relative' }}>
           <Metric Icon={Wind} label="Wind" value={currentWind != null ? `${Math.round(currentWind)}` : '\u2003'} unit="mph" />
-          <Metric Icon={Droplets} label="Rain now" value={`${(currentRain || 0).toFixed(2)}`} unit='in/h' />
+          <Metric Icon={Droplets} label="Rain now" value={currentRain == null ? '\u2003' : currentRain.toFixed(2)} unit='in/h' />
           <Metric Icon={Thermometer} label="Humidity" value={currentHumidity != null ? `${Math.round(currentHumidity)}` : '\u2003'} unit="%" />
         </div>
       </motion.div>
