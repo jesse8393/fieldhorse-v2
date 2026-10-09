@@ -270,7 +270,7 @@ export default async (request) => {
     // Enforcement explicitly turned on but the key is missing — refuse
     // to silently accept forged events. Operator needs to set
     // DOCUSIGN_CONNECT_HMAC_KEY too.
-    console.error('[docusign-webhook] DOCUSIGN_REQUIRE_HMAC=1 but DOCUSIGN_CONNECT_HMAC_KEY is missing — rejecting')
+    console.error('[docusign-webhook] DOCUSIGN_REQUIRE_HMAC=1 but DOCUSIGN_CONNECT_HMAC_KEY is missing, rejecting')
     return new Response('hmac_key_missing', { status: 500 })
   } else if (process.env.DOCUSIGN_ALLOW_UNSIGNED === '1') {
     // Explicit opt-out for deployments that haven't provisioned DocuSign
@@ -284,7 +284,7 @@ export default async (request) => {
     // knows an envelopeId could POST a forged "completed" event and flip a
     // proposal to approved. Reject until Connect HMAC is configured (or the
     // operator explicitly sets DOCUSIGN_ALLOW_UNSIGNED=1).
-    console.error('[docusign-webhook] rejecting UNSIGNED payload — set DOCUSIGN_CONNECT_HMAC_KEY (or DOCUSIGN_ALLOW_UNSIGNED=1 to opt out)')
+    console.error('[docusign-webhook] rejecting UNSIGNED payload. Set DOCUSIGN_CONNECT_HMAC_KEY, or DOCUSIGN_ALLOW_UNSIGNED=1 to opt out.')
     return new Response('hmac_not_configured', { status: 401 })
   }
 

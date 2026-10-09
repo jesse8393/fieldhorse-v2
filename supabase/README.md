@@ -2,8 +2,8 @@
 
 Project ref: `pnmhblvslftdzfcdezbw`.
 
-- `migrations/` holds the numbered SQL files this repo has accumulated.
-- `functions/` holds edge function sources captured from production on 2026-10-09.
+* `migrations/` holds the numbered SQL files this repo has accumulated.
+* `functions/` holds edge function sources captured from production on 2026-10-09.
 
 ## Production and this folder are out of sync
 

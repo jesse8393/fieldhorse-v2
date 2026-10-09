@@ -34,3 +34,7 @@ inspect_*.mjs
 checkhdr.mjs
 verify*.mjs
 .env.local
+
+# Playwright output
+test-results/
+playwright-report/
