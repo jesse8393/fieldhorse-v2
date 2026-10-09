@@ -1,5 +1,5 @@
 // Netlify Function — List pending timesheets for approval.
-// POST /api/org-timesheets-list  { from?: iso, to?: iso }
+// POST /api/org-timesheets-list  { from?: iso, to?: iso, org_id? }
 // Authorization: Bearer <supabase access token>
 //
 // Caller must be owner/admin/manager. Returns punches in the caller's
@@ -7,8 +7,14 @@
 // approved (approved_at IS NULL), within the optional [from, to)
 // window. Decorates each punch with the puncher's display name +
 // email so the approver can read a real roster, not raw user_ids.
+// The acting org comes from lib/membership.js. is_self marks the
+// caller's own punches: org-punch-approve skips those unless the
+// caller is an owner.
 
 import { createClient } from '@supabase/supabase-js'
+import { emailsForUsers } from './lib/authEmails.js'
+import { resolveCallerMembership } from './lib/membership.js'
+import { netPunchMinutes } from './lib/punches.js'
 
 export default async (request) => {
   if (request.method === 'OPTIONS') {
@@ -47,16 +53,9 @@ export default async (request) => {
   })
 
   // Caller role gate.
-  const { data: myMember } = await admin
-    .from('org_members')
-    .select('org_id, role, revoked_at')
-    .eq('user_id', authUserId)
-    .is('revoked_at', null)
-    .order('joined_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  if (!myMember) return json({ error: 'no_membership' }, 403)
+  const resolved = await resolveCallerMembership(admin, authUserId, body)
+  if (!resolved.membership) return json({ error: resolved.error, message: resolved.message }, resolved.status)
+  const myMember = resolved.membership
   if (!['owner', 'admin', 'manager'].includes(myMember.role)) {
     return json({ error: 'insufficient_role' }, 403)
   }
@@ -74,7 +73,10 @@ export default async (request) => {
   if (to)   query = query.lt('punch_in_at', to)
 
   const { data: punches, error: pErr } = await query.limit(500)
-  if (pErr) return json({ error: 'punches_lookup_failed', message: pErr.message }, 500)
+  if (pErr) {
+    console.error('[org-timesheets-list] punch lookup failed', pErr)
+    return json({ error: 'punches_lookup_failed', message: 'Could not load timesheets. Try again shortly.' }, 500)
+  }
 
   // Decorate with puncher info + linked-job names.
   const userIds = Array.from(new Set((punches || []).map((p) => p.user_id)))
@@ -90,10 +92,10 @@ export default async (request) => {
       .in('user_id', userIds)
     profilesById = Object.fromEntries((profs || []).map((p) => [p.user_id, p]))
   }
+  // Emails for the people on this timesheet only (see lib/authEmails.js).
   let emailsById = {}
   try {
-    const { data: usersList } = await admin.auth.admin.listUsers({ perPage: 1000 })
-    emailsById = Object.fromEntries((usersList?.users || []).map((u) => [u.id, u.email]))
+    emailsById = await emailsForUsers(admin, userIds)
   } catch { /* non-fatal */ }
   let contactsById = {}
   if (contactIds.length > 0) {
@@ -123,9 +125,7 @@ export default async (request) => {
   }
 
   const decorated = (punches || []).map((p) => {
-    const inMs = p.punch_in_at ? new Date(p.punch_in_at).getTime() : 0
-    const outMs = p.punch_out_at ? new Date(p.punch_out_at).getTime() : 0
-    const minutes = Math.max(0, Math.round((outMs - inMs) / 60_000) - (p.break_minutes || 0))
+    const minutes = netPunchMinutes(p)
     const rate = p.hourly_rate != null ? Number(p.hourly_rate) : (defaultRateByUser[p.user_id] ?? null)
     return {
       id: p.id,
@@ -135,6 +135,7 @@ export default async (request) => {
       // UI can exclude them from batch approval.
       invalid: minutes <= 0,
       user_id: p.user_id,
+      is_self: p.user_id === authUserId,
       user_name: profilesById[p.user_id]?.full_name || null,
       user_email: emailsById[p.user_id] || null,
       contact_id: p.contact_id,

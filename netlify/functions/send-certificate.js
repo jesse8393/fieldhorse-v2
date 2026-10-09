@@ -16,6 +16,9 @@
 // No 'via FieldHorse' anywhere in the inbox.
 
 import { createClient } from '@supabase/supabase-js'
+import { loadAccessibleRow, brandingUserIdFor } from './lib/orgAccess.js'
+import { hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
+import { formatFromHeader, renderParagraphs, textField } from './lib/email.js'
 
 export default async (request) => {
   if (request.method === 'OPTIONS') {
@@ -91,25 +94,34 @@ export default async (request) => {
     return json({ error: 'forbidden', detail: 'sender_user_id must match the signed-in user.' }, 403)
   }
 
-  // 1. Verify ownership.
-  const { data: contact, error: contactErr } = await supabase
-    .from('fh_contacts')
-    .select('id, name, job_title, user_id')
-    .eq('id', contact_id)
-    .eq('user_id', sender_user_id)
-    .maybeSingle()
-  if (contactErr) {
-    return json({ error: 'contact_lookup_failed', detail: contactErr.message }, 500)
-  }
-  if (!contact) {
-    return json({ error: 'forbidden_or_not_found' }, 403)
+  // Per sender cap shared by every send-* function (see send-quote.js).
+  const rlOk = await checkRateLimit(supabase, {
+    scope: 'send-email', identifier: hashIdentifier(sender_user_id), limit: 30, windowSeconds: 600,
+  })
+  if (!rlOk) {
+    return json({ error: 'rate_limited', message: 'Too many emails sent in a short time. Try again in a few minutes.' }, 429)
   }
 
-  // 2. Profile branding (company name, reply-to).
+  // 1. Verify the caller may act on the job: its creator, or an owner,
+  // admin or manager of its company.
+  const access = await loadAccessibleRow(supabase, {
+    table: 'fh_contacts', id: contact_id, callerId: sender_user_id,
+    select: 'name, job_title'
+  })
+  if (access.error === 'lookup_failed') {
+    return json({ error: 'contact_lookup_failed', message: 'Could not load this job. Try again.' }, 500)
+  }
+  if (!access.row) {
+    return json({ error: 'forbidden_or_not_found', message: 'This record was not found, or your role cannot send it. Ask an owner, admin or manager.' }, 403)
+  }
+  const contact = access.row
+
+  // 2. Company branding (company name, reply-to).
+  const brandingUserId = (await brandingUserIdFor(supabase, contact)) || sender_user_id
   const { data: profile } = await supabase
     .from('profiles')
     .select('full_name, company_name, company_email')
-    .eq('user_id', sender_user_id)
+    .eq('user_id', brandingUserId)
     .maybeSingle()
 
   const companyName = (profile?.company_name || profile?.full_name || '').trim()
@@ -128,9 +140,10 @@ export default async (request) => {
     .from('job-files')
     .download(storage_path)
   if (dlErr || !fileBlob) {
+    console.error('[send-certificate] pdf download failed', dlErr)
     return json({
       error: 'pdf_download_failed',
-      detail: dlErr?.message || 'PDF not found at storage_path'
+      detail: 'Could not read the certificate PDF. Try sending again.'
     }, 500)
   }
   const arrayBuffer = await fileBlob.arrayBuffer()
@@ -141,22 +154,24 @@ export default async (request) => {
   // tone is "here's your copy for your records" rather than "please
   // review and approve."
   const fromName = companyName || SEND_EMAIL_FROM_NAME
-  const fromHeader = `${fromName} <${SEND_EMAIL_FROM}>`
+  const fromHeader = formatFromHeader(fromName, SEND_EMAIL_FROM)
   const jobLabel = contact.job_title || contact.name || 'your project'
-  const subject = `Certificate of Completion — ${jobLabel}`
-  const safeRecipientName = (recipient_name || contact.name || '').trim()
+  const subject = `Certificate of Completion for ${jobLabel}`
+  // Optional fields read through textField so a non string value from a
+  // malformed client falls back to the default instead of throwing.
+  const safeRecipientName = textField(recipient_name) || textField(contact.name)
   const greeting = safeRecipientName ? `Hi ${safeRecipientName.split(/\s+/)[0]},` : 'Hi,'
   const senderLine = companyName || 'Your contractor'
-  const customMessage = (sender_message || '').trim()
+  const customMessage = textField(sender_message)
 
   const text = [
     greeting,
     '',
-    customMessage || `Attached is the Certificate of Completion for ${jobLabel}. Keep this with your records — it covers the warranty terms and the completion date.`,
+    customMessage || `Attached is the Certificate of Completion for ${jobLabel}. Keep this with your records. It covers the warranty terms and the completion date.`,
     '',
-    'Reply directly to this email if you have any questions or spot anything that needs follow-up.',
+    'Reply directly to this email if you have any questions or spot anything that needs follow up.',
     '',
-    `— ${senderLine}`
+    senderLine
   ].join('\n')
 
   const html = renderCertificateHtml({
@@ -167,7 +182,7 @@ export default async (request) => {
     companyName
   })
 
-  const safeFilename = (filename || `Certificate-${contact.id}.pdf`).replace(/[^a-z0-9._-]/gi, '_')
+  const safeFilename = (textField(filename) || `Certificate-${contact.id}.pdf`).replace(/[^a-z0-9._-]/gi, '_')
 
   // 5. Send via Resend.
   const resendPayload = {
@@ -210,7 +225,6 @@ export default async (request) => {
       .from('fh_closeouts')
       .update({ updated_at: sentAtIso })
       .eq('contact_id', contact_id)
-      .eq('user_id', sender_user_id)
   } catch (e) {
     console.warn('[send-certificate] closeout touch failed', e)
   }
@@ -237,9 +251,10 @@ function renderCertificateHtml({ greeting, customMessage, jobLabel, senderLine, 
   const safe = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   }[c]))
+  // The operator's note keeps its paragraphs and line breaks.
   const msg = customMessage
-    ? safe(customMessage)
-    : `Attached is the Certificate of Completion for <strong>${safe(jobLabel)}</strong>. Keep this with your records — it covers the warranty terms and the completion date.`
+    ? renderParagraphs(customMessage, safe)
+    : `<p style="margin:0;">Attached is the Certificate of Completion for <strong>${safe(jobLabel)}</strong>. Keep this with your records. It covers the warranty terms and the completion date.</p>`
   return `<!doctype html>
 <html lang="en">
 <body style="margin:0;padding:0;background:#F2EDE4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#141414;line-height:1.55;">
@@ -253,7 +268,7 @@ function renderCertificateHtml({ greeting, customMessage, jobLabel, senderLine, 
           <p style="margin:0;font-size:16px;color:#141414;">${safe(greeting)}</p>
         </td></tr>
         <tr><td style="padding:0 32px 16px;">
-          <p style="margin:0;font-size:16px;color:#141414;">${msg}</p>
+          <div style="font-size:16px;color:#141414;">${msg}</div>
         </td></tr>
         <tr><td style="padding:0 32px 24px;">
           <p style="margin:0;font-size:14px;color:#5C5C5C;">Reply directly to this email if you have any questions or spot anything that needs follow up.</p>
@@ -281,8 +296,11 @@ function corsHeaders() {
   }
 }
 
+// The app shows `detail` (then the error code) when a send fails, so a
+// plain `message` is mirrored into `detail` for the person reading it.
 function json(obj, status = 200) {
-  return new Response(JSON.stringify(obj), {
+  const body = obj && obj.message && !obj.detail ? { ...obj, detail: obj.message } : obj
+  return new Response(JSON.stringify(body), {
     status,
     headers: { 'Content-Type': 'application/json', ...corsHeaders() }
   })

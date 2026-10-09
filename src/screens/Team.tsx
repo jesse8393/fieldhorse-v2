@@ -42,7 +42,7 @@ function fmtExpires(iso: string | null): string {
 
 export default function Team() {
   const navigate = useNavigate()
-  const { orgName, role, loading: membershipLoading, canManageTeam, canInviteMembers } = useMembership()
+  const { orgId, orgName, role, loading: membershipLoading, canManageTeam, canInviteMembers } = useMembership()
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -78,8 +78,9 @@ export default function Team() {
     // Only call once the membership context has resolved, avoids a
     // 403 from the backend during the brief signed-in-but-no-membership
     // window.
+    // Reloads when the workspace changes too.
     if (!membershipLoading) load()
-  }, [membershipLoading, load])
+  }, [membershipLoading, load, orgId])
 
   const activeCount = members.length
   const ownerCount = members.filter((m) => m.role === 'owner').length

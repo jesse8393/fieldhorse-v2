@@ -1,6 +1,7 @@
 // Netlify Function — Set an org member's default hourly rate.
-// POST /api/org-member-rate  { member_user_id, rate }   (rate null clears it)
+// POST /api/org-member-rate  { member_user_id, rate, org_id? }   (rate null clears it)
 // Authorization: Bearer <supabase access token>
+// The acting org comes from lib/membership.js.
 //
 // Owner/admin only, same tier guard as role changes: you can only set rates
 // for members strictly below your tier. Keeps rate-setting owner-controlled
@@ -8,6 +9,7 @@
 // labor cost).
 
 import { createClient } from '@supabase/supabase-js'
+import { resolveCallerMembership } from './lib/membership.js'
 
 const ROLE_TIER = { crew: 0, foreman: 1, manager: 2, admin: 3, owner: 4 }
 
@@ -49,10 +51,9 @@ export default async (request) => {
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { autoRefreshToken: false, persistSession: false } })
 
-  const { data: myMember } = await admin
-    .from('org_members').select('org_id, role').eq('user_id', authUserId).is('revoked_at', null)
-    .order('joined_at', { ascending: false }).limit(1).maybeSingle()
-  if (!myMember) return json({ error: 'no_membership' }, 403)
+  const resolved = await resolveCallerMembership(admin, authUserId, body)
+  if (!resolved.membership) return json({ error: resolved.error, message: resolved.message }, resolved.status)
+  const myMember = resolved.membership
   if (!['owner', 'admin'].includes(myMember.role)) return json({ error: 'insufficient_role' }, 403)
   const myTier = ROLE_TIER[myMember.role] ?? 0
 
@@ -66,7 +67,10 @@ export default async (request) => {
 
   const { error: updErr } = await admin
     .from('org_members').update({ default_hourly_rate: rate }).eq('id', target.id).eq('org_id', myMember.org_id)
-  if (updErr) return json({ error: 'rate_update_failed', message: updErr.message }, 500)
+  if (updErr) {
+    console.error('[org-member-rate] update failed', updErr)
+    return json({ error: 'rate_update_failed', message: 'Could not save the rate. Try again.' }, 500)
+  }
 
   return json({ ok: true, rate })
 }

@@ -1,14 +1,16 @@
 // Netlify Function — Create an org invite.
-// POST /api/org-invite-create  { email, role }
+// POST /api/org-invite-create  { email, role, org_id? }
 // Authorization: Bearer <supabase access token>
 //
 // Caller must be authenticated AND be an owner/admin of an active
-// membership. Creates a public.org_invites row with a fresh random
+// membership (in the org named by org_id, see lib/membership.js).
+// Creates a public.org_invites row with a fresh random
 // token and a 14-day expiry. Returns the accept URL so the caller can
 // share it manually (email-send wiring is a Phase B follow-up).
 
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'node:crypto'
+import { resolveCallerMembership } from './lib/membership.js'
 
 const VALID_ROLES = ['owner', 'admin', 'manager', 'foreman', 'crew']
 
@@ -52,17 +54,9 @@ export default async (request) => {
     auth: { autoRefreshToken: false, persistSession: false }
   })
 
-  const { data: myMember, error: myErr } = await admin
-    .from('org_members')
-    .select('org_id, role, revoked_at')
-    .eq('user_id', authUserId)
-    .is('revoked_at', null)
-    .order('joined_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  if (myErr) return json({ error: 'membership_lookup_failed', message: myErr.message }, 500)
-  if (!myMember) return json({ error: 'no_membership' }, 403)
+  const resolved = await resolveCallerMembership(admin, authUserId, body)
+  if (!resolved.membership) return json({ error: resolved.error, message: resolved.message }, resolved.status)
+  const myMember = resolved.membership
   if (myMember.role !== 'owner' && myMember.role !== 'admin') {
     return json({ error: 'insufficient_role' }, 403)
   }
@@ -95,7 +89,10 @@ export default async (request) => {
     .select('id, expires_at')
     .single()
 
-  if (insErr) return json({ error: 'invite_create_failed', message: insErr.message }, 500)
+  if (insErr) {
+    console.error('[org-invite-create] insert failed', insErr)
+    return json({ error: 'invite_create_failed', message: 'Could not create the invite. Try again.' }, 500)
+  }
 
   const acceptUrl = SITE_URL
     ? `${SITE_URL.replace(/\/$/, '')}/invite/${token}`

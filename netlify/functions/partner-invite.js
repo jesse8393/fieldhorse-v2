@@ -27,6 +27,14 @@
 //   APP_BASE_URL                — optional, default https://fieldhorse.io
 
 import { createClient } from '@supabase/supabase-js'
+import crypto from 'node:crypto'
+import { loadAccessibleRow, brandingUserIdFor } from './lib/orgAccess.js'
+import { hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
+import { formatFromHeader } from './lib/email.js'
+
+// Mirrors PARTNER_ROLES in src/lib/partners.ts. Anything else is dropped so
+// a crafted request cannot put arbitrary text into a platform sent email.
+const PARTNER_ROLES = ['Foreman', 'Sub', 'Estimator', 'Other']
 
 export default async (request) => {
   if (request.method === 'OPTIONS') {
@@ -57,8 +65,9 @@ export default async (request) => {
     return json({ error: 'missing_fields', required: ['job_id', 'partner_email', 'invited_by_user_id'] }, 400)
   }
 
-  const normalizedName = String(partner_name || '').trim() || null
-  const normalizedRole = String(partner_role || '').trim() || null
+  const normalizedName = String(partner_name || '').trim().slice(0, 120) || null
+  const requestedRole = String(partner_role || '').trim()
+  const normalizedRole = PARTNER_ROLES.find((r) => r.toLowerCase() === requestedRole.toLowerCase()) || null
 
   const normalizedEmail = String(partner_email).toLowerCase().trim()
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
@@ -87,20 +96,27 @@ export default async (request) => {
     return json({ error: 'forbidden', detail: 'invited_by_user_id must match the signed-in user.' }, 403)
   }
 
-  // 1. Verify the caller owns the job.
-  const { data: ownedJob, error: ownErr } = await supabase
-    .from('fh_contacts')
-    .select('id, name, user_id')
-    .eq('id', job_id)
-    .eq('user_id', invited_by_user_id)
-    .maybeSingle()
-  if (ownErr) {
-    console.error('[partner-invite] job lookup failed', ownErr)
-    return json({ error: 'job_lookup_failed', detail: ownErr.message }, 500)
+  // Per sender cap shared by every send-* function (see send-quote.js).
+  const rlOk = await checkRateLimit(supabase, {
+    scope: 'send-email', identifier: hashIdentifier(invited_by_user_id), limit: 30, windowSeconds: 600,
+  })
+  if (!rlOk) {
+    return json({ error: 'rate_limited', message: 'Too many invites sent in a short time. Try again in a few minutes.' }, 429)
   }
-  if (!ownedJob) {
-    return json({ error: 'forbidden_or_not_found' }, 403)
+
+  // 1. Verify the caller may manage partners on this job: its creator, or
+  // an owner, admin or manager of its company.
+  const access = await loadAccessibleRow(supabase, {
+    table: 'fh_contacts', id: job_id, callerId: invited_by_user_id, select: 'name'
+  })
+  if (access.error === 'lookup_failed') {
+    return json({ error: 'job_lookup_failed', message: 'Could not load this job. Try again.' }, 500)
   }
+  if (!access.row) {
+    return json({ error: 'forbidden_or_not_found', message: 'This record was not found, or your role cannot send it. Ask an owner, admin or manager.' }, 403)
+  }
+  const ownedJob = access.row
+  const brandingUserId = (await brandingUserIdFor(supabase, ownedJob)) || invited_by_user_id
 
   // 2. Insert the invite. Trigger fh_fill_invite_token generates invite_token.
   const { data: invite, error: insErr } = await supabase
@@ -121,35 +137,49 @@ export default async (request) => {
     if (insErr.code === '23505') {
       const { data: existing, error: reErr } = await supabase
         .from('fh_job_partners')
-        .select('invite_token, status')
+        .select('id, invite_token, status')
         .eq('job_id', job_id)
         .eq('partner_email', normalizedEmail)
         .maybeSingle()
       if (reErr || !existing) {
         console.error('[partner-invite] unique-violation resend lookup failed', { insErr, reErr })
-        return json({ error: 'db_insert_failed', detail: insErr.message, code: insErr.code }, 500)
+        return json({ error: 'db_insert_failed', message: 'Could not create the invite. Try again.' }, 500)
       }
-      // Backfill name + role on the existing invite if the operator
-      // re-sent with new identity info. Quiet — we don't care about
-      // failures here.
-      if (normalizedName || normalizedRole) {
-        const patch = {}
-        if (normalizedName) patch.partner_name = normalizedName
-        if (normalizedRole) patch.partner_role = normalizedRole
-        try {
-          await supabase
-            .from('fh_job_partners')
-            .update(patch)
-            .eq('job_id', job_id)
-            .eq('partner_email', normalizedEmail)
-        } catch {}
+      // Backfill name + role if the operator re-sent with new identity
+      // info, and reissue a revoked or declined invite (see
+      // buildResendPatch). A failed backfill alone stays quiet; a failed
+      // reissue must not email the old, dead link.
+      const { patch, reissue } = buildResendPatch({
+        status: existing.status,
+        partnerName: normalizedName,
+        partnerRole: normalizedRole,
+        nowIso: new Date().toISOString(),
+        newToken: crypto.randomBytes(24).toString('hex')
+      })
+      let inviteToken = existing.invite_token
+      let inviteStatus = existing.status
+      if (Object.keys(patch).length > 0) {
+        const { error: patchErr } = await supabase
+          .from('fh_job_partners')
+          .update(patch)
+          .eq('id', existing.id)
+        if (patchErr && reissue) {
+          console.error('[partner-invite] reissue of a revoked invite failed', patchErr)
+          return json({ error: 'db_insert_failed', message: 'Could not create the invite. Try again.' }, 500)
+        }
+        if (reissue) {
+          inviteToken = patch.invite_token
+          inviteStatus = patch.status
+        }
       }
-      const resentUrl = buildInviteUrl(request, existing.invite_token)
+      const resentUrl = buildInviteUrl(request, inviteToken)
       const resentSendResult = send_email
         ? await sendInviteEmail({
             request,
             supabase,
-            ownerUserId: invited_by_user_id,
+            ownerUserId: brandingUserId,
+            senderUserId: invited_by_user_id,
+            jobId: job_id,
             recipientEmail: normalizedEmail,
             inviteUrl: resentUrl,
             jobName: ownedJob.name,
@@ -160,25 +190,18 @@ export default async (request) => {
       return json({
         ok: true,
         resent: true,
-        status: existing.status,
+        status: inviteStatus,
         invite_url: resentUrl,
         job_name: ownedJob.name || null,
         ...resentSendResult
       })
     }
-    // Surface the raw Supabase error to both Netlify logs and the client so
-    // the operator can see whether it's a missing-table (migration 004 not run)
-    // vs an RLS / schema issue.
+    // Log the database error server side only; the client gets a plain
+    // message (raw Postgres text and hints used to reach the browser).
     console.error('[partner-invite] insert failed', insErr)
-    const missingTable = String(insErr.message || '').toLowerCase().includes('fh_job_partners')
-      && /does not exist|not.found/.test(String(insErr.message || '').toLowerCase())
     return json({
       error: 'db_insert_failed',
-      code: insErr.code || null,
-      detail: insErr.message || null,
-      hint: missingTable
-        ? 'Table fh_job_partners does not exist. Re-run supabase/migrations/004_partner_jobs.sql in the SQL editor.'
-        : (insErr.hint || null)
+      message: 'Could not create the invite. Try again.'
     }, 500)
   }
 
@@ -187,7 +210,9 @@ export default async (request) => {
     ? await sendInviteEmail({
         request,
         supabase,
-        ownerUserId: invited_by_user_id,
+        ownerUserId: brandingUserId,
+        senderUserId: invited_by_user_id,
+        jobId: job_id,
         recipientEmail: normalizedEmail,
         inviteUrl: newUrl,
         jobName: ownedJob.name,
@@ -204,12 +229,39 @@ export default async (request) => {
   })
 }
 
+// Patch for an invite that already exists on this job (the unique
+// job_id + partner_email row). Name and role are backfilled when given. A
+// revoked or declined invite is reissued as a fresh pending invite with a
+// new token: partner-invite-accept answers 410 invite_revoked for a revoked
+// row, so mailing the old link again left the partner with a link that
+// could never work while the sender saw "Invite sent". Partner fields are
+// cleared so the new acceptance starts clean (including a soft delete, which
+// would otherwise keep hiding the job after the partner accepts again).
+export function buildResendPatch({ status, partnerName, partnerRole, nowIso, newToken }) {
+  const patch = {}
+  if (partnerName) patch.partner_name = partnerName
+  if (partnerRole) patch.partner_role = partnerRole
+  const reissue = status === 'revoked' || status === 'declined'
+  if (reissue) {
+    Object.assign(patch, {
+      status: 'pending',
+      invite_token: newToken,
+      partner_user_id: null,
+      accepted_at: null,
+      invited_at: nowIso,
+      deleted_by_partner_at: null,
+      deleted_by_invited_at: null
+    })
+  }
+  return { patch, reissue }
+}
+
 // Sends the invite email via Resend and logs the activity. Never throws —
 // always returns a result object so the caller can attach it to the JSON
 // response and let the client decide how to surface the outcome (success
 // vs. fall back to copy/share). The token has already been issued by the
 // time this runs, so the invite link is valid even if email fails.
-async function sendInviteEmail({ request, supabase, ownerUserId, recipientEmail, inviteUrl, jobName, partnerName, partnerRole }) {
+async function sendInviteEmail({ request, supabase, ownerUserId, senderUserId, jobId, recipientEmail, inviteUrl, jobName, partnerName, partnerRole }) {
   const RESEND_API_KEY = process.env.RESEND_API_KEY
   const SEND_EMAIL_FROM = process.env.SEND_EMAIL_FROM
   const SEND_EMAIL_FROM_NAME = process.env.SEND_EMAIL_FROM_NAME || 'FieldHorse'
@@ -237,13 +289,13 @@ async function sendInviteEmail({ request, supabase, ownerUserId, recipientEmail,
   // never "Contractor via FieldHorse". Falls back to the platform default
   // only when the contractor hasn't filled in their company name yet.
   const fromName = companyName || SEND_EMAIL_FROM_NAME
-  const fromHeader = `${fromName} <${SEND_EMAIL_FROM}>`
+  const fromHeader = formatFromHeader(fromName, SEND_EMAIL_FROM)
   const senderLine = companyName || 'Your contractor'
   const safeJob = jobName || 'a job'
   const greetingName = (partnerName || '').trim()
   const roleLabel = (partnerRole || '').trim()
   const subject = greetingName
-    ? `${greetingName} — co-manage ${safeJob}`
+    ? `${greetingName}, you're invited to co-manage ${safeJob}`
     : `Co-manage ${safeJob}`
 
   const text = [
@@ -256,9 +308,9 @@ async function sendInviteEmail({ request, supabase, ownerUserId, recipientEmail,
     'Open this link to accept the invite:',
     inviteUrl,
     '',
-    'You will only see this specific job — no other contacts, rates, or data.',
+    'You will only see this specific job and no other contacts, rates, or data from their account.',
     '',
-    `— ${senderLine}`
+    senderLine
   ].join('\n')
 
   const html = renderInviteHtml({
@@ -298,8 +350,8 @@ async function sendInviteEmail({ request, supabase, ownerUserId, recipientEmail,
     // Best-effort activity log; never blocks the response.
     try {
       await supabase.from('fh_notes').insert({
-        user_id: ownerUserId,
-        contact_id: null,
+        user_id: senderUserId || ownerUserId,
+        contact_id: jobId || null,
         text: `Partner invite sent to ${recipientEmail}${jobName ? ` for ${jobName}` : ''}`,
         category: 'activity'
       })
@@ -319,8 +371,11 @@ function renderInviteHtml({ senderLine, jobName, inviteUrl, companyName, partner
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   }[c]))
   const greeting = partnerName ? `Hi ${safe(partnerName)},` : 'Hi,'
+  // The article is computed on its own; aOrAn() returns "an Estimator",
+  // which used to print the role twice ("as an Estimator Estimator").
+  const article = /^[aeiou]/i.test(String(partnerRole || '').trim()) ? 'an' : 'a'
   const roleClause = partnerRole
-    ? `as ${aOrAn(partnerRole)} <strong style="color:#C9963A;">${safe(partnerRole)}</strong>`
+    ? `as ${article} <strong style="color:#C9963A;">${safe(partnerRole)}</strong>`
     : 'as a partner'
   return `<!doctype html>
 <html lang="en">
@@ -375,12 +430,15 @@ function corsHeaders() {
   return {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type'
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization'
   }
 }
 
+// The app shows `detail` (then the error code) when a send fails, so a
+// plain `message` is mirrored into `detail` for the person reading it.
 function json(obj, status = 200) {
-  return new Response(JSON.stringify(obj), {
+  const body = obj && obj.message && !obj.detail ? { ...obj, detail: obj.message } : obj
+  return new Response(JSON.stringify(body), {
     status,
     headers: { 'Content-Type': 'application/json', ...corsHeaders() }
   })

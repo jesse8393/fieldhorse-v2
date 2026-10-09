@@ -112,7 +112,10 @@ export default async function handler(req) {
     .eq('user_id', link.user_id)
     .neq('status', 'approved')
     .select('id')
-  if (upErr) return json({ error: 'approve_failed', message: upErr.message }, 500)
+  if (upErr) {
+    console.error('[public-co-approve] update failed', upErr)
+    return json({ error: 'approve_failed', message: 'Could not record your approval. Try again.' }, 500)
+  }
   if (!updatedRows || updatedRows.length === 0) return json({ error: 'already_approved' }, 409)
 
   // 3. Tell the contractor — bell + lock screen. Best effort.
@@ -129,7 +132,7 @@ export default async function handler(req) {
       user_id: link.user_id,
       kind: 'change_order_signed',
       title,
-      body: `${who} signed CO #${co.sequence_number}${co.title ? ` — ${co.title}` : ''}${customerNote ? ` · "${customerNote}"` : ''}`,
+      body: `${who} signed CO #${co.sequence_number}${co.title ? `: ${co.title}` : ''}${customerNote ? ` · "${customerNote}"` : ''}`,
       link: `/jobs/${co.contact_id}?tab=quote`
     })
   } catch { /* bell is best-effort */ }
@@ -140,7 +143,7 @@ export default async function handler(req) {
       await supabase.from('fh_notes').insert({
         user_id: link.user_id,
         contact_id: co.contact_id,
-        text: `CO #${co.sequence_number} signed by ${signatureName} — note: ${customerNote}`,
+        text: `CO #${co.sequence_number} signed by ${signatureName}. Note: ${customerNote}`,
         category: 'activity'
       })
     } catch { /* best-effort */ }

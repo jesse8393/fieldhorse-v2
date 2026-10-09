@@ -1,13 +1,24 @@
 // Netlify Function — Approve one or many time punches.
-// POST /api/org-punch-approve  { punch_ids: string[] }
+// POST /api/org-punch-approve  { punch_ids: string[], org_id? }
 // Authorization: Bearer <supabase access token>
 //
-// Caller must be owner/admin/manager of the punches' org. Service-
-// role stamps approved_at = now() and approved_by = caller_user_id.
+// Caller must be owner/admin/manager of the punches' org (the acting org
+// comes from lib/membership.js). Service role stamps
+// approved_at = now() and approved_by = caller_user_id.
 // Cross-org punches are silently filtered out so a bulk-approve from
 // one tab can't accidentally touch another tenant.
+//
+// Skipped and reported back (lib/punches.js):
+//   skipped_ids:  zero length shifts, the rows org-timesheets-list marks
+//                 invalid; a stale client could otherwise freeze them as
+//                 payroll
+//   self_skipped: the caller's own punches when the caller is not an
+//                 owner, so a manager or admin cannot sign off their own
+//                 hours
 
 import { createClient } from '@supabase/supabase-js'
+import { resolveCallerMembership } from './lib/membership.js'
+import { partitionApprovablePunches } from './lib/punches.js'
 
 export default async (request) => {
   if (request.method === 'OPTIONS') {
@@ -46,18 +57,34 @@ export default async (request) => {
     auth: { autoRefreshToken: false, persistSession: false }
   })
 
-  const { data: myMember } = await admin
-    .from('org_members')
-    .select('org_id, role, revoked_at')
-    .eq('user_id', authUserId)
-    .is('revoked_at', null)
-    .order('joined_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  if (!myMember) return json({ error: 'no_membership' }, 403)
+  const resolved = await resolveCallerMembership(admin, authUserId, body)
+  if (!resolved.membership) return json({ error: resolved.error, message: resolved.message }, resolved.status)
+  const myMember = resolved.membership
   if (!['owner', 'admin', 'manager'].includes(myMember.role)) {
     return json({ error: 'insufficient_role' }, 403)
+  }
+
+  // The requested punches that are still pending in the caller's org.
+  // PostgREST cannot compare two columns, so the duration check runs on
+  // these rows in JS and only the approvable ids reach the UPDATE below.
+  const { data: pending, error: pendingErr } = await admin
+    .from('fh_time_punches')
+    .select('id, user_id, punch_in_at, punch_out_at, break_minutes, hourly_rate')
+    .in('id', punchIds)
+    .eq('org_id', myMember.org_id)
+    .is('approved_at', null)
+    .not('punch_out_at', 'is', null)
+  if (pendingErr) {
+    console.error('[org-punch-approve] punch lookup failed', pendingErr)
+    return json({ error: 'approve_failed', message: 'Could not approve these punches. Try again.' }, 500)
+  }
+  const { approvable, invalidIds, selfIds } = partitionApprovablePunches(pending, {
+    callerId: authUserId,
+    callerRole: myMember.role,
+  })
+  const approvableIds = approvable.map((p) => p.id)
+  if (approvableIds.length === 0) {
+    return json({ ok: true, approved_count: 0, approved_ids: [], skipped_ids: invalidIds, self_skipped: selfIds })
   }
 
   // Freeze the rate on approval: any punch still missing an
@@ -67,13 +94,8 @@ export default async (request) => {
   // when job cost is next computed — a raise months later silently
   // repriced already-approved (even closed-job) shifts. Service role
   // is exempt from the 054 one-time-set guard, but we only fill NULLs.
-  const { data: unrated } = await admin
-    .from('fh_time_punches')
-    .select('id, user_id')
-    .in('id', punchIds)
-    .eq('org_id', myMember.org_id)
-    .is('hourly_rate', null)
-  if (unrated?.length) {
+  const unrated = approvable.filter((p) => p.hourly_rate == null)
+  if (unrated.length) {
     const userIds = [...new Set(unrated.map((p) => p.user_id).filter(Boolean))]
     const { data: members } = await admin
       .from('org_members')
@@ -107,18 +129,23 @@ export default async (request) => {
       approved_at: new Date().toISOString(),
       approved_by: authUserId,
     })
-    .in('id', punchIds)
+    .in('id', approvableIds)
     .eq('org_id', myMember.org_id)
     .is('approved_at', null)
     .not('punch_out_at', 'is', null)
     .select('id')
 
-  if (updErr) return json({ error: 'approve_failed', message: updErr.message }, 500)
+  if (updErr) {
+    console.error('[org-punch-approve] update failed', updErr)
+    return json({ error: 'approve_failed', message: 'Could not approve these punches. Try again.' }, 500)
+  }
 
   return json({
     ok: true,
     approved_count: (updated || []).length,
     approved_ids: (updated || []).map((r) => r.id),
+    skipped_ids: invalidIds,
+    self_skipped: selfIds,
   })
 }
 

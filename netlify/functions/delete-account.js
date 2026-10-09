@@ -315,12 +315,16 @@ export default async (request) => {
     }
   }
 
+  // Cleanup problems after the account is gone are logged for the operator
+  // and reported to the client only as a count, never as database text.
+  if (purgeWarnings.length || storageWarnings.length) {
+    console.error('[delete-account] cleanup warnings', { purgeWarnings, storageWarnings })
+  }
   return json({
     ok: true,
     handed_off_orgs: plan.handoffs.length,
     deleted_orgs: plan.soloOrgIds.length,
-    purge_warnings: purgeWarnings,
-    storage_warnings: storageWarnings
+    cleanup_warnings: purgeWarnings.length + storageWarnings.length
   })
 }
 

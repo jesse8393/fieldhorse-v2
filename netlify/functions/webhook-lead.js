@@ -133,7 +133,8 @@ export default async (request) => {
     .insert(row)
     .select('id')
   if (insertErr) {
-    return json({ error: 'insert_failed', detail: insertErr.message }, 502)
+    console.error('[webhook-lead] insert failed', insertErr)
+    return json({ error: 'insert_failed', detail: 'Could not save the lead. Try again shortly.' }, 500)
   }
   const newId = inserted[0]?.id
 

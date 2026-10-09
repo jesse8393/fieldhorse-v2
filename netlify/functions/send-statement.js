@@ -14,7 +14,9 @@
 //   Reply-To: company_email || sender's auth email
 
 import { createClient } from '@supabase/supabase-js'
-import { renderPayBlock } from './lib/email.js'
+import { renderPayBlock, formatFromHeader, textField } from './lib/email.js'
+import { loadAccessibleRow, brandingUserIdFor } from './lib/orgAccess.js'
+import { hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
 
 export default async (request) => {
   if (request.method === 'OPTIONS') {
@@ -50,7 +52,7 @@ export default async (request) => {
     storage_path,
     filename,
     total_due
-  } = payload
+  } = payload || {}
 
   if (!client_id || !sender_user_id || !recipient_email || !storage_path) {
     return json({
@@ -76,25 +78,34 @@ export default async (request) => {
     return json({ error: 'forbidden', detail: 'sender_user_id must match the signed-in user.' }, 403)
   }
 
-  // 1. Verify the caller owns the client.
-  const { data: client, error: clientErr } = await supabase
-    .from('fh_clients')
-    .select('id, name, company_name, user_id')
-    .eq('id', client_id)
-    .eq('user_id', sender_user_id)
-    .maybeSingle()
-  if (clientErr) {
-    return json({ error: 'client_lookup_failed', detail: clientErr.message }, 500)
-  }
-  if (!client) {
-    return json({ error: 'forbidden_or_not_found' }, 403)
+  // Per sender cap shared by every send-* function (see send-quote.js).
+  const rlOk = await checkRateLimit(supabase, {
+    scope: 'send-email', identifier: hashIdentifier(sender_user_id), limit: 30, windowSeconds: 600,
+  })
+  if (!rlOk) {
+    return json({ error: 'rate_limited', message: 'Too many emails sent in a short time. Try again in a few minutes.' }, 429)
   }
 
-  // 2. Branding for From-line + Reply-To.
+  // 1. Verify the caller may act on the client: its creator, or an owner,
+  // admin or manager of its company.
+  const access = await loadAccessibleRow(supabase, {
+    table: 'fh_clients', id: client_id, callerId: sender_user_id,
+    select: 'name, company_name'
+  })
+  if (access.error === 'lookup_failed') {
+    return json({ error: 'client_lookup_failed', message: 'Could not load this client. Try again.' }, 500)
+  }
+  if (!access.row) {
+    return json({ error: 'forbidden_or_not_found', message: 'This record was not found, or your role cannot send it. Ask an owner, admin or manager.' }, 403)
+  }
+  const client = access.row
+
+  // 2. Company branding for From-line + Reply-To + pay link.
+  const brandingUserId = (await brandingUserIdFor(supabase, client)) || sender_user_id
   const { data: profile } = await supabase
     .from('profiles')
     .select('full_name, company_name, company_email, payment_link, payment_instructions')
-    .eq('user_id', sender_user_id)
+    .eq('user_id', brandingUserId)
     .maybeSingle()
 
   const companyName = (profile?.company_name || profile?.full_name || '').trim()
@@ -113,18 +124,21 @@ export default async (request) => {
     .from('job-files')
     .download(storage_path)
   if (dlErr || !fileBlob) {
-    return json({ error: 'pdf_download_failed', detail: dlErr?.message || 'PDF not found at storage_path' }, 500)
+    console.error('[send-statement] pdf download failed', dlErr)
+    return json({ error: 'pdf_download_failed', detail: 'Could not read the statement PDF. Try sending again.' }, 500)
   }
   const arrayBuffer = await fileBlob.arrayBuffer()
   const base64Pdf = Buffer.from(arrayBuffer).toString('base64')
 
   // 4. Compose.
   const fromName = companyName || SEND_EMAIL_FROM_NAME
-  const fromHeader = `${fromName} <${SEND_EMAIL_FROM}>`
+  const fromHeader = formatFromHeader(fromName, SEND_EMAIL_FROM)
   const clientLabel = client.company_name || client.name || 'your account'
   const amountLabel = formatMoneyLabel(total_due)
-  const subject = `Statement — ${clientLabel}${amountLabel ? ` — ${amountLabel} due` : ''}`
-  const safeRecipientName = (recipient_name || client.company_name || client.name || '').trim()
+  const subject = `Statement for ${clientLabel}${amountLabel ? ` (${amountLabel} due)` : ''}`
+  // Optional fields read through textField so a non string value from a
+  // malformed client falls back to the default instead of throwing.
+  const safeRecipientName = textField(recipient_name) || textField(client.company_name) || textField(client.name)
   const greeting = safeRecipientName ? `Hi ${safeRecipientName.split(/\s+/)[0]},` : 'Hi,'
   const senderLine = companyName || 'Your contractor'
   const payLink = (profile?.payment_link || '').trim()
@@ -139,11 +153,11 @@ export default async (request) => {
     '',
     'Reply directly to this email with any questions or to confirm payment.',
     '',
-    `— ${senderLine}`
+    senderLine
   ].join('\n')
 
   const html = renderStatementHtml({ greeting, clientLabel, amountLabel, senderLine, payLink, payInstructions })
-  const safeFilename = (filename || `statement-${client.id}.pdf`).replace(/[^a-z0-9._-]/gi, '_')
+  const safeFilename = (textField(filename) || `statement-${client.id}.pdf`).replace(/[^a-z0-9._-]/gi, '_')
 
   // 5. Send via Resend.
   const resendPayload = {
@@ -202,7 +216,7 @@ function renderStatementHtml({ greeting, clientLabel, amountLabel, senderLine, p
         ${payRow}
         <tr><td>
           <p style="margin:0 0 16px;color:#5C5C5C;">Reply directly to this email with any questions or to confirm payment.</p>
-          <p style="margin:24px 0 0;">— ${safe(senderLine)}</p>
+          <p style="margin:24px 0 0;">From ${safe(senderLine)}</p>
         </td></tr>
       </table>
     </td></tr>
@@ -223,8 +237,11 @@ function corsHeaders() {
   }
 }
 
+// The app shows `detail` (then the error code) when a send fails, so a
+// plain `message` is mirrored into `detail` for the person reading it.
 function json(obj, status = 200) {
-  return new Response(JSON.stringify(obj), {
+  const body = obj && obj.message && !obj.detail ? { ...obj, detail: obj.message } : obj
+  return new Response(JSON.stringify(body), {
     status,
     headers: { 'Content-Type': 'application/json', ...corsHeaders() }
   })

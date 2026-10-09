@@ -1,14 +1,15 @@
 // Netlify Function — Remove (revoke) an org member.
-// POST /api/org-member-remove  { member_user_id }
+// POST /api/org-member-remove  { member_user_id, org_id? }
 // Authorization: Bearer <supabase access token>
 //
 // Owner/admin only. Sets revoked_at on the member row. Guards:
-//   - target must be in the caller's org
+//   - target must be in the caller's org (org_id, see lib/membership.js)
 //   - you can't remove someone whose role is >= your own tier
 //   - you can't remove the last remaining owner
 //   - you can't remove yourself here (use leave/delete-account)
 
 import { createClient } from '@supabase/supabase-js'
+import { resolveCallerMembership } from './lib/membership.js'
 
 const ROLE_TIER = { crew: 0, foreman: 1, manager: 2, admin: 3, owner: 4 }
 
@@ -41,10 +42,9 @@ export default async (request) => {
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { autoRefreshToken: false, persistSession: false } })
 
-  const { data: myMember } = await admin
-    .from('org_members').select('org_id, role').eq('user_id', authUserId).is('revoked_at', null)
-    .order('joined_at', { ascending: false }).limit(1).maybeSingle()
-  if (!myMember) return json({ error: 'no_membership' }, 403)
+  const resolved = await resolveCallerMembership(admin, authUserId, body)
+  if (!resolved.membership) return json({ error: resolved.error, message: resolved.message }, resolved.status)
+  const myMember = resolved.membership
   if (!['owner', 'admin'].includes(myMember.role)) return json({ error: 'insufficient_role' }, 403)
 
   const { data: target } = await admin
@@ -65,7 +65,10 @@ export default async (request) => {
   const { error: updErr } = await admin
     .from('org_members').update({ revoked_at: new Date().toISOString() })
     .eq('id', target.id).eq('org_id', myMember.org_id)
-  if (updErr) return json({ error: 'remove_failed', message: updErr.message }, 500)
+  if (updErr) {
+    console.error('[org-member-remove] update failed', updErr)
+    return json({ error: 'remove_failed', message: 'Could not remove this member. Try again.' }, 500)
+  }
 
   return json({ ok: true })
 }

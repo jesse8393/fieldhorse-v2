@@ -3,9 +3,28 @@
 // All four endpoints accept POST + JSON body. Authenticated endpoints
 // pull the supabase session at call time so the JWT is fresh after
 // long idle.
+//
+// Workspace: every member and timesheet call sends org_id for the
+// workspace the app is showing, so the server acts on that org and
+// refuses with 403 when the caller is no longer an active member of it
+// (netlify/functions/lib/membership.js). MembershipContext owns the
+// choice and hands it over through setOrgApiOrgId. Until it has, no
+// org_id is sent and the server falls back to the caller's owner
+// membership, then the newest one.
 
 import { supabase } from './supabase.ts'
 import type { OrgRole } from './permissions.ts'
+
+let currentOrgId: string | null = null
+
+/** Set the workspace the org-* calls act on; null clears it (sign out). */
+export function setOrgApiOrgId(orgId: string | null): void {
+  currentOrgId = orgId || null
+}
+
+function withOrg(body: Record<string, unknown>): Record<string, unknown> {
+  return currentOrgId ? { ...body, org_id: currentOrgId } : body
+}
 
 export type OrgInviteInfo = {
   email: string
@@ -95,30 +114,30 @@ export function orgInviteAccept(
 }
 
 export function orgMembersList(): Promise<{ ok: true } & OrgMembersListResponse> {
-  return callJson('/api/org-members-list', {})
+  return callJson('/api/org-members-list', withOrg({}))
 }
 
 export function orgInviteCreate(
   email: string,
   role: OrgRole,
 ): Promise<{ ok: true; id: string; token: string; accept_url: string; expires_at: string | null }> {
-  return callJson('/api/org-invite-create', { email, role })
+  return callJson('/api/org-invite-create', withOrg({ email, role }))
 }
 
 export function orgInviteRevoke(inviteId: string): Promise<{ ok: true }> {
-  return callJson('/api/org-invite-revoke', { invite_id: inviteId })
+  return callJson('/api/org-invite-revoke', withOrg({ invite_id: inviteId }))
 }
 
 export function orgMemberRemove(memberUserId: string): Promise<{ ok: true }> {
-  return callJson('/api/org-member-remove', { member_user_id: memberUserId })
+  return callJson('/api/org-member-remove', withOrg({ member_user_id: memberUserId }))
 }
 
 export function orgMemberRole(memberUserId: string, role: OrgRole): Promise<{ ok: true; role: OrgRole }> {
-  return callJson('/api/org-member-role', { member_user_id: memberUserId, role })
+  return callJson('/api/org-member-role', withOrg({ member_user_id: memberUserId, role }))
 }
 
 export function orgMemberRate(memberUserId: string, rate: number | null): Promise<{ ok: true; rate: number | null }> {
-  return callJson('/api/org-member-rate', { member_user_id: memberUserId, rate })
+  return callJson('/api/org-member-rate', withOrg({ member_user_id: memberUserId, rate }))
 }
 
 // ────────────────────────────────────────────────────────────
@@ -143,18 +162,28 @@ export type PendingPunch = {
   flag_reason: string | null
   /** Zero-length shift (out <= in), not approvable payroll. */
   invalid?: boolean
+  /** The caller's own punch; only an owner may approve it. */
+  is_self?: boolean
 }
 
 export function orgTimesheetsList(
   opts: { from?: string; to?: string } = {},
 ): Promise<{ ok: true; caller_role: OrgRole; org_id: string; punches: PendingPunch[] }> {
-  return callJson('/api/org-timesheets-list', opts)
+  return callJson('/api/org-timesheets-list', withOrg({ ...opts }))
 }
 
 export function orgPunchApprove(
   punchIds: string[],
-): Promise<{ ok: true; approved_count: number; approved_ids: string[] }> {
-  return callJson('/api/org-punch-approve', { punch_ids: punchIds })
+): Promise<{
+  ok: true
+  approved_count: number
+  approved_ids: string[]
+  /** Zero-length shifts the server refused to approve. */
+  skipped_ids?: string[]
+  /** The caller's own punches, left for another approver unless the caller is an owner. */
+  self_skipped?: string[]
+}> {
+  return callJson('/api/org-punch-approve', withOrg({ punch_ids: punchIds }))
 }
 
 export function orgPunchFlag(
@@ -162,5 +191,5 @@ export function orgPunchFlag(
   flagged: boolean,
   flagReason?: string,
 ): Promise<{ ok: true; count: number; ids: string[] }> {
-  return callJson('/api/org-punch-flag', { punch_ids: punchIds, flagged, flag_reason: flagReason })
+  return callJson('/api/org-punch-flag', withOrg({ punch_ids: punchIds, flagged, flag_reason: flagReason }))
 }
