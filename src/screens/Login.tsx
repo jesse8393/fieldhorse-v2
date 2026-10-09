@@ -179,7 +179,7 @@ export default function Login() {
       >
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: 24, letterSpacing: 0, lineHeight: 1 }}>
-            <span style={{ color: 'var(--v3-primary)' }}>FIELD</span>
+            <span style={{ color: 'var(--v3-primary-text)' }}>FIELD</span>
             <span style={{ color: 'var(--v3-text)' }}>HORSE</span>
           </div>
           <h1
@@ -228,7 +228,7 @@ export default function Login() {
           />
 
           {!isSupabaseConfigured && (
-            <p role="alert" style={{ margin: 0, fontSize: 12, color: 'var(--v3-danger-bright)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}>
+            <p role="alert" style={{ margin: 0, fontSize: 12, color: 'var(--v3-danger-text)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}>
               Local Supabase env is missing. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env.local, then restart Vite.
             </p>
           )}
@@ -251,7 +251,7 @@ export default function Login() {
                   width: '100%',
                   padding: '12px 12px 12px 32px',
                   borderRadius: 10,
-                  background: '#141414',
+                  background: 'var(--v3-bg)',
                   border: '1px solid var(--v3-border-strong)',
                   color: 'var(--v3-text)',
                   fontSize: 14,
@@ -281,7 +281,7 @@ export default function Login() {
                   width: '100%',
                   padding: '12px 12px 12px 32px',
                   borderRadius: 10,
-                  background: '#141414',
+                  background: 'var(--v3-bg)',
                   border: '1px solid var(--v3-border-strong)',
                   color: 'var(--v3-text)',
                   fontSize: 14,
@@ -294,7 +294,7 @@ export default function Login() {
           </label>
 
           {error && (
-            <p role="alert" style={{ margin: 0, fontSize: 12, color: 'var(--v3-danger-bright)', fontFamily: 'var(--font-body)' }}>
+            <p role="alert" style={{ margin: 0, fontSize: 12, color: 'var(--v3-danger-text)', fontFamily: 'var(--font-body)' }}>
               {error}
             </p>
           )}
@@ -303,7 +303,7 @@ export default function Login() {
               live region added together with its text is often skipped. */}
           <p role="status" style={SR_ONLY}>{notice}</p>
           {notice && (
-            <p aria-hidden="true" style={{ margin: 0, fontSize: 12, color: 'var(--v3-success-bright)', fontFamily: 'var(--font-body)' }}>
+            <p aria-hidden="true" style={{ margin: 0, fontSize: 12, color: 'var(--v3-success-text)', fontFamily: 'var(--font-body)' }}>
               {notice}
             </p>
           )}

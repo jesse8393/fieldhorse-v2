@@ -23,9 +23,9 @@ type EyebrowTone = 'default' | 'gold' | 'alert' | 'success'
 
 const TONE_COLOR: Record<EyebrowTone, string> = {
   default: 'var(--v3-text-muted)',
-  gold:    'var(--v3-primary)',
-  alert:   'var(--v3-danger-bright)',
-  success: 'var(--v3-success-bright)'
+  gold:    'var(--v3-primary-text)',
+  alert:   'var(--v3-danger-text)',
+  success: 'var(--v3-success-text)'
 }
 
 type EyebrowProps = HTMLAttributes<HTMLElement> & {

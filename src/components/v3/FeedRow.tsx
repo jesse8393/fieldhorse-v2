@@ -12,8 +12,8 @@ const ICONS: Record<string, import('react').ComponentType<any>> = {
 }
 const TONE: Record<string, { color: string; bg: string }> = {
   'crew-on-site': { color: 'var(--v3-stage-active)', bg: 'rgba(45, 122, 79, 0.14)' },
-  'photos':       { color: 'var(--v3-primary)',      bg: 'var(--v3-primary-soft)' },
-  'invoice':      { color: 'var(--v3-primary)',      bg: 'var(--v3-primary-soft)' },
+  'photos':       { color: 'var(--v3-primary-text)',      bg: 'var(--v3-primary-soft)' },
+  'invoice':      { color: 'var(--v3-primary-text)',      bg: 'var(--v3-primary-soft)' },
   'note':         { color: 'var(--v3-text-muted)',   bg: 'var(--v3-glass-tint)' },
   default:        { color: 'var(--v3-text-muted)',   bg: 'var(--v3-glass-tint)' }
 }

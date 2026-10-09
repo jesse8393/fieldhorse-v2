@@ -120,7 +120,7 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
           color: 'var(--v3-text-muted)', fontVariantNumeric: 'tabular-nums'
         }}>
           Total{' '}
-          <strong style={{ color: 'var(--v3-primary)', fontWeight: 700 }}>
+          <strong style={{ color: 'var(--v3-primary-text)', fontWeight: 700 }}>
             {money(total)}
           </strong>
         </span>
@@ -147,7 +147,7 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
           </div>
           <span style={{
             fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
-            color: 'var(--v3-primary)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap'
+            color: 'var(--v3-primary-text)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap'
           }}>
             {money(crewLabor.cost)}
           </span>
@@ -163,7 +163,7 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
           padding: '12px 16px', borderRadius: 10,
           background: 'var(--v3-surface-2)',
           border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
-          color: 'var(--v3-primary)',
+          color: 'var(--v3-primary-text)',
           fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
           letterSpacing: 0, cursor: 'pointer',
           WebkitTapHighlightColor: 'transparent'
@@ -202,7 +202,7 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
                 <span aria-hidden="true" style={{
                   flexShrink: 0, width: 32, height: 32, borderRadius: 10,
                   background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)',
-                  color: 'var(--v3-primary)',
+                  color: 'var(--v3-primary-text)',
                   display: 'grid', placeItems: 'center'
                 }}>
                   <Receipt size={14} />

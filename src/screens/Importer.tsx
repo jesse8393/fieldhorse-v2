@@ -347,7 +347,7 @@ export default function Importer() {
         </div>
         <div
           aria-hidden="true"
-          style={{ flexShrink: 0, width: 44, height: 44, borderRadius: 10, border: '1px solid rgba(201,150,58,0.3)', background: 'rgba(201,150,58,0.1)', display: 'grid', placeItems: 'center', color: 'var(--field-gold-bright)' }}
+          style={{ flexShrink: 0, width: 44, height: 44, borderRadius: 10, border: '1px solid rgba(201,150,58,0.3)', background: 'rgba(201,150,58,0.1)', display: 'grid', placeItems: 'center', color: 'var(--v3-primary-text)' }}
         >
           <FileSpreadsheet size={20} />
         </div>
@@ -400,7 +400,7 @@ export default function Importer() {
                   borderRadius: 10,
                   border: on ? '1px solid rgba(201,150,58,0.4)' : '1px solid var(--rule)',
                   background: on ? 'rgba(201,150,58,0.14)' : 'var(--surface-2)',
-                  color: on ? 'var(--field-gold-bright)' : 'var(--ink-muted)',
+                  color: on ? 'var(--v3-primary-text)' : 'var(--ink-muted)',
                   fontFamily: 'var(--font-body)',
                   fontSize: 12,
                   fontWeight: 700,
@@ -431,7 +431,7 @@ export default function Importer() {
             textAlign: 'center'
           }}
         >
-          <div style={{ width: 48, height: 48, borderRadius: 10, background: 'rgba(201,150,58,0.15)', border: '1px solid rgba(201,150,58,0.35)', display: 'grid', placeItems: 'center', color: 'var(--field-gold-bright)' }}>
+          <div style={{ width: 48, height: 48, borderRadius: 10, background: 'rgba(201,150,58,0.15)', border: '1px solid rgba(201,150,58,0.35)', display: 'grid', placeItems: 'center', color: 'var(--v3-primary-text)' }}>
             <Upload size={22} />
           </div>
           <span style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, color: 'var(--ink-strong)' }}>
@@ -485,7 +485,7 @@ export default function Importer() {
                   <div key={f.key} style={{ display: 'grid', gridTemplateColumns: '96px 1fr', gap: 8, alignItems: 'center' }}>
                     <span style={{
                       fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600,
-                      color: unmapped && f.required ? 'var(--alert-red)' : 'var(--ink-strong)'
+                      color: unmapped && f.required ? 'var(--v3-danger-text)' : 'var(--ink-strong)'
                     }}>
                       {f.label}{f.required ? ' *' : ''}
                     </span>
@@ -609,7 +609,7 @@ export default function Importer() {
                 borderRadius: 10,
                 background: done.err ? 'rgba(192,57,43,0.12)' : 'rgba(45,122,79,0.14)',
                 border: done.err ? '1px solid rgba(192,57,43,0.35)' : '1px solid rgba(45,122,79,0.35)',
-                color: done.err ? 'var(--alert-red)' : 'var(--signal-green)',
+                color: done.err ? 'var(--v3-danger-text)' : 'var(--v3-success-text)',
                 fontFamily: 'var(--font-body)',
                 fontSize: 14,
                 fontWeight: 600
@@ -670,7 +670,7 @@ export default function Importer() {
                   type="button"
                   onClick={copyWebhook}
                   aria-label="Copy intake link"
-                  style={{ width: 30, height: 30, borderRadius: 10, border: 'none', background: 'transparent', color: copiedWebhook ? 'var(--signal-green)' : 'var(--ink-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}
+                  style={{ width: 30, height: 30, borderRadius: 10, border: 'none', background: 'transparent', color: copiedWebhook ? 'var(--v3-success-text)' : 'var(--ink-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}
                 >
                   {copiedWebhook ? <Check size={14} /> : <Copy size={14} />}
                 </button>

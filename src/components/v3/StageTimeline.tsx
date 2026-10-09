@@ -28,7 +28,7 @@ export default function StageTimeline({ currentStage }: { currentStage?: string 
         borderRadius: 10,
         background: 'rgba(192, 57, 43, 0.10)',
         border: '1px solid rgba(192, 57, 43, 0.32)',
-        color: '#C9963A',
+        color: 'var(--v3-primary-text)',
         fontFamily: 'var(--font-body)',
         fontSize: 12,
         fontWeight: 700,
@@ -107,7 +107,7 @@ export default function StageTimeline({ currentStage }: { currentStage?: string 
         const isCurrent = i === safeIdx
         const isFuture = i > safeIdx
         const labelColor = isCurrent
-          ? 'var(--v3-primary)'
+          ? 'var(--v3-primary-text)'
           : isComplete
             ? 'var(--v3-text)'
             : 'var(--v3-text-muted)'
@@ -124,7 +124,7 @@ export default function StageTimeline({ currentStage }: { currentStage?: string 
         } : isComplete ? {
           background: 'var(--v3-primary-soft)',
           border: '1px solid color-mix(in srgb, var(--v3-primary) 32%, transparent)',
-          color: 'var(--v3-primary)',
+          color: 'var(--v3-primary-text)',
           boxShadow: 'none'
         } : {
           background: 'var(--v3-surface-2)',

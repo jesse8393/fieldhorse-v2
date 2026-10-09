@@ -636,7 +636,7 @@ export default function Settings() {
                 display: 'grid', placeItems: 'center',
                 background: quoteFollowUpEnabled ? 'var(--v3-primary-soft)' : 'var(--v3-surface-2)',
                 border: '1px solid var(--v3-border-strong)',
-                color: quoteFollowUpEnabled ? 'var(--v3-primary)' : 'var(--v3-text-muted)'
+                color: quoteFollowUpEnabled ? 'var(--v3-primary-text)' : 'var(--v3-text-muted)'
               }}>
                 <CalendarClock size={16} />
               </span>
@@ -724,7 +724,7 @@ export default function Settings() {
                   borderRadius: 10,
                   border: isOn ? '1px solid rgba(201,150,58,0.4)' : '1px solid var(--rule)',
                   background: isOn ? 'rgba(201,150,58,0.14)' : 'var(--surface-2)',
-                  color: isOn ? 'var(--field-gold-bright)' : 'var(--ink-muted)',
+                  color: isOn ? 'var(--v3-primary-text)' : 'var(--ink-muted)',
                   fontFamily: 'var(--font-body)',
                   fontSize: 12,
                   fontWeight: 700,
@@ -794,7 +794,7 @@ export default function Settings() {
             type="button"
             whileTap={{ scale: 0.97 }}
             onClick={pinLocation}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 12px', borderRadius: 10, background: 'rgba(201,150,58,0.08)', border: '1px solid rgba(201,150,58,0.25)', color: 'var(--field-gold-bright)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 12px', borderRadius: 10, background: 'rgba(201,150,58,0.08)', border: '1px solid rgba(201,150,58,0.25)', color: 'var(--v3-primary-text)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
           >
             <MapPin size={16} />
             {profile?.location_lat ? 'Repin' : 'Pin location'}
@@ -821,7 +821,7 @@ export default function Settings() {
               border: theme === 'light'
                 ? '1px solid color-mix(in srgb, var(--v3-primary) 40%, transparent)'
                 : '1px solid var(--v3-border-strong)',
-              color: theme === 'light' ? 'var(--v3-primary)' : 'var(--v3-text-muted)'
+              color: theme === 'light' ? 'var(--v3-primary-text)' : 'var(--v3-text-muted)'
             }}>
               <SunMedium size={16} />
             </span>
@@ -866,7 +866,7 @@ export default function Settings() {
               type="button"
               whileTap={{ scale: 0.97 }}
               onClick={handleSignOut} className="fh-press-instant"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 10, background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--alert-red)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 10, background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--v3-danger-text)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
             >
               <LogOut size={14} />
               Sign out
@@ -894,7 +894,7 @@ export default function Settings() {
                 whileTap={{ scale: 0.97 }}
                 onClick={() => setConfirmWipe(true)} className="fh-press-instant"
                 disabled={wiping}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 12px', borderRadius: 10, background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--alert-red)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 12px', borderRadius: 10, background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--v3-danger-text)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
               >
                 <Trash2 size={14} />
                 Remove sample data
@@ -921,7 +921,7 @@ export default function Settings() {
               </div>
             )}
             {wipeResult && (
-              <p style={{ margin: '10px 0 0', color: wipeResult.startsWith("Couldn't") ? 'var(--alert-red)' : 'var(--signal-green)', fontSize: 12, fontFamily: 'var(--font-body)' }}>
+              <p style={{ margin: '10px 0 0', color: wipeResult.startsWith("Couldn't") ? 'var(--v3-danger-text)' : 'var(--v3-success-text)', fontSize: 12, fontFamily: 'var(--font-body)' }}>
                 {wipeResult}
               </p>
             )}
@@ -1096,7 +1096,7 @@ function PushRow({ userId }: { userId?: string }) {
           display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 10,
           background: enabled ? 'var(--v3-surface-2)' : 'var(--v3-primary-soft)',
           border: enabled ? '1px solid var(--v3-border-strong)' : '1px solid color-mix(in srgb, var(--v3-primary) 40%, transparent)',
-          color: enabled ? 'var(--v3-text-muted)' : 'var(--v3-primary)',
+          color: enabled ? 'var(--v3-text-muted)' : 'var(--v3-primary-text)',
           fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, cursor: 'pointer',
           opacity: busy ? 0.6 : 1
         }}
@@ -1155,7 +1155,7 @@ function DeleteAccountRow({ onDone }: { onDone: () => void }) {
 
   return (
     <div style={{ marginTop: 10, padding: '12px', borderRadius: 10, background: 'rgba(192,57,43,0.08)', border: '1px solid rgba(192,57,43,0.35)' }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--alert-red)', marginBottom: 4 }}>Permanently delete your account</div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--v3-danger-text)', marginBottom: 4 }}>Permanently delete your account</div>
       <p style={{ margin: '0 0 10px', fontSize: 12, color: 'var(--ink-muted)', lineHeight: 1.5 }}>
         This closes your login and erases your personal data. If you run Fieldhorse alone, every contact, job, quote, invoice, payment, photo, and file is erased too. If you work on a team, the records you created stay with the team and pass to an owner. The only owner of a team has to make someone else an owner first. It can't be undone. Type <strong>DELETE</strong> to confirm.
       </p>
@@ -1170,7 +1170,7 @@ function DeleteAccountRow({ onDone }: { onDone: () => void }) {
       />
       <div style={{ display: 'flex', gap: 8 }}>
         <button type="button" onClick={() => { setOpen(false); setConfirmText('') }} disabled={busy} style={{ flex: 1, padding: '12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Cancel</button>
-        <button type="button" onClick={doDelete} disabled={busy || confirmText.trim().toUpperCase() !== 'DELETE'} style={{ flex: 1, padding: '12px', borderRadius: 10, background: 'rgba(192,57,43,0.16)', border: '1px solid rgba(192,57,43,0.5)', color: 'var(--alert-red)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, cursor: 'pointer', opacity: busy || confirmText.trim().toUpperCase() !== 'DELETE' ? 0.5 : 1 }}>
+        <button type="button" onClick={doDelete} disabled={busy || confirmText.trim().toUpperCase() !== 'DELETE'} style={{ flex: 1, padding: '12px', borderRadius: 10, background: 'rgba(192,57,43,0.16)', border: '1px solid rgba(192,57,43,0.5)', color: 'var(--v3-danger-text)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, cursor: 'pointer', opacity: busy || confirmText.trim().toUpperCase() !== 'DELETE' ? 0.5 : 1 }}>
           {busy ? 'Deleting…' : 'Delete forever'}
         </button>
       </div>
@@ -1180,7 +1180,7 @@ function DeleteAccountRow({ onDone }: { onDone: () => void }) {
 
 function Section({ variants, title, sub, meta, metaTone, children }: any) {
   const metaBg = metaTone === 'red'
-    ? { background: 'var(--v3-danger-soft)', border: '1px solid color-mix(in srgb, var(--v3-danger) 40%, transparent)', color: 'var(--v3-danger-bright)' }
+    ? { background: 'var(--v3-danger-soft)', border: '1px solid color-mix(in srgb, var(--v3-danger) 40%, transparent)', color: 'var(--v3-danger-text)' }
     : { background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)', color: 'var(--v3-text-muted)' }
   return (
     <motion.section
@@ -1338,7 +1338,7 @@ function EstimateTemplatePicker({ value, onChange }: any) {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>{t.name}</span>
-              {on && <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, color: 'var(--v3-primary, #C9963A)' }}>SELECTED</span>}
+              {on && <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, color: 'var(--v3-primary-text)' }}>SELECTED</span>}
             </div>
             <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, lineHeight: 1.4, color: 'var(--ink-muted)' }}>{t.blurb}</span>
           </button>

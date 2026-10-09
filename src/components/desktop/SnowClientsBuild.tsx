@@ -294,7 +294,7 @@ export default function SnowClientsBuild(props: Props) {
                   <strong className="fh-build-truncate" title={r.name}>{r.name || 'Unnamed'}</strong>
                   <span className={`fh-build-dot is-${status.tone}`}>{status.label}</span>
                   <span className="fh-build-rel">{relTime(r.last_activity_at)}</span>
-                  <span className="fh-build-num" style={{ color: outstanding > 0 ? 'var(--v3-primary, #c9963a)' : undefined, fontWeight: outstanding > 0 ? 700 : 500 }}>
+                  <span className="fh-build-num" style={{ color: outstanding > 0 ? 'var(--v3-primary-text)' : undefined, fontWeight: outstanding > 0 ? 700 : 500 }}>
                     {outstanding > 0 ? moneyFull(outstanding) : '\u2003'}
                   </span>
                   <span className="fh-build-num">{activeCount}</span>
@@ -326,7 +326,7 @@ export default function SnowClientsBuild(props: Props) {
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Needs follow up</div>
-              <strong style={{ color: needsFollowUp > 0 ? 'var(--v3-primary-bright)' : undefined }}>{needsFollowUp}</strong>
+              <strong style={{ color: needsFollowUp > 0 ? 'var(--v3-primary-text)' : undefined }}>{needsFollowUp}</strong>
               <span>cooled 30+ days</span>
               {needsFollowUp > 0 && <div className="fh-build-spark is-gold" />}
             </section>

@@ -699,7 +699,7 @@ function QuoteViewToggle({ value, onChange }: any) {
               borderRadius: 10,
               border: 0,
               background: on ? 'var(--v3-primary-soft)' : 'transparent',
-              color: on ? 'var(--v3-primary)' : 'var(--v3-text-muted)',
+              color: on ? 'var(--v3-primary-text)' : 'var(--v3-text-muted)',
               fontFamily: 'var(--font-body)',
               fontSize: 12,
               fontWeight: 700,
@@ -902,7 +902,7 @@ function ClearDraftBand({ contact, baseCount, clearing, onClearDraft }: any) {
           borderRadius: 10,
           background: 'transparent',
           border: '1px solid color-mix(in srgb, var(--v3-danger-bright) 35%, transparent)',
-          color: 'var(--v3-danger-bright)',
+          color: 'var(--v3-danger-text)',
           fontFamily: 'var(--font-body)',
           fontSize: 12, fontWeight: 700, letterSpacing: 0,
           cursor: clearing ? 'not-allowed' : 'pointer',
@@ -1026,9 +1026,9 @@ function ContextCard({ contact, status }: any) {
         <span className="fh-quote-workspace__context-key">Status</span>
         <span
           className="fh-quote-workspace__context-val"
-          style={{ color: status?.tone === 'gold' ? 'var(--v3-primary)'
-            : status?.tone === 'good' ? 'var(--v3-good, #5C5C5C)'
-            : status?.tone === 'danger' ? 'var(--v3-danger-bright)'
+          style={{ color: status?.tone === 'gold' ? 'var(--v3-primary-text)'
+            : status?.tone === 'good' ? 'var(--v3-success-text)'
+            : status?.tone === 'danger' ? 'var(--v3-danger-text)'
             : 'var(--v3-text-muted)' }}
         >
           {status?.label || 'Draft'}
@@ -1067,7 +1067,7 @@ function ApproveBand({ contact, baseCount, busy, pastQuote = false, onOpenApprov
         background: 'rgba(192, 57, 43, 0.10)',
         border: '1px solid rgba(192, 57, 43, 0.40)'
       }}>
-        <span className="v3-eyebrow" style={{ color: 'var(--v3-danger-bright)' }}>
+        <span className="v3-eyebrow" style={{ color: 'var(--v3-danger-text)' }}>
           <PenLine size={11} aria-hidden="true" style={{ marginRight: 4, verticalAlign: 'middle' }} />
           Customer requested changes
         </span>
@@ -1104,11 +1104,11 @@ function ApproveBand({ contact, baseCount, busy, pastQuote = false, onOpenApprov
         border: '1px solid rgba(45, 122, 79, 0.40)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <ShieldCheck size={16} aria-hidden="true" style={{ color: 'var(--v3-good, #5C5C5C)' }} />
+          <ShieldCheck size={16} aria-hidden="true" style={{ color: 'var(--v3-success-text)' }} />
           <span style={{
             fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
             letterSpacing: 0, textTransform: 'uppercase',
-            color: 'var(--v3-good, #5C5C5C)'
+            color: 'var(--v3-success-text)'
           }}>
             {implicit ? 'Approved · job stage' : 'Quote approved'}
           </span>
@@ -1154,7 +1154,7 @@ function ApproveBand({ contact, baseCount, busy, pastQuote = false, onOpenApprov
       background: 'var(--v3-surface)',
       border: '1px solid var(--v3-border)'
     }}>
-      <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>
+      <span className="v3-eyebrow" style={{ color: 'var(--v3-primary-text)' }}>
         <Lock size={11} aria-hidden="true" style={{ marginRight: 4, verticalAlign: 'middle' }} />
         Approval
       </span>
@@ -1400,19 +1400,19 @@ function StatusPill({ status }: any) {
         return {
           bg: 'var(--v3-primary-soft)',
           border: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)',
-          color: 'var(--v3-primary)'
+          color: 'var(--v3-primary-text)'
         }
       case 'good':
         return {
           bg: 'rgba(45, 122, 79, 0.14)',
           border: 'rgba(45, 122, 79, 0.45)',
-          color: 'var(--v3-good, #5C5C5C)'
+          color: 'var(--v3-success-text)'
         }
       case 'danger':
         return {
           bg: 'rgba(192, 57, 43, 0.14)',
           border: 'rgba(192, 57, 43, 0.45)',
-          color: 'var(--v3-danger-bright, #C0392B)'
+          color: 'var(--v3-danger-text)'
         }
       default:
         return {

@@ -191,7 +191,7 @@ export default function HomeActivityCard() {
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 4,
             fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-            color: 'var(--v3-primary-bright)',
+            color: 'var(--v3-primary-text)',
             textDecoration: 'none', letterSpacing: 0
           }}
         >
@@ -209,9 +209,9 @@ function Row({ event, isLast }: any) {
   const Icon = event.icon
   const palette = ({
     neutral: { bg: 'var(--v3-glass-tint-2)', fg: 'var(--v3-text-muted)', br: 'var(--v3-border-mid)' },
-    gold:    { bg: 'color-mix(in srgb, var(--v3-primary) 14%, transparent)', fg: 'var(--v3-primary-bright)', br: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)' },
-    green:   { bg: 'rgba(45, 122, 79,0.10)', fg: 'var(--v3-success-bright, #2D7A4F)', br: 'rgba(45, 122, 79,0.30)' },
-    red:     { bg: 'rgba(192, 57, 43,0.10)', fg: 'var(--v3-danger-bright, #C0392B)', br: 'rgba(192, 57, 43,0.30)' }
+    gold:    { bg: 'color-mix(in srgb, var(--v3-primary) 14%, transparent)', fg: 'var(--v3-primary-text)', br: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)' },
+    green:   { bg: 'rgba(45, 122, 79,0.10)', fg: 'var(--v3-success-text)', br: 'rgba(45, 122, 79,0.30)' },
+    red:     { bg: 'rgba(192, 57, 43,0.10)', fg: 'var(--v3-danger-text)', br: 'rgba(192, 57, 43,0.30)' }
   } as Record<string, any>)[event.tone || 'neutral']
   const jobName = event.contact?.name || event.contact?.job_title || 'Unknown job'
 

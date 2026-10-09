@@ -17,8 +17,8 @@ const TRADES = [
 ]
 
 const RESULT_META: Record<string, any> = {
-  pass: { label: 'Pass', color: 'var(--v3-success-bright)', soft: 'var(--v3-success-soft)', icon: CheckCircle2 },
-  fail: { label: 'Fail', color: 'var(--v3-danger-bright)',  soft: 'var(--v3-danger-soft)',  icon: XCircle },
+  pass: { label: 'Pass', color: 'var(--v3-success-text)', soft: 'var(--v3-success-soft)', icon: CheckCircle2 },
+  fail: { label: 'Fail', color: 'var(--v3-danger-text)',  soft: 'var(--v3-danger-soft)',  icon: XCircle },
   na:   { label: 'N/A',  color: 'var(--v3-text-muted)',     soft: 'var(--v3-glass-tint)',   icon: MinusCircle }
 }
 

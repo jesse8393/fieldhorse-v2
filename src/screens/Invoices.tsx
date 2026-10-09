@@ -47,8 +47,8 @@ const SnowInvoices = lazy(() => import('../components/desktop/SnowInvoicesBuild.
 
 const AGING_BUCKETS = [
   { id: '0-30',  label: 'Current',  short: '0 to 30 d',  max: 30,        color: 'var(--v3-text-muted)',     accent: 'var(--v3-border-strong)' },
-  { id: '31-60', label: 'Late',     short: '31 to 60 d', max: 60,        color: 'var(--v3-primary)',         accent: 'color-mix(in srgb, var(--v3-primary) 40%, transparent)' },
-  { id: '60+',   label: 'Overdue',  short: '60+ d',   max: Infinity,  color: 'var(--v3-danger-bright)',   accent: 'color-mix(in srgb, var(--v3-danger) 50%, transparent)' }
+  { id: '31-60', label: 'Late',     short: '31 to 60 d', max: 60,        color: 'var(--v3-primary-text)',         accent: 'color-mix(in srgb, var(--v3-primary) 40%, transparent)' },
+  { id: '60+',   label: 'Overdue',  short: '60+ d',   max: Infinity,  color: 'var(--v3-danger-text)',   accent: 'color-mix(in srgb, var(--v3-danger) 50%, transparent)' }
 ]
 
 function bucketFor(days: any) {
@@ -732,8 +732,8 @@ export default function Invoices() {
                     {' · pace '}
                     <span style={{
                       color: collectionPace.deltaPct >= 0
-                        ? 'var(--v3-success-bright)'
-                        : 'var(--v3-danger-bright)',
+                        ? 'var(--v3-success-text)'
+                        : 'var(--v3-danger-text)',
                       fontWeight: 600
                     }}>
                       {collectionPace.deltaPct >= 0 ? '+' : ''}{collectionPace.deltaPct}%
@@ -1010,9 +1010,9 @@ function AgingBar({ totals }: any) {
    ============================================================ */
 const INVOICE_STATUS_META: Record<string, { label: string; color: string }> = {
   draft:   { label: 'Draft',   color: 'var(--v3-text-muted)' },
-  sent:    { label: 'Sent',    color: 'var(--v3-primary)' },
-  overdue: { label: 'Overdue', color: 'var(--v3-danger-bright)' },
-  paid:    { label: 'Paid',    color: 'var(--v3-success-bright, #2D7A4F)' },
+  sent:    { label: 'Sent',    color: 'var(--v3-primary-text)' },
+  overdue: { label: 'Overdue', color: 'var(--v3-danger-text)' },
+  paid:    { label: 'Paid',    color: 'var(--v3-success-text)' },
   void:    { label: 'Void',    color: 'var(--v3-text-muted)' }
 }
 
@@ -1200,7 +1200,7 @@ function PaymentCard({ row, onPDF, onPaid, onEmail, isSending, isSent }: any) {
               fontFamily: 'var(--font-display)',
               fontSize: 24,
               lineHeight: 1,
-              color: balance > 0 ? 'var(--v3-text)' : 'var(--v3-success-bright)',
+              color: balance > 0 ? 'var(--v3-text)' : 'var(--v3-success-text)',
               fontVariantNumeric: 'tabular-nums',
               textShadow: balance > 0 ? '0 1px 0 var(--v3-glass-tint-2)' : 'none'
             }}>

@@ -370,7 +370,7 @@ export default function Bid() {
             fontFamily: 'var(--font-body)',
             fontSize: 12, fontWeight: 700,
             letterSpacing: 0, textTransform: 'uppercase',
-            color: 'var(--v3-primary)',
+            color: 'var(--v3-primary-text)',
             display: 'inline-flex', alignItems: 'center', gap: 8
           }}>
             <Calculator size={11} aria-hidden="true" />
@@ -421,7 +421,7 @@ export default function Bid() {
               onClick={() => setPickerOpen((v) => !v)}
               style={{
                 background: 'transparent', border: 'none',
-                color: 'var(--v3-primary-bright)',
+                color: 'var(--v3-primary-text)',
                 fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
                 letterSpacing: 0, cursor: 'pointer', padding: 0
               }}
@@ -459,7 +459,7 @@ export default function Bid() {
                       padding: '8px 12px', borderRadius: 10,
                       background: 'color-mix(in srgb, var(--v3-primary) 14%, transparent)',
                       border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
-                      color: 'var(--v3-primary-bright)',
+                      color: 'var(--v3-primary-text)',
                       fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
                       letterSpacing: 0, cursor: 'pointer'
                     }}
@@ -475,7 +475,7 @@ export default function Bid() {
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                       background: 'transparent',
                       border: '1px solid rgba(192, 57, 43, 0.35)',
-                      color: 'var(--v3-danger-bright, #C0392B)', cursor: 'pointer'
+                      color: 'var(--v3-danger-text)', cursor: 'pointer'
                     }}
                   >
                     <Trash2 size={12} aria-hidden="true" />
@@ -596,7 +596,7 @@ export default function Bid() {
               <span style={{
                 fontFamily: 'var(--font-display)',
                 fontSize: 20,
-                color: 'var(--v3-primary)',
+                color: 'var(--v3-primary-text)',
                 fontVariantNumeric: 'tabular-nums'
               }}>
                 {marginPct}%
@@ -677,7 +677,7 @@ export default function Bid() {
               fontSize: 12,
               lineHeight: 1.5
             }}>
-              <div style={{ fontWeight: 700, color: 'var(--v3-danger-bright)', marginBottom: 4 }}>AI unavailable</div>
+              <div style={{ fontWeight: 700, color: 'var(--v3-danger-text)', marginBottom: 4 }}>AI unavailable</div>
               <div style={{ color: 'var(--v3-text-muted)', marginBottom: 10 }}>
                 {err}, your scope is preserved. Fill in line items manually if you need this estimate out the door.
               </div>
@@ -733,7 +733,7 @@ export default function Bid() {
             style={{ margin: '0 var(--v3-gutter) 28px' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
-              <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <span className="v3-eyebrow" style={{ color: 'var(--v3-primary-text)', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                 <Sparkles size={11} />
                 Recommended Price · {marginPct}% margin
               </span>
@@ -931,7 +931,7 @@ export default function Bid() {
                 background: 'var(--v3-danger-soft)',
                 border: '1px solid color-mix(in srgb, var(--v3-danger) 30%, transparent)'
               }}>
-                <span className="v3-eyebrow" style={{ color: 'var(--v3-danger-bright)' }}>Risks</span>
+                <span className="v3-eyebrow" style={{ color: 'var(--v3-danger-text)' }}>Risks</span>
                 <ul style={{ margin: '6px 0 0', paddingLeft: 16, color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 14, lineHeight: 1.55 }}>
                   {bid.risks.map((r: any, i: any) => <li key={i} style={{ marginBottom: 4 }}>{r}</li>)}
                 </ul>
@@ -961,7 +961,7 @@ export default function Bid() {
                 border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
                 display: 'grid',
                 placeItems: 'center',
-                color: 'var(--v3-primary)'
+                color: 'var(--v3-primary-text)'
               }}>
                 <FileText size={20} />
               </div>
@@ -969,7 +969,7 @@ export default function Bid() {
                 Your estimate will appear here.
               </div>
               <div style={{ fontSize: 12, lineHeight: 1.5 }}>
-                Describe the scope above, pick a job type and trades, then tap <strong style={{ color: 'var(--v3-primary)' }}>Generate Estimate</strong>.
+                Describe the scope above, pick a job type and trades, then tap <strong style={{ color: 'var(--v3-primary-text)' }}>Generate Estimate</strong>.
               </div>
             </div>
           </motion.div>

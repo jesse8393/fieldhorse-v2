@@ -257,14 +257,14 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-          <span aria-hidden="true" style={{ width: 32, height: 32, borderRadius: 10, display: 'grid', placeItems: 'center', background: start ? 'rgba(45, 122, 79,0.18)' : 'rgba(201,150,58,0.12)', border: start ? '1px solid rgba(45, 122, 79,0.35)' : '1px solid rgba(201,150,58,0.3)', color: start ? 'var(--signal-green)' : 'var(--field-gold-bright)' }}>
+          <span aria-hidden="true" style={{ width: 32, height: 32, borderRadius: 10, display: 'grid', placeItems: 'center', background: start ? 'rgba(45, 122, 79,0.18)' : 'rgba(201,150,58,0.12)', border: start ? '1px solid rgba(45, 122, 79,0.35)' : '1px solid rgba(201,150,58,0.3)', color: start ? 'var(--v3-success-text)' : 'var(--v3-primary-text)' }}>
             <Clock size={14} />
           </span>
           <div>
             <Eyebrow as="div" style={{ color: 'var(--ink-muted)' }}>
               Time on this job
             </Eyebrow>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, lineHeight: 1, marginTop: 4, color: start ? 'var(--signal-green)' : 'var(--ink-strong)' }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, lineHeight: 1, marginTop: 4, color: start ? 'var(--v3-success-text)' : 'var(--ink-strong)' }}>
               {start ? fmtElapsed(elapsedMs) : 'Not clocked in'}
             </div>
           </div>
@@ -312,7 +312,7 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
             </label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <Eyebrow style={{ color: 'var(--ink-muted)' }}>Billable</Eyebrow>
-              <span style={{ padding: '8px 12px', borderRadius: 10, border: '1px solid var(--rule)', background: 'var(--surface-2)', fontFamily: 'var(--font-display)', fontSize: 14, color: 'var(--field-gold-bright)' }}>
+              <span style={{ padding: '8px 12px', borderRadius: 10, border: '1px solid var(--rule)', background: 'var(--surface-2)', fontFamily: 'var(--font-display)', fontSize: 14, color: 'var(--v3-primary-text)' }}>
                 ${billablePreview.toLocaleString(undefined, { maximumFractionDigits: 2 })}
               </span>
             </div>
@@ -325,7 +325,7 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
             style={{ padding: '8px 12px', borderRadius: 10, border: '1px solid var(--rule)', background: 'var(--surface-2)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, boxSizing: 'border-box' }}
           />
           {hoursPreview < 0.05 && (
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--field-gold-bright)' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--v3-primary-text)' }}>
               <AlertTriangle size={11} /> Less than 3 minutes, sure?
             </div>
           )}

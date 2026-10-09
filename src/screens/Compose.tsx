@@ -408,7 +408,7 @@ export default function Compose() {
                 fontSize: 12,
                 lineHeight: 1.5
               }}>
-                <div style={{ fontWeight: 700, color: 'var(--v3-danger-bright)', marginBottom: 4 }}>AI unavailable</div>
+                <div style={{ fontWeight: 700, color: 'var(--v3-danger-text)', marginBottom: 4 }}>AI unavailable</div>
                 <div style={{ color: 'var(--v3-text-muted)', marginBottom: 10 }}>{error}</div>
                 <button
                   type="button"
@@ -694,7 +694,7 @@ export default function Compose() {
               lineHeight: 1.5
             }}>
               The draft will appear here. Pick a channel + intent above, then tap{' '}
-              <strong style={{ color: 'var(--v3-primary)' }}>Generate draft</strong>.
+              <strong style={{ color: 'var(--v3-primary-text)' }}>Generate draft</strong>.
             </div>
           </motion.div>
         )}
@@ -733,7 +733,7 @@ function ContextChip({ children, tone = 'default' }: any) {
       border: `1px solid ${isGold
         ? 'color-mix(in srgb, var(--v3-primary) 32%, transparent)'
         : 'var(--v3-border)'}`,
-      color: isGold ? 'var(--v3-primary)' : 'var(--v3-text)',
+      color: isGold ? 'var(--v3-primary-text)' : 'var(--v3-text)',
       fontFamily: 'var(--font-body)',
       fontSize: 12,
       fontWeight: 600,
@@ -809,7 +809,8 @@ function SmsHero({ draft, contact }: any) {
           width: 32, height: 32, borderRadius: 10,
           background: 'linear-gradient(135deg, #141414, #141414)',
           border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
-          color: 'var(--v3-primary)',
+          // The tile stays onyx in both themes, so its ink stays pure gold.
+          color: 'var(--gold)',
           fontFamily: 'var(--font-display)', fontSize: 12,
           display: 'grid', placeItems: 'center',
           flexShrink: 0

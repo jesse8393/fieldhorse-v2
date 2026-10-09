@@ -506,7 +506,7 @@ function SuccessPane({ readyUrl, sendFallbackReason, recipientEmail, copied, onC
             padding: '12px 12px', borderRadius: 10,
             background: copied ? 'rgba(45,122,79,0.14)' : 'var(--surface-2)',
             border: copied ? '1px solid rgba(45,122,79,0.4)' : '1px solid var(--rule)',
-            color: copied ? 'var(--signal-green)' : 'var(--ink-strong)',
+            color: copied ? 'var(--v3-success-text)' : 'var(--ink-strong)',
             fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: 0,
             cursor: 'pointer'
           }}

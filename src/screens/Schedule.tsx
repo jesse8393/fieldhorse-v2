@@ -602,7 +602,7 @@ export default function Schedule() {
 // over a small uppercase label. Tone "gold" for the primary today figure,
 // "muted" for secondary reads.
 function SummaryStat({ label, value, tone = 'muted' }: any) {
-  const valueColor = tone === 'gold' ? 'var(--v3-primary)' : 'var(--v3-text)'
+  const valueColor = tone === 'gold' ? 'var(--v3-primary-text)' : 'var(--v3-text)'
   return (
     <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 8 }}>
       <span style={{
@@ -768,7 +768,7 @@ function DayView({ events, now, onClick, onEdit, onDelete, onAdd }: any) {
               width: 72, height: 72, borderRadius: 10,
               background: 'linear-gradient(135deg, #141414, #141414)',
               border: '1px solid color-mix(in srgb, var(--v3-primary) 45%, transparent)',
-              color: 'var(--v3-primary-bright, var(--v3-primary))',
+              color: 'var(--gold)',
               display: 'grid', placeItems: 'center',
               boxShadow:
                 'inset 0 1px 0 rgba(201, 150, 58,0.22),' +
@@ -878,7 +878,7 @@ function DayView({ events, now, onClick, onEdit, onDelete, onAdd }: any) {
 const STATUS_TONE: Record<string, any> = {
   'On Site':     { color: 'var(--v3-stage-active)', soft: 'rgba(45, 122, 79, 0.16)',   border: 'rgba(45, 122, 79, 0.40)' },
   'In Progress': { color: 'var(--v3-stage-lead)',   soft: 'rgba(92, 92, 92, 0.14)', border: 'rgba(92, 92, 92, 0.40)' },
-  'Upcoming':    { color: 'var(--v3-primary)',      soft: 'var(--v3-primary-soft)',     border: 'var(--v3-border-gold)' },
+  'Upcoming':    { color: 'var(--v3-primary-text)',      soft: 'var(--v3-primary-soft)',     border: 'var(--v3-border-gold)' },
   'Scheduled':   { color: 'var(--v3-text-muted)',   soft: 'var(--v3-glass-tint)',       border: 'var(--v3-border-mid)' },
   'Done':        { color: 'var(--v3-text-faint)',   soft: 'var(--v3-glass-tint)',       border: 'var(--v3-border)' }
 }

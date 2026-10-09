@@ -75,7 +75,7 @@ export default function InvoiceSection({ contact, payments = [], changeOrders = 
           <div style={{
             fontFamily: 'var(--font-display)',
             fontSize: 24,
-            color: isClosed ? 'var(--v3-success-bright)' : 'var(--v3-primary)',
+            color: isClosed ? 'var(--v3-success-text)' : 'var(--v3-primary-text)',
             lineHeight: 1, letterSpacing: 0,
             fontVariantNumeric: 'tabular-nums'
           }}>
@@ -163,7 +163,7 @@ export default function InvoiceSection({ contact, payments = [], changeOrders = 
                   flexShrink: 0, width: 32, height: 32, borderRadius: 10,
                   background: 'rgba(45, 122, 79, 0.14)',
                   border: '1px solid color-mix(in srgb, var(--v3-success-bright) 30%, transparent)',
-                  color: 'var(--v3-success-bright)',
+                  color: 'var(--v3-success-text)',
                   display: 'grid', placeItems: 'center'
                 }}>
                   <DollarSign size={14} />

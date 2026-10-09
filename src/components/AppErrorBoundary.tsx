@@ -45,7 +45,9 @@ export default class AppErrorBoundary extends React.Component<{ children?: React
           display: 'grid',
           placeItems: 'center',
           background: '#141414',
-          color: 'var(--v3-text)',
+          // Always dark, so the ink is pinned to linen; the theme's ink
+          // turns onyx in daylight and would vanish here.
+          color: 'var(--linen)',
           fontFamily: 'DM Sans, system-ui, sans-serif'
         }}
       >

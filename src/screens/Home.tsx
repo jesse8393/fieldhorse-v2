@@ -301,7 +301,7 @@ export default function Home() {
           }}>
             {greetingPrefix().replace(',', '')},{' '}
             <span style={{
-              color: 'var(--v3-primary)',
+              color: 'var(--v3-primary-text)',
               letterSpacing: 0
             }}>{firstName}.</span>
           </h1>
@@ -357,7 +357,7 @@ export default function Home() {
               borderRadius: 'var(--v3-radius-btn)',
               background: 'var(--v3-primary-soft)',
               border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
-              color: 'var(--v3-primary)',
+              color: 'var(--v3-primary-text)',
               fontFamily: 'var(--font-body)',
               fontSize: 12,
               fontWeight: 600,
@@ -371,7 +371,7 @@ export default function Home() {
         )}
       </motion.div>
       {weatherErr && !hasCoords ? (
-        <div className="v3-caption" style={{ padding: '0 var(--v3-gutter) 12px', color: 'var(--v3-danger)' }}>
+        <div className="v3-caption" style={{ padding: '0 var(--v3-gutter) 12px', color: 'var(--v3-danger-text)' }}>
           {weatherErr}
         </div>
       ) : null}
@@ -491,7 +491,7 @@ export default function Home() {
             fontSize: 24,
             fontWeight: 700,
             letterSpacing: 0,
-            color: 'var(--v3-primary)',
+            color: 'var(--v3-primary-text)',
             fontVariantNumeric: 'tabular-nums',
             lineHeight: 1.0,
             whiteSpace: 'nowrap',
@@ -509,7 +509,7 @@ export default function Home() {
                   fontSize: 24,
                   fontWeight: 600,
                   marginRight: 1,
-                  color: 'color-mix(in srgb, var(--v3-primary) 70%, var(--v3-text-muted))',
+                  color: 'color-mix(in srgb, var(--v3-primary-text) 70%, var(--v3-text-muted))',
                   textShadow: 'none'
                 }}>
                   $
@@ -528,7 +528,7 @@ export default function Home() {
               fontSize: 12,
               fontWeight: 700,
               letterSpacing: 0,
-              color: trendUp ? 'var(--v3-success-bright)' : 'var(--v3-danger-bright)',
+              color: trendUp ? 'var(--v3-success-text)' : 'var(--v3-danger-text)',
               fontVariantNumeric: 'tabular-nums',
               lineHeight: 1
             }}>
@@ -907,7 +907,7 @@ function TodayOnSiteRow({ row, photoUrl, onTap }: any) {
           {row.title}
         </div>
         {stage && (
-          <Eyebrow as="div" style={{ marginTop: 3, color: stage.color }}>
+          <Eyebrow as="div" style={{ marginTop: 3, color: `color-mix(in srgb, ${stage.color} 55%, var(--v3-text) 45%)` }}>
             {stage.label}
           </Eyebrow>
         )}
@@ -999,7 +999,7 @@ function PipelineDealRow({ deal, photoUrl, onTap }: any) {
         }}>
           {deal.name}
         </div>
-        <Eyebrow as="div" style={{ marginTop: 4, color: stage.color }}>
+        <Eyebrow as="div" style={{ marginTop: 4, color: `color-mix(in srgb, ${stage.color} 55%, var(--v3-text) 45%)` }}>
           {stage.label}
         </Eyebrow>
       </div>
@@ -1030,15 +1030,15 @@ function PipelineDealRow({ deal, photoUrl, onTap }: any) {
    ============================================================ */
 
 const COMPACT_TONE: Record<string, any> = {
-  primary: { color: 'var(--v3-primary)' },
-  success: { color: 'var(--v3-success-bright)' },
-  danger:  { color: 'var(--v3-danger-bright)' },
-  // warn, bronze/amber from the stage-quote token; reads as "needs attention
-  // soon" without claiming the urgency of danger.
-  warn:    { color: 'var(--v3-stage-quote)' },
-  // lead, steel-blue from the stage-lead token; the closest token-native
-  // option to the mockup's lavender for the Quotes tile.
-  lead:    { color: 'var(--v3-stage-lead)' }
+  primary: { color: 'var(--v3-primary-text)' },
+  success: { color: 'var(--v3-success-text)' },
+  danger:  { color: 'var(--v3-danger-text)' },
+  // warn, text safe gold; reads as "needs attention soon" without
+  // claiming the urgency of danger.
+  warn:    { color: 'var(--v3-primary-text)' },
+  // lead, the muted neutral. Raw steel (the stage-lead token) measures
+  // 2.76:1 on onyx, too faint for a number.
+  lead:    { color: 'var(--v3-text-muted)' }
 }
 
 function CompactKpi({ tone = 'primary', value, label, subline, icon: Icon, isMoney, onTap }: any) {
@@ -1201,7 +1201,7 @@ function nextActionPath(action: any) {
 // and the small hairline sweep. Red urgency stays red, green stays green.
 const URGENCY_TONE: Record<string, any> = {
   danger:  { color: 'var(--v3-danger-bright)',  glow: 'rgba(192, 57, 43, 0.45)' },
-  warn:    { color: 'var(--v3-warn)',           glow: 'rgba(201, 150, 58, 0.40)' },
+  warn:    { color: 'var(--v3-primary-text)',   glow: 'rgba(201, 150, 58, 0.40)' },
   success: { color: 'var(--v3-success-bright)', glow: 'rgba(45, 122, 79, 0.40)' }
 }
 
@@ -1430,9 +1430,9 @@ function nameInitials(name: any) {
    ============================================================ */
 function PipelineBreakdownCell({ dotColor, label, count, tone, onClick }: any) {
   const valueColor = tone === 'success'
-    ? 'var(--v3-success-bright, #5C5C5C)'
+    ? 'var(--v3-success-text)'
     : tone === 'gold'
-      ? 'var(--v3-primary)'
+      ? 'var(--v3-primary-text)'
       : 'var(--v3-text)'
   return (
     <button

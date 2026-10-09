@@ -219,7 +219,7 @@ export default function SelectionsSection({ jobId, userId, clientId }: any) {
           fontFamily: 'var(--font-body)', fontSize: 14,
           border: '1px dashed var(--v3-border)', borderRadius: 10,
         }}>
-          <Palette size={18} aria-hidden="true" style={{ display: 'block', margin: '0 auto 8px', color: 'var(--v3-primary)' }} />
+          <Palette size={18} aria-hidden="true" style={{ display: 'block', margin: '0 auto 8px', color: 'var(--v3-primary-text)' }} />
           No selections yet. Add one for every finish the client needs to pick, tile, paint, fixtures, hardware.
         </div>
       ) : (
@@ -303,7 +303,7 @@ function SelectionCard({
             </p>
           )}
           {(row.due_at || overdue) && (
-            <div style={{ marginTop: 6, fontSize: 12, color: overdue ? 'var(--v3-danger-bright)' : 'var(--v3-text-muted)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <div style={{ marginTop: 6, fontSize: 12, color: overdue ? 'var(--v3-danger-text)' : 'var(--v3-text-muted)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
               {overdue && <AlertTriangle size={11} />}
               Due {fmtDate(row.due_at)} {overdue ? ': overdue' : ''}
             </div>
@@ -360,7 +360,7 @@ function SelectionCard({
                     {o.label}
                   </strong>
                   {o.price != null && (
-                    <span style={{ fontSize: 12, color: 'var(--v3-primary)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                    <span style={{ fontSize: 12, color: 'var(--v3-primary-text)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
                       {fmtMoney(o.price)}
                     </span>
                   )}
@@ -385,7 +385,7 @@ function SelectionCard({
                     Pick this
                   </button>
                 ) : (
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--v3-success-bright, #2D7A4F)', fontWeight: 700 }}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--v3-success-text)', fontWeight: 700 }}>
                     <Check size={12} aria-hidden="true" />
                     Picked
                     {row.decision_by && (
@@ -500,7 +500,7 @@ function SelectionComposer({
 
       <div style={{ borderTop: '1px solid var(--v3-glass-tint-2)', paddingTop: 12, marginTop: 4 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <span className="fh-build-eyebrow" style={{ color: 'var(--v3-primary)' }}>Options</span>
+          <span className="fh-build-eyebrow" style={{ color: 'var(--v3-primary-text)' }}>Options</span>
           <button type="button" onClick={addOpt} style={chipBtnGhost}><Plus size={11} /> Add option</button>
         </div>
         {options.map((o, idx) => (
@@ -513,7 +513,7 @@ function SelectionComposer({
             <input value={o.brand || ''} onChange={(e) => setOpt(idx, { brand: e.target.value })} placeholder="Brand" style={inputStyle} />
             <input value={o.sku || ''} onChange={(e) => setOpt(idx, { sku: e.target.value })} placeholder="SKU / model" style={inputStyle} />
             <input type="number" value={o.price ?? ''} onChange={(e) => setOpt(idx, { price: e.target.value === '' ? null : Number(e.target.value) })} placeholder="$" style={inputStyle} />
-            <button type="button" onClick={() => removeOpt(idx)} disabled={options.length === 1} aria-label="Remove option" style={{ ...iconBtnStyle, color: options.length === 1 ? 'var(--v3-text-muted)' : 'var(--v3-danger-bright)' }}>
+            <button type="button" onClick={() => removeOpt(idx)} disabled={options.length === 1} aria-label="Remove option" style={{ ...iconBtnStyle, color: options.length === 1 ? 'var(--v3-text-muted)' : 'var(--v3-danger-text)' }}>
               <X size={13} />
             </button>
           </div>
@@ -571,7 +571,7 @@ function OptionsEditor({
         <input value={room} onChange={(e) => setRoom(e.target.value)} placeholder="Room" style={{ ...inputStyle, flex: 1 }} />
         <input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Category" style={{ ...inputStyle, flex: 1 }} />
       </div>
-      <div className="fh-build-eyebrow" style={{ color: 'var(--v3-primary)' }}>Options</div>
+      <div className="fh-build-eyebrow" style={{ color: 'var(--v3-primary-text)' }}>Options</div>
       {opts.map((o, idx) => (
         <div key={o.id} style={{
           display: 'grid',
@@ -582,7 +582,7 @@ function OptionsEditor({
           <input value={o.brand || ''} onChange={(e) => setOpt(idx, { brand: e.target.value })} placeholder="Brand" style={inputStyle} />
           <input value={o.sku || ''} onChange={(e) => setOpt(idx, { sku: e.target.value })} placeholder="SKU" style={inputStyle} />
           <input type="number" value={o.price ?? ''} onChange={(e) => setOpt(idx, { price: e.target.value === '' ? null : Number(e.target.value) })} placeholder="$" style={inputStyle} />
-          <button type="button" onClick={() => removeOpt(idx)} disabled={opts.length === 1} aria-label="Remove option" style={{ ...iconBtnStyle, color: opts.length === 1 ? 'var(--v3-text-muted)' : 'var(--v3-danger-bright)' }}>
+          <button type="button" onClick={() => removeOpt(idx)} disabled={opts.length === 1} aria-label="Remove option" style={{ ...iconBtnStyle, color: opts.length === 1 ? 'var(--v3-text-muted)' : 'var(--v3-danger-text)' }}>
             <X size={13} />
           </button>
         </div>
@@ -633,7 +633,7 @@ const chipBtn: React.CSSProperties = {
   padding: '4px 12px', borderRadius: 10,
   background: 'color-mix(in srgb, var(--v3-primary) 12%, transparent)',
   border: '1px solid color-mix(in srgb, var(--v3-primary) 28%, transparent)',
-  color: 'var(--v3-primary)',
+  color: 'var(--v3-primary-text)',
   fontSize: 12, fontWeight: 700, letterSpacing: 0, cursor: 'pointer',
 }
 

@@ -283,9 +283,9 @@ export default function OverviewTab({
             <div className="cockpit-headline__r">
               <div className="cockpit-headline__lbl">Health</div>
               <div className="cockpit-headline__margin" style={{
-                color: health.score >= 75 ? 'var(--v3-success-bright, #5C5C5C)'
-                  : health.score >= 50 ? 'var(--v3-primary)'
-                  : 'var(--v3-danger-bright)'
+                color: health.score >= 75 ? 'var(--v3-success-text)'
+                  : health.score >= 50 ? 'var(--v3-primary-text)'
+                  : 'var(--v3-danger-text)'
               }}>{health.score}%</div>
               <div className="cockpit-headline__sub">{health.label}</div>
             </div>
@@ -608,7 +608,7 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId, canEditAmount = fa
                 padding: '8px 12px', borderRadius: 10,
                 background: 'color-mix(in srgb, var(--v3-primary) 14%, transparent)',
                 border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
-                color: 'var(--v3-primary-bright)',
+                color: 'var(--v3-primary-text)',
                 fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
                 letterSpacing: 0, cursor: 'pointer'
               }}

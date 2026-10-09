@@ -418,7 +418,7 @@ export default function Tasks() {
                         {assigneeLabel}
                       </span>
                     )}
-                    <span className={b.key === 'overdue' ? 'fh-build-num' : 'fh-build-rel'} style={{ color: b.key === 'overdue' ? 'var(--v3-danger-bright)' : undefined, fontWeight: b.key === 'overdue' ? 700 : undefined }}>
+                    <span className={b.key === 'overdue' ? 'fh-build-num' : 'fh-build-rel'} style={{ color: b.key === 'overdue' ? 'var(--v3-danger-text)' : undefined, fontWeight: b.key === 'overdue' ? 700 : undefined }}>
                       {t.due_at ? <><Calendar size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />{fmtDue(t.due_at)}</> : '\u2003'}
                     </span>
                     <span style={{ display: 'inline-flex', gap: 4 }}>
@@ -437,7 +437,7 @@ export default function Tasks() {
                         onClick={() => deleteTask(t.id)}
                         title="Delete task"
                         aria-label="Delete task"
-                        style={{ color: 'var(--v3-danger-bright)' }}
+                        style={{ color: 'var(--v3-danger-text)' }}
                       >
                         <Trash2 size={14} />
                       </button>

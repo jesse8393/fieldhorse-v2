@@ -174,7 +174,7 @@ export default function SnowForecastBuild(props: Props) {
               </p>
             )}
             {!hasCoords && (
-              <p style={{ marginTop: 8, color: 'var(--v3-primary-bright)' }}>
+              <p style={{ marginTop: 8, color: 'var(--v3-primary-text)' }}>
                 Pin a location for accurate work window signals.
               </p>
             )}
@@ -280,7 +280,7 @@ export default function SnowForecastBuild(props: Props) {
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Rain risk</div>
-              <strong style={{ color: rainRiskDays > 0 ? 'var(--v3-primary-bright)' : 'var(--v3-success-bright)' }}>{rainRiskDays}</strong>
+              <strong style={{ color: rainRiskDays > 0 ? 'var(--v3-primary-text)' : 'var(--v3-success-text)' }}>{rainRiskDays}</strong>
               <span>days ≥ 50% chance</span>
               {rainRiskDays > 0 && <div className="fh-build-spark is-gold" />}
             </section>

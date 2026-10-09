@@ -76,7 +76,7 @@ export default class RouteErrorBoundary extends React.Component<{ children?: Rea
             textAlign: 'center'
           }}
         >
-          <div className="v3-eyebrow" style={{ color: 'var(--v3-danger-bright)' }}>
+          <div className="v3-eyebrow" style={{ color: 'var(--v3-danger-text)' }}>
             Screen Error
           </div>
           <h2 className="v3-h1" style={{ marginTop: 8 }}>
@@ -108,7 +108,7 @@ export default class RouteErrorBoundary extends React.Component<{ children?: Rea
                 borderRadius: 10,
                 background: 'var(--v3-danger-soft)',
                 border: '1px solid color-mix(in srgb, var(--v3-danger) 40%, transparent)',
-                color: 'var(--v3-danger-bright)',
+                color: 'var(--v3-danger-text)',
                 whiteSpace: 'pre-wrap',
                 overflowWrap: 'anywhere'
               }}

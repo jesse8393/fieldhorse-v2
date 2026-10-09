@@ -238,7 +238,7 @@ export default function Clients() {
         <div style={{
           padding: '12px 16px',
           borderRadius: 10,
-          background: 'linear-gradient(180deg, #141414 0%, var(--v3-surface) 72%)',
+          background: 'linear-gradient(180deg, var(--v3-bg) 0%, var(--v3-surface) 72%)',
           border: '1px solid var(--v3-border)',
           boxShadow: '0 1px 0 rgba(242, 237, 228, 0.06) inset, 0 1px 2px rgba(20, 20, 20, 0.40), 0 8px 22px rgba(20, 20, 20, 0.42), 0 20px 44px rgba(20, 20, 20, 0.28)'
         }}>
@@ -348,7 +348,7 @@ export default function Clients() {
               width: 32, height: 32, borderRadius: 10,
               background: 'var(--v3-primary-soft)',
               border: '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)',
-              color: 'var(--v3-primary)',
+              color: 'var(--v3-primary-text)',
               display: 'grid', placeItems: 'center', flexShrink: 0
             }}>
               <AlertTriangle size={14} />
@@ -404,7 +404,7 @@ export default function Clients() {
               background: 'var(--v3-surface-2)',
               border: '1px solid color-mix(in srgb, var(--v3-primary) 22%, transparent)',
               display: 'grid', placeItems: 'center',
-              color: 'var(--v3-primary)'
+              color: 'var(--v3-primary-text)'
             }}>
               <Briefcase size={18} aria-hidden="true" />
             </div>
@@ -613,8 +613,8 @@ function ClientRow({ client: c, rollup: r, lastActivityRel, index, isTop, isLast
   }, [c.company_name, r.activeCount, r.outstanding])
 
   const sublineColor =
-    subline.tone === 'danger' ? 'var(--v3-danger-bright)' :
-    subline.tone === 'gold'   ? 'var(--v3-primary)' :
+    subline.tone === 'danger' ? 'var(--v3-danger-text)' :
+    subline.tone === 'gold'   ? 'var(--v3-primary-text)' :
                                 'var(--v3-text-muted)'
 
   // Performance: drop per-row entrance animations and whileHover. The

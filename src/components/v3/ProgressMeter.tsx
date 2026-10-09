@@ -28,6 +28,12 @@ export default function ProgressMeter({
     : safe >= 50
       ? 'var(--v3-primary)'
       : 'var(--v3-danger-bright)'
+  // The bar keeps the full tone; the number uses the text safe shade.
+  const ink = safe >= 80
+    ? 'var(--v3-success-text)'
+    : safe >= 50
+      ? 'var(--v3-primary-text)'
+      : 'var(--v3-danger-text)'
 
   return (
     <div style={{
@@ -57,7 +63,7 @@ export default function ProgressMeter({
           fontFamily: 'var(--font-body)',
           fontSize: 14,
           fontWeight: 700,
-          color,
+          color: ink,
           fontVariantNumeric: 'tabular-nums'
         }}>
           {Math.round(safe)}%

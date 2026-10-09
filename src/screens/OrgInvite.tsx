@@ -90,7 +90,7 @@ export default function OrgInvite() {
     <div className="fh-build-page" data-build-screen="OrgInvite" style={{ display: 'grid', placeItems: 'center', minHeight: '100vh' }}>
       <main style={{ width: '100%', maxWidth: 460, padding: '32px 24px' }}>
         <div className="fh-build-card" style={{ padding: 24 }}>
-          <div className="fh-build-eyebrow" style={{ color: 'var(--v3-primary, #C9963A)' }}>
+          <div className="fh-build-eyebrow" style={{ color: 'var(--v3-primary-text)' }}>
             Team invite
           </div>
 

@@ -472,7 +472,7 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
                       padding: '12px 12px', borderRadius: 10,
                       background: 'rgba(192,57,43,0.10)',
                       border: '1px solid rgba(192,57,43,0.35)',
-                      color: 'var(--alert-red, #C0392B)',
+                      color: 'var(--v3-danger-text)',
                       fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
                       cursor: saving ? 'wait' : 'pointer'
                     }}

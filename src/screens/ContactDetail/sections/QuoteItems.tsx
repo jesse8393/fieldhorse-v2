@@ -501,7 +501,7 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
         className="v3-section v3-section--primary-quiet"
         style={{ margin: 0, padding: '16px 16px' }}
       >
-        <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>
+        <span className="v3-eyebrow" style={{ color: 'var(--v3-primary-text)' }}>
           <Receipt size={11} aria-hidden="true" style={{ marginRight: 4, verticalAlign: 'middle' }} />
           Quote
         </span>
@@ -758,7 +758,7 @@ function RowActionButton({ children, ariaLabel, onClick, disabled, tone }: any) 
       onMouseEnter={(e) => {
         if (disabled || !canHover) return
         e.currentTarget.style.color = tone === 'danger'
-          ? 'var(--v3-danger-bright)'
+          ? 'var(--v3-danger-text)'
           : 'var(--v3-text)'
       }}
       onMouseLeave={(e) => {
@@ -785,7 +785,7 @@ function StatusChip({ label, tone }: any) {
     ? {
         bg: 'var(--v3-primary-soft)',
         border: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)',
-        color: 'var(--v3-primary)'
+        color: 'var(--v3-primary-text)'
       }
     : {
         bg: 'var(--v3-surface-2)',
@@ -898,7 +898,7 @@ function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryD
                     fontFamily: 'var(--font-display)',
                     background: s.source === 'rates' ? 'var(--v3-primary-soft)' : 'var(--v3-surface-2)',
                     border: '1px solid var(--v3-border)',
-                    color: s.source === 'rates' ? 'var(--v3-primary)' : 'var(--v3-text-muted)'
+                    color: s.source === 'rates' ? 'var(--v3-primary-text)' : 'var(--v3-text-muted)'
                   }}>
                     {s.source === 'rates' ? 'RATE CARD' : `×${s.uses}`}
                   </span>
@@ -1132,7 +1132,7 @@ function KindPicker({ value, onChange }: any) {
               background: on
                 ? 'color-mix(in srgb, var(--v3-primary) 18%, transparent)'
                 : 'transparent',
-              color: on ? 'var(--v3-primary)' : 'var(--v3-text-muted)',
+              color: on ? 'var(--v3-primary-text)' : 'var(--v3-text-muted)',
               fontFamily: 'var(--font-body)',
               fontSize: 12,
               fontWeight: 700,
@@ -1170,7 +1170,7 @@ const inputStyle: import('react').CSSProperties = {
 
 function Stat({ label, value, tone = 'default' }: any) {
   const valueColor = tone === 'gold'
-    ? 'var(--v3-primary)'
+    ? 'var(--v3-primary-text)'
     : tone === 'muted'
       ? 'var(--v3-text-muted)'
       : 'var(--v3-text)'

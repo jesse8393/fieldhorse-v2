@@ -37,9 +37,9 @@ export default function MiniMetric({
       <strong
         style={{
           color:
-            tone === 'bad'  ? 'var(--v3-danger-bright)'
-          : tone === 'warn' ? '#C9963A'
-          : accent          ? 'var(--v3-primary, #C9963A)'
+            tone === 'bad'  ? 'var(--v3-danger-text)'
+          : tone === 'warn' ? 'var(--v3-primary-text)'
+          : accent          ? 'var(--v3-primary-text)'
           : undefined,
         }}
       >

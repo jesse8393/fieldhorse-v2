@@ -684,7 +684,7 @@ function SubDetailDesktop({
           <aside className="fh-build-rail fh-build-rail--page">
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Compliance</div>
-              <strong style={{ color: insuranceTone === 'bad' ? 'var(--v3-danger-bright)' : insuranceTone === 'warn' ? '#C9963A' : undefined }}>
+              <strong style={{ color: insuranceTone === 'bad' ? 'var(--v3-danger-text)' : insuranceTone === 'warn' ? 'var(--v3-primary-text)' : undefined }}>
                 {insuranceLabel}
               </strong>
               <span>
@@ -1214,7 +1214,7 @@ function Field({ label, value, onChange, type = 'text', inputMode, placeholder, 
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
       <Eyebrow>
-        {label}{required && <span style={{ color: 'var(--v3-primary)', marginLeft: 3 }}>*</span>}
+        {label}{required && <span style={{ color: 'var(--v3-primary-text)', marginLeft: 3 }}>*</span>}
       </Eyebrow>
       <input
         type={type}
@@ -1288,7 +1288,7 @@ function ExpiryNote({ days }: any) {
         ? 'color-mix(in srgb, var(--v3-danger, #C0392B) 16%, transparent)'
         : 'var(--v3-primary-soft)', border: `1px solid ${expired
         ? 'color-mix(in srgb, var(--v3-danger, #C0392B) 50%, transparent)'
-        : 'color-mix(in srgb, var(--v3-primary) 36%, transparent)'}`, color: expired ? 'var(--v3-danger-bright, #C0392B)' : 'var(--v3-primary)' }}>
+        : 'color-mix(in srgb, var(--v3-primary) 36%, transparent)'}`, color: expired ? 'var(--v3-danger-text)' : 'var(--v3-primary-text)' }}>
       <AlertTriangle size={12} />
       {expired ? `Expired ${Math.abs(days)}d ago` : `Expires in ${days}d`}
     </Eyebrow>
@@ -1299,7 +1299,7 @@ function StatusPill({ onFile }: any) {
   return (
     <Eyebrow style={{ padding: '4px 8px', borderRadius: 10, background: onFile ? 'var(--v3-primary-soft)' : 'var(--v3-surface)', border: `1px solid ${onFile
         ? 'color-mix(in srgb, var(--v3-primary) 32%, transparent)'
-        : 'var(--v3-border)'}`, color: onFile ? 'var(--v3-primary)' : 'var(--v3-text-muted)' }}>
+        : 'var(--v3-border)'}`, color: onFile ? 'var(--v3-primary-text)' : 'var(--v3-text-muted)' }}>
       {onFile ? 'On file' : 'Missing'}
     </Eyebrow>
   )
@@ -1330,7 +1330,7 @@ function IconButton({ children, onClick, disabled, primary, danger, title }: any
         color: primary
           ? 'var(--v3-on-primary)'
           : danger
-          ? 'var(--v3-danger-bright, #C0392B)'
+          ? 'var(--v3-danger-text)'
           : 'var(--v3-text)',
         cursor: disabled ? 'default' : 'pointer',
         opacity: disabled ? 0.5 : 1,

@@ -186,7 +186,7 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
           overflow: 'hidden'
         }}
       >
-        <span style={{ width: 26, height: 26, borderRadius: 10, background: 'rgba(201,150,58,0.08)', border: '1px solid rgba(201,150,58,0.35)', color: 'var(--field-gold-bright)', display: 'grid', placeItems: 'center', fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: 0, opacity: 0.72 }}>FH</span>
+        <span style={{ width: 26, height: 26, borderRadius: 10, background: 'rgba(201,150,58,0.08)', border: '1px solid rgba(201,150,58,0.35)', color: 'var(--v3-primary-text)', display: 'grid', placeItems: 'center', fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: 0, opacity: 0.72 }}>FH</span>
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 36 }}>
           {displayedLogo ? (
             <img loading="lazy"src={displayedLogo}
@@ -194,7 +194,7 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
               style={{ maxHeight: 36, maxWidth: '70%', objectFit: 'contain' }}
             />
           ) : companyName ? (
-            <span style={{ fontFamily: 'var(--font-display)', fontSize: 20, letterSpacing: 0, textTransform: 'uppercase', color: 'var(--field-gold-bright)' }}>{companyName}</span>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: 20, letterSpacing: 0, textTransform: 'uppercase', color: 'var(--v3-primary-text)' }}>{companyName}</span>
           ) : fullName ? (
             <span style={{ fontFamily: 'var(--font-display)', fontSize: 20, letterSpacing: 0, textTransform: 'uppercase', color: 'var(--ink-strong)' }}>{fullName}</span>
           ) : (

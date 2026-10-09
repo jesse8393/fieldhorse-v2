@@ -218,7 +218,7 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
               }}
             />
             {titleError && (
-              <span role="alert" style={{ fontSize: 12, color: 'var(--v3-danger-bright)' }}>
+              <span role="alert" style={{ fontSize: 12, color: 'var(--v3-danger-text)' }}>
                 Give the event a title before saving.
               </span>
             )}

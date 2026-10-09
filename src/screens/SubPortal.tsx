@@ -391,7 +391,7 @@ export default function SubPortal() {
 
               <section className="fh-build-rail-card">
                 <div className="fh-build-eyebrow">Insurance</div>
-                <strong style={{ color: ins.tone === 'bad' ? 'var(--v3-danger-bright)' : ins.tone === 'warn' ? '#C9963A' : ins.tone === 'good' ? '#2D7A4F' : undefined }}>
+                <strong style={{ color: ins.tone === 'bad' ? 'var(--v3-danger-text)' : ins.tone === 'warn' ? 'var(--v3-primary-text)' : ins.tone === 'good' ? 'var(--v3-success-text)' : undefined }}>
                   {ins.label}
                 </strong>
                 <span>
@@ -443,7 +443,7 @@ function ProfileRow({ label, value, tone, muted }: { label: string; value: strin
       </Eyebrow>
       <span style={{
         fontSize: 14,
-        color: muted ? 'var(--v3-text-muted)' : tone === 'bad' ? 'var(--v3-danger-bright)' : tone === 'warn' ? '#C9963A' : 'var(--v3-text)',
+        color: muted ? 'var(--v3-text-muted)' : tone === 'bad' ? 'var(--v3-danger-text)' : tone === 'warn' ? 'var(--v3-primary-text)' : 'var(--v3-text)',
         wordBreak: 'break-word',
       }}>
         {value}
@@ -492,12 +492,12 @@ function DocSlot({ kind, label, path, uploading, onUpload }: {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <FileText size={14} aria-hidden="true" style={{ color: path ? 'var(--v3-primary, #C9963A)' : 'var(--v3-text-muted)' }} />
+        <FileText size={14} aria-hidden="true" style={{ color: path ? 'var(--v3-primary-text)' : 'var(--v3-text-muted)' }} />
         <strong style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: 'var(--v3-text)' }}>
           {label}
         </strong>
       </div>
-      <div style={{ fontSize: 12, color: path ? '#2D7A4F' : 'var(--v3-text-muted)', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ fontSize: 12, color: path ? 'var(--v3-success-text)' : 'var(--v3-text-muted)', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
         {path ? <><Check size={12} aria-hidden="true" /> On file</> : 'Not uploaded'}
       </div>
       <input
@@ -629,7 +629,7 @@ function EditProfileDialog({
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <div className="fh-build-eyebrow" style={{ color: 'var(--v3-primary, #C9963A)' }}>Edit profile</div>
+            <div className="fh-build-eyebrow" style={{ color: 'var(--v3-primary-text)' }}>Edit profile</div>
             <h2 style={{ margin: '6px 0 18px', fontFamily: 'var(--font-display, "Bebas Neue", Impact, sans-serif)', fontSize: 24, letterSpacing: 0, color: 'var(--v3-text)' }}>
               Keep your details current.
             </h2>
@@ -673,7 +673,7 @@ function EditProfileDialog({
         </div>
 
         {error && (
-          <div style={{ marginTop: 14, padding: 12, borderRadius: 10, background: 'rgba(192, 57, 43,.10)', border: '1px solid rgba(192, 57, 43,.30)', color: 'var(--v3-danger-bright)', fontSize: 12 }}>
+          <div style={{ marginTop: 14, padding: 12, borderRadius: 10, background: 'rgba(192, 57, 43,.10)', border: '1px solid rgba(192, 57, 43,.30)', color: 'var(--v3-danger-text)', fontSize: 12 }}>
             {error}
           </div>
         )}

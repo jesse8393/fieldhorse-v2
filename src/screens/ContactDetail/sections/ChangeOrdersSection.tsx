@@ -247,7 +247,7 @@ function SectionHeader({ count, canAdd, onAdd }: any) {
       borderBottom: '1px solid var(--v3-border)',
       background: 'var(--v3-surface-2)'
     }}>
-      <FileEdit size={14} aria-hidden="true" style={{ color: 'var(--v3-primary-bright)' }} />
+      <FileEdit size={14} aria-hidden="true" style={{ color: 'var(--v3-primary-text)' }} />
       <Eyebrow tone="gold">
         Change orders
         {count > 0 && (
@@ -326,7 +326,7 @@ function Row({ co, readOnly, onEdit, onApprove, onGetSignature, onVoid, onDelete
     <div style={{ display: 'grid', gridTemplateColumns: '64px 1fr auto', gap: 12, padding: '12px 16px', alignItems: 'flex-start' }}>
       <div style={{
         fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600,
-        letterSpacing: 0, color: 'var(--v3-primary-bright)',
+        letterSpacing: 0, color: 'var(--v3-primary-text)',
         fontVariantNumeric: 'tabular-nums', paddingTop: 4
       }}>
         CO #{co.sequence_number}
@@ -355,7 +355,7 @@ function Row({ co, readOnly, onEdit, onApprove, onGetSignature, onVoid, onDelete
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
         <div style={{
           fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
-          color: isVoid ? 'var(--v3-text-muted)' : isCredit ? 'var(--v3-success-bright, #2D7A4F)' : 'var(--v3-text)',
+          color: isVoid ? 'var(--v3-text-muted)' : isCredit ? 'var(--v3-success-text)' : 'var(--v3-text)',
           fontVariantNumeric: 'tabular-nums',
           textDecoration: isVoid ? 'line-through' : 'none',
           whiteSpace: 'nowrap'
@@ -552,9 +552,9 @@ function Editor({ initial, isNew, onSave, onCancel }: any) {
 function Tag({ tone, children }: any) {
   const palette = ({
     muted: { bg: 'var(--v3-glass-tint)', fg: 'var(--v3-text-muted)', br: 'var(--v3-border-mid)' },
-    green: { bg: 'rgba(45, 122, 79, 0.12)', fg: 'var(--v3-success-bright, #2D7A4F)', br: 'rgba(45, 122, 79, 0.30)' },
-    gold:  { bg: 'rgba(201, 150, 58, 0.12)', fg: 'var(--v3-primary-bright)', br: 'rgba(201, 150, 58, 0.30)' },
-    red:   { bg: 'rgba(192, 57, 43, 0.10)', fg: 'var(--v3-danger-bright, #C0392B)', br: 'rgba(192, 57, 43, 0.30)' }
+    green: { bg: 'rgba(45, 122, 79, 0.12)', fg: 'var(--v3-success-text)', br: 'rgba(45, 122, 79, 0.30)' },
+    gold:  { bg: 'rgba(201, 150, 58, 0.12)', fg: 'var(--v3-primary-text)', br: 'rgba(201, 150, 58, 0.30)' },
+    red:   { bg: 'rgba(192, 57, 43, 0.10)', fg: 'var(--v3-danger-text)', br: 'rgba(192, 57, 43, 0.30)' }
   } as Record<string, any>)[tone] || { bg: 'var(--v3-glass-tint)', fg: 'var(--v3-text-muted)', br: 'var(--v3-border-mid)' }
   return (
     <Eyebrow style={{ padding: '4px 8px', borderRadius: 10, background: palette.bg, border: `1px solid ${palette.br}`, color: palette.fg }}>
@@ -576,7 +576,7 @@ function IconBtn({ children, onClick, tone, title, ...rest }: any) {
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         background: 'transparent',
         border: `1px solid ${danger ? 'rgba(192, 57, 43, 0.35)' : 'var(--v3-border-strong)'}`,
-        color: danger ? 'var(--v3-danger-bright, #C0392B)' : 'var(--v3-text)',
+        color: danger ? 'var(--v3-danger-text)' : 'var(--v3-text)',
         cursor: 'pointer'
       }}
     >
@@ -608,7 +608,7 @@ const chipStyle = {
 const chipActiveStyle = {
   background: 'rgba(201, 150, 58, 0.15)',
   borderColor: 'var(--v3-primary)',
-  color: 'var(--v3-primary-bright)'
+  color: 'var(--v3-primary-text)'
 }
 const primaryBtnStyle = {
   display: 'inline-flex', alignItems: 'center', gap: 8,

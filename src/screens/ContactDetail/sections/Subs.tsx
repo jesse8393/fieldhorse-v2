@@ -20,9 +20,9 @@ const SUB_STATUSES = [
 
 const STATUS_COLOR: Record<string, string> = {
   scheduled: 'var(--v3-text-muted)',
-  onsite:    'var(--v3-success-bright)',
-  complete:  'var(--v3-primary)',
-  paid:      'var(--v3-success-bright)'
+  onsite:    'var(--v3-success-text)',
+  complete:  'var(--v3-primary-text)',
+  paid:      'var(--v3-success-text)'
 }
 
 function money(n: any) {
@@ -110,7 +110,7 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }: an
         </Eyebrow>
         <span style={{
           fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-          color: 'var(--v3-primary)', fontVariantNumeric: 'tabular-nums'
+          color: 'var(--v3-primary-text)', fontVariantNumeric: 'tabular-nums'
         }}>
           {subs.length} {subs.length === 1 ? 'sub' : 'subs'}
           {totalRate > 0 ? ` · ${money(totalRate)}` : ''}
@@ -126,7 +126,7 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }: an
           padding: '12px 16px', borderRadius: 10,
           background: 'var(--v3-surface-2)',
           border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
-          color: 'var(--v3-primary)',
+          color: 'var(--v3-primary-text)',
           fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
           letterSpacing: 0, cursor: 'pointer',
           WebkitTapHighlightColor: 'transparent'
@@ -165,7 +165,7 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }: an
                 <span aria-hidden="true" style={{
                   flexShrink: 0, width: 32, height: 32, borderRadius: 10,
                   background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)',
-                  color: 'var(--v3-primary)',
+                  color: 'var(--v3-primary-text)',
                   display: 'grid', placeItems: 'center'
                 }}>
                   <Wrench size={14} />
@@ -193,7 +193,7 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }: an
                   </Eyebrow>
                   <span style={{
                     fontFamily: 'var(--font-display)', fontSize: 14,
-                    color: 'var(--v3-primary)',
+                    color: 'var(--v3-primary-text)',
                     fontVariantNumeric: 'tabular-nums', minWidth: 60, textAlign: 'right'
                   }}>
                     {money(s.rate)}

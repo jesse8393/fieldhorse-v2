@@ -301,7 +301,7 @@ export default function CaptureSheet() {
                     background: listening
                       ? 'color-mix(in srgb, var(--v3-primary) 18%, var(--surface-2))'
                       : 'var(--surface-2)',
-                    color: listening ? 'var(--v3-primary)' : 'var(--ink-strong)',
+                    color: listening ? 'var(--v3-primary-text)' : 'var(--ink-strong)',
                     boxShadow: listening ? '0 0 0 8px color-mix(in srgb, var(--v3-primary) 12%, transparent)' : 'none',
                     transition: 'box-shadow 200ms ease, background 200ms ease',
                     WebkitTapHighlightColor: 'transparent'

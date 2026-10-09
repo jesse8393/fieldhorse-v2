@@ -306,7 +306,7 @@ export default function MaterialsSection({ jobId, userId }: any) {
           fontFamily: 'var(--font-body)', fontSize: 14,
           border: '1px dashed var(--v3-border)', borderRadius: 10,
         }}>
-          <Truck size={18} aria-hidden="true" style={{ display: 'block', margin: '0 auto 8px', color: 'var(--v3-primary)' }} />
+          <Truck size={18} aria-hidden="true" style={{ display: 'block', margin: '0 auto 8px', color: 'var(--v3-primary-text)' }} />
           No materials tracked yet. Add line items above, paste a list, or pull from your field reports.
         </div>
       ) : (
@@ -418,7 +418,7 @@ function MaterialCard({
         {row.unit_cost != null ? `${fmtMoney(row.unit_cost)}/u` : '\u2003'}
       </div>
 
-      <div style={{ fontSize: 12, fontVariantNumeric: 'tabular-nums', color: lineCost > 0 ? 'var(--v3-primary)' : 'var(--v3-text-muted)', fontWeight: lineCost > 0 ? 700 : 400 }}>
+      <div style={{ fontSize: 12, fontVariantNumeric: 'tabular-nums', color: lineCost > 0 ? 'var(--v3-primary-text)' : 'var(--v3-text-muted)', fontWeight: lineCost > 0 ? 700 : 400 }}>
         {lineCost > 0 ? fmtMoney(lineCost) : '\u2003'}
       </div>
 
@@ -609,7 +609,7 @@ function DialogShell({ title, subtitle, onClose, children }: { title: string; su
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <div className="fh-build-eyebrow" style={{ color: 'var(--v3-primary)' }}>{title}</div>
+            <div className="fh-build-eyebrow" style={{ color: 'var(--v3-primary-text)' }}>{title}</div>
             {subtitle && (
               <p style={{ margin: '6px 0 12px', fontSize: 12, color: 'var(--v3-text-muted)' }}>{subtitle}</p>
             )}

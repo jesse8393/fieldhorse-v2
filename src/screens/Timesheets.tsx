@@ -397,7 +397,7 @@ export default function Timesheets() {
                       disabled={!!approving[r.id]}
                       aria-label={r.flagged ? 'Clear flag' : 'Flag punch'}
                       title={r.flagged ? 'Clear flag' : 'Flag / reject'}
-                      style={{ color: r.flagged ? 'var(--v3-primary, #c9963a)' : undefined }}
+                      style={{ color: r.flagged ? 'var(--v3-primary-text)' : undefined }}
                     >
                       <AlertTriangle size={14} />
                     </button>

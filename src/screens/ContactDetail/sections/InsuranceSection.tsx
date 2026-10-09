@@ -273,7 +273,7 @@ function panelHeaderStyle() {
     fontSize: 12,
     fontWeight: 700,
     letterSpacing: 0,
-    color: 'var(--v3-primary-bright)',
+    color: 'var(--v3-primary-text)',
     textTransform: 'uppercase'
   }
 }
@@ -354,7 +354,7 @@ function dangerGhostBtnStyle() {
     borderRadius: 10,
     background: 'transparent',
     border: '1px solid color-mix(in srgb, var(--v3-danger, #C0392B) 40%, transparent)',
-    color: 'var(--v3-danger-bright, #C0392B)',
+    color: 'var(--v3-danger-text)',
     cursor: 'pointer'
   }
 }

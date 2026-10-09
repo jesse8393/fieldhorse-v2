@@ -175,10 +175,10 @@ export default function PartnerInvite() {
       <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 420, opacity: 1 }}>
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{ fontFamily: 'var(--font-display, "Bebas Neue", sans-serif)', fontSize: 24, letterSpacing: 0, lineHeight: 1 }}>
-            <span style={{ color: 'var(--field-gold, #C9963A)' }}>FIELD</span>
+            <span style={{ color: 'var(--v3-primary-text)' }}>FIELD</span>
             <span style={{ color: 'var(--ink-strong, #F2EDE4)' }}>HORSE</span>
           </div>
-          <Eyebrow as="div" style={{ marginTop: 20, padding: '4px 12px', borderRadius: 10, background: 'rgba(201,150,58,0.12)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--field-gold-bright, #C9963A)' }}>
+          <Eyebrow as="div" style={{ marginTop: 20, padding: '4px 12px', borderRadius: 10, background: 'rgba(201,150,58,0.12)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--v3-primary-text)' }}>
             <Users size={11} />
             Partner invite
           </Eyebrow>
@@ -197,7 +197,7 @@ export default function PartnerInvite() {
         {showFatal && (
           <div
             role="alert"
-            style={{ padding: '12px 16px', borderRadius: 10, background: 'rgba(192,57,43,0.10)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--alert-red, #C0392B)', fontFamily: 'var(--font-body, "DM Sans", sans-serif)', fontSize: 14, fontWeight: 600, textAlign: 'center' }}
+            style={{ padding: '12px 16px', borderRadius: 10, background: 'rgba(192,57,43,0.10)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--v3-danger-text)', fontFamily: 'var(--font-body, "DM Sans", sans-serif)', fontSize: 14, fontWeight: 600, textAlign: 'center' }}
           >
             {infoErr}
           </div>
@@ -206,7 +206,7 @@ export default function PartnerInvite() {
         {showSoftError && (
           <div
             role="alert"
-            style={{ padding: '12px 12px', borderRadius: 10, background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--alert-red, #C0392B)', fontFamily: 'var(--font-body, "DM Sans", sans-serif)', fontSize: 14, fontWeight: 600, marginBottom: 14 }}
+            style={{ padding: '12px 12px', borderRadius: 10, background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--v3-danger-text)', fontFamily: 'var(--font-body, "DM Sans", sans-serif)', fontSize: 14, fontWeight: 600, marginBottom: 14 }}
           >
             {infoErr}
           </div>

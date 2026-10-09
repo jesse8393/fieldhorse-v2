@@ -433,7 +433,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
               color: 'var(--ink-strong)',
               fontFamily: 'var(--font-body)', fontSize: 12, lineHeight: 1.45
             }}>
-              <AlertTriangle size={14} aria-hidden="true" style={{ color: 'var(--alert-red, #C0392B)', marginTop: 2, flexShrink: 0 }} />
+              <AlertTriangle size={14} aria-hidden="true" style={{ color: 'var(--v3-danger-text)', marginTop: 2, flexShrink: 0 }} />
               <span style={{ flex: 1 }}>{err}</span>
               <button
                 type="button"
@@ -515,7 +515,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
               background: 'rgba(192, 57, 43, 0.10)',
               border: '1px solid rgba(192, 57, 43, 0.40)'
             }}>
-              <AlertTriangle size={14} aria-hidden="true" style={{ color: 'var(--alert-red, #C0392B)', marginTop: 2, flexShrink: 0 }} />
+              <AlertTriangle size={14} aria-hidden="true" style={{ color: 'var(--v3-danger-text)', marginTop: 2, flexShrink: 0 }} />
               <span style={{
                 fontFamily: 'var(--font-body)', fontSize: 12, lineHeight: 1.45,
                 color: 'var(--ink-strong)'

@@ -602,7 +602,7 @@ function Header({ count, canAdd, onAdd, canGenerate, onGenerate, generating }: a
       background: 'var(--v3-surface-2)',
       flexWrap: 'wrap'
     }}>
-      <FileText size={14} aria-hidden="true" style={{ color: 'var(--v3-primary-bright)' }} />
+      <FileText size={14} aria-hidden="true" style={{ color: 'var(--v3-primary-text)' }} />
       <Eyebrow tone="gold">
         Invoice draws
         {count > 0 && (
@@ -623,7 +623,7 @@ function Header({ count, canAdd, onAdd, canGenerate, onGenerate, generating }: a
               padding: '8px 12px', borderRadius: 10,
               background: 'color-mix(in srgb, var(--v3-primary) 14%, transparent)',
               border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
-              color: 'var(--v3-primary-bright)',
+              color: 'var(--v3-primary-text)',
               fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
               letterSpacing: 0,
               cursor: generating ? 'wait' : 'pointer',
@@ -662,8 +662,8 @@ function Summary({ contractTotal, drawsIssued, previouslyPaid, unbilled }: any) 
   const cells = [
     { label: 'Contract total', value: money(contractTotal) },
     { label: 'Drawn so far',   value: money(drawsIssued) },
-    { label: 'Paid to date',   value: money(previouslyPaid), color: 'var(--v3-success-bright, #2D7A4F)' },
-    { label: 'Unbilled',       value: money(unbilled),       color: 'var(--v3-primary-bright)' }
+    { label: 'Paid to date',   value: money(previouslyPaid), color: 'var(--v3-success-text)' },
+    { label: 'Unbilled',       value: money(unbilled),       color: 'var(--v3-primary-text)' }
   ]
   return (
     <div className="fh-draws-summary" style={{
@@ -740,7 +740,7 @@ function Row({ draw, busy, readOnly, onEdit, onDownload, onSend, onMarkPaid, onV
     <div className="fh-draws-row" style={{ display: 'grid', gridTemplateColumns: '72px 1fr auto', gap: 12, padding: '12px 16px', alignItems: 'flex-start' }}>
       <div style={{
         fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-        letterSpacing: 0, color: 'var(--v3-primary-bright)',
+        letterSpacing: 0, color: 'var(--v3-primary-text)',
         fontVariantNumeric: 'tabular-nums', paddingTop: 4
       }}>
         Draw #{draw.sequence_number}
@@ -938,9 +938,9 @@ function Editor({ initial, isNew, unbilled, onSave, onCancel }: any) {
 function Tag({ tone, children }: any) {
   const palette = ({
     muted: { bg: 'var(--v3-glass-tint)', fg: 'var(--v3-text-muted)', br: 'var(--v3-border-mid)' },
-    green: { bg: 'rgba(45, 122, 79, 0.12)', fg: 'var(--v3-success-bright, #2D7A4F)', br: 'rgba(45, 122, 79, 0.30)' },
-    gold:  { bg: 'rgba(201, 150, 58, 0.12)', fg: 'var(--v3-primary-bright)', br: 'rgba(201, 150, 58, 0.30)' },
-    red:   { bg: 'rgba(192, 57, 43, 0.10)', fg: 'var(--v3-danger-bright, #C0392B)', br: 'rgba(192, 57, 43, 0.30)' }
+    green: { bg: 'rgba(45, 122, 79, 0.12)', fg: 'var(--v3-success-text)', br: 'rgba(45, 122, 79, 0.30)' },
+    gold:  { bg: 'rgba(201, 150, 58, 0.12)', fg: 'var(--v3-primary-text)', br: 'rgba(201, 150, 58, 0.30)' },
+    red:   { bg: 'rgba(192, 57, 43, 0.10)', fg: 'var(--v3-danger-text)', br: 'rgba(192, 57, 43, 0.30)' }
   } as Record<string, any>)[tone] || { bg: 'var(--v3-glass-tint)', fg: 'var(--v3-text-muted)', br: 'var(--v3-border-mid)' }
   return (
     <Eyebrow style={{ padding: '4px 8px', borderRadius: 10, background: palette.bg, border: `1px solid ${palette.br}`, color: palette.fg }}>
@@ -963,7 +963,7 @@ function IconBtn({ children, onClick, disabled, tone, title, ...rest }: any) {
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         background: 'transparent',
         border: `1px solid ${danger ? 'rgba(192, 57, 43, 0.35)' : 'var(--v3-border-strong)'}`,
-        color: danger ? 'var(--v3-danger-bright, #C0392B)' : 'var(--v3-text)',
+        color: danger ? 'var(--v3-danger-text)' : 'var(--v3-text)',
         cursor: disabled ? 'wait' : 'pointer',
         opacity: disabled ? 0.6 : 1
       }}
@@ -992,7 +992,7 @@ const chipStyle = {
 const chipActiveStyle = {
   background: 'rgba(201, 150, 58, 0.15)',
   borderColor: 'var(--v3-primary)',
-  color: 'var(--v3-primary-bright)'
+  color: 'var(--v3-primary-text)'
 }
 const primaryBtnStyle = {
   display: 'inline-flex', alignItems: 'center', gap: 8,

@@ -381,7 +381,7 @@ export default function Analytics() {
         }}
       >
         <div style={{ minWidth: 0, flex: 1 }}>
-          <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          <span className="v3-eyebrow" style={{ color: 'var(--v3-primary-text)', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
             <BarChart3 size={11} />
             Reports & Insights
           </span>
@@ -516,7 +516,7 @@ export default function Analytics() {
                   <Tooltip
                     contentStyle={{ background: 'var(--surface-1)', border: '1px solid var(--rule-bold)', borderRadius: 10, fontFamily: 'var(--font-body)', fontSize: 12 }}
                     labelStyle={{ color: 'var(--ink-muted)', fontSize: 12, letterSpacing: 0, textTransform: 'uppercase' }}
-                    itemStyle={{ color: 'var(--field-gold-bright)', fontWeight: 700 }}
+                    itemStyle={{ color: 'var(--v3-primary-text)', fontWeight: 700 }}
                     formatter={(v) => [fmtMoneyCompact(v), 'Pipeline']}
                   />
                   <Area
@@ -672,8 +672,8 @@ export default function Analytics() {
                         </span>
                         <span style={{
                           fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
-                          color: r.pct >= 60 ? 'var(--v3-success-bright, #2D7A4F)'
-                            : r.pct >= 40 ? 'var(--v3-primary-bright)'
+                          color: r.pct >= 60 ? 'var(--v3-success-text)'
+                            : r.pct >= 40 ? 'var(--v3-primary-text)'
                             : 'var(--v3-text-muted)',
                           fontVariantNumeric: 'tabular-nums', minWidth: 38, textAlign: 'right'
                         }}>
@@ -698,7 +698,7 @@ export default function Analytics() {
                           }}>
                             {c.name}
                           </span>
-                          <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, color: 'var(--v3-success-bright, #2D7A4F)', fontVariantNumeric: 'tabular-nums' }}>
+                          <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, color: 'var(--v3-success-text)', fontVariantNumeric: 'tabular-nums' }}>
                             {money(c.amount)}
                           </span>
                         </div>
@@ -722,7 +722,7 @@ export default function Analytics() {
                     <Eyebrow as="div">
                       Retainage held
                     </Eyebrow>
-                    <div style={{ marginTop: 4, fontFamily: 'var(--font-display)', fontSize: 24, color: retainageOutstanding > 0 ? 'var(--v3-primary-bright)' : 'var(--v3-text-muted)', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+                    <div style={{ marginTop: 4, fontFamily: 'var(--font-display)', fontSize: 24, color: retainageOutstanding > 0 ? 'var(--v3-primary-text)' : 'var(--v3-text-muted)', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
                       {money(retainageOutstanding)}
                     </div>
                     <div style={{ marginTop: 3, fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--v3-text-muted)' }}>
@@ -828,7 +828,7 @@ function FunnelBar({ label, count, max, note, gold, danger }: any) {
       <span style={{
         flexShrink: 0, minWidth: 24, textAlign: 'right',
         fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 700,
-        color: danger ? 'var(--v3-danger-bright)' : gold ? 'var(--v3-primary)' : 'var(--v3-text)'
+        color: danger ? 'var(--v3-danger-text)' : gold ? 'var(--v3-primary-text)' : 'var(--v3-text)'
       }}>
         {count}
       </span>
@@ -878,7 +878,7 @@ function KPI({ label, to, format, Icon, gold, note }: any) {
             position: 'absolute',
             top: 12,
             right: 12,
-            color: gold ? 'var(--v3-primary)' : 'var(--v3-text-muted)',
+            color: gold ? 'var(--v3-primary-text)' : 'var(--v3-text-muted)',
             opacity: gold ? 1 : 0.6
           }}
         />
@@ -891,7 +891,7 @@ function KPI({ label, to, format, Icon, gold, note }: any) {
           letterSpacing: 0,
           lineHeight: 1,
           marginTop: 10,
-          color: gold ? 'var(--v3-primary)' : 'var(--v3-text)',
+          color: gold ? 'var(--v3-primary-text)' : 'var(--v3-text)',
           fontVariantNumeric: 'tabular-nums',
           textShadow: gold ? '0 1px 12px rgba(201, 150, 58, 0.20)' : 'none'
         }}

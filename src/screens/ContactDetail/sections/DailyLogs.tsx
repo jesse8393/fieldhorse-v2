@@ -562,7 +562,7 @@ export default function DailyLogsSection({ jobId, userId }: any) {
             borderRadius: 10,
           }}
         >
-          <Sparkles size={18} aria-hidden="true" style={{ display: 'block', margin: '0 auto 8px', color: 'var(--v3-primary)' }} />
+          <Sparkles size={18} aria-hidden="true" style={{ display: 'block', margin: '0 auto 8px', color: 'var(--v3-primary-text)' }} />
           No daily logs yet. Tap <strong style={{ color: 'var(--v3-text)' }}>+ New log</strong> after a shift to capture what got done.
         </div>
       ) : (

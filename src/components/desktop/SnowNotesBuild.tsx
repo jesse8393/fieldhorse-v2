@@ -133,7 +133,7 @@ export default function SnowNotesBuild(props: Props) {
               {' '}{cockpitStats.parsedCount} parsed by AI
             </p>
             {cockpitStats.riskCount > 0 && (
-              <p style={{ color: 'var(--v3-primary-bright)', marginTop: 6 }}>
+              <p style={{ color: 'var(--v3-primary-text)', marginTop: 6 }}>
                 <AlertTriangle size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
                 {cockpitStats.riskCount} open risk{cockpitStats.riskCount === 1 ? '' : 's'} flagged
               </p>
@@ -195,7 +195,7 @@ export default function SnowNotesBuild(props: Props) {
 
                 {parsed && (
                   <div className="fh-build-capture__parsed">
-                    <div className="fh-build-eyebrow" style={{ color: 'var(--v3-primary, #c9963a)' }}>AI parse preview</div>
+                    <div className="fh-build-eyebrow" style={{ color: 'var(--v3-primary-text)' }}>AI parse preview</div>
                     {parsed.summary && <p>{parsed.summary}</p>}
                     {parsed.action_items?.length > 0 && (
                       <ul>
@@ -302,7 +302,7 @@ export default function SnowNotesBuild(props: Props) {
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Open risks</div>
-              <strong style={{ color: cockpitStats.riskCount > 0 ? 'var(--v3-danger-bright)' : undefined }}>
+              <strong style={{ color: cockpitStats.riskCount > 0 ? 'var(--v3-danger-text)' : undefined }}>
                 {cockpitStats.riskCount}
               </strong>
               <span>{cockpitStats.riskCount > 0 ? 'Needs triage' : 'All clear'}</span>
@@ -311,7 +311,7 @@ export default function SnowNotesBuild(props: Props) {
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Missing job links</div>
-              <strong style={{ color: unlinkedCount > 0 ? 'var(--v3-primary-bright)' : undefined }}>{unlinkedCount}</strong>
+              <strong style={{ color: unlinkedCount > 0 ? 'var(--v3-primary-text)' : undefined }}>{unlinkedCount}</strong>
               <span>{unlinkedCount > 0 ? 'Tie reports to jobs' : 'All linked'}</span>
             </section>
 

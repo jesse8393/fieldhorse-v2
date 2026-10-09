@@ -450,7 +450,7 @@ function InviteDialog({ callerRole, onClose, onSent }: { callerRole: OrgRole | n
           boxShadow: '0 22px 60px rgba(20, 20, 20,.50)',
         }}
       >
-        <div className="fh-build-eyebrow" style={{ color: 'var(--v3-primary, #c9963a)' }}>Invite teammate</div>
+        <div className="fh-build-eyebrow" style={{ color: 'var(--v3-primary-text)' }}>Invite teammate</div>
         <h2 style={{ margin: '6px 0 18px', fontFamily: 'var(--font-display, "Bebas Neue", Impact, sans-serif)', fontSize: 24, letterSpacing: 0, color: 'var(--v3-text)' }}>
           Add someone to the field.
         </h2>
@@ -523,7 +523,7 @@ function InviteDialog({ callerRole, onClose, onSent }: { callerRole: OrgRole | n
             </label>
 
             {error && (
-              <div style={{ marginBottom: 14, padding: 12, borderRadius: 10, background: 'rgba(192, 57, 43,.10)', border: '1px solid rgba(192, 57, 43,.30)', color: 'var(--v3-danger-bright)', fontSize: 12 }}>
+              <div style={{ marginBottom: 14, padding: 12, borderRadius: 10, background: 'rgba(192, 57, 43,.10)', border: '1px solid rgba(192, 57, 43,.30)', color: 'var(--v3-danger-text)', fontSize: 12 }}>
                 {error}
               </div>
             )}

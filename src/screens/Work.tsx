@@ -353,7 +353,7 @@ export default function Work() {
           is the list. */}
       <motion.div className="fh-work__head" variants={item} style={{ padding: '12px 24px 8px' }}>
         <h1 className="jobs-title">
-          Work <span style={{ color: 'var(--v3-primary-bright)' }}>&amp; Deals</span>
+          Work <span style={{ color: 'var(--v3-primary-text)' }}>&amp; Deals</span>
         </h1>
         <div className="jobs-stats">
           {loading ? (
@@ -404,7 +404,7 @@ export default function Work() {
         {searchDegraded && search.trim().length >= 2 && (
           <div role="status" style={{
             marginTop: 6, fontSize: 12, fontFamily: 'var(--font-body)',
-            color: 'var(--v3-primary)', display: 'flex', alignItems: 'center', gap: 8
+            color: 'var(--v3-primary-text)', display: 'flex', alignItems: 'center', gap: 8
           }}>
             <Sparkles size={11} aria-hidden="true" />
             Showing recent deals only, full history search is unreachable right now.
@@ -477,7 +477,7 @@ export default function Work() {
                 onClick={() => setAddOpen(true)}
                 style={{
                   background: 'none', border: 'none', padding: 0,
-                  color: 'var(--v3-primary)', fontWeight: 700, fontSize: 12, cursor: 'pointer'
+                  color: 'var(--v3-primary-text)', fontWeight: 700, fontSize: 12, cursor: 'pointer'
                 }}
               >
                 Add your first deal →
@@ -604,14 +604,14 @@ const DealCard = memo(function DealCard({ contact: c, isNew, busy, canSell: mayM
       icon: <PhoneIcon size={18} />,
       label: `Call ${c.name || 'deal'}`,
       color: 'rgba(45, 122, 79, 0.22)',
-      fg: 'var(--v3-success-bright)',
+      fg: 'var(--v3-success-text)',
       onClick: () => { window.location.href = `tel:${phone}` }
     })
     swipeActions.push({
       icon: <MsgIcon size={18} />,
       label: `Text ${c.name || 'deal'}`,
       color: 'rgba(201, 150, 58, 0.18)',
-      fg: 'var(--v3-primary)',
+      fg: 'var(--v3-primary-text)',
       onClick: () => { window.location.href = `sms:${phone}` }
     })
   }
@@ -685,8 +685,8 @@ const DealCard = memo(function DealCard({ contact: c, isNew, busy, canSell: mayM
             <div>
               <StatusPill
                 color={follow.tone === 'danger'
-                  ? 'var(--v3-danger-bright)'
-                  : follow.tone === 'warn' ? 'var(--v3-primary)' : 'var(--v3-text-muted)'}
+                  ? 'var(--v3-danger-text)'
+                  : follow.tone === 'warn' ? 'var(--v3-primary-text)' : 'var(--v3-text-muted)'}
                 icon={CalendarClock}
                 label={follow.label}
               />

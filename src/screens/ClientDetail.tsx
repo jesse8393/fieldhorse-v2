@@ -190,7 +190,7 @@ export default function ClientDetail() {
   if (isError && !bundle) {
     return (
       <div className="v3-screen" style={{ padding: '24px 24px 48px', background: 'var(--v3-bg)' }}>
-        <button type="button" onClick={() => navigate('/clients')} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--v3-primary)', fontWeight: 700, cursor: 'pointer' }}>← Back to clients</button>
+        <button type="button" onClick={() => navigate('/clients')} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--v3-primary-text)', fontWeight: 700, cursor: 'pointer' }}>← Back to clients</button>
         <div style={{ marginTop: 12 }}>
           <DataErrorState
             title="Couldn't load this client"
@@ -205,7 +205,7 @@ export default function ClientDetail() {
   if (!client) {
     return (
       <div className="v3-screen" style={{ padding: '24px 24px 48px', background: 'var(--v3-bg)' }}>
-        <button type="button" onClick={() => navigate('/clients')} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--v3-primary)', fontWeight: 700, cursor: 'pointer' }}>← Back to clients</button>
+        <button type="button" onClick={() => navigate('/clients')} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--v3-primary-text)', fontWeight: 700, cursor: 'pointer' }}>← Back to clients</button>
         <p style={{ color: 'var(--v3-text-muted)', marginTop: 12 }}>Client not found.</p>
       </div>
     )
@@ -348,7 +348,7 @@ export default function ClientDetail() {
         <div style={{
           padding: '12px 12px',
           borderRadius: 10,
-          background: 'linear-gradient(180deg, #141414 0%, var(--v3-surface) 72%)',
+          background: 'linear-gradient(180deg, var(--v3-bg) 0%, var(--v3-surface) 72%)',
           border: '1px solid var(--v3-border)',
           boxShadow: '0 1px 0 rgba(242, 237, 228, 0.06) inset, 0 1px 2px rgba(20, 20, 20, 0.40), 0 8px 22px rgba(20, 20, 20, 0.42), 0 20px 44px rgba(20, 20, 20, 0.28)'
         }}>
@@ -364,7 +364,7 @@ export default function ClientDetail() {
               fontFamily: 'var(--font-display)',
               fontSize: 24,
               letterSpacing: 0,
-              color: 'var(--v3-primary)',
+              color: 'var(--v3-primary-text)',
               boxShadow: 'inset 0 1px 0 rgba(242, 237, 228, 0.05)'
             }}>
               {initial}
@@ -562,7 +562,7 @@ function NewDealOption({ icon: Icon, label, sub, onClick, disabled }: any) {
         width: 40, height: 40, borderRadius: 10,
         background: 'var(--v3-primary-soft)',
         border: '1px solid color-mix(in srgb, var(--v3-primary) 28%, transparent)',
-        color: 'var(--v3-primary)',
+        color: 'var(--v3-primary-text)',
         display: 'grid', placeItems: 'center'
       }}>
         <Icon size={18} />
@@ -593,8 +593,8 @@ function NewDealOption({ icon: Icon, label, sub, onClick, disabled }: any) {
 
 function IconBtn({ children, onClick, ariaLabel, ariaPressed, tone, disabled }: any) {
   const palette = {
-    primary: { bg: 'var(--v3-primary-soft)', border: 'color-mix(in srgb, var(--v3-primary) 45%, transparent)', color: 'var(--v3-primary)' },
-    danger:  { bg: 'rgba(192, 57, 43, 0.10)', border: 'color-mix(in srgb, var(--v3-danger) 35%, transparent)', color: 'var(--v3-danger-bright)' }
+    primary: { bg: 'var(--v3-primary-soft)', border: 'color-mix(in srgb, var(--v3-primary) 45%, transparent)', color: 'var(--v3-primary-text)' },
+    danger:  { bg: 'rgba(192, 57, 43, 0.10)', border: 'color-mix(in srgb, var(--v3-danger) 35%, transparent)', color: 'var(--v3-danger-text)' }
   }
   const p = (tone && (palette as any)[tone]) || { bg: 'var(--v3-surface)', border: 'var(--v3-border-strong)', color: 'var(--v3-text)' }
   return (
@@ -849,7 +849,7 @@ function ContactRow({ icon: Icon, label, value, href, multiline, isLast }: any) 
         border: hasValue
           ? '1px solid color-mix(in srgb, var(--v3-primary) 28%, transparent)'
           : '1px solid var(--v3-border)',
-        color: hasValue ? 'var(--v3-primary)' : 'var(--v3-text-muted)',
+        color: hasValue ? 'var(--v3-primary-text)' : 'var(--v3-text-muted)',
         display: 'grid', placeItems: 'center'
       }}>
         <Icon size={15} />
@@ -1214,7 +1214,7 @@ function ClientTimeline({ jobs, payments, notes, files, onOpen }: any) {
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
                 <span style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, color: 'var(--v3-text)' }}>{e.title}</span>
                 {e.amount != null && e.amount > 0 && (
-                  <span style={{ flexShrink: 0, fontSize: 14, fontWeight: 800, color: 'var(--v3-success-bright, #2D7A4F)', fontVariantNumeric: 'tabular-nums' }}>+{money(e.amount)}</span>
+                  <span style={{ flexShrink: 0, fontSize: 14, fontWeight: 800, color: 'var(--v3-success-text)', fontVariantNumeric: 'tabular-nums' }}>+{money(e.amount)}</span>
                 )}
               </div>
               {e.detail && (
@@ -1233,8 +1233,8 @@ function ClientTimeline({ jobs, payments, notes, files, onOpen }: any) {
 }
 
 const TIMELINE_META: Record<string, { Icon: any; color: string; bg: string; border: string }> = {
-  payment: { Icon: DollarSign, color: 'var(--v3-success-bright, #2D7A4F)', bg: 'color-mix(in srgb, #2D7A4F 12%, transparent)', border: 'color-mix(in srgb, #2D7A4F 35%, transparent)' },
-  job:     { Icon: Briefcase,  color: 'var(--v3-primary)', bg: 'var(--v3-primary-soft)', border: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)' },
+  payment: { Icon: DollarSign, color: 'var(--v3-success-text)', bg: 'color-mix(in srgb, #2D7A4F 12%, transparent)', border: 'color-mix(in srgb, #2D7A4F 35%, transparent)' },
+  job:     { Icon: Briefcase,  color: 'var(--v3-primary-text)', bg: 'var(--v3-primary-soft)', border: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)' },
   note:    { Icon: MessageSquare, color: 'var(--v3-text-muted)', bg: 'var(--v3-surface-2)', border: 'var(--v3-border)' },
   file:    { Icon: ImageIcon, color: 'var(--v3-text-muted)', bg: 'var(--v3-surface-2)', border: 'var(--v3-border)' }
 }
@@ -1352,7 +1352,7 @@ function ProjectsList({ jobs, payments = [], changeOrders = [], onOpen }: any) {
                     display: 'flex', flexDirection: 'column', gap: 12,
                     padding: '12px 12px 12px 24px',
                     borderRadius: 10,
-                    background: '#141414',
+                    background: 'var(--v3-bg)',
                     border: '1px solid var(--v3-border-strong)',
                     boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 1px 2px rgba(20, 20, 20, 0.22)',
                     textAlign: 'left',
@@ -1397,7 +1397,7 @@ function ProjectsList({ jobs, payments = [], changeOrders = [], onOpen }: any) {
                       <div style={{
                         fontFamily: 'var(--font-display)',
                         fontSize: 16,
-                        color: 'var(--v3-primary)',
+                        color: 'var(--v3-primary-text)',
                         letterSpacing: 0,
                         fontVariantNumeric: 'tabular-nums',
                         lineHeight: 1
@@ -1438,7 +1438,7 @@ function ProjectsList({ jobs, payments = [], changeOrders = [], onOpen }: any) {
                         <span>
                           {money(paid)} paid{paid > 0 ? ` · ${pct}%` : ''}
                         </span>
-                        <span style={{ color: due ? 'var(--v3-danger-bright, #C0392B)' : 'var(--v3-success-bright, #2D7A4F)' }}>
+                        <span style={{ color: due ? 'var(--v3-danger-text)' : 'var(--v3-success-text)' }}>
                           {due ? `${money(balance)} due` : 'Paid in full'}
                         </span>
                       </div>
@@ -1573,7 +1573,7 @@ function FilesList({ rows }: any) {
               width: 34, height: 34, borderRadius: 10,
               background: 'var(--v3-primary-soft)',
               border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
-              color: 'var(--v3-primary)',
+              color: 'var(--v3-primary-text)',
               display: 'grid', placeItems: 'center'
             }}>
               {r.kind === 'photo' ? <ImageIcon size={15} /> : <Paperclip size={15} />}

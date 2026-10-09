@@ -366,7 +366,7 @@ export default function PhotosSection({ jobId, userId }: any) {
                   ? '1px solid color-mix(in srgb, var(--v3-primary) 50%, transparent)'
                   : '1px solid var(--v3-border)',
                 background: compareMode ? 'var(--v3-primary-soft)' : 'transparent',
-                color: compareMode ? 'var(--v3-primary)' : 'var(--v3-text)',
+                color: compareMode ? 'var(--v3-primary-text)' : 'var(--v3-text)',
                 fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
                 letterSpacing: 0, cursor: 'pointer'
               }}
@@ -407,7 +407,7 @@ export default function PhotosSection({ jobId, userId }: any) {
         }}>
           <div style={{
             fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-            letterSpacing: 0, color: 'var(--v3-primary)'
+            letterSpacing: 0, color: 'var(--v3-primary-text)'
           }}>
             {!compareBefore ? 'Tap the BEFORE photo' :
               !compareAfter ? 'Now tap the AFTER photo' :

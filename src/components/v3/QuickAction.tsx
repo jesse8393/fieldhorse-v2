@@ -54,7 +54,7 @@ export default function QuickAction({ icon: Icon, label, primary = false, onTap 
           border: `1px solid ${primary
             ? 'color-mix(in srgb, var(--v3-primary) 32%, transparent)'
             : 'var(--v3-border)'}`,
-          color: primary ? 'var(--v3-primary)' : 'var(--v3-text)'
+          color: primary ? 'var(--v3-primary-text)' : 'var(--v3-text)'
         }}
       >
         <Icon size={19} strokeWidth={2.2} />

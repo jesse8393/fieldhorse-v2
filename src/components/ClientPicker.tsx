@@ -163,7 +163,7 @@ export default function ClientPicker({ userId, value, onChange }: any) {
 
   if (value?.id) {
     return (
-      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 8px 12px 12px', borderRadius: 10, background: 'rgba(201,150,58,0.14)', border: '1px solid rgba(201,150,58,0.35)', color: 'var(--field-gold-bright)', maxWidth: '100%', minWidth: 0 }}>
+      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 8px 12px 12px', borderRadius: 10, background: 'rgba(201,150,58,0.14)', border: '1px solid rgba(201,150,58,0.35)', color: 'var(--v3-primary-text)', maxWidth: '100%', minWidth: 0 }}>
         <Check size={14} />
         <span style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value.name || 'Client'}</span>
         <button
@@ -171,7 +171,7 @@ export default function ClientPicker({ userId, value, onChange }: any) {
           onPointerDown={(ev) => { ev.preventDefault(); ev.stopPropagation(); onChange?.(null) }}
           onClick={(ev) => { ev.preventDefault(); ev.stopPropagation() }}
           aria-label="Unlink client"
-          style={{ width: 28, height: 28, padding: 0, borderRadius: 10, background: 'transparent', border: 'none', color: 'var(--field-gold-bright)', cursor: 'pointer', display: 'grid', placeItems: 'center', touchAction: 'manipulation', flexShrink: 0 }}
+          style={{ width: 28, height: 28, padding: 0, borderRadius: 10, background: 'transparent', border: 'none', color: 'var(--v3-primary-text)', cursor: 'pointer', display: 'grid', placeItems: 'center', touchAction: 'manipulation', flexShrink: 0 }}
         >
           <X size={14} />
         </button>
@@ -260,7 +260,7 @@ export default function ClientPicker({ userId, value, onChange }: any) {
                   </div>
                 )}
               </div>
-              <span style={{ flexShrink: 0, fontSize: 12, color: 'var(--field-gold-bright)', fontWeight: 700, letterSpacing: 0 }}>
+              <span style={{ flexShrink: 0, fontSize: 12, color: 'var(--v3-primary-text)', fontWeight: 700, letterSpacing: 0 }}>
                 {r.active_jobs_count || 0}
               </span>
             </button>
@@ -277,7 +277,7 @@ export default function ClientPicker({ userId, value, onChange }: any) {
               onPointerDown={(ev) => { ev.preventDefault(); ev.stopPropagation(); createInline() }}
               onClick={(ev) => { ev.preventDefault(); ev.stopPropagation() }}
               disabled={creating}
-              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '12px 12px', marginTop: filtered.length ? 4 : 0, background: 'linear-gradient(135deg, rgba(201,150,58,0.18), rgba(92, 92, 92,0.12))', border: '1px solid rgba(201,150,58,0.4)', borderRadius: 10, color: 'var(--field-gold-bright)', cursor: creating ? 'default' : 'pointer', textAlign: 'left', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, touchAction: 'manipulation' }}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '12px 12px', marginTop: filtered.length ? 4 : 0, background: 'linear-gradient(135deg, rgba(201,150,58,0.18), rgba(92, 92, 92,0.12))', border: '1px solid rgba(201,150,58,0.4)', borderRadius: 10, color: 'var(--v3-primary-text)', cursor: creating ? 'default' : 'pointer', textAlign: 'left', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, touchAction: 'manipulation' }}
             >
               <UserPlus size={14} />
               {creating ? 'Creating…' : <>Create "<span style={{ color: 'var(--ink-strong)' }}>{trimmed}</span>"</>}

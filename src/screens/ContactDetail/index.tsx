@@ -196,7 +196,7 @@ function ActionIntentBanner({
             borderRadius: 10,
             border: '1px solid rgba(201, 150, 58, 0.42)',
             background: 'rgba(201, 150, 58, 0.13)',
-            color: 'var(--v3-primary)',
+            color: 'var(--v3-primary-text)',
             fontFamily: 'var(--font-body)',
             fontSize: 12,
             fontWeight: 800,
@@ -478,7 +478,7 @@ export default function ContactDetail() {
           type="button"
           onClick={() => navigate(routeHome)}
           style={{
-            background: 'none', border: 'none', color: 'var(--v3-primary)',
+            background: 'none', border: 'none', color: 'var(--v3-primary-text)',
             fontWeight: 700, fontSize: 14, cursor: 'pointer', padding: '8px 12px'
           }}
         >
@@ -1244,13 +1244,13 @@ function NextTodoDueChip({ iso }: any) {
     ? {
         bg: 'var(--v3-danger-soft)',
         border: 'color-mix(in srgb, var(--v3-danger) 40%, transparent)',
-        color: 'var(--v3-danger-bright)'
+        color: 'var(--v3-danger-text)'
       }
     : status.tone === 'warn'
       ? {
           bg: 'var(--v3-primary-soft)',
           border: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)',
-          color: 'var(--v3-primary)'
+          color: 'var(--v3-primary-text)'
         }
       : {
           bg: 'var(--v3-surface-2)',
@@ -1279,7 +1279,7 @@ function iconButtonStyle({ disabled = false, tone }: any = {}) {
     border: tone === 'primary'
       ? '1px solid color-mix(in srgb, var(--v3-primary) 45%, transparent)'
       : '1px solid var(--v3-border)',
-    color: tone === 'primary' ? 'var(--v3-primary)' : disabled ? 'var(--v3-text-muted)' : 'var(--v3-text)',
+    color: tone === 'primary' ? 'var(--v3-primary-text)' : disabled ? 'var(--v3-text-muted)' : 'var(--v3-text)',
     cursor: disabled ? 'default' : 'pointer',
     opacity: disabled ? 0.4 : 1,
     WebkitTapHighlightColor: 'transparent'

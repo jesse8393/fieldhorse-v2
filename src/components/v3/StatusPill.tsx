@@ -75,10 +75,11 @@ export default function StatusPill({
         borderRadius: 10,
         background: `color-mix(in srgb, ${chipColor} 12%, transparent)`,
         border: `1px solid color-mix(in srgb, ${chipColor} 35%, transparent)`,
-        // Mix toward the theme's text color, NOT white: in dark the text
-        // is linen (same lightening as before); in daylight it darkens
-        // the chip text for contrast on paper instead of washing it out.
-        color: `color-mix(in srgb, ${chipColor} 80%, var(--v3-text) 20%)`,
+        // Mix toward the theme's text color, NOT white: linen in dark,
+        // onyx in daylight. At 55/45 every tone (steel, gold, green, red)
+        // clears 4.5:1 on its own tint in both themes; the old 80/20 mix
+        // measured 2.98:1 for gold in daylight and 3.39:1 for steel in dark.
+        color: `color-mix(in srgb, ${chipColor} 55%, var(--v3-text) 45%)`,
         fontFamily: 'var(--font-body)',
         fontSize: 12,
         fontWeight: 700,

@@ -15,10 +15,12 @@ const SnowForecast = lazy(() => import('../components/desktop/SnowForecastBuild.
 // Status token → brand palette mapping used across the whole screen.
 // All three statuses get a solid hex fallback so the strip doesn't render
 // transparent if a CSS var fails to resolve.
+// `fg` paints dots and bars (it must stay hex for the glow alpha suffix);
+// `ink` is the text safe shade for labels in both themes.
 const TONE: Record<string, any> = {
-  go:   { fg: '#2D7A4F', bg: 'rgba(45,122,79,0.16)',  border: 'rgba(45, 122, 79,0.35)', label: 'Clear to work' },
-  warn: { fg: '#C9963A', bg: 'rgba(201,150,58,0.14)', border: 'rgba(201,150,58,0.35)', label: 'Tight window' },
-  stop: { fg: '#C0392B', bg: 'rgba(192,57,43,0.15)',  border: 'rgba(192,57,43,0.35)',  label: 'Stand down' }
+  go:   { fg: '#2D7A4F', ink: 'var(--v3-success-text)', bg: 'rgba(45,122,79,0.16)',  border: 'rgba(45, 122, 79,0.35)', label: 'Clear to work' },
+  warn: { fg: '#C9963A', ink: 'var(--v3-primary-text)', bg: 'rgba(201,150,58,0.14)', border: 'rgba(201,150,58,0.35)', label: 'Tight window' },
+  stop: { fg: '#C0392B', ink: 'var(--v3-danger-text)',  bg: 'rgba(192,57,43,0.15)',  border: 'rgba(192,57,43,0.35)',  label: 'Stand down' }
 }
 
 function statusTone(status: any) { return TONE[status] || TONE.go }
@@ -202,7 +204,7 @@ useEffect(() => {
             borderRadius: 10,
             border: hasCoords ? '1px solid rgba(201,150,58,0.3)' : '1px solid var(--rule)',
             background: hasCoords ? 'rgba(201,150,58,0.1)' : 'var(--surface-2)',
-            color: hasCoords ? 'var(--field-gold-bright)' : 'var(--ink-strong)',
+            color: hasCoords ? 'var(--v3-primary-text)' : 'var(--ink-strong)',
             display: 'grid',
             placeItems: 'center',
             cursor: 'pointer'
@@ -221,7 +223,7 @@ useEffect(() => {
             : (cityName || 'Murfreesboro, TN')}
         </div>
         {err && (
-          <div role="alert" style={{ marginTop: 8, fontSize: 12, color: 'var(--alert-red)', fontFamily: 'var(--font-body)' }}>
+          <div role="alert" style={{ marginTop: 8, fontSize: 12, color: 'var(--v3-danger-text)', fontFamily: 'var(--font-body)' }}>
             {err}
           </div>
         )}
@@ -236,7 +238,9 @@ useEffect(() => {
           margin: '0 20px 14px',
           padding: '24px 24px 24px',
           borderRadius: 10,
-          background: 'linear-gradient(135deg, rgba(20, 20, 20,0.9), rgba(20, 20, 20,0.6))',
+          // Canvas colored veil: onyx in dark (as before), linen in daylight,
+          // so the theme colored temperature and labels stay readable.
+          background: 'linear-gradient(135deg, color-mix(in srgb, var(--v3-bg) 90%, transparent), color-mix(in srgb, var(--v3-bg) 60%, transparent))',
           border: `1px solid ${tone.border}`
         }}
       >
@@ -281,7 +285,7 @@ useEffect(() => {
             style={{ width: 10, height: 10, borderRadius: 10, background: tone.fg, boxShadow: `0 0 12px ${tone.fg}99` }}
           />
           <div style={{ minWidth: 0, flex: 1 }}>
-            <Eyebrow as="div" style={{ color: tone.fg }}>
+            <Eyebrow as="div" style={{ color: tone.ink }}>
               {currentWindow.label || tone.label}
             </Eyebrow>
             {currentWindow.reasons?.length > 0 && (
@@ -359,7 +363,7 @@ useEffect(() => {
                       both fmtHour and a markerLabel that printed "12A" /
                       "6A" / "12P" / "6P" twice, stacked vertically.
                       Marker hours now just get a slightly bolder color. */}
-                  <span style={{ fontSize: 12, fontWeight: isMarker ? 800 : 700, color: isMarker ? 'var(--field-gold-bright)' : 'var(--ink-muted)', fontFamily: 'var(--font-body)', letterSpacing: 0 }}>
+                  <span style={{ fontSize: 12, fontWeight: isMarker ? 800 : 700, color: isMarker ? 'var(--v3-primary-text)' : 'var(--ink-muted)', fontFamily: 'var(--font-body)', letterSpacing: 0 }}>
                     {fmtHour(h.time)}
                   </span>
                   <span
@@ -411,7 +415,7 @@ useEffect(() => {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                        <span style={{ fontFamily: 'var(--font-display)', fontSize: 16, letterSpacing: 0, color: i === 0 ? 'var(--field-gold-bright)' : 'var(--ink-strong)' }}>
+                        <span style={{ fontFamily: 'var(--font-display)', fontSize: 16, letterSpacing: 0, color: i === 0 ? 'var(--v3-primary-text)' : 'var(--ink-strong)' }}>
                           {i === 0 ? 'TODAY' : fmtDay(d.time)}
                         </span>
                         <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--ink-muted)' }}>
@@ -427,7 +431,7 @@ useEffect(() => {
                           <Wind size={11} />
                           {Math.round(d.windMax)} mph
                         </span>
-                        <Eyebrow style={{ gap: 4, padding: '4px 8px', borderRadius: 10, background: t.bg, border: `1px solid ${t.border}`, color: t.fg }}>
+                        <Eyebrow style={{ gap: 4, padding: '4px 8px', borderRadius: 10, background: t.bg, border: `1px solid ${t.border}`, color: t.ink }}>
                           {dayStatus === 'go' ? 'GO' : dayStatus === 'warn' ? 'TIGHT' : 'STOP'}
                         </Eyebrow>
                       </div>
@@ -479,7 +483,7 @@ useEffect(() => {
               >
                 <span
                   aria-hidden="true"
-                  style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 10, background: t.bg, border: `1px solid ${t.border}`, display: 'grid', placeItems: 'center', color: t.fg }}
+                  style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 10, background: t.bg, border: `1px solid ${t.border}`, display: 'grid', placeItems: 'center', color: t.ink }}
                 >
                   <Glyph size={14} strokeWidth={2.4} />
                 </span>
@@ -497,7 +501,7 @@ useEffect(() => {
                     </div>
                   )}
                 </div>
-                <Eyebrow style={{ flexShrink: 0, padding: '4px 8px', borderRadius: 10, background: t.bg, border: `1px solid ${t.border}`, color: t.fg }}>
+                <Eyebrow style={{ flexShrink: 0, padding: '4px 8px', borderRadius: 10, background: t.bg, border: `1px solid ${t.border}`, color: t.ink }}>
                   {r.status === 'go' ? 'GO' : r.status === 'warn' ? 'TIGHT' : 'STOP'}
                 </Eyebrow>
               </div>

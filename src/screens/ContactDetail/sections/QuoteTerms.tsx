@@ -86,7 +86,7 @@ export default function QuoteTermsSection({ contact, patch, valuesRef }: any) {
       style={{ margin: 0, padding: '16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}
     >
       <div>
-        <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>
+        <span className="v3-eyebrow" style={{ color: 'var(--v3-primary-text)' }}>
           <FileText size={11} aria-hidden="true" style={{ marginRight: 4, verticalAlign: 'middle' }} />
           Quote terms
         </span>

@@ -53,8 +53,8 @@ import { InvoiceTemplate } from '../components/documents'
 
 const AGING_BUCKETS = [
   { id: '0-30',  label: 'Current',  max: 30,        color: 'var(--v3-text-muted)',     accent: 'var(--v3-border-strong)' },
-  { id: '31-60', label: 'Late',     max: 60,        color: 'var(--v3-primary)',        accent: 'color-mix(in srgb, var(--v3-primary) 40%, transparent)' },
-  { id: '60+',   label: 'Overdue',  max: Infinity,  color: 'var(--v3-danger-bright)',  accent: 'color-mix(in srgb, var(--v3-danger) 50%, transparent)' }
+  { id: '31-60', label: 'Late',     max: 60,        color: 'var(--v3-primary-text)',        accent: 'color-mix(in srgb, var(--v3-primary) 40%, transparent)' },
+  { id: '60+',   label: 'Overdue',  max: Infinity,  color: 'var(--v3-danger-text)',  accent: 'color-mix(in srgb, var(--v3-danger) 50%, transparent)' }
 ]
 
 function bucketFor(days: any) {
@@ -772,7 +772,7 @@ export default function InvoiceDetail() {
                     background: 'var(--v3-surface-2)',
                     border: '1px solid var(--v3-border-strong)',
                     display: 'grid', placeItems: 'center',
-                    color: 'var(--v3-success-bright)',
+                    color: 'var(--v3-success-text)',
                     flexShrink: 0
                   }}>
                     <CheckCircle2 size={14} />
@@ -1099,7 +1099,7 @@ function ViewModeToggle({ value, onChange }: any) {
               borderRadius: 10,
               border: 0,
               background: on ? 'var(--v3-primary-soft)' : 'transparent',
-              color: on ? 'var(--v3-primary)' : 'var(--v3-text-muted)',
+              color: on ? 'var(--v3-primary-text)' : 'var(--v3-text-muted)',
               fontFamily: 'var(--font-body)',
               fontSize: 12,
               fontWeight: 700,
@@ -1137,19 +1137,19 @@ function StatusPill({ status }: any) {
         return {
           bg: 'var(--v3-primary-soft)',
           border: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)',
-          color: 'var(--v3-primary)'
+          color: 'var(--v3-primary-text)'
         }
       case 'good':
         return {
           bg: 'rgba(45, 122, 79, 0.14)',
           border: 'rgba(45, 122, 79, 0.45)',
-          color: 'var(--v3-success-bright)'
+          color: 'var(--v3-success-text)'
         }
       case 'danger':
         return {
           bg: 'rgba(192, 57, 43, 0.14)',
           border: 'rgba(192, 57, 43, 0.45)',
-          color: 'var(--v3-danger-bright)'
+          color: 'var(--v3-danger-text)'
         }
       default:
         return {

@@ -133,8 +133,8 @@ export default function StatementSheet({ open, onClose, client, jobs, payments, 
                 ))}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 12px', borderRadius: 10, background: 'var(--v3-primary-soft)', border: '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)' }}>
-                <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: 'var(--v3-primary)' }}>Total due</span>
-                <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--v3-primary)', fontVariantNumeric: 'tabular-nums' }}>{money(data.totalDue)}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: 'var(--v3-primary-text)' }}>Total due</span>
+                <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--v3-primary-text)', fontVariantNumeric: 'tabular-nums' }}>{money(data.totalDue)}</span>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 2 }}>

@@ -203,7 +203,7 @@ export default function FilesSection({ jobId, userId }: any) {
               <span aria-hidden="true" style={{
                 flexShrink: 0, width: 36, height: 36, borderRadius: 10,
                 background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)',
-                color: 'var(--v3-primary)',
+                color: 'var(--v3-primary-text)',
                 display: 'grid', placeItems: 'center'
               }}>
                 <FileText size={15} />

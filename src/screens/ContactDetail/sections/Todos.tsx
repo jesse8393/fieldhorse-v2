@@ -196,7 +196,7 @@ export default function TodosSection({ jobId, userId }: any) {
             fontFamily: 'var(--font-body)',
             fontSize: 12,
             fontWeight: 700,
-            color: undoneCount === 0 ? 'var(--v3-success-bright)' : 'var(--v3-primary)',
+            color: undoneCount === 0 ? 'var(--v3-success-text)' : 'var(--v3-primary-text)',
             fontVariantNumeric: 'tabular-nums'
           }}>
             {undoneCount === 0 ? 'All clear' : `${undoneCount} pending`}
@@ -320,7 +320,7 @@ export default function TodosSection({ jobId, userId }: any) {
                       ? '1px solid color-mix(in srgb, var(--v3-success-bright) 60%, transparent)'
                       : '1px solid var(--v3-border-strong)',
                     background: r.done ? 'rgba(45, 122, 79, 0.18)' : 'transparent',
-                    color: 'var(--v3-success-bright)',
+                    color: 'var(--v3-success-text)',
                     cursor: 'pointer',
                     display: 'grid', placeItems: 'center',
                     transition: 'background 160ms ease, border-color 160ms ease'
@@ -394,14 +394,14 @@ function DueChipButton({ iso, done, onChange }: any) {
       return {
         bg: 'var(--v3-danger-soft)',
         border: 'color-mix(in srgb, var(--v3-danger) 40%, transparent)',
-        color: 'var(--v3-danger-bright)'
+        color: 'var(--v3-danger-text)'
       }
     }
     if (status.tone === 'warn') {
       return {
         bg: 'var(--v3-primary-soft)',
         border: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)',
-        color: 'var(--v3-primary)'
+        color: 'var(--v3-primary-text)'
       }
     }
     return { bg: 'var(--v3-surface-2)', border: 'var(--v3-border)', color: 'var(--v3-text-muted)' }
@@ -449,7 +449,7 @@ function AssignChipSelect({ members, value, onChange, selfId, memberById }: any)
         borderRadius: 10,
         background: value ? 'color-mix(in srgb, var(--v3-primary) 12%, transparent)' : 'transparent',
         border: value ? '1px solid color-mix(in srgb, var(--v3-primary) 28%, transparent)' : '1px solid var(--v3-border)',
-        color: value ? 'var(--v3-primary)' : 'var(--v3-text-muted)',
+        color: value ? 'var(--v3-primary-text)' : 'var(--v3-text-muted)',
         fontFamily: 'var(--font-body)',
         fontSize: 12,
         fontWeight: 700,

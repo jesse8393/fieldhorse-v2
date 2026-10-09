@@ -470,7 +470,7 @@ export default function SnowInvoicesBuild({
                   <span className="fh-build-num fh-build-rel">{r.paid > 0 ? moneyFull(r.paid) : '\u2003'}</span>
                   <span
                     className="fh-build-num"
-                    style={{ color: r.balance > 0 ? 'var(--v3-primary, #c9963a)' : 'var(--v3-success-bright)', fontWeight: 700 }}
+                    style={{ color: r.balance > 0 ? 'var(--v3-primary-text)' : 'var(--v3-success-text)', fontWeight: 700 }}
                   >
                     {r.balance > 0 ? moneyFull(r.balance) : 'Paid'}
                   </span>
@@ -548,7 +548,7 @@ export default function SnowInvoicesBuild({
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Overdue 60+ d</div>
-              <strong style={{ color: overdueCount > 0 ? 'var(--v3-danger-bright)' : undefined }}>
+              <strong style={{ color: overdueCount > 0 ? 'var(--v3-danger-text)' : undefined }}>
                 {moneyFull(totals['60+'])}
               </strong>
               <span>{overdueCount} {overdueCount === 1 ? 'invoice' : 'invoices'}</span>
