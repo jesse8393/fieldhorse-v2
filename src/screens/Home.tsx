@@ -1418,9 +1418,6 @@ function nameInitials(name: any) {
   return (parts[0][0] + parts[1][0]).toUpperCase()
 }
 
-/* StageChip, inline "<count> <label>" tap target inside the pipeline
-   card breakdown. stopPropagation so the outer card tap (→ /jobs)
-   doesn't double-fire when one of the chips is pressed. */
 /* ============================================================
    PipelineBreakdownCell, one tap-cell inside the pipeline hero's
    3-up breakdown row. Ported from the v3 design's
@@ -1481,35 +1478,6 @@ function PipelineBreakdownCell({ dotColor, label, count, tone, onClick }: any) {
       }}>
         {count === 1 ? 'deal' : 'deals'}
       </div>
-    </button>
-  )
-}
-
-function StageChip({ count, label, stage, navigate }: any) {
-  return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation()
-        hapticTap()
-        navigate(`/jobs?stage=${stage}`)
-      }}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'baseline',
-        gap: 4,
-        padding: '4px 4px',
-        margin: '-2px -4px',
-        background: 'transparent',
-        border: 'none',
-        color: 'inherit',
-        font: 'inherit',
-        cursor: 'pointer',
-        WebkitTapHighlightColor: 'transparent'
-      }}
-    >
-      <span style={{ fontWeight: 700, color: 'var(--v3-text)' }}>{count}</span>
-      <span>{label}</span>
     </button>
   )
 }

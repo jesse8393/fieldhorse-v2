@@ -1,10 +1,9 @@
 // FieldhorseEmblem, the canonical brand mark.
 //
-// Renders the operator-provided artwork (/public/icon-source.png)
-// as an <img>. The PNG is the source of truth, same file the PWA
-// home-screen icons (192/512) and the iOS apple-touch-icon are
-// generated from in scripts/build-icons.mjs, so the in-app badge
-// and the install icon never drift.
+// Renders /icon-192.png as an <img>. scripts/build-icons.mjs generates
+// it, the 512 icon and the iOS apple-touch-icon from the same
+// operator-provided artwork (design/icon-source.png), so the in-app
+// badge and the install icon never drift.
 //
 // Props:
 //   size , pixel side length (defaults to 28 for inline use; pass 96+
@@ -29,10 +28,10 @@ export default function FieldhorseEmblem({
   const isDecorative = title == null
   return (
     <img
-      // Versioned query string busts the iOS Safari + service worker
-      // cache when the underlying PNG changes. Bump the number when
-      // /public/icon-192.png is regenerated from a new icon-source.png.
-      src="/icon-192.png?v=2"
+      // Plain URL, no version query: it has to match the service worker
+      // precache entry exactly, or an offline cold start shows a broken
+      // image. The precache revision already picks up a regenerated PNG.
+      src="/icon-192.png"
       width={size}
       height={size}
       alt={isDecorative ? '' : title}

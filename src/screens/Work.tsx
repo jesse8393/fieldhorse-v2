@@ -160,9 +160,38 @@ export default function Work() {
     () => isMoneyRole ? CHIPS : CHIPS.filter((c) => c.id === 'all' || c.id === 'active' || c.id === 'done'),
     [isMoneyRole]
   )
+
+  const chipCounts = useMemo<Partial<Record<ChipId, number>>>(() => {
+    if (loading) return {}
+    const out: Partial<Record<ChipId, number>> = {}
+    for (const c of visibleChips) {
+      // Field roles never count lead/quote rows, even under 'all'.
+      out[c.id] = contacts.filter((row) =>
+        c.match(row) && (isMoneyRole || (row.stage !== 'lead' && row.stage !== 'quote'))
+      ).length
+    }
+    return out
+  }, [contacts, loading, visibleChips, isMoneyRole])
+  const lostCount = Number(chipCounts.lost || 0)
+
   // For a field role, if the URL/deep-link left them on a now-hidden chip,
-  // fall back to 'all'.
-  const effectiveChip: ChipId = visibleChips.some((c) => c.id === chip) ? chip : 'all'
+  // fall back to 'all'. Same for Lost once nothing is lost: its pill is
+  // hidden then, so the view would be an empty list with no active pill.
+  const effectiveChip: ChipId =
+    !visibleChips.some((c) => c.id === chip) || (chip === 'lost' && !loading && lostCount === 0) ? 'all' : chip
+
+  // Drop a ?stage the view fell back from, so the address, the active
+  // pill, the list and the empty state all agree. Waits until the role
+  // and a fresh list have loaded: membership fails closed (field view)
+  // while it resolves, and a cached list can be missing newer lost deals.
+  useEffect(() => {
+    if (loading || membershipLoading || isError || isFetching) return
+    if (chip === effectiveChip || !searchParams.has('stage')) return
+    const sp = new URLSearchParams(searchParams)
+    sp.delete('stage')
+    setSearchParams(sp, { replace: true })
+  }, [loading, membershipLoading, isError, isFetching, chip, effectiveChip, searchParams, setSearchParams])
+
   const baseChip = CHIPS.find((c) => c.id === effectiveChip) || CHIPS[0]
   // Field roles never see lead/quote rows, even under the All chip.
   const activeChip = isMoneyRole
@@ -206,18 +235,6 @@ export default function Work() {
   }, [contacts, serverHits, activeChip, search])
 
   const { visible, sentinelRef, hasMore } = useInfiniteRender(filtered, `${effectiveChip}|${search}`)
-
-  const chipCounts = useMemo<Partial<Record<ChipId, number>>>(() => {
-    if (loading) return {}
-    const out: Partial<Record<ChipId, number>> = {}
-    for (const c of visibleChips) {
-      // Field roles never count lead/quote rows, even under 'all'.
-      out[c.id] = contacts.filter((row) =>
-        c.match(row) && (isMoneyRole || (row.stage !== 'lead' && row.stage !== 'quote'))
-      ).length
-    }
-    return out
-  }, [contacts, loading, visibleChips, isMoneyRole])
 
   const summary = useMemo(() => {
     // Field roles: count only the active work they can see, and never
@@ -322,7 +339,6 @@ export default function Work() {
   const handleFollowUp = useCallback((c: JobRow, when: number | Date | null) => setFollowUp(c, when), [setFollowUp])
 
   const { stagger, item } = useFhMotion()
-  const lostCount = Number(chipCounts.lost || 0)
 
   return (
     <motion.div
@@ -448,14 +464,14 @@ export default function Work() {
           <div className="v3-empty">
             <Sparkles size={20} color="var(--v3-text-muted)" style={{ margin: '0 auto 8px' }} />
             <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
-              {chip !== 'all' || search ? 'Nothing matches that view.' : 'No work yet.'}
+              {effectiveChip !== 'all' || search ? 'Nothing matches that view.' : 'No work yet.'}
             </div>
             <div style={{ fontSize: 12, marginBottom: 10 }}>
-              {chip !== 'all' || search
+              {effectiveChip !== 'all' || search
                 ? 'Clear the search or switch stage to see more.'
                 : 'Add the next phone call and let it move through the stages.'}
             </div>
-            {chip === 'all' && !search && (
+            {effectiveChip === 'all' && !search && (
               <button
                 type="button"
                 onClick={() => setAddOpen(true)}

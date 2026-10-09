@@ -22,9 +22,8 @@
 // AFTER rounding so 999_999 reads "$1.00M", not "$1000K".
 //
 // Files with INTENTIONALLY different number-formatting rules (e.g.
-// V3PaymentSheet uses Intl.NumberFormat full currency; KanbanBoard
-// uses 1-decimal conditional K/M) keep their own helpers, this
-// module is for the dominant canonical shape only.
+// V3PaymentSheet uses Intl.NumberFormat full currency) keep their own
+// helpers, this module is for the dominant canonical shape only.
 
 function toNumber(n: unknown): number {
   const v = Number(n || 0)

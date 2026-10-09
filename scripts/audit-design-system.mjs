@@ -46,7 +46,9 @@ function lineAt(text, index) {
 
 const auditedFiles = [
   ...['src', 'mobile', 'netlify', 'public'].flatMap((base) => walk(join(root, base))),
-  join(root, 'index.html')
+  join(root, 'index.html'),
+  // The PWA manifest colors live here; they drifted off palette before.
+  join(root, 'vite.config.js')
 ]
 
 for (const file of auditedFiles) {
