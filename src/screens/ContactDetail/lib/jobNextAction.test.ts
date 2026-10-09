@@ -22,6 +22,7 @@ describe('resolveNextAction priority chain', () => {
       todos: [{ id: 't1', text: 'Call supplier' }]
     })
     expect(r.kind).toBe('schedule')
+    expect(r.ctaLabel).toBe('View on schedule')
     expect(r.sourceId).toBe('s1')
   })
 

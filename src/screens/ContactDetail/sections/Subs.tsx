@@ -77,8 +77,15 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }: an
   async function remove(id: any) {
     hapticTap()
     const snapshot = subs.find((s: any) => s.id === id)
-    const { error } = await supabase.from('fh_subs').delete().eq('id', id).eq('user_id', userId)
+    // Match by id only: a teammate must be able to remove a sub someone else
+    // added. RLS scopes the company; an empty result means nothing was removed.
+    const { data: removed, error } = await supabase.from('fh_subs').delete().eq('id', id).select('id')
     if (error) { toastError("Couldn't delete", error.message); return }
+    if (!removed || removed.length === 0) {
+      toastError("Couldn't delete", 'This sub may already be gone, or your role cannot remove it.')
+      fetchAll?.()
+      return
+    }
     await recalcCost(contact.id, userId)
     fetchAll?.()
     toastUndo('Sub removed', {

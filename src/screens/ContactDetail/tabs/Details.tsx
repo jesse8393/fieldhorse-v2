@@ -37,14 +37,18 @@ export default function DetailsTab({
   patch,
   onOpenAddEvent,
   onOpenInvitePartner,
-  insurance
+  insurance,
+  canSeeMoney = false
 }: any) {
-  const [sub, setSub] = useState('milestones')
+  const [chosenSub, setSub] = useState('milestones')
+  // Insurance claims are money records closed to field roles (migration
+  // 064), so the sub tab would only show an empty claim and fail to save.
+  const sub = !canSeeMoney && chosenSub === 'insurance' ? 'milestones' : chosenSub
 
   // Sub-tabs with counts where they make the screen more useful
   const subTabsWithCounts = useMemo(() => {
     const milestones = Array.isArray(contact?.milestones) ? contact.milestones : []
-    return SUB_TABS.map((t) => {
+    return SUB_TABS.filter((t) => canSeeMoney || t.id !== 'insurance').map((t) => {
       if (t.id === 'milestones') {
         const undone = milestones.filter((m: any) => !m.done).length
         return undone > 0 ? { ...t, count: undone } : t
@@ -57,7 +61,7 @@ export default function DetailsTab({
       }
       return t
     })
-  }, [contact, scheduleItems, inspections])
+  }, [contact, scheduleItems, inspections, canSeeMoney])
 
   return (
     <div>

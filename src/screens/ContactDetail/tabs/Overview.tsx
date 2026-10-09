@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { Plus, Pencil, X as XIcon, ShieldCheck, Receipt } from 'lucide-react'
+import { Plus, Pencil, X as XIcon, ShieldCheck, Receipt, RotateCcw } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
+import { toYmd } from '../../../lib/dates.ts'
 import {
   startQuote, approveQuote, markComplete, reopen
 } from '../../../lib/pipeline.ts'
@@ -18,7 +20,7 @@ import {
 import TimeClockCard from '../../../components/TimeClockCard.tsx'
 import { computeJobHealth } from '../lib/jobHealth.ts'
 import ActivityLog from '../sections/ActivityLog.tsx'
-import { resolvePrimaryAction } from '../lib/jobNextAction.ts'
+import { resolvePrimaryAction, resolveNextAction, type JobNextAction } from '../lib/jobNextAction.ts'
 import ClientPicker from '../../../components/ClientPicker.tsx'
 import { money } from '../lib/format.ts'
 import { countNoun } from '../../../lib/format.ts'
@@ -37,10 +39,19 @@ import { countNoun } from '../../../lib/format.ts'
  * per screen"). Its CTA dispatches by `kind` resolved from jobNextAction.ts:
  *   - milestone → patch contact.milestones[i].done = true
  *   - todo      → fh_job_todos UPDATE done=true
- *   - schedule  → open AddEventSheet via onOpenAddEvent (parent owns sheet)
+ *   - schedule  → open that day on the Schedule screen (an event has no
+ *                 done flag, and it is not the job, so nothing is completed)
  *   - stage     → call pipelineFn from pipeline.ts (markComplete/etc)
  *   - idle      → open AddEventSheet
+ *
+ * Money is role gated by the parent: canSeeMoney (owner, admin, manager)
+ * shows the contract cockpit, canMoveMoney adds billing actions, pipeline
+ * moves and the amount field. Both default to false so a missing prop
+ * fails closed. Field roles get the field next action (schedule,
+ * milestone, task) and never a stage move.
  */
+const IDLE_ACTION: JobNextAction = { kind: 'idle', title: 'No next action.', ctaLabel: '+ Schedule next step' }
+
 export default function OverviewTab({
   contact,
   notes = [],
@@ -62,20 +73,24 @@ export default function OverviewTab({
   onOpenApproveQuote,
   onOpenMarkComplete,
   onOpenSendInvoice,
-  onOpenQuote
+  onOpenQuote,
+  canSeeMoney = false,
+  canMoveMoney = false
 }: any) {
   const [actionLoading, setActionLoading] = useState(false)
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
 
   const health = useMemo(
     () => computeJobHealth({ contact, payments, scheduleItems }),
     [contact, payments, scheduleItems]
   )
 
-  const nextAction = useMemo(
-    () => resolvePrimaryAction({ contact, scheduleItems, todos }),
-    [contact, scheduleItems, todos]
-  )
+  const nextAction = useMemo(() => {
+    if (canMoveMoney) return resolvePrimaryAction({ contact, scheduleItems, todos })
+    const fieldAction = resolveNextAction({ contact, scheduleItems, todos })
+    return fieldAction.kind === 'stage' ? IDLE_ACTION : fieldAction
+  }, [canMoveMoney, contact, scheduleItems, todos])
 
   const milestones = useMemo(
     () => Array.isArray(contact?.milestones) ? contact.milestones : [],
@@ -107,13 +122,15 @@ export default function OverviewTab({
               ? { ...prev, todos: (prev.todos || []).map((t: any) => t.id === todoId ? { ...t, done: true } : t) }
               : prev
           )
-          const { error } = await supabase
+          // By id only: teammates complete each other's tasks, RLS scopes
+          // the org. .select() so a zero row update is not a "complete".
+          const { data: updated, error } = await supabase
             .from('fh_job_todos')
             .update({ done: true, completed_at: new Date().toISOString() })
             .eq('id', todoId)
-            .eq('user_id', userId)
-          if (error) {
-            toastError("Couldn't mark task done", error.message)
+            .select('id')
+          if (error || !updated || updated.length === 0) {
+            toastError("Couldn't mark task done", error?.message || 'This task may have been removed. Refresh and try again.')
             await fetchAll() // roll the optimistic flip back
           } else {
             toastSuccess('Task complete')
@@ -122,17 +139,13 @@ export default function OverviewTab({
           break
         }
         case 'schedule': {
-          // Schedule entries don't have a `done` column. Tapping Mark Complete
-          // here advances stage if the user is on `job` (kickoff scheduled →
-          // mark job complete). Otherwise fall through to opening the next-
-          // event sheet so they can schedule the follow-up.
-          if (contact.stage === 'job') {
-            const res: any = await markComplete(contact)
-            if (res?.error) throw res.error
-            await fetchAll()
-          } else {
-            onOpenAddEvent?.()
-          }
+          // An upcoming event is not the job. This CTA used to call
+          // markComplete, so tapping a kickoff set the whole job's
+          // completed_at (billing, analytics) before work started. Open
+          // the event's day on the schedule instead; job completion stays
+          // with the explicit Mark complete flows.
+          const day = toYmd(nextAction.date)
+          navigate(day ? `/schedule?d=${day}` : '/schedule')
           break
         }
         case 'stage': {
@@ -197,6 +210,22 @@ export default function OverviewTab({
     onOpenAddEvent?.()
   }
 
+  // Undo for "work complete": clears completed_at so the job reads as
+  // in progress again (the Mark complete next action set it in one tap,
+  // with no way back in the UI).
+  async function handleReopenWork() {
+    if (actionLoading) return
+    setActionLoading(true)
+    try {
+      await patch({ completed_at: null })
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  // The schedule CTA opens the event's day rather than completing it.
+  const nextActionCta = nextAction.kind === 'schedule' ? 'View on schedule' : nextAction.ctaLabel
+
   // True contract = base amount + approved change orders, the same
   // number the header balance, Financials tab, and customer PDF use.
   // Without the CO term this cockpit read "Paid in full / $0 remaining"
@@ -211,20 +240,24 @@ export default function OverviewTab({
   const credit = Math.max(0, paidNum - contractValue)
   const billedPct = contractValue > 0 ? Math.min(1, paidNum / contractValue) : 0
   const isExecutionStage = contact?.stage === 'job' || contact?.stage === 'invoice' || contact?.stage === 'closed'
-  const showCockpit = contractValue > 0 && isExecutionStage
+  const showCockpit = canSeeMoney && contractValue > 0 && isExecutionStage
+  const isJobStage = contact?.stage === 'job' || contact?.stage === 'invoice'
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '8px 24px 32px' }}>
 
       {/* EDIT FIELDS, only shown when header EDIT toggle is on. Renders ABOVE
           the dashboard so the operator's eye lands on the form. Cancel/Save
-          collapses back to the read-only Overview. */}
+          collapses back to the read-only Overview. Keyed by job so another
+          job always starts from its own values. */}
       {isEditing && (
         <EditFieldsCard
+          key={contact?.id}
           contact={contact}
           patch={patch}
           onExitEdit={onExitEdit}
           userId={userId}
+          canEditAmount={canMoveMoney}
         />
       )}
 
@@ -278,7 +311,7 @@ export default function OverviewTab({
             title={nextAction.kind === 'idle' ? null : nextAction.title}
             date={nextAction.date}
             dueIso={nextAction.kind === 'todo' ? nextAction.dueAt : null}
-            cta={nextAction.ctaLabel}
+            cta={nextActionCta}
             onComplete={handleNextActionComplete}
             onSchedule={handleNextActionSchedule}
             loading={actionLoading}
@@ -290,7 +323,7 @@ export default function OverviewTab({
           title={nextAction.kind === 'idle' ? null : nextAction.title}
           date={nextAction.date}
           dueIso={nextAction.kind === 'todo' ? nextAction.dueAt : null}
-          cta={nextAction.ctaLabel}
+          cta={nextActionCta}
           onComplete={handleNextActionComplete}
           onSchedule={handleNextActionSchedule}
           loading={actionLoading}
@@ -322,19 +355,26 @@ export default function OverviewTab({
       )}
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-        {(contact?.stage === 'invoice' || contact?.stage === 'job') && (
+        {/* Billing and closeout belong to the money roles; field roles
+            cannot read or write invoices, payments or closeouts. */}
+        {canMoveMoney && isJobStage && (
           <Button variant="secondary" leftIcon={Receipt} onClick={() => { hapticTap(); onOpenSendInvoice?.() }}>
             Send invoice
           </Button>
         )}
-        {(contact?.stage === 'invoice' || contact?.stage === 'job' || contact?.stage === 'closed') && (
+        {canMoveMoney && isExecutionStage && (
           <Button variant="secondary" leftIcon={Plus} onClick={() => { hapticTap(); onOpenLogPayment?.() }}>
             Log payment
           </Button>
         )}
-        {(contact?.stage === 'invoice' || contact?.stage === 'job' || contact?.stage === 'closed') && (
+        {canMoveMoney && isExecutionStage && (
           <Button variant="secondary" leftIcon={ShieldCheck} onClick={() => { hapticTap(); onOpenMarkComplete?.() }}>
             {contact?.stage === 'closed' ? 'Closeout record' : 'Mark complete'}
+          </Button>
+        )}
+        {canMoveMoney && isJobStage && !!contact?.completed_at && (
+          <Button variant="secondary" leftIcon={RotateCcw} onClick={() => { hapticTap(); handleReopenWork() }} disabled={actionLoading}>
+            Reopen work
           </Button>
         )}
         <Button variant="secondary" leftIcon={Plus} onClick={() => { hapticTap(); onOpenAddEvent?.() }}>
@@ -355,9 +395,9 @@ export default function OverviewTab({
       <ActivityLog
         contact={contact}
         notes={notes}
-        payments={payments}
+        payments={canSeeMoney ? payments : []}
         scheduleItems={scheduleItems}
-        changeOrders={changeOrders}
+        changeOrders={canSeeMoney ? changeOrders : []}
         stageTransitions={stageTransitions}
       />
 
@@ -411,9 +451,14 @@ const EDITABLE_FIELDS = [
   { key: 'notes',       label: 'Notes',       kind: 'textarea', placeholder: 'Anything else…',    col: 1 }
 ]
 
-function EditFieldsCard({ contact, patch, onExitEdit, userId }: any) {
+function EditFieldsCard({ contact, patch, onExitEdit, userId, canEditAmount = false }: any) {
+  // Snapshot of the row when editing starts. The parent keys this card by
+  // job id, so another job remounts it with fresh values, and a realtime
+  // refetch mid edit never wipes what the operator typed.
   const [form, setForm] = useState(() => buildForm(contact))
   const [saving, setSaving] = useState(false)
+  // The contract amount is money: field roles edit everything else.
+  const fields = canEditAmount ? EDITABLE_FIELDS : EDITABLE_FIELDS.filter((f) => f.key !== 'amount')
   const recordNoun = contact?.stage === 'lead' ? 'lead'
     : contact?.stage === 'quote' ? 'quote'
     : 'job'
@@ -426,11 +471,6 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId }: any) {
   // time can include it without polluting the EDITABLE_FIELDS form
   // shape. null = no change, '' = explicit unlink, uuid = new link.
   const [pendingClientId, setPendingClientId] = useState<any>(null)
-
-  // Reset form whenever the underlying contact changes (e.g. a partner edit
-  // streams in via realtime mid-edit). Keeps the form authoritative for
-  // changed fields while reflecting truth for untouched ones.
-  useEffect(() => { setForm(buildForm(contact)) }, [contact?.id])
 
   // Lazy-load the linked client when present. Skips silently when the
   // contact has no client link or RLS denies (partner viewer).
@@ -497,7 +537,7 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId }: any) {
     if (saving) return
     // Diff: only patch keys whose value differs from the contact row.
     const diff: Record<string, any> = {}
-    for (const f of EDITABLE_FIELDS) {
+    for (const f of fields) {
       const next = f.kind === 'number' ? (form[f.key] === '' ? null : Number(form[f.key])) : form[f.key]
       const cur = contact[f.key]
       const normalizedCur = cur ?? (f.kind === 'number' ? null : '')
@@ -514,8 +554,11 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId }: any) {
       return
     }
     setSaving(true)
-    await patch(diff)
+    const res = await patch(diff)
     setSaving(false)
+    // On failure patch has already said why; keep the form open with
+    // the typed values so the operator can retry instead of losing them.
+    if (res?.error) return
     onExitEdit?.()
   }
 
@@ -609,7 +652,7 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId }: any) {
       </div>
 
       <div className="v3-edit-grid">
-        {EDITABLE_FIELDS.map((f) => (
+        {fields.map((f) => (
           <EditField
             key={f.key}
             label={f.key === 'job_title' && recordNoun !== 'job' ? 'Project / scope' : f.label}

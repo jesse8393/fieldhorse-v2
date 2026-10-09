@@ -832,14 +832,18 @@ export function useGenerateDraws() {
   const client = useQueryClient()
   return async (input: { userId: string; contactId: string; contractTotal: number }) => {
     if (!(input.contractTotal > 0)) return { error: new Error('Set the contract amount first.') }
-    let allocated = 0
+    // Work in cents so draws keep their cents and still sum to the contract
+    // exactly; the last draw takes the remainder (same rule as the web app's
+    // splitByPercents in src/lib/paymentSchedule.ts).
+    const totalCents = Math.round(input.contractTotal * 100)
+    let allocatedCents = 0
     for (let i = 0; i < DEFAULT_DRAW_SCHEDULE.length; i++) {
       const s = DEFAULT_DRAW_SCHEDULE[i]
-      // Last draw absorbs rounding so the draws sum to the contract exactly.
-      const amount = i === DEFAULT_DRAW_SCHEDULE.length - 1
-        ? Math.max(0, input.contractTotal - allocated)
-        : Math.round(input.contractTotal * (s.pct / 100))
-      allocated += amount
+      const cents = i === DEFAULT_DRAW_SCHEDULE.length - 1
+        ? Math.max(0, totalCents - allocatedCents)
+        : Math.round(totalCents * (s.pct / 100))
+      allocatedCents += cents
+      const amount = cents / 100
       const { error } = await supabase.from('fh_invoices').insert({
         user_id: input.userId,
         contact_id: input.contactId,
@@ -888,9 +892,18 @@ export function useAddQuoteItem() {
   const client = useQueryClient()
   return async (input: { userId: string; jobId: string; item: QuoteItemInput }) => {
     const { item } = input
+    // Append after the last line. Every insert used to get the default
+    // sort_order, so reordering lines with equal positions did nothing.
+    const { data: last } = await supabase.from('fh_quote_items')
+      .select('sort_order')
+      .eq('contact_id', input.jobId)
+      .order('sort_order', { ascending: false })
+      .limit(1)
+    const nextSort = Number((last as any)?.[0]?.sort_order ?? -1) + 1
     const { error } = await supabase.from('fh_quote_items').insert({
       user_id: input.userId,
       contact_id: input.jobId,
+      sort_order: Number.isFinite(nextSort) ? nextSort : 0,
       description: item.description,
       qty: item.qty,
       rate: item.rate,

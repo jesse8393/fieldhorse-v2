@@ -37,6 +37,9 @@ type Props = {
   paid?: number | null
   outstanding?: number | null
   changeOrderTotals?: { count: number; pending: number; approved: number; total: number } | null
+  // False for crew and foreman: contract, paid, outstanding, billing and
+  // change order panels are hidden rather than rendered blank.
+  showMoney?: boolean
   children: ReactNode
 }
 
@@ -63,6 +66,7 @@ export default function SnowJobDetailBuild(props: Props) {
     onBack, backLabel = 'Jobs', onEdit, onDelete, onAddEvent,
     primaryAction, isEditing,
     scheduleStatus, reportsMissing, billingStatus, health, paid, outstanding, changeOrderTotals,
+    showMoney = true,
     children,
   } = props
 
@@ -176,7 +180,12 @@ export default function SnowJobDetailBuild(props: Props) {
           </div>
 
           <div className="fh-build-mini-grid fh-build-mini-grid--detail">
-            {isExecution ? (
+            {isExecution && !showMoney ? (
+              <>
+                <MiniMetric label="Stage" value={stageLabel} />
+                <MiniMetric label="Schedule" value={scheduleStatus?.label || '\u2003'} />
+              </>
+            ) : isExecution ? (
               <>
                 <MiniMetric
                   label="Contract"
@@ -198,11 +207,13 @@ export default function SnowJobDetailBuild(props: Props) {
               <>
                 {/* Pre-deal stats: a lead has no contract/paid/outstanding :
                     show what matters for winning it instead. */}
-                <MiniMetric
-                  label="Est. value"
-                  value={Number(contact?.amount || 0) > 0 ? money(contact?.amount) : '\u2003'}
-                  accent={Number(contact?.amount || 0) > 0}
-                />
+                {showMoney && (
+                  <MiniMetric
+                    label="Est. value"
+                    value={Number(contact?.amount || 0) > 0 ? money(contact?.amount) : '\u2003'}
+                    accent={Number(contact?.amount || 0) > 0}
+                  />
+                )}
                 <MiniMetric
                   label="Source"
                   value={contact?.referred_by || '\u2003'}
@@ -338,6 +349,7 @@ export default function SnowJobDetailBuild(props: Props) {
               )}
             </section>
 
+            {showMoney && (<>
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Billing</div>
               {billingStatus ? (
@@ -390,6 +402,7 @@ export default function SnowJobDetailBuild(props: Props) {
                 </>
               )}
             </section>
+            </>)}
             </>)}
           </aside>
         </section>

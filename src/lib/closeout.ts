@@ -7,6 +7,11 @@
 //
 // Approval methods come from the migration's CHECK constraint, keep this
 // list in sync with the SQL or upserts will reject.
+//
+// Reads and deletes are scoped by the job only. RLS decides the tenant,
+// and job rows carry whichever teammate created them (payments are
+// stamped with the job owner's id), so filtering by the caller would
+// zero the totals whenever someone other than the creator closes out.
 
 import { supabase } from './supabase.ts'
 import { transitionStage } from './stages.ts'
@@ -47,10 +52,16 @@ export async function loadCloseout({ userId, contactId }: { userId: string | und
   const { data } = await supabase
     .from('fh_closeouts')
     .select('*')
-    .eq('user_id', userId)
     .eq('contact_id', contactId)
     .maybeSingle()
   return data || null
+}
+
+// Balance the closeout sheet warns about: base amount plus approved
+// change orders, minus what has been paid. Matches the final_amount the
+// certificate snapshots, so the sheet and the certificate agree.
+export function closeoutBalance(amount: number | string | null | undefined, approvedCO: number | string | null | undefined, paid: number | string | null | undefined) {
+  return Math.max(0, Number(amount || 0) + Number(approvedCO || 0) - Number(paid || 0))
 }
 
 // Snapshot helpers, called by the sheet before save so the modal can
@@ -61,12 +72,10 @@ export async function snapshotJobTotals({ userId, contactId }: { userId: string 
     supabase
       .from('fh_payments')
       .select('amount')
-      .eq('user_id', userId)
       .eq('contact_id', contactId),
     supabase
       .from('fh_job_files')
       .select('id', { count: 'exact', head: true })
-      .eq('user_id', userId)
       .eq('job_id', contactId),
     // Approved change orders count toward the final contract, a
     // certificate that says "Paid in full" while CO money is owed is
@@ -74,7 +83,6 @@ export async function snapshotJobTotals({ userId, contactId }: { userId: string 
     supabase
       .from('fh_change_orders')
       .select('amount, status')
-      .eq('user_id', userId)
       .eq('contact_id', contactId)
       .eq('status', 'approved')
   ])
@@ -93,7 +101,10 @@ export async function saveCloseout({ userId, contact, payload, advanceStage = tr
   const totals = await snapshotJobTotals({ userId, contactId: contact.id })
 
   const row = {
-    user_id: userId,
+    // The closeout belongs to the job, so it carries the job owner's id
+    // like the job's payments do. Re-saving from another teammate's
+    // account then updates the same record instead of re-owning it.
+    user_id: contact.user_id || userId,
     contact_id: contact.id,
     closed_at: payload.closed_at || new Date().toISOString(),
     warranty_start_date: payload.warranty_start_date || null,
@@ -145,7 +156,6 @@ export async function clearCloseout({ userId, contact, reopenTo = 'job' }: { use
   const { error } = await supabase
     .from('fh_closeouts')
     .delete()
-    .eq('user_id', userId)
     .eq('contact_id', contact.id)
   if (error) throw error
   if (reopenTo && contact.stage === 'closed') {

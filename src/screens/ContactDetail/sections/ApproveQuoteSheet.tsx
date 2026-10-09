@@ -8,6 +8,7 @@ import { toastError, toastSuccess } from '../../../lib/toast.ts'
 import { hapticStageChange, hapticTap } from '../../../lib/haptics.ts'
 import { approveQuote as pipelineApproveQuote } from '../../../lib/pipeline.ts'
 import { generateQuote } from '../../../lib/pdf.js'
+import { proposalNumber } from '../../../components/documents/numbers.ts'
 import SignaturePad from '../../../components/SignaturePad.tsx'
 import { useDrawerKeyboard } from '../../../lib/useDrawerKeyboard.ts'
 import { Eyebrow } from '../../../components/v3'
@@ -56,19 +57,6 @@ function money(n: any) {
   })
 }
 
-// Compute a deterministic-ish quote number for the snapshot.
-// Mirrors the helper in pdf.js so the approval record carries the
-// same identifier the PDF will stamp later in 4C-3.
-function makeQuoteNumber(contactId: any) {
-  const d = new Date()
-  const y = d.getFullYear().toString().slice(-2)
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const tail = contactId
-    ? String(contactId).replace(/-/g, '').slice(-4).toUpperCase()
-    : Math.random().toString(36).slice(2, 6).toUpperCase()
-  return `FH-Q-${y}${m}-${tail}`
-}
-
 export default function ApproveQuoteSheet({ open, contact, userId, onClose, onApproved }: any) {
   const { profile } = useProfile()
 
@@ -111,11 +99,12 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
     let alive = true
     setLoadingItems(true)
     ;(async () => {
+      // Scoped by the job, RLS decides the tenant, so a teammate approves
+      // the same lines the quote's author wrote.
       const { data, error } = await supabase
         .from('fh_quote_items')
         .select('*')
         .eq('contact_id', contact.id)
-        .eq('user_id', userId)
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: true })
       if (!alive) return
@@ -128,7 +117,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
       setLoadingItems(false)
     })()
     return () => { alive = false }
-  }, [open, contact?.id, contact?.updated_at, userId])
+  }, [open, contact?.id, contact?.updated_at, contact?.name, contact?.email, userId])
 
   const totals = useMemo(() => {
     let base = 0, optional = 0, excludedCount = 0, baseCount = 0, optionalCount = 0
@@ -204,7 +193,11 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
       }
 
       const snapshot = {
-        quote_number: makeQuoteNumber(contact.id),
+        // Same number the proposal PDF and the quote header show
+        // (company prefix, never the app's name), so the approval record
+        // and the archived file match what the customer received.
+        // Same issue date the printed proposal uses, so the year matches.
+        quote_number: proposalNumber(company.name, contact.id, contact.quote_sent_at || contact.created_at),
         snapshot_taken_at: new Date().toISOString(),
         company,
         contact: {
