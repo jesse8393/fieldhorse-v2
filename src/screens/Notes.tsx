@@ -190,13 +190,12 @@ export default function Notes() {
       return
     }
     // Keep the AI parse with the note so the AI badge, risk spine and
-    // action items survive a reload. It is written as a separate update
-    // because fh_notes.parsed comes from optional migration 003: where
-    // the column is missing the update fails and the note still stands,
-    // just without the parse. Queued (offline) notes skip it.
+    // action items survive a reload. It is written as a separate update so
+    // a failed parse write never costs the note itself (the column was
+    // added in production by migration 068). Queued (offline) notes skip it.
     let savedParsed: any = null
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && !queued) {
-      const { data: stored, error: parsedErr } = await (supabase.from('fh_notes') as any)
+      const { data: stored, error: parsedErr } = await supabase.from('fh_notes')
         .update({ parsed })
         .eq('id', id)
         .select('id')

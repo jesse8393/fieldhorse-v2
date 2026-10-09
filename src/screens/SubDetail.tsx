@@ -158,7 +158,7 @@ export default function SubDetail() {
         phone: seedPhone,
         trades: seedTrade,
         identity_key: key || null,
-      } as any)
+      })
       .select()
       .maybeSingle()
     setCreating(false)

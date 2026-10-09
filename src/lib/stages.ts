@@ -332,8 +332,7 @@ export async function recalcCost(contactId: string | undefined, userId: string |
   // the next recalc by an owner, admin or manager (timesheet approval,
   // expense or sub edits) brings it up to date.
   if (contactRow?.org_id) {
-    // fh_money_visible is newer than the generated types (database.types.ts).
-    const { data: moneyVisible, error: visErr } = await (supabase.rpc as any)('fh_money_visible', { p_org_id: contactRow.org_id })
+    const { data: moneyVisible, error: visErr } = await supabase.rpc('fh_money_visible', { p_org_id: contactRow.org_id })
     if (!visErr && moneyVisible === false) return null
   }
   // No user_id filter on the sums: the job screen shows ALL fh_subs /

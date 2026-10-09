@@ -31,13 +31,20 @@ type Note = {
   title?: string | null
   contact_id?: string | null
   created_at?: string | null
-  parsed?: {
-    summary?: string
-    action_items?: string[]
-    risks?: string[]
-    follow_up_date?: string
-    materials_needed?: string[]
-  }
+  // fh_notes.parsed is free form JSON from the AI parse (or null).
+  parsed?: unknown
+}
+
+type ParsedNote = {
+  summary?: string
+  action_items?: string[]
+  risks?: string[]
+  follow_up_date?: string
+  materials_needed?: string[]
+}
+
+function asParsed(value: unknown): ParsedNote | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as ParsedNote) : null
 }
 
 type Props = {
@@ -240,8 +247,9 @@ export default function SnowNotesBuild(props: Props) {
               )}
               {!loading && recent.slice(0, 25).map((n: any) => {
                 const linkedJob = contacts.find((c) => c.id === n.contact_id)
-                const hasParsed = !!(n.parsed && (n.parsed.summary || n.parsed.action_items?.length || n.parsed.risks?.length))
-                const hasRisk = !!(n.parsed?.risks?.length)
+                const p = asParsed(n.parsed)
+                const hasParsed = !!(p && (p.summary || p.action_items?.length || p.risks?.length))
+                const hasRisk = !!(p?.risks?.length)
                 const body = (n.text || n.body || n.title || '').toString()
                 return (
                   <div key={n.id} className="fh-build-note-row">
