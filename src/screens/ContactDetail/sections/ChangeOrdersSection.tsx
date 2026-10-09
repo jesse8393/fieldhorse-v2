@@ -19,14 +19,10 @@ import { mintPublicLink } from '../../../lib/publicLink.ts'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
 import { useConfirm } from '../../../components/ConfirmSheet.tsx'
 import { Eyebrow } from '../../../components/v3'
-
-function money(n: any) {
-  const v = Number(n || 0)
-  return v.toLocaleString(undefined, {
-    style: 'currency', currency: 'USD',
-    minimumFractionDigits: 0, maximumFractionDigits: 0
-  })
-}
+// Cents aware, so a $1,249.50 change order never reads "$1,250".
+import { money } from '../../../components/documents/format.ts'
+import { useMembership } from '../../../contexts/MembershipContext.tsx'
+import { canEditJobMoney } from '../lib/jobAccess.ts'
 
 function shortDate(iso: any) {
   if (!iso) return ''
@@ -37,21 +33,30 @@ function shortDate(iso: any) {
 
 export default function ChangeOrdersSection({ contact, userId, changeOrders = [], onChange }: any) {
   const confirm = useConfirm()
-  const isOwner = contact && contact.user_id === userId
+  // Any owner, admin or manager of the job's company may edit, not only
+  // the teammate who created the job (see lib/jobAccess.ts).
+  const { orgId: viewerOrgId, canCreateFinancialDocs } = useMembership()
+  const isOwner = !!contact && canEditJobMoney({
+    contactUserId: contact.user_id,
+    contactOrgId: contact.org_id,
+    userId,
+    orgId: viewerOrgId,
+    canCreateFinancialDocs,
+  })
   const [editingId, setEditingId] = useState<any>(null)
   const [creating, setCreating] = useState(false)
 
   if (!isOwner) {
-    // Partners can READ approved COs (per migration 019 partner policy),
-    // but can't author. Render the read-only list when there are
-    // approved entries; render nothing when there's nothing to show.
-    const visible = changeOrders.filter((co: any) => co.status === 'approved')
-    if (visible.length === 0) return null
+    // Read only for everyone but the job's creator. RLS decides what is
+    // visible: partners only ever receive approved COs (migration 019
+    // partner policy), while teammates see every CO on the job, so the
+    // list is not filtered again here. Render nothing when it is empty.
+    if (changeOrders.length === 0) return null
     return (
       <SectionShell>
-        <SectionHeader count={visible.length} canAdd={false} onAdd={() => {}} />
+        <SectionHeader count={changeOrders.length} canAdd={false} onAdd={() => {}} />
         <List
-          changeOrders={visible}
+          changeOrders={changeOrders}
           readOnly
         />
       </SectionShell>
@@ -78,7 +83,10 @@ export default function ChangeOrdersSection({ contact, userId, changeOrders = []
       if (payload.id) {
         res = await supabase
           .from('fh_change_orders')
-          .update(row)
+          // An approved change order carries the customer's sign off on
+          // its title and amount, so editing one only rewrites the
+          // description.
+          .update(payload.locked ? { description: row.description } : row)
           .eq('id', payload.id)
           .select('*')
           .single()
@@ -99,15 +107,12 @@ export default function ChangeOrdersSection({ contact, userId, changeOrders = []
       // Best-effort; never blocks the save.
       if (!payload.id && res.data) {
         try {
-          const moneyStr = Number(res.data.amount || 0).toLocaleString(undefined, {
-            style: 'currency', currency: 'USD',
-            minimumFractionDigits: 0, maximumFractionDigits: 0
-          })
-          const sign = res.data.amount >= 0 ? '+' : '−'
+          const amt = Number(res.data.amount || 0)
+          const sign = amt >= 0 ? '+' : '−'
           await supabase.from('fh_notifications').insert({
             user_id: userId,
             kind: 'change_order_added',
-            title: `CO #${res.data.sequence_number} added · ${sign}${Math.abs(res.data.amount) > 0 ? moneyStr : '$0'}`,
+            title: `CO #${res.data.sequence_number} added · ${sign}${money(Math.abs(amt))}`,
             body: `${contact?.name || 'Job'} · ${res.data.title || 'Change order'}`,
             link: `/jobs/${contact.id}?tab=quote`
           })
@@ -369,7 +374,11 @@ function Row({ co, readOnly, onEdit, onApprove, onGetSignature, onVoid, onDelete
                 <Check size={12} aria-hidden="true" />
               </IconBtn>
             )}
-            <IconBtn onClick={onEdit} aria-label="Edit change order" title="Edit">
+            <IconBtn
+              onClick={onEdit}
+              aria-label={isApproved ? 'Edit change order description' : 'Edit change order'}
+              title={isApproved ? 'Edit description' : 'Edit'}
+            >
               <FileEdit size={12} aria-hidden="true" />
             </IconBtn>
             {!isVoid && (
@@ -388,6 +397,12 @@ function Row({ co, readOnly, onEdit, onApprove, onGetSignature, onVoid, onDelete
 }
 
 function Editor({ initial, isNew, onSave, onCancel }: any) {
+  // An approved change order holds the customer's sign off (their typed
+  // signature, or the approval the contractor recorded) on its title and
+  // amount, so those stay as approved and only the description can
+  // change. New terms mean voiding it and adding a new change order that
+  // goes out for approval again.
+  const locked = !isNew && initial.status === 'approved'
   const [form, setForm] = useState({
     id: initial.id || null,
     title: initial.title || '',
@@ -403,8 +418,22 @@ function Editor({ initial, isNew, onSave, onCancel }: any) {
   function set(k: any, v: any) { setForm((prev) => ({ ...prev, [k]: v })) }
 
   async function submit() {
+    if (locked) {
+      setSaving(true)
+      await onSave?.({ id: form.id, description: form.description, locked: true })
+      setSaving(false)
+      return
+    }
     if (!form.title.trim()) {
       toastError('Title required', 'Enter a short label for the change order.')
+      return
+    }
+    // Check for a usable number rather than an invalid one: NaN fails
+    // every comparison. An empty or mistyped amount used to save as a $0
+    // change order that could then go out for signature.
+    const amt = Number(form.amount)
+    if (!Number.isFinite(amt) || amt === 0) {
+      toastError('Amount required', 'Enter the change order amount. Use a minus sign for a credit.')
       return
     }
     setSaving(true)
@@ -421,8 +450,9 @@ function Editor({ initial, isNew, onSave, onCancel }: any) {
             type="text"
             value={form.title}
             onChange={(e) => set('title', e.target.value)}
+            disabled={locked}
             placeholder="Rot at SW corner, replace ~8' bottom plate"
-            style={inputStyle}
+            style={{ ...inputStyle, ...(locked ? lockedInputStyle : null) }}
           />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -433,13 +463,23 @@ function Editor({ initial, isNew, onSave, onCancel }: any) {
               type="text"
               inputMode="decimal"
               value={form.amount}
-              onChange={(e) => set('amount', e.target.value)}
+              // Like the draws editor, keep only digits and the decimal
+              // point, plus a minus sign here for credits, so typing
+              // "1,500" or pasting "$1,500" saves $1,500 instead of $0.
+              onChange={(e) => set('amount', e.target.value.replace(/[^0-9.-]/g, ''))}
+              disabled={locked}
               placeholder="0"
-              style={{ ...inputStyle, paddingLeft: 24 }}
+              style={{ ...inputStyle, paddingLeft: 24, ...(locked ? lockedInputStyle : null) }}
             />
           </div>
         </label>
       </div>
+      {locked && (
+        <div style={{ marginTop: 10, fontFamily: 'var(--font-body)', fontSize: 12, lineHeight: 1.45, color: 'var(--v3-text-muted)' }}>
+          {initial.approved_by_name ? `Approved by ${initial.approved_by_name}` : 'Approved'}
+          {initial.approved_at ? ` on ${shortDate(initial.approved_at)}` : ''}. The title and amount stay as approved. To change them, void this change order and add a new one.
+        </div>
+      )}
       <label style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 10 }}>
         <span style={labelStyle}>Description (optional)</span>
         <textarea
@@ -450,22 +490,24 @@ function Editor({ initial, isNew, onSave, onCancel }: any) {
           style={{ ...inputStyle, resize: 'vertical' }}
         />
       </label>
-      <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-        {['draft', 'sent', 'approved', 'rejected'].map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => set('status', s)}
-            style={{
-              ...chipStyle,
-              ...(form.status === s ? chipActiveStyle : null)
-            }}
-          >
-            {s.charAt(0).toUpperCase() + s.slice(1)}
-          </button>
-        ))}
-      </div>
-      {form.status === 'approved' && (
+      {!locked && (
+        <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+          {['draft', 'sent', 'approved', 'rejected'].map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => set('status', s)}
+              style={{
+                ...chipStyle,
+                ...(form.status === s ? chipActiveStyle : null)
+              }}
+            >
+              {s.charAt(0).toUpperCase() + s.slice(1)}
+            </button>
+          ))}
+        </div>
+      )}
+      {!locked && form.status === 'approved' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 10 }}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <span style={labelStyle}>Approved by</span>
@@ -552,6 +594,10 @@ const inputStyle: import('react').CSSProperties = {
   padding: '8px 12px', borderRadius: 10,
   background: 'var(--v3-surface)', border: '1px solid var(--v3-border-strong)',
   color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none'
+}
+const lockedInputStyle: import('react').CSSProperties = {
+  opacity: 0.65,
+  cursor: 'not-allowed'
 }
 const chipStyle = {
   padding: '8px 12px', borderRadius: 10,

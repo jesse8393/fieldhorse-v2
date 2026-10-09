@@ -21,6 +21,8 @@ import { Shield, Save as SaveIcon, X, Trash2 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
 import { useConfirm } from '../../../components/ConfirmSheet.tsx'
+import { useMembership } from '../../../contexts/MembershipContext.tsx'
+import { canEditJobMoney } from '../lib/jobAccess.ts'
 
 const FIELDS = [
   { key: 'claim_number',     label: 'Claim number',     type: 'text',  placeholder: 'CL-2026-04812' },
@@ -50,7 +52,16 @@ function hydrate(insurance: any) {
 
 export default function InsuranceSection({ contact, userId, insurance, onChange }: any) {
   const confirm = useConfirm()
-  const isOwner = contact && contact.user_id === userId
+  // Any owner, admin or manager of the job's company may edit, not only
+  // the teammate who created the job (see lib/jobAccess.ts).
+  const { orgId: viewerOrgId, canCreateFinancialDocs } = useMembership()
+  const isOwner = !!contact && canEditJobMoney({
+    contactUserId: contact.user_id,
+    contactOrgId: contact.org_id,
+    userId,
+    orgId: viewerOrgId,
+    canCreateFinancialDocs,
+  })
   const [editing, setEditing] = useState(!insurance)
   const [form, setForm] = useState(() => hydrate(insurance))
   const [saving, setSaving] = useState(false)

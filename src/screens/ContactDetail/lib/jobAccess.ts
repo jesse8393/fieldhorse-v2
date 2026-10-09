@@ -28,3 +28,24 @@ export function tabsForRole<T extends DetailTab>(tabs: T[], canSeeMoney: boolean
 export function pickVisibleTab(requested: string | null | undefined, visible: DetailTab[]): string {
   return requested && visible.some((t) => t.id === requested) ? requested : 'overview'
 }
+
+/**
+ * Who may edit a job's change orders, draws and insurance claim. In a
+ * company that is any owner, admin or manager of the job's company, not
+ * only the teammate who created the job (they all manage the same book).
+ * Without a company it is the job's creator. Crew and foreman never edit
+ * these; the database refuses them too.
+ */
+export function canEditJobMoney(args: {
+  contactUserId?: string | null
+  contactOrgId?: string | null
+  userId?: string | null
+  orgId?: string | null
+  canCreateFinancialDocs: boolean
+}): boolean {
+  const isCreator = !!args.userId && args.contactUserId === args.userId
+  if (!args.orgId) return isCreator
+  if (!args.canCreateFinancialDocs) return false
+  if (!args.contactOrgId) return isCreator
+  return args.contactOrgId === args.orgId
+}

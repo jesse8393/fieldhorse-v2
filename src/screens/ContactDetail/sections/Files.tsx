@@ -7,6 +7,7 @@ import { hapticTap } from '../../../lib/haptics.ts'
 import { SkeletonList } from '../../../components/Skeleton.tsx'
 import ActionSheet from '../../../components/ActionSheet.tsx'
 import { Eyebrow } from '../../../components/v3'
+import { extensionOf, isBlockedUpload, opensInline } from '../lib/fileTypes.ts'
 
 const BUCKET = 'job-files'
 const MAX_BYTES = 25 * 1024 * 1024 // 25 MB per file
@@ -34,11 +35,12 @@ export default function FilesSection({ jobId, userId }: any) {
   const fetchRows = useCallback(async () => {
     if (!jobId || !userId) return
     setLoading(true)
+    // Every file on the job, whoever added it: org RLS scopes the read
+    // to teammates and accepted partners.
     const { data } = await supabase
       .from('fh_job_files')
       .select('*')
       .eq('job_id', jobId)
-      .eq('user_id', userId)
       .eq('kind', 'file')
       .order('uploaded_at', { ascending: false })
     setRows(data || [])
@@ -53,13 +55,18 @@ export default function FilesSection({ jobId, userId }: any) {
     const files: any[] = Array.from(e.target.files || [])
     if (files.length === 0) return
     setUploading(true)
+    let added = 0
     try {
       for (const file of files) {
         if (file.size > MAX_BYTES) {
           toastError('File too large', `${file.name} exceeds 25 MB`)
           continue
         }
-        const ext = (file.name.split('.').pop() || 'bin').toLowerCase()
+        if (isBlockedUpload(file)) {
+          toastError("Can't add that file", `${file.name}: web pages, SVG and XML files can't be stored on a job. Save it as a PDF or zip it first.`)
+          continue
+        }
+        const ext = extensionOf(file.name) || 'bin'
         const rowId = crypto.randomUUID()
         const path = `${userId}/${jobId}/${rowId}.${ext}`
         const { error: upErr } = await supabase.storage
@@ -77,8 +84,9 @@ export default function FilesSection({ jobId, userId }: any) {
           kind: 'file'
         })
         if (insErr) throw insErr
+        added += 1
       }
-      toastSuccess('Files uploaded', `Added ${files.length}`)
+      if (added > 0) toastSuccess('Files uploaded', `Added ${added}`)
       await fetchRows()
     } catch (ex: any) {
       toastError('Upload failed', ex?.message || 'Try again')
@@ -88,11 +96,15 @@ export default function FilesSection({ jobId, userId }: any) {
     }
   }
 
-  async function open(row: any) {
+  // Only PDFs and plain images open in a tab. Anything else, and the
+  // Download button, downloads under the file's own name, so a web page
+  // or SVG that reached storage never renders on the storage domain.
+  async function open(row: any, forceDownload = false) {
     hapticTap()
+    const download = forceDownload || !opensInline(row)
     const { data, error } = await supabase.storage
       .from(BUCKET)
-      .createSignedUrl(row.storage_path, 3600)
+      .createSignedUrl(row.storage_path, 3600, download ? { download: row.filename || true } : undefined)
     if (error || !data?.signedUrl) {
       toastError('Could not open', error?.message || 'Try again')
       return
@@ -112,9 +124,21 @@ export default function FilesSection({ jobId, userId }: any) {
     if (!row || deleting) return
     setDeleting(true)
     try {
-      await supabase.storage.from(BUCKET).remove([row.storage_path])
-      await supabase.from('fh_job_files').delete().eq('id', row.id).eq('user_id', userId)
-      toastSuccess('Deleted', row.filename)
+      // Object first: the storage delete policy for teammates needs the
+      // fh_job_files row to still exist. remove() reports failure in
+      // { error } instead of throwing, and a failed remove must keep the
+      // row, or the object is orphaned with nothing pointing at it.
+      const { error: rmErr } = await supabase.storage.from(BUCKET).remove([row.storage_path])
+      if (rmErr) throw rmErr
+      // By id: any teammate can remove a job file, RLS scopes the tenant.
+      const { data: gone, error: delErr } = await supabase
+        .from('fh_job_files')
+        .delete()
+        .eq('id', row.id)
+        .select('id')
+      if (delErr) throw delErr
+      if (!gone?.length) toastError('Delete failed', 'This file may already be gone.')
+      else toastSuccess('Deleted', row.filename)
       await fetchRows()
     } catch (ex: any) {
       toastError('Delete failed', ex?.message || 'Try again')
@@ -210,7 +234,7 @@ export default function FilesSection({ jobId, userId }: any) {
               </button>
               <button
                 type="button"
-                onClick={() => open(r)}
+                onClick={() => open(r, true)}
                 aria-label="Download"
                 style={{
                   width: 32, height: 32, borderRadius: 10,

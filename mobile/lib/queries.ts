@@ -280,7 +280,7 @@ export function useLogPayment() {
       contact_id: input.contactId,
       amount: input.amount,
       method: input.method || 'check',
-      paid_on: input.paidOn || new Date().toISOString().slice(0, 10)
+      paid_on: input.paidOn || localYmd()
     } as any)
     if (!error) {
       client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
@@ -1387,11 +1387,50 @@ export function useInvoicesOverview(userId: string | undefined) {
   })
 }
 
+// Today's calendar date on this device. toISOString() is UTC, which is
+// already tomorrow for US users in the evening.
+function localYmd(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+// Marking an invoice paid also records the money against it, so the job
+// balance, the web app and the customer statement agree. Only the part not
+// already paid against this invoice is logged.
 export function useMarkInvoicePaid() {
   const client = useQueryClient()
   return async (input: { id: string; userId: string }) => {
+    const { data: inv, error: invErr } = await supabase.from('fh_invoices')
+      .select('id, contact_id, amount, status')
+      .eq('id', input.id)
+      .maybeSingle()
+    if (invErr || !inv) return { error: invErr || new Error('Invoice not found.') }
+    const row = inv as any
+    if (row.status === 'paid') return { error: null }
+    const { data: linked, error: linkErr } = await supabase.from('fh_payments')
+      .select('amount')
+      .eq('invoice_id', input.id)
+    if (linkErr) return { error: linkErr }
+    const already = (linked ?? []).reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0)
+    const remainder = Math.round((Number(row.amount || 0) - already) * 100) / 100
+    if (remainder > 0) {
+      const { error: payErr } = await supabase.from('fh_payments').insert({
+        user_id: input.userId,
+        contact_id: row.contact_id,
+        invoice_id: input.id,
+        amount: remainder,
+        method: 'other',
+        paid_on: localYmd()
+      } as any)
+      if (payErr) return { error: payErr }
+    }
     const { error } = await supabase.from('fh_invoices').update({ status: 'paid' } as any).eq('id', input.id)
-    if (!error) client.invalidateQueries({ queryKey: ['invoicesOverview', input.userId] })
+    if (!error) {
+      client.invalidateQueries({ queryKey: ['invoicesOverview', input.userId] })
+      client.invalidateQueries({ queryKey: ['jobDetail', row.contact_id] })
+      client.invalidateQueries({ queryKey: ['invoiceDetail', row.contact_id] })
+      client.invalidateQueries({ queryKey: ['activityFeed', input.userId] })
+      client.invalidateQueries({ queryKey: queryKeys.jobs })
+    }
     return { error }
   }
 }

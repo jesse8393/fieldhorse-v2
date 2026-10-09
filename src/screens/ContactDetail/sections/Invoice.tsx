@@ -5,12 +5,9 @@ import { supabase } from '../../../lib/supabase.ts'
 import { useConfirm } from '../../../components/ConfirmSheet.tsx'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
 import { Eyebrow } from '../../../components/v3'
-
-function money(n: any) {
-  return Number(n || 0).toLocaleString(undefined, {
-    style: 'currency', currency: 'USD', maximumFractionDigits: 0
-  })
-}
+import { contractTotals } from '../../../lib/invoices.ts'
+// Cents aware, so a $4,999.50 balance never reads "$5,000".
+import { money } from '../../../components/documents/format.ts'
 
 /**
  * Invoice section, surfaces balance + payment history. The actual "Log
@@ -22,8 +19,12 @@ function money(n: any) {
  * corrected. Each row confirms before deleting since payments drive the
  * job's paid/balance numbers.
  */
-export default function InvoiceSection({ contact, payments = [], paid = 0, balance = 0, onOpenLogPayment, userId, fetchAll }: any) {
-  const amount = Number(contact?.amount || 0)
+export default function InvoiceSection({ contact, payments = [], changeOrders = [], paid = 0, balance = 0, onOpenLogPayment, userId, fetchAll }: any) {
+  // The contract is the base amount plus approved change orders, the
+  // same figure `balance` is measured against (useJobData runs
+  // contractTotals on the same rows), so the hero, the "paid of" line and
+  // the bar share one base.
+  const amount = contractTotals({ contact, payments, changeOrders }).contractTotal
   const pct = amount > 0 ? Math.min(100, Math.round((paid / amount) * 100)) : 0
   const isClosed = balance <= 0.5 && amount > 0
   const confirm = useConfirm() as any

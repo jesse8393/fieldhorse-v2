@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Check, Plus, Trash2, Calendar, UserRound } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
@@ -33,6 +33,11 @@ export default function TodosSection({ jobId, userId }: any) {
   // a single-user org-of-one effectively just shows "Me".
   const [assignDraft, setAssignDraft] = useState('')
   const [members, setMembers] = useState<OrgMember[]>([])
+  // True while a new task is being inserted. The ref is the actual guard:
+  // a second Enter (or Enter then a tap on Add) can fire before React
+  // re-renders with the state, and must not insert the task twice.
+  const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
 
   // Fetch the org member list once for the assignee picker. Best-effort
   //, if the call fails (e.g. org_members endpoint unreachable) the
@@ -74,33 +79,46 @@ export default function TodosSection({ jobId, userId }: any) {
 
   async function add() {
     const txt = draft.trim()
-    if (!txt) return
+    if (!txt || savingRef.current) return
+    savingRef.current = true
+    setSaving(true)
     hapticTap()
-    const payload: Record<string, any> = { user_id: userId, job_id: jobId, text: txt }
-    if (dueDraft) payload.due_at = dateInputToTimestamp(dueDraft)
-    if (assignDraft) payload.assigned_to = assignDraft
-    const { queued, error } = await resilientInsert('fh_job_todos', payload)
-    if (error) {
-      toastError("Couldn't add task", error.message)
-      return
+    try {
+      const payload: Record<string, any> = { user_id: userId, job_id: jobId, text: txt }
+      if (dueDraft) payload.due_at = dateInputToTimestamp(dueDraft)
+      if (assignDraft) payload.assigned_to = assignDraft
+      const { queued, error } = await resilientInsert('fh_job_todos', payload)
+      if (error) {
+        toastError("Couldn't add task", error.message)
+        return
+      }
+      if (queued) toastSuccess('Saved offline', 'Will sync when signal returns')
+      setDraft('')
+      setDueDraft('')
+      setAssignDraft('')
+      fetchRows()
+    } finally {
+      savingRef.current = false
+      setSaving(false)
     }
-    if (queued) toastSuccess('Saved offline', 'Will sync when signal returns')
-    setDraft('')
-    setDueDraft('')
-    setAssignDraft('')
-    fetchRows()
   }
 
-  // Reassign an existing task. Allowed for any teammate (org-scoped
-  // RLS on fh_job_todos governs the actual write).
+  // Teammates edit and remove each other's tasks, so every write below
+  // matches by id only and org RLS on fh_job_todos scopes the tenant. A
+  // write that matches no row (deleted meanwhile, or access revoked)
+  // returns no error, so each asks for the id back and treats an empty
+  // result as a failure.
+
+  // Reassign an existing task.
   async function reassign(rowId: any, nextAssignedTo: string | null) {
     setRows((rs) => rs.map((r) => r.id === rowId ? { ...r, assigned_to: nextAssignedTo } : r))
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('fh_job_todos')
       .update({ assigned_to: nextAssignedTo })
       .eq('id', rowId)
-    if (error) {
-      toastError("Couldn't reassign", error.message)
+      .select('id')
+    if (error || !data?.length) {
+      toastError("Couldn't reassign", error?.message || 'This task may have been deleted.')
       fetchRows()
     }
   }
@@ -109,13 +127,13 @@ export default function TodosSection({ jobId, userId }: any) {
   // fires here. Optimistic update with rollback on Supabase error.
   async function updateDueAt(rowId: any, nextDueAt: any) {
     setRows((rs) => rs.map((r) => r.id === rowId ? { ...r, due_at: nextDueAt } : r))
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('fh_job_todos')
       .update({ due_at: nextDueAt })
       .eq('id', rowId)
-      .eq('user_id', userId)
-    if (error) {
-      toastError("Couldn't update due date", error.message)
+      .select('id')
+    if (error || !data?.length) {
+      toastError("Couldn't update due date", error?.message || 'This task may have been deleted.')
       fetchRows()
     }
   }
@@ -130,8 +148,11 @@ export default function TodosSection({ jobId, userId }: any) {
     ))
     const { error } = await resilientUpdate(
       'fh_job_todos',
-      { id: row.id, user_id: userId },
-      { done: next, completed_at: next ? new Date().toISOString() : null }
+      { id: row.id },
+      { done: next, completed_at: next ? new Date().toISOString() : null },
+      // The match no longer carries a user_id for the outbox to read the
+      // owner from, so tag a queued copy with who made the change.
+      { userId }
     )
     if (error) {
       toastError("Couldn't update", error.message)
@@ -143,8 +164,12 @@ export default function TodosSection({ jobId, userId }: any) {
     hapticTap()
     const snapshot = rows.find((r) => r.id === rowId)
     setRows((rs) => rs.filter((r) => r.id !== rowId)) // optimistic
-    const { error } = await supabase.from('fh_job_todos').delete().eq('id', rowId).eq('user_id', userId)
-    if (error) { toastError("Couldn't delete", error.message); fetchRows(); return }
+    const { data, error } = await supabase.from('fh_job_todos').delete().eq('id', rowId).select('id')
+    if (error || !data?.length) {
+      toastError("Couldn't delete", error?.message || 'This task may already be gone.')
+      fetchRows()
+      return
+    }
     toastUndo('Task deleted', {
       description: (snapshot?.text || '').slice(0, 60) || 'Tap Undo to restore',
       onUndo: async () => {
@@ -185,7 +210,7 @@ export default function TodosSection({ jobId, userId }: any) {
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') add() }}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !saving) add() }}
           placeholder="Add a task…"
           style={{
             flex: '1 1 200px', minWidth: 0,
@@ -237,7 +262,7 @@ export default function TodosSection({ jobId, userId }: any) {
           type="button"
           whileTap={{ scale: 0.96 }}
           onClick={add}
-          disabled={!draft.trim()}
+          disabled={!draft.trim() || saving}
           aria-label="Add task"
           style={{
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
@@ -245,14 +270,14 @@ export default function TodosSection({ jobId, userId }: any) {
             background: 'var(--v3-primary)', color: 'var(--v3-on-primary)',
             fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
             letterSpacing: 0,
-            cursor: draft.trim() ? 'pointer' : 'default',
-            opacity: draft.trim() ? 1 : 0.5,
+            cursor: draft.trim() && !saving ? 'pointer' : 'default',
+            opacity: draft.trim() && !saving ? 1 : 0.5,
             boxShadow: draft.trim() ? '0 6px 18px rgba(201, 150, 58, 0.28)' : 'none',
             WebkitTapHighlightColor: 'transparent'
           }}
         >
           <Plus size={14} aria-hidden="true" />
-          Add
+          {saving ? 'Adding…' : 'Add'}
         </motion.button>
       </div>
 

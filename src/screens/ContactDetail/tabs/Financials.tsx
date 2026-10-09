@@ -81,6 +81,7 @@ export default function FinancialsTab({
           <InvoiceSection
             contact={contact}
             payments={payments}
+            changeOrders={changeOrders}
             paid={paid}
             balance={balance}
             onOpenLogPayment={onOpenLogPayment}

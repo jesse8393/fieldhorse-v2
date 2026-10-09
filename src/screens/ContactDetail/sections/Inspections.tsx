@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/drawer'
 import { notifySelf } from '../../../lib/notifications.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
+import { toastError } from '../../../lib/toast.ts'
 import { Eyebrow } from '../../../components/v3'
 
 const TRADES = [
@@ -41,13 +42,20 @@ export default function InspectionsSection({ contact, inspections = [], userId, 
   const [activeTrade, setActiveTrade] = useState<any>(null)
 
   async function logResult(trade: any, result: any, notes: any) {
-    await supabase.from('fh_inspections').insert({
+    // supabase-js returns { error } instead of throwing (network, RLS).
+    // On failure keep the drawer open with the notes, and skip the
+    // "Inspection logged" notification, since no record exists.
+    const { error } = await supabase.from('fh_inspections').insert({
       user_id: userId,
       contact_id: contact.id,
       trade,
       result,
       data: { notes: notes || '' }
     })
+    if (error) {
+      toastError("Couldn't log inspection", error.message)
+      return
+    }
     notifySelf(userId, {
       kind: 'inspection_logged',
       title: `${trade} · ${String(result).toUpperCase()}`,

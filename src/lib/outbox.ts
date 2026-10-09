@@ -137,6 +137,7 @@ async function putEntry(e: OutboxEntry): Promise<boolean> {
 }
 
 const QUEUE_FULL = { message: "Offline storage is full, this didn't save. Reconnect to sync your queued work, then try again." }
+const NOTHING_UPDATED = { message: 'Nothing was changed. It may have been removed, or your role cannot edit it. Refresh and try again.', code: 'nothing_updated' }
 
 async function deleteEntry(key: string) {
   try {
@@ -270,8 +271,14 @@ export async function resilientUpdate(
   table: string, match: Record<string, any>, patch: Record<string, any>, opts: OutboxWriteOptions = {}
 ): Promise<WriteResult> {
   if (typeof navigator === 'undefined' || navigator.onLine !== false) {
-    const { error } = await db.from(table).update(patch).match(match)
-    if (!error) return { queued: false, error: null, id: String(match.id || '') }
+    // select('id') so an update that matched nothing (a row a teammate
+    // removed, or one this role cannot change) is reported instead of
+    // looking like a success.
+    const { data, error } = await db.from(table).update(patch).match(match).select('id')
+    if (!error) {
+      if (Array.isArray(data) && data.length === 0) return { queued: false, error: NOTHING_UPDATED, id: String(match.id || '') }
+      return { queued: false, error: null, id: String(match.id || '') }
+    }
     if (!isNetworkError(error)) return { queued: false, error, id: String(match.id || '') }
   }
   const ok = await putEntry({

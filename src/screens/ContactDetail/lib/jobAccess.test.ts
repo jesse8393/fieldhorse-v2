@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { tabsForRole, pickVisibleTab } from './jobAccess.ts'
+import { tabsForRole, pickVisibleTab, canEditJobMoney } from './jobAccess.ts'
 
 const JOB_TABS = [
   { id: 'overview', label: 'Overview' },
@@ -42,5 +42,24 @@ describe('pickVisibleTab', () => {
     expect(pickVisibleTab('nope', crewTabs)).toBe('overview')
     expect(pickVisibleTab(null, crewTabs)).toBe('overview')
     expect(pickVisibleTab(undefined, JOB_TABS)).toBe('overview')
+  })
+})
+
+describe('canEditJobMoney', () => {
+  const base = { contactUserId: 'owner-1', contactOrgId: 'org-1', canCreateFinancialDocs: true }
+
+  it('lets any money role in the job company edit, not only the creator', () => {
+    expect(canEditJobMoney({ ...base, userId: 'admin-2', orgId: 'org-1' })).toBe(true)
+    expect(canEditJobMoney({ ...base, userId: 'owner-1', orgId: 'org-1' })).toBe(true)
+  })
+
+  it('refuses field roles, even the creator, and other companies', () => {
+    expect(canEditJobMoney({ ...base, userId: 'owner-1', orgId: 'org-1', canCreateFinancialDocs: false })).toBe(false)
+    expect(canEditJobMoney({ ...base, userId: 'admin-2', orgId: 'org-2' })).toBe(false)
+  })
+
+  it('falls back to the creator when there is no company', () => {
+    expect(canEditJobMoney({ ...base, contactOrgId: null, userId: 'owner-1', orgId: null })).toBe(true)
+    expect(canEditJobMoney({ ...base, contactOrgId: null, userId: 'someone', orgId: null })).toBe(false)
   })
 })
