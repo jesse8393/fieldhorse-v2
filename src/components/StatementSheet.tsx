@@ -13,14 +13,11 @@ import { companyFromProfile } from '../lib/invoices.ts'
 import { gatherStatement, downloadStatement, sendStatementEmail, type StatementJob, type StatementPayment, type StatementChangeOrder } from '../lib/statement.ts'
 import { mintPublicLink, listClientStatementLinks, buildPublicUrl } from '../lib/publicLink.ts'
 import { toast, toastSuccess, toastInfo } from '../lib/toast.ts'
+import { moneyExact } from '../lib/format.ts'
 
-function money(n: any) {
-  const v = Number(n || 0)
-  if (!v) return '$0'
-  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(v >= 10_000_000 ? 1 : 2)}M`
-  if (v >= 1_000) return `$${(v / 1_000).toFixed(v >= 10_000 ? 0 : 1)}K`
-  return `$${Math.round(v).toLocaleString()}`
-}
+// A statement is a financial document: every figure here must match the
+// PDF and the email to the cent, never a "$12K" abbreviation.
+const money = moneyExact
 
 export type StatementSheetClient = {
   id: string

@@ -7,8 +7,10 @@ import { useInvoicesBundle, useInvalidateInvoices } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
 import {
-  createInvoice, sendInvoiceEmail, buildInvoicePdf, setInvoiceStatus
+  createInvoice, sendInvoiceEmail, buildInvoicePdf, setInvoiceStatus, fetchInvoicesForContact
 } from '../lib/invoices.ts'
+import { pickBalanceInvoice } from '../lib/invoiceSettlement.ts'
+import { moneyExact } from '../lib/format.ts'
 // Lazy, pdf.js + transitive jspdf + autoTable deps are ~430KB. Only
 // loads on the first PDF action (per-row Generate or Email Invoice).
 async function loadPdf(): Promise<any> {
@@ -239,6 +241,13 @@ export default function Invoices() {
       : invoiceRows,
     [invoiceRows, filter]
   )
+  // Same bounded window as the job balances below: 'All' can hold years
+  // of invoices, and mounting every card (each re-rendering on every
+  // send) janked phones.
+  const { visible: visibleInvoiceRows, sentinelRef: invoicesSentinelRef, hasMore: invoicesHasMore } = useInfiniteRender(
+    shownInvoiceRows,
+    filter
+  )
 
   const totals = useMemo(() => {
     const out: Record<string, number> = { '0-30': 0, '31-60': 0, '60+': 0, total: 0, count: 0 }
@@ -356,6 +365,18 @@ export default function Invoices() {
     setPayingRow(row)
   }
 
+  // Mark paid on an issued invoice links the payment to it, prefilled
+  // with what is still due on it: never more than the job's remaining
+  // balance, so clearing a bill the job already paid can't record the
+  // same money a second time.
+  function openInvoicePayment(r: any) {
+    if (!r?.job) return
+    const amount = Number(r.invoice.amount || 0)
+    const jobBalance = rows.find((x) => x.job.id === r.job.id)?.balance ?? amount
+    const due = Math.max(0, Math.min(amount, jobBalance))
+    setPayingRow({ job: r.job, balance: due, invoice: { ...r.invoice, amount: due } })
+  }
+
   // Payments scoped to one job, feeds the per-invoice PDF's balance
   // summary + payment history blocks.
   function paymentsForJob(jobId: string) {
@@ -370,7 +391,7 @@ export default function Invoices() {
   }
 
   // Email the remaining balance straight from a job row. Pipeline v2:
-  // this now mints a real fh_invoices row first, so the send is tracked
+  // the send always goes out as a real fh_invoices row, so it is tracked
   // (status, due date, mark-paid) instead of an untracked ad-hoc PDF.
   async function handleSendEmail(row: any) {
     const job = row?.job
@@ -382,27 +403,30 @@ export default function Invoices() {
     }
     setSendingId(job.id)
     try {
-      // Reuse an existing open (unsent draft or already-sent, not paid/
-      // void) invoice that covers this balance instead of minting a new
-      // "Balance due" row on every tap, repeated taps were creating
-      // duplicate open invoices for the same money.
-      const existing = invoices.find((inv) =>
-        (inv as any).contact_id === job.id
-        && !['paid', 'void'].includes(String((inv as any).status || '').toLowerCase())
-        && Math.abs(Number((inv as any).amount || 0) - Number(row.balance || 0)) < 0.5
-      )
-      let invoice = existing
-      if (!invoice) {
+      // Read this job's invoices fresh (the screen's list is capped and
+      // can lag), then resend its oldest open bill when it has one. A new
+      // "Balance due" row is minted only for money nobody has billed yet:
+      // minting the whole balance next to open draws doubled what the
+      // customer was invoiced, and repeated taps stacked duplicates.
+      const { data: jobInvoices, error: listErr } = await fetchInvoicesForContact(job.id)
+      if (listErr) throw new Error(listErr.message || "Couldn't load this job's invoices")
+      const plan = pickBalanceInvoice({ invoices: jobInvoices, contractTotal: row.amount, balance: row.balance })
+      if (!plan) throw new Error('Nothing is owed on this job right now.')
+      let invoice
+      if (plan.invoice) {
+        invoice = plan.invoice
+      } else {
         const { data: created, error } = await createInvoice({
           contact: job,
           userId: user.id,
           title: 'Balance due',
-          amount: row.balance,
+          amount: plan.amount,
           due_at: new Date(Date.now() + 14 * 86400000).toISOString()
         })
         if (error || !created) throw new Error(error?.message || "Couldn't create the invoice")
         invoice = created
       }
+      const wasDraft = String(invoice.status || '').toLowerCase() === 'draft'
       const res = await sendInvoiceEmail({
         invoice,
         contact: job,
@@ -413,11 +437,18 @@ export default function Invoices() {
         changeOrders: changeOrdersForJob(job.id)
       })
       if (res.ok) {
-        toastSuccess(`Invoice sent to ${res.recipient}`, res.filename)
+        // Name the bill that went out: it can be an open draw rather
+        // than the whole balance shown on the card.
+        toastSuccess(`Invoice sent to ${res.recipient}`, `${invoice.title || `Invoice #${invoice.sequence_number}`} · ${moneyExact(invoice.amount)}`)
         setSentId(job.id)
         setTimeout(() => setSentId(null), 2400)
       } else if (res.reason === 'sender_not_configured') {
-        toastError("Email NOT sent, sender isn't configured", 'Downloaded the PDF so you can email it manually. Saved as a draft invoice.')
+        toastError(
+          "Email NOT sent, sender isn't configured",
+          wasDraft
+            ? 'Downloaded the PDF so you can email it manually. The invoice is saved as a draft.'
+            : 'Downloaded the PDF so you can email it manually.'
+        )
       } else {
         throw new Error(res.message || 'Send failed')
       }
@@ -548,11 +579,7 @@ export default function Invoices() {
             onPayRow={(r) => setPayingRow(r)}
             onSendInvoice={handleInvoiceSend}
             onDownloadInvoice={handleInvoiceDownload}
-            onPayInvoice={(r) => setPayingRow({
-              job: r.job,
-              balance: Number(r.invoice.amount || 0),
-              invoice: r.invoice
-            })}
+            onPayInvoice={openInvoicePayment}
             onVoidInvoice={handleInvoiceVoid}
           />
         </Suspense>
@@ -750,7 +777,7 @@ export default function Invoices() {
             </span>
           </div>
           <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {shownInvoiceRows.map((r) => (
+            {visibleInvoiceRows.map((r) => (
               <InvoiceCard
                 key={r.invoice.id}
                 row={r}
@@ -759,16 +786,10 @@ export default function Invoices() {
                 onSend={() => handleInvoiceSend(r)}
                 onDownload={() => handleInvoiceDownload(r)}
                 onVoid={() => handleInvoiceVoid(r)}
-                onMarkPaid={() => {
-                  if (!r.job) return
-                  setPayingRow({
-                    job: r.job,
-                    balance: Number(r.invoice.amount || 0),
-                    invoice: r.invoice
-                  })
-                }}
+                onMarkPaid={() => openInvoicePayment(r)}
               />
             ))}
+            {invoicesHasMore && <li ref={invoicesSentinelRef as any} aria-hidden="true" style={{ height: 1 }} />}
           </ul>
         </motion.div>
       )}

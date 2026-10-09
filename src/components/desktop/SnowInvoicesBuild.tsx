@@ -197,6 +197,10 @@ export default function SnowInvoicesBuild({
 
   const viewRows = table.getRowModel().rows
   const visibleRows = useMemo(() => viewRows.slice(0, 80), [viewRows])
+  // The issued list rendered every invoice the company ever sent. Cap it
+  // like the balances table and say so when more exist.
+  const ISSUED_LIMIT = 80
+  const visibleIssued = useMemo(() => issuedInvoices.slice(0, ISSUED_LIMIT), [issuedInvoices])
 
   function exportCsv() {
     downloadCsv(`fieldhorse-invoices-${filter}.csv`, toCsv(viewRows.map((r) => r.original)))
@@ -289,7 +293,7 @@ export default function SnowInvoicesBuild({
               {filter === 'outstanding' ? 'No open invoices.' : 'No issued invoices yet.'}
             </div>
           )}
-          {!loading && issuedInvoices.map((row) => {
+          {!loading && visibleIssued.map((row) => {
             const { invoice, job, effStatus } = row
             const status = INVOICE_STATUS[effStatus] || INVOICE_STATUS.draft
             const settled = effStatus === 'paid' || effStatus === 'void'
@@ -374,6 +378,11 @@ export default function SnowInvoicesBuild({
               </div>
             )
           })}
+          {!loading && issuedInvoices.length > ISSUED_LIMIT && (
+            <div className="fh-build-table__more">
+              Showing first {ISSUED_LIMIT} of {issuedInvoices.length.toLocaleString()}. Use the filter to narrow the list.
+            </div>
+          )}
         </section>
 
         <section className="fh-build-content-grid fh-build-content-grid--invoices">

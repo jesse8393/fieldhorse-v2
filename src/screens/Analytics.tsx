@@ -150,7 +150,15 @@ export default function Analytics() {
     const jobs = contacts.filter((c) => c.stage === 'job').length
     const closedCount = contacts.filter((c) => c.stage === 'closed').length
     const lostCount = contacts.filter((c) => c.stage === 'lost').length
-    const milesYTD = mileage.reduce((s, m) => s + Number(m.miles || 0), 0)
+    const yearStart = new Date(new Date().getFullYear(), 0, 1).getTime()
+    // Year to date means this calendar year only: the mileage fetch
+    // returns every drive ever logged, so summing it all inflated the
+    // tax deduction with prior years. drove_on is date-only, parse LOCAL
+    // so a Jan 1 drive isn't pushed back into last year.
+    const milesYTD = mileage.reduce((s, m) => {
+      const t = parseDateOnly(m.drove_on)?.getTime() ?? NaN
+      return t >= yearStart ? s + Number(m.miles || 0) : s
+    }, 0)
     const mileageDeduction = milesYTD * 0.67
     // Real YTD invoiced/collected totals, computed from the same
     // payments/invoices arrays the rest of this screen reads.
@@ -158,7 +166,6 @@ export default function Analytics() {
     // desktop Build component can render "\u2003" instead of $0, that
     // distinguishes "no financial data hooked up" from "you've
     // invoiced $0 this year".
-    const yearStart = new Date(new Date().getFullYear(), 0, 1).getTime()
     // Prefer fh_invoices rows when present (operators who use the full
     // invoice flow). Fall back to summing contract amounts on jobs that
     // have reached the invoice or closed stage this year, matches the
@@ -624,7 +631,7 @@ export default function Analytics() {
                   >
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, color: 'var(--v3-text)' }}>{m.purpose || 'Drive'}</div>
-                      <div style={{ fontSize: 12, color: 'var(--v3-text-muted)', marginTop: 2 }}>{new Date(m.drove_on as any).toLocaleDateString()}</div>
+                      <div style={{ fontSize: 12, color: 'var(--v3-text-muted)', marginTop: 2 }}>{parseDateOnly(m.drove_on)?.toLocaleDateString() ?? ''}</div>
                     </div>
                     <div style={{ fontFamily: 'var(--font-display)', fontSize: 14, color: 'var(--v3-text)', fontVariantNumeric: 'tabular-nums' }}>{m.miles} mi</div>
                   </div>

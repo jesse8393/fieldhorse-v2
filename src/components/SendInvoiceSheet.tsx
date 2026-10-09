@@ -8,7 +8,7 @@
 // or Save draft. Creates a first-class fh_invoices row either way so
 // the Invoices screen tracks it.
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Receipt, Send, Download, FileText, X } from 'lucide-react'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
@@ -68,6 +68,8 @@ export default function SendInvoiceSheet({
   // need the invoice to say which one this covers. Prints in the line
   // item's Description column on the PDF.
   const [description, setDescription] = useState('')
+  // The draft this sheet session already saved (see makeInvoice).
+  const savedDraftRef = useRef<InvoiceRow | null>(null)
   const { formRef, drawerStyle, formStyle } = useDrawerKeyboard(open)
 
   const totals = useMemo(
@@ -81,6 +83,7 @@ export default function SendInvoiceSheet({
   useEffect(() => {
     if (!open || !contact?.id) return
     let alive = true
+    savedDraftRef.current = null
     setLoading(true)
     ;(async () => {
       const { data } = await fetchInvoicesForContact(contact.id)
@@ -133,10 +136,37 @@ export default function SendInvoiceSheet({
 
   // Always lands as a draft row first; sendInvoiceEmail flips it to
   // 'sent' on a successful send, so a failed send leaves an honest draft.
+  // A retry in the same sheet (after a failed send or download) updates
+  // that draft instead of inserting another: drafts count as billed, so
+  // every extra copy ate the job's unbilled amount and listed the same
+  // money twice on the Invoices screen.
   async function makeInvoice() {
     const due_at = dueDays > 0
       ? new Date(Date.now() + dueDays * 86400000).toISOString()
       : new Date().toISOString()
+    const saved = savedDraftRef.current
+    if (saved) {
+      const { data: updated, error: updateErr } = await supabase
+        .from('fh_invoices')
+        .update({
+          title: title.trim() || 'Invoice',
+          amount: amountNum,
+          due_at,
+          notes: notes.trim() || null,
+          description: description.trim() || null
+        } as any)
+        .eq('id', saved.id)
+        .eq('status', 'draft')
+        .select('*')
+        .maybeSingle()
+      if (updateErr) throw new Error(updateErr.message || "Couldn't update the invoice")
+      // Still a draft: reuse it. Otherwise it went out after all, so this
+      // is a new bill and gets its own row below.
+      if (updated) {
+        savedDraftRef.current = updated as InvoiceRow
+        return updated as InvoiceRow
+      }
+    }
     const { data, error } = await createInvoice({
       contact, userId,
       title, amount: amountNum,
@@ -146,6 +176,7 @@ export default function SendInvoiceSheet({
       description
     })
     if (error || !data) throw new Error(error?.message || "Couldn't create the invoice")
+    savedDraftRef.current = data
     return data
   }
 
@@ -203,7 +234,7 @@ export default function SendInvoiceSheet({
       const { downloadPdf } = await import('../lib/pdf.js')
       downloadPdf(result)
       hapticSuccess()
-      toastSuccess('Invoice PDF downloaded', result.filename)
+      toastSuccess('Draft saved and PDF downloaded', result.filename)
       onDone?.()
       onClose?.()
     } catch (e: any) {
@@ -421,7 +452,10 @@ export default function SendInvoiceSheet({
                   style={ghostBtnStyle(!!busy)}
                 >
                   <Download size={13} />
-                  {busy === 'download' ? 'Building…' : 'Download PDF'}
+                  {/* Says it saves: the PDF carries a real invoice number,
+                      so downloading files the invoice as a draft on the
+                      job. Read as a preview, it left a stray draft per tap. */}
+                  {busy === 'download' ? 'Building…' : 'Save & download'}
                 </button>
               </div>
               <motion.button

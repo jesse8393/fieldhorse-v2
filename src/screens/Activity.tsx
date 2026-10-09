@@ -27,6 +27,7 @@ import { SkeletonList } from '../components/Skeleton.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
 import { Eyebrow } from '../components/v3'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
+import { paymentEventTime } from '../lib/activityTime.ts'
 import SnowActivityBuild from '../components/desktop/SnowActivityBuild.tsx'
 
 const PAGE_SIZE = 60
@@ -111,9 +112,13 @@ export default function Activity() {
 
       for (const p of payments || []) {
         const kindStr = p.kind && p.kind !== 'other' ? ` · ${p.kind}` : ''
+        // paid_on is date-only: a LOCAL calendar day with no time (a UTC
+        // parse filed an Oct 9 payment under Yesterday at 7:00 PM).
+        const { when, dateOnly } = paymentEventTime(p.paid_on, p.created_at)
         out.push({
           id: `p:${p.id}`,
-          when: new Date((p.paid_on || p.created_at) as any),
+          when,
+          dateOnly,
           contact: contactById.get(p.contact_id as string),
           contactId: p.contact_id,
           kind: 'payment',
@@ -353,8 +358,7 @@ function EventRow({ event }: any) {
               {jobName}
             </span>
             {event.sub && <> · {event.sub}</>}
-            {' · '}
-            {timeAt(event.when)}
+            {!event.dateOnly && <>{' · '}{timeAt(event.when)}</>}
           </div>
         </div>
         <ArrowRight size={14} color="var(--v3-text-faint, var(--v3-text-muted))" style={{ alignSelf: 'center', flexShrink: 0 }} />

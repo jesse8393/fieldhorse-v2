@@ -24,6 +24,9 @@ type ActivityEvent = {
   title: string
   sub?: string | null
   amount?: number
+  // True for payments dated by paid_on alone (a calendar day with no time),
+  // so the row shows the day without a made up 12:00 AM.
+  dateOnly?: boolean
 }
 
 type Props = {
@@ -270,7 +273,7 @@ function DesktopEventRow({ event }: { event: ActivityEvent }) {
       <span className={`fh-build-dot ${toneClass(event.tone)}`}>{eventType(event)}</span>
       <time dateTime={event.when.toISOString()}>
         {event.when.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-        <span>{event.when.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</span>
+        {!event.dateOnly && <span>{event.when.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</span>}
       </time>
       <ArrowRight size={13} aria-hidden="true" />
     </Link>
