@@ -6,10 +6,11 @@ import {
   XCircle, Trash2, Users, ArrowRight
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext.tsx'
+import { useMembership } from '../../contexts/MembershipContext.tsx'
 import { supabase } from '../../lib/supabase.ts'
 import { markLost, startQuote, reopen } from '../../lib/pipeline.ts'
 import { stageColor } from '../../lib/stages.ts'
-import { toastSuccess, toastInfo, toastError } from '../../lib/toast.ts'
+import { toastSuccess, toastError } from '../../lib/toast.ts'
 import { hapticTap, hapticError } from '../../lib/haptics.ts'
 import { dueStatus } from '../../lib/dueDate.ts'
 import { SkeletonBlock as SkeletonBlock_, SkeletonList as SkeletonList_ } from '../../components/Skeleton.tsx'
@@ -18,6 +19,8 @@ const SkeletonList = SkeletonList_ as any
 import ActionSheet from '../../components/ActionSheet.tsx'
 import AddEventSheet from '../../components/AddEventSheet.tsx'
 import InvitePartnerSheet from '../../components/InvitePartnerSheet.tsx'
+import DataErrorState from '../../components/DataErrorState.tsx'
+import { useConfirm } from '../../components/ConfirmSheet.tsx'
 // Lazy, sheets only mount on operator action (Mark Complete /
 // Record Payment respectively).
 const MarkCompleteSheet = lazy(() => import('../../components/MarkCompleteSheet.tsx'))
@@ -28,10 +31,12 @@ import {
   DropdownMenuItem, DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu'
 import { StageTimeline, SegmentedTabs, Eyebrow, StampNumber } from '../../components/v3'
+import { tabPanelProps } from '../../lib/tabs.ts'
 import { useJobData } from './hooks/useJobData.ts'
 import { resolveNextAction } from './lib/jobNextAction.ts'
 import { computeJobHealth } from './lib/jobHealth.ts'
 import { tabsForStage, resolveTabForStage } from './lib/stageWorkspace.ts'
+import { tabsForRole, pickVisibleTab } from './lib/jobAccess.ts'
 import OverviewTab from './tabs/Overview.tsx'
 // Lazy, non-default tabs + sections + ApproveQuoteSheet only render
 // when the operator picks them. Saves ~290KB of code from the initial
@@ -192,7 +197,7 @@ function ActionIntentBanner({
             borderRadius: 10,
             border: '1px solid rgba(201, 150, 58, 0.42)',
             background: 'rgba(201, 150, 58, 0.13)',
-            color: 'var(--v3-primary)',
+            color: 'var(--v3-primary-text)',
             fontFamily: 'var(--font-body)',
             fontSize: 12,
             fontWeight: 800,
@@ -245,9 +250,28 @@ export default function ContactDetail() {
     contact, subs, expenses, payments, inspections, notes,
     scheduleItems, scheduleCount, todos, clientSummary,
     insurance, changeOrders, stageTransitions,
-    paid, balance, credit, loading, fetchAll, patch
+    paid, contractTotal, balance, credit, loading, isError, fetchAll, patch
   } = data
   const isDesktop = useIsDesktop()
+  const confirm = useConfirm() as any
+
+  // Role gates from lib/permissions.ts. Field roles (foreman, crew) reach
+  // this screen from /work and /crew, but money stays with owner, admin
+  // and manager: contract value, billing, closeout, pipeline moves. The
+  // database already hides payments, invoices, change orders and quote
+  // items from field roles, so showing those surfaces would only render
+  // empty totals and saves that fail. Fail closed while membership
+  // resolves (same trade as Work.tsx): the job hydrates from the
+  // persisted cache instantly, and defaulting to money visible would
+  // flash it to a crew member on every cold open.
+  const membership = useMembership()
+  const canSeeMoney = !membership.loading && membership.canSeeFinancials
+  const canMoveMoney = !membership.loading && membership.canCreateFinancialDocs
+  // Deleting a job is owner only, and only inside the viewer's own org:
+  // a partner's role in their own company does not reach a job they were
+  // invited to (RLS would refuse the delete anyway).
+  const canDeleteJob = !membership.loading && membership.canBillOrDelete
+    && (!contact?.org_id || contact.org_id === membership.orgId)
   const routeHome = location.pathname.startsWith('/leads')
     ? '/leads'
     : location.pathname.startsWith('/quotes')
@@ -289,13 +313,17 @@ export default function ContactDetail() {
   async function markTodoDone(todoId: any) {
     if (!todoId || !user) return
     hapticTap()
-    const { error } = await supabase
+    // By id only: teammates clear each other's tasks on a shared job and
+    // RLS scopes the org. .select() so a zero row update reads as a
+    // failure instead of "Done".
+    const { data: updated, error } = await supabase
       .from('fh_job_todos')
       .update({ done: true, completed_at: new Date().toISOString() })
       .eq('id', todoId)
-      .eq('user_id', user.id)
-    if (error) {
-      toastError("Couldn't mark done", error.message || 'Try again')
+      .select('id')
+    if (error || !updated || updated.length === 0) {
+      toastError("Couldn't mark done", error?.message || 'This task may have been removed. Refresh and try again.')
+      fetchAll()
       return
     }
     toastSuccess('Done', 'Action cleared')
@@ -310,19 +338,23 @@ export default function ContactDetail() {
   // first click switch immediately; the URL catches up after.
   const tabParam = searchParams.get('tab')
   const stageTabs = tabsForStage(contact?.stage)
-  const visibleTabs = TOP_TABS.filter((t) => stageTabs.includes(t.id as any))
+  // Field roles lose the money only tabs (Quote, Change orders) and get
+  // Financials as an expenses only view.
+  const visibleTabs = tabsForRole(TOP_TABS.filter((t) => stageTabs.includes(t.id as any)), canSeeMoney)
   // Jobber-style: a quote IS the quote. Opening a quote-stage deal lands
   // straight in the quote document instead of the Overview cockpit, so you
   // don't "open a deal, then go build a quote." Every other stage keeps
   // Overview as its home. `defaultTab` is also the param we omit from the
   // URL, so navigating to Overview on a quote sets ?tab=overview (and
   // doesn't bounce straight back to the quote).
-  const defaultTab = String(contact?.stage || '').toLowerCase() === 'quote' ? 'quote' : 'overview'
+  const defaultTab = String(contact?.stage || '').toLowerCase() === 'quote' && canSeeMoney ? 'quote' : 'overview'
   const urlTab = (tabParam && VALID_TABS.has(tabParam))
     ? resolveTabForStage(contact?.stage, tabParam)
     : defaultTab
   const [localTab, setLocalTab] = useState<string | null>(null)
-  const tab = localTab ?? urlTab
+  // A deep link or stale local choice can name a tab this role or stage
+  // does not expose; render Overview then.
+  const tab = pickVisibleTab(localTab ?? urlTab, visibleTabs)
   function setTab(next: any) {
     if (next === tab) return
     setLocalTab(next)
@@ -354,7 +386,12 @@ export default function ContactDetail() {
   // Edit mode is a flag the Overview tab + section editors read.
   // Header EDIT button toggles + jumps to overview if currently on another tab.
   const [isEditing, setIsEditing] = useState(false)
-  const actionIntent = readJobActionIntent(searchParams.get('action'))
+  const requestedIntent = readJobActionIntent(searchParams.get('action'))
+  // Dashboard cues are billing or sales work, except a reschedule, so
+  // field roles only get that one.
+  const actionIntent = requestedIntent && (canMoveMoney || requestedIntent === 'reschedule')
+    ? requestedIntent
+    : null
   const actionIntentMeta = actionIntent ? JOB_ACTION_INTENTS[actionIntent] : null
 
   function clearActionIntent(nextTab?: string) {
@@ -369,7 +406,7 @@ export default function ContactDetail() {
 
   function handleActionIntentPrimary() {
     if (!actionIntent || !actionIntentMeta) return
-    const resolvedTab = resolveTabForStage(contact?.stage, actionIntentMeta.tab)
+    const resolvedTab = pickVisibleTab(resolveTabForStage(contact?.stage, actionIntentMeta.tab), visibleTabs)
     setLocalTab(resolvedTab)
     clearActionIntent(resolvedTab)
 
@@ -383,13 +420,26 @@ export default function ContactDetail() {
   }
 
   async function handleDelete() {
-    if (deleting) return
+    if (deleting || !canDeleteJob) return
     setDeleting(true)
     setDeleteErr('')
     try {
       const deletedName = contact?.name || 'this job'
-      const { error } = await supabase.from('fh_contacts').delete().eq('id', id as string).eq('user_id', user?.id as string)
+      // By id only: the owner deletes any job in the org, whoever created
+      // it, and RLS scopes the tenant. .select() turns a zero row delete
+      // (already gone, or not allowed) into a visible failure instead of
+      // a false "Deleted".
+      const { data: removed, error } = await supabase
+        .from('fh_contacts')
+        .delete()
+        .eq('id', id as string)
+        .select('id')
       if (error) throw error
+      if (!removed || removed.length === 0) {
+        setDeleting(false)
+        setDeleteErr("This job wasn't deleted. It may already be gone, or your account can't delete it.")
+        return
+      }
       toastSuccess('Deleted', `${deletedName} and cascading rows removed`)
       navigate(detailHome)
     } catch (e: any) {
@@ -419,7 +469,9 @@ export default function ContactDetail() {
     )
   }
 
-  // Not found
+  // Not found, or could not load. A failed fetch (offline, 5xx, expired
+  // session) is not proof the job is gone, so it gets a retry instead of
+  // "not found".
   if (!contact) {
     return (
       <div style={{ padding: '32px 24px', minHeight: '100%', background: 'var(--v3-bg)', textAlign: 'center' }}>
@@ -427,13 +479,23 @@ export default function ContactDetail() {
           type="button"
           onClick={() => navigate(routeHome)}
           style={{
-            background: 'none', border: 'none', color: 'var(--v3-primary)',
+            background: 'none', border: 'none', color: 'var(--v3-primary-text)',
             fontWeight: 700, fontSize: 14, cursor: 'pointer', padding: '8px 12px'
           }}
         >
           ← Back to {routeHome === '/quotes' ? 'quotes' : routeHome === '/leads' ? 'leads' : 'jobs'}
         </button>
-        <p style={{ color: 'var(--v3-text-muted)', marginTop: 16 }}>Contact not found.</p>
+        {isError ? (
+          <div style={{ marginTop: 16, textAlign: 'left' }}>
+            <DataErrorState
+              title="Couldn't load this job"
+              message="Check your connection and try again. Nothing was changed."
+              onRetry={() => { void fetchAll() }}
+            />
+          </div>
+        ) : (
+          <p style={{ color: 'var(--v3-text-muted)', marginTop: 16 }}>Contact not found.</p>
+        )}
       </div>
     )
   }
@@ -478,12 +540,37 @@ export default function ContactDetail() {
     await fetchAll()
   }
 
+  // Mark lost is a sales move: money roles only, and only while the deal
+  // is still a lead or quote (same rule as the Work list). A won job
+  // marked lost would drop its revenue out of the won totals.
+  const canMarkLost = canMoveMoney && (contact.stage === 'lead' || contact.stage === 'quote')
+  async function onMarkLost() {
+    if (!contact || !canMarkLost) return
+    const ok = await confirm({
+      title: 'Mark this deal lost?',
+      body: 'It moves to the lost column. You can reopen it later as a lead.',
+      confirmLabel: 'Mark lost',
+      destructive: true
+    })
+    if (!ok) return
+    hapticError()
+    // pipeline.markLost toasts on success; only the failure needs one.
+    const res: any = await markLost(contact)
+    if (res?.error) {
+      toastError("Couldn't mark lost", res.error.message || 'Try again')
+      return
+    }
+    fetchAll()
+  }
+
   // Job-stage CTA: the user's #1 ask, invoice straight from the job.
   // While money is still owed the primary action is Send invoice; once
   // the balance is collected the job is ready for its closeout.
-  // ('invoice' is the legacy alias of 'job', same treatment.)
+  // ('invoice' is the legacy alias of 'job', same treatment.) Every one
+  // of these is a pipeline or billing move, so field roles get none.
   const stageCta: { label: string; onClick: () => void } | null =
-    contact.stage === 'lead'    ? { label: 'Convert to quote', onClick: onBuildQuote }
+    !canMoveMoney ? null
+    : contact.stage === 'lead'    ? { label: 'Convert to quote', onClick: onBuildQuote }
     : contact.stage === 'quote'
       ? contact.proposal_status === 'changes_requested'
         ? { label: 'Review changes', onClick: () => setTab('quote') }
@@ -495,6 +582,127 @@ export default function ContactDetail() {
     : contact.stage === 'closed'  ? { label: 'Reopen',         onClick: onReopen }
     : contact.stage === 'lost'    ? { label: 'Reopen',         onClick: onReopen }
     : null
+
+  // Tab router, rendered once and placed in either shell. The desktop
+  // and mobile branches used to carry their own copies, and the desktop
+  // copy drifted: Overview lost changeOrders (cockpit read "Paid in full"
+  // while approved CO money was owed), stageTransitions (activity) and
+  // onOpenMarkComplete (a dead Mark complete button), and Quote, Details
+  // and Financials lost their insurance and change order data.
+  const tabPanels = (
+    <>
+      {tab === 'overview' && (
+        <OverviewTab
+          contact={contact}
+          notes={notes}
+          payments={payments}
+          scheduleItems={scheduleItems}
+          todos={todos}
+          changeOrders={changeOrders}
+          stageTransitions={stageTransitions}
+          paid={paid}
+          balance={balance}
+          userId={user?.id}
+          fetchAll={fetchAll}
+          patch={patch}
+          isEditing={isEditing}
+          canSeeMoney={canSeeMoney}
+          canMoveMoney={canMoveMoney}
+          onExitEdit={() => setIsEditing(false)}
+          onOpenAddEvent={() => setEventOpen(true)}
+          onOpenLogPayment={() => setPayModalOpen(true)}
+          onOpenInvitePartner={() => setInviteOpen(true)}
+          onOpenApproveQuote={() => setApproveOpen(true)}
+          onOpenMarkComplete={() => setCompleteOpen(true)}
+          onOpenSendInvoice={() => setInvoiceOpen(true)}
+          onOpenQuote={() => setTab('quote')}
+        />
+      )}
+      {tab === 'quote' && (
+        <Suspense fallback={<TabFallback />}>
+          <QuoteTab
+            contact={contact}
+            userId={user?.id}
+            fetchAll={fetchAll}
+            patch={patch}
+            onOpenApprove={() => setApproveOpen(true)}
+            insurance={insurance}
+            changeOrders={changeOrders}
+          />
+        </Suspense>
+      )}
+      {tab === 'details' && (
+        <Suspense fallback={<TabFallback />}>
+          <DetailsTab
+            contact={contact}
+            inspections={inspections}
+            scheduleItems={scheduleItems}
+            userId={user?.id}
+            fetchAll={fetchAll}
+            patch={patch}
+            onOpenAddEvent={() => setEventOpen(true)}
+            onOpenInvitePartner={() => setInviteOpen(true)}
+            insurance={insurance}
+            canSeeMoney={canSeeMoney}
+          />
+        </Suspense>
+      )}
+      {tab === 'financials' && (
+        <Suspense fallback={<TabFallback />}>
+          <FinancialsTab
+            contact={contact}
+            subs={subs}
+            expenses={expenses}
+            payments={payments}
+            paid={paid}
+            balance={balance}
+            userId={user?.id}
+            fetchAll={fetchAll}
+            patch={patch}
+            onOpenLogPayment={() => setPayModalOpen(true)}
+            insurance={insurance}
+            changeOrders={changeOrders}
+            canSeeMoney={canSeeMoney}
+          />
+        </Suspense>
+      )}
+      {tab === 'files' && (
+        <Suspense fallback={<TabFallback />}>
+          <FilesTab
+            contact={contact}
+            notes={notes}
+            userId={user?.id}
+            fetchAll={fetchAll}
+          />
+        </Suspense>
+      )}
+      {tab === 'logs' && (
+        <Suspense fallback={<TabFallback />}>
+          <DailyLogsSection jobId={contact?.id} userId={user?.id} />
+        </Suspense>
+      )}
+      {tab === 'selections' && (
+        <Suspense fallback={<TabFallback />}>
+          <SelectionsSection jobId={contact?.id} userId={user?.id} clientId={contact?.client_id} />
+        </Suspense>
+      )}
+      {tab === 'materials' && (
+        <Suspense fallback={<TabFallback />}>
+          <MaterialsSection jobId={contact?.id} userId={user?.id} />
+        </Suspense>
+      )}
+      {tab === 'change_orders' && (
+        <Suspense fallback={<TabFallback />}>
+          <ChangeOrdersSection
+            contact={contact}
+            userId={user?.id}
+            changeOrders={changeOrders}
+            onChange={() => fetchAll?.()}
+          />
+        </Suspense>
+      )}
+    </>
+  )
 
   return (
     <div
@@ -559,7 +767,9 @@ export default function ContactDetail() {
 
           return (
             <Suspense fallback={null}><SnowJobDetailBuild
-              contact={contact}
+              // The shell reads Contract straight off contact.amount, so
+              // field roles get a copy without it (the metric stays blank).
+              contact={canSeeMoney ? contact : { ...contact, amount: null }}
               client={clientSummary}
               tabs={visibleTabs}
               activeTab={tab}
@@ -567,17 +777,18 @@ export default function ContactDetail() {
               onBack={() => navigate(detailHome)}
               backLabel={detailBackLabel}
               onEdit={handleEditClick}
-              onDelete={() => setDeleteOpen(true)}
+              onDelete={canDeleteJob ? () => setDeleteOpen(true) : undefined}
               onAddEvent={() => setEventOpen(true)}
               primaryAction={tab === 'overview' ? null : stageCta}
               isEditing={isEditing}
               scheduleStatus={scheduleStatus}
               reportsMissing={reportsMissing}
-              billingStatus={billingStatus}
+              billingStatus={canSeeMoney ? billingStatus : null}
               health={jobHealth}
-              changeOrderTotals={changeOrderTotals}
-              paid={paid}
-              outstanding={balance}
+              changeOrderTotals={canSeeMoney ? changeOrderTotals : null}
+              paid={canSeeMoney ? paid : null}
+              outstanding={canSeeMoney ? balance : null}
+              showMoney={canSeeMoney}
             >
               {actionIntentMeta && (
                 <ActionIntentBanner
@@ -586,103 +797,7 @@ export default function ContactDetail() {
                   onDismiss={() => clearActionIntent()}
                 />
               )}
-              {tab === 'overview' && (
-                <OverviewTab
-                  contact={contact}
-                  notes={notes}
-                  payments={payments}
-                  scheduleItems={scheduleItems}
-                  todos={todos}
-                  paid={paid}
-                  balance={balance}
-                  userId={user?.id}
-                  fetchAll={fetchAll}
-                  patch={patch}
-                  isEditing={isEditing}
-                  onExitEdit={() => setIsEditing(false)}
-                  onOpenAddEvent={() => setEventOpen(true)}
-                  onOpenLogPayment={() => setPayModalOpen(true)}
-                  onOpenInvitePartner={() => setInviteOpen(true)}
-                  onOpenApproveQuote={() => setApproveOpen(true)}
-                  onOpenSendInvoice={() => setInvoiceOpen(true)}
-                  onOpenQuote={() => setTab('quote')}
-                />
-              )}
-              {tab === 'quote' && (
-                <Suspense fallback={<TabFallback />}>
-                  <QuoteTab
-                    contact={contact}
-                    userId={user?.id}
-                    fetchAll={fetchAll}
-                    patch={patch}
-                    onOpenApprove={() => setApproveOpen(true)}
-                  />
-                </Suspense>
-              )}
-              {tab === 'details' && (
-                <Suspense fallback={<TabFallback />}>
-                  <DetailsTab
-                    contact={contact}
-                    inspections={inspections}
-                    scheduleItems={scheduleItems}
-                    userId={user?.id}
-                    fetchAll={fetchAll}
-                    patch={patch}
-                    onOpenAddEvent={() => setEventOpen(true)}
-                    onOpenInvitePartner={() => setInviteOpen(true)}
-                  />
-                </Suspense>
-              )}
-              {tab === 'financials' && (
-                <Suspense fallback={<TabFallback />}>
-                  <FinancialsTab
-                    contact={contact}
-                    subs={subs}
-                    expenses={expenses}
-                    payments={payments}
-                    paid={paid}
-                    balance={balance}
-                    userId={user?.id}
-                    fetchAll={fetchAll}
-                    onOpenLogPayment={() => setPayModalOpen(true)}
-                  />
-                </Suspense>
-              )}
-              {tab === 'files' && (
-                <Suspense fallback={<TabFallback />}>
-                  <FilesTab
-                    contact={contact}
-                    notes={notes}
-                    userId={user?.id}
-                    fetchAll={fetchAll}
-                  />
-                </Suspense>
-              )}
-              {tab === 'logs' && (
-                <Suspense fallback={<TabFallback />}>
-                  <DailyLogsSection jobId={contact?.id} userId={user?.id} />
-                </Suspense>
-              )}
-              {tab === 'selections' && (
-                <Suspense fallback={<TabFallback />}>
-                  <SelectionsSection jobId={contact?.id} userId={user?.id} clientId={contact?.client_id} />
-                </Suspense>
-              )}
-              {tab === 'materials' && (
-                <Suspense fallback={<TabFallback />}>
-                  <MaterialsSection jobId={contact?.id} userId={user?.id} />
-                </Suspense>
-              )}
-              {tab === 'change_orders' && (
-                <Suspense fallback={<TabFallback />}>
-                  <ChangeOrdersSection
-                    contact={contact}
-                    userId={user?.id}
-                    changeOrders={changeOrders}
-                    onChange={() => fetchAll?.()}
-                  />
-                </Suspense>
-              )}
+              {tabPanels}
             </SnowJobDetailBuild></Suspense>
           )
         })()
@@ -694,19 +809,16 @@ export default function ContactDetail() {
         clientSummary={clientSummary}
         viewerUserId={user?.id}
         isEditing={isEditing}
+        showMoney={canSeeMoney}
+        contractTotal={contractTotal}
         paid={paid}
         balance={balance}
         nextTodo={nextTodo}
         onBack={() => navigate(detailHome)}
         backLabel={detailBackLabel}
         onEdit={handleEditClick}
-        onMarkLost={async () => {
-          hapticError()
-          await markLost(contact)
-          toastInfo('Marked lost', 'Moved to lost column')
-          fetchAll()
-        }}
-        onDelete={() => setDeleteOpen(true)}
+        onMarkLost={canMarkLost ? onMarkLost : undefined}
+        onDelete={canDeleteJob ? () => setDeleteOpen(true) : undefined}
         onClientNav={(cid: any) => navigate(`/clients/${cid}`)}
         onTodoDone={markTodoDone}
       />
@@ -752,123 +864,20 @@ export default function ContactDetail() {
         onChange={setTab}
         tabs={visibleTabs}
         ariaLabel={`${detailBackLabel.slice(0, -1) || 'Job'} detail tabs`}
+        idBase="fh-job-tabs"
       />
 
       {/* TAB ROUTER */}
-      <div>
-        {tab === 'overview' && (
-          <OverviewTab
-            contact={contact}
-            notes={notes}
-            payments={payments}
-            scheduleItems={scheduleItems}
-            todos={todos}
-            changeOrders={changeOrders}
-            stageTransitions={stageTransitions}
-            paid={paid}
-            balance={balance}
-            userId={user?.id}
-            fetchAll={fetchAll}
-            patch={patch}
-            isEditing={isEditing}
-            onExitEdit={() => setIsEditing(false)}
-            onOpenAddEvent={() => setEventOpen(true)}
-            onOpenLogPayment={() => setPayModalOpen(true)}
-            onOpenInvitePartner={() => setInviteOpen(true)}
-            onOpenApproveQuote={() => setApproveOpen(true)}
-            onOpenMarkComplete={() => setCompleteOpen(true)}
-            onOpenSendInvoice={() => setInvoiceOpen(true)}
-            onOpenQuote={() => setTab('quote')}
-          />
-        )}
-        {tab === 'quote' && (
-          <Suspense fallback={<TabFallback />}>
-            <QuoteTab
-              contact={contact}
-              userId={user?.id}
-              fetchAll={fetchAll}
-              patch={patch}
-              onOpenApprove={() => setApproveOpen(true)}
-              insurance={insurance}
-              changeOrders={changeOrders}
-            />
-          </Suspense>
-        )}
-        {tab === 'details' && (
-          <Suspense fallback={<TabFallback />}>
-            <DetailsTab
-              contact={contact}
-              inspections={inspections}
-              scheduleItems={scheduleItems}
-              userId={user?.id}
-              fetchAll={fetchAll}
-              patch={patch}
-              onOpenAddEvent={() => setEventOpen(true)}
-              onOpenInvitePartner={() => setInviteOpen(true)}
-              insurance={insurance}
-            />
-          </Suspense>
-        )}
-        {tab === 'financials' && (
-          <Suspense fallback={<TabFallback />}>
-            <FinancialsTab
-              contact={contact}
-              subs={subs}
-              expenses={expenses}
-              payments={payments}
-              paid={paid}
-              balance={balance}
-              userId={user?.id}
-              fetchAll={fetchAll}
-              patch={patch}
-              onOpenLogPayment={() => setPayModalOpen(true)}
-              insurance={insurance}
-              changeOrders={changeOrders}
-            />
-          </Suspense>
-        )}
-        {tab === 'files' && (
-          <Suspense fallback={<TabFallback />}>
-            <FilesTab
-              contact={contact}
-              notes={notes}
-              userId={user?.id}
-              fetchAll={fetchAll}
-            />
-          </Suspense>
-        )}
-        {tab === 'logs' && (
-          <Suspense fallback={<TabFallback />}>
-            <DailyLogsSection jobId={contact?.id} userId={user?.id} />
-          </Suspense>
-        )}
-        {tab === 'selections' && (
-          <Suspense fallback={<TabFallback />}>
-            <SelectionsSection jobId={contact?.id} userId={user?.id} clientId={contact?.client_id} />
-          </Suspense>
-        )}
-        {tab === 'materials' && (
-          <Suspense fallback={<TabFallback />}>
-            <MaterialsSection jobId={contact?.id} userId={user?.id} />
-          </Suspense>
-        )}
-        {tab === 'change_orders' && (
-          <Suspense fallback={<TabFallback />}>
-            <ChangeOrdersSection
-              contact={contact}
-              userId={user?.id}
-              changeOrders={changeOrders}
-              onChange={() => fetchAll?.()}
-            />
-          </Suspense>
-        )}
+      <div {...tabPanelProps('fh-job-tabs', tab)}>
+        {tabPanels}
       </div>
       </>
       )}
 
-      {/* MODALS */}
+      {/* MODALS. The billing, closeout and approval sheets only mount for
+          money roles, so no stray open state can surface them to crew. */}
       <AnimatePresence>
-        {payModalOpen && (
+        {payModalOpen && canMoveMoney && (
           <Suspense fallback={null}>
             <V3PaymentSheet
               contact={contact}
@@ -896,38 +905,42 @@ export default function ContactDetail() {
         invitedByUserId={user?.id}
       />
 
-      <Suspense fallback={null}>
-        <MarkCompleteSheet
-          open={completeOpen}
-          userId={user?.id}
-          contact={contact}
-          onClose={() => setCompleteOpen(false)}
-          onSaved={fetchAll}
-        />
-      </Suspense>
+      {canMoveMoney && (
+        <>
+          <Suspense fallback={null}>
+            <MarkCompleteSheet
+              open={completeOpen}
+              userId={user?.id}
+              contact={contact}
+              onClose={() => setCompleteOpen(false)}
+              onSaved={fetchAll}
+            />
+          </Suspense>
 
-      <Suspense fallback={null}>
-        <SendInvoiceSheet
-          open={invoiceOpen}
-          userId={user?.id}
-          contact={contact}
-          payments={payments}
-          changeOrders={changeOrders}
-          insurance={insurance}
-          onClose={() => setInvoiceOpen(false)}
-          onDone={fetchAll}
-        />
-      </Suspense>
+          <Suspense fallback={null}>
+            <SendInvoiceSheet
+              open={invoiceOpen}
+              userId={user?.id}
+              contact={contact}
+              payments={payments}
+              changeOrders={changeOrders}
+              insurance={insurance}
+              onClose={() => setInvoiceOpen(false)}
+              onDone={fetchAll}
+            />
+          </Suspense>
 
-      <Suspense fallback={null}>
-        <ApproveQuoteSheet
-          open={approveOpen}
-          contact={contact}
-          userId={user?.id}
-          onClose={() => setApproveOpen(false)}
-          onApproved={fetchAll}
-        />
-      </Suspense>
+          <Suspense fallback={null}>
+            <ApproveQuoteSheet
+              open={approveOpen}
+              contact={contact}
+              userId={user?.id}
+              onClose={() => setApproveOpen(false)}
+              onApproved={fetchAll}
+            />
+          </Suspense>
+        </>
+      )}
 
       <ActionSheet
         open={deleteOpen}
@@ -975,15 +988,17 @@ export default function ContactDetail() {
 
 function Header({
   contact, clientSummary, viewerUserId, isEditing,
-  paid, balance, nextTodo,
+  showMoney = false, contractTotal, paid, balance, nextTodo,
   onBack, backLabel = 'Jobs', onEdit, onMarkLost, onDelete, onClientNav, onTodoDone
 }: any) {
   const isOwnerView = !!viewerUserId && contact.user_id === viewerUserId
   const phoneHref = contact.phone ? `tel:${contact.phone}` : null
   const smsHref = contact.phone ? `sms:${contact.phone}` : null
 
-  const contractValue = Number(contact?.amount || 0)
-  const showMetrics = contractValue > 0
+  // Value includes approved change orders, the same contract Balance is
+  // measured against, so Value, Paid and Balance add up. Money roles only.
+  const contractValue = Number(contractTotal ?? contact?.amount ?? 0)
+  const showMetrics = showMoney && contractValue > 0
   // Owner-view eyebrow shows the resolved client name; partner view still
   // shows the static CLIENT label so the chrome doesn't go blank when RLS
   // hides clientSummary.
@@ -1027,26 +1042,34 @@ function Header({
           >
             <Pencil size={16} aria-hidden="true" />
           </IconButton>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                aria-label="More actions"
-                style={iconButtonStyle()}
-              >
-                <MoreHorizontal size={18} aria-hidden="true" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent side="bottom" align="end" sideOffset={8} collisionPadding={20}>
-              <DropdownMenuItem onSelect={onMarkLost}>
-                <XCircle size={14} /> Mark lost
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem variant="destructive" onSelect={onDelete}>
-                <Trash2 size={14} /> Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* Both entries are role and stage gated by the parent; the
+              menu only renders when one of them is offered. */}
+          {(onMarkLost || onDelete) && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="More actions"
+                  style={iconButtonStyle()}
+                >
+                  <MoreHorizontal size={18} aria-hidden="true" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="bottom" align="end" sideOffset={8} collisionPadding={20}>
+                {onMarkLost && (
+                  <DropdownMenuItem onSelect={onMarkLost}>
+                    <XCircle size={14} /> Mark lost
+                  </DropdownMenuItem>
+                )}
+                {onMarkLost && onDelete && <DropdownMenuSeparator />}
+                {onDelete && (
+                  <DropdownMenuItem variant="destructive" onSelect={onDelete}>
+                    <Trash2 size={14} /> Delete
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
 
@@ -1223,13 +1246,13 @@ function NextTodoDueChip({ iso }: any) {
     ? {
         bg: 'var(--v3-danger-soft)',
         border: 'color-mix(in srgb, var(--v3-danger) 40%, transparent)',
-        color: 'var(--v3-danger-bright)'
+        color: 'var(--v3-danger-text)'
       }
     : status.tone === 'warn'
       ? {
           bg: 'var(--v3-primary-soft)',
           border: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)',
-          color: 'var(--v3-primary)'
+          color: 'var(--v3-primary-text)'
         }
       : {
           bg: 'var(--v3-surface-2)',
@@ -1258,7 +1281,7 @@ function iconButtonStyle({ disabled = false, tone }: any = {}) {
     border: tone === 'primary'
       ? '1px solid color-mix(in srgb, var(--v3-primary) 45%, transparent)'
       : '1px solid var(--v3-border)',
-    color: tone === 'primary' ? 'var(--v3-primary)' : disabled ? 'var(--v3-text-muted)' : 'var(--v3-text)',
+    color: tone === 'primary' ? 'var(--v3-primary-text)' : disabled ? 'var(--v3-text-muted)' : 'var(--v3-text)',
     cursor: disabled ? 'default' : 'pointer',
     opacity: disabled ? 0.4 : 1,
     WebkitTapHighlightColor: 'transparent'

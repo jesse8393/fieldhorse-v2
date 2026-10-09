@@ -2,6 +2,8 @@
 import { supabase } from './supabase.ts'
 import { todayYmd } from './dates.ts'
 import { crewLaborForContact } from './labor.ts'
+import { moneyExact } from './format.ts'
+import { invoicesPaidInFull } from './invoiceSettlement.ts'
 import type { Database } from './database.types.ts'
 
 // Only the fields the stage helpers actually read, declared narrowly so
@@ -181,40 +183,13 @@ export async function logPayment(contact: Contact, { id, amount, method, kind, r
     .upsert(payload as any, { onConflict: 'id', ignoreDuplicates: true })
   if (insErr) return { error: insErr }
 
-  // Payment against a specific invoice settles that invoice, but only
-  // flip it to 'paid' when the payments actually COVER its amount. A
-  // partial payment (the operator can freely edit the amount, and
-  // partial pay is an explicit feature) must leave the invoice 'sent'
-  // with a residual balance, not read as fully paid. Best-effort: the
-  // payment rows remain the source of truth for money math either way.
-  if (invoice_id) {
-    const [{ data: inv }, { data: invPays }] = await Promise.all([
-      supabase.from('fh_invoices').select('amount').eq('id', invoice_id).eq('user_id', contact.user_id).maybeSingle(),
-      supabase.from('fh_payments').select('amount').eq('invoice_id', invoice_id).eq('user_id', contact.user_id)
-    ])
-    const invoiceAmount = Number(inv?.amount || 0)
-    const paidToInvoice = (invPays || []).reduce((s: number, p: any) => s + Number(p.amount || 0), 0)
-    // Cent tolerance so floating-point sums don't strand a "paid" flip.
-    const covered = invoiceAmount > 0 && paidToInvoice + 0.005 >= invoiceAmount
-    const { error: invErr } = await supabase
-      .from('fh_invoices')
-      .update({ status: covered ? 'paid' : 'sent' })
-      .eq('id', invoice_id)
-      .eq('user_id', contact.user_id)
-    if (invErr) {
-      console.error('[fieldhorse] logPayment invoice status update failed', invErr)
-    }
-  }
-
   // Write a notification for the contractor's own inbox so the bell
   // badge pings when a payment is recorded (even if they recorded it
   // themselves, confirms the entry landed and surfaces on Activity).
   // Best-effort; never blocks the main return path.
   try {
-    const money = normalizedAmount.toLocaleString(undefined, {
-      style: 'currency', currency: 'USD',
-      minimumFractionDigits: 0, maximumFractionDigits: 0
-    })
+    // Exact to the cent: a $1,234.50 payment must not read "$1,235".
+    const money = moneyExact(normalizedAmount)
     const kindTag = normalizedKind !== 'other' ? ` · ${normalizedKind}` : ''
     const { error: notifErr } = await supabase.from('fh_notifications').insert({
       user_id: contact.user_id,
@@ -234,47 +209,99 @@ export async function logPayment(contact: Contact, { id, amount, method, kind, r
     console.error('[fieldhorse] logPayment notification threw', e)
   }
 
-  // Re-check balance
-  const { data: pays } = await supabase
-    .from('fh_payments')
-    .select('amount')
-    .eq('contact_id', contact.id)
-    .eq('user_id', contact.user_id)
-  const total = (pays || []).reduce((s, p) => s + Number(p.amount || 0), 0)
-  // Auto-close only when there's a real contract amount that's now fully
-  // paid. Guarding on amount > 0 stops a job with no amount yet (e.g. a
-  // freshly created quick invoice before line items set the total) from
-  // auto-closing on its first payment, `total >= 0` is otherwise always true.
+  // Re-read everything the job's money depends on. Every read is scoped
+  // to the job (contact_id) and left to RLS for the org: payments,
+  // invoices and change orders carry whichever teammate created them, so
+  // filtering on the job creator's user_id silently dropped rows (an
+  // admin's invoice never settled, an admin's change order was missing
+  // from the contract and the job auto-closed early).
   //
   // The true contract is the base amount PLUS approved change orders :
   // matching contractTotals()/statement math. Without the COs, a job with an
   // approved change order auto-closes on the base amount while CO money is
   // still owed, silently dropping it from statements and A/R.
-  const { data: cos, error: coErr } = await supabase
-    .from('fh_change_orders')
-    .select('amount, status')
-    .eq('contact_id', contact.id)
-    .eq('user_id', contact.user_id)
-    .eq('status', 'approved')
-  // If the CO fetch fails we can't know the true contract, so fail safe:
-  // skip the auto-close rather than treat a failed fetch as "no COs" and
-  // prematurely close a job that still owes change order money.
   //
   // Re-read the contract amount rather than trusting the caller's
   // in-memory contact row, a quote edited moments earlier (or on
   // another device) could make a stale cached amount auto-close a job
   // that still owes money, or miss a close that should fire.
-  const { data: freshContact } = await supabase
-    .from('fh_contacts')
-    .select('amount, stage')
-    .eq('id', contact.id)
-    .maybeSingle()
+  const [paysRes, invsRes, cosRes, freshRes] = await Promise.all([
+    supabase
+      .from('fh_payments')
+      .select('amount, invoice_id')
+      .eq('contact_id', contact.id),
+    supabase
+      .from('fh_invoices')
+      .select('id, amount, status, sequence_number')
+      .eq('contact_id', contact.id),
+    supabase
+      .from('fh_change_orders')
+      .select('amount, status')
+      .eq('contact_id', contact.id)
+      .eq('status', 'approved'),
+    supabase
+      .from('fh_contacts')
+      .select('amount, stage')
+      .eq('id', contact.id)
+      .maybeSingle()
+  ])
+  const pays = paysRes.data || []
+  const total = pays.reduce((s, p) => s + Number(p.amount || 0), 0)
+  const coErr = cosRes.error
+  const freshContact = freshRes.data
   const baseAmount = Number((freshContact?.amount ?? contact.amount) || 0)
   const currentStage = freshContact?.stage ?? contact.stage
+  // If the CO fetch fails we can't know the true contract, so fail safe:
+  // skip the auto-close rather than treat a failed fetch as "no COs" and
+  // prematurely close a job that still owes change order money.
+  const contractAmount = coErr
+    ? null
+    : baseAmount + (cosRes.data || []).reduce((s, c) => s + Number(c.amount || 0), 0)
+
+  // Settle the job's invoices from its payments. A payment linked to an
+  // invoice pays that one first; a payment logged against the job pays
+  // open invoices oldest first, so a fully paid job no longer keeps a
+  // 'sent' invoice that nags as past due (and invites a second payment
+  // for the same money). An invoice only flips to 'paid' when payments
+  // actually COVER it: partial pay is an explicit feature and must leave
+  // a residual balance. Best-effort: the payment rows remain the source
+  // of truth for money math either way.
+  if (paysRes.error || invsRes.error) {
+    console.error('[fieldhorse] logPayment invoice settle skipped', paysRes.error || invsRes.error)
+  } else {
+    const invs = invsRes.data || []
+    const paidIds = invoicesPaidInFull({ invoices: invs, payments: pays, contractTotal: contractAmount })
+    if (paidIds.length > 0) {
+      const { error: paidErr } = await supabase
+        .from('fh_invoices')
+        .update({ status: 'paid' })
+        .in('id', paidIds)
+        .in('status', ['draft', 'sent', 'overdue'])
+      if (paidErr) {
+        console.error('[fieldhorse] logPayment invoice status update failed', paidErr)
+      }
+    }
+    // A partial payment against a draft means the bill went out: it reads
+    // 'sent' with a residual balance from here on.
+    const target = invoice_id ? invs.find((inv) => inv.id === invoice_id) : null
+    if (target && target.status === 'draft' && !paidIds.includes(target.id)) {
+      const { error: sentErr } = await supabase
+        .from('fh_invoices')
+        .update({ status: 'sent' })
+        .eq('id', target.id)
+        .eq('status', 'draft')
+      if (sentErr) {
+        console.error('[fieldhorse] logPayment invoice status update failed', sentErr)
+      }
+    }
+  }
+
+  // Auto-close only when there's a real contract amount that's now fully
+  // paid. Guarding on amount > 0 stops a job with no amount yet (e.g. a
+  // freshly created quick invoice before line items set the total) from
+  // auto-closing on its first payment, `total >= 0` is otherwise always true.
   let closed = false
-  if (!coErr) {
-    const approvedCO = (cos || []).reduce((s, c) => s + Number(c.amount || 0), 0)
-    const contractAmount = baseAmount + approvedCO
+  if (contractAmount != null) {
     if (contractAmount > 0 && total >= contractAmount && currentStage !== 'closed') {
       const { error: closeErr } = await supabase.from('fh_contacts').update({ stage: 'closed' }).eq('id', contact.id).eq('user_id', contact.user_id)
       closed = !closeErr
@@ -295,10 +322,19 @@ export async function recalcCost(contactId: string | undefined, userId: string |
   // and then no-op'd the write behind a user_id filter.
   const { data: contactRow } = await supabase
     .from('fh_contacts')
-    .select('id, user_id')
+    .select('id, user_id, org_id')
     .eq('id', contactId)
     .maybeSingle()
   const ownerId = contactRow?.user_id || userId
+  // Crew and foreman can read only their own time punches, so a recalc
+  // they trigger (clocking out, logging an expense) would write a cost
+  // missing everyone else's labor. Leave the cached cost alone for them;
+  // the next recalc by an owner, admin or manager (timesheet approval,
+  // expense or sub edits) brings it up to date.
+  if (contactRow?.org_id) {
+    const { data: moneyVisible, error: visErr } = await supabase.rpc('fh_money_visible', { p_org_id: contactRow.org_id })
+    if (!visErr && moneyVisible === false) return null
+  }
   // No user_id filter on the sums: the job screen shows ALL fh_subs /
   // fh_expenses rows on the contact (org RLS), so the cached cost must
   // count them all too, filtering to the caller's own rows dropped

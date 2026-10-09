@@ -8,6 +8,9 @@
 //     through expenses, so its punches must NOT be counted again here.
 //   • Crew members clock in via Crew Home, which writes ONLY a punch
 //     row, before this module, that time never reached job cost.
+//   • Any other member using the job-screen TimeClockCard also writes
+//     ONLY a punch row (laborBooksAsExpense below), so it is priced
+//     here like a Crew Home punch and never booked twice.
 //
 // The split: count punches whose user_id differs from the job owner's.
 // (Known small hole: the owner clocking via Crew Home is skipped too :
@@ -24,6 +27,18 @@ export type CrewLabor = {
   hours: number       // Σ hours over ALL completed crew punches
   unratedHours: number // hours on punches with no hourly_rate (excluded from cost)
   punches: number
+}
+
+/** True when this user's job-screen clock out should book labor as an
+ *  fh_expenses row: only for the job owner, resolved the way recalcCost
+ *  resolves it (the contact's user_id, or the caller when the contact has
+ *  none). crewLaborForContact prices every other user's punches, so they
+ *  must close the punch only or the shift is counted twice. */
+export function laborBooksAsExpense(
+  jobOwnerId: string | null | undefined,
+  userId: string | null | undefined
+): boolean {
+  return !jobOwnerId || jobOwnerId === userId
 }
 
 export function punchHours(p: {

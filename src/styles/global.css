@@ -28,7 +28,7 @@ select:focus-visible,
   position: absolute;
   top: 8px;
   left: 8px;
-  z-index: 100;
+  z-index: var(--z-overlay);
   padding: 8px 12px;
   border-radius: 10px;
   background: var(--field-gold-bright, #C9963A);
@@ -222,7 +222,7 @@ select:focus-visible,
 /* Brand rule: no gradient text. Solid brand gold instead — same accent,
    no clipped-fill effect (UI audit #38). */
 .fh-text-gradient-gold {
-  color: var(--field-gold-bright);
+  color: var(--v3-primary-text);
 }
 
 .fh-font-serif { font-family: var(--font-serif); }
@@ -275,7 +275,7 @@ select:focus-visible,
   color: var(--v3-text-muted);
   margin-top: 3px;
 }
-.dispatch-card.is-live .dispatch-card__hr { color: var(--v3-success-bright); }
+.dispatch-card.is-live .dispatch-card__hr { color: var(--v3-success-text); }
 .dispatch-card__body { flex: 1; min-width: 0; }
 .dispatch-card__head-row {
   display: flex;
@@ -324,7 +324,7 @@ select:focus-visible,
 }
 .dispatch-state-pill--live {
   background: color-mix(in srgb, var(--v3-success) 20%, transparent);
-  color: var(--v3-success-bright);
+  color: var(--v3-success-text);
   border: 1px solid color-mix(in srgb, var(--v3-success) 35%, transparent);
   display: inline-flex;
   align-items: center;
@@ -351,7 +351,7 @@ select:focus-visible,
 }
 .dispatch-state-pill--done {
   background: var(--v3-primary-soft);
-  color: var(--v3-primary-bright);
+  color: var(--v3-primary-text);
   border: 1px solid color-mix(in srgb, var(--v3-primary) 28%, transparent);
 }
 .dispatch-state-pill--default {
@@ -487,9 +487,9 @@ select:focus-visible,
 }
 .dispatch-state__opt.is-on {
   background: var(--v3-primary-soft);
-  color: var(--v3-primary);
+  color: var(--v3-primary-text);
 }
-.dispatch-state__opt.is-on b { opacity: 1; color: var(--v3-primary); }
+.dispatch-state__opt.is-on b { opacity: 1; color: var(--v3-primary-text); }
 
 /* ============================================================
    JOB DETAIL — cockpit headline hero from design handoff.
@@ -553,7 +553,7 @@ select:focus-visible,
   font-family: var(--font-display);
   font-size: 20px;
   line-height: 1;
-  color: var(--v3-success-bright, #5C5C5C);
+  color: var(--v3-success-text);
   font-variant-numeric: tabular-nums;
 }
 .cockpit-headline__bar {
@@ -582,7 +582,7 @@ select:focus-visible,
   font-variant-numeric: tabular-nums;
 }
 .cockpit-headline__bar-meta b {
-  color: var(--v3-primary);
+  color: var(--v3-primary-text);
   font-weight: 400;
 }
 
@@ -665,7 +665,7 @@ select:focus-visible,
   font-family: var(--font-display);
   font-size: 20px;
   line-height: 1;
-  color: var(--v3-primary);
+  color: var(--v3-primary-text);
   letter-spacing: 0;
   font-variant-numeric: tabular-nums;
 }
@@ -707,8 +707,8 @@ select:focus-visible,
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
-.cl-strip-cell__val--gold { color: var(--v3-primary); }
-.cl-strip-cell__val--alert { color: var(--v3-danger-bright); }
+.cl-strip-cell__val--gold { color: var(--v3-primary-text); }
+.cl-strip-cell__val--alert { color: var(--v3-danger-text); }
 
 .cl-card__tap {
   display: block;
@@ -765,12 +765,12 @@ select:focus-visible,
   font-variant-numeric: tabular-nums;
   font-feature-settings: 'tnum' on, 'lnum' on;
   font-size: 16px;
-  color: var(--v3-primary-bright);
+  color: var(--v3-primary-text);
   letter-spacing: 0;
 }
 .dot-sep { color: var(--v3-text-faint); }
-.jobs-stats__alert { color: var(--v3-danger-bright); }
-.jobs-stats__alert b { color: var(--v3-danger-bright); }
+.jobs-stats__alert { color: var(--v3-danger-text); }
+.jobs-stats__alert b { color: var(--v3-danger-text); }
 
 /* ============================================================
    DESIGN UTILITY CLASSES — sourced from the 5/17 design handoff
@@ -798,7 +798,7 @@ select:focus-visible,
 .gold-italic {
   font-style: italic;
   font-weight: 400;
-  color: var(--v3-primary);
+  color: var(--v3-primary-text);
   letter-spacing: 0;
 }
 
@@ -825,7 +825,7 @@ select:focus-visible,
 /* Money numeric treatment — neon gold + 800 weight + tight tracking.
    Apply to $amount renders only; never to labels or counts. */
 .fh-money {
-  color: var(--field-gold-neon);
+  color: var(--v3-primary-text);
   font-weight: 800;
   letter-spacing: 0;
   font-variant-numeric: tabular-nums;
@@ -990,7 +990,7 @@ a {
   line-height: 0.9;
   display: inline-flex;
 }
-.fh-wordmark .field { color: var(--field-gold); }
+.fh-wordmark .field { color: var(--v3-primary-text); }
 .fh-wordmark .horse { color: var(--ink-strong); }
 .fh-wordmark-stack--inverse .fh-wordmark .horse { color: #F2EDE4; }
 
@@ -1135,7 +1135,7 @@ a {
   border: none;
   padding: var(--space-1) var(--space-2);
   margin-top: calc(-1 * var(--space-2));
-  color: var(--field-gold);
+  color: var(--v3-primary-text);
   font-size: 14px;
   text-align: center;
   cursor: pointer;
@@ -1150,7 +1150,7 @@ a {
   padding: var(--space-3) var(--space-4);
   background: rgba(192, 57, 43, 0.08);
   border-left: 2px solid var(--alert-red);
-  color: var(--alert-red);
+  color: var(--v3-danger-text);
   font-size: 14px;
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }
@@ -1215,7 +1215,7 @@ a {
   font-family: var(--font-display);
   font-size: 16px;
   letter-spacing: 0;
-  color: var(--field-gold);
+  color: var(--v3-primary-text);
 }
 
 .fh-onb__hero {
@@ -1285,7 +1285,7 @@ a {
   font-family: var(--font-display);
   font-size: 20px;
   letter-spacing: 0;
-  color: var(--field-gold);
+  color: var(--v3-primary-text);
 }
 .fh-onb__section-title {
   font-family: var(--font-display);
@@ -1406,7 +1406,7 @@ a {
   pointer-events: none;
 }
 .fh-svc.is-on .fh-svc__label { color: var(--raw-linen); }
-.fh-svc.is-on .fh-svc__glyph { color: var(--field-gold); }
+.fh-svc.is-on .fh-svc__glyph { color: var(--v3-primary-text); }
 .fh-svc.is-on .fh-svc__mark {
   background: var(--field-gold);
   border-color: var(--field-gold);
@@ -1420,7 +1420,7 @@ a {
   font-weight: 600;
   letter-spacing: 0;
   text-transform: uppercase;
-  color: var(--field-gold);
+  color: var(--v3-primary-text);
 }
 
 /* Location */
@@ -1471,7 +1471,7 @@ a {
   font-family: var(--font-display);
   font-size: 16px;
   letter-spacing: 0;
-  color: var(--signal-green);
+  color: var(--v3-success-text);
 }
 .fh-loc__note {
   margin: 0;
@@ -1504,7 +1504,7 @@ a {
   background: none;
   border: none;
   padding: 0;
-  color: var(--field-gold);
+  color: var(--v3-primary-text);
   font-family: inherit;
   font-size: inherit;
   cursor: pointer;
@@ -1570,7 +1570,7 @@ a {
 
 .fh-logo__btn:hover {
   border-color: var(--fh-gold, #C9963A);
-  color: var(--fh-gold, #C9963A);
+  color: var(--v3-primary-text, #C9963A);
   transform: translateY(-1px);
 }
 
@@ -1642,7 +1642,7 @@ a {
   right: 0;
   font-size: 12px;
   letter-spacing: 0;
-  color: #C9963A;
+  color: var(--v3-primary-text);
   white-space: nowrap;
   background: rgba(20, 20, 20, 0.9);
   border: 1px solid rgba(201, 150, 58, 0.3);
@@ -1894,7 +1894,7 @@ a {
   border-radius: 10px;
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--field-gold) 34%, transparent);
 }
-.fh-nav__item.is-active .fh-nav__icon { color: var(--field-gold-bright); }
+.fh-nav__item.is-active .fh-nav__icon { color: var(--v3-primary-text); }
 .fh-nav__item.is-active .fh-nav__label { color: var(--ink-strong); font-weight: 700; }
 [data-theme='light'] .fh-nav__item.is-active {
   background: rgba(20, 20, 20, 0.06);
@@ -2282,6 +2282,14 @@ a {
    the sidebar is theme-locked. */
 @media (min-width: 900px) {
   [data-theme='light'] .fh-desktop-sidebar {
+    /* Theme tokens that descendants read for text keep their dark theme
+       values on this dark rail. */
+    --ink-muted: var(--linen-muted);
+    --v3-text-muted: var(--linen-muted);
+    --v3-text-faint: var(--linen-muted);
+    --v3-primary-text: var(--gold);
+    --v3-danger-text: color-mix(in srgb, var(--red) 55%, var(--linen) 45%);
+    --v3-success-text: color-mix(in srgb, var(--green) 55%, var(--linen) 45%);
     background:
       linear-gradient(180deg, rgba(20, 20, 20, 0.98) 0%, rgba(20, 20, 20, 0.99) 100%);
     box-shadow:
@@ -2713,7 +2721,7 @@ a {
     font-family: var(--font-display);
     font-size: 20px;
     letter-spacing: 0;
-    color: var(--v3-primary);
+    color: var(--v3-primary-text);
     font-variant-numeric: tabular-nums;
   }
 
@@ -2816,7 +2824,7 @@ a {
       linear-gradient(180deg, rgba(201, 150, 58, 0.18) 0%, color-mix(in srgb, var(--v3-primary) 10%, transparent) 100%),
       var(--v3-surface);
     border: 1px solid color-mix(in srgb, var(--v3-primary) 38%, var(--v3-border));
-    color: var(--v3-primary);
+    color: var(--v3-primary-text);
     font-family: var(--font-body);
     font-size: 12px;
     font-weight: 700;
@@ -2930,71 +2938,21 @@ a {
 }
 
 /* =========================================================================
-   DESKTOP DENSITY — Phase 6
+   DESKTOP DENSITY, Phase 6
 
-   Jobs and Clients used the desktop canvas after Phase 2, but the
-   cards still rendered with mobile-tuned padding / photo height /
-   gap, so the grid felt like enlarged mobile rather than a real
-   command-center board. This block tightens the per-card and
-   per-grid measurements at >=900px only — no mobile rule changes.
-
-   Targets:
-   - JobCard photo banner    140 → 104  (-36)
-   - JobCard padding         18  → 12   tighter shoulders + bottom
-   - JobCard interior gap    12-14 → 9
-   - JobCard headline / amount / next-action sizes nudged down
-   - Jobs grid minmax        290 → 240  (more cards per row)
-   - Jobs grid gap            14 → 10
-   - ClientTile minHeight    210 → 168  (-42)
-   - ClientTile padding      18 → 14    tighter shoulders
-   - Clients grid minmax     320 → 280
-   - Clients grid gap         16 → 12
-
-   Inline styles on JobCard / ClientTile force `!important` here.
-   This is intentional — the inline styles are the mobile-tuned
-   defaults; this block is the desktop-only override.
+   Tightens the Clients grid and the Jobs and Clients head rows at
+   900px and up. Mobile rules are untouched. The Jobs screen now uses
+   its own board layout, so the old JobCard overrides were removed.
    ========================================================================= */
 @media (min-width: 900px) {
 
-  /* JobCard — tighter shoulders + bottom padding. The two padding
-     variants (with photo / without) need separate selectors so the
-     photo banner doesn't get an unwanted top inset. */
-  .v3-screen--jobs .fh-job-card {
-    padding: 12px 12px 12px 16px !important;
-    gap: 8px !important;
-    border-radius: 10px !important;
-  }
-  .v3-screen--jobs .fh-job-card--with-photo {
-    padding: 0 12px 12px !important;
-  }
-  /* Photo banner — first aria-hidden child div. Inline height: 140. */
-  .v3-screen--jobs .fh-job-card--with-photo > div[aria-hidden="true"]:first-child {
-    height: 104px !important;
-  }
-
-  /* Trim the inner content. Most JobCard text is set inline so we
-     have to reach into the children with attribute selectors. The
-     headline (job name) is an h3; trim its size + line-height. The
-     amount is a span using var(--font-display); trim font-size.
-     These selectors are loose on purpose — they target any
-     reasonable headline/amount inside the card and back off the
-     mobile-tuned 16-22px to 14-18px desktop sizes. */
-  .v3-screen--jobs .fh-job-card h3 {
-    font-size: 14px !important;
-    line-height: 1.2 !important;
-  }
-  /* Client name eyebrow above headline — trim a touch. */
-  .v3-screen--jobs .fh-job-card > div[style*="letter-spacing"] {
-    font-size: 12px !important;
-  }
-
-  /* Clients grid — slightly denser, smaller gap. */
+  /* Clients grid: slightly denser, smaller gap. */
   .v3-screen--clients > .fh-clients__grid {
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)) !important;
     gap: 12px !important;
   }
 
-  /* Tighten Jobs/Clients head row to drop the slight top void. */
+  /* Tighten Jobs and Clients head row to drop the slight top void. */
   .fh-app--layout-responsive .v3-screen--jobs,
   .fh-app--layout-responsive .v3-screen--clients {
     padding-top: 0 !important;
@@ -3027,7 +2985,7 @@ a {
   position: fixed;
   right: 20px;
   bottom: calc(var(--fh-mobile-dock-height) + var(--space-4));
-  z-index: 40;
+  z-index: var(--z-nav);
   width: 44px;
   height: 44px;
   border-radius: 10px;
@@ -3303,10 +3261,10 @@ body:has(.fh-fab:not(.fh-fab--capture)) .fh-fab--capture {
   }
 
   .fh-activity-table__icon.is-good,
-  .fh-activity-mix__icon.is-good { color: var(--v3-success-bright); border-color: color-mix(in srgb, var(--v3-success-bright) 30%, transparent); }
+  .fh-activity-mix__icon.is-good { color: var(--v3-success-text); border-color: color-mix(in srgb, var(--v3-success-bright) 30%, transparent); }
   .fh-activity-table__icon.is-warn,
-  .fh-activity-mix__icon.is-warn { color: var(--v3-primary-bright); border-color: color-mix(in srgb, var(--v3-primary) 30%, transparent); }
-  .fh-activity-table__icon.is-bad { color: var(--v3-danger-bright); border-color: color-mix(in srgb, var(--v3-danger-bright) 30%, transparent); }
+  .fh-activity-mix__icon.is-warn { color: var(--v3-primary-text); border-color: color-mix(in srgb, var(--v3-primary) 30%, transparent); }
+  .fh-activity-table__icon.is-bad { color: var(--v3-danger-text); border-color: color-mix(in srgb, var(--v3-danger-bright) 30%, transparent); }
 
   .fh-activity-table__event {
     display: flex;
@@ -3394,7 +3352,7 @@ body:has(.fh-fab:not(.fh-fab--capture)) .fh-fab--capture {
   }
 
   .fh-activity-shortcuts a:last-child { border-bottom: 0; }
-  .fh-activity-shortcuts a:hover { color: var(--v3-primary); }
+  .fh-activity-shortcuts a:hover { color: var(--v3-primary-text); }
 }
 
 @media (min-width: 900px) and (max-width: 1199px) {
@@ -3470,7 +3428,7 @@ body:has(.fh-fab:not(.fh-fab--capture)) .fh-fab--capture {
     border: 1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent);
     border-radius: 10px;
     background: var(--v3-primary-soft);
-    color: var(--v3-primary);
+    color: var(--v3-primary-text);
     font-family: var(--font-display);
     font-size: 20px;
   }
@@ -3520,10 +3478,10 @@ body:has(.fh-fab:not(.fh-fab--capture)) .fh-fab--capture {
     white-space: nowrap;
   }
 
-  .fh-partners-table__jobs a:hover { color: var(--v3-primary); }
+  .fh-partners-table__jobs a:hover { color: var(--v3-primary-text); }
   .fh-partners-table__time { display: flex; align-items: center; gap: 4px; color: var(--v3-text-muted); }
   .fh-partners-table__actions { display: flex; justify-content: flex-end; }
-  .fh-build-icon-action.is-danger { color: var(--v3-danger-bright); }
+  .fh-build-icon-action.is-danger { color: var(--v3-danger-text); }
 
   .fh-partners-table__loading,
   .fh-partners-table__empty {
@@ -3543,7 +3501,7 @@ body:has(.fh-fab:not(.fh-fab--capture)) .fh-fab--capture {
   }
 
   .fh-partners-table__empty strong { color: var(--v3-text); }
-  .fh-partners-build__warn { color: var(--v3-primary-bright) !important; }
+  .fh-partners-build__warn { color: var(--v3-primary-text) !important; }
 
   .fh-partners-role-mix {
     display: flex;
@@ -3689,14 +3647,14 @@ body:has(.fh-fab:not(.fh-fab--capture)) .fh-fab--capture {
    read as a coherent pair. */
 .fh-header-search-btn:hover,
 .fh-header-search-btn:active {
-  color: var(--field-gold-bright) !important;
+  color: var(--v3-primary-text) !important;
   border-color: color-mix(in srgb, var(--v3-primary) 35%, transparent) !important;
   background: color-mix(in srgb, var(--v3-primary) 8%, transparent) !important;
 }
 
 .fh-header-notes-btn:hover,
 .fh-header-notes-btn:active {
-  color: var(--field-gold-bright) !important;
+  color: var(--v3-primary-text) !important;
   border-color: color-mix(in srgb, var(--v3-primary) 35%, transparent) !important;
   background: color-mix(in srgb, var(--v3-primary) 8%, transparent) !important;
 }
@@ -3722,18 +3680,6 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 [vaul-drawer][vaul-drawer-direction='bottom'] {
   left: 0;
   right: 0;
-}
-
-/* ContactDetail page — defensively clamp every child so the Partner card
-   and other info rows can never push past the viewport on iOS Safari,
-   regardless of what padding/flex logic the row uses internally. */
-.fh-detail {
-  width: 100%;
-  max-width: 100vw;
-  overflow-x: hidden;
-}
-.fh-detail > * {
-  max-width: 100%;
 }
 
 /* Drawer root — portaled into document.body to escape any transform/stacking
@@ -3841,7 +3787,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   cursor: pointer;
   transition: color 160ms var(--ease), border-color 160ms var(--ease);
 }
-.fh-drawer__close:hover { color: var(--field-gold); border-color: var(--field-gold); }
+.fh-drawer__close:hover { color: var(--v3-primary-text); border-color: var(--field-gold); }
 
 .fh-drawer__body {
   flex: 1;
@@ -3865,7 +3811,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   font-feature-settings: "tnum";
   font-size: 12px;
   font-weight: 600;
-  color: var(--field-gold);
+  color: var(--v3-primary-text);
   letter-spacing: 0;
   text-transform: uppercase;
   padding: 8px 4px 4px;
@@ -3909,7 +3855,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   flex: 1;
   background: transparent;
   border: 1px solid rgba(192, 57, 43, 0.4);
-  color: var(--alert-red);
+  color: var(--v3-danger-text);
 }
 .fh-drawer__signout:hover {
   background: rgba(192, 57, 43, 0.08);
@@ -3926,40 +3872,6 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   background: var(--surface-2);
   color: var(--ink-strong);
   letter-spacing: 0;
-}
-
-/* =========================================================================
-   PAGE SHELL — used by Jobs, ContactDetail, Notes, Schedule etc.
-   ========================================================================= */
-.fh-page {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: var(--space-5) var(--space-5) var(--space-7);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-.fh-page__head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--space-4);
-  padding-bottom: var(--space-3);
-  border-bottom: 1px solid var(--rule);
-}
-.fh-page__head > div { display: flex; flex-direction: column; gap: 4px; }
-.fh-page__headActions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex-direction: row !important;
-}
-.fh-page__title {
-  font-family: var(--font-display);
-  font-size: 24px;
-  letter-spacing: 0;
-  line-height: 0.9;
-  color: var(--ink-strong);
 }
 
 /* =========================================================================
@@ -3994,7 +3906,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   border-color: var(--rule-bold);
   color: var(--ink-strong);
 }
-.fh-btn--ghost:hover:not(:disabled) { border-color: var(--field-gold); color: var(--field-gold); }
+.fh-btn--ghost:hover:not(:disabled) { border-color: var(--field-gold); color: var(--v3-primary-text); }
 .fh-btn--ink {
   background: var(--ink-strong);
   color: var(--surface-0);
@@ -4003,89 +3915,12 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 .fh-btn--danger {
   background: transparent;
   border-color: rgba(192, 57, 43, 0.5);
-  color: var(--alert-red);
+  color: var(--v3-danger-text);
 }
 .fh-btn--danger:hover:not(:disabled) {
   background: var(--alert-red);
   border-color: var(--alert-red);
   color: #F2EDE4;
-}
-.fh-card {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  width: 100%;
-  padding: var(--space-4);
-  background: var(--surface-1);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-md);
-  text-align: left;
-  cursor: pointer;
-  position: relative;
-  overflow: hidden;
-  transition: transform 160ms var(--ease), border-color 160ms var(--ease), box-shadow 160ms var(--ease);
-}
-.fh-card:hover {
-  transform: translateY(-1px);
-  border-color: var(--field-gold);
-  box-shadow: var(--shadow-card);
-}
-/* Brand rule: no thick colored side stripes on cards (UI audit #17) —
-   stage is communicated by the pill badge alone. The ::before hook
-   stays (the just-added flash animation uses it) but renders no
-   permanent stripe. */
-.fh-card--stage::before {
-  content: '';
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 0;
-}
-@keyframes fh-justadded-flash {
-  0%   { background: var(--field-gold-bright); box-shadow: 0 0 16px color-mix(in srgb, var(--v3-primary) 60%, transparent); }
-  60%  { background: var(--field-gold); }
-  100% { background: var(--stage-lead); box-shadow: 0 0 0 color-mix(in srgb, var(--v3-primary) 0%, transparent); }
-}
-.fh-card--lead::before    { background: var(--stage-lead); }
-.fh-card--quote::before   { background: var(--stage-quote); }
-.fh-card--job::before     { background: var(--stage-job); }
-.fh-card--invoice::before { background: var(--stage-invoice); }
-.fh-card--closed::before  { background: var(--stage-closed); }
-.fh-card--lost::before    { background: var(--stage-lost); }
-.fh-card__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
-.fh-card__row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-.fh-card__title {
-  font-family: var(--font-body);
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--ink-strong);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.fh-card__amount {
-  font-family: var(--font-display);
-  font-size: 20px;
-  letter-spacing: 0;
-  color: var(--ink-strong);
-  flex-shrink: 0;
-}
-.fh-card__sub {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: 14px;
-  color: var(--ink-muted);
-}
-.fh-card__dot {
-  width: 3px;
-  height: 3px;
-  border-radius: 10px;
-  background: var(--ink-muted);
 }
 
 /* Margin pill */
@@ -4115,103 +3950,6 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 @keyframes fh-shimmer {
   0% { background-position: 100% 0; }
   100% { background-position: -100% 0; }
-}
-
-/* =========================================================================
-   CONTACT DETAIL — tabs, summary panel, rows, milestones, trades
-   ========================================================================= */
-.fh-detail {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: var(--space-4) var(--space-5) var(--space-7);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-.fh-detail__back {
-  background: transparent;
-  border: none;
-  color: var(--ink-muted);
-  padding: 8px 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-family: var(--font-body);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0;
-  text-transform: uppercase;
-  cursor: pointer;
-  align-self: flex-start;
-}
-.fh-detail__back:hover { color: var(--field-gold); }
-.fh-detail__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-4);
-  padding-bottom: var(--space-3);
-  border-bottom: 1px solid var(--rule);
-}
-.fh-detail__title-wrap { display: flex; flex-direction: column; gap: 8px; }
-.fh-detail__title {
-  font-family: var(--font-display);
-  font-size: 24px;
-  line-height: 0.92;
-  letter-spacing: 0;
-  color: var(--ink-strong);
-}
-.fh-detail__sub {
-  font-size: 14px;
-  color: var(--ink-muted);
-}
-.fh-detail__actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-@keyframes fh-wave {
-  0%, 100% { transform: scaleY(0.5); opacity: 0.5; }
-  50% { transform: scaleY(1); opacity: 1; }
-}
-
-.fh-note {
-  padding: var(--space-4);
-  background: var(--surface-1);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-md);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  transition: border-color 160ms var(--ease);
-}
-.fh-note:hover { border-color: color-mix(in srgb, var(--field-gold) 50%, var(--rule)); }
-.fh-note__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.fh-note__sum {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 16px;
-  color: var(--ink-strong);
-  letter-spacing: 0;
-}
-.fh-note__body {
-  margin: 0;
-  font-size: 14px;
-  color: var(--ink-muted);
-  white-space: pre-wrap;
-}
-.fh-note__list {
-  margin: 0;
-  padding-left: 1.2em;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 14px;
-  color: var(--ink-strong);
 }
 
 /* =========================================================================
@@ -4366,7 +4104,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   font-family: var(--font-body);
   font-size: 12px;
   font-weight: 700;
-  color: var(--v3-primary-bright);
+  color: var(--v3-primary-text);
   letter-spacing: 0;
   text-transform: uppercase;
   font-variant-numeric: tabular-nums;
@@ -4446,48 +4184,6 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 }
 
 /* =========================================================================
-   IMPORTER SCREEN — CSV drop + webhook endpoint
-   ========================================================================= */
-.fh-import {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-.fh-import__drop {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  padding: var(--space-6) var(--space-4);
-  background: var(--surface-1);
-  border: 2px dashed var(--rule);
-  border-radius: var(--radius-md);
-  color: var(--ink-muted);
-  cursor: pointer;
-  transition: border-color 160ms var(--ease), color 160ms var(--ease), background 160ms var(--ease);
-  text-align: center;
-}
-.fh-import__drop:hover {
-  border-color: var(--field-gold);
-  color: var(--field-gold);
-  background: color-mix(in srgb, var(--field-gold) 4%, var(--surface-1));
-}
-.fh-import__drop span { font-size: 14px; font-weight: 600; }
-.fh-import__preview {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  background: var(--surface-1);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-md);
-}
-[data-theme='dark'] .fh-import__drop:hover {
-  background: color-mix(in srgb, var(--field-gold) 8%, var(--surface-1));
-}
-
-/* =========================================================================
    RESPONSIVE — tighten schedule + bid + settings on phone
    ========================================================================= */
 @media (max-width: 640px) {
@@ -4559,7 +4255,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   right: var(--space-3);
   bottom: var(--space-3);
 }
-.fh-svc.is-on .fh-spec-code { color: var(--field-gold-hot); }
+.fh-svc.is-on .fh-spec-code { color: var(--v3-primary-text); }
 
 /* ---- Status pill: pulsing dot + uppercase mono label ---- */
 @keyframes fh-pulse {
@@ -4578,7 +4274,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   font-weight: 500;
 }
 .fh-hero-coord__dot {
-  color: var(--field-gold);
+  color: var(--v3-primary-text);
   margin: 0 8px;
 }
 
@@ -4613,7 +4309,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   font-family: var(--font-display);
   font-size: 24px;
   line-height: 0.9;
-  color: var(--field-gold);
+  color: var(--v3-primary-text);
 }
 .fh-counter__label {
   font-family: var(--font-mono);
@@ -4726,9 +4422,10 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   color: var(--ink-strong);
   margin: 0;
 }
-.fh-asheet__title-accent { color: var(--field-gold); }
+.fh-asheet__title-accent { color: var(--v3-primary-text); }
 
 .fh-asheet__close {
+  position: relative;
   flex-shrink: 0;
   width: 32px;
   height: 32px;
@@ -4741,9 +4438,15 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   cursor: pointer;
   transition: border-color 160ms var(--ease), color 160ms var(--ease);
 }
+/* 32px visual, 44px tap target. */
+.fh-asheet__close::before {
+  content: '';
+  position: absolute;
+  inset: -7px;
+}
 .fh-asheet__close:hover {
   border-color: var(--field-gold);
-  color: var(--field-gold);
+  color: var(--v3-primary-text);
 }
 
 .fh-asheet__progress {
@@ -4846,7 +4549,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   letter-spacing: 0;
   text-transform: uppercase;
 }
-.fh-asheet__hint span { color: var(--field-gold); }
+.fh-asheet__hint span { color: var(--v3-primary-text); }
 
 /* ---- Sheet field primitives ---- */
 .fh-asheet-field {
@@ -4893,10 +4596,14 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   background-size: 14px;
   padding-right: 24px;
 }
-.fh-asheet-field input:focus,
+/* Focus underline: matches the base rule's specificity (its :not()
+   chain used to outrank a plain :focus, so focused fields showed no
+   change at all) and doubles to 2px so keyboard focus reads clearly. */
+.fh-asheet-field input:not([type='checkbox']):not([type='radio']):focus,
 .fh-asheet-field textarea:focus,
 .fh-asheet-field select:focus {
-  border-bottom-color: var(--field-gold);
+  border-bottom-color: var(--v3-primary-text);
+  box-shadow: 0 1px 0 var(--v3-primary-text);
 }
 
 /* ---- Chip row ---- */
@@ -4952,11 +4659,14 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   border-bottom: 1px solid var(--rule);
   transition: border-color 160ms var(--ease);
 }
-.fh-asheet-money:focus-within { border-bottom-color: var(--field-gold); }
+.fh-asheet-money:focus-within {
+  border-bottom-color: var(--v3-primary-text);
+  box-shadow: 0 1px 0 var(--v3-primary-text);
+}
 .fh-asheet-money__prefix {
   font-family: var(--font-display);
   font-size: 24px;
-  color: var(--field-gold);
+  color: var(--v3-primary-text);
   line-height: 1;
   letter-spacing: 0;
 }
@@ -5094,7 +4804,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 .fh-asheet--v2 .fh-asheet-chip.is-on {
   background: color-mix(in srgb, var(--v3-primary) 16%, transparent);
   border-color: color-mix(in srgb, var(--v3-primary) 55%, transparent);
-  color: var(--v3-primary-bright);
+  color: var(--v3-primary-text);
   font-weight: 600;
   transform: none;
   box-shadow: none;
@@ -5186,7 +4896,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   font-family: var(--font-display);
   font-size: 12px;
   letter-spacing: 0;
-  color: var(--v3-primary-bright);
+  color: var(--v3-primary-text);
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -5222,7 +4932,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   color: var(--v3-text-muted);
   line-height: 1.35;
 }
-.fh-vmic__hint.is-error { color: #C9963A; }
+.fh-vmic__hint.is-error { color: var(--v3-primary-text, #C9963A); }
 
 /* Compact transcript rail — appears under the mic when the operator
    speaks. Ports transcript-rail from styles-refine.css. Play glyph +
@@ -5241,7 +4951,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   width: 32px; height: 32px; border-radius: 10px;
   background: var(--v3-primary-soft);
   border: 1px solid var(--v3-border-gold);
-  color: var(--v3-primary-bright);
+  color: var(--v3-primary-text);
   display: grid; place-items: center;
   flex-shrink: 0;
 }
@@ -5319,7 +5029,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   height: 26px;
   border: none;
   background: transparent;
-  color: var(--alert-red);
+  color: var(--v3-danger-text);
   font-size: 20px;
   line-height: 1;
   cursor: pointer;
@@ -5372,7 +5082,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   font-size: 12px;
   letter-spacing: 0;
   text-transform: uppercase;
-  color: var(--field-gold);
+  color: var(--v3-primary-text);
   font-weight: 600;
 }
 .fh-emptystate__title {
@@ -5473,65 +5183,6 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 }
 
 /* =========================================================================
-   TOASTER — stage transitions, commit confirmations
-   ========================================================================= */
-.fh-toaster {
-  position: fixed;
-  top: calc(env(safe-area-inset-top) + 16px);
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: var(--z-toast);
-  pointer-events: none;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: center;
-  width: max-content;
-  max-width: calc(100vw - 32px);
-}
-.fh-toast {
-  /* Toasts carry no interactive children — let taps pass through to
-     elements underneath instead of intercepting clicks. */
-  pointer-events: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  background: color-mix(in srgb, var(--onyx) 92%, transparent);
-  border: 1px solid var(--field-gold);
-  border-radius: var(--radius-spec);
-  color: var(--raw-linen);
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum";
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0;
-  text-transform: uppercase;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  box-shadow: 0 12px 32px -8px rgba(20, 20, 20, 0.5);
-}
-.fh-toast__dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 10px;
-  background: currentColor;
-  box-shadow: 0 0 10px currentColor;
-}
-.fh-toast--gold { color: var(--field-gold); border-color: var(--field-gold); }
-.fh-toast--green { color: var(--signal-green); border-color: var(--signal-green); }
-.fh-toast--red { color: var(--alert-red); border-color: var(--alert-red); }
-.fh-toast--steel { color: var(--steel-lt); border-color: var(--steel); }
-.fh-toast--lead { color: var(--stage-lead); border-color: var(--stage-lead); }
-.fh-toast--quote { color: var(--stage-quote); border-color: var(--stage-quote); }
-.fh-toast--job { color: var(--stage-job); border-color: var(--stage-job); }
-.fh-toast--invoice { color: var(--stage-invoice); border-color: var(--stage-invoice); }
-.fh-toast--closed { color: var(--stage-closed); border-color: var(--stage-closed); }
-.fh-toast--lost { color: var(--stage-lost); border-color: var(--stage-lost); }
-.fh-toast__text { color: var(--raw-linen); letter-spacing: 0; }
-
-/* =========================================================================
    SPEC TABS — shared industrial segment control.
    Used for view toggles (Day/Week/Month), tab rows on detail screens, etc.
    ========================================================================= */
@@ -5579,7 +5230,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--v3-primary) 22%, transparent);
   transform: translateY(-1px);
 }
-.fh-spectab.is-on .fh-spectab__code { color: var(--field-gold-hot); }
+.fh-spectab.is-on .fh-spectab__code { color: var(--v3-primary-text); }
 .fh-spectab.is-on::before {
   content: '';
   position: absolute;
@@ -5711,7 +5362,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     margin: 8px 12px 4px;
     color: var(--v3-text-faint);
     font-size: 12px;
-    font-weight: 850;
+    font-weight: 800;
     letter-spacing: 0;
     text-transform: uppercase;
   }
@@ -5817,7 +5468,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   }
 
   .fh-build-sun {
-    color: var(--v3-primary, #C9963A);
+    color: var(--v3-primary-text, #C9963A);
   }
 
   .fh-build-icon-btn,
@@ -5860,7 +5511,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   }
 
   .fh-build-good {
-    color: var(--v3-primary, #C9963A);
+    color: var(--v3-primary-text, #C9963A);
     font-size: 14px;
     letter-spacing: 0;
   }
@@ -5907,10 +5558,10 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     gap: 4px;
     border: none;
     background: transparent;
-    color: var(--v3-primary, #C9963A);
+    color: var(--v3-primary-text, #C9963A);
     cursor: pointer;
     font-size: 12px;
-    font-weight: 750;
+    font-weight: 800;
   }
 
   .fh-build-mini-grid {
@@ -5975,7 +5626,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   .fh-build-eyebrow {
     color: var(--v3-text-muted);
     font-size: 12px;
-    font-weight: 850;
+    font-weight: 800;
     letter-spacing: 0;
     text-transform: uppercase;
   }
@@ -6002,9 +5653,9 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    color: var(--v3-success-bright);
+    color: var(--v3-success-text);
     font-size: 12px;
-    font-weight: 750;
+    font-weight: 800;
   }
 
   .fh-build-pipeline__copy {
@@ -6081,9 +5732,9 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
      collision). */
   .fh-build-stage-grid button > span:not(.fh-build-stage-grid__dot) {
     display: block;
-    color: var(--v3-primary, #C9963A);
+    color: var(--v3-primary-text, #C9963A);
     font-size: 12px;
-    font-weight: 850;
+    font-weight: 800;
     letter-spacing: 0;
     text-transform: uppercase;
     white-space: nowrap;
@@ -6108,7 +5759,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   .fh-build-stage-grid small {
     display: block;
     margin-top: 7px;
-    color: var(--v3-primary, #C9963A);
+    color: var(--v3-primary-text, #C9963A);
     font-size: 12px;
   }
 
@@ -6184,7 +5835,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   .fh-build-today__actions small {
     display: block;
     margin-top: 4px;
-    color: var(--v3-primary, #C9963A);
+    color: var(--v3-primary-text, #C9963A);
     font-size: 12px;
   }
 
@@ -6282,7 +5933,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     min-height: 34px;
     color: var(--v3-text-muted);
     font-size: 12px;
-    font-weight: 850;
+    font-weight: 800;
     letter-spacing: 0;
     text-transform: uppercase;
   }
@@ -6306,7 +5957,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 
   .fh-build-table__row strong {
     color: var(--v3-text);
-    font-weight: 750;
+    font-weight: 800;
   }
 
   .fh-build-table__head.is-owner,
@@ -6350,7 +6001,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   }
 
   .fh-build-dot.is-warn {
-    color: var(--v3-primary-bright);
+    color: var(--v3-primary-text);
   }
 
   .fh-build-dot.is-neutral {
@@ -6603,7 +6254,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   .fh-build-inline-link {
     background: transparent;
     border: 0;
-    color: var(--v3-primary, #C9963A);
+    color: var(--v3-primary-text, #C9963A);
     font: inherit;
     cursor: pointer;
     padding: 0;
@@ -6633,7 +6284,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     border-radius: 10px;
     border: 1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent);
     background: transparent;
-    color: var(--v3-primary, #C9963A);
+    color: var(--v3-primary-text, #C9963A);
     font-size: 12px;
     font-weight: 800;
     letter-spacing: 0;
@@ -6657,7 +6308,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     gap: 4px;
     background: transparent;
     border: 0;
-    color: var(--v3-primary, #C9963A);
+    color: var(--v3-primary-text, #C9963A);
     cursor: pointer;
     font-size: 12px;
     font-weight: 700;
@@ -6716,127 +6367,6 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     gap: 12px;
   }
 
-  .fh-build-agenda__day {
-    background: linear-gradient(180deg, var(--v3-surface-glass), var(--v3-surface-glass));
-    border: 1px solid var(--v3-border-mid);
-    border-radius: 10px;
-    overflow: hidden;
-  }
-
-  .fh-build-agenda__day.is-today {
-    border-color: color-mix(in srgb, var(--v3-primary) 55%, transparent);
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--v3-primary) 15%, transparent), 0 22px 60px rgba(20, 20, 20,.34);
-  }
-
-  .fh-build-agenda__head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 24px;
-    border-bottom: 1px solid var(--v3-glass-tint-2);
-  }
-
-  .fh-build-agenda__date {
-    display: flex;
-    align-items: baseline;
-    gap: 12px;
-  }
-
-  .fh-build-agenda__weekday {
-    font-size: 12px;
-    font-weight: 850;
-    letter-spacing: 0;
-    text-transform: uppercase;
-    color: var(--v3-text-muted);
-  }
-
-  .fh-build-agenda__daynum {
-    font-family: var(--font-display, "Bebas Neue", Impact, sans-serif);
-    font-size: 24px;
-    line-height: 1;
-    color: var(--v3-text);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .fh-build-agenda__month {
-    font-size: 12px;
-    font-weight: 800;
-    letter-spacing: 0;
-    color: var(--v3-text-muted);
-  }
-
-  .fh-build-agenda__head-meta {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    color: var(--v3-text-muted);
-    font-size: 12px;
-  }
-
-  .fh-build-agenda__today-chip {
-    padding: 4px 8px;
-    border-radius: 10px;
-    background: var(--v3-primary, #C9963A);
-    color: var(--v3-surface);
-    font-size: 12px;
-    font-weight: 800;
-    letter-spacing: 0;
-    text-transform: uppercase;
-  }
-
-  .fh-build-agenda__empty {
-    padding: 24px 24px;
-    color: var(--v3-text-faint);
-    font-size: 12px;
-  }
-
-  .fh-build-agenda__list {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .fh-build-agenda__event {
-    display: grid;
-    grid-template-columns: 140px 1fr auto;
-    align-items: center;
-    gap: 16px;
-    padding: 12px 24px;
-    border-top: 1px solid var(--v3-glass-tint-2);
-  }
-
-  .fh-build-agenda__event:first-child {
-    border-top: 0;
-  }
-
-  .fh-build-agenda__time {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--v3-primary, #C9963A);
-    font-size: 12px;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: 0;
-  }
-
-  .fh-build-agenda__title {
-    color: var(--v3-text);
-    font-size: 14px;
-    font-weight: 700;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .fh-build-agenda__loc {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    color: var(--v3-text-muted);
-    font-size: 12px;
-  }
-
   /* Upcoming card in the rail */
   .fh-build-upnext {
     display: flex;
@@ -6846,7 +6376,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   }
 
   .fh-build-upnext__time {
-    color: var(--v3-primary, #C9963A);
+    color: var(--v3-primary-text, #C9963A);
     font-size: 12px;
     font-weight: 700;
     letter-spacing: 0;
@@ -6896,7 +6426,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   }
 
   .fh-build-rail-list__time {
-    color: var(--v3-primary, #C9963A);
+    color: var(--v3-primary-text, #C9963A);
     font-size: 12px;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
@@ -6918,7 +6448,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     text-align: center;
     cursor: pointer;
     border-radius: 10px;
-    color: var(--v3-primary, #C9963A);
+    color: var(--v3-primary-text, #C9963A);
     font-weight: 800;
     letter-spacing: 0;
     height: 44px;
@@ -6972,11 +6502,11 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     text-align: left;
   }
   .fh-build-banner.is-warn { color: var(--v3-text); }
-  .fh-build-banner svg { color: var(--v3-primary-bright); flex-shrink: 0; }
+  .fh-build-banner svg { color: var(--v3-primary-text); flex-shrink: 0; }
   .fh-build-banner strong { color: var(--v3-text); font-weight: 800; }
   .fh-build-banner__cta {
     margin-left: auto;
-    color: var(--v3-primary, #C9963A);
+    color: var(--v3-primary-text, #C9963A);
     font-weight: 800;
     font-size: 12px;
     letter-spacing: 0;
@@ -7015,12 +6545,12 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     letter-spacing: 0;
   }
   .fh-build-chip.is-muted   { color: var(--v3-text-muted); }
-  .fh-build-chip.is-gold    { background: color-mix(in srgb, var(--v3-primary) 14%, transparent); border-color: color-mix(in srgb, var(--v3-primary) 40%, transparent); color: var(--v3-primary, #C9963A); }
-  .fh-build-chip.is-warn    { background: color-mix(in srgb, var(--v3-primary-bright) 14%, transparent); border-color: color-mix(in srgb, var(--v3-primary-bright) 40%, transparent); color: var(--v3-primary-bright); }
+  .fh-build-chip.is-gold    { background: color-mix(in srgb, var(--v3-primary) 14%, transparent); border-color: color-mix(in srgb, var(--v3-primary) 40%, transparent); color: var(--v3-primary-text, #C9963A); }
+  .fh-build-chip.is-warn    { background: color-mix(in srgb, var(--v3-primary-bright) 14%, transparent); border-color: color-mix(in srgb, var(--v3-primary-bright) 40%, transparent); color: var(--v3-primary-text); }
   .fh-build-chip.is-link    {
     background: color-mix(in srgb, var(--v3-success-bright) 10%, transparent);
     border-color: color-mix(in srgb, var(--v3-success-bright) 32%, transparent);
-    color: var(--v3-success-bright);
+    color: var(--v3-success-text);
     cursor: pointer;
   }
   .fh-build-chip.is-link:hover { background: color-mix(in srgb, var(--v3-success-bright) 18%, transparent); }
@@ -7145,7 +6675,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     border-radius: 10px;
     background: color-mix(in srgb, var(--v3-danger-bright) 10%, transparent);
     border: 1px solid color-mix(in srgb, var(--v3-danger-bright) 30%, transparent);
-    color: var(--v3-danger-bright);
+    color: var(--v3-danger-text);
     font-size: 12px;
   }
 
@@ -7240,7 +6770,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     color: var(--v3-text);
   }
   .fh-build-icon-action.is-danger:hover {
-    color: var(--v3-danger-bright);
+    color: var(--v3-danger-text);
     border-color: color-mix(in srgb, var(--v3-danger-bright) 30%, transparent);
     background: color-mix(in srgb, var(--v3-danger-bright) 10%, transparent);
   }
@@ -7328,7 +6858,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     text-align: right;
     font-family: var(--font-display, "Bebas Neue", Impact, sans-serif);
     font-size: 20px;
-    color: var(--v3-primary, #C9963A);
+    color: var(--v3-primary-text, #C9963A);
     font-variant-numeric: tabular-nums;
   }
 
@@ -7409,8 +6939,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     border-radius: 10px;
     border-top: 3px solid currentColor;
   }
-  .fh-build-forecast-day.is-good { color: var(--v3-success-bright); }
-  .fh-build-forecast-day.is-warn { color: var(--v3-primary-bright); }
+  .fh-build-forecast-day.is-good { color: var(--v3-success-text); }
+  .fh-build-forecast-day.is-warn { color: var(--v3-primary-text); }
 
   .fh-build-forecast-day__head {
     display: flex;
@@ -7420,7 +6950,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   }
   .fh-build-forecast-day__weekday {
     font-size: 12px;
-    font-weight: 850;
+    font-weight: 800;
     letter-spacing: 0;
     color: inherit;
   }
@@ -7453,7 +6983,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     font-size: 12px;
     font-variant-numeric: tabular-nums;
   }
-  .fh-build-forecast-day__row svg { color: var(--v3-primary, #C9963A); }
+  .fh-build-forecast-day__row svg { color: var(--v3-primary-text, #C9963A); }
 
   .fh-build-table__head.is-trades,
   .fh-build-table__row.is-trades {
@@ -7606,7 +7136,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   }
   .fh-build-tab:hover { color: var(--v3-text); }
   .fh-build-tab.is-active {
-    color: var(--v3-primary, #C9963A);
+    color: var(--v3-primary-text, #C9963A);
     border-bottom-color: var(--v3-primary, #C9963A);
   }
   .fh-build-tabs__cta {
@@ -7619,7 +7149,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     border-radius: 10px;
     background: color-mix(in srgb, var(--v3-primary) 10%, transparent);
     border: 1px solid color-mix(in srgb, var(--v3-primary) 32%, transparent);
-    color: var(--v3-primary, #C9963A);
+    color: var(--v3-primary-text, #C9963A);
     font-family: var(--font-body, "DM Sans", system-ui, sans-serif);
     font-size: 12px;
     font-weight: 800;
@@ -7669,8 +7199,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     border-bottom: 1px solid var(--v3-glass-tint-2);
   }
   .fh-build-contact-row:last-child { border-bottom: 0; }
-  .fh-build-contact-row:hover { color: var(--v3-primary, #C9963A); }
-  .fh-build-contact-row svg { color: var(--v3-primary, #C9963A); flex-shrink: 0; }
+  .fh-build-contact-row:hover { color: var(--v3-primary-text, #C9963A); }
+  .fh-build-contact-row svg { color: var(--v3-primary-text, #C9963A); flex-shrink: 0; }
   .fh-build-contact-row > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .fh-build-contact-row__chev { color: var(--v3-text-faint); flex-shrink: 0; }
 
@@ -8121,18 +7651,45 @@ em.fh-text-gradient-gold {
      • .fh-inline-add input focus border
      • .fh-capture__input focus border + halo
    All flip to a neutral high-contrast color so a11y focus rings
-   stay visible without reading as foggy yellow. */
+   stay visible without reading as foggy yellow (7.16:1 on onyx in the
+   dark theme, 5.73:1 on linen in the light theme). */
+a:focus-visible,
 button:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible,
+summary:focus-visible,
 [role="button"]:focus-visible,
+[role="tab"]:focus-visible,
 [tabindex]:focus-visible,
 .v3-btn:focus-visible,
 .v3-card--interactive:focus-visible,
 .dispatch-card__tap:focus-visible,
 .cl-card__tap:focus-visible {
   outline-color: var(--v3-text-muted) !important;
+}
+/* Keyboard focus is always visible. Dozens of controls set an inline
+   `outline: none`, which beats every non-important rule, so keyboard
+   focus on them (the Login fields among them) showed nothing. Style and
+   width are forced for every button, link and tab, and for text fields
+   whose inline style removed the outline. Fields styled here with their
+   own focus border keep it, and programmatic focus targets with
+   tabindex="-1", such as a dialog container, are left alone. */
+a:focus-visible,
+button:focus-visible,
+summary:focus-visible,
+[role="button"]:focus-visible,
+[role="tab"]:focus-visible,
+[tabindex]:not([tabindex="-1"]):focus-visible,
+input[style*="outline"]:focus-visible,
+textarea[style*="outline"]:focus-visible,
+select[style*="outline"]:focus-visible,
+.v3-btn:focus-visible,
+.v3-card--interactive:focus-visible,
+.dispatch-card__tap:focus-visible,
+.cl-card__tap:focus-visible {
+  outline-style: solid !important;
+  outline-width: 2px !important;
 }
 
 .fh-field__input:focus {
@@ -8255,7 +7812,7 @@ select:focus-visible,
   font-family: var(--font-display, var(--font-body));
   font-size: 20px;
   font-weight: 600;
-  color: var(--field-gold-bright, #C9963A);
+  color: var(--v3-primary-text, #C9963A);
   letter-spacing: 0;
   display: block;
   margin-bottom: 2px;
@@ -8302,7 +7859,7 @@ select:focus-visible,
 }
 
 .fh-build-rail-card__action {
-  color: var(--field-gold-bright, #C9963A);
+  color: var(--v3-primary-text, #C9963A);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0;
@@ -8369,7 +7926,7 @@ select:focus-visible,
 }
 
 .fh-build-inline-link {
-  color: var(--field-gold-bright, #C9963A);
+  color: var(--v3-primary-text, #C9963A);
   font-weight: 600;
   text-decoration: none;
   letter-spacing: 0;
@@ -8641,7 +8198,7 @@ select:focus-visible,
    ships its own sizing. Mobile-explicit declaration just to anchor
    color so it doesn't inherit a stripped value. */
 .fh-build-sun {
-  color: var(--field-gold-bright, #C9963A);
+  color: var(--v3-primary-text, #C9963A);
   flex-shrink: 0;
 }
 
@@ -8856,7 +8413,7 @@ select:focus-visible,
 .fh-crm-flow__stages strong {
   display: block;
   margin: 8px 0 5px;
-  color: var(--field-gold-bright, #C9963A);
+  color: var(--v3-primary-text, #C9963A);
   font-family: var(--font-display, var(--font-body));
   font-size: 24px;
   font-weight: 500;
@@ -9233,7 +8790,7 @@ select:focus-visible,
   font-size: 14px;
 }
 
-.fh-subdetail-profile-row strong.is-warn { color: var(--v3-primary-bright); }
+.fh-subdetail-profile-row strong.is-warn { color: var(--v3-primary-text); }
 
 .fh-build-table__row.is-subdetail-jobs {
   color: inherit;
@@ -9293,6 +8850,11 @@ select:focus-visible,
   --v3-text: #F2EDE4;
   --v3-text-muted: rgba(242, 237, 228, 0.68);
   --v3-border-strong: rgba(242, 237, 228, 0.16);
+  /* The light theme deepens the text accents for linen; this surface
+     stays dark, so it keeps the dark theme values. */
+  --v3-primary-text: var(--gold);
+  --v3-danger-text: color-mix(in srgb, var(--red) 55%, var(--linen) 45%);
+  --v3-success-text: color-mix(in srgb, var(--green) 55%, var(--linen) 45%);
 }
 
 .fh-auth-label {
@@ -9381,7 +8943,7 @@ select:focus-visible,
     font-weight: 800;
     letter-spacing: 0;
     text-transform: uppercase;
-    color: var(--v3-primary-bright, #C9963A);
+    color: var(--v3-primary-text, #C9963A);
     text-align: left;
   }
 
@@ -9421,6 +8983,12 @@ select:focus-visible,
 
   .fh-detail-rail__search input::placeholder {
     color: var(--v3-text-faint);
+  }
+
+  /* The search inputs drop their own outline, so the box shows focus. */
+  .fh-detail-rail__search:focus-within,
+  .fh-build-search:focus-within {
+    border-color: var(--v3-primary-text);
   }
 
   .fh-detail-rail__list {
@@ -9582,7 +9150,7 @@ select:focus-visible,
 .v3-btn--danger {
   border-color: color-mix(in srgb, var(--v3-danger) 40%, transparent);
   background: var(--v3-danger-soft);
-  color: var(--v3-danger-bright);
+  color: var(--v3-danger-text);
 }
 
 .v3-btn--success {
@@ -9695,7 +9263,7 @@ select:focus-visible,
   cursor: pointer;
 }
 .fh-build-table__head .fh-build-sort:hover { color: var(--v3-text); }
-.fh-build-table__head .fh-build-sort.is-sorted { color: var(--v3-primary); }
+.fh-build-table__head .fh-build-sort.is-sorted { color: var(--v3-primary-text); }
 .fh-build-table__head .fh-build-sort .fh-build-sort__hint { opacity: 0; transition: opacity 120ms ease; }
 .fh-build-table__head .fh-build-sort:hover .fh-build-sort__hint { opacity: 0.65; }
 
@@ -9725,4 +9293,30 @@ select:focus-visible,
 .fh-build-table-filter input::placeholder { color: var(--v3-text-faint); }
 .fh-build-table-filter:focus-within {
   border-color: color-mix(in srgb, var(--v3-primary) 55%, transparent);
+}
+
+/* Legal pages (Privacy, Terms). Their mailto links carry an inline
+   brand gold, 2.28:1 on the daylight canvas, so links on these pages
+   follow the theme's text accent instead (5.51:1 on linen). */
+.fh-legal a[href] {
+  color: var(--v3-primary-text) !important;
+}
+
+/* Reduce Motion: stop the decorative loops. They sit at the end of the
+   file so they follow every rule that starts them. The logo upload
+   spinner keeps turning because it is the only sign the upload is
+   still running. */
+@media (prefers-reduced-motion: reduce) {
+  .fh-fx-aurora__a,
+  .fh-fx-aurora__b,
+  .fh-fx-aurora__c,
+  .fh-fx-grid,
+  .fh-fx-spotlight,
+  .fh-fx-shimmer-bar__fill::after,
+  .fh-fx-scan-line,
+  .dispatch-state-pill--live::before,
+  .fh-vmic__btn.is-on::after,
+  .fh-vmic__pulse {
+    animation: none;
+  }
 }

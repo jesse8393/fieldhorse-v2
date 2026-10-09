@@ -13,6 +13,18 @@
   --onyx-light-3: color-mix(in srgb, var(--onyx) 84%, var(--linen) 16%);
   --gold-10: rgba(201, 150, 58, 0.10);
   --gold-20: rgba(201, 150, 58, 0.20);
+  --gold-30: rgba(201, 150, 58, 0.30);
+  --gold-45: rgba(201, 150, 58, 0.45);
+  /* Light theme tiers: linen stepped toward onyx, mirroring the
+     onyx-light steps of the dark theme. */
+  --linen-dark-1: color-mix(in srgb, var(--linen) 97%, var(--onyx) 3%);
+  --linen-dark-2: color-mix(in srgb, var(--linen) 94%, var(--onyx) 6%);
+  /* Muted ink for the dark theme. Pure steel measures 2.76:1 on onyx
+     (1.79:1 on surface-3) and fails WCAG AA for the 12px captions,
+     labels, table heads and placeholders that use it. Linen mixed into
+     onyx keeps the neutral tone at 7.16:1 on onyx and 4.64:1 on
+     surface-3. The light theme keeps steel, 5.73:1 on linen. */
+  --linen-muted: color-mix(in srgb, var(--linen) 65%, var(--onyx) 35%);
 
   /* Legacy color aliases */
   --field-gold: var(--gold);
@@ -35,9 +47,9 @@
   --surface-2: var(--onyx-light-2);
   --surface-elev: var(--onyx-light-3);
   --ink-strong: var(--linen);
-  --ink-muted: var(--steel);
+  --ink-muted: var(--linen-muted);
   --ink-inverse: var(--onyx);
-  --ink-faint: var(--steel);
+  --ink-faint: var(--linen-muted);
   --rule: var(--gold-10);
   --rule-bold: var(--gold-20);
 
@@ -99,10 +111,14 @@
   --shadow-pop: 0 8px 24px rgba(20, 20, 20, 0.48), 0 2px 6px rgba(20, 20, 20, 0.32);
   --shadow-raised: 0 2px 4px rgba(20, 20, 20, 0.32), 0 12px 28px rgba(20, 20, 20, 0.40);
 
-  /* Z layers */
+  /* Z layers, lowest first: sticky header 30, bottom nav and FAB 40,
+     install banner 45 (under Radix and Vaul sheets at 50 and the action
+     sheets and drawers at 80), the mobile search overlay and skip link
+     100, then the command palette with its scrim one below it. */
   --z-nav: 40;
+  --z-banner: 45;
   --z-modal: 80;
-  --z-toast: 120;
+  --z-overlay: 100;
   --z-cmdk: 140;
 
   /* Canonical v3 aliases */
@@ -114,8 +130,8 @@
   --v3-surface-glass: var(--onyx-light-1);
   --v3-text: var(--linen);
   --v3-text-secondary: var(--linen);
-  --v3-text-muted: var(--steel);
-  --v3-text-faint: var(--steel);
+  --v3-text-muted: var(--linen-muted);
+  --v3-text-faint: var(--linen-muted);
   --v3-border: var(--gold-10);
   --v3-border-mid: var(--gold-10);
   --v3-border-strong: var(--gold-20);
@@ -150,6 +166,16 @@
   --v3-danger-bright: var(--red);
   --v3-danger-soft: color-mix(in srgb, var(--red) 20%, transparent);
   --v3-on-primary: var(--onyx);
+
+  /* Text safe accents. Base gold, red and green are kept for fills,
+     borders, rings and buttons, but as small text they fail WCAG AA on
+     some surfaces (red on onyx 3.39:1, green 3.52:1, gold on linen
+     2.28:1). Text and icon colors read these instead. Dark values:
+     gold 6.94:1 on onyx and 4.50:1 on surface-3; red 6.85:1 on onyx and
+     4.65:1 on its soft tint over surface-2; green 7.42:1 and 4.85:1. */
+  --v3-primary-text: var(--gold);
+  --v3-danger-text: color-mix(in srgb, var(--red) 55%, var(--linen) 45%);
+  --v3-success-text: color-mix(in srgb, var(--green) 55%, var(--linen) 45%);
 
   --v3-radius-card: 10px;
   --v3-radius-btn: 10px;
@@ -186,26 +212,44 @@
 }
 
 [data-theme='light'] {
+  /* Page and cards stay linen; nested and raised tiers step toward onyx
+     so inputs, chips and hover states read against the card. */
   --surface-0: var(--linen);
   --surface-1: var(--linen);
-  --surface-2: var(--linen);
-  --surface-elev: var(--linen);
+  --surface-2: var(--linen-dark-1);
+  --surface-elev: var(--linen-dark-2);
   --ink-strong: var(--onyx);
   --ink-muted: var(--steel);
   --ink-inverse: var(--linen);
   --ink-faint: var(--steel);
+  /* Gold at 10% and 20% all but disappears on linen (1.08:1 and 1.16:1);
+     30% and 45% land near the dark theme's hairline weights. */
+  --rule: var(--gold-30);
+  --rule-bold: var(--gold-45);
 
   --v3-bg: var(--linen);
   --v3-surface: var(--linen);
-  --v3-surface-2: var(--linen);
-  --v3-surface-3: var(--linen);
+  --v3-surface-2: var(--linen-dark-1);
+  --v3-surface-3: var(--linen-dark-2);
   --v3-surface-page: var(--linen);
   --v3-surface-glass: var(--linen);
+  --v3-section-bg: var(--linen);
+  --v3-section-border: var(--gold-30);
   --v3-text: var(--onyx);
   --v3-text-secondary: var(--onyx);
   --v3-text-muted: var(--steel);
   --v3-text-faint: var(--steel);
+  --v3-border: var(--gold-30);
+  --v3-border-mid: var(--gold-30);
+  --v3-border-strong: var(--gold-45);
+  --v3-border-gold: var(--gold-45);
   --v3-on-primary: var(--onyx);
+  /* Deeper accents for text on linen: gold 5.51:1 on linen and 4.57:1
+     on a gold tint over surface-3; red 6.34:1 and 4.52:1 on its soft
+     tint over surface-2; green 6.32:1 and 4.65:1. */
+  --v3-primary-text: color-mix(in srgb, var(--gold) 54%, var(--onyx) 46%);
+  --v3-danger-text: color-mix(in srgb, var(--red) 78%, var(--onyx) 22%);
+  --v3-success-text: color-mix(in srgb, var(--green) 75%, var(--onyx) 25%);
   --fh-canvas: var(--linen);
   --fh-chrome-veil-1: rgba(242, 237, 228, 0.92);
   --fh-chrome-veil-2: rgba(242, 237, 228, 0.78);

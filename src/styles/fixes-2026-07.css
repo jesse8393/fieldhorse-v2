@@ -1,6 +1,7 @@
 /* fixes-2026-07.css — July 2026 redesign overrides.
-   Loaded AFTER global.css (see main.tsx import order), so equal
-   specificity rules here win the cascade. Additions that would have
+   Loaded after global.css and before v3.css and mobile-keyboard-fix.css
+   (see main.tsx import order), so equal specificity rules here beat
+   global.css but lose to those two files. Additions that would have
    gone into global.css live here instead to keep that file stable. */
 
 /* Desktop chrome dedup. When the current screen renders its own Build
@@ -119,7 +120,7 @@
   .fh-build-cal__week span {
     padding: 12px 12px;
     font-size: 12px;
-    font-weight: 850;
+    font-weight: 800;
     letter-spacing: 0;
     text-transform: uppercase;
     color: var(--v3-text-muted);
@@ -206,7 +207,7 @@
   border-radius: 10px;
   border: 1px solid color-mix(in srgb, var(--v3-primary) 40%, transparent);
   background: color-mix(in srgb, var(--v3-primary) 12%, transparent);
-  color: var(--v3-primary-bright, #C9963A);
+  color: var(--v3-primary-text, #C9963A);
   font-family: var(--font-body);
   font-size: 12px;
   font-weight: 700;
@@ -476,7 +477,7 @@
   }
 
   .fh-build-table__empty--action > svg {
-    color: var(--v3-primary);
+    color: var(--v3-primary-text);
   }
 
   .fh-build-toolbar-row,
@@ -566,7 +567,7 @@
   }
 
   .fh-build-dayplan__event > span {
-    color: var(--v3-primary-bright);
+    color: var(--v3-primary-text);
     font-size: 12px;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
@@ -609,7 +610,7 @@
     background: transparent;
     border: 1px solid var(--v3-border-strong);
     border-radius: 10px;
-    color: var(--v3-primary-bright);
+    color: var(--v3-primary-text);
     font-size: 12px;
     font-weight: 700;
     cursor: pointer;
@@ -662,7 +663,7 @@
   }
 
   .fh-build-weekplan__day.is-today .fh-build-weekplan__head > strong {
-    color: var(--v3-primary-bright);
+    color: var(--v3-primary-text);
   }
 
   .fh-build-weekplan__body {

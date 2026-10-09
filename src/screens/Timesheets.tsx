@@ -13,7 +13,7 @@ import { useMembership } from '../contexts/MembershipContext.tsx'
 import { orgPunchApprove, orgPunchFlag, orgTimesheetsList, type PendingPunch } from '../lib/orgApi.ts'
 import { recalcCost } from '../lib/stages.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
-import { toastSuccess, toastError } from '../lib/toast.ts'
+import { toastSuccess, toastError, toastInfo } from '../lib/toast.ts'
 import MiniMetric from '../components/MiniMetric.tsx'
 import { Button } from '../ui/index.ts'
 
@@ -54,7 +54,7 @@ function startOfWeek(): Date {
 export default function Timesheets() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { orgName, role, loading: memLoading, canApproveTimesheets } = useMembership()
+  const { orgId, orgName, role, loading: memLoading, canApproveTimesheets } = useMembership()
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -88,7 +88,15 @@ export default function Timesheets() {
     }
   }, [windowMode])
 
-  useEffect(() => { if (!memLoading) load() }, [memLoading, load])
+  // Reload when the workspace changes, not only when membership first loads.
+  useEffect(() => { if (!memLoading) load() }, [memLoading, load, orgId])
+
+  // Admins and managers need someone else to approve their own hours; the
+  // server refuses them too (an owner approving their own time is normal).
+  const needsOtherApprover = useCallback(
+    (p: PendingPunch) => !!p.is_self && role !== 'owner',
+    [role],
+  )
 
   // Group by user for batch-approve.
   const groups = useMemo(() => {
@@ -127,7 +135,21 @@ export default function Timesheets() {
     setApproving((m) => Object.fromEntries([...Object.entries(m), ...ids.map((id) => [id, true] as const)]))
     try {
       const res = await orgPunchApprove(ids)
-      toastSuccess(`${res.approved_count} approved`)
+      if (res.approved_count > 0) toastSuccess(`${res.approved_count} approved`)
+      const selfCount = res.self_skipped?.length || 0
+      const invalidCount = res.skipped_ids?.length || 0
+      if (selfCount > 0) {
+        toastInfo(
+          selfCount === 1 ? 'One of these is your own punch' : `${selfCount} of these are your own punches`,
+          'Another owner, admin or manager has to approve your hours.',
+        )
+      }
+      if (invalidCount > 0) {
+        toastInfo(
+          invalidCount === 1 ? 'One punch has no worked time' : `${invalidCount} punches have no worked time`,
+          'They were not approved. Flag them so the clock times get fixed.',
+        )
+      }
       // Optimistic: drop the approved rows.
       setPunches((cur) => cur.filter((p) => !res.approved_ids.includes(p.id)))
       recalcAffected(res.approved_ids || ids)
@@ -321,8 +343,8 @@ export default function Timesheets() {
                     // all", disputed or invalid punches must be resolved
                     // (or explicitly approved) on their own row, not
                     // swept through with the batch.
-                    onClick={() => approve(g.rows.filter((r) => !r.flagged && !r.invalid).map((r) => r.id))}
-                    disabled={g.rows.every((r) => r.flagged || r.invalid) || g.rows.some((r) => approving[r.id])}
+                    onClick={() => approve(g.rows.filter((r) => !r.flagged && !r.invalid && !needsOtherApprover(r)).map((r) => r.id))}
+                    disabled={g.rows.every((r) => r.flagged || r.invalid || needsOtherApprover(r)) || g.rows.some((r) => approving[r.id])}
                   >
                     <CheckCheck size={13} /> Approve all
                   </button>
@@ -361,6 +383,8 @@ export default function Timesheets() {
                       <span className="fh-build-dot is-warn" title={r.flag_reason || ''}>Flagged</span>
                     ) : r.invalid ? (
                       <span className="fh-build-dot is-bad" title="Clock out is not after clock in">Invalid</span>
+                    ) : needsOtherApprover(r) ? (
+                      <span className="fh-build-dot is-neutral" title="Another owner, admin or manager has to approve your own hours">Your hours</span>
                     ) : (
                       <span className="fh-build-dot is-neutral">Pending</span>
                     )}
@@ -373,7 +397,7 @@ export default function Timesheets() {
                       disabled={!!approving[r.id]}
                       aria-label={r.flagged ? 'Clear flag' : 'Flag punch'}
                       title={r.flagged ? 'Clear flag' : 'Flag / reject'}
-                      style={{ color: r.flagged ? 'var(--v3-primary, #c9963a)' : undefined }}
+                      style={{ color: r.flagged ? 'var(--v3-primary-text)' : undefined }}
                     >
                       <AlertTriangle size={14} />
                     </button>
@@ -381,9 +405,9 @@ export default function Timesheets() {
                       type="button"
                       className="fh-build-icon-action"
                       onClick={() => approve([r.id])}
-                      disabled={!!approving[r.id]}
+                      disabled={!!approving[r.id] || r.invalid || needsOtherApprover(r)}
                       aria-label="Approve punch"
-                      title="Approve"
+                      title={r.invalid ? 'Fix the clock times before approving' : needsOtherApprover(r) ? 'Another approver has to sign off your own hours' : 'Approve'}
                     >
                       <Check size={14} />
                     </button>

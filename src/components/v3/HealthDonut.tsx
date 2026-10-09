@@ -26,11 +26,17 @@ type HealthDonutProps = {
 
 export default function HealthDonut({ value = 0, size = 110, stroke = 9, label }: HealthDonutProps) {
   const safe = Math.max(0, Math.min(100, Number(value) || 0))
+  // `color` paints the ring; `ink` is the text safe shade of the same
+  // tone for the number and the label under it.
   const tier = useMemo(() => {
-    if (safe >= 80) return { name: 'Good',    color: 'var(--v3-success-bright)', soft: 'var(--v3-success-soft)' }
-    if (safe >= 50) return { name: 'At Risk', color: 'var(--v3-warn)',            soft: 'var(--v3-warn-soft)' }
-    return                  { name: 'Behind',  color: 'var(--v3-danger-bright)',  soft: 'var(--v3-danger-soft)' }
+    if (safe >= 80) return { name: 'Good',    color: 'var(--v3-success-bright)', ink: 'var(--v3-success-text)', soft: 'var(--v3-success-soft)' }
+    if (safe >= 50) return { name: 'At Risk', color: 'var(--v3-warn)',            ink: 'var(--v3-primary-text)', soft: 'var(--v3-warn-soft)' }
+    return                  { name: 'Behind',  color: 'var(--v3-danger-bright)',  ink: 'var(--v3-danger-text)',  soft: 'var(--v3-danger-soft)' }
   }, [safe])
+  // Screen readers hear the same word sighted users see: a caller's label
+  // (Overview passes the computed health label) wins over the tier name.
+  const shownLabel = label || tier.name
+  const spokenLabel = typeof label === 'string' || typeof label === 'number' ? String(label) : tier.name
 
   const radius = (size - stroke) / 2
   const circumference = 2 * Math.PI * radius
@@ -64,7 +70,7 @@ export default function HealthDonut({ value = 0, size = 110, stroke = 9, label }
         display: 'grid',
         placeItems: 'center'
       }}>
-        <svg width={size} height={size} role="img" aria-label={`Job health ${safe} out of 100, ${tier.name}`}>
+        <svg width={size} height={size} role="img" aria-label={`Job health ${Math.round(safe)} out of 100, ${spokenLabel}`}>
           {/* Track */}
           <circle
             cx={size / 2}
@@ -89,7 +95,8 @@ export default function HealthDonut({ value = 0, size = 110, stroke = 9, label }
             style={{ transition: 'stroke-dashoffset 600ms cubic-bezier(0.2, 0.8, 0.2, 1)' }}
           />
         </svg>
-        <div style={{
+        {/* Visual only: the svg's label already says the score and word. */}
+        <div aria-hidden="true" style={{
           position: 'absolute',
           inset: 0,
           display: 'flex',
@@ -101,7 +108,7 @@ export default function HealthDonut({ value = 0, size = 110, stroke = 9, label }
           <span style={{
             fontFamily: 'var(--font-display)',
             fontSize: 24,
-            color: tier.color,
+            color: tier.ink,
             lineHeight: 1,
             fontVariantNumeric: 'tabular-nums'
           }}>
@@ -114,9 +121,9 @@ export default function HealthDonut({ value = 0, size = 110, stroke = 9, label }
             fontWeight: 700,
             letterSpacing: 0,
             textTransform: 'uppercase',
-            color: tier.color
+            color: tier.ink
           }}>
-            {label || tier.name}
+            {shownLabel}
           </span>
         </div>
       </div>

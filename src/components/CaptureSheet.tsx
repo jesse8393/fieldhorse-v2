@@ -29,6 +29,7 @@ import {
 import { commitCapture, type CaptureContact } from '../lib/captureActions.ts'
 import { pushOutbox, flushOutbox, outboxCount } from '../lib/captureOutbox.ts'
 import { compressImageToDataUrl, parseExpenseFromImage } from '../lib/docIntelligence.ts'
+import { speechErrorFeedback } from '../lib/speech.ts'
 import { Eyebrow } from './v3'
 
 type Phase = 'input' | 'parsing' | 'confirm' | 'saving'
@@ -133,9 +134,13 @@ export default function CaptureSheet() {
       const spoken = (final || '').trim()
       if (spoken) submit(spoken)
     }
-    rec.onerror = () => {
+    rec.onerror = (e: any) => {
       setListening(false)
       recRef.current = null
+      // Say why the mic stopped (blocked, no speech, no mic, offline)
+      // instead of silently snapping back to "Tap to talk".
+      const fb = speechErrorFeedback(e?.error)
+      if (fb) (fb.tone === 'info' ? toastInfo : toastError)(fb.title, fb.description)
     }
     recRef.current = rec
     setText('')
@@ -177,7 +182,14 @@ export default function CaptureSheet() {
     stopVoice()
 
     if (!navigator.onLine) {
-      pushOutbox(input)
+      // The queue refuses new captures when full; keep the words in the
+      // sheet rather than claiming they were saved.
+      if (!pushOutbox(input, user.id)) {
+        setText(input)
+        hapticError()
+        toastError("Couldn't save offline", 'Offline storage is full. Reconnect to sync, then try again.')
+        return
+      }
       hapticSuccess()
       toastSuccess('Captured offline', "It'll sync as a note when you're back in signal.")
       close()
@@ -289,7 +301,7 @@ export default function CaptureSheet() {
                     background: listening
                       ? 'color-mix(in srgb, var(--v3-primary) 18%, var(--surface-2))'
                       : 'var(--surface-2)',
-                    color: listening ? 'var(--v3-primary)' : 'var(--ink-strong)',
+                    color: listening ? 'var(--v3-primary-text)' : 'var(--ink-strong)',
                     boxShadow: listening ? '0 0 0 8px color-mix(in srgb, var(--v3-primary) 12%, transparent)' : 'none',
                     transition: 'box-shadow 200ms ease, background 200ms ease',
                     WebkitTapHighlightColor: 'transparent'

@@ -26,7 +26,7 @@ async function loadPdf(): Promise<any> {
 }
 import {
   SIGNOFF_METHODS, WARRANTY_PRESETS,
-  loadCloseout, saveCloseout, clearCloseout, snapshotJobTotals
+  loadCloseout, saveCloseout, clearCloseout, snapshotJobTotals, closeoutBalance
 } from '../lib/closeout.ts'
 import { Eyebrow } from './v3'
 
@@ -50,10 +50,13 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [existing, setExisting] = useState<any>(null)
-  const [totals, setTotals] = useState({ paid: 0, photoCount: 0 })
+  const [totals, setTotals] = useState({ paid: 0, photoCount: 0, approvedCO: 0 })
   const { formRef, drawerStyle, formStyle } = useDrawerKeyboard(open)
 
-  const balance = Math.max(0, Number(contact?.amount || 0) - totals.paid)
+  // Contract and balance include approved change orders, the same
+  // figures saveCloseout snapshots onto the certificate.
+  const contractTotal = Number(contact?.amount || 0) + Number(totals.approvedCO || 0)
+  const balance = closeoutBalance(contact?.amount, totals.approvedCO, totals.paid)
   const isReopening = !!existing
 
   useEffect(() => {
@@ -317,7 +320,7 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
                 padding: '12px 12px', borderRadius: 10,
                 background: 'var(--surface-2)', border: '1px solid var(--rule)'
               }}>
-                <Stat label="Contract" value={moneyFmt(contact?.amount)} />
+                <Stat label="Contract" value={moneyFmt(contractTotal)} />
                 <Stat label="Paid" value={moneyFmt(totals.paid)} tone={balance > 0 ? 'muted' : 'good'} />
                 <Stat label={balance > 0 ? 'Balance' : 'Photos'} value={balance > 0 ? moneyFmt(balance) : String(totals.photoCount)} tone={balance > 0 ? 'danger' : 'muted'} />
               </div>
@@ -469,7 +472,7 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
                       padding: '12px 12px', borderRadius: 10,
                       background: 'rgba(192,57,43,0.10)',
                       border: '1px solid rgba(192,57,43,0.35)',
-                      color: 'var(--alert-red, #C0392B)',
+                      color: 'var(--v3-danger-text)',
                       fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
                       cursor: saving ? 'wait' : 'pointer'
                     }}

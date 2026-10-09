@@ -1,5 +1,20 @@
 import { describe, it, expect } from 'vitest'
-import { punchHours } from './labor.ts'
+import { punchHours, laborBooksAsExpense } from './labor.ts'
+
+describe('laborBooksAsExpense', () => {
+  it('books the job owner through expenses', () => {
+    expect(laborBooksAsExpense('owner-1', 'owner-1')).toBe(true)
+  })
+
+  it('leaves everyone else to crew labor so a shift is not counted twice', () => {
+    expect(laborBooksAsExpense('owner-1', 'manager-2')).toBe(false)
+  })
+
+  it('treats the caller as owner when the job has none, like recalcCost', () => {
+    expect(laborBooksAsExpense(null, 'user-3')).toBe(true)
+    expect(laborBooksAsExpense(undefined, 'user-3')).toBe(true)
+  })
+})
 
 describe('punchHours', () => {
   it('computes hours minus break', () => {

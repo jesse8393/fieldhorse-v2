@@ -105,13 +105,13 @@ export default function SnowSettingsBuild(props: Props) {
                 <>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
                     <CheckCircle2 size={16} color="var(--v3-success-bright)" />
-                    <strong style={{ fontSize: 20, color: 'var(--v3-success-bright)' }}>All set</strong>
+                    <strong style={{ fontSize: 20, color: 'var(--v3-success-text)' }}>All set</strong>
                   </div>
                   <span>Profile and brand fully configured.</span>
                 </>
               ) : (
                 <>
-                  <strong style={{ color: 'var(--v3-primary-bright)' }}>{missingItems.length}</strong>
+                  <strong style={{ color: 'var(--v3-primary-text)' }}>{missingItems.length}</strong>
                   <span>field{missingItems.length === 1 ? '' : 's'} to fill</span>
                   <ul className="fh-build-rail-list" style={{ marginTop: 12 }}>
                     {missingItems.slice(0, 4).map((m, i) => (

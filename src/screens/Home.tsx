@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { motion } from 'framer-motion'
@@ -30,12 +30,13 @@ import { canHover } from '../lib/hover.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import DataErrorState from '../components/DataErrorState.tsx'
 import { useHomeDashboard, useHomeDashboardRealtime } from '../lib/homeDashboard.ts'
+import { lazyWithRetry } from '../lib/lazyWithRetry.ts'
 // Lazy, desktop-only variant. Home itself is an eager route (loaded
 // with the main bundle) so any static import here ships SnowHome to
 // mobile users too even though they never render it. Lazy keeps the
 // main bundle lean; desktop sees a near-instant suspense flash since
 // the chunk fetches in parallel with first paint.
-const SnowHome = lazy(() => import('../components/desktop/SnowHomeBuild.tsx'))
+const SnowHome = lazyWithRetry(() => import('../components/desktop/SnowHomeBuild.tsx'))
 
 const EMPTY_PHOTO_URLS: Record<string, string> = {}
 
@@ -179,8 +180,10 @@ export default function Home() {
   // Sub-only redirect: an authenticated user with NO org membership
   // is, in practice, somebody who accepted a partner invite (or
   // signed up without onboarding). Land them on /sub-portal, the
-  // owner dashboard would 403 every query they made.
-  if (!membership.loading && !membership.role && !membership.orgId) {
+  // owner dashboard would 403 every query they made. Only on a clean
+  // answer: a failed membership fetch (offline cold open) also leaves
+  // no role, and the cached dashboard is what that owner needs.
+  if (!membership.loading && !membership.error && !membership.role && !membership.orgId) {
     return <Navigate to="/sub-portal" replace />
   }
 
@@ -298,7 +301,7 @@ export default function Home() {
           }}>
             {greetingPrefix().replace(',', '')},{' '}
             <span style={{
-              color: 'var(--v3-primary)',
+              color: 'var(--v3-primary-text)',
               letterSpacing: 0
             }}>{firstName}.</span>
           </h1>
@@ -354,7 +357,7 @@ export default function Home() {
               borderRadius: 'var(--v3-radius-btn)',
               background: 'var(--v3-primary-soft)',
               border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
-              color: 'var(--v3-primary)',
+              color: 'var(--v3-primary-text)',
               fontFamily: 'var(--font-body)',
               fontSize: 12,
               fontWeight: 600,
@@ -368,7 +371,7 @@ export default function Home() {
         )}
       </motion.div>
       {weatherErr && !hasCoords ? (
-        <div className="v3-caption" style={{ padding: '0 var(--v3-gutter) 12px', color: 'var(--v3-danger)' }}>
+        <div className="v3-caption" style={{ padding: '0 var(--v3-gutter) 12px', color: 'var(--v3-danger-text)' }}>
           {weatherErr}
         </div>
       ) : null}
@@ -488,7 +491,7 @@ export default function Home() {
             fontSize: 24,
             fontWeight: 700,
             letterSpacing: 0,
-            color: 'var(--v3-primary)',
+            color: 'var(--v3-primary-text)',
             fontVariantNumeric: 'tabular-nums',
             lineHeight: 1.0,
             whiteSpace: 'nowrap',
@@ -506,7 +509,7 @@ export default function Home() {
                   fontSize: 24,
                   fontWeight: 600,
                   marginRight: 1,
-                  color: 'color-mix(in srgb, var(--v3-primary) 70%, var(--v3-text-muted))',
+                  color: 'color-mix(in srgb, var(--v3-primary-text) 70%, var(--v3-text-muted))',
                   textShadow: 'none'
                 }}>
                   $
@@ -525,7 +528,7 @@ export default function Home() {
               fontSize: 12,
               fontWeight: 700,
               letterSpacing: 0,
-              color: trendUp ? 'var(--v3-success-bright)' : 'var(--v3-danger-bright)',
+              color: trendUp ? 'var(--v3-success-text)' : 'var(--v3-danger-text)',
               fontVariantNumeric: 'tabular-nums',
               lineHeight: 1
             }}>
@@ -904,7 +907,7 @@ function TodayOnSiteRow({ row, photoUrl, onTap }: any) {
           {row.title}
         </div>
         {stage && (
-          <Eyebrow as="div" style={{ marginTop: 3, color: stage.color }}>
+          <Eyebrow as="div" style={{ marginTop: 3, color: `color-mix(in srgb, ${stage.color} 55%, var(--v3-text) 45%)` }}>
             {stage.label}
           </Eyebrow>
         )}
@@ -996,7 +999,7 @@ function PipelineDealRow({ deal, photoUrl, onTap }: any) {
         }}>
           {deal.name}
         </div>
-        <Eyebrow as="div" style={{ marginTop: 4, color: stage.color }}>
+        <Eyebrow as="div" style={{ marginTop: 4, color: `color-mix(in srgb, ${stage.color} 55%, var(--v3-text) 45%)` }}>
           {stage.label}
         </Eyebrow>
       </div>
@@ -1027,15 +1030,15 @@ function PipelineDealRow({ deal, photoUrl, onTap }: any) {
    ============================================================ */
 
 const COMPACT_TONE: Record<string, any> = {
-  primary: { color: 'var(--v3-primary)' },
-  success: { color: 'var(--v3-success-bright)' },
-  danger:  { color: 'var(--v3-danger-bright)' },
-  // warn, bronze/amber from the stage-quote token; reads as "needs attention
-  // soon" without claiming the urgency of danger.
-  warn:    { color: 'var(--v3-stage-quote)' },
-  // lead, steel-blue from the stage-lead token; the closest token-native
-  // option to the mockup's lavender for the Quotes tile.
-  lead:    { color: 'var(--v3-stage-lead)' }
+  primary: { color: 'var(--v3-primary-text)' },
+  success: { color: 'var(--v3-success-text)' },
+  danger:  { color: 'var(--v3-danger-text)' },
+  // warn, text safe gold; reads as "needs attention soon" without
+  // claiming the urgency of danger.
+  warn:    { color: 'var(--v3-primary-text)' },
+  // lead, the muted neutral. Raw steel (the stage-lead token) measures
+  // 2.76:1 on onyx, too faint for a number.
+  lead:    { color: 'var(--v3-text-muted)' }
 }
 
 function CompactKpi({ tone = 'primary', value, label, subline, icon: Icon, isMoney, onTap }: any) {
@@ -1198,7 +1201,7 @@ function nextActionPath(action: any) {
 // and the small hairline sweep. Red urgency stays red, green stays green.
 const URGENCY_TONE: Record<string, any> = {
   danger:  { color: 'var(--v3-danger-bright)',  glow: 'rgba(192, 57, 43, 0.45)' },
-  warn:    { color: 'var(--v3-warn)',           glow: 'rgba(201, 150, 58, 0.40)' },
+  warn:    { color: 'var(--v3-primary-text)',   glow: 'rgba(201, 150, 58, 0.40)' },
   success: { color: 'var(--v3-success-bright)', glow: 'rgba(45, 122, 79, 0.40)' }
 }
 
@@ -1415,9 +1418,6 @@ function nameInitials(name: any) {
   return (parts[0][0] + parts[1][0]).toUpperCase()
 }
 
-/* StageChip, inline "<count> <label>" tap target inside the pipeline
-   card breakdown. stopPropagation so the outer card tap (→ /jobs)
-   doesn't double-fire when one of the chips is pressed. */
 /* ============================================================
    PipelineBreakdownCell, one tap-cell inside the pipeline hero's
    3-up breakdown row. Ported from the v3 design's
@@ -1430,9 +1430,9 @@ function nameInitials(name: any) {
    ============================================================ */
 function PipelineBreakdownCell({ dotColor, label, count, tone, onClick }: any) {
   const valueColor = tone === 'success'
-    ? 'var(--v3-success-bright, #5C5C5C)'
+    ? 'var(--v3-success-text)'
     : tone === 'gold'
-      ? 'var(--v3-primary)'
+      ? 'var(--v3-primary-text)'
       : 'var(--v3-text)'
   return (
     <button
@@ -1478,35 +1478,6 @@ function PipelineBreakdownCell({ dotColor, label, count, tone, onClick }: any) {
       }}>
         {count === 1 ? 'deal' : 'deals'}
       </div>
-    </button>
-  )
-}
-
-function StageChip({ count, label, stage, navigate }: any) {
-  return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation()
-        hapticTap()
-        navigate(`/jobs?stage=${stage}`)
-      }}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'baseline',
-        gap: 4,
-        padding: '4px 4px',
-        margin: '-2px -4px',
-        background: 'transparent',
-        border: 'none',
-        color: 'inherit',
-        font: 'inherit',
-        cursor: 'pointer',
-        WebkitTapHighlightColor: 'transparent'
-      }}
-    >
-      <span style={{ fontWeight: 700, color: 'var(--v3-text)' }}>{count}</span>
-      <span>{label}</span>
     </button>
   )
 }

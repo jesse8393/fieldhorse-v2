@@ -27,6 +27,7 @@ import { SkeletonList } from '../components/Skeleton.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
 import { Eyebrow } from '../components/v3'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
+import { paymentEventTime } from '../lib/activityTime.ts'
 import SnowActivityBuild from '../components/desktop/SnowActivityBuild.tsx'
 
 const PAGE_SIZE = 60
@@ -111,9 +112,13 @@ export default function Activity() {
 
       for (const p of payments || []) {
         const kindStr = p.kind && p.kind !== 'other' ? ` · ${p.kind}` : ''
+        // paid_on is date-only: a LOCAL calendar day with no time (a UTC
+        // parse filed an Oct 9 payment under Yesterday at 7:00 PM).
+        const { when, dateOnly } = paymentEventTime(p.paid_on, p.created_at)
         out.push({
           id: `p:${p.id}`,
-          when: new Date((p.paid_on || p.created_at) as any),
+          when,
+          dateOnly,
           contact: contactById.get(p.contact_id as string),
           contactId: p.contact_id,
           kind: 'payment',
@@ -299,9 +304,9 @@ function EventRow({ event }: any) {
   const Icon = event.icon || ActivityIcon
   const tone = ({
     neutral: { fg: 'var(--v3-text-muted)', bg: 'var(--v3-glass-tint-2)', br: 'var(--v3-border-mid)' },
-    gold:    { fg: 'var(--v3-primary-bright)', bg: 'color-mix(in srgb, var(--v3-primary) 14%, transparent)', br: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)' },
-    green:   { fg: 'var(--v3-success-bright, #2D7A4F)', bg: 'rgba(45, 122, 79,0.10)', br: 'rgba(45, 122, 79,0.30)' },
-    red:     { fg: 'var(--v3-danger-bright, #C0392B)', bg: 'rgba(192, 57, 43,0.10)', br: 'rgba(192, 57, 43,0.30)' }
+    gold:    { fg: 'var(--v3-primary-text)', bg: 'color-mix(in srgb, var(--v3-primary) 14%, transparent)', br: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)' },
+    green:   { fg: 'var(--v3-success-text)', bg: 'rgba(45, 122, 79,0.10)', br: 'rgba(45, 122, 79,0.30)' },
+    red:     { fg: 'var(--v3-danger-text)', bg: 'rgba(192, 57, 43,0.10)', br: 'rgba(192, 57, 43,0.30)' }
   } as Record<string, any>)[event.tone || 'neutral']
 
   const jobName = event.contact?.name || event.contact?.job_title || 'Unknown job'
@@ -353,8 +358,7 @@ function EventRow({ event }: any) {
               {jobName}
             </span>
             {event.sub && <> · {event.sub}</>}
-            {' · '}
-            {timeAt(event.when)}
+            {!event.dateOnly && <>{' · '}{timeAt(event.when)}</>}
           </div>
         </div>
         <ArrowRight size={14} color="var(--v3-text-faint, var(--v3-text-muted))" style={{ alignSelf: 'center', flexShrink: 0 }} />

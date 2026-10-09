@@ -219,7 +219,7 @@ function ChangeOrderView({ data, token, onApproved }: any) {
           border: '1px solid rgba(45, 122, 79, 0.40)',
           fontFamily: "'DM Sans', system-ui, sans-serif", color: '#141414', textAlign: 'center'
         }}>
-          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: '#2D7A4F', marginBottom: 6 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: 'color-mix(in srgb, var(--v3-success-text) 75%, #141414 25%)', marginBottom: 6 }}>
             Change order approved
           </div>
           <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5 }}>
@@ -274,7 +274,7 @@ function ApprovedNote({ companyName }: any) {
     >
       <div style={{
         fontSize: 12, fontWeight: 700, letterSpacing: 0,
-        textTransform: 'uppercase', color: '#2D7A4F', marginBottom: 6
+        textTransform: 'uppercase', color: 'color-mix(in srgb, var(--v3-success-text) 75%, #141414 25%)', marginBottom: 6
       }}>
         Proposal approved
       </div>
@@ -305,7 +305,7 @@ function ChangesRequestedNote({ companyName, requestedNote, requestedAt }: any) 
         fontWeight: 700,
         letterSpacing: 0,
         textTransform: 'uppercase',
-        color: '#C9963A',
+        color: 'color-mix(in srgb, var(--v3-primary-text) 54%, #141414 46%)',
         marginBottom: 8
       }}>
         Changes requested
@@ -358,7 +358,7 @@ function ErrorState({ message }: any) {
     >
       <div style={{
         fontSize: 12, fontWeight: 700, letterSpacing: 0,
-        textTransform: 'uppercase', color: '#C9963A', marginBottom: 10
+        textTransform: 'uppercase', color: 'color-mix(in srgb, var(--v3-primary-text) 54%, #141414 46%)', marginBottom: 10
       }}>
         Unavailable
       </div>

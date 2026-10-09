@@ -13,6 +13,10 @@ const ThemeContext = createContext<ThemeContextValue | null>(null)
 const STORAGE_KEY = 'fh:theme'
 
 // PWA status-bar / browser-chrome color per theme. Matches --v3-bg.
+// The pre-paint script in index.html repeats STORAGE_KEY and the light
+// color (and its CSP hash in netlify.toml must follow any edit there);
+// the manifest theme_color in vite.config.js is the dark color. Keep
+// them in step.
 const THEME_COLOR: Record<Theme, string> = {
   dark: '#141414',
   light: '#F2EDE4'

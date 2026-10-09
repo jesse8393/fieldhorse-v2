@@ -54,7 +54,7 @@ export default function ScreenCloser({
         fontFamily: 'var(--font-body)',
         fontSize: 12, fontWeight: 700,
         letterSpacing: 0, textTransform: 'uppercase',
-        color: 'var(--v3-primary)'
+        color: 'var(--v3-primary-text)'
       }}>
         <Sparkles size={11} aria-hidden="true" />
         FieldHorse
@@ -77,11 +77,13 @@ export default function ScreenCloser({
           onClick={onCta}
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 8,
+            // 44px tall so it is an easy thumb target.
+            minHeight: 44,
             padding: '8px 16px',
             borderRadius: 10,
             background: 'transparent',
             border: '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)',
-            color: 'var(--v3-primary)',
+            color: 'var(--v3-primary-text)',
             fontFamily: 'var(--font-body)',
             fontSize: 12, fontWeight: 700,
             letterSpacing: 0, textTransform: 'uppercase',

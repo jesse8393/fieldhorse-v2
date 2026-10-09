@@ -34,6 +34,7 @@ import {
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { prefetchRoute } from '../lib/routePrefetch.ts'
+import OrgSwitcher from './OrgSwitcher.tsx'
 
 type Item = {
   label: string
@@ -111,7 +112,7 @@ export default function DesktopSidebar() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const { signOut, user } = useAuth()
-  const { canViewRoute, role, loading: membershipLoading, hasCrew, isPartner } = useMembership()
+  const { canViewRoute, role, loading: membershipLoading, hasCrew, isPartner, memberships } = useMembership()
 
   const userEmail = user?.email || ''
 
@@ -212,6 +213,16 @@ export default function DesktopSidebar() {
           )
         })}
       </nav>
+
+      {/* Renders only for people in more than one company. It lives here,
+          not only in Settings, because Settings is owner and admin only and
+          someone who switches into a crew workspace must be able to switch
+          back. */}
+      {memberships.length > 1 && (
+        <div style={{ padding: '0 12px 12px' }}>
+          <OrgSwitcher />
+        </div>
+      )}
 
       <div className="fh-desktop-sidebar__foot">
         <div className="fh-desktop-sidebar__account">

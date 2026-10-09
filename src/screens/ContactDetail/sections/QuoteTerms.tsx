@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { FileText } from 'lucide-react'
 import { dateInputToTimestamp, timestampToDateInput } from '../../../lib/dueDate.ts'
 import { Eyebrow } from '../../../components/v3'
@@ -9,14 +9,15 @@ import { Eyebrow } from '../../../components/v3'
  * Phase 4B-2: live working-draft fields backing migration 012's
  * scope_text / terms_text / exclusions_text / quote_expires_at on
  * fh_contacts. Autosave on blur via the parent's `patch` helper
- * (optimistic + user_id-guarded). No Send / Preview / Download
- * actions yet, those land in 4B-3 and 4B-4.
+ * (optimistic, rolled back with a toast on failure). No Send /
+ * Preview / Download actions yet, those land in 4B-3 and 4B-4.
  *
- * Hydrates from `contact.*` and re-syncs whenever the underlying
- * row changes (id flip on navigation, on the server updated_at bump
- * from background refetch). Local edits are not clobbered between
- * the operator typing and blurring because the effect keys on
- * `id` + `updated_at`, not on every render.
+ * Hydrates from `contact.*` and re-syncs each field when its saved
+ * value changes (another device, a partner, Clear draft) or the job
+ * changes. Syncing per field means the refetch that follows saving one
+ * field never wipes text being typed in another, and a field whose
+ * save has not gone through keeps the typed text so the next blur can
+ * retry.
  */
 export default function QuoteTermsSection({ contact, patch, valuesRef }: any) {
   const [scope, setScope] = useState(contact?.scope_text || '')
@@ -24,12 +25,24 @@ export default function QuoteTermsSection({ contact, patch, valuesRef }: any) {
   const [terms, setTerms] = useState(contact?.terms_text || '')
   const [expires, setExpires] = useState(timestampToDateInput(contact?.quote_expires_at))
 
-  useEffect(() => {
-    setScope(contact?.scope_text || '')
-    setExclusions(contact?.exclusions_text || '')
-    setTerms(contact?.terms_text || '')
-    setExpires(timestampToDateInput(contact?.quote_expires_at))
-  }, [contact?.id, contact?.updated_at])
+  // Fields with typed text that has not saved yet (a save in flight or
+  // one that failed). Their own optimistic write and rollback must not
+  // overwrite the typed text; a successful save clears the flag.
+  const unsaved = useRef<Record<string, boolean>>({})
+
+  const contactId = contact?.id
+  const savedScope = contact?.scope_text || ''
+  const savedExclusions = contact?.exclusions_text || ''
+  const savedTerms = contact?.terms_text || ''
+  const savedExpires = timestampToDateInput(contact?.quote_expires_at)
+
+  // Declared first so a job change clears the flags before the fields
+  // below re-sync.
+  useEffect(() => { unsaved.current = {} }, [contactId])
+  useEffect(() => { if (!unsaved.current.scope_text) setScope(savedScope) }, [contactId, savedScope])
+  useEffect(() => { if (!unsaved.current.exclusions_text) setExclusions(savedExclusions) }, [contactId, savedExclusions])
+  useEffect(() => { if (!unsaved.current.terms_text) setTerms(savedTerms) }, [contactId, savedTerms])
+  useEffect(() => { if (!unsaved.current.quote_expires_at) setExpires(savedExpires) }, [contactId, savedExpires])
 
   // Publish the latest local state into a parent-owned ref on every
   // change. Quote.jsx's buildPdf reads from this ref so unblurred
@@ -50,15 +63,21 @@ export default function QuoteTermsSection({ contact, patch, valuesRef }: any) {
   async function saveText(field: any, current: any, prior: any) {
     const next = normText(current)
     const before = normText(prior)
-    if (next === before) return
-    await patch?.({ [field]: next })
+    if (next === before) { unsaved.current[field] = false; return }
+    unsaved.current[field] = true
+    const res = await patch?.({ [field]: next })
+    if (!res?.error) unsaved.current[field] = false
   }
 
   async function saveExpires(current: any, priorIso: any) {
     const nextIso = dateInputToTimestamp(current) // null on empty
-    if (nextIso === priorIso) return
-    if (!nextIso && !priorIso) return
-    await patch?.({ quote_expires_at: nextIso })
+    if (nextIso === priorIso || (!nextIso && !priorIso)) {
+      unsaved.current.quote_expires_at = false
+      return
+    }
+    unsaved.current.quote_expires_at = true
+    const res = await patch?.({ quote_expires_at: nextIso })
+    if (!res?.error) unsaved.current.quote_expires_at = false
   }
 
   return (
@@ -67,7 +86,7 @@ export default function QuoteTermsSection({ contact, patch, valuesRef }: any) {
       style={{ margin: 0, padding: '16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}
     >
       <div>
-        <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>
+        <span className="v3-eyebrow" style={{ color: 'var(--v3-primary-text)' }}>
           <FileText size={11} aria-hidden="true" style={{ marginRight: 4, verticalAlign: 'middle' }} />
           Quote terms
         </span>

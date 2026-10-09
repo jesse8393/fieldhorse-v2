@@ -63,6 +63,23 @@ export function contractTotals({ contact, payments = [], changeOrders = [], invo
   }
 }
 
+// What the customer owes on one invoice right now: its amount, capped at
+// the job's remaining balance. The PDF's "Amount due" hero applies the
+// same cap, so the email and its attachment always show one figure (a
+// job with an earlier deposit used to get an email asking for the full
+// invoice while the PDF asked for the smaller balance).
+export function invoiceAmountDue({ invoice, contact, payments = [], changeOrders = [] }: {
+  invoice: { amount?: number | string | null } | null | undefined
+  contact: Partial<Contact> | null | undefined
+  payments?: { amount?: number | string | null }[]
+  changeOrders?: { amount?: number | string | null; status?: string | null }[]
+}) {
+  const amount = Number(invoice?.amount || 0)
+  if (!Number.isFinite(amount) || amount <= 0) return 0
+  const { balance } = contractTotals({ contact, payments, changeOrders })
+  return Math.round(Math.min(amount, balance) * 100) / 100
+}
+
 export async function fetchInvoicesForContact(contactId: string) {
   const { data, error } = await supabase
     .from('fh_invoices')
@@ -226,7 +243,7 @@ export async function sendInvoiceEmail({ invoice, contact, company, userId, reci
       recipient_name: contact.name || null,
       storage_path: path,
       filename: result.filename,
-      amount_due: invoice.amount
+      amount_due: invoiceAmountDue({ invoice, contact, payments, changeOrders })
     })
   })
   const sendBody = await sendRes.json().catch(() => ({}))

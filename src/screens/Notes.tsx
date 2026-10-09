@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import {
   FileText, Briefcase, Mic, MicOff, Sparkles, Trash2,
   AlertTriangle, ClipboardCheck, Package, Calendar, Clock,
@@ -11,7 +11,8 @@ import { supabase } from '../lib/supabase.ts'
 import { useNotesBundle, notesKey } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { claudeMessage } from '../lib/anthropic.ts'
-import { toastSuccess, toastUndo, toastError } from '../lib/toast.ts'
+import { toastSuccess, toastUndo, toastError, toastInfo } from '../lib/toast.ts'
+import { speechErrorFeedback } from '../lib/speech.ts'
 import { hapticTap, hapticSuccess } from '../lib/haptics.ts'
 import { canHover } from '../lib/hover.ts'
 import { resilientInsert } from '../lib/outbox.ts'
@@ -43,6 +44,9 @@ const SYSTEM = `You are Fieldhorse, a construction operations AI. You receive ro
    ============================================================ */
 
 export default function Notes() {
+  // The listening bars pulse forever; people who ask for reduced motion
+  // get still bars (the mic button already shows the listening state).
+  const reduceMotion = useReducedMotion()
   const { user } = useAuth()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -75,25 +79,57 @@ export default function Notes() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Stop a recognition session for good: detach its handlers so a late
+  // result or end event can't touch state, then abort.
+  function abortVoice() {
+    const rec = recognitionRef.current
+    recognitionRef.current = null
+    if (!rec) return
+    rec.onresult = null
+    rec.onend = null
+    rec.onerror = null
+    try { rec.abort() } catch {}
+  }
+
+  // Release the mic when the screen unmounts; a continuous session
+  // otherwise keeps listening after navigating away.
+  useEffect(() => abortVoice, [])
+
   function startVoice() {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     if (!SR) {
       setVoiceState('error')
+      toastInfo('Voice not supported here', 'Type the note instead.')
       return
     }
+    abortVoice()
     const rec = new SR()
     rec.continuous = true
     rec.interimResults = true
     rec.lang = 'en-US'
+    // With interimResults the same phrase arrives many times as it grows,
+    // so rebuild the dictated text from the draft as it was when the mic
+    // opened instead of appending every partial hypothesis.
+    const base = draft.trim() ? draft.trimEnd() + ' ' : ''
+    let final = ''
     rec.onresult = (e: any) => {
-      let chunk = ''
+      let interim = ''
       for (let i = e.resultIndex; i < e.results.length; i++) {
-        chunk += e.results[i][0].transcript
+        const t = e.results[i][0].transcript
+        if (e.results[i].isFinal) final += t
+        else interim += t
       }
-      setDraft((d) => (d ? d + ' ' : '') + chunk)
+      setDraft(base + (final + interim).trim())
     }
-    rec.onend = () => setVoiceState('idle')
-    rec.onerror = () => setVoiceState('error')
+    rec.onend = () => {
+      if (recognitionRef.current === rec) recognitionRef.current = null
+      setVoiceState('idle')
+    }
+    rec.onerror = (e: any) => {
+      setVoiceState('error')
+      const fb = speechErrorFeedback(e?.error)
+      if (fb) (fb.tone === 'info' ? toastInfo : toastError)(fb.title, fb.description)
+    }
     rec.start()
     recognitionRef.current = rec
     setVoiceState('listening')
@@ -148,15 +184,29 @@ export default function Notes() {
     // resilientInsert mints the id client-side, so the optimistic row
     // below is the same row that lands in the DB (online or queued).
     const { queued, error, id } = await resilientInsert('fh_notes', payload)
-    setSaving(false)
     if (error) {
+      setSaving(false)
       // resilientInsert only surfaces a non-network error here (dead zones
       // queue instead), a real failure the user must see, not a silent
       // no-op that looks like the note was saved.
       toastError("Couldn't save note", error.message || 'Try again')
       return
     }
-    const localRow = { ...payload, id, created_at: new Date().toISOString(), done: false }
+    // Keep the AI parse with the note so the AI badge, risk spine and
+    // action items survive a reload. It is written as a separate update so
+    // a failed parse write never costs the note itself (the column was
+    // added in production by migration 068). Queued (offline) notes skip it.
+    let savedParsed: any = null
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && !queued) {
+      const { data: stored, error: parsedErr } = await supabase.from('fh_notes')
+        .update({ parsed })
+        .eq('id', id)
+        .select('id')
+      if (parsedErr) console.warn('[notes] AI parse not stored with the note', parsedErr)
+      else if (stored?.length) savedParsed = parsed
+    }
+    setSaving(false)
+    const localRow = { ...payload, id, created_at: new Date().toISOString(), done: false, ...(savedParsed ? { parsed: savedParsed } : {}) }
     setDraft('')
     setParsed(null)
     setContactId('')
@@ -309,7 +359,7 @@ export default function Notes() {
       >
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>Field Notes</span>
+            <span className="v3-eyebrow" style={{ color: 'var(--v3-primary-text)' }}>Field Notes</span>
             <h1 style={{ margin: '6px 0 0', fontSize: 24, lineHeight: 1.1, letterSpacing: 0, fontWeight: 600, color: 'var(--v3-text)' }}>
               Notes, fast.
             </h1>
@@ -393,7 +443,7 @@ export default function Notes() {
                   height: 10,
                   borderRadius: 10,
                   background: 'var(--v3-danger)',
-                  animation: `fh-pulse-dot 900ms ${i * 110}ms infinite ease-in-out`
+                  animation: reduceMotion ? 'none' : `fh-pulse-dot 900ms ${i * 110}ms infinite ease-in-out`
                 }}
               />
             ))}
@@ -444,7 +494,7 @@ export default function Notes() {
               borderRadius: 10,
               background: !draft.trim() || parsing ? 'var(--v3-surface-2)' : 'var(--v3-primary-soft)',
               border: !draft.trim() || parsing ? '1px solid var(--v3-border)' : '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)',
-              color: !draft.trim() || parsing ? 'var(--v3-text-muted)' : 'var(--v3-primary)',
+              color: !draft.trim() || parsing ? 'var(--v3-text-muted)' : 'var(--v3-primary-text)',
               fontFamily: 'var(--font-body)',
               fontSize: 14,
               fontWeight: 600,
@@ -487,7 +537,7 @@ export default function Notes() {
               lineHeight: 1.5
             }}
           >
-            <span style={{ fontWeight: 700, color: 'var(--v3-danger-bright)' }}>AI parse unavailable. </span>
+            <span style={{ fontWeight: 700, color: 'var(--v3-danger-text)' }}>AI parse unavailable. </span>
             <span style={{ color: 'var(--v3-text-muted)' }}>{parseError} You can still save the note as entered.</span>
           </div>
         )}
@@ -510,7 +560,7 @@ export default function Notes() {
             >
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <Sparkles size={12} color="var(--v3-primary)" />
-                <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>AI Summary</span>
+                <span className="v3-eyebrow" style={{ color: 'var(--v3-primary-text)' }}>AI Summary</span>
               </div>
               <p style={{ margin: 0, fontSize: 14, color: 'var(--v3-text)', fontFamily: 'var(--font-body)', lineHeight: 1.5 }}>
                 {parsed.summary}
@@ -521,7 +571,7 @@ export default function Notes() {
               {parsed.follow_up_date && (
                 <p style={{ margin: '10px 0 0', fontSize: 12, fontFamily: 'var(--font-body)', color: 'var(--v3-text-muted)', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                   <Calendar size={12} />
-                  Follow up: <strong style={{ color: 'var(--v3-primary)' }}>{parsed.follow_up_date}</strong>
+                  Follow up: <strong style={{ color: 'var(--v3-primary-text)' }}>{parsed.follow_up_date}</strong>
                 </p>
               )}
             </motion.div>
@@ -675,7 +725,7 @@ export default function Notes() {
               No action items yet.
             </div>
             <div style={{ fontSize: 12, lineHeight: 1.5 }}>
-              Tap <strong style={{ color: 'var(--v3-primary)' }}>AI parse</strong> on a note above to extract action items, risks, and materials.
+              Tap <strong style={{ color: 'var(--v3-primary-text)' }}>AI parse</strong> on a note above to extract action items, risks, and materials.
             </div>
           </div>
         ) : (
@@ -753,7 +803,7 @@ function VoiceButton({ listening, onStart, onStop }: any) {
           ? '1px solid color-mix(in srgb, var(--v3-danger) 50%, transparent)'
           : '1px solid var(--v3-border-strong)',
         background: listening ? 'var(--v3-danger-soft)' : 'var(--v3-surface)',
-        color: listening ? 'var(--v3-danger-bright)' : 'var(--v3-text)',
+        color: listening ? 'var(--v3-danger-text)' : 'var(--v3-text)',
         fontFamily: 'var(--font-body)',
         fontSize: 14,
         fontWeight: 700,
@@ -808,14 +858,14 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
       icon: <ArchiveIcon size={18} />,
       label: 'Archive note',
       color: 'rgba(45, 122, 79, 0.18)',
-      fg: 'var(--v3-success-bright)',
+      fg: 'var(--v3-success-text)',
       onClick: onArchive
     },
     {
       icon: <Trash2 size={18} />,
       label: 'Delete note',
       color: 'rgba(192, 57, 43, 0.18)',
-      fg: 'var(--v3-danger-bright)',
+      fg: 'var(--v3-danger-text)',
       onClick: onDelete
     }
   ]
@@ -895,7 +945,7 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
                   borderRadius: 10,
                   background: 'var(--v3-primary-soft)',
                   border: '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)',
-                  color: 'var(--v3-primary)',
+                  color: 'var(--v3-primary-text)',
                   fontFamily: 'var(--font-display)',
                   fontSize: 12,
                   letterSpacing: 0
@@ -1015,9 +1065,9 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
 function ParsedList({ title, items, Icon, tone }: any) {
   if (!items || items.length === 0) return null
   const color = tone === 'warn'
-    ? 'var(--v3-danger-bright)'
+    ? 'var(--v3-danger-text)'
     : tone === 'good'
-      ? 'var(--v3-success-bright)'
+      ? 'var(--v3-success-text)'
       : 'var(--v3-text-muted)'
   return (
     <div style={{ marginTop: 10 }}>
@@ -1039,9 +1089,9 @@ function ParsedList({ title, items, Icon, tone }: any) {
    ============================================================ */
 function CockpitStat({ label, value, tone = 'default' }: any) {
   const color = tone === 'gold'
-    ? 'var(--v3-primary)'
+    ? 'var(--v3-primary-text)'
     : tone === 'alert'
-      ? 'var(--v3-danger-bright)'
+      ? 'var(--v3-danger-text)'
       : 'var(--v3-text)'
   return (
     <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 8 }}>
@@ -1053,7 +1103,7 @@ function CockpitStat({ label, value, tone = 'default' }: any) {
       }}>
         {value}
       </span>
-      <span className="v3-eyebrow" style={tone === 'alert' ? { color: 'var(--v3-danger-bright)' } : undefined}>
+      <span className="v3-eyebrow" style={tone === 'alert' ? { color: 'var(--v3-danger-text)' } : undefined}>
         {label}
       </span>
     </span>

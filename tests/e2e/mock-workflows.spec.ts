@@ -220,9 +220,12 @@ test('uses the full desktop workspace without changing the mobile screens', asyn
     }
 
     if (route.name === 'activity' || route.name === 'partners') {
+      // The activity table renders one header row per day group, so scope
+      // to the first match; strict mode otherwise fails on fixtures with
+      // more than one day of events.
       const tableHeader = page.locator(route.name === 'activity'
         ? '.fh-activity-table__head'
-        : '.fh-partners-table__head')
+        : '.fh-partners-table__head').first()
       const tableWidth = await tableHeader.evaluate((element) => ({
         clientWidth: element.clientWidth,
         scrollWidth: element.scrollWidth,

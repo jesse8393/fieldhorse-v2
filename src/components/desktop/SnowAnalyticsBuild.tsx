@@ -215,11 +215,11 @@ export default function SnowAnalyticsBuild(props: Props) {
                 <div className="fh-build-eyebrow">Revenue received · last {revenueByMonth.length} months</div>
                 <span className="fh-build-rel">
                   {monthOverMonth > 0 ? (
-                    <span style={{ color: 'var(--v3-success-bright)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ color: 'var(--v3-success-text)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                       <TrendingUp size={12} /> {money(monthOverMonth)} MoM
                     </span>
                   ) : monthOverMonth < 0 ? (
-                    <span style={{ color: 'var(--v3-danger-bright)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ color: 'var(--v3-danger-text)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                       <TrendingDown size={12} /> {money(Math.abs(monthOverMonth))} MoM
                     </span>
                   ) : '\u2003'}
@@ -263,7 +263,7 @@ export default function SnowAnalyticsBuild(props: Props) {
                   <div key={c.id || c.name || i} className="fh-build-table__row is-topclients">
                     <span className="fh-build-rel">{String(i + 1).padStart(2, '0')}</span>
                     <strong className="fh-build-truncate">{c.name || 'Unnamed'}</strong>
-                    <span className="fh-build-num" style={{ color: 'var(--v3-primary, #c9963a)', fontWeight: 700 }}>{money(v)}</span>
+                    <span className="fh-build-num" style={{ color: 'var(--v3-primary-text)', fontWeight: 700 }}>{money(v)}</span>
                   </div>
                 )
               })}
@@ -299,7 +299,7 @@ export default function SnowAnalyticsBuild(props: Props) {
                   <strong style={{
                     color: collectionRate == null
                       ? undefined
-                      : Number(stats.invoiced) > Number(stats.collected) ? 'var(--v3-danger-bright)' : 'var(--v3-success-bright)',
+                      : Number(stats.invoiced) > Number(stats.collected) ? 'var(--v3-danger-text)' : 'var(--v3-success-text)',
                   }}>
                     {collectionRate != null ? pct(ratioToPct(collectionRate)) : '\u2003'}
                   </strong>

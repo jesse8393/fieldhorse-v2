@@ -58,6 +58,30 @@ export async function pushEnabled(): Promise<boolean> {
   }
 }
 
+function subscribeDevice(reg: ServiceWorkerRegistration): Promise<PushSubscription> {
+  return reg.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) as BufferSource
+  })
+}
+
+async function saveSubscription(userId: string, sub: PushSubscription): Promise<{ code?: string } | null> {
+  const json = sub.toJSON() as any
+  if (!json?.endpoint || !json?.keys?.p256dh || !json?.keys?.auth) return { code: 'invalid_subscription' }
+  const { error } = await (supabase as any).from('fh_push_subscriptions').upsert(
+    {
+      user_id: userId,
+      endpoint: json.endpoint,
+      p256dh: json.keys.p256dh,
+      auth: json.keys.auth,
+      user_agent: navigator.userAgent.slice(0, 280),
+      last_seen_at: new Date().toISOString()
+    },
+    { onConflict: 'endpoint' }
+  )
+  return error || null
+}
+
 /**
  * Ask permission, subscribe this device, persist the subscription.
  * Must be called from a user gesture (tap), per platform rules.
@@ -69,40 +93,51 @@ export async function enablePush(userId: string): Promise<'enabled' | 'denied' |
     const permission = await Notification.requestPermission()
     if (permission !== 'granted') return 'denied'
     const reg = await navigator.serviceWorker.ready
-    const sub =
-      (await reg.pushManager.getSubscription()) ||
-      (await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) as BufferSource
-      }))
-    const json = sub.toJSON() as any
-    if (!json?.endpoint || !json?.keys?.p256dh || !json?.keys?.auth) return 'failed'
-    const { error } = await (supabase as any).from('fh_push_subscriptions').upsert(
-      {
-        user_id: userId,
-        endpoint: json.endpoint,
-        p256dh: json.keys.p256dh,
-        auth: json.keys.auth,
-        user_agent: navigator.userAgent.slice(0, 280),
-        last_seen_at: new Date().toISOString()
-      },
-      { onConflict: 'endpoint' }
-    )
-    if (error) return 'failed'
-    return 'enabled'
+    const existing = await reg.pushManager.getSubscription()
+    let error = await saveSubscription(userId, existing || (await subscribeDevice(reg)))
+    if (error?.code === '42501' && existing) {
+      // The browser handed back a subscription that another account on
+      // this device registered (it signed out before sign out removed
+      // it). That row is not ours to update, so start a fresh
+      // subscription; the server prunes the old endpoint once it fails.
+      await existing.unsubscribe()
+      error = await saveSubscription(userId, await subscribeDevice(reg))
+    }
+    return error ? 'failed' : 'enabled'
   } catch {
     return 'failed'
   }
 }
 
+// getRegistration, not serviceWorker.ready: ready never settles when no
+// service worker is registered (dev builds, a cleared install), and sign
+// out waits on these helpers.
+async function currentSubscription(): Promise<PushSubscription | null> {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return null
+  const reg = await navigator.serviceWorker.getRegistration()
+  return (await reg?.pushManager?.getSubscription()) ?? null
+}
+
 /** Unsubscribe this device and remove its row. */
 export async function disablePush(): Promise<void> {
   try {
-    const reg = await navigator.serviceWorker.ready
-    const sub = await reg.pushManager.getSubscription()
+    const sub = await currentSubscription()
     if (!sub) return
     const endpoint = sub.endpoint
     await sub.unsubscribe()
     await (supabase as any).from('fh_push_subscriptions').delete().eq('endpoint', endpoint)
+  } catch { /* best effort */ }
+}
+
+/**
+ * Stop this device receiving the signed out account's notifications
+ * when there is no session left to delete the row with (session expired,
+ * signed out in another tab). The server prunes the dead endpoint the
+ * next time a send to it fails.
+ */
+export async function unsubscribePushLocally(): Promise<void> {
+  try {
+    const sub = await currentSubscription()
+    if (sub) await sub.unsubscribe()
   } catch { /* best effort */ }
 }

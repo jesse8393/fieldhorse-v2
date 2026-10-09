@@ -48,6 +48,12 @@ export default async (request) => {
   const authUser = userData.user
   const authEmail = String(authUser.email || '').toLowerCase()
   const authUserId = authUser.id
+  // The invite binds by email, so the email must be proven. Supabase only
+  // issues sessions after confirmation when confirmations are on, but this
+  // keeps the guarantee if that project setting is ever turned off.
+  if (!authUser.email_confirmed_at) {
+    return json({ error: 'email_unconfirmed', message: 'Confirm your email address, then open the invite again.' }, 403)
+  }
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false }
@@ -56,11 +62,14 @@ export default async (request) => {
   // Load invite.
   const { data: invite, error: invErr } = await admin
     .from('org_invites')
-    .select('id, org_id, email, role, expires_at, accepted_at')
+    .select('id, org_id, email, role, expires_at, accepted_at, invited_by')
     .eq('token', token)
     .maybeSingle()
 
-  if (invErr) return json({ error: 'lookup_failed', message: invErr.message }, 500)
+  if (invErr) {
+    console.error('[org-invite-accept] invite lookup failed', invErr)
+    return json({ error: 'lookup_failed', message: 'Could not load this invite. Try again.' }, 500)
+  }
   if (!invite) return json({ error: 'invite_not_found' }, 404)
 
   if (invite.expires_at && new Date(invite.expires_at).getTime() < Date.now()) {
@@ -107,7 +116,10 @@ export default async (request) => {
       role: invite.role,
       invited_by: invite.invited_by ?? null,
     })
-  if (insErr) return json({ error: 'membership_create_failed', message: insErr.message }, 500)
+  if (insErr) {
+    console.error('[org-invite-accept] membership insert failed', insErr)
+    return json({ error: 'membership_create_failed', message: 'Could not add you to the team. Try again.' }, 500)
+  }
 
   // Mark invite accepted (best-effort; the membership row is the
   // source of truth, so don't fail the request if this step has a
@@ -117,7 +129,34 @@ export default async (request) => {
     .update({ accepted_at: new Date().toISOString(), accepted_by: authUserId })
     .eq('id', invite.id)
 
+  // The teammate's company is the one that invited them, so they skip
+  // owner onboarding (which would create a company of their own and
+  // offer to seed sample jobs). Best effort: the app shows invitees a
+  // short welcome instead if this does not land.
+  await markOnboarded(admin, authUserId)
+
   return json({ ok: true, org_id: invite.org_id, role: invite.role })
+}
+
+// Sets profiles.onboarded_at for the user when it is still empty,
+// creating the profile row if the signup trigger has not. Never
+// overwrites an existing onboarded_at.
+export async function markOnboarded(admin, userId) {
+  const now = new Date().toISOString()
+  try {
+    const { error: insErr } = await admin
+      .from('profiles')
+      .upsert({ user_id: userId, onboarded_at: now }, { onConflict: 'user_id', ignoreDuplicates: true })
+    if (insErr) console.error('[org-invite-accept] profile create failed', insErr)
+    const { error: updErr } = await admin
+      .from('profiles')
+      .update({ onboarded_at: now })
+      .eq('user_id', userId)
+      .is('onboarded_at', null)
+    if (updErr) console.error('[org-invite-accept] onboarded_at update failed', updErr)
+  } catch (err) {
+    console.error('[org-invite-accept] onboarded_at update failed', err)
+  }
 }
 
 function corsHeaders() {

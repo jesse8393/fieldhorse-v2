@@ -1,6 +1,7 @@
 // Netlify Function — List members + pending invites for the caller's org.
-// POST /api/org-members-list  {}
+// POST /api/org-members-list  { org_id? }
 // Authorization: Bearer <supabase access token>
+// The acting org comes from lib/membership.js.
 //
 // Why an edge function instead of a direct client query:
 //   public.org_members has a deliberately narrow RLS policy
@@ -10,6 +11,8 @@
 //   here, which applies the role gate in JS before returning data.
 
 import { createClient } from '@supabase/supabase-js'
+import { emailsForUsers } from './lib/authEmails.js'
+import { resolveCallerMembership } from './lib/membership.js'
 
 export default async (request) => {
   if (request.method === 'OPTIONS') {
@@ -30,6 +33,9 @@ export default async (request) => {
   const bearer = authHeader.toLowerCase().startsWith('bearer ') ? authHeader.slice(7) : ''
   if (!bearer) return json({ error: 'not_authenticated' }, 401)
 
+  let body = {}
+  try { body = (await request.json()) || {} } catch { /* allow empty */ }
+
   const authClient = createClient(SUPABASE_URL, ANON_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
     global: { headers: { Authorization: `Bearer ${bearer}` } }
@@ -42,20 +48,12 @@ export default async (request) => {
     auth: { autoRefreshToken: false, persistSession: false }
   })
 
-  // 1. Find caller's active membership.
-  const { data: myMember, error: myErr } = await admin
-    .from('org_members')
-    .select('org_id, role, revoked_at')
-    .eq('user_id', authUserId)
-    .is('revoked_at', null)
-    .order('joined_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  // Log the raw DB error server-side; the client gets a human string
-  // (a schema error was previously printed verbatim in the Team UI).
-  if (myErr) { console.error('[org-members-list] membership lookup failed', myErr); return json({ error: 'membership_lookup_failed', message: 'Could not load your membership. Try again shortly.' }, 500) }
-  if (!myMember) return json({ error: 'no_membership' }, 403)
+  // 1. Find caller's active membership. lib/membership.js logs a raw DB
+  // error server side and hands back a human string (a schema error was
+  // previously printed verbatim in the Team UI).
+  const resolved = await resolveCallerMembership(admin, authUserId, body)
+  if (!resolved.membership) return json({ error: resolved.error, message: resolved.message }, resolved.status)
+  const myMember = resolved.membership
 
   // Anyone in the org can SEE the roster (foreman + crew need to know
   // who else is on their team). Mutation actions get gated by role on
@@ -84,17 +82,12 @@ export default async (request) => {
       .in('user_id', userIds)
     profilesById = Object.fromEntries((profs || []).map((p) => [p.user_id, p]))
   }
-  // auth.users emails — admin.listUsers is paginated; for orgs with
-  // small membership counts (the common case) one page suffices. If a
-  // single org ever grows past 1000 members we'll need pagination
-  // here, but that's not a Phase B concern.
+  // auth.users emails for this roster only (see lib/authEmails.js).
+  // Non-fatal: members render without emails if the admin API fails.
   let emailsById = {}
   try {
-    const { data: usersList } = await admin.auth.admin.listUsers({ perPage: 1000 })
-    emailsById = Object.fromEntries((usersList?.users || []).map((u) => [u.id, u.email]))
-  } catch {
-    // Non-fatal — return members without emails if the admin API call fails.
-  }
+    emailsById = await emailsForUsers(admin, userIds)
+  } catch {}
 
   // Pay rates are management-only data. Every member can see the roster,
   // but crew/foreman must NOT learn each teammate's default_hourly_rate —

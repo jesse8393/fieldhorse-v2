@@ -31,9 +31,9 @@ const ICONS: Record<string, any> = {
 
 const TONE_COLORS: Record<string, any> = {
   neutral: { fg: 'var(--v3-text-muted)', bg: 'var(--v3-glass-tint-2)', dot: 'var(--v3-text-muted)' },
-  gold:    { fg: 'var(--v3-primary-bright)', bg: 'color-mix(in srgb, var(--v3-primary) 14%, transparent)', dot: 'var(--v3-primary)' },
-  green:   { fg: 'var(--v3-success-bright, #2D7A4F)', bg: 'rgba(45, 122, 79, 0.10)', dot: 'var(--v3-success-bright, #2D7A4F)' },
-  red:     { fg: 'var(--v3-danger-bright, #C0392B)', bg: 'rgba(192, 57, 43, 0.10)', dot: 'var(--v3-danger-bright, #C0392B)' }
+  gold:    { fg: 'var(--v3-primary-text)', bg: 'color-mix(in srgb, var(--v3-primary) 14%, transparent)', dot: 'var(--v3-primary)' },
+  green:   { fg: 'var(--v3-success-text)', bg: 'rgba(45, 122, 79, 0.10)', dot: 'var(--v3-success-bright, #2D7A4F)' },
+  red:     { fg: 'var(--v3-danger-text)', bg: 'rgba(192, 57, 43, 0.10)', dot: 'var(--v3-danger-bright, #C0392B)' }
 }
 
 function relTime(d: any) {
@@ -94,7 +94,7 @@ export default function ActivityLog({
         borderBottom: '1px solid var(--v3-border)',
         background: 'var(--v3-surface-2)'
       }}>
-        <Activity size={14} aria-hidden="true" style={{ color: 'var(--v3-primary-bright)' }} />
+        <Activity size={14} aria-hidden="true" style={{ color: 'var(--v3-primary-text)' }} />
         <Eyebrow tone="gold">
           Activity
           <span style={{ marginLeft: 8, color: 'var(--v3-text-muted)' }}>
@@ -187,7 +187,7 @@ export default function ActivityLog({
             padding: '12px 16px',
             borderTop: '1px solid var(--v3-border)',
             background: 'transparent', border: 'none',
-            color: 'var(--v3-primary-bright)',
+            color: 'var(--v3-primary-text)',
             fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
             letterSpacing: 0, cursor: 'pointer',
             textAlign: 'center'

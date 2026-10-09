@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   Upload, GitCompareArrows, ChevronLeft, ChevronRight,
   X, Trash2, Sparkles, Image as ImageIcon
 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
+import { signedUrlsFor } from '../../../lib/signedUrls.ts'
 import { compressImageToBlob, compressImageToDataUrl, captionPhoto } from '../../../lib/docIntelligence.ts'
 import { toastError, toastSuccess } from '../../../lib/toast.ts'
 import { hapticTap, hapticSuccess } from '../../../lib/haptics.ts'
@@ -52,6 +54,7 @@ const SCOPE_SECTIONS = [
  *   - Compare mode: select 2 photos, drag the before/after slider.
  */
 export default function PhotosSection({ jobId, userId }: any) {
+  const queryClient = useQueryClient()
   const [rows, setRows] = useState<any[]>([])
   const [thumbUrls, setThumbUrls] = useState<any>({}) // { [rowId]: signedUrl }
   const [loading, setLoading] = useState(true)
@@ -73,28 +76,24 @@ export default function PhotosSection({ jobId, userId }: any) {
   const fetchRows = useCallback(async () => {
     if (!jobId || !userId) return
     setLoading(true)
+    // Every photo on the job, whoever took it: org RLS scopes the read
+    // to teammates and accepted partners.
     const { data } = await supabase
       .from('fh_job_files')
       .select('*')
       .eq('job_id', jobId)
-      .eq('user_id', userId)
       .eq('kind', 'photo')
       .order('uploaded_at', { ascending: false })
     const list = data || []
     setRows(list)
     setLoading(false)
 
-    // Batch sign URLs for the grid thumbnails.
+    // Batch sign URLs for the grid thumbnails. URLs signed in the last
+    // 50 minutes are reused, so coming back to the job lets the browser
+    // cache serve the images instead of downloading them again.
     if (list.length > 0) {
-      const paths = list.map((r) => r.storage_path)
-      const { data: signed } = await supabase.storage
-        .from(BUCKET)
-        .createSignedUrls(paths, 3600)
+      const byPath = await signedUrlsFor(queryClient, BUCKET, list.map((r) => r.storage_path))
       const next: Record<string, any> = {}
-      const byPath = new Map()
-      for (const s of signed || []) {
-        if (s?.signedUrl && !s.error) byPath.set(s.path, s.signedUrl)
-      }
       for (const r of list) {
         const url = byPath.get(r.storage_path)
         if (url) next[r.id] = url
@@ -103,7 +102,7 @@ export default function PhotosSection({ jobId, userId }: any) {
     } else {
       setThumbUrls({})
     }
-  }, [jobId, userId])
+  }, [jobId, userId, queryClient])
 
   useEffect(() => { fetchRows() }, [fetchRows])
 
@@ -220,15 +219,21 @@ export default function PhotosSection({ jobId, userId }: any) {
     }
   }
 
+  // Any teammate can caption or tag a photo, so these writes match by id
+  // and leave the tenant check to RLS. A write that matches no row (the
+  // photo was deleted meanwhile) returns no error, so ask for the id back.
   async function saveCaption(rowId: any, nextCaption: any) {
     const trimmed = (nextCaption || '').trim()
     setRows((prev) => prev.map((r) => r.id === rowId ? { ...r, caption: trimmed || null } : r))
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('fh_job_files')
       .update({ caption: trimmed || null })
       .eq('id', rowId)
-      .eq('user_id', userId)
-    if (error) toastError("Couldn't save caption", error.message)
+      .select('id')
+    if (error || !data?.length) {
+      toastError("Couldn't save caption", error?.message || 'This photo may have been deleted.')
+      fetchRows()
+    }
   }
 
   // Tagging a photo to a scope section ("Roofing", "Demolition", …) lets
@@ -239,12 +244,15 @@ export default function PhotosSection({ jobId, userId }: any) {
   async function saveSectionTag(rowId: any, nextTag: any) {
     const trimmed = (nextTag || '').trim()
     setRows((prev) => prev.map((r) => r.id === rowId ? { ...r, section_tag: trimmed || null } : r))
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('fh_job_files')
       .update({ section_tag: trimmed || null })
       .eq('id', rowId)
-      .eq('user_id', userId)
-    if (error) toastError("Couldn't save section tag", error.message)
+      .select('id')
+    if (error || !data?.length) {
+      toastError("Couldn't save section tag", error?.message || 'This photo may have been deleted.')
+      fetchRows()
+    }
   }
 
   // Open the destructive-confirm sheet for this photo. The actual
@@ -259,9 +267,20 @@ export default function PhotosSection({ jobId, userId }: any) {
     if (!row || deleting) return
     setDeleting(true)
     try {
-      await supabase.storage.from(BUCKET).remove([row.storage_path])
-      await supabase.from('fh_job_files').delete().eq('id', row.id).eq('user_id', userId)
-      toastSuccess('Deleted', row.filename)
+      // Object first: the storage delete policy for teammates needs the
+      // fh_job_files row to still exist. remove() reports failure in
+      // { error } instead of throwing, and a failed remove must keep the
+      // row, or the object is orphaned with nothing pointing at it.
+      const { error: rmErr } = await supabase.storage.from(BUCKET).remove([row.storage_path])
+      if (rmErr) throw rmErr
+      const { data: gone, error: delErr } = await supabase
+        .from('fh_job_files')
+        .delete()
+        .eq('id', row.id)
+        .select('id')
+      if (delErr) throw delErr
+      if (!gone?.length) toastError('Delete failed', 'This photo may already be gone.')
+      else toastSuccess('Deleted', row.filename)
       await fetchRows()
     } catch (ex: any) {
       toastError('Delete failed', ex?.message || 'Try again')
@@ -273,8 +292,8 @@ export default function PhotosSection({ jobId, userId }: any) {
 
   async function urlFor(row: any) {
     if (thumbUrls[row.id]) return thumbUrls[row.id]
-    const { data } = await supabase.storage.from(BUCKET).createSignedUrl(row.storage_path, 3600)
-    return data?.signedUrl || ''
+    const byPath = await signedUrlsFor(queryClient, BUCKET, [row.storage_path])
+    return byPath.get(row.storage_path) || ''
   }
 
   async function openLightbox(idx: any) {
@@ -347,7 +366,7 @@ export default function PhotosSection({ jobId, userId }: any) {
                   ? '1px solid color-mix(in srgb, var(--v3-primary) 50%, transparent)'
                   : '1px solid var(--v3-border)',
                 background: compareMode ? 'var(--v3-primary-soft)' : 'transparent',
-                color: compareMode ? 'var(--v3-primary)' : 'var(--v3-text)',
+                color: compareMode ? 'var(--v3-primary-text)' : 'var(--v3-text)',
                 fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
                 letterSpacing: 0, cursor: 'pointer'
               }}
@@ -388,7 +407,7 @@ export default function PhotosSection({ jobId, userId }: any) {
         }}>
           <div style={{
             fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-            letterSpacing: 0, color: 'var(--v3-primary)'
+            letterSpacing: 0, color: 'var(--v3-primary-text)'
           }}>
             {!compareBefore ? 'Tap the BEFORE photo' :
               !compareAfter ? 'Now tap the AFTER photo' :

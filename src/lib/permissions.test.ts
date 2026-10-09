@@ -25,4 +25,17 @@ describe('canViewRoute', () => {
     expect(canViewRoute('foreman', '/pipeline')).toBe(false)
     expect(canViewRoute('crew', '/pipeline')).toBe(false)
   })
+
+  it('fails closed for a route with no rule', () => {
+    expect(canViewRoute('owner', '/some-new-screen')).toBe(true)
+    expect(canViewRoute('admin', '/some-new-screen')).toBe(true)
+    expect(canViewRoute('crew', '/some-new-screen')).toBe(false)
+    expect(canViewRoute('foreman', '/some-new-screen')).toBe(false)
+  })
+
+  it('still lets field roles open the job and field screens they need', () => {
+    for (const route of ['/', '/crew', '/work', '/jobs', '/notes', '/schedule', '/activity', '/team', '/pour-window']) {
+      expect(canViewRoute('crew', route)).toBe(true)
+    }
+  })
 })

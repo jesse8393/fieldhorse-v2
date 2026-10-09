@@ -13,6 +13,7 @@ import {
   type StageId
 } from './stages.ts'
 import { toast, hapticMedium, hapticSuccess } from './toast.ts'
+import { moneyExact } from './format.ts'
 import type { Database } from './database.types.ts'
 
 // The stage helpers only read identity + display fields, never the full
@@ -104,7 +105,9 @@ export async function logPayment(contact: Contact, input: { id?: string | null; 
   if (closed) {
     toast(`Paid in full · moved to Closed`, { accent: 'closed', heavy: true })
   } else {
-    toast(`Payment logged · $${paid.toLocaleString()}`, { accent: 'gold' })
+    // Currency formatting keeps both cent digits: plain toLocaleString
+    // printed $1,234.50 as "$1,234.5".
+    toast(`Payment logged · ${moneyExact(paid)}`, { accent: 'gold' })
   }
   return res
 }

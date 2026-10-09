@@ -45,9 +45,9 @@ const SIZE_PX: Record<StampSize, number> = {
 const TONE_COLOR: Record<StampTone, string> = {
   default: 'var(--v3-text)',
   muted:   'var(--v3-text-muted)',
-  gold:    'var(--v3-primary)',
-  success: 'var(--v3-success-bright)',
-  danger:  'var(--v3-danger-bright)'
+  gold:    'var(--v3-primary-text)',
+  success: 'var(--v3-success-text)',
+  danger:  'var(--v3-danger-text)'
 }
 
 type StampNumberProps = HTMLAttributes<HTMLElement> & {

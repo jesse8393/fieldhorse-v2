@@ -13,6 +13,32 @@ const BUILD_SHA = (() => {
   try { return execSync('git rev-parse --short=12 HEAD').toString().trim() } catch { return 'dev' }
 })()
 
+// Year long immutable caching for hashed build output, written file by
+// file into dist/_headers (Netlify reads it next to netlify.toml). A
+// wildcard /assets/* header rule also matched chunks that a later deploy
+// had removed, because Netlify matches header rules on the path, not the
+// status. The browser then stored the reply for a missing chunk (the SPA
+// page, or now the 404) as immutable for a year, still served it after a
+// rollback brought the file back, and the service worker precache reads
+// hashed URLs through that same HTTP cache. Listing only the files in
+// this build keeps a missing chunk on Netlify's default revalidating
+// policy. Do not add a public/_headers: it would collide with this file;
+// put other headers in netlify.toml.
+function immutableAssetHeaders() {
+  return {
+    name: 'fh-immutable-asset-headers',
+    apply: 'build',
+    enforce: 'post',
+    generateBundle(_options, bundle) {
+      const rules = Object.keys(bundle)
+        .filter((fileName) => fileName.startsWith('assets/'))
+        .sort()
+        .map((fileName) => `/${fileName}\n  Cache-Control: public, max-age=31536000, immutable\n`)
+      this.emitFile({ type: 'asset', fileName: '_headers', source: rules.join('') })
+    }
+  }
+}
+
 export default defineConfig({
   define: {
     __FH_BUILD_SHA__: JSON.stringify(BUILD_SHA),
@@ -20,6 +46,9 @@ export default defineConfig({
   },
   plugins: [
     react(),
+    immutableAssetHeaders(),
+    // Registration comes from public/registerSW.js (it skips customer
+    // document links), which the plugin ships instead of generating one.
     VitePWA({
       registerType: 'autoUpdate',
       // skipWaiting + clientsClaim — without these, a deployed update
@@ -35,11 +64,54 @@ export default defineConfig({
         // Web-push handlers (push + notificationclick) live in
         // public/push-sw.js and are pulled into the generated SW here.
         importScripts: ['push-sw.js'],
+        // Precache the app shell and every screen so the field app works
+        // offline, but not chunks only an on demand feature loads. Each
+        // install (and each deploy that changes them) would otherwise
+        // download them for every user. Do not list a chunk that a screen
+        // imports statically: vendor-jspdf and vendor-pdf-table stay in
+        // because the Financials tab and ApproveQuoteSheet import them.
+        globIgnores: [
+          '**/node_modules/**/*',
+          // jsPDF's optional HTML and SVG renderers (html2canvas,
+          // DOMPurify, and canvg, which Rollup names index.es). They load
+          // only for doc.html() or addSvgAsImage(), which the app never
+          // calls.
+          'assets/vendor-html2canvas-*.js',
+          'assets/vendor-dompurify-*.js',
+          'assets/index.es-*.js',
+          // Recharts: only the Analytics screen imports it.
+          'assets/vendor-charts-*.js',
+          // Served by netlify.toml for missing /assets/ files only.
+          '404.html',
+        ],
+        // index.html versions its icon links (?v=2) to bust browser
+        // favicon caches; ignore that parameter so those requests still
+        // hit the precached icons offline.
+        ignoreURLParametersMatching: [/^utm_/, /^fbclid$/, /^v$/],
         // Runtime caching for assets the precache doesn't own (third-
         // party origins + Supabase Storage public URLs). Cuts repeat
         // network roundtrips on warm visits and gives a soft offline
         // experience for previously-seen photos / logos.
         runtimeCaching: [
+          {
+            // Hashed chunks left out of the precache (globIgnores). A
+            // hashed URL never changes content, so the first online load
+            // is kept for offline use. Never store an HTML page served
+            // under a chunk URL (an SPA fallback), only real files.
+            urlPattern: ({ url, sameOrigin }) => sameOrigin && url.pathname.startsWith('/assets/'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'fh-lazy-assets',
+              expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 30, purgeOnQuotaError: true },
+              cacheableResponse: { statuses: [200] },
+              plugins: [
+                {
+                  cacheWillUpdate: async ({ response }) =>
+                    response && !(response.headers.get('content-type') || '').includes('text/html') ? response : null,
+                },
+              ],
+            },
+          },
           {
             // Google Fonts stylesheet — cache the CSS aggressively;
             // it points to versioned woff2 files that get their own
@@ -84,7 +156,7 @@ export default defineConfig({
           },
         ],
       },
-      includeAssets: ['favicon.svg', 'icon.svg', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png'],
+      includeAssets: ['apple-touch-icon.png', 'icon-192.png', 'icon-512.png'],
       manifest: {
         // Stable identity across installs. Without `id`, Chrome treats
         // the install as a brand-new app every time the start_url path
@@ -96,10 +168,15 @@ export default defineConfig({
         name: 'Fieldhorse',
         short_name: 'Fieldhorse',
         description: 'Contractor field operations',
-        theme_color: '#0B0907',
-        background_color: '#0B0907',
+        // Onyx, the dark --v3-bg. Matches the theme-color meta in
+        // index.html and THEME_COLOR.dark in ThemeContext.tsx, so the
+        // splash, the status bar and the first painted frame agree.
+        theme_color: '#141414',
+        background_color: '#141414',
         display: 'standalone',
-        orientation: 'portrait',
+        // No orientation lock: the app has tablet and desktop layouts at
+        // 900px and up, which a portrait lock kept Android tablets from
+        // reaching in landscape.
         icons: [
           { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
           { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },

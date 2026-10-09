@@ -21,6 +21,7 @@ import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { canHover } from '../lib/hover.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
+import { startOfWeek } from '../lib/scheduleDates.ts'
 const SnowSchedule = lazy(() => import('../components/desktop/SnowScheduleBuild.tsx'))
 
 const VIEWS = [
@@ -34,6 +35,8 @@ function addDays(d: any, n: any) { const x = new Date(d); x.setDate(x.getDate() 
 function sameDay(a: any, b: any) { return a.toDateString() === b.toDateString() }
 function fmtDate(d: any) { return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) }
 function fmtTime(iso: any) { return iso ? new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '' }
+
+const WEATHERBAR_TONE: Record<string, string> = { go: 'good', warn: 'ok', stop: 'poor' }
 
 export default function Schedule() {
   const { user } = useAuth()
@@ -64,13 +67,17 @@ export default function Schedule() {
     try { window.localStorage.setItem('fh:schedule:view', view) } catch {}
   }, [view])
   const [cursor, setCursor] = useState(initialCursor)
+  const isDesktop = useIsDesktop()
 
   // Range bounds for the current day/week/month grid. Only depends on
   // view + cursor; feeds the scheduled-events query below.
   const range = useMemo(() => {
     if (view === 'day') return { start: cursor, end: addDays(cursor, 1) }
     if (view === 'week') {
-      const s = addDays(cursor, -cursor.getDay())
+      // Fetch the same seven days the visible grid draws. The mobile
+      // WeekView and dispatch strip start the week on Monday; the desktop
+      // planner (SnowScheduleBuild) starts it on Sunday.
+      const s = startOfWeek(cursor, isDesktop ? 0 : 1)
       return { start: s, end: addDays(s, 7) }
     }
     const monthStart = new Date(cursor.getFullYear(), cursor.getMonth(), 1)
@@ -78,7 +85,7 @@ export default function Schedule() {
     const gridStart = addDays(monthStart, -monthStart.getDay())
     const gridEnd = addDays(gridStart, 42)
     return { start: gridStart, end: gridEnd, monthStart, monthEnd }
-  }, [view, cursor])
+  }, [view, cursor, isDesktop])
 
   // TanStack Query replaces the manual events/upcoming/loading useState
   // + load()/loadUpcoming() callbacks. keepPreviousData inside the hook
@@ -99,6 +106,7 @@ export default function Schedule() {
   const loadUpcoming = invalidateSchedule
 
   const [weather, setWeather] = useState<any>(null)
+  const [weatherFailed, setWeatherFailed] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
   const [editEvent, setEditEvent] = useState<any>(null)
   // Destructive-confirm sheet for delete event. pendingDeleteEvt is the
@@ -138,15 +146,19 @@ export default function Schedule() {
     // Recurring series: delete every occurrence sharing the series id
     // (stored in `recurring`) so we don't orphan the other rows, and
     // restore the whole series on Undo.
+    // No user_id filter: the schedule is company wide (RLS scopes the
+    // org), so a teammate's event must delete too. .select('id') turns a
+    // zero row delete into a visible failure instead of a false success.
     const seriesId = (snapshot as any)?.recurring
     if (seriesId) {
       const { data: seriesRows } = await supabase
-        .from('fh_schedule').select('*').eq('user_id', user!.id).eq('recurring', seriesId)
-      const { error: serr } = await supabase
-        .from('fh_schedule').delete().eq('user_id', user!.id).eq('recurring', seriesId)
+        .from('fh_schedule').select('*').eq('recurring', seriesId)
+      const { data: removed, error: serr } = await supabase
+        .from('fh_schedule').delete().eq('recurring', seriesId).select('id')
       if (serr) { toastError("Couldn't delete", serr.message); return }
-      for (const r of (seriesRows || [])) dropScheduleEvent((r as any).id)
-      const n = (seriesRows || []).length || 1
+      if (!removed?.length) { toastError("Couldn't delete", 'This series was not removed. Refresh and try again.'); return }
+      for (const r of removed) dropScheduleEvent((r as any).id)
+      const n = removed.length
       toastUndo(`Series deleted · ${n} event${n === 1 ? '' : 's'}`, {
         description: snapshot?.title || 'Tap Undo to restore',
         onUndo: async () => {
@@ -163,9 +175,13 @@ export default function Schedule() {
       return
     }
 
-    const { error } = await supabase.from('fh_schedule').delete().eq("id", evtId).eq("user_id", user!.id)
+    const { data: removed, error } = await supabase.from('fh_schedule').delete().eq('id', evtId).select('id')
     if (error) {
       toastError("Couldn't delete", error.message)
+      return
+    }
+    if (!removed?.length) {
+      toastError("Couldn't delete", 'This event was not removed. Refresh and try again.')
       return
     }
     // Optimistic cache removal so the row vanishes immediately, before
@@ -190,7 +206,10 @@ export default function Schedule() {
 
   useEffect(() => {
     if (!hasCoords) return
-    getWeather(profile.location_lat as any, profile.location_lon as any).then(setWeather).catch(() => {})
+    setWeatherFailed(false)
+    getWeather(profile.location_lat as any, profile.location_lon as any)
+      .then(setWeather)
+      .catch(() => setWeatherFailed(true))
   }, [hasCoords, profile?.location_lat, profile?.location_lon])
 
   function shift(n: any) {
@@ -248,7 +267,10 @@ export default function Schedule() {
   }
 
   const { stagger, item } = useFhMotion()
-  const isDesktop = useIsDesktop()
+
+  // The header names one day, so count that day's visits, not every
+  // event in the fetched week or month grid.
+  const cursorDayCount = (events || []).filter((e: any) => sameDay(new Date(e.start_at), cursor)).length
 
   // Phase 7, desktop-first composition. At >=900px the planner +
   // upcoming rail workspace replaces the narrow mobile dispatch
@@ -298,8 +320,8 @@ export default function Schedule() {
         <Eyebrow as="div" tone="gold" style={{ marginBottom: 6 }}>
           {cursor.toLocaleDateString(undefined, { weekday: 'short' })} ·{' '}
           {cursor.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-          {(events && events.length > 0) && (
-            <> · {events.length} {events.length === 1 ? 'visit' : 'visits'}</>
+          {cursorDayCount > 0 && (
+            <> · {cursorDayCount} {cursorDayCount === 1 ? 'visit' : 'visits'}</>
           )}
         </Eyebrow>
         <h1 style={{
@@ -324,11 +346,13 @@ export default function Schedule() {
         )}
       </motion.div>
 
-      {/* WEATHER STRIP */}
+      {/* WEATHER STRIP. The stylesheet names its tones good, ok and poor;
+          the work window reports go, warn and stop, so map them, and stay
+          neutral until a forecast has actually loaded. */}
       {hasCoords && (
-        <motion.div variants={item} className={`fh-weatherbar fh-weatherbar--${windowRead.status}`} style={{ margin: '10px 20px 0' }}>
-          <span className="fh-weatherbar__dot" />
-          <span className="fh-weatherbar__label">{windowRead.label}</span>
+        <motion.div variants={item} className={`fh-weatherbar${weather?.current ? ` fh-weatherbar--${WEATHERBAR_TONE[windowRead.status] || 'good'}` : ''}`} style={{ margin: '10px 20px 0' }}>
+          <span className="fh-weatherbar__dot" aria-hidden="true" />
+          <span className="fh-weatherbar__label">{weather?.current ? windowRead.label : weatherFailed ? 'Forecast unavailable' : 'Loading forecast'}</span>
           {windowRead.reasons.length > 0 && <span className="fh-weatherbar__reason">{windowRead.reasons.join(' · ')}</span>}
         </motion.div>
       )}
@@ -494,7 +518,7 @@ export default function Schedule() {
           )}
           {events != null && view === 'week' && (
             <WeekView
-              start={addDays(cursor, -((cursor.getDay() + 6) % 7))}
+              start={range.start}
               events={events}
               onClick={(id: any) => navigate(`/jobs/${id}`)}
               onDelete={requestDeleteEvent}
@@ -586,7 +610,7 @@ export default function Schedule() {
 // over a small uppercase label. Tone "gold" for the primary today figure,
 // "muted" for secondary reads.
 function SummaryStat({ label, value, tone = 'muted' }: any) {
-  const valueColor = tone === 'gold' ? 'var(--v3-primary)' : 'var(--v3-text)'
+  const valueColor = tone === 'gold' ? 'var(--v3-primary-text)' : 'var(--v3-text)'
   return (
     <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 8 }}>
       <span style={{
@@ -752,7 +776,7 @@ function DayView({ events, now, onClick, onEdit, onDelete, onAdd }: any) {
               width: 72, height: 72, borderRadius: 10,
               background: 'linear-gradient(135deg, #141414, #141414)',
               border: '1px solid color-mix(in srgb, var(--v3-primary) 45%, transparent)',
-              color: 'var(--v3-primary-bright, var(--v3-primary))',
+              color: 'var(--gold)',
               display: 'grid', placeItems: 'center',
               boxShadow:
                 'inset 0 1px 0 rgba(201, 150, 58,0.22),' +
@@ -862,7 +886,7 @@ function DayView({ events, now, onClick, onEdit, onDelete, onAdd }: any) {
 const STATUS_TONE: Record<string, any> = {
   'On Site':     { color: 'var(--v3-stage-active)', soft: 'rgba(45, 122, 79, 0.16)',   border: 'rgba(45, 122, 79, 0.40)' },
   'In Progress': { color: 'var(--v3-stage-lead)',   soft: 'rgba(92, 92, 92, 0.14)', border: 'rgba(92, 92, 92, 0.40)' },
-  'Upcoming':    { color: 'var(--v3-primary)',      soft: 'var(--v3-primary-soft)',     border: 'var(--v3-border-gold)' },
+  'Upcoming':    { color: 'var(--v3-primary-text)',      soft: 'var(--v3-primary-soft)',     border: 'var(--v3-border-gold)' },
   'Scheduled':   { color: 'var(--v3-text-muted)',   soft: 'var(--v3-glass-tint)',       border: 'var(--v3-border-mid)' },
   'Done':        { color: 'var(--v3-text-faint)',   soft: 'var(--v3-glass-tint)',       border: 'var(--v3-border)' }
 }

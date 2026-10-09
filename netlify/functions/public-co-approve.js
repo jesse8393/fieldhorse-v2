@@ -18,6 +18,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { clientIp, hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
 import { sendPushToUser } from './lib/push.js'
+import { linkScope } from './lib/linkScope.js'
 
 function corsHeaders() {
   return {
@@ -72,7 +73,7 @@ export default async function handler(req) {
   // 1. Resolve + validate the link.
   const { data: link } = await supabase
     .from('fh_public_links')
-    .select('id, user_id, contact_id, change_order_id, kind, revoked_at, expires_at')
+    .select('id, user_id, org_id, contact_id, change_order_id, kind, revoked_at, expires_at')
     .eq('token', token)
     .maybeSingle()
   if (!link || link.kind !== 'change_order' || !link.change_order_id) {
@@ -88,7 +89,7 @@ export default async function handler(req) {
     .from('fh_change_orders')
     .select('id, contact_id, user_id, sequence_number, title, amount, status')
     .eq('id', link.change_order_id)
-    .eq('user_id', link.user_id)
+    .match(linkScope(link))
     .maybeSingle()
   if (!co) return json({ error: 'gone' }, 404)
   if (co.status === 'approved') return json({ error: 'already_approved' }, 409)
@@ -109,10 +110,13 @@ export default async function handler(req) {
       approved_at: approvedAt
     })
     .eq('id', co.id)
-    .eq('user_id', link.user_id)
+    .match(linkScope(link))
     .neq('status', 'approved')
     .select('id')
-  if (upErr) return json({ error: 'approve_failed', message: upErr.message }, 500)
+  if (upErr) {
+    console.error('[public-co-approve] update failed', upErr)
+    return json({ error: 'approve_failed', message: 'Could not record your approval. Try again.' }, 500)
+  }
   if (!updatedRows || updatedRows.length === 0) return json({ error: 'already_approved' }, 409)
 
   // 3. Tell the contractor — bell + lock screen. Best effort.
@@ -129,7 +133,7 @@ export default async function handler(req) {
       user_id: link.user_id,
       kind: 'change_order_signed',
       title,
-      body: `${who} signed CO #${co.sequence_number}${co.title ? ` — ${co.title}` : ''}${customerNote ? ` · "${customerNote}"` : ''}`,
+      body: `${who} signed CO #${co.sequence_number}${co.title ? `: ${co.title}` : ''}${customerNote ? ` · "${customerNote}"` : ''}`,
       link: `/jobs/${co.contact_id}?tab=quote`
     })
   } catch { /* bell is best-effort */ }
@@ -140,7 +144,7 @@ export default async function handler(req) {
       await supabase.from('fh_notes').insert({
         user_id: link.user_id,
         contact_id: co.contact_id,
-        text: `CO #${co.sequence_number} signed by ${signatureName} — note: ${customerNote}`,
+        text: `CO #${co.sequence_number} signed by ${signatureName}. Note: ${customerNote}`,
         category: 'activity'
       })
     } catch { /* best-effort */ }

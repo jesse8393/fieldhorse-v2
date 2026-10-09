@@ -26,6 +26,7 @@ import ChangeOrdersBlock from './ChangeOrdersBlock.tsx'
 import { DOC_COLORS, DOC_FONTS, resolveBrandGold } from './tokens.ts'
 import { money, longDate } from './format.ts'
 import { proposalNumber } from './numbers.ts'
+import { groupPhotosByTag } from './photoGroups.ts'
 import { SlateProposal, MintProposal, EditorialProposal } from './proposalThemes.tsx'
 
 const TEMPLATE_COMPONENTS: Record<string, (props: { view: any }) => any> = {
@@ -336,13 +337,7 @@ function AddOnsTable({ items }: any) {
 }
 
 function ProjectPhotosBlock({ photos }: any) {
-  const groups = new Map()
-  for (const p of photos) {
-    if (!p?.url) continue
-    const tag = (p.section_tag || '').trim() || 'Project photos'
-    if (!groups.has(tag)) groups.set(tag, [])
-    groups.get(tag).push(p)
-  }
+  const groups = groupPhotosByTag((photos || []).filter((p: any) => p?.url))
   const entries = Array.from(groups.entries())
   if (entries.length === 0) return null
 

@@ -10,7 +10,7 @@ import { useFhMotion } from '../lib/motion.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useClientsBundle, useInvalidateClients } from '../lib/queries.ts'
 import { rollupByClient } from '../lib/rollups.ts'
-import { findDuplicateClusters } from '../lib/clientMerge.ts'
+import { findDuplicateClusters, loadNotDuplicates, rememberNotDuplicates } from '../lib/clientMerge.ts'
 import NewClientSheet from '../components/NewClientSheet.tsx'
 // Lazy, sheet only mounts when the operator opens the merge flow.
 const MergeDuplicatesSheet = lazy(() => import('../components/MergeDuplicatesSheet.tsx'))
@@ -65,7 +65,13 @@ export default function Clients() {
 
   // Duplicate detection, runs every time the client roster changes.
   // Match policy lives in lib/clientMerge.ts (phone or email normalized).
-  const duplicateClusters = useMemo(() => findDuplicateClusters(rows), [rows])
+  // Pairs the operator marked as different clients in the merge sheet
+  // stop being flagged (remembered on this device).
+  const [notDuplicates, setNotDuplicates] = useState<ReadonlySet<string>>(() => loadNotDuplicates(user?.id))
+  const markDistinct = (pairs: Array<[string, string]>) => {
+    setNotDuplicates(rememberNotDuplicates(user?.id, notDuplicates, pairs))
+  }
+  const duplicateClusters = useMemo(() => findDuplicateClusters(rows, notDuplicates), [rows, notDuplicates])
   const duplicateCount = useMemo(
     () => duplicateClusters.reduce((s, c) => s + c.members.length, 0),
     [duplicateClusters]
@@ -205,8 +211,10 @@ export default function Clients() {
           onClose={() => setAddOpen(false)}
           onSaved={(client: any) => {
             setAddOpen(false)
+            // Refresh the cached list either way, so the new client is
+            // there when the operator comes back from its detail page.
+            load()
             if (client?.id) navigate(`/clients/${client.id}`)
-            else load()
           }}
         />
         <Suspense fallback={null}>
@@ -216,6 +224,7 @@ export default function Clients() {
             clusters={duplicateClusters}
             onClose={() => setMergeOpen(false)}
             onMerged={load}
+            onMarkedDistinct={markDistinct}
           />
         </Suspense>
       </>
@@ -229,7 +238,7 @@ export default function Clients() {
         <div style={{
           padding: '12px 16px',
           borderRadius: 10,
-          background: 'linear-gradient(180deg, #141414 0%, var(--v3-surface) 72%)',
+          background: 'linear-gradient(180deg, var(--v3-bg) 0%, var(--v3-surface) 72%)',
           border: '1px solid var(--v3-border)',
           boxShadow: '0 1px 0 rgba(242, 237, 228, 0.06) inset, 0 1px 2px rgba(20, 20, 20, 0.40), 0 8px 22px rgba(20, 20, 20, 0.42), 0 20px 44px rgba(20, 20, 20, 0.28)'
         }}>
@@ -339,7 +348,7 @@ export default function Clients() {
               width: 32, height: 32, borderRadius: 10,
               background: 'var(--v3-primary-soft)',
               border: '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)',
-              color: 'var(--v3-primary)',
+              color: 'var(--v3-primary-text)',
               display: 'grid', placeItems: 'center', flexShrink: 0
             }}>
               <AlertTriangle size={14} />
@@ -395,7 +404,7 @@ export default function Clients() {
               background: 'var(--v3-surface-2)',
               border: '1px solid color-mix(in srgb, var(--v3-primary) 22%, transparent)',
               display: 'grid', placeItems: 'center',
-              color: 'var(--v3-primary)'
+              color: 'var(--v3-primary-text)'
             }}>
               <Briefcase size={18} aria-hidden="true" />
             </div>
@@ -528,8 +537,10 @@ export default function Clients() {
         onClose={() => setAddOpen(false)}
         onSaved={(client: any) => {
           setAddOpen(false)
+          // Refresh the cached list either way, so the new client is
+          // there when the operator comes back from its detail page.
+          load()
           if (client?.id) navigate(`/clients/${client.id}`)
-          else load()
         }}
       />
       <Suspense fallback={null}>
@@ -539,6 +550,7 @@ export default function Clients() {
           clusters={duplicateClusters}
           onClose={() => setMergeOpen(false)}
           onMerged={load}
+          onMarkedDistinct={markDistinct}
         />
       </Suspense>
       <FloatingActionButton
@@ -601,8 +613,8 @@ function ClientRow({ client: c, rollup: r, lastActivityRel, index, isTop, isLast
   }, [c.company_name, r.activeCount, r.outstanding])
 
   const sublineColor =
-    subline.tone === 'danger' ? 'var(--v3-danger-bright)' :
-    subline.tone === 'gold'   ? 'var(--v3-primary)' :
+    subline.tone === 'danger' ? 'var(--v3-danger-text)' :
+    subline.tone === 'gold'   ? 'var(--v3-primary-text)' :
                                 'var(--v3-text-muted)'
 
   // Performance: drop per-row entrance animations and whileHover. The

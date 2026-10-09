@@ -13,14 +13,11 @@ import { companyFromProfile } from '../lib/invoices.ts'
 import { gatherStatement, downloadStatement, sendStatementEmail, type StatementJob, type StatementPayment, type StatementChangeOrder } from '../lib/statement.ts'
 import { mintPublicLink, listClientStatementLinks, buildPublicUrl } from '../lib/publicLink.ts'
 import { toast, toastSuccess, toastInfo } from '../lib/toast.ts'
+import { moneyExact } from '../lib/format.ts'
 
-function money(n: any) {
-  const v = Number(n || 0)
-  if (!v) return '$0'
-  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(v >= 10_000_000 ? 1 : 2)}M`
-  if (v >= 1_000) return `$${(v / 1_000).toFixed(v >= 10_000 ? 0 : 1)}K`
-  return `$${Math.round(v).toLocaleString()}`
-}
+// A statement is a financial document: every figure here must match the
+// PDF and the email to the cent, never a "$12K" abbreviation.
+const money = moneyExact
 
 export type StatementSheetClient = {
   id: string
@@ -136,8 +133,8 @@ export default function StatementSheet({ open, onClose, client, jobs, payments, 
                 ))}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 12px', borderRadius: 10, background: 'var(--v3-primary-soft)', border: '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)' }}>
-                <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: 'var(--v3-primary)' }}>Total due</span>
-                <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--v3-primary)', fontVariantNumeric: 'tabular-nums' }}>{money(data.totalDue)}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: 'var(--v3-primary-text)' }}>Total due</span>
+                <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--v3-primary-text)', fontVariantNumeric: 'tabular-nums' }}>{money(data.totalDue)}</span>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 2 }}>

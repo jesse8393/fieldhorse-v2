@@ -9,7 +9,9 @@ import {
 import { universalSearch } from '../lib/universalSearch.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { Eyebrow } from './v3'
+import DataErrorState from './DataErrorState.tsx'
 import { lockDocumentScroll } from '../lib/documentScrollLock.ts'
+import { useModalFocus } from '../lib/useModalFocus.ts'
 
 // Mobile-native search overlay, replaces CommandPalette on phone widths
 // (the cmdk popover renders clipped on iOS Safari + Chrome behind the
@@ -20,8 +22,10 @@ import { lockDocumentScroll } from '../lib/documentScrollLock.ts'
 //     (`fh:open-palette`), so AppHeader's search button works for both
 //   - only opens when window.innerWidth < 900 (CommandPalette gates on
 //     >=900 so we never get a dual-open)
-//   - full-screen sheet, sticky search input at top, auto-focuses on open
+//   - full-screen sheet, sticky search input at top, auto-focuses on open,
+//     keeps Tab inside while open and hands focus back on close
 //   - results grouped by entity (jobs / clients / notes / events / files)
+//   - a failed request shows an error with Retry, never "Nothing matched"
 //   - tap result → navigate + close; Escape / tap scrim / X also close
 //
 // Uses the existing universalSearch lib so result shapes + RLS scoping
@@ -48,9 +52,19 @@ export default function MobileSearchOverlay() {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<any>(null) // null = idle, {} = empty results
   const [searching, setSearching] = useState(false)
+  // A failed request is not an empty result: offline on a job site, the
+  // old "Nothing matched" made people think the record did not exist.
+  const [searchFailed, setSearchFailed] = useState(false)
+  const [retryTick, setRetryTick] = useState(0)
   const inputRef = useRef<any>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const { user } = useAuth()
+
+  // Focus the input shortly after open so iOS's keyboard animation doesn't
+  // fight the slide-in, keep Tab inside the overlay, and return focus to
+  // the header search button on close.
+  useModalFocus(dialogRef, open, { initialFocus: inputRef, delay: 220 })
 
   // Window event from AppHeader. Only honor it on phone widths so we
   // don't fight the desktop CommandPalette (it self-gates on >=900).
@@ -70,18 +84,11 @@ export default function MobileSearchOverlay() {
       setQuery('')
       setResults(null)
       setSearching(false)
+      setSearchFailed(false)
       return
     }
     // Lock body scroll while open.
     return lockDocumentScroll()
-  }, [open])
-
-  // Auto-focus input shortly after open so iOS's keyboard animation
-  // doesn't fight the slide-in.
-  useEffect(() => {
-    if (!open) return
-    const t = setTimeout(() => { inputRef.current?.focus() }, 220)
-    return () => clearTimeout(t)
   }, [open])
 
   // Escape closes.
@@ -98,21 +105,25 @@ export default function MobileSearchOverlay() {
   useEffect(() => {
     if (!open) return
     const q = query.trim()
-    if (!q) { setResults(null); setSearching(false); return }
+    if (!q) { setResults(null); setSearching(false); setSearchFailed(false); return }
     setSearching(true)
+    setSearchFailed(false)
     let cancelled = false
     const t = setTimeout(async () => {
       try {
         const data = await universalSearch(q, user?.id)
         if (!cancelled) setResults(data)
       } catch {
-        if (!cancelled) setResults({ jobs: [], clients: [], notes: [], events: [], files: [], total: 0 })
+        if (!cancelled) {
+          setResults(null)
+          setSearchFailed(true)
+        }
       } finally {
         if (!cancelled) setSearching(false)
       }
     }, DEBOUNCE_MS)
     return () => { cancelled = true; clearTimeout(t) }
-  }, [query, open, user?.id])
+  }, [query, open, user?.id, retryTick])
 
   const handleGo = useCallback((to: any) => {
     setOpen(false)
@@ -128,6 +139,7 @@ export default function MobileSearchOverlay() {
       {open && (
         <motion.div
           key="fh-msearch"
+          ref={dialogRef}
           role="dialog"
           aria-modal="true"
           aria-label="Search"
@@ -136,8 +148,11 @@ export default function MobileSearchOverlay() {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.18 }}
           style={{
-            position: 'fixed', inset: 0, zIndex: 100,
-            background: 'rgba(20, 20, 20, 0.86)',
+            position: 'fixed', inset: 0, zIndex: 'var(--z-overlay)',
+            // Canvas colored veil: onyx in the dark theme (the old fixed
+            // value), linen in daylight, so the hint and empty copy keep
+            // their contrast in both themes.
+            background: 'color-mix(in srgb, var(--v3-bg) 86%, transparent)',
             backdropFilter: 'blur(14px)',
             WebkitBackdropFilter: 'blur(14px)',
             display: 'flex', flexDirection: 'column'
@@ -219,8 +234,7 @@ export default function MobileSearchOverlay() {
                     borderRadius: 10,
                     color: 'var(--v3-text)',
                     fontFamily: 'var(--font-body)',
-                    fontSize: 14,
-                    outline: 'none'
+                    fontSize: 14
                   }}
                 />
               </div>
@@ -238,7 +252,17 @@ export default function MobileSearchOverlay() {
               {query.trim() && searching && (
                 <EmptyState text="Searching…" />
               )}
-              {query.trim() && !searching && results && results.total === 0 && (
+              {query.trim() && !searching && searchFailed && (
+                <div style={{ padding: '16px 4px' }}>
+                  <DataErrorState
+                    compact
+                    title="Search is unavailable right now."
+                    message="Check your connection and try again."
+                    onRetry={() => setRetryTick((n) => n + 1)}
+                  />
+                </div>
+              )}
+              {query.trim() && !searching && !searchFailed && results && results.total === 0 && (
                 <EmptyState text={`Nothing matched "${query.trim()}".`} />
               )}
               {query.trim() && results && results.total > 0 && (
@@ -337,7 +361,7 @@ function ResultRow({ item, onGo }: any) {
             width: 32, height: 32, borderRadius: 10,
             background: 'var(--v3-primary-soft)',
             border: '1px solid var(--v3-border-gold)',
-            color: 'var(--v3-primary-bright)',
+            color: 'var(--v3-primary-text)',
             display: 'grid', placeItems: 'center',
             flexShrink: 0
           }}

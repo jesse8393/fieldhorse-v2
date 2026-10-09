@@ -1,15 +1,16 @@
 // Netlify Function — Change an org member's role.
-// POST /api/org-member-role  { member_user_id, role }
+// POST /api/org-member-role  { member_user_id, role, org_id? }
 // Authorization: Bearer <supabase access token>
 //
 // Owner/admin only. Guards:
-//   - target must be in the caller's org
+//   - target must be in the caller's org (org_id, see lib/membership.js)
 //   - both the target's CURRENT role and the NEW role must be strictly
 //     below the caller's tier (an admin can't touch an admin/owner, and
 //     can't promote anyone to admin/owner)
 //   - can't demote the last owner
 
 import { createClient } from '@supabase/supabase-js'
+import { resolveCallerMembership } from './lib/membership.js'
 
 const ROLE_TIER = { crew: 0, foreman: 1, manager: 2, admin: 3, owner: 4 }
 const VALID_ROLES = ['owner', 'admin', 'manager', 'foreman', 'crew']
@@ -44,10 +45,9 @@ export default async (request) => {
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { autoRefreshToken: false, persistSession: false } })
 
-  const { data: myMember } = await admin
-    .from('org_members').select('org_id, role').eq('user_id', authUserId).is('revoked_at', null)
-    .order('joined_at', { ascending: false }).limit(1).maybeSingle()
-  if (!myMember) return json({ error: 'no_membership' }, 403)
+  const resolved = await resolveCallerMembership(admin, authUserId, body)
+  if (!resolved.membership) return json({ error: resolved.error, message: resolved.message }, resolved.status)
+  const myMember = resolved.membership
   if (!['owner', 'admin'].includes(myMember.role)) return json({ error: 'insufficient_role' }, 403)
   const myTier = ROLE_TIER[myMember.role] ?? 0
 
@@ -69,7 +69,10 @@ export default async (request) => {
 
   const { error: updErr } = await admin
     .from('org_members').update({ role }).eq('id', target.id).eq('org_id', myMember.org_id)
-  if (updErr) return json({ error: 'role_update_failed', message: updErr.message }, 500)
+  if (updErr) {
+    console.error('[org-member-role] update failed', updErr)
+    return json({ error: 'role_update_failed', message: 'Could not change the role. Try again.' }, 500)
+  }
 
   return json({ ok: true, role })
 }

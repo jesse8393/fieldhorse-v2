@@ -31,14 +31,15 @@ export type JobNextAction = {
  * Pure function. Returns one of these shapes (always { kind, title, ctaLabel }
  * plus optional date/pipelineFn/sourceId/dueAt):
  *
- *   { kind: 'schedule',  title, date, ctaLabel: 'Mark Complete',  sourceId }
+ *   { kind: 'schedule',  title, date, ctaLabel: 'View on schedule', sourceId }
  *   { kind: 'milestone', title,       ctaLabel: 'Mark Complete',  sourceId: index }
  *   { kind: 'todo',      title, dueAt, ctaLabel: 'Mark Complete', sourceId }
  *   { kind: 'stage',     title,       ctaLabel: <stage cta>,      pipelineFn }
  *   { kind: 'idle',      title: 'No next action.', ctaLabel: '+ Schedule next step' }
  *
  * The parent shell wires `onComplete` based on `kind`:
- *   - schedule  → mark fh_schedule entry done OR delete (TBD; for now: open AddEvent)
+ *   - schedule  → open the schedule on that day (an upcoming visit is not
+ *                 a reason to mark the whole job complete)
  *   - milestone → patch contact.milestones[i].done = true (existing pattern)
  *   - todo      → fh_job_todos UPDATE done=true, completed_at=now()
  *   - stage     → call pipelineFn(contact)
@@ -126,7 +127,7 @@ export function resolveNextAction({ contact, scheduleItems = [], todos = [] }: {
       kind: 'schedule',
       title: upcoming.title || 'Scheduled work',
       date: upcoming.start_at,
-      ctaLabel: 'Mark Complete',
+      ctaLabel: 'View on schedule',
       sourceId: upcoming.id
     }
   }

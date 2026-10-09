@@ -137,7 +137,7 @@ export default function NextActionCard({
               padding: '12px 16px',
               borderRadius: 10,
               background: 'var(--v3-surface-2)',
-              color: 'var(--v3-primary)',
+              color: 'var(--v3-primary-text)',
               border: '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)',
               fontFamily: 'var(--font-body)',
               fontSize: 14,
@@ -165,13 +165,13 @@ function DueStatusChip({ status }: { status: { tone: string; label: string } }) 
     ? {
         bg: 'var(--v3-danger-soft)',
         border: 'color-mix(in srgb, var(--v3-danger) 40%, transparent)',
-        color: 'var(--v3-danger-bright)'
+        color: 'var(--v3-danger-text)'
       }
     : status.tone === 'warn'
       ? {
           bg: 'var(--v3-primary-soft)',
           border: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)',
-          color: 'var(--v3-primary)'
+          color: 'var(--v3-primary-text)'
         }
       : {
           bg: 'var(--v3-surface-2)',

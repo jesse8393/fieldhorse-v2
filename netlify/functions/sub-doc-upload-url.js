@@ -17,6 +17,7 @@
 // dangling path on the profile.
 
 import { createClient } from '@supabase/supabase-js'
+import { boundSubOrgIds, SUB_DOC_TYPES } from './lib/subAccess.js'
 
 const VALID_KINDS = ['coi', 'w9', 'license']
 const MAX_FILENAME = 80
@@ -42,10 +43,15 @@ export default async (request) => {
   try { body = await request.json() } catch { return json({ error: 'invalid_json' }, 400) }
   const kind = String(body?.kind || '').toLowerCase().trim()
   const filename = String(body?.filename || '').trim().slice(0, MAX_FILENAME)
-  const contentType = String(body?.content_type || 'application/pdf').trim()
+  const contentType = String(body?.content_type || 'application/pdf').trim().toLowerCase()
 
   if (!VALID_KINDS.includes(kind)) return json({ error: 'invalid_kind' }, 400)
   if (!filename) return json({ error: 'missing_filename' }, 400)
+  // The bucket only accepts these types (migration 063); reject others here
+  // with a clear message instead of a failed upload.
+  if (!SUB_DOC_TYPES[contentType]) {
+    return json({ error: 'unsupported_type', detail: 'Upload a PDF, JPG or PNG file.' }, 400)
+  }
 
   // Verify caller.
   const authClient = createClient(SUPABASE_URL, ANON_KEY, {
@@ -56,31 +62,36 @@ export default async (request) => {
   if (authErr || !userData?.user) return json({ error: 'invalid_token' }, 401)
   const authUserId = userData.user.id
 
-  // Build a privacy-clean path.
-  const ext = (() => {
-    const m = /\.([a-z0-9]{1,8})$/i.exec(filename)
-    if (m) return m[1].toLowerCase()
-    if (contentType.includes('pdf')) return 'pdf'
-    if (contentType.includes('jpeg') || contentType.includes('jpg')) return 'jpg'
-    if (contentType.includes('png')) return 'png'
-    return 'bin'
-  })()
+  const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false }
+  })
+
+  // Only subs linked to a contractor through an accepted job invite can
+  // store documents (see lib/subAccess.js).
+  const { orgIds, error: scopeErr } = await boundSubOrgIds(admin, authUserId)
+  if (scopeErr) {
+    console.error('[sub-doc-upload-url] scope lookup failed', scopeErr)
+    return json({ error: 'scope_lookup_failed', detail: 'Could not load your contractors. Try again shortly.' }, 500)
+  }
+  if (orgIds.length === 0) {
+    return json({ error: 'no_linked_contractor', detail: 'Accept a job invite from your contractor first, then upload documents.' }, 403)
+  }
+
+  // Build a privacy clean path. The extension follows the checked type.
+  const ext = SUB_DOC_TYPES[contentType]
   const ts = Date.now()
   const rand = (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
     ? crypto.randomUUID().slice(0, 8)
     : Math.random().toString(36).slice(2, 10)
   const storagePath = `${authUserId}/${kind}/${ts}-${rand}.${ext}`
 
-  const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
-    auth: { autoRefreshToken: false, persistSession: false }
-  })
-
   const { data: signed, error: signErr } = await admin.storage
     .from('sub-docs')
     .createSignedUploadUrl(storagePath)
 
   if (signErr || !signed) {
-    return json({ error: 'sign_failed', message: signErr?.message || 'No signed URL returned.' }, 500)
+    console.error('[sub-doc-upload-url] signing failed', signErr)
+    return json({ error: 'sign_failed', detail: 'Could not start the upload. Try again shortly.' }, 500)
   }
 
   return json({

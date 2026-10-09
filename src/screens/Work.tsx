@@ -160,9 +160,38 @@ export default function Work() {
     () => isMoneyRole ? CHIPS : CHIPS.filter((c) => c.id === 'all' || c.id === 'active' || c.id === 'done'),
     [isMoneyRole]
   )
+
+  const chipCounts = useMemo<Partial<Record<ChipId, number>>>(() => {
+    if (loading) return {}
+    const out: Partial<Record<ChipId, number>> = {}
+    for (const c of visibleChips) {
+      // Field roles never count lead/quote rows, even under 'all'.
+      out[c.id] = contacts.filter((row) =>
+        c.match(row) && (isMoneyRole || (row.stage !== 'lead' && row.stage !== 'quote'))
+      ).length
+    }
+    return out
+  }, [contacts, loading, visibleChips, isMoneyRole])
+  const lostCount = Number(chipCounts.lost || 0)
+
   // For a field role, if the URL/deep-link left them on a now-hidden chip,
-  // fall back to 'all'.
-  const effectiveChip: ChipId = visibleChips.some((c) => c.id === chip) ? chip : 'all'
+  // fall back to 'all'. Same for Lost once nothing is lost: its pill is
+  // hidden then, so the view would be an empty list with no active pill.
+  const effectiveChip: ChipId =
+    !visibleChips.some((c) => c.id === chip) || (chip === 'lost' && !loading && lostCount === 0) ? 'all' : chip
+
+  // Drop a ?stage the view fell back from, so the address, the active
+  // pill, the list and the empty state all agree. Waits until the role
+  // and a fresh list have loaded: membership fails closed (field view)
+  // while it resolves, and a cached list can be missing newer lost deals.
+  useEffect(() => {
+    if (loading || membershipLoading || isError || isFetching) return
+    if (chip === effectiveChip || !searchParams.has('stage')) return
+    const sp = new URLSearchParams(searchParams)
+    sp.delete('stage')
+    setSearchParams(sp, { replace: true })
+  }, [loading, membershipLoading, isError, isFetching, chip, effectiveChip, searchParams, setSearchParams])
+
   const baseChip = CHIPS.find((c) => c.id === effectiveChip) || CHIPS[0]
   // Field roles never see lead/quote rows, even under the All chip.
   const activeChip = isMoneyRole
@@ -206,18 +235,6 @@ export default function Work() {
   }, [contacts, serverHits, activeChip, search])
 
   const { visible, sentinelRef, hasMore } = useInfiniteRender(filtered, `${effectiveChip}|${search}`)
-
-  const chipCounts = useMemo<Partial<Record<ChipId, number>>>(() => {
-    if (loading) return {}
-    const out: Partial<Record<ChipId, number>> = {}
-    for (const c of visibleChips) {
-      // Field roles never count lead/quote rows, even under 'all'.
-      out[c.id] = contacts.filter((row) =>
-        c.match(row) && (isMoneyRole || (row.stage !== 'lead' && row.stage !== 'quote'))
-      ).length
-    }
-    return out
-  }, [contacts, loading, visibleChips, isMoneyRole])
 
   const summary = useMemo(() => {
     // Field roles: count only the active work they can see, and never
@@ -322,7 +339,6 @@ export default function Work() {
   const handleFollowUp = useCallback((c: JobRow, when: number | Date | null) => setFollowUp(c, when), [setFollowUp])
 
   const { stagger, item } = useFhMotion()
-  const lostCount = Number(chipCounts.lost || 0)
 
   return (
     <motion.div
@@ -337,7 +353,7 @@ export default function Work() {
           is the list. */}
       <motion.div className="fh-work__head" variants={item} style={{ padding: '12px 24px 8px' }}>
         <h1 className="jobs-title">
-          Work <span style={{ color: 'var(--v3-primary-bright)' }}>&amp; Deals</span>
+          Work <span style={{ color: 'var(--v3-primary-text)' }}>&amp; Deals</span>
         </h1>
         <div className="jobs-stats">
           {loading ? (
@@ -388,7 +404,7 @@ export default function Work() {
         {searchDegraded && search.trim().length >= 2 && (
           <div role="status" style={{
             marginTop: 6, fontSize: 12, fontFamily: 'var(--font-body)',
-            color: 'var(--v3-primary)', display: 'flex', alignItems: 'center', gap: 8
+            color: 'var(--v3-primary-text)', display: 'flex', alignItems: 'center', gap: 8
           }}>
             <Sparkles size={11} aria-hidden="true" />
             Showing recent deals only, full history search is unreachable right now.
@@ -398,7 +414,10 @@ export default function Work() {
 
       {/* STAGE CHIPS, the whole pipeline in one row. */}
       <motion.div className="fh-work__chips" variants={item} style={{ padding: '0 var(--v3-gutter) 12px' }}>
-        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }} role="tablist" aria-label="Stage filters">
+        {/* A labelled group of toggle buttons (FilterPill sets aria-pressed).
+            Not a tablist: the pills filter one list rather than switching
+            panels, and every pill stays in the Tab order. */}
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }} role="group" aria-label="Stage filters">
           {visibleChips.filter((c) => c.id !== 'lost' || lostCount > 0).map((c) => (
             <FilterPill
               key={c.id}
@@ -448,20 +467,20 @@ export default function Work() {
           <div className="v3-empty">
             <Sparkles size={20} color="var(--v3-text-muted)" style={{ margin: '0 auto 8px' }} />
             <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
-              {chip !== 'all' || search ? 'Nothing matches that view.' : 'No work yet.'}
+              {effectiveChip !== 'all' || search ? 'Nothing matches that view.' : 'No work yet.'}
             </div>
             <div style={{ fontSize: 12, marginBottom: 10 }}>
-              {chip !== 'all' || search
+              {effectiveChip !== 'all' || search
                 ? 'Clear the search or switch stage to see more.'
                 : 'Add the next phone call and let it move through the stages.'}
             </div>
-            {chip === 'all' && !search && (
+            {effectiveChip === 'all' && !search && (
               <button
                 type="button"
                 onClick={() => setAddOpen(true)}
                 style={{
                   background: 'none', border: 'none', padding: 0,
-                  color: 'var(--v3-primary)', fontWeight: 700, fontSize: 12, cursor: 'pointer'
+                  color: 'var(--v3-primary-text)', fontWeight: 700, fontSize: 12, cursor: 'pointer'
                 }}
               >
                 Add your first deal →
@@ -588,14 +607,14 @@ const DealCard = memo(function DealCard({ contact: c, isNew, busy, canSell: mayM
       icon: <PhoneIcon size={18} />,
       label: `Call ${c.name || 'deal'}`,
       color: 'rgba(45, 122, 79, 0.22)',
-      fg: 'var(--v3-success-bright)',
+      fg: 'var(--v3-success-text)',
       onClick: () => { window.location.href = `tel:${phone}` }
     })
     swipeActions.push({
       icon: <MsgIcon size={18} />,
       label: `Text ${c.name || 'deal'}`,
       color: 'rgba(201, 150, 58, 0.18)',
-      fg: 'var(--v3-primary)',
+      fg: 'var(--v3-primary-text)',
       onClick: () => { window.location.href = `sms:${phone}` }
     })
   }
@@ -669,8 +688,8 @@ const DealCard = memo(function DealCard({ contact: c, isNew, busy, canSell: mayM
             <div>
               <StatusPill
                 color={follow.tone === 'danger'
-                  ? 'var(--v3-danger-bright)'
-                  : follow.tone === 'warn' ? 'var(--v3-primary)' : 'var(--v3-text-muted)'}
+                  ? 'var(--v3-danger-text)'
+                  : follow.tone === 'warn' ? 'var(--v3-primary-text)' : 'var(--v3-text-muted)'}
                 icon={CalendarClock}
                 label={follow.label}
               />

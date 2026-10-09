@@ -86,8 +86,7 @@ export const canDoFieldWork     = (r: MaybeRole) =>
 export function canViewRoute(role: MaybeRole, route: string): boolean {
   if (!role) return false
   switch (route) {
-    case '/':
-    case '/home':           return true                            // home redirects foreman/crew to /crew (handled in screen)
+    case '/':               return true                            // home redirects foreman/crew to /crew (handled in screen)
     case '/crew':           return canDoFieldWork(role)            // everyone with a role; crew/foreman LAND here
     case '/work':           return true                            // one deal list; money-stage moves gate in-view
     case '/pipeline':       return canCreateFinancialDocs(role)    // full revenue sequence: leads, quotes, jobs, collect
@@ -111,6 +110,8 @@ export function canViewRoute(role: MaybeRole, route: string): boolean {
     case '/timesheets':     return canApproveTimesheets(role)       // owner/admin/manager only
     case '/tasks':          return canSeeAllJobs(role)               // cross-job dashboard, owner/admin only
     case '/sub-portal':     return false                             // hidden from org members in the sidebar (DesktopSidebar shows it explicitly for sub-only / no-role users). The route itself is still reachable by URL, useful when an org member is also a sub on another contractor's job.
-    default:                return true
+    // Fail closed: a route added later without a rule here is visible to
+    // owners and admins only until someone decides who should see it.
+    default:                return canSeeAllJobs(role)
   }
 }

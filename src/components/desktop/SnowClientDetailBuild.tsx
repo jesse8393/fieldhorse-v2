@@ -187,7 +187,7 @@ export default function SnowClientDetailBuild(props: Props) {
           <aside className="fh-build-rail fh-build-rail--page">
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Next action</div>
-              <strong style={{ color: nextAction.tone === 'warn' ? 'var(--v3-primary-bright)' : nextAction.tone === 'good' ? 'var(--v3-success-bright)' : undefined }}>
+              <strong style={{ color: nextAction.tone === 'warn' ? 'var(--v3-primary-text)' : nextAction.tone === 'good' ? 'var(--v3-success-text)' : undefined }}>
                 {nextAction.label}
               </strong>
               <span>derived from open work + AR</span>
@@ -196,7 +196,7 @@ export default function SnowClientDetailBuild(props: Props) {
             {outstanding > 0 && (
               <section className="fh-build-rail-card">
                 <div className="fh-build-eyebrow">Outstanding AR</div>
-                <strong style={{ color: 'var(--v3-primary, #c9963a)' }}>{moneyFull(outstanding)}</strong>
+                <strong style={{ color: 'var(--v3-primary-text)' }}>{moneyFull(outstanding)}</strong>
                 <span>owed across {(payments || []).length || activeCount} job{(payments || []).length === 1 ? '' : 's'}</span>
                 <div className="fh-build-spark is-gold" />
               </section>
@@ -208,14 +208,14 @@ export default function SnowClientDetailBuild(props: Props) {
                 <span>No active jobs</span>
               ) : status.tone === 'warn' ? (
                 <>
-                  <strong style={{ color: 'var(--v3-primary-bright)', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  <strong style={{ color: 'var(--v3-primary-text)', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                     <AlertTriangle size={14} /> Cooling
                   </strong>
                   <span>30+ days since last touch</span>
                 </>
               ) : (
                 <>
-                  <strong style={{ color: 'var(--v3-success-bright)' }}>None</strong>
+                  <strong style={{ color: 'var(--v3-success-text)' }}>None</strong>
                   <span>Relationship healthy</span>
                 </>
               )}

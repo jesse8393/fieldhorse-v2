@@ -8,6 +8,7 @@ import { canHover } from '../../../lib/hover.ts'
 import { SkeletonList } from '../../../components/Skeleton.tsx'
 import { loadUserRateCard } from '../../../lib/rateCard.ts'
 import { Eyebrow } from '../../../components/v3'
+import { planReorder } from './quoteItemOrder.ts'
 
 /**
  * Quote items section, fh_quote_items CRUD editor.
@@ -21,9 +22,11 @@ import { Eyebrow } from '../../../components/v3'
  *           rate, amount, notes, is_optional, is_excluded, sort_order,
  *           created_at, updated_at }
  *
- * RLS: owner all (user_id = auth.uid()) + accepted partner all (via
- * fh_job_partners). Phase 2B explicit user_id guards on every read /
- * write are preserved.
+ * RLS: members of the job's org (money roles only, migration 064) plus
+ * accepted partners. Reads and writes are scoped by the job (or row id)
+ * and RLS decides the tenant, so a teammate sees and edits the same
+ * lines the author wrote. user_id is stamped on insert as provenance
+ * only.
  */
 
 const SECTION_SUGGESTIONS = ['Labor', 'Materials', 'Subs', 'Equipment', 'Other']
@@ -238,7 +241,6 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
       .from('fh_quote_items')
       .select('*')
       .eq('contact_id', jobId)
-      .eq('user_id', userId)
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: true })
     const list = data || []
@@ -259,8 +261,9 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
   const [addFocusSignal, setAddFocusSignal] = useState(0)
 
   // ============================================================
-  // CRUD, all writes user_id-guarded. The migration-011 recalc
-  // trigger fires on each write and keeps fh_contacts.amount synced.
+  // CRUD, scoped by row id or job with RLS as the tenant boundary. The
+  // migration-011 recalc trigger fires on each write and keeps
+  // fh_contacts.amount synced.
   // ============================================================
 
   async function addItem(input: any) {
@@ -299,7 +302,6 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
       .from('fh_quote_items')
       .update(patch)
       .eq('id', id)
-      .eq('user_id', userId)
     if (error) {
       toastError("Couldn't update item", error.message)
       return false
@@ -321,7 +323,6 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
       .from('fh_quote_items')
       .delete()
       .eq('id', id)
-      .eq('user_id', userId)
     if (error) {
       toastError("Couldn't delete item", error.message)
       fetchRows({ silent: true })
@@ -349,23 +350,22 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
     if (targetIdx < 0 || targetIdx >= rows.length) return false
     // Don't reorder across a row that's still saving (no real id yet).
     if (rows[idx]?._pending || rows[targetIdx]?._pending) return false
+    // Rows sharing a sort_order get renumbered, a plain swap of equal
+    // values would leave the order unchanged.
+    const plan = planReorder(rows, idx, direction)
+    if (!plan) return false
+    // A renumber also rewrites rows that are still saving; wait for them.
+    if (plan.updates.some((u) => String(u.id).startsWith('temp-'))) return false
     hapticTap()
-    const a = rows[idx]
-    const b = rows[targetIdx]
-    const aOrder = a.sort_order
-    const bOrder = b.sort_order
-    setRows((rs) => {
-      const next = rs.slice()
-      next[idx] = { ...a, sort_order: bOrder }
-      next[targetIdx] = { ...b, sort_order: aOrder }
-      return next.sort((x, y) => x.sort_order - y.sort_order)
-    })
-    const [r1, r2] = await Promise.all([
-      supabase.from('fh_quote_items').update({ sort_order: bOrder }).eq('id', a.id).eq('user_id', userId),
-      supabase.from('fh_quote_items').update({ sort_order: aOrder }).eq('id', b.id).eq('user_id', userId)
-    ])
-    if (r1.error || r2.error) {
-      toastError("Couldn't reorder", (r1.error || r2.error)?.message)
+    setRows(plan.rows)
+    // Keep optimistic adds numbered after the (possibly renumbered) list.
+    sortRef.current = Math.max(sortRef.current, ...plan.rows.map((r: any) => (Number(r.sort_order) || 0) + 1))
+    const results = await Promise.all(plan.updates.map((u) =>
+      supabase.from('fh_quote_items').update({ sort_order: u.sort_order }).eq('id', u.id)
+    ))
+    const failed = results.find((r) => r.error)
+    if (failed?.error) {
+      toastError("Couldn't reorder", failed.error.message)
       fetchRows({ silent: true })
       return false
     }
@@ -501,7 +501,7 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
         className="v3-section v3-section--primary-quiet"
         style={{ margin: 0, padding: '16px 16px' }}
       >
-        <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>
+        <span className="v3-eyebrow" style={{ color: 'var(--v3-primary-text)' }}>
           <Receipt size={11} aria-hidden="true" style={{ marginRight: 4, verticalAlign: 'middle' }} />
           Quote
         </span>
@@ -758,7 +758,7 @@ function RowActionButton({ children, ariaLabel, onClick, disabled, tone }: any) 
       onMouseEnter={(e) => {
         if (disabled || !canHover) return
         e.currentTarget.style.color = tone === 'danger'
-          ? 'var(--v3-danger-bright)'
+          ? 'var(--v3-danger-text)'
           : 'var(--v3-text)'
       }}
       onMouseLeave={(e) => {
@@ -785,7 +785,7 @@ function StatusChip({ label, tone }: any) {
     ? {
         bg: 'var(--v3-primary-soft)',
         border: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)',
-        color: 'var(--v3-primary)'
+        color: 'var(--v3-primary-text)'
       }
     : {
         bg: 'var(--v3-surface-2)',
@@ -898,7 +898,7 @@ function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryD
                     fontFamily: 'var(--font-display)',
                     background: s.source === 'rates' ? 'var(--v3-primary-soft)' : 'var(--v3-surface-2)',
                     border: '1px solid var(--v3-border)',
-                    color: s.source === 'rates' ? 'var(--v3-primary)' : 'var(--v3-text-muted)'
+                    color: s.source === 'rates' ? 'var(--v3-primary-text)' : 'var(--v3-text-muted)'
                   }}>
                     {s.source === 'rates' ? 'RATE CARD' : `×${s.uses}`}
                   </span>
@@ -1132,7 +1132,7 @@ function KindPicker({ value, onChange }: any) {
               background: on
                 ? 'color-mix(in srgb, var(--v3-primary) 18%, transparent)'
                 : 'transparent',
-              color: on ? 'var(--v3-primary)' : 'var(--v3-text-muted)',
+              color: on ? 'var(--v3-primary-text)' : 'var(--v3-text-muted)',
               fontFamily: 'var(--font-body)',
               fontSize: 12,
               fontWeight: 700,
@@ -1170,7 +1170,7 @@ const inputStyle: import('react').CSSProperties = {
 
 function Stat({ label, value, tone = 'default' }: any) {
   const valueColor = tone === 'gold'
-    ? 'var(--v3-primary)'
+    ? 'var(--v3-primary-text)'
     : tone === 'muted'
       ? 'var(--v3-text-muted)'
       : 'var(--v3-text)'

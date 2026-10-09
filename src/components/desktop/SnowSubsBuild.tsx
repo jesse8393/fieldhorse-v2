@@ -240,7 +240,7 @@ export default function SnowSubsBuild(props: Props) {
               <section className="fh-build-rail-card">
                 <div className="fh-build-eyebrow">Insurance expiring</div>
                 <>
-                  <strong style={{ color: insuranceExpiring > 0 ? 'var(--v3-primary-bright)' : undefined }}>
+                  <strong style={{ color: insuranceExpiring > 0 ? 'var(--v3-primary-text)' : undefined }}>
                     {insuranceExpiring}
                   </strong>
                   <span>{insuranceExpiring > 0 ? 'Verify before next use' : 'All current'}</span>

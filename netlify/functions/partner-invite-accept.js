@@ -56,6 +56,11 @@ export default async (request) => {
   const authUser = userData.user
   const authEmail = String(authUser.email || '').toLowerCase()
   const authUserId = authUser.id
+  // The invite binds by email, so the email must be proven (see
+  // org-invite-accept.js).
+  if (!authUser.email_confirmed_at) {
+    return json({ error: 'email_unconfirmed', message: 'Confirm your email address, then open the invite again.' }, 403)
+  }
 
   // Service role client for the update.
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
@@ -69,7 +74,10 @@ export default async (request) => {
     .eq('invite_token', token)
     .maybeSingle()
 
-  if (invErr) return json({ error: 'lookup_failed', message: invErr.message }, 500)
+  if (invErr) {
+    console.error('[partner-invite-accept] lookup failed', invErr)
+    return json({ error: 'lookup_failed', message: 'Could not load this invite. Try again shortly.' }, 500)
+  }
   if (!invite) return json({ error: 'invite_not_found' }, 404)
   if (invite.status === 'revoked') return json({ error: 'invite_revoked' }, 410)
 
@@ -93,7 +101,10 @@ export default async (request) => {
     })
     .eq('id', invite.id)
 
-  if (updErr) return json({ error: 'accept_failed', message: updErr.message }, 500)
+  if (updErr) {
+    console.error('[partner-invite-accept] update failed', updErr)
+    return json({ error: 'accept_failed', message: 'Could not accept this invite. Try again.' }, 500)
+  }
 
   // Lock-screen ping to the inviting contractor (bell row already
   // exists via the fh_notifications trigger path). Best effort.

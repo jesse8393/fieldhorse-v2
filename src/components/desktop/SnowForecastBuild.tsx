@@ -52,6 +52,8 @@ type Props = {
   daily: DailyRow[]
   tradeRows: TradeRow[]
   onPinLocation: () => void
+  // Present only when the forecast request failed.
+  onRetry?: () => void
   onGoToSchedule?: () => void
 }
 
@@ -96,7 +98,7 @@ export default function SnowForecastBuild(props: Props) {
   const {
     loading, err, hasCoords, cityName, weather,
     currentWindow, daily, tradeRows,
-    onPinLocation, onGoToSchedule,
+    onPinLocation, onRetry, onGoToSchedule,
   } = props
 
   const current = weather?.current || {}
@@ -105,14 +107,21 @@ export default function SnowForecastBuild(props: Props) {
   const humidity = current.relative_humidity_2m
   const rain = current.precipitation ?? 0
 
-  const windowTone = tone(currentWindow?.status || 'go')
-  const windowLabel = currentWindow?.label || (windowTone === 'good' ? 'Clear to work' : windowTone === 'warn' ? 'Proceed with caution' : 'Hold work')
+  // No forecast yet (loading or failed): stay neutral instead of claiming
+  // a clear day, and say what is going on.
+  const hasForecast = Boolean(weather?.current)
+  const windowTone = hasForecast ? tone(currentWindow?.status || 'go') : 'neutral'
+  const windowLabel = !hasForecast
+    ? (loading ? 'Loading forecast' : onRetry ? 'Forecast unavailable' : 'Awaiting forecast')
+    : currentWindow?.label || (windowTone === 'good' ? 'Clear to work' : windowTone === 'warn' ? 'Proceed with caution' : 'Hold work')
 
   // Best work window over the next 7 days = first 'good' day
   const bestDay = daily.find((d) => dayWorkStatus(d).tone === 'good')
   const rainRiskDays = daily.filter((d) => (d.rainPct ?? 0) >= 50).length
   const noGoDays = daily.filter((d) => dayWorkStatus(d).tone === 'bad').length
-  const suggestedAction = noGoDays >= 3
+  const suggestedAction = !hasForecast
+    ? 'Check the forecast before dispatch'
+    : noGoDays >= 3
     ? 'Reschedule outdoor crews'
     : windowTone === 'bad'
       ? 'Hold and reassess'
@@ -174,7 +183,7 @@ export default function SnowForecastBuild(props: Props) {
               </p>
             )}
             {!hasCoords && (
-              <p style={{ marginTop: 8, color: 'var(--v3-primary-bright)' }}>
+              <p style={{ marginTop: 8, color: 'var(--v3-primary-text)' }}>
                 Pin a location for accurate work window signals.
               </p>
             )}
@@ -184,14 +193,19 @@ export default function SnowForecastBuild(props: Props) {
             <MiniMetric label="Temperature" value={tMax != null ? `${Math.round(tMax)}°` : '\u2003'} accent />
             <MiniMetric label="Wind" value={wind != null ? `${Math.round(wind)} mph` : '\u2003'} tone={(wind ?? 0) >= 20 ? 'warn' : undefined} />
             <MiniMetric label="Humidity" value={humidity != null ? `${Math.round(humidity)}%` : '\u2003'} />
-            <MiniMetric label="Rain now" value={rain > 0 ? `${rain.toFixed(2)}″` : '0″'} tone={rain > 0 ? 'warn' : undefined} />
+            <MiniMetric label="Rain now" value={!hasForecast ? '\u2003' : rain > 0 ? `${rain.toFixed(2)}″` : '0″'} tone={rain > 0 ? 'warn' : undefined} />
           </div>
         </section>
 
         {err && (
-          <div className="fh-build-banner is-warn">
+          <div className="fh-build-banner is-warn" role="alert">
             <CloudRain size={14} />
             <span>{err}</span>
+            {onRetry && (
+              <button type="button" className="fh-build-banner__cta" onClick={onRetry} disabled={loading} style={{ background: 'none', border: 'none', cursor: loading ? 'wait' : 'pointer', minHeight: 44 }}>
+                {loading ? 'Trying again' : 'Try again'}
+              </button>
+            )}
           </div>
         )}
 
@@ -274,21 +288,21 @@ export default function SnowForecastBuild(props: Props) {
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Best work window</div>
               <strong>{bestDay ? fmtDay(bestDay.time) : '\u2003'}</strong>
-              <span>{bestDay ? fmtDate(bestDay.time) : 'No clear days ahead'}</span>
+              <span>{bestDay ? fmtDate(bestDay.time) : daily.length ? 'No clear days ahead' : 'No forecast yet'}</span>
               {bestDay && <div className="fh-build-spark is-gold" />}
             </section>
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Rain risk</div>
-              <strong style={{ color: rainRiskDays > 0 ? 'var(--v3-primary-bright)' : 'var(--v3-success-bright)' }}>{rainRiskDays}</strong>
-              <span>days ≥ 50% chance</span>
+              <strong style={{ color: !daily.length ? undefined : rainRiskDays > 0 ? 'var(--v3-primary-text)' : 'var(--v3-success-text)' }}>{daily.length ? rainRiskDays : '\u2003'}</strong>
+              <span>{daily.length ? 'days ≥ 50% chance' : 'No forecast yet'}</span>
               {rainRiskDays > 0 && <div className="fh-build-spark is-gold" />}
             </section>
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Temperature</div>
               <strong>{tMax != null ? `${Math.round(tMax)}°F` : '\u2003'}</strong>
-              <span>{tMax != null && (tMax > 90 || tMax < 40) ? 'Outside comfort range' : 'In comfort range'}</span>
+              <span>{tMax == null ? 'No reading yet' : (tMax > 90 || tMax < 40) ? 'Outside comfort range' : 'In comfort range'}</span>
               <div className="fh-build-rail-card__spark">
                 <Thermometer size={14} />
                 <span>{tMax != null ? (tMax > 90 ? 'Hot' : tMax < 50 ? 'Cold' : 'Comfortable') : '\u2003'}</span>

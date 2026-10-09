@@ -1,15 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Calculator, MessageSquare, BarChart3, Upload, Settings as SettingsIcon, LogOut, ChevronRight, Hammer, Receipt, CloudSun, Moon, Sun, Home as HomeIcon, Briefcase, Users, Calendar, Activity as ActivityIcon, PlayCircle, ClipboardCheck, Clock, UsersRound, Sparkles, FileText } from 'lucide-react'
 import Icon from './icons/Icon.tsx'
+import OrgSwitcher from './OrgSwitcher.tsx'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { useTheme } from '../contexts/ThemeContext.tsx'
 import { canHover } from '../lib/hover.ts'
 import { layoutForPath } from '../lib/appLayout.ts'
 import { lockDocumentScroll } from '../lib/documentScrollLock.ts'
+import { useModalFocus } from '../lib/useModalFocus.ts'
 
 // IA collapse (redesign W2): the thumb bar is the contractor's verbs :
 // Home, Sell (Leads), Work (Jobs), Get Paid (Money). Money replaced
@@ -95,8 +97,13 @@ const NAV_GROUPS: DrawerGroup[] = [
 
 export default function BottomNav() {
   const [moreOpen, setMoreOpen] = useState(false)
+  const drawerRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const location = useLocation()
+
+  // The More drawer is a modal dialog: focus moves in on open, Tab stays
+  // inside, and focus returns to the More button on close.
+  useModalFocus(drawerRef, moreOpen)
 
   // Belt-and-suspenders: close the More drawer whenever the route
   // changes, even if the navigation happened from somewhere other
@@ -107,7 +114,7 @@ export default function BottomNav() {
   }, [location.pathname])
   const { signOut, user } = useAuth()
   const { theme, toggleTheme } = useTheme()
-  const { canViewRoute, role, loading: membershipLoading, hasCrew, isPartner } = useMembership()
+  const { canViewRoute, role, loading: membershipLoading, hasCrew, isPartner, memberships } = useMembership()
   const userEmail = user?.email || ''
 
   // Filter the More-drawer groups by the caller's role. Mirrors the
@@ -185,6 +192,7 @@ export default function BottomNav() {
           />
           <motion.div
             key="drawer"
+            ref={drawerRef}
             className="fh-drawer"
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
@@ -291,98 +299,112 @@ export default function BottomNav() {
             <div
               style={{
                 display: 'flex',
-                alignItems: 'center',
+                flexDirection: 'column',
                 gap: 12,
                 padding: '12px 16px calc(12px + env(safe-area-inset-bottom, 0px))',
                 borderTop: '1px solid var(--v3-border)',
                 background: 'transparent'
               }}
             >
+              {/* Workspace picker for people in more than one company
+                  (OrgSwitcher renders nothing otherwise). Here, not only
+                  in Settings, because Settings is owner and admin only and
+                  someone who switches into a crew workspace needs a way
+                  back on mobile. */}
+              {memberships.length > 1 && <OrgSwitcher />}
               <div
                 style={{
-                  flex: 1,
-                  minWidth: 0,
                   display: 'flex',
-                  flexDirection: 'column',
-                  gap: 4
+                  alignItems: 'center',
+                  gap: 12
                 }}
               >
-                <span
-                  className="v3-eyebrow"
-                  style={{ color: 'var(--v3-text-muted)' }}
+                <div
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 4
+                  }}
                 >
-                  Account
-                </span>
-                {userEmail && (
                   <span
-                    style={{
-                      fontFamily: 'var(--font-body)',
-                      fontSize: 14,
-                      fontWeight: 600,
-                      color: 'var(--v3-text)',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis'
-                    }}
+                    className="v3-eyebrow"
+                    style={{ color: 'var(--v3-text-muted)' }}
                   >
-                    {userEmail}
+                    Account
                   </span>
-                )}
+                  {userEmail && (
+                    <span
+                      style={{
+                        fontFamily: 'var(--font-body)',
+                        fontSize: 14,
+                        fontWeight: 600,
+                        color: 'var(--v3-text)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}
+                    >
+                      {userEmail}
+                    </span>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => toggleTheme()}
+                  aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+                  title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+                  style={{
+                    flexShrink: 0,
+                    width: 36,
+                    height: 36,
+                    borderRadius: 10,
+                    border: '1px solid var(--v3-border-strong)',
+                    background: 'var(--v3-surface)',
+                    color: 'var(--v3-primary-text)',
+                    display: 'grid',
+                    placeItems: 'center',
+                    cursor: 'pointer',
+                    WebkitTapHighlightColor: 'transparent'
+                  }}
+                >
+                  {theme === 'dark' ? <Moon size={15} /> : <Sun size={15} />}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  aria-label="Sign out"
+                  title="Sign out"
+                  style={{
+                    flexShrink: 0,
+                    width: 36,
+                    height: 36,
+                    borderRadius: 10,
+                    border: '1px solid var(--v3-border-strong)',
+                    background: 'var(--v3-surface)',
+                    color: 'var(--v3-text-muted)',
+                    display: 'grid',
+                    placeItems: 'center',
+                    cursor: 'pointer',
+                    WebkitTapHighlightColor: 'transparent',
+                    transition: 'color 140ms ease, border-color 140ms ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!canHover) return
+                    e.currentTarget.style.color = 'var(--v3-danger-text)'
+                    e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--v3-danger) 50%, transparent)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = 'var(--v3-text-muted)'
+                    e.currentTarget.style.borderColor = 'var(--v3-border-strong)'
+                  }}
+                >
+                  <LogOut size={15} />
+                </button>
               </div>
-
-              <button
-                type="button"
-                onClick={() => toggleTheme()}
-                aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-                title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-                style={{
-                  flexShrink: 0,
-                  width: 36,
-                  height: 36,
-                  borderRadius: 10,
-                  border: '1px solid var(--v3-border-strong)',
-                  background: 'var(--v3-surface)',
-                  color: 'var(--v3-primary)',
-                  display: 'grid',
-                  placeItems: 'center',
-                  cursor: 'pointer',
-                  WebkitTapHighlightColor: 'transparent'
-                }}
-              >
-                {theme === 'dark' ? <Moon size={15} /> : <Sun size={15} />}
-              </button>
-
-              <button
-                type="button"
-                onClick={handleSignOut}
-                aria-label="Sign out"
-                title="Sign out"
-                style={{
-                  flexShrink: 0,
-                  width: 36,
-                  height: 36,
-                  borderRadius: 10,
-                  border: '1px solid var(--v3-border-strong)',
-                  background: 'var(--v3-surface)',
-                  color: 'var(--v3-text-muted)',
-                  display: 'grid',
-                  placeItems: 'center',
-                  cursor: 'pointer',
-                  WebkitTapHighlightColor: 'transparent',
-                  transition: 'color 140ms ease, border-color 140ms ease'
-                }}
-                onMouseEnter={(e) => {
-                  if (!canHover) return
-                  e.currentTarget.style.color = 'var(--v3-danger-bright)'
-                  e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--v3-danger) 50%, transparent)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color = 'var(--v3-text-muted)'
-                  e.currentTarget.style.borderColor = 'var(--v3-border-strong)'
-                }}
-              >
-                <LogOut size={15} />
-              </button>
             </div>
           </motion.div>
         </div>
@@ -423,6 +445,7 @@ export default function BottomNav() {
         type="button"
         className={`fh-nav__item${moreOpen ? ' is-active' : ''}`}
         onClick={() => setMoreOpen((v) => !v)}
+        aria-haspopup="dialog"
         aria-expanded={moreOpen}
       >
         <span className="fh-nav__icon">

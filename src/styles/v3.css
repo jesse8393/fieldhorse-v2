@@ -1,7 +1,15 @@
 /* ================================================================
    FIELDHORSE v3 — FOUNDATION UTILITY LAYER
    Typography scale, button/card/pill primitives, motion helpers.
-   Scoped via .v3-* class names so legacy .fh-* rules are untouched.
+   Mostly scoped via .v3-* class names, but this file also styles a
+   few shared legacy hooks (.fh-screen, .fh-badge, .fh-stat-card,
+   .fh-data-table) and the command palette's data-slot hooks.
+   Load order (main.tsx): tokens, global, fixes-2026-07, this file,
+   mobile-keyboard-fix. Equal specificity rules here beat global.css
+   and fixes-2026-07.css and lose to mobile-keyboard-fix.css. The
+   command palette is skinned both here and in mobile-keyboard-fix.css
+   (.fh-command-dialog), with !important on both sides, so check both
+   files before changing it.
    v3 tokens (--v3-*) are defined in tokens.css.
    ================================================================ */
 
@@ -85,9 +93,9 @@
 }
 
 .v3-text-muted { color: var(--v3-text-muted); }
-.v3-text-success { color: var(--v3-success); }
-.v3-text-danger { color: var(--v3-danger); }
-.v3-text-primary { color: var(--v3-primary); }
+.v3-text-success { color: var(--v3-success-text); }
+.v3-text-danger { color: var(--v3-danger-text); }
+.v3-text-primary { color: var(--v3-primary-text); }
 
 /* ---------- Button primitive ---------- */
 .v3-btn {
@@ -221,17 +229,17 @@
 }
 .v3-pill--primary {
   background: var(--v3-primary-soft);
-  color: #C9963A;
+  color: var(--v3-primary-text);
   border-color: rgba(201, 150, 58, 0.30);
 }
 .v3-pill--success {
   background: var(--v3-success-soft);
-  color: var(--v3-success-bright);
+  color: var(--v3-success-text);
   border-color: rgba(45, 122, 79, 0.30);
 }
 .v3-pill--danger {
   background: var(--v3-danger-soft);
-  color: #C9963A;
+  color: var(--v3-danger-text);
   border-color: rgba(192, 57, 43, 0.40);
 }
 .v3-pill--neutral {
@@ -249,6 +257,7 @@
   padding: 4px 0 12px;
 }
 .v3-section-link {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -258,8 +267,20 @@
   font-family: var(--font-body);
   font-size: 12px;
   font-weight: 600;
-  color: var(--v3-primary);
+  color: var(--v3-primary-text);
   cursor: pointer;
+}
+/* The visible link stays a compact 12px caption, but the tap target is
+   at least 44px tall: an invisible hit area reaches past the text so a
+   thumb aimed at "View all" does not land on the card below. */
+.v3-section-link::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: -8px;
+  right: -8px;
+  height: 44px;
+  transform: translateY(-50%);
 }
 
 /* ---------- Layout helpers ---------- */
@@ -279,16 +300,6 @@
   color: var(--v3-text);
   padding-bottom: 48px;
 }
-.v3-stack > * + * { margin-top: 16px; }
-.v3-stack-sm > * + * { margin-top: 8px; }
-
-/* ---------- System rhythm helpers ----------
-   Standardized vertical spacing — replaces ad-hoc padding-bottom
-   per group. Apply to a wrapping <div> around stacked sections. */
-.v3-stack-screen > * + * { margin-top: var(--v3-rhythm-screen); }
-.v3-stack-section > * + * { margin-top: var(--v3-rhythm-section); }
-.v3-stack-tight > * + * { margin-top: var(--v3-rhythm-tight); }
-.v3-stack-loose > * + * { margin-top: var(--v3-rhythm-loose); }
 
 /* Screen gutter — token-driven L/R padding for page content */
 .v3-gutter { padding-left: var(--v3-gutter); padding-right: var(--v3-gutter); }
@@ -421,16 +432,6 @@
 /* Section header inside a section reads tighter — bottom-pad only */
 .v3-section > .v3-section-header { padding: 0 0 12px; }
 
-/* Section group — container of multiple .v3-section blocks with
-   standardized rhythm between them. Apply as the screen's main
-   content wrapper. */
-.v3-section-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--v3-rhythm-screen);
-  padding: 0 var(--v3-gutter);
-}
-
 /* Empty state — framed dashed surface so empty zones stop reading
    as flat dead space. Use anywhere you currently render a bare
    "Nothing yet" caption on the page background. */
@@ -469,6 +470,9 @@
   border-radius: 10px;
   animation: v3-skeleton 1.4s ease-in-out infinite;
 }
+@media (prefers-reduced-motion: reduce) {
+  .v3-skeleton { animation: none; opacity: 0.7; }
+}
 
 /* ---------- Focus ring ---------- */
 .v3-btn:focus-visible,
@@ -497,12 +501,12 @@
 .fh-badge--success {
   border-color: var(--v3-success);
   background: var(--v3-success-soft);
-  color: var(--v3-success);
+  color: var(--v3-success-text);
 }
 .fh-badge--danger {
   border-color: var(--v3-danger);
   background: var(--v3-danger-soft);
-  color: var(--v3-danger);
+  color: var(--v3-danger-text);
 }
 
 .fh-stat-card {
@@ -526,8 +530,8 @@
   font-size: 24px;
   letter-spacing: 0;
 }
-.fh-stat-card__change--up { color: var(--v3-success); }
-.fh-stat-card__change--down { color: var(--v3-danger); }
+.fh-stat-card__change--up { color: var(--v3-success-text); }
+.fh-stat-card__change--down { color: var(--v3-danger-text); }
 
 .fh-data-table__scroll {
   width: 100%;
@@ -690,7 +694,7 @@
   color: var(--v3-text) !important;
 }
 [data-slot='command-item'] svg {
-  color: var(--v3-primary) !important;
+  color: var(--v3-primary-text) !important;
 }
 
 /* Separator hairline */
@@ -715,35 +719,25 @@
   -webkit-backdrop-filter: blur(2px) !important;
 }
 
-/* ---------- Schedule day-strip dispatch board ----------
-   Single-column timeline. The 7-day strip + Day/Week tabs + time-block
-   list match the mockup. Horizontal scroll on the day strip if the
-   viewport can't fit 7 cells side-by-side comfortably. */
-.fh-week-strip {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 8px;
-}
+/* ---------- Screen root ----------
+   The page floor color comes from global.css (.fh-screen / .v3-screen
+   background-color: var(--fh-canvas) !important, background-image:
+   none), so no background is declared here. The old noise grain and
+   gold stage light that lived in this block never painted under that
+   override and were removed.
 
-/* ---------- Page background (QA-pass) ----------
-   .v3-screen is the page floor. Two layered effects:
-     1. Top-only gold "stage light" (subtle ambient, capped at 320px)
-     2. SVG noise grain at MUCH lower opacity (was 4.5% → 1.8%) so it
-        kills banding without becoming a visible grid texture
-   Background-attachment: fixed on the noise so scrolling doesn't
-   reveal a tiling seam at the bottom of long screens. */
+   Horizontal overflow is clipped, not hidden. `hidden` computes the
+   other axis to `auto`, which turns every screen root into a scroll
+   container that never scrolls, so position: sticky descendants (the
+   Quote decision rail, the SubDetail save bar) stuck to the screen
+   instead of the viewport. `clip` blocks horizontal paint without
+   owning vertical scroll, matching html and body in global.css. The
+   `hidden` line stays as the fallback for browsers without `clip`. */
 .fh-screen,
 .v3-screen {
   position: relative;
   overflow-x: hidden;
-  background:
-    /* Noise grain — only enough to kill banding on dark gradients.
-       0.6% alpha + finer frequency so it never reads as a grid/texture. */
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='320'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.006 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
-    /* Top stage light — gold, capped at top 280px */
-    radial-gradient(ellipse 100% 280px at 50% 0%, rgba(201, 150, 58, 0.04), transparent 70%),
-    var(--v3-bg);
-  background-attachment: fixed, scroll, scroll;
+  overflow-x: clip;
 }
 /* Page content rides above the bg */
 .fh-screen > *,

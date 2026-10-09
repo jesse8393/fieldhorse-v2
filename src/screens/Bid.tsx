@@ -17,6 +17,7 @@ import CountUp from '../components/fx/CountUp.tsx'
 import SectionHeader from '../components/v3/SectionHeader.tsx'
 import { FilterPill, Eyebrow } from '../components/v3'
 import { useConfirm } from '../components/ConfirmSheet.tsx'
+import { parseAmount } from '../lib/amount.ts'
 
 // White-label: internal-only tool but no app-attributable phrasing
 // just in case any of the output is shown to a customer downstream.
@@ -27,6 +28,30 @@ const SYSTEM = `You are an estimating assistant for a contractor's business. Giv
 // via the merged rate card; we just don't surface them as suggested
 // pre-checks because they're user-specific.
 const TRADES = Object.keys(RATE_CARD)
+
+// The model is asked for JSON numbers but can answer "12,000" or
+// "$4,500", which made totals NaN ("$NaN" headline, null job amount).
+// Coerce every money and quantity field once, on the way in. Missing or
+// unreadable values become null so the `|| 1` and `??` fallbacks below
+// still apply.
+function normalizeBid(raw: any) {
+  if (!raw || typeof raw !== 'object') return raw
+  return {
+    ...raw,
+    total_low: parseAmount(raw.total_low),
+    total_high: parseAmount(raw.total_high),
+    line_items: Array.isArray(raw.line_items)
+      ? raw.line_items
+        .filter((li: any) => li && typeof li === 'object')
+        .map((li: any) => ({
+          ...li,
+          qty: parseAmount(li.qty),
+          rate_low: parseAmount(li.rate_low),
+          rate_high: parseAmount(li.rate_high)
+        }))
+      : []
+  }
+}
 
 function money(n: any) { return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) }
 function formatThousands(n: any) { return Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 }) }
@@ -102,7 +127,7 @@ export default function Bid() {
       const text = res?.content?.[0]?.text || ''
       const match = text.match(/\{[\s\S]*\}/)
       if (match) {
-        const parsedBid = JSON.parse(match[0])
+        const parsedBid = normalizeBid(JSON.parse(match[0]))
         hapticSuccess(); setBid(parsedBid)
         const low = parsedBid.total_low || parsedBid.line_items?.reduce((s: any, li: any) => s + (li.rate_low * (li.qty || 1)), 0) || 0
         const high = parsedBid.total_high || parsedBid.line_items?.reduce((s: any, li: any) => s + (li.rate_high * (li.qty || 1)), 0) || 0
@@ -263,14 +288,15 @@ export default function Bid() {
   // round trip entirely. The operator can refine + push to a job
   // from there as if they'd just generated it.
   function loadTemplate(t: any) {
-    setBid({
+    // Templates hold saved model output, so normalize them the same way.
+    setBid(normalizeBid({
       summary: t.description || t.name,
       line_items: t.line_items || [],
       total_low:  t.total_low,
       total_high: t.total_high,
       assumptions: [],
       risks: []
-    })
+    }))
     if (t.job_type) setJobType(t.job_type)
     setScope(`Loaded from template: ${t.name}`)
     setPickerOpen(false)
@@ -344,7 +370,7 @@ export default function Bid() {
             fontFamily: 'var(--font-body)',
             fontSize: 12, fontWeight: 700,
             letterSpacing: 0, textTransform: 'uppercase',
-            color: 'var(--v3-primary)',
+            color: 'var(--v3-primary-text)',
             display: 'inline-flex', alignItems: 'center', gap: 8
           }}>
             <Calculator size={11} aria-hidden="true" />
@@ -395,7 +421,7 @@ export default function Bid() {
               onClick={() => setPickerOpen((v) => !v)}
               style={{
                 background: 'transparent', border: 'none',
-                color: 'var(--v3-primary-bright)',
+                color: 'var(--v3-primary-text)',
                 fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
                 letterSpacing: 0, cursor: 'pointer', padding: 0
               }}
@@ -433,7 +459,7 @@ export default function Bid() {
                       padding: '8px 12px', borderRadius: 10,
                       background: 'color-mix(in srgb, var(--v3-primary) 14%, transparent)',
                       border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
-                      color: 'var(--v3-primary-bright)',
+                      color: 'var(--v3-primary-text)',
                       fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
                       letterSpacing: 0, cursor: 'pointer'
                     }}
@@ -449,7 +475,7 @@ export default function Bid() {
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                       background: 'transparent',
                       border: '1px solid rgba(192, 57, 43, 0.35)',
-                      color: 'var(--v3-danger-bright, #C0392B)', cursor: 'pointer'
+                      color: 'var(--v3-danger-text)', cursor: 'pointer'
                     }}
                   >
                     <Trash2 size={12} aria-hidden="true" />
@@ -570,7 +596,7 @@ export default function Bid() {
               <span style={{
                 fontFamily: 'var(--font-display)',
                 fontSize: 20,
-                color: 'var(--v3-primary)',
+                color: 'var(--v3-primary-text)',
                 fontVariantNumeric: 'tabular-nums'
               }}>
                 {marginPct}%
@@ -651,7 +677,7 @@ export default function Bid() {
               fontSize: 12,
               lineHeight: 1.5
             }}>
-              <div style={{ fontWeight: 700, color: 'var(--v3-danger-bright)', marginBottom: 4 }}>AI unavailable</div>
+              <div style={{ fontWeight: 700, color: 'var(--v3-danger-text)', marginBottom: 4 }}>AI unavailable</div>
               <div style={{ color: 'var(--v3-text-muted)', marginBottom: 10 }}>
                 {err}, your scope is preserved. Fill in line items manually if you need this estimate out the door.
               </div>
@@ -707,7 +733,7 @@ export default function Bid() {
             style={{ margin: '0 var(--v3-gutter) 28px' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
-              <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <span className="v3-eyebrow" style={{ color: 'var(--v3-primary-text)', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                 <Sparkles size={11} />
                 Recommended Price · {marginPct}% margin
               </span>
@@ -905,7 +931,7 @@ export default function Bid() {
                 background: 'var(--v3-danger-soft)',
                 border: '1px solid color-mix(in srgb, var(--v3-danger) 30%, transparent)'
               }}>
-                <span className="v3-eyebrow" style={{ color: 'var(--v3-danger-bright)' }}>Risks</span>
+                <span className="v3-eyebrow" style={{ color: 'var(--v3-danger-text)' }}>Risks</span>
                 <ul style={{ margin: '6px 0 0', paddingLeft: 16, color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 14, lineHeight: 1.55 }}>
                   {bid.risks.map((r: any, i: any) => <li key={i} style={{ marginBottom: 4 }}>{r}</li>)}
                 </ul>
@@ -935,7 +961,7 @@ export default function Bid() {
                 border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
                 display: 'grid',
                 placeItems: 'center',
-                color: 'var(--v3-primary)'
+                color: 'var(--v3-primary-text)'
               }}>
                 <FileText size={20} />
               </div>
@@ -943,7 +969,7 @@ export default function Bid() {
                 Your estimate will appear here.
               </div>
               <div style={{ fontSize: 12, lineHeight: 1.5 }}>
-                Describe the scope above, pick a job type and trades, then tap <strong style={{ color: 'var(--v3-primary)' }}>Generate Estimate</strong>.
+                Describe the scope above, pick a job type and trades, then tap <strong style={{ color: 'var(--v3-primary-text)' }}>Generate Estimate</strong>.
               </div>
             </div>
           </motion.div>

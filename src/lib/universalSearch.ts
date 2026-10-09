@@ -19,6 +19,8 @@
 
 import { supabase } from './supabase.ts'
 import { detailRoute } from './stages.ts'
+import { escapeLikeText, ilikeAnyOf } from './searchFilter.ts'
+import { lastKnownOrg } from './orgScope.ts'
 
 const PER_KIND = 6
 
@@ -41,8 +43,6 @@ export type SearchResults = {
   total: number
 }
 
-function pat(q: string) { return `%${q.replace(/[%_]/g, (m) => '\\' + m)}%` }
-
 function fmtDateShort(iso: string | null | undefined) {
   if (!iso) return ''
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
@@ -57,30 +57,43 @@ function fmtDateTime(iso: string | null | undefined) {
 // Canonical stage→URL mapping lives in stages.ts (audit: 5 copies drifted).
 const contactRoute = (row: any) => detailRoute(row)
 
-export async function universalSearch(query: string | null | undefined, userId: string | undefined): Promise<SearchResults> {
+export async function universalSearch(
+  query: string | null | undefined,
+  userId: string | undefined,
+  orgId?: string | null,
+): Promise<SearchResults> {
   const q = String(query || '').trim()
   if (!q || !userId) return { jobs: [], clients: [], notes: [], events: [], files: [], total: 0 }
 
-  const like = pat(q)
+  // Search the active company's book, like every list screen does
+  // (lib/orgScope.ts), so teammates' jobs, clients, events and files show
+  // up. Notes stay personal, matching the Notes screen. Without a known
+  // company, fall back to the caller's own rows.
+  const scopeOrg = orgId === undefined ? (lastKnownOrg(userId) ?? null) : orgId
+  const scoped = <Q extends { eq(column: string, value: string): Q }>(builder: Q): Q =>
+    scopeOrg ? builder.eq('org_id', scopeOrg) : builder.eq('user_id', userId)
+
+  // Single column filters take the pattern as is; the or() filters below
+  // go through ilikeAnyOf, which quotes it (commas and parentheses are
+  // or() syntax, so "Smith, John" or "(615) 555-0101" broke them).
+  const like = `%${escapeLikeText(q)}%`
 
   // Parallel, independent queries, no transactional concern.
   // Each .or() searches the most useful columns for that table.
-  // Every query carries .eq('user_id', userId) for tenant isolation
-  // defense-in-depth alongside RLS.
+  // Every query carries an explicit company (or owner) filter as defense
+  // in depth alongside RLS.
   const [jobsRes, clientsRes, notesRes, eventsRes, filesRes] = await Promise.all([
-    supabase
+    scoped(supabase
       .from('fh_contacts')
-      .select('id, name, job_title, job_type, stage, amount')
-      .eq('user_id', userId)
-      .or(`name.ilike.${like},job_title.ilike.${like},job_type.ilike.${like},phone.ilike.${like},email.ilike.${like},address.ilike.${like}`)
+      .select('id, name, job_title, job_type, stage, amount'))
+      .or(ilikeAnyOf(['name', 'job_title', 'job_type', 'phone', 'email', 'address'], q))
       .order('updated_at', { ascending: false })
       .limit(PER_KIND),
 
-    supabase
+    scoped(supabase
       .from('fh_clients')
-      .select('id, name, company_name, phone, email, active_jobs_count')
-      .eq('user_id', userId)
-      .or(`name.ilike.${like},company_name.ilike.${like},phone.ilike.${like},email.ilike.${like}`)
+      .select('id, name, company_name, phone, email, active_jobs_count'))
+      .or(ilikeAnyOf(['name', 'company_name', 'phone', 'email'], q))
       .order('last_activity_at', { ascending: false, nullsFirst: false })
       .limit(PER_KIND),
 
@@ -92,22 +105,29 @@ export async function universalSearch(query: string | null | undefined, userId: 
       .order('created_at', { ascending: false })
       .limit(PER_KIND),
 
-    supabase
+    scoped(supabase
       .from('fh_schedule')
-      .select('id, title, start_at, contact_id, fh_contacts(name)')
-      .eq('user_id', userId)
+      .select('id, title, start_at, contact_id, fh_contacts(name)'))
       .ilike('title', like)
       .order('start_at', { ascending: false })
       .limit(PER_KIND),
 
-    supabase
+    scoped(supabase
       .from('fh_job_files')
-      .select('id, filename, kind, job_id, fh_contacts(name)')
-      .eq('user_id', userId)
+      .select('id, filename, kind, job_id, fh_contacts(name)'))
       .ilike('filename', like)
       .order('uploaded_at', { ascending: false })
       .limit(PER_KIND)
   ])
+
+  // A failed group used to come back as an empty list, so a broken query
+  // read as "Nothing matched". Fail the whole search instead and let the
+  // palette show its error state.
+  const failed = [jobsRes, clientsRes, notesRes, eventsRes, filesRes].find((r) => r.error)
+  if (failed?.error) {
+    console.warn('[fieldhorse] universal search failed', failed.error)
+    throw new Error("Search isn't working right now. Check your connection and try again.")
+  }
 
   // The embedded fh_contacts join makes the row types awkward to infer;
   // these are display mappers, so we read the rows loosely.

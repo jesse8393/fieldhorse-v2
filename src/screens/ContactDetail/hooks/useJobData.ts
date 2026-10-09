@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo } from 'react'
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase.ts'
-import { toastSuccess } from '../../../lib/toast.ts'
+import { toastSuccess, toastError } from '../../../lib/toast.ts'
 import { contractTotals } from '../../../lib/invoices.ts'
 import type { Database } from '../../../lib/database.types.ts'
 
@@ -17,12 +17,15 @@ type ContactUpdate = Database['public']['Tables']['fh_contacts']['Update']
  *   - one keyed query (['jobDetail', id]) runs the 11 parallel fetches
  *     + the conditional fh_clients lookup
  *   - fetchAll() now invalidates the query (callers already await it)
- *   - patch() does an optimistic cache write, then the supabase update,
- *     then invalidates on failure
+ *   - patch() does an optimistic cache write, then the supabase update;
+ *     on failure it rolls the changed fields back, toasts, resyncs and
+ *     returns { error } so callers can keep their form open
  *   - the realtime subscription invalidates instead of refetching by hand
+ *   - any failed read throws, so the screen shows a retryable error
+ *     instead of caching "not found" or empty money lists as real data
  *
- * RLS (owner OR accepted-partner) is the access layer, no JS user_id
- * filter, matching the prior behavior so partner-shared jobs surface.
+ * RLS (org members OR accepted partners) is the access layer, no JS
+ * user_id filter, so teammates and partner-shared jobs surface.
  */
 
 const EMPTY = {
@@ -41,7 +44,7 @@ const EMPTY = {
 }
 
 async function fetchJobDetail(id: string, userId: string | undefined) {
-  const [c, s, e, p, i, n, sch, td, ins, co, st] = await Promise.all([
+  const results = await Promise.all([
     supabase.from('fh_contacts').select('*').eq('id', id).maybeSingle(),
     supabase.from('fh_subs').select('*').eq('contact_id', id).order('created_at', { ascending: false }),
     supabase.from('fh_expenses').select('*').eq('contact_id', id).order('expense_date', { ascending: false }),
@@ -54,6 +57,18 @@ async function fetchJobDetail(id: string, userId: string | undefined) {
     supabase.from('fh_change_orders').select('*').eq('contact_id', id).order('sequence_number', { ascending: true }),
     supabase.from('fh_stage_transitions').select('*').eq('contact_id', id).order('transitioned_at', { ascending: true })
   ])
+  const [c, s, e, p, i, n, sch, td, ins, co, st] = results
+
+  // supabase-js resolves network failures, 5xx and policy errors as
+  // { data: null, error } instead of throwing. Throw so TanStack treats
+  // the fetch as failed: it retries, keeps the last good data on a
+  // background refetch, and never caches (or persists) a missing job or
+  // empty payments as real. Rows RLS hides are not errors (crew just get
+  // empty money lists), and maybeSingle returns null data, not an error,
+  // when the job does not exist.
+  for (const r of results) {
+    if (r.error) throw r.error
+  }
 
   const contactRow = c.data || null
 
@@ -108,7 +123,7 @@ export function prefetchJobDetail(queryClient: QueryClient, id: string | undefin
 export function useJobData(id: string | undefined, userId: string | undefined) {
   const queryClient = useQueryClient()
 
-  const { data, isPending } = useQuery({
+  const { data, isPending, isError } = useQuery({
     queryKey: ['jobDetail', id],
     queryFn: () => fetchJobDetail(id as string, userId),
     enabled: !!id && !!userId
@@ -137,14 +152,41 @@ export function useJobData(id: string | undefined, userId: string | undefined) {
   )
 
   // Optimistic patch, flip the cached contact locally, sync, toast on
-  // success; invalidate to resync on failure.
-  const patch = useCallback(async (update: ContactUpdate) => {
-    queryClient.setQueryData(['jobDetail', id], (prev: any) =>
+  // success. On failure roll the changed fields back, say so, resync,
+  // and return the error so a form can stay open with the typed values.
+  const patch = useCallback(async (update: ContactUpdate): Promise<{ error: { message: string } | null }> => {
+    const key = ['jobDetail', id]
+    const before = (queryClient.getQueryData(key) as any)?.contact
+    queryClient.setQueryData(key, (prev: any) =>
       prev ? { ...prev, contact: { ...prev.contact, ...update } } : prev
     )
-    const { error } = await supabase.from('fh_contacts').update(update).eq('id', id as string)
-    if (!error) toastSuccess('Saved', 'Changes synced')
-    else queryClient.invalidateQueries({ queryKey: ['jobDetail', id] })
+    // .select() so an update RLS filters out (zero rows, no error) is
+    // reported as a failure instead of "Saved".
+    const { data: rows, error } = await supabase
+      .from('fh_contacts')
+      .update(update)
+      .eq('id', id as string)
+      .select('id')
+    const failure = error
+      || (!rows || rows.length === 0
+        ? { message: 'This job may have been removed, or you no longer have access to edit it.' }
+        : null)
+    if (!failure) {
+      toastSuccess('Saved', 'Changes synced')
+      return { error: null }
+    }
+    // Restore only the fields this patch touched, other optimistic edits
+    // made since stay put until the resync lands.
+    if (before) {
+      const revert: Record<string, unknown> = {}
+      for (const k of Object.keys(update)) revert[k] = before[k]
+      queryClient.setQueryData(key, (prev: any) =>
+        prev ? { ...prev, contact: { ...prev.contact, ...revert } } : prev
+      )
+    }
+    queryClient.invalidateQueries({ queryKey: key })
+    toastError("Couldn't save", failure.message || 'Try again')
+    return { error: failure }
   }, [id, queryClient])
 
   const paid = useMemo(
@@ -176,6 +218,9 @@ export function useJobData(id: string | undefined, userId: string | undefined) {
     stageTransitions: d.stageTransitions,
     // derived
     paid,
+    // Base amount plus approved change orders, the figure balance is
+    // measured against, so Value, Paid and Balance add up.
+    contractTotal: moneyTotals.contractTotal,
     balance: moneyTotals.balance,
     credit: moneyTotals.credit,
     // status, isPending (not isLoading) so the skeleton shows until the
@@ -183,6 +228,9 @@ export function useJobData(id: string | undefined, userId: string | undefined) {
     // is still resolving and the query is disabled. Matches the prior
     // "loading starts true" semantics.
     loading: isPending,
+    // True when the last fetch failed. With no cached job this means the
+    // screen could not load it, which is different from "not found".
+    isError,
     // actions
     fetchAll,
     patch

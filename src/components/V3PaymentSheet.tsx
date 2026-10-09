@@ -173,7 +173,7 @@ export default function V3PaymentSheet({ contact, balance, invoice = null, onClo
               background: 'rgba(45, 122, 79, 0.14)',
               border: '1px solid rgba(45, 122, 79, 0.45)',
               display: 'grid', placeItems: 'center',
-              color: 'var(--signal-green, #2D7A4F)'
+              color: 'var(--v3-success-text)'
             }}>
               <Check size={26} strokeWidth={2.5} />
             </span>

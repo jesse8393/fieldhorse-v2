@@ -33,6 +33,8 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
+import { loadAccessibleRow, brandingUserIdFor } from './lib/orgAccess.js'
+import { formatFromHeader, renderParagraphs, textField } from './lib/email.js'
 
 export default async (request) => {
   if (request.method === 'OPTIONS') {
@@ -100,7 +102,8 @@ export default async (request) => {
     return json({ error: 'invalid_email' }, 400)
   }
 
-  const trimmedBody = String(messageBody).trim()
+  // A non string body reads as empty rather than mailing "[object Object]".
+  const trimmedBody = textField(messageBody)
   if (trimmedBody.length === 0) {
     return json({ error: 'empty_body' }, 400)
   }
@@ -130,22 +133,23 @@ export default async (request) => {
     return json({ error: 'rate_limited', message: 'Too many messages. Please try again in a minute.' }, 429)
   }
 
-  // Verify the caller owns the contact. contact_id is required (checked
-  // above), so the relay can only reach a client on the caller's own roster.
-  const { data: contact, error: cErr } = await supabase
-    .from('fh_contacts')
-    .select('id, name, job_title, user_id')
-    .eq('id', contact_id)
-    .eq('user_id', sender_user_id)
-    .maybeSingle()
-  if (cErr) return json({ error: 'contact_lookup_failed', detail: cErr.message }, 500)
-  if (!contact) return json({ error: 'forbidden_or_not_found' }, 403)
+  // Verify the caller may act on the contact: its creator, or an owner,
+  // admin or manager of its company. contact_id is required (checked
+  // above), so the relay can only reach a client on the company's roster.
+  const access = await loadAccessibleRow(supabase, {
+    table: 'fh_contacts', id: contact_id, callerId: sender_user_id,
+    select: 'name, job_title'
+  })
+  if (access.error === 'lookup_failed') return json({ error: 'contact_lookup_failed', message: 'Could not load this job. Try again.' }, 500)
+  if (!access.row) return json({ error: 'forbidden_or_not_found', message: 'This record was not found, or your role cannot send it. Ask an owner, admin or manager.' }, 403)
+  const contact = access.row
 
-  // Pull contractor branding for From-line + Reply-To.
+  // Pull the company's branding for From-line + Reply-To.
+  const brandingUserId = (await brandingUserIdFor(supabase, contact)) || sender_user_id
   const { data: profile } = await supabase
     .from('profiles')
     .select('full_name, company_name, company_email')
-    .eq('user_id', sender_user_id)
+    .eq('user_id', brandingUserId)
     .maybeSingle()
 
   const companyName = (profile?.company_name || profile?.full_name || '').trim()
@@ -158,9 +162,11 @@ export default async (request) => {
   // Falls back to SEND_EMAIL_FROM_NAME only when the contractor has
   // no company_name on file at all.
   const fromName = companyName || SEND_EMAIL_FROM_NAME
-  const fromHeader = `${fromName} <${SEND_EMAIL_FROM}>`
+  const fromHeader = formatFromHeader(fromName, SEND_EMAIL_FROM)
 
-  const finalSubject = (subject || '').trim()
+  // textField: a non string subject from a malformed client falls back to
+  // the default instead of throwing.
+  const finalSubject = textField(subject)
     || (contact?.job_title ? `Re: ${contact.job_title}` : `Message from ${companyName || fromName}`)
 
   // Compose HTML by paragraphizing the plain-text body. Email clients
@@ -220,21 +226,17 @@ function renderMessageHtml({ body, senderLine, companyName }) {
   const safe = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   }[c]))
-  // Convert plain-text paragraphs (double newline) into <p> blocks;
-  // single newlines become <br>. Preserves the operator's intended
-  // paragraph rhythm.
-  const paragraphs = String(body || '')
-    .split(/\n{2,}/)
-    .map((p) => safe(p).replace(/\n/g, '<br>'))
-    .filter((p) => p.length > 0)
-  const bodyHtml = paragraphs.map((p) => `<p style="margin:0 0 14px;">${p}</p>`).join('')
+  // Convert plain-text paragraphs (blank line) into <p> blocks; single
+  // newlines become <br>. Preserves the operator's intended paragraph
+  // rhythm. Shared with the quote, invoice and certificate emails.
+  const bodyHtml = renderParagraphs(body, safe)
   return `<!doctype html>
 <html lang="en">
 <body style="margin:0;padding:0;background:#F2EDE4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#141414;line-height:1.55;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#F2EDE4;padding:32px 16px;">
     <tr><td align="center">
       <table role="presentation" width="560" cellspacing="0" cellpadding="0" style="max-width:560px;background:#F2EDE4;border-radius:10px;border:1px solid #5C5C5C;overflow:hidden;">
-        <tr><td style="padding:32px 32px 8px;">
+        <tr><td style="padding:32px 32px 24px;">
           <div style="font-size:16px;color:#141414;">${bodyHtml}</div>
         </td></tr>
         <tr><td style="padding:8px 32px 32px;">
@@ -260,8 +262,11 @@ function corsHeaders() {
   }
 }
 
+// The app shows `detail` (then the error code) when a send fails, so a
+// plain `message` is mirrored into `detail` for the person reading it.
 function json(obj, status = 200) {
-  return new Response(JSON.stringify(obj), {
+  const body = obj && obj.message && !obj.detail ? { ...obj, detail: obj.message } : obj
+  return new Response(JSON.stringify(body), {
     status,
     headers: { 'Content-Type': 'application/json', ...corsHeaders() }
   })

@@ -37,6 +37,9 @@ type Props = {
   paid?: number | null
   outstanding?: number | null
   changeOrderTotals?: { count: number; pending: number; approved: number; total: number } | null
+  // False for crew and foreman: contract, paid, outstanding, billing and
+  // change order panels are hidden rather than rendered blank.
+  showMoney?: boolean
   children: ReactNode
 }
 
@@ -63,6 +66,7 @@ export default function SnowJobDetailBuild(props: Props) {
     onBack, backLabel = 'Jobs', onEdit, onDelete, onAddEvent,
     primaryAction, isEditing,
     scheduleStatus, reportsMissing, billingStatus, health, paid, outstanding, changeOrderTotals,
+    showMoney = true,
     children,
   } = props
 
@@ -176,7 +180,12 @@ export default function SnowJobDetailBuild(props: Props) {
           </div>
 
           <div className="fh-build-mini-grid fh-build-mini-grid--detail">
-            {isExecution ? (
+            {isExecution && !showMoney ? (
+              <>
+                <MiniMetric label="Stage" value={stageLabel} />
+                <MiniMetric label="Schedule" value={scheduleStatus?.label || '\u2003'} />
+              </>
+            ) : isExecution ? (
               <>
                 <MiniMetric
                   label="Contract"
@@ -198,11 +207,13 @@ export default function SnowJobDetailBuild(props: Props) {
               <>
                 {/* Pre-deal stats: a lead has no contract/paid/outstanding :
                     show what matters for winning it instead. */}
-                <MiniMetric
-                  label="Est. value"
-                  value={Number(contact?.amount || 0) > 0 ? money(contact?.amount) : '\u2003'}
-                  accent={Number(contact?.amount || 0) > 0}
-                />
+                {showMoney && (
+                  <MiniMetric
+                    label="Est. value"
+                    value={Number(contact?.amount || 0) > 0 ? money(contact?.amount) : '\u2003'}
+                    accent={Number(contact?.amount || 0) > 0}
+                  />
+                )}
                 <MiniMetric
                   label="Source"
                   value={contact?.referred_by || '\u2003'}
@@ -286,9 +297,9 @@ export default function SnowJobDetailBuild(props: Props) {
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Job health</div>
               <strong style={{
-                color: healthTone === 'bad' ? 'var(--v3-danger-bright)'
-                     : healthTone === 'warn' ? 'var(--v3-primary-bright)'
-                     : healthTone === 'good' ? 'var(--v3-success-bright)'
+                color: healthTone === 'bad' ? 'var(--v3-danger-text)'
+                     : healthTone === 'warn' ? 'var(--v3-primary-text)'
+                     : healthTone === 'good' ? 'var(--v3-success-text)'
                      : undefined,
               }}>
                 {health?.label || 'Not tracked'}
@@ -305,9 +316,9 @@ export default function SnowJobDetailBuild(props: Props) {
               {scheduleStatus ? (
                 <>
                   <strong style={{
-                    color: scheduleStatus.tone === 'bad' ? 'var(--v3-danger-bright)'
-                         : scheduleStatus.tone === 'warn' ? 'var(--v3-primary-bright)'
-                         : 'var(--v3-success-bright)',
+                    color: scheduleStatus.tone === 'bad' ? 'var(--v3-danger-text)'
+                         : scheduleStatus.tone === 'warn' ? 'var(--v3-primary-text)'
+                         : 'var(--v3-success-text)',
                   }}>
                     {scheduleStatus.label}
                   </strong>
@@ -327,7 +338,7 @@ export default function SnowJobDetailBuild(props: Props) {
               <div className="fh-build-eyebrow">Reports</div>
               {reportsMissing != null ? (
                 <>
-                  <strong style={{ color: reportsMissing > 0 ? 'var(--v3-primary-bright)' : 'var(--v3-success-bright)', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  <strong style={{ color: reportsMissing > 0 ? 'var(--v3-primary-text)' : 'var(--v3-success-text)', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                     {reportsMissing > 0 ? <AlertTriangle size={14} /> : <ClipboardCheck size={14} />}
                     {reportsMissing > 0 ? `${reportsMissing} missing` : 'Up to date'}
                   </strong>
@@ -338,14 +349,15 @@ export default function SnowJobDetailBuild(props: Props) {
               )}
             </section>
 
+            {showMoney && (<>
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Billing</div>
               {billingStatus ? (
                 <>
                   <strong style={{
-                    color: billingStatus.tone === 'bad' ? 'var(--v3-danger-bright)'
-                         : billingStatus.tone === 'warn' ? 'var(--v3-primary-bright)'
-                         : billingStatus.tone === 'good' ? 'var(--v3-success-bright)'
+                    color: billingStatus.tone === 'bad' ? 'var(--v3-danger-text)'
+                         : billingStatus.tone === 'warn' ? 'var(--v3-primary-text)'
+                         : billingStatus.tone === 'good' ? 'var(--v3-success-text)'
                          : undefined,
                     display: 'inline-flex', alignItems: 'center', gap: 8,
                   }}>
@@ -370,19 +382,19 @@ export default function SnowJobDetailBuild(props: Props) {
               ) : (
                 <>
                   <strong style={{
-                    color: changeOrderTotals.total < 0 ? 'var(--v3-danger-bright)' : undefined,
+                    color: changeOrderTotals.total < 0 ? 'var(--v3-danger-text)' : undefined,
                   }}>
                     {moneyFull(changeOrderTotals.total)}
                   </strong>
                   <span>
                     {changeOrderTotals.count} CO{changeOrderTotals.count === 1 ? '' : 's'}
                     {changeOrderTotals.pending !== 0 && (
-                      <> · <span style={{ color: 'var(--v3-primary-bright)' }}>
+                      <> · <span style={{ color: 'var(--v3-primary-text)' }}>
                         {moneyFull(changeOrderTotals.pending)} pending
                       </span></>
                     )}
                     {changeOrderTotals.approved !== 0 && (
-                      <> · <span style={{ color: 'var(--v3-success-bright)' }}>
+                      <> · <span style={{ color: 'var(--v3-success-text)' }}>
                         {moneyFull(changeOrderTotals.approved)} approved
                       </span></>
                     )}
@@ -390,6 +402,7 @@ export default function SnowJobDetailBuild(props: Props) {
                 </>
               )}
             </section>
+            </>)}
             </>)}
           </aside>
         </section>

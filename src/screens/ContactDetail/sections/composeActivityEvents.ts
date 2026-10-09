@@ -13,6 +13,8 @@
 // Sorted most-recent first; events at the exact same timestamp keep
 // insertion order (kind precedence).
 
+import { parseDateOnly, todayYmd } from '../../../lib/dates.ts'
+
 type ActivityEvent = {
   id: string
   when: Date
@@ -41,6 +43,20 @@ function money(n: number | string | null | undefined) {
     style: 'currency', currency: 'USD',
     minimumFractionDigits: 0, maximumFractionDigits: 0
   })
+}
+
+// When a payment happened. paid_on is a date only column, and
+// new Date('2026-06-01') parses as UTC midnight, the previous evening in
+// US timezones. Read it as a local calendar day instead, and when the row
+// was logged on that same day use the logged time, so a payment entered
+// a minute ago reads "just now" rather than hours ago.
+export function paymentWhen(p: { paid_on?: string | null; created_at?: string | null }): Date {
+  const logged = p.created_at ? new Date(p.created_at) : null
+  const loggedOk = !!logged && !Number.isNaN(logged.getTime())
+  const day = parseDateOnly(p.paid_on)
+  if (!day) return loggedOk ? (logged as Date) : new Date(NaN)
+  if (loggedOk && todayYmd(logged as Date) === todayYmd(day)) return logged as Date
+  return day
 }
 
 // Tone matrix for stage transitions. Closed = good (collected),
@@ -131,7 +147,7 @@ export function composeActivityEvents({
     const kindStr = kindLabel(p.kind)
     out.push({
       id: `payment:${p.id}`,
-      when: new Date(p.paid_on || p.created_at),
+      when: paymentWhen(p),
       kind: 'payment',
       title: `${money(p.amount)} received${kindStr ? ` · ${kindStr}` : ''}`,
       sub: [

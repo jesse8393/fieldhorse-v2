@@ -1,12 +1,12 @@
-import { lazy, Suspense, useEffect } from 'react'
-import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Toaster as SonnerToaster } from 'sonner'
+import { Suspense, useEffect, useLayoutEffect, useRef } from 'react'
+import { Navigate, Outlet, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
 import AppHeader from './AppHeader.tsx'
 import BottomNav from './BottomNav.tsx'
+import { lazyWithRetry } from '../lib/lazyWithRetry.ts'
 // Lazy + conditional, DesktopSidebar is hidden by CSS on mobile but
 // still shipped + parsed. Gating on useIsDesktop saves the JS code
 // + parse cost for phone users, who outnumber desktop usage.
-const DesktopSidebar = lazy(() => import('./DesktopSidebar.tsx'))
+const DesktopSidebar = lazyWithRetry(() => import('./DesktopSidebar.tsx'))
 import CommandPalette from './CommandPalette.tsx'
 import MobileSearchOverlay from './MobileSearchOverlay.tsx'
 import CaptureFab from './CaptureFab.tsx'
@@ -77,34 +77,91 @@ function fallbackRouteForRole(role: string | null) {
   return '/'
 }
 
+const MAX_RESTORE_FRAMES = 20
+
 export default function AppShell() {
   const location = useLocation()
+  const navigationType = useNavigationType()
   const navigate = useNavigate()
   const isDesktop = useIsDesktop()
   const { canViewRoute, role, loading: membershipLoading, error: membershipError } = useMembership()
 
+  // Scroll position per history entry, so Back and Forward return to
+  // where the user left a long list instead of its top. The browser's
+  // own restore runs before React renders the page it belongs to, so
+  // the shell takes it over while it is mounted.
+  const scrollByEntry = useRef(new Map<string, number>())
+  const lastPathname = useRef<string | null>(null)
+
+  useLayoutEffect(() => {
+    const { history } = window
+    const previous = history.scrollRestoration
+    try { history.scrollRestoration = 'manual' } catch { /* unsupported */ }
+    return () => {
+      try { history.scrollRestoration = previous } catch { /* unsupported */ }
+    }
+  }, [])
+
+  // A layout effect, so the listener moves to the new entry before the
+  // browser reports any scroll the page swap causes. While a sheet holds
+  // the scroll lock (lib/documentScrollLock.ts pins the body), scrollY
+  // reads 0, so those readings are skipped.
+  useLayoutEffect(() => {
+    const key = location.key
+    const remember = () => {
+      if (document.body.style.position === 'fixed') return
+      scrollByEntry.current.set(key, window.scrollY)
+    }
+    window.addEventListener('scroll', remember, { passive: true })
+    return () => window.removeEventListener('scroll', remember)
+  }, [location.key])
+
+  // A passive effect on purpose: sheets and drawers release their scroll
+  // lock (which scrolls back to where the old page was) in effect
+  // cleanups, and those run before this.
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'instant' })
-  }, [location.pathname])
+    const pathChanged = lastPathname.current !== location.pathname
+    lastPathname.current = location.pathname
+    const target = navigationType === 'POP' ? scrollByEntry.current.get(location.key) : undefined
+    if (target == null) {
+      // A new page starts at the top (tab or filter changes in the
+      // query string keep their place).
+      if (pathChanged) window.scrollTo({ top: 0, behavior: 'instant' })
+      return
+    }
+    // Back or Forward: the list may still be filling in from the cache,
+    // so retry for a few frames until the page is tall enough.
+    let frames = 0
+    let raf = 0
+    const restore = () => {
+      const max = document.documentElement.scrollHeight - window.innerHeight
+      window.scrollTo({ top: Math.min(target, Math.max(0, max)), behavior: 'instant' })
+      if (max >= target || ++frames >= MAX_RESTORE_FRAMES) return
+      raf = requestAnimationFrame(restore)
+    }
+    restore()
+    return () => cancelAnimationFrame(raf)
+  }, [location.key, location.pathname, navigationType])
 
   // Offline outbox: drain queued writes on app start, on regaining
   // network, and whenever the tab becomes visible. See lib/outbox.ts.
   useEffect(() => startOutboxSync(), [])
 
-  useEffect(() => {
-    if (membershipLoading) return
-    // A membership FETCH ERROR (offline / transient) leaves role null,
-    // which is indistinguishable from "confirmed not a member", don't
-    // hard-eject an authenticated user to /sub-portal on a network blip.
-    // The persisted cache covers reads until membership resolves.
-    if (membershipError && role === null) return
-    const route = permissionRouteForPath(location.pathname)
-    if (route === '/sub-portal') return
-    const allowed = role ? canViewRoute(route) : false
-    if (!allowed) {
-      navigate(fallbackRouteForRole(role), { replace: true })
-    }
-  }, [canViewRoute, location.pathname, membershipLoading, membershipError, navigate, role])
+  // Role gate, decided while rendering so a screen this role may not
+  // open never mounts (it would fire its queries, and the persisted
+  // cache would keep the rows) before the redirect. A membership FETCH
+  // ERROR (offline / transient) leaves role null, which is
+  // indistinguishable from "confirmed not a member", don't hard-eject
+  // an authenticated user to /sub-portal on a network blip. The
+  // persisted cache covers reads until membership resolves.
+  const route = permissionRouteForPath(location.pathname)
+  const redirectTo =
+    !membershipLoading &&
+    !(membershipError && role === null) &&
+    route !== '/sub-portal' &&
+    !(role && canViewRoute(route))
+      ? fallbackRouteForRole(role)
+      : null
 
   // Global navigation event so chrome buttons inside Build components
   // (bell, footer links, etc.) can navigate without each component
@@ -174,7 +231,7 @@ export default function AppShell() {
         <div className="fh-app__main-inner">
           <Suspense fallback={<RouteFallback />}>
             <RouteErrorBoundary resetKey={location.key}>
-              <Outlet />
+              {redirectTo ? <Navigate to={redirectTo} replace /> : <Outlet />}
             </RouteErrorBoundary>
           </Suspense>
         </div>
@@ -189,32 +246,7 @@ export default function AppShell() {
       <CommandPalette />
       <MobileSearchOverlay />
       <InstallPrompt />
-
-      {/* Single toast system: Sonner only. The legacy fh:toast banner
-          rendered the SAME event a second time (top banner + bottom
-          card for one action), which read as debris. lib/toast.ts still
-          dispatches fh:toast for any listener, but nothing renders it.
-          Desktop: compact bottom-right cards, offset left of the FAB
-          column (FAB is fixed right:20 / 56px wide) so toasts never
-          cover it. Mobile: full-width banner above the bottom nav. */}
-      <SonnerToaster
-        position="bottom-right"
-        theme="dark"
-        richColors
-        visibleToasts={3}
-        offset={{ bottom: '20px', right: '92px' }}
-        mobileOffset={{ bottom: 'calc(var(--fh-mobile-dock-height) + 16px)', left: '16px', right: '16px' }}
-        toastOptions={{
-          style: {
-            maxWidth: 'min(380px, calc(100vw - 32px))',
-            background: 'var(--v3-surface-glass)',
-            color: 'var(--ink-strong)',
-            border: '1px solid rgba(201, 150, 58, 0.35)',
-            fontFamily: 'var(--font-body)',
-            backdropFilter: 'blur(30px)'
-          }
-        }}
-      />
+      {/* Toasts: one Sonner Toaster at the app root (components/AppToaster.tsx). */}
     </div>
   )
 }

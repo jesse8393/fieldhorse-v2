@@ -25,6 +25,7 @@ import {
 } from '../lib/timePunches.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { recalcCost } from '../lib/stages.ts'
+import OrgSwitcher from '../components/OrgSwitcher.tsx'
 
 type ScheduleRow = {
   id: string
@@ -253,6 +254,11 @@ export default function Crew() {
           <div>
             <div className="fh-build-good">{fmtDayHeading(new Date())}</div>
             <h1 className="fh-build-title">CREW</h1>
+            {/* Only shows for people in more than one company, so a crew
+                member can switch back to their own workspace on mobile. */}
+            <div style={{ marginTop: 12, maxWidth: 320 }}>
+              <OrgSwitcher />
+            </div>
           </div>
 
           <div className={`fh-build-focus fh-build-window-card is-${activePunch ? 'good' : 'neutral'}`}>
@@ -335,7 +341,7 @@ export default function Crew() {
                 <button
                   type="button"
                   onClick={() => navigate('/schedule')}
-                  style={{ background: 'transparent', border: 'none', color: 'var(--v3-primary, #C9963A)', cursor: 'pointer', fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase' }}
+                  style={{ background: 'transparent', border: 'none', color: 'var(--v3-primary-text)', cursor: 'pointer', fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase' }}
                 >
                   Full schedule →
                 </button>
@@ -358,7 +364,7 @@ export default function Crew() {
                         alignItems: 'center',
                       }}
                     >
-                      <span style={{ color: 'var(--v3-primary, #C9963A)', fontSize: 12, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                      <span style={{ color: 'var(--v3-primary-text)', fontSize: 12, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
                         <Clock size={11} style={{ display: 'inline', marginRight: 6, verticalAlign: '-1px' }} />
                         {fmtTime(ev.start_at)}{ev.end_at ? ` to ${fmtTime(ev.end_at)}` : ''}
                       </span>
@@ -461,7 +467,7 @@ export default function Crew() {
                         style={{ gridTemplateColumns: 'auto 1fr', cursor: 'pointer' }}
                         onClick={() => navigate(`/jobs/${t.job_id}`)}
                       >
-                        <span style={{ color: overdue ? 'var(--v3-danger-bright)' : 'var(--v3-primary, #C9963A)' }}>
+                        <span style={{ color: overdue ? 'var(--v3-danger-text)' : 'var(--v3-primary-text)' }}>
                           {overdue ? <AlertTriangle size={11} /> : <Clock size={11} />}
                         </span>
                         <span className="fh-build-rail-list__title" title={t.text}>
@@ -509,7 +515,7 @@ function MiniMetric({ label, value, accent, tone }: { label: string; value: stri
   return (
     <div className="fh-build-mini">
       <strong style={{
-        color: tone === 'bad' ? 'var(--v3-danger-bright)' : tone === 'warn' ? '#C9963A' : accent ? 'var(--v3-primary, #C9963A)' : undefined,
+        color: tone === 'bad' ? 'var(--v3-danger-text)' : tone === 'warn' ? 'var(--v3-primary-text)' : accent ? 'var(--v3-primary-text)' : undefined,
         textTransform: label === 'Your role' ? 'capitalize' : undefined,
       }}>
         {value}

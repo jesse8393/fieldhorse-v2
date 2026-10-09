@@ -49,9 +49,11 @@ export default function MessagesSection({ contactId, userId, notes = [], fetchAl
   // posts via fh_notes_partner policy.
   async function remove(note: any) {
     if (!note?.id) return
+    // The delete offers Undo for a few seconds (toastUndo below), so the
+    // confirm says that rather than calling it permanent.
     const ok = await confirm({
       title: 'Delete this note?',
-      body: 'This cannot be undone.',
+      body: 'You can undo this for a few seconds.',
       confirmLabel: 'Delete',
       destructive: true
     })

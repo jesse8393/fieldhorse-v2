@@ -39,7 +39,7 @@ export default function ScheduledSection({ scheduleItems = [], onOpenAddEvent }:
             padding: '8px 12px', borderRadius: 10,
             background: 'var(--v3-primary-soft)',
             border: '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)',
-            color: 'var(--v3-primary)',
+            color: 'var(--v3-primary-text)',
             fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
             cursor: 'pointer',
             WebkitTapHighlightColor: 'transparent'
@@ -86,7 +86,7 @@ export default function ScheduledSection({ scheduleItems = [], onOpenAddEvent }:
                     flexShrink: 0, width: 36, height: 36, borderRadius: 10,
                     background: 'var(--v3-primary-soft)',
                     border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
-                    color: 'var(--v3-primary)',
+                    color: 'var(--v3-primary-text)',
                     display: 'grid', placeItems: 'center'
                   }}>
                     <Calendar size={15} />

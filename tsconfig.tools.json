@@ -1,0 +1,14 @@
+{
+  /* Typechecks the e2e specs and the root Playwright and Vitest configs,
+     which live outside src and so outside tsconfig.json. Same compiler
+     options; `npm run typecheck` runs both projects. The specs import
+     scripts/qa-mock.mjs, which is plain JS: allowJs lets tsc read its
+     exports without checking the file itself (checkJs stays off). */
+  "extends": "./tsconfig.json",
+  "include": [
+    "tests/e2e",
+    "playwright.config.ts",
+    "playwright.workflow.config.ts",
+    "vitest.config.ts"
+  ]
+}

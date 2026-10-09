@@ -8,6 +8,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { clientIp, hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
 import { sendPushToUser } from './lib/push.js'
+import { linkScope } from './lib/linkScope.js'
 
 const MAX_TOKEN_LENGTH = 256
 const MAX_NAME_LENGTH = 200
@@ -110,7 +111,7 @@ export default async function handler(request) {
     .from('fh_contacts')
     .select('id, user_id, org_id, name, job_title, stage, proposal_status, follow_up_on, quote_change_request_note, quote_change_requested_at')
     .eq('id', link.contact_id)
-    .eq('user_id', link.user_id)
+    .match(linkScope(link))
     .maybeSingle()
   if (contactError) return json({ error: 'contact_lookup_failed' }, 500)
   if (!contact) return json({ error: 'gone' }, 410)
@@ -133,7 +134,7 @@ export default async function handler(request) {
       quote_change_requested_at: requestedAt
     })
     .eq('id', contact.id)
-    .eq('user_id', link.user_id)
+    .match(linkScope(link))
     .or('proposal_status.is.null,proposal_status.in.(draft,sent,viewed,changes_requested)')
     .select('id')
   if (updateError) return json({ error: 'request_failed' }, 500)
@@ -157,7 +158,7 @@ export default async function handler(request) {
         quote_change_requested_at: contact.quote_change_requested_at || null
       })
       .eq('id', contact.id)
-      .eq('user_id', link.user_id)
+      .match(linkScope(link))
       .eq('proposal_status', 'changes_requested')
       .eq('quote_change_requested_at', requestedAt)
     return json({ error: 'activity_write_failed' }, 500)

@@ -45,7 +45,10 @@ export default async (request) => {
     .eq('invite_token', token)
     .maybeSingle()
 
-  if (error) return json({ error: 'lookup_failed', message: error.message }, 500)
+  if (error) {
+    console.error('[partner-invite-info] lookup failed', error)
+    return json({ error: 'lookup_failed', message: 'Could not load this invite. Try again shortly.' }, 500)
+  }
   if (!invite) return json({ error: 'invite_not_found' }, 404)
   if (invite.status === 'revoked') return json({ error: 'invite_revoked' }, 410)
 

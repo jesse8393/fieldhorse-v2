@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { NotebookPen, Search } from 'lucide-react'
 import { useProfile } from '../contexts/ProfileContext.tsx'
@@ -165,14 +166,21 @@ export default function AppHeader() {
 }
 
 function BrandSlot({ logoSrc, company, fullName }: any) {
+  // The logo URL that failed to load (expired signed URL, deleted object,
+  // offline cold start). While it is the current logo, the slot falls
+  // through to the company name, full name or wordmark below. Keyed by
+  // URL rather than a flag, so a new upload (a new logoSrc) is tried.
+  const [failedSrc, setFailedSrc] = useState<string | null>(null)
   // Mobile-header-fix: the thin-ribbon trim left the wordmark visibly
   // weak on iPhone, at clamp(12px, 2.6vw, 14px) on a 390px viewport the
   // brand max'd at 14px and read as a faint placeholder. Bumped to
   // clamp(15px, 4vw, 18px) so the contractor's name registers as
   // immediate identification without taking over the header strip.
-  if (logoSrc) {
+  if (logoSrc && logoSrc !== failedSrc) {
+    // Not lazy loaded: the sticky header is always on screen.
     return (
-      <img loading="lazy"src={logoSrc}
+      <img
+        src={logoSrc}
         alt={company || 'Company logo'}
         style={{
           maxHeight: 'clamp(22px, 4.6vw, 30px)',
@@ -182,13 +190,7 @@ function BrandSlot({ logoSrc, company, fullName }: any) {
           objectFit: 'contain',
           display: 'block'
         }}
-        onError={(e) => {
-          // If the signed URL expired or 403s, hide the img and let the
-          // fallback text be visible on next render. We can't force a
-          // re-render from here without state, so just blank it, the
-          // parent layout stays stable.
-          e.currentTarget.style.display = 'none'
-        }}
+        onError={() => setFailedSrc(logoSrc)}
       />
     )
   }

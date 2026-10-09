@@ -1,10 +1,13 @@
 /* ================================================================
    Mobile keyboard safety overrides — paired with the visualViewport
-   listeners in src/components/ActionSheet.jsx and NewClientSheet.jsx.
+   listener in src/components/ActionSheet.tsx (it sets --fh-vvh and
+   --fh-kbd on the sheet).
 
-   Loaded AFTER global.css so these rules win the cascade. Kept in a
-   separate file because the global.css blob is too large to push
-   through the proxy's API path; iterating this file is fast.
+   Loaded LAST: main.tsx imports tokens.css, global.css,
+   fixes-2026-07.css, v3.css and then this file, so its rules win ties
+   against all four. Kept in a separate file because the global.css
+   blob is too large to push through the proxy's API path; iterating
+   this file is fast.
 
    What changed vs the global.css defaults:
 
@@ -21,7 +24,7 @@
       min-height: 0 so max-height is honored.
 
    3. Inputs get scroll-margin-top/bottom so scrollIntoView({block:
-      'nearest'}) (called from ActionSheet.jsx focusin) leaves
+      'nearest'}) (called from ActionSheet.tsx focusin) leaves
       headroom above for the sheet header and below for the footer.
    ================================================================ */
 
@@ -67,24 +70,15 @@
 em,
 i,
 .gold-italic,
-.fh-font-serif-italic,
-.v3-h1 em,
-.v3-h1 .v3-h1__accent,
-.dt-jobs__h1 em,
-.dt-home__h1 em,
-.fh-voice-hero__transcript-placeholder,
-.fh-home__greet-btn.is-empty {
+.v3-h1 em {
   font-style: normal !important;
   font-family: var(--font-body) !important;
 }
 /* Solid brand gold on the accent utility classes — gradient text is
    off-brand (UI audit #38). */
 .gold-italic,
-.fh-font-serif-italic,
-.v3-h1 em,
-.dt-jobs__h1 em,
-.dt-home__h1 em {
-  color: var(--field-gold, #C9963A);
+.v3-h1 em {
+  color: var(--v3-primary-text, #C9963A);
   letter-spacing: 0;
 }
 
@@ -101,8 +95,8 @@ i,
    These overrides:
    1. Pin position: fixed + left:50% explicitly so cascade can't drop it.
    2. Top-anchor under the iOS safe-area inset (notch / Dynamic Island).
-   3. Lift z-index above every other overlay in the app (action sheets
-      are 80-91, bottom nav is 40, header is 30; we sit at 110).
+   3. Lift z-index above every other overlay in the app through the
+      --z-cmdk layer token (see the Z layers in tokens.css).
    4. Paint a FieldHorse dark surface with a visible gold-tinted border
       and a real shadow so the panel is unmistakably present.
    5. Cap height to dvh-minus-insets so internal scroll always works.
@@ -125,7 +119,7 @@ i,
      dialog ~250px above the viewport (audit found x:-44, y:-233). */
   translate: none !important;
   transform: translateX(-50%) !important;
-  z-index: 110 !important;
+  z-index: var(--z-cmdk) !important;
   width: min(calc(100% - 24px), 560px) !important;
   max-width: min(calc(100% - 24px), 560px) !important;
   max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 24px) !important;
@@ -144,7 +138,7 @@ i,
    panel itself. */
 .fh-command-dialog ~ [data-slot="dialog-overlay"],
 [data-slot="dialog-portal"] [data-slot="dialog-overlay"] {
-  z-index: 109 !important;
+  z-index: calc(var(--z-cmdk) - 1) !important;
 }
 
 /* Force the inner scroll list and input strip onto the dark surface
@@ -186,78 +180,6 @@ i,
 }
 .fh-command-dialog [data-slot="command-empty"] {
   color: var(--ink-muted, rgba(242, 237, 228, 0.55)) !important;
-}
-
-/* ================================================================
-   NEW LEAD SHEET — surface regression tightening.
-
-   The audit screenshots flagged the sheet as "too tall and old" —
-   the voice-hero block (Fast Capture) consumed roughly a third of
-   the visible viewport on iPhone, fields had loose vertical rhythm,
-   and the commit button at the foot felt visually buried below all
-   that space. None of this is a structural problem; the v2 variant
-   already exists. We tighten the v2 vertical rhythm here so the
-   JSX doesn't have to be rearranged.
-
-   Targets ONLY .fh-asheet--v2 — the sheets that opted into v2 are
-   NewLeadSheet + AddEventSheet today. Other sheets (delete confirm,
-   approval, etc.) are not affected.
-   ================================================================ */
-.fh-asheet--v2 .fh-asheet__body {
-  padding-top: 12px !important;
-  gap: 12px !important;
-}
-
-.fh-asheet--v2 .fh-voice-hero {
-  padding: 12px 12px !important;
-  gap: 8px !important;
-}
-.fh-asheet--v2 .fh-voice-hero__head {
-  margin-bottom: 0 !important;
-}
-.fh-asheet--v2 .fh-voice-hero__desc {
-  font-size: 12px !important;
-  margin: 2px 0 4px !important;
-  line-height: 1.35 !important;
-  color: var(--ink-muted) !important;
-}
-.fh-asheet--v2 .fh-voice-hero__btn {
-  min-height: 40px !important;
-  padding: 8px 12px !important;
-  font-size: 12px !important;
-}
-.fh-asheet--v2 .fh-voice-hero__mic {
-  width: 16px !important;
-  height: 16px !important;
-}
-.fh-asheet--v2 .fh-voice-hero__transcript {
-  min-height: 32px !important;
-  padding: 8px 12px !important;
-  font-size: 12px !important;
-}
-
-/* Tighten field rhythm — labels stay readable, inputs lose excess
-   padding. Two-up rows (Phone | Email) get a smaller gap to match. */
-.fh-asheet--v2 .fh-asheet-field input,
-.fh-asheet--v2 .fh-asheet-field select,
-.fh-asheet--v2 .fh-asheet-field textarea,
-.fh-asheet--v2 .fh-asheet-select {
-  padding: 12px 12px !important;
-  font-size: 14px !important;
-  border-radius: 10px !important;
-}
-.fh-asheet--v2 .fh-asheet-money__input {
-  padding: 12px 12px !important;
-  font-size: 14px !important;
-}
-
-/* Active commit button gets a brighter halo so it no longer reads
-   as inactive. Disabled state untouched — still muted. */
-.fh-asheet--v2 .fh-asheet__commit:not(:disabled) {
-  box-shadow:
-    0 0 0 2px rgba(201, 150, 58, 0.16),
-    0 8px 22px rgba(201, 150, 58, 0.32),
-    inset 0 1px 0 rgba(242, 237, 228, 0.18) !important;
 }
 
 /* ================================================================

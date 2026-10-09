@@ -1,12 +1,13 @@
 // Netlify Function — Revoke a pending org invite.
-// POST /api/org-invite-revoke  { invite_id }
+// POST /api/org-invite-revoke  { invite_id, org_id? }
 // Authorization: Bearer <supabase access token>
 //
 // Owner/admin of the same org may revoke pending invites. Revocation
 // sets expires_at to now (idempotent + irreversible without a new
-// invite row).
+// invite row). The acting org comes from lib/membership.js.
 
 import { createClient } from '@supabase/supabase-js'
+import { resolveCallerMembership } from './lib/membership.js'
 
 export default async (request) => {
   if (request.method === 'OPTIONS') {
@@ -45,16 +46,9 @@ export default async (request) => {
   })
 
   // Caller membership + role gate.
-  const { data: myMember } = await admin
-    .from('org_members')
-    .select('org_id, role, revoked_at')
-    .eq('user_id', authUserId)
-    .is('revoked_at', null)
-    .order('joined_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  if (!myMember) return json({ error: 'no_membership' }, 403)
+  const resolved = await resolveCallerMembership(admin, authUserId, body)
+  if (!resolved.membership) return json({ error: resolved.error, message: resolved.message }, resolved.status)
+  const myMember = resolved.membership
   if (myMember.role !== 'owner' && myMember.role !== 'admin') {
     return json({ error: 'insufficient_role' }, 403)
   }
@@ -76,7 +70,10 @@ export default async (request) => {
     .update({ expires_at: new Date().toISOString() })
     .eq('id', invite.id)
 
-  if (updErr) return json({ error: 'revoke_failed', message: updErr.message }, 500)
+  if (updErr) {
+    console.error('[org-invite-revoke] update failed', updErr)
+    return json({ error: 'revoke_failed', message: 'Could not revoke the invite. Try again.' }, 500)
+  }
 
   return json({ ok: true })
 }

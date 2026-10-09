@@ -47,13 +47,10 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
   // never flipped through the Approve button (legacy / manual advance).
   const pastQuote = ['job', 'invoice', 'closed'].includes(contact?.stage)
 
-  const status = useMemo(() => deriveStatus(contact, pastQuote), [
-    contact?.proposal_status,
-    contact?.quote_sent_at,
-    contact?.quote_expires_at,
-    contact?.follow_up_on,
-    pastQuote
-  ])
+  // Keyed on the whole contact: deriveStatus also reads
+  // quote_change_requested_at, so a second change request (status stays
+  // changes_requested) has to refresh the "Requested" line too.
+  const status = useMemo(() => deriveStatus(contact, pastQuote), [contact, pastQuote])
 
   const company = useMemo(() => ({
     name: profile?.company_name || profile?.full_name || 'My Company',
@@ -75,6 +72,9 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
   // on contact.updated_at, the recalc trigger from migration 011 bumps
   // updated_at on every fh_quote_items write, so this auto-refreshes
   // after add / edit / delete / Send without an extra subscription.
+  // Every fh_quote_items read here is scoped by the job with RLS as the
+  // tenant boundary, never by the viewer, so a teammate sees the lines
+  // the quote's author wrote.
   const [baseCount, setBaseCount] = useState(0)
   useEffect(() => {
     let alive = true
@@ -84,7 +84,6 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
         .from('fh_quote_items')
         .select('id', { count: 'exact', head: true })
         .eq('contact_id', contact.id)
-        .eq('user_id', userId)
         .eq('is_optional', false)
         .eq('is_excluded', false)
       if (alive) setBaseCount(count || 0)
@@ -113,7 +112,6 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
           .from('fh_quote_items')
           .select('*')
           .eq('contact_id', contact.id)
-          .eq('user_id', userId)
           .order('sort_order', { ascending: true }),
         loadProjectPhotosForPdf(contact.id, userId).catch(() => [])
       ])
@@ -199,7 +197,6 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
       .from('fh_quote_items')
       .select('*')
       .eq('contact_id', contact.id)
-      .eq('user_id', userId)
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: true })
     if (error) throw new Error(error.message)
@@ -245,12 +242,28 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
   async function handlePreview() {
     if (disabled) return
     hapticTap()
+    // Open the tab now, inside the tap. Building the PDF takes seconds,
+    // and Safari (the main field device) and other popup blockers drop a
+    // window.open that runs after that much async work. No 'noopener'
+    // here: with it window.open always returns null, so a blocked popup
+    // could not be told apart from an opened one.
+    const win = window.open('', '_blank')
+    if (!win) {
+      toastError("Couldn't open the preview", 'Allow popups for this site, or use Download.')
+      return
+    }
+    try { win.document.title = 'Preparing preview'; win.document.body.textContent = 'Preparing your preview…' } catch {}
     setBusy('preview')
     try {
       const result = await buildPdf()
       const url = result.doc.output('bloburl')
-      window.open(url, '_blank', 'noopener')
+      try { win.opener = null } catch {}
+      win.location.href = url
+      // The tab has the PDF once it loads, so free the blob afterwards
+      // instead of holding it for the life of this page.
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
     } catch (e: any) {
+      try { win.close() } catch {}
       toastError("Couldn't preview", e?.message || 'Try again')
     } finally {
       setBusy(null)
@@ -294,21 +307,28 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
     hapticTap()
     setClearing(true)
     try {
-      // Delete all line items for this contact (RLS scoped). The recalc
-      // trigger from migration 011 fires per-row delete, so totals on
-      // fh_contacts are recomputed automatically.
-      const { error: delErr } = await supabase
+      // Delete every line item on this job, whoever wrote it (RLS
+      // scopes the tenant). The recalc trigger from migration 011 fires
+      // per-row delete, so totals on fh_contacts are recomputed
+      // automatically.
+      const { data: deleted, error: delErr } = await supabase
         .from('fh_quote_items')
         .delete()
         .eq('contact_id', contact.id)
-        .eq('user_id', userId)
+        .select('id')
       if (delErr) throw delErr
+      // Lines exist but none were removed (refused by the database): stop
+      // here rather than wipe the terms of a quote whose lines remain.
+      if (baseCount > 0 && (!deleted || deleted.length === 0)) {
+        throw new Error("The line items couldn't be removed, so nothing was changed.")
+      }
 
-      // Reset draft fields on the contact. Keep stage + name + client
-      // intact, only clear the quote-specific fields. Status reverts
-      // to 'draft' if it was 'sent'/'viewed'/'rejected'/'expired'.
+      // Reset draft fields on the contact, only once the items are gone.
+      // Keep stage + name + client intact, only clear the quote-specific
+      // fields. Status reverts to 'draft' if it was
+      // 'sent'/'viewed'/'rejected'/'expired'.
       if (patch) {
-        await patch({
+        const res = await patch({
           scope_text: null,
           exclusions_text: null,
           terms_text: null,
@@ -316,6 +336,11 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
           quote_expires_at: null,
           proposal_status: 'draft'
         })
+        // patch already showed why the reset failed.
+        if (res?.error) {
+          if (fetchAll) await fetchAll()
+          return
+        }
       }
       if (fetchAll) await fetchAll()
       toastSuccess('Draft quote cleared', 'Line items and draft terms removed.')
@@ -674,7 +699,7 @@ function QuoteViewToggle({ value, onChange }: any) {
               borderRadius: 10,
               border: 0,
               background: on ? 'var(--v3-primary-soft)' : 'transparent',
-              color: on ? 'var(--v3-primary)' : 'var(--v3-text-muted)',
+              color: on ? 'var(--v3-primary-text)' : 'var(--v3-text-muted)',
               fontFamily: 'var(--font-body)',
               fontSize: 12,
               fontWeight: 700,
@@ -877,7 +902,7 @@ function ClearDraftBand({ contact, baseCount, clearing, onClearDraft }: any) {
           borderRadius: 10,
           background: 'transparent',
           border: '1px solid color-mix(in srgb, var(--v3-danger-bright) 35%, transparent)',
-          color: 'var(--v3-danger-bright)',
+          color: 'var(--v3-danger-text)',
           fontFamily: 'var(--font-body)',
           fontSize: 12, fontWeight: 700, letterSpacing: 0,
           cursor: clearing ? 'not-allowed' : 'pointer',
@@ -1001,9 +1026,9 @@ function ContextCard({ contact, status }: any) {
         <span className="fh-quote-workspace__context-key">Status</span>
         <span
           className="fh-quote-workspace__context-val"
-          style={{ color: status?.tone === 'gold' ? 'var(--v3-primary)'
-            : status?.tone === 'good' ? 'var(--v3-good, #5C5C5C)'
-            : status?.tone === 'danger' ? 'var(--v3-danger-bright)'
+          style={{ color: status?.tone === 'gold' ? 'var(--v3-primary-text)'
+            : status?.tone === 'good' ? 'var(--v3-success-text)'
+            : status?.tone === 'danger' ? 'var(--v3-danger-text)'
             : 'var(--v3-text-muted)' }}
         >
           {status?.label || 'Draft'}
@@ -1042,7 +1067,7 @@ function ApproveBand({ contact, baseCount, busy, pastQuote = false, onOpenApprov
         background: 'rgba(192, 57, 43, 0.10)',
         border: '1px solid rgba(192, 57, 43, 0.40)'
       }}>
-        <span className="v3-eyebrow" style={{ color: 'var(--v3-danger-bright)' }}>
+        <span className="v3-eyebrow" style={{ color: 'var(--v3-danger-text)' }}>
           <PenLine size={11} aria-hidden="true" style={{ marginRight: 4, verticalAlign: 'middle' }} />
           Customer requested changes
         </span>
@@ -1079,11 +1104,11 @@ function ApproveBand({ contact, baseCount, busy, pastQuote = false, onOpenApprov
         border: '1px solid rgba(45, 122, 79, 0.40)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <ShieldCheck size={16} aria-hidden="true" style={{ color: 'var(--v3-good, #5C5C5C)' }} />
+          <ShieldCheck size={16} aria-hidden="true" style={{ color: 'var(--v3-success-text)' }} />
           <span style={{
             fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
             letterSpacing: 0, textTransform: 'uppercase',
-            color: 'var(--v3-good, #5C5C5C)'
+            color: 'var(--v3-success-text)'
           }}>
             {implicit ? 'Approved · job stage' : 'Quote approved'}
           </span>
@@ -1129,7 +1154,7 @@ function ApproveBand({ contact, baseCount, busy, pastQuote = false, onOpenApprov
       background: 'var(--v3-surface)',
       border: '1px solid var(--v3-border)'
     }}>
-      <span className="v3-eyebrow" style={{ color: 'var(--v3-primary)' }}>
+      <span className="v3-eyebrow" style={{ color: 'var(--v3-primary-text)' }}>
         <Lock size={11} aria-hidden="true" style={{ marginRight: 4, verticalAlign: 'middle' }} />
         Approval
       </span>
@@ -1375,19 +1400,19 @@ function StatusPill({ status }: any) {
         return {
           bg: 'var(--v3-primary-soft)',
           border: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)',
-          color: 'var(--v3-primary)'
+          color: 'var(--v3-primary-text)'
         }
       case 'good':
         return {
           bg: 'rgba(45, 122, 79, 0.14)',
           border: 'rgba(45, 122, 79, 0.45)',
-          color: 'var(--v3-good, #5C5C5C)'
+          color: 'var(--v3-success-text)'
         }
       case 'danger':
         return {
           bg: 'rgba(192, 57, 43, 0.14)',
           border: 'rgba(192, 57, 43, 0.45)',
-          color: 'var(--v3-danger-bright, #C0392B)'
+          color: 'var(--v3-danger-text)'
         }
       default:
         return {
@@ -1465,11 +1490,11 @@ function shortDate(iso: any) {
  */
 async function loadProjectPhotosForPdf(jobId: any, userId: any) {
   if (!jobId || !userId) return []
+  // Every photo on the job, whoever uploaded it (RLS scopes the tenant).
   const { data, error } = await supabase
     .from('fh_job_files')
     .select('id, storage_path, caption, section_tag, kind, uploaded_at')
     .eq('job_id', jobId)
-    .eq('user_id', userId)
     .eq('kind', 'photo')
     .order('uploaded_at', { ascending: true })
     .limit(8)

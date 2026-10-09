@@ -31,7 +31,7 @@ export default function InvitePartnerSection({ contact, onOpenInvitePartner }: a
           width: 44, height: 44, borderRadius: 10,
           background: 'var(--v3-primary-soft)',
           border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
-          color: 'var(--v3-primary)',
+          color: 'var(--v3-primary-text)',
           justifyContent: 'center'
         }}>
           <Users size={20} aria-hidden="true" />

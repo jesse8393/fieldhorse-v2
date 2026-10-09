@@ -1,6 +1,6 @@
-// Fire-and-forget toast. Dispatches a CustomEvent that <Toaster/> listens for,
-// AND forwards to Sonner so new code can opt into richer toasts without breaking
-// existing callers that rely on the accent / heavy / destructive options.
+// Fire-and-forget toast through Sonner (mounted once by AppToaster). Callers
+// can still pass the older accent / heavy / destructive options, which map to
+// a Sonner variant and duration.
 
 import { toast as sonnerToast } from 'sonner'
 
@@ -38,9 +38,7 @@ export function toast(message: string, options: ToastOptions = {}) {
     // eslint-disable-next-line no-console
     console.log(`[toast] ${detail.accent}: ${message}`)
   }
-  window.dispatchEvent(new CustomEvent('fh:toast', { detail }))
-
-  // Sonner forward. Explicit variant wins; otherwise infer from accent.
+  // Explicit variant wins; otherwise infer from accent.
   const variant = options.variant || variantFromAccent(detail.accent)
   const sonnerOpts = { description: options.description, duration: detail.duration }
   if (variant === 'success') sonnerToast.success(message, sonnerOpts)
@@ -74,15 +72,7 @@ export const toastInfo = (message: string, description?: string) => toast(messag
  */
 export function toastUndo(message: string, { description, onUndo, duration = 8000 }: { description?: string; onUndo?: () => void | Promise<void>; duration?: number } = {}) {
   if (typeof window === 'undefined') return
-  // Mirror to legacy fh:toast for the in-app Toaster panel
-  const detail = {
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    message,
-    accent: 'gold',
-    duration
-  }
-  window.dispatchEvent(new CustomEvent('fh:toast', { detail }))
-  // Sonner, the action button is the whole point
+  // The action button is the whole point
   sonnerToast(message, {
     description,
     duration,

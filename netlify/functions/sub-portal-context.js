@@ -3,19 +3,16 @@
 // Authorization: Bearer <supabase access token>
 //
 // Returns everything the /sub-portal screen needs in one round trip:
-//   - matched_profiles: fh_sub_profiles rows where email matches the
-//     caller's auth email (case-insensitive). A sub working for
-//     multiple GCs has multiple rows — we hand them all back so the
-//     UI can render a single combined profile or show the per-GC
-//     differences.
+//   - matched_profiles: fh_sub_profiles rows whose email matches the
+//     caller's auth email, limited to orgs where the caller accepted a job
+//     invite (see lib/subAccess.js for why email alone is not enough). A sub
+//     working for several contractors has one row per contractor.
+//     The contractor's private notes and org ids are never returned.
 //   - accepted_partners: fh_job_partners rows the caller has accepted.
-//   - payments: fh_payments for jobs the caller is an accepted
-//     partner on, newest first (last 100). RLS on fh_payments is
-//     org-scoped so we have to use service-role here.
-//   - linked_jobs: fh_contacts joins keyed by id for the partner +
-//     payment lookups.
+//   - linked_jobs: fh_contacts rows keyed by id for the partner rows.
 
 import { createClient } from '@supabase/supabase-js'
+import { normalizeEmail } from './lib/subAccess.js'
 
 export default async (request) => {
   if (request.method === 'OPTIONS') {
@@ -42,30 +39,14 @@ export default async (request) => {
   if (authErr || !userData?.user) return json({ error: 'invalid_token' }, 401)
   const authUser = userData.user
   const authUserId = authUser.id
-  const authEmail = String(authUser.email || '').toLowerCase()
+  const authEmail = normalizeEmail(authUser.email)
   if (!authEmail) return json({ error: 'no_auth_email' }, 400)
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false }
   })
 
-  // 1) Sub profiles matching this caller's email (across all orgs).
-  //    Exact match, NOT .ilike: authEmail is caller-controlled and LIKE
-  //    metacharacters (`_`, `%`) in their own address would match OTHER subs'
-  //    rows and leak foreign profiles/docs into this bundle. authEmail is
-  //    already lowercased above and sub emails are stored lowercased, so .eq
-  //    is both correct and wildcard-safe.
-  const profilesRes = await admin
-    .from('fh_sub_profiles')
-    .select('id, org_id, name, company, email, phone, address, ein, trades, insurance_carrier, insurance_policy, insurance_expires_on, coi_path, w9_path, license_path, license_number, payment_handle, payment_method, notes, created_at, updated_at')
-    .eq('email', authEmail)
-    .order('updated_at', { ascending: false })
-
-  if (profilesRes.error) {
-    return json({ error: 'profile_lookup_failed', message: profilesRes.error.message }, 500)
-  }
-
-  // 2) Accepted partner rows for this caller.
+  // 1) Accepted partner rows for this caller.
   const partnersRes = await admin
     .from('fh_job_partners')
     .select('id, job_id, partner_role, accepted_at, invited_at, status, org_id, invited_by_user_id')
@@ -75,23 +56,51 @@ export default async (request) => {
     .limit(200)
 
   if (partnersRes.error) {
-    return json({ error: 'partners_lookup_failed', message: partnersRes.error.message }, 500)
+    console.error('[sub-portal-context] partner lookup failed', partnersRes.error)
+    return json({ error: 'partners_lookup_failed', message: 'Could not load your jobs. Try again shortly.' }, 500)
   }
 
   const partners = partnersRes.data || []
   const jobIds = Array.from(new Set(partners.map((p) => p.job_id).filter(Boolean)))
 
-  // 3) Linked job rows (the partner-read RLS would let the client read
-  //    these too, but we already have service-role open — one batch).
-  //    No `amount` — the GC's contract value with THEIR customer is not
-  //    the sub's business.
+  // 2) Linked job rows. No `amount`: the contractor's contract value with
+  //    their customer is not the sub's business. org_id is read only to
+  //    scope the profile lookup below and is not returned.
   let linkedJobs = {}
+  const boundOrgIds = new Set()
   if (jobIds.length > 0) {
-    const { data: jobs } = await admin
+    const { data: jobs, error: jobsErr } = await admin
       .from('fh_contacts')
-      .select('id, name, address, stage, updated_at, job_title')
+      .select('id, org_id, name, address, stage, updated_at, job_title')
       .in('id', jobIds)
-    linkedJobs = Object.fromEntries((jobs || []).map((j) => [j.id, j]))
+    if (jobsErr) {
+      console.error('[sub-portal-context] job lookup failed', jobsErr)
+      return json({ error: 'jobs_lookup_failed', message: 'Could not load your jobs. Try again shortly.' }, 500)
+    }
+    for (const j of jobs || []) {
+      if (j.org_id) boundOrgIds.add(j.org_id)
+      const { org_id: _org, ...publicJob } = j
+      linkedJobs[j.id] = publicJob
+    }
+  }
+
+  // 3) Vendor profiles for this email, only in orgs where the caller
+  //    accepted a job invite. Exact match, NOT .ilike: LIKE metacharacters
+  //    (`_`, `%`) in a caller's own address would match other subs' rows.
+  //    Stored emails are lowercased by a trigger (migration 065).
+  let profiles = []
+  if (boundOrgIds.size > 0) {
+    const profilesRes = await admin
+      .from('fh_sub_profiles')
+      .select('id, name, company, email, phone, address, ein, trades, insurance_carrier, insurance_policy, insurance_expires_on, coi_path, w9_path, license_path, license_number, payment_handle, payment_method, created_at, updated_at')
+      .eq('email', authEmail)
+      .in('org_id', Array.from(boundOrgIds))
+      .order('updated_at', { ascending: false })
+    if (profilesRes.error) {
+      console.error('[sub-portal-context] profile lookup failed', profilesRes.error)
+      return json({ error: 'profile_lookup_failed', message: 'Could not load your profile. Try again shortly.' }, 500)
+    }
+    profiles = profilesRes.data || []
   }
 
   // NOTE — deliberately NO fh_payments here. Those rows are the GC's
@@ -105,7 +114,7 @@ export default async (request) => {
   return json({
     ok: true,
     auth: { email: authEmail, user_id: authUserId },
-    matched_profiles: profilesRes.data || [],
+    matched_profiles: profiles,
     accepted_partners: partners,
     linked_jobs: linkedJobs,
   })

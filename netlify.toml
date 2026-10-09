@@ -4,10 +4,25 @@
   functions = "netlify/functions"
 
 [build.environment]
-  NODE_VERSION = "20"
+  # Node 20 reached end of life on 2026-04-30. Functions run on this
+  # version too.
+  NODE_VERSION = "22"
 
 [functions]
   node_bundler = "esbuild"
+
+# All redirect rules live here. Do not add a public/_redirects: Netlify
+# reads that file first, so its catch all would shadow the asset rule.
+#
+# A hashed chunk that a newer deploy removed answers 404 instead of the
+# SPA page, so a stale tab gets a clean load error (the app reloads once
+# to pick up the new build) rather than HTML under a .js URL. Files that
+# exist are served as usual: without force, a rule only applies when no
+# file matches the path.
+[[redirects]]
+  from = "/assets/*"
+  to = "/404.html"
+  status = 404
 
 # /api/* routes resolve to Netlify Functions via the `config.path` exported
 # from each function file. SPA fallback for everything else.
@@ -16,16 +31,48 @@
   to = "/index.html"
   status = 200
 
-[[headers]]
-  for = "/assets/*"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
+# Immutable caching for /assets/ is written per file into dist/_headers
+# at build time (vite.config.js), so only files in the current deploy get
+# it. A wildcard rule here would also cover the 404 for a missing chunk.
 
-# Baseline security headers for every response. Intentionally no
-# Content-Security-Policy yet — a strict CSP needs testing against
-# framer-motion inline styles, Google Fonts, Supabase realtime
-# websockets, and the Netlify function endpoints before it can ship
-# safely; add it as its own change with report-only first.
+# Customer and invitee links carry a secret token in the path and show
+# personal data or pricing. Keep them out of search results if a link is
+# ever posted somewhere public. Not disallowed in robots.txt on purpose:
+# a crawler has to fetch the page to see the noindex.
+[[headers]]
+  for = "/p/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow, noarchive"
+
+[[headers]]
+  for = "/invite/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow, noarchive"
+
+[[headers]]
+  for = "/partner-invite/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow, noarchive"
+
+# Baseline security headers for every response.
+#
+# The Content Security Policy ships as Report-Only: browsers log what it
+# would block in the console and block nothing. Enforce it (rename the
+# header to Content-Security-Policy) only after the app, the public
+# document page and PDF preview run clean against it. Sources, from the
+# code:
+#   script-src  the inline theme script in index.html (hash; update it
+#               when that script changes) and the fonts link onload
+#               handler there (unsafe-hashes plus its hash)
+#   style-src   unsafe-inline for injected style tags (sonner, vaul,
+#               radix), plus the Google Fonts stylesheet
+#   img-src     Supabase Storage photos and logos, data: and blob: for
+#               previews, signatures and PDF images
+#   connect-src Supabase REST, auth, storage, functions and realtime
+#               (wss), Open-Meteo weather, BigDataCloud reverse geocoding,
+#               and Google Fonts, which the service worker fetches to cache
+#   same origin covers /api/* Netlify Functions, sw.js, push-sw.js and
+#   the manifest
 [[headers]]
   for = "/*"
   [headers.values]
@@ -34,3 +81,4 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
     Strict-Transport-Security = "max-age=31536000; includeSubDomains"
     Permissions-Policy = "camera=(self), microphone=(self), geolocation=(self)"
+    Content-Security-Policy-Report-Only = "default-src 'self'; script-src 'self' 'sha256-JWA027fXAZlhLB5VriGW6GxRmHhs/zkq7wnIJEons/M=' 'unsafe-hashes' 'sha256-MhtPZXr7+LpJUY5qtMutB+qWfQtMaPccfe7QXtCcEYc='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://pnmhblvslftdzfcdezbw.supabase.co; connect-src 'self' https://pnmhblvslftdzfcdezbw.supabase.co wss://pnmhblvslftdzfcdezbw.supabase.co https://api.open-meteo.com https://api.bigdatacloud.net https://fonts.googleapis.com https://fonts.gstatic.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"

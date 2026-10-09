@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase.ts'
 import { todayYmd } from '../lib/dates.ts'
 import { recalcCost } from '../lib/stages.ts'
 import { getActivePunchForContact, punchIn as dbPunchIn, punchOut as dbPunchOut } from '../lib/timePunches.ts'
+import { laborBooksAsExpense } from '../lib/labor.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { hapticTap, hapticSuccess } from '../lib/haptics.ts'
 import { Eyebrow } from './v3'
@@ -15,7 +16,9 @@ import { countNoun } from '../lib/format.ts'
 // close doesn't lose the running meter. On clock out we prompt for an
 // hourly rate (default from localStorage), insert an fh_expenses row
 // with category='Labor', and call recalcCost so the job's cost +
-// margin update everywhere they're shown.
+// margin update everywhere they're shown. Only the job owner gets the
+// expense row; any other member just closes their punch, which
+// lib/labor.ts prices as crew labor (one booking per shift).
 //
 // V1 scope:
 //   - Local-device only. Clock in on phone, clock out on phone, same
@@ -83,6 +86,9 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
   const tickRef = useRef<any>(null)
+  // Only the job owner books labor as an expense row; everyone else's
+  // punch is priced by lib/labor.ts (see laborBooksAsExpense).
+  const bookAsExpense = laborBooksAsExpense(contact?.user_id, userId)
 
   // Re-read on jobId change (navigation between jobs).
   // We fall back to localStorage immediately for instant UI, then
@@ -165,36 +171,51 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
     const billable = Math.round(hours * rate * 100) / 100
     setSaving(true)
     try {
-      // 1) Close the punch row. If we don't have a punchId in state
-      //    (e.g. the user's seed came from localStorage but the DB
-      //    reconcile hadn't returned yet), submission proceeds with
-      //    just the fh_expenses insert, fh_time_punches will be
-      //    missing this shift but cost tracking still works.
-      if (punchId) {
-        try {
-          await dbPunchOut({
-            punchId,
-            hourlyRate: rate,
-            notes: note.trim() || null,
-          })
-        } catch (punchErr: any) {
-          // Non-fatal, log it and continue with the cost insert so the
-          // operator's job cost stays accurate.
-          console.warn('[TimeClockCard] punch close failed', punchErr)
+      if (bookAsExpense) {
+        // OWNER: 1) Close the punch row. If we don't have a punchId in
+        //    state (e.g. the user's seed came from localStorage but the
+        //    DB reconcile hadn't returned yet), submission proceeds with
+        //    just the fh_expenses insert, fh_time_punches will be
+        //    missing this shift but cost tracking still works.
+        if (punchId) {
+          try {
+            await dbPunchOut({
+              punchId,
+              hourlyRate: rate,
+              notes: note.trim() || null,
+            })
+          } catch (punchErr: any) {
+            // Non-fatal, log it and continue with the cost insert so the
+            // operator's job cost stays accurate.
+            console.warn('[TimeClockCard] punch close failed', punchErr)
+          }
         }
-      }
 
-      // 2) Cost row (kept verbatim, feeds the per-job cost / margin
-      //    rollup that the rest of the app already reads).
-      const { error } = await supabase.from('fh_expenses').insert({
-        user_id: userId,
-        contact_id: contact.id,
-        description: note.trim() || `Labor, ${hours.toFixed(2)} ${countNoun(hours, 'hr')} @ $${rate}/hr`,
-        amount: billable,
-        category: 'Labor',
-        expense_date: todayYmd()
-      })
-      if (error) throw error
+        // 2) Cost row (kept verbatim, feeds the per-job cost / margin
+        //    rollup that the rest of the app already reads).
+        const { error } = await supabase.from('fh_expenses').insert({
+          user_id: userId,
+          contact_id: contact.id,
+          description: note.trim() || `Labor, ${hours.toFixed(2)} ${countNoun(hours, 'hr')} @ $${rate}/hr`,
+          amount: billable,
+          category: 'Labor',
+          expense_date: todayYmd()
+        })
+        if (error) throw error
+      } else {
+        // ANYONE ELSE: the closed punch is the record. lib/labor.ts
+        // prices it into job cost at the rate snapshot below, so an
+        // expense row here would count the shift twice. If the punch
+        // can't be closed, surface the error and keep the meter running.
+        let id = punchId
+        if (!id) id = (await getActivePunchForContact(userId, contact.id))?.id || null
+        if (!id) throw new Error('No open shift found on this job. Refresh and try again.')
+        await dbPunchOut({
+          punchId: id,
+          hourlyRate: rate,
+          notes: note.trim() || null,
+        })
+      }
       writePreferredRate(rate)
       writeActiveStart(contact.id, null)
       setStart(null)
@@ -236,14 +257,14 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-          <span aria-hidden="true" style={{ width: 32, height: 32, borderRadius: 10, display: 'grid', placeItems: 'center', background: start ? 'rgba(45, 122, 79,0.18)' : 'rgba(201,150,58,0.12)', border: start ? '1px solid rgba(45, 122, 79,0.35)' : '1px solid rgba(201,150,58,0.3)', color: start ? 'var(--signal-green)' : 'var(--field-gold-bright)' }}>
+          <span aria-hidden="true" style={{ width: 32, height: 32, borderRadius: 10, display: 'grid', placeItems: 'center', background: start ? 'rgba(45, 122, 79,0.18)' : 'rgba(201,150,58,0.12)', border: start ? '1px solid rgba(45, 122, 79,0.35)' : '1px solid rgba(201,150,58,0.3)', color: start ? 'var(--v3-success-text)' : 'var(--v3-primary-text)' }}>
             <Clock size={14} />
           </span>
           <div>
             <Eyebrow as="div" style={{ color: 'var(--ink-muted)' }}>
               Time on this job
             </Eyebrow>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, lineHeight: 1, marginTop: 4, color: start ? 'var(--signal-green)' : 'var(--ink-strong)' }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, lineHeight: 1, marginTop: 4, color: start ? 'var(--v3-success-text)' : 'var(--ink-strong)' }}>
               {start ? fmtElapsed(elapsedMs) : 'Not clocked in'}
             </div>
           </div>
@@ -271,7 +292,7 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
       {confirming && (
         <div style={{ padding: 12, borderRadius: 10, background: 'rgba(20, 20, 20,0.25)', border: '1px solid var(--rule)', display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
-            Logging <strong style={{ color: 'var(--ink-strong)' }}>{fmtElapsed(elapsedMs)}</strong> as a Labor expense on this job.
+            Logging <strong style={{ color: 'var(--ink-strong)' }}>{fmtElapsed(elapsedMs)}</strong> {bookAsExpense ? 'as a Labor expense' : 'as crew time'} on this job.
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -291,7 +312,7 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
             </label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <Eyebrow style={{ color: 'var(--ink-muted)' }}>Billable</Eyebrow>
-              <span style={{ padding: '8px 12px', borderRadius: 10, border: '1px solid var(--rule)', background: 'var(--surface-2)', fontFamily: 'var(--font-display)', fontSize: 14, color: 'var(--field-gold-bright)' }}>
+              <span style={{ padding: '8px 12px', borderRadius: 10, border: '1px solid var(--rule)', background: 'var(--surface-2)', fontFamily: 'var(--font-display)', fontSize: 14, color: 'var(--v3-primary-text)' }}>
                 ${billablePreview.toLocaleString(undefined, { maximumFractionDigits: 2 })}
               </span>
             </div>
@@ -304,7 +325,7 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
             style={{ padding: '8px 12px', borderRadius: 10, border: '1px solid var(--rule)', background: 'var(--surface-2)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, boxSizing: 'border-box' }}
           />
           {hoursPreview < 0.05 && (
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--field-gold-bright)' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--v3-primary-text)' }}>
               <AlertTriangle size={11} /> Less than 3 minutes, sure?
             </div>
           )}

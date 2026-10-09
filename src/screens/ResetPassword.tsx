@@ -65,7 +65,7 @@ export default function ResetPassword() {
       >
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: 24, letterSpacing: 0, lineHeight: 1 }}>
-            <span style={{ color: 'var(--field-gold)' }}>FIELD</span>
+            <span style={{ color: 'var(--v3-primary-text)' }}>FIELD</span>
             <span style={{ color: 'var(--ink-strong)' }}>HORSE</span>
           </div>
           <h1
@@ -76,7 +76,7 @@ export default function ResetPassword() {
             <br />
             password.
           </h1>
-          <Eyebrow as="div" style={{ marginTop: 12, padding: '4px 12px', borderRadius: 10, background: ready ? 'rgba(201,150,58,0.12)' : 'var(--surface-2)', border: ready ? '1px solid rgba(201,150,58,0.3)' : '1px solid var(--rule)', color: ready ? 'var(--field-gold-bright)' : 'var(--ink-muted)' }}>
+          <Eyebrow as="div" style={{ marginTop: 12, padding: '4px 12px', borderRadius: 10, background: ready ? 'rgba(201,150,58,0.12)' : 'var(--surface-2)', border: ready ? '1px solid rgba(201,150,58,0.3)' : '1px solid var(--rule)', color: ready ? 'var(--v3-primary-text)' : 'var(--ink-muted)' }}>
             <span style={{ width: 5, height: 5, borderRadius: 10, background: ready ? 'var(--field-gold-bright)' : 'var(--ink-muted)' }} />
             {ready ? 'Link verified' : 'Verifying'}
           </Eyebrow>
@@ -134,10 +134,10 @@ export default function ResetPassword() {
             </label>
 
             {error && (
-              <p role="alert" style={{ margin: 0, fontSize: 12, color: 'var(--alert-red)', fontFamily: 'var(--font-body)' }}>{error}</p>
+              <p role="alert" style={{ margin: 0, fontSize: 12, color: 'var(--v3-danger-text)', fontFamily: 'var(--font-body)' }}>{error}</p>
             )}
             {notice && (
-              <p style={{ margin: 0, fontSize: 12, color: 'var(--signal-green)', fontFamily: 'var(--font-body)' }}>{notice}</p>
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--v3-success-text)', fontFamily: 'var(--font-body)' }}>{notice}</p>
             )}
 
             <motion.button

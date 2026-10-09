@@ -1,13 +1,15 @@
 // Netlify Function — Flag / reject (or clear) time punches.
-// POST /api/org-punch-flag  { punch_ids: string[], flagged: bool, flag_reason?: string }
+// POST /api/org-punch-flag  { punch_ids: string[], flagged: bool, flag_reason?: string, org_id? }
 // Authorization: Bearer <supabase access token>
 //
 // Owner/admin/manager only. Sets flagged + flag_reason on the punches.
 // Flagging a punch also clears any prior approval (a flagged/rejected
 // punch shouldn't stay approved). Clearing (flagged=false) resets the
-// reason. Cross-org punches are filtered out in the UPDATE.
+// reason. Cross-org punches are filtered out in the UPDATE. The acting
+// org comes from lib/membership.js.
 
 import { createClient } from '@supabase/supabase-js'
+import { resolveCallerMembership } from './lib/membership.js'
 
 export default async (request) => {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders() })
@@ -40,10 +42,9 @@ export default async (request) => {
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { autoRefreshToken: false, persistSession: false } })
 
-  const { data: myMember } = await admin
-    .from('org_members').select('org_id, role').eq('user_id', authUserId).is('revoked_at', null)
-    .order('joined_at', { ascending: false }).limit(1).maybeSingle()
-  if (!myMember) return json({ error: 'no_membership' }, 403)
+  const resolved = await resolveCallerMembership(admin, authUserId, body)
+  if (!resolved.membership) return json({ error: resolved.error, message: resolved.message }, resolved.status)
+  const myMember = resolved.membership
   if (!['owner', 'admin', 'manager'].includes(myMember.role)) return json({ error: 'insufficient_role' }, 403)
 
   const patch = flagged
@@ -54,7 +55,10 @@ export default async (request) => {
     .from('fh_time_punches').update(patch)
     .in('id', punchIds).eq('org_id', myMember.org_id)
     .select('id')
-  if (updErr) return json({ error: 'flag_failed', message: updErr.message }, 500)
+  if (updErr) {
+    console.error('[org-punch-flag] update failed', updErr)
+    return json({ error: 'flag_failed', message: 'Could not update these punches. Try again.' }, 500)
+  }
 
   return json({ ok: true, count: (updated || []).length, ids: (updated || []).map((r) => r.id) })
 }

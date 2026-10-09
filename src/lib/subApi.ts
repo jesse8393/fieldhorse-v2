@@ -6,9 +6,9 @@ import { supabase } from './supabase.ts'
 
 export type DocKind = 'coi' | 'w9' | 'license'
 
+// The portal never receives the contractor's private notes or org ids.
 export type SubProfile = {
   id: string
-  org_id: string | null
   name: string | null
   company: string | null
   email: string | null
@@ -25,7 +25,6 @@ export type SubProfile = {
   license_number: string | null
   payment_handle: string | null
   payment_method: string | null
-  notes: string | null
   created_at: string | null
   updated_at: string | null
 }
@@ -51,23 +50,11 @@ export type SubJob = {
   job_title: string | null
 }
 
-export type SubPayment = {
-  id: string
-  contact_id: string | null
-  amount: number
-  kind: string | null
-  method: string | null
-  reference: string | null
-  paid_on: string | null
-  created_at: string | null
-}
-
 export type SubPortalContext = {
   auth: { email: string; user_id: string }
   matched_profiles: SubProfile[]
   accepted_partners: AcceptedPartner[]
   linked_jobs: Record<string, SubJob>
-  payments: SubPayment[]
 }
 
 async function authHeader(): Promise<Record<string, string>> {
@@ -107,7 +94,6 @@ export type SubProfileUpdate = Partial<{
   license_number: string | null
   payment_handle: string | null
   payment_method: string | null
-  notes: string | null
 }>
 
 export function subPortalContext(): Promise<{ ok: true } & SubPortalContext> {
@@ -122,7 +108,19 @@ export function subProfileUpdate(
 
 // One-shot doc upload: ask for a signed URL, PUT the file, then
 // confirm. Returns the storage path written into the profile.
+// The sub-docs bucket accepts only PDF, JPEG and PNG. Some browsers leave
+// File.type empty, so fall back to the extension.
+function docContentType(file: File): string {
+  if (file.type) return file.type
+  const ext = (file.name.split('.').pop() || '').toLowerCase()
+  if (ext === 'pdf') return 'application/pdf'
+  if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg'
+  if (ext === 'png') return 'image/png'
+  return 'application/octet-stream'
+}
+
 export async function subUploadDoc(file: File, kind: DocKind): Promise<{ storage_path: string }> {
+  const contentType = docContentType(file)
   // 1) Sign.
   const sign = await callJson<{
     ok: true
@@ -134,7 +132,7 @@ export async function subUploadDoc(file: File, kind: DocKind): Promise<{ storage
   }>('/api/sub-doc-upload-url', {
     kind,
     filename: file.name,
-    content_type: file.type || 'application/octet-stream',
+    content_type: contentType,
   })
 
   // 2) PUT into Supabase Storage via the signed URL. The signed-upload
@@ -142,7 +140,7 @@ export async function subUploadDoc(file: File, kind: DocKind): Promise<{ storage
   const { error: upErr } = await supabase.storage
     .from(sign.bucket)
     .uploadToSignedUrl(sign.storage_path, sign.token, file, {
-      contentType: file.type || sign.content_type,
+      contentType: sign.content_type || contentType,
       upsert: true,
     })
   if (upErr) throw upErr

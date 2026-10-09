@@ -1,8 +1,9 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { MapPin, Trash2, LogOut, Upload as UploadIcon, Bell, SunMedium, CalendarClock } from 'lucide-react'
 import BrandLogoPicker from '../components/BrandLogoPicker.tsx'
+import OrgSwitcher from '../components/OrgSwitcher.tsx'
 import RateCardEditor from '../components/settings/RateCardEditor.tsx'
 const SnowSettingsBuild = lazy(() => import('../components/desktop/SnowSettingsBuild.tsx'))
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
@@ -40,6 +41,44 @@ const DEMO_CHILD_TABLES: { table: string; fk: string }[] = [
   { table: 'fh_notes',     fk: 'contact_id' },
   { table: 'fh_job_todos', fk: 'job_id' }
 ]
+
+function canonicalServices(services: unknown): string[] {
+  const canonical = new Set(SERVICES)
+  const list = Array.isArray(services) ? services : []
+  return Array.from(new Set(
+    list.map((s) => String(s || '').trim()).filter((s) => s && canonical.has(s))
+  ))
+}
+
+// The editable fields as seeded from a profile row.
+function formFromProfile(profile: any) {
+  const quoteFollowUp = readQuoteFollowUpPreferences(profile?.preferences)
+  return {
+    displayName: profile?.full_name || '',
+    companyName: profile?.company_name || '',
+    companyPhone: profile?.company_phone || '',
+    companyEmail: profile?.company_email || '',
+    companyWebsite: profile?.company_website || '',
+    companyAddress: profile?.company_address || '',
+    licenseNumber: profile?.license_number || '',
+    insuredText: profile?.insured_text || '',
+    warrantyDefault: profile?.warranty_default || '',
+    paymentLink: profile?.payment_link || '',
+    paymentInstructions: profile?.payment_instructions || '',
+    brandAccentHex: profile?.brand_accent_hex || '',
+    estimateTemplate: profile?.estimate_template || 'classic',
+    quoteFollowUpEnabled: quoteFollowUp.enabled,
+    quoteFollowUpDays: quoteFollowUp.days,
+    services: canonicalServices(profile?.services)
+  }
+}
+
+type SettingsForm = ReturnType<typeof formFromProfile>
+
+function sameFormValue(a: unknown, b: unknown) {
+  if (Array.isArray(a) && Array.isArray(b)) return [...a].sort().join('|') === [...b].sort().join('|')
+  return a === b
+}
 
 export default function Settings() {
   const { user, signOut } = useAuth()
@@ -160,30 +199,47 @@ export default function Settings() {
     }
   }
 
-  useEffect(() => {
-    setDisplayName(profile?.full_name || '')
-    setCompanyName(profile?.company_name || '')
-    setCompanyPhone(profile?.company_phone || '')
-    setCompanyEmail(profile?.company_email || '')
-    setCompanyWebsite(profile?.company_website || '')
-    setCompanyAddress(profile?.company_address || '')
-    setLicenseNumber(profile?.license_number || '')
-    setInsuredText(profile?.insured_text || '')
-    setWarrantyDefault(profile?.warranty_default || '')
-    setPaymentLink((profile as any)?.payment_link || '')
-    setPaymentInstructions((profile as any)?.payment_instructions || '')
-    setBrandAccentHex(profile?.brand_accent_hex || '')
-    setEstimateTemplate((profile as any)?.estimate_template || 'classic')
-    const quoteFollowUp = readQuoteFollowUpPreferences(profile?.preferences)
-    setQuoteFollowUpEnabled(quoteFollowUp.enabled)
-    setQuoteFollowUpDays(quoteFollowUp.days)
-    setServices(() => {
-      const canonical = new Set(SERVICES)
-      return Array.from(new Set(
-        (profile?.services || []).map((s) => String(s || '').trim()).filter((s) => s && canonical.has(s))
-      ))
-    })
-  }, [profile])
+  // What the form was last seeded with, and for which user.
+  const seededRef = useRef<{ userId: string | null; form: SettingsForm } | null>(null)
+
+  // Copy profile values into the form. Every profile write hands back a
+  // new profile object (a logo upload, the display name saving on blur,
+  // pinning the location, a refetch), and reseeding every field on each
+  // one threw away whatever the operator had typed but not saved yet. A
+  // field they edited now keeps their text unless the profile's own value
+  // for that field changed. `all` reseeds everything, used after Save so
+  // the form shows exactly what was stored.
+  const seedForm = useCallback((source: any, all = false) => {
+    const next = formFromProfile(source)
+    const prev = seededRef.current
+    const sourceUserId: string | null = source?.user_id ?? null
+    const reseedAll = all || !prev || prev.userId !== sourceUserId
+    const pick = <K extends keyof SettingsForm>(key: K) => (current: SettingsForm[K]): SettingsForm[K] => {
+      if (reseedAll || !prev) return next[key]
+      const edited = !sameFormValue(current, prev.form[key])
+      const changedOnServer = !sameFormValue(next[key], prev.form[key])
+      return edited && !changedOnServer ? current : next[key]
+    }
+    setDisplayName(pick('displayName'))
+    setCompanyName(pick('companyName'))
+    setCompanyPhone(pick('companyPhone'))
+    setCompanyEmail(pick('companyEmail'))
+    setCompanyWebsite(pick('companyWebsite'))
+    setCompanyAddress(pick('companyAddress'))
+    setLicenseNumber(pick('licenseNumber'))
+    setInsuredText(pick('insuredText'))
+    setWarrantyDefault(pick('warrantyDefault'))
+    setPaymentLink(pick('paymentLink'))
+    setPaymentInstructions(pick('paymentInstructions'))
+    setBrandAccentHex(pick('brandAccentHex'))
+    setEstimateTemplate(pick('estimateTemplate'))
+    setQuoteFollowUpEnabled(pick('quoteFollowUpEnabled'))
+    setQuoteFollowUpDays(pick('quoteFollowUpDays'))
+    setServices(pick('services'))
+    seededRef.current = { userId: sourceUserId, form: next }
+  }, [])
+
+  useEffect(() => { seedForm(profile) }, [profile, seedForm])
 
   const profileQuoteFollowUp = readQuoteFollowUpPreferences(profile?.preferences)
   const profileServices = Array.from(new Set(
@@ -231,12 +287,6 @@ export default function Settings() {
       const t = (s || '').trim()
       return t.length === 0 ? null : t
     }
-    // Pay links pasted from an app often drop the scheme ("venmo.com/…").
-    // Prepend https:// so the stored value is a real clickable URL :
-    // unless it's already a deep-link scheme (venmo://, etc.).
-    // safePayUrl (shared) allow-lists the scheme so a dangerous link
-    // (javascript:, data:, …) is never stored and later rendered as an
-    // href on a customer facing page.
     // Validate brand accent before save. Migration 015's CHECK
     // constraint will reject anything off-format with an opaque
     // Postgres error; catching it here lets us surface a friendly
@@ -255,7 +305,26 @@ export default function Settings() {
       safeAccent = rawAccent.toLowerCase()
     }
 
-    const { error } = await upsertProfile({
+    // Pay links pasted from an app often drop the scheme ("venmo.com/…");
+    // safePayUrl (shared) prepends https:// so the stored value is a real
+    // clickable URL. It allow-lists http(s), mailto and tel, so a dangerous
+    // link (javascript:, data:, …) is never stored and later rendered as an
+    // href on a customer facing page. App deep links (venmo://,
+    // cashapp://) aren't on that list either, and they used to be dropped
+    // silently, clearing the link while the toast said "Saved". Stop and
+    // say so instead.
+    const rawPayLink = (paymentLink || '').trim()
+    const payLink = safePayUrl(rawPayLink)
+    if (rawPayLink && !payLink) {
+      toastError(
+        'Use a web link for payments',
+        "App links like venmo:// don't open for every customer. Paste a web address instead, like venmo.com/u/yourname. Settings not saved."
+      )
+      setSaving(false)
+      return
+    }
+
+    const { data: savedProfile, error } = await upsertProfile({
       full_name: nullIfBlank(displayName),
       company_name: companyName,
       company_phone: nullIfBlank(companyPhone),
@@ -265,7 +334,7 @@ export default function Settings() {
       license_number: nullIfBlank(licenseNumber),
       insured_text: nullIfBlank(insuredText),
       warranty_default: nullIfBlank(warrantyDefault),
-      payment_link: nullIfBlank(safePayUrl(paymentLink)),
+      payment_link: nullIfBlank(payLink),
       payment_instructions: nullIfBlank(paymentInstructions),
       brand_accent_hex: safeAccent,
       estimate_template: estimateTemplate || 'classic',
@@ -280,6 +349,8 @@ export default function Settings() {
       toastError("Couldn't save settings", error.message || 'Try again in a moment.')
       return
     }
+    // Show exactly what was stored (trimmed, https:// added, and so on).
+    if (savedProfile) seedForm(savedProfile, true)
     await refresh()
     setSaving(false)
     setSaved(true)
@@ -428,12 +499,16 @@ export default function Settings() {
             logoUrl={profile?.logo_url}
             companyName={profile?.company_name}
             fullName={profile?.full_name}
+            // Throw on a failed write so the picker reports it instead of
+            // toasting "Logo saved".
             onSaved={async (url: any) => {
-              await upsertProfile({ logo_url: url, logo_uploaded_at: new Date().toISOString() })
+              const { error } = await upsertProfile({ logo_url: url, logo_uploaded_at: new Date().toISOString() })
+              if (error) throw error
               refresh()
             }}
             onRemoved={async () => {
-              await upsertProfile({ logo_url: null, logo_uploaded_at: null })
+              const { error } = await upsertProfile({ logo_url: null, logo_uploaded_at: null })
+              if (error) throw error
               refresh()
             }}
           />
@@ -561,7 +636,7 @@ export default function Settings() {
                 display: 'grid', placeItems: 'center',
                 background: quoteFollowUpEnabled ? 'var(--v3-primary-soft)' : 'var(--v3-surface-2)',
                 border: '1px solid var(--v3-border-strong)',
-                color: quoteFollowUpEnabled ? 'var(--v3-primary)' : 'var(--v3-text-muted)'
+                color: quoteFollowUpEnabled ? 'var(--v3-primary-text)' : 'var(--v3-text-muted)'
               }}>
                 <CalendarClock size={16} />
               </span>
@@ -649,7 +724,7 @@ export default function Settings() {
                   borderRadius: 10,
                   border: isOn ? '1px solid rgba(201,150,58,0.4)' : '1px solid var(--rule)',
                   background: isOn ? 'rgba(201,150,58,0.14)' : 'var(--surface-2)',
-                  color: isOn ? 'var(--field-gold-bright)' : 'var(--ink-muted)',
+                  color: isOn ? 'var(--v3-primary-text)' : 'var(--ink-muted)',
                   fontFamily: 'var(--font-body)',
                   fontSize: 12,
                   fontWeight: 700,
@@ -719,7 +794,7 @@ export default function Settings() {
             type="button"
             whileTap={{ scale: 0.97 }}
             onClick={pinLocation}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 12px', borderRadius: 10, background: 'rgba(201,150,58,0.08)', border: '1px solid rgba(201,150,58,0.25)', color: 'var(--field-gold-bright)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 12px', borderRadius: 10, background: 'rgba(201,150,58,0.08)', border: '1px solid rgba(201,150,58,0.25)', color: 'var(--v3-primary-text)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
           >
             <MapPin size={16} />
             {profile?.location_lat ? 'Repin' : 'Pin location'}
@@ -746,7 +821,7 @@ export default function Settings() {
               border: theme === 'light'
                 ? '1px solid color-mix(in srgb, var(--v3-primary) 40%, transparent)'
                 : '1px solid var(--v3-border-strong)',
-              color: theme === 'light' ? 'var(--v3-primary)' : 'var(--v3-text-muted)'
+              color: theme === 'light' ? 'var(--v3-primary-text)' : 'var(--v3-text-muted)'
             }}>
               <SunMedium size={16} />
             </span>
@@ -777,22 +852,26 @@ export default function Settings() {
       </Section>
 
       <Section variants={item} title={<>Your <em>session.</em></>}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, color: 'var(--ink-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {user?.email}
+        {/* Workspace picker; renders nothing for a single company. */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <OrgSwitcher />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, color: 'var(--ink-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {user?.email}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 2 }}>Signed in</div>
             </div>
-            <div style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 2 }}>Signed in</div>
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.97 }}
+              onClick={handleSignOut} className="fh-press-instant"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 10, background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--v3-danger-text)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+            >
+              <LogOut size={14} />
+              Sign out
+            </motion.button>
           </div>
-          <motion.button
-            type="button"
-            whileTap={{ scale: 0.97 }}
-            onClick={handleSignOut} className="fh-press-instant"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 10, background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--alert-red)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
-          >
-            <LogOut size={14} />
-            Sign out
-          </motion.button>
         </div>
         <DeleteAccountRow onDone={handleSignOut} />
       </Section>
@@ -815,7 +894,7 @@ export default function Settings() {
                 whileTap={{ scale: 0.97 }}
                 onClick={() => setConfirmWipe(true)} className="fh-press-instant"
                 disabled={wiping}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 12px', borderRadius: 10, background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--alert-red)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 12px', borderRadius: 10, background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--v3-danger-text)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
               >
                 <Trash2 size={14} />
                 Remove sample data
@@ -842,7 +921,7 @@ export default function Settings() {
               </div>
             )}
             {wipeResult && (
-              <p style={{ margin: '10px 0 0', color: wipeResult.startsWith("Couldn't") ? 'var(--alert-red)' : 'var(--signal-green)', fontSize: 12, fontFamily: 'var(--font-body)' }}>
+              <p style={{ margin: '10px 0 0', color: wipeResult.startsWith("Couldn't") ? 'var(--v3-danger-text)' : 'var(--v3-success-text)', fontSize: 12, fontFamily: 'var(--font-body)' }}>
                 {wipeResult}
               </p>
             )}
@@ -1017,7 +1096,7 @@ function PushRow({ userId }: { userId?: string }) {
           display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 10,
           background: enabled ? 'var(--v3-surface-2)' : 'var(--v3-primary-soft)',
           border: enabled ? '1px solid var(--v3-border-strong)' : '1px solid color-mix(in srgb, var(--v3-primary) 40%, transparent)',
-          color: enabled ? 'var(--v3-text-muted)' : 'var(--v3-primary)',
+          color: enabled ? 'var(--v3-text-muted)' : 'var(--v3-primary-text)',
           fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, cursor: 'pointer',
           opacity: busy ? 0.6 : 1
         }}
@@ -1076,9 +1155,9 @@ function DeleteAccountRow({ onDone }: { onDone: () => void }) {
 
   return (
     <div style={{ marginTop: 10, padding: '12px', borderRadius: 10, background: 'rgba(192,57,43,0.08)', border: '1px solid rgba(192,57,43,0.35)' }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--alert-red)', marginBottom: 4 }}>Permanently delete your account</div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--v3-danger-text)', marginBottom: 4 }}>Permanently delete your account</div>
       <p style={{ margin: '0 0 10px', fontSize: 12, color: 'var(--ink-muted)', lineHeight: 1.5 }}>
-        This erases every contact, job, quote, invoice, payment, photo, and file you own, and closes your login. It can't be undone. Type <strong>DELETE</strong> to confirm.
+        This closes your login and erases your personal data. If you run Fieldhorse alone, every contact, job, quote, invoice, payment, photo, and file is erased too. If you work on a team, the records you created stay with the team and pass to an owner. The only owner of a team has to make someone else an owner first. It can't be undone. Type <strong>DELETE</strong> to confirm.
       </p>
       <input
         type="text"
@@ -1091,7 +1170,7 @@ function DeleteAccountRow({ onDone }: { onDone: () => void }) {
       />
       <div style={{ display: 'flex', gap: 8 }}>
         <button type="button" onClick={() => { setOpen(false); setConfirmText('') }} disabled={busy} style={{ flex: 1, padding: '12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Cancel</button>
-        <button type="button" onClick={doDelete} disabled={busy || confirmText.trim().toUpperCase() !== 'DELETE'} style={{ flex: 1, padding: '12px', borderRadius: 10, background: 'rgba(192,57,43,0.16)', border: '1px solid rgba(192,57,43,0.5)', color: 'var(--alert-red)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, cursor: 'pointer', opacity: busy || confirmText.trim().toUpperCase() !== 'DELETE' ? 0.5 : 1 }}>
+        <button type="button" onClick={doDelete} disabled={busy || confirmText.trim().toUpperCase() !== 'DELETE'} style={{ flex: 1, padding: '12px', borderRadius: 10, background: 'rgba(192,57,43,0.16)', border: '1px solid rgba(192,57,43,0.5)', color: 'var(--v3-danger-text)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, cursor: 'pointer', opacity: busy || confirmText.trim().toUpperCase() !== 'DELETE' ? 0.5 : 1 }}>
           {busy ? 'Deleting…' : 'Delete forever'}
         </button>
       </div>
@@ -1101,7 +1180,7 @@ function DeleteAccountRow({ onDone }: { onDone: () => void }) {
 
 function Section({ variants, title, sub, meta, metaTone, children }: any) {
   const metaBg = metaTone === 'red'
-    ? { background: 'var(--v3-danger-soft)', border: '1px solid color-mix(in srgb, var(--v3-danger) 40%, transparent)', color: 'var(--v3-danger-bright)' }
+    ? { background: 'var(--v3-danger-soft)', border: '1px solid color-mix(in srgb, var(--v3-danger) 40%, transparent)', color: 'var(--v3-danger-text)' }
     : { background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)', color: 'var(--v3-text-muted)' }
   return (
     <motion.section
@@ -1226,7 +1305,7 @@ const COLOR_PRESETS = [
 const ESTIMATE_TEMPLATES = [
   { key: 'classic',   name: 'Classic',   blurb: 'Editorial dark accent layout grouped by trade.', swatch: ['#141414', '#C9963A', '#F2EDE4'] },
   { key: 'slate',     name: 'Slate',     blurb: 'Gray header bar, From/For blocks, itemized rows.', swatch: ['#5C5C5C', '#F2EDE4', '#F2EDE4'] },
-  { key: 'mint',      name: 'Mint',      blurb: 'Large green ESTIMATE wordmark, itemized rows.', swatch: ['#5C5C5C', '#F2EDE4', '#F2EDE4'] },
+  { key: 'mint',      name: 'Mint',      blurb: 'Large green ESTIMATE wordmark, itemized rows.', swatch: ['#2D7A4F', '#F2EDE4', '#F2EDE4'] },
   { key: 'editorial', name: 'Editorial', blurb: 'Sand + serif, Scope of Work and Cost Breakdown.', swatch: ['#F2EDE4', '#C9963A', '#141414'] }
 ]
 
@@ -1259,7 +1338,7 @@ function EstimateTemplatePicker({ value, onChange }: any) {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>{t.name}</span>
-              {on && <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, color: 'var(--v3-primary, #C9963A)' }}>SELECTED</span>}
+              {on && <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, color: 'var(--v3-primary-text)' }}>SELECTED</span>}
             </div>
             <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, lineHeight: 1.4, color: 'var(--ink-muted)' }}>{t.blurb}</span>
           </button>

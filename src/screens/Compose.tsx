@@ -4,10 +4,11 @@ import { Sparkles, Copy, Check, MessageSquare, Mail, Mic, Send, PenLine, RotateC
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import BuildTopbar from '../components/desktop/BuildTopbar.tsx'
 import { supabase, authHeaders } from '../lib/supabase.ts'
+import { useOrgScope } from '../lib/orgScope.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
 import { claudeMessage } from '../lib/anthropic.ts'
-import { toastSuccess } from '../lib/toast.ts'
+import { toastSuccess, toastError } from '../lib/toast.ts'
 import { hapticMedium, hapticSuccess } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { FilterPill, Eyebrow } from '../components/v3'
@@ -39,6 +40,9 @@ export default function Compose() {
   const [contacts, setContacts] = useState<any[]>([])
   const [context, setContext] = useState('')
   const [draft, setDraft] = useState('')
+  // Manual mode (AI unavailable): the draft panel shows an editable
+  // textarea instead of the read-only preview.
+  const [manual, setManual] = useState(false)
   const [loading, setLoading] = useState(false)
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState('')
@@ -47,15 +51,17 @@ export default function Compose() {
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
 
+  // The company's jobs, not only the ones this user created.
+  const orgScope = useOrgScope(user?.id)
   useEffect(() => {
-    if (!user) return
-    supabase
+    if (!user || orgScope === undefined) return
+    const base = supabase
       .from('fh_contacts')
       .select('id, name, phone, email, job_title, job_type, stage, amount')
-      .eq('user_id', user.id)
+    ;(orgScope ? base.eq('org_id', orgScope) : base.eq('user_id', user.id))
       .order('updated_at', { ascending: false })
       .then(({ data }: any) => setContacts(data || []))
-  }, [user])
+  }, [user, orgScope])
 
   useEffect(() => {
     setContact(contacts.find((c) => c.id === contactId) || null)
@@ -63,8 +69,11 @@ export default function Compose() {
 
   async function generate() {
     const ch = CHANNELS.find((c) => c.id === channel)
+    // A hand written message must survive another failed AI attempt.
+    const manualDraft = manual && draft.trim() ? draft : ''
     setLoading(true)
     setDraft('')
+    setManual(false)
     setError('')
     setCopied(false)
     try {
@@ -95,19 +104,25 @@ export default function Compose() {
       } else {
         setError(e?.message || 'AI generation failed.')
       }
+      if (manualDraft) {
+        setDraft(manualDraft)
+        setManual(true)
+        toastError('AI still unavailable', 'Your message is still here.')
+      }
     } finally {
       setLoading(false)
     }
   }
 
   async function copy() {
+    if (!draft.trim()) return
     await navigator.clipboard.writeText(draft)
     setCopied(true)
     setTimeout(() => setCopied(false), 1800)
   }
 
   async function sendAction() {
-    if (!contact) return
+    if (!contact || !draft.trim()) return
     if (channel === 'sms' && contact.phone) window.location.href = `sms:${contact.phone}?body=${encodeURIComponent(draft)}`
     if (channel === 'email' && contact.email) window.location.href = `mailto:${contact.email}?body=${encodeURIComponent(draft)}`
   }
@@ -122,7 +137,7 @@ export default function Compose() {
   // returns 503 sender_not_configured, operators on a non-Resend
   // deploy can still ship the draft through their mail client.
   async function handleSendEmail() {
-    if (!contact?.email || !draft || sending) return
+    if (!contact?.email || !draft.trim() || sending) return
     setSending(true)
     setError('')
     try {
@@ -162,7 +177,9 @@ export default function Compose() {
       )
       setTimeout(() => setSent(false), 2400)
     } catch (e: any) {
-      setError(e?.message || 'Could not send the message. Try again.')
+      // The inline error block belongs to drafting and only shows while
+      // there is no draft, so a failed send was invisible. Say it plainly.
+      toastError("Couldn't send the email", e?.message || 'Try again in a moment.')
     } finally {
       setSending(false)
     }
@@ -180,6 +197,10 @@ export default function Compose() {
 
   const { stagger, item } = useFhMotion()
   const isDesktop = useIsDesktop()
+  // Copy and Send need real text; a blank or whitespace draft can't go out.
+  const hasText = !!draft.trim()
+  const canEmail = !!contact?.email && hasText
+  const canSms = !!contact?.phone && hasText
 
   return (
     <motion.div
@@ -387,11 +408,11 @@ export default function Compose() {
                 fontSize: 12,
                 lineHeight: 1.5
               }}>
-                <div style={{ fontWeight: 700, color: 'var(--v3-danger-bright)', marginBottom: 4 }}>AI unavailable</div>
+                <div style={{ fontWeight: 700, color: 'var(--v3-danger-text)', marginBottom: 4 }}>AI unavailable</div>
                 <div style={{ color: 'var(--v3-text-muted)', marginBottom: 10 }}>{error}</div>
                 <button
                   type="button"
-                  onClick={() => { setError(''); setDraft(' ') }}
+                  onClick={() => { setError(''); setDraft(''); setManual(true) }}
                   style={{
                     padding: '8px 12px',
                     borderRadius: 10,
@@ -418,7 +439,7 @@ export default function Compose() {
           missing exit animation caused the wait to never resolve. Switched
           to plain conditional render so the draft hero always appears the
           instant `draft` state flips truthy. */}
-      {draft ? (
+      {draft || manual ? (
           <motion.div
             key="draft"
             className="fh-compose-workspace__output"
@@ -450,13 +471,27 @@ export default function Compose() {
                     sms   → iPhone-style chat bubble with phone bar + recipient
                     email → envelope-style card with FROM / TO / SUBJECT rows
                     voice → script panel labelled "your voice cloned" */}
-              <DraftHero
-                channel={channel}
-                draft={draft}
-                contact={contact}
-                profile={profile}
-                intent={intent}
-              />
+              {manual ? (
+                // AI is down: write the message by hand. The preview heroes
+                // are read only, so without this there was nothing to type in.
+                <textarea
+                  rows={6}
+                  autoFocus
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  aria-label="Message"
+                  placeholder="Write your message here."
+                  style={{ ...selectStyle, resize: 'vertical', minHeight: 140, fontFamily: 'var(--font-body)', lineHeight: 1.55 }}
+                />
+              ) : (
+                <DraftHero
+                  channel={channel}
+                  draft={draft}
+                  contact={contact}
+                  profile={profile}
+                  intent={intent}
+                />
+              )}
 
               {/* Action row, 5/17 Compose-end-to-end port.
                   Per the design's CTA bar (screens-compose-nav.jsx)
@@ -516,6 +551,7 @@ export default function Compose() {
                 <button
                   type="button"
                   onClick={copy}
+                  disabled={!hasText}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -525,11 +561,11 @@ export default function Compose() {
                     borderRadius: 10,
                     background: 'var(--v3-surface-2)',
                     border: '1px solid var(--v3-border-strong)',
-                    color: 'var(--v3-text)',
+                    color: hasText ? 'var(--v3-text)' : 'var(--v3-text-muted)',
                     fontFamily: 'var(--font-body)',
                     fontSize: 12,
                     fontWeight: 600,
-                    cursor: 'pointer',
+                    cursor: hasText ? 'pointer' : 'default',
                     WebkitTapHighlightColor: 'transparent'
                   }}
                 >
@@ -564,8 +600,8 @@ export default function Compose() {
                   <button
                     type="button"
                     onClick={handleSendEmail}
-                    disabled={sending || !contact?.email}
-                    title={!contact?.email ? 'Add a client email first' : undefined}
+                    disabled={sending || !canEmail}
+                    title={!contact?.email ? 'Add a client email first' : !hasText ? 'Write a message first' : undefined}
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -576,10 +612,10 @@ export default function Compose() {
                       border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
                       background: sent
                         ? 'linear-gradient(180deg, var(--v3-success-bright) 0%, var(--v3-success) 100%)'
-                        : (sending || !contact?.email)
+                        : (sending || !canEmail)
                           ? 'var(--v3-surface-2)'
                           : 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
-                      color: (sending || !contact?.email)
+                      color: (sending || !canEmail)
                         ? 'var(--v3-text-muted)'
                         : 'var(--v3-on-primary)',
                       fontFamily: 'var(--font-body)',
@@ -587,12 +623,12 @@ export default function Compose() {
                       fontWeight: 700,
                       letterSpacing: 0,
                       textTransform: 'uppercase',
-                      cursor: (sending || !contact?.email) ? 'not-allowed' : 'pointer',
+                      cursor: (sending || !canEmail) ? 'not-allowed' : 'pointer',
                       WebkitTapHighlightColor: 'transparent',
-                      boxShadow: (sending || !contact?.email)
+                      boxShadow: (sending || !canEmail)
                         ? 'none'
                         : '0 0 0 2px rgba(201, 150, 58, 0.14), 0 4px 12px rgba(201, 150, 58, 0.28)',
-                      opacity: !contact?.email ? 0.6 : 1
+                      opacity: !canEmail ? 0.6 : 1
                     }}
                   >
                     {sent ? <Check size={13} /> : <Send size={13} />}
@@ -604,8 +640,8 @@ export default function Compose() {
                   <button
                     type="button"
                     onClick={sendAction}
-                    disabled={!contact?.phone}
-                    title={!contact?.phone ? 'Add a client phone first' : undefined}
+                    disabled={!canSms}
+                    title={!contact?.phone ? 'Add a client phone first' : !hasText ? 'Write a message first' : undefined}
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -614,21 +650,21 @@ export default function Compose() {
                       minHeight: 40,
                       borderRadius: 10,
                       border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
-                      background: contact?.phone
+                      background: canSms
                         ? 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)'
                         : 'var(--v3-surface-2)',
-                      color: contact?.phone ? 'var(--v3-on-primary)' : 'var(--v3-text-muted)',
+                      color: canSms ? 'var(--v3-on-primary)' : 'var(--v3-text-muted)',
                       fontFamily: 'var(--font-body)',
                       fontSize: 12,
                       fontWeight: 700,
                       letterSpacing: 0,
                       textTransform: 'uppercase',
-                      cursor: contact?.phone ? 'pointer' : 'not-allowed',
+                      cursor: canSms ? 'pointer' : 'not-allowed',
                       WebkitTapHighlightColor: 'transparent',
-                      boxShadow: contact?.phone
+                      boxShadow: canSms
                         ? '0 0 0 2px rgba(201, 150, 58, 0.14), 0 4px 12px rgba(201, 150, 58, 0.28)'
                         : 'none',
-                      opacity: !contact?.phone ? 0.6 : 1
+                      opacity: !canSms ? 0.6 : 1
                     }}
                   >
                     <Send size={13} />
@@ -658,7 +694,7 @@ export default function Compose() {
               lineHeight: 1.5
             }}>
               The draft will appear here. Pick a channel + intent above, then tap{' '}
-              <strong style={{ color: 'var(--v3-primary)' }}>Generate draft</strong>.
+              <strong style={{ color: 'var(--v3-primary-text)' }}>Generate draft</strong>.
             </div>
           </motion.div>
         )}
@@ -697,7 +733,7 @@ function ContextChip({ children, tone = 'default' }: any) {
       border: `1px solid ${isGold
         ? 'color-mix(in srgb, var(--v3-primary) 32%, transparent)'
         : 'var(--v3-border)'}`,
-      color: isGold ? 'var(--v3-primary)' : 'var(--v3-text)',
+      color: isGold ? 'var(--v3-primary-text)' : 'var(--v3-text)',
       fontFamily: 'var(--font-body)',
       fontSize: 12,
       fontWeight: 600,
@@ -773,7 +809,8 @@ function SmsHero({ draft, contact }: any) {
           width: 32, height: 32, borderRadius: 10,
           background: 'linear-gradient(135deg, #141414, #141414)',
           border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
-          color: 'var(--v3-primary)',
+          // The tile stays onyx in both themes, so its ink stays pure gold.
+          color: 'var(--gold)',
           fontFamily: 'var(--font-display)', fontSize: 12,
           display: 'grid', placeItems: 'center',
           flexShrink: 0

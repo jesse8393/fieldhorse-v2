@@ -48,7 +48,10 @@ export default async (request) => {
     .eq('token', token)
     .maybeSingle()
 
-  if (invErr) return json({ error: 'lookup_failed', message: invErr.message }, 500)
+  if (invErr) {
+    console.error('[org-invite-info] lookup failed', invErr)
+    return json({ error: 'lookup_failed', message: 'Could not load this invite. Try again shortly.' }, 500)
+  }
   if (!invite) return json({ error: 'invite_not_found' }, 404)
 
   // Hand back state so the UI can render the right banner without an

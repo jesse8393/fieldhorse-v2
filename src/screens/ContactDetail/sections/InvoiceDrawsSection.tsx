@@ -18,7 +18,9 @@
 // Cash jobs / small projects don't need to touch this, the existing
 // single-invoice flow on the Invoice sub-tab stays exactly as it was.
 
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
+import { AnimatePresence } from 'framer-motion'
+import { useQueryClient } from '@tanstack/react-query'
 import { Plus, FileEdit, Send, Download, Check, X, Trash2, FileText } from 'lucide-react'
 import { supabase, authHeaders } from '../../../lib/supabase.ts'
 import { parseDateOnly, toYmd } from '../../../lib/dates.ts'
@@ -27,17 +29,20 @@ import { useAuth } from '../../../contexts/AuthContext.tsx'
 import { generateInvoice, downloadPdf } from '../../../lib/pdf.js'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
 import { DEFAULT_PAYMENT_SCHEDULE } from '../../../components/documents'
+// Cents aware: whole amounts print as "$1,250", amounts with cents keep
+// them, so a generated $1,249.75 draw never reads "$1,250".
+import { money } from '../../../components/documents/format.ts'
 import { useConfirm } from '../../../components/ConfirmSheet.tsx'
 import { Eyebrow } from '../../../components/v3'
 import { countNoun } from '../../../lib/format.ts'
+import { invoiceAmountDue } from '../../../lib/invoices.ts'
+import { invoicesPaidInFull } from '../../../lib/invoiceSettlement.ts'
+import { splitByPercents } from '../../../lib/paymentSchedule.ts'
+import { useMembership } from '../../../contexts/MembershipContext.tsx'
+import { canEditJobMoney } from '../lib/jobAccess.ts'
 
-function money(n: any) {
-  const v = Number(n || 0)
-  return v.toLocaleString(undefined, {
-    style: 'currency', currency: 'USD',
-    minimumFractionDigits: 0, maximumFractionDigits: 0
-  })
-}
+// Loaded on first "Mark paid" tap, like the other screens that open it.
+const V3PaymentSheet = lazy(() => import('../../../components/V3PaymentSheet.tsx'))
 
 function shortDate(iso: any) {
   const d = parseDateOnly(iso)
@@ -67,12 +72,28 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
   const confirm = useConfirm()
   const { profile } = useProfile()
   const { user } = useAuth()
+  const queryClient = useQueryClient()
   const [draws, setDraws] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  // A failed read shows an empty list, which must not offer "Generate
+  // from terms" on a job that may already have draws.
+  const [loadFailed, setLoadFailed] = useState(false)
   const [editingId, setEditingId] = useState<any>(null)
   const [creating, setCreating] = useState(false)
   const [busyId, setBusyId] = useState<any>(null)
-  const isOwner = contact && contact.user_id === userId
+  // The draw a payment is being recorded against, and what is still owed
+  // on it, while the payment sheet is open.
+  const [paying, setPaying] = useState<{ draw: any; owed: number } | null>(null)
+  // Any owner, admin or manager of the job's company may edit, not only
+  // the teammate who created the job (see lib/jobAccess.ts).
+  const { orgId: viewerOrgId, canCreateFinancialDocs } = useMembership()
+  const isOwner = !!contact && canEditJobMoney({
+    contactUserId: contact.user_id,
+    contactOrgId: contact.org_id,
+    userId,
+    orgId: viewerOrgId,
+    canCreateFinancialDocs,
+  })
 
   // Resolved contract total = contact.amount + approved change order
   // adjustments. Mirrors the math in InvoiceTemplate so on-screen +
@@ -82,24 +103,30 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
     .reduce((s: any, co: any) => s + Number(co.amount || 0), 0)
   const contractTotal = Number(contact?.amount || 0) + approvedCOAdjustment
   const previouslyPaid = (payments || []).reduce((s: any, p: any) => s + Number(p.amount || 0), 0)
-  const drawsIssued = draws
-    .filter((d) => d.status !== 'void')
-    .reduce((s, d) => s + Number(d.amount || 0), 0)
+  const liveDraws = draws.filter((d) => d.status !== 'void')
+  const drawsIssued = liveDraws.reduce((s, d) => s + Number(d.amount || 0), 0)
   const unbilled = Math.max(0, contractTotal - drawsIssued)
 
-  const fetchDraws = async () => {
-    if (!contact?.id) return
+  const contactId = contact?.id
+  const fetchDraws = useCallback(async () => {
+    if (!contactId) return
     setLoading(true)
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('fh_invoices')
       .select('*')
-      .eq('contact_id', contact.id)
+      .eq('contact_id', contactId)
       .order('sequence_number', { ascending: true })
+    if (error) toastError("Couldn't load draws", error.message)
     setDraws(data || [])
+    setLoadFailed(!!error)
     setLoading(false)
-  }
+  }, [contactId])
 
-  useEffect(() => { fetchDraws() }, [contact?.id])
+  useEffect(() => { fetchDraws() }, [fetchDraws])
+
+  // Paid to date and the PDF's previously paid come from the job detail
+  // query, so a payment recorded here refreshes it.
+  const refreshJob = () => queryClient.invalidateQueries({ queryKey: ['jobDetail', contactId] })
 
   async function handleSave(payload: any) {
     if (!contact?.id || !userId) return false
@@ -151,11 +178,12 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
   // title comes from the schedule's label; amount = pct × contractTotal
   // (which already includes approved change orders).
   //
-  // Guarded against duplicate generation: only enabled when zero draws
-  // exist on the contract. Re-running after deletion is fine.
+  // Guarded against duplicate generation: only enabled when no live
+  // draws exist on the contract. Re-running after voiding or deleting
+  // them is fine.
   async function handleGenerateFromTerms() {
-    if (!contact?.id || !userId) return
-    if (draws.length > 0) {
+    if (!contact?.id || !userId || loadFailed) return
+    if (liveDraws.length > 0) {
       toastError(
         'Draws already exist',
         'Delete or void the existing draws first if you want to start over from terms.'
@@ -175,27 +203,22 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       // Build N rows + insert sequentially so the BEFORE INSERT trigger
       // assigns sequence_numbers 1, 2, 3 deterministically. Batch insert
       // would race the sequence assignment.
+      //
+      // splitByPercents works in cents: each draw rounds on its own and
+      // the last takes the remainder, so a $3,000.50 contract produces
+      // draws that add up to exactly $3,000.50. It is the same split the
+      // proposal's payment terms print, so the two never disagree.
+      const amounts = splitByPercents(contractTotal, schedule.map((row) => row.pct))
       let createdCount = 0
-      let issuedSoFar = 0
       for (let i = 0; i < schedule.length; i++) {
         const row = schedule[i]
         const pct = Number(row.pct || 0)
-        // Each draw rounds independently EXCEPT the last, which takes
-        // the remainder, otherwise per-draw rounding drifts and the
-        // schedule doesn't reconcile to the contract total. Round to
-        // CENTS, not whole dollars: a $3,000.50 contract must produce
-        // draws that sum to exactly $3,000.50, or the schedule printed
-        // on the customer's invoice disagrees with the contract line.
-        const amount = i === schedule.length - 1
-          ? Math.round((contractTotal - issuedSoFar) * 100) / 100
-          : Math.round(contractTotal * pct) / 100
-        issuedSoFar += amount
         const { error } = await supabase.from('fh_invoices').insert({
           contact_id: contact.id,
           user_id: userId,
           sequence_number: 0, // trigger assigns next
           title: `${pct}%, ${row.label}`,
-          amount,
+          amount: amounts[i],
           status: 'draft',
           notes: row.sub || null
         })
@@ -214,8 +237,25 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
     }
   }
 
+  // Every balance (Paid to date, the job's balance, A/R, statements, the
+  // customer's link) is summed from fh_payments, so marking a draw paid
+  // has to record the payment, not just flip its status. The payment
+  // sheet links the payment to this draw and logPayment settles it.
   async function handleMarkPaid(draw: any) {
-    if (!draw?.id) return
+    if (!draw?.id || busyId) return
+    // Money already on the books may cover this draw: a payment linked to
+    // it, or job level money (say a deposit logged before the draws were
+    // set up) that pays the oldest open draws first. Then only the status
+    // is behind, and recording another payment would count it twice.
+    const covered = invoicesPaidInFull({ invoices: draws, payments, contractTotal }).includes(draw.id)
+    if (!covered) {
+      const linked = (payments || [])
+        .filter((p: any) => p?.invoice_id === draw.id)
+        .reduce((s: number, p: any) => s + Number(p.amount || 0), 0)
+      const owed = Math.max(0, Math.round((Number(draw.amount || 0) - linked) * 100) / 100)
+      setPaying({ draw, owed })
+      return
+    }
     setBusyId(draw.id)
     try {
       const { error } = await supabase
@@ -223,7 +263,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
         .update({ status: 'paid' })
         .eq('id', draw.id)
       if (error) throw error
-      toastSuccess('Marked paid', `Draw #${draw.sequence_number}`)
+      toastSuccess('Marked paid', `Draw #${draw.sequence_number} is covered by payments already logged`)
       await fetchDraws()
     } catch (e: any) {
       toastError("Couldn't update", e?.message || 'Try again.')
@@ -250,7 +290,14 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
     }
   }
 
+  // Only a draft can be deleted. Its number never reached the customer,
+  // while deleting a sent or paid draw hands its number to the next draw
+  // and unlinks its payments. Void keeps that record on the books.
   async function handleDelete(draw: any) {
+    if (draw?.status !== 'draft') {
+      toastError('Only drafts can be deleted', 'Void this draw instead so it stays on the books.')
+      return
+    }
     if (!(await confirm({ title: `Delete Draw #${draw.sequence_number}?`, body: 'This cannot be undone.', destructive: true }))) return
     try {
       const { error } = await supabase
@@ -406,7 +453,8 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
           recipient_name: contact.name || null,
           storage_path: path,
           filename: result.filename,
-          amount_due: draw.amount
+          // Same cap as the PDF's "Amount due", so email and PDF agree.
+          amount_due: invoiceAmountDue({ invoice: draw, contact, payments, changeOrders })
         })
       })
       const sendBody = await sendRes.json().catch(() => ({}))
@@ -463,7 +511,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
         count={draws.length}
         canAdd={!creating && editingId == null}
         onAdd={() => setCreating(true)}
-        canGenerate={!loading && draws.length === 0 && contractTotal > 0 && !creating && editingId == null}
+        canGenerate={!loading && !loadFailed && liveDraws.length === 0 && contractTotal > 0 && !creating && editingId == null}
         onGenerate={handleGenerateFromTerms}
         generating={busyId === '__generate__'}
       />
@@ -508,6 +556,21 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
           onSend={handleSend}
         />
       )}
+      <AnimatePresence>
+        {paying && (
+          <Suspense fallback={null}>
+            <V3PaymentSheet
+              contact={contact}
+              balance={paying.owed}
+              // Prefill what is still owed on this draw, not its full
+              // amount, when part of it was already paid.
+              invoice={{ ...paying.draw, amount: paying.owed }}
+              onClose={() => setPaying(null)}
+              onLogged={() => { setPaying(null); fetchDraws(); refreshJob() }}
+            />
+          </Suspense>
+        )}
+      </AnimatePresence>
     </Shell>
   )
 }
@@ -539,7 +602,7 @@ function Header({ count, canAdd, onAdd, canGenerate, onGenerate, generating }: a
       background: 'var(--v3-surface-2)',
       flexWrap: 'wrap'
     }}>
-      <FileText size={14} aria-hidden="true" style={{ color: 'var(--v3-primary-bright)' }} />
+      <FileText size={14} aria-hidden="true" style={{ color: 'var(--v3-primary-text)' }} />
       <Eyebrow tone="gold">
         Invoice draws
         {count > 0 && (
@@ -560,7 +623,7 @@ function Header({ count, canAdd, onAdd, canGenerate, onGenerate, generating }: a
               padding: '8px 12px', borderRadius: 10,
               background: 'color-mix(in srgb, var(--v3-primary) 14%, transparent)',
               border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
-              color: 'var(--v3-primary-bright)',
+              color: 'var(--v3-primary-text)',
               fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
               letterSpacing: 0,
               cursor: generating ? 'wait' : 'pointer',
@@ -599,8 +662,8 @@ function Summary({ contractTotal, drawsIssued, previouslyPaid, unbilled }: any) 
   const cells = [
     { label: 'Contract total', value: money(contractTotal) },
     { label: 'Drawn so far',   value: money(drawsIssued) },
-    { label: 'Paid to date',   value: money(previouslyPaid), color: 'var(--v3-success-bright, #2D7A4F)' },
-    { label: 'Unbilled',       value: money(unbilled),       color: 'var(--v3-primary-bright)' }
+    { label: 'Paid to date',   value: money(previouslyPaid), color: 'var(--v3-success-text)' },
+    { label: 'Unbilled',       value: money(unbilled),       color: 'var(--v3-primary-text)' }
   ]
   return (
     <div className="fh-draws-summary" style={{
@@ -677,7 +740,7 @@ function Row({ draw, busy, readOnly, onEdit, onDownload, onSend, onMarkPaid, onV
     <div className="fh-draws-row" style={{ display: 'grid', gridTemplateColumns: '72px 1fr auto', gap: 12, padding: '12px 16px', alignItems: 'flex-start' }}>
       <div style={{
         fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-        letterSpacing: 0, color: 'var(--v3-primary-bright)',
+        letterSpacing: 0, color: 'var(--v3-primary-text)',
         fontVariantNumeric: 'tabular-nums', paddingTop: 4
       }}>
         Draw #{draw.sequence_number}
@@ -740,9 +803,12 @@ function Row({ draw, busy, readOnly, onEdit, onDownload, onSend, onMarkPaid, onV
                 <X size={12} aria-hidden="true" />
               </IconBtn>
             )}
-            <IconBtn onClick={onDelete} tone="danger" title="Delete" aria-label="Delete draw">
-              <Trash2 size={12} aria-hidden="true" />
-            </IconBtn>
+            {/* Drafts only: a sent or paid draw is voided, never deleted. */}
+            {draw.status === 'draft' && (
+              <IconBtn onClick={onDelete} tone="danger" title="Delete" aria-label="Delete draw">
+                <Trash2 size={12} aria-hidden="true" />
+              </IconBtn>
+            )}
           </div>
         )}
       </div>
@@ -840,7 +906,10 @@ function Editor({ initial, isNew, unbilled, onSave, onCancel }: any) {
         />
       </label>
       <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-        {['draft','sent','paid','overdue'].map((s) => (
+        {/* Paid is only shown for a draw that already is. A draw becomes
+            paid by recording its payment (the check button), so the
+            balance moves with the status. */}
+        {(initial.status === 'paid' ? ['draft', 'sent', 'paid', 'overdue'] : ['draft', 'sent', 'overdue']).map((s) => (
           <button
             key={s}
             type="button"
@@ -869,9 +938,9 @@ function Editor({ initial, isNew, unbilled, onSave, onCancel }: any) {
 function Tag({ tone, children }: any) {
   const palette = ({
     muted: { bg: 'var(--v3-glass-tint)', fg: 'var(--v3-text-muted)', br: 'var(--v3-border-mid)' },
-    green: { bg: 'rgba(45, 122, 79, 0.12)', fg: 'var(--v3-success-bright, #2D7A4F)', br: 'rgba(45, 122, 79, 0.30)' },
-    gold:  { bg: 'rgba(201, 150, 58, 0.12)', fg: 'var(--v3-primary-bright)', br: 'rgba(201, 150, 58, 0.30)' },
-    red:   { bg: 'rgba(192, 57, 43, 0.10)', fg: 'var(--v3-danger-bright, #C0392B)', br: 'rgba(192, 57, 43, 0.30)' }
+    green: { bg: 'rgba(45, 122, 79, 0.12)', fg: 'var(--v3-success-text)', br: 'rgba(45, 122, 79, 0.30)' },
+    gold:  { bg: 'rgba(201, 150, 58, 0.12)', fg: 'var(--v3-primary-text)', br: 'rgba(201, 150, 58, 0.30)' },
+    red:   { bg: 'rgba(192, 57, 43, 0.10)', fg: 'var(--v3-danger-text)', br: 'rgba(192, 57, 43, 0.30)' }
   } as Record<string, any>)[tone] || { bg: 'var(--v3-glass-tint)', fg: 'var(--v3-text-muted)', br: 'var(--v3-border-mid)' }
   return (
     <Eyebrow style={{ padding: '4px 8px', borderRadius: 10, background: palette.bg, border: `1px solid ${palette.br}`, color: palette.fg }}>
@@ -894,7 +963,7 @@ function IconBtn({ children, onClick, disabled, tone, title, ...rest }: any) {
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         background: 'transparent',
         border: `1px solid ${danger ? 'rgba(192, 57, 43, 0.35)' : 'var(--v3-border-strong)'}`,
-        color: danger ? 'var(--v3-danger-bright, #C0392B)' : 'var(--v3-text)',
+        color: danger ? 'var(--v3-danger-text)' : 'var(--v3-text)',
         cursor: disabled ? 'wait' : 'pointer',
         opacity: disabled ? 0.6 : 1
       }}
@@ -923,7 +992,7 @@ const chipStyle = {
 const chipActiveStyle = {
   background: 'rgba(201, 150, 58, 0.15)',
   borderColor: 'var(--v3-primary)',
-  color: 'var(--v3-primary-bright)'
+  color: 'var(--v3-primary-text)'
 }
 const primaryBtnStyle = {
   display: 'inline-flex', alignItems: 'center', gap: 8,

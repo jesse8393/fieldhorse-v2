@@ -1,3 +1,5 @@
+import { handleTablistKeyDown } from '../../lib/tabs.ts'
+
 /**
  * FilterPill, canonical segmented filter chip with optional count.
  *
@@ -28,8 +30,11 @@ type FilterPillProps = import('react').ButtonHTMLAttributes<HTMLButtonElement> &
    * ARIA role. Defaults to a standalone toggle button (role="button" +
    * aria-pressed), which is valid in ANY container. Pass `asTab` only
    * when the pill lives inside a role="tablist" (e.g. Work.tsx), then it
-   * emits role="tab" + aria-selected. Invoices.tsx renders these pills in
-   * a plain flex div, so the default keeps them from being orphaned
+   * emits role="tab" + aria-selected and joins the tablist keyboard
+   * pattern: only the active pill is a Tab stop, and Left/Right/Home/End
+   * move between the pills (lib/tabs.ts). Keep exactly one pill active in
+   * that tablist so it stays reachable. Invoices.tsx renders these pills
+   * in a plain flex div, so the default keeps them from being orphaned
    * role="tab" nodes.
    */
   asTab?: boolean
@@ -45,6 +50,7 @@ export default function FilterPill({
   asTab = false,
   className,
   style,
+  onKeyDown,
   ...rest
 }: FilterPillProps) {
   const padY = size === 'sm' ? 7 : 9
@@ -58,6 +64,11 @@ export default function FilterPill({
       role={asTab ? 'tab' : 'button'}
       aria-selected={asTab ? active : undefined}
       aria-pressed={asTab ? undefined : active}
+      tabIndex={asTab ? (active ? 0 : -1) : undefined}
+      onKeyDown={(e) => {
+        onKeyDown?.(e)
+        if (asTab) handleTablistKeyDown(e)
+      }}
       aria-label={ariaLabel}
       className={className}
       style={{

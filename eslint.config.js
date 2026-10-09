@@ -1,13 +1,42 @@
-// ESLint v9 flat config — minimal config that lets `npm run lint` exit
-// cleanly so CI doesn't block. Targets only safe rule families: no-undef
-// (off — typescript-eslint handles undeclared globals via tsconfig),
-// no-unused-vars (off — typescript handles), and common JSX rules.
+// ESLint 9 flat config. `npm run lint` runs `eslint .` over the web app,
+// the Netlify functions, the e2e specs and the repo scripts.
 //
-// Intentionally permissive: this codebase has long-standing inline
-// `style={{...}}` patterns + heavy `any` casting that would generate
-// thousands of warnings under strict configs. Tightening is its own
-// project. For now the script just needs to exit zero on a clean tree.
+// What it checks:
+// * Every .js, .mjs, .ts and .tsx file outside the ignored folders gets
+//   @eslint/js recommended at its default levels, so real bug patterns
+//   such as unreachable code, duplicate keys, constant conditions, switch
+//   fall through and self assignment fail the run.
+// * .ts and .tsx files are parsed by the typescript-eslint parser with JSX
+//   on. Parsing only: there is no type aware `project`, so lint stays fast
+//   and needs no tsconfig. Type errors are what `npm run typecheck` is for.
+// * React hooks: rules-of-hooks is an error and exhaustive-deps a warning.
+//   Only these two rules are named, so a newer plugin version cannot turn
+//   on more rules through its recommended preset.
+// * eslint-plugin-react is registered so disable comments that name its
+//   rules resolve, and only its rules for real JSX bugs are on (missing
+//   list keys, duplicate props, comments rendered as text, state mutated
+//   directly). Its style rules stay off.
+//
+// * Plain .js and .mjs files are not typechecked, so no-undef runs on them
+//   with the globals each one really has: Node for the Netlify functions,
+//   scripts and build config, the browser for src/lib/pdf.js, and both for
+//   the QA scripts, whose page callbacks run in the browser.
+//
+// What it leaves off:
+// * no-undef and no-redeclare for .ts and .tsx. The TypeScript compiler
+//   reports undefined names and clashing declarations there.
+// * no-unused-vars for every file. Unused names are untidy rather than
+//   broken, and tsconfig leaves noUnusedLocals off too.
+// * Reports of unused disable comments. Several comments name rules that
+//   are off here (no-console, for one), so they would always read as unused.
+//
+// Warnings do not fail the run. Review each exhaustive-deps warning on its
+// own merits: adding a missing dependency changes when the effect runs.
 import js from '@eslint/js'
+import tseslint from 'typescript-eslint'
+import reactHooks from 'eslint-plugin-react-hooks'
+import react from 'eslint-plugin-react'
+import globals from 'globals'
 
 export default [
   {
@@ -18,9 +47,16 @@ export default [
       'public/**',
       'mobile/**',
       'supabase/migrations/**',
-      'scripts/**',
       'test_out/**',
       '_reference/**',
+      'qa-shots/**',
+      'playwright-report/**',
+      'test-results/**',
+      '.netlify/**',
+      // Local Claude settings and agent worktrees, each a full copy of the repo.
+      '.claude/**',
+      // Root level .mjs files are local session tooling that git ignores.
+      '*.mjs',
     ],
   },
   js.configs.recommended,
@@ -28,71 +64,54 @@ export default [
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
-      globals: {
-        window: 'readonly',
-        document: 'readonly',
-        navigator: 'readonly',
-        location: 'readonly',
-        localStorage: 'readonly',
-        sessionStorage: 'readonly',
-        console: 'readonly',
-        fetch: 'readonly',
-        Request: 'readonly',
-        Response: 'readonly',
-        Headers: 'readonly',
-        URL: 'readonly',
-        URLSearchParams: 'readonly',
-        Blob: 'readonly',
-        File: 'readonly',
-        FileReader: 'readonly',
-        FormData: 'readonly',
-        ResizeObserver: 'readonly',
-        IntersectionObserver: 'readonly',
-        MutationObserver: 'readonly',
-        CustomEvent: 'readonly',
-        Event: 'readonly',
-        AbortController: 'readonly',
-        AbortSignal: 'readonly',
-        setTimeout: 'readonly',
-        clearTimeout: 'readonly',
-        setInterval: 'readonly',
-        clearInterval: 'readonly',
-        queueMicrotask: 'readonly',
-        crypto: 'readonly',
-        atob: 'readonly',
-        btoa: 'readonly',
-        // Node-ish globals used in build scripts / SSR-ish paths
-        process: 'readonly',
-        Buffer: 'readonly',
-        __dirname: 'readonly',
-        __filename: 'readonly',
-        global: 'readonly',
-        // Service-worker globals (referenced by vite-plugin-pwa output)
-        self: 'readonly',
-        caches: 'readonly',
-        clients: 'readonly',
-        importScripts: 'readonly',
-        // React 17+ automatic JSX transform doesn't need React in scope
-        React: 'readonly',
-        JSX: 'readonly',
-      },
+    },
+    linterOptions: {
+      reportUnusedDisableDirectives: 'off',
     },
     rules: {
-      // TypeScript handles these better than ESLint:
-      'no-unused-vars': 'off',
       'no-undef': 'off',
-      // Common React idioms that fire false positives:
-      'no-empty': ['warn', { allowEmptyCatch: true }],
-      'no-prototype-builtins': 'off',
-      'no-useless-escape': 'off',
-      'no-cond-assign': 'off',
-      'no-irregular-whitespace': 'off',
-      'no-control-regex': 'off',
-      'no-misleading-character-class': 'off',
-      'no-fallthrough': 'warn',
-      'no-self-assign': 'warn',
-      'no-async-promise-executor': 'warn',
-      'no-constant-binary-expression': 'warn',
+      'no-unused-vars': 'off',
+      'no-empty': ['error', { allowEmptyCatch: true }],
+    },
+  },
+  {
+    files: ['netlify/**/*.js', '*.js', 'scripts/**/*.{js,mjs}'],
+    languageOptions: { globals: { ...globals.node } },
+    rules: { 'no-undef': 'error' },
+  },
+  {
+    // Playwright QA scripts: page.evaluate callbacks run in the browser.
+    files: ['scripts/qa-*.mjs'],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+  },
+  {
+    files: ['src/**/*.js'],
+    languageOptions: { globals: { ...globals.browser } },
+    rules: { 'no-undef': 'error' },
+  },
+  {
+    files: ['**/*.{ts,tsx}'],
+    languageOptions: {
+      parser: tseslint.parser,
+      parserOptions: { ecmaFeatures: { jsx: true } },
+    },
+    plugins: {
+      'react-hooks': reactHooks,
+      react,
+    },
+    settings: {
+      react: { version: 'detect' },
+    },
+    rules: {
+      'no-redeclare': 'off',
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
+      'react/jsx-key': 'error',
+      'react/jsx-no-duplicate-props': 'error',
+      'react/jsx-no-comment-textnodes': 'error',
+      'react/no-children-prop': 'error',
+      'react/no-danger-with-children': 'error',
+      'react/no-direct-mutation-state': 'error',
     },
   },
 ]

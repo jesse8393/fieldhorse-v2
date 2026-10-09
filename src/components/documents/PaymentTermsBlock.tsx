@@ -11,10 +11,13 @@
 // array of { pct, label, sub? } and the block renders that instead.
 // Each row stamps the percent + dollar amount derived from `total`,
 // so the customer sees real money next to each milestone rather than
-// having to math it out themselves.
+// having to math it out themselves. Amounts come from the shared cents
+// split (last milestone takes the remainder), so the milestones add up
+// to the printed total and match the draws generated from these terms.
 
 import { DOC_COLORS, typeStyle, resolveBrandGold } from './tokens.ts'
 import { money } from './format.ts'
+import { splitByPercents } from '../../lib/paymentSchedule.ts'
 
 export const DEFAULT_PAYMENT_SCHEDULE = [
   { pct: 50, label: 'Deposit due upon approval',         sub: 'Before crew mobilizes' },
@@ -28,7 +31,7 @@ export default function PaymentTermsBlock({
   company
 }: { total?: number; schedule?: any[]; company?: any }) {
   const gold = resolveBrandGold(company)
-  const grand = Number(total || 0)
+  const amounts = splitByPercents(total, schedule.map((row) => row?.pct))
 
   return (
     <ul
@@ -45,7 +48,7 @@ export default function PaymentTermsBlock({
     >
       {schedule.map((row, i) => {
         const pct = Number(row.pct || 0)
-        const amt = Math.round(grand * (pct / 100))
+        const amt = amounts[i]
         return (
           <li
             key={i}

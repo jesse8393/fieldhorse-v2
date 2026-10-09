@@ -19,6 +19,69 @@ const ANTHROPIC_VERSION = '2023-06-01'
 // (doc intelligence); 8192 leaves headroom while capping abuse cost.
 const MAX_TOKENS_CEILING = 8192
 
+// Input caps. The per user rate limit bounds how many requests run; these
+// bound what one request can cost. Before them a signed in account could
+// send megabytes of filler in `system` on every allowed request. Every
+// caller in src/ sends a short prompt (a few thousand characters), and the
+// vision helpers send one photo compressed to about 1.2 MB (1.6 MB of
+// base64), which the body cap leaves room for.
+export const INPUT_LIMITS = {
+  bodyChars: 4_000_000,
+  textChars: 60_000,
+  imageBlocks: 2,
+}
+
+/**
+ * Size of a request's prompt: characters of text in `system` and every
+ * message, plus the number of image blocks. Image data is not counted as
+ * text (an image's token cost is bounded by its size cap, so the count is
+ * what matters); any other block type counts by its JSON length.
+ */
+export function measureClaudeInput({ system, messages }) {
+  let textChars = 0
+  let imageBlocks = 0
+  const add = (content) => {
+    if (content == null) return
+    if (typeof content === 'string') {
+      textChars += content.length
+      return
+    }
+    if (!Array.isArray(content)) {
+      textChars += JSON.stringify(content).length
+      return
+    }
+    for (const block of content) {
+      if (block?.type === 'image') imageBlocks += 1
+      else if (block?.type === 'text' && typeof block.text === 'string') textChars += block.text.length
+      else textChars += JSON.stringify(block ?? null).length
+    }
+  }
+  add(system)
+  for (const message of Array.isArray(messages) ? messages : []) add(message?.content)
+  return { textChars, imageBlocks }
+}
+
+/**
+ * How the proxy treats a model, keyed on the family prefix rather than
+ * exact ids, so pointing ANTHROPIC_MODEL at another Claude 5 model (for
+ * example claude-fable-5-1 or claude-opus-5-5) keeps the same handling.
+ *   isClaude5:       every Claude 5 model rejects a non default
+ *                    temperature with a 400, so it is never forwarded
+ *   disableThinking: claude-sonnet-5 only, as before. Other Claude 5
+ *                    models keep thinking on (Sonnet 5.5 rejects thinking
+ *                    disabled, and Fable, Mythos and Opus 5.5 cannot turn
+ *                    it off at all)
+ *   thinkingOn:      thinking stays on and shares max_tokens with the
+ *                    answer, so small budgets are floored and effort is
+ *                    pinned low unless the caller asks otherwise
+ */
+export function claudeModelTraits(model) {
+  const id = String(model || '')
+  const isClaude5 = /^claude-(fable|mythos|opus|sonnet|haiku)-5(-|$)/.test(id)
+  const disableThinking = id === 'claude-sonnet-5'
+  return { isClaude5, disableThinking, thinkingOn: isClaude5 && !disableThinking }
+}
+
 export default async (request) => {
   if (request.method === 'OPTIONS') {
     return new Response(null, {
@@ -65,9 +128,20 @@ export default async (request) => {
     return json({ error: 'rate_limited', message: 'Too many requests. Please try again in a minute.' }, 429)
   }
 
+  // Read the raw text first so an oversized body is refused before it is
+  // parsed (see INPUT_LIMITS).
+  let rawBody
+  try {
+    rawBody = await request.text()
+  } catch {
+    return json({ error: 'invalid_json' }, 400)
+  }
+  if (rawBody.length > INPUT_LIMITS.bodyChars) {
+    return json({ error: 'payload_too_large', message: 'This request is too large for the assistant.' }, 413)
+  }
   let body
   try {
-    body = await request.json()
+    body = JSON.parse(rawBody)
   } catch {
     return json({ error: 'invalid_json' }, 400)
   }
@@ -87,6 +161,10 @@ export default async (request) => {
   if (messages.length > 50) {
     return json({ error: 'too_many_messages', limit: 50 }, 400)
   }
+  const inputSize = measureClaudeInput({ system, messages })
+  if (inputSize.textChars > INPUT_LIMITS.textChars || inputSize.imageBlocks > INPUT_LIMITS.imageBlocks) {
+    return json({ error: 'payload_too_large', message: 'This request is too large for the assistant.' }, 413)
+  }
 
   // Model allow-list. `model` is caller-supplied; without this a signed-in
   // user could point the shared API key at any (e.g. more expensive) model.
@@ -100,37 +178,36 @@ export default async (request) => {
     DEFAULT_MODEL
   ])
   const safeModel = ALLOWED_MODELS.has(model) ? model : DEFAULT_MODEL
+  const traits = claudeModelTraits(safeModel)
 
-  // Fable 5 runs adaptive thinking on EVERY turn, and thinking tokens share
-  // the max_tokens budget. Our callers ask for small caps (some as low as
-  // 120) sized for a no-thinking model — on Fable that starves the actual
-  // answer and truncates the JSON. Floor the budget so thinking + output
-  // both have room. (Still bounded by MAX_TOKENS_CEILING.)
-  const FABLE_MIN_TOKENS = 1200
+  // Claude 5 models with thinking on (Fable 5 always thinks) spend
+  // thinking tokens from the max_tokens budget. Our callers ask for small
+  // caps (some as low as 120) sized for a no thinking model, which starves
+  // the actual answer and truncates the JSON. Floor the budget so thinking
+  // and output both have room. (Still bounded by MAX_TOKENS_CEILING.)
+  const THINKING_MIN_TOKENS = 1200
   const requested = Math.max(1, Number(max_tokens) || 1024)
-  const floored = safeModel === 'claude-fable-5' ? Math.max(requested, FABLE_MIN_TOKENS) : requested
+  const floored = traits.thinkingOn ? Math.max(requested, THINKING_MIN_TOKENS) : requested
   const cappedMaxTokens = Math.min(floored, MAX_TOKENS_CEILING)
 
   const payload = { model: safeModel, max_tokens: cappedMaxTokens, messages }
   if (system) payload.system = system
 
   // Claude 5 family API differences (vs the 4.x models this proxy was
-  // written for):
-  //   - sonnet-5 / fable-5 reject non-default sampling params with a 400
-  //     → never forward temperature to them.
-  //   - fable-5 thinking is always on and cannot be disabled; depth (and
-  //     therefore latency + token spend) is controlled via
-  //     output_config.effort. These are short, latency-sensitive utility
-  //     calls, so default to LOW effort unless the caller asks otherwise —
-  //     low-effort Fable still beats prior models and keeps us inside the
-  //     client timeout.
-  //   - sonnet-5 (allowlisted fallback) runs adaptive thinking when
+  // written for), applied by family through claudeModelTraits:
+  //   * Claude 5 models reject non default sampling params with a 400,
+  //     so temperature is never forwarded to them.
+  //   * Where thinking stays on, depth (and therefore latency and token
+  //     spend) is controlled via output_config.effort. These are short,
+  //     latency sensitive utility calls, so default to LOW effort unless
+  //     the caller asks otherwise; low effort keeps us inside the client
+  //     timeout.
+  //   * claude-sonnet-5 (allowlisted fallback) runs adaptive thinking when
   //     `thinking` is omitted; disable it there for the same latency reason.
-  const isClaude5 = safeModel === 'claude-sonnet-5' || safeModel === 'claude-fable-5'
-  if (typeof temperature === 'number' && !isClaude5) payload.temperature = temperature
-  if (safeModel === 'claude-sonnet-5') payload.thinking = { type: 'disabled' }
+  if (typeof temperature === 'number' && !traits.isClaude5) payload.temperature = temperature
+  if (traits.disableThinking) payload.thinking = { type: 'disabled' }
   const EFFORTS = new Set(['low', 'medium', 'high'])
-  if (safeModel === 'claude-fable-5') {
+  if (traits.thinkingOn) {
     payload.output_config = { effort: EFFORTS.has(effort) ? effort : 'low' }
   }
 

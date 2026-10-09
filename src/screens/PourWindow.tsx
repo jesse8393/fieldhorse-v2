@@ -15,13 +15,21 @@ const SnowForecast = lazy(() => import('../components/desktop/SnowForecastBuild.
 // Status token → brand palette mapping used across the whole screen.
 // All three statuses get a solid hex fallback so the strip doesn't render
 // transparent if a CSS var fails to resolve.
+// `fg` paints dots and bars (it must stay hex for the glow alpha suffix);
+// `ink` is the text safe shade for labels in both themes.
 const TONE: Record<string, any> = {
-  go:   { fg: '#2D7A4F', bg: 'rgba(45,122,79,0.16)',  border: 'rgba(45, 122, 79,0.35)', label: 'Clear to work' },
-  warn: { fg: '#C9963A', bg: 'rgba(201,150,58,0.14)', border: 'rgba(201,150,58,0.35)', label: 'Tight window' },
-  stop: { fg: '#C9963A', bg: 'rgba(192,57,43,0.15)',  border: 'rgba(192,57,43,0.35)',  label: 'Stand down' }
+  go:   { fg: '#2D7A4F', ink: 'var(--v3-success-text)', bg: 'rgba(45,122,79,0.16)',  border: 'rgba(45, 122, 79,0.35)', label: 'Clear to work' },
+  warn: { fg: '#C9963A', ink: 'var(--v3-primary-text)', bg: 'rgba(201,150,58,0.14)', border: 'rgba(201,150,58,0.35)', label: 'Tight window' },
+  stop: { fg: '#C0392B', ink: 'var(--v3-danger-text)',  bg: 'rgba(192,57,43,0.15)',  border: 'rgba(192,57,43,0.35)',  label: 'Stand down' }
 }
 
 function statusTone(status: any) { return TONE[status] || TONE.go }
+
+// Before a forecast arrives (loading, or the request failed) the screen must
+// not wear the green "clear to work" tone.
+const NEUTRAL_TONE = { fg: '#5C5C5C', ink: 'var(--v3-text-muted)', bg: 'var(--surface-2)', border: 'var(--rule)', label: '' }
+
+const FORECAST_ERROR = "Couldn't load the forecast. Check your connection and try again."
 
 function fmtTemp(t: any) {
   return t == null ? '\u2003' : `${Math.round(t)}°`
@@ -65,6 +73,10 @@ export default function PourWindow() {
   const [weather, setWeather] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
+  // True when the forecast request itself failed (not a location error), so
+  // the screen can offer a retry and stop showing a work status.
+  const [forecastFailed, setForecastFailed] = useState(false)
+  const [reloadTick, setReloadTick] = useState(0)
   const [cityName, setCityName] = useState('')
 
   const hasCoords = profile?.location_lat != null && profile?.location_lon != null
@@ -74,13 +86,19 @@ export default function PourWindow() {
     let cancelled = false
     const lat = profile?.location_lat ?? MURFREESBORO.lat
     const lon = profile?.location_lon ?? MURFREESBORO.lon
-    setLoading(true); setErr('')
+    setLoading(true); setErr(''); setForecastFailed(false)
     getWeather(lat, lon)
       .then((d) => { if (!cancelled) setWeather(d) })
-      .catch((e) => { if (!cancelled) setErr(e.message || 'Forecast unavailable') })
+      .catch(() => {
+        if (cancelled) return
+        setErr(FORECAST_ERROR)
+        setForecastFailed(true)
+      })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [profile?.location_lat, profile?.location_lon])
+  }, [profile?.location_lat, profile?.location_lon, reloadTick])
+
+  function retryForecast() { setReloadTick((n) => n + 1) }
 useEffect(() => {
     let cancelled = false
     const lat = profile?.location_lat ?? MURFREESBORO.lat
@@ -93,13 +111,13 @@ useEffect(() => {
 
 
   function pinLocation() {
-    if (!('geolocation' in navigator)) return setErr('Geolocation not supported')
+    if (!('geolocation' in navigator)) return setErr("This device can't share its location.")
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         await upsertProfile({ location_lat: pos.coords.latitude, location_lon: pos.coords.longitude })
         refresh()
       },
-      () => setErr('Location denied'),
+      () => setErr('Location access is off. Allow it for this site to pin your spot.'),
       { enableHighAccuracy: false, timeout: 8000, maximumAge: 60 * 60 * 1000 }
     )
   }
@@ -108,8 +126,10 @@ useEffect(() => {
     () => workWindow(weather?.current, services),
     [weather, services]
   )
+  // Anchor "Next 24 hours" on the forecast's own clock (current.time is
+  // local to the forecast spot) so it starts at the hour in progress.
   const strip = useMemo(
-    () => hourlyStrip(weather?.hourly, services, 24),
+    () => hourlyStrip(weather?.hourly, services, 24, weather?.current?.time),
     [weather, services]
   )
   const daily = useMemo(() => {
@@ -141,12 +161,17 @@ useEffect(() => {
     return list.map((t) => ({ trade: t, ...tradeStatus(t, snap) }))
   }, [weather, services])
 
-  const tone = statusTone(currentWindow?.status || 'go')
+  const tone = weather ? statusTone(currentWindow?.status || 'go') : NEUTRAL_TONE
+  const statusLabel = weather
+    ? (currentWindow.label || tone.label)
+    : loading ? 'Loading forecast' : forecastFailed ? 'Forecast unavailable' : 'Awaiting forecast'
   const currentCode = weather?.current?.weather_code
   const currentTemp = weather?.current?.temperature_2m
   const currentWind = weather?.current?.wind_speed_10m
   const currentHumidity = weather?.current?.relative_humidity_2m
-  const currentRain = weather?.current?.precipitation ?? 0
+  // Null until a forecast arrives, so the tile stays blank instead of
+  // claiming 0.00 in/h of rain.
+  const currentRain = weather?.current ? (weather.current.precipitation ?? 0) : null
 
   const { stagger, item } = useFhMotion()
   const isDesktop = useIsDesktop()
@@ -164,6 +189,7 @@ useEffect(() => {
           daily={daily}
           tradeRows={tradeRows}
           onPinLocation={pinLocation}
+          onRetry={forecastFailed ? retryForecast : undefined}
           onGoToSchedule={() => navigate('/schedule')}
         />
       </Suspense>
@@ -200,7 +226,7 @@ useEffect(() => {
             borderRadius: 10,
             border: hasCoords ? '1px solid rgba(201,150,58,0.3)' : '1px solid var(--rule)',
             background: hasCoords ? 'rgba(201,150,58,0.1)' : 'var(--surface-2)',
-            color: hasCoords ? 'var(--field-gold-bright)' : 'var(--ink-strong)',
+            color: hasCoords ? 'var(--v3-primary-text)' : 'var(--ink-strong)',
             display: 'grid',
             placeItems: 'center',
             cursor: 'pointer'
@@ -219,8 +245,18 @@ useEffect(() => {
             : (cityName || 'Murfreesboro, TN')}
         </div>
         {err && (
-          <div role="alert" style={{ marginTop: 8, fontSize: 12, color: 'var(--alert-red)', fontFamily: 'var(--font-body)' }}>
-            {err}
+          <div role="alert" style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', fontSize: 12, color: 'var(--v3-danger-text)', fontFamily: 'var(--font-body)' }}>
+            <span>{err}</span>
+            {forecastFailed && (
+              <button
+                type="button"
+                onClick={() => { hapticTap(); retryForecast() }}
+                disabled={loading}
+                style={{ minHeight: 44, padding: '0 16px', borderRadius: 10, border: '1px solid var(--rule-bold)', background: 'var(--surface-2)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, cursor: loading ? 'wait' : 'pointer' }}
+              >
+                {loading ? 'Trying again' : 'Try again'}
+              </button>
+            )}
           </div>
         )}
       </motion.div>
@@ -234,7 +270,9 @@ useEffect(() => {
           margin: '0 20px 14px',
           padding: '24px 24px 24px',
           borderRadius: 10,
-          background: 'linear-gradient(135deg, rgba(20, 20, 20,0.9), rgba(20, 20, 20,0.6))',
+          // Canvas colored veil: onyx in dark (as before), linen in daylight,
+          // so the theme colored temperature and labels stay readable.
+          background: 'linear-gradient(135deg, color-mix(in srgb, var(--v3-bg) 90%, transparent), color-mix(in srgb, var(--v3-bg) 60%, transparent))',
           border: `1px solid ${tone.border}`
         }}
       >
@@ -243,7 +281,7 @@ useEffect(() => {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', position: 'relative', gap: 12 }}>
           <div style={{ minWidth: 0, flex: 1 }}>
             <Eyebrow as="div" style={{ color: 'var(--ink-muted)' }}>
-              Today · {weatherLabel(currentCode)}
+              {currentCode == null ? 'Today' : `Today · ${weatherLabel(currentCode)}`}
             </Eyebrow>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 10 }}>
               <span style={{ fontFamily: 'var(--font-display)', fontSize: 24, letterSpacing: 0, lineHeight: 0.9, color: 'var(--ink-strong)' }}>
@@ -279,8 +317,8 @@ useEffect(() => {
             style={{ width: 10, height: 10, borderRadius: 10, background: tone.fg, boxShadow: `0 0 12px ${tone.fg}99` }}
           />
           <div style={{ minWidth: 0, flex: 1 }}>
-            <Eyebrow as="div" style={{ color: tone.fg }}>
-              {currentWindow.label || tone.label}
+            <Eyebrow as="div" style={{ color: tone.ink }}>
+              {statusLabel}
             </Eyebrow>
             {currentWindow.reasons?.length > 0 && (
               <div style={{ marginTop: 2, fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--ink-muted)' }}>
@@ -293,7 +331,7 @@ useEffect(() => {
         {/* Metric trio */}
         <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, position: 'relative' }}>
           <Metric Icon={Wind} label="Wind" value={currentWind != null ? `${Math.round(currentWind)}` : '\u2003'} unit="mph" />
-          <Metric Icon={Droplets} label="Rain now" value={`${(currentRain || 0).toFixed(2)}`} unit='in/h' />
+          <Metric Icon={Droplets} label="Rain now" value={currentRain == null ? '\u2003' : currentRain.toFixed(2)} unit='in/h' />
           <Metric Icon={Thermometer} label="Humidity" value={currentHumidity != null ? `${Math.round(currentHumidity)}` : '\u2003'} unit="%" />
         </div>
       </motion.div>
@@ -357,7 +395,7 @@ useEffect(() => {
                       both fmtHour and a markerLabel that printed "12A" /
                       "6A" / "12P" / "6P" twice, stacked vertically.
                       Marker hours now just get a slightly bolder color. */}
-                  <span style={{ fontSize: 12, fontWeight: isMarker ? 800 : 700, color: isMarker ? 'var(--field-gold-bright)' : 'var(--ink-muted)', fontFamily: 'var(--font-body)', letterSpacing: 0 }}>
+                  <span style={{ fontSize: 12, fontWeight: isMarker ? 800 : 700, color: isMarker ? 'var(--v3-primary-text)' : 'var(--ink-muted)', fontFamily: 'var(--font-body)', letterSpacing: 0 }}>
                     {fmtHour(h.time)}
                   </span>
                   <span
@@ -409,7 +447,7 @@ useEffect(() => {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                        <span style={{ fontFamily: 'var(--font-display)', fontSize: 16, letterSpacing: 0, color: i === 0 ? 'var(--field-gold-bright)' : 'var(--ink-strong)' }}>
+                        <span style={{ fontFamily: 'var(--font-display)', fontSize: 16, letterSpacing: 0, color: i === 0 ? 'var(--v3-primary-text)' : 'var(--ink-strong)' }}>
                           {i === 0 ? 'TODAY' : fmtDay(d.time)}
                         </span>
                         <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--ink-muted)' }}>
@@ -425,7 +463,7 @@ useEffect(() => {
                           <Wind size={11} />
                           {Math.round(d.windMax)} mph
                         </span>
-                        <Eyebrow style={{ gap: 4, padding: '4px 8px', borderRadius: 10, background: t.bg, border: `1px solid ${t.border}`, color: t.fg }}>
+                        <Eyebrow style={{ gap: 4, padding: '4px 8px', borderRadius: 10, background: t.bg, border: `1px solid ${t.border}`, color: t.ink }}>
                           {dayStatus === 'go' ? 'GO' : dayStatus === 'warn' ? 'TIGHT' : 'STOP'}
                         </Eyebrow>
                       </div>
@@ -477,7 +515,7 @@ useEffect(() => {
               >
                 <span
                   aria-hidden="true"
-                  style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 10, background: t.bg, border: `1px solid ${t.border}`, display: 'grid', placeItems: 'center', color: t.fg }}
+                  style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 10, background: t.bg, border: `1px solid ${t.border}`, display: 'grid', placeItems: 'center', color: t.ink }}
                 >
                   <Glyph size={14} strokeWidth={2.4} />
                 </span>
@@ -495,7 +533,7 @@ useEffect(() => {
                     </div>
                   )}
                 </div>
-                <Eyebrow style={{ flexShrink: 0, padding: '4px 8px', borderRadius: 10, background: t.bg, border: `1px solid ${t.border}`, color: t.fg }}>
+                <Eyebrow style={{ flexShrink: 0, padding: '4px 8px', borderRadius: 10, background: t.bg, border: `1px solid ${t.border}`, color: t.ink }}>
                   {r.status === 'go' ? 'GO' : r.status === 'warn' ? 'TIGHT' : 'STOP'}
                 </Eyebrow>
               </div>

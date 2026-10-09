@@ -227,7 +227,7 @@ export default function Partners() {
             textAlign: 'center', color: 'var(--v3-text-muted)',
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12
           }}>
-            <Users size={20} aria-hidden="true" style={{ color: 'var(--v3-primary)' }} />
+            <Users size={20} aria-hidden="true" style={{ color: 'var(--v3-primary-text)' }} />
             <div style={{
               fontFamily: 'var(--font-body)', fontSize: 14,
               fontWeight: 700, color: 'var(--v3-text)'
@@ -262,8 +262,8 @@ export default function Partners() {
 }
 
 function Metric({ label, tone = 'default', children }: any) {
-  const color = tone === 'good' ? 'var(--v3-good, #5C5C5C)'
-    : tone === 'gold' ? 'var(--v3-primary-bright)'
+  const color = tone === 'good' ? 'var(--v3-success-text)'
+    : tone === 'gold' ? 'var(--v3-primary-text)'
     : 'var(--v3-text)'
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
@@ -297,7 +297,7 @@ function PartnerCard({ partner, onResend, onRevoke, busy, resendingKey }: any) {
             width: 44, height: 44, borderRadius: 10,
             background: 'var(--v3-primary-soft)',
             border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)',
-            color: 'var(--v3-primary)',
+            color: 'var(--v3-primary-text)',
             display: 'grid', placeItems: 'center',
             fontFamily: 'var(--font-display)', fontSize: 20,
             letterSpacing: 0
@@ -371,9 +371,9 @@ function PartnerCard({ partner, onResend, onRevoke, busy, resendingKey }: any) {
                     {j.name || j.jobTitle || 'Untitled job'}
                   </span>
                 </Link>
-                <Eyebrow style={{ color: j.status === 'accepted' ? 'var(--v3-good, #5C5C5C)'
+                <Eyebrow style={{ color: j.status === 'accepted' ? 'var(--v3-success-text)'
                     : j.status === 'revoked' ? 'var(--v3-text-muted)'
-                    : 'var(--v3-primary-bright)' }}>
+                    : 'var(--v3-primary-text)' }}>
                   {j.status}
                 </Eyebrow>
                 {j.status !== 'revoked' && (
@@ -418,7 +418,7 @@ function PartnerCard({ partner, onResend, onRevoke, busy, resendingKey }: any) {
                 padding: '8px 12px', borderRadius: 10,
                 background: 'rgba(192,57,43,0.10)',
                 border: '1px solid rgba(192,57,43,0.35)',
-                color: 'var(--v3-danger-bright, #C0392B)',
+                color: 'var(--v3-danger-text)',
                 fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
                 letterSpacing: 0,
                 cursor: busy ? 'wait' : 'pointer',
@@ -437,10 +437,10 @@ function PartnerCard({ partner, onResend, onRevoke, busy, resendingKey }: any) {
 
 function StatusBadge({ status }: any) {
   const palette = status === 'accepted'
-    ? { bg: 'rgba(45, 122, 79, 0.14)', border: 'rgba(45, 122, 79, 0.45)', color: 'var(--v3-good, #5C5C5C)' }
+    ? { bg: 'rgba(45, 122, 79, 0.14)', border: 'rgba(45, 122, 79, 0.45)', color: 'var(--v3-success-text)' }
     : status === 'revoked'
       ? { bg: 'var(--v3-glass-tint)', border: 'var(--v3-border-strong)', color: 'var(--v3-text-muted)' }
-      : { bg: 'var(--v3-primary-soft)', border: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)', color: 'var(--v3-primary-bright)' }
+      : { bg: 'var(--v3-primary-soft)', border: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)', color: 'var(--v3-primary-text)' }
   return (
     <Eyebrow style={{ flexShrink: 0, padding: '4px 8px', borderRadius: 10, background: palette.bg, border: `1px solid ${palette.border}`, color: palette.color }}>
       {status}
@@ -453,7 +453,7 @@ function iconBtnStyle(busy: any) {
     width: 32, height: 32, borderRadius: 10,
     background: 'var(--v3-surface-2)',
     border: '1px solid var(--v3-border-strong)',
-    color: busy ? 'var(--v3-good, #5C5C5C)' : 'var(--v3-text)',
+    color: busy ? 'var(--v3-success-text)' : 'var(--v3-text)',
     display: 'grid', placeItems: 'center',
     cursor: busy ? 'wait' : 'pointer',
     WebkitTapHighlightColor: 'transparent'

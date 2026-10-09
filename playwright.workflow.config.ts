@@ -1,5 +1,12 @@
 import { defineConfig, devices } from '@playwright/test'
 
+// Browser channel. Unset (the default) runs Playwright's bundled Chromium,
+// which is what CI and most containers have. Set PW_CHANNEL=chrome to run
+// against an installed Google Chrome for device parity checks. Before this
+// the suite hardcoded 'chrome' and could not start anywhere Chrome was not
+// installed, which is how it ended up red on main without anyone noticing.
+const browserChannel = process.env.PW_CHANNEL ? { channel: process.env.PW_CHANNEL } : {}
+
 const mockAnonKey = [
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9',
   'eyJyb2xlIjoiYW5vbiIsImlhdCI6MTcxMDAwMDAwMCwiZXhwIjoyMDAwMDAwMDAwfQ',
@@ -16,7 +23,7 @@ export default defineConfig({
   reporter: [['list']],
   use: {
     baseURL: 'http://127.0.0.1:5199',
-    channel: 'chrome',
+    ...browserChannel,
     serviceWorkers: 'block',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
@@ -25,11 +32,11 @@ export default defineConfig({
   projects: [
     {
       name: 'desktop-workflow',
-      use: { ...devices['Desktop Chrome'], channel: 'chrome' }
+      use: { ...devices['Desktop Chrome'], ...browserChannel }
     },
     {
       name: 'mobile-workflow',
-      use: { ...devices['Pixel 7'], channel: 'chrome' }
+      use: { ...devices['Pixel 7'], ...browserChannel }
     }
   ],
   webServer: {

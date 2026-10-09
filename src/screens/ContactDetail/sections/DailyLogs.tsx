@@ -10,19 +10,37 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useQueryClient } from '@tanstack/react-query'
 import { CloudSun, Trash2, Users, Clock, Sparkles, ImagePlus, X, Pencil } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
+import { signedUrlsFor } from '../../../lib/signedUrls.ts'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { SkeletonList } from '../../../components/Skeleton.tsx'
 import { useConfirm } from '../../../components/ConfirmSheet.tsx'
 import { compressImageToBlob } from '../../../lib/docIntelligence.ts'
+import { todayYmd } from '../../../lib/dates.ts'
 import { Eyebrow } from '../../../components/v3'
 
 const SkeletonAny = SkeletonList as any
 const PHOTO_BUCKET = 'job-photos'
-const SIGN_TTL_SECONDS = 3600
 const MAX_BYTES = 10 * 1024 * 1024
+
+// Storage paths a saved log's photo list points at.
+function photoPaths(photos: any): string[] {
+  return (Array.isArray(photos) ? photos : [])
+    .map((p: any) => p?.storage_path)
+    .filter((p: any): p is string => typeof p === 'string' && p.length > 0)
+}
+
+// Delete photo objects nothing points at any more. Best effort: a failed
+// cleanup leaves a stray object, never a broken log, so it only warns.
+function removeStoredPhotos(paths: string[]) {
+  if (paths.length === 0) return
+  supabase.storage.from(PHOTO_BUCKET).remove(paths)
+    .then(({ error }) => { if (error) console.warn('[daily logs] photo cleanup failed', error.message) })
+    .catch(() => {})
+}
 
 type LogRow = {
   id: string
@@ -55,6 +73,7 @@ type DraftPhoto = { local_id: string; preview_url: string; storage_path: string;
 
 export default function DailyLogsSection({ jobId, userId }: any) {
   const confirm = useConfirm()
+  const queryClient = useQueryClient()
   const [rows, setRows] = useState<LogRow[]>([])
   const [loading, setLoading] = useState(true)
   const [composing, setComposing] = useState(false)
@@ -74,6 +93,10 @@ export default function DailyLogsSection({ jobId, userId }: any) {
   const [draftPhotos, setDraftPhotos] = useState<DraftPhoto[]>([])
   const [saving, setSaving] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  // Bumped every time the draft is cleared (cancel, post, save, or a new
+  // edit), so a photo that finishes uploading afterwards knows nothing
+  // will point at it.
+  const draftGenRef = useRef(0)
 
   const load = useCallback(async () => {
     if (!jobId) return
@@ -91,35 +114,25 @@ export default function DailyLogsSection({ jobId, userId }: any) {
     } else {
       const list = (data || []) as LogRow[]
       setRows(list)
-      // Batch-sign every photo path referenced by these rows so the
-      // <img> tags get a fresh signed URL. One round-trip regardless
-      // of how many logs returned.
-      const paths = new Set<string>()
-      for (const r of list) {
-        const arr = Array.isArray(r.photos) ? r.photos : []
-        for (const p of arr) {
-          if (typeof p?.storage_path === 'string') paths.add(p.storage_path)
-        }
-      }
-      if (paths.size > 0) {
-        const { data: signed } = await supabase.storage
-          .from(PHOTO_BUCKET)
-          .createSignedUrls(Array.from(paths), SIGN_TTL_SECONDS)
-        const next: Record<string, string> = {}
-        for (const s of (signed || [])) {
-          if (s?.path && s.signedUrl && !s.error) next[s.path] = s.signedUrl
-        }
-        setPhotoUrls(next)
+      // Batch-sign every photo path referenced by these rows. One
+      // round-trip regardless of how many logs returned, and URLs signed
+      // in the last 50 minutes are reused, so reloading the feed after a
+      // post lets the browser cache serve photos it already has.
+      const paths = list.flatMap((r) => photoPaths(r.photos))
+      if (paths.length > 0) {
+        const byPath = await signedUrlsFor(queryClient, PHOTO_BUCKET, paths)
+        setPhotoUrls(Object.fromEntries(byPath))
       } else {
         setPhotoUrls({})
       }
     }
     setLoading(false)
-  }, [jobId])
+  }, [jobId, queryClient])
 
   useEffect(() => { load() }, [load])
 
   function clearDraft() {
+    draftGenRef.current += 1
     setSummary('')
     setNextSteps('')
     setWeatherText('')
@@ -133,11 +146,30 @@ export default function DailyLogsSection({ jobId, userId }: any) {
     setDraftPhotos([])
   }
 
+  // Photos uploaded for the open draft. Photos already on a saved log
+  // (edit mode) are left out: that log still points at them.
+  function draftUploads(): string[] {
+    return draftPhotos
+      .filter((p) => !p.existing && !p.uploading && p.storage_path)
+      .map((p) => p.storage_path)
+  }
+
+  // Cancel throws the draft away, including the photos uploaded for it,
+  // which no log will ever point at.
+  function discardDraft() {
+    removeStoredPhotos(draftUploads())
+    clearDraft()
+    setComposing(false)
+  }
+
   // Open the compose form filled from an existing row. Existing
   // photos are loaded as drafts (flagged so cancel/remove doesn't purge
   // them from storage) using their already-signed URLs for preview.
   function startEdit(r: LogRow) {
     hapticTap()
+    // The edit replaces whatever draft was open, uploads included.
+    removeStoredPhotos(draftUploads())
+    clearDraft()
     setEditingId(r.id)
     setSummary(r.summary || '')
     setNextSteps(r.next_steps || '')
@@ -205,9 +237,20 @@ export default function DailyLogsSection({ jobId, userId }: any) {
       uploading: true,
     }))
     setDraftPhotos((cur) => [...cur, ...placeholders])
+    const gen = draftGenRef.current
     for (let i = 0; i < files.length; i++) {
       const ph = placeholders[i]
+      // The draft was cancelled or posted while this batch was uploading:
+      // stop, and delete anything that landed after it went away.
+      if (draftGenRef.current !== gen) break
       const done = await uploadOnePhoto(files[i])
+      if (draftGenRef.current !== gen) {
+        if (done) {
+          removeStoredPhotos([done.storage_path])
+          URL.revokeObjectURL(done.preview_url)
+        }
+        break
+      }
       setDraftPhotos((cur) => {
         if (!done) return cur.filter((p) => p.local_id !== ph.local_id)
         return cur.map((p) => (p.local_id === ph.local_id ? done : p))
@@ -244,25 +287,32 @@ export default function DailyLogsSection({ jobId, userId }: any) {
     if (editingId) {
       // Update in place. Optional fields are written explicitly (null
       // when cleared) so editing can remove a value, and photos are
-      // rewritten to whatever survived the edit.
+      // rewritten to whatever survived the edit. The photos column is
+      // NOT NULL (an empty list, never null), so a log with no photos
+      // writes [].
       const patch: Record<string, any> = {
         summary: text,
         next_steps: nextSteps.trim() || null,
         weather_text: weatherText.trim() || null,
         crew_count: crewCount && Number.isFinite(Number(crewCount)) ? parseInt(crewCount, 10) : null,
         hours_worked: hoursWorked && Number.isFinite(Number(hoursWorked)) ? Number(hoursWorked) : null,
-        photos: readyPhotos.length > 0 ? readyPhotos : null,
+        photos: readyPhotos,
       }
-      const { error } = await supabase
+      const { data: updated, error } = await supabase
         .from('fh_daily_logs')
         .update(patch as any)
         .eq('id', editingId)
         .eq('user_id', userId)
+        .select('id')
       setSaving(false)
-      if (error) {
-        toastError("Couldn't save changes", error.message)
+      if (error || !updated?.length) {
+        toastError("Couldn't save changes", error?.message || 'This log may have been deleted, or you can no longer edit it.')
         return
       }
+      // Photos taken off the log in this edit are no longer referenced.
+      const kept = new Set(readyPhotos.map((p) => p.storage_path))
+      const before = rows.find((r) => r.id === editingId)
+      removeStoredPhotos(photoPaths(before?.photos).filter((p) => !kept.has(p)))
       clearDraft()
       setComposing(false)
       toastSuccess('Daily log updated')
@@ -274,6 +324,9 @@ export default function DailyLogsSection({ jobId, userId }: any) {
       user_id: userId,
       contact_id: jobId,
       summary: text,
+      // The foreman's calendar day. The column default is the database's
+      // current_date, which is UTC, so an evening post was dated tomorrow.
+      log_date: todayYmd(),
     }
     if (nextSteps.trim()) payload.next_steps = nextSteps.trim()
     if (weatherText.trim()) payload.weather_text = weatherText.trim()
@@ -296,12 +349,21 @@ export default function DailyLogsSection({ jobId, userId }: any) {
     hapticTap()
     const ok = await confirm({ title: 'Delete this daily log?', body: 'This cannot be undone.', destructive: true })
     if (!ok) return
+    const row = rows.find((r) => r.id === id)
     setRows((rs) => rs.filter((r) => r.id !== id))
-    const { error } = await supabase.from('fh_daily_logs').delete().eq('id', id).eq('user_id', userId)
-    if (error) {
-      toastError("Couldn't delete", error.message)
+    const { data: deleted, error } = await supabase
+      .from('fh_daily_logs')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', userId)
+      .select('id')
+    if (error || !deleted?.length) {
+      toastError("Couldn't delete", error?.message || 'This log may already be gone, or you can no longer delete it.')
       load()
+      return
     }
+    // The log was the only thing pointing at its photos.
+    removeStoredPhotos(photoPaths(row?.photos))
   }
 
   return (
@@ -468,7 +530,7 @@ export default function DailyLogsSection({ jobId, userId }: any) {
             </button>
             <button
               type="button"
-              onClick={() => { clearDraft(); setComposing(false) }}
+              onClick={discardDraft}
               disabled={saving}
               style={secondaryBtn}
             >
@@ -500,7 +562,7 @@ export default function DailyLogsSection({ jobId, userId }: any) {
             borderRadius: 10,
           }}
         >
-          <Sparkles size={18} aria-hidden="true" style={{ display: 'block', margin: '0 auto 8px', color: 'var(--v3-primary)' }} />
+          <Sparkles size={18} aria-hidden="true" style={{ display: 'block', margin: '0 auto 8px', color: 'var(--v3-primary-text)' }} />
           No daily logs yet. Tap <strong style={{ color: 'var(--v3-text)' }}>+ New log</strong> after a shift to capture what got done.
         </div>
       ) : (

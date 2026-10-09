@@ -15,7 +15,10 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, authHeaders } from '../lib/supabase.ts'
 import { useInvoiceDetail, useInvalidateInvoiceDetail } from '../lib/queries.ts'
-import { fetchInvoicesForContact } from '../lib/invoices.ts'
+import { fetchInvoicesForContact, createInvoice, sendInvoiceEmail } from '../lib/invoices.ts'
+import { pickBalanceInvoice } from '../lib/invoiceSettlement.ts'
+import { moneyExact } from '../lib/format.ts'
+import { parseDateOnly } from '../lib/dates.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
 // Lazy, pdf.js + transitive jspdf + autoTable deps are ~430KB. Only
@@ -50,8 +53,8 @@ import { InvoiceTemplate } from '../components/documents'
 
 const AGING_BUCKETS = [
   { id: '0-30',  label: 'Current',  max: 30,        color: 'var(--v3-text-muted)',     accent: 'var(--v3-border-strong)' },
-  { id: '31-60', label: 'Late',     max: 60,        color: 'var(--v3-primary)',        accent: 'color-mix(in srgb, var(--v3-primary) 40%, transparent)' },
-  { id: '60+',   label: 'Overdue',  max: Infinity,  color: 'var(--v3-danger-bright)',  accent: 'color-mix(in srgb, var(--v3-danger) 50%, transparent)' }
+  { id: '31-60', label: 'Late',     max: 60,        color: 'var(--v3-primary-text)',        accent: 'color-mix(in srgb, var(--v3-primary) 40%, transparent)' },
+  { id: '60+',   label: 'Overdue',  max: Infinity,  color: 'var(--v3-danger-text)',  accent: 'color-mix(in srgb, var(--v3-danger) 50%, transparent)' }
 ]
 
 function bucketFor(days: any) {
@@ -67,9 +70,10 @@ function fmtMoney(n: any) {
 }
 
 function fmtDate(iso: any) {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
+  // paid_on is date-only: parse LOCAL, or a payment dated Oct 9 prints
+  // as Oct 8 in every US timezone. Timestamps pass through unchanged.
+  const d = parseDateOnly(iso)
+  if (!d) return ''
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
@@ -123,20 +127,18 @@ export default function InvoiceDetail() {
     enabled: !!id
   })
 
-  // The draw this screen bills: first still-open row (not void/paid/draft),
-  // falling back to the latest non-void row so we always have a real
-  // invoice number + due date when any draw exists.
-  const currentDraw = useMemo(() => {
-    const rows = invoiceRows || []
-    const open = rows.find((r: any) => {
-      const s = String(r?.status || '').toLowerCase()
-      return s !== 'void' && s !== 'paid' && s !== 'draft'
-    })
-    if (open) return open
-    const nonVoid = rows.filter((r: any) => String(r?.status || '').toLowerCase() !== 'void')
-    if (nonVoid.length) return nonVoid[nonVoid.length - 1]
-    return rows.length ? rows[rows.length - 1] : null
-  }, [invoiceRows])
+  // What this screen bills: the oldest still-open ISSUED draw (sent or
+  // overdue; rows arrive in sequence order), the same draw the Draws tab
+  // and the public link bill. Billing the whole contract here sent one
+  // customer a $20,000 "invoice" next to a $5,000 draw for the same job.
+  // Drafts were never sent and paid rows are settled, so neither may
+  // stand in as "this invoice" (that put a draft's number and amount on
+  // a PDF whose line items billed the whole balance). With no open
+  // issued draw the screen bills the whole balance.
+  const billingDraw = useMemo(() => (invoiceRows || []).find((r: any) => {
+    const s = String(r?.status || '').toLowerCase()
+    return s !== 'void' && s !== 'paid' && s !== 'draft'
+  }) || null, [invoiceRows])
   const [paying, setPaying] = useState(false)
   const [generating, setGenerating] = useState(false)
   // 'detail' = existing list-style breakdown (default, original UX).
@@ -184,9 +186,8 @@ export default function InvoiceDetail() {
     // first billed yesterday open with a red "Overdue · 91d" pill while
     // the A/R list said "Current · 1d".
     const drawAnchor = (() => {
-      const s = String(currentDraw?.status || '').toLowerCase()
-      if (!currentDraw || s === 'paid' || s === 'void' || s === 'draft') return null
-      const raw = currentDraw.due_at || currentDraw.issued_at || currentDraw.created_at
+      if (!billingDraw) return null
+      const raw = billingDraw.due_at || billingDraw.issued_at || billingDraw.created_at
       const t = raw ? new Date(raw).getTime() : NaN
       return Number.isFinite(t) ? t : null
     })()
@@ -197,7 +198,7 @@ export default function InvoiceDetail() {
     const isClosed = (contact?.stage || '').toLowerCase() === 'closed'
     const pctPaid = amount > 0 ? Math.min(100, Math.max(0, (paid / amount) * 100)) : 0
     return { amount, paid, balance, ageDays, bucket, isPaid, isClosed, pctPaid }
-  }, [contact, payments, changeOrders, currentDraw])
+  }, [contact, payments, changeOrders, billingDraw])
 
   const status = useMemo(() => {
     // Computed status, no stored invoice_status column today. The four
@@ -222,16 +223,6 @@ export default function InvoiceDetail() {
     payment_instructions: (profile as any)?.payment_instructions || ''
   }), [profile])
 
-  // What this screen is billing right now. When an open draw exists,
-  // the PDF/email bill THAT draw (same as the Draws tab and the public
-  // link), this path used to bill the whole contract, so the same
-  // customer could receive a $20,000 "invoice" from here and a $5,000
-  // draw from the Draws tab for the same job. Jobs without draw rows
-  // keep the whole-balance presentation.
-  const billingDraw = useMemo(() => {
-    const s = String(currentDraw?.status || '').toLowerCase()
-    return currentDraw && s !== 'paid' && s !== 'void' && s !== 'draft' ? currentDraw : null
-  }, [currentDraw])
   const pdfLineItems = useMemo(() => (
     billingDraw
       ? [{
@@ -274,7 +265,7 @@ export default function InvoiceDetail() {
         taxRate: 0,
         notes: '',
         dueDate: '',
-        dueDateIso: currentDraw?.due_at || null,
+        dueDateIso: billingDraw?.due_at || null,
         invoiceId: contact.id,
         payments,
         contractTotal: Number(contact?.amount || 0),
@@ -282,7 +273,9 @@ export default function InvoiceDetail() {
         insurance,
         changeOrders,
         invoices: invoiceRows,
-        currentInvoice: currentDraw
+        // The same row the line items bill, so the number, hero amount
+        // and due date describe one bill (null bills the whole balance).
+        currentInvoice: billingDraw
       })
       if (!result?.doc) throw new Error('PDF generator returned no document')
       downloadPdf(result)
@@ -329,6 +322,63 @@ export default function InvoiceDetail() {
     }
   }
 
+  // No open issued draw but money is still owed: the send goes out as a
+  // real fh_invoices row (the oldest unsent draft, else a new "Balance
+  // due" for the part of the contract nobody has billed yet) through the
+  // shared sendInvoiceEmail, so the issue date, due date and status are
+  // tracked like every other send. An untracked ad hoc PDF left no open
+  // invoice behind and A/R aging fell back to the job's creation date.
+  async function sendTrackedBalanceInvoice() {
+    if (!contact) return
+    const { data: rows, error: listErr } = await fetchInvoicesForContact(contact.id)
+    if (listErr) throw new Error(listErr.message || "Couldn't load this job's invoices")
+    const plan = pickBalanceInvoice({ invoices: rows, contractTotal: totals.amount, balance: totals.balance })
+    if (!plan) throw new Error('Nothing is owed on this job right now.')
+    let invoice
+    if (plan.invoice) {
+      invoice = plan.invoice
+    } else {
+      const { data: created, error: createErr } = await createInvoice({
+        contact,
+        userId: user!.id,
+        title: 'Balance due',
+        amount: plan.amount,
+        due_at: new Date(Date.now() + 14 * 86400000).toISOString()
+      })
+      if (createErr || !created) throw new Error(createErr?.message || "Couldn't create the invoice")
+      invoice = created
+    }
+    const wasDraft = String(invoice.status || '').toLowerCase() === 'draft'
+    const res = await sendInvoiceEmail({
+      invoice,
+      // Same recipient block as this screen's own PDF (client fallbacks).
+      contact: { ...contact, name: resolved.name || contact.name, email: resolved.email, phone: resolved.phone, address: resolved.address },
+      company,
+      userId: user!.id,
+      recipientEmail: resolved.email,
+      payments,
+      changeOrders,
+      insurance
+    })
+    if (res.ok) {
+      // Name the bill that went out: it can be a draft draw rather than
+      // the whole balance this screen showed.
+      toastSuccess(`Invoice sent to ${res.recipient}`, `${invoice.title || `Invoice #${invoice.sequence_number}`} · ${moneyExact(invoice.amount)}`)
+      setSent(true)
+      setTimeout(() => setSent(false), 2400)
+    } else if (res.reason === 'sender_not_configured') {
+      toastError(
+        "Email NOT sent, sender isn't configured",
+        wasDraft
+          ? 'Downloaded the PDF so you can email it manually. The invoice is saved as a draft.'
+          : 'Downloaded the PDF so you can email it manually.'
+      )
+    } else {
+      throw new Error(res.message || 'Send failed')
+    }
+    refresh()
+  }
+
   async function handleSendInvoice() {
     if (!contact || sending) return
     if (!resolved.email) {
@@ -337,6 +387,10 @@ export default function InvoiceDetail() {
     }
     setSending(true)
     try {
+      if (!billingDraw && totals.balance > 0.5) {
+        await sendTrackedBalanceInvoice()
+        return
+      }
       const { generateInvoice, downloadPdf } = await loadPdf()
       const result = await generateInvoice({
         company,
@@ -352,7 +406,7 @@ export default function InvoiceDetail() {
         taxRate: 0,
         notes: '',
         dueDate: '',
-        dueDateIso: currentDraw?.due_at || null,
+        dueDateIso: billingDraw?.due_at || null,
         invoiceId: contact.id,
         payments,
         contractTotal: Number(contact?.amount || 0),
@@ -360,7 +414,7 @@ export default function InvoiceDetail() {
         insurance,
         changeOrders,
         invoices: invoiceRows,
-        currentInvoice: currentDraw
+        currentInvoice: billingDraw
       })
       if (!result?.doc) throw new Error('PDF generator returned no document')
 
@@ -534,7 +588,7 @@ export default function InvoiceDetail() {
           insurance={insurance}
           changeOrders={changeOrders}
           invoices={invoiceRows}
-          currentInvoice={currentDraw}
+          currentInvoice={billingDraw}
         />
       ) : null}
       {viewMode === 'document' ? null : (
@@ -718,7 +772,7 @@ export default function InvoiceDetail() {
                     background: 'var(--v3-surface-2)',
                     border: '1px solid var(--v3-border-strong)',
                     display: 'grid', placeItems: 'center',
-                    color: 'var(--v3-success-bright)',
+                    color: 'var(--v3-success-text)',
                     flexShrink: 0
                   }}>
                     <CheckCircle2 size={14} />
@@ -922,9 +976,13 @@ export default function InvoiceDetail() {
       <AnimatePresence>
         {paying && (
           <Suspense fallback={null}>
+            {/* Collecting here pays the bill this screen shows: the
+                payment links to the open draw (prefilled with what is due
+                on it, never more than the balance) so that draw settles. */}
             <V3PaymentSheet
               contact={contact}
               balance={totals.balance}
+              invoice={billingDraw ? { ...billingDraw, amount: amountDueNow } : null}
               onClose={() => setPaying(false)}
               onLogged={() => { setPaying(false); refresh() }}
             />
@@ -1041,7 +1099,7 @@ function ViewModeToggle({ value, onChange }: any) {
               borderRadius: 10,
               border: 0,
               background: on ? 'var(--v3-primary-soft)' : 'transparent',
-              color: on ? 'var(--v3-primary)' : 'var(--v3-text-muted)',
+              color: on ? 'var(--v3-primary-text)' : 'var(--v3-text-muted)',
               fontFamily: 'var(--font-body)',
               fontSize: 12,
               fontWeight: 700,
@@ -1079,19 +1137,19 @@ function StatusPill({ status }: any) {
         return {
           bg: 'var(--v3-primary-soft)',
           border: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)',
-          color: 'var(--v3-primary)'
+          color: 'var(--v3-primary-text)'
         }
       case 'good':
         return {
           bg: 'rgba(45, 122, 79, 0.14)',
           border: 'rgba(45, 122, 79, 0.45)',
-          color: 'var(--v3-success-bright)'
+          color: 'var(--v3-success-text)'
         }
       case 'danger':
         return {
           bg: 'rgba(192, 57, 43, 0.14)',
           border: 'rgba(192, 57, 43, 0.45)',
-          color: 'var(--v3-danger-bright)'
+          color: 'var(--v3-danger-text)'
         }
       default:
         return {

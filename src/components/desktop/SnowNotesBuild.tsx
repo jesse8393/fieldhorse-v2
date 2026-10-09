@@ -31,13 +31,20 @@ type Note = {
   title?: string | null
   contact_id?: string | null
   created_at?: string | null
-  parsed?: {
-    summary?: string
-    action_items?: string[]
-    risks?: string[]
-    follow_up_date?: string
-    materials_needed?: string[]
-  }
+  // fh_notes.parsed is free form JSON from the AI parse (or null).
+  parsed?: unknown
+}
+
+type ParsedNote = {
+  summary?: string
+  action_items?: string[]
+  risks?: string[]
+  follow_up_date?: string
+  materials_needed?: string[]
+}
+
+function asParsed(value: unknown): ParsedNote | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as ParsedNote) : null
 }
 
 type Props = {
@@ -126,7 +133,7 @@ export default function SnowNotesBuild(props: Props) {
               {' '}{cockpitStats.parsedCount} parsed by AI
             </p>
             {cockpitStats.riskCount > 0 && (
-              <p style={{ color: 'var(--v3-primary-bright)', marginTop: 6 }}>
+              <p style={{ color: 'var(--v3-primary-text)', marginTop: 6 }}>
                 <AlertTriangle size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
                 {cockpitStats.riskCount} open risk{cockpitStats.riskCount === 1 ? '' : 's'} flagged
               </p>
@@ -188,7 +195,7 @@ export default function SnowNotesBuild(props: Props) {
 
                 {parsed && (
                   <div className="fh-build-capture__parsed">
-                    <div className="fh-build-eyebrow" style={{ color: 'var(--v3-primary, #c9963a)' }}>AI parse preview</div>
+                    <div className="fh-build-eyebrow" style={{ color: 'var(--v3-primary-text)' }}>AI parse preview</div>
                     {parsed.summary && <p>{parsed.summary}</p>}
                     {parsed.action_items?.length > 0 && (
                       <ul>
@@ -240,8 +247,9 @@ export default function SnowNotesBuild(props: Props) {
               )}
               {!loading && recent.slice(0, 25).map((n: any) => {
                 const linkedJob = contacts.find((c) => c.id === n.contact_id)
-                const hasParsed = !!(n.parsed && (n.parsed.summary || n.parsed.action_items?.length || n.parsed.risks?.length))
-                const hasRisk = !!(n.parsed?.risks?.length)
+                const p = asParsed(n.parsed)
+                const hasParsed = !!(p && (p.summary || p.action_items?.length || p.risks?.length))
+                const hasRisk = !!(p?.risks?.length)
                 const body = (n.text || n.body || n.title || '').toString()
                 return (
                   <div key={n.id} className="fh-build-note-row">
@@ -294,7 +302,7 @@ export default function SnowNotesBuild(props: Props) {
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Open risks</div>
-              <strong style={{ color: cockpitStats.riskCount > 0 ? 'var(--v3-danger-bright)' : undefined }}>
+              <strong style={{ color: cockpitStats.riskCount > 0 ? 'var(--v3-danger-text)' : undefined }}>
                 {cockpitStats.riskCount}
               </strong>
               <span>{cockpitStats.riskCount > 0 ? 'Needs triage' : 'All clear'}</span>
@@ -303,7 +311,7 @@ export default function SnowNotesBuild(props: Props) {
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Missing job links</div>
-              <strong style={{ color: unlinkedCount > 0 ? 'var(--v3-primary-bright)' : undefined }}>{unlinkedCount}</strong>
+              <strong style={{ color: unlinkedCount > 0 ? 'var(--v3-primary-text)' : undefined }}>{unlinkedCount}</strong>
               <span>{unlinkedCount > 0 ? 'Tie reports to jobs' : 'All linked'}</span>
             </section>
 
