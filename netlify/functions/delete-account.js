@@ -69,6 +69,12 @@ const USER_BUCKETS = ['job-files', 'job-photos', 'sub-docs', 'logos', 'company-l
  * orgNames:    { [org_id]: name } for error messages
  *
  * Returns { soloOrgIds, handoffs: [{ orgId, successorId }], blocked: [{ orgId, orgName }] }
+ *
+ * @param {{
+ *   memberships?: Array<{ org_id: string, role: string }>,
+ *   teammates?: Array<{ org_id: string, user_id: string, role: string, joined_at?: string | null }>,
+ *   orgNames?: Record<string, string>,
+ * }} input
  */
 export function planAccountDeletion({ memberships = [], teammates = [], orgNames = {} }) {
   const soloOrgIds = []
