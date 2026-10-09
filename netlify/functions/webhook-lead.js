@@ -100,6 +100,11 @@ export default async (request) => {
   } catch {
     return json({ error: 'invalid_json' }, 400)
   }
+  // `null`, arrays, strings and numbers are valid JSON but not a lead; the
+  // field loop below used to throw a TypeError (500) on `null`.
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return json({ error: 'invalid_payload', detail: 'Send a JSON object with at least a name.' }, 400)
+  }
 
   for (const f of REQUIRED_FIELDS) {
     if (!payload[f] || String(payload[f]).trim() === '') {

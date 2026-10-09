@@ -65,6 +65,22 @@ export function buildPublicLinkViewEvent(req, link, contact, salt) {
   }
 }
 
+// Columns a customer may see. Internal fields (user_id, org_id, created_by,
+// internal notes on change orders) stay server side.
+const PUBLIC_PAYMENT_COLUMNS = 'id, contact_id, invoice_id, amount, paid_on, created_at, method, reference, kind'
+const PUBLIC_CHANGE_ORDER_COLUMNS = 'id, contact_id, sequence_number, title, description, amount, status, approved_at, approved_by_name, created_at'
+
+// Human label + in-app deep link for a "customer viewed" notification.
+export function viewedLabelFor(link) {
+  if (link.kind === 'invoice') {
+    return { kindLabel: 'invoice', detailLink: `/jobs/${link.contact_id}?tab=financials` }
+  }
+  if (link.kind === 'change_order') {
+    return { kindLabel: 'change order', detailLink: `/jobs/${link.contact_id}?tab=quote` }
+  }
+  return { kindLabel: 'proposal', detailLink: `/quotes/${link.contact_id}?tab=quote` }
+}
+
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -121,7 +137,7 @@ export default async function handler(req) {
   // Statement links are client-scoped (every open job for one client)
   // rather than job-scoped, so they take a wholly separate load path.
   if (link.kind === 'statement') {
-    return handleStatement(supabase, link)
+    return handleStatement(supabase, req, link)
   }
 
   // 2. Load the contact + related data in parallel
@@ -138,8 +154,28 @@ export default async function handler(req) {
     supabase.from('fh_contacts').select('*').eq('id', link.contact_id).eq('user_id', link.user_id).maybeSingle(),
     supabase.from('profiles').select('*').eq('user_id', link.user_id).maybeSingle(),
     supabase.from('fh_quote_items').select('*').eq('contact_id', link.contact_id).order('sort_order', { ascending: true }),
-    supabase.from('fh_payments').select('*').eq('contact_id', link.contact_id).order('paid_on', { ascending: false }),
-    supabase.from('fh_change_orders').select('*').eq('contact_id', link.contact_id).order('sequence_number', { ascending: true }),
+    // Projected to what the customer documents render (PaymentHistoryBlock).
+    supabase
+      .from('fh_payments')
+      .select(PUBLIC_PAYMENT_COLUMNS)
+      .eq('contact_id', link.contact_id)
+      .order('paid_on', { ascending: false }),
+    // Customer-visible change orders only: sent and approved ones, plus the
+    // one a change order link points at. `*` used to ship drafts, rejected
+    // and voided change orders with their amounts to anyone with the link.
+    link.change_order_id
+      ? supabase
+          .from('fh_change_orders')
+          .select(PUBLIC_CHANGE_ORDER_COLUMNS)
+          .eq('contact_id', link.contact_id)
+          .or(`status.in.(sent,approved),id.eq.${link.change_order_id}`)
+          .order('sequence_number', { ascending: true })
+      : supabase
+          .from('fh_change_orders')
+          .select(PUBLIC_CHANGE_ORDER_COLUMNS)
+          .eq('contact_id', link.contact_id)
+          .in('status', ['sent', 'approved'])
+          .order('sequence_number', { ascending: true }),
     supabase.from('fh_insurance_claims').select('*').eq('contact_id', link.contact_id).maybeSingle(),
     // Customer-visible draws only, projected columns only. `*` shipped
     // draft/void rows (amounts for bills that were never issued) and
@@ -213,10 +249,7 @@ export default async function handler(req) {
   ]
 
   if (shouldNotify) {
-    const kindLabel = link.kind === 'invoice' ? 'invoice' : 'proposal'
-    const detailLink = link.kind === 'invoice'
-      ? `/jobs/${link.contact_id}?tab=financials`
-      : `/quotes/${link.contact_id}?tab=quote`
+    const { kindLabel, detailLink } = viewedLabelFor(link)
     sideEffects.push(
       supabase.from('fh_notifications').insert({
       user_id: link.user_id,
@@ -307,7 +340,7 @@ function buildCompany(profile) {
 // client, all their jobs (scoped by user_id for tenant isolation),
 // and the payments + approved change orders across those jobs, then
 // returns the shape the public StatementView renders.
-async function handleStatement(supabase, link) {
+async function handleStatement(supabase, req, link) {
   const [{ data: client }, { data: profile }, { data: jobs }] = await Promise.all([
     supabase.from('fh_clients').select('*').eq('id', link.client_id).eq('user_id', link.user_id).maybeSingle(),
     supabase.from('profiles').select('*').eq('user_id', link.user_id).maybeSingle(),
@@ -330,8 +363,8 @@ async function handleStatement(supabase, link) {
   let changeOrders = []
   if (jobIds.length > 0) {
     const [{ data: pay }, { data: cos }] = await Promise.all([
-      supabase.from('fh_payments').select('*').in('contact_id', jobIds).order('paid_on', { ascending: false }),
-      supabase.from('fh_change_orders').select('*').in('contact_id', jobIds).eq('status', 'approved')
+      supabase.from('fh_payments').select(PUBLIC_PAYMENT_COLUMNS).in('contact_id', jobIds).order('paid_on', { ascending: false }),
+      supabase.from('fh_change_orders').select(PUBLIC_CHANGE_ORDER_COLUMNS).in('contact_id', jobIds).eq('status', 'approved')
     ])
     payments = pay || []
     changeOrders = cos || []
@@ -339,32 +372,39 @@ async function handleStatement(supabase, link) {
 
   const company = buildCompany(profile)
 
-  // View bump + debounced contractor notification, same policy as the
-  // job-scoped path. Both best-effort; neither blocks the response.
+  // View audit + debounced contractor notification, same policy as the
+  // job-scoped path. Awaited: Netlify freezes the function once the
+  // response is returned, so the old fire-and-forget calls were dropped
+  // intermittently, which also broke the one hour debounce. The audit RPC
+  // bumps view_count and last_viewed_at and writes fh_public_link_events.
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
   const shouldNotify = !link.last_viewed_at || new Date(link.last_viewed_at) < oneHourAgo
 
-  supabase
-    .from('fh_public_links')
-    .update({ view_count: (link.view_count || 0) + 1, last_viewed_at: new Date().toISOString() })
-    .eq('id', link.id)
-    .then(() => {}, () => {})
-
+  const sideEffects = [recordPublicLinkView(supabase, req, link, client)]
   if (shouldNotify) {
     const who = client.company_name || client.name || 'A customer'
-    supabase.from('fh_notifications').insert({
-      user_id: link.user_id,
-      kind: 'public_link_viewed',
-      title: 'Customer viewed your statement',
-      body: who,
-      link: `/clients/${link.client_id}`
-    }).then(() => {}, () => {})
-    sendPushToUser(supabase, link.user_id, {
-      title: 'Customer is viewing your statement 👀',
-      body: who,
-      link: `/clients/${link.client_id}`,
-      tag: `link-viewed-${link.id}`
-    })
+    sideEffects.push(
+      supabase.from('fh_notifications').insert({
+        user_id: link.user_id,
+        org_id: link.org_id || client.org_id || null,
+        kind: 'public_link_viewed',
+        title: 'Customer viewed your statement',
+        body: who,
+        link: `/clients/${link.client_id}`
+      }),
+      sendPushToUser(supabase, link.user_id, {
+        title: 'Customer is viewing your statement 👀',
+        body: who,
+        link: `/clients/${link.client_id}`,
+        tag: `link-viewed-${link.id}`
+      })
+    )
+  }
+  const settled = await Promise.allSettled(sideEffects)
+  for (const result of settled) {
+    if (result.status === 'rejected') {
+      console.warn('[public-link] statement side effect failed', result.reason)
+    }
   }
 
   return json({

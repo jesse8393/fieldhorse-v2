@@ -20,12 +20,16 @@
 //   4. INSERT fh_notifications { kind='quote_approved' } for the
 //      contractor's bell.
 //
-// Idempotency: if proposal_status is already 'approved', returns 409
-// so a customer double-tap doesn't double-write a version row.
+// Idempotency: proposal_status is flipped to 'approved' with a
+// conditional update before any other write, so of two overlapping
+// requests (a customer double tap) exactly one proceeds and the other
+// gets 409. If the version insert then fails, the claim is released.
 
 import { createClient } from '@supabase/supabase-js'
-import { hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
+import { clientIp as rateLimitIp, hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
 import { sendPushToUser } from './lib/push.js'
+
+const CLOSED_STAGES = new Set(['lost', 'closed'])
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -83,7 +87,7 @@ export default async function handler(req) {
   // Per-IP rate limit — this is a binding write (records an approval /
   // signature), so keep it tight to slow signature-spraying.
   const allowed = await checkRateLimit(supabase, {
-    scope: 'public-link-approve', identifier: hashIdentifier(clientIp(req)), limit: 20,
+    scope: 'public-link-approve', identifier: hashIdentifier(rateLimitIp(req)), limit: 20,
   })
   if (!allowed) {
     return json({ error: 'rate_limited', message: 'Too many requests. Please try again in a minute.' }, 429)
@@ -113,6 +117,10 @@ export default async function handler(req) {
   if (!contact) return json({ error: 'gone' }, 404)
   if ((contact.proposal_status || 'draft').toLowerCase() === 'approved') {
     return json({ error: 'already_approved', message: 'This proposal has already been approved.' }, 409)
+  }
+  // A lost or closed job cannot be signed from an old link.
+  if (CLOSED_STAGES.has(String(contact.stage || '').toLowerCase())) {
+    return json({ error: 'not_approvable', message: 'This proposal is no longer open. Ask your contractor for an updated one.' }, 409)
   }
   // The quote's own validity date must gate approval too — links are
   // minted with expires_at NULL, so without this check a customer could
@@ -211,7 +219,36 @@ export default async function handler(req) {
     approval_origin: 'public_link'
   }
 
-  // 3. Compute next version_number per contact.
+  // 3. Claim the approval atomically before writing anything else. A
+  // customer double tap sends two overlapping requests; the old read then
+  // write check let both through, so the second either hit the unique
+  // (contact_id, version_number) constraint and showed a 500 for a
+  // proposal that was in fact approved, or minted a second approved
+  // version and a second "Quote approved" push. Only the request that
+  // flips proposal_status wins.
+  const previousStatus = contact.proposal_status ?? null
+  const { data: claimed, error: claimErr } = await supabase
+    .from('fh_contacts')
+    .update({ proposal_status: 'approved' })
+    .eq('id', contact.id)
+    .or('proposal_status.is.null,proposal_status.neq.approved')
+    .select('id')
+  if (claimErr) {
+    console.error('[public-link-approve] approval claim failed', claimErr)
+    return json({ error: 'approve_failed', message: 'We could not record your approval. Please try again.' }, 500)
+  }
+  if (!claimed || claimed.length === 0) {
+    return json({ error: 'already_approved', message: 'This proposal has already been approved.' }, 409)
+  }
+  const releaseClaim = async () => {
+    const { error } = await supabase
+      .from('fh_contacts')
+      .update({ proposal_status: previousStatus })
+      .eq('id', contact.id)
+    if (error) console.error('[public-link-approve] claim release failed', error)
+  }
+
+  // 4. Compute next version_number per contact.
   const { data: maxRow } = await supabase
     .from('fh_quote_versions')
     .select('version_number')
@@ -224,7 +261,7 @@ export default async function handler(req) {
   const ip = clientIp(req)
   const ua = req.headers.get('user-agent') || null
 
-  // 4. Insert the approved version row.
+  // 5. Insert the approved version row.
   const { data: newRow, error: insErr } = await supabase
     .from('fh_quote_versions')
     .insert({
@@ -249,10 +286,11 @@ export default async function handler(req) {
     .single()
   if (insErr) {
     console.error('[public-link-approve] insert failed', insErr)
-    return json({ error: 'db_insert_failed', detail: insErr.message }, 500)
+    await releaseClaim()
+    return json({ error: 'approve_failed', message: 'We could not record your approval. Please try again.' }, 500)
   }
 
-  // 5. Supersede prior approved rows (best effort, never blocks).
+  // 6. Supersede prior approved rows (best effort, never blocks).
   await supabase
     .from('fh_quote_versions')
     .update({ status: 'superseded', superseded_at: new Date().toISOString(), superseded_by: newRow.id })
@@ -260,19 +298,17 @@ export default async function handler(req) {
     .neq('id', newRow.id)
     .eq('status', 'approved')
 
-  // 6. Point contact + flip proposal_status.
+  // 7. Point the contact at the approved version (status was flipped by
+  // the claim above).
   const { error: upErr } = await supabase
     .from('fh_contacts')
-    .update({
-      approved_quote_version_id: newRow.id,
-      proposal_status: 'approved'
-    })
+    .update({ approved_quote_version_id: newRow.id })
     .eq('id', contact.id)
   if (upErr) {
     console.error('[public-link-approve] contact update failed', upErr)
   }
 
-  // 7. Notification to the contractor's bell + lock screen.
+  // 8. Notification to the contractor's bell + lock screen.
   try {
     await supabase.from('fh_notifications').insert({
       user_id: link.user_id,
