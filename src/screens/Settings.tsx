@@ -1078,7 +1078,7 @@ function DeleteAccountRow({ onDone }: { onDone: () => void }) {
     <div style={{ marginTop: 10, padding: '12px', borderRadius: 10, background: 'rgba(192,57,43,0.08)', border: '1px solid rgba(192,57,43,0.35)' }}>
       <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--alert-red)', marginBottom: 4 }}>Permanently delete your account</div>
       <p style={{ margin: '0 0 10px', fontSize: 12, color: 'var(--ink-muted)', lineHeight: 1.5 }}>
-        This erases every contact, job, quote, invoice, payment, photo, and file you own, and closes your login. It can't be undone. Type <strong>DELETE</strong> to confirm.
+        This closes your login and erases your personal data. If you run Fieldhorse alone, every contact, job, quote, invoice, payment, photo, and file is erased too. If you work on a team, the records you created stay with the team and pass to an owner. The only owner of a team has to make someone else an owner first. It can't be undone. Type <strong>DELETE</strong> to confirm.
       </p>
       <input
         type="text"
