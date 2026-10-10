@@ -226,7 +226,6 @@
 .v3-section > * { position: relative; z-index: 1; }
 
 /* Section variants */
-.v3-section--flush { padding: 0; }
 .v3-section--quiet {
   /* Lower-key variant for secondary zones — no inner highlight,
      reduced shadow. Keeps depth without competing with primary
@@ -299,13 +298,6 @@
 /* When a card sits directly inside a section, give it a real edge —
    stronger border + a bit of inset so the card READS as a card, not
    a tinted block. Hover bumps the surface to surface-3. */
-.v3-section .v3-card {
-  background: var(--v3-surface-glass);
-  border: 1px solid var(--v3-border-strong);
-  box-shadow: 0 1px 0 rgba(242, 237, 228, 0.05) inset, 0 4px 14px rgba(20, 20, 20, 0.30);
-}
-.v3-section .v3-card--surface-2 { background: var(--v3-surface-2); }
-
 /* Section header inside a section reads tighter — bottom-pad only */
 .v3-section > .v3-section-header { padding: 0 0 12px; }
 
@@ -386,30 +378,6 @@
   color: var(--v3-danger-text);
 }
 
-.fh-stat-card {
-  display: grid;
-  gap: 8px;
-}
-.fh-stat-card__label,
-.fh-stat-card__subline,
-.fh-stat-card__change {
-  font-family: var(--font-body);
-  font-size: 12px;
-  letter-spacing: 0;
-}
-.fh-stat-card__label,
-.fh-stat-card__subline {
-  color: var(--v3-text-muted);
-}
-.fh-stat-card__value {
-  color: var(--v3-text);
-  font-family: var(--font-body);
-  font-size: 24px;
-  letter-spacing: 0;
-}
-.fh-stat-card__change--up { color: var(--v3-success-text); }
-.fh-stat-card__change--down { color: var(--v3-danger-text); }
-
 .fh-data-table__scroll {
   width: 100%;
   overflow-x: auto;
@@ -454,13 +422,8 @@
   0%, 100% { transform: translate(0, 0); opacity: 1; }
   50%      { transform: translate(-22px, 10px); opacity: 0.82; }
 }
-.fh-hero-drift {
-  animation: fh-hero-drift 22s ease-in-out infinite;
-  will-change: transform, opacity;
-}
 @media (prefers-reduced-motion: reduce) {
-  .fh-hero-drift { animation: none; }
-}
+  }
 
 /* ---------- Command Palette (cmdk + shadcn dialog) — v3 polish ----------
    The shadcn dialog ships with --popover white and a thin gray border

@@ -18,23 +18,7 @@
 }
 
 @media (min-width: 900px) {
-  .fh-build-content-grid--home {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .fh-build-content-grid--home > .fh-build-today,
-  .fh-build-content-grid--home > .fh-build-owner,
-  .fh-build-content-grid--home > .fh-build-revenue,
-  .fh-build-content-grid--home > .fh-build-health {
-    grid-column: 1;
-    min-height: 0;
-  }
-
-  .fh-build-content-grid--home > .fh-build-today {
-    min-height: 0;
-  }
-
-  /* Invoices table. minmax floor on the name track: at narrow card
+        /* Invoices table. minmax floor on the name track: at narrow card
      widths the old bare 1.4fr resolved to 0px, the fixed tracks plus
      gaps consumed the whole row, and the CLIENT/JOB cell (the one
      column that says WHO owes you) silently vanished. */
@@ -48,15 +32,7 @@
      layout needs ~780px. Below that, drop the PAID column (balance
      already tells the story) and tighten the rest so the name track
      keeps real room instead of scrolling sideways. */
-  .fh-build-invoices-table {
-    container-type: inline-size;
-  }
-
-  .fh-build-issued-table {
-    container-type: inline-size;
-  }
-
-  .fh-build-table__head.is-issued-invoices,
+      .fh-build-table__head.is-issued-invoices,
   .fh-build-table__row.is-issued-invoices {
     grid-template-columns:
       minmax(180px, 1.5fr)
@@ -68,31 +44,7 @@
     min-width: 680px;
   }
 
-  .fh-build-issued-job {
-    min-width: 0;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: inherit;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .fh-build-issued-job:disabled {
-    cursor: default;
-  }
-
-  .fh-build-issued-actions {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 4px;
-  }
-
-  @container (max-width: 789px) {
+        @container (max-width: 789px) {
     .fh-build-table__head.is-invoices,
     .fh-build-table__row.is-invoices {
       grid-template-columns: minmax(150px, 1.6fr) 84px 44px 92px 92px 108px;
@@ -106,118 +58,9 @@
   }
 
   /* Month calendar grid, desktop /schedule Month view. */
-  .fh-build-cal {
-    background: var(--v3-surface-glass);
-    border: 1px solid var(--v3-border-mid);
-    border-radius: 10px;
-    overflow: hidden;
-  }
-  .fh-build-cal__week {
-    display: grid;
-    grid-template-columns: repeat(7, minmax(0, 1fr));
-    border-bottom: 1px solid var(--v3-glass-tint-2);
-  }
-  .fh-build-cal__week span {
-    padding: 12px 12px;
-    font-size: 12px;
-    font-weight: 800;
-    letter-spacing: 0;
-    color: var(--v3-text-muted);
-    text-align: left;
-  }
-  .fh-build-cal__grid {
-    display: grid;
-    /* minmax(0,1fr): a wide event chip must truncate, not stretch its
-       whole weekday column (nowrap chips set min-content wide). */
-    grid-template-columns: repeat(7, minmax(0, 1fr));
-  }
-  .fh-build-cal__day {
-    min-width: 0;
-    appearance: none;
-    background: none;
-    border: 0;
-    border-top: 1px solid var(--v3-glass-tint-2);
-    border-right: 1px solid var(--v3-glass-tint-2);
-    min-height: 104px;
-    padding: 8px 12px;
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-    text-align: left;
-    cursor: pointer;
-    color: var(--v3-text);
-    transition: background 120ms ease;
-  }
-  .fh-build-cal__day:nth-child(7n) { border-right: 0; }
-  .fh-build-cal__day:nth-child(-n+7) { border-top: 0; }
-  .fh-build-cal__day:hover { background: color-mix(in srgb, var(--v3-primary) 6%, transparent); }
-  .fh-build-cal__day.is-out { opacity: .38; }
-  .fh-build-cal__num {
-    font-family: var(--font-display);
-    font-size: 14px;
-    letter-spacing: 0;
-    color: var(--v3-text-muted);
-    line-height: 1;
-  }
-  .fh-build-cal__day.is-today .fh-build-cal__num {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    border-radius: 10px;
-    background: linear-gradient(135deg, var(--field-gold-bright, #C9963A), var(--field-gold-deep, #C9963A));
-    color: var(--onyx, #141414);
-    font-weight: 700;
-  }
-  .fh-build-cal__day.has-events .fh-build-cal__num { color: var(--v3-text); }
-  .fh-build-cal__chips {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    min-width: 0;
-  }
-  .fh-build-cal__chip {
-    font-size: 12px;
-    line-height: 1.35;
-    padding: 4px 8px;
-    border-radius: 10px;
-    background: color-mix(in srgb, var(--v3-primary) 14%, transparent);
-    border: 1px solid color-mix(in srgb, var(--v3-primary) 26%, transparent);
-    color: var(--v3-text);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .fh-build-cal__more {
-    font-size: 12px;
-    color: var(--v3-text-muted);
-    padding-left: 4px;
-  }
-}
+                              }
 
 /* Rail card call to action (Add client info on an unattached deal). */
-.fh-build-rail-cta {
-  appearance: none;
-  align-self: flex-start;
-  margin-top: 2px;
-  padding: 8px 12px;
-  border-radius: 10px;
-  border: 1px solid color-mix(in srgb, var(--v3-primary) 40%, transparent);
-  background: color-mix(in srgb, var(--v3-primary) 12%, transparent);
-  color: var(--v3-primary-text, #C9963A);
-  font-family: var(--font-body);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0;
-  cursor: pointer;
-  transition: background 120ms ease;
-}
-.fh-build-rail-cta:hover {
-  background: color-mix(in srgb, var(--v3-primary) 20%, transparent);
-}
-
 /* ---- Cold load skeletons (Build dashboard, July 26 evening pass) ----
    During the first seconds after sign in the dashboard used to print
    em dash placeholders and "Loading" strings, and the three tables
@@ -228,30 +71,8 @@
   0%   { background-position: 160% 0; }
   100% { background-position: -60% 0; }
 }
-.fh-build-skel {
-  display: inline-block;
-  height: 12px;
-  width: 72px;
-  border-radius: 10px;
-  background: linear-gradient(
-    90deg,
-    rgba(242, 237, 228, 0.06) 25%,
-    rgba(242, 237, 228, 0.14) 50%,
-    rgba(242, 237, 228, 0.06) 75%
-  );
-  background-size: 200% 100%;
-  animation: fhSkelShimmer 1.4s ease-in-out infinite;
-  vertical-align: middle;
-}
-.fh-build-skel--money  { height: 34px; width: 190px; border-radius: 10px; }
-.fh-build-skel--stat   { height: 20px; width: 40px;  border-radius: 10px;  }
-.fh-build-skel--metric { height: 16px; width: 64px;  border-radius: 10px;  }
-.fh-build-skel--sub    { height: 10px; width: 84px;  }
-.fh-build-skel--chip   { height: 24px; width: 96px;  border-radius: 10px; }
-.fh-build-skel--line   { height: 11px; width: 60%;   }
 @media (prefers-reduced-motion: reduce) {
-  .fh-build-skel { animation: none; opacity: 0.6; }
-}
+  }
 
 /* August 2026 desktop product pass.
    The Build screens share one quieter workspace treatment: neutral
@@ -391,14 +212,7 @@
     border-right: 0;
   }
 
-  .fh-build-row-btn {
-    min-width: 104px;
-    height: 32px;
-    flex: 0 0 auto;
-    white-space: nowrap;
-  }
-
-  .fh-build-content-grid {
+    .fh-build-content-grid {
     align-items: start;
   }
 
@@ -494,128 +308,7 @@
     box-shadow: 0 8px 24px rgba(20, 20, 20, 0.24);
   }
 
-  .fh-build-dayplan__head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--v3-border-mid);
-  }
-
-  .fh-build-dayplan__head > div > strong {
-    display: block;
-    margin-top: 4px;
-    color: var(--v3-text);
-    font-family: var(--font-body);
-    font-size: 16px;
-  }
-
-  .fh-build-dayplan__head > span {
-    color: var(--v3-text-secondary);
-    font-size: 12px;
-  }
-
-  .fh-build-dayplan__timeline {
-    position: relative;
-    margin: 16px;
-  }
-
-  .fh-build-dayplan__hour {
-    position: absolute;
-    right: 0;
-    left: 0;
-    border-top: 1px solid var(--v3-border-mid);
-  }
-
-  .fh-build-dayplan__hour > span {
-    position: absolute;
-    top: -8px;
-    left: 0;
-    width: 56px;
-    color: var(--v3-text-muted);
-    font-size: 12px;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .fh-build-dayplan__events {
-    position: absolute;
-    inset: 0 0 0 72px;
-  }
-
-  .fh-build-dayplan__event {
-    position: absolute;
-    right: 0;
-    left: 0;
-    display: grid;
-    grid-template-columns: 128px minmax(0, 1fr) auto;
-    align-items: start;
-    gap: 12px;
-    overflow: hidden;
-    padding: 12px;
-    background: var(--v3-primary-soft);
-    border: 1px solid var(--v3-border-strong);
-    border-radius: 10px;
-    color: var(--v3-text);
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .fh-build-dayplan__event:hover,
-  .fh-build-weekplan__event:hover {
-    border-color: var(--v3-primary);
-  }
-
-  .fh-build-dayplan__event > span {
-    color: var(--v3-primary-text);
-    font-size: 12px;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .fh-build-dayplan__event > strong {
-    overflow: hidden;
-    font-family: var(--font-body);
-    font-size: 14px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .fh-build-dayplan__event > small {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    color: var(--v3-text-secondary);
-    font-size: 12px;
-  }
-
-  .fh-build-dayplan__empty {
-    position: absolute;
-    top: 48px;
-    left: 72px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    color: var(--v3-text-secondary);
-    font-size: 14px;
-  }
-
-  .fh-build-dayplan__empty > button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    height: 32px;
-    padding: 0 12px;
-    background: transparent;
-    border: 1px solid var(--v3-border-strong);
-    border-radius: 10px;
-    color: var(--v3-primary-text);
-    font-size: 12px;
-    font-weight: 700;
-    cursor: pointer;
-  }
-
-  .fh-build-weekplan {
+                              .fh-build-weekplan {
     display: grid;
     grid-template-columns: repeat(7, minmax(92px, 1fr));
     overflow-x: auto;
@@ -630,183 +323,7 @@
     border-right: 0;
   }
 
-  .fh-build-weekplan__head {
-    width: 100%;
-    height: 64px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 0 12px;
-    background: transparent;
-    border: 0;
-    border-bottom: 1px solid var(--v3-border-mid);
-    color: var(--v3-text-secondary);
-    cursor: pointer;
-  }
-
-  .fh-build-weekplan__head > span {
-    font-size: 12px;
-    font-weight: 700;
-  }
-
-  .fh-build-weekplan__head > strong {
-    color: var(--v3-text);
-    font-family: var(--font-body);
-    font-size: 20px;
-  }
-
-  .fh-build-weekplan__day.is-today .fh-build-weekplan__head {
-    background: var(--v3-primary-soft);
-  }
-
-  .fh-build-weekplan__day.is-today .fh-build-weekplan__head > strong {
-    color: var(--v3-primary-text);
-  }
-
-  .fh-build-weekplan__body {
-    min-height: 440px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 8px;
-  }
-
-  .fh-build-weekplan__empty {
-    padding: 8px 4px;
-    color: var(--v3-text-muted);
-    font-size: 12px;
-  }
-
-  .fh-build-weekplan__event {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    padding: 8px;
-    background: var(--v3-primary-soft);
-    border: 1px solid var(--v3-border-mid);
-    border-radius: 10px;
-    color: var(--v3-text);
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .fh-build-weekplan__event > span,
-  .fh-build-weekplan__event > small {
-    overflow: hidden;
-    color: var(--v3-text-secondary);
-    font-size: 12px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .fh-build-weekplan__event > strong {
-    overflow: hidden;
-    font-family: var(--font-body);
-    font-size: 14px;
-    text-overflow: ellipsis;
-  }
-
-  .fh-build-content-grid--home {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
-    margin-top: 16px;
-  }
-
-  .fh-build-content-grid--home > .fh-build-today,
-  .fh-build-content-grid--home > .fh-build-health {
-    grid-column: 1 / -1;
-  }
-
-  .fh-build-content-grid--home > .fh-build-owner {
-    grid-column: 1;
-  }
-
-  .fh-build-content-grid--home > .fh-build-revenue {
-    grid-column: 2;
-  }
-
-  .fh-build-today {
-    padding: 0;
-  }
-
-  .fh-build-today__body {
-    padding: 16px;
-  }
-
-  .fh-build-today__stats {
-    margin-top: 12px;
-    padding-bottom: 12px;
-  }
-
-  .fh-build-today__actions {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
-    margin-top: 12px;
-  }
-
-  .fh-crm-brief p {
-    color: var(--v3-text);
-    opacity: 0.72;
-  }
-
-  .fh-crm-flow__stages {
-    gap: 0;
-    overflow: hidden;
-    border: 1px solid var(--v3-border-mid);
-    border-radius: 10px;
-  }
-
-  .fh-crm-flow__stages button {
-    min-height: 88px;
-    background: transparent;
-    background-image: none;
-    border: 0;
-    border-right: 1px solid var(--v3-border-mid);
-    border-radius: 10px;
-  }
-
-  .fh-crm-flow__stages button:last-child {
-    border-right: 0;
-  }
-
-  .fh-crm-brief__actions button,
-  .fh-crm-saved button {
-    min-height: 40px;
-    background: transparent;
-  }
-
-  .fh-crm-saved {
-    gap: 0;
-  }
-
-  .fh-crm-saved button {
-    justify-content: flex-start;
-    border: 0;
-    border-bottom: 1px solid var(--v3-border-mid);
-    border-radius: 10px;
-    text-align: left;
-  }
-
-  .fh-crm-saved button:last-of-type {
-    border-bottom: 0;
-  }
-
-  .fh-desktop-sidebar__link {
-    color: var(--ink-strong);
-    opacity: 0.58;
-  }
-
-  .fh-desktop-sidebar__link:hover {
-    opacity: 0.86;
-  }
-
-  .fh-desktop-sidebar__link.is-active {
-    opacity: 1;
-  }
-
-  [data-theme='light'] .fh-build-topbar {
+                                                            [data-theme='light'] .fh-build-topbar {
     box-shadow: 0 4px 12px rgba(20, 20, 20, 0.08);
   }
 
@@ -845,38 +362,8 @@
     grid-template-columns: 1fr;
   }
 
-  .fh-build-content-grid--home {
-    grid-template-columns: 1fr;
-  }
-
-  .fh-build-content-grid--home > .fh-build-today,
-  .fh-build-content-grid--home > .fh-build-owner,
-  .fh-build-content-grid--home > .fh-build-revenue,
-  .fh-build-content-grid--home > .fh-build-health {
-    grid-column: 1;
-  }
-}
+    }
 
 /* Loading tile for the Lead to cash stage strip. Mirrors the real
    .fh-crm-flow__stages button shell (border, radius, padding) but is
    inert and carries shimmer bars instead of $0 / 0 deals. */
-.fh-crm-flow__stage-skel {
-  min-width: 0;
-  border: 1px solid var(--v3-border-mid);
-  background:
-    linear-gradient(180deg, var(--v3-glass-tint), var(--v3-glass-tint)),
-    var(--v3-glass-tint);
-  border-radius: 10px;
-  padding: 12px;
-  text-align: left;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.fh-crm-flow__stage-skel > span {
-  display: block;
-  color: var(--v3-text-muted);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0;
-}
