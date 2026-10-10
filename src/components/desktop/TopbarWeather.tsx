@@ -32,22 +32,31 @@ async function cachedWeather(lat: number, lon: number) {
   return promise
 }
 
-export default function TopbarWeather() {
+// `given` is for a screen that already fetched the forecast: pass that
+// snapshot and this slot shows it without a second request. null means
+// the screen is still loading it (the slot stays empty); leave the prop
+// out and the slot fetches for itself, as every other screen does.
+export default function TopbarWeather({ snapshot: given }: { snapshot?: any } = {}) {
   const { profile } = useProfile()
-  const [snapshot, setSnapshot] = useState<any>(() => cache?.data ?? null)
+  const screenOwns = given !== undefined
+  const [fetched, setFetched] = useState<any>(() => cache?.data ?? null)
+  const snapshot = screenOwns ? given : fetched
+
+  const lat: number = (profile as any)?.location_lat ?? MURFREESBORO.lat
+  const lon: number = (profile as any)?.location_lon ?? MURFREESBORO.lon
 
   useEffect(() => {
+    if (screenOwns) return
     let cancelled = false
-    const lat = (profile as any)?.location_lat ?? MURFREESBORO.lat
-    const lon = (profile as any)?.location_lon ?? MURFREESBORO.lon
     cachedWeather(lat, lon)
-      .then((d) => { if (!cancelled) setSnapshot(d) })
+      .then((d) => { if (!cancelled) setFetched(d) })
       .catch(() => { /* header weather is decorative, fail silent */ })
     return () => { cancelled = true }
-  }, [(profile as any)?.location_lat, (profile as any)?.location_lon])
+  }, [screenOwns, lat, lon])
 
   const temp = snapshot?.current?.temperature_2m
   if (temp == null) {
+    if (screenOwns && snapshot === null) return null
     return <span style={{ opacity: 0.6 }}>Weather unavailable</span>
   }
   const cond = weatherLabel(snapshot?.current?.weather_code)

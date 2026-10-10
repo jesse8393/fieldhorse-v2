@@ -134,8 +134,8 @@ test('keeps the desktop schedule planning workflow complete', async ({ page }, t
   await capture(page, testInfo, 'desktop-schedule-week', true)
 
   await page.getByRole('button', { name: 'Day', exact: true }).click()
-  await expect(page.locator('.fh-build-dayplan')).toBeVisible()
-  const event = page.locator('.fh-build-dayplan__event').first()
+  await expect(page.locator('.fhsch-board[data-view="day"]')).toBeVisible()
+  const event = page.locator('.fhsch-event').first()
   await expect(event).toContainText('Pour slab')
   await capture(page, testInfo, 'desktop-schedule-day', true)
   await event.click()
@@ -144,7 +144,7 @@ test('keeps the desktop schedule planning workflow complete', async ({ page }, t
   await page.getByRole('button', { name: 'Cancel', exact: true }).click()
 
   await page.getByRole('button', { name: 'Month', exact: true }).click()
-  await expect(page.locator('.fh-build-cal')).toBeVisible()
+  await expect(page.locator('.fhsch-month')).toBeVisible()
   await capture(page, testInfo, 'desktop-schedule-month', true)
   await page.getByRole('button', { name: 'Week', exact: true }).click()
   await expect(page.locator('.fh-build-weekplan')).toBeVisible()
