@@ -23,6 +23,7 @@ import { canHover } from '../lib/hover.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { startOfWeek } from '../lib/scheduleDates.ts'
+import { jobLabel } from '../lib/scheduleBoard.ts'
 const SnowSchedule = lazy(() => import('../components/desktop/SnowScheduleBuild.tsx'))
 
 const VIEWS = [
@@ -109,6 +110,9 @@ export default function Schedule() {
   const [weather, setWeather] = useState<any>(null)
   const [weatherFailed, setWeatherFailed] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
+  // The desktop tray's Schedule button opens the same sheet with its job
+  // already picked and the visit named after it.
+  const [addPreset, setAddPreset] = useState<{ contactId: string; title: string } | null>(null)
   const [editEvent, setEditEvent] = useState<any>(null)
   // Destructive-confirm sheet for delete event. pendingDeleteEvt is the
   // event row being deleted (for title display); deletingEvt is the
@@ -290,15 +294,23 @@ export default function Schedule() {
             setCursor={setCursor}
             view={view}
             setView={setView}
-            onAddEvent={() => setAddOpen(true)}
+            weather={hasCoords && !weatherFailed ? weather : undefined}
+            onAddEvent={() => { setAddPreset(null); setAddOpen(true) }}
+            onNewJob={() => navigate('/work?new=1&asStage=job')}
+            onScheduleJob={(job) => {
+              setAddPreset({ contactId: job.id, title: jobLabel(job) })
+              setAddOpen(true)
+            }}
             onOpenEvent={(event: any) => setEditEvent(event)}
           />
         </Suspense>
         <AddEventSheet
           open={addOpen}
           userId={user?.id}
-          onClose={() => setAddOpen(false)}
-          onSaved={() => { setAddOpen(false); load() }}
+          defaultContactId={addPreset?.contactId ?? ''}
+          defaultTitle={addPreset?.title ?? ''}
+          onClose={() => { setAddOpen(false); setAddPreset(null) }}
+          onSaved={() => { setAddOpen(false); setAddPreset(null); load() }}
         />
         <AddEventSheet
           open={!!editEvent}
