@@ -71,7 +71,7 @@ Status is one of todo, done, blocked, skipped.
 | 6 | 6.3 Thread with the AI draft | done | 0ca4345 | |
 | 6 | 6.4 Phase 6 review and pull request | done | see git log | #221, images in phase6-review |
 | 7 | 7.1 Unused components | done | see git log | Pour window hero is now an OnyxStage |
-| 7 | 7.2 Dead CSS guarded by screenshots | todo | | |
+| 7 | 7.2 Dead CSS guarded by screenshots | done | see git log | 392 rules removed in 4 batches, 0 changed pixels |
 | 7 | 7.3 Final record and morning summary | todo | | |
 
 ## Notes and differences from the plans
@@ -100,6 +100,14 @@ Status is one of todo, done, blocked, skipped.
 * The Quote tab on a phone sits under the Job page header (rail, money strip, quick actions, tabs), so the render's bare Quote page layout differs by design.
 * `src/lib/queries.ts` gained `cost` on the invoices bundle jobs so Money can compute margin. `tests/e2e/mock-workflows.spec.ts` changed two phone assertions that named old phone cards.
 * Full suite on the Phase 3 head: lint 0 errors (50 warnings, down from 57), typecheck, build and design audit pass, 720 of 720 unit tests, Playwright 95 passed and 75 skipped by project.
+
+### Phase 7 notes
+
+* Decision D30 in `SPEC.md` covers what was deleted and what was kept.
+* The screenshot guard is `tests/e2e/cleanup-guard.spec.ts`. It runs only with `FH_VISUAL=1`. To check a change: `QA_NOW=2026-10-08T14:00:00.000Z FH_VISUAL=1 npx playwright test cleanup-guard`. To retake the baselines add `--update-snapshots`. `QA_NOW` also makes `scripts/qa-mock.mjs` build its dates from that time, so runs repeat. The baselines were shown to be stable over two runs, and a deliberate one rule change (a 0.4 px letter spacing on `.fh-app`) made the guard fail with 872 changed pixels.
+* `scripts/find-dead-css.mjs` lists the rules the app can no longer match. It reports none now.
+* **Legacy colors still in use (design audit list):** all six, `#C9963A`, `#141414`, `#F2EDE4`, `#5C5C5C`, `#C0392B` and `#2D7A4F`, with their rgb forms. They are named by the mobile app, the email and PDF templates in `netlify/functions`, `src/components/documents`, the public quote and invoice pages, Landing, Settings and many older screens, plus `tokens.css` and `global.css`. None could be dropped.
+* Unused files that the plan did not list were left alone, and are named in D30.
 
 ### Phase 6 notes
 
