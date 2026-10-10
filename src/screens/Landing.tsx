@@ -129,8 +129,8 @@ export default function Landing() {
           }}
         >
           Leads, estimates, schedule, invoices, and jobs in one place.
-          Built by a working general contractor who needed it, not by a
-          software company guessing at what the trades do all day.
+          Built by someone who runs a construction company and needed it,
+          not by a software company guessing at what the trades do all day.
         </p>
         <div
           style={{
