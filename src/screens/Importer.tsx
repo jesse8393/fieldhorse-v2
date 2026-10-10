@@ -357,7 +357,7 @@ export default function Importer() {
         <motion.section variants={item} className="fh-build-hero-row fh-build-hero-row--page fh-importer-build__hero">
           <div>
             <div className="fh-build-good">Office</div>
-            <h1 className="fh-build-title">IMPORT DATA.</h1>
+            <h1 className="fh-build-title">Import data.</h1>
           </div>
           <div className="fh-build-focus">
             <div className="fh-build-eyebrow">Import readiness</div>
@@ -468,7 +468,7 @@ export default function Importer() {
                   background: 'rgba(201,150,58,0.14)',
                   color: 'var(--field-gold-bright)',
                   fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-                  letterSpacing: 0, textTransform: 'uppercase',
+                  letterSpacing: 0,
                   cursor: aiMapping ? 'wait' : 'pointer',
                   opacity: aiMapping ? 0.7 : 1
                 }}
@@ -592,7 +592,7 @@ export default function Importer() {
               }}
             >
               <Upload size={16} />
-              {importing ? 'IMPORTING…' : `IMPORT ${toImport.length} CONTACTS`}
+              {importing ? 'Importing…' : `Import ${toImport.length} contacts`}
             </motion.button>
           </div>
         )}

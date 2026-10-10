@@ -1,18 +1,15 @@
-import { lazy, Suspense, useState, useMemo, useEffect } from 'react'
+import { lazy, Suspense, useState, useMemo, useEffect, useRef } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
-import {
-  ChevronLeft, Phone, MessageSquare, Pencil, MoreHorizontal,
-  XCircle, Trash2, Users, ArrowRight
-} from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
+import { AnimatePresence } from 'framer-motion'
+import { XCircle, ArrowRight } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useMembership } from '../../contexts/MembershipContext.tsx'
 import { supabase } from '../../lib/supabase.ts'
 import { markLost, startQuote, reopen } from '../../lib/pipeline.ts'
-import { stageColor } from '../../lib/stages.ts'
+import { stageColor, margin } from '../../lib/stages.ts'
 import { toastSuccess, toastError } from '../../lib/toast.ts'
 import { hapticTap, hapticError } from '../../lib/haptics.ts'
-import { dueStatus } from '../../lib/dueDate.ts'
 import { SkeletonBlock as SkeletonBlock_, SkeletonList as SkeletonList_ } from '../../components/Skeleton.tsx'
 const SkeletonBlock = SkeletonBlock_ as any
 const SkeletonList = SkeletonList_ as any
@@ -26,14 +23,9 @@ import { useConfirm } from '../../components/ConfirmSheet.tsx'
 const MarkCompleteSheet = lazy(() => import('../../components/MarkCompleteSheet.tsx'))
 const V3PaymentSheet = lazy(() => import('../../components/V3PaymentSheet.tsx'))
 const SendInvoiceSheet = lazy(() => import('../../components/SendInvoiceSheet.tsx'))
-import {
-  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
-  DropdownMenuItem, DropdownMenuSeparator
-} from '@/components/ui/dropdown-menu'
-import { StageTimeline, SegmentedTabs, Eyebrow, StampNumber } from '../../components/v3'
+import { Eyebrow } from '../../components/v3'
 import { tabPanelProps } from '../../lib/tabs.ts'
 import { useJobData } from './hooks/useJobData.ts'
-import { resolveNextAction } from './lib/jobNextAction.ts'
 import { computeJobHealth } from './lib/jobHealth.ts'
 import { tabsForStage, resolveTabForStage } from './lib/stageWorkspace.ts'
 import { tabsForRole, pickVisibleTab } from './lib/jobAccess.ts'
@@ -54,6 +46,14 @@ const ChangeOrdersSection = lazy(() => import('./sections/ChangeOrdersSection.ts
 const ApproveQuoteSheet = lazy(() => import('./sections/ApproveQuoteSheet.tsx'))
 const SnowJobDetailBuild = lazy(() => import('../../components/desktop/SnowJobDetailBuild.tsx'))
 import { useIsDesktop } from '../../lib/useMediaQuery.ts'
+import { useHideDock } from '../../lib/dockVisibility.ts'
+import { openCapture } from '../../lib/captureAttach.ts'
+import { jobMoney } from './lib/spine.ts'
+import JobHeaderPhone, { JobSectionTabs, JobMoreSheet } from './phone/JobHeaderPhone.tsx'
+import type { JobMoreAction } from './phone/JobHeaderPhone.tsx'
+import JobActionCapsule from './phone/JobActionCapsule.tsx'
+import { useJobPhotos } from './phone/SpineList.tsx'
+import { saveFollowUp } from '../../lib/followUp.ts'
 
 // Tab fallback for Suspense, replaces fallback={null}, which made tab
 // taps look broken (active state animates, then blank space for the
@@ -246,6 +246,7 @@ export default function ContactDetail() {
   const [searchParams, setSearchParams] = useSearchParams()
 
   const data = useJobData(id, user?.id)
+  const queryClient = useQueryClient()
   const {
     contact, subs, expenses, payments, inspections, notes,
     scheduleItems, scheduleCount, todos, clientSummary,
@@ -287,48 +288,12 @@ export default function ContactDetail() {
         : '/jobs'
   const detailBackLabel = detailHome === '/quotes' ? 'Quotes' : detailHome === '/leads' ? 'Leads' : 'Jobs'
 
-  // Cockpit "Next action" row consumes the same due-aware resolver as
-  // the Overview hero so the two never disagree (Phase 2H-5). The row's
-  // "Done" button is purpose-built for fh_job_todos completion, so we
-  // only surface todo-kind resolved actions here, when the resolver
-  // picks a schedule/milestone/stage default the row hides and the
-  // operator sees the canonical next action on the Overview tab.
-  const nextAction = useMemo(
-    () => resolveNextAction({ contact, scheduleItems, todos }),
-    [contact, scheduleItems, todos]
-  )
+  // The todo "Next action" the old phone header carried lives on the
+  // Overview's next action card, which uses the same resolver.
   const jobHealth = useMemo(
     () => computeJobHealth({ contact, payments, scheduleItems }),
     [contact, payments, scheduleItems]
   )
-  const nextTodo = useMemo(() => {
-    if (!nextAction || nextAction.kind !== 'todo') return null
-    return {
-      id: nextAction.sourceId,
-      text: nextAction.title,
-      due_at: nextAction.dueAt
-    }
-  }, [nextAction])
-
-  async function markTodoDone(todoId: any) {
-    if (!todoId || !user) return
-    hapticTap()
-    // By id only: teammates clear each other's tasks on a shared job and
-    // RLS scopes the org. .select() so a zero row update reads as a
-    // failure instead of "Done".
-    const { data: updated, error } = await supabase
-      .from('fh_job_todos')
-      .update({ done: true, completed_at: new Date().toISOString() })
-      .eq('id', todoId)
-      .select('id')
-    if (error || !updated || updated.length === 0) {
-      toastError("Couldn't mark done", error?.message || 'This task may have been removed. Refresh and try again.')
-      fetchAll()
-      return
-    }
-    toastSuccess('Done', 'Action cleared')
-    fetchAll()
-  }
 
   // Tab state. Local state is the source of truth for the rendered
   // panel; the URL (?tab=) is a synced mirror for deep links and
@@ -386,6 +351,16 @@ export default function ContactDetail() {
   // Edit mode is a flag the Overview tab + section editors read.
   // Header EDIT button toggles + jumps to overview if currently on another tab.
   const [isEditing, setIsEditing] = useState(false)
+
+  // Phone (spec 8.1 and 9.4): the page brings its own onyx action
+  // capsule, so the dock steps aside while it is mounted. The header's
+  // cover and count and the Spine share one photo query.
+  useHideDock(!isDesktop)
+  const jobPhotos = useJobPhotos(isDesktop ? null : id)
+  const tabsRef = useRef<HTMLDivElement | null>(null)
+  const [moreOpen, setMoreOpen] = useState(false)
+  // Photos the capsule's camera took, waiting for the Files tab to upload.
+  const [pendingPhotos, setPendingPhotos] = useState<File[] | null>(null)
   const requestedIntent = readJobActionIntent(searchParams.get('action'))
   // Dashboard cues are billing or sales work, except a reschedule, so
   // field roles only get that one.
@@ -508,9 +483,10 @@ export default function ContactDetail() {
   // builder gets full width. 5/17 chrome unification, fixes the 5/13
   // audit's "two design systems on one page" finding where switching
   // to Quote on desktop swapped the entire chrome.
-  // Mobile <900px continues to use the Header + StageTimeline +
-  // SegmentedTabs + tab content flow verbatim. Modals stay mounted at
-  // the wrapper level so both branches can dispatch them.
+  // Phone (<900px) draws the redesigned top (photo header, onyx band,
+  // stage rail, money strip, quick actions), the section tabs with the
+  // Spine first (decision D5) and the floating action capsule. Modals
+  // stay mounted at the wrapper level so both branches can dispatch them.
   const useDesktopShell = isDesktop
 
   // Per-stage primary action, gives the mobile deal screen the same
@@ -583,6 +559,41 @@ export default function ContactDetail() {
     : contact.stage === 'lost'    ? { label: 'Reopen',         onClick: onReopen }
     : null
 
+  // Phone money strip: contract, paid, balance and the margin chip, for
+  // money roles only and once there is money on the job. Margin needs a
+  // recorded cost; without one there is no chip rather than a false 100%.
+  const phoneMoney = canSeeMoney && (Number(contractTotal || 0) > 0 || Number(paid || 0) > 0)
+    ? jobMoney({
+        contractTotal: Number(contractTotal || 0),
+        paid: Number(paid || 0),
+        balance: Number(balance || 0),
+        marginPct: Number(contact.cost || 0) > 0 && Number(contact.amount || 0) > 0 ? margin(contact) : null
+      })
+    : null
+
+  // Open a section from the header (the photo count, Photos) or the
+  // capsule's camera, then bring the tabs into view under the thumb.
+  function openSection(next: string) {
+    setTab(next)
+    requestAnimationFrame(() => {
+      const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+      tabsRef.current?.scrollIntoView({ block: 'start', behavior: reduce ? 'auto' : 'smooth' })
+    })
+  }
+
+  // The more button's sheet carries what the old header row and menu
+  // did: edit, the linked client, schedule, partner, mark lost, delete.
+  const isOwnerView = !!user?.id && contact.user_id === user.id
+  const moreActions: JobMoreAction[] = [
+    { id: 'edit', label: isEditing ? 'Stop editing' : 'Edit job details', onSelect: handleEditClick },
+    ...(isOwnerView && contact.client_id
+      ? [{ id: 'client', label: 'Open the client', subline: clientSummary?.name || undefined, onSelect: () => navigate(`/clients/${contact.client_id}`) }]
+      : []),
+    { id: 'event', label: 'Schedule an event', onSelect: () => setEventOpen(true) },
+    { id: 'partner', label: 'Invite a partner', onSelect: () => setInviteOpen(true) },
+    ...(canMarkLost ? [{ id: 'lost', label: 'Mark lost', onSelect: () => { void onMarkLost() } }] : [])
+  ]
+
   // Tab router, rendered once and placed in either shell. The desktop
   // and mobile branches used to carry their own copies, and the desktop
   // copy drifted: Overview lost changeOrders (cockpit read "Paid in full"
@@ -616,6 +627,9 @@ export default function ContactDetail() {
           onOpenMarkComplete={() => setCompleteOpen(true)}
           onOpenSendInvoice={() => setInvoiceOpen(true)}
           onOpenQuote={() => setTab('quote')}
+          spineFirst={!isDesktop}
+          inspections={inspections}
+          onAddToSpine={() => openCapture({ jobId: contact.id })}
         />
       )}
       {tab === 'quote' && (
@@ -673,6 +687,8 @@ export default function ContactDetail() {
             notes={notes}
             userId={user?.id}
             fetchAll={fetchAll}
+            incomingPhotos={pendingPhotos}
+            onIncomingPhotosHandled={() => setPendingPhotos(null)}
           />
         </Suspense>
       )}
@@ -802,76 +818,57 @@ export default function ContactDetail() {
           )
         })()
       ) : (
-      <>
-      {/* HEADER, back / title / more, then action row, then stage timeline */}
-      <Header
-        contact={contact}
-        clientSummary={clientSummary}
-        viewerUserId={user?.id}
-        isEditing={isEditing}
-        showMoney={canSeeMoney}
-        contractTotal={contractTotal}
-        paid={paid}
-        balance={balance}
-        nextTodo={nextTodo}
-        onBack={() => navigate(detailHome)}
-        backLabel={detailBackLabel}
-        onEdit={handleEditClick}
-        onMarkLost={canMarkLost ? onMarkLost : undefined}
-        onDelete={canDeleteJob ? () => setDeleteOpen(true) : undefined}
-        onClientNav={(cid: any) => navigate(`/clients/${cid}`)}
-        onTodoDone={markTodoDone}
-      />
+      <div className="fhj-page">
+        <JobHeaderPhone
+          contact={contact}
+          photos={jobPhotos}
+          money={phoneMoney}
+          backLabel={detailBackLabel}
+          onBack={() => navigate(detailHome)}
+          onMore={() => setMoreOpen(true)}
+          onOpenPhotos={() => openSection('files')}
+        />
 
-      <StageTimeline currentStage={contact.stage ?? undefined} />
+        {actionIntentMeta && (
+          <div style={{ padding: '16px 20px 0' }}>
+            <ActionIntentBanner
+              meta={actionIntentMeta}
+              onPrimary={handleActionIntentPrimary}
+              onDismiss={() => clearActionIntent()}
+            />
+          </div>
+        )}
 
-      {actionIntentMeta && (
-        <div style={{ padding: '0 24px 8px' }}>
-          <ActionIntentBanner
-            meta={actionIntentMeta}
-            onPrimary={handleActionIntentPrimary}
-            onDismiss={() => clearActionIntent()}
-          />
+        {/* Sections as text tabs, Overview reads Spine (decision D5) */}
+        <JobSectionTabs
+          ref={tabsRef}
+          tabs={visibleTabs}
+          value={tab}
+          onChange={setTab}
+          idBase="fh-job-tabs"
+        />
+
+        <div {...tabPanelProps('fh-job-tabs', tab)}>
+          {tabPanels}
         </div>
-      )}
 
-      {/* STAGE PRIMARY ACTION, one clear next step per stage */}
-      {stageCta && tab !== 'overview' && (
-        <div style={{ padding: '4px 24px 8px' }}>
-          <motion.button
-            type="button"
-            whileTap={{ scale: 0.99 }}
-            onClick={() => { hapticTap(); stageCta.onClick() }}
-            style={{
-              width: '100%',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              padding: '12px 16px', borderRadius: 10, border: 'none',
-              background: 'var(--v3-primary)', color: 'var(--v3-on-primary)',
-              fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, letterSpacing: 0,
-              cursor: 'pointer', boxShadow: 'var(--v3-gold-glow)',
-              WebkitTapHighlightColor: 'transparent'
-            }}
-          >
-            {stageCta.label}
-            <ArrowRight size={16} strokeWidth={2.4} aria-hidden="true" />
-          </motion.button>
-        </div>
-      )}
+        <JobActionCapsule
+          action={stageCta}
+          onPhotos={(files) => { setPendingPhotos(files); openSection('files') }}
+          onVoice={() => openCapture({ jobId: contact.id })}
+        />
 
-      {/* TOP-LEVEL TABS (underline variant) */}
-      <SegmentedTabs
-        value={tab}
-        onChange={setTab}
-        tabs={visibleTabs}
-        ariaLabel={`${detailBackLabel.slice(0, -1) || 'Job'} detail tabs`}
-        idBase="fh-job-tabs"
-      />
-
-      {/* TAB ROUTER */}
-      <div {...tabPanelProps('fh-job-tabs', tab)}>
-        {tabPanels}
+        <JobMoreSheet
+          open={moreOpen}
+          onOpenChange={setMoreOpen}
+          title={contact.job_title || contact.name || 'This job'}
+          actions={moreActions}
+          followUp={contact.stage === 'lost' || contact.stage === 'closed'
+            ? undefined
+            : { current: contact.follow_up_on ?? null, onSet: (when) => { void saveFollowUp(queryClient, contact, user?.id, when) } }}
+          onDelete={canDeleteJob ? () => setDeleteOpen(true) : undefined}
+        />
       </div>
-      </>
       )}
 
       {/* MODALS. The billing, closeout and approval sheets only mount for
@@ -979,352 +976,6 @@ export default function ContactDetail() {
         </Eyebrow>
       </ActionSheet>
     </div>
-  )
-}
-
-/* ============================================================
-   HEADER, back / title / stage / client / action row / more menu
-   ============================================================ */
-
-function Header({
-  contact, clientSummary, viewerUserId, isEditing,
-  showMoney = false, contractTotal, paid, balance, nextTodo,
-  onBack, backLabel = 'Jobs', onEdit, onMarkLost, onDelete, onClientNav, onTodoDone
-}: any) {
-  const isOwnerView = !!viewerUserId && contact.user_id === viewerUserId
-  const phoneHref = contact.phone ? `tel:${contact.phone}` : null
-  const smsHref = contact.phone ? `sms:${contact.phone}` : null
-
-  // Value includes approved change orders, the same contract Balance is
-  // measured against, so Value, Paid and Balance add up. Money roles only.
-  const contractValue = Number(contractTotal ?? contact?.amount ?? 0)
-  const showMetrics = showMoney && contractValue > 0
-  // Owner-view eyebrow shows the resolved client name; partner view still
-  // shows the static CLIENT label so the chrome doesn't go blank when RLS
-  // hides clientSummary.
-  const clientLabel = contact.client_id
-    ? (isOwnerView ? (clientSummary?.name || 'Client') : 'Client')
-    : null
-
-  return (
-    <div style={{ padding: '8px 24px 12px' }}>
-      {/* Top row: back · spacer · more */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
-        <IconButton onClick={onBack} ariaLabel={`Back to ${String(backLabel).toLowerCase()}`}>
-          <ChevronLeft size={18} aria-hidden="true" />
-        </IconButton>
-
-        {/* Action row, Call, Text, Edit, More */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {phoneHref ? (
-            <PhoneAction href={phoneHref} ariaLabel={`Call ${contact.name || 'contact'}`}>
-              <Phone size={16} aria-hidden="true" />
-            </PhoneAction>
-          ) : (
-            <IconButton disabled ariaLabel="Call (no phone on file)">
-              <Phone size={16} aria-hidden="true" />
-            </IconButton>
-          )}
-          {smsHref ? (
-            <PhoneAction href={smsHref} ariaLabel={`Text ${contact.name || 'contact'}`}>
-              <MessageSquare size={16} aria-hidden="true" />
-            </PhoneAction>
-          ) : (
-            <IconButton disabled ariaLabel="Text (no phone on file)">
-              <MessageSquare size={16} aria-hidden="true" />
-            </IconButton>
-          )}
-          <IconButton
-            onClick={onEdit}
-            ariaLabel={isEditing ? 'Stop editing' : 'Edit job'}
-            ariaPressed={isEditing}
-            tone={isEditing ? 'primary' : undefined}
-          >
-            <Pencil size={16} aria-hidden="true" />
-          </IconButton>
-          {/* Both entries are role and stage gated by the parent; the
-              menu only renders when one of them is offered. */}
-          {(onMarkLost || onDelete) && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  aria-label="More actions"
-                  style={iconButtonStyle()}
-                >
-                  <MoreHorizontal size={18} aria-hidden="true" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent side="bottom" align="end" sideOffset={8} collisionPadding={20}>
-                {onMarkLost && (
-                  <DropdownMenuItem onSelect={onMarkLost}>
-                    <XCircle size={14} /> Mark lost
-                  </DropdownMenuItem>
-                )}
-                {onMarkLost && onDelete && <DropdownMenuSeparator />}
-                {onDelete && (
-                  <DropdownMenuItem variant="destructive" onSelect={onDelete}>
-                    <Trash2 size={14} /> Delete
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </div>
-      </div>
-
-      {/* Cockpit, eyebrow client / serif title / job_title / metrics / next action */}
-      <div style={{
-        padding: '12px 12px',
-        borderRadius: 10,
-        // Top-tint rides the surface ladder (was literal #141414, in
-        // daylight it smeared a dark gradient across the paper card).
-        background: 'linear-gradient(180deg, var(--v3-surface-2) 0%, var(--v3-surface) 72%)',
-        border: '1px solid var(--v3-border)',
-        boxShadow: '0 1px 0 rgba(242, 237, 228, 0.06) inset, 0 1px 2px rgba(20, 20, 20, 0.40), 0 8px 22px rgba(20, 20, 20, 0.42), 0 20px 44px rgba(20, 20, 20, 0.28)'
-      }}>
-        {clientLabel && (isOwnerView && contact.client_id ? (
-          <button
-            type="button"
-            onClick={() => onClientNav(contact.client_id)}
-            style={{
-              padding: '4px 8px',
-              marginLeft: -6,
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              WebkitTapHighlightColor: 'transparent'
-            }}
-          >
-            <Eyebrow as="span">
-              <Users size={10} aria-hidden="true" />
-              {clientLabel}
-            </Eyebrow>
-          </button>
-        ) : (
-          <Eyebrow as="span" aria-label="Shared job, client visible only to owner">
-            <Users size={10} aria-hidden="true" />
-            {clientLabel}
-          </Eyebrow>
-        ))}
-
-        <h1 style={{
-          margin: clientLabel ? '4px 0 0' : 0,
-          fontSize: 24,
-          lineHeight: 1.1,
-          letterSpacing: 0,
-          fontWeight: 600,
-          color: 'var(--v3-text)'
-        }}>
-          {contact.name || 'Untitled'}
-        </h1>
-        {contact.job_title && (
-          <div style={{
-            marginTop: 2,
-            fontFamily: 'var(--font-body)',
-            fontSize: 12,
-            color: 'var(--v3-text-muted)',
-            lineHeight: 1.3
-          }}>
-            {contact.job_title}
-          </div>
-        )}
-
-        {showMetrics && (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: paid > 0 ? '1fr 1fr 1fr' : '1fr',
-            alignItems: 'end',
-            gap: 12,
-            marginTop: 10,
-            paddingTop: 12,
-            borderTop: '1px solid var(--v3-border)'
-          }}>
-            <CockpitMetric label="Value" tone="gold" size="lg">
-              {kMoney(contractValue)}
-            </CockpitMetric>
-            {paid > 0 && (
-              <>
-                <CockpitMetric label="Paid" tone="success" size="md">
-                  {kMoney(paid)}
-                </CockpitMetric>
-                <CockpitMetric label="Balance" size="md">
-                  {kMoney(balance)}
-                </CockpitMetric>
-              </>
-            )}
-          </div>
-        )}
-
-        {nextTodo && (
-          <div style={{
-            marginTop: 10,
-            padding: '8px 12px 8px 12px',
-            borderRadius: 10,
-            background: 'var(--v3-surface-2)',
-            border: '1px solid var(--v3-border)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12
-          }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <Eyebrow tone="gold">Next action</Eyebrow>
-              <div style={{
-                marginTop: 2,
-                fontFamily: 'var(--font-body)',
-                fontSize: 14,
-                fontWeight: 600,
-                color: 'var(--v3-text)',
-                lineHeight: 1.3,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap'
-              }}>
-                {nextTodo.text || 'Open todo'}
-              </div>
-              <NextTodoDueChip iso={nextTodo.due_at} />
-            </div>
-            <button
-              type="button"
-              onClick={() => onTodoDone?.(nextTodo.id)}
-              style={{
-                flexShrink: 0,
-                padding: '8px 12px',
-                borderRadius: 10,
-                border: '1px solid color-mix(in srgb, var(--v3-primary) 50%, transparent)',
-                background: 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
-                color: 'var(--v3-on-primary)',
-                fontFamily: 'var(--font-body)',
-                fontSize: 12,
-                fontWeight: 700,
-                letterSpacing: 0,
-                textTransform: 'uppercase',
-                cursor: 'pointer',
-                WebkitTapHighlightColor: 'transparent',
-                boxShadow: '0 0 0 2px rgba(201, 150, 58, 0.10), 0 3px 8px rgba(201, 150, 58, 0.16)'
-              }}
-            >
-              Done
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-/* Compact money formatter, $46K / $1.2M for cockpit metrics. Falls back to
-   full dollars under 1k. */
-function kMoney(n: any) {
-  const v = Number(n || 0)
-  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`
-  if (v >= 1_000) return `$${Math.round(v / 1_000)}K`
-  return `$${Math.round(v).toLocaleString()}`
-}
-
-function CockpitMetric({ label, tone = 'default', size = 'lg', children }: any) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-      <Eyebrow tone={tone === 'gold' ? 'gold' : 'default'}>{label}</Eyebrow>
-      <StampNumber size={size} tone={tone}>{children}</StampNumber>
-    </div>
-  )
-}
-
-/**
- * NextTodoDueChip, read-only due-status chip rendered under the
- * cockpit Next-Action text. Returns null when iso is null/undefined
- * so rows without a due date stay clean. Tones mirror the v3 pattern:
- *   danger  → overdue
- *   warn    → today (gold)
- *   muted   → future (date label)
- */
-function NextTodoDueChip({ iso }: any) {
-  const status = dueStatus(iso)
-  if (!status) return null
-  const palette = status.tone === 'danger'
-    ? {
-        bg: 'var(--v3-danger-soft)',
-        border: 'color-mix(in srgb, var(--v3-danger) 40%, transparent)',
-        color: 'var(--v3-danger-text)'
-      }
-    : status.tone === 'warn'
-      ? {
-          bg: 'var(--v3-primary-soft)',
-          border: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)',
-          color: 'var(--v3-primary-text)'
-        }
-      : {
-          bg: 'var(--v3-surface-2)',
-          border: 'var(--v3-border)',
-          color: 'var(--v3-text-muted)'
-        }
-  return (
-    <Eyebrow style={{ marginTop: 4, padding: '4px 8px', borderRadius: 10, background: palette.bg, border: `1px solid ${palette.border}`, color: palette.color, whiteSpace: 'nowrap' }}>
-      Due · {status.label}
-    </Eyebrow>
-  )
-}
-
-/* ============================================================
-   ICON BUTTONS, header chrome
-   ============================================================ */
-
-function iconButtonStyle({ disabled = false, tone }: any = {}) {
-  return {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    display: 'grid',
-    placeItems: 'center',
-    background: tone === 'primary' ? 'var(--v3-primary-soft)' : 'var(--v3-surface)',
-    border: tone === 'primary'
-      ? '1px solid color-mix(in srgb, var(--v3-primary) 45%, transparent)'
-      : '1px solid var(--v3-border)',
-    color: tone === 'primary' ? 'var(--v3-primary-text)' : disabled ? 'var(--v3-text-muted)' : 'var(--v3-text)',
-    cursor: disabled ? 'default' : 'pointer',
-    opacity: disabled ? 0.4 : 1,
-    WebkitTapHighlightColor: 'transparent'
-  }
-}
-
-function IconButton({ children, onClick, disabled, ariaLabel, ariaPressed, tone }: any) {
-  return (
-    <motion.button
-      type="button"
-      whileTap={disabled ? undefined : { scale: 0.94 }}
-      onClick={() => { if (!disabled) { hapticTap(); onClick?.() } }}
-      disabled={disabled}
-      aria-label={ariaLabel}
-      aria-pressed={ariaPressed}
-      style={iconButtonStyle({ disabled, tone })}
-    >
-      {children}
-    </motion.button>
-  )
-}
-
-/**
- * PhoneAction, plain <a> with setTimeout fallback. The audit-batch-6 fix:
- * framer-motion + Vaul drawer was eating clicks on iOS Safari for tel:/sms:.
- * Plain anchor + manual location.href fallback ensures the OS handler fires.
- */
-function PhoneAction({ href, ariaLabel, children }: any) {
-  return (
-    <a
-      href={href}
-      aria-label={ariaLabel}
-      onClick={(e) => {
-        e.stopPropagation()
-        hapticTap()
-        if (typeof window !== 'undefined') {
-          setTimeout(() => { window.location.href = href }, 0)
-        }
-      }}
-      style={{ ...iconButtonStyle({}), textDecoration: 'none' }}
-    >
-      {children}
-    </a>
   )
 }
 

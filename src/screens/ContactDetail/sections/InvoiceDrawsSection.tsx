@@ -463,7 +463,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
         // Same fallback InvoiceDetail uses, download so the operator
         // can email manually while they set up Resend env.
         toastError(
-          "Email NOT sent, sender isn't configured",
+          "Email not sent, sender isn't configured",
           'Downloaded the PDF so you can email it manually.'
         )
         downloadPdf(result)
@@ -676,7 +676,6 @@ function Summary({ contractTotal, drawsIssued, previouslyPaid, unbilled }: any) 
           <div className="fh-draws-summary__label" style={{
             fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
             letterSpacing: 0, color: 'var(--v3-text-muted)',
-            textTransform: 'uppercase'
           }}>
             {c.label}
           </div>
@@ -759,11 +758,11 @@ function Row({ draw, busy, readOnly, onEdit, onDownload, onSend, onMarkPaid, onV
           {draw.notes && <span style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>· {draw.notes}</span>}
         </div>
         <div style={{ marginTop: 6, display: 'flex', gap: 8 }}>
-          {isPaid && <Tag tone="green">PAID</Tag>}
-          {isVoid && <Tag tone="muted">VOID</Tag>}
-          {isOverdue && <Tag tone="red">OVERDUE</Tag>}
-          {!isPaid && !isVoid && !isOverdue && draw.status === 'draft' && <Tag tone="muted">DRAFT</Tag>}
-          {!isPaid && !isVoid && !isOverdue && draw.status === 'sent'  && <Tag tone="gold">SENT</Tag>}
+          {isPaid && <Tag tone="green">Paid</Tag>}
+          {isVoid && <Tag tone="muted">Void</Tag>}
+          {isOverdue && <Tag tone="red">Overdue</Tag>}
+          {!isPaid && !isVoid && !isOverdue && draw.status === 'draft' && <Tag tone="muted">Draft</Tag>}
+          {!isPaid && !isVoid && !isOverdue && draw.status === 'sent'  && <Tag tone="gold">Sent</Tag>}
         </div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
@@ -975,7 +974,7 @@ function IconBtn({ children, onClick, disabled, tone, title, ...rest }: any) {
 
 const labelStyle = {
   fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-  letterSpacing: 0, color: 'var(--v3-text-muted)', textTransform: 'uppercase'
+  letterSpacing: 0, color: 'var(--v3-text-muted)'
 }
 const inputStyle: import('react').CSSProperties = {
   width: '100%', boxSizing: 'border-box',
@@ -1001,7 +1000,7 @@ const primaryBtnStyle = {
   background: 'linear-gradient(180deg, var(--v3-primary-bright) 0%, var(--v3-primary) 100%)',
   color: '#141414',
   fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-  letterSpacing: 0, textTransform: 'uppercase', cursor: 'pointer'
+  letterSpacing: 0, cursor: 'pointer'
 }
 const ghostBtnStyle = {
   display: 'inline-flex', alignItems: 'center', gap: 8,

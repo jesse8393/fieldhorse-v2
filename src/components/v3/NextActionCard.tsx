@@ -57,10 +57,9 @@ export default function NextActionCard({
         fontSize: 12,
         fontWeight: 700,
         letterSpacing: 0,
-        textTransform: 'uppercase',
         color: 'var(--v3-text-muted)'
       }}>
-        Next Action
+        Next action
       </span>
 
       {hasAction ? (
@@ -192,7 +191,6 @@ function DueStatusChip({ status }: { status: { tone: string; label: string } }) 
       fontSize: 12,
       fontWeight: 700,
       letterSpacing: 0,
-      textTransform: 'uppercase',
       whiteSpace: 'nowrap',
       lineHeight: 1.4
     }}>

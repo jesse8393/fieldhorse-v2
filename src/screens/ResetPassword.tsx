@@ -64,7 +64,7 @@ export default function ResetPassword() {
         style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 380 }}
       >
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 24, letterSpacing: 0, lineHeight: 1 }}>
+          <div style={{ fontFamily: 'var(--font-wordmark)', fontSize: 24, letterSpacing: 0, lineHeight: 1 }}>
             <span style={{ color: 'var(--v3-primary-text)' }}>FIELD</span>
             <span style={{ color: 'var(--ink-strong)' }}>HORSE</span>
           </div>
@@ -163,7 +163,7 @@ export default function ResetPassword() {
                 opacity: busy ? 0.6 : 1
               }}
             >
-              {busy ? 'SAVING…' : (<>UPDATE PASSWORD<ArrowRight size={18} /></>)}
+              {busy ? 'Saving…' : (<>Update password<ArrowRight size={18} /></>)}
             </motion.button>
           </form>
         ) : (

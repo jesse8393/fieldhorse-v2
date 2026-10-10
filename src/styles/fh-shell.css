@@ -1,0 +1,636 @@
+/*
+ * Redesign app shell: phone header, dock, workspace menu, theme control,
+ * desktop sidebar and the company monogram.
+ * Spec: docs/design/2026-10-redesign/SPEC.md, section 8. Class prefix fhs-
+ * (fhc-monogram is shared with the component library).
+ */
+
+/* ---- Company monogram (spec 7) ---- */
+.fhc-monogram {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+  background: var(--fh-onyx);
+  border: 1px solid rgba(201, 150, 58, 0.55);
+  box-shadow: inset 0 1px 0 rgba(242, 237, 228, 0.08);
+}
+.fhc-monogram--32 { width: 32px; height: 32px; border-radius: 10px; }
+.fhc-monogram--40 { width: 40px; height: 40px; border-radius: 12px; }
+.fhc-monogram--48 { width: 48px; height: 48px; border-radius: 14px; }
+.fhc-monogram img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 4px;
+  box-sizing: border-box;
+}
+.fhc-monogram__initials {
+  font-family: var(--fh-font-display);
+  font-weight: 600;
+  line-height: 1;
+  color: var(--fh-gold);
+}
+.fhc-monogram--32 .fhc-monogram__initials { font-size: 14px; }
+.fhc-monogram--40 .fhc-monogram__initials { font-size: 18px; }
+.fhc-monogram--48 .fhc-monogram__initials { font-size: 20px; }
+
+/* ---- Icon buttons in the chrome ---- */
+.fhs-icon-btn {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--fh-ink);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--dur-fast) var(--ease), transform var(--dur-mechanical) var(--ease-mechanical);
+}
+.fhs-icon-btn:hover { background: var(--fh-wash); }
+.fhs-icon-btn:active { background: var(--fh-wash-2); transform: translateY(1px); }
+.fhs-icon-btn--small { width: 36px; height: 36px; }
+.fhs-icon-btn__badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  background: var(--fh-gold);
+  color: var(--fh-on-gold);
+  font: 600 12px/16px var(--fh-font-body);
+  text-align: center;
+  box-shadow: 0 0 0 2px var(--fh-plaster);
+}
+
+/* ---- Header (spec 8.2, decision D4) ---- */
+.fhs-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: calc(8px + env(safe-area-inset-top, 0px)) 12px 8px 12px;
+  background: linear-gradient(180deg, var(--fh-veil-1) 0%, var(--fh-veil-2) 82%, var(--fh-veil-0) 100%);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+.fhs-header__menu {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--dur-mechanical) var(--ease-mechanical);
+}
+.fhs-header__menu:active { transform: scale(0.96); }
+.fhs-header__company {
+  flex: 1;
+  min-width: 0;
+  font: 600 17px/22px var(--fh-font-body);
+  color: var(--fh-ink);
+  /* Wraps between words, up to two lines, before anything is cut off. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: break-word;
+}
+.fhs-header__company--long { font: 600 15px/20px var(--fh-font-body); }
+.fhs-header__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+@media (min-width: 900px) {
+  .fhs-header__menu,
+  .fhs-header__company { display: none; }
+}
+
+/* ---- Screen title row (Phase 2): the title on the left and, on a
+   phone, the screen's add action as a secondary mini button on the
+   right. The dock coin stays the only floating gold action. ---- */
+.fhs-screen-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.fhs-screen-head > :first-child { min-width: 0; }
+.fhs-screen-head > .fhc-btn { flex-shrink: 0; }
+
+/* ---- Dock (spec 8.1) ---- */
+.fhs-dock {
+  position: fixed;
+  z-index: var(--z-nav);
+  left: 50%;
+  bottom: var(--fh-dock-gap);
+  width: min(calc(100% - 32px), 480px);
+  height: 64px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: stretch;
+  padding: 0 8px;
+  border-radius: 28px;
+  background: var(--fh-dock);
+  box-shadow: var(--fh-shadow-overlay), inset 0 1px 0 rgba(242, 237, 228, 0.06);
+  transform: translateX(-50%);
+  transition:
+    transform var(--dur-sheet-in) var(--ease-out),
+    opacity var(--dur-sheet-out) var(--ease),
+    visibility 0s;
+}
+.fhs-dock.is-hidden {
+  transform: translate(-50%, calc(100% + 32px));
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    transform var(--dur-sheet-out) var(--ease),
+    opacity var(--dur-sheet-out) var(--ease),
+    visibility 0s var(--dur-sheet-out);
+}
+@media (min-width: 900px) {
+  .fhs-dock { display: none; }
+}
+/* Content tucks under the dock: a plaster fade starts 40 px above the
+   capsule and runs to the bottom edge, so rows read as passing behind
+   it rather than being covered. It sits just under the dock, never
+   takes a tap, and goes away whenever the dock is hidden (keyboard
+   open, or a screen with its own action capsule). */
+@media (max-width: 899px) {
+  body:has(.fhs-dock:not(.is-hidden))::after {
+    content: '';
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: calc(var(--z-nav) - 1);
+    height: calc(var(--fh-dock-gap) + 64px + 40px);
+    background: linear-gradient(180deg, transparent 0, var(--fh-plaster) 40px);
+    pointer-events: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fhs-dock,
+  .fhs-dock.is-hidden { transform: translateX(-50%); }
+}
+.fhs-dock__side {
+  flex: 1;
+  display: flex;
+  justify-content: space-around;
+}
+.fhs-dock__item {
+  position: relative;
+  flex: 1;
+  min-width: 48px;
+  max-width: 88px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-radius: 18px;
+  color: var(--fh-smoke);
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: color var(--dur-fast) var(--ease);
+}
+.fhs-dock__item:hover { color: var(--fh-linen); }
+.fhs-dock__item:focus-visible { outline-offset: -4px; }
+.fhs-dock__item.is-active { color: var(--fh-linen); }
+.fhs-dock__label {
+  font: 500 12px/14px var(--fh-font-body);
+  white-space: nowrap;
+}
+.fhs-dock__item.is-active .fhs-dock__label { font-weight: 600; }
+.fhs-dock__dot {
+  position: absolute;
+  bottom: 6px;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--fh-gold);
+  opacity: 0;
+}
+.fhs-dock__item.is-active .fhs-dock__dot { opacity: 1; }
+.fhs-dock__center {
+  position: relative;
+  flex: 0 0 76px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding-bottom: 12px;
+}
+.fhs-dock__label--coin { color: var(--fh-linen); }
+.fhs-dock__coin {
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--fh-gold-brushed);
+  color: var(--fh-on-gold);
+  /* The dock colored ring makes the capsule bulge around the coin. */
+  box-shadow:
+    var(--fh-gold-edge),
+    0 0 0 5px var(--fh-dock),
+    0 12px 22px -10px rgba(22, 20, 15, 0.7);
+  transform: translateX(-50%);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--dur-mechanical) var(--ease-mechanical), filter var(--dur-fast) var(--ease);
+}
+.fhs-dock__coin:hover { filter: brightness(1.04); }
+.fhs-dock__coin:active { transform: translateX(-50%) scale(0.96); filter: brightness(0.96); }
+.fhs-dock__coin:focus-visible { outline-offset: 4px; }
+
+/* ---- Workspace menu (spec 8.2) ---- */
+.fhs-menu-root {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+}
+.fhs-menu__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(22, 20, 15, 0.45);
+}
+.fhs-menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 88dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--fh-paper);
+  color: var(--fh-ink);
+  border-radius: 22px 22px 0 0;
+  box-shadow: var(--fh-shadow-overlay);
+}
+@media (min-width: 600px) {
+  .fhs-menu {
+    max-width: 520px;
+    margin: 0 auto;
+  }
+}
+.fhs-menu__grabber {
+  flex-shrink: 0;
+  width: 40px;
+  height: 4px;
+  margin: 8px auto 4px;
+  border-radius: 999px;
+  background: var(--fh-edge);
+}
+.fhs-menu__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px 16px 20px;
+  border-bottom: 1px solid var(--fh-hairline);
+}
+.fhs-menu__who {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.fhs-menu__company,
+.fhs-menu__email {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fhs-menu__company { font: 600 18px/24px var(--fh-font-body); color: var(--fh-ink); }
+.fhs-menu__email { font: 500 13px/16px var(--fh-font-body); color: var(--fh-ink-3); }
+.fhs-menu__body {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 12px 16px;
+}
+.fhs-menu__group-title {
+  margin: 0;
+  padding: 16px 8px 8px;
+  font: 600 13px/16px var(--fh-font-body);
+  color: var(--fh-ink-3);
+}
+.fhs-menu__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.fhs-menu__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--fh-ink);
+  font: 500 16px/22px var(--fh-font-body);
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+.fhs-menu__row:hover { background: var(--fh-wash); }
+.fhs-menu__row:active { background: var(--fh-wash-2); }
+.fhs-menu__row.is-active { background: var(--fh-tray); font-weight: 600; }
+.fhs-menu__row-icon { color: var(--fh-ink-3); flex-shrink: 0; }
+.fhs-menu__row.is-active .fhs-menu__row-icon { color: var(--fh-ink); }
+.fhs-menu__row-label { flex: 1; min-width: 0; }
+.fhs-menu__row-chevron { color: var(--fh-ink-4); flex-shrink: 0; }
+.fhs-menu__group--settings {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+  padding: 16px 8px 0;
+  border-top: 1px solid var(--fh-hairline);
+}
+.fhs-menu__foot {
+  padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--fh-hairline);
+}
+.fhs-menu__signout {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--fh-ink-2);
+  font: 500 16px/22px var(--fh-font-body);
+  cursor: pointer;
+}
+.fhs-menu__signout:hover { background: var(--fh-wash); color: var(--fh-ink); }
+
+/* ---- Auto, Day, Night control (spec 10) ---- */
+.fhs-mode {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.fhs-mode__legend {
+  padding: 0;
+  margin-bottom: 8px;
+  font: 600 13px/16px var(--fh-font-body);
+  color: var(--fh-ink-3);
+}
+.fhs-mode__track {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--fh-hairline);
+  border-radius: 14px;
+  background: var(--fh-tray);
+}
+.fhs-mode__option { position: relative; display: block; }
+.fhs-mode__option input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.fhs-mode__face {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  border-radius: 10px;
+  color: var(--fh-ink-3);
+  font: 500 15px/20px var(--fh-font-body);
+  pointer-events: none;
+  transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.fhs-mode__option input:checked + .fhs-mode__face {
+  background: var(--fh-paper);
+  color: var(--fh-ink);
+  font-weight: 600;
+  box-shadow: var(--fh-shadow-soft);
+}
+.fhs-mode__option input:focus-visible + .fhs-mode__face {
+  outline: 2px solid var(--fh-focus);
+  outline-offset: 2px;
+}
+.fhs-mode__hint {
+  margin: 8px 0 0;
+  font: 500 13px/16px var(--fh-font-body);
+  color: var(--fh-ink-3);
+}
+
+/* ---- Desktop sidebar (spec 8.3) ---- */
+@media (min-width: 900px) {
+  .fh-desktop-sidebar.fhs-side {
+    width: var(--fh-sidebar-w);
+    box-sizing: border-box;
+    gap: 12px;
+    padding: 16px 12px 12px;
+    /* The rail itself never scrolls: the nav list scrolls inside it and
+       the brand, search and footer stay put. */
+    overflow: hidden;
+    isolation: isolate;
+    background: var(--fh-onyx);
+    border-right: 1px solid var(--fh-onyx-line);
+    box-shadow: none;
+  }
+}
+.fhs-side__brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 8px;
+}
+.fhs-side__brand-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.fhs-side__company,
+.fhs-side__city,
+.fhs-side__person-name,
+.fhs-side__person-email {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fhs-side__company { font: 600 16px/22px var(--fh-font-body); color: var(--fh-linen); }
+.fhs-side__city { font: 500 13px/16px var(--fh-font-body); color: var(--fh-smoke); }
+.fhs-side__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 40px;
+  padding: 0 8px 0 12px;
+  border: 1px solid var(--fh-onyx-line);
+  border-radius: 12px;
+  background: var(--fh-onyx-2);
+  color: var(--fh-smoke);
+  font: 500 14px/18px var(--fh-font-body);
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+.fhs-side__search span { flex: 1; }
+.fhs-side__search:hover { color: var(--fh-linen); border-color: var(--fh-edge); }
+.fhs-side__kbd {
+  padding: 0 4px;
+  border: 1px solid var(--fh-onyx-line);
+  border-radius: 7px;
+  font: 500 12px/18px var(--fh-font-body);
+  color: var(--fh-smoke);
+}
+.fhs-side__nav {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.fhs-side__nav::-webkit-scrollbar { display: none; }
+.fhs-side__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.fhs-side__link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--fh-smoke);
+  font: 500 15px/20px var(--fh-font-body);
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease);
+}
+.fhs-side__link svg { color: var(--fh-linen); opacity: 0.72; flex-shrink: 0; }
+.fhs-side__link:hover { color: var(--fh-linen); background: rgba(242, 237, 228, 0.04); }
+.fhs-side__link.is-active {
+  color: var(--fh-linen);
+  font-weight: 600;
+  background: rgba(201, 150, 58, 0.08);
+}
+.fhs-side__link.is-active svg { opacity: 1; }
+/* The 3 px gold bar on the sidebar's left edge (spec 8.3). */
+.fhs-side__link.is-active::before {
+  content: '';
+  position: absolute;
+  left: -12px;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 0 999px 999px 0;
+  background: var(--fh-gold);
+}
+.fhs-side__more-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--fh-smoke);
+  font: 600 13px/16px var(--fh-font-body);
+  cursor: pointer;
+}
+.fhs-side__more-toggle:hover { color: var(--fh-linen); }
+.fhs-side__chevron { transition: transform var(--dur) var(--ease); }
+.fhs-side__chevron.is-open { transform: rotate(180deg); }
+/* The secondary group runs denser, so the whole rail fits a 900 px tall
+   window with it open (scroll-behavior.spec.ts holds that). */
+.fhs-side__list--more { margin-top: 4px; }
+.fhs-side__list--more .fhs-side__link { height: 36px; }
+.fhs-side__list--more + .fhs-side__list--more {
+  padding-top: 4px;
+  border-top: 1px solid var(--fh-onyx-line);
+}
+.fhs-side__switcher { padding: 0 8px; }
+.fhs-side__foot {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--fh-onyx-line);
+}
+.fhs-side__person {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 4px 0 8px;
+}
+.fhs-side__avatar {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--fh-onyx-2);
+  border: 1px solid var(--fh-onyx-line);
+  color: var(--fh-linen);
+  font: 600 13px/16px var(--fh-font-body);
+}
+.fhs-side__person-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.fhs-side__person-name { font: 600 14px/18px var(--fh-font-body); color: var(--fh-linen); }
+.fhs-side__person-email { font: 500 13px/16px var(--fh-font-body); color: var(--fh-smoke); }
+.fhs-side .fhs-icon-btn { color: var(--fh-smoke); }
+.fhs-side .fhs-icon-btn:hover { color: var(--fh-linen); }

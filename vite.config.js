@@ -64,6 +64,9 @@ export default defineConfig({
         // Web-push handlers (push + notificationclick) live in
         // public/push-sw.js and are pulled into the generated SW here.
         importScripts: ['push-sw.js'],
+        // The default patterns plus the self hosted fonts (only the
+        // woff2 files; every browser that installs the app reads woff2).
+        globPatterns: ['**/*.{js,css,html,woff2}'],
         // Precache the app shell and every screen so the field app works
         // offline, but not chunks only an on demand feature loads. Each
         // install (and each deploy that changes them) would otherwise
@@ -113,28 +116,6 @@ export default defineConfig({
             },
           },
           {
-            // Google Fonts stylesheet — cache the CSS aggressively;
-            // it points to versioned woff2 files that get their own
-            // cache below.
-            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'google-fonts-stylesheets',
-              expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 },
-            },
-          },
-          {
-            // Google Fonts woff2 files — never change at a given URL,
-            // safe to cache for a year.
-            urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'google-fonts-files',
-              expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 365 },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-          {
             // Supabase Storage public-bucket URLs (job photos, logos).
             // Stale-while-revalidate so the user sees a fast hit from
             // cache while the SW refreshes in the background. Capped
@@ -148,9 +129,6 @@ export default defineConfig({
               // 200 only — status 0 (opaque) can wrap an error response
               // and pin it in cache for 7 days. Supabase Storage serves
               // proper CORS headers so responses are never opaque here.
-              // (Google Fonts above keeps [0, 200]: gstatic requests are
-              // legitimately opaque in no-cors mode — official Workbox
-              // recipe.)
               cacheableResponse: { statuses: [200] },
             },
           },
@@ -168,11 +146,11 @@ export default defineConfig({
         name: 'Fieldhorse',
         short_name: 'Fieldhorse',
         description: 'Contractor field operations',
-        // Onyx, the dark --v3-bg. Matches the theme-color meta in
-        // index.html and THEME_COLOR.dark in ThemeContext.tsx, so the
-        // splash, the status bar and the first painted frame agree.
-        theme_color: '#141414',
-        background_color: '#141414',
+        // Onyx (--fh-onyx). The splash is the onyx stage; the pre paint
+        // script in index.html then sets the theme-color meta for the
+        // Day or Night theme before the first frame.
+        theme_color: '#16140F',
+        background_color: '#16140F',
         display: 'standalone',
         // No orientation lock: the app has tablet and desktop layouts at
         // 900px and up, which a portrait lock kept Android tablets from

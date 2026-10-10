@@ -122,7 +122,6 @@
     font-size: 12px;
     font-weight: 800;
     letter-spacing: 0;
-    text-transform: uppercase;
     color: var(--v3-text-muted);
     text-align: left;
   }
@@ -649,7 +648,6 @@
   .fh-build-weekplan__head > span {
     font-size: 12px;
     font-weight: 700;
-    text-transform: uppercase;
   }
 
   .fh-build-weekplan__head > strong {
@@ -880,6 +878,5 @@
   color: var(--v3-text-muted);
   font-size: 12px;
   font-weight: 700;
-  text-transform: uppercase;
   letter-spacing: 0;
 }

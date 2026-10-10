@@ -21,6 +21,9 @@
     "test:all": "npm run lint && npm run typecheck && npm run test && npm run e2e && npm run build"
   },
   "dependencies": {
+    "@fontsource/barlow": "^5.3.0",
+    "@fontsource/barlow-condensed": "^5.3.0",
+    "@fontsource/bebas-neue": "^5.3.0",
     "@supabase/supabase-js": "^2.45.4",
     "@tailwindcss/postcss": "^4.1.18",
     "@tanstack/query-async-storage-persister": "^5.101.2",

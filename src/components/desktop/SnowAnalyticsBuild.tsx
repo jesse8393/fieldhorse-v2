@@ -139,7 +139,7 @@ export default function SnowAnalyticsBuild(props: Props) {
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
             <div className="fh-build-good">Business</div>
-            <h1 className="fh-build-title">ANALYTICS</h1>
+            <h1 className="fh-build-title">Analytics</h1>
           </div>
 
           <div className="fh-build-focus">
@@ -343,7 +343,7 @@ export default function SnowAnalyticsBuild(props: Props) {
 function KpiCell({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
   return (
     <div className="fh-build-kpi-cell">
-      <strong style={muted ? { color: 'var(--v3-text-faint)', fontSize: 14, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase' } : undefined}>
+      <strong style={muted ? { color: 'var(--v3-text-faint)', fontSize: 14, fontWeight: 700, letterSpacing: 0 } : undefined}>
         {value}
       </strong>
       <span>{label}</span>

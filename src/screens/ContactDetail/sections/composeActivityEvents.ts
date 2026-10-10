@@ -15,13 +15,15 @@
 
 import { parseDateOnly, todayYmd } from '../../../lib/dates.ts'
 
-type ActivityEvent = {
+export type ActivityEvent = {
   id: string
   when: Date
   kind: string
   title: string
   sub?: string | null
   tone?: string
+  /** Payments and change orders: the dollar amount, so a reader can show cents. */
+  amount?: number
 }
 
 function methodLabel(m: string | null | undefined) {
@@ -150,6 +152,7 @@ export function composeActivityEvents({
       when: paymentWhen(p),
       kind: 'payment',
       title: `${money(p.amount)} received${kindStr ? ` · ${kindStr}` : ''}`,
+      amount: Number(p.amount || 0),
       sub: [
         methodLabel(p.method),
         p.reference || null
@@ -167,6 +170,7 @@ export function composeActivityEvents({
       kind: 'change_order',
       title: `CO #${co.sequence_number} added, ${co.title || 'Change order'}`,
       sub: `${co.amount >= 0 ? '+' : ''}${money(co.amount)}`,
+      amount: Number(co.amount || 0),
       tone: 'neutral'
     })
     if (co.status === 'approved' && co.approved_at && co.approved_at !== co.created_at) {
@@ -175,6 +179,7 @@ export function composeActivityEvents({
         when: new Date(co.approved_at),
         kind: 'change_order_approved',
         title: `CO #${co.sequence_number} approved`,
+        amount: Number(co.amount || 0),
         sub: co.approved_by_name ? `Signed by ${co.approved_by_name}` : null,
         tone: 'green'
       })

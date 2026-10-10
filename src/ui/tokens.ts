@@ -38,6 +38,6 @@ export const buttonSizes = {
 } as const
 
 export const fonts = {
-  display: 'Bebas Neue',
-  body: 'DM Sans'
+  display: 'var(--font-display)',
+  body: 'var(--font-body)'
 } as const

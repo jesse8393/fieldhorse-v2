@@ -37,7 +37,7 @@ async function tour(viewport, themeName, tag) {
   await ctx.addInitScript(([s, theme]) => {
     try {
       localStorage.setItem('sb-qa-mock-auth-token', JSON.stringify(s))
-      localStorage.setItem('fh:theme', theme)
+      localStorage.setItem('fh:theme-mode', theme === 'light' ? 'day' : 'night')
       localStorage.setItem('fh-onboarding-seen', '1')
     } catch {}
   }, [session, themeName])

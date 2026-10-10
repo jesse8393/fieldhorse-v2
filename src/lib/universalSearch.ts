@@ -18,7 +18,7 @@
 // known item, not for browsing, go to the dedicated screen for that.
 
 import { supabase } from './supabase.ts'
-import { detailRoute } from './stages.ts'
+import { detailRoute, stageLabel } from './stages.ts'
 import { escapeLikeText, ilikeAnyOf } from './searchFilter.ts'
 import { lastKnownOrg } from './orgScope.ts'
 
@@ -137,7 +137,7 @@ export async function universalSearch(
     id: `job:${j.id}`,
     kind: 'job',
     title: j.name || 'Untitled',
-    sub: [j.job_title || j.job_type, j.stage?.toUpperCase(), j.amount ? `$${Math.round(j.amount).toLocaleString()}` : null].filter(Boolean).join(' · '),
+    sub: [j.job_title || j.job_type, j.stage ? stageLabel(String(j.stage)) : null, j.amount ? `$${Math.round(j.amount).toLocaleString()}` : null].filter(Boolean).join(' · '),
     to: contactRoute(j)
   }))
   const clients: SearchResult[] = asRows(clientsRes.data).map((c) => ({

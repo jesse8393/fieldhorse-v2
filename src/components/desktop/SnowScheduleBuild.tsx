@@ -188,7 +188,7 @@ export default function SnowScheduleBuild(props: Props) {
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
             <div className="fh-build-good">Operations</div>
-            <h1 className="fh-build-title">SCHEDULE</h1>
+            <h1 className="fh-build-title">Schedule</h1>
           </div>
 
           <div className="fh-build-focus">

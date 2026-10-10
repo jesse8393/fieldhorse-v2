@@ -2,6 +2,7 @@ import { createPortal } from 'react-dom'
 import { motion } from 'framer-motion'
 import { Plus } from 'lucide-react'
 import { hapticMedium } from '../../lib/haptics.ts'
+import { useIsDesktop } from '../../lib/useMediaQuery.ts'
 
 /**
  * Canonical floating action button.
@@ -30,6 +31,10 @@ import { hapticMedium } from '../../lib/haptics.ts'
  *                     >=900px (where the screen now provides an inline
  *                     primary action button in its desktop header).
  *
+ * Phones get nothing: below 900px the dock's Capture coin is the only
+ * floating gold action (redesign spec sections 1 and 8.1), and each screen puts
+ * its add action in its header instead.
+ *
  * Position is owned by the .fh-fab class in global.css:
  *   right: 20px;
  *   bottom: calc(96px + env(safe-area-inset-bottom, 0px));
@@ -54,7 +59,8 @@ export default function FloatingActionButton({
   iconStrokeWidth = 2.6,
   hideOnDesktop = false
 }: FloatingActionButtonProps) {
-  if (typeof document === 'undefined') return null
+  const isDesktop = useIsDesktop()
+  if (!isDesktop || typeof document === 'undefined') return null
 
   function handleClick(e: import('react').MouseEvent<HTMLButtonElement>) {
     hapticMedium()

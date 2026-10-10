@@ -5,7 +5,7 @@ async function installSession(context: BrowserContext) {
   await installMock(context)
   await context.addInitScript((savedSession) => {
     localStorage.setItem('sb-qa-mock-auth-token', JSON.stringify(savedSession))
-    localStorage.setItem('fh:theme', 'dark')
+    localStorage.setItem('fh:theme-mode', 'night')
     localStorage.setItem('fh-onboarding-seen', '1')
   }, session)
 }
@@ -36,7 +36,9 @@ test('keeps the work lifecycle action ready', async ({ page }, testInfo) => {
   const expectNoPageErrors = failOnPageErrors(page)
 
   await openRoute(page, '/work')
-  await expect(page.getByRole('heading', { name: /work & deals/i })).toBeVisible()
+  // Phones get the redesigned Jobs list (spec 9.3); desktop keeps the deal board.
+  const workHeading = testInfo.project.name.startsWith('mobile') ? /^jobs$/i : /work & deals/i
+  await expect(page.getByRole('heading', { level: 1, name: workHeading })).toBeVisible()
   await expect(page.getByText('Justin Bryan', { exact: true })).toBeVisible()
   await expect(page.getByText('MMC Properties', { exact: true })).toBeVisible()
   await expect(page.getByText('Plumbing Bellevue', { exact: true })).toBeVisible()
@@ -76,7 +78,9 @@ test('keeps money, schedule, settings, and missing routes usable', async ({ page
   }
   await expect(page.getByText(/\+?0(?:\.0)?%\s*[·•]\s*7d/i)).toHaveCount(0)
   if (testInfo.project.name.startsWith('mobile')) {
-    await expect(page.getByText('Job Behind', { exact: true })).toBeVisible()
+    // The phone shows Today (tests/e2e/today.spec.ts); the KPI tiles stay
+    // on the desktop view.
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(/stops?( done)?\.|Clear day\.|Quiet day\./)
     await expect(page.getByText('Jobs Behind', { exact: true })).toHaveCount(0)
   }
   await capture(page, testInfo, 'home', true)
@@ -236,7 +240,7 @@ test('uses the full desktop workspace without changing the mobile screens', asyn
     await capture(page, testInfo, `desktop-${route.name}`, true)
   }
 
-  const sidebarOverflow = await page.locator('.fh-desktop-sidebar__nav').evaluate((element) => ({
+  const sidebarOverflow = await page.locator('.fhs-side__nav').evaluate((element) => ({
     overflowY: getComputedStyle(element).overflowY,
     scrollbarWidth: getComputedStyle(element).scrollbarWidth,
   }))

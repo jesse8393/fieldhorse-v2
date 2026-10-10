@@ -14,7 +14,7 @@ export default function InvitePartnerSection({ contact, onOpenInvitePartner }: a
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 24px 24px' }}>
 
       <Eyebrow>
-        Invite Partner
+        Invite partner
       </Eyebrow>
 
       <div style={{

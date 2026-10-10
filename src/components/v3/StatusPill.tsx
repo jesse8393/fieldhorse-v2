@@ -11,8 +11,8 @@
  *   • Top Deal gold-gradient chip with bold caps + drop shadow
  *   • Various ad-hoc colored chips on Pipeline Preview
  *
- * Mockup-canonical layout (matches FH v3): chip is small, calm,
- * letter-spaced uppercase. Tone telegraphs the meaning; chrome
+ * Mockup-canonical layout (matches FH v3): chip is small and calm,
+ * sentence case. Tone telegraphs the meaning; chrome
  * never competes with the rest of the card.
  *
  * @param {object} props
@@ -34,7 +34,7 @@ const TONE: Record<StatusTone, { color: string; label: string; Icon?: ComponentT
   invoice:  { color: 'var(--v3-stage-won)',        label: 'Invoice' },
   closed:   { color: 'var(--v3-success-bright)',   label: 'Closed' },
   lost:     { color: 'var(--v3-text-muted)',       label: 'Lost' },
-  topDeal:  { color: 'var(--v3-primary)',          label: 'Top Deal',  Icon: Star },
+  topDeal:  { color: 'var(--v3-primary)',          label: 'Top deal',  Icon: Star },
   approved: { color: 'var(--v3-success-bright)',   label: 'Approved',  Icon: Check },
   cold:     { color: 'var(--v3-danger-bright)',    label: 'Cold',      Icon: Snowflake }
 }
@@ -84,7 +84,6 @@ export default function StatusPill({
         fontSize: 12,
         fontWeight: 700,
         letterSpacing: 0,
-        textTransform: 'uppercase',
         lineHeight: 1.4,
         whiteSpace: 'nowrap',
         ...style

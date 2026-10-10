@@ -4,23 +4,53 @@ import { fileURLToPath } from 'node:url'
 
 const root = join(fileURLToPath(new URL('..', import.meta.url)))
 const extensions = new Set(['.css', '.html', '.js', '.json', '.jsx', '.ts', '.tsx'])
+// The October 2026 redesign palette (docs/design/2026-10-redesign/SPEC.md,
+// section 5), Day and Night, plus the six legacy brand colors that
+// screens not yet rebuilt still name. Phase 7 drops the legacy ones.
 const allowedColors = new Set([
-  '#C9963A',
-  '#141414',
-  '#F2EDE4',
-  '#5C5C5C',
-  '#C0392B',
-  '#2D7A4F'
+  // Legacy brand colors
+  '#C9963A', '#141414', '#F2EDE4', '#5C5C5C', '#C0392B', '#2D7A4F',
+  // Day ground and ink
+  '#EDE8DF', '#FBF9F5', '#F5F1EA', '#DAD3C7', '#EAE5DC', '#C7BFB1', '#8B8375',
+  '#1B1A16', '#4F4B43', '#66615A', '#7A5A1F',
+  // Gold
+  '#E6C278', '#AD7E2E',
+  // Onyx stage
+  '#16140F', '#211F19', '#352F26', '#1E1C16', '#9A9183', '#24211B',
+  // Status, Day
+  '#2E7D4F', '#DCEADF', '#1D5536', '#3B5F85', '#DCE5EE', '#2C4A6B',
+  '#B3362A', '#F2DCD8', '#7E2419',
+  // Night ground and ink
+  '#171611', '#2A2720', '#2C2821', '#4A443A', '#7A7366', '#C9C1B3',
+  // Status, Night
+  '#5FB37F', '#1F3A2B', '#9ED1B1', '#6E93BA', '#1E2F40', '#A9C4DE',
+  '#D6735F', '#3A1F1A', '#E8B3A8'
 ])
-const allowedSpacing = new Set([0, 4, 8, 12, 16, 24, 32, 48])
-const allowedType = new Set([12, 14, 16, 20, 24])
+// Spacing: the 4 to 48 scale plus the 20 px phone and 28 px desktop
+// gutters (spec 5.7).
+const allowedSpacing = new Set([0, 4, 8, 12, 16, 20, 24, 28, 32, 48])
+// Type: the role sizes in spec 5.6, plus the legacy 20 and 24.
+const allowedType = new Set([12, 13, 14, 15, 16, 17, 18, 20, 24, 30, 34, 36, 38, 52])
+// Radius: chips 7, legacy 10, controls 12, cards 14, photos 18, vault
+// and sheets 22, dock 28, pills 999 (spec 5.7).
+const allowedRadius = new Set([7, 10, 12, 14, 18, 22, 28, 999])
 const allowedRgb = new Set([
   '201,150,58',
   '20,20,20',
   '242,237,228',
   '92,92,92',
   '192,57,43',
-  '45,122,79'
+  '45,122,79',
+  // Redesign: gold edge light and shade, onyx scrim and overlay shadow,
+  // warm raised shadow, ink wash, plaster and night veils, night shadow.
+  '255,244,214',
+  '80,52,12',
+  '22,20,15',
+  '60,40,10',
+  '27,26,22',
+  '237,232,223',
+  '23,22,17',
+  '10,9,6'
 ])
 const violations = new Map()
 
@@ -64,7 +94,7 @@ for (const file of auditedFiles) {
 
     for (const match of text.matchAll(/borderRadius:\s*(\d+)|border-radius:\s*(\d+)px/gi)) {
       const value = Number(match[1] || match[2])
-      if (value !== 10 && value !== 999) add(file, lineAt(text, match.index), `raw radius ${value}`)
+      if (!allowedRadius.has(value)) add(file, lineAt(text, match.index), `raw radius ${value}`)
     }
 
     for (const match of text.matchAll(/fontSize:\s*(\d+(?:\.\d+)?)|font-size:\s*(\d+(?:\.\d+)?)px/gi)) {

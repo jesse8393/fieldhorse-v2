@@ -8,7 +8,7 @@
  *
  * Tier thresholds match the HealthDonut v3 primitive:
  *   80–100 → Good     (success green)
- *   50–79  → At Risk  (gold)
+ *   50–79  → At risk  (gold)
  *    0–49  → Behind   (danger red)
  *
  * Caveats deliberately accepted, not bugs:
@@ -93,7 +93,7 @@ export function computeJobHealth({ contact, payments = [], scheduleItems = [] }:
   )
 
   const tier = score >= 80 ? 'good' : score >= 50 ? 'risk' : 'behind'
-  const label = tier === 'good' ? 'Good' : tier === 'risk' ? 'At Risk' : 'Behind'
+  const label = tier === 'good' ? 'Good' : tier === 'risk' ? 'At risk' : 'Behind'
 
   return {
     score,

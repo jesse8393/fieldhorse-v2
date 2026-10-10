@@ -253,7 +253,7 @@ export default function Crew() {
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
             <div className="fh-build-good">{fmtDayHeading(new Date())}</div>
-            <h1 className="fh-build-title">CREW</h1>
+            <h1 className="fh-build-title">Crew</h1>
             {/* Only shows for people in more than one company, so a crew
                 member can switch back to their own workspace on mobile. */}
             <div style={{ marginTop: 12, maxWidth: 320 }}>
@@ -277,7 +277,7 @@ export default function Crew() {
             )}
             {!activePunch && todayJobs.length > 0 && (
               <label style={{ display: 'block', marginTop: 12 }}>
-                <span style={{ display: 'block', fontSize: 12, letterSpacing: 0, textTransform: 'uppercase', color: 'var(--v3-text-muted)', marginBottom: 4 }}>
+                <span style={{ display: 'block', fontSize: 12, letterSpacing: 0, color: 'var(--v3-text-muted)', marginBottom: 4 }}>
                   Clock in to
                 </span>
                 <select
@@ -341,7 +341,7 @@ export default function Crew() {
                 <button
                   type="button"
                   onClick={() => navigate('/schedule')}
-                  style={{ background: 'transparent', border: 'none', color: 'var(--v3-primary-text)', cursor: 'pointer', fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase' }}
+                  style={{ background: 'transparent', border: 'none', color: 'var(--v3-primary-text)', cursor: 'pointer', fontSize: 12, fontWeight: 700, letterSpacing: 0 }}
                 >
                   Full schedule →
                 </button>

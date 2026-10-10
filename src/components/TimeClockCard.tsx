@@ -275,7 +275,7 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
             onClick={handleClockIn}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 12px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))', color: 'var(--onyx)', fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: 0, cursor: 'pointer' }}
           >
-            <Play size={12} /> CLOCK IN
+            <Play size={12} /> Clock in
           </button>
         )}
         {start && !confirming && (
@@ -284,7 +284,7 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
             onClick={handleStopRequest}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 12px', borderRadius: 10, border: 'none', background: 'var(--alert-red)', color: '#F2EDE4', fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: 0, cursor: 'pointer' }}
           >
-            <Square size={12} /> CLOCK OUT
+            <Square size={12} /> Clock out
           </button>
         )}
       </div>
@@ -344,7 +344,7 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
               disabled={saving || rate <= 0}
               style={{ padding: '8px 12px', borderRadius: 10, border: 'none', background: saving ? 'rgba(45, 122, 79,0.5)' : 'var(--signal-green)', color: '#F2EDE4', fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: 0, cursor: saving ? 'default' : 'pointer' }}
             >
-              {saving ? 'LOGGING…' : 'LOG TIME'}
+              {saving ? 'Logging…' : 'Log time'}
             </button>
           </div>
         </div>

@@ -1,62 +1,109 @@
-import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react'
 import type { ReactNode } from 'react'
+import {
+  dayWindows,
+  readCachedLocation,
+  readMode,
+  resolveTheme,
+  THEME_COLOR,
+  writeMode,
+  writeSunCache,
+  type ResolvedTheme,
+  type ThemeMode
+} from '../lib/themeMode.ts'
+import { isValidLocation } from '../lib/sunTimes.ts'
 
-type Theme = 'dark' | 'light'
+// Day, Night and Auto (spec section 10). Auto follows sunrise and sunset
+// at the company's location (profiles.location_lat and location_lon,
+// passed in through ThemeLocationSync), or 7 am to 7 pm without one.
+//
+// The pre paint script in index.html applies the same rule before React
+// renders, from the windows this provider caches in fh:sun, so the first
+// frame and the status bar already match.
+
+type Theme = ResolvedTheme
 
 type ThemeContextValue = {
+  /** The theme on screen right now: 'light' (Day) or 'dark' (Night). */
   theme: Theme
+  /** What the person picked: auto, day or night. */
+  mode: ThemeMode
+  setMode: (mode: ThemeMode) => void
+  /** Pins Day ('light') or Night ('dark'). Kept for older callers. */
   setTheme: (t: Theme) => void
+  /** Pins the opposite of what is on screen. Kept for older callers. */
   toggleTheme: () => void
+  /** The company location Auto follows. */
+  setLocation: (lat: number | null | undefined, lon: number | null | undefined) => void
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null)
-const STORAGE_KEY = 'fh:theme'
 
-// PWA status-bar / browser-chrome color per theme. Matches --v3-bg.
-// The pre-paint script in index.html repeats STORAGE_KEY and the light
-// color (and its CSP hash in netlify.toml must follow any edit there);
-// the manifest theme_color in vite.config.js is the dark color. Keep
-// them in step.
-const THEME_COLOR: Record<Theme, string> = {
-  dark: '#141414',
-  light: '#F2EDE4'
-}
-
-function initial(): Theme {
-  if (typeof window === 'undefined') return 'dark'
-  // Safari Private Mode on older iOS throws SecurityError on localStorage.
-  // Default to dark on any failure.
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored === 'dark' || stored === 'light') return stored
-  } catch { /* noop */ }
-  return 'dark' // Fieldhorse ships dark-first
-}
+type Location = { lat: number; lon: number } | null
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>(initial)
-  // The ≥900px dark pin is gone: the desktop build screens (fh-build)
-  // were re-tokenized in the desktop-parity sweep, so daylight now
-  // applies on every viewport.
+  const [mode, setModeState] = useState<ThemeMode>(readMode)
+  const [location, setLocationState] = useState<Location>(readCachedLocation)
+  // The moment the theme was last worked out. Moved forward when Auto
+  // reaches a sunrise or sunset, or the app comes back to the foreground.
+  const [clock, setClock] = useState(() => Date.now())
+
+  const { theme, nextChange, windows } = useMemo(() => {
+    const windows = dayWindows(new Date(clock), location?.lat, location?.lon)
+    return { ...resolveTheme(mode, clock, windows), windows }
+  }, [mode, location, clock])
 
   useEffect(() => {
     const root = document.documentElement
     root.setAttribute('data-theme', theme)
-    // Keep the PWA status bar / browser chrome in step with the canvas.
     const meta = document.querySelector('meta[name="theme-color"]')
     if (meta) meta.setAttribute('content', THEME_COLOR[theme])
-    try { localStorage.setItem(STORAGE_KEY, theme) } catch { /* private mode */ }
   }, [theme])
 
-  const toggleTheme = useCallback(() => {
-    setTheme((t) => (t === 'dark' ? 'light' : 'dark'))
+  useEffect(() => {
+    writeSunCache(windows, location?.lat, location?.lon)
+  }, [windows, location])
+
+  // Wake up at the next sunrise or sunset, and re-check whenever the app
+  // returns to the foreground (timers do not run while a phone sleeps).
+  useEffect(() => {
+    if (nextChange == null) return
+    const delay = Math.max(1000, Math.min(nextChange - Date.now() + 1000, 6 * 60 * 60 * 1000))
+    const id = window.setTimeout(() => setClock(Date.now()), delay)
+    return () => window.clearTimeout(id)
+  }, [nextChange])
+
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === 'visible') setClock(Date.now())
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
   }, [])
 
-  return (
-    <ThemeContext.Provider value={{ theme, setTheme, toggleTheme }}>
-      {children}
-    </ThemeContext.Provider>
+  const setMode = useCallback((next: ThemeMode) => {
+    writeMode(next)
+    setModeState(next)
+  }, [])
+
+  const setTheme = useCallback((t: Theme) => setMode(t === 'light' ? 'day' : 'night'), [setMode])
+
+  const toggleTheme = useCallback(() => setMode(theme === 'light' ? 'night' : 'day'), [setMode, theme])
+
+  const setLocation = useCallback((lat: number | null | undefined, lon: number | null | undefined) => {
+    setLocationState((current) => {
+      if (!isValidLocation(lat, lon)) return current
+      if (current && current.lat === lat && current.lon === lon) return current
+      return { lat: lat as number, lon: lon as number }
+    })
+  }, [])
+
+  const value = useMemo(
+    () => ({ theme, mode, setMode, setTheme, toggleTheme, setLocation }),
+    [theme, mode, setMode, setTheme, toggleTheme, setLocation]
   )
+
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
 }
 
 export function useTheme() {

@@ -77,7 +77,7 @@ export default class RouteErrorBoundary extends React.Component<{ children?: Rea
           }}
         >
           <div className="v3-eyebrow" style={{ color: 'var(--v3-danger-text)' }}>
-            Screen Error
+            Screen error
           </div>
           <h2 className="v3-h1" style={{ marginTop: 8 }}>
             Something went wrong <em>loading this screen.</em>

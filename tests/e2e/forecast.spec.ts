@@ -8,7 +8,7 @@ test('shows an honest forecast failure state and recovers on retry', async ({ co
   await installMock(context)
   await context.addInitScript((savedSession) => {
     localStorage.setItem('sb-qa-mock-auth-token', JSON.stringify(savedSession))
-    localStorage.setItem('fh:theme', 'dark')
+    localStorage.setItem('fh:theme-mode', 'night')
     localStorage.setItem('fh-onboarding-seen', '1')
   }, session)
 

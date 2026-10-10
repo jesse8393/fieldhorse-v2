@@ -444,7 +444,7 @@ export default function Invoices() {
         setTimeout(() => setSentId(null), 2400)
       } else if (res.reason === 'sender_not_configured') {
         toastError(
-          "Email NOT sent, sender isn't configured",
+          "Email not sent, sender isn't configured",
           wasDraft
             ? 'Downloaded the PDF so you can email it manually. The invoice is saved as a draft.'
             : 'Downloaded the PDF so you can email it manually.'
@@ -489,7 +489,7 @@ export default function Invoices() {
         setTimeout(() => setSentId(null), 2400)
         refresh()
       } else if (res.reason === 'sender_not_configured') {
-        toastError("Email NOT sent, sender isn't configured", 'Downloaded the PDF so you can email it manually.')
+        toastError("Email not sent, sender isn't configured", 'Downloaded the PDF so you can email it manually.')
       } else {
         throw new Error(res.message || 'Send failed')
       }
@@ -652,7 +652,7 @@ export default function Invoices() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
             <Eyebrow tone="gold">
               <Receipt size={11} aria-hidden="true" />
-              Money Owed
+              Money owed
             </Eyebrow>
             {!loading && <BalanceStateChip totals={totals} />}
           </div>
@@ -670,7 +670,7 @@ export default function Invoices() {
                 {fmtMoney(totals.total)}
               </StampNumber>
             )}
-            <Eyebrow as="div" style={{ marginTop: 6 }}>Total Outstanding</Eyebrow>
+            <Eyebrow as="div" style={{ marginTop: 6 }}>Total outstanding</Eyebrow>
           </div>
 
           {/* Aging visualization + 3-cell breakdown */}
@@ -680,7 +680,10 @@ export default function Invoices() {
               <div style={{
                 marginTop: 10,
                 display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
+                // Columns size to their amounts so a six figure balance
+                // never runs into the next bucket.
+                gridTemplateColumns: 'repeat(3, auto)',
+                justifyContent: 'space-between',
                 gap: 12
               }}>
                 {AGING_BUCKETS.map((b) => {
@@ -1204,7 +1207,7 @@ function PaymentCard({ row, onPDF, onPaid, onEmail, isSending, isSent }: any) {
               fontVariantNumeric: 'tabular-nums',
               textShadow: balance > 0 ? '0 1px 0 var(--v3-glass-tint-2)' : 'none'
             }}>
-              {balance > 0 ? fmtMoney(balance) : 'PAID'}
+              {balance > 0 ? fmtMoney(balance) : 'Paid'}
             </div>
             {isOutstanding && (
               <StatusPill

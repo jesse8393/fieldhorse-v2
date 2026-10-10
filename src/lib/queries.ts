@@ -33,15 +33,18 @@ export type Payment = Database['public']['Tables']['fh_payments']['Row']
 // The columns the Work list (and desktop rail) actually render. Keeping
 // this a projection instead of `*` cuts each row to a fraction of its
 // full width, fh_contacts carries big text fields (notes, scope,
-// proposal HTML) that the list never shows.
+// proposal HTML) that the list never shows. completed_at and
+// quote_sent_at feed the phone Jobs rows ("Sent yesterday", the Done
+// group's last 30 days).
 export const JOB_LIST_COLUMNS =
-  'id, user_id, client_id, name, phone, email, address, stage, amount, job_title, job_type, referred_by, proposal_status, follow_up_on, updated_at, created_at'
+  'id, user_id, client_id, name, phone, email, address, stage, amount, job_title, job_type, referred_by, proposal_status, follow_up_on, completed_at, quote_sent_at, updated_at, created_at'
 
 export type JobRow = Pick<
   Contact,
   | 'id' | 'user_id' | 'client_id' | 'name' | 'phone' | 'email' | 'address'
   | 'stage' | 'amount' | 'job_title' | 'job_type' | 'referred_by'
-  | 'proposal_status' | 'follow_up_on' | 'updated_at' | 'created_at'
+  | 'proposal_status' | 'follow_up_on' | 'completed_at' | 'quote_sent_at'
+  | 'updated_at' | 'created_at'
 > & {
   fh_clients: Pick<Client, 'name' | 'phone' | 'email'> | null
 }

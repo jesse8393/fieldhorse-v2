@@ -72,7 +72,7 @@ export default function LogMilesSheet({ open, userId, onOpenChange, onSaved }: a
     fontSize: 14,
     outline: 'none'
   }
-  const labelStyle = { fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: 'var(--ink-muted)' }
+  const labelStyle = { fontSize: 12, fontWeight: 700, letterSpacing: 0, color: 'var(--ink-muted)' }
 
   return (
     <Drawer open={open} onOpenChange={(v: any) => { if (!(!v && saving)) onOpenChange(v) }}>
@@ -208,7 +208,7 @@ export default function LogMilesSheet({ open, userId, onOpenChange, onSaved }: a
               }}
             >
               <SaveIcon size={14} />
-              {saving ? 'SAVING…' : 'SAVE'}
+              {saving ? 'Saving…' : 'Save'}
             </motion.button>
           </div>
         </form>

@@ -50,7 +50,7 @@ const PAYMENT_METHODS = [
 
 const DOC_SLOTS = [
   { id: 'w9',      label: 'W9',                 path: 'w9_path',      hint: 'Required for 1099 reporting' },
-  { id: 'coi',     label: 'Certificate of Insurance', path: 'coi_path', hint: 'COI / liability cert' },
+  { id: 'coi',     label: 'Certificate of insurance', path: 'coi_path', hint: 'COI / liability cert' },
   { id: 'license', label: 'License',             path: 'license_path', hint: 'Trade or contractor license' }
 ]
 
@@ -341,7 +341,7 @@ export default function SubDetail() {
                 ${totals.billed.toLocaleString()}
               </StampNumber>
               <Eyebrow as="div" style={{ marginTop: 2 }}>
-                across {subRows.length} {subRows.length === 1 ? 'job' : 'jobs'}
+                Across {subRows.length} {subRows.length === 1 ? 'job' : 'jobs'}
               </Eyebrow>
             </div>
             <span aria-hidden="true" style={{ background: 'var(--v3-border)', alignSelf: 'stretch' }} />
@@ -393,7 +393,7 @@ export default function SubDetail() {
                 color: 'var(--v3-on-primary)',
                 fontFamily: 'var(--font-body)',
                 fontSize: 12, fontWeight: 700,
-                letterSpacing: 0, textTransform: 'uppercase',
+                letterSpacing: 0,
                 cursor: creating ? 'default' : 'pointer',
                 opacity: creating ? 0.6 : 1,
                 boxShadow: '0 0 0 2px rgba(201, 150, 58, 0.14), 0 4px 10px rgba(201, 150, 58, 0.28)',
@@ -896,7 +896,7 @@ function ProfileEditor({ profile, onSaved }: any) {
         <Row>
           <SelectField label="Method" value={form.payment_method} onChange={(v: any) => setField('payment_method', v)} options={PAYMENT_METHODS} />
           <Field
-            label="Handle / Account"
+            label="Handle / account"
             value={form.payment_handle}
             onChange={(v: any) => setField('payment_handle', v)}
             placeholder={
@@ -956,7 +956,7 @@ function ProfileEditor({ profile, onSaved }: any) {
               : 'var(--v3-surface-2)',
             color: dirty ? 'var(--v3-on-primary)' : 'var(--v3-text-muted)',
             fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
-            letterSpacing: 0, textTransform: 'uppercase',
+            letterSpacing: 0,
             cursor: saving || !dirty ? 'default' : 'pointer',
             opacity: saving ? 0.7 : 1,
             boxShadow: dirty ? '0 0 0 2px rgba(201, 150, 58, 0.14), 0 8px 18px rgba(20, 20, 20, 0.45)' : 'none'
@@ -1029,7 +1029,7 @@ function DocumentsSection({ profile, onChanged }: any) {
         await supabase.storage.from('sub-docs').remove([previousPath])
       }
       onChanged?.(data)
-      toastSuccess('Uploaded', `${slotId.toUpperCase()} on file`)
+      toastSuccess('Uploaded', `${DOC_SLOTS.find((s) => s.id === slotId)?.label || slotId} on file`)
       hapticSuccess()
     } catch (e: any) {
       toastError("Couldn't upload", e?.message || 'Try again')
@@ -1040,7 +1040,7 @@ function DocumentsSection({ profile, onChanged }: any) {
 
   async function handleRemove(slotId: any, pathField: any, currentPath: any) {
     if (!currentPath) return
-    const label = DOC_SLOTS.find((s) => s.id === slotId)?.label || slotId.toUpperCase()
+    const label = DOC_SLOTS.find((s) => s.id === slotId)?.label || slotId
     const owned = contractorOwnsDoc(currentPath, profile, user?.id)
     const ok = await confirm({
       title: `Remove the ${label}?`,

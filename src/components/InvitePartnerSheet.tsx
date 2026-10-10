@@ -194,7 +194,7 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
     }
   }
 
-  const labelStyle: import('react').CSSProperties = { fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: 'var(--ink-muted)' }
+  const labelStyle: import('react').CSSProperties = { fontSize: 12, fontWeight: 700, letterSpacing: 0, color: 'var(--ink-muted)' }
   const fieldStyle: import('react').CSSProperties = {
     padding: '12px 12px',
     borderRadius: 10,
@@ -367,7 +367,7 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
                 }}
               >
                 <Send size={14} />
-                {sending ? 'SENDING…' : 'SEND INVITE'}
+                {sending ? 'Sending…' : 'Send invite'}
               </motion.button>
             </div>
           </form>
@@ -512,7 +512,7 @@ function SuccessPane({ readyUrl, sendFallbackReason, recipientEmail, copied, onC
           }}
         >
           {copied ? <Check size={14} /> : <Copy size={14} />}
-          {copied ? 'COPIED' : 'COPY LINK'}
+          {copied ? 'Copied' : 'Copy link'}
         </motion.button>
         <motion.button
           type="button"
@@ -529,7 +529,7 @@ function SuccessPane({ readyUrl, sendFallbackReason, recipientEmail, copied, onC
           }}
         >
           <Share2 size={14} />
-          SHARE
+          Share
         </motion.button>
       </div>
       <button

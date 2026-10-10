@@ -166,7 +166,6 @@ i,
 .fh-command-dialog [data-slot="command-group"] [cmdk-group-heading] {
   color: var(--ink-muted, rgba(242, 237, 228, 0.55)) !important;
   letter-spacing: 0;
-  text-transform: uppercase;
 }
 .fh-command-dialog [data-slot="command-item"] {
   color: var(--ink-strong, #F2EDE4) !important;

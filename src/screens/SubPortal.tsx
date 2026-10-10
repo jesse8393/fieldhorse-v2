@@ -33,6 +33,9 @@ import MiniMetric from '../components/MiniMetric.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
 import { Eyebrow } from '../components/v3'
 
+// Toast words for each document kind; acronyms stay in capitals.
+const DOC_KIND_LABEL: Record<DocKind, string> = { coi: 'COI', w9: 'W9', license: 'License' }
+
 // Insurance expiry is a date only column, so parse it as a local calendar
 // date. new Date('2026-12-31') is UTC midnight, the day before in the US.
 function fmtDate(iso: string | null): string {
@@ -152,7 +155,7 @@ export default function SubPortal() {
     setUploading(kind)
     try {
       await subUploadDoc(file, kind)
-      toastSuccess(`${kind.toUpperCase()} uploaded`)
+      toastSuccess(`${DOC_KIND_LABEL[kind]} uploaded`)
       await load()
     } catch (e: any) {
       toastError('Upload failed', e?.detail || e?.message || '')
@@ -196,7 +199,7 @@ export default function SubPortal() {
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
             <div className="fh-build-good">Sub portal</div>
-            <h1 className="fh-build-title">YOUR JOBS.</h1>
+            <h1 className="fh-build-title">Your jobs.</h1>
           </div>
 
           <div className="fh-build-focus">
@@ -493,7 +496,7 @@ function DocSlot({ kind, label, path, uploading, onUpload }: {
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <FileText size={14} aria-hidden="true" style={{ color: path ? 'var(--v3-primary-text)' : 'var(--v3-text-muted)' }} />
-        <strong style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: 'var(--v3-text)' }}>
+        <strong style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, color: 'var(--v3-text)' }}>
           {label}
         </strong>
       </div>
@@ -630,7 +633,7 @@ function EditProfileDialog({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
             <div className="fh-build-eyebrow" style={{ color: 'var(--v3-primary-text)' }}>Edit profile</div>
-            <h2 style={{ margin: '6px 0 18px', fontFamily: 'var(--font-display, "Bebas Neue", Impact, sans-serif)', fontSize: 24, letterSpacing: 0, color: 'var(--v3-text)' }}>
+            <h2 style={{ margin: '6px 0 18px', fontFamily: 'var(--font-display)', fontSize: 24, letterSpacing: 0, color: 'var(--v3-text)' }}>
               Keep your details current.
             </h2>
           </div>

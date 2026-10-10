@@ -98,7 +98,6 @@ export default function DocIntakeButton({
           fontFamily: 'var(--font-display)',
           fontSize: 12,
           letterSpacing: 0,
-          textTransform: 'uppercase',
           cursor: 'pointer'
         }}
       >
@@ -154,7 +153,7 @@ export default function DocIntakeButton({
             {busy ? (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 12px', borderRadius: 10, background: 'var(--v3-glass-tint-2)', border: '1px solid var(--v3-border-strong)', color: 'var(--ink-strong)', fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: 0 }}>
                 <Loader2 size={14} style={{ animation: 'fh-spin 700ms linear infinite' }} />
-                READING DOC…
+                Reading doc…
               </div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -179,7 +178,7 @@ export default function DocIntakeButton({
 
             {!busy && (
               <Eyebrow as="p" style={{ margin: '10px 0 0', color: 'var(--ink-faint)', display: 'flex', justifyContent: 'center' }}>
-                or paste an image · ⌘V
+                Or paste an image · ⌘V
               </Eyebrow>
             )}
 

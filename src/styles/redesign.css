@@ -1,0 +1,137 @@
+/*
+ * October 2026 redesign, overrides for screens that are not rebuilt yet.
+ * Spec: docs/design/2026-10-redesign/SPEC.md. Loaded after v3.css and
+ * before mobile-keyboard-fix.css (see main.tsx).
+ *
+ * Everything here bends the older CSS toward the new system. New
+ * components in src/components/fh read the --fh- tokens directly and
+ * need none of it. Phase 7 deletes what no screen needs any more.
+ */
+
+/* ---- Type (spec 5.6) ---- */
+body {
+  font-family: var(--fh-font-body);
+  font-variant-numeric: tabular-nums;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--fh-font-display);
+  font-weight: 600;
+}
+
+/* ---- Focus (spec 12) ---- */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--fh-focus);
+  outline-offset: 2px;
+}
+/* global.css forces a muted ring color with !important on these; the
+   spec ring is ink on Day, linen on Night and on onyx (--fh-focus). */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+summary:focus-visible,
+[role="button"]:focus-visible,
+[role="tab"]:focus-visible,
+[tabindex]:focus-visible,
+.v3-btn:focus-visible,
+.v3-card--interactive:focus-visible,
+.dispatch-card__tap:focus-visible,
+.cl-card__tap:focus-visible {
+  outline-color: var(--fh-focus) !important;
+}
+
+/* ---- Onyx scope ----
+ * Anything drawn on onyx (the dock, the desktop sidebar, onyx stages,
+ * vault cards, toasts) carries .fh-onyx-scope. Custom properties are
+ * resolved where they are declared, so the legacy names are restated
+ * here, not just the --fh- values they point at. */
+.fh-onyx-scope {
+  --fh-ink: #F2EDE4;
+  --fh-ink-2: #C9C1B3;
+  --fh-ink-3: #9A9183;
+  --fh-ink-4: #7A7366;
+  --fh-hairline: #352F26;
+  --fh-hairline-soft: #2C2821;
+  --fh-edge: #4A443A;
+  --fh-edge-strong: #7A7366;
+  --fh-focus: #F2EDE4;
+  --fh-gold-ink: #C9963A;
+  --fh-wash: rgba(242, 237, 228, 0.06);
+  --fh-wash-2: rgba(242, 237, 228, 0.10);
+
+  --ink-strong: var(--fh-ink);
+  --ink-muted: var(--fh-ink-2);
+  --ink-faint: var(--fh-ink-3);
+  --rule: var(--fh-hairline);
+  --rule-bold: var(--fh-edge);
+  --v3-text: var(--fh-ink);
+  --v3-text-secondary: var(--fh-ink-2);
+  --v3-text-muted: var(--fh-ink-3);
+  --v3-text-faint: var(--fh-ink-3);
+  --v3-border: var(--fh-hairline);
+  --v3-border-mid: var(--fh-hairline);
+  --v3-border-strong: var(--fh-edge);
+  --v3-glass-tint: var(--fh-wash);
+  --v3-glass-tint-2: var(--fh-wash-2);
+  --v3-surface: var(--fh-onyx-2);
+  --v3-surface-2: var(--fh-onyx-2);
+  --v3-primary-text: var(--fh-gold);
+  --v3-danger-text: #E8B3A8;
+  --v3-success-text: #9ED1B1;
+  --linen-muted: var(--fh-ink-2);
+
+  color: var(--fh-ink);
+  color-scheme: dark;
+}
+
+/* ---- Grain on onyx (spec 5.7) ----
+ * About 3 percent noise, on its own layer so scrolling never repaints
+ * it. The host needs position: relative and isolation: isolate. */
+.fh-grain::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+  mix-blend-mode: screen;
+}
+
+/* ---- Desktop sidebar width (spec 8.3) ---- */
+@media (min-width: 900px) {
+  .fh-desktop-sidebar {
+    width: var(--fh-sidebar-w);
+  }
+  .fh-app__main {
+    width: calc(100% - var(--fh-sidebar-w));
+    margin-left: var(--fh-sidebar-w);
+  }
+  .fh-app-header {
+    width: calc(100% - var(--fh-sidebar-w));
+    margin-left: var(--fh-sidebar-w);
+  }
+  /* The invoice action bar centers on the content column, right of the
+     sidebar (global.css centered it for the old 256 px rail). */
+  .fh-invoice-actionbar {
+    width: min(1280px, calc(100% - var(--fh-sidebar-w) - 64px));
+    left: calc(50% + var(--fh-sidebar-w) / 2) !important;
+  }
+}
+
+/* ---- Reduced motion (spec 5.7): fades only ---- */
+@media (prefers-reduced-motion: reduce) {
+  .fh-dock__coin,
+  .fh-sheet {
+    transition-property: opacity !important;
+  }
+}

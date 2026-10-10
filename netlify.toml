@@ -62,15 +62,15 @@
 # document page and PDF preview run clean against it. Sources, from the
 # code:
 #   script-src  the inline theme script in index.html (hash; update it
-#               when that script changes) and the fonts link onload
-#               handler there (unsafe-hashes plus its hash)
+#               when that script changes)
 #   style-src   unsafe-inline for injected style tags (sonner, vaul,
-#               radix), plus the Google Fonts stylesheet
+#               radix)
+#   font-src    self: the fonts ship with the app (@fontsource)
 #   img-src     Supabase Storage photos and logos, data: and blob: for
 #               previews, signatures and PDF images
 #   connect-src Supabase REST, auth, storage, functions and realtime
-#               (wss), Open-Meteo weather, BigDataCloud reverse geocoding,
-#               and Google Fonts, which the service worker fetches to cache
+#               (wss), Open-Meteo weather and BigDataCloud reverse
+#               geocoding
 #   same origin covers /api/* Netlify Functions, sw.js, push-sw.js and
 #   the manifest
 [[headers]]
@@ -81,4 +81,4 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
     Strict-Transport-Security = "max-age=31536000; includeSubDomains"
     Permissions-Policy = "camera=(self), microphone=(self), geolocation=(self)"
-    Content-Security-Policy-Report-Only = "default-src 'self'; script-src 'self' 'sha256-JWA027fXAZlhLB5VriGW6GxRmHhs/zkq7wnIJEons/M=' 'unsafe-hashes' 'sha256-MhtPZXr7+LpJUY5qtMutB+qWfQtMaPccfe7QXtCcEYc='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://pnmhblvslftdzfcdezbw.supabase.co; connect-src 'self' https://pnmhblvslftdzfcdezbw.supabase.co wss://pnmhblvslftdzfcdezbw.supabase.co https://api.open-meteo.com https://api.bigdatacloud.net https://fonts.googleapis.com https://fonts.gstatic.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+    Content-Security-Policy-Report-Only = "default-src 'self'; script-src 'self' 'sha256-bwxGnPeU0u0fRTxIzWYEwLfYNxiQWfUKoPzpHKOqXAo='; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https://pnmhblvslftdzfcdezbw.supabase.co; connect-src 'self' https://pnmhblvslftdzfcdezbw.supabase.co wss://pnmhblvslftdzfcdezbw.supabase.co https://api.open-meteo.com https://api.bigdatacloud.net; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"

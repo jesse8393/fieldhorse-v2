@@ -3,7 +3,7 @@ import { useAccountLabels, formatAttribution } from '../../lib/accountAttributio
 /**
  * PostedByChip, compact byline for shared-job content.
  *
- * Renders a small uppercase eyebrow-style chip:
+ * Renders a small eyebrow-style chip:
  *   "Posted by Parker Construction Co."
  *   "Added by Office Admin · Partner"
  *   "Created by you"
@@ -44,7 +44,6 @@ export default function PostedByChip({ userId, verb = 'posted', showRole = false
         fontSize: 12,
         fontWeight: 600,
         letterSpacing: 0,
-        textTransform: 'uppercase',
         color: 'var(--v3-text-muted)',
         lineHeight: 1.3,
         whiteSpace: 'normal',

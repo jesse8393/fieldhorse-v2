@@ -369,7 +369,7 @@ export default function Bid() {
           <span className={isDesktop ? 'fh-build-good' : undefined} style={isDesktop ? undefined : {
             fontFamily: 'var(--font-body)',
             fontSize: 12, fontWeight: 700,
-            letterSpacing: 0, textTransform: 'uppercase',
+            letterSpacing: 0,
             color: 'var(--v3-primary-text)',
             display: 'inline-flex', alignItems: 'center', gap: 8
           }}>
@@ -385,7 +385,7 @@ export default function Bid() {
             fontWeight: 700,
             color: 'var(--v3-text)'
           }}>
-            {isDesktop ? 'ESTIMATE BUILDER' : 'Build a clean estimate'}
+            {isDesktop ? 'Estimate builder' : 'Build a clean estimate'}
           </h1>
           <p style={{
             margin: '6px 0 0',
@@ -735,7 +735,7 @@ export default function Bid() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
               <span className="v3-eyebrow" style={{ color: 'var(--v3-primary-text)', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                 <Sparkles size={11} />
-                Recommended Price · {marginPct}% margin
+                Recommended price · {marginPct}% margin
               </span>
               <div style={{ display: 'inline-flex', gap: 8, flexWrap: 'wrap' }}>
                 <button
@@ -855,7 +855,7 @@ export default function Bid() {
               paddingTop: 12,
               borderTop: '1px solid var(--v3-border)'
             }}>
-              <SectionHeader label="Line Items" />
+              <SectionHeader label="Line items" />
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
                 {bid.line_items?.map((li: any, i: any) => (
                   <motion.div

@@ -1,0 +1,560 @@
+/*
+ * The Job page on a phone (spec 9.4, render glamor/g-job.jpg). Class
+ * prefix fhj-. Reads only the --fh- tokens (plus the motion and z layer
+ * tokens), so Day and Night follow the theme on their own, and anything
+ * inside .fh-onyx-scope reads linen text and the linen focus ring.
+ */
+
+/* The photo header carries back and more on this page, under the status
+   bar, so the shared header steps aside on a phone (both job renders
+   show no app header). Desktop keeps its chrome. */
+@media (max-width: 899px) {
+  body:has(.fhj-page) .fh-app-header {
+    display: none;
+  }
+}
+
+.fhj-page {
+  color: var(--fh-ink);
+  font-family: var(--fh-font-body);
+}
+
+/* Focus: 2 px --fh-focus (linen inside .fh-onyx-scope). global.css
+   forces a muted outline color on every focused control, so these
+   restate it with the same weight. */
+.fhj-hero__count:focus-visible,
+.fhj-quick__action:focus-visible,
+.fhj-tabs__tab:focus-visible,
+.fhj-more__toggle:focus-visible {
+  outline: 2px solid var(--fh-focus) !important;
+  outline-color: var(--fh-focus) !important;
+  outline-offset: 2px;
+}
+
+/* ================================================================
+   Photo header and onyx band
+   ================================================================ */
+
+.fhc-stage.fhj-hero {
+  position: relative;
+  padding: 0;
+  overflow: hidden;
+}
+
+.fhj-hero__photo {
+  position: relative;
+  height: 34vh;
+  height: 34svh;
+  min-height: 220px;
+  background: var(--fh-stage);
+}
+
+.fhj-hero__img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity var(--dur-slow) var(--ease);
+}
+
+.fhj-hero__img.is-loaded {
+  opacity: 1;
+}
+
+/* A dark wash under the status bar and the round buttons. */
+.fhj-hero__photo::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 1;
+  height: 120px;
+  background: linear-gradient(180deg, rgba(22, 20, 15, 0.6) 0%, rgba(22, 20, 15, 0) 100%);
+  pointer-events: none;
+}
+
+/* The photo fades into the band, so the title sits on solid onyx. */
+.fhj-hero__photo::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 1;
+  height: 60%;
+  background: linear-gradient(180deg, rgba(22, 20, 15, 0) 0%, var(--fh-stage) 100%);
+  pointer-events: none;
+}
+
+.fhj-hero__bar {
+  position: absolute;
+  z-index: 3;
+  top: calc(env(safe-area-inset-top, 0px) + 8px);
+  left: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.fhj-hero__bar > *,
+.fhj-hero__bar-end > * {
+  pointer-events: auto;
+}
+
+.fhj-hero__bar-end {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* "14 photos": a translucent pill, 36 tall with a 44 px hit area. */
+.fhj-hero__count {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(22, 20, 15, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(242, 237, 228, 0.16);
+  color: var(--fh-linen);
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  backdrop-filter: blur(12px) saturate(1.2);
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--dur-instant) var(--ease-mechanical);
+}
+
+.fhj-hero__count::before {
+  content: '';
+  position: absolute;
+  inset: -4px 0;
+}
+
+.fhj-hero__count:active {
+  transform: translateY(1px);
+}
+
+.fhj-hero__count.is-on-photo {
+  position: absolute;
+  z-index: 3;
+  right: 20px;
+  bottom: 60px;
+}
+
+.fhj-hero__band {
+  position: relative;
+  z-index: 2;
+  padding: 0 20px 20px;
+}
+
+/* No photo: the band alone, clear of the back and more buttons. */
+.fhj-hero:not(.has-photo) .fhj-hero__band {
+  padding-top: calc(env(safe-area-inset-top, 0px) + 48px + 24px);
+}
+
+.fhj-hero.has-photo .fhj-hero__band {
+  margin-top: -48px;
+}
+
+.fhj-hero__title {
+  margin: 0;
+  font-family: var(--fh-font-display);
+  font-size: 34px;
+  line-height: 36px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--fh-linen);
+  overflow-wrap: break-word;
+}
+
+.fhj-hero__sub {
+  margin: 4px 0 0;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 400;
+  color: var(--fh-smoke);
+  overflow-wrap: break-word;
+}
+
+/* ================================================================
+   Rail, money strip, quick actions
+   ================================================================ */
+
+.fhj-facts {
+  padding: 20px 20px 0;
+}
+
+.fhj-rail {
+  padding-bottom: 20px;
+}
+
+.fhj-money {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  padding: 16px 0;
+  border-top: 1px solid var(--fh-hairline);
+}
+
+.fhj-money__list {
+  display: flex;
+  flex-wrap: wrap;
+  row-gap: 12px;
+  min-width: 0;
+  margin: 0;
+}
+
+.fhj-money__item {
+  min-width: 0;
+  padding: 0 16px;
+  border-left: 1px solid var(--fh-hairline);
+}
+
+.fhj-money__item:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.fhj-money__item dt {
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--fh-ink-2);
+}
+
+.fhj-money__item dd {
+  margin: 4px 0 0;
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+  color: var(--fh-ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.fhj-money__chip {
+  flex: none;
+}
+
+.fhj-quick {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 16px 0;
+  border-top: 1px solid var(--fh-hairline);
+  list-style: none;
+}
+
+.fhj-quick__action {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 4px 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--fh-ink);
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.fhj-quick__disc {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  background: var(--fh-paper);
+  box-shadow: inset 0 0 0 1px var(--fh-edge);
+  transition: transform var(--dur-instant) var(--ease-mechanical), background-color var(--dur-fast) var(--ease);
+}
+
+.fhj-quick__action:hover .fhj-quick__disc {
+  background: var(--fh-tray);
+}
+
+.fhj-quick__action:active .fhj-quick__disc {
+  transform: translateY(1px);
+  background: var(--fh-tray);
+}
+
+.fhj-quick__label {
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--fh-ink);
+  text-align: center;
+}
+
+.fhj-quick__action:disabled {
+  cursor: not-allowed;
+}
+
+.fhj-quick__action:disabled .fhj-quick__disc {
+  color: var(--fh-ink-4);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--fh-hairline);
+}
+
+.fhj-quick__action:disabled .fhj-quick__label {
+  color: var(--fh-ink-3);
+}
+
+/* ================================================================
+   Section tabs (decision D5)
+   ================================================================ */
+
+.fhj-tabs {
+  border-bottom: 1px solid var(--fh-hairline);
+}
+
+.fhj-tabs__strip {
+  display: flex;
+  gap: 24px;
+  padding: 0 20px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.fhj-tabs__strip::-webkit-scrollbar {
+  display: none;
+}
+
+/* The strip's end padding, which a scrolling flex row drops. */
+.fhj-tabs__strip::after {
+  content: '';
+  flex: 0 0 1px;
+}
+
+.fhj-tabs__tab {
+  position: relative;
+  flex: none;
+  min-height: 48px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--fh-ink-3);
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.fhj-tabs__tab:hover {
+  color: var(--fh-ink-2);
+}
+
+.fhj-tabs__tab.is-active {
+  color: var(--fh-ink);
+  font-weight: 600;
+}
+
+.fhj-tabs__tab.is-active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--fh-gold);
+}
+
+/* ================================================================
+   The Spine and the "More about this job" disclosure
+   ================================================================ */
+
+.fhj-spine {
+  padding: 24px 20px 8px;
+}
+
+.fhj-spine__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.fhj-spine__title {
+  margin: 0;
+  font-family: var(--fh-font-display);
+  font-size: 24px;
+  line-height: 28px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--fh-ink);
+}
+
+.fhj-spine__head .fhc-btn--quiet {
+  margin-right: -12px;
+  color: var(--fh-ink-2);
+}
+
+.fhj-spine__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fhj-spine__more {
+  margin: 8px 0 0 52px;
+}
+
+.fhj-more {
+  margin: 16px 20px 0;
+  border-top: 1px solid var(--fh-hairline);
+}
+
+.fhj-more__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fh-ink);
+  font-family: var(--fh-font-body);
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.fhj-more__toggle svg {
+  flex: none;
+  color: var(--fh-ink-3);
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.fhj-more__toggle[aria-expanded='true'] svg {
+  transform: rotate(180deg);
+}
+
+.fhj-more__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 0 24px;
+}
+
+.fhj-edit {
+  padding: 16px 20px 0;
+}
+
+/* ================================================================
+   Action capsule
+   ================================================================ */
+
+.fhj-capsule {
+  position: fixed;
+  z-index: var(--z-nav);
+  left: 50%;
+  bottom: var(--fh-dock-gap);
+  width: min(calc(100% - 32px), 408px);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 28px;
+  background: var(--fh-dock);
+  box-shadow: var(--fh-shadow-overlay), inset 0 1px 0 rgba(242, 237, 228, 0.06);
+  transform: translateX(-50%);
+}
+
+.fhj-capsule.is-compact {
+  width: auto;
+}
+
+.fhj-capsule.is-hidden {
+  visibility: hidden;
+  opacity: 0;
+  transform: translate(-50%, calc(100% + 32px));
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .fhj-capsule {
+    transition:
+      transform var(--dur-sheet-in) var(--ease-out),
+      opacity var(--dur-sheet-out) var(--ease),
+      visibility 0s;
+  }
+  .fhj-capsule.is-hidden {
+    transition:
+      transform var(--dur-sheet-out) var(--ease),
+      opacity var(--dur-sheet-out) var(--ease),
+      visibility 0s var(--dur-sheet-out);
+  }
+}
+
+.fhj-capsule .fhc-iconbtn.fhj-capsule__round {
+  width: 56px;
+  height: 56px;
+}
+
+.fhj-capsule .fhc-btn.fhj-capsule__primary {
+  --fhc-radius: 22px;
+  flex: 1;
+  min-width: 0;
+  border-radius: 22px;
+  padding: 0 16px;
+}
+
+@media (min-width: 900px) {
+  .fhj-capsule {
+    display: none;
+  }
+}
+
+/* ================================================================
+   More sheet
+   ================================================================ */
+
+.fhj-more-sheet__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fhj-more-sheet__danger {
+  padding-top: 24px;
+}
+
+.fhj-more-sheet__pick {
+  display: grid;
+  gap: 12px;
+  padding-top: 20px;
+}

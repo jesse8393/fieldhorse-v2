@@ -33,6 +33,15 @@ import {
 //   lastWorked , newest created_at across rows
 //   jobIds     , list for the expanded "history" view
 
+// Display words for fh_subs.status, the same ones the job's Subs
+// section shows.
+const SUB_STATUS_LABEL: Record<string, string> = {
+  scheduled: 'Scheduled',
+  onsite: 'On site',
+  complete: 'Complete',
+  paid: 'Paid'
+}
+
 function money(n: any) {
   const v = Number(n || 0)
   if (!v) return '$0'
@@ -226,7 +235,7 @@ export default function Subs() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
             <Eyebrow tone="gold">
               <Hammer size={11} aria-hidden="true" />
-              Sub Directory
+              Sub directory
             </Eyebrow>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               {!loading && (
@@ -255,7 +264,6 @@ export default function Subs() {
                   fontSize: 12,
                   fontWeight: 700,
                   letterSpacing: 0,
-                  textTransform: 'uppercase',
                   cursor: 'pointer',
                   WebkitTapHighlightColor: 'transparent',
                   boxShadow: '0 0 0 2px rgba(201, 150, 58, 0.14), 0 4px 10px rgba(201, 150, 58, 0.28)'
@@ -280,7 +288,7 @@ export default function Subs() {
                 {money(screenStats.totalBilled)}
               </StampNumber>
               <Eyebrow as="div" style={{ marginTop: 2 }}>
-                across {grouped.length} {grouped.length === 1 ? 'sub' : 'subs'}
+                Across {grouped.length} {grouped.length === 1 ? 'sub' : 'subs'}
               </Eyebrow>
             </div>
             <span aria-hidden="true" style={{ background: 'var(--v3-border)', alignSelf: 'stretch' }} />
@@ -292,7 +300,7 @@ export default function Subs() {
               <Eyebrow as="div" style={{ marginTop: 2 }}>
                 {screenStats.activeRecent > 0
                   ? `${screenStats.activeRecent} worked in 30d`
-                  : 'no recent activity'}
+                  : 'No recent activity'}
               </Eyebrow>
             </div>
           </div>
@@ -690,7 +698,7 @@ function SubCard({ g, contacts, isTop }: any) {
                     {Number(r.rate || 0) > 0 ? `$${Number(r.rate).toLocaleString()}` : '\u2003'}
                   </span>
                   <Eyebrow style={{ flexShrink: 0, padding: '4px 8px', borderRadius: 10, background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)' }}>
-                    {r.status || 'scheduled'}
+                    {SUB_STATUS_LABEL[r.status || 'scheduled'] || r.status}
                   </Eyebrow>
                 </li>
               )
@@ -757,7 +765,7 @@ function AddSubDrawer({ open, userId, orgId, onClose, onCreated }: any) {
   const labelStyle: import('react').CSSProperties = {
     fontFamily: 'var(--font-body)',
     fontSize: 12, fontWeight: 700,
-    letterSpacing: 0, textTransform: 'uppercase',
+    letterSpacing: 0,
     color: 'var(--v3-text-muted)'
   }
 
@@ -868,7 +876,7 @@ function AddSubDrawer({ open, userId, orgId, onClose, onCreated }: any) {
                 background: 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
                 color: 'var(--v3-on-primary)',
                 fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
-                letterSpacing: 0, textTransform: 'uppercase',
+                letterSpacing: 0,
                 cursor: !form.name.trim() || saving ? 'default' : 'pointer',
                 opacity: !form.name.trim() || saving ? 0.5 : 1,
                 boxShadow: '0 0 0 2px rgba(201, 150, 58, 0.14), 0 4px 12px rgba(201, 150, 58, 0.28)'

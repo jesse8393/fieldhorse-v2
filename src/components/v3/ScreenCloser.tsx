@@ -53,11 +53,11 @@ export default function ScreenCloser({
         display: 'inline-flex', alignItems: 'center', gap: 8,
         fontFamily: 'var(--font-body)',
         fontSize: 12, fontWeight: 700,
-        letterSpacing: 0, textTransform: 'uppercase',
+        letterSpacing: 0,
         color: 'var(--v3-primary-text)'
       }}>
         <Sparkles size={11} aria-hidden="true" />
-        FieldHorse
+        Fieldhorse
       </div>
 
       {caption && (
@@ -86,7 +86,7 @@ export default function ScreenCloser({
             color: 'var(--v3-primary-text)',
             fontFamily: 'var(--font-body)',
             fontSize: 12, fontWeight: 700,
-            letterSpacing: 0, textTransform: 'uppercase',
+            letterSpacing: 0,
             cursor: 'pointer'
           }}
         >

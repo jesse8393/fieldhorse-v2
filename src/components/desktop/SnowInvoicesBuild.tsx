@@ -235,7 +235,7 @@ export default function SnowInvoicesBuild({
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
             <div className="fh-build-good">Get paid</div>
-            <h1 className="fh-build-title">INVOICES</h1>
+            <h1 className="fh-build-title">Invoices</h1>
           </div>
 
           <div className="fh-build-focus">
@@ -264,7 +264,7 @@ export default function SnowInvoicesBuild({
 
           <div className="fh-build-mini-grid">
             <MiniMetric label="Outstanding"    value={money(totals.total ?? 0)} accent />
-            <MiniMetric label="Current 0-30 d" value={money(totals['0-30'] ?? 0)} />
+            <MiniMetric label="Current 0 to 30 d" value={money(totals['0-30'] ?? 0)} />
             <MiniMetric label="Late 31 to 60 d" value={money(totals['31-60'] ?? 0)} tone={(totals['31-60'] ?? 0) > 0 ? 'warn' : undefined} />
             <MiniMetric label="Overdue 60+ d"  value={money(totals['60+'] ?? 0)}  tone={(totals['60+'] ?? 0) > 0 ? 'bad' : undefined} />
           </div>

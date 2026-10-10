@@ -383,7 +383,7 @@ export default function Analytics() {
         <div style={{ minWidth: 0, flex: 1 }}>
           <span className="v3-eyebrow" style={{ color: 'var(--v3-primary-text)', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
             <BarChart3 size={11} />
-            Reports & Insights
+            Reports & insights
           </span>
           <h1 className="v3-h1" style={{ marginTop: 6 }}>
             Know your <em>numbers.</em>
@@ -433,11 +433,11 @@ export default function Analytics() {
               <KPI label="Pipeline"          to={stats.pipeline}         format={fmtMoneyCompact} Icon={TrendingUp} gold />
               <KPI label="Won YTD"           to={stats.wonYTD}           format={fmtMoneyCompact} Icon={DollarSign} gold />
               <KPI label="Profit YTD"        to={stats.profitYTD}        format={fmtMoneyCompact} Icon={DollarSign} gold />
-              <KPI label="Avg Margin"        to={stats.avgMargin}        format={fmtPct}          Icon={Target} note={stats.avgMarginNote} />
-              <KPI label="Close Rate"        to={stats.closeRate}        format={fmtPct}          Icon={Target} note={stats.closeRateNote} />
-              <KPI label="Active Leads"      to={stats.leads}            format={fmtInt}          Icon={TrendingUp} />
+              <KPI label="Avg margin"        to={stats.avgMargin}        format={fmtPct}          Icon={Target} note={stats.avgMarginNote} />
+              <KPI label="Close rate"        to={stats.closeRate}        format={fmtPct}          Icon={Target} note={stats.closeRateNote} />
+              <KPI label="Active leads"      to={stats.leads}            format={fmtInt}          Icon={TrendingUp} />
               <KPI label="Miles YTD"         to={stats.milesYTD}         format={fmtInt}          Icon={Car} />
-              <KPI label="Mileage Deduction" to={stats.mileageDeduction} format={fmtMoneyCompact} Icon={Car} />
+              <KPI label="Mileage deduction" to={stats.mileageDeduction} format={fmtMoneyCompact} Icon={Car} />
             </div>
           </motion.div>
 
@@ -483,7 +483,7 @@ export default function Analytics() {
             <div className="v3-section-header">
               <span className="v3-eyebrow" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                 <TrendingUp size={11} color="var(--v3-primary)" />
-                Pipeline Trend · 12 wks
+                Pipeline trend · 12 wks
               </span>
               <span className="v3-eyebrow" style={{ opacity: 0.65 }}>Active value</span>
             </div>
@@ -515,7 +515,7 @@ export default function Analytics() {
                   <YAxis hide />
                   <Tooltip
                     contentStyle={{ background: 'var(--surface-1)', border: '1px solid var(--rule-bold)', borderRadius: 10, fontFamily: 'var(--font-body)', fontSize: 12 }}
-                    labelStyle={{ color: 'var(--ink-muted)', fontSize: 12, letterSpacing: 0, textTransform: 'uppercase' }}
+                    labelStyle={{ color: 'var(--ink-muted)', fontSize: 12, letterSpacing: 0 }}
                     itemStyle={{ color: 'var(--v3-primary-text)', fontWeight: 700 }}
                     formatter={(v) => [fmtMoneyCompact(v), 'Pipeline']}
                   />
@@ -535,7 +535,7 @@ export default function Analytics() {
           </motion.section>
 
           <motion.section variants={item} className="v3-section" style={{ margin: '0 var(--v3-gutter) 14px' }}>
-            <SectionHeader label="Pipeline by Stage" />
+            <SectionHeader label="Pipeline by stage" />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
               {byStage.map((s, i) => {
                 const widthPct = (s.value / maxStageValue) * 100
@@ -575,7 +575,7 @@ export default function Analytics() {
             <div className="v3-section-header">
               <span className="v3-eyebrow" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                 <Car size={11} color="var(--v3-primary)" />
-                Mileage Log
+                Mileage log
               </span>
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                 <Eyebrow tone="gold" style={{ padding: '4px 8px', borderRadius: 10, background: 'var(--v3-primary-soft)', border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)' }}>

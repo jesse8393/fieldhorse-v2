@@ -20,7 +20,7 @@ import { supabase } from '../lib/supabase.ts'
 import { useClientDetail, useInvalidateClientDetail, useInvalidateClients } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { toastError, toastInfo } from '../lib/toast.ts'
-import { stageColor } from '../lib/stages.ts'
+import { stageColor, stageLabel } from '../lib/stages.ts'
 import StatementSheet from '../components/StatementSheet.tsx'
 import { gatherStatement } from '../lib/statement.ts'
 import { rollupJobs } from '../lib/rollups.ts'
@@ -812,7 +812,7 @@ function OverviewRead({ client, lifetime, outstanding, activeCount, jobs = [], p
           boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 2px 8px rgba(20, 20, 20, 0.2)'
         }}>
           <Eyebrow as="div" style={{ marginBottom: 8 }}>
-            Internal Notes
+            Internal notes
           </Eyebrow>
           <div style={{
             fontFamily: 'var(--font-body)',
@@ -914,7 +914,7 @@ function OverviewEdit({ client, onCommit, onCancel }: any) {
   const labelStyle: import('react').CSSProperties = {
     fontFamily: 'var(--font-body)',
     fontSize: 12, fontWeight: 700,
-    letterSpacing: 0, textTransform: 'uppercase',
+    letterSpacing: 0,
     color: 'var(--v3-text-muted)'
   }
   async function commit() {
@@ -1313,7 +1313,7 @@ function ProjectsList({ jobs, payments = [], changeOrders = [], onOpen }: any) {
                 color: active ? 'var(--v3-on-primary)' : 'var(--v3-text-muted)',
                 fontFamily: 'var(--font-body)',
                 fontSize: 12, fontWeight: 700,
-                letterSpacing: 0, textTransform: 'uppercase',
+                letterSpacing: 0,
                 fontVariantNumeric: 'tabular-nums',
                 cursor: 'pointer',
                 WebkitTapHighlightColor: 'transparent',
@@ -1407,7 +1407,7 @@ function ProjectsList({ jobs, payments = [], changeOrders = [], onOpen }: any) {
                         {money(contract)}
                       </div>
                       <Eyebrow as="div" style={{ marginTop: 4, color: c }}>
-                        {j.stage}
+                        {stageLabel(String(j.stage || ''))}
                       </Eyebrow>
                     </div>
                   </div>

@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { MapPin, Trash2, LogOut, Upload as UploadIcon, Bell, SunMedium, CalendarClock } from 'lucide-react'
+import { MapPin, Trash2, LogOut, Upload as UploadIcon, Bell, CalendarClock } from 'lucide-react'
 import BrandLogoPicker from '../components/BrandLogoPicker.tsx'
 import OrgSwitcher from '../components/OrgSwitcher.tsx'
 import RateCardEditor from '../components/settings/RateCardEditor.tsx'
@@ -11,7 +11,7 @@ import { supabase } from '../lib/supabase.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
 import { reverseGeocode } from '../lib/weather.ts'
-import { useTheme } from '../contexts/ThemeContext.tsx'
+import ThemeModeControl from '../components/fh/ThemeModeControl.tsx'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { pushSupport, pushEnabled, enablePush, disablePush } from '../lib/push.ts'
 import { safePayUrl } from '../lib/payLink.ts'
@@ -83,7 +83,6 @@ function sameFormValue(a: unknown, b: unknown) {
 export default function Settings() {
   const { user, signOut } = useAuth()
   const { profile, upsertProfile, refresh } = useProfile()
-  const { theme, setTheme } = useTheme()
   const navigate = useNavigate()
   const [displayName, setDisplayName] = useState(profile?.full_name || '')
   const [companyName, setCompanyName] = useState(profile?.company_name || '')
@@ -802,44 +801,14 @@ export default function Settings() {
         </div>
       </Section>
 
-      {/* APPEARANCE, daylight mode. Restored after the light-theme
-          parity pass (theme_parity token sweep + chrome veil tokens);
-          desktop joined after the fh-build sweep (desktop_parity), so
-          the toggle now applies on every viewport. Framed as a field
-          feature: high-contrast warm paper for direct sunlight. */}
+      {/* APPEARANCE: Auto, Day and Night (spec section 10). Auto turns to
+          Night at sunset where the company works. */}
       <Section
         variants={item}
         title={<>Built for <em>daylight.</em></>}
-        sub="High contrast light theme for reading the app in direct sun."
+        sub="Day reads in direct sun. Night is easy on the eyes after dark. Auto switches at sunset."
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '4px 0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-            <span aria-hidden="true" style={{
-              flexShrink: 0, width: 34, height: 34, borderRadius: 10,
-              display: 'grid', placeItems: 'center',
-              background: theme === 'light' ? 'var(--v3-primary-soft)' : 'var(--v3-surface-2)',
-              border: theme === 'light'
-                ? '1px solid color-mix(in srgb, var(--v3-primary) 40%, transparent)'
-                : '1px solid var(--v3-border-strong)',
-              color: theme === 'light' ? 'var(--v3-primary-text)' : 'var(--v3-text-muted)'
-            }}>
-              <SunMedium size={16} />
-            </span>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, color: 'var(--v3-text)' }}>
-                Daylight mode
-              </div>
-              <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--v3-text-muted)', lineHeight: 1.4 }}>
-                Warm paper, readable in direct sun. Applies everywhere.
-              </div>
-            </div>
-          </div>
-          <Switch
-            checked={theme === 'light'}
-            onCheckedChange={(on: boolean) => { hapticMedium(); setTheme(on ? 'light' : 'dark') }}
-            aria-label="Toggle daylight mode"
-          />
-        </div>
+        <ThemeModeControl label="Day and Night" />
       </Section>
 
       {/* ACCOUNT */}
@@ -881,7 +850,7 @@ export default function Settings() {
         <Section
           variants={item}
           title={<>Remove <em>sample data.</em></>}
-          meta="DEMO"
+          meta="Demo"
           metaTone="red"
         >
           <p style={{ margin: 0, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontSize: 12 }}>
@@ -916,7 +885,7 @@ export default function Settings() {
                   disabled={wiping}
                   style={{ padding: '12px 12px', borderRadius: 10, background: 'linear-gradient(135deg, #C0392B, #C0392B)', border: 'none', color: 'var(--raw-linen)', fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: 0, cursor: 'pointer', boxShadow: '0 6px 16px rgba(192,57,43,0.4)' }}
                 >
-                  {wiping ? 'REMOVING…' : 'REMOVE SAMPLE DATA'}
+                  {wiping ? 'Removing…' : 'Remove sample data'}
                 </motion.button>
               </div>
             )}
@@ -973,7 +942,7 @@ export default function Settings() {
           }}
         >
           <UploadIcon size={16} />
-          {saving ? 'SAVING...' : saved ? 'SAVED' : 'SAVE CHANGES'}
+          {saving ? 'Saving...' : saved ? 'Saved' : 'Save changes'}
         </motion.button>
       </div>}
     </>
@@ -1205,7 +1174,6 @@ function Section({ variants, title, sub, meta, metaTone, children }: any) {
               fontSize: 12,
               fontWeight: 700,
               letterSpacing: 0,
-              textTransform: 'uppercase',
               ...metaBg
             }}
           >
@@ -1338,7 +1306,7 @@ function EstimateTemplatePicker({ value, onChange }: any) {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>{t.name}</span>
-              {on && <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, color: 'var(--v3-primary-text)' }}>SELECTED</span>}
+              {on && <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, color: 'var(--v3-primary-text)' }}>Selected</span>}
             </div>
             <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, lineHeight: 1.4, color: 'var(--ink-muted)' }}>{t.blurb}</span>
           </button>
@@ -1454,10 +1422,9 @@ function BrandColorEditor({ value, onChange, companyName }: any) {
               fontFamily: 'var(--font-display)',
               fontSize: 20, fontWeight: 600,
               letterSpacing: 0,
-              color: '#141414', marginTop: 2,
-              textTransform: 'uppercase'
+              color: '#141414', marginTop: 2
             }}>
-              {(companyName || 'My Company').toUpperCase()}
+              {companyName || 'My company'}
             </div>
           </div>
           {/* Status pill */}

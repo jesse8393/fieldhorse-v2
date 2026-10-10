@@ -58,7 +58,7 @@ export default function NewQuoteSheet({ open, userId, onClose, onStarted }: any)
   }
 
   const canStart = !!client?.id && !starting
-  const labelStyle: import('react').CSSProperties = { fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: 'var(--ink-muted)' }
+  const labelStyle: import('react').CSSProperties = { fontSize: 12, fontWeight: 700, letterSpacing: 0, color: 'var(--ink-muted)' }
 
   return (
     <Drawer open={open} onOpenChange={(v: any) => { if (!v && !starting) onClose?.() }}>
@@ -128,7 +128,7 @@ export default function NewQuoteSheet({ open, userId, onClose, onStarted }: any)
                 minWidth: 0, boxSizing: 'border-box', touchAction: 'manipulation'
               }}
             >
-              {starting ? 'STARTING…' : 'START QUOTE'}
+              {starting ? 'Starting…' : 'Start quote'}
               {!starting && <ArrowRight size={15} />}
             </motion.button>
           </div>

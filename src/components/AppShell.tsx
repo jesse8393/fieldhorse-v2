@@ -1,7 +1,8 @@
 import { Suspense, useEffect, useLayoutEffect, useRef } from 'react'
 import { Navigate, Outlet, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
 import AppHeader from './AppHeader.tsx'
-import BottomNav from './BottomNav.tsx'
+import Dock from './fh/Dock.tsx'
+import WorkspaceMenu from './WorkspaceMenu.tsx'
 import { lazyWithRetry } from '../lib/lazyWithRetry.ts'
 // Lazy + conditional, DesktopSidebar is hidden by CSS on mobile but
 // still shipped + parsed. Gating on useIsDesktop saves the JS code
@@ -19,7 +20,7 @@ import { useMembership } from '../contexts/MembershipContext.tsx'
 import { layoutForPath } from '../lib/appLayout.ts'
 
 // Route-loading skeleton, matches Onyx bg so split-chunk fetches don't
-// flash a white screen. AppHeader + BottomNav stay mounted around it.
+// flash a white screen. AppHeader and the dock stay mounted around it.
 //
 // Audit found Client detail + Notes feeling broken because the chunk
 // load + initial data fetch combined for ~2-3 s of mostly-empty
@@ -237,11 +238,12 @@ export default function AppShell() {
         </div>
       </main>
 
-      <BottomNav />
-      {/* Universal Capture, the global "say it / type it / snap it"
-          entry point. FAB opens the sheet; the sheet also answers
-          Cmd/Ctrl+J and the `fh:open-capture` event. */}
-      <CaptureFab />
+      {/* Phone: the dock (its Capture coin is the phone's capture entry)
+          and the workspace menu the header monogram opens. Desktop: the
+          sidebar above, and the capture button. The sheet also answers
+          Cmd/Ctrl+J and the `fh:open-capture` event everywhere. */}
+      {isDesktop ? <CaptureFab /> : <Dock />}
+      <WorkspaceMenu />
       <CaptureSheet />
       <CommandPalette />
       <MobileSearchOverlay />
