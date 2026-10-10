@@ -6,7 +6,8 @@ import { toast, toastSuccess, toastUndo, toastError } from '../lib/toast.ts'
 import ActionSheet from '../components/ActionSheet.tsx'
 import AddEventSheet from '../components/AddEventSheet.tsx'
 import { SkeletonList } from '../components/Skeleton.tsx'
-import { FloatingActionButton, ScreenCloser, Eyebrow } from '../components/v3'
+import { ScreenCloser, Eyebrow } from '../components/v3'
+import { Button } from '../components/fh'
 import { supabase } from '../lib/supabase.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import {
@@ -324,17 +325,22 @@ export default function Schedule() {
             <> · {cursorDayCount} {cursorDayCount === 1 ? 'visit' : 'visits'}</>
           )}
         </Eyebrow>
-        <h1 style={{
-          margin: 0,
-          fontFamily: 'var(--font-display)',
-          fontSize: 24,
-          lineHeight: 1, letterSpacing: 0,
-          color: 'var(--v3-text)'
-        }}>
-          {sameDay(cursor, startOfDay(new Date()))
-            ? 'Today'
-            : cursor.toLocaleDateString(undefined, { weekday: 'long' })}
-        </h1>
+        <div className="fhs-screen-head">
+          <h1 style={{
+            margin: 0,
+            fontFamily: 'var(--font-display)',
+            fontSize: 24,
+            lineHeight: 1, letterSpacing: 0,
+            color: 'var(--v3-text)'
+          }}>
+            {sameDay(cursor, startOfDay(new Date()))
+              ? 'Today'
+              : cursor.toLocaleDateString(undefined, { weekday: 'long' })}
+          </h1>
+          <Button variant="secondary" size="mini" icon={Plus} onClick={() => setAddOpen(true)}>
+            New event
+          </Button>
+        </div>
         {upcoming.length > 0 && (
           <div style={{
             marginTop: 4,
@@ -539,19 +545,6 @@ export default function Schedule() {
           )}
         </motion.div>
       </SwipeShell>
-
-      {/* FAB, canonical portal-rendered primitive, immune to
-          containing-block traps from transformed ancestors. Hidden
-          when the day view is showing its own "Schedule a job" empty
-          state CTA so the screen never has two stacked gold +
-          buttons fighting for the operator's tap. */}
-      {events && events.length > 0 && (
-        <FloatingActionButton
-          onClick={() => setAddOpen(true)}
-          ariaLabel="New event"
-          iconStrokeWidth={2.5}
-        />
-      )}
 
       <ScreenCloser caption="Tap a day above to plan the week ahead." />
 

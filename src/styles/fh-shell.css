@@ -119,6 +119,18 @@
   .fhs-header__company { display: none; }
 }
 
+/* ---- Screen title row (Phase 2): the title on the left and, on a
+   phone, the screen's add action as a secondary mini button on the
+   right. The dock coin stays the only floating gold action. ---- */
+.fhs-screen-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.fhs-screen-head > :first-child { min-width: 0; }
+.fhs-screen-head > .fhc-btn { flex-shrink: 0; }
+
 /* ---- Dock (spec 8.1) ---- */
 .fhs-dock {
   position: fixed;

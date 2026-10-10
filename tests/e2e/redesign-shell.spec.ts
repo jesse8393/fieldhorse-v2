@@ -67,6 +67,20 @@ test.describe('phone shell', () => {
     await page.reload({ waitUntil: 'domcontentloaded' })
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
   })
+
+  test('phone screens show one gold plus', async ({ page }) => {
+    // The dock coin is the only floating gold action on a phone; each
+    // screen's own add action moves into its header as a quiet button.
+    for (const [path, name] of [
+      ['/work', 'New lead'],
+      ['/schedule', 'New event'],
+      ['/clients', 'New customer']
+    ] as const) {
+      await open(page, path)
+      await expect(page.getByRole('button', { name, exact: true })).toBeVisible()
+      await expect(page.locator('.fh-fab')).toHaveCount(0)
+    }
+  })
 })
 
 test.describe('first paint', () => {

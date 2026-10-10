@@ -25,12 +25,13 @@ import { useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Search, Phone as PhoneIcon, MessageSquare as MsgIcon, Sparkles,
-  CalendarClock, CalendarDays, Trophy, XCircle, MoreHorizontal, RotateCcw
+  CalendarClock, CalendarDays, Trophy, XCircle, MoreHorizontal, RotateCcw, Plus
 } from 'lucide-react'
 import SwipeableRow from '../components/SwipeableRow.tsx'
 import { SkeletonList } from '../components/Skeleton.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
 import { FilterPill, FloatingActionButton, ScreenCloser, StatusPill } from '../components/v3'
+import { Button } from '../components/fh'
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuItem, DropdownMenuSeparator
@@ -52,6 +53,7 @@ import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { canHover } from '../lib/hover.ts'
+import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { useJobs, useJobsRealtime, useJobSearch, jobsKey, type JobRow } from '../lib/queries.ts'
 
 const NewLeadSheet = lazy(() => import('../components/NewLeadSheet.tsx'))
@@ -339,6 +341,7 @@ export default function Work() {
   const handleFollowUp = useCallback((c: JobRow, when: number | Date | null) => setFollowUp(c, when), [setFollowUp])
 
   const { stagger, item } = useFhMotion()
+  const isDesktop = useIsDesktop()
 
   return (
     <motion.div
@@ -352,9 +355,16 @@ export default function Work() {
           Home already owns "what should I do next"; this screen's job
           is the list. */}
       <motion.div className="fh-work__head" variants={item} style={{ padding: '12px 24px 8px' }}>
-        <h1 className="jobs-title">
-          Work <span style={{ color: 'var(--v3-primary-text)' }}>&amp; deals</span>
-        </h1>
+        <div className="fhs-screen-head">
+          <h1 className="jobs-title">
+            Work <span style={{ color: 'var(--v3-primary-text)' }}>&amp; deals</span>
+          </h1>
+          {!isDesktop && (
+            <Button variant="secondary" size="mini" icon={Plus} onClick={() => { setAddStage('lead'); setAddOpen(true) }}>
+              New lead
+            </Button>
+          )}
+        </div>
         <div className="jobs-stats">
           {loading ? (
             <span style={{ color: 'var(--v3-text-muted)' }}>Loading…</span>

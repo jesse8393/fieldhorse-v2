@@ -14,7 +14,8 @@ import { findDuplicateClusters, loadNotDuplicates, rememberNotDuplicates } from 
 import NewClientSheet from '../components/NewClientSheet.tsx'
 // Lazy, sheet only mounts when the operator opens the merge flow.
 const MergeDuplicatesSheet = lazy(() => import('../components/MergeDuplicatesSheet.tsx'))
-import { FilterPill, Eyebrow, StampNumber, FloatingActionButton, ScreenCloser } from '../components/v3'
+import { FilterPill, Eyebrow, StampNumber, ScreenCloser } from '../components/v3'
+import { Button } from '../components/fh'
 const SnowClients = lazy(() => import('../components/desktop/SnowClientsBuild.tsx'))
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 
@@ -248,16 +249,11 @@ export default function Clients() {
               <Eyebrow tone="gold">Clients</Eyebrow>
               {!loading && <ClientsStateChip stats={screenStats} totalAccounts={rows.length} />}
             </div>
-            {/* Desktop-only inline primary action. FAB hides on desktop. */}
-            <button
-              type="button"
-              className="fh-clients__action fh-desktop-only-action"
-              onClick={() => { hapticMedium(); setAddOpen(true) }}
-              aria-label="New client"
-            >
-              <Plus size={15} strokeWidth={2.4} />
-              <span>New client</span>
-            </button>
+            {/* The add action sits in the header on a phone; the dock coin
+                is the only floating gold action (spec 8.1). */}
+            <Button variant="secondary" size="mini" icon={Plus} onClick={() => { hapticMedium(); setAddOpen(true) }}>
+              New customer
+            </Button>
           </div>
 
           {/* KPI strip, Lifetime billed | Outstanding (when populated) */}
@@ -553,12 +549,6 @@ export default function Clients() {
           onMarkedDistinct={markDistinct}
         />
       </Suspense>
-      <FloatingActionButton
-        onClick={() => setAddOpen(true)}
-        ariaLabel="New client"
-        iconStrokeWidth={2.75}
-        hideOnDesktop
-      />
     </motion.div>
   )
 }
