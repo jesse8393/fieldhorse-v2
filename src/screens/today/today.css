@@ -1,0 +1,440 @@
+/*
+ * Today on a phone (spec 9.2). Class prefix fht-. Reads only --fh- tokens,
+ * so Day and Night follow the theme and the stage reads linen through
+ * .fh-onyx-scope.
+ */
+
+.fht {
+  /* The shared header: 8 px, a 44 px control row, 8 px, plus the notch. */
+  --fht-header-h: calc(60px + env(safe-area-inset-top, 0px));
+  /* The paper around the loading card, as PhotoCard draws it. */
+  --fht-bezel: 6px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--fh-plaster);
+  color: var(--fh-ink);
+}
+
+/* ---- Stage ----
+   Rules that meet a component class are scoped under .fht, because the
+   component sheet loads after this one. */
+
+.fht .fht-stage {
+  display: grid;
+  gap: 12px;
+  padding: 16px 20px 32px;
+}
+
+.fht:not(.has-card) .fht-stage {
+  padding-bottom: 24px;
+}
+
+.fht.has-card .fht-stage {
+  /* Room for the next stop card, which overlaps the edge by 48 px. */
+  padding-bottom: calc(48px + 24px);
+}
+
+.fht-stage__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 32px;
+}
+
+.fht-date {
+  min-width: 0;
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+.fht-hero {
+  margin: 0;
+  font-family: var(--fh-font-display);
+  font-size: 38px;
+  line-height: 40px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--fh-ink);
+  overflow-wrap: anywhere;
+}
+
+.fht-hero__line {
+  display: block;
+}
+
+.fht-hero--loading {
+  display: grid;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.fht-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 400;
+  color: var(--fh-ink-2);
+}
+
+.fht-line > svg {
+  flex: none;
+  color: var(--fh-ink);
+}
+
+.fht-line--pin {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.fht-line--quiet,
+.fht-line__note {
+  color: var(--fh-ink-3);
+  font-size: 15px;
+  line-height: 20px;
+}
+
+/* ---- Next stop card, overlapping the stage edge ---- */
+
+.fht-card {
+  position: relative;
+  z-index: 1;
+  margin-top: -48px;
+  padding: 0 20px;
+}
+
+.fht-next__link {
+  color: inherit;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* The whole text band opens the job; Navigate sits above it. */
+.fht-next__link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+}
+
+.fht-next__link:focus-visible {
+  outline: none;
+}
+
+.fht-next__link:focus-visible::after {
+  outline: 2px solid var(--fh-focus-on-onyx);
+  outline-offset: -4px;
+}
+
+.fht-next .fhc-photo__action {
+  position: relative;
+  z-index: 1;
+}
+
+/* Loading: the card's tray and frame, empty. */
+.fht-card__tray {
+  padding: var(--fht-bezel);
+  border-radius: 18px;
+  background: var(--fh-paper);
+  box-shadow: inset 0 0 0 1px var(--fh-hairline), var(--fh-shadow-raised);
+}
+
+.fht-card__frame {
+  display: grid;
+  align-content: end;
+  gap: 8px;
+  aspect-ratio: 16 / 9;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--fh-stage);
+}
+
+/* ---- Lists on plaster ---- */
+
+.fht-body {
+  display: grid;
+  gap: 32px;
+  padding: 32px 20px 24px;
+}
+
+.fht:not(.has-card) .fht-body,
+.fht-body--flush {
+  padding-top: 24px;
+}
+
+.fht-section {
+  display: grid;
+  min-width: 0;
+}
+
+.fht-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--fh-hairline);
+}
+
+.fht-head__title {
+  margin: 0;
+  font-family: var(--fh-font-display);
+  font-size: 24px;
+  line-height: 28px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--fh-ink);
+}
+
+.fht-head__end {
+  flex: none;
+  display: flex;
+  align-items: center;
+}
+
+.fht-head__count {
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--fh-ink-2);
+}
+
+/* A quiet link in a section head lines its text up with the gutter.
+   The margin sits on the wrapper, so the button keeps its full width. */
+.fht-head__end--link {
+  margin-right: -12px;
+}
+
+.fht-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fht-more {
+  display: flex;
+  padding-top: 4px;
+}
+
+.fht-more .fhc-btn--quiet {
+  margin-left: -12px;
+}
+
+.fht-quiet {
+  margin: 0;
+  padding: 16px 0;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--fh-ink-3);
+}
+
+.fht .fht-empty {
+  padding-top: 16px;
+}
+
+/* ---- A visit: time column, job, detail, chip; the address below ---- */
+
+.fht-visit {
+  min-width: 0;
+}
+
+.fht-visit + .fht-visit {
+  border-top: 1px solid var(--fh-hairline);
+}
+
+.fht-visit__main {
+  --fhc-radius: 12px;
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+  min-height: 64px;
+  margin: 0 -12px;
+  padding: 12px;
+  border-radius: var(--fhc-radius);
+  box-sizing: border-box;
+  color: inherit;
+  text-decoration: none;
+}
+
+.fht-visit__main.is-interactive {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: transform var(--dur-instant) var(--ease-mechanical);
+}
+
+.fht-visit__main.is-interactive::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--fh-ink);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.fht-visit__main.is-interactive:hover::after { opacity: 0.04; }
+.fht-visit__main.is-interactive:active::after { opacity: 0.08; }
+.fht-visit__main.is-interactive:active { transform: translateY(1px); }
+
+.fht-visit__main.is-interactive:focus-visible {
+  outline: 2px solid var(--fh-focus) !important;
+  outline-offset: 2px;
+  border-radius: var(--fhc-radius);
+}
+
+.fht-visit__time {
+  display: grid;
+  align-content: start;
+  font-family: var(--fh-font-body);
+  font-variant-numeric: tabular-nums;
+}
+
+.fht-visit__clock {
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+  color: var(--fh-ink);
+}
+
+.fht-visit__ampm {
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+.fht-visit__body {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.fht-visit__title {
+  font-family: var(--fh-font-body);
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+  color: var(--fh-ink);
+  overflow-wrap: anywhere;
+}
+
+.fht-visit__detail {
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 400;
+  color: var(--fh-ink-2);
+  overflow-wrap: anywhere;
+}
+
+.fht-visit__chip {
+  display: flex;
+  padding-top: 0;
+}
+
+/* Today, done: a lighter row, the time in ink 3. */
+.fht-visit--done .fht-visit__clock {
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+.fht-visit--done .fht-visit__title {
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 500;
+}
+
+/* The address sits under the job, in the body column. */
+.fht-visit__where {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  column-gap: 12px;
+  padding-bottom: 8px;
+}
+
+.fht-visit__wherein {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.fht-visit__pin {
+  display: inline-grid;
+  flex: none;
+  color: var(--fh-ink-3);
+}
+
+.fht-visit__address {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--fh-ink-2);
+  overflow-wrap: anywhere;
+}
+
+.fht-visit__wherein .fhc-btn--quiet {
+  flex: none;
+  margin-right: -12px;
+}
+
+/* ---- The stage runs under the header on a phone ---- */
+
+@media (max-width: 719px) {
+  .fht {
+    margin-top: calc(-1 * var(--fht-header-h));
+  }
+
+  .fht .fht-stage {
+    padding-top: calc(var(--fht-header-h) + 8px);
+  }
+
+  /* While the header sits over the stage it reads linen on onyx: clear
+     at the top so the glow shows, onyx once the page scrolls. */
+  .fh-app:has(.fht[data-header='top']) .fhs-header,
+  .fh-app:has(.fht[data-header='stage']) .fhs-header {
+    --fh-ink: var(--fh-linen);
+    --fh-focus: var(--fh-focus-on-onyx);
+    --fh-wash: color-mix(in srgb, var(--fh-linen) 6%, transparent);
+    --fh-wash-2: color-mix(in srgb, var(--fh-linen) 10%, transparent);
+    /* The ring around the bell's badge. */
+    --fh-plaster: var(--fh-stage);
+    background: transparent;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .fh-app:has(.fht[data-header='stage']) .fhs-header {
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--fh-stage) 94%, transparent) 0%,
+      color-mix(in srgb, var(--fh-stage) 84%, transparent) 82%,
+      color-mix(in srgb, var(--fh-stage) 0%, transparent) 100%
+    );
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+  }
+}

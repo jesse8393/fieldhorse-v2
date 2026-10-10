@@ -78,7 +78,9 @@ test('keeps money, schedule, settings, and missing routes usable', async ({ page
   }
   await expect(page.getByText(/\+?0(?:\.0)?%\s*[·•]\s*7d/i)).toHaveCount(0)
   if (testInfo.project.name.startsWith('mobile')) {
-    await expect(page.getByText('Job Behind', { exact: true })).toBeVisible()
+    // The phone shows Today (tests/e2e/today.spec.ts); the KPI tiles stay
+    // on the desktop view.
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(/stops?( done)?\.|Clear day\.|Quiet day\./)
     await expect(page.getByText('Jobs Behind', { exact: true })).toHaveCount(0)
   }
   await capture(page, testInfo, 'home', true)
