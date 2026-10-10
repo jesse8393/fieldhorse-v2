@@ -140,85 +140,9 @@ select:focus-visible,
 }
 
 /* Premium FX utility classes */
-.fh-fx-aurora { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
 /* Three warm layers, all gold — blueprint spec is constant yellow breathing.
    Different positions + durations + directions + negative animation-delays
    keep the three blobs from pulsing in lockstep. */
-.fh-fx-aurora__a {
-  position: absolute; top: -200px; left: -100px;
-  width: 500px; height: 500px;
-  background: radial-gradient(circle, rgba(201, 150, 58,0.26), transparent 60%);
-  filter: blur(60px);
-  animation: fh-aurora-drift 22s ease-in-out infinite;
-}
-.fh-fx-aurora__b {
-  position: absolute; bottom: -150px; right: -150px;
-  width: 450px; height: 450px;
-  background: radial-gradient(circle, color-mix(in srgb, var(--v3-primary) 22%, transparent), transparent 60%);
-  filter: blur(70px);
-  animation: fh-aurora-drift-alt 28s ease-in-out infinite reverse;
-  animation-delay: -6s;
-}
-.fh-fx-aurora__c {
-  position: absolute; top: 38%; right: -120px;
-  width: 380px; height: 380px;
-  background: radial-gradient(circle, rgba(92, 92, 92,0.18), transparent 60%);
-  filter: blur(80px);
-  animation: fh-aurora-drift 36s ease-in-out infinite;
-  animation-delay: -12s;
-}
-[data-theme='light'] .fh-fx-aurora__a { background: radial-gradient(circle, rgba(201, 150, 58,0.18), transparent 60%); }
-[data-theme='light'] .fh-fx-aurora__b { background: radial-gradient(circle, color-mix(in srgb, var(--v3-primary) 14%, transparent), transparent 60%); }
-[data-theme='light'] .fh-fx-aurora__c { background: radial-gradient(circle, rgba(92, 92, 92,0.10), transparent 60%); }
-
-.fh-fx-grid {
-  position: absolute; inset: 0; pointer-events: none; z-index: 0;
-  background-image:
-    linear-gradient(var(--v3-glass-tint) 1px, transparent 1px),
-    linear-gradient(90deg, var(--v3-glass-tint) 1px, transparent 1px);
-  background-size: 40px 40px;
-  animation: fh-grid-drift 60s linear infinite;
-  will-change: background-position;
-}
-[data-theme='light'] .fh-fx-grid {
-  background-image:
-    linear-gradient(rgba(20,20,20,0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(20,20,20,0.045) 1px, transparent 1px);
-}
-
-.fh-fx-spotlight {
-  position: absolute; pointer-events: none;
-  width: 200px; height: 200px;
-  border-radius: 10px;
-  background: radial-gradient(circle, rgba(201, 150, 58,0.4), transparent 60%);
-  animation: fh-spotlight-breathe 4s ease-in-out infinite;
-}
-
-.fh-fx-shimmer-bar {
-  position: relative; overflow: hidden;
-  height: 6px; border-radius: 10px;
-  background: var(--v3-border-mid);
-}
-.fh-fx-shimmer-bar__fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--field-gold-deep), var(--field-gold-bright), var(--field-gold-hot));
-  border-radius: 10px;
-  box-shadow: 0 0 20px rgba(201, 150, 58,0.5);
-  position: relative;
-}
-.fh-fx-shimmer-bar__fill::after {
-  content: ''; position: absolute;
-  top: 0; right: 0; width: 30%; height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(242, 237, 228,0.5), transparent);
-  animation: fh-shimmer-sweep 2s infinite;
-}
-
-.fh-fx-scan-line {
-  position: absolute; top: 0; left: 0; right: 0; height: 2px;
-  background: linear-gradient(90deg, transparent, var(--field-gold-bright), transparent);
-  animation: fh-scan-line 3s ease-in-out infinite;
-}
-
 /* Brand rule: no gradient text. Solid brand gold instead — same accent,
    no clipped-fill effect (UI audit #38). */
 .fh-text-gradient-gold {
@@ -796,13 +720,6 @@ select:focus-visible,
 
 /* Raised cards — drop onto KPI tiles, job cards, client rows, weekly target.
    Brand rule: surfaces lift off the base; never float in the void. */
-.fh-card-raised {
-  box-shadow: var(--shadow-raised);
-  transition: box-shadow var(--dur-mechanical) var(--ease-mechanical),
-              transform var(--dur-mechanical) var(--ease-mechanical);
-}
-.fh-card-raised:hover { transform: translateY(-1px); }
-
 /* Instant press depress — tap registers before network/HMR completes.
    Pairs with framer-motion whileTap for the visual confirmation. */
 .fh-press-instant {
@@ -816,36 +733,8 @@ select:focus-visible,
 
 /* Money numeric treatment — neon gold + 800 weight + tight tracking.
    Apply to $amount renders only; never to labels or counts. */
-.fh-money {
-  color: var(--v3-primary-text);
-  font-weight: 800;
-  letter-spacing: 0;
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum";
-}
-
 /* Stage pill — solid fill + onyx text. High-contrast, sunlight legible.
    Color set via inline style or a stage-specific modifier. */
-.fh-stage-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  border-radius: 10px;
-  font-family: var(--font-body);
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0;
-  color: var(--onyx);
-  line-height: 1.4;
-}
-.fh-stage-pill--lead    { background: var(--stage-lead); }
-.fh-stage-pill--quote   { background: var(--stage-quote); }
-.fh-stage-pill--job     { background: var(--stage-job); }
-.fh-stage-pill--invoice { background: var(--stage-invoice); }
-.fh-stage-pill--closed  { background: var(--stage-closed); }
-.fh-stage-pill--lost    { background: var(--stage-lost); color: #F2EDE4; }
-
 /* Aceternity-style animated moving border. Wrap any container and the gradient ring
    orbits its perimeter. Adds "premium shimmer" without affecting layout. */
 @keyframes fh-moving-border {
@@ -986,53 +875,7 @@ a {
 .fh-wordmark-stack--inverse .fh-wordmark .horse { color: #F2EDE4; }
 
 /* ---------- Auth surface ---------- */
-.fh-auth {
-  min-height: 100dvh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-5);
-  background: var(--surface-0);
-}
-.fh-auth__stack {
-  width: 100%;
-  max-width: 380px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-}
-.fh-auth__stampline {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-.fh-auth__head {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  margin-top: var(--space-4);
-}
-.fh-auth__title {
-  font-family: var(--font-display);
-  font-size: 24px;
-  letter-spacing: 0;
-  color: var(--ink-strong);
-  line-height: 0.95;
-}
-.fh-auth__sub {
-  margin: 0;
-  font-size: 16px;
-  color: var(--ink-muted);
-}
-
 /* ---------- Form fields ---------- */
-.fh-auth__form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
 .fh-field {
   display: flex;
   flex-direction: column;
@@ -1105,34 +948,6 @@ a {
 }
 
 /* ---------- Auth toggle + messages ---------- */
-.fh-auth__toggle {
-  background: none;
-  border: none;
-  padding: var(--space-2);
-  color: var(--ink-muted);
-  font-size: 14px;
-  text-align: center;
-  cursor: pointer;
-  transition: color 160ms var(--ease);
-}
-.fh-auth__toggle:hover:not(:disabled) { color: var(--ink-strong); }
-.fh-auth__toggle:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.fh-auth__forgot {
-  background: none;
-  border: none;
-  padding: var(--space-1) var(--space-2);
-  margin-top: calc(-1 * var(--space-2));
-  color: var(--v3-primary-text);
-  font-size: 14px;
-  text-align: center;
-  cursor: pointer;
-  letter-spacing: 0;
-  transition: opacity 160ms var(--ease);
-}
-.fh-auth__forgot:hover:not(:disabled) { opacity: 0.8; }
-.fh-auth__forgot:disabled { opacity: 0.5; cursor: not-allowed; }
-
 .fh-auth__error {
   margin: 0;
   padding: var(--space-3) var(--space-4);
@@ -1142,16 +957,6 @@ a {
   font-size: 14px;
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }
-.fh-auth__notice {
-  margin: 0;
-  padding: var(--space-3) var(--space-4);
-  background: color-mix(in srgb, var(--v3-primary) 10%, transparent);
-  border-left: 2px solid var(--field-gold);
-  color: var(--ink-strong);
-  font-size: 14px;
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-}
-
 /* ===========================================================
    Onboarding — "Set up shop."
    Refined industrial · field handbook meets premium spec sheet
@@ -1198,13 +1003,6 @@ a {
   letter-spacing: 0;
   color: var(--ink-muted);
 }
-.fh-onb__spec-v {
-  font-family: var(--font-display);
-  font-size: 16px;
-  letter-spacing: 0;
-  color: var(--v3-primary-text);
-}
-
 .fh-onb__hero {
   display: flex;
   flex-direction: column;
@@ -1265,12 +1063,6 @@ a {
   flex-wrap: wrap;
   padding-bottom: var(--space-3);
   border-bottom: 1px solid var(--rule);
-}
-.fh-onb__section-idx {
-  font-family: var(--font-display);
-  font-size: 20px;
-  letter-spacing: 0;
-  color: var(--v3-primary-text);
 }
 .fh-onb__section-title {
   font-family: var(--font-display);
@@ -1779,26 +1571,6 @@ a {
 /* =========================================================================
    BOTTOM NAV — glass-lined, springy indicator dot
    ========================================================================= */
-.fh-nav {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: var(--z-nav);
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 0;
-  /* V3-SYSTEM-1B-2: top/horizontal pad 8 → 6, bottom 10 → 8 so the
-     dock loses ~4px of chunk while keeping the safe-area inset intact. */
-  padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
-  /* Fully solid — no glass / blur / translucency. Per user feedback the
-     frosted backdrop-filter still read as "see-through" even with an
-     opaque background color, because the saturated blur layer sits on
-     top of the solid bg. Onyx tile only. */
-  background: var(--surface-1);
-  border-top: 1px solid var(--rule);
-  box-sizing: border-box;
-}
 /* V3-SYSTEM-1A2: bottom nav cap follows the active layout mode on
    .fh-app root, so the dock and the content column always agree. In
    mobile-frame routes the dock floats centered at ~440px with rounded
@@ -1808,111 +1580,20 @@ a {
    the bottom nav with sidebar nav, and that decision happens when
    those layouts ship, not here. */
 @media (min-width: 720px) {
-  .fh-nav[data-layout='mobile-frame'],
-  .fh-nav[data-layout='prose'] {
-    left: 50%;
-    right: auto;
-    transform: translateX(-50%);
-    width: 100%;
-    max-width: 440px;
-    border-top-left-radius: 10px;
-    border-top-right-radius: 10px;
-    border-left: 1px solid var(--rule);
-    border-right: 1px solid var(--rule);
   }
-}
 @media (min-width: 720px) {
-  .fh-nav[data-layout='prose'] { max-width: 640px; }
-}
+  }
 /* Phase 1: Responsive route at tablet widths keeps the same centered
    440px BottomNav as mobile-frame, since Home looks the same at 720-
    899px (sidebar hasn't activated yet). At >=900px the BottomNav is
    hidden entirely by the desktop shell rules below. */
 @media (min-width: 720px) and (max-width: 899px) {
-  .fh-nav[data-layout='responsive'] {
-    left: 50%;
-    right: auto;
-    transform: translateX(-50%);
-    width: 100%;
-    max-width: 440px;
-    border-top-left-radius: 10px;
-    border-top-right-radius: 10px;
-    border-left: 1px solid var(--rule);
-    border-right: 1px solid var(--rule);
   }
-}
-.fh-nav__item {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  /* V3-SYSTEM-1B-2: WCAG-compliant 44px minimum tap area (was 48). The
-     header padding extends touch beyond the visible cell. */
-  min-height: 44px;
-  min-width: 44px;
-  padding: 4px;
-  background: none;
-  border: none;
-  color: var(--ink-muted);
-  text-decoration: none;
-  font-family: var(--font-body);
-  border-radius: var(--radius-sm);
-  transition: color 160ms var(--ease);
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-  box-sizing: border-box;
-}
 /* V3-SYSTEM-1B-2: active state keeps the gold wash + inner stroke
    pattern but quieter — alpha 0.18 → 0.12 and inner stroke gold@30%
    → gold@22% so the dock reads as a calm mobile dock instead of
    chunky control. Dot below also shrinks. Light theme tracks the
    same demotion. */
-.fh-nav__item.is-active {
-  color: var(--ink-strong);
-  background: rgba(201, 150, 58, 0.18);
-  border-radius: 10px;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--field-gold) 34%, transparent);
-}
-.fh-nav__item.is-active .fh-nav__icon { color: var(--v3-primary-text); }
-.fh-nav__item.is-active .fh-nav__label { color: var(--ink-strong); font-weight: 700; }
-[data-theme='light'] .fh-nav__item.is-active {
-  background: rgba(20, 20, 20, 0.06);
-  box-shadow: inset 0 0 0 1px rgba(20, 20, 20, 0.08);
-}
-.fh-nav__item:hover { color: var(--ink-strong); }
-.fh-nav__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-}
-.fh-nav__label {
-  /* Legibility over style: outdoors, at arm's length, a 9.9px mono-uppercase
-     label is hard to read. Body font, larger, sentence case, tight tracking. */
-  font-family: var(--font-body);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0;
-  text-transform: none;
-  pointer-events: none;
-  line-height: 1;
-}
-.fh-nav__dot {
-  position: absolute;
-  bottom: 2px;
-  /* V3-SYSTEM-1B-2: 4 → 3px with softer halo so the dot reads as a
-     transition cue under a calmer pill, not a separate gold pip. */
-  width: 3px;
-  height: 3px;
-  border-radius: 10px;
-  background: var(--field-gold);
-  box-shadow: 0 0 0 2px rgba(201, 150, 58, 0.14);
-  pointer-events: none;
-}
-
 /* =========================================================================
    DESKTOP SHELL — Phase 1 of the Responsive Desktop Command Center
 
@@ -1973,224 +1654,21 @@ a {
      thin divider via padding/border-bottom. The logo image is
      contained — never cropped, squeezed, or clipped — and given
      enough room to breathe (max-height 84px). */
-  .fh-desktop-sidebar__brand {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 8px 24px;
-    border-bottom: 1px solid var(--rule);
-    margin-bottom: 18px;
-    min-width: 0;
-  }
-  /* Small system label above the logo — pinned at the top so the
+    /* Small system label above the logo — pinned at the top so the
      user always sees which app they're in even when a tenant brand
      dominates. Reads as supporting chrome, not the brand. */
-  .fh-desktop-sidebar__system-label {
-    align-self: flex-start;
-    font-family: var(--font-mono);
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0;
-    color: var(--ink-muted);
-    line-height: 1;
-    opacity: 0.7;
-    padding: 4px 4px;
-  }
-  /* Logo container — full width of the rail (minus padding) so wide
+    /* Logo container — full width of the rail (minus padding) so wide
      logos render at full size. object-fit:contain prevents squeeze;
      max-height caps tall marks so the brand block stays bounded. */
-  .fh-desktop-sidebar__logo-wrap {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 4px 0 4px;
-    min-height: 64px;
-  }
-  .fh-desktop-sidebar__logo {
-    display: block;
-    max-width: 100%;
-    max-height: 84px;
-    width: auto;
-    height: auto;
-    object-fit: contain;
-  }
-  /* Wordmark fallback — when no logo_url is present. Wide serif
+      /* Wordmark fallback — when no logo_url is present. Wide serif
      wordmark, centered, never clipped. Same component is used for
      the tenant company name and the FIELDHORSE system mark. */
-  .fh-desktop-sidebar__co-wordmark {
-    display: inline-flex;
-    align-items: baseline;
-    justify-content: center;
-    width: 100%;
-    padding: 16px 4px 12px;
-    font-family: var(--font-display);
-    font-size: 20px;
-    letter-spacing: 0;
-    color: var(--ink-strong);
-    /* The uppercase transform was removed 5/17 — the 5/13 audit flagged
-       "sidebar shows PARKER CONSTRUCTION COMPANY, settings input shows
-       Parker Construction Co." as a name mismatch. They were the same
-       field, just rendered upper here. Preserve the operator's typed
-       casing so the sidebar matches what they see in Settings and what
-       the customer sees on proposals/invoices. The FIELD/HORSE wordmark
-       fallback is typed in capitals in the source, so it needs no
-       transform either. */
-    line-height: 1;
-    text-align: center;
-    overflow-wrap: anywhere;
-  }
-  /* When the brand falls all the way through to the FIELDHORSE
+    /* When the brand falls all the way through to the FIELDHORSE
      wordmark, drop the system label above (it would just say the
      same thing) and tighten letter-spacing back to the badge value. */
-  .fh-desktop-sidebar__co-wordmark--system {
-    /* FIELD/HORSE fallback — the brand wordmark, typed in capitals. */
-    letter-spacing: 0;
-    gap: 4px;
-  }
-  /* Nav stack */
-  .fh-desktop-sidebar__nav {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    /* Keep short-height desktops scrollable without painting a bright
-       browser scrollbar through the navigation. */
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-  .fh-desktop-sidebar__nav::-webkit-scrollbar {
-    width: 0;
-    height: 0;
-  }
-  .fh-desktop-sidebar__group {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-  .fh-desktop-sidebar__eyebrow {
-    display: block;
-    font-family: var(--font-mono);
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0;
-    color: var(--ink-muted);
-    padding: 4px 12px 8px;
-    opacity: 0.7;
-  }
-  .fh-desktop-sidebar__list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-  .fh-desktop-sidebar__divider {
-    height: 1px;
-    background: var(--rule);
-    margin: 4px 6px;
-    opacity: 0.6;
-  }
-  .fh-desktop-sidebar__link {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 8px 12px;
-    border-radius: 10px;
-    color: var(--ink-muted);
-    text-decoration: none;
-    font-family: var(--font-body);
-    font-size: var(--type-14);
-    font-weight: 500;
-    letter-spacing: 0;
-    line-height: 1;
-    transition: background-color 140ms var(--ease), color 140ms var(--ease);
-    -webkit-tap-highlight-color: transparent;
-    position: relative;
-  }
-  .fh-desktop-sidebar__link:hover {
-    background: var(--surface-2);
-    color: var(--ink-strong);
-  }
-  .fh-desktop-sidebar__link.is-active {
-    background: rgba(201, 150, 58, 0.10);
-    color: var(--ink-strong);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--field-gold) 22%, transparent);
-  }
-  .fh-desktop-sidebar__link.is-active .fh-desktop-sidebar__link-icon {
-    color: var(--field-gold-bright);
-  }
-  .fh-desktop-sidebar__link-icon {
-    display: inline-grid;
-    place-items: center;
-    width: 22px;
-    height: 22px;
-    flex-shrink: 0;
-    color: currentColor;
-  }
-  .fh-desktop-sidebar__link-label {
-    flex: 1;
-    min-width: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  /* Foot — account chip + theme/sign-out icon buttons */
-  .fh-desktop-sidebar__foot {
-    margin-top: 12px;
-    padding: 12px 8px 4px;
-    border-top: 1px solid var(--rule);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .fh-desktop-sidebar__account {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-  .fh-desktop-sidebar__account-eyebrow {
-    font-family: var(--font-mono);
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0;
-    color: var(--ink-muted);
-  }
-  .fh-desktop-sidebar__account-email {
-    font-family: var(--font-body);
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--ink-strong);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .fh-desktop-sidebar__icon-btn {
-    flex-shrink: 0;
-    width: 32px;
-    height: 32px;
-    border-radius: 10px;
-    border: 1px solid var(--rule);
-    background: var(--surface-2);
-    color: var(--ink-muted);
-    display: grid;
-    place-items: center;
-    cursor: pointer;
-    transition: color 140ms var(--ease), border-color 140ms var(--ease), background-color 140ms var(--ease);
-    -webkit-tap-highlight-color: transparent;
-  }
-  .fh-desktop-sidebar__icon-btn:hover {
-    color: var(--ink-strong);
-    border-color: color-mix(in srgb, var(--field-gold) 32%, var(--rule));
-  }
-
-  /* Shift the main content + header inset to clear the 256px sidebar
+    /* Nav stack */
+                          /* Foot — account chip + theme/sign-out icon buttons */
+              /* Shift the main content + header inset to clear the 256px sidebar
      (Phase 9 fit fix). */
   .fh-app__main {
     width: calc(100% - 256px);
@@ -2211,15 +1689,12 @@ a {
     box-sizing: border-box;
   }
   /* Hide the BottomNav on desktop — sidebar carries primary nav. */
-  .fh-nav { display: none !important; }
-  /* Hide AppHeader's mobile-only brand slots — sidebar owns identity.
+    /* Hide AppHeader's mobile-only brand slots — sidebar owns identity.
      `!important` overrides the inline `display: flex` on the brand
      wrapper div (Phase 2.5 fix — without it the centered tenant
      wordmark was still rendering at the top of every desktop view,
      reading as "Parker dominates the page"). */
-  .fh-app-header__badge { display: none !important; }
-  .fh-app-header__brand { display: none !important; }
-  /* Header content shifts to the right — give the action cluster more
+      /* Header content shifts to the right — give the action cluster more
      room to breathe and align with content gutter on desktop. */
   .fh-app-header { justify-content: flex-end !important; padding-right: 24px !important; }
   /* Phase 10b crisp-glass mandate: replace the mobile fade-to-
@@ -2280,45 +1755,7 @@ a {
      daylight. (The 7/4 desktop-parity sweep converted them to
      var(--v3-text*) and the QA tour caught the whole rail going
      invisible in light — do not re-tokenize this block.) */
-  [data-theme='light'] .fh-desktop-sidebar__co,
-  [data-theme='light'] .fh-desktop-sidebar__brand-name {
-    color: #F2EDE4;
-  }
-  [data-theme='light'] .fh-desktop-sidebar__tag,
-  [data-theme='light'] .fh-desktop-sidebar__system-label,
-  [data-theme='light'] .fh-desktop-sidebar__eyebrow,
-  [data-theme='light'] .fh-desktop-sidebar__account-eyebrow {
-    color: rgba(242, 237, 228, 0.55);
-  }
-  [data-theme='light'] .fh-desktop-sidebar__account-email {
-    color: #F2EDE4;
-  }
-  [data-theme='light'] .fh-desktop-sidebar__link {
-    color: rgba(242, 237, 228, 0.78);
-  }
-  [data-theme='light'] .fh-desktop-sidebar__link:hover {
-    background: rgba(242, 237, 228, 0.04);
-    color: #F2EDE4;
-  }
-  [data-theme='light'] .fh-desktop-sidebar__link.is-active {
-    background: rgba(201, 150, 58, 0.10);
-    color: #F2EDE4;
-  }
-  [data-theme='light'] .fh-desktop-sidebar__link-label {
-    color: inherit;
-  }
-  [data-theme='light'] .fh-desktop-sidebar__icon-btn {
-    background: rgba(242, 237, 228, 0.04);
-    border-color: rgba(242, 237, 228, 0.10);
-    color: rgba(242, 237, 228, 0.78);
-  }
-  [data-theme='light'] .fh-desktop-sidebar__divider {
-    background: rgba(242, 237, 228, 0.10);
-  }
-  [data-theme='light'] .fh-desktop-sidebar__brand {
-    border-bottom-color: rgba(242, 237, 228, 0.10);
-  }
-}
+                    }
 
 /* =========================================================================
    PHASE 11 STABILIZATION — desktop fixes (browser audit follow-ups)
@@ -2752,31 +2189,14 @@ a {
    Home's "first 2 full-width, rest split into 2 cols" pattern.
    ========================================================================= */
 @media (min-width: 900px) {
-  .fh-app--layout-responsive .v3-screen--home {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    column-gap: 24px;
-    row-gap: 0;
-    align-items: start;
-    padding-top: 4px;
-  }
-  /* First two top-of-page rows (greeting strip + Today's Revenue
+    /* First two top-of-page rows (greeting strip + Today's Revenue
      Opportunity card) span both columns so they read as the page
      header. Items 3+ stack in two columns by source order. */
-  .fh-app--layout-responsive .v3-screen--home > :nth-child(-n+2) {
-    grid-column: 1 / -1;
-  }
-  /* Reset per-section horizontal margins inside the grid — the inner
+    /* Reset per-section horizontal margins inside the grid — the inner
      wrapper provides the gutter on desktop, so child cards should
      hug the column they live in instead of carrying their own
      mobile-tuned 0 var(--v3-gutter) shoulders. */
-  .fh-app--layout-responsive .v3-screen--home > .v3-section,
-  .fh-app--layout-responsive .v3-screen--home > .v3-section-header {
-    margin-left: 0;
-    margin-right: 0;
-    margin-bottom: 16px;
   }
-}
 
 /* =========================================================================
    DESKTOP-ONLY INLINE ACTION BUTTON — Phase 2
@@ -2786,39 +2206,8 @@ a {
    On mobile this stays display:none and the FAB carries the primary
    action (thumb-reach pattern).
    ========================================================================= */
-.fh-desktop-only-action { display: none; }
 @media (min-width: 900px) {
-  .fh-desktop-only-action {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    height: 32px;
-    border-radius: 10px;
-    background:
-      linear-gradient(180deg, rgba(201, 150, 58, 0.18) 0%, color-mix(in srgb, var(--v3-primary) 10%, transparent) 100%),
-      var(--v3-surface);
-    border: 1px solid color-mix(in srgb, var(--v3-primary) 38%, var(--v3-border));
-    color: var(--v3-primary-text);
-    font-family: var(--font-body);
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0;
-    cursor: pointer;
-    box-shadow: 0 1px 0 var(--v3-border) inset, 0 4px 14px rgba(20, 20, 20, 0.32);
-    transition: transform 140ms var(--ease), box-shadow 140ms var(--ease), border-color 140ms var(--ease);
-    flex-shrink: 0;
-    white-space: nowrap;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .fh-desktop-only-action:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 1px 0 var(--v3-border-mid) inset, 0 8px 22px color-mix(in srgb, var(--v3-primary) 18%, transparent);
-    border-color: color-mix(in srgb, var(--v3-primary) 55%, var(--v3-border));
-  }
-  .fh-desktop-only-action:active { transform: translateY(0); }
-
-  /* FAB collapses on desktop when the screen has supplied an inline
+        /* FAB collapses on desktop when the screen has supplied an inline
      primary action (Jobs, Clients in Phase 2). Other screens that
      keep the FAB are unaffected because they don't pass the prop. */
   .fh-fab--hide-desktop { display: none !important; }
@@ -2844,21 +2233,7 @@ a {
    so the grid placement isn't a fragile :nth-child contract.
    ========================================================================= */
 @media (min-width: 900px) {
-  .fh-app--layout-responsive .v3-screen--jobs {
-    display: grid;
-    /* Three top-row cells — head (which contains the inline new-lead
-       button), search, tabs — then a full-width grid row. */
-    grid-template-columns:
-      minmax(280px, 1fr)
-      minmax(220px, 360px)
-      minmax(0, auto);
-    grid-template-rows: auto auto;
-    column-gap: 16px;
-    row-gap: 12px;
-    align-items: center;
-    padding: 4px 0 32px;
   }
-}
 
 /* =========================================================================
    CLIENTS — desktop directory layout (Phase 2)
@@ -2906,10 +2281,7 @@ a {
   /* Card grid — bump minmax so tiles have breathing room on the wider
      canvas (mobile 320 → desktop 320 unchanged but the column count
      scales naturally with auto-fill). Slightly looser gap. */
-  .v3-screen--clients > .fh-clients__grid {
-    gap: 16px !important;
   }
-}
 
 /* =========================================================================
    DESKTOP DENSITY, Phase 6
@@ -2921,12 +2293,7 @@ a {
 @media (min-width: 900px) {
 
   /* Clients grid: slightly denser, smaller gap. */
-  .v3-screen--clients > .fh-clients__grid {
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)) !important;
-    gap: 12px !important;
-  }
-
-  /* Tighten Jobs and Clients head row to drop the slight top void. */
+    /* Tighten Jobs and Clients head row to drop the slight top void. */
   .fh-app--layout-responsive .v3-screen--jobs,
   .fh-app--layout-responsive .v3-screen--clients {
     padding-top: 0 !important;
