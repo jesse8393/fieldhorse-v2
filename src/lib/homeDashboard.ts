@@ -19,7 +19,7 @@ type ContactRow = Pick<
   'id' | 'name' | 'amount' | 'stage' | 'updated_at' | 'created_at' | 'completed_at' | 'follow_up_on' | 'proposal_status'
 > & Partial<Pick<
   Database['public']['Tables']['fh_contacts']['Row'],
-  'quote_change_request_note' | 'quote_change_requested_at'
+  'quote_change_request_note' | 'quote_change_requested_at' | 'address' | 'job_title'
 >>
 
 type ScheduleRow = Pick<
@@ -27,8 +27,10 @@ type ScheduleRow = Pick<
   'id' | 'contact_id' | 'start_at' | 'end_at' | 'title'
 >
 
+type ScheduleContact = Pick<ContactRow, 'name' | 'stage' | 'address' | 'job_title'>
+
 type ScheduleWithContact = ScheduleRow & {
-  fh_contacts: Pick<ContactRow, 'name' | 'stage'> | null
+  fh_contacts: ScheduleContact | null
 }
 
 type PaymentRow = Pick<
@@ -101,6 +103,8 @@ export type HomeTodayOnSite = {
   stage: string | null
   startAt: string | null
   endAt: string | null
+  address: string | null
+  jobTitle: string | null
 }
 
 export type HomeTopPipeline = {
@@ -154,6 +158,8 @@ export type HomeDashboardBundle = {
   stageBreakdown: HomeStageBreakdown
   stageRail: HomeStageRail[]
   todayOnSite: HomeTodayOnSite[]
+  /** The next local day's visits, the same shape as todayOnSite. */
+  tomorrowOnSite: HomeTodayOnSite[]
   nextActions: HomeNextAction[]
   photoUrlByJob: Record<string, string>
 }
@@ -166,6 +172,7 @@ export type HomeDashboardSource = {
   // "chase invoice", and job-health outstanding need full history.
   payments: PaymentRow[]
   todaySchedules: ScheduleWithContact[]
+  tomorrowSchedules: ScheduleWithContact[]
   photoUrlByJob: Record<string, string>
   proposalViews: PublicLinkRow[]
   sentChangeOrders: ChangeOrderRow[]
@@ -520,15 +527,25 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
     return new Date(contact.updated_at || contact.created_at || 0) < sevenDaysAgo
   }).length
 
-  const todayOnSite = source.todaySchedules.map((schedule) => ({
-    id: schedule.id,
-    contactId: schedule.contact_id,
-    title: schedule.title || schedule.fh_contacts?.name || 'Scheduled visit',
-    clientName: schedule.fh_contacts?.name || null,
-    stage: schedule.fh_contacts?.stage || null,
-    startAt: schedule.start_at,
-    endAt: schedule.end_at,
-  }))
+  // The job comes embedded with each visit. A visit read without the
+  // embed falls back to the job's own contact row.
+  const onSite = (schedule: ScheduleWithContact): HomeTodayOnSite => {
+    const job: Partial<ScheduleContact> | undefined = schedule.fh_contacts
+      ?? (schedule.contact_id ? contactsById.get(schedule.contact_id) : undefined)
+    return {
+      id: schedule.id,
+      contactId: schedule.contact_id,
+      title: schedule.title || job?.name || 'Scheduled visit',
+      clientName: job?.name || null,
+      stage: job?.stage || null,
+      startAt: schedule.start_at,
+      endAt: schedule.end_at,
+      address: job?.address || null,
+      jobTitle: job?.job_title || null,
+    }
+  }
+  const todayOnSite = source.todaySchedules.map(onSite)
+  const tomorrowOnSite = (source.tomorrowSchedules ?? []).map(onSite)
 
   const topPipeline = contacts
     .filter((contact) => ACTIVE_STAGES.includes(contact.stage || ''))
@@ -599,6 +616,7 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
     stageBreakdown,
     stageRail,
     todayOnSite,
+    tomorrowOnSite,
     nextActions: actions.slice(0, 6),
     photoUrlByJob: source.photoUrlByJob,
   }
@@ -622,7 +640,10 @@ async function fetchAllLabelled<T>(label: string, build: Parameters<typeof fetch
 }
 
 const CONTACT_COLUMNS =
-  'id, name, amount, stage, updated_at, created_at, completed_at, follow_up_on, proposal_status, quote_change_request_note, quote_change_requested_at'
+  'id, name, amount, stage, updated_at, created_at, completed_at, follow_up_on, proposal_status, quote_change_request_note, quote_change_requested_at, address, job_title'
+
+// Visits with the job they belong to, for Today's next stop and day list.
+const SCHEDULE_COLUMNS = 'id, contact_id, start_at, end_at, title, fh_contacts(name, stage, address, job_title)'
 
 // Cover photos are not part of this fetch (photoUrlByJob comes back
 // empty): useHomeDashboard loads them in their own query once the bundle
@@ -638,6 +659,8 @@ export async function fetchHomeDashboard(
   todayStart.setHours(0, 0, 0, 0)
   const todayEnd = new Date(todayStart)
   todayEnd.setDate(todayEnd.getDate() + 1)
+  const tomorrowEnd = new Date(todayEnd)
+  tomorrowEnd.setDate(tomorrowEnd.getDate() + 1)
 
   const overdueScheduleQuery = (orgId
     ? supabase.from('fh_schedule').select('contact_id, end_at, start_at').eq('org_id', orgId)
@@ -686,14 +709,18 @@ export async function fetchHomeDashboard(
       .range(from, to)
   )
 
-  const todayScheduleQuery = (orgId
-    ? supabase.from('fh_schedule').select('id, contact_id, start_at, end_at, title, fh_contacts(name, stage)').eq('org_id', orgId)
-    : supabase.from('fh_schedule').select('id, contact_id, start_at, end_at, title, fh_contacts(name, stage)').eq('user_id', userId)
+  // One local day of visits, earliest first: today, and the next day
+  // for Today's evening view.
+  const scheduleForDay = (from: Date, to: Date) => (orgId
+    ? supabase.from('fh_schedule').select(SCHEDULE_COLUMNS).eq('org_id', orgId)
+    : supabase.from('fh_schedule').select(SCHEDULE_COLUMNS).eq('user_id', userId)
   )
-    .gte('start_at', todayStart.toISOString())
-    .lt('start_at', todayEnd.toISOString())
+    .gte('start_at', from.toISOString())
+    .lt('start_at', to.toISOString())
     .order('start_at', { ascending: true })
     .limit(6)
+  const todayScheduleQuery = scheduleForDay(todayStart, todayEnd)
+  const tomorrowScheduleQuery = scheduleForDay(todayEnd, tomorrowEnd)
 
   const proposalViewsPromise = fetchAllLabelled<PublicLinkRow>('proposal views', (from, to) =>
     (orgId
@@ -735,6 +762,7 @@ export async function fetchHomeDashboard(
     sentChangeOrders,
     openInvoices,
     approvedChangeOrders,
+    tomorrowSchedRes,
   ] = await Promise.all([
     contactsPromise,
     overdueScheduleQuery,
@@ -744,10 +772,12 @@ export async function fetchHomeDashboard(
     sentChangeOrdersPromise,
     openInvoicesPromise,
     approvedCoPromise,
+    tomorrowScheduleQuery,
   ])
 
   assertOk('overdue schedule', overdueSchedRes)
   assertOk('today schedule', todaySchedRes)
+  assertOk('tomorrow schedule', tomorrowSchedRes)
 
   return buildHomeDashboardBundle({
     now,
@@ -755,6 +785,7 @@ export async function fetchHomeDashboard(
     overdueSchedules: (overdueSchedRes.data ?? []) as Pick<ScheduleRow, 'contact_id'>[],
     payments,
     todaySchedules: (todaySchedRes.data ?? []) as unknown as ScheduleWithContact[],
+    tomorrowSchedules: (tomorrowSchedRes.data ?? []) as unknown as ScheduleWithContact[],
     photoUrlByJob: {},
     proposalViews,
     sentChangeOrders,

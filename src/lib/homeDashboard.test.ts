@@ -8,6 +8,7 @@ function baseSource(overrides: Partial<HomeDashboardSource> = {}): HomeDashboard
     overdueSchedules: [],
     payments: [],
     todaySchedules: [],
+    tomorrowSchedules: [],
     photoUrlByJob: {},
     proposalViews: [],
     sentChangeOrders: [],
@@ -255,6 +256,86 @@ describe('buildHomeDashboardBundle', () => {
     }))
     const health = bundle.jobHealth.find((row) => row.id === 'job-1')
     expect(health?.billing).toBe('Outstanding') // the $2K CO is still owed
+  })
+})
+
+describe('today and tomorrow on site', () => {
+  it('carries the address, the job title and tomorrow from the source', () => {
+    const bundle = buildHomeDashboardBundle(baseSource({
+      todaySchedules: [{
+        id: 'visit-1',
+        contact_id: 'job-1',
+        start_at: '2026-06-18T12:30:00.000Z',
+        end_at: '2026-06-18T16:00:00.000Z',
+        title: 'Pour slab, crew A',
+        fh_contacts: { name: 'Whitcomb', stage: 'job', address: '2210 Ridgecrest Dr', job_title: 'Garage slab' },
+      }],
+      tomorrowSchedules: [{
+        id: 'visit-2',
+        contact_id: 'job-2',
+        start_at: '2026-06-19T14:00:00.000Z',
+        end_at: null,
+        title: null,
+        fh_contacts: { name: 'Castellanos', stage: 'lead', address: null, job_title: 'Pool deck' },
+      }],
+    }))
+
+    expect(bundle.todayOnSite).toEqual([{
+      id: 'visit-1',
+      contactId: 'job-1',
+      title: 'Pour slab, crew A',
+      clientName: 'Whitcomb',
+      stage: 'job',
+      startAt: '2026-06-18T12:30:00.000Z',
+      endAt: '2026-06-18T16:00:00.000Z',
+      address: '2210 Ridgecrest Dr',
+      jobTitle: 'Garage slab',
+    }])
+    expect(bundle.tomorrowOnSite).toEqual([{
+      id: 'visit-2',
+      contactId: 'job-2',
+      title: 'Castellanos',
+      clientName: 'Castellanos',
+      stage: 'lead',
+      startAt: '2026-06-19T14:00:00.000Z',
+      endAt: null,
+      address: null,
+      jobTitle: 'Pool deck',
+    }])
+  })
+
+  it('reads the job from the contact rows when a visit has no embedded contact', () => {
+    const bundle = buildHomeDashboardBundle(baseSource({
+      contacts: [{
+        id: 'job-1',
+        name: 'Plumbing Bellevue',
+        amount: 33100,
+        stage: 'job',
+        created_at: '2026-06-01T12:00:00.000Z',
+        updated_at: '2026-06-17T12:00:00.000Z',
+        completed_at: null,
+        follow_up_on: null,
+        proposal_status: null,
+        address: '412 Burkitt Station Rd',
+        job_title: 'Slab and trench',
+      }],
+      todaySchedules: [{
+        id: 'visit-1',
+        contact_id: 'job-1',
+        start_at: '2026-06-18T14:00:00.000Z',
+        end_at: '2026-06-18T18:00:00.000Z',
+        title: 'Pour slab',
+        fh_contacts: null,
+      }],
+    }))
+
+    expect(bundle.todayOnSite[0]).toMatchObject({
+      clientName: 'Plumbing Bellevue',
+      stage: 'job',
+      address: '412 Burkitt Station Rd',
+      jobTitle: 'Slab and trench',
+    })
+    expect(bundle.tomorrowOnSite).toEqual([])
   })
 })
 
