@@ -1,0 +1,273 @@
+/* ================================================================
+   Command palette (SPEC.md 9.12, render base/desktop-command.jpg)
+
+   A centered paper panel over a 45 percent onyx scrim: the search field
+   with its esc key cap, hairline grouped rows, and a footer of key hints.
+   It reads only --fh- tokens, so Day and Night follow on their own. It
+   does not use the legacy .fh-command-dialog rules.
+   ================================================================ */
+
+.fhp-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-cmdk) - 1);
+  background: color-mix(in srgb, var(--fh-onyx) 45%, transparent);
+}
+
+.fhp-panel {
+  position: fixed;
+  top: 20vh;
+  right: 0;
+  left: 0;
+  z-index: var(--z-cmdk);
+  display: flex;
+  flex-direction: column;
+  width: min(560px, calc(100vw - 32px));
+  margin: 0 auto;
+  box-sizing: border-box;
+  overflow: hidden;
+  border-radius: 22px;
+  background: var(--fh-paper);
+  box-shadow: inset 0 0 0 1px var(--fh-edge), var(--fh-shadow-overlay);
+  color: var(--fh-ink);
+  font-family: var(--fh-font-body);
+  font-variant-numeric: tabular-nums;
+}
+
+/* global.css gives every [role='dialog'] max-height: 100vh minus 32 px at
+   this width; the panel starts 20vh down, so it needs its own cap, and
+   the extra attribute selector outranks that rule. */
+.fhp-panel[role='dialog'] {
+  max-height: calc(80vh - 32px);
+}
+
+.fhp-cmd {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ---------------- Search field ---------------- */
+
+.fhp-search {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: none;
+  height: 60px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--fh-hairline);
+  box-sizing: border-box;
+  color: var(--fh-ink);
+}
+
+/* The field itself draws no ring (the whole row is the field); keyboard
+   focus shows as a 2 px line under the row instead. */
+.fhp-search:focus-within {
+  border-bottom-color: var(--fh-edge-strong);
+  box-shadow: 0 1px 0 var(--fh-edge-strong);
+}
+
+.fhp-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fh-ink);
+  font-family: inherit;
+  font-size: 20px;
+  line-height: 24px;
+  font-weight: 500;
+}
+
+.fhp-input:focus,
+.fhp-input:focus-visible {
+  outline: 0 !important;
+  border-radius: 0;
+}
+
+.fhp-input::placeholder {
+  color: var(--fh-ink-3);
+  font-weight: 400;
+}
+
+/* ---------------- Results ---------------- */
+
+.fhp-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 8px 12px 12px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.fhp-group + .fhp-group {
+  margin-top: 4px;
+}
+
+/* v3.css styles every [cmdk-group-heading] with !important (12 px, 700),
+   so these need it too. */
+.fhp-group [cmdk-group-heading] {
+  padding: 12px 12px 4px !important;
+  color: var(--fh-ink-3) !important;
+  font-family: var(--fh-font-body) !important;
+  font-size: 14px !important;
+  line-height: 18px;
+  font-weight: 500 !important;
+  letter-spacing: 0;
+}
+
+.fhp-item {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  min-height: 44px;
+  padding: 8px 20px;
+  border-radius: 12px;
+  box-sizing: border-box;
+  color: var(--fh-ink);
+  cursor: pointer;
+  user-select: none;
+}
+
+.fhp-item--rich {
+  min-height: 60px;
+}
+
+/* The highlighted row: a wash plus an edge, so it never rests on tint alone. */
+.fhp-item[data-selected='true'] {
+  background: var(--fh-tray);
+  box-shadow: inset 0 0 0 1px var(--fh-edge);
+}
+
+.fhp-item[data-disabled='true'] {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.fhp-item__icon {
+  flex: none;
+  color: var(--fh-ink-2);
+}
+
+.fhp-item__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.fhp-item__title {
+  overflow: hidden;
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fhp-item--rich .fhp-item__title {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.fhp-item__sub {
+  overflow: hidden;
+  color: var(--fh-ink-2);
+  font-size: 15px;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fhp-item__chevron {
+  flex: none;
+  margin-left: auto;
+  color: var(--fh-ink-3);
+}
+
+.fhp-keys {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.fhp-keys .fhc-keycap {
+  min-width: 24px;
+  height: 24px;
+}
+
+.fhp-note {
+  padding: 24px 12px;
+  color: var(--fh-ink-2);
+  font-size: 15px;
+  line-height: 20px;
+  text-align: center;
+}
+
+/* ---------------- Footer ---------------- */
+
+.fhp-foot {
+  display: flex;
+  align-items: center;
+  flex: none;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--fh-hairline);
+  color: var(--fh-ink-2);
+  font-size: 15px;
+  line-height: 24px;
+}
+
+.fhp-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.fhp-hint .fhc-keycap {
+  min-width: 24px;
+  height: 24px;
+}
+
+.fhp-hint__keys {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 4px;
+}
+
+/* ---------------- Motion ---------------- */
+
+@keyframes fhp-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fhp-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes fhp-rise-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fhp-scrim[data-state='open'] { animation: fhp-fade-in 120ms ease-out; }
+.fhp-scrim[data-state='closed'] { animation: fhp-fade-out 100ms ease-in; }
+.fhp-panel[data-state='open'] { animation: fhp-rise-in 140ms ease-out; }
+.fhp-panel[data-state='closed'] { animation: fhp-fade-out 100ms ease-in; }
+
+/* Reduced motion: fades only. */
+@media (prefers-reduced-motion: reduce) {
+  .fhp-panel[data-state='open'] { animation: fhp-fade-in 120ms ease-out; }
+}
