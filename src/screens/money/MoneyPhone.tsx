@@ -17,73 +17,31 @@
 // that send, download, void and record payments are Invoices.tsx's own and
 // arrive as props, so the phone and the desktop table share one code path.
 
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import { ChevronRight, Receipt } from 'lucide-react'
 import { Button, Chip, EmptyState, Row, Skeleton, SkeletonRows, VaultCard, formatMoney } from '../../components/fh'
 import Monogram from '../../components/fh/Monogram.tsx'
-import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useProfile } from '../../contexts/ProfileContext.tsx'
-import { useJobs, type InvoicesBundle } from '../../lib/queries.ts'
+import { useJobs } from '../../lib/queries.ts'
 import { buildInvoiceList, buildMoneyView, type MoneyRow } from '../../lib/moneyView.ts'
 import { hapticTap } from '../../lib/haptics.ts'
-import InvoiceJobPicker from './InvoiceJobPicker.tsx'
-import InvoiceSheet from './InvoiceSheet.tsx'
-import RemindSheet from './RemindSheet.tsx'
 import {
   BalancesPanel,
   InvoicesPanel,
   PANEL_TITLES,
   PanelShell,
-  StatementsPanel,
-  isMoneyPanel
+  StatementsPanel
 } from './MoneyPanels.tsx'
-import type {
-  AgingTotals,
-  ClientBalanceGroup,
-  CollectionPace,
-  IssuedInvoiceRow,
-  JobBalanceRow,
-  MoneyFilter,
-  MoneyJob,
-  SendInvoiceOptions
-} from './types.ts'
+import { useMoneyPanel } from './useMoneyPanel.ts'
+import { useMoneySheets } from './useMoneySheets.tsx'
+import type { MoneyScreenProps } from './types.ts'
 import './money.css'
 
-// The Send invoice sheet is the existing create invoice flow. It is heavy
-// and only needed after someone picks a job, so it loads on demand.
-const SendInvoiceSheet = lazy(() => import('../../components/SendInvoiceSheet.tsx'))
-
-export type MoneyPhoneProps = {
-  bundle: InvoicesBundle | undefined
-  loading: boolean
-  /** Issued invoices with their job and displayed status (every one, unfiltered). */
-  invoiceRows: IssuedInvoiceRow[]
-  /** Job balances, already narrowed by the filter. */
-  jobBalances: JobBalanceRow[]
-  totals: AgingTotals
-  clientAR: ClientBalanceGroup[]
-  collectionPace: CollectionPace
-  filter: MoneyFilter
-  onFilterChange: (next: MoneyFilter) => void
-  /** The invoice id that is mid send, if any. */
-  sendingId: string | null
-  /** Sends the invoice email. Resolves true once it has gone out. */
-  onSendInvoice: (row: IssuedInvoiceRow, options?: SendInvoiceOptions) => Promise<boolean>
-  onDownloadInvoice: (row: IssuedInvoiceRow) => void
-  onPayInvoice: (row: IssuedInvoiceRow) => void
-  onVoidInvoice: (row: IssuedInvoiceRow) => void
-  onStatement: (group: ClientBalanceGroup) => void
-  /** Reload the invoices after a new one is saved. */
-  onRefresh: () => void
-}
+export type MoneyPhoneProps = MoneyScreenProps
 
 function countLine(n: number): string {
   return `${n} ${n === 1 ? 'invoice' : 'invoices'}`
-}
-
-function emailFor(job: MoneyJob | null | undefined): string {
-  return (job?.email || job?.fh_clients?.email || '').trim()
 }
 
 type GroupProps = {
@@ -167,40 +125,9 @@ export default function MoneyPhone({
   onStatement,
   onRefresh
 }: MoneyPhoneProps) {
-  const { user } = useAuth()
   const { profile } = useProfile()
-  const navigate = useNavigate()
-  const location = useLocation()
-  const [searchParams, setSearchParams] = useSearchParams()
   const jobsQuery = useJobs()
-
-  const panelParam = searchParams.get('panel')
-  const panel = isMoneyPanel(panelParam) ? panelParam : null
-
-  // A page opens at its top; closing it returns to where Money was scrolled
-  // and puts focus back on the Money heading.
-  const titleRef = useRef<HTMLHeadingElement>(null)
-  const scrollBefore = useRef(0)
-  const wasPanel = useRef(false)
-  useEffect(() => {
-    if (panel) {
-      wasPanel.current = true
-      window.scrollTo({ top: 0, behavior: 'instant' })
-    } else if (wasPanel.current) {
-      wasPanel.current = false
-      window.scrollTo({ top: scrollBefore.current, behavior: 'instant' })
-      titleRef.current?.focus({ preventScroll: true })
-    }
-  }, [panel])
-
-  // Which sheet is open. The invoice and reminder ids stay after a sheet
-  // closes so its content holds still while it leaves.
-  const [actionsId, setActionsId] = useState<string | null>(null)
-  const [actionsOpen, setActionsOpen] = useState(false)
-  const [remindId, setRemindId] = useState<string | null>(null)
-  const [remindOpen, setRemindOpen] = useState(false)
-  const [pickerOpen, setPickerOpen] = useState(false)
-  const [billJob, setBillJob] = useState<MoneyJob | null>(null)
+  const { panel, titleRef, panelHref, openPanel, closePanel } = useMoneyPanel()
 
   const waiting = loading || jobsQuery.isLoading
   const view = useMemo(
@@ -208,118 +135,22 @@ export default function MoneyPhone({
     [bundle, jobsQuery.data]
   )
   const invoiceList = useMemo(() => (bundle ? buildInvoiceList({ bundle, now: new Date() }) : []), [bundle])
-  const invoiceById = useMemo(() => new Map(invoiceRows.map((r) => [r.invoice.id, r])), [invoiceRows])
-  const listById = useMemo(() => new Map(invoiceList.map((r) => [r.id, r])), [invoiceList])
   const openInvoiceCount = useMemo(
     () => invoiceList.filter((r) => r.status === 'draft' || r.status === 'sent' || r.status === 'overdue').length,
     [invoiceList]
   )
 
-  const openActions = (invoiceId: string) => {
-    setActionsId(invoiceId)
-    setActionsOpen(true)
-  }
-  const openRemind = (row: MoneyRow) => {
-    if (!row.invoiceId) return
-    setRemindId(row.invoiceId)
-    setRemindOpen(true)
-  }
-
-  const actionsIssued = actionsId ? invoiceById.get(actionsId) ?? null : null
-  const actionsRow = actionsId ? listById.get(actionsId) ?? null : null
-  const remindIssued = remindId ? invoiceById.get(remindId) ?? null : null
-  const remindRow: MoneyRow | null = remindId ? listById.get(remindId) ?? null : null
-
-  const sendReminder = async () => {
-    if (!remindIssued) return
-    const sent = await onSendInvoice(remindIssued, { reminder: true })
-    if (sent) setRemindOpen(false)
-  }
-
-  const resend = async () => {
-    if (!actionsIssued) return
-    const sent = await onSendInvoice(actionsIssued)
-    if (sent) setActionsOpen(false)
-  }
-
-  // Each of these closes the sheet first, so the payment sheet, the
-  // download or the confirmation takes the screen on its own.
-  const handOver = (act: (row: IssuedInvoiceRow) => void) => () => {
-    if (!actionsIssued) return
-    setActionsOpen(false)
-    act(actionsIssued)
-  }
-
-  const pickJob = (job: MoneyJob) => {
-    setPickerOpen(false)
-    setBillJob(job)
-  }
-
-  const panelHref = (id: string) => {
-    const sp = new URLSearchParams(searchParams)
-    sp.set('panel', id)
-    return `?${sp.toString()}`
-  }
-
-  const openPanel = () => {
-    hapticTap()
-    scrollBefore.current = window.scrollY
-  }
-
-  // Back closes the panel the way the browser's Back would; a page opened
-  // straight on a panel has no history to go back to, so it drops the param.
-  const closePanel = () => {
-    if (location.key !== 'default') {
-      navigate(-1)
-      return
-    }
-    const sp = new URLSearchParams(searchParams)
-    sp.delete('panel')
-    setSearchParams(sp, { replace: true })
-  }
-
-  const sheets = (
-    <>
-      <InvoiceSheet
-        open={actionsOpen}
-        onOpenChange={setActionsOpen}
-        issued={actionsIssued}
-        row={actionsRow}
-        sending={actionsId !== null && sendingId === actionsId}
-        onResend={() => void resend()}
-        onPdf={handOver(onDownloadInvoice)}
-        onMarkPaid={handOver(onPayInvoice)}
-        onVoid={handOver(onVoidInvoice)}
-      />
-      <RemindSheet
-        open={remindOpen}
-        onOpenChange={setRemindOpen}
-        row={remindRow}
-        email={emailFor(remindIssued?.job)}
-        sending={remindId !== null && sendingId === remindId}
-        onSend={() => void sendReminder()}
-      />
-      <InvoiceJobPicker
-        open={pickerOpen}
-        onOpenChange={setPickerOpen}
-        jobs={bundle?.jobs ?? []}
-        onPick={pickJob}
-      />
-      {billJob && bundle && (
-        <Suspense fallback={null}>
-          <SendInvoiceSheet
-            open
-            userId={user?.id}
-            contact={billJob}
-            payments={bundle.payments.filter((p) => p.contact_id === billJob.id)}
-            changeOrders={bundle.changeOrders.filter((c) => c.contact_id === billJob.id)}
-            onClose={() => setBillJob(null)}
-            onDone={onRefresh}
-          />
-        </Suspense>
-      )}
-    </>
-  )
+  const { openActions, openRemind, openPicker, sheets } = useMoneySheets({
+    bundle,
+    invoiceRows,
+    invoiceList,
+    sendingId,
+    onSendInvoice,
+    onDownloadInvoice,
+    onPayInvoice,
+    onVoidInvoice,
+    onRefresh
+  })
 
   if (panel) {
     return (
@@ -407,7 +238,7 @@ export default function MoneyPhone({
                 icon={Receipt}
                 title="No open invoices"
                 action={
-                  <Button variant="secondary" size="md" onClick={() => { hapticTap(); setPickerOpen(true) }}>
+                  <Button variant="secondary" size="md" onClick={() => { hapticTap(); openPicker() }}>
                     Create an invoice
                   </Button>
                 }
@@ -431,19 +262,19 @@ export default function MoneyPhone({
           )}
 
           <nav className="fhm-more" aria-label="More on money">
-            <Link className="fhm-link" to={panelHref('statements')} onClick={openPanel}>
+            <Link className="fhm-link" to={panelHref('statements')} onClick={() => { hapticTap(); openPanel() }}>
               <span className="fhm-link__label">Statements</span>
               <span className="fhm-link__value">
                 {clientAR.length === 0 ? 'Nobody owes you' : `${clientAR.length} ${clientAR.length === 1 ? 'customer owes' : 'customers owe'} you`}
               </span>
               <ChevronRight className="fhm-link__chevron" size={18} aria-hidden="true" />
             </Link>
-            <Link className="fhm-link" to={panelHref('invoices')} onClick={openPanel}>
+            <Link className="fhm-link" to={panelHref('invoices')} onClick={() => { hapticTap(); openPanel() }}>
               <span className="fhm-link__label">All invoices</span>
               <span className="fhm-link__value">{openInvoiceCount} open</span>
               <ChevronRight className="fhm-link__chevron" size={18} aria-hidden="true" />
             </Link>
-            <Link className="fhm-link" to={panelHref('balances')} onClick={openPanel}>
+            <Link className="fhm-link" to={panelHref('balances')} onClick={() => { hapticTap(); openPanel() }}>
               <span className="fhm-link__label">Job balances</span>
               <span className="fhm-link__value">{formatMoney(totals.total)}</span>
               <ChevronRight className="fhm-link__chevron" size={18} aria-hidden="true" />

@@ -43,12 +43,12 @@ export const AGING = [
   { id: '60+', label: 'Overdue', range: 'Over 60 days', tone: 'danger' }
 ] as const satisfies readonly { id: keyof AgingTotals; label: string; range: string; tone: ChipTone }[]
 
-function agingLabel(bucket: string): { label: string; tone: ChipTone } {
+export function agingLabel(bucket: string): { label: string; tone: ChipTone } {
   const found = AGING.find((b) => b.id === bucket) ?? AGING[0]
   return { label: found.label, tone: found.tone }
 }
 
-function plural(n: number, one: string, many: string): string {
+export function plural(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`
 }
 
@@ -77,7 +77,7 @@ const FILTERS: { id: MoneyFilter; label: string }[] = [
   { id: 'all', label: 'All' }
 ]
 
-function FilterControl({ value, onChange, label }: { value: MoneyFilter; onChange: (next: MoneyFilter) => void; label: string }) {
+export function FilterControl({ value, onChange, label }: { value: MoneyFilter; onChange: (next: MoneyFilter) => void; label: string }) {
   const name = useId()
   return (
     <fieldset className="fhm-filter">

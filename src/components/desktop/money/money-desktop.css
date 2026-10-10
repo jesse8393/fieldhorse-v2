@@ -1,0 +1,620 @@
+/*
+ * Money on a desktop (spec 9.7, plan task 4.6). Class prefix fhmd-. Reads
+ * only --fh- tokens, so Day and Night follow on their own. The vault card,
+ * chips, buttons, empty state and skeletons come from src/components/fh;
+ * the filter control and the sheet contents come from
+ * src/screens/money/money.css. This file lays out the toolbar, the vault
+ * and aging row, the quiet links, the group tables and the three pages
+ * behind them.
+ *
+ * .fh-build-page stays on the root so the shell specs and the scroll checks
+ * find the screen; its page height and backdrop (global.css) are not wanted
+ * here.
+ */
+
+.fhmd.fh-build-page {
+  display: block;
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--fh-ink);
+  font-family: var(--fh-font-body);
+}
+
+.fhmd {
+  box-sizing: border-box;
+  min-width: 0;
+  color: var(--fh-ink);
+  font-family: var(--fh-font-body);
+}
+
+/* The shared header strip keeps its search and bell, but takes the page
+   ground and loses its rule, so the title reads as the top of the screen,
+   as on Schedule. global.css paints it with !important, so these do too. */
+@media (min-width: 900px) {
+  body:has(.fhmd) .fh-app-header {
+    background: var(--fh-canvas) !important;
+    border-bottom: 0 !important;
+    padding-right: 32px !important;
+  }
+}
+
+/* Focus: 2 px --fh-focus. global.css forces a muted outline color on every
+   focused control, so these restate it. */
+.fhmd-name:focus-visible,
+.fhmd-link:focus-visible,
+.fhmd-sort:focus-visible {
+  outline: 2px solid var(--fh-focus) !important;
+  outline-color: var(--fh-focus) !important;
+  outline-offset: 2px;
+  border-radius: 7px;
+}
+
+/* ---- Toolbar: the title, then Reports and New invoice ---- */
+.fhmd-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  padding: 0 0 20px;
+}
+
+.fhmd-toolbar--panel {
+  justify-content: flex-start;
+  gap: 12px;
+}
+
+.fhmd-title {
+  min-width: 0;
+  margin: 0;
+  font-family: var(--fh-font-display);
+  font-size: 36px;
+  line-height: 40px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--fh-ink);
+  overflow-wrap: anywhere;
+}
+
+.fhmd-title:focus {
+  outline: none;
+}
+
+.fhmd-toolbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fhmd-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 0 0 48px;
+}
+
+/* ---- The vault card beside the aging summary ---- */
+.fhmd-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  align-items: stretch;
+  gap: 24px;
+}
+
+.fhmd-vault {
+  min-width: 0;
+}
+
+.fhmd .fhmd-vault__skel {
+  border-radius: 28px;
+}
+
+/* Outstanding by age: one flat tray with a hairline between the columns. */
+.fhmd-aging {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+  padding: 24px;
+  border-radius: 14px;
+  background: var(--fh-tray);
+  box-shadow: inset 0 0 0 1px var(--fh-hairline);
+}
+
+/* On a page of its own (Job balances) it runs as a band: the total at the
+   left, the three ages at the right, the month's pace underneath. */
+.fhmd-main > .fhmd-aging {
+  display: grid;
+  grid-template-columns: minmax(200px, 1fr) minmax(0, 2fr);
+  align-items: center;
+  gap: 16px 32px;
+  margin-bottom: 8px;
+}
+
+.fhmd-main > .fhmd-aging .fhmd-aging__facts {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.fhmd-main > .fhmd-aging .fhmd-aging__pace {
+  grid-column: 1 / -1;
+}
+
+.fhmd-aging__head {
+  display: grid;
+  gap: 4px;
+}
+
+.fhmd-aging__label {
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--fh-ink-2);
+}
+
+.fhmd-aging__total {
+  margin: 0;
+  font-family: var(--fh-font-display);
+  font-size: 34px;
+  line-height: 36px;
+  font-weight: 600;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--fh-ink);
+  overflow-wrap: anywhere;
+}
+
+.fhmd-aging__facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--fh-hairline);
+}
+
+.fhmd-aging__fact {
+  min-width: 0;
+}
+
+.fhmd-aging__fact + .fhmd-aging__fact {
+  padding-left: 16px;
+  border-left: 1px solid var(--fh-hairline);
+}
+
+.fhmd-aging__fact dt {
+  font-family: var(--fh-font-body);
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+.fhmd-aging__fact dd {
+  margin: 4px 0 0;
+  font-family: var(--fh-font-display);
+  font-size: 20px;
+  line-height: 24px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--fh-ink);
+  white-space: nowrap;
+}
+
+.fhmd-aging__fact dd.fhmd-aging__range {
+  margin-top: 0;
+  font-family: var(--fh-font-body);
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+.fhmd-aging__pace {
+  margin: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--fh-hairline);
+  font-family: var(--fh-font-body);
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--fh-ink-2);
+}
+
+/* ---- Quiet links to the lists behind Money ---- */
+.fhmd-more {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 24px;
+  border-top: 1px solid var(--fh-hairline);
+  border-bottom: 1px solid var(--fh-hairline);
+}
+
+.fhmd-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 56px;
+  padding: 8px 12px;
+  color: var(--fh-ink);
+  text-decoration: none;
+}
+
+.fhmd-link + .fhmd-link {
+  border-left: 1px solid var(--fh-hairline);
+}
+
+.fhmd-link:hover {
+  background: var(--fh-wash);
+}
+
+.fhmd-link__label {
+  flex: none;
+  font-family: var(--fh-font-body);
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.fhmd-link__value {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--fh-ink-2);
+}
+
+.fhmd-link__chevron {
+  flex: none;
+  color: var(--fh-ink-3);
+}
+
+.fhmd-state {
+  padding-top: 24px;
+}
+
+.fhmd-quiet {
+  margin: 0;
+  padding: 24px 0 8px;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 400;
+  color: var(--fh-ink-2);
+}
+
+/* ---- Groups: a title with its note, then a table on plaster ---- */
+.fhmd-group {
+  min-width: 0;
+  margin-top: 32px;
+}
+
+.fhmd-group__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+}
+
+.fhmd-group__title {
+  min-width: 0;
+  margin: 0;
+  font-family: var(--fh-font-display);
+  font-size: 24px;
+  line-height: 28px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--fh-ink);
+}
+
+.fhmd-group__note {
+  min-width: 0;
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 400;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--fh-ink-2);
+}
+
+/* ---- The table: hairline rows on plaster ---- */
+.fhmd-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-family: var(--fh-font-body);
+}
+
+.fhmd-col--customer { width: 24%; }
+.fhmd-col--job { width: 30%; }
+.fhmd-col--amount { width: 14%; }
+.fhmd-col--status { width: 20%; }
+.fhmd-col--action { width: 12%; }
+.fhmd-col--wide-action { width: 23%; }
+
+.fhmd-table--balances .fhmd-col--status { width: 17%; }
+.fhmd-table--balances .fhmd-col--amount { width: 12%; }
+
+.fhmd-table th {
+  padding: 8px 12px;
+  border-top: 1px solid var(--fh-hairline);
+  border-bottom: 1px solid var(--fh-hairline);
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+  text-align: left;
+  color: var(--fh-ink-3);
+}
+
+.fhmd-table td {
+  min-width: 0;
+  padding: 12px;
+  vertical-align: middle;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 400;
+  color: var(--fh-ink-2);
+  overflow-wrap: anywhere;
+}
+
+.fhmd-table tbody tr + tr td {
+  border-top: 1px solid var(--fh-hairline);
+}
+
+.fhmd-table tbody tr:last-child td {
+  border-bottom: 1px solid var(--fh-hairline);
+}
+
+.fhmd-row.is-click {
+  cursor: pointer;
+}
+
+.fhmd-row.is-click:hover td {
+  background: var(--fh-wash);
+}
+
+.fhmd-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.fhmd-end {
+  text-align: right;
+}
+
+.fhmd-cell--amount {
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+  color: var(--fh-ink);
+}
+
+.fhmd-name {
+  display: block;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--fh-font-body);
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-align: left;
+  color: var(--fh-ink);
+}
+
+button.fhmd-name {
+  cursor: pointer;
+}
+
+/* The name is the row's way in for a keyboard or a pointer: its box grows
+   to 46 px tall (44 or more to the finger) without moving the text, and
+   the line under it lets the press through. */
+button.fhmd-name,
+.fhmd-name--link {
+  padding: 12px 0;
+  margin: -12px 0;
+}
+
+.fhmd-name--link {
+  text-decoration: none;
+}
+
+.fhmd-name--link + .fhmd-sub {
+  pointer-events: none;
+}
+
+.fhmd-name--link:hover,
+button.fhmd-name:hover {
+  text-decoration: underline;
+}
+
+.fhmd-sub {
+  display: block;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 400;
+  color: var(--fh-ink-2);
+}
+
+.fhmd-status {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+}
+
+.fhmd-status__main {
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--fh-ink-2);
+}
+
+.fhmd-status__sub {
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+.fhmd-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px 8px;
+}
+
+.fhmd-none {
+  text-align: center;
+}
+
+/* ---- The pages behind Money ---- */
+.fhmd-intro {
+  margin: 0 0 20px;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 400;
+  color: var(--fh-ink-2);
+}
+
+.fhmd-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  margin: 24px 0 8px;
+}
+
+.fhmd-tools__filter {
+  width: 280px;
+  max-width: 100%;
+}
+
+.fhmd-tools__filter .fhm-filter {
+  margin: 0;
+}
+
+.fhmd-tools__count {
+  margin: 0 0 0 auto;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--fh-ink-2);
+}
+
+.fhmd-count {
+  margin: 0;
+  padding-bottom: 8px;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--fh-ink-2);
+}
+
+.fhmd-search {
+  box-sizing: border-box;
+  display: flex;
+  flex: 1 1 240px;
+  align-items: center;
+  gap: 8px;
+  max-width: 420px;
+  height: 48px;
+  padding: 0 12px;
+  border: 1px solid var(--fh-edge-strong);
+  border-radius: 12px;
+  background: var(--fh-paper);
+  color: var(--fh-ink-3);
+}
+
+.fhmd-search:focus-within {
+  outline: 2px solid var(--fh-focus);
+  outline-offset: 2px;
+}
+
+.fhmd-search input,
+.fhmd-search input:focus,
+.fhmd-search input:focus-visible {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none !important;
+  box-shadow: none;
+  background: transparent;
+  color: var(--fh-ink);
+  font-family: var(--fh-font-body);
+  font-size: 16px;
+  line-height: 20px;
+  font-weight: 400;
+}
+
+.fhmd-search input::placeholder {
+  color: var(--fh-ink-3);
+}
+
+/* Sortable column heads: the whole head is the button, 44 px tall. */
+.fhmd-table th:has(.fhmd-sort) {
+  padding: 0;
+}
+
+.fhmd-sort {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 12px;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.fhmd-num .fhmd-sort {
+  justify-content: flex-end;
+}
+
+.fhmd-sort.is-sorted {
+  color: var(--fh-ink);
+}
+
+.fhmd-sort__hint {
+  opacity: 0.5;
+}
+
+@media (max-width: 1199px) {
+  .fhmd-top {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 1099px) {
+  .fhmd-more {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fhmd-link + .fhmd-link {
+    border-left: 0;
+    border-top: 1px solid var(--fh-hairline);
+  }
+}
