@@ -27,12 +27,17 @@ import { DOC_COLORS, DOC_FONTS, resolveBrandGold } from './tokens.ts'
 import { money, longDate } from './format.ts'
 import { proposalNumber } from './numbers.ts'
 import { groupPhotosByTag } from './photoGroups.ts'
-import { SlateProposal, MintProposal, EditorialProposal } from './proposalThemes.tsx'
+import { SlateProposal, MintProposal, EditorialProposal, FieldhorseProposal } from './proposalThemes.tsx'
 
+// 'fieldhorse' is the phone first customer portal (spec 9.9). It is a
+// choice in Settings, never the default: a company with no estimate_template
+// still resolves to 'classic' below, so no live customer page changes until
+// its owner picks it (decision D13).
 const TEMPLATE_COMPONENTS: Record<string, (props: { view: any }) => any> = {
   slate: SlateProposal,
   mint: MintProposal,
-  editorial: EditorialProposal
+  editorial: EditorialProposal,
+  fieldhorse: FieldhorseProposal
 }
 
 const DEFAULT_PAYMENT_COPY = '50% deposit due upon approval · 40% due at material delivery or midpoint · 10% due upon substantial completion.'
@@ -55,7 +60,8 @@ export default function ProposalTemplate({
   meta = {},
   status = 'draft',
   showInternalNotes = false,
-  photos = []
+  photos = [],
+  portal = undefined       // the live customer link's extras, read by the 'fieldhorse' theme only
 }: any) {
   const issuedAt = meta.issuedAt || new Date()
   const number = meta.number || proposalNumber(company?.name, contact?.id, issuedAt)
@@ -121,7 +127,8 @@ export default function ProposalTemplate({
       approval,
       photos,
       insurance,
-      changeOrders
+      changeOrders,
+      portal
     }
     return <ThemeComponent view={view} />
   }

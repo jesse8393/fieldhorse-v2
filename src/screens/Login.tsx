@@ -1,31 +1,23 @@
 import { type FormEvent, useState } from 'react'
 import { useNavigate, Navigate, useSearchParams } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import { Mail, Lock, ArrowRight } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.tsx'
-import { useProfile } from '../contexts/ProfileContext.tsx'
 import { isSupabaseConfigured } from '../lib/supabase.ts'
 import { safeNextPath } from '../lib/nextPath.ts'
+import { Button, Field } from '../components/fh'
+import AuthShell from './auth/AuthShell.tsx'
 
 function getErrorMessage(err: unknown, fallback: string) {
   return err instanceof Error ? err.message : fallback
 }
 
-const SR_ONLY: React.CSSProperties = {
-  position: 'absolute',
-  width: 1,
-  height: 1,
-  margin: -1,
-  padding: 0,
-  border: 0,
-  overflow: 'hidden',
-  clip: 'rect(0 0 0 0)',
-  whiteSpace: 'nowrap'
-}
+const MISSING_ENV = 'Local Supabase env is missing. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env.local, then restart Vite.'
 
+// Welcome and Login (spec 9.1, render glamor/g-welcome.jpg): the FIELDHORSE
+// wordmark, the line, email and password, one brushed gold Sign in, an
+// outlined Create a workspace that switches to sign up, a quiet Forgot
+// password and the smoke line. The stage is always onyx (AuthShell).
 export default function Login() {
   const { signIn, signUp, sendPasswordReset, session, loading } = useAuth()
-  const { profile } = useProfile()
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const partnerInviteToken = params.get('partner_invite') || ''
@@ -49,7 +41,7 @@ export default function Login() {
   // resets naturally for later visits.
   const [justSignedUp, setJustSignedUp] = useState(false)
   const controlsDisabled = busy
-  const submitDisabled = busy || !isSupabaseConfigured
+  const submitDisabled = !isSupabaseConfigured
 
   // After-auth destination: partner invite flow > ?next= > root.
   const afterAuthTarget = partnerInviteToken
@@ -60,7 +52,9 @@ export default function Login() {
   // invited teammate, and onboarding would make them a company of their own.
   const hasExplicitTarget = Boolean(partnerInviteToken || nextPath)
 
-  if (loading) return null
+  // Reading the saved session: paint the stage, not the form, so a returning
+  // person never sees it flash before the redirect below.
+  if (loading) return <AuthShell labelledBy="fh-login-title" loading />
   if (session) {
     const dest = justSignedUp && !hasExplicitTarget ? '/onboarding' : afterAuthTarget
     return <Navigate to={dest} replace />
@@ -70,7 +64,7 @@ export default function Login() {
     setError('')
     setNotice('')
     if (!isSupabaseConfigured) {
-      setError('Local Supabase env is missing. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env.local, then restart Vite.')
+      setError(MISSING_ENV)
       return
     }
     if (!email) {
@@ -94,7 +88,7 @@ export default function Login() {
     setError('')
     setNotice('')
     if (!isSupabaseConfigured) {
-      setError('Local Supabase env is missing. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env.local, then restart Vite.')
+      setError(MISSING_ENV)
       return
     }
     setBusy(true)
@@ -133,240 +127,87 @@ export default function Login() {
   }
 
   const isSignIn = mode === 'signin'
-  const firstName = profile?.full_name?.trim().split(/\s+/)[0]
-  // Voice: premium business owner, not field operator. "Welcome back."
-  // for returning users, "Built for builders." for new accounts. Once
-  // the profile name is known we personalize the sign in line.
-  const headline = isSignIn
-    ? (firstName ? `Welcome back, ${firstName}.` : 'Welcome back.')
-    : 'Built for builders.'
-  const subline = isSignIn
-    ? 'Run your business with clarity.'
-    : 'Manage jobs, clients, and revenue in one place.'
 
   return (
-    <main
-      className="fh-auth-screen"
-      aria-labelledby="fh-login-title"
-      style={{
-        position: 'relative',
-        minHeight: '100vh',
-        display: 'grid',
-        placeItems: 'center',
-        padding: 24,
-        background: 'var(--v3-bg)',
-        color: 'var(--v3-text)',
-        overflow: 'hidden'
-      }}
-    >
-      {/* Subtle warm radial behind the card, not aurora, not grid. Just
-          a single soft gold halo to add depth without atmosphere. */}
-      <div
-        aria-hidden="true"
-        style={{
-          position: 'absolute',
-          inset: 0,
-          pointerEvents: 'none',
-          background: 'radial-gradient(ellipse 80% 60% at 50% 0%, rgba(201, 150, 58, 0.06), transparent 70%)'
-        }}
-      />
+    <AuthShell labelledBy="fh-login-title">
+      <h1 id="fh-login-title" className="fha-line">Run every job like a captain.</h1>
 
-      <motion.div
-        initial={{ y: 12 }}
-        animate={{ y: 0 }}
-        transition={{ duration: 0.6, ease: [0.2, 0.8, 0.2, 1] }}
-        style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 400 }}
-      >
-        <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{ fontFamily: 'var(--font-wordmark)', fontSize: 24, letterSpacing: 0, lineHeight: 1 }}>
-            <span style={{ color: 'var(--v3-primary-text)' }}>FIELD</span>
-            <span style={{ color: 'var(--v3-text)' }}>HORSE</span>
-          </div>
-          <h1
-            id="fh-login-title"
-            className="v3-h1"
-            style={{ fontSize: 24, marginTop: 24, lineHeight: 1.15 }}
-          >
-            {headline}
-          </h1>
-          <p
-            className="v3-caption"
-            style={{ marginTop: 8, fontSize: 14, lineHeight: 1.45 }}
-          >
-            {subline}
-          </p>
-        </div>
+      <form className="fha-form" onSubmit={onSubmit} noValidate>
+        {!isSupabaseConfigured && (
+          <p role="alert" className="fha-alert">{MISSING_ENV}</p>
+        )}
 
-        {/* Card, v3 surface + premium gold top-edge stroke */}
-        <form
-          onSubmit={onSubmit}
-          noValidate
-          style={{
-            position: 'relative',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 12,
-            padding: 24,
-            borderRadius: 10,
-            background: 'var(--v3-surface)',
-            border: '1px solid var(--v3-border-strong)',
-            boxShadow: '0 1px 0 var(--v3-border-mid) inset, 0 4px 14px rgba(20, 20, 20, 0.30), 0 16px 40px rgba(20, 20, 20, 0.32)',
-            overflow: 'hidden'
-          }}
-        >
-          <span
-            aria-hidden="true"
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: '14%',
-              right: '14%',
-              height: 1,
-              background: 'linear-gradient(90deg, transparent 0%, rgba(201, 150, 58, 0.55) 50%, transparent 100%)',
-              pointerEvents: 'none'
-            }}
-          />
+        <Field
+          label="Email"
+          type="email"
+          required
+          autoComplete="email"
+          inputMode="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          disabled={controlsDisabled}
+          placeholder="you@company.com"
+        />
 
-          {!isSupabaseConfigured && (
-            <p role="alert" style={{ margin: 0, fontSize: 12, color: 'var(--v3-danger-text)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}>
-              Local Supabase env is missing. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env.local, then restart Vite.
-            </p>
-          )}
+        <Field
+          label="Password"
+          type="password"
+          required
+          minLength={6}
+          autoComplete={isSignIn ? 'current-password' : 'new-password'}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          disabled={controlsDisabled}
+          placeholder="••••••••"
+        />
 
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <span className="v3-eyebrow fh-auth-label" style={{ color: 'var(--v3-text)', opacity: 1 }}>Email</span>
-            <div style={{ position: 'relative' }}>
-              <Mail size={15} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: 'var(--v3-text-muted)', pointerEvents: 'none' }} />
-              <input
-                className="fh-auth-input"
-                type="email"
-                required
-                autoComplete="email"
-                inputMode="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={controlsDisabled}
-                placeholder="you@company.com"
-                style={{
-                  width: '100%',
-                  padding: '12px 12px 12px 32px',
-                  borderRadius: 10,
-                  background: 'var(--v3-bg)',
-                  border: '1px solid var(--v3-border-strong)',
-                  color: 'var(--v3-text)',
-                  fontSize: 14,
-                  fontFamily: 'var(--font-body)',
-                  outline: 'none',
-                  boxSizing: 'border-box'
-                }}
-              />
-            </div>
-          </label>
+        {error && <p role="alert" className="fha-alert">{error}</p>}
+        {/* Screen readers announce the notice (reset link sent, confirm
+            your email) from this region. It stays mounted, because a
+            live region added together with its text is often skipped. */}
+        <p role="status" className="fhc-vh">{notice}</p>
+        {notice && <p aria-hidden="true" className="fha-notice">{notice}</p>}
 
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <span className="v3-eyebrow fh-auth-label" style={{ color: 'var(--v3-text)', opacity: 1 }}>Password</span>
-            <div style={{ position: 'relative' }}>
-              <Lock size={15} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: 'var(--v3-text-muted)', pointerEvents: 'none' }} />
-              <input
-                className="fh-auth-input"
-                type="password"
-                required
-                minLength={6}
-                autoComplete={isSignIn ? 'current-password' : 'new-password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={controlsDisabled}
-                placeholder="••••••••"
-                style={{
-                  width: '100%',
-                  padding: '12px 12px 12px 32px',
-                  borderRadius: 10,
-                  background: 'var(--v3-bg)',
-                  border: '1px solid var(--v3-border-strong)',
-                  color: 'var(--v3-text)',
-                  fontSize: 14,
-                  fontFamily: 'var(--font-body)',
-                  outline: 'none',
-                  boxSizing: 'border-box'
-                }}
-              />
-            </div>
-          </label>
-
-          {error && (
-            <p role="alert" style={{ margin: 0, fontSize: 12, color: 'var(--v3-danger-text)', fontFamily: 'var(--font-body)' }}>
-              {error}
-            </p>
-          )}
-          {/* Screen readers announce the notice (reset link sent, confirm
-              your email) from this region. It stays mounted, because a
-              live region added together with its text is often skipped. */}
-          <p role="status" style={SR_ONLY}>{notice}</p>
-          {notice && (
-            <p aria-hidden="true" style={{ margin: 0, fontSize: 12, color: 'var(--v3-success-text)', fontFamily: 'var(--font-body)' }}>
-              {notice}
-            </p>
-          )}
-
-          <motion.button
+        <div className="fha-actions">
+          <Button
             type="submit"
+            variant="primary"
+            size="lg"
+            block
+            data-fha-primary
             disabled={submitDisabled}
-            whileTap={{ scale: 0.98 }}
-            style={{
-              marginTop: 6,
-              padding: '12px 16px',
-              borderRadius: 10,
-              background: 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
-              color: 'var(--v3-on-primary)',
-              fontFamily: 'var(--font-body)',
-              fontSize: 14,
-              fontWeight: 700,
-              letterSpacing: 0,
-              border: '1px solid color-mix(in srgb, var(--v3-primary) 60%, transparent)',
-              cursor: submitDisabled ? 'default' : 'pointer',
-              boxShadow: '0 0 0 3px rgba(201, 150, 58, 0.16), 0 6px 18px rgba(201, 150, 58, 0.32), 0 1px 0 var(--v3-border-strong) inset',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8,
-              minHeight: 48,
-              opacity: submitDisabled ? 0.72 : 1
-            }}
+            loading={busy}
           >
             {!isSupabaseConfigured
               ? 'Add Supabase env'
               : busy
                 ? (isSignIn ? 'Signing in…' : 'Creating account…')
-                : (<>{isSignIn ? 'Sign in' : 'Create account'}<ArrowRight size={16} /></>)}
-          </motion.button>
+                : (isSignIn ? 'Sign in' : 'Create account')}
+          </Button>
 
-          <button
-            type="button"
-            className="fh-auth-link-btn"
+          <Button
+            variant="secondary"
+            size="lg"
+            block
+            disabled={controlsDisabled}
             onClick={() => {
               setError('')
               setNotice('')
               setMode(isSignIn ? 'signup' : 'signin')
             }}
-            disabled={controlsDisabled}
-            style={{ background: 'none', border: 'none', padding: 0, marginTop: 6, fontSize: 12, color: 'var(--v3-text)', fontFamily: 'var(--font-body)', cursor: 'pointer', textAlign: 'center', opacity: 1 }}
           >
-            {isSignIn ? 'New to Fieldhorse? Create an account' : 'Already have an account? Sign in'}
-          </button>
+            {isSignIn ? 'Create a workspace' : 'Already have an account? Sign in'}
+          </Button>
+        </div>
 
-          {isSignIn && (
-            <button
-              type="button"
-              className="fh-auth-link-btn"
-              onClick={handleForgotPassword}
-              disabled={controlsDisabled}
-              style={{ background: 'none', border: 'none', padding: 0, fontSize: 12, color: 'var(--v3-text)', fontFamily: 'var(--font-body)', cursor: 'pointer', textAlign: 'center', opacity: 1 }}
-            >
-              Forgot password?
-            </button>
-          )}
-        </form>
-      </motion.div>
-    </main>
+        {isSignIn && (
+          <Button variant="quiet" size="md" block disabled={controlsDisabled} onClick={handleForgotPassword}>
+            Forgot password?
+          </Button>
+        )}
+      </form>
+
+      <p className="fha-smoke">Bring your jobs over from Jobber in a few minutes.</p>
+    </AuthShell>
   )
 }

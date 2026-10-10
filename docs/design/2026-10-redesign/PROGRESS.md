@@ -24,7 +24,7 @@ Nothing failed persistently on the first full `npm run test:all` of this run, on
 | 2 | `claude/audit-fix-pass-2026-10-09` | #217 | `main` |
 | 3 | `redesign/phase-3` | #218 (draft) | the Phase 2 branch |
 | 4 | `redesign/phase-4` | #219 (draft) | `redesign/phase-3` |
-| 5 | `redesign/phase-5` | not opened yet | `redesign/phase-4` |
+| 5 | `redesign/phase-5` | #220 (draft) | `redesign/phase-4` |
 | 6 | `redesign/phase-6` | not opened yet | `redesign/phase-5` |
 | 7 | `redesign/phase-7` | not opened yet | `redesign/phase-6` |
 
@@ -62,10 +62,10 @@ Status is one of todo, done, blocked, skipped.
 | 4 | 4.5 Desktop Today (stretch) | done | bd4e0a3 | Changed the Today parts the phone shares; phone tests unchanged |
 | 4 | 4.6 Desktop Money (stretch) | done | c5b7ea4 | Phone sheet logic moved into two shared hooks |
 | 4 | 4.7 Phase 4 review and pull request | done | see git log | #219, images in phase4-review |
-| 5 | 5.1 Portal view model | todo | | |
-| 5 | 5.2 Fieldhorse proposal theme | todo | | |
-| 5 | 5.3 Welcome and Login | todo | | |
-| 5 | 5.4 Phase 5 review and pull request | todo | | |
+| 5 | 5.1 Portal view model | done | c6f44a0 | |
+| 5 | 5.2 Fieldhorse proposal theme | done | 17b7d31 | Settings choice hidden until a migration allows it (D22) |
+| 5 | 5.3 Welcome and Login | done | fd12c62 | |
+| 5 | 5.4 Phase 5 review and pull request | done | see git log | #220, images in phase5-review |
 | 6 | 6.1 Inbox data and engine switch | todo | | |
 | 6 | 6.2 Inbox list | todo | | |
 | 6 | 6.3 Thread with the AI draft | todo | | |
@@ -100,6 +100,13 @@ Status is one of todo, done, blocked, skipped.
 * The Quote tab on a phone sits under the Job page header (rail, money strip, quick actions, tabs), so the render's bare Quote page layout differs by design.
 * `src/lib/queries.ts` gained `cost` on the invoices bundle jobs so Money can compute margin. `tests/e2e/mock-workflows.spec.ts` changed two phone assertions that named old phone cards.
 * Full suite on the Phase 3 head: lint 0 errors (50 warnings, down from 57), typecheck, build and design audit pass, 720 of 720 unit tests, Playwright 95 passed and 75 skipped by project.
+
+### Phase 5 notes
+
+* Decisions D22 to D25 in `SPEC.md` cover the Settings choice, the portal numbers, the portal layout and the Welcome and Login shell.
+* **Needs a migration (not written, the run rules forbid it).** `profiles_estimate_template_check` allows only classic, slate, mint and editorial, so the Fieldhorse card in Settings is hidden behind `FIELDHORSE_TEMPLATE_SAVES` in `src/screens/Settings.tsx`. The portal theme itself works for any company whose `estimate_template` is `fieldhorse`.
+* CI on #219 caught two timing sensitive desktop tests (`palette.spec` waited for network idle, `schedule.spec` dropped a keyboard drag before the highlight). Both now wait for the page. Network idle took up to 41 seconds under CPU load locally.
+* Full suite on the Phase 5 head: lint 0 errors (46 warnings), typecheck, build and design audit pass, 812 of 812 unit tests, Playwright 198 passed and 116 skipped by project.
 
 ### Phase 4 notes
 

@@ -8773,47 +8773,6 @@ select[style*="outline"]:focus-visible,
   }
 }
 
-/* Auth accessibility polish: keep the premium dark login surface, but
-   lift low-contrast labels/placeholders/secondary actions to WCAG AA. */
-.fh-auth-screen {
-  --v3-bg: #141414;
-  --v3-surface: #141414;
-  --v3-surface-2: #141414;
-  --v3-surface-3: #141414;
-  --v3-text: #F2EDE4;
-  --v3-text-muted: rgba(242, 237, 228, 0.68);
-  --v3-border-strong: rgba(242, 237, 228, 0.16);
-  /* The light theme deepens the text accents for linen; this surface
-     stays dark, so it keeps the dark theme values. */
-  --v3-primary-text: var(--gold);
-  --v3-danger-text: color-mix(in srgb, var(--red) 55%, var(--linen) 45%);
-  --v3-success-text: color-mix(in srgb, var(--green) 55%, var(--linen) 45%);
-}
-
-.fh-auth-label {
-  color: #F2EDE4 !important;
-  opacity: 1 !important;
-}
-
-.fh-auth-input {
-  color: #F2EDE4 !important;
-  opacity: 1 !important;
-}
-
-.fh-auth-input::placeholder {
-  color: #F2EDE4 !important;
-  opacity: 1 !important;
-}
-
-.fh-auth-link-btn {
-  color: #F2EDE4 !important;
-  opacity: 1 !important;
-}
-
-.fh-auth-link-btn:disabled {
-  color: rgba(242, 237, 228, 0.58) !important;
-}
-
 /* =========================================================================
    DESKTOP MASTER-DETAIL — /jobs/:id, /leads/:id, /quotes/:id
 

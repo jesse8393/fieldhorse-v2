@@ -14,16 +14,30 @@
 //   2. The contractor's own uploaded logo, top of document
 //   3. A distinct visual identity (header treatment, table, totals)
 //
+// FieldhorseProposal (the last export) is the exception: it is the phone
+// first customer portal of the October 2026 redesign (spec 9.9), built from
+// the fh components and --fh- tokens so it follows Day and Night, and it
+// reads lib/portalView.ts instead of the letter paper helpers below. It
+// ships as a choice in Settings and is never the default (decision D13).
+//
 // The distinctive part of each theme is its header + parties + line item
 // table + totals. Supporting sections (scope prose, payment terms,
 // exclusions, photos, insurance, change orders, signature) are rendered
 // by the shared <SupportingSections> block so the themes stay focused
 // and feature-complete without duplicating that machinery three times.
 
+import { useId, useState } from 'react'
+import type { ReactNode } from 'react'
+import { Phone } from 'lucide-react'
 import { DOC_COLORS, DOC_FONTS, THEME_PALETTES } from './tokens.ts'
-import { money } from './format.ts'
+import { money, longDate } from './format.ts'
 import InsuranceModeBlock from './InsuranceModeBlock.tsx'
 import ChangeOrdersBlock from './ChangeOrdersBlock.tsx'
+import { Button, Chip, Icon, OnyxStage, Row, formatMoney } from '../fh'
+import Monogram from '../fh/Monogram.tsx'
+import { cx } from '../fh/cx.ts'
+import { buildPortalView, depositSentence, type PortalView, type PublicDocPayload } from '../../lib/portalView.ts'
+import './fieldhorse-proposal.css'
 
 export type ProposalLineItem = {
   description: string
@@ -56,6 +70,20 @@ export type ProposalView = {
   photos?: any[]
   insurance?: any
   changeOrders?: any[]
+  /** Only the live customer link passes this; see FieldhorseProposal. */
+  portal?: ProposalPortal
+}
+
+/**
+ * What the public page hands the Fieldhorse theme besides the shared view:
+ * the /api/public-link payload (the portal view model reads it), the
+ * approve bar to draw in the bottom capsule while the quote is open, and
+ * what "Ask about this" does. The in app preview passes none of it.
+ */
+export type ProposalPortal = {
+  payload: PublicDocPayload
+  approveBar?: ReactNode
+  onAsk?: (itemTitle: string) => void
 }
 
 const PAGE_W = 816
@@ -565,3 +593,330 @@ const tdL: any = { textAlign: 'left', padding: '12px 8px 12px 0', verticalAlign:
 const tdR: any = { textAlign: 'right', padding: '12px 0 12px 8px', verticalAlign: 'top', color: '#141414', fontVariantNumeric: 'tabular-nums' }
 
 export { fmtLongDate }
+
+
+/* ============================================================
+   FIELDHORSE, the customer portal (spec 9.9, render g-portal).
+   Cover photo fading into onyx, or onyx alone. Monogram, company
+   name, trust line and a call button. The headline, a total tray,
+   what is included, optional additions as read only rows, three
+   numbered steps and a bottom onyx capsule: the approve bar while
+   the quote is open, "Approved" and a Pay deposit button after.
+   ============================================================ */
+
+// The in app preview (Quote tab) has no payload; rebuild the little the
+// view model reads from the shared view, so one code path draws both.
+function payloadFromView(view: ProposalView): PublicDocPayload {
+  const lines = (view.lineItems || []).map((it, i) => ({ ...it, sort_order: i }))
+  const extras = (view.upgrades || []).flatMap((group) =>
+    (group.items || []).map((it) => ({ ...it, section: group.title, is_optional: true, sort_order: lines.length }))
+  )
+  return {
+    kind: 'proposal',
+    contact: { ...(view.recipient || {}), proposal_status: view.status ?? null },
+    company: view.company || {},
+    items: [...lines, ...extras],
+    photos: view.photos || [],
+    changeOrders: view.changeOrders || []
+  }
+}
+
+const INSURANCE_FIELDS: Array<[string, string, boolean]> = [
+  ['claim_number', 'Claim number', false],
+  ['carrier', 'Carrier', false],
+  ['adjuster', 'Adjuster', false],
+  ['deductible', 'Deductible', true],
+  ['rcv', 'RCV', true],
+  ['acv', 'ACV', true],
+  ['depreciation', 'Depreciation', true],
+  ['supplement_amount', 'Supplement', true],
+  ['mortgage_company', 'Mortgage company', false]
+]
+
+function DetailPhoto({ url, caption }: { url: string; caption?: string | null }) {
+  const [failed, setFailed] = useState(false)
+  if (failed) return null
+  return (
+    <div className="fhp-photos__item">
+      <img src={url} alt={caption || 'Project photo'} loading="lazy" onError={() => setFailed(true)} />
+    </div>
+  )
+}
+
+// Everything the letter paper themes print that the portal's main column
+// leaves out, so a customer can still read the terms they are agreeing to.
+function FullDetails({ id, view }: { id: string; view: ProposalView }) {
+  const scope = (view.scopeText || '').trim()
+  const warranty = (view.warrantyText || '').trim()
+  const exclusions = view.exclusions || []
+  const orders = (view.changeOrders || []).filter((co: any) => co?.status && co.status !== 'void')
+  const insurance = view.insurance || null
+  const facts = insurance
+    ? INSURANCE_FIELDS
+        .filter(([key]) => insurance[key] != null && insurance[key] !== '')
+        .map(([key, label, isMoney]) => ({ label, value: isMoney ? money(insurance[key], { cents: true }) : String(insurance[key]) }))
+    : []
+  const morePhotos = (view.photos || []).slice(1, 7).filter((p: any) => p?.url)
+  return (
+    <div className="fhp-details" id={id}>
+      {scope && (
+        <section>
+          <h3 className="fhp-details__title">Scope of work</h3>
+          <p style={{ whiteSpace: 'pre-wrap' }}>{scope}</p>
+        </section>
+      )}
+      <section>
+        <h3 className="fhp-details__title">Payment terms</h3>
+        <p>{view.paymentTerms}</p>
+      </section>
+      {warranty && (
+        <section>
+          <h3 className="fhp-details__title">Warranty</h3>
+          <p>{warranty}</p>
+        </section>
+      )}
+      {exclusions.length > 0 && (
+        <section>
+          <h3 className="fhp-details__title">Not included</h3>
+          <ul>
+            {exclusions.map((x, i) => <li key={i}>{x}</li>)}
+          </ul>
+        </section>
+      )}
+      {orders.length > 0 && (
+        <section>
+          <h3 className="fhp-details__title">Change orders</h3>
+          <ul className="fhp-details__rows">
+            {orders.map((co: any, i: number) => (
+              <li key={co.id || i}>
+                <span>
+                  {co.sequence_number != null ? `Change order ${co.sequence_number}` : 'Change order'}{co.title ? `, ${co.title}` : ''}{' '}
+                  <Chip label={String(co.status).toLowerCase() === 'approved' ? 'Approved' : 'Waiting on approval'} tone={String(co.status).toLowerCase() === 'approved' ? 'success' : 'neutral'} />
+                </span>
+                <span>{formatMoney(Number(co.amount) || 0)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {facts.length > 0 && (
+        <section>
+          <h3 className="fhp-details__title">Insurance claim</h3>
+          <dl className="fhp-facts">
+            {facts.map((f) => (
+              <div key={f.label}><dt>{f.label}</dt><dd>{f.value}</dd></div>
+            ))}
+          </dl>
+        </section>
+      )}
+      {morePhotos.length > 0 && (
+        <section>
+          <h3 className="fhp-details__title">Project photos</h3>
+          <div className="fhp-photos">
+            {morePhotos.map((p: any, i: number) => <DetailPhoto key={`${p.url}-${i}`} url={p.url} caption={p.caption} />)}
+          </div>
+        </section>
+      )}
+    </div>
+  )
+}
+
+// After approval: the word Approved, who and when only if the payload has
+// it (D12), and "Pay deposit" when the company set a payment link (D7).
+function ApprovedCapsule({ pv }: { pv: PortalView }) {
+  const { name, date } = pv.approved || { name: null, date: null }
+  const stamp = name && date ? `Approved by ${name} on ${date}.`
+    : name ? `Approved by ${name}.`
+    : date ? `Approved on ${date}.`
+    : 'Thank you.'
+  return (
+    <div className="fhp-dock">
+      <section className="fhp-capsule fh-onyx-scope fh-grain" aria-label="Approval">
+        <Chip label="Approved" tone="success" dot />
+        <h2 className="fhp-capsule__title">{stamp}</h2>
+        <p className="fhp-capsule__text">
+          {pv.companyName} has your approval and will be in touch with next steps.
+        </p>
+        {pv.payUrl && (
+          <div className="fhp-actions">
+            <Button variant="primary" size="lg" block href={pv.payUrl} target="_blank" rel="noopener noreferrer">
+              {pv.deposit.amount > 0 ? `Pay deposit ${formatMoney(pv.deposit.amount)}` : 'Pay deposit'}
+            </Button>
+          </div>
+        )}
+      </section>
+    </div>
+  )
+}
+
+function ChangesRequestedCapsule({ pv, note, requestedAt }: { pv: PortalView; note?: string | null; requestedAt?: string | null }) {
+  const received = longDate(requestedAt)
+  return (
+    <div className="fhp-dock">
+      <section className="fhp-capsule fh-onyx-scope fh-grain" aria-label="Changes requested">
+        <Chip label="Changes requested" tone="info" dot />
+        <h2 className="fhp-capsule__title">Waiting on a revised proposal.</h2>
+        <p className="fhp-capsule__text">
+          {pv.companyName} has your feedback and will send a revised proposal before approval.
+          {received ? ` Request received ${received}.` : ''}
+        </p>
+        {note ? <p className="fhp-capsule__quote">{note}</p> : null}
+      </section>
+    </div>
+  )
+}
+
+export function FieldhorseProposal({ view }: { view: ProposalView }) {
+  const portal = view.portal
+  const payload = portal?.payload ?? payloadFromView(view)
+  const pv = buildPortalView(payload, new Date())
+  const status = String(payload.contact?.proposal_status || '').toLowerCase()
+  const [failedCover, setFailedCover] = useState<string | null>(null)
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const detailsId = useId()
+  const includedId = useId()
+  const optionalId = useId()
+  const stepsId = useId()
+
+  // A cover that fails to load leaves onyx alone, never a broken image.
+  const cover = pv.coverUrl && pv.coverUrl !== failedCover ? pv.coverUrl : null
+  const callDigits = String(payload.company?.phone || '').replace(/[^\d+]/g, '')
+  const sentence = depositSentence(pv.deposit)
+
+  let capsule: ReactNode = null
+  if (pv.approved) capsule = <ApprovedCapsule pv={pv} />
+  else if (status === 'changes_requested') {
+    capsule = (
+      <ChangesRequestedCapsule
+        pv={pv}
+        note={payload.contact?.quote_change_request_note}
+        requestedAt={payload.contact?.quote_change_requested_at}
+      />
+    )
+  } else if (portal?.approveBar) capsule = portal.approveBar
+
+  return (
+    <article className="fhp" aria-label={`Quote from ${pv.companyName}`}>
+      <OnyxStage as="header" glow className={cx('fhp-head', cover && 'fhp-head--photo')}>
+        {cover && (
+          <div className="fhp-cover">
+            <img src={cover} alt="" onError={() => setFailedCover(cover)} />
+          </div>
+        )}
+        <div className="fhp-col fhp-head__inner">
+          <div className="fhp-brand">
+            <Monogram name={pv.companyName} logoUrl={pv.logoUrl} size={40} />
+            <div className="fhp-brand__text">
+              <p className="fhp-brand__name">{pv.companyName}</p>
+              {pv.trustLine && <p className="fhp-brand__trust">{pv.trustLine}</p>}
+            </div>
+            {callDigits && (
+              <a
+                className="fhc-iconbtn fhc-iconbtn--onyx fhc-iconbtn--round fhc-iconbtn--44 fhp-call"
+                href={`tel:${callDigits}`}
+                aria-label={`Call ${pv.companyName}`}
+              >
+                <Icon icon={Phone} size={22} />
+              </a>
+            )}
+          </div>
+          <h1 className="fhp-headline">{pv.headline}</h1>
+          {pv.addressLine && <p className="fhp-address">{pv.addressLine}</p>}
+        </div>
+      </OnyxStage>
+
+      <div className="fhp-col fhp-body">
+        <section className="fhp-total" aria-label="Total">
+          <p className="fhp-total__label">Total</p>
+          <p className="fhp-total__amount">{formatMoney(pv.total)}</p>
+          {sentence && <p className="fhp-total__note">{sentence}</p>}
+        </section>
+
+        {pv.included.length > 0 && (
+          <section className="fhp-section" aria-labelledby={includedId}>
+            <div className="fhp-section__head">
+              <h2 className="fhp-section__title" id={includedId}>What's included</h2>
+              <Button
+                variant="quiet"
+                size="mini"
+                aria-expanded={detailsOpen}
+                aria-controls={detailsId}
+                onClick={() => setDetailsOpen((open) => !open)}
+              >
+                {detailsOpen ? 'Hide details' : 'Full details'}
+              </Button>
+            </div>
+            <ul className="fhp-lines">
+              {pv.included.map((line, i) => (
+                <Row key={i} as="li" title={line.title} money={line.amount} />
+              ))}
+            </ul>
+            {detailsOpen && <FullDetails id={detailsId} view={view} />}
+          </section>
+        )}
+        {pv.included.length === 0 && (
+          <section className="fhp-section">
+            <div className="fhp-section__head">
+              <h2 className="fhp-section__title">Full details</h2>
+              <Button
+                variant="quiet"
+                size="mini"
+                aria-expanded={detailsOpen}
+                aria-controls={detailsId}
+                onClick={() => setDetailsOpen((open) => !open)}
+              >
+                {detailsOpen ? 'Hide details' : 'Full details'}
+              </Button>
+            </div>
+            {detailsOpen && <FullDetails id={detailsId} view={view} />}
+          </section>
+        )}
+
+        {pv.optional.length > 0 && (
+          <section className="fhp-section" aria-labelledby={optionalId}>
+            <div className="fhp-section__head">
+              <h2 className="fhp-section__title" id={optionalId}>Optional additions</h2>
+            </div>
+            <p className="fhp-note">Priced separately and not in your total.</p>
+            <ul className="fhp-lines">
+              {pv.optional.map((line, i) => (
+                <Row
+                  key={i}
+                  as="li"
+                  title={line.title}
+                  money={`+${formatMoney(line.amount)}`}
+                  next={portal?.onAsk ? (
+                    <Button
+                      variant="quiet"
+                      size="mini"
+                      className="fhp-ask"
+                      aria-label={`Ask about this, ${line.title}`}
+                      onClick={() => portal.onAsk?.(line.title)}
+                    >
+                      Ask about this
+                    </Button>
+                  ) : undefined}
+                />
+              ))}
+            </ul>
+          </section>
+        )}
+
+        <section className="fhp-section" aria-labelledby={stepsId}>
+          <div className="fhp-section__head">
+            <h2 className="fhp-section__title" id={stepsId}>What happens next</h2>
+          </div>
+          <ol className="fhp-steps" role="list" aria-labelledby={stepsId}>
+            {pv.steps.map((step, i) => <li key={i}>{step}</li>)}
+          </ol>
+        </section>
+      </div>
+
+      {capsule}
+
+      <footer className="fhp-foot">
+        <p>Powered by Fieldhorse</p>
+      </footer>
+    </article>
+  )
+}
