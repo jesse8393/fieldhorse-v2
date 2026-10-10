@@ -171,7 +171,7 @@
   align-items: center;
   justify-content: center;
   gap: 4px;
-  border-radius: 20px;
+  border-radius: 18px;
   color: var(--fh-smoke);
   text-decoration: none;
   -webkit-tap-highlight-color: transparent;
