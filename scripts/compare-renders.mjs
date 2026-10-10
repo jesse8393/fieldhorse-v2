@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-// Side by side review images for the redesign (Phase 2 plan, Task 14):
-// our build on the left, the approved render on the right, both scaled
-// to the same height, one PNG per screen and theme.
+// Side by side review images for the redesign (Phase 2 plan Task 14 and
+// the review task that closes each later phase): our build on the left,
+// the approved render on the right, both scaled to the same height, one
+// PNG per screen and theme.
 //
 // It starts nothing itself. Run the dev server against the mocked
 // Supabase project first (the env in playwright.config.ts webServer):
@@ -10,13 +11,15 @@
 //   VITE_SUPABASE_ANON_KEY=<the mock key in playwright.config.ts> npm run dev
 //   node scripts/compare-renders.mjs
 //
-// Env: BASE_URL (default http://127.0.0.1:5173), OUT_DIR (default
-// docs/design/2026-10-redesign/phase2-review), PW_EXECUTABLE_PATH to use
-// a specific Chromium binary, ONLY to capture a subset by name.
+// Env: BASE_URL (default http://127.0.0.1:5173), PHASE (a phase number,
+// to capture only that phase's shots; writes to phase<N>-review),
+// OUT_DIR (override the output folder; without PHASE it defaults to
+// final-review), PW_EXECUTABLE_PATH to use a specific Chromium binary,
+// ONLY to capture a comma separated subset by name.
 //
-// The mock has no job photos, so c-job1 gets a stand-in: the slab cut
-// from the g-job render itself, served through a mocked storage bucket.
-// It shows where photos land and how they are framed, not real content.
+// The mock has no job photos, so job c-job1 gets a placeholder: the slab
+// cut from the g-job render, served through a mocked storage bucket. It
+// shows where photos land and how they are framed, not real content.
 // Callbacks passed to the page run in the browser.
 /* global document, localStorage */
 import { mkdirSync } from 'node:fs'
@@ -27,7 +30,8 @@ import { installMock, session } from './qa-mock.mjs'
 
 const ROOT = join(import.meta.dirname, '..')
 const RENDERS = join(ROOT, 'docs/design/2026-10-redesign')
-const OUT = process.env.OUT_DIR || join(RENDERS, 'phase2-review')
+const PHASE = process.env.PHASE ? Number(process.env.PHASE) : null
+const OUT = process.env.OUT_DIR || join(RENDERS, PHASE ? `phase${PHASE}-review` : 'final-review')
 const BASE = process.env.BASE_URL || 'http://127.0.0.1:5173'
 const ONLY = process.env.ONLY ? new Set(process.env.ONLY.split(',')) : null
 
@@ -35,19 +39,110 @@ const ONLY = process.env.ONLY ? new Set(process.env.ONLY.split(',')) : null
 const TIMEZONE = 'America/Chicago'
 const LAT = 35.84
 const LON = -86.36
-const HEIGHT = 1200
 
+const PHONE = { width: 390, height: 844, scale: 2, mobile: true, outHeight: 1200 }
+const DESKTOP = { width: 1440, height: 900, scale: 1, mobile: false, outHeight: 900 }
+
+// One entry per image. Fields: name, phase, title, path, mode (day or
+// night), clock ([hour, minute] local), render (a file under the design
+// folder), view (PHONE by default), action (a named step in `steps`),
+// tables (a function from the frozen clock to extra mock tables).
 const SHOTS = [
-  { name: 'today-day', path: '/', mode: 'day', clock: [6, 40], render: 'glamor/g-today.jpg' },
-  { name: 'today-night', path: '/', mode: 'night', clock: [6, 40], render: 'glamor/g-today.jpg' },
-  { name: 'evening-night', path: '/', mode: 'night', clock: [19, 40], render: 'base/night.jpg' },
-  { name: 'jobs-day', path: '/work', mode: 'day', clock: [6, 40], render: 'base/jobs.jpg' },
-  { name: 'jobs-night', path: '/work', mode: 'night', clock: [6, 40], render: 'base/jobs.jpg' },
-  { name: 'job-day', path: '/jobs/c-job1', mode: 'day', clock: [6, 40], render: 'glamor/g-job.jpg' },
-  { name: 'job-night', path: '/jobs/c-job1', mode: 'night', clock: [6, 40], render: 'glamor/g-job.jpg' },
-  { name: 'capture-day', path: '/', mode: 'day', clock: [6, 40], action: 'capture', render: 'base/capture.jpg' },
-  { name: 'capture-night', path: '/', mode: 'night', clock: [6, 40], action: 'capture', render: 'base/capture.jpg' }
+  { phase: 2, name: 'today-day', path: '/', mode: 'day', render: 'glamor/g-today.jpg' },
+  { phase: 2, name: 'today-night', path: '/', mode: 'night', render: 'glamor/g-today.jpg' },
+  { phase: 2, name: 'evening-night', path: '/', mode: 'night', clock: [19, 40], render: 'base/night.jpg' },
+  { phase: 2, name: 'jobs-day', path: '/work', mode: 'day', render: 'base/jobs.jpg' },
+  { phase: 2, name: 'jobs-night', path: '/work', mode: 'night', render: 'base/jobs.jpg' },
+  { phase: 2, name: 'job-day', path: '/jobs/c-job1', mode: 'day', render: 'glamor/g-job.jpg' },
+  { phase: 2, name: 'job-night', path: '/jobs/c-job1', mode: 'night', render: 'glamor/g-job.jpg' },
+  { phase: 2, name: 'capture-day', path: '/', mode: 'day', action: 'capture', render: 'base/capture.jpg' },
+  { phase: 2, name: 'capture-night', path: '/', mode: 'night', action: 'capture', render: 'base/capture.jpg' },
+  { phase: 3, name: 'money-day', path: '/invoices', mode: 'day', render: 'glamor/g-money.jpg', tables: moneyTables },
+  { phase: 3, name: 'money-night', path: '/invoices', mode: 'night', render: 'glamor/g-money.jpg', tables: moneyTables },
+  { phase: 3, name: 'quote-day', path: '/quotes/c-quote?tab=quote', mode: 'day', render: 'glamor/g-quote.jpg', tables: quoteTables },
+  { phase: 3, name: 'quote-night', path: '/quotes/c-quote?tab=quote', mode: 'night', render: 'glamor/g-quote.jpg', tables: quoteTables }
 ]
+
+// Phase 3 money screen: an overdue invoice, two due soon, a sent and a
+// viewed quote, and payments this week and last, all relative to the
+// frozen morning so the groups fill the same way on any day.
+function moneyTables(clock) {
+  const day = (offset) => {
+    const d = new Date(clock.getTime() + offset * 86400e3)
+    const parts = Object.fromEntries(
+      new Intl.DateTimeFormat('en-US', { timeZone: TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit' })
+        .formatToParts(d).map((p) => [p.type, p.value])
+    )
+    return `${parts.year}-${parts.month}-${parts.day}`
+  }
+  const at = (offset) => new Date(clock.getTime() + offset * 86400e3).toISOString()
+  const client = { id: 'cl-1', name: 'Jeff Roy', phone: '555-0101', email: 'jeff@roy.com' }
+  const contact = (p) => ({
+    user_id: session.user.id, client_id: 'cl-1', phone: '555-0101', email: 'x@y.com', address: '412 Burkitt Station Rd',
+    notes: null, scope_text: null, milestones: [], created_at: at(-30), updated_at: at(-5), proposal_status: null,
+    follow_up_on: null, completed_at: null, invoice_no: null, cost: null, fh_clients: client, ...p
+  })
+  const invoice = (p) => ({
+    user_id: session.user.id, description: null, notes: null, status: 'sent', sequence_number: 1,
+    issued_at: at(-12), created_at: at(-12), updated_at: at(-12), ...p
+  })
+  const payment = (p) => ({ user_id: session.user.id, method: 'check', reference: null, invoice_id: null, kind: null, ...p })
+  return {
+    fh_contacts: [
+      contact({ id: 'c-rosa', stage: 'job', name: 'Rosa Delgado', email: 'rosa@example.com', job_title: 'Concrete steps', amount: 8000 }),
+      contact({ id: 'c-lorraine', stage: 'job', name: 'Lorraine Beasley', job_title: 'Bath retile', amount: 9000 }),
+      contact({ id: 'c-gail', stage: 'job', name: 'Gail Abernathy', job_title: 'Roof repair', amount: 6000 }),
+      contact({ id: 'c-darnell', stage: 'closed', name: 'Darnell Whitcomb', job_title: 'Garage slab', amount: 9600, cost: 6960, completed_at: at(-9) }),
+      contact({ id: 'c-marco', stage: 'quote', name: 'Marco Castellanos', job_title: 'Pool deck pour', amount: 18458, proposal_status: 'sent', quote_sent_at: at(-1) }),
+      contact({ id: 'c-chidi', stage: 'quote', name: 'Chidi Okafor', job_title: 'Ridge vent and shingle repair', amount: 3180, proposal_status: 'viewed', quote_sent_at: at(-4) })
+    ],
+    fh_invoices: [
+      invoice({ id: 'i-rosa', contact_id: 'c-rosa', title: 'Final', amount: 1240, sequence_number: 2, due_at: day(-6) }),
+      invoice({ id: 'i-lorraine', contact_id: 'c-lorraine', title: 'Final balance', amount: 4850, due_at: day(1) }),
+      invoice({ id: 'i-gail', contact_id: 'c-gail', title: 'Balance', amount: 2960, due_at: day(5) }),
+      invoice({ id: 'i-paid', contact_id: 'c-darnell', title: 'Deposit', amount: 6187.5, status: 'paid', due_at: day(-9) })
+    ],
+    fh_payments: [
+      payment({ id: 'p-dep', contact_id: 'c-darnell', amount: 6187.5, paid_on: day(-8), kind: 'deposit', invoice_id: 'i-paid', created_at: at(-8) }),
+      payment({ id: 'p-gail', contact_id: 'c-gail', amount: 620, paid_on: day(-4), created_at: at(-4) }),
+      payment({ id: 'p-rosa', contact_id: 'c-rosa', amount: 3000, paid_on: day(-2), created_at: at(-2) })
+    ]
+  }
+}
+
+// Phase 3 quote editor: the render's pool deck quote. Five base lines and
+// one optional upgrade on the sent quote contact c-quote.
+function quoteTables(clock) {
+  const at = new Date(clock.getTime() - 86400e3).toISOString()
+  const item = (id, description, over = {}) => ({
+    id, user_id: session.user.id, contact_id: 'c-quote', section: null, description, qty: 1, unit: null,
+    rate: 0, amount: 0, notes: null, is_optional: false, is_excluded: false, sort_order: 0,
+    created_at: at, updated_at: at, ...over
+  })
+  return {
+    fh_quote_items: [
+      item('qi1', 'Excavate and grade', { qty: 1100, unit: 'sq ft', rate: 2, amount: 2200, sort_order: 0 }),
+      item('qi2', 'Rebar, #4 at 18 in on center', { qty: 1100, unit: 'sq ft', rate: 2.6, amount: 2860, sort_order: 1 }),
+      item('qi3', '4 in slab, 4,000 psi fiber mix', { qty: 1100, unit: 'sq ft', rate: 8.5, amount: 9350, notes: 'broom finish', sort_order: 2 }),
+      item('qi4', 'Expansion and control joints', { qty: 160, unit: 'lf', rate: 4, amount: 640, sort_order: 3 }),
+      item('qi5', 'Pump truck', { qty: 1, unit: 'day', rate: 950, amount: 950, sort_order: 4 }),
+      item('qi6', 'Stamped ashlar, charcoal release', { qty: 1, rate: 4950, amount: 4950, is_optional: true, sort_order: 5 })
+    ]
+  }
+}
+
+// Named steps that run after the page has loaded.
+const STEPS = {
+  async capture(page) {
+    await page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: /Capture/ }).click()
+    await page.waitForTimeout(900)
+    await page.getByRole('dialog').getByRole('textbox').first()
+      .fill('Remind me to call the inspector tomorrow morning about the Bellevue slab final.')
+    await page.getByRole('button', { name: 'File it' }).click()
+    await page.getByRole('button', { name: 'Save', exact: true }).waitFor({ timeout: 15_000 })
+    await page.waitForTimeout(500)
+  }
+}
 
 // Today's date in Murfreesboro at a given local time, as an instant.
 function localInstant([hour, minute]) {
@@ -178,19 +273,21 @@ function captureReply(clock) {
 }
 
 async function capture(browser, shot) {
-  const clock = localInstant(shot.clock)
+  const clock = localInstant(shot.clock || [6, 40])
+  const view = shot.view || PHONE
   const context = await browser.newContext({
-    viewport: { width: 390, height: 844 },
-    deviceScaleFactor: 2,
-    isMobile: true,
-    hasTouch: true,
+    viewport: { width: view.width, height: view.height },
+    deviceScaleFactor: view.scale,
+    isMobile: view.mobile,
+    hasTouch: view.mobile,
     timezoneId: TIMEZONE,
     serviceWorkers: 'block'
   })
-  const photos = photoRows(localInstant([6, 40]))
+  const morning = localInstant([6, 40])
+  const photos = photoRows(morning)
   await installMock(context, {
     supabaseHosts: ['qa-mock.supabase.co', 'pnmhblvslftdzfcdezbw.supabase.co'],
-    tables: { fh_schedule: scheduleFor(localInstant([6, 40])), fh_job_files: photos }
+    tables: { fh_schedule: scheduleFor(morning), fh_job_files: photos, ...(shot.tables ? shot.tables(morning) : {}) }
   })
   await mockPhotos(context, photos)
   await context.route('**/api/claude', (route) => route.fulfill({
@@ -214,15 +311,7 @@ async function capture(browser, shot) {
   await page.waitForLoadState('load')
   await page.evaluate(() => document.fonts.ready)
   await page.waitForTimeout(1500)
-  if (shot.action === 'capture') {
-    await page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: /Capture/ }).click()
-    await page.waitForTimeout(900)
-    await page.getByRole('dialog').getByRole('textbox').first()
-      .fill('Remind me to call the inspector tomorrow morning about the Bellevue slab final.')
-    await page.getByRole('button', { name: 'File it' }).click()
-    await page.getByRole('button', { name: 'Save', exact: true }).waitFor({ timeout: 15_000 })
-    await page.waitForTimeout(500)
-  }
+  if (shot.action) await STEPS[shot.action](page)
   const png = await page.screenshot({ animations: 'disabled' })
   await context.close()
   return png
@@ -235,7 +324,7 @@ function label(text, width) {
   return Buffer.from(svg)
 }
 
-async function sideBySide(ours, renderPath, title) {
+async function sideBySide(ours, renderPath, title, HEIGHT) {
   const left = await sharp(ours).resize({ height: HEIGHT }).toBuffer({ resolveWithObject: true })
   const right = await sharp(renderPath).resize({ height: HEIGHT }).toBuffer({ resolveWithObject: true })
   const gap = 32
@@ -257,11 +346,13 @@ const browser = await chromium.launch(process.env.PW_EXECUTABLE_PATH ? { executa
 mkdirSync(OUT, { recursive: true })
 try {
   for (const shot of SHOTS) {
+    if (PHASE && shot.phase !== PHASE) continue
     if (ONLY && !ONLY.has(shot.name)) continue
     const ours = await capture(browser, shot)
-    const title = `${shot.name.split('-')[0][0].toUpperCase()}${shot.name.split('-')[0].slice(1)}, ${shot.mode === 'day' ? 'Day' : 'Night'}`
+    const [screen] = shot.name.split('-')
+    const title = shot.title || `${screen[0].toUpperCase()}${screen.slice(1)}, ${shot.mode === 'day' ? 'Day' : 'Night'}`
     const out = join(OUT, `${shot.name}.png`)
-    await sharp(await sideBySide(ours, join(RENDERS, shot.render), title)).toFile(out)
+    await sharp(await sideBySide(ours, join(RENDERS, shot.render), title, (shot.view || PHONE).outHeight)).toFile(out)
     console.log('wrote', out)
   }
 } finally {

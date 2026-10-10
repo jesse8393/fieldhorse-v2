@@ -10,16 +10,29 @@ async function loadPdf(): Promise<any> {
 }
 import { toastError, toastSuccess } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
-import { dateInputToTimestamp } from '../../../lib/dueDate.ts'
+import { dateInputToTimestamp, timestampToDateInput } from '../../../lib/dueDate.ts'
 import QuoteItemsSection from '../sections/QuoteItems.tsx'
 import QuoteTermsSection from '../sections/QuoteTerms.tsx'
 import ChangeOrdersSection from '../sections/ChangeOrdersSection.tsx'
 import { useConfirm } from '../../../components/ConfirmSheet.tsx'
 import { proposalNumber } from '../../../components/documents/numbers.ts'
-import { ProposalTemplate, mapItemsToScope } from '../../../components/documents'
+import { DocumentPreviewPane, loadProjectPhotosForPdf } from '../sections/DocumentPreviewPane.tsx'
+import { deriveStatus, shortDate } from '../lib/quoteStatus.ts'
 import { mintPublicLink } from '../../../lib/publicLink.ts'
 import { Eyebrow } from '../../../components/v3'
-import { formatFollowUpDate, quoteFollowUpDate } from '../../../lib/quoteFollowUp.ts'
+import { quoteFollowUpDate } from '../../../lib/quoteFollowUp.ts'
+import { useIsDesktop } from '../../../lib/useMediaQuery.ts'
+import QuotePhone from '../phone/QuotePhone.tsx'
+
+// An iPhone running the app from the home screen. Safari's share sheet is
+// the way to hand a link on there (no clipboard prompt, no new tab).
+function isIosStandalone(): boolean {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false
+  const ios = /iPad|iPhone|iPod/.test(navigator.userAgent)
+  const standalone = window.matchMedia?.('(display-mode: standalone)')?.matches === true
+    || (navigator as any).standalone === true
+  return ios && standalone
+}
 
 /**
  * QUOTE tab, the formal sellable scope. Lead → Quote → Approved Job
@@ -40,6 +53,9 @@ import { formatFollowUpDate, quoteFollowUpDate } from '../../../lib/quoteFollowU
  */
 export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenApprove, insurance = null, changeOrders = [] }: any) {
   const { profile } = useProfile()
+  // Below 900 px the tab is the phone editor (phone/QuotePhone.tsx). The
+  // handlers and PDF build below are shared; only the layout differs.
+  const isDesktop = useIsDesktop()
 
   // "Past quote" = pipeline stage already advanced beyond the quoting
   // phase. The job has been started / invoiced / closed, which means
@@ -145,6 +161,21 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
   // ref so unblurred textarea content reaches the PDF, independent of
   // mobile blur-timing races (P1 fix from V3-QA-1B retest).
   const termsValuesRef = useRef({ scope: '', exclusions: '', terms: '', expires: '' })
+
+  // The phone editor mounts no QuoteTermsSection to publish into the ref,
+  // and its terms sheet saves straight to the contact. Without this the ref
+  // would stay blank and buildPdf would read the blanks as edits and wipe
+  // the saved scope, exclusions and terms. So on a phone the ref follows
+  // what is saved.
+  useEffect(() => {
+    if (isDesktop) return
+    termsValuesRef.current = {
+      scope: contact?.scope_text || '',
+      exclusions: contact?.exclusions_text || '',
+      terms: contact?.terms_text || '',
+      expires: timestampToDateInput(contact?.quote_expires_at)
+    }
+  }, [isDesktop, contact?.scope_text, contact?.exclusions_text, contact?.terms_text, contact?.quote_expires_at])
 
   // Shared PDF build path. Fetches fresh items so any pending blur
   // saves on QuoteTerms or QuoteItems are reflected. Throws on zero
@@ -364,6 +395,17 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
         userId,
         kind: 'proposal'
       })
+      // On an iPhone added to the home screen the share sheet is how a
+      // link goes out (spec section 4), so offer it right after the link
+      // exists, while the tap is still fresh. Closing it, or a browser
+      // that refuses, falls back to copying the link below.
+      let shared = false
+      if (isIosStandalone() && typeof navigator.share === 'function') {
+        try {
+          await navigator.share({ title: `Proposal for ${contact.name || 'your project'}`, url: link.url })
+          shared = true
+        } catch { /* closed or refused: copy instead */ }
+      }
       const currentStatus = (contact.proposal_status || 'draft').toLowerCase()
       const canAwaitResponse = !pastQuote && !['approved', 'rejected', 'expired'].includes(currentStatus)
       if (canAwaitResponse && patch) {
@@ -376,11 +418,13 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
         })
         await fetchAll?.()
       }
-      try {
-        await navigator.clipboard.writeText(link.url)
-        toastSuccess('Share link copied', 'Send via text, email, however you like.')
-      } catch {
-        toastSuccess('Share link ready', link.url)
+      if (!shared) {
+        try {
+          await navigator.clipboard.writeText(link.url)
+          toastSuccess('Share link copied', 'Send via text, email, however you like.')
+        } catch {
+          toastSuccess('Share link ready', link.url)
+        }
       }
     } catch (e: any) {
       toastError("Couldn't mint share link", e?.message || 'Try again.')
@@ -535,6 +579,32 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
     } finally {
       setBusy(null)
     }
+  }
+
+  if (!isDesktop) {
+    return (
+      <QuotePhone
+        contact={contact}
+        userId={userId}
+        company={company}
+        insurance={insurance}
+        changeOrders={changeOrders}
+        status={status}
+        pastQuote={pastQuote}
+        busy={busy}
+        hasClientEmail={hasClientEmail}
+        clearing={clearing}
+        patch={patch}
+        onContactRefresh={fetchAll}
+        onSend={handleSend}
+        onShare={handleShare}
+        onOpenPdf={handlePreview}
+        onDownload={handleDownload}
+        onEsign={handleEsign}
+        onOpenApprove={onOpenApprove}
+        onClearDraft={handleClearDraft}
+      />
+    )
   }
 
   return (
@@ -716,110 +786,6 @@ function QuoteViewToggle({ value, onChange }: any) {
   )
 }
 
-function DocumentPreviewPane({ company, contact, items, photos = [], loading, insurance = null, changeOrders = [] }: any) {
-  // Group line items by their `section` field so each trade renders
-  // as its own ScopeSectionCard. Order is preserved (groupByOrdered).
-  // Optional items (is_optional=true) split into the upgrades array;
-  // excluded items become a bullet list under "Exclusions".
-  const { scopeSections, upgrades, exclusions, baseTotal, upgradeTotal } = mapItemsToScope(items)
-  const status = (contact?.proposal_status || 'draft').toLowerCase()
-  const docStatus = status === 'approved' ? 'approved'
-    : status === 'sent' ? 'sent'
-    : status === 'changes_requested' ? 'sent'
-    : status === 'expired' ? 'expired'
-    : 'draft'
-
-  // When the quote is approved, pull the most recent approval snapshot
-  // so the preview can stamp the captured signature + date onto the
-  // ApprovalBlock. Stays null for draft / sent / expired quotes, the
-  // block then renders blank signature lines.
-  const [approval, setApproval] = useState<any>(null)
-  useEffect(() => {
-    let cancelled = false
-    if (status !== 'approved' || !contact?.id) {
-      setApproval(null)
-      return
-    }
-    ;(async () => {
-      const { data } = await supabase
-        .from('fh_quote_versions')
-        .select('approved_by_name, approved_at, signature_kind, signature_data, approval_method')
-        .eq('contact_id', contact.id)
-        .eq('status', 'approved')
-        .order('approved_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-      if (cancelled || !data) return
-      const isDrawn = data.signature_kind === 'drawn'
-      setApproval({
-        mode: 'approved',
-        clientName: data.approved_by_name,
-        clientSignatureDataUrl: isDrawn ? data.signature_data : null,
-        clientApprovedAt: data.approved_at,
-        contractorSignatureDataUrl: null,
-        contractorApprovedAt: null
-      })
-    })()
-    return () => { cancelled = true }
-  }, [status, contact?.id])
-
-  return (
-    <div
-      style={{
-        padding: '8px 0 24px',
-        // Cream backdrop so the white letter-paper sits visibly on
-        // the dark workspace surface without floating.
-        background: '#141414',
-        margin: '0 -16px',
-        paddingLeft: 12,
-        paddingRight: 12,
-        borderRadius: 10
-      }}
-    >
-      {loading && (
-        <div style={{
-          padding: '24px',
-          textAlign: 'center',
-          color: 'var(--v3-text-muted)',
-          fontFamily: 'var(--font-body)',
-          fontSize: 14
-        }}>
-          Loading preview…
-        </div>
-      )}
-      {!loading && (
-        <ProposalTemplate
-          company={company}
-          contact={contact}
-          project={{
-            title: contact?.job_title || contact?.name || 'Construction services',
-            address: contact?.address || ''
-          }}
-          scopeSections={scopeSections}
-          upgrades={upgrades}
-          pricing={{
-            baseTotal,
-            upgradeTotal,
-            discount: 0,
-            taxRate: 0
-          }}
-          paymentTermsText={contact?.terms_text || ''}
-          warrantyText={company?.warranty_default || ''}
-          exclusions={exclusions}
-          insurance={insurance}
-          changeOrders={changeOrders}
-          photos={photos}
-          approval={approval}
-          meta={{
-            issuedAt: contact?.quote_sent_at || contact?.created_at,
-            expiresAt: contact?.quote_expires_at || null
-          }}
-          status={docStatus}
-        />
-      )}
-    </div>
-  )
-}
 
 /**
  * Translate flat fh_quote_items rows into the ProposalTemplate's
@@ -1328,69 +1294,6 @@ function PrimaryButton({ icon, label, onClick, disabled }: any) {
   )
 }
 
-/* ============================================================
-   Status derivation, pure read of contact columns. proposal_status
-   default is 'draft' (migration 002); quote_sent_at and
-   quote_expires_at are nullable (migration 012). Expiration
-   takes precedence over status when expired so the operator
-   sees the urgent state regardless of how the row was last saved.
-   ============================================================ */
-function deriveStatus(contact: any, pastQuote = false) {
-  const raw = (contact?.proposal_status || 'draft').toLowerCase()
-  const sentIso = contact?.quote_sent_at || null
-  const expIso = contact?.quote_expires_at || null
-
-  const now = Date.now()
-  const expMs = expIso ? new Date(expIso).getTime() : null
-  const isExpired = expMs != null && Number.isFinite(expMs) && expMs < now
-
-  let label = capitalize(raw)
-  let tone = 'muted'
-  let sub = null
-
-  if (raw === 'draft') { tone = 'muted' }
-  else if (raw === 'sent') { tone = 'gold'; sub = relativeAgo(sentIso, 'Sent') }
-  else if (raw === 'viewed') { tone = 'gold'; sub = relativeAgo(sentIso, 'Sent') }
-  else if (raw === 'changes_requested') {
-    label = 'Changes requested'
-    tone = 'danger'
-    sub = relativeAgo(contact?.quote_change_requested_at, 'Requested')
-  }
-  else if (raw === 'approved') { tone = 'good'; sub = relativeAgo(sentIso, 'Sent') }
-  else if (raw === 'rejected') { tone = 'danger' }
-
-  if (['sent', 'viewed'].includes(raw) && contact?.follow_up_on) {
-    const followUpLabel = formatFollowUpDate(contact.follow_up_on)
-    if (followUpLabel) sub = sub ? `${sub}, follow up ${followUpLabel}` : `Follow up ${followUpLabel}`
-  }
-
-  // Job has advanced past the quote phase but the explicit Approve
-  // button was never tapped (manual stage advance, legacy data, etc).
-  // Treat as approved so the pill / banner / approve band don't keep
-  // claiming "Draft" on a job that's already invoicing or closed.
-  // Rejected stays rejected, that's a terminal "lost" state.
-  if (pastQuote && raw !== 'approved' && raw !== 'rejected') {
-    label = 'Approved'
-    tone = 'good'
-    sub = 'Implied by job stage'
-    return { label, tone, sub }
-  }
-
-  // Expiry only applies to quotes still awaiting a decision. Approved
-  // and rejected are terminal, an approved quote whose expiry date
-  // passes is still approved (the customer already committed); flipping
-  // it to "Expired · danger" made closed-won jobs look like they fell
-  // through (audit FH-QA-009).
-  if (isExpired && raw !== 'approved' && raw !== 'rejected' && raw !== 'changes_requested') {
-    label = 'Expired'
-    tone = 'danger'
-    sub = expIso ? `Was due ${shortDate(expIso)}` : null
-  } else if (expIso && raw !== 'approved' && raw !== 'rejected' && raw !== 'changes_requested') {
-    sub = sub ? `${sub} · Expires ${shortDate(expIso)}` : `Expires ${shortDate(expIso)}`
-  }
-
-  return { label, tone, sub }
-}
 
 function StatusPill({ status }: any) {
   const palette = (() => {
@@ -1444,85 +1347,4 @@ function StatusPill({ status }: any) {
   )
 }
 
-function capitalize(s: any) {
-  if (!s) return ''
-  return s[0].toUpperCase() + s.slice(1)
-}
 
-function relativeAgo(iso: any, prefix: any) {
-  if (!iso) return null
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return null
-  const dayMs = 24 * 60 * 60 * 1000
-  const sameDay = (a: any, b: any) =>
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  const now = new Date()
-  const yesterday = new Date(now.getTime() - dayMs)
-  if (sameDay(d, now)) return `${prefix} today`
-  if (sameDay(d, yesterday)) return `${prefix} yesterday`
-  const days = Math.floor((now.getTime() - d.getTime()) / dayMs)
-  if (days >= 1 && days < 30) return `${prefix} ${days}d ago`
-  return `${prefix} ${shortDate(iso)}`
-}
-
-function shortDate(iso: any) {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-}
-
-/**
- * Pull project photos for this job and resolve each storage_path to a
- * signed URL the PDF generator can fetch. Best-effort:
- *   - skips photos with no storage_path
- *   - tolerates per-photo signed-URL failures (filtered out)
- *   - returns [] when the table query fails so the renderer falls
- *     through to its placeholder zones cleanly
- *
- * Each entry returns { url, section_tag, caption } so the renderer can
- * route a tagged photo to its matching scope block. section_tag is
- * sourced from the photo's caption when present (e.g., a caption of
- * "Roofing" tags the photo for the Roofing scope), a lightweight
- * convention that doesn't require a schema change.
- */
-async function loadProjectPhotosForPdf(jobId: any, userId: any) {
-  if (!jobId || !userId) return []
-  // Every photo on the job, whoever uploaded it (RLS scopes the tenant).
-  const { data, error } = await supabase
-    .from('fh_job_files')
-    .select('id, storage_path, caption, section_tag, kind, uploaded_at')
-    .eq('job_id', jobId)
-    .eq('kind', 'photo')
-    .order('uploaded_at', { ascending: true })
-    .limit(8)
-  if (error || !Array.isArray(data) || data.length === 0) return []
-
-  // Sign each path. Failures filter out, the renderer handles missing
-  // photos via placeholders without throwing.
-  const signed = await Promise.all(
-    data.map(async (row) => {
-      try {
-        const { data: signedRes, error: signErr } = await supabase.storage
-          .from('job-photos')
-          .createSignedUrl(row.storage_path, 60 * 60)
-        if (signErr || !signedRes?.signedUrl) return null
-        // section_tag (migration 020) is the source of truth; legacy
-        // photos that used the caption-as-tag convention before the
-        // column existed fall back so they still distribute correctly.
-        const tag = (row.section_tag || '').trim()
-          || (row.caption || '').trim()
-          || null
-        return {
-          url: signedRes.signedUrl,
-          section_tag: tag,
-          caption: row.caption || null
-        }
-      } catch {
-        return null
-      }
-    })
-  )
-  return signed.filter(Boolean)
-}

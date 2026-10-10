@@ -29,7 +29,7 @@ import { planReorder } from './quoteItemOrder.ts'
  * only.
  */
 
-const SECTION_SUGGESTIONS = ['Labor', 'Materials', 'Subs', 'Equipment', 'Other']
+export const SECTION_SUGGESTIONS = ['Labor', 'Materials', 'Subs', 'Equipment', 'Other']
 
 /* ============================================================
    Line item autocomplete, kills the typing on the highest-
@@ -48,7 +48,7 @@ export type ItemSuggestion = {
   source: 'history' | 'rates'
 }
 
-function useItemSuggestions(userId: any): ItemSuggestion[] {
+export function useItemSuggestions(userId: any): ItemSuggestion[] {
   const [suggestions, setSuggestions] = useState<ItemSuggestion[]>([])
   useEffect(() => {
     let alive = true
@@ -105,7 +105,7 @@ function useItemSuggestions(userId: any): ItemSuggestion[] {
 }
 
 /** Top matches for the current input. Empty input → most-used history. */
-function matchSuggestions(all: ItemSuggestion[], input: string): ItemSuggestion[] {
+export function matchSuggestions(all: ItemSuggestion[], input: string): ItemSuggestion[] {
   const q = (input || '').trim().toLowerCase()
   if (!q) {
     return all.filter((s) => s.source === 'history').sort((a, b) => b.uses - a.uses).slice(0, 6)
@@ -141,7 +141,7 @@ function money(n: any) {
   })
 }
 
-function emptyDraft() {
+export function emptyDraft() {
   return {
     section: '',
     description: '',
@@ -156,7 +156,7 @@ function emptyDraft() {
   }
 }
 
-function draftFromRow(row: any) {
+export function draftFromRow(row: any) {
   // amountOverridden seeds true on edit so changing qty/rate does not
   // silently overwrite an intentionally-set amount on an existing row.
   // Operators can still edit the amount field directly. Add-mode keeps
@@ -181,7 +181,7 @@ function draftFromRow(row: any) {
 // fields are guarded against negatives and NaN, HTML `min="0"` is not
 // reliably enforced on submit, so we re-check at the JS boundary.
 // Credit lines (negative amounts) are deferred to a later phase.
-function validateDraft(d: any) {
+export function validateDraft(d: any) {
   if (!d.description || !d.description.trim()) return 'Description is required'
   const qty = Number(d.qty)
   const rate = Number(d.rate)
@@ -192,7 +192,7 @@ function validateDraft(d: any) {
   return null
 }
 
-function normalizeForDB(d: any) {
+export function normalizeForDB(d: any) {
   // Derive flags from a single canonical kind so an inconsistent draft
   // (e.g. both flags somehow true) can never reach the DB. Mutually
   // exclusive by construction.
@@ -214,21 +214,88 @@ function normalizeForDB(d: any) {
   }
 }
 
-export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: any) {
+// ============================================================
+// Form handlers, add + edit share the same draft shape.
+// Auto-recompute amount when qty or rate change unless the
+// operator has explicitly overridden the amount field.
+// is_optional and is_excluded are mutually exclusive.
+// ============================================================
+export function patchDraft(setter: any, key: any, value: any) {
+  setter((d: any) => {
+    // Synthetic 'kind' key, drives the 3-way mode picker and writes
+    // both is_optional + is_excluded atomically. Mutually exclusive
+    // by design; eliminates the ambiguity of two parallel checkboxes.
+    if (key === 'kind') {
+      return {
+        ...d,
+        is_optional: value === 'optional',
+        is_excluded: value === 'excluded'
+      }
+    }
+    const next = { ...d, [key]: value }
+    if (key === 'qty' || key === 'rate') {
+      if (!d.amountOverridden) {
+        const qty = Number(key === 'qty' ? value : d.qty)
+        const rate = Number(key === 'rate' ? value : d.rate)
+        if (Number.isFinite(qty) && Number.isFinite(rate)) {
+          next.amount = String(+(qty * rate).toFixed(2))
+        }
+      }
+    }
+    if (key === 'amount') {
+      next.amountOverridden = true
+    }
+    if (key === 'is_optional' && value) {
+      next.is_excluded = false
+    }
+    if (key === 'is_excluded' && value) {
+      next.is_optional = false
+    }
+    return next
+  })
+}
+
+// Derive the 3-way mode label from the current flags. Used by the
+// segment control to show the active selection.
+export function kindFromDraft(d: any) {
+  if (d?.is_excluded) return 'excluded'
+  if (d?.is_optional) return 'optional'
+  return 'base'
+}
+
+// Apply a picked suggestion: description + unit + rate land together,
+// amount recomputes from the current qty, and amountOverridden resets
+// so subsequent qty tweaks keep auto-calculating.
+export function applySuggestion(setter: any, s: ItemSuggestion) {
+  hapticTap()
+  setter((d: any) => {
+    const qty = Number(d.qty)
+    const amount = Number.isFinite(qty) ? +(qty * s.rate).toFixed(2) : s.rate
+    return {
+      ...d,
+      description: s.description,
+      unit: s.unit || d.unit,
+      rate: String(s.rate),
+      amount: String(amount),
+      amountOverridden: false
+    }
+  })
+}
+
+/**
+ * The job's quote lines and the writes on them. QuoteItemsSection (the
+ * desktop builder) and the phone editor (phone/QuotePhone.tsx) share this,
+ * so both save through the same updateItem, addItem, removeItem and
+ * reorderItem. Moved out of the component unchanged.
+ */
+export function useQuoteItems({ jobId, userId, onContactRefresh }: any) {
   const [rows, setRows] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-
-  const [draft, setDraft] = useState(emptyDraft)
-  const suggestions = useItemSuggestions(userId)
 
   // Monotonic next sort_order, seeded from loaded rows and bumped per add.
   // Keeps rapid optimistic adds in entry order without reading (possibly
   // stale) rows state between back-to-back adds.
   const sortRef = useRef(0)
-
-  const [editingId, setEditingId] = useState<any>(null)
-  const [editDraft, setEditDraft] = useState(emptyDraft)
-  const [editing, setEditing] = useState(false)
 
   // `silent` refetches without flashing the whole list to a skeleton :
   // used after every add/edit/delete so rapid multi-item entry stays
@@ -254,11 +321,6 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
   }, [jobId, userId])
 
   useEffect(() => { fetchRows() }, [fetchRows])
-
-  // Bumped after each successful add so the Add card re-focuses its
-  // description input, you can fire off line items back-to-back without
-  // reaching for the field again.
-  const [addFocusSignal, setAddFocusSignal] = useState(0)
 
   // ============================================================
   // CRUD, scoped by row id or job with RLS as the tenant boundary. The
@@ -372,74 +434,23 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
     return true
   }
 
-  // ============================================================
-  // Form handlers, add + edit share the same draft shape.
-  // Auto-recompute amount when qty or rate change unless the
-  // operator has explicitly overridden the amount field.
-  // is_optional and is_excluded are mutually exclusive.
-  // ============================================================
+  return { rows, loading, fetchRows, addItem, updateItem, removeItem, reorderItem }
+}
 
-  function patchDraft(setter: any, key: any, value: any) {
-    setter((d: any) => {
-      // Synthetic 'kind' key, drives the 3-way mode picker and writes
-      // both is_optional + is_excluded atomically. Mutually exclusive
-      // by design; eliminates the ambiguity of two parallel checkboxes.
-      if (key === 'kind') {
-        return {
-          ...d,
-          is_optional: value === 'optional',
-          is_excluded: value === 'excluded'
-        }
-      }
-      const next = { ...d, [key]: value }
-      if (key === 'qty' || key === 'rate') {
-        if (!d.amountOverridden) {
-          const qty = Number(key === 'qty' ? value : d.qty)
-          const rate = Number(key === 'rate' ? value : d.rate)
-          if (Number.isFinite(qty) && Number.isFinite(rate)) {
-            next.amount = String(+(qty * rate).toFixed(2))
-          }
-        }
-      }
-      if (key === 'amount') {
-        next.amountOverridden = true
-      }
-      if (key === 'is_optional' && value) {
-        next.is_excluded = false
-      }
-      if (key === 'is_excluded' && value) {
-        next.is_optional = false
-      }
-      return next
-    })
-  }
+export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: any) {
+  const { rows, loading, addItem, updateItem, removeItem, reorderItem } = useQuoteItems({ jobId, userId, onContactRefresh })
 
-  // Derive the 3-way mode label from the current flags. Used by the
-  // segment control to show the active selection.
-  function kindFromDraft(d: any) {
-    if (d?.is_excluded) return 'excluded'
-    if (d?.is_optional) return 'optional'
-    return 'base'
-  }
+  const [draft, setDraft] = useState(emptyDraft)
+  const suggestions = useItemSuggestions(userId)
 
-  // Apply a picked suggestion: description + unit + rate land together,
-  // amount recomputes from the current qty, and amountOverridden resets
-  // so subsequent qty tweaks keep auto-calculating.
-  function applySuggestion(setter: any, s: ItemSuggestion) {
-    hapticTap()
-    setter((d: any) => {
-      const qty = Number(d.qty)
-      const amount = Number.isFinite(qty) ? +(qty * s.rate).toFixed(2) : s.rate
-      return {
-        ...d,
-        description: s.description,
-        unit: s.unit || d.unit,
-        rate: String(s.rate),
-        amount: String(amount),
-        amountOverridden: false
-      }
-    })
-  }
+  const [editingId, setEditingId] = useState<any>(null)
+  const [editDraft, setEditDraft] = useState(emptyDraft)
+  const [editing, setEditing] = useState(false)
+
+  // Bumped after each successful add so the Add card re-focuses its
+  // description input, you can fire off line items back-to-back without
+  // reaching for the field again.
+  const [addFocusSignal, setAddFocusSignal] = useState(0)
 
   function handleAdd() {
     const err = validateDraft(draft)

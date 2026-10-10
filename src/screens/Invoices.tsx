@@ -1,29 +1,16 @@
 import { lazy, Suspense, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Receipt, FileDown, DollarSign, ChevronRight, Check, Send, CheckCircle2 } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { supabase } from '../lib/supabase.ts'
+import { AnimatePresence } from 'framer-motion'
 import { useInvoicesBundle, useInvalidateInvoices } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
-import {
-  createInvoice, sendInvoiceEmail, buildInvoicePdf, setInvoiceStatus, fetchInvoicesForContact
-} from '../lib/invoices.ts'
-import { pickBalanceInvoice } from '../lib/invoiceSettlement.ts'
-import { moneyExact } from '../lib/format.ts'
+import { sendInvoiceEmail, buildInvoicePdf, setInvoiceStatus } from '../lib/invoices.ts'
 // Lazy, pdf.js + transitive jspdf + autoTable deps are ~430KB. Only
 // loads on the first PDF action (per-row Generate or Email Invoice).
 async function loadPdf(): Promise<any> {
   return import('../lib/pdf.js')
 }
 import { toastSuccess, toastError } from '../lib/toast.ts'
-import { hapticTap } from '../lib/haptics.ts'
-import { useFhMotion } from '../lib/motion.ts'
-import { SkeletonList } from '../components/Skeleton.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
-import { useInfiniteRender } from '../lib/useInfiniteRender.ts'
-import SectionHeader from '../components/v3/SectionHeader.tsx'
-import { Button, FilterPill, Eyebrow, StampNumber, StatusPill } from '../components/v3'
 // V3PaymentSheet is lazy, only loads when an operator taps "Mark Paid".
 // Avoids dragging ~440KB into the initial Invoices route chunk.
 const V3PaymentSheet = lazy(() => import('../components/V3PaymentSheet.tsx'))
@@ -34,6 +21,8 @@ import { parseDateOnly } from '../lib/dates.ts'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 const SnowInvoices = lazy(() => import('../components/desktop/SnowInvoicesBuild.tsx'))
+import MoneyPhone from './money/MoneyPhone.tsx'
+import type { MoneyFilter } from './money/types.ts'
 
 // Invoices / AR, v3 money command screen.
 //
@@ -44,12 +33,12 @@ const SnowInvoices = lazy(() => import('../components/desktop/SnowInvoicesBuild.
 //      who-owes-me-what aging view, kept from the original screen.
 // The per-job Email action now creates a first-class invoice for the
 // balance instead of firing an untracked ad-hoc PDF.
-
-const AGING_BUCKETS = [
-  { id: '0-30',  label: 'Current',  short: '0 to 30 d',  max: 30,        color: 'var(--v3-text-muted)',     accent: 'var(--v3-border-strong)' },
-  { id: '31-60', label: 'Late',     short: '31 to 60 d', max: 60,        color: 'var(--v3-primary-text)',         accent: 'color-mix(in srgb, var(--v3-primary) 40%, transparent)' },
-  { id: '60+',   label: 'Overdue',  short: '60+ d',   max: Infinity,  color: 'var(--v3-danger-text)',   accent: 'color-mix(in srgb, var(--v3-danger) 50%, transparent)' }
-]
+//
+// Below 900 px the screen is MoneyPhone (src/screens/money/): this file
+// still loads the data and owns the send, download, void and payment
+// handlers, and hands them down. Per job Email, Download and Mark paid
+// live on the job's invoice page (InvoiceDetail, /invoices/:id), which
+// the phone's Job balances list links to.
 
 function bucketFor(days: any) {
   if (days <= 30) return '0-30'
@@ -71,19 +60,16 @@ function resolveClient(job: any) {
   }
 }
 
-function fmtMoney(n: any) {
-  return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
-}
-
 export default function Invoices() {
   const { user } = useAuth()
   const { profile } = useProfile()
   const { data: bundle, isLoading: loading, isError } = useInvoicesBundle(user?.id)
   const refresh = useInvalidateInvoices()
-  const jobs = bundle?.jobs ?? []
-  const payments = bundle?.payments ?? []
-  const invoices = bundle?.invoices ?? []
-  const changeOrders = bundle?.changeOrders ?? []
+  // Memoized so the lists below keep one identity until the bundle changes.
+  const jobs = useMemo(() => bundle?.jobs ?? [], [bundle])
+  const payments = useMemo(() => bundle?.payments ?? [], [bundle])
+  const invoices = useMemo(() => bundle?.invoices ?? [], [bundle])
+  const changeOrders = useMemo(() => bundle?.changeOrders ?? [], [bundle])
   // Approved change orders raise each job's true contract; without this
   // the balances below understate what a job with signed COs owes.
   const approvedCoByJob = useMemo(() => approvedCoByContact(changeOrders), [changeOrders])
@@ -174,12 +160,6 @@ export default function Invoices() {
     () => filter === 'outstanding' ? rows.filter((r) => r.isOutstanding) : rows,
     [rows, filter]
   )
-  // Bounded render window that grows on scroll, the A/R list can be long.
-  const { visible: visibleBalances, sentinelRef: balancesSentinelRef, hasMore: balancesHasMore } = useInfiniteRender(
-    filtered,
-    filter
-  )
-
   // BY-CLIENT A/R rollup, group every outstanding job balance under
   // its linked client so "who owes me, and how overdue" reads at a
   // glance. Each group carries the client's jobs + the worst aging
@@ -241,14 +221,6 @@ export default function Invoices() {
       : invoiceRows,
     [invoiceRows, filter]
   )
-  // Same bounded window as the job balances below: 'All' can hold years
-  // of invoices, and mounting every card (each re-rendering on every
-  // send) janked phones.
-  const { visible: visibleInvoiceRows, sentinelRef: invoicesSentinelRef, hasMore: invoicesHasMore } = useInfiniteRender(
-    shownInvoiceRows,
-    filter
-  )
-
   const totals = useMemo(() => {
     const out: Record<string, number> = { '0-30': 0, '31-60': 0, '60+': 0, total: 0, count: 0 }
     for (const r of rows) {
@@ -305,66 +277,6 @@ export default function Invoices() {
     payment_instructions: (profile as any)?.payment_instructions || ''
   }), [profile])
 
-  async function handleGeneratePDF(row: any) {
-    // Audit caught this as a no-op. Wrap in try/catch so a jsPDF
-    // failure surfaces a real error instead of silently swallowing,
-    // and so the user sees a toast immediately on click instead of
-    // wondering if anything happened.
-    try {
-      const { generateInvoice, downloadPdf } = await loadPdf()
-      // generateInvoice() became async in 4D-2D, pre-fetches the
-      // contractor's logo via loadLogoForPdf before rendering.
-      const c = resolveClient(row.job)
-      // Pull payments for this job so the new PDF's Balance Summary +
-      // Payment History sections render with real data instead of the
-      // synthetic "Less: payments received" row the old generator used.
-      const { data: jobPayments } = await supabase
-        .from('fh_payments')
-        .select('*')
-        .eq('contact_id', row.job.id)
-        .order('paid_on', { ascending: false })
-      const result = await generateInvoice({
-        company,
-        contact: {
-          id: row.job.id,
-          name: c.name || row.job.client_name || 'Client',
-          address: c.address,
-          phone: c.phone,
-          email: c.email,
-          job_title: row.job.job_title
-        },
-        lineItems: [
-          {
-            description: row.job.job_title || 'Construction services per agreement',
-            qty: 1,
-            rate: row.amount,
-            amount: row.amount
-          }
-        ],
-        taxRate: 0,
-        notes: '',
-        dueDate: '',
-        invoiceId: row.job.id,
-        payments: jobPayments || [],
-        contractTotal: row.amount,
-        previouslyPaid: row.paid
-      })
-      if (!result?.doc) throw new Error('PDF generator returned no document')
-      downloadPdf(result)
-      toastSuccess('Invoice PDF downloaded', result.filename)
-    } catch (e: any) {
-      console.error('[invoices] PDF generation failed:', e)
-      toastError("Couldn't generate PDF", e?.message || 'Try again')
-    }
-  }
-
-  // Mark Paid now opens the shared V3PaymentSheet. The sheet handles
-  // method / reference / paid_on / partial amount and calls logPayment
-  // through the existing pipeline (auto-close cascade preserved).
-  function openPaymentSheet(row: any) {
-    setPayingRow(row)
-  }
-
   // Mark paid on an issued invoice links the payment to it, prefilled
   // with what is still due on it: never more than the job's remaining
   // balance, so clearing a bill the job already paid can't record the
@@ -390,87 +302,20 @@ export default function Invoices() {
     return changeOrders.filter((co) => (co as any).contact_id === jobId)
   }
 
-  // Email the remaining balance straight from a job row. Pipeline v2:
-  // the send always goes out as a real fh_invoices row, so it is tracked
-  // (status, due date, mark-paid) instead of an untracked ad-hoc PDF.
-  async function handleSendEmail(row: any) {
-    const job = row?.job
-    if (!user || !job) return
-    const c = resolveClient(job)
-    if (!c.email) {
-      toastError('Add a client email first', `Open the linked client to add an email for ${c.name || 'this client'}.`)
-      return
-    }
-    setSendingId(job.id)
-    try {
-      // Read this job's invoices fresh (the screen's list is capped and
-      // can lag), then resend its oldest open bill when it has one. A new
-      // "Balance due" row is minted only for money nobody has billed yet:
-      // minting the whole balance next to open draws doubled what the
-      // customer was invoiced, and repeated taps stacked duplicates.
-      const { data: jobInvoices, error: listErr } = await fetchInvoicesForContact(job.id)
-      if (listErr) throw new Error(listErr.message || "Couldn't load this job's invoices")
-      const plan = pickBalanceInvoice({ invoices: jobInvoices, contractTotal: row.amount, balance: row.balance })
-      if (!plan) throw new Error('Nothing is owed on this job right now.')
-      let invoice
-      if (plan.invoice) {
-        invoice = plan.invoice
-      } else {
-        const { data: created, error } = await createInvoice({
-          contact: job,
-          userId: user.id,
-          title: 'Balance due',
-          amount: plan.amount,
-          due_at: new Date(Date.now() + 14 * 86400000).toISOString()
-        })
-        if (error || !created) throw new Error(error?.message || "Couldn't create the invoice")
-        invoice = created
-      }
-      const wasDraft = String(invoice.status || '').toLowerCase() === 'draft'
-      const res = await sendInvoiceEmail({
-        invoice,
-        contact: job,
-        company,
-        userId: user.id,
-        recipientEmail: c.email,
-        payments: paymentsForJob(job.id),
-        changeOrders: changeOrdersForJob(job.id)
-      })
-      if (res.ok) {
-        // Name the bill that went out: it can be an open draw rather
-        // than the whole balance shown on the card.
-        toastSuccess(`Invoice sent to ${res.recipient}`, `${invoice.title || `Invoice #${invoice.sequence_number}`} · ${moneyExact(invoice.amount)}`)
-        setSentId(job.id)
-        setTimeout(() => setSentId(null), 2400)
-      } else if (res.reason === 'sender_not_configured') {
-        toastError(
-          "Email not sent, sender isn't configured",
-          wasDraft
-            ? 'Downloaded the PDF so you can email it manually. The invoice is saved as a draft.'
-            : 'Downloaded the PDF so you can email it manually.'
-        )
-      } else {
-        throw new Error(res.message || 'Send failed')
-      }
-      refresh()
-    } catch (e: any) {
-      toastError("Couldn't send invoice", e?.message || 'Try again')
-    } finally {
-      setSendingId(null)
-    }
-  }
-
   // Per-invoice actions, operate on the first-class fh_invoices rows.
-  async function handleInvoiceSend(r: any) {
+  // Resolves true once the email has gone out, so the phone's Remind and
+  // Resend sheets know when to close. A reminder is the same email sent
+  // again; only the toast words it differently (decision D6).
+  async function handleInvoiceSend(r: any, options: { reminder?: boolean } = {}): Promise<boolean> {
     const { invoice, job } = r
     if (!user || !job) {
       toastError("Couldn't resolve the job", 'This invoice belongs to a job that is no longer in the money pipeline.')
-      return
+      return false
     }
     const c = resolveClient(job)
     if (!c.email) {
       toastError('Add a client email first', `Open the linked client to add an email for ${c.name || 'this client'}.`)
-      return
+      return false
     }
     setSendingId(invoice.id)
     try {
@@ -484,10 +329,11 @@ export default function Invoices() {
         changeOrders: changeOrdersForJob(job.id)
       })
       if (res.ok) {
-        toastSuccess(`Invoice sent to ${res.recipient}`, res.filename)
+        toastSuccess(`${options.reminder ? 'Reminder' : 'Invoice'} sent to ${res.recipient}`, res.filename)
         setSentId(invoice.id)
         setTimeout(() => setSentId(null), 2400)
         refresh()
+        return true
       } else if (res.reason === 'sender_not_configured') {
         toastError("Email not sent, sender isn't configured", 'Downloaded the PDF so you can email it manually.')
       } else {
@@ -498,6 +344,7 @@ export default function Invoices() {
     } finally {
       setSendingId(null)
     }
+    return false
   }
 
   async function handleInvoiceDownload(r: any) {
@@ -538,8 +385,6 @@ export default function Invoices() {
     refresh()
   }
 
-  const { stagger, item } = useFhMotion()
-  const allCaughtUp = !loading && totals.count === 0
   const navigate = useNavigate()
   const isDesktop = useIsDesktop()
 
@@ -609,314 +454,29 @@ export default function Invoices() {
     )
   }
 
+  // Phone: the Money screen. It takes the same rows and handlers the
+  // desktop table gets; the payment and statement sheets below are the
+  // existing ones, opened from its invoice actions and its Who owes you list.
   return (
-    <motion.div
-      className="v3-screen"
-      variants={stagger}
-      initial="hidden"
-      animate="show"
-      style={{
-        position: 'relative',
-        background: 'var(--v3-bg)'
-      }}
-    >
-      {/* COCKPIT, black-glass A/R panel: title eyebrow + state chip +
-          headline total + aging bar + 3-cell aging breakdown.
-          Backdrop-filter + neutral inner highlight match the v3 black-
-          glass treatment shipped on Schedule/Notes/Home cockpits. */}
-      <motion.div variants={item} style={{ padding: '8px 24px 12px' }}>
-        <div style={{
-          position: 'relative',
-          padding: '12px 16px',
-          borderRadius: 10,
-          background: 'var(--v3-surface-glass)',
-          backdropFilter: 'blur(14px) saturate(1.1)',
-          WebkitBackdropFilter: 'blur(14px) saturate(1.1)',
-          border: '1px solid var(--v3-border)',
-          boxShadow: '0 1px 0 var(--v3-glass-tint) inset, 0 8px 22px rgba(20, 20, 20, 0.40)',
-          overflow: 'hidden'
-        }}>
-          {/* Gold radial sweep behind the hero number, ported from
-              owed-hero__sweep in the design handoff. Adds the premium
-              "money sits on warm light" feel without changing layout. */}
-          <span aria-hidden="true" style={{
-            position: 'absolute',
-            top: '-40%',
-            right: '-15%',
-            width: '70%',
-            height: '180%',
-            background: 'radial-gradient(45% 30% at 50% 50%, rgba(201, 150, 58, 0.14), transparent 70%)',
-            pointerEvents: 'none'
-          }} />
-          {/* Top row: section eyebrow + state chip (urgency lives here, not in the total) */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-            <Eyebrow tone="gold">
-              <Receipt size={11} aria-hidden="true" />
-              Money owed
-            </Eyebrow>
-            {!loading && <BalanceStateChip totals={totals} />}
-          </div>
-
-          {/* Headline total, always linen. Magnitude is the noun; state lives
-              in the chip above. Stripe / Mercury pattern. */}
-          <div style={{ marginTop: 8 }}>
-            {loading ? (
-              <span className="v3-skeleton" style={{ display: 'inline-block', width: 200, height: 48, borderRadius: 10 }} />
-            ) : (
-              <StampNumber
-                size="2xl"
-                style={{ display: 'block', lineHeight: 0.95 }}
-              >
-                {fmtMoney(totals.total)}
-              </StampNumber>
-            )}
-            <Eyebrow as="div" style={{ marginTop: 6 }}>Total outstanding</Eyebrow>
-          </div>
-
-          {/* Aging visualization + 3-cell breakdown */}
-          {!loading && totals.total > 0 && (
-            <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--v3-border)', position: 'relative' }}>
-              <AgingBar totals={totals} />
-              <div style={{
-                marginTop: 10,
-                display: 'grid',
-                // Columns size to their amounts so a six figure balance
-                // never runs into the next bucket.
-                gridTemplateColumns: 'repeat(3, auto)',
-                justifyContent: 'space-between',
-                gap: 12
-              }}>
-                {AGING_BUCKETS.map((b) => {
-                  const value = totals[b.id]
-                  const isOverdueCell = b.id === '60+'
-                  const tone = isOverdueCell && value > 0
-                    ? 'danger'
-                    : value > 0
-                      ? 'default'
-                      : 'muted'
-                  return (
-                    <div key={b.id} style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-                      <StampNumber size="md" tone={tone}>{fmtMoney(value)}</StampNumber>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-                        <Eyebrow style={{ whiteSpace: 'nowrap' }}>{b.label}</Eyebrow>
-                        <Eyebrow style={{ color: 'var(--v3-text-faint, color-mix(in srgb, var(--v3-text-muted) 70%, transparent))', whiteSpace: 'nowrap' }}>{b.short}</Eyebrow>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Month-to-date collection pace, positive momentum signal that
-              balances the alarm of outstanding totals. Ported from
-              owed-hero__tip in the design handoff. */}
-          {!loading && collectionPace.monthCollected > 0 && (
-            <div style={{
-              marginTop: 12,
-              paddingTop: 12,
-              borderTop: '1px solid var(--v3-border)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              fontFamily: 'var(--font-body)',
-              fontSize: 12,
-              color: 'var(--v3-text-muted)',
-              position: 'relative'
-            }}>
-              <Check size={11} aria-hidden="true" color="var(--v3-success-bright)" strokeWidth={2.4} />
-              <span>
-                <span style={{ color: 'var(--v3-text)', fontWeight: 600 }}>
-                  {fmtMoney(collectionPace.monthCollected)}
-                </span>
-                {' collected this month'}
-                {collectionPace.deltaPct !== null && (
-                  <>
-                    {' · pace '}
-                    <span style={{
-                      color: collectionPace.deltaPct >= 0
-                        ? 'var(--v3-success-text)'
-                        : 'var(--v3-danger-text)',
-                      fontWeight: 600
-                    }}>
-                      {collectionPace.deltaPct >= 0 ? '+' : ''}{collectionPace.deltaPct}%
-                    </span>
-                    {' vs avg'}
-                  </>
-                )}
-              </span>
-            </div>
-          )}
-        </div>
-      </motion.div>
-
-      {/* GLOBAL FILTER, one control governs every section below (issued
-          invoices, who-owes-you, job balances). It lives directly under
-          the cockpit so the toggle sits ABOVE the sections it filters
-          instead of buried in the last section's header, where changing
-          it silently reshaped the sections already scrolled past. */}
-      <motion.div variants={item} style={{ display: 'flex', gap: 8, padding: '0 var(--v3-gutter) 16px' }}>
-        <FilterPill size="sm" active={filter === 'outstanding'} onClick={() => { hapticTap(); setFilter('outstanding') }}>Outstanding</FilterPill>
-        <FilterPill size="sm" active={filter === 'all'} onClick={() => { hapticTap(); setFilter('all') }}>All</FilterPill>
-      </motion.div>
-
-      {/* ISSUED INVOICES, first-class fh_invoices rows. Every deposit,
-          progress draw, and final bill lives here with its own status
-          + actions. Created from the job screen's Send Invoice sheet
-          (or the per-job Email button below). */}
-      {!loading && shownInvoiceRows.length > 0 && (
-        <motion.div
-          variants={item}
-          className="v3-section"
-          style={{ margin: '0 var(--v3-gutter) 24px' }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
-            <SectionHeader label={filter === 'outstanding' ? 'Open invoices' : 'All invoices'} />
-            <span style={{
-              fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-              color: 'var(--v3-text-muted)', fontVariantNumeric: 'tabular-nums'
-            }}>
-              {shownInvoiceRows.length}
-            </span>
-          </div>
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {visibleInvoiceRows.map((r) => (
-              <InvoiceCard
-                key={r.invoice.id}
-                row={r}
-                isSending={sendingId === r.invoice.id}
-                isSent={sentId === r.invoice.id}
-                onSend={() => handleInvoiceSend(r)}
-                onDownload={() => handleInvoiceDownload(r)}
-                onVoid={() => handleInvoiceVoid(r)}
-                onMarkPaid={() => openInvoicePayment(r)}
-              />
-            ))}
-            {invoicesHasMore && <li ref={invoicesSentinelRef as any} aria-hidden="true" style={{ height: 1 }} />}
-          </ul>
-        </motion.div>
-      )}
-
-      {/* BY-CLIENT A/R, who owes you, worst-aged first. Outstanding
-          filter only; one tap fires a statement across all their jobs. */}
-      {!loading && filter === 'outstanding' && clientAR.length > 0 && (
-        <motion.div
-          variants={item}
-          className="v3-section"
-          style={{ margin: '0 var(--v3-gutter) 24px' }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
-            <SectionHeader label="Who owes you" />
-            <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, color: 'var(--v3-text-muted)', fontVariantNumeric: 'tabular-nums' }}>
-              {clientAR.length}
-            </span>
-          </div>
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {clientAR.map((g: any) => {
-              const b = AGING_BUCKETS.find((x) => x.id === g.worst) || AGING_BUCKETS[0]
-              return (
-                <li key={g.clientId}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 12px', borderRadius: 10, background: 'var(--v3-surface)', border: '1px solid var(--v3-border)' }}>
-                    <button
-                      type="button"
-                      onClick={() => { hapticTap(); navigate(`/clients/${g.clientId}`) }}
-                      style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                        <span style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, color: 'var(--v3-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {g.client.company_name || g.client.name || 'Client'}
-                        </span>
-                        <StatusPill color={b.color} label={b.label} style={{ flexShrink: 0 }} />
-                      </div>
-                      <div style={{ fontSize: 12, color: 'var(--v3-text-muted)', marginTop: 2 }}>
-                        {g.jobs.length} {g.jobs.length === 1 ? 'property' : 'properties'}
-                      </div>
-                    </button>
-                    <span style={{ flexShrink: 0, fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 800, color: 'var(--v3-text)', fontVariantNumeric: 'tabular-nums' }}>
-                      {fmtMoney(g.total)}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => { hapticTap(); setStatementClient(g) }}
-                      aria-label={`Statement for ${g.client.company_name || g.client.name || 'client'}`}
-                      style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '8px 12px', borderRadius: 10, background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)', color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
-                    >
-                      <Receipt size={13} /> Statement
-                    </button>
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
-        </motion.div>
-      )}
-
-      {/* FILTER + LIST SECTION */}
-      <motion.div
-        variants={item}
-        className="v3-section"
-        style={{ margin: '0 var(--v3-gutter) 28px' }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
-          <SectionHeader label={filter === 'outstanding' ? 'Job balances' : 'All money jobs'} />
-          <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, color: 'var(--v3-text-muted)', fontVariantNumeric: 'tabular-nums' }}>
-            {filtered.length}
-          </span>
-        </div>
-
-        {loading && <SkeletonList rows={3} />}
-
-        {!loading && filtered.length === 0 && (
-          <div className="v3-empty">
-            <Receipt size={20} color="var(--v3-text-muted)" style={{ margin: '0 auto 8px' }} />
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
-              {filter === 'outstanding' ? 'Nothing outstanding.' : 'No money jobs yet.'}
-            </div>
-            <div style={{ fontSize: 12 }}>
-              {filter === 'outstanding'
-                ? 'Every active job is paid in full.'
-                : 'Approve a quote to move it into the money pipeline.'}
-            </div>
-          </div>
-        )}
-
-        {!loading && filtered.length > 0 && (
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {visibleBalances.map((r) => (
-              <PaymentCard
-                key={r.job.id}
-                row={r}
-                isSending={sendingId === r.job.id}
-                isSent={sentId === r.job.id}
-                onEmail={() => handleSendEmail(r)}
-                onPDF={() => handleGeneratePDF(r)}
-                onPaid={async () => {
-                  // Phase 11 stabilization, confirm before opening the
-                  // payment sheet so accidental Mark Paid taps in a
-                  // dense list don't begin the log-payment flow.
-                  const name = r.job?.name || 'this job'
-                  const amt = Number(r.balance || 0).toLocaleString(undefined, {
-                    style: 'currency', currency: 'USD', maximumFractionDigits: 0
-                  })
-                  const ok = await confirm({
-                    title: `Log payment for ${name}?`,
-                    body: `Opens the payment sheet filled with ${amt}.`,
-                    confirmLabel: 'Open sheet'
-                  })
-                  if (!ok) return
-                  openPaymentSheet(r)
-                }}
-              />
-            ))}
-            {balancesHasMore && <li ref={balancesSentinelRef as any} aria-hidden="true" style={{ height: 1 }} />}
-          </ul>
-        )}
-      </motion.div>
-
-      {/* Payment sheet, shared V3PaymentSheet from ContactDetail.
-          Opens when the operator taps Mark Paid on a row, prefilled with
-          that row's balance. On submit, logPayment cascades through
-          pipeline.ts (auto-close on overpayment) and we refresh. */}
+    <>
+      <MoneyPhone
+        bundle={bundle}
+        loading={loading}
+        invoiceRows={invoiceRows}
+        jobBalances={filtered}
+        totals={totals}
+        clientAR={clientAR}
+        collectionPace={collectionPace}
+        filter={filter as MoneyFilter}
+        onFilterChange={(f) => setFilter(f)}
+        sendingId={sendingId}
+        onSendInvoice={handleInvoiceSend}
+        onDownloadInvoice={handleInvoiceDownload}
+        onPayInvoice={openInvoicePayment}
+        onVoidInvoice={handleInvoiceVoid}
+        onStatement={(g) => setStatementClient(g)}
+        onRefresh={() => refresh()}
+      />
       <AnimatePresence>
         {payingRow && (
           <Suspense fallback={null}>
@@ -930,8 +490,6 @@ export default function Invoices() {
           </Suspense>
         )}
       </AnimatePresence>
-
-      {/* Client statement, fired from a "Who owes you" row */}
       <StatementSheet
         open={!!statementClient}
         onClose={() => setStatementClient(null)}
@@ -941,350 +499,6 @@ export default function Invoices() {
         changeOrders={changeOrders}
         userId={user?.id}
       />
-    </motion.div>
-  )
-}
-
-/* ============================================================
-   BalanceStateChip, small premium state pill that lives in the
-   cockpit top-right. Carries the urgency signal so the headline
-   total can stay calm linen. Three variants:
-     - none:    muted "All caught up" with check (zero outstanding)
-     - collect: gold-tinted "Collect · N" (outstanding, no overdue)
-     - overdue: danger-tinted "Overdue · N" (60+ exists)
-   ============================================================ */
-function BalanceStateChip({ totals }: any) {
-  // Variant selection, overdue beats collect beats none. Renders via
-  // the kit's StatusPill (wave 2) instead of a hand-rolled twin.
-  if (totals.count === 0) {
-    return <StatusPill color="var(--v3-text-muted)" icon={Check} label="All caught up" />
-  }
-  if (totals['60+'] > 0) {
-    return <StatusPill color="var(--v3-danger-bright)" label={`Overdue · ${totals.count}`} />
-  }
-  return <StatusPill color="var(--v3-primary)" label={`Collect · ${totals.count}`} />
-}
-
-/* ============================================================
-   AgingBar, single 6px segmented pill showing Current / Late /
-   Overdue proportions of total outstanding. Mirrors the prototype
-   owed-aging__bar pattern; segments collapse to zero-width when
-   their bucket is empty.
-   ============================================================ */
-function AgingBar({ totals }: any) {
-  const total = totals.total || 0
-  if (total <= 0) return null
-  const pct = (n: any) => (Number(n) / total) * 100
-  return (
-    <div
-      role="img"
-      aria-label="Outstanding balance by age"
-      style={{
-        display: 'flex',
-        height: 6,
-        borderRadius: 10,
-        background: 'var(--v3-track, rgba(242, 237, 228, 0.05))',
-        overflow: 'hidden'
-      }}
-    >
-      {AGING_BUCKETS.map((b) => {
-        const w = pct(totals[b.id])
-        if (w <= 0) return null
-        return (
-          <span
-            key={b.id}
-            aria-hidden="true"
-            style={{
-              width: `${w}%`,
-              background: b.color,
-              transition: 'width 220ms ease'
-            }}
-          />
-        )
-      })}
-    </div>
-  )
-}
-
-/* ============================================================
-   InvoiceCard, one issued fh_invoices row. Compact: status spine +
-   title/job + amount/due + actions (Send · Download · Mark paid ·
-   Void). Paid/void rows render quiet with no actions.
-   ============================================================ */
-const INVOICE_STATUS_META: Record<string, { label: string; color: string }> = {
-  draft:   { label: 'Draft',   color: 'var(--v3-text-muted)' },
-  sent:    { label: 'Sent',    color: 'var(--v3-primary-text)' },
-  overdue: { label: 'Overdue', color: 'var(--v3-danger-text)' },
-  paid:    { label: 'Paid',    color: 'var(--v3-success-text)' },
-  void:    { label: 'Void',    color: 'var(--v3-text-muted)' }
-}
-
-function shortDate(iso: any) {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-}
-
-function InvoiceCard({ row, isSending, isSent, onSend, onDownload, onMarkPaid, onVoid }: any) {
-  const { invoice, job, effStatus } = row
-  const meta = INVOICE_STATUS_META[effStatus] || INVOICE_STATUS_META.draft
-  const settled = effStatus === 'paid' || effStatus === 'void'
-  const title = invoice.title || `Invoice #${invoice.sequence_number}`
-
-  return (
-    <li>
-      <article style={{
-        position: 'relative',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 12,
-        padding: '12px 12px 12px 24px',
-        borderRadius: 10,
-        background: 'var(--v3-surface)',
-        border: effStatus === 'overdue'
-          ? '1px solid color-mix(in srgb, var(--v3-danger) 40%, transparent)'
-          : '1px solid var(--v3-border)',
-        opacity: settled ? 0.72 : 1,
-        overflow: 'hidden'
-      }}>
-        <span aria-hidden="true" style={{
-          position: 'absolute', left: 0, top: 10, bottom: 10, width: 3,
-          background: meta.color, borderRadius: '0 3px 3px 0', pointerEvents: 'none'
-        }} />
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{
-              fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: 14,
-              color: 'var(--v3-text)',
-              textDecoration: effStatus === 'void' ? 'line-through' : 'none'
-            }}>
-              {title}
-            </div>
-            <div style={{
-              marginTop: 2, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
-              fontSize: 12, color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)'
-            }}>
-              {job ? (
-                <Link to={`/jobs/${job.id}?tab=financials`} style={{ color: 'var(--v3-text-muted)', textDecoration: 'none' }}>
-                  {job.name || 'Job'} ›
-                </Link>
-              ) : (
-                <span>Job removed</span>
-              )}
-              {invoice.due_at && <span>· due {shortDate(invoice.due_at)}</span>}
-              {invoice.issued_at && effStatus !== 'draft' && <span>· sent {shortDate(invoice.issued_at)}</span>}
-            </div>
-          </div>
-          <div style={{ flexShrink: 0, textAlign: 'right' }}>
-            <div style={{
-              fontFamily: 'var(--font-display)', fontSize: 20, lineHeight: 1,
-              color: 'var(--v3-text)', fontVariantNumeric: 'tabular-nums',
-              textDecoration: effStatus === 'void' ? 'line-through' : 'none'
-            }}>
-              {fmtMoney(invoice.amount)}
-            </div>
-            <StatusPill color={meta.color} label={meta.label} style={{ marginTop: 4 }} />
-          </div>
-        </div>
-        {!settled && (
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-            <Button size="sm" variant={isSent ? 'success' : 'secondary'} onClick={onSend} disabled={isSending}>
-              {isSent ? <CheckCircle2 size={12} /> : <Send size={12} />}
-              {isSent ? 'Sent' : isSending ? 'Sending…' : effStatus === 'draft' ? 'Send' : 'Resend'}
-            </Button>
-            <Button size="sm" variant="secondary" onClick={onDownload}>
-              <FileDown size={12} /> PDF
-            </Button>
-            <Button size="sm" variant="primary" onClick={onMarkPaid}>
-              <DollarSign size={12} /> Mark paid
-            </Button>
-            <Button size="sm" variant="ghost" onClick={onVoid}>
-              Void
-            </Button>
-          </div>
-        )}
-      </article>
-    </li>
-  )
-}
-
-/* ============================================================
-   PaymentCard, premium v3 invoice card.
-   Layout:
-     ┌──────────────────────────────────────────────────┐
-     │  [spine]  Job name          $24,400  ›           │
-     │           Project type      45 d · LATE          │
-     │           ▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░ 42% paid     │
-     │           [Invoice PDF]    [MARK PAID]           │
-     └──────────────────────────────────────────────────┘
-   Functions preserved: PDF generation + mark paid via parent props.
-   ============================================================ */
-function PaymentCard({ row, onPDF, onPaid, onEmail, isSending, isSent }: any) {
-  const { job, amount, paid, balance, ageDays, bucket, isOutstanding } = row
-  const bucketMeta = AGING_BUCKETS.find((b) => b.id === bucket) || AGING_BUCKETS[0]
-  const pctPaid = amount > 0 ? Math.min(100, Math.max(0, (paid / amount) * 100)) : 0
-  const isOverdue = bucket === '60+'
-
-  return (
-    <li>
-      <motion.article
-        whileHover={{ y: -2 }}
-        transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-        style={{
-          position: 'relative',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 12,
-          padding: '12px 12px 12px 24px',
-          borderRadius: 10,
-          // Solid surface instead of glass+backdrop-blur: backdrop-filter is
-          // one of the most expensive mobile GPU ops, and this card renders
-          // once per outstanding balance. A solid surface + hairline border
-          // reads the same at card scale for a fraction of the paint cost.
-          background: 'var(--v3-surface-2)',
-          border: isOverdue
-            ? '1px solid color-mix(in srgb, var(--v3-danger) 40%, transparent)'
-            : '1px solid var(--v3-border-strong)',
-          boxShadow: '0 1px 0 var(--v3-glass-tint) inset, 0 4px 14px rgba(20, 20, 20, 0.30)',
-          overflow: 'hidden'
-        }}
-      >
-        {/* Aging-color spine, left edge */}
-        <span aria-hidden="true" style={{
-          position: 'absolute',
-          left: 0, top: 12, bottom: 12,
-          width: 4,
-          background: `linear-gradient(180deg, ${bucketMeta.color}, color-mix(in srgb, ${bucketMeta.color} 40%, transparent))`,
-          borderRadius: '0 4px 4px 0',
-          pointerEvents: 'none'
-        }} />
-
-        {/* Top row: name/project + amount/age */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <Link
-              to={`/invoices/${job.id}`}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 8,
-                color: 'var(--v3-text)',
-                textDecoration: 'none'
-              }}
-            >
-              <span style={{
-                fontFamily: 'var(--font-body)',
-                fontWeight: 700,
-                fontSize: 14,
-                letterSpacing: 0
-              }}>
-                {job.name || 'Unnamed job'}
-              </span>
-              <ChevronRight size={12} color="var(--v3-text-muted)" />
-            </Link>
-            {job.job_title && (
-              <div style={{
-                marginTop: 2,
-                fontSize: 12,
-                color: 'var(--v3-text-muted)',
-                fontFamily: 'var(--font-body)',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                maxWidth: '100%'
-              }}>
-                {job.job_title}
-              </div>
-            )}
-          </div>
-          <div style={{ flexShrink: 0, textAlign: 'right' }}>
-            <div style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: 24,
-              lineHeight: 1,
-              color: balance > 0 ? 'var(--v3-text)' : 'var(--v3-success-text)',
-              fontVariantNumeric: 'tabular-nums',
-              textShadow: balance > 0 ? '0 1px 0 var(--v3-glass-tint-2)' : 'none'
-            }}>
-              {balance > 0 ? fmtMoney(balance) : 'Paid'}
-            </div>
-            {isOutstanding && (
-              <StatusPill
-                color={bucketMeta.color}
-                label={`${ageDays} d · ${bucketMeta.label}`}
-                style={{ marginTop: 4 }}
-              />
-            )}
-          </div>
-        </div>
-
-        {/* Paid progress, visible payment momentum */}
-        <div>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            fontSize: 12,
-            color: 'var(--v3-text-muted)',
-            fontFamily: 'var(--font-body)',
-            marginBottom: 5
-          }}>
-            <span>{fmtMoney(paid)} paid of {fmtMoney(amount)}</span>
-            <span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--v3-text)' }}>
-              {Math.round(pctPaid)}%
-            </span>
-          </div>
-          <div style={{
-            height: 6,
-            borderRadius: 10,
-            background: 'var(--v3-track)',
-            overflow: 'hidden'
-          }}>
-            <div style={{
-              width: `${pctPaid}%`,
-              height: '100%',
-              background: pctPaid >= 100
-                ? 'var(--v3-success-bright)'
-                : 'linear-gradient(90deg, var(--v3-primary-deep), var(--v3-primary))',
-              borderRadius: 10,
-              transition: 'width 220ms ease',
-              boxShadow: pctPaid >= 100
-                ? '0 0 8px rgba(45, 122, 79, 0.40)'
-                : 'none'
-            }} />
-          </div>
-        </div>
-
-        {/* Action row: Email + PDF + Mark Paid (only on outstanding) */}
-        {isOutstanding && (
-          <div style={{
-            display: 'flex',
-            gap: 8,
-            justifyContent: 'flex-end',
-            paddingTop: 4,
-            flexWrap: 'wrap'
-          }}>
-            {/* Email, primary send action. Mirrors the Send button on
-                InvoiceDetail. User shouldn't have to dive into the detail
-                page just to email the client. */}
-            <Button
-              variant={isSent ? 'success' : 'secondary'}
-              onClick={onEmail}
-              disabled={isSending}
-              title={!resolveClient(row.job).email ? 'Add a client email first on the linked client' : 'Email the invoice to the client'}
-            >
-              {isSent ? <CheckCircle2 size={13} /> : <Send size={13} />}
-              {isSent ? 'Sent' : isSending ? 'Sending…' : 'Email'}
-            </Button>
-            <Button variant="secondary" onClick={onPDF}>
-              <FileDown size={13} /> Download
-            </Button>
-            <Button variant="primary" onClick={onPaid}>
-              <DollarSign size={13} /> Mark Paid
-            </Button>
-          </div>
-        )}
-      </motion.article>
-    </li>
+    </>
   )
 }
