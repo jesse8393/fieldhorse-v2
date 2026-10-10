@@ -208,7 +208,10 @@ test.describe('command palette', () => {
     await signIn(context, { tables: { fh_contacts: [JOB], fh_clients: [CLIENT] } })
     const requests: string[] = []
     await open(page)
-    await page.waitForLoadState('networkidle')
+    // The board is drawn, so the page listeners are in place. Network idle
+    // is not a usable signal here: the weather and font requests may never
+    // settle on a slow runner.
+    await expect(page.getByRole('region', { name: 'Unscheduled jobs' })).toBeVisible()
     const before = page.url()
 
     // A real textarea: Universal Capture's, opened by its own shortcut.
