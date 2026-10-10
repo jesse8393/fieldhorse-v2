@@ -25,7 +25,7 @@ Nothing failed persistently on the first full `npm run test:all` of this run, on
 | 3 | `redesign/phase-3` | #218 (draft) | the Phase 2 branch |
 | 4 | `redesign/phase-4` | #219 (draft) | `redesign/phase-3` |
 | 5 | `redesign/phase-5` | #220 (draft) | `redesign/phase-4` |
-| 6 | `redesign/phase-6` | not opened yet | `redesign/phase-5` |
+| 6 | `redesign/phase-6` | #221 (draft) | `redesign/phase-5` |
 | 7 | `redesign/phase-7` | not opened yet | `redesign/phase-6` |
 
 ## Tasks
@@ -69,7 +69,7 @@ Status is one of todo, done, blocked, skipped.
 | 6 | 6.1 Inbox data and engine switch | done | 45a0515 | Also touched `permissions.ts` and `appLayout.ts`, both additive |
 | 6 | 6.2 Inbox list | done | d5588e8 | |
 | 6 | 6.3 Thread with the AI draft | done | 0ca4345 | |
-| 6 | 6.4 Phase 6 review and pull request | todo | | |
+| 6 | 6.4 Phase 6 review and pull request | done | see git log | #221, images in phase6-review |
 | 7 | 7.1 Unused components | todo | | |
 | 7 | 7.2 Dead CSS guarded by screenshots | todo | | |
 | 7 | 7.3 Final record and morning summary | todo | | |
