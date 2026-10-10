@@ -86,7 +86,14 @@ test('keeps money, schedule, settings, and missing routes usable', async ({ page
   await capture(page, testInfo, 'home', true)
 
   await openRoute(page, '/invoices')
-  await expect(page.getByText('Progress draw 1', { exact: true })).toBeVisible()
+  if (testInfo.project.name.startsWith('mobile')) {
+    // The phone shows Money (tests/e2e/money.spec.ts): the invoice is a row
+    // under Due soon, named for the customer, with the job and the invoice.
+    await expect(page.getByRole('heading', { level: 1, name: 'Money' })).toBeVisible()
+    await expect(page.getByText('Driveway replacement, progress draw 1', { exact: true })).toBeVisible()
+  } else {
+    await expect(page.getByText('Progress draw 1', { exact: true })).toBeVisible()
+  }
   await capture(page, testInfo, 'invoices')
 
   await openRoute(page, '/schedule')

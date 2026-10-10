@@ -1,0 +1,497 @@
+/*
+ * Money on a phone (spec 9.7, render glamor/g-money.jpg). Class prefix
+ * fhm-. Reads only --fh- tokens, so Day and Night follow on their own.
+ * Rows, chips, buttons, the vault card and sheets come from the fh
+ * components; this file lays out the title, the groups, the quiet links at
+ * the bottom, the sub pages and what sits inside the sheets.
+ */
+
+.fhm {
+  padding-bottom: 24px;
+}
+
+/* ---- Title row: Money, then Reports ---- */
+.fhm-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px var(--fh-gutter) 8px;
+}
+
+.fhm-head--panel {
+  justify-content: flex-start;
+  gap: 8px;
+  padding-left: calc(var(--fh-gutter) - 4px);
+}
+
+.fhm-title:focus {
+  outline: none;
+}
+
+.fhm-title {
+  min-width: 0;
+  margin: 0;
+  font-family: var(--fh-font-display);
+  font-size: 36px;
+  line-height: 40px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--fh-ink);
+  overflow-wrap: anywhere;
+}
+
+/* The quiet Reports link sits level with the title's text. */
+.fhm-head > .fhc-btn {
+  flex: none;
+  color: var(--fh-ink-2);
+}
+
+/* ---- Vault card ---- */
+.fhm-vault {
+  padding: 8px var(--fh-gutter) 8px;
+}
+
+.fhm .fhm-vault__skel {
+  border-radius: 28px;
+}
+
+.fhm-state {
+  padding: 16px var(--fh-gutter) 0;
+}
+
+.fhm-quiet {
+  margin: 0;
+  padding: 24px var(--fh-gutter) 8px;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 400;
+  color: var(--fh-ink-2);
+}
+
+/* ---- Groups: a title with its note, then hairline rows ---- */
+.fhm-group {
+  padding: 0 var(--fh-gutter) 8px;
+}
+
+/* A full width hairline between groups, as in the render. */
+.fhm-group + .fhm-group {
+  margin-top: 8px;
+  box-shadow: inset 0 1px 0 var(--fh-hairline);
+}
+
+.fhm-group__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 0 12px;
+  border-bottom: 1px solid var(--fh-hairline);
+}
+
+.fhm-group__title {
+  min-width: 0;
+  margin: 0;
+  font-family: var(--fh-font-display);
+  font-size: 24px;
+  line-height: 28px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--fh-ink);
+}
+
+.fhm-group__note {
+  min-width: 0;
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 400;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--fh-ink-2);
+}
+
+.fhm-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* ---- Quiet links to the lists behind Money ---- */
+.fhm-more {
+  display: flex;
+  flex-direction: column;
+  margin: 16px var(--fh-gutter) 0;
+  border-top: 1px solid var(--fh-hairline);
+}
+
+.fhm-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--fh-hairline);
+  color: var(--fh-ink);
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.fhm-link__label {
+  flex: none;
+  font-family: var(--fh-font-body);
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.fhm-link__value {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--fh-ink-2);
+}
+
+.fhm-link__chevron {
+  flex: none;
+  color: var(--fh-ink-3);
+}
+
+.fhm-link:active {
+  background: color-mix(in srgb, var(--fh-ink) 6%, transparent);
+}
+
+.fhm-link:focus-visible {
+  outline: 2px solid var(--fh-focus) !important;
+  outline-color: var(--fh-focus) !important;
+  outline-offset: 2px;
+  border-radius: 7px;
+}
+
+/* ---- Sub pages: Who owes you, All invoices, Job balances ---- */
+.fhm-panel {
+  padding: 4px var(--fh-gutter) 0;
+}
+
+.fhm-panel__intro {
+  margin: 0 0 8px;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 400;
+  color: var(--fh-ink-2);
+}
+
+.fhm-panel__count {
+  margin: 12px 0 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--fh-hairline);
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--fh-ink-2);
+}
+
+.fhm-vh {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The Outstanding and All choice. */
+.fhm-filter {
+  min-width: 0;
+  margin: 8px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.fhm-seg {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--fh-hairline);
+  border-radius: 14px;
+  background: var(--fh-tray);
+}
+
+.fhm-seg__option {
+  position: relative;
+  display: block;
+}
+
+.fhm-seg__option input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.fhm-seg__face {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  border-radius: 10px;
+  color: var(--fh-ink-3);
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  pointer-events: none;
+  transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+.fhm-seg__option input:checked + .fhm-seg__face {
+  background: var(--fh-paper);
+  color: var(--fh-ink);
+  font-weight: 600;
+  box-shadow: var(--fh-shadow-soft);
+}
+
+.fhm-seg__option input:focus-visible + .fhm-seg__face {
+  outline: 2px solid var(--fh-focus);
+  outline-offset: 2px;
+}
+
+/* Job balances: the aging summary on a tray, flat, with a hairline between columns. */
+.fhm-aging {
+  margin: 8px 0 0;
+  padding: 16px;
+  border-radius: 14px;
+  background: var(--fh-tray);
+  box-shadow: inset 0 0 0 1px var(--fh-hairline);
+}
+
+.fhm-aging__label {
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--fh-ink-2);
+}
+
+.fhm-aging__total {
+  margin: 4px 0 0;
+  font-family: var(--fh-font-display);
+  font-size: 34px;
+  line-height: 36px;
+  font-weight: 600;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--fh-ink);
+  overflow-wrap: anywhere;
+}
+
+.fhm-aging__facts {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  justify-content: space-between;
+  margin: 16px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--fh-hairline);
+}
+
+.fhm-aging__fact {
+  min-width: 0;
+}
+
+.fhm-aging__fact dt {
+  font-family: var(--fh-font-body);
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+.fhm-aging__fact dd {
+  margin: 4px 0 0;
+  font-family: var(--fh-font-display);
+  font-size: 20px;
+  line-height: 24px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--fh-ink);
+  white-space: nowrap;
+}
+
+.fhm-aging__fact dd.fhm-aging__range {
+  margin-top: 0;
+  font-family: var(--fh-font-body);
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+.fhm-aging__pace {
+  margin: 12px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--fh-hairline);
+  font-family: var(--fh-font-body);
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--fh-ink-2);
+}
+
+/* ---- Invoice actions sheet ---- */
+.fhm-inv {
+  display: grid;
+  gap: 20px;
+}
+
+.fhm-inv__summary {
+  display: grid;
+  gap: 4px;
+}
+
+.fhm-inv__who {
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+  color: var(--fh-ink);
+}
+
+.fhm-inv__sub {
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--fh-ink-2);
+}
+
+.fhm-inv__amount {
+  margin: 8px 0 0;
+  font-family: var(--fh-font-display);
+  font-size: 34px;
+  line-height: 36px;
+  font-weight: 600;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--fh-ink);
+}
+
+.fhm-inv__status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.fhm-inv__dates {
+  font-family: var(--fh-font-body);
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--fh-ink-2);
+}
+
+.fhm-inv__actions {
+  display: grid;
+  gap: 8px;
+}
+
+/* Void sits apart from the other actions. */
+.fhm-inv__actions .fhc-btn--destructive {
+  margin-top: 8px;
+}
+
+/* ---- Remind sheet ---- */
+.fhm-remind {
+  display: grid;
+  gap: 16px;
+}
+
+.fhm-remind__facts {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.fhm-remind__fact {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.fhm-remind__fact dt {
+  font-family: var(--fh-font-body);
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+.fhm-remind__fact dd {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  min-width: 0;
+  font-family: var(--fh-font-body);
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+  color: var(--fh-ink);
+  overflow-wrap: anywhere;
+}
+
+.fhm-remind__sub {
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 400;
+  color: var(--fh-ink-2);
+}
+
+.fhm-remind__amount {
+  font-variant-numeric: tabular-nums;
+}
+
+.fhm-remind__help {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.fhm-helper {
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--fh-ink-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fhm-seg__face {
+    transition: none;
+  }
+}
