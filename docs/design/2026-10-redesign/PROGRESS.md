@@ -6,7 +6,78 @@ Run rules and plans: `PHASE2_PLAN.md` to `PHASE7_PLAN.md` in this folder, decisi
 
 ## Morning summary
 
-Not written yet. It goes here when the run finishes or has to stop.
+Good morning, Jesse. Phases 2 to 7 are all built and pushed. Nothing is merged, nothing was deployed, and no database or server file was touched. Every pull request is a draft, stacked in order, so you can read them one at a time.
+
+### 1. What is done, phase by phase
+
+| Phase | What | Pull request | Checks on its head |
+| --- | --- | --- | --- |
+| 2 | Today, Jobs, the Job page, Capture and the Night stage on a phone | #217 (existing, a Phase 2 section was added to its description) | Full suite passed: 651 unit tests, Playwright 64 passed |
+| 3 | Money and the quote editor on a phone | #218 | 720 unit tests, Playwright 95 passed |
+| 4 | Desktop Schedule board, desktop Job page, command palette, and the two stretch tasks: desktop Today and desktop Money | #219 | 801 unit tests, Playwright 153 passed |
+| 5 | Customer quote page in the Fieldhorse theme, Welcome and Login | #220 | 812 unit tests, Playwright 198 passed (before the Phase 4 stretch work was merged in, and covered again by the Phase 6 run) |
+| 6 | Inbox list and thread with the AI draft | #221 | 850 unit tests, Playwright 270 passed |
+| 7 | Cleanup: unused components, dead CSS removed behind a screenshot guard, the final image record | #222 | 850 unit tests, Playwright 270 passed, 184 skipped (the screenshot guard only runs on request) |
+
+On every head lint has 0 errors, and typecheck, build and the design audit pass. No test failed on any final head, and nothing failed persistently before this run either (see "Failing before this run" below). The only trouble was two timing sensitive desktop tests that CI caught on #219. Both now wait for the page, and the fix is on the Phase 4 branch and every branch above it.
+
+### 2. Images worth looking at first
+
+All in `docs/design/2026-10-redesign/final-review/`, our build on the left and the approved render on the right.
+
+* `today-day.png` and `today-night.png`: the new Today.
+* `job-day.png`: the Job page on a phone.
+* `money-day.png` and `quote-day.png`: the two big Phase 3 screens.
+* `schedule-day.png`, `deskjob-day.png`, `palette-day.png`: the three desktop renders.
+* `deskhome-day.png` and `deskmoney-day.png`: desktop Today and Money (they sit next to the phone renders, because there is no desktop render for them).
+* `portal-day.png`, `portal-approve-day.png` and `portal-night.png`: what your customer sees.
+* `login-none.png` and `login-photo.png`: the sign in screen with no photo, and with a stand in photo.
+* `thread-day.png` and `thread-night.png`: the Inbox thread.
+
+### 3. Blocked, and things that need you
+
+Nothing is blocked. Five things need your eye:
+
+1. **The Fieldhorse customer page cannot be chosen in Settings yet.** The database only allows four template names, and saving a fifth would fail the whole Settings save. I may not write migrations, so the Fieldhorse card is hidden behind one flag. The SQL to widen the check is in #220 and in decision D22. After you run it, change `FIELDHORSE_TEMPLATE_SAVES` to true in `src/screens/Settings.tsx`.
+2. **The Inbox guesses at three live values** (what a held reason looks like, the status of a waiting draft, and where the draft text sits). The Growth Engine tables are not in the migrations. Nothing can send by accident, but please check D26 against the live schema before you turn the engine on for anyone.
+3. **Two numbers vanished from desktop Today:** the "N at risk" dollar value and "N behind". Each lead or job behind still shows as a Needs an answer row (up to 6). See D28.
+4. **Three design calls are open for you:** the Job page hides the shared header strip (D14, D20), Navigate is outlined rather than gold on Today, and a capture made offline from a job is still saved as a note with no job.
+5. **Left alone on purpose:** the six legacy brand colors are still used by the mobile app, the email and document templates, the customer pages and older screens, so they stay in the design audit list. A few unused files outside the plan's list (for example `HomeActivityCard.tsx`, `NewQuoteSheet.tsx`, `SpecTabs.tsx`, `Toaster.tsx` and the unused shadcn parts in `src/components/ui`) are still there.
+
+### 4. New decisions in SPEC.md section 17
+
+D1 to D13 were yours or set before this run. New in this run:
+
+* D14 The shared header strip is hidden on the Job page, which runs the photo under it.
+* D15 How the Money groups are counted (overdue, due soon, due this week).
+* D16 Where the old phone Money features went (Statements, All invoices, Job balances pages).
+* D17 Deposit and status chips on the Quote tab.
+* D18 The Quote tab capsule shows Total, deposit and Send for approval.
+* D19 Palette shortcuts are Alt plus I, M and N, and only fire inside the open palette.
+* D20 Desktop Job page details.
+* D21 Desktop Schedule board details.
+* D22 The Fieldhorse template choice is hidden until a migration allows it.
+* D23 Portal numbers and wording (total, deposit, trust line, approver name).
+* D24 Portal layout details (capsule at the end of the page, Full details, Ask about this).
+* D25 One onyx shell for Welcome, Login, Reset password and Partner invite.
+* D26 The Inbox values it has to guess.
+* D27 Who sees the Inbox and how the thread behaves.
+* D28 Desktop Today.
+* D29 Desktop Money.
+* D30 Phase 7 choices (the forecast screen's hero, what was deleted, and what was kept).
+
+### 5. iPhone test checklist
+
+1. Open Today in the morning and again after dark. Look at Day and Night.
+2. Tap Capture on Today, then Capture from inside a job. Save a note and a to do.
+3. Open a job. Walk the tabs, tap Call and Message, and check the gold button follows the stage.
+4. Jobs: switch tabs, open the filter, open a job.
+5. Money: open Remind on an overdue invoice and read it, then close it without sending. Open an invoice sheet and the Statements page.
+6. Open a quote, switch to the Quote tab, open the preview and check Send for approval.
+7. Open a customer link on your phone with a real quote. It will still look like your current template, because the Fieldhorse choice is held back (item 1 above).
+8. Sign out and look at Login. Tap the password field, and check Sign in stays above the keyboard.
+9. Turn the phone sideways on Today and Jobs, and check nothing overlaps.
+10. If you turn the messaging engine on for a test company, open Inbox, open a thread, edit a draft and tap Send once. Do this only for a test customer.
 
 ## Failing before this run
 
@@ -26,7 +97,7 @@ Nothing failed persistently on the first full `npm run test:all` of this run, on
 | 4 | `redesign/phase-4` | #219 (draft) | `redesign/phase-3` |
 | 5 | `redesign/phase-5` | #220 (draft) | `redesign/phase-4` |
 | 6 | `redesign/phase-6` | #221 (draft) | `redesign/phase-5` |
-| 7 | `redesign/phase-7` | not opened yet | `redesign/phase-6` |
+| 7 | `redesign/phase-7` | #222 (draft) | `redesign/phase-6` |
 
 ## Tasks
 
@@ -72,7 +143,7 @@ Status is one of todo, done, blocked, skipped.
 | 6 | 6.4 Phase 6 review and pull request | done | see git log | #221, images in phase6-review |
 | 7 | 7.1 Unused components | done | see git log | Pour window hero is now an OnyxStage |
 | 7 | 7.2 Dead CSS guarded by screenshots | done | see git log | 392 rules removed in 4 batches, 0 changed pixels |
-| 7 | 7.3 Final record and morning summary | todo | | |
+| 7 | 7.3 Final record and morning summary | done | see git log | #222, images in final-review |
 
 ## Notes and differences from the plans
 
