@@ -59,9 +59,9 @@ Status is one of todo, done, blocked, skipped.
 | 4 | 4.2 Week board and Unscheduled tray | done | 053d488 | `@dnd-kit/core` added in 2146dc7 |
 | 4 | 4.3 Desktop Job page | done | 940e23a | |
 | 4 | 4.4 Command palette actions | done | 9d704ed | |
-| 4 | 4.5 Desktop Today (stretch) | todo | | agent running |
-| 4 | 4.6 Desktop Money (stretch) | todo | | agent running |
-| 4 | 4.7 Phase 4 review and pull request | todo | | #219 opened as a draft with 4.1 to 4.4, images in phase4-review; stretch tasks 4.5 and 4.6 are in progress |
+| 4 | 4.5 Desktop Today (stretch) | done | bd4e0a3 | Changed the Today parts the phone shares; phone tests unchanged |
+| 4 | 4.6 Desktop Money (stretch) | done | c5b7ea4 | Phone sheet logic moved into two shared hooks |
+| 4 | 4.7 Phase 4 review and pull request | done | see git log | #219, images in phase4-review |
 | 5 | 5.1 Portal view model | todo | | |
 | 5 | 5.2 Fieldhorse proposal theme | todo | | |
 | 5 | 5.3 Welcome and Login | todo | | |
@@ -105,4 +105,20 @@ Status is one of todo, done, blocked, skipped.
 
 * Decisions D19 to D21 in `SPEC.md` cover the palette shortcuts, the desktop Job page and the Schedule board. The schedule agent also found that a second `NotificationsBell` throws ("cannot add postgres_changes callbacks after subscribe") because the two instances share a channel name, and a CSS hidden header still mounts its bell, so any screen that hides the header must not render its own bell.
 * The first dev server load after `@dnd-kit/core` is imported re-optimizes dependencies once and can break a single e2e run.
-* The desktop shots in the review images are Day only, as the plan says.
+* The desktop shots in the review images are Day only, as the plan says. There is no desktop render for Today or Money, so those two shots sit next to the phone renders.
+* CI on #219 caught two timing sensitive desktop tests (`palette.spec` waited for network idle, `schedule.spec` dropped a keyboard drag before the highlight). Both now wait for the page. Network idle took up to 41 seconds under CPU load locally.
+
+### Phase 4 stretch decisions (recorded in SPEC section 17 as D28 and D29 on the Phase 6 branch)
+
+* **D28, desktop Today.**
+  * Today now takes the same props as the phone and shares its parts (`todayParts.tsx`). Both layouts read `buildTodayView`.
+  * The KPI tiles, the revenue overview, saved views, the opportunities table and the job health preview are gone. Pipeline numbers live in Reports, and every job they listed is a row in Jobs.
+  * "Needs an answer" always shows on desktop, with "Nothing needs an answer right now." when empty, so the right column is never only the week strip.
+  * The week strip reads the schedule, Sunday to Saturday like the Schedule screen, with each day linking to `/schedule?d=`.
+  * The stage carries New lead and New job as secondary buttons. A full day has no gold action, as on the phone.
+  * Two aggregate figures no longer appear anywhere in the app: "N at risk" with its dollar value (`dealsAtRisk`) and "N behind" (`jobsBehind`). Each stalled lead and each behind job is still a Needs an answer row, up to 6. Both numbers stay in the dashboard data.
+* **D29, desktop Money.**
+  * The vault card sits beside a Total outstanding panel with the three ages, then a strip with Statements, All invoices and Job balances, then the four group tables (Customer, Job, Amount, Status, Action).
+  * No gold button on the page. New invoice is a secondary button. The only gold is Send reminder inside the Remind sheet, as on the phone.
+  * A row click does what Open does. Overdue rows also have a name button, because Remind is their only action control.
+  * The phone's sheets and `?panel=` pages are shared through two new hooks, `useMoneySheets` and `useMoneyPanel`. The 80 row caps on All invoices and Job balances became grow on scroll. Weather left the page.
