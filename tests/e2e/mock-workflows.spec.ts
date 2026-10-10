@@ -73,14 +73,12 @@ test('keeps money, schedule, settings, and missing routes usable', async ({ page
   if (await pipelineButton.count()) {
     await expect(pipelineButton.locator('.v3-skeleton')).toHaveCount(0)
   }
-  if (testInfo.project.name.startsWith('desktop')) {
-    await expect(page.getByText(/collected this week/i)).toHaveCount(1)
-  }
+  // Both layouts show Today (tests/e2e/today.spec.ts) and neither keeps the
+  // old dashboard tiles; collected this week lives on Money.
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(/stops?( done)?\.|Clear day\.|Quiet day\./)
+  await expect(page.getByText(/collected this week/i)).toHaveCount(0)
   await expect(page.getByText(/\+?0(?:\.0)?%\s*[·•]\s*7d/i)).toHaveCount(0)
   if (testInfo.project.name.startsWith('mobile')) {
-    // The phone shows Today (tests/e2e/today.spec.ts); the KPI tiles stay
-    // on the desktop view.
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText(/stops?( done)?\.|Clear day\.|Quiet day\./)
     await expect(page.getByText('Jobs Behind', { exact: true })).toHaveCount(0)
   }
   await capture(page, testInfo, 'home', true)

@@ -1,967 +1,286 @@
-import {
-  ArrowDownRight,
-  ArrowUpRight,
-  BarChart3,
-  Bell,
-  Calendar,
-  CalendarDays,
-  ChevronRight,
-  CircleDollarSign,
-  Clock3,
-  FileText,
-  MapPin,
-  Plus,
-  Search,
-  Sun,
-  Users,
-} from 'lucide-react'
-import { money, moneyFull } from '../../lib/format.ts'
+// SnowHomeBuild, desktop Today (spec 9.2 and the Phase 4 plan, Task 4.5).
+// There is no desktop render; it is the phone Today laid out for a wide
+// screen, from the same buildTodayView.
+//
+// Left column: the onyx stage (date line, headline, weather and pour line,
+// the gold hairline) with the next stop on a photo card hanging off its
+// edge, then "Your day". Right column: "Needs an answer" and the week strip,
+// seven days with their visits, today marked, each opening the schedule.
+// After sunset the left column turns to "Today, done" and "Tomorrow".
+//
+// The dashboard tiles, the revenue overview and the pipeline tables are
+// not on Today any more; pipeline numbers live in Reports (/analytics).
+// There is no brushed gold action on a full day, as on the phone: New lead
+// and New job are secondary buttons on the stage.
+
+import { useMemo } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { CalendarPlus, Plus } from 'lucide-react'
+import { Button, EmptyState, OnyxStage, Skeleton, SkeletonRows, SyncPill } from '../fh/index.ts'
 import DataErrorState from '../DataErrorState.tsx'
-import MiniMetric from '../MiniMetric.tsx'
-import { StatusPill } from '../v3'
-import { LIST_STAGE_META } from '../../lib/stages.ts'
+import { useAuth } from '../../contexts/AuthContext.tsx'
+import { useScheduleEvents } from '../../lib/queries.ts'
+import { weekRangeLabel } from '../../lib/scheduleBoard.ts'
+import { buildTodayView, todayWeather, weekBounds, weekStrip } from '../../lib/todayView.ts'
+import type { HomeTodayOnSite } from '../../lib/homeDashboard.ts'
+import {
+  AnswerList,
+  NextStopCard,
+  SectionHead,
+  StageHero,
+  StageLine,
+  Visit,
+  WeekLink,
+  deviceMaps,
+  eveningDate,
+  longDate
+} from '../../screens/today/todayParts.tsx'
+import type { TodayScreenProps } from '../../screens/today/todayParts.tsx'
+import '../../screens/today/today.css'
+import './today-desktop.css'
 
-type Props = {
-  firstName: string
-  now: Date
-  hasCoords: boolean
-  tempStr: string
-  condStr: string
-  pipeline: number | null
-  trendUp: boolean
-  trendPct: number | null
-  stageBreakdown: { won?: number; active?: number; lead?: number; invoice?: number } | null
-  // Full per-stage rail (lead/quote/job/invoice/closed/lost with real
-  // counts + $ totals), preferred over stageBreakdown when present.
-  stageRail?: Array<{ key: string; count: number; total: number }> | null
-  // Job Health Preview rows (Phase 1 §3). Each row already carries
-  // the per-column status text + tone keyed to the .fh-build-dot
-  // palette so SnowHomeBuild renders them verbatim.
-  jobHealth?: Array<{
-    id: string
-    job: string
-    stage: string
-    schedule: string; scheduleTone: 'good' | 'warn' | 'bad' | 'neutral'
-    billing: string;  billingTone: 'good' | 'warn' | 'bad' | 'neutral'
-    risk: string;     riskTone: 'good' | 'warn' | 'bad' | 'neutral'
-    next: string
-  }> | null
-  // Home.tsx stores dealsAtRisk as a shape: { count, value, followUps,
-  // quotesAttention, … }, older callers expect a plain number. We
-  // accept either and normalize at the render site.
-  dealsAtRisk: number | { count?: number; value?: number; [k: string]: any } | null
-  jobsBehind: number | null
-  invoicingWeek: number | null
-  todayOnSite: any[] | null
-  topPipeline: any[] | null
-  nextActions: any[] | null
-  dashboardError?: string
-  onRetryDashboard?: () => void
-  onGoToJobs: (filter?: string) => void
-  onGoToPipeline?: () => void
-  onGoToLeads?: (filter?: string) => void
-  onGoToQuotes?: (filter?: string) => void
-  onGoToActivity?: () => void
-  onGoToSchedule: () => void
-  onGoToInvoices: () => void
-  onOpenJob: (id: string) => void
-  onOpenJobAtTab: (id: string, tab?: string, intent?: string) => void
-  onNewLead: () => void
-  // Optional pass-throughs from Home.tsx, accepted but unused here.
-  weatherErr?: any
-  pinLocation?: () => void
-  onGoToBid?: () => void
-  onGoToCompose?: () => void
-  onGoToPourWindow?: () => void
-}
+/* ---------------- The week strip ---------------- */
 
-type PipelineRoute = 'jobs' | 'leads' | 'quotes'
-
-type PipelineRailRow = {
-  key: string
-  label: string
-  amount: string
-  count: number
-  width: string
-  route: PipelineRoute
-  filter?: string
-}
-
-function greetingFor(now: Date) {
-  const h = now.getHours()
-  if (h < 12) return 'Good morning'
-  if (h < 18) return 'Good afternoon'
-  return 'Good evening'
-}
-
-/* Cold-load shimmer block. Variant maps to a .fh-build-skel--* class in
-   fixes-2026-07.css (money / stat / metric / sub / chip / line). Every
-   spot that used to print an em dash or a "Loading" string during the
-   first seconds now renders one of these instead, gray pulse reads as
-   loading, never as a confident zero. */
-function Skel({ variant, width }: { variant?: string; width?: number | string }) {
-  return (
-    <span
-      className={`fh-build-skel${variant ? ` fh-build-skel--${variant}` : ''}`}
-      style={width != null ? { width } : undefined}
-      aria-hidden="true"
-    />
-  )
-}
-
-/* Loading rows for the three dashboard tables. Same .fh-build-table__row
-   shell as real rows so column rhythm holds; single shimmer bar per row
-   with staggered widths so the block reads as content arriving. */
-function SkelRows({ variantClass }: { variantClass: string }) {
-  return (
-    <>
-      {['82%', '64%', '48%'].map((w) => (
-        <div
-          key={w}
-          className={`fh-build-table__row ${variantClass}`}
-          style={{ gridTemplateColumns: '1fr', cursor: 'default' }}
-        >
-          <Skel variant="line" width={w} />
-        </div>
-      ))}
-    </>
-  )
-}
-
-// Coerces dealsAtRisk into { count, value, followUps, quotesAttention }
-// regardless of upstream shape so the right-rail tile can interpolate
-// primitives safely. Returns null when the data hasn't loaded yet so
-// callers can render '\u2003' instead of guessing a value.
-function normalizeDealsAtRisk(
-  input: number | { count?: number; value?: number; followUps?: number; quotesAttention?: number; [k: string]: any } | null | undefined,
-): { count: number; value: number; followUps: number | null; quotesAttention: number | null } | null {
-  if (input == null) return null
-  if (typeof input === 'number') return { count: input, value: 0, followUps: null, quotesAttention: null }
-  if (Array.isArray(input)) return { count: input.length, value: 0, followUps: null, quotesAttention: null }
-  if (typeof input === 'object') {
-    const count = typeof input.count === 'number' ? input.count : 0
-    const value = typeof input.value === 'number' ? input.value : 0
-    const followUps = typeof input.followUps === 'number' ? input.followUps : null
-    const quotesAttention = typeof input.quotesAttention === 'number' ? input.quotesAttention : null
-    return { count, value, followUps, quotesAttention }
-  }
-  return null
-}
-
-export default function SnowHomeBuild(props: Props) {
-  const {
-    firstName,
-    now,
-    hasCoords,
-    tempStr,
-    condStr,
-    pipeline,
-    trendUp,
-    trendPct,
-    stageBreakdown,
-    dealsAtRisk,
-    jobsBehind,
-    invoicingWeek,
-    todayOnSite,
-    topPipeline,
-    nextActions,
-    onGoToJobs,
-    onGoToPipeline,
-    onGoToLeads,
-    onGoToQuotes,
-    onGoToActivity,
-    onGoToSchedule,
-    onGoToInvoices,
-    onOpenJob,
-    onOpenJobAtTab,
-    onNewLead,
-    stageRail,
-    jobHealth,
-    dashboardError,
-    onRetryDashboard,
-  } = props as any
-
-  const dateLabel = now.toLocaleDateString(undefined, {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  })
-
-  // Full per-stage rail (real totals over the deduped contact list)
-  // when the parent provides it, matches the approved mock where
-  // every stage shows $ + count. Falls back to the 3-bucket
-  // approximation for any caller that hasn't wired stageRail yet.
-  const pipelineRows = Array.isArray(stageRail) && stageRail.length > 0
-    ? buildStageRailRows(stageRail)
-    : buildPipelineStages(topPipeline, stageBreakdown)
-  // Active opportunities = the ACTIVE_STAGES set (lead+quote+job+invoice)
-  //, closed/lost don't belong in an "active" count even though they're
-  // visible columns on the stage rail. Audit H2 caught the subtitle
-  // saying "24 active opportunities" by counting every row including
-  // the 8 closed and 1 lost.
-  const ACTIVE_RAIL_KEYS = new Set(['lead', 'quote', 'job', 'invoice', 'active'])
-  const totalOppCount = pipelineRows.reduce(
-    (s: number, r: any) => s + (ACTIVE_RAIL_KEYS.has(r.key) ? (r.count || 0) : 0),
-    0
-  )
-  const activeStageCount = pipelineRows.filter((r: any) => ACTIVE_RAIL_KEYS.has(r.key) && (r.count || 0) > 0).length
-  const queueRows = buildOwnerQueue(nextActions)
-  const revenueRows = buildRevenueRows(topPipeline)
-  // Job Health Preview rows come from Home.tsx (which has the contacts
-  // + overdue-schedule + payments joined). Empty array while loading
-  // so the card prints its loading state instead of a wired stub.
-  const jobRows = Array.isArray(jobHealth) ? jobHealth : []
+function WeekSection({ now }: { now: Date }) {
+  const { user } = useAuth()
+  const { start, end } = weekBounds(now)
+  const week = useScheduleEvents(user?.id, start.toISOString(), end.toISOString())
+  const days = useMemo(() => weekStrip(week.data ?? [], now), [week.data, now])
+  const last = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6)
 
   return (
-    <div
-      className="fh-build-page"
-      data-build-screen="SnowHomeBuild"
-      data-build-route="/"
-    >
-      <header className="fh-build-topbar">
-        <button
-          type="button"
-          className="fh-build-search"
-          onClick={() => {
-            if (typeof window !== 'undefined') {
-              window.dispatchEvent(new CustomEvent('fh:open-palette'))
-            }
-          }}
-          aria-label="Open command palette"
-        >
-          <Search size={14} />
-          <span>Search jobs, clients, invoices, notes...</span>
-          <kbd>⌘K</kbd>
-        </button>
-
-        <div className="fh-build-topbar__meta">
-          <span>{dateLabel}</span>
-          <span className="fh-build-vline" />
-          {hasCoords ? (
-            tempStr ? (
-              <>
-                <span>{tempStr}{condStr ? ` · ${condStr}` : ''}</span>
-                <Sun size={16} className="fh-build-sun" />
-              </>
-            ) : (
-              <Skel variant="sub" width={56} />
-            )
-          ) : (
-            <span style={{ opacity: 0.6 }}>Weather not set</span>
-          )}
-        </div>
-
-        <button
-          className="fh-build-icon-btn"
-          type="button"
-          onClick={() => onGoToActivity?.()}
-          aria-label="Open activity"
-          title="Activity"
-        >
-          <Bell size={16} />
-        </button>
-
-        <button className="fh-build-new-btn" type="button" onClick={onNewLead}>
-          <Plus size={15} />
-          New
-        </button>
-      </header>
-
-      {dashboardError ? (
-        <div style={{ padding: '0 24px 12px' }}>
-          <DataErrorState
-            compact
-            title="Dashboard data couldn't refresh"
-            message={dashboardError}
-            onRetry={onRetryDashboard}
-          />
-        </div>
-      ) : null}
-
-      <main className="fh-build-main">
-        <section className="fh-build-hero-row">
-          <div>
-            <div className="fh-build-good">{greetingFor(now)}, {firstName || 'there'}</div>
-            <h1 className="fh-build-title">Today</h1>
-          </div>
-
-          <FocusCard onGoToSchedule={onGoToSchedule} />
-
-          <div className="fh-build-mini-grid">
-            {/* Labels match what the numbers actually measure, "Crews
-                on site" here vs "Crews active" on Schedule disagreed
-                because both were mislabeled (UI audit #11/#28).
-                "Reports missing" (a hardcoded placeholder dash, the
-                count was never wired) is replaced by "Open deals",
-                which the stage rail already computes for real. */}
-            <MiniMetric label="On site today" value={todayOnSite == null ? <Skel variant="metric" width={28} /> : String(todayOnSite.length)} />
-            <MiniMetric label="Open deals" value={stageRail == null && stageBreakdown == null ? <Skel variant="metric" width={28} /> : String(totalOppCount)} />
-            <MiniMetric label="Queued actions" value={nextActions == null ? <Skel variant="metric" width={28} /> : String(nextActions.length)} />
-            {/* invoicingWeek is money COLLECTED since Sunday, labeling it
-                "Ready to invoice" claimed already-received cash was billable. */}
-            <MiniMetric label="Collected this week" value={invoicingWeek == null ? <Skel variant="metric" width={56} /> : money(invoicingWeek)} />
-          </div>
-        </section>
-
-        <RevenueOperatingLayer
-          pipeline={pipeline}
-          rows={pipelineRows}
-          dealsAtRisk={dealsAtRisk}
-          jobsBehind={jobsBehind}
-          nextActions={nextActions}
-          onGoToJobs={onGoToJobs}
-          onGoToLeads={onGoToLeads}
-          onGoToQuotes={onGoToQuotes}
-          onGoToInvoices={onGoToInvoices}
-          onGoToActivity={onGoToActivity}
-        />
-
-        <section className="fh-build-content-grid fh-build-content-grid--home">
-          <TodayCard
-            activeJobsCount={stageBreakdown?.active ?? null}
-            onGoToSchedule={onGoToSchedule}
-            onNewLead={onNewLead}
-          />
-
-          <OwnerQueue
-            rows={queueRows}
-            loading={nextActions == null}
-            onOpenJobAtTab={onOpenJobAtTab}
-            onViewAll={onGoToActivity}
-          />
-
-          <RevenueOpportunities
-            rows={revenueRows}
-            loading={topPipeline == null}
-            onOpenJob={onOpenJob}
-            onViewAll={onGoToLeads}
-          />
-
-          <JobHealthPreview
-            rows={jobRows}
-            loading={jobHealth == null}
-            onGoToJobs={onGoToJobs}
-            onOpenJob={onOpenJob}
-          />
-        </section>
-      </main>
-    </div>
-  )
-}
-
-function RevenueOperatingLayer({
-  pipeline,
-  rows,
-  dealsAtRisk,
-  jobsBehind,
-  nextActions,
-  onGoToJobs,
-  onGoToLeads,
-  onGoToQuotes,
-  onGoToInvoices,
-  onGoToActivity,
-}: any) {
-  const risk = normalizeDealsAtRisk(dealsAtRisk)
-  const actionCount = Array.isArray(nextActions) ? nextActions.length : null
-  const firstAction = Array.isArray(nextActions) && nextActions.length > 0 ? nextActions[0] : null
-  const openRows = Array.isArray(rows) ? rows.filter((row: PipelineRailRow) => row.key !== 'closed' && row.key !== 'lost') : []
-  const openCount = openRows.reduce((sum: number, row: any) => sum + Number(row.count || 0), 0)
-  const riskValue = risk?.value || 0
-  const healthCopy = risk == null
-    ? 'Loading revenue signals.'
-    : risk.count > 0
-      ? `${risk.count} customer ${risk.count === 1 ? 'thread needs' : 'threads need'} owner attention before the pipeline gets stale.`
-      : 'No stalled lead or quote signals in the current book.'
-  const primaryAction = firstAction?.verb || firstAction?.title || 'Review owner queue'
-
-  return (
-    <section className="fh-crm-os" aria-label="Revenue workspace">
-      <article className="fh-crm-brief">
-        <div className="fh-build-eyebrow">Revenue overview</div>
-        <h2>Pipeline at a glance</h2>
-        <p>
-          {pipeline == null
-            ? 'Loading current jobs, invoices, and activity.'
-            : `${moneyFull(pipeline)} in active pipeline across ${openCount} open opportunities. ${healthCopy}`}
+    <section className="fht-section fhtd-week" aria-labelledby="fhtd-week">
+      <SectionHead
+        id="fhtd-week"
+        title="This week"
+        end={<span className="fht-head__count">{weekRangeLabel(start, last)}</span>}
+      />
+      {week.data ? (
+        <ol className="fhtd-week__strip">
+          {days.map((day) => (
+            <li key={day.key} className={`fhtd-day${day.today ? ' is-today' : ''}${day.count === 0 ? ' is-empty' : ''}`}>
+              <Link
+                className="fhtd-day__link"
+                to={`/schedule?d=${day.key}`}
+                aria-label={day.label}
+                aria-current={day.today ? 'date' : undefined}
+              >
+                <span className="fhtd-day__week">
+                  {day.today && <span className="fhtd-day__dot" aria-hidden="true" />}
+                  {day.today ? 'Today' : day.weekday}
+                </span>
+                <span className="fhtd-day__num">{day.dayOfMonth}</span>
+                <span className="fhtd-day__count">{day.countText}</span>
+              </Link>
+            </li>
+          ))}
+        </ol>
+      ) : week.isError ? (
+        <p className="fht-quiet">
+          The week could not load. <Link className="fhtd-inline-link" to="/schedule">Open the schedule</Link>
         </p>
-        <div className="fh-crm-brief__chips">
-          {risk == null ? <Skel variant="chip" width={78} /> : <span>{risk.count} at risk</span>}
-          {jobsBehind == null ? <Skel variant="chip" width={72} /> : <span>{jobsBehind} behind</span>}
-          {actionCount == null ? <Skel variant="chip" width={110} /> : <span>{actionCount} owner actions</span>}
-        </div>
-        <div className="fh-crm-brief__actions">
-          <button type="button" onClick={() => onGoToActivity?.()}>
-            {primaryAction}
-          </button>
-          <button type="button" onClick={() => onGoToLeads?.()}>
-            Review leads
-          </button>
-        </div>
-      </article>
-
-      <article className="fh-crm-flow">
-        <div className="fh-crm-flow__head">
-          <div>
-            <div className="fh-build-eyebrow">Pipeline workflow</div>
-            <strong>Lead to cash</strong>
-          </div>
-        </div>
-        <div className="fh-crm-flow__stages">
-          {/* While the dashboard query is in flight the fallback rows
-              carry zero counts, printing "$0 · 0 deals" per stage read
-              as an empty book on every cold load. Shimmer tiles until
-              pipeline resolves. */}
-          {pipeline == null
-            ? ['Lead', 'Active', 'Complete'].map((label) => (
-                <div key={label} className="fh-crm-flow__stage-skel">
-                  <span>{label}</span>
-                  <Skel variant="metric" width={54} />
-                  <Skel variant="sub" width={44} />
-                </div>
-              ))
-            : rows.map((row: PipelineRailRow) => (
-                <button
-                  key={row.label}
-                  type="button"
-                  data-stage={row.key}
-                  onClick={() => openPipelineRow(row, onGoToJobs, onGoToLeads, onGoToQuotes)}
-                >
-                  <span>{row.label}</span>
-                  <strong>{row.amount}</strong>
-                  <small>{row.count} {Number(row.count) === 1 ? 'deal' : 'deals'}</small>
-                </button>
-              ))}
-        </div>
-      </article>
-
-      <article className="fh-crm-saved">
-        <div className="fh-build-eyebrow">Saved views</div>
-        <button type="button" onClick={() => onGoToLeads?.()}>At risk leads</button>
-        <button type="button" onClick={() => onGoToJobs?.('active')}>Active jobs</button>
-        <button type="button" onClick={() => onGoToInvoices?.()}>Ready to collect</button>
-        <button type="button" onClick={() => onGoToActivity?.()}>Activity feed</button>
-        {riskValue > 0 && <span>{moneyFull(riskValue)} needs attention</span>}
-      </article>
+      ) : (
+        <ol className="fhtd-week__strip" aria-busy="true" aria-label="Loading the week">
+          {days.map((day) => (
+            <li key={day.key} className="fhtd-day">
+              <span className="fhtd-day__link" aria-hidden="true">
+                <Skeleton width={28} height={12} />
+                <Skeleton width={20} height={22} />
+                <Skeleton width={36} height={12} />
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
     </section>
   )
 }
 
-function openPipelineRow(
-  row: Pick<PipelineRailRow, 'route' | 'filter' | 'key'>,
-  onGoToJobs?: (filter?: string) => void,
-  onGoToLeads?: (filter?: string) => void,
-  onGoToQuotes?: (filter?: string) => void,
-) {
-  if (row.route === 'quotes') {
-    onGoToQuotes?.(row.filter || row.key)
-    return
-  }
-  if (row.route === 'leads') {
-    onGoToLeads?.(row.filter || row.key)
-    return
-  }
-  onGoToJobs?.(row.filter || row.key)
-}
+/* ---------------- Screen ---------------- */
 
-function FocusCard({ onGoToSchedule }: { onGoToSchedule: () => void }) {
-  return (
-    <section className="fh-build-focus">
-      <div className="fh-build-eyebrow">Today’s focus</div>
-      <p>Open your schedule to plan today’s priorities.</p>
-      <button type="button" onClick={onGoToSchedule}>
-        Open Schedule <ChevronRight size={13} />
-      </button>
-    </section>
-  )
-}
+export default function SnowHomeBuild({
+  bundle,
+  loading,
+  error,
+  onRetry,
+  now,
+  lat,
+  lon,
+  services,
+  forecast,
+  forecastError,
+  hasLocation,
+  onPinLocation,
+  actionPath
+}: TodayScreenProps) {
+  const [params] = useSearchParams()
+  const showAllAnswers = params.get('answers') === 'all'
 
-function PipelineHero({ pipeline, trendUp, trendPct, rows, totalOppCount, activeStageCount, onGoToJobs, onGoToPipeline, onGoToLeads, onGoToQuotes }: any) {
-  // stageCount = active stages that actually have deals (not every
-  // rail column). Otherwise the subtitle reads "across 5 stages" on
-  // a book that only has work in 3 of them.
-  const stageCount = activeStageCount ?? rows.length
-  const oppLabel =
-    totalOppCount === 0
-      ? 'No active opportunities yet'
-      : `${totalOppCount} active ${totalOppCount === 1 ? 'opportunity' : 'opportunities'} across ${stageCount} ${stageCount === 1 ? 'stage' : 'stages'}`
-  return (
-    <section className="fh-build-card fh-build-pipeline" onClick={() => onGoToPipeline?.()}>
-      <div className="fh-build-card__overlay" />
-      <div className="fh-build-eyebrow">Active pipeline · all stages</div>
+  const weather = hasLocation ? todayWeather(forecast, services) : null
+  const view = bundle ? buildTodayView({ bundle, now, lat, lon, weather }) : null
+  const evening = view?.evening ?? false
+  const maps = deviceMaps()
 
-      <div className="fh-build-pipeline__top">
-        <div className="fh-build-money">
-          {pipeline == null ? <Skel variant="money" /> : moneyFull(pipeline)}
+  const next = view && !evening ? view.nextStop : null
+  const hasCard = next != null || (!view && loading)
+
+  /* ----- Stage ----- */
+  const stage = (
+    <OnyxStage glow className="fhtd-stage" aria-labelledby="fht-title">
+      <div className="fht-stage__meta">
+        <p className="fht-date">{evening ? eveningDate(now) : longDate(now)}</p>
+        <div className="fhtd-stage__tools">
+          <SyncPill />
+          <Button variant="secondary" size="mini" icon={Plus} to="/work?new=1">New lead</Button>
+          <Button variant="secondary" size="mini" icon={Plus} to="/work?new=1&asStage=job">New job</Button>
         </div>
+      </div>
+      <StageHero view={view} loading={loading} />
+      <StageLine
+        view={view}
+        loading={loading}
+        hasLocation={hasLocation}
+        forecast={forecast}
+        forecastError={forecastError}
+        weather={weather}
+        onPinLocation={onPinLocation}
+      />
+    </OnyxStage>
+  )
 
-        {trendPct != null && trendPct !== 0 && (
-          <div className={trendUp ? 'fh-build-trend is-up' : 'fh-build-trend is-down'}>
-            {trendUp ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
-            {Math.abs(trendPct).toFixed(1)}%
+  /* ----- Right column ----- */
+  let answersSection
+  if (view) {
+    const answers = showAllAnswers ? bundle?.nextActions ?? view.answers : view.answers
+    answersSection = (
+      <section className="fht-section fht-section--answers" aria-labelledby="fht-answers">
+        <SectionHead id="fht-answers" title="Needs an answer" end={<span className="fht-head__count">{view.answersTotal}</span>} />
+        {view.answersTotal > 0 ? (
+          <AnswerList answers={answers} now={now} actionPath={actionPath} />
+        ) : (
+          <p className="fht-quiet">Nothing needs an answer right now.</p>
+        )}
+        {view.answersTotal > 3 && (
+          <div className="fht-more">
+            <Button variant="quiet" size="mini" to={{ search: showAllAnswers ? '' : '?answers=all' }} replace>
+              {showAllAnswers ? 'Show fewer' : 'See all'}
+            </Button>
           </div>
         )}
-      </div>
+      </section>
+    )
+  } else if (loading) {
+    answersSection = (
+      <section className="fht-section" aria-hidden="true">
+        <SkeletonRows rows={3} label="Loading what needs an answer" />
+      </section>
+    )
+  }
 
-      {/* While the dashboard query is in flight the count is a raw 0 :
-          printing "No active opportunities yet" then would be a
-          confident lie for a second. Shimmer until pipeline resolves. */}
-      <p className="fh-build-pipeline__copy">
-        {pipeline == null ? <Skel variant="sub" width={230} /> : oppLabel}
-      </p>
-
-      {/* The per-stage tile grid was removed here (UI audit #14/#31/#32):
-          it duplicated the Pipeline-workflow strip rendered directly
-          above, nested five cards inside this card, and its stage dots
-          overlapped the neighboring tiles' deal counts. This card is
-          the money hero; the strip above is the per-stage breakdown. */}
-      <div className="fh-build-stage-line">
-        {rows.map((row: any) => (
-          <span key={row.label} style={{ width: row.width }} />
-        ))}
-      </div>
-    </section>
+  const side = (
+    <div className="fhtd-side">
+      {answersSection}
+      <WeekSection now={now} />
+    </div>
   )
-}
 
-function TodayCard({ activeJobsCount, onGoToSchedule, onNewLead }: any) {
-  // Crew headcount isn't tracked yet, show '\u2003' rather than a fake number.
-  // Jobs in progress comes from the real stage breakdown.
-  return (
-    <section className="fh-build-card fh-build-today">
-      <div className="fh-build-today__body">
-        <div className="fh-build-eyebrow">Today</div>
-
-        <div className="fh-build-today__stats">
-          <div>
-            <strong>{activeJobsCount == null ? <Skel variant="stat" /> : activeJobsCount}</strong>
-            <span>jobs in progress</span>
+  /* ----- Loading and error with nothing cached ----- */
+  if (!view) {
+    return (
+      <div className={`fhtd fh-build-page${hasCard ? ' has-card' : ''}`} data-build-screen="SnowHomeBuild" data-build-route="/">
+        <div className="fhtd-grid">
+          <div className="fhtd-main">
+            {stage}
+            {loading ? (
+              <>
+                <div className="fht-card" aria-hidden="true">
+                  <div className="fht-card__tray">
+                    <div className="fht-card__frame fh-onyx-scope">
+                      <Skeleton width="40%" height={12} />
+                      <Skeleton width="64%" height={22} />
+                    </div>
+                  </div>
+                </div>
+                <SkeletonRows rows={3} label="Loading today" />
+              </>
+            ) : (
+              <DataErrorState
+                title="Today could not load"
+                message={error || 'Check your connection and try again.'}
+                onRetry={onRetry}
+              />
+            )}
           </div>
-        </div>
-
-        <div className="fh-build-today__actions">
-          <button type="button" onClick={onGoToSchedule}>
-            <Calendar size={14} />
-            <span>
-              Schedule
-              <small>View today’s schedule</small>
-            </span>
-            <ChevronRight size={13} />
-          </button>
-
-          <button type="button" onClick={onNewLead}>
-            <FileText size={14} />
-            <span>
-              New Lead
-              <small>Create opportunity</small>
-            </span>
-            <ChevronRight size={13} />
-          </button>
+          {side}
         </div>
       </div>
-    </section>
-  )
-}
+    )
+  }
 
-function RightRail({ dealsAtRisk, jobsBehind }: any) {
-  // dealsAtRisk may be a number (legacy), an object { count, value, followUps,
-  // quotesAttention }, or null. normalizeDealsAtRisk returns null when not
-  // yet loaded, render '\u2003' rather than a fabricated number.
-  const risk = normalizeDealsAtRisk(dealsAtRisk)
-  const dealsValue = risk == null ? <Skel variant="metric" /> : moneyFull(risk.value)
-  const dealsSub =
-    risk == null ? <Skel variant="sub" /> : `${risk.count} ${risk.count === 1 ? 'deal' : 'deals'}`
-  const jobsBehindValue = jobsBehind == null ? <Skel variant="metric" width={32} /> : String(jobsBehind)
-  const jobsBehindSub =
-    jobsBehind == null ? <Skel variant="sub" /> : jobsBehind === 0 ? 'All on track' : 'needs attention'
-  const followUpsValue =
-    risk?.followUps == null ? <Skel variant="metric" width={32} /> : String(risk.followUps)
-  const followUpsSub = risk?.followUps == null ? <Skel variant="sub" /> : 'leads waiting'
-  const quotesValue =
-    risk?.quotesAttention == null ? <Skel variant="metric" width={32} /> : String(risk.quotesAttention)
-  const quotesSub = risk?.quotesAttention == null
-    ? <Skel variant="sub" />
-    : `${risk.quotesAttention === 1 ? 'quote' : 'quotes'} waiting`
+  /* ----- Left column sections ----- */
+  const isOver = (item: HomeTodayOnSite) => view.done.includes(item)
+
+  let daySections
+  if (evening) {
+    daySections = (
+      <>
+        {view.day.length > 0 && (
+          <section className="fht-section" aria-labelledby="fht-done">
+            <SectionHead
+              id="fht-done"
+              title="Today, done"
+              end={<span className="fht-head__count">{`${view.done.length} of ${view.day.length}`}</span>}
+            />
+            <ul className="fht-list">
+              {view.day.map((item) => <Visit key={item.id} item={item} variant="done" over={isOver(item)} maps={maps} />)}
+            </ul>
+          </section>
+        )}
+        <section className="fht-section" aria-labelledby="fht-tomorrow">
+          <SectionHead id="fht-tomorrow" title="Tomorrow" end={<WeekLink />} link />
+          {view.tomorrow.length > 0 ? (
+            <ul className="fht-list">
+              {view.tomorrow.map((item) => <Visit key={item.id} item={item} variant="tomorrow" over={false} maps={maps} />)}
+            </ul>
+          ) : (
+            <p className="fht-quiet">Nothing on the schedule tomorrow.</p>
+          )}
+        </section>
+      </>
+    )
+  } else if (view.day.length > 0) {
+    daySections = (
+      <section className="fht-section" aria-labelledby="fht-day">
+        <SectionHead id="fht-day" title="Your day" end={<WeekLink />} link />
+        <ul className="fht-list">
+          {view.day.map((item) => <Visit key={item.id} item={item} variant="day" over={isOver(item)} maps={maps} />)}
+        </ul>
+      </section>
+    )
+  } else {
+    daySections = (
+      <EmptyState
+        className="fhtd-empty"
+        icon={CalendarPlus}
+        title="Nothing scheduled today"
+        action={<Button variant="primary" to="/schedule">Plan the week</Button>}
+      />
+    )
+  }
+
   return (
-    <aside className="fh-build-rail">
-      {/* Card names aligned to the approved mock (audit M4):
-          "Deals at risk" → "Goals at risk", "Quotes needing attention"
-          → "Estimates needing action". Other titles already matched. */}
-      <RailMetric title="Goals at risk" value={dealsValue} sub={dealsSub} chart="red" />
-      <RailMetric title="Jobs behind" value={jobsBehindValue} sub={jobsBehindSub} chart="gold" />
-      <RailMetric title="Follow ups due" value={followUpsValue} sub={followUpsSub} />
-      <RailMetric title="Estimates needing action" value={quotesValue} sub={quotesSub} />
-    </aside>
-  )
-}
-
-function RailMetric({ title, value, sub, chart }: any) {
-  return (
-    <section className="fh-build-rail-card">
-      <div className="fh-build-eyebrow">{title}</div>
-      <strong>{value}</strong>
-      <span>{sub}</span>
-      {chart && <div className={`fh-build-spark is-${chart}`} />}
-    </section>
-  )
-}
-
-function OwnerQueue({ rows, loading, onOpenJobAtTab, onViewAll }: any) {
-  return (
-    <section className="fh-build-card fh-build-table fh-build-owner">
-      <CardHeader title="Owner queue" />
-      <div className="fh-build-table__head is-owner">
-        <span>#</span>
-        <span>Action</span>
-        <span>Client / Job</span>
-        <span>Amount</span>
-        <span>Status</span>
-        <span>Due</span>
-      </div>
-
-      {/* Loading first: printing the "caught up" empty state while the
-          query is still in flight told the owner a comforting lie for
-          a second on every cold load. */}
-      {loading ? (
-        <SkelRows variantClass="is-owner" />
-      ) : rows.length === 0 ? (
-        <EmptyRow label="No actions queued. You are caught up." />
-      ) : (
-        rows.map((row: any, index: number) => (
-          <button
-            key={`${row.action}-${row.client}-${index}`}
-            type="button"
-            className="fh-build-table__row is-owner"
-            // Wait-status string ("Lead waiting 15 days") moves to a
-            // tooltip so the table stays clean (Phase 1 §2).
-            title={row.tooltip || undefined}
-            onClick={() => row.contactId && onOpenJobAtTab(row.contactId, row.tab, row.intent)}
-          >
-            <span>{index + 1}</span>
-            <strong>{row.action}</strong>
-            <span>{row.client}</span>
-            <span className={`fh-build-num${row.amount ? '' : ' fh-build-placeholder'}`}>
-              {row.amount || '\u2003'}
-            </span>
-            <span className={`fh-build-dot is-${row.statusTone}`}>{row.status}</span>
-            <span>{row.due}</span>
-            <ChevronRight size={13} />
-          </button>
-        ))
+    <div className={`fhtd fh-build-page${next ? ' has-card' : ''}`} data-build-screen="SnowHomeBuild" data-build-route="/">
+      {error && (
+        <DataErrorState compact className="fhtd-error" title="Today could not refresh" message={error} onRetry={onRetry} />
       )}
-
-      <FooterLink label="View all tasks" onClick={onViewAll} />
-    </section>
-  )
-}
-
-function RevenueOpportunities({ rows, loading, onOpenJob, onViewAll }: any) {
-  return (
-    <section className="fh-build-card fh-build-table fh-build-revenue">
-      <CardHeader title="Revenue opportunities" />
-      <div className="fh-build-table__head is-revenue">
-        <span>Job / Client</span>
-        <span>Stage</span>
-        <span>Amount</span>
-        <span>Last touch</span>
-        <span>Next step</span>
+      <div className="fhtd-grid">
+        <div className="fhtd-main">
+          {stage}
+          {next && <NextStopCard next={next} maps={maps} ratio="21 / 8" />}
+          {daySections}
+        </div>
+        {side}
       </div>
-
-      {loading ? (
-        <SkelRows variantClass="is-revenue" />
-      ) : rows.length === 0 ? (
-        <EmptyRow label="No active deals yet. Start a new lead to populate this list." />
-      ) : (
-        rows.map((row: any) => {
-          const stage = LIST_STAGE_META[row.stageKey] || LIST_STAGE_META.lead
-          return (
-            <button
-              key={row.id || row.name}
-              type="button"
-              className="fh-build-table__row is-revenue"
-              onClick={() => row.id && onOpenJob(row.id)}
-            >
-              <strong>{row.name}</strong>
-              <StatusPill label={row.stage} color={stage.color} />
-              <span>{row.amount}</span>
-              <span>{row.touch}</span>
-              <span>{row.next}</span>
-            </button>
-          )
-        })
-      )}
-
-      <FooterLink label="View all opportunities" onClick={onViewAll} />
-    </section>
-  )
-}
-
-function JobHealthPreview({ rows, loading, onGoToJobs, onOpenJob }: any) {
-  return (
-    <section className="fh-build-card fh-build-table fh-build-health">
-      <CardHeader title="Job health preview" action="Operational risks" />
-      <div className="fh-build-table__head is-health">
-        <span>Job</span>
-        <span>Stage</span>
-        <span>Schedule</span>
-        <span>Billing</span>
-        <span>Risk</span>
-        <span>Next action</span>
-      </div>
-
-      {loading ? (
-        <SkelRows variantClass="is-health" />
-      ) : rows.length === 0 ? (
-        <EmptyRow label="No job health signals yet. Active jobs show up here." />
-      ) : (
-        rows.map((row: any) => (
-          <button
-            key={row.id || row.job}
-            type="button"
-            className="fh-build-table__row is-health"
-            // Deep-link to the specific job file when an id is present
-            //, previously every row routed to /jobs (no target).
-            onClick={() => row.id ? onOpenJob?.(row.id) : onGoToJobs()}
-          >
-            <strong>{row.job}</strong>
-            <span>{row.stage}</span>
-            <span className={`fh-build-dot is-${row.scheduleTone}`}>{row.schedule}</span>
-            <span className={`fh-build-dot is-${row.billingTone}`}>{row.billing}</span>
-            <span className={`fh-build-dot is-${row.riskTone}`}>{row.risk}</span>
-            <span>{row.next}</span>
-            <ChevronRight size={13} />
-          </button>
-        ))
-      )}
-
-      <FooterLink label="View all jobs" onClick={() => onGoToJobs?.()} />
-    </section>
-  )
-}
-
-function EmptyRow({ label }: { label: string }) {
-  return (
-    <div
-      className="fh-build-table__row"
-      style={{
-        gridTemplateColumns: '1fr',
-        color: 'rgba(242, 237, 228,0.55)',
-        fontSize: 14,
-        padding: '16px 16px',
-        cursor: 'default',
-      }}
-    >
-      <span>{label}</span>
     </div>
   )
 }
-
-function CardHeader({ title, action }: any) {
-  return (
-    <header className="fh-build-card-head">
-      <div className="fh-build-eyebrow">{title}</div>
-      {action && <button type="button">{action}</button>}
-    </header>
-  )
-}
-
-function FooterLink({ label, onClick }: { label: string; onClick?: () => void }) {
-  return (
-    <button type="button" className="fh-build-footer-link" onClick={onClick}>
-      {label} <ChevronRight size={13} />
-    </button>
-  )
-}
-
-// Full-stage rail rows from the per-stage breakdown Home.tsx computes
-// over the complete contact list. Real $ totals per stage, the mock's
-// "every stage with $ + count" rail without fabricating stages the
-// data model doesn't have. Lost is dropped from the rail when empty
-// so a healthy book doesn't dedicate a column to zero.
-function buildStageRailRows(stageRail: Array<{ key: string; count: number; total: number }>): PipelineRailRow[] {
-  const LABEL: Record<string, string> = {
-    lead: 'Lead',
-    quote: 'Quote',
-    job: 'Active',
-    invoice: 'Invoicing',
-    closed: 'Complete',
-    lost: 'Lost',
-  }
-  // Map rail keys to the /jobs?stage= filter ids used by onGoToJobs.
-  // Post-H3 the Jobs screen has distinct 'invoice' and 'closed' chips,
-  // so each rail column routes to its own filter. (The old invoice→won
-  // alias also broke the hero subtitle: ACTIVE_RAIL_KEYS counts the
-  // 'invoice' key, which never appeared because it was remapped :
-  // spot-check caught "16 active across 3 stages" under a $138k
-  // headline that spans 17 deals across 4 stages.)
-  const ROUTE: Record<string, { route: PipelineRoute; filter: string }> = {
-    lead: { route: 'leads', filter: 'new' },
-    quote: { route: 'quotes', filter: 'quoted' },
-    job: { route: 'jobs', filter: 'active' },
-    invoice: { route: 'jobs', filter: 'active' },
-    closed: { route: 'jobs', filter: 'closed' },
-    lost: { route: 'leads', filter: 'lost' },
-  }
-  const rows = stageRail
-    .filter((s) => s.key !== 'lost' || s.count > 0)
-    .map((s) => ({
-      key: s.key,
-      label: LABEL[s.key] || s.key,
-      amount: s.total > 0 ? money(s.total) : '$0',
-      count: s.count,
-      ...(ROUTE[s.key] || { route: 'jobs' as const, filter: 'all' }),
-    }))
-  const totalCount = rows.reduce((sum, r) => sum + r.count, 0)
-  return rows.map((r) => ({
-    ...r,
-    width: totalCount > 0 ? `${Math.max(5, Math.round((r.count / totalCount) * 100))}%` : `${Math.round(100 / rows.length)}%`,
-  }))
-}
-
-// Render 3 real funnel buckets (Lead/Active/Won) sourced from
-// stageBreakdown, with $ totals derived from topPipeline rows whose
-// stage falls into each bucket. We intentionally show 3 buckets
-// rather than fabricating 8 named stages, counts are the source of
-// truth, amounts are best-effort from the top-deal slice we have.
-function buildPipelineStages(
-  topPipeline: any[] | null,
-  stageBreakdown: { won?: number; active?: number; lead?: number } | null,
-): PipelineRailRow[] {
-  const buckets: Record<string, { key: string; label: string; stages: string[]; route: PipelineRoute; filter: string }> = {
-    lead:   { key: 'lead',   label: 'Lead',     stages: ['lead', 'quote'], route: 'leads', filter: 'open' },
-    active: { key: 'active', label: 'Active',   stages: ['job', 'invoice'], route: 'jobs', filter: 'active' },
-    won:    { key: 'closed', label: 'Complete', stages: ['closed'], route: 'jobs', filter: 'closed' },
-  }
-  const sums: Record<string, number> = { lead: 0, active: 0, won: 0 }
-  for (const deal of topPipeline || []) {
-    for (const [bk, b] of Object.entries(buckets)) {
-      if (b.stages.includes(String(deal.stage || '').toLowerCase())) {
-        sums[bk] += Number(deal.amount || deal.value || 0)
-      }
-    }
-  }
-  const rows = (['lead', 'active', 'won'] as const).map((k) => ({
-    key: buckets[k].key,
-    label: buckets[k].label,
-    amount: sums[k] > 0 ? money(sums[k]) : '$0',
-    count: stageBreakdown?.[k] ?? 0,
-    route: buckets[k].route,
-    filter: buckets[k].filter,
-  }))
-  const totalCount = rows.reduce((s, r) => s + r.count, 0)
-  return rows.map((r) => ({
-    ...r,
-    width: totalCount > 0 ? `${Math.max(5, Math.round((r.count / totalCount) * 100))}%` : '33%',
-  }))
-}
-
-// Map a real Next Action into the owner-queue row shape. urgencyTone
-// ('danger' | 'warn' | 'success') maps to the dot tone the table uses.
-// Amount/due aren't part of the action payload, so we leave them blank
-// rather than invent numbers.
-// Phase 1 §2: render the Owner Queue table to spec, Action column is
-// a verb phrase, Client / Job column is the actual record name, Amount
-// is the deal value, Due is a date or "Today" / "Nd ago" label. The
-// `detail` wait-status string (e.g. "Lead waiting 15 days") moves to
-// the row's title attribute as a tooltip so it's still discoverable
-// without crowding the table.
-function buildOwnerQueue(nextActions: any[] | null) {
-  if (!nextActions) return []
-  return nextActions.slice(0, 6).map((a: any) => {
-    const tone =
-      a.urgencyTone === 'danger' ? 'bad'
-      : a.urgencyTone === 'warn' ? 'warn'
-      : a.urgencyTone === 'success' ? 'good'
-      : 'neutral'
-    const status =
-      a.urgencyTone === 'danger' ? 'High'
-      : a.urgencyTone === 'warn' ? 'Medium'
-      : a.urgencyTone === 'success' ? 'Action'
-      : 'Queued'
-    // Verb-only action. New payload provides `verb`; legacy payload
-    // (no verb) falls back to the full title.
-    const action = a.verb || a.title || a.label || 'Action required'
-    const client = a.contactName || a.client || ''
-    const amount = Number(a.contactAmount || 0) > 0
-      ? moneyFull(Number(a.contactAmount))
-      : ''
-    const due = formatDue(a.dueIso, a.dueKind)
-    return {
-      action,
-      client,
-      amount,
-      status,
-      statusTone: tone,
-      due,
-      tooltip: a.detail || '',
-      contactId: a.contactId,
-      tab: a.tab,
-      intent: a.intent,
-    }
-  })
-}
-
-function formatDue(iso: string | null | undefined, kind: string | null | undefined) {
-  if (!iso) return ''
-  const t = new Date(iso).getTime()
-  if (!Number.isFinite(t)) return ''
-  // `waited` → "Nd ago" (last touch was N days back, follow-up overdue)
-  // `overdue` → "Today" (action is needed right now)
-  // `invoiced` → "Nd ago" (invoice sent N days back, payment expected)
-  // anything else → short date
-  const days = Math.floor((Date.now() - t) / 86400000)
-  if (kind === 'overdue') return 'Today'
-  if (kind === 'waited' || kind === 'invoiced') {
-    if (days <= 0) return 'Today'
-    if (days === 1) return '1d ago'
-    return `${days}d ago`
-  }
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-}
-
-function buildRevenueRows(topPipeline: any[] | null) {
-  if (!topPipeline) return []
-  const stageLabel: Record<string, string> = {
-    lead: 'Lead',
-    quote: 'Quote',
-    job: 'Job',
-    invoice: 'Invoice',
-    closed: 'Closed',
-    lost: 'Lost',
-  }
-  // Stage-derived next step keeps the column honest without a tasks
-  // join: the operator's obvious move at each stage.
-  const nextByStage: Record<string, string> = {
-    lead: 'Qualify + follow up',
-    quote: 'Send / chase quote',
-    job: 'Keep crew moving',
-    invoice: 'Collect balance',
-    closed: 'Request referral',
-    lost: 'Archive or revisit',
-  }
-  return topPipeline.slice(0, 5).map((c: any) => {
-    const sid = String(c.stage || '').toLowerCase()
-    const t = c.updatedAt ? new Date(c.updatedAt).getTime() : NaN
-    const days = Number.isFinite(t) ? Math.floor((Date.now() - t) / 86400000) : null
-    return {
-      id: c.id,
-      name: c.name || 'Unnamed',
-      stage: stageLabel[sid] || c.stage || 'New',
-      stageKey: sid,
-      amount: moneyFull(c.amount || c.value || 0),
-      touch: days == null ? 'New' : days <= 0 ? 'Today' : `${days}d ago`,
-      next: nextByStage[sid] || 'Review',
-    }
-  })
-}
-
-// Job Health requires per-job schedule / report / billing / risk
-// signals that aren't computed on Home yet. Until that data lands,
-// emit zero rows, the table will render its header + empty state
-// rather than fabricated rows with placeholder client names.
-// (buildJobHealthRows removed, Job Health rows are now computed in
-// screens/Home.tsx where the contacts + overdue-schedule + payments
-// data lives. Phase 1 §3.)
-
-// Silence "imported but not used" warnings for icons reserved for future use.
-void BarChart3; void CalendarDays; void CircleDollarSign; void Clock3; void MapPin; void Users
