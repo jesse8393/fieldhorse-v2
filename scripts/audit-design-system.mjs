@@ -5,8 +5,10 @@ import { fileURLToPath } from 'node:url'
 const root = join(fileURLToPath(new URL('..', import.meta.url)))
 const extensions = new Set(['.css', '.html', '.js', '.json', '.jsx', '.ts', '.tsx'])
 // The October 2026 redesign palette (docs/design/2026-10-redesign/SPEC.md,
-// section 5), Day and Night, plus the six legacy brand colors that
-// screens not yet rebuilt still name. Phase 7 drops the legacy ones.
+// section 5), Day and Night, plus the six legacy brand colors. Phase 7
+// checked each one against the files this audit scans: all six are still
+// named by the mobile app, the email and document templates, the customer
+// pages and older screens, so they stay until those are rebuilt.
 const allowedColors = new Set([
   // Legacy brand colors
   '#C9963A', '#141414', '#F2EDE4', '#5C5C5C', '#C0392B', '#2D7A4F',
