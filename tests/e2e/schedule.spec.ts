@@ -209,7 +209,12 @@ test.describe('drag to schedule', () => {
     await page.getByRole('button', { name: /Drag Plumbing Bellevue/ }).focus()
     await page.keyboard.press('Space')
     await page.keyboard.press('ArrowDown')
+    // The first arrow lands on today at the next full hour (Thursday 10 am);
+    // the left arrow moves to Wednesday 10 am, which has passed. Wait for the
+    // highlight before dropping, so a slow runner never drops too early.
+    await expect(page.locator('[data-slot="2026-10-08T10"]')).toHaveClass(/is-over/)
     await page.keyboard.press('ArrowLeft')
+    await expect(page.locator('[data-slot="2026-10-07T10"]')).toHaveClass(/is-over/)
     await page.keyboard.press('Space')
     await expect(page.getByText('Pick a time from now on.', { exact: true })).toBeVisible()
     expect(writes).toEqual([])
