@@ -33,7 +33,7 @@ test.describe('phone shell', () => {
     await expect(dock.getByRole('link', { name: 'Jobs' })).toHaveAttribute('aria-current', 'page')
 
     await dock.getByRole('button', { name: /Capture/ }).click()
-    await expect(page.getByRole('heading', { name: 'Just say it.' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Capture', exact: true })).toBeVisible()
   })
 
   test('the header monogram opens the workspace menu from any screen', async ({ page }) => {

@@ -9,6 +9,7 @@ import { useKeyboardOpen } from '../../lib/useKeyboardOpen.ts'
 import { useTheme } from '../../contexts/ThemeContext.tsx'
 import { hapticMedium } from '../../lib/haptics.ts'
 import { prefetchRoute } from '../../lib/routePrefetch.ts'
+import { openCapture } from '../../lib/captureAttach.ts'
 
 // The phone dock (spec 8.1): a floating onyx capsule with Today, Jobs,
 // the brushed gold Capture coin, Money and Schedule. Items follow the
@@ -68,7 +69,7 @@ export default function Dock() {
           title="Capture (⌘J)"
           onClick={() => {
             hapticMedium()
-            window.dispatchEvent(new CustomEvent('fh:open-capture'))
+            openCapture()
           }}
         >
           <Icon icon={Plus} size={24} />
