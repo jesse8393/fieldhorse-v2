@@ -70,7 +70,7 @@ Status is one of todo, done, blocked, skipped.
 | 6 | 6.2 Inbox list | done | d5588e8 | |
 | 6 | 6.3 Thread with the AI draft | done | 0ca4345 | |
 | 6 | 6.4 Phase 6 review and pull request | done | see git log | #221, images in phase6-review |
-| 7 | 7.1 Unused components | todo | | |
+| 7 | 7.1 Unused components | done | see git log | Pour window hero is now an OnyxStage |
 | 7 | 7.2 Dead CSS guarded by screenshots | todo | | |
 | 7 | 7.3 Final record and morning summary | todo | | |
 
