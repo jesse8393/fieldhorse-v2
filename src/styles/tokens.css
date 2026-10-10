@@ -1,32 +1,118 @@
+/*
+ * Fieldhorse design tokens, October 2026 redesign.
+ * Spec: docs/design/2026-10-redesign/SPEC.md, sections 5 and 6.
+ *
+ * Day is the default and lives in :root. Night overrides only the
+ * --fh- values under [data-theme='dark']; every legacy name below is
+ * mapped onto a --fh- token, so it follows the theme on its own.
+ * ThemeContext and the pre paint script in index.html always set
+ * data-theme ('light' for Day, 'dark' for Night).
+ *
+ * Text tokens hold plain hex values, never color-mix, so
+ * tokens.contrast.test.ts can measure every pair in spec section 12.
+ */
 :root {
-  /* Canonical FieldHorse palette */
-  --gold: #C9963A;
-  --onyx: #141414;
-  --linen: #F2EDE4;
-  --steel: #5C5C5C;
-  --red: #C0392B;
-  --green: #2D7A4F;
+  /* ---- Ground and ink, Day (spec 5.1) ---- */
+  --fh-plaster: #EDE8DF;
+  --fh-paper: #FBF9F5;
+  --fh-tray: #F5F1EA;
+  --fh-hairline: #DAD3C7;
+  --fh-hairline-soft: #EAE5DC;
+  --fh-edge: #C7BFB1;
+  --fh-edge-strong: #8B8375;
+  --fh-ink: #1B1A16;
+  --fh-ink-2: #4F4B43;
+  --fh-ink-3: #66615A;
+  --fh-ink-4: #8B8375;
+  --fh-focus: #1B1A16;
+  /* Gold as small text (links, amounts in gold). 5.2:1 on plaster. */
+  --fh-gold-ink: #7A5A1F;
 
-  /* Approved derived surfaces and tints */
-  --onyx-light-1: color-mix(in srgb, var(--onyx) 94%, var(--linen) 6%);
-  --onyx-light-2: color-mix(in srgb, var(--onyx) 90%, var(--linen) 10%);
-  --onyx-light-3: color-mix(in srgb, var(--onyx) 84%, var(--linen) 16%);
+  /* ---- Gold (spec 5.2) ---- */
+  --fh-gold: #C9963A;
+  --fh-gold-hi: #E6C278;
+  --fh-gold-lo: #AD7E2E;
+  --fh-gold-brushed: linear-gradient(180deg, #E6C278 0%, #C9963A 55%, #AD7E2E 100%);
+  --fh-gold-edge: inset 0 1px 0 rgba(255, 244, 214, 0.75), inset 0 -1px 0 rgba(80, 52, 12, 0.35);
+  --fh-on-gold: #1B1A16;
+
+  /* ---- Onyx stage, the same in both themes (spec 5.3) ---- */
+  --fh-onyx: #16140F;
+  --fh-onyx-2: #211F19;
+  --fh-onyx-line: #352F26;
+  --fh-dock: #16140F;
+  --fh-linen: #F2EDE4;
+  --fh-smoke: #9A9183;
+  --fh-gold-line: #C9963A;
+  --fh-focus-on-onyx: #F2EDE4;
+  --fh-scrim: linear-gradient(180deg, rgba(22, 20, 15, 0) 0%, rgba(22, 20, 15, 0.78) 100%);
+
+  /* ---- Status, jewel tones (spec 5.4). Every color travels with a word. ---- */
+  --fh-success: #2E7D4F;
+  --fh-success-fill: #DCEADF;
+  --fh-success-ink: #1D5536;
+  --fh-info: #3B5F85;
+  --fh-info-fill: #DCE5EE;
+  --fh-info-ink: #2C4A6B;
+  --fh-danger: #B3362A;
+  --fh-danger-fill: #F2DCD8;
+  --fh-danger-ink: #7E2419;
+  --fh-neutral: #8B8375;
+
+  /* ---- Type (spec 5.6) ---- */
+  --fh-font-body: 'Barlow', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --fh-font-display: 'Barlow Condensed', 'Barlow', -apple-system, BlinkMacSystemFont, sans-serif;
+  --fh-font-wordmark: 'Bebas Neue', 'Barlow Condensed', sans-serif;
+
+  /* ---- Shape, depth (spec 5.7) ---- */
+  --fh-r-chip: 7px;
+  --fh-r-control: 12px;
+  --fh-r-control-lg: 14px;
+  --fh-r-card: 14px;
+  --fh-r-photo: 18px;
+  --fh-r-vault: 22px;
+  --fh-r-sheet: 22px;
+  --fh-r-dock: 28px;
+  --fh-shadow-raised: 0 18px 30px -18px rgba(60, 40, 10, 0.45), 0 2px 6px rgba(60, 40, 10, 0.08);
+  --fh-shadow-overlay: 0 16px 28px -14px rgba(22, 20, 15, 0.55);
+  --fh-shadow-soft: 0 1px 2px rgba(60, 40, 10, 0.06), 0 8px 24px -12px rgba(60, 40, 10, 0.18);
+  --fh-gutter: 20px;
+  --fh-gutter-desktop: 28px;
+  --fh-sidebar-w: 232px;
+  /* Neutral wash for icon buttons and skeleton bars. */
+  --fh-wash: rgba(27, 26, 22, 0.05);
+  --fh-wash-2: rgba(27, 26, 22, 0.08);
+  /* Header veil over scrolling content. */
+  --fh-veil-1: rgba(237, 232, 223, 0.92);
+  --fh-veil-2: rgba(237, 232, 223, 0.78);
+  --fh-veil-0: rgba(237, 232, 223, 0);
+
+  /* ================================================================
+     Legacy names, mapped onto the tokens above (spec section 6).
+     Screens not yet rebuilt read these; Phase 7 removes what is left.
+     ================================================================ */
+
+  /* Brand constants. These do not flip with the theme: --onyx is the
+     ink on gold buttons and the always dark surfaces, --linen the text
+     on them. */
+  --gold: var(--fh-gold);
+  --onyx: var(--fh-onyx);
+  --linen: var(--fh-linen);
+  --steel: var(--fh-ink-3);
+  --red: var(--fh-danger);
+  --green: var(--fh-success);
+
+  --onyx-light-1: color-mix(in srgb, var(--fh-onyx) 94%, var(--fh-linen) 6%);
+  --onyx-light-2: color-mix(in srgb, var(--fh-onyx) 90%, var(--fh-linen) 10%);
+  --onyx-light-3: color-mix(in srgb, var(--fh-onyx) 84%, var(--fh-linen) 16%);
   --gold-10: rgba(201, 150, 58, 0.10);
   --gold-20: rgba(201, 150, 58, 0.20);
   --gold-30: rgba(201, 150, 58, 0.30);
   --gold-45: rgba(201, 150, 58, 0.45);
-  /* Light theme tiers: linen stepped toward onyx, mirroring the
-     onyx-light steps of the dark theme. */
-  --linen-dark-1: color-mix(in srgb, var(--linen) 97%, var(--onyx) 3%);
-  --linen-dark-2: color-mix(in srgb, var(--linen) 94%, var(--onyx) 6%);
-  /* Muted ink for the dark theme. Pure steel measures 2.76:1 on onyx
-     (1.79:1 on surface-3) and fails WCAG AA for the 12px captions,
-     labels, table heads and placeholders that use it. Linen mixed into
-     onyx keeps the neutral tone at 7.16:1 on onyx and 4.64:1 on
-     surface-3. The light theme keeps steel, 5.73:1 on linen. */
-  --linen-muted: color-mix(in srgb, var(--linen) 65%, var(--onyx) 35%);
+  --linen-dark-1: var(--fh-tray);
+  --linen-dark-2: var(--fh-hairline-soft);
+  --linen-muted: var(--fh-ink-2);
 
-  /* Legacy color aliases */
   --field-gold: var(--gold);
   --field-gold-hot: var(--gold);
   --field-gold-bright: var(--gold);
@@ -42,28 +128,29 @@
   --steel-xlt: var(--steel);
 
   /* Surfaces and ink */
-  --surface-0: var(--onyx);
-  --surface-1: var(--onyx-light-1);
-  --surface-2: var(--onyx-light-2);
-  --surface-elev: var(--onyx-light-3);
-  --ink-strong: var(--linen);
-  --ink-muted: var(--linen-muted);
-  --ink-inverse: var(--onyx);
-  --ink-faint: var(--linen-muted);
-  --rule: var(--gold-10);
-  --rule-bold: var(--gold-20);
+  --surface-0: var(--fh-plaster);
+  --surface-1: var(--fh-paper);
+  --surface-2: var(--fh-tray);
+  --surface-elev: var(--fh-hairline-soft);
+  --ink-strong: var(--fh-ink);
+  --ink-muted: var(--fh-ink-2);
+  --ink-inverse: var(--fh-linen);
+  --ink-faint: var(--fh-ink-3);
+  --rule: var(--fh-hairline);
+  --rule-bold: var(--fh-edge);
 
-  /* Stage and status colors */
-  --stage-lead: var(--steel);
-  --stage-quote: var(--gold);
-  --stage-job: var(--green);
-  --stage-invoice: var(--gold);
-  --stage-closed: var(--steel);
-  --stage-lost: var(--red);
+  /* Stage colors, as dots and fills. Every stage shows its word too. */
+  --stage-lead: var(--fh-neutral);
+  --stage-quote: var(--fh-info);
+  --stage-job: var(--fh-success);
+  --stage-invoice: var(--fh-success);
+  --stage-closed: var(--fh-ink-3);
+  --stage-lost: var(--fh-neutral);
 
   /* Typography */
-  --font-display: 'Bebas Neue', 'Helvetica Neue', sans-serif;
-  --font-body: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: var(--fh-font-display);
+  --font-body: var(--fh-font-body);
+  --font-wordmark: var(--fh-font-wordmark);
   --font-serif: var(--font-body);
   --font-mono: var(--font-body);
   --type-12: 12px;
@@ -72,16 +159,16 @@
   --type-20: 20px;
   --type-24: 24px;
 
-  /* One control and card radius, with pills reserved for badges */
-  --radius-xs: 10px;
-  --radius-sm: 10px;
-  --radius-md: 10px;
-  --radius-lg: 10px;
-  --radius-xl: 10px;
-  --radius-spec: 10px;
+  /* Radius scale (spec 5.7) */
+  --radius-xs: var(--fh-r-chip);
+  --radius-sm: var(--fh-r-control);
+  --radius-md: var(--fh-r-control);
+  --radius-lg: var(--fh-r-card);
+  --radius-xl: var(--fh-r-photo);
+  --radius-spec: var(--fh-r-control);
   --radius-pill: 999px;
 
-  /* Locked spacing scale */
+  /* Spacing scale */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -91,10 +178,11 @@
   --space-7: 48px;
   --space-8: 48px;
 
-  /* Mobile chrome geometry. The dock is one 44px control row, 8px
-     vertical padding, and a 1px top rule. Safe area is part of its
-     rendered height, so every floating control can share this offset. */
-  --fh-mobile-dock-height: calc(61px + env(safe-area-inset-bottom, 0px));
+  /* Mobile chrome geometry. The dock is a 64px capsule floating
+     max(12px, safe area) above the bottom edge; this is the space a
+     floating control or the page end needs to clear it. */
+  --fh-dock-gap: max(12px, env(safe-area-inset-bottom, 0px));
+  --fh-mobile-dock-height: calc(72px + max(12px, env(safe-area-inset-bottom, 0px)));
 
   /* Motion */
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -105,82 +193,81 @@
   --dur-fast: 120ms;
   --dur: 200ms;
   --dur-slow: 360ms;
+  --dur-sheet-in: 280ms;
+  --dur-sheet-out: 180ms;
 
   /* Elevation */
-  --shadow-card: 0 1px 2px rgba(20, 20, 20, 0.40), 0 8px 24px rgba(20, 20, 20, 0.32);
-  --shadow-pop: 0 8px 24px rgba(20, 20, 20, 0.48), 0 2px 6px rgba(20, 20, 20, 0.32);
-  --shadow-raised: 0 2px 4px rgba(20, 20, 20, 0.32), 0 12px 28px rgba(20, 20, 20, 0.40);
+  --shadow-card: var(--fh-shadow-soft);
+  --shadow-pop: var(--fh-shadow-overlay);
+  --shadow-raised: var(--fh-shadow-raised);
 
-  /* Z layers, lowest first: sticky header 30, bottom nav and FAB 40,
-     install banner 45 (under Radix and Vaul sheets at 50 and the action
-     sheets and drawers at 80), the mobile search overlay and skip link
-     100, then the command palette with its scrim one below it. */
+  /* Z layers, lowest first: sticky header 30, dock and floating buttons
+     40, install banner 45 (under Radix and Vaul sheets at 50 and the
+     action sheets and drawers at 80), the mobile search overlay and
+     skip link 100, toasts 120, then the command palette with its scrim
+     one below it. */
   --z-nav: 40;
   --z-banner: 45;
   --z-modal: 80;
   --z-overlay: 100;
+  --z-toast: 120;
   --z-cmdk: 140;
 
-  /* Canonical v3 aliases */
-  --v3-bg: var(--onyx);
-  --v3-surface: var(--onyx-light-1);
-  --v3-surface-2: var(--onyx-light-2);
-  --v3-surface-3: var(--onyx-light-3);
-  --v3-surface-page: var(--onyx);
-  --v3-surface-glass: var(--onyx-light-1);
-  --v3-text: var(--linen);
-  --v3-text-secondary: var(--linen);
-  --v3-text-muted: var(--linen-muted);
-  --v3-text-faint: var(--linen-muted);
-  --v3-border: var(--gold-10);
-  --v3-border-mid: var(--gold-10);
-  --v3-border-strong: var(--gold-20);
-  --v3-border-gold: var(--gold-20);
-  --v3-glass-tint: var(--gold-10);
-  --v3-glass-tint-2: var(--gold-20);
+  /* v3 names */
+  --v3-bg: var(--fh-plaster);
+  --v3-surface: var(--fh-paper);
+  --v3-surface-2: var(--fh-tray);
+  --v3-surface-3: var(--fh-hairline-soft);
+  --v3-surface-page: var(--fh-plaster);
+  --v3-surface-glass: var(--fh-paper);
+  --v3-text: var(--fh-ink);
+  --v3-text-secondary: var(--fh-ink-2);
+  --v3-text-muted: var(--fh-ink-3);
+  --v3-text-faint: var(--fh-ink-3);
+  --v3-border: var(--fh-hairline);
+  --v3-border-mid: var(--fh-hairline);
+  --v3-border-strong: var(--fh-edge);
+  --v3-border-gold: var(--gold-45);
+  --v3-glass-tint: var(--fh-wash);
+  --v3-glass-tint-2: var(--fh-wash-2);
 
-  --fh-chrome-veil-1: rgba(20, 20, 20, 0.88);
-  --fh-chrome-veil-2: rgba(20, 20, 20, 0.72);
-  --fh-chrome-veil-0: rgba(20, 20, 20, 0);
-  --fh-canvas: var(--onyx);
+  --fh-chrome-veil-1: var(--fh-veil-1);
+  --fh-chrome-veil-2: var(--fh-veil-2);
+  --fh-chrome-veil-0: var(--fh-veil-0);
+  --fh-canvas: var(--fh-plaster);
 
-  --v3-primary: var(--gold);
-  --v3-primary-hot: var(--gold);
-  --v3-primary-bright: var(--gold);
-  --v3-primary-deep: var(--gold);
+  --v3-primary: var(--fh-gold);
+  --v3-primary-hot: var(--fh-gold);
+  --v3-primary-bright: var(--fh-gold);
+  --v3-primary-deep: var(--fh-gold-lo);
   --v3-primary-soft: var(--gold-10);
   --v3-primary-glow: var(--gold-20);
 
-  --v3-stage-lead: var(--steel);
-  --v3-stage-quote: var(--gold);
-  --v3-stage-active: var(--green);
-  --v3-stage-won: var(--gold);
-  --v3-stage-closed: var(--steel);
+  --v3-stage-lead: var(--stage-lead);
+  --v3-stage-quote: var(--stage-quote);
+  --v3-stage-active: var(--stage-job);
+  --v3-stage-won: var(--fh-success);
+  --v3-stage-closed: var(--stage-closed);
 
-  --v3-success: var(--green);
-  --v3-success-bright: var(--green);
-  --v3-success-soft: color-mix(in srgb, var(--green) 20%, transparent);
-  --v3-warn: var(--gold);
+  --v3-success: var(--fh-success);
+  --v3-success-bright: var(--fh-success);
+  --v3-success-soft: var(--fh-success-fill);
+  --v3-warn: var(--fh-gold);
   --v3-warn-soft: var(--gold-10);
-  --v3-danger: var(--red);
-  --v3-danger-bright: var(--red);
-  --v3-danger-soft: color-mix(in srgb, var(--red) 20%, transparent);
-  --v3-on-primary: var(--onyx);
+  --v3-danger: var(--fh-danger);
+  --v3-danger-bright: var(--fh-danger);
+  --v3-danger-soft: var(--fh-danger-fill);
+  --v3-on-primary: var(--fh-on-gold);
 
-  /* Text safe accents. Base gold, red and green are kept for fills,
-     borders, rings and buttons, but as small text they fail WCAG AA on
-     some surfaces (red on onyx 3.39:1, green 3.52:1, gold on linen
-     2.28:1). Text and icon colors read these instead. Dark values:
-     gold 6.94:1 on onyx and 4.50:1 on surface-3; red 6.85:1 on onyx and
-     4.65:1 on its soft tint over surface-2; green 7.42:1 and 4.85:1. */
-  --v3-primary-text: var(--gold);
-  --v3-danger-text: color-mix(in srgb, var(--red) 55%, var(--linen) 45%);
-  --v3-success-text: color-mix(in srgb, var(--green) 55%, var(--linen) 45%);
+  /* Text safe accents: gold, red and green as small text. */
+  --v3-primary-text: var(--fh-gold-ink);
+  --v3-danger-text: var(--fh-danger-ink);
+  --v3-success-text: var(--fh-success-ink);
 
-  --v3-radius-card: 10px;
-  --v3-radius-btn: 10px;
+  --v3-radius-card: var(--fh-r-card);
+  --v3-radius-btn: var(--fh-r-control);
   --v3-radius-pill: 999px;
-  --v3-section-radius: 10px;
+  --v3-section-radius: var(--fh-r-card);
 
   --v3-s-1: 4px;
   --v3-s-2: 8px;
@@ -196,11 +283,11 @@
   --v3-gold-glow: 0 0 0 1px var(--gold-20) inset, 0 8px 24px var(--gold-20);
   --v3-gold-glow-sm: 0 0 0 1px var(--gold-20) inset, 0 4px 12px var(--gold-10);
   --v3-gold-stroke: linear-gradient(90deg, transparent 0%, var(--gold) 50%, transparent 100%);
-  --v3-track: var(--gold-10);
-  --v3-track-strong: var(--gold-20);
+  --v3-track: var(--fh-hairline);
+  --v3-track-strong: var(--fh-edge);
 
-  --v3-section-bg: var(--onyx-light-1);
-  --v3-section-border: var(--gold-10);
+  --v3-section-bg: var(--fh-paper);
+  --v3-section-border: var(--fh-hairline);
   --v3-section-shadow: var(--shadow-card);
   --v3-rhythm-screen: 24px;
   --v3-rhythm-section: 16px;
@@ -209,77 +296,49 @@
   --v3-pad-section: 16px;
   --v3-pad-section-tight: 12px;
   --v3-gutter: 24px;
+
+  color-scheme: light;
 }
 
-[data-theme='light'] {
-  /* Page and cards stay linen; nested and raised tiers step toward onyx
-     so inputs, chips and hover states read against the card. */
-  --surface-0: var(--linen);
-  --surface-1: var(--linen);
-  --surface-2: var(--linen-dark-1);
-  --surface-elev: var(--linen-dark-2);
-  --ink-strong: var(--onyx);
-  --ink-muted: var(--steel);
-  --ink-inverse: var(--linen);
-  --ink-faint: var(--steel);
-  /* Gold at 10% and 20% all but disappears on linen (1.08:1 and 1.16:1);
-     30% and 45% land near the dark theme's hairline weights. */
-  --rule: var(--gold-30);
-  --rule-bold: var(--gold-45);
-
-  --v3-bg: var(--linen);
-  --v3-surface: var(--linen);
-  --v3-surface-2: var(--linen-dark-1);
-  --v3-surface-3: var(--linen-dark-2);
-  --v3-surface-page: var(--linen);
-  --v3-surface-glass: var(--linen);
-  --v3-section-bg: var(--linen);
-  --v3-section-border: var(--gold-30);
-  --v3-text: var(--onyx);
-  --v3-text-secondary: var(--onyx);
-  --v3-text-muted: var(--steel);
-  --v3-text-faint: var(--steel);
-  --v3-border: var(--gold-30);
-  --v3-border-mid: var(--gold-30);
-  --v3-border-strong: var(--gold-45);
-  --v3-border-gold: var(--gold-45);
-  --v3-on-primary: var(--onyx);
-  /* Deeper accents for text on linen: gold 5.51:1 on linen and 4.57:1
-     on a gold tint over surface-3; red 6.34:1 and 4.52:1 on its soft
-     tint over surface-2; green 6.32:1 and 4.65:1. */
-  --v3-primary-text: color-mix(in srgb, var(--gold) 54%, var(--onyx) 46%);
-  --v3-danger-text: color-mix(in srgb, var(--red) 78%, var(--onyx) 22%);
-  --v3-success-text: color-mix(in srgb, var(--green) 75%, var(--onyx) 25%);
-  --fh-canvas: var(--linen);
-  --fh-chrome-veil-1: rgba(242, 237, 228, 0.92);
-  --fh-chrome-veil-2: rgba(242, 237, 228, 0.78);
-  --fh-chrome-veil-0: rgba(242, 237, 228, 0);
-}
-
+/* ---- Night (spec 5.5). Only --fh- values change; the legacy names
+   above follow through their var() references. ---- */
 [data-theme='dark'] {
-  --surface-0: var(--v3-bg);
-  --surface-1: var(--v3-surface);
-  --surface-2: var(--v3-surface-2);
-  --surface-elev: var(--v3-surface-3);
-  --ink-strong: var(--v3-text);
-  --ink-muted: var(--v3-text-muted);
-  --ink-inverse: var(--v3-on-primary);
-  --ink-faint: var(--v3-text-faint);
-  --rule: var(--v3-border);
-  --rule-bold: var(--v3-border-strong);
-}
+  --fh-plaster: #171611;
+  --fh-paper: #211F19;
+  --fh-tray: #2A2720;
+  --fh-hairline: #352F26;
+  --fh-hairline-soft: #2C2821;
+  --fh-edge: #4A443A;
+  --fh-edge-strong: #7A7366;
+  --fh-ink: #F2EDE4;
+  --fh-ink-2: #C9C1B3;
+  --fh-ink-3: #9A9183;
+  --fh-ink-4: #7A7366;
+  --fh-focus: #F2EDE4;
+  --fh-gold-ink: #C9963A;
+  --fh-dock: #1E1C16;
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    --surface-0: var(--v3-bg);
-    --surface-1: var(--v3-surface);
-    --surface-2: var(--v3-surface-2);
-    --surface-elev: var(--v3-surface-3);
-    --ink-strong: var(--v3-text);
-    --ink-muted: var(--v3-text-muted);
-    --ink-inverse: var(--v3-on-primary);
-    --ink-faint: var(--v3-text-faint);
-    --rule: var(--v3-border);
-    --rule-bold: var(--v3-border-strong);
-  }
+  --fh-success: #5FB37F;
+  --fh-success-fill: #1F3A2B;
+  --fh-success-ink: #9ED1B1;
+  --fh-info: #6E93BA;
+  --fh-info-fill: #1E2F40;
+  --fh-info-ink: #A9C4DE;
+  --fh-danger: #D6735F;
+  --fh-danger-fill: #3A1F1A;
+  --fh-danger-ink: #E8B3A8;
+  --fh-neutral: #7A7366;
+
+  --fh-shadow-soft: 0 1px 2px rgba(10, 9, 6, 0.35), 0 8px 24px -12px rgba(10, 9, 6, 0.55);
+  --fh-shadow-raised: 0 18px 30px -18px rgba(10, 9, 6, 0.7), 0 2px 6px rgba(10, 9, 6, 0.3);
+  --fh-wash: rgba(242, 237, 228, 0.06);
+  --fh-wash-2: rgba(242, 237, 228, 0.10);
+  --fh-veil-1: rgba(23, 22, 17, 0.92);
+  --fh-veil-2: rgba(23, 22, 17, 0.78);
+  --fh-veil-0: rgba(23, 22, 17, 0);
+
+  /* On Night the inverse ink is the dark one. */
+  --ink-inverse: var(--fh-onyx);
+
+  color-scheme: dark;
 }
