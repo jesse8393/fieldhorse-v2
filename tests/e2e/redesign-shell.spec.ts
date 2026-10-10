@@ -81,6 +81,39 @@ test.describe('phone shell', () => {
       await expect(page.locator('.fh-fab')).toHaveCount(0)
     }
   })
+
+  test('last item clears the dock', async ({ page }) => {
+    for (const path of ['/invoices', '/clients']) {
+      await open(page, path)
+      await expect(page.locator('main').getByRole('button').first()).toBeVisible()
+      // Scroll to the very bottom; long lists render more rows as they
+      // near the end, so repeat until the page stops growing.
+      let height = 0
+      for (let i = 0; i < 6; i++) {
+        const next = await page.evaluate(() => document.documentElement.scrollHeight)
+        if (next === height) break
+        height = next
+        await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }))
+        await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+      }
+      const { lastBottom, dockTop } = await page.evaluate(() => {
+        const inFlow = (el: Element) => {
+          for (let node: Element | null = el; node; node = node.parentElement) {
+            const { position } = getComputedStyle(node)
+            if (position === 'fixed' || position === 'sticky') return false
+          }
+          return true
+        }
+        const controls = [...document.querySelectorAll('main a, main button, main input, main [role="button"]')]
+          .filter((el) => inFlow(el) && (el as HTMLElement).offsetParent !== null)
+        const lastBottom = Math.max(...controls.map((el) => el.getBoundingClientRect().bottom))
+        const capsule = document.querySelector('.fhs-dock')!.getBoundingClientRect()
+        const coin = document.querySelector('.fhs-dock__coin')!.getBoundingClientRect()
+        return { lastBottom, dockTop: Math.min(capsule.top, coin.top) }
+      })
+      expect(lastBottom, `${path}: last control ends at ${lastBottom}, dock starts at ${dockTop}`).toBeLessThanOrEqual(dockTop)
+    }
+  })
 })
 
 test.describe('first paint', () => {

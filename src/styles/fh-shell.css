@@ -164,6 +164,24 @@
 @media (min-width: 900px) {
   .fhs-dock { display: none; }
 }
+/* Content tucks under the dock: a plaster fade starts 40 px above the
+   capsule and runs to the bottom edge, so rows read as passing behind
+   it rather than being covered. It sits just under the dock, never
+   takes a tap, and goes away whenever the dock is hidden (keyboard
+   open, or a screen with its own action capsule). */
+@media (max-width: 899px) {
+  body:has(.fhs-dock:not(.is-hidden))::after {
+    content: '';
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: calc(var(--z-nav) - 1);
+    height: calc(var(--fh-dock-gap) + 64px + 40px);
+    background: linear-gradient(180deg, transparent 0, var(--fh-plaster) 40px);
+    pointer-events: none;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .fhs-dock,
   .fhs-dock.is-hidden { transform: translateX(-50%); }
