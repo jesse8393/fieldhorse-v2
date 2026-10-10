@@ -66,9 +66,9 @@ Status is one of todo, done, blocked, skipped.
 | 5 | 5.2 Fieldhorse proposal theme | done | 17b7d31 | Settings choice hidden until a migration allows it (D22) |
 | 5 | 5.3 Welcome and Login | done | fd12c62 | |
 | 5 | 5.4 Phase 5 review and pull request | done | see git log | #220, images in phase5-review |
-| 6 | 6.1 Inbox data and engine switch | todo | | |
-| 6 | 6.2 Inbox list | todo | | |
-| 6 | 6.3 Thread with the AI draft | todo | | |
+| 6 | 6.1 Inbox data and engine switch | done | 45a0515 | Also touched `permissions.ts` and `appLayout.ts`, both additive |
+| 6 | 6.2 Inbox list | done | d5588e8 | |
+| 6 | 6.3 Thread with the AI draft | done | 0ca4345 | |
 | 6 | 6.4 Phase 6 review and pull request | todo | | |
 | 7 | 7.1 Unused components | todo | | |
 | 7 | 7.2 Dead CSS guarded by screenshots | todo | | |
@@ -100,6 +100,11 @@ Status is one of todo, done, blocked, skipped.
 * The Quote tab on a phone sits under the Job page header (rail, money strip, quick actions, tabs), so the render's bare Quote page layout differs by design.
 * `src/lib/queries.ts` gained `cost` on the invoices bundle jobs so Money can compute margin. `tests/e2e/mock-workflows.spec.ts` changed two phone assertions that named old phone cards.
 * Full suite on the Phase 3 head: lint 0 errors (50 warnings, down from 57), typecheck, build and design audit pass, 720 of 720 unit tests, Playwright 95 passed and 75 skipped by project.
+
+### Phase 6 notes
+
+* Decisions D26 and D27 in `SPEC.md` cover the Inbox data guesses and who sees the Inbox. **Check D26 against the live schema:** the Growth Engine tables are not in `supabase/migrations`, so the held reasons and draft status values are best guesses.
+* The inbox agent added `tests/e2e/helpers/rpcCalls.ts` and RPC call recording to `scripts/qa-mock.mjs` (an `rpcLog` option and an `rpcCalls(context, name)` reader).
 
 ### Phase 5 notes
 
