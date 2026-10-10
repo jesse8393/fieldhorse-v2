@@ -1,0 +1,1245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Lumen — The AI Sleep Coach That Wakes You at Your Lightest Sleep</title>
+<meta name="description" content="Lumen is an AI sleep coach that tracks your sleep cycles and wakes you during your lightest sleep phase — so you rise refreshed, never groggy." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #070912;
+    --bg-2: #0c1022;
+    --panel: rgba(255, 255, 255, 0.04);
+    --panel-border: rgba(255, 255, 255, 0.09);
+    --ink: #eef1ff;
+    --muted: #9aa3c7;
+    --faint: #6b7299;
+    --accent: #8b7dff;
+    --accent-2: #45d7ff;
+    --gold: #ffcf6b;
+    --radius: 20px;
+    --maxw: 1140px;
+    --shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.8);
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: "Inter", system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  /* Ambient background */
+  .aurora {
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    background:
+      radial-gradient(900px 600px at 80% -10%, rgba(139, 125, 255, 0.22), transparent 60%),
+      radial-gradient(800px 500px at 10% 10%, rgba(69, 215, 255, 0.14), transparent 55%),
+      radial-gradient(1000px 700px at 50% 120%, rgba(255, 207, 107, 0.08), transparent 60%),
+      linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+  }
+  .stars {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background-image:
+      radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,0.7), transparent),
+      radial-gradient(1px 1px at 70% 65%, rgba(255,255,255,0.5), transparent),
+      radial-gradient(1.5px 1.5px at 40% 80%, rgba(255,255,255,0.6), transparent),
+      radial-gradient(1px 1px at 85% 20%, rgba(255,255,255,0.5), transparent),
+      radial-gradient(1px 1px at 55% 15%, rgba(255,255,255,0.4), transparent),
+      radial-gradient(1px 1px at 12% 70%, rgba(255,255,255,0.4), transparent);
+    opacity: 0.6;
+    animation: twinkle 8s ease-in-out infinite alternate;
+  }
+  @keyframes twinkle { from { opacity: 0.35; } to { opacity: 0.7; } }
+
+  a { color: inherit; text-decoration: none; }
+
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+    font-size: 15px;
+    padding: 14px 26px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: transform 0.25s var(--ease), box-shadow 0.25s var(--ease), background 0.25s;
+    white-space: nowrap;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: #07091a;
+    box-shadow: 0 12px 30px -10px rgba(139, 125, 255, 0.6);
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 18px 40px -12px rgba(139, 125, 255, 0.75); }
+  .btn-ghost {
+    background: var(--panel);
+    border-color: var(--panel-border);
+    color: var(--ink);
+  }
+  .btn-ghost:hover { background: rgba(255,255,255,0.08); transform: translateY(-2px); }
+
+  /* Nav */
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    backdrop-filter: blur(14px);
+    background: rgba(7, 9, 18, 0.55);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 72px;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    font-weight: 700;
+    font-size: 19px;
+    letter-spacing: -0.02em;
+  }
+  .logo-mark {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #fff8e6 0%, var(--gold) 35%, #e89f3c 75%, transparent 100%);
+    box-shadow: 0 0 22px rgba(255, 207, 107, 0.55);
+    position: relative;
+  }
+  .logo-mark::after {
+    content: "";
+    position: absolute;
+    top: -3px; left: -3px; right: -3px; bottom: -3px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 207, 107, 0.3);
+  }
+  .nav-links { display: flex; gap: 30px; font-size: 15px; color: var(--muted); }
+  .nav-links a { transition: color 0.2s; }
+  .nav-links a:hover { color: var(--ink); }
+  .nav-cta { display: flex; align-items: center; gap: 14px; }
+  .menu-toggle { display: none; background: none; border: 0; color: var(--ink); cursor: pointer; }
+
+  /* Hero */
+  .hero { padding: 90px 0 70px; position: relative; }
+  .hero-grid {
+    display: grid;
+    grid-template-columns: 1.05fr 0.95fr;
+    gap: 56px;
+    align-items: center;
+  }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    padding: 7px 14px;
+    border-radius: 999px;
+    margin-bottom: 26px;
+  }
+  .pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-2); box-shadow: 0 0 10px var(--accent-2); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; transform: scale(1);} 50% { opacity: 0.4; transform: scale(0.7);} }
+
+  h1 {
+    font-family: "Fraunces", serif;
+    font-weight: 600;
+    font-size: clamp(40px, 6vw, 66px);
+    line-height: 1.04;
+    letter-spacing: -0.025em;
+    margin-bottom: 22px;
+  }
+  h1 .glow {
+    background: linear-gradient(120deg, var(--gold), var(--accent-2), var(--accent));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .hero p.lead {
+    font-size: clamp(17px, 2vw, 19px);
+    color: var(--muted);
+    max-width: 540px;
+    margin-bottom: 34px;
+  }
+  .hero-actions { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+  .hero-note { font-size: 13px; color: var(--faint); margin-top: 18px; display: flex; gap: 18px; flex-wrap: wrap; }
+  .hero-note span { display: inline-flex; align-items: center; gap: 7px; }
+  .check { color: var(--accent-2); }
+
+  /* Phone / device mock */
+  .device {
+    position: relative;
+    margin: 0 auto;
+    width: 300px;
+    height: 600px;
+    border-radius: 44px;
+    background: linear-gradient(160deg, #171b33, #0a0d1d);
+    border: 1px solid rgba(255,255,255,0.1);
+    box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,0.08);
+    padding: 14px;
+  }
+  .device::before {
+    content: "";
+    position: absolute;
+    top: 16px; left: 50%; transform: translateX(-50%);
+    width: 110px; height: 26px;
+    background: #05060f;
+    border-radius: 0 0 16px 16px;
+    z-index: 3;
+  }
+  .device-screen {
+    width: 100%; height: 100%;
+    border-radius: 32px;
+    background: radial-gradient(120% 80% at 50% 0%, #1a1f3d 0%, #0a0c1c 70%);
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding: 46px 20px 22px;
+  }
+  .dvc-time { font-family: "Fraunces", serif; font-size: 46px; font-weight: 600; letter-spacing: -0.02em; }
+  .dvc-sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .dvc-status {
+    margin-top: 18px;
+    background: linear-gradient(135deg, rgba(139,125,255,0.18), rgba(69,215,255,0.12));
+    border: 1px solid rgba(139,125,255,0.3);
+    border-radius: 16px;
+    padding: 14px 16px;
+  }
+  .dvc-status .lab { font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--accent-2); }
+  .dvc-status .val { font-size: 17px; font-weight: 600; margin-top: 4px; }
+  .dvc-status .meta { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .dvc-spark { margin-top: auto; }
+  .dvc-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; }
+  .dvc-alarm { font-size: 13px; color: var(--muted); }
+  .dvc-alarm b { color: var(--ink); font-weight: 600; }
+  .ring {
+    width: 46px; height: 46px;
+    border-radius: 50%;
+    background: conic-gradient(var(--accent-2) 0deg, var(--accent) 220deg, rgba(255,255,255,0.08) 220deg);
+    display: grid; place-items: center;
+  }
+  .ring::after { content: ""; width: 36px; height: 36px; border-radius: 50%; background: #0c0f20; }
+  .ring span { position: absolute; font-size: 11px; font-weight: 700; }
+
+  .float-card {
+    position: absolute;
+    background: rgba(12,16,34,0.82);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--panel-border);
+    border-radius: 14px;
+    padding: 12px 15px;
+    box-shadow: var(--shadow);
+    font-size: 13px;
+  }
+  .float-card .t { color: var(--faint); font-size: 11px; }
+  .float-card .b { font-weight: 700; font-size: 16px; margin-top: 2px; }
+  .fc-1 { top: 60px; left: -34px; animation: bob 5s ease-in-out infinite; }
+  .fc-2 { bottom: 90px; right: -40px; animation: bob 6s ease-in-out infinite reverse; }
+  @keyframes bob { 0%,100% { transform: translateY(0);} 50% { transform: translateY(-12px);} }
+
+  /* Logos strip */
+  .strip { padding: 28px 0 10px; }
+  .strip p { text-align: center; color: var(--faint); font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 18px; }
+  .strip-logos { display: flex; flex-wrap: wrap; justify-content: center; gap: 40px; opacity: 0.6; }
+  .strip-logos span { font-weight: 700; font-size: 18px; letter-spacing: -0.01em; color: var(--muted); }
+
+  /* Section scaffold */
+  section { padding: 86px 0; }
+  .sec-head { text-align: center; max-width: 660px; margin: 0 auto 54px; }
+  .eyebrow { font-size: 13px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent); margin-bottom: 14px; }
+  h2 {
+    font-family: "Fraunces", serif;
+    font-weight: 600;
+    font-size: clamp(30px, 4.4vw, 46px);
+    line-height: 1.08;
+    letter-spacing: -0.02em;
+    margin-bottom: 16px;
+  }
+  .sec-head p { color: var(--muted); font-size: 17px; }
+
+  /* Live chart panel */
+  .chart-panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius);
+    padding: 30px;
+    box-shadow: var(--shadow);
+  }
+  .chart-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 18px;
+    margin-bottom: 22px;
+  }
+  .chart-top h3 { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #36e0a0; box-shadow: 0 0 12px #36e0a0; animation: pulse 1.6s infinite; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+  .legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 7px; vertical-align: middle; }
+  .chart-canvas-wrap { position: relative; width: 100%; }
+  canvas { display: block; width: 100%; height: auto; }
+  .chart-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-top: 24px;
+  }
+  .stat {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--panel-border);
+    border-radius: 14px;
+    padding: 16px;
+  }
+  .stat .k { font-size: 12px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.08em; }
+  .stat .v { font-family: "Fraunces", serif; font-size: 28px; font-weight: 600; margin-top: 4px; }
+  .stat .v small { font-size: 14px; color: var(--muted); font-family: "Inter"; font-weight: 500; }
+
+  /* Features */
+  .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+  .feature {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius);
+    padding: 28px;
+    transition: transform 0.3s var(--ease), border-color 0.3s, background 0.3s;
+  }
+  .feature:hover { transform: translateY(-6px); border-color: rgba(139,125,255,0.4); background: rgba(139,125,255,0.05); }
+  .feat-ico {
+    width: 48px; height: 48px;
+    border-radius: 13px;
+    display: grid; place-items: center;
+    background: linear-gradient(135deg, rgba(139,125,255,0.25), rgba(69,215,255,0.18));
+    border: 1px solid rgba(139,125,255,0.3);
+    margin-bottom: 18px;
+  }
+  .feature h3 { font-size: 19px; font-weight: 700; margin-bottom: 9px; }
+  .feature p { color: var(--muted); font-size: 15px; }
+
+  /* How it works */
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; counter-reset: step; }
+  .step {
+    position: relative;
+    padding: 28px;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius);
+  }
+  .step .num {
+    font-family: "Fraunces", serif;
+    font-size: 40px;
+    font-weight: 600;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    line-height: 1;
+    margin-bottom: 14px;
+  }
+  .step h3 { font-size: 18px; margin-bottom: 8px; }
+  .step p { color: var(--muted); font-size: 15px; }
+
+  /* Testimonials */
+  .tgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+  .quote {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius);
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .stars-row { color: var(--gold); font-size: 15px; letter-spacing: 2px; }
+  .quote p { font-size: 16px; color: var(--ink); line-height: 1.65; }
+  .who { display: flex; align-items: center; gap: 12px; margin-top: auto; }
+  .avatar {
+    width: 42px; height: 42px; border-radius: 50%;
+    display: grid; place-items: center;
+    font-weight: 700; font-size: 15px;
+    color: #07091a;
+  }
+  .who .nm { font-weight: 600; font-size: 15px; }
+  .who .rl { color: var(--faint); font-size: 13px; }
+
+  /* Pricing */
+  .toggle-row { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 38px; font-size: 15px; color: var(--muted); }
+  .switch { position: relative; width: 54px; height: 30px; }
+  .switch input { display: none; }
+  .slider { position: absolute; inset: 0; background: var(--panel); border: 1px solid var(--panel-border); border-radius: 999px; cursor: pointer; transition: 0.3s; }
+  .slider::before { content: ""; position: absolute; width: 22px; height: 22px; left: 3px; top: 3px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-2)); transition: 0.3s var(--ease); }
+  .switch input:checked + .slider::before { transform: translateX(24px); }
+  .save-badge { background: rgba(54,224,160,0.15); color: #4fe6ad; border: 1px solid rgba(54,224,160,0.3); padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+
+  .pricing { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; align-items: stretch; }
+  .plan {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius);
+    padding: 32px 28px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+  .plan.featured {
+    background: linear-gradient(180deg, rgba(139,125,255,0.14), rgba(69,215,255,0.05));
+    border-color: rgba(139,125,255,0.5);
+    box-shadow: 0 30px 70px -28px rgba(139,125,255,0.5);
+  }
+  .plan .tag-pop {
+    position: absolute; top: -13px; left: 50%; transform: translateX(-50%);
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: #07091a; font-size: 12px; font-weight: 700;
+    padding: 5px 14px; border-radius: 999px;
+    letter-spacing: 0.04em;
+  }
+  .plan h3 { font-size: 18px; font-weight: 700; }
+  .plan .desc { color: var(--muted); font-size: 14px; margin-top: 6px; min-height: 40px; }
+  .price { display: flex; align-items: baseline; gap: 4px; margin: 20px 0 6px; }
+  .price .cur { font-size: 22px; font-weight: 600; color: var(--muted); }
+  .price .amt { font-family: "Fraunces", serif; font-size: 50px; font-weight: 600; letter-spacing: -0.02em; }
+  .price .per { color: var(--faint); font-size: 15px; }
+  .plan ul { list-style: none; margin: 20px 0 26px; display: flex; flex-direction: column; gap: 12px; }
+  .plan li { display: flex; gap: 11px; align-items: flex-start; font-size: 15px; color: var(--muted); }
+  .plan li svg { flex-shrink: 0; margin-top: 3px; }
+  .plan .btn { width: 100%; justify-content: center; margin-top: auto; }
+
+  /* FAQ */
+  .faq { max-width: 800px; margin: 0 auto; }
+  .qa {
+    border-bottom: 1px solid var(--panel-border);
+  }
+  .qa button {
+    width: 100%;
+    background: none;
+    border: 0;
+    color: var(--ink);
+    text-align: left;
+    padding: 24px 4px;
+    font-size: 17px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    font-family: inherit;
+  }
+  .qa .ico { flex-shrink: 0; transition: transform 0.3s var(--ease); color: var(--accent); font-size: 22px; line-height: 1; }
+  .qa.open .ico { transform: rotate(45deg); }
+  .qa .ans { max-height: 0; overflow: hidden; transition: max-height 0.4s var(--ease); }
+  .qa .ans p { color: var(--muted); font-size: 15.5px; padding: 0 4px 24px; }
+
+  /* CTA */
+  .cta-final {
+    text-align: center;
+    background: linear-gradient(135deg, rgba(139,125,255,0.16), rgba(69,215,255,0.08));
+    border: 1px solid rgba(139,125,255,0.3);
+    border-radius: 28px;
+    padding: 64px 32px;
+    position: relative;
+    overflow: hidden;
+  }
+  .cta-final::before {
+    content: ""; position: absolute; inset: 0;
+    background: radial-gradient(600px 300px at 50% 0%, rgba(255,207,107,0.12), transparent 70%);
+  }
+  .cta-final h2 { position: relative; }
+  .cta-final p { color: var(--muted); font-size: 18px; max-width: 540px; margin: 0 auto 30px; position: relative; }
+  .cta-final .hero-actions { justify-content: center; position: relative; }
+
+  /* Footer */
+  footer { border-top: 1px solid rgba(255,255,255,0.06); padding: 56px 0 36px; }
+  .foot-grid { display: grid; grid-template-columns: 1.5fr repeat(3, 1fr); gap: 40px; margin-bottom: 44px; }
+  .foot-brand p { color: var(--muted); font-size: 14px; margin-top: 14px; max-width: 280px; }
+  .foot-col h4 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--faint); margin-bottom: 16px; }
+  .foot-col a { display: block; color: var(--muted); font-size: 14px; margin-bottom: 11px; transition: color 0.2s; }
+  .foot-col a:hover { color: var(--ink); }
+  .foot-bottom { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; padding-top: 26px; border-top: 1px solid rgba(255,255,255,0.06); color: var(--faint); font-size: 13px; }
+  .foot-social { display: flex; gap: 16px; }
+  .foot-social a:hover { color: var(--ink); }
+
+  /* Reveal animation */
+  .reveal { opacity: 0; transform: translateY(28px); transition: opacity 0.7s var(--ease), transform 0.7s var(--ease); }
+  .reveal.in { opacity: 1; transform: none; }
+
+  /* Responsive */
+  @media (max-width: 940px) {
+    .hero-grid { grid-template-columns: 1fr; gap: 60px; }
+    .hero-content { text-align: center; }
+    .hero p.lead { margin-left: auto; margin-right: auto; }
+    .hero-actions, .hero-note { justify-content: center; }
+    .features, .steps, .tgrid, .pricing { grid-template-columns: 1fr; }
+    .foot-grid { grid-template-columns: 1fr 1fr; }
+    .chart-stats { grid-template-columns: 1fr 1fr; }
+    .nav-links { display: none; }
+    .plan.featured { order: -1; }
+  }
+  @media (max-width: 520px) {
+    .foot-grid { grid-template-columns: 1fr; }
+    .float-card { display: none; }
+    section { padding: 64px 0; }
+    .cta-final { padding: 48px 22px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    .reveal { opacity: 1; transform: none; }
+  }
+</style>
+</head>
+<body>
+<div class="aurora"></div>
+<div class="stars"></div>
+
+<!-- Nav -->
+<header>
+  <div class="wrap">
+    <nav>
+      <a href="#" class="logo"><span class="logo-mark"></span> Lumen</a>
+      <div class="nav-links">
+        <a href="#how">How it works</a>
+        <a href="#chart">Live tracking</a>
+        <a href="#reviews">Reviews</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#faq">FAQ</a>
+      </div>
+      <div class="nav-cta">
+        <a href="#pricing" class="btn btn-ghost">Sign in</a>
+        <a href="#pricing" class="btn btn-primary">Start free trial</a>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="wrap">
+    <div class="hero-grid">
+      <div class="hero-content reveal in">
+        <span class="pill"><span class="dot"></span> Now learning from 2.4M nights of sleep</span>
+        <h1>Wake up at your <span class="glow">lightest sleep</span>, never groggy again.</h1>
+        <p class="lead">Lumen is your AI sleep coach. It reads your sleep cycles in real time and gently wakes you in the perfect 30-minute window — so you rise clear-headed, energized, and ready before your alarm ever has to shout.</p>
+        <div class="hero-actions">
+          <a href="#pricing" class="btn btn-primary">Start 14-day free trial →</a>
+          <a href="#how" class="btn btn-ghost">See how it works</a>
+        </div>
+        <div class="hero-note">
+          <span><span class="check">✓</span> No sleep tracker required</span>
+          <span><span class="check">✓</span> Works with Apple Watch &amp; Oura</span>
+          <span><span class="check">✓</span> Cancel anytime</span>
+        </div>
+      </div>
+
+      <div class="hero-visual reveal in">
+        <div class="device">
+          <div class="device-screen">
+            <div class="dvc-time" id="dvcTime">6:42</div>
+            <div class="dvc-sub">Smart window · 6:30 – 7:00 AM</div>
+            <div class="dvc-status">
+              <div class="lab">Current phase</div>
+              <div class="val" id="dvcPhase">Light sleep · ideal to wake</div>
+              <div class="meta" id="dvcMeta">Lumen will wake you in ~4 min</div>
+            </div>
+            <div class="dvc-spark">
+              <canvas id="miniChart" width="520" height="160" aria-hidden="true"></canvas>
+            </div>
+            <div class="dvc-foot">
+              <div class="dvc-alarm">Sleep score<br><b>92 · Excellent</b></div>
+              <div class="ring"><span>7h 48m</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="float-card fc-1">
+          <div class="t">Avg. wake-up grogginess</div>
+          <div class="b" style="color:#4fe6ad">↓ 61%</div>
+        </div>
+        <div class="float-card fc-2">
+          <div class="t">Cycles detected tonight</div>
+          <div class="b">5 complete</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Trust strip -->
+<div class="strip">
+  <div class="wrap">
+    <p>Trusted by sleepers at</p>
+    <div class="strip-logos">
+      <span>Northwind</span>
+      <span>Vertex Labs</span>
+      <span>Cadence</span>
+      <span>Orbital</span>
+      <span>Helix Health</span>
+      <span>Lumio</span>
+    </div>
+  </div>
+</div>
+
+<!-- Live chart -->
+<section id="chart">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="eyebrow">Real-time sleep intelligence</div>
+      <h2>Watch Lumen read your night, cycle by cycle</h2>
+      <p>This is a live simulation of a full night. Lumen maps every dip into deep sleep and every rise toward waking, then targets your smart alarm to the next light-sleep peak inside your window.</p>
+    </div>
+
+    <div class="chart-panel reveal">
+      <div class="chart-top">
+        <h3><span class="live-dot"></span> Tonight's hypnogram <span id="liveClock" style="color:var(--faint);font-weight:500;font-size:14px;"></span></h3>
+        <div class="legend">
+          <span><i style="background:#45d7ff"></i>Awake</span>
+          <span><i style="background:#8b7dff"></i>REM</span>
+          <span><i style="background:#6fa8ff"></i>Light</span>
+          <span><i style="background:#3a4a8f"></i>Deep</span>
+          <span><i style="background:#ffcf6b"></i>Smart wake window</span>
+        </div>
+      </div>
+      <div class="chart-canvas-wrap">
+        <canvas id="sleepChart" width="1080" height="380" role="img" aria-label="Live animated hypnogram showing sleep stages across the night, with a highlighted smart wake window where Lumen targets the lightest sleep."></canvas>
+      </div>
+      <div class="chart-stats">
+        <div class="stat"><div class="k">Time asleep</div><div class="v" id="sAsleep">7h 48m</div></div>
+        <div class="stat"><div class="k">Deep sleep</div><div class="v" id="sDeep">1h 36m <small>21%</small></div></div>
+        <div class="stat"><div class="k">REM sleep</div><div class="v" id="sRem">1h 54m <small>24%</small></div></div>
+        <div class="stat"><div class="k">Wake target</div><div class="v" id="sWake" style="color:var(--gold)">6:46 AM</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section id="features">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="eyebrow">Why Lumen</div>
+      <h2>A coach, not just an alarm</h2>
+      <p>Most alarms blast you awake mid-cycle. Lumen understands the architecture of your sleep and works with your biology instead of against it.</p>
+    </div>
+    <div class="features">
+      <div class="feature reveal">
+        <div class="feat-ico">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#45d7ff" stroke-width="1.8"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" stroke-linejoin="round"/></svg>
+        </div>
+        <h3>Lightest-sleep wake-ups</h3>
+        <p>Lumen finds the shallowest moment inside your chosen 30-minute window and wakes you there — the difference between dragging yourself up and floating up.</p>
+      </div>
+      <div class="feature reveal">
+        <div class="feat-ico">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8b7dff" stroke-width="1.8"><path d="M3 12h4l3 8 4-16 3 8h4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <h3>Adaptive AI model</h3>
+        <p>Your personal model retrains every morning on your actual nights, learning how caffeine, workouts, and late screens shift your cycles over time.</p>
+      </div>
+      <div class="feature reveal">
+        <div class="feat-ico">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffcf6b" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <h3>Wind-down coaching</h3>
+        <p>Get a nightly plan — ideal bedtime, light exposure, and a breathing track — tuned to the wake time you actually need to hit tomorrow.</p>
+      </div>
+      <div class="feature reveal">
+        <div class="feat-ico">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#45d7ff" stroke-width="1.8"><rect x="5" y="2" width="14" height="20" rx="3"/><path d="M11 18h2" stroke-linecap="round"/></svg>
+        </div>
+        <h3>No new hardware</h3>
+        <p>Use just your phone on the nightstand, or pair an Apple Watch, Oura, or Whoop for clinical-grade signals. Lumen blends whatever you have.</p>
+      </div>
+      <div class="feature reveal">
+        <div class="feat-ico">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8b7dff" stroke-width="1.8"><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l3 3M16 16l3 3M19 5l-3 3M8 16l-3 3" stroke-linecap="round"/></svg>
+        </div>
+        <h3>Sunrise alarm</h3>
+        <p>A gradual light-and-sound sunrise eases you toward waking, then a gentle chime lands precisely on your lightest moment — never a jarring buzz.</p>
+      </div>
+      <div class="feature reveal">
+        <div class="feat-ico">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffcf6b" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" stroke-linejoin="round"/></svg>
+        </div>
+        <h3>Private by design</h3>
+        <p>Your sleep data is encrypted and processed on-device first. We never sell it, and you can export or delete everything in one tap.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- How it works -->
+<section id="how">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="eyebrow">How it works</div>
+      <h2>Three nights to better mornings</h2>
+      <p>Set it up in under two minutes. Lumen handles the science while you sleep.</p>
+    </div>
+    <div class="steps">
+      <div class="step reveal">
+        <div class="num">01</div>
+        <h3>Set your window</h3>
+        <p>Tell Lumen the latest you can wake — say 7:00 AM. It opens a smart 30-minute window before it and starts listening the moment you doze off.</p>
+      </div>
+      <div class="step reveal">
+        <div class="num">02</div>
+        <h3>Lumen tracks your cycles</h3>
+        <p>Using motion, heart rate, and sound, the AI maps light, deep, and REM in real time, predicting where your next light-sleep peak will land.</p>
+      </div>
+      <div class="step reveal">
+        <div class="num">03</div>
+        <h3>Wake at the perfect moment</h3>
+        <p>A sunrise glow and soft chime lift you at your lightest second inside the window. You wake clear, with a full report waiting on your phone.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Testimonials -->
+<section id="reviews">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="eyebrow">Loved by early risers</div>
+      <h2>People are waking up different</h2>
+      <p>Over 40,000 five-star mornings and counting. Here's what a few of them sound like.</p>
+    </div>
+    <div class="tgrid">
+      <div class="quote reveal">
+        <div class="stars-row">★★★★★</div>
+        <p>"I've used every sleep app out there. Lumen is the first one that actually changed how I feel at 6 AM. I stopped hitting snooze by week two — I just don't need it anymore."</p>
+        <div class="who">
+          <div class="avatar" style="background:linear-gradient(135deg,#8b7dff,#45d7ff)">MR</div>
+          <div><div class="nm">Mara Reyes</div><div class="rl">ER nurse, night-shift survivor</div></div>
+        </div>
+      </div>
+      <div class="quote reveal">
+        <div class="stars-row">★★★★★</div>
+        <p>"As a founder I run on too little sleep. Lumen can't give me more hours, but it makes the hours I get count. Waking in light sleep is genuinely a different species of morning."</p>
+        <div class="who">
+          <div class="avatar" style="background:linear-gradient(135deg,#ffcf6b,#e89f3c)">DK</div>
+          <div><div class="nm">Daniel Okafor</div><div class="rl">Startup founder, Berlin</div></div>
+        </div>
+      </div>
+      <div class="quote reveal">
+        <div class="stars-row">★★★★★</div>
+        <p>"The wind-down coaching surprised me most. It nudged my bedtime 25 minutes earlier and my deep sleep jumped. My Oura ring agrees — readiness is up 14 points on average."</p>
+        <div class="who">
+          <div class="avatar" style="background:linear-gradient(135deg,#36e0a0,#45d7ff)">PT</div>
+          <div><div class="nm">Priya Tan</div><div class="rl">Marathoner &amp; data analyst</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Pricing -->
+<section id="pricing">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="eyebrow">Pricing</div>
+      <h2>Start free. Upgrade when you feel it.</h2>
+      <p>Every plan includes the smart wake window. Premium unlocks the adaptive AI coach and wearable fusion.</p>
+    </div>
+
+    <div class="toggle-row reveal">
+      <span id="lblMonthly" style="color:var(--ink)">Monthly</span>
+      <label class="switch"><input type="checkbox" id="billToggle"><span class="slider"></span></label>
+      <span id="lblYearly">Yearly</span>
+      <span class="save-badge">Save 33%</span>
+    </div>
+
+    <div class="pricing">
+      <div class="plan reveal">
+        <h3>Starter</h3>
+        <div class="desc">The essentials to stop waking up groggy.</div>
+        <div class="price"><span class="cur">$</span><span class="amt">0</span><span class="per">/forever</span></div>
+        <ul>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#45d7ff" stroke-width="2"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg> Smart 30-min wake window</li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#45d7ff" stroke-width="2"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg> Phone-only sleep tracking</li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#45d7ff" stroke-width="2"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg> Morning sleep score</li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#45d7ff" stroke-width="2"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg> 7 nights of history</li>
+        </ul>
+        <a href="#" class="btn btn-ghost">Get started free</a>
+      </div>
+
+      <div class="plan featured reveal">
+        <div class="tag-pop">Most popular</div>
+        <h3>Premium</h3>
+        <div class="desc">The full AI coach for people serious about mornings.</div>
+        <div class="price"><span class="cur">$</span><span class="amt" id="premiumPrice">9</span><span class="per" id="premiumPer">/month</span></div>
+        <ul>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8b7dff" stroke-width="2"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg> Everything in Starter</li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8b7dff" stroke-width="2"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg> Adaptive AI model that learns you</li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8b7dff" stroke-width="2"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg> Apple Watch, Oura &amp; Whoop fusion</li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8b7dff" stroke-width="2"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg> Nightly wind-down coaching</li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8b7dff" stroke-width="2"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg> Unlimited history &amp; trends</li>
+        </ul>
+        <a href="#" class="btn btn-primary">Start 14-day free trial</a>
+      </div>
+
+      <div class="plan reveal">
+        <h3>Family</h3>
+        <div class="desc">Premium for the whole household, one bill.</div>
+        <div class="price"><span class="cur">$</span><span class="amt" id="familyPrice">19</span><span class="per" id="familyPer">/month</span></div>
+        <ul>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffcf6b" stroke-width="2"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg> Up to 5 Premium accounts</li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffcf6b" stroke-width="2"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg> Shared family sleep dashboard</li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffcf6b" stroke-width="2"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg> Kid-friendly gentle wake modes</li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffcf6b" stroke-width="2"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg> Priority human support</li>
+        </ul>
+        <a href="#" class="btn btn-ghost">Choose Family</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section id="faq">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="eyebrow">Questions</div>
+      <h2>Everything you're wondering</h2>
+    </div>
+    <div class="faq reveal">
+      <div class="qa">
+        <button>How does Lumen know I'm in light sleep?<span class="ico">+</span></button>
+        <div class="ans"><p>Lumen combines micro-movements picked up by your phone's accelerometer, ambient sound patterns, and — if you wear one — heart-rate and HRV from your watch or ring. It feeds these into a model that classifies your sleep stage every 30 seconds, then predicts when the next light-sleep window will arrive so it can time your wake-up precisely.</p></div>
+      </div>
+      <div class="qa">
+        <button>Do I need a smartwatch or special device?<span class="ico">+</span></button>
+        <div class="ans"><p>No. Lumen works with just your phone resting on the nightstand or mattress. If you do own an Apple Watch, Oura Ring, or Whoop band, pairing it gives Lumen richer biometric signals and even sharper wake timing — but it's completely optional.</p></div>
+      </div>
+      <div class="qa">
+        <button>What exactly is the "smart wake window"?<span class="ico">+</span></button>
+        <div class="ans"><p>Instead of a single fixed alarm time, you give Lumen the latest you can wake — for example 7:00 AM. Lumen then watches the 30 minutes before that and wakes you at the lightest sleep moment it finds. If you're already in deep sleep right at the deadline, it still wakes you gently at 7:00 so you're never late.</p></div>
+      </div>
+      <div class="qa">
+        <button>Will it wake my partner?<span class="ico">+</span></button>
+        <div class="ans"><p>Lumen's sunrise alarm starts as a soft glow and a low chime that ramps gradually, and you can route the audio to a watch haptic or earbud instead of the room speaker. Most couples find it far less disruptive than a traditional blaring alarm.</p></div>
+      </div>
+      <div class="qa">
+        <button>Is my sleep data private?<span class="ico">+</span></button>
+        <div class="ans"><p>Yes. Raw sensor data is processed on your device first, and anything synced to your account is encrypted in transit and at rest. We never sell or share your data with advertisers. You can export everything or permanently delete your account with a single tap, anytime.</p></div>
+      </div>
+      <div class="qa">
+        <button>Can I cancel the trial without being charged?<span class="ico">+</span></button>
+        <div class="ans"><p>Absolutely. The 14-day Premium trial requires no commitment — cancel any time before it ends and you won't be charged a cent. If you do nothing, the Starter plan stays free forever, so you'll always have the core smart wake window.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Final CTA -->
+<section>
+  <div class="wrap">
+    <div class="cta-final reveal">
+      <h2>Tomorrow's morning starts tonight.</h2>
+      <p>Join 40,000+ people who traded the snooze button for a clear head. Your first 14 days of Premium are on us.</p>
+      <div class="hero-actions">
+        <a href="#pricing" class="btn btn-primary">Start your free trial →</a>
+        <a href="#how" class="btn btn-ghost">Learn how it works</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <a href="#" class="logo"><span class="logo-mark"></span> Lumen</a>
+        <p>The AI sleep coach that wakes you at your lightest sleep, so every morning starts clear.</p>
+      </div>
+      <div class="foot-col">
+        <h4>Product</h4>
+        <a href="#how">How it works</a>
+        <a href="#chart">Live tracking</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#features">Features</a>
+      </div>
+      <div class="foot-col">
+        <h4>Company</h4>
+        <a href="#">About</a>
+        <a href="#">Sleep science</a>
+        <a href="#reviews">Reviews</a>
+        <a href="#">Careers</a>
+      </div>
+      <div class="foot-col">
+        <h4>Support</h4>
+        <a href="#faq">FAQ</a>
+        <a href="#">Help center</a>
+        <a href="#">Privacy</a>
+        <a href="#">Terms</a>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <div>© 2026 Lumen Labs, Inc. Made for better mornings.</div>
+      <div class="foot-social">
+        <a href="#" aria-label="Twitter">Twitter</a>
+        <a href="#" aria-label="Instagram">Instagram</a>
+        <a href="#" aria-label="Email">hello@lumen.sleep</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- Sleep stage model ---------- */
+  // Stage levels (y): 0 Awake (top) -> 1 REM -> 2 Light -> 3 Deep (bottom)
+  var STAGE = { AWAKE: 0, REM: 1, LIGHT: 2, DEEP: 3 };
+  var stageColor = ["#45d7ff", "#8b7dff", "#6fa8ff", "#3a4a8f"];
+  var stageName = ["Awake", "REM sleep", "Light sleep", "Deep sleep"];
+
+  // A realistic full-night hypnogram: ~96 samples (every 5 min over 8h).
+  // Built from 5 sleep cycles that deepen early and lighten toward morning.
+  function buildNight() {
+    var seq = [];
+    // brief settling
+    seq.push(0, 0);
+    var cycles = [
+      // [deepDepth, deepHold, remLen]
+      [3, 6, 2],
+      [3, 5, 4],
+      [2, 4, 5],
+      [2, 3, 6],
+      [1, 2, 7]
+    ];
+    cycles.forEach(function (c, i) {
+      var deep = c[0], hold = c[1], rem = c[2];
+      // descend: light -> deeper
+      seq.push(2, 2);
+      for (var d = 3; d <= deep; d++) seq.push(d);
+      for (var h = 0; h < hold; h++) seq.push(deep);
+      // ascend back toward light
+      for (var u = deep - 1; u >= 2; u--) seq.push(u);
+      // REM near light/awake boundary
+      seq.push(2);
+      for (var r = 0; r < rem; r++) seq.push(1);
+      // tiny micro-awakening between cycles
+      if (i < cycles.length - 1) seq.push(2, 1);
+    });
+    // morning: drift up toward waking with light/REM oscillation
+    seq.push(2, 1, 2, 1, 2, 0);
+    return seq;
+  }
+
+  var night = buildNight();
+  var N = night.length;
+
+  /* ---------- Main hypnogram canvas ---------- */
+  var canvas = document.getElementById("sleepChart");
+  var ctx = canvas.getContext("2d");
+
+  // Smart wake window sits over the last ~12% of the night (morning light sleep)
+  var windowStart = Math.floor(N * 0.88);
+  var windowEnd = N - 2;
+  // Wake target = lightest (smallest stage value, ties -> latest) inside window
+  var wakeIdx = windowStart;
+  var best = 99;
+  for (var w = windowStart; w <= windowEnd; w++) {
+    if (night[w] <= best) { best = night[w]; wakeIdx = w; }
+  }
+
+  function setupHiDPI(cv, cx) {
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var cssW = cv.clientWidth;
+    var cssH = cv.getAttribute("data-cssh") ? +cv.getAttribute("data-cssh") : cv.height;
+    // keep aspect from width
+    var ratio = cv.height / cv.width;
+    cssH = cssW * ratio;
+    cv.width = Math.round(cssW * dpr);
+    cv.height = Math.round(cssH * dpr);
+    cv.style.height = cssH + "px";
+    cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { w: cssW, h: cssH };
+  }
+
+  var dims = setupHiDPI(canvas, ctx);
+
+  function yForStage(stage, h, padT, padB) {
+    var usable = h - padT - padB;
+    return padT + (stage / 3) * usable;
+  }
+
+  var progress = 0;          // 0..N, animated reveal
+  var lastT = 0;
+
+  function drawHypnogram(ts) {
+    if (!lastT) lastT = ts;
+    var dt = ts - lastT;
+    lastT = ts;
+
+    var w = dims.w, h = dims.h;
+    var padL = 8, padR = 8, padT = 26, padB = 26;
+    var plotW = w - padL - padR;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // advance progress (full sweep ~6.5s, then hold)
+    if (progress < N) {
+      progress += (dt / 1000) * (N / 6.5);
+      if (progress > N) progress = N;
+    }
+    var shown = Math.max(1, progress);
+
+    var stepX = plotW / (N - 1);
+
+    // --- smart wake window band ---
+    var bx0 = padL + windowStart * stepX;
+    var bx1 = padL + windowEnd * stepX;
+    var grad = ctx.createLinearGradient(0, padT, 0, h - padB);
+    grad.addColorStop(0, "rgba(255,207,107,0.18)");
+    grad.addColorStop(1, "rgba(255,207,107,0.02)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(bx0, padT - 8, bx1 - bx0, h - padT - padB + 16);
+    ctx.strokeStyle = "rgba(255,207,107,0.35)";
+    ctx.setLineDash([4, 5]);
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(bx0, padT - 8); ctx.lineTo(bx0, h - padB + 8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(bx1, padT - 8); ctx.lineTo(bx1, h - padB + 8); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // window label
+    ctx.fillStyle = "rgba(255,207,107,0.9)";
+    ctx.font = "600 12px Inter, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("Smart wake window", (bx0 + bx1) / 2, padT - 12);
+
+    // --- stage gridlines ---
+    ctx.textAlign = "left";
+    for (var s = 0; s <= 3; s++) {
+      var gy = yForStage(s, h, padT, padB);
+      ctx.strokeStyle = "rgba(255,255,255,0.05)";
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(padL, gy); ctx.lineTo(w - padR, gy); ctx.stroke();
+    }
+
+    // --- build stepped path points up to shown ---
+    var nShown = Math.floor(shown);
+    var frac = shown - nShown;
+
+    function px(i) { return padL + i * stepX; }
+    function py(i) { return yForStage(night[i], h, padT, padB); }
+
+    // filled area under the line
+    ctx.beginPath();
+    ctx.moveTo(px(0), h - padB);
+    ctx.lineTo(px(0), py(0));
+    for (var i = 1; i <= nShown && i < N; i++) {
+      ctx.lineTo(px(i), py(i - 1)); // step
+      ctx.lineTo(px(i), py(i));
+    }
+    // partial segment
+    var headX = px(0), headY = py(0);
+    if (nShown < N - 1) {
+      var fx = px(nShown) + stepX * frac;
+      headX = fx; headY = py(nShown);
+      ctx.lineTo(fx, py(nShown));
+    } else {
+      headX = px(N - 1); headY = py(N - 1);
+    }
+    ctx.lineTo(headX, h - padB);
+    ctx.closePath();
+    var fillG = ctx.createLinearGradient(0, padT, 0, h - padB);
+    fillG.addColorStop(0, "rgba(139,125,255,0.28)");
+    fillG.addColorStop(1, "rgba(139,125,255,0.02)");
+    ctx.fillStyle = fillG;
+    ctx.fill();
+
+    // --- colored stepped line ---
+    ctx.lineWidth = 2.4;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    for (var j = 1; j <= nShown && j < N; j++) {
+      var seg = ctx.createLinearGradient(px(j - 1), 0, px(j), 0);
+      seg.addColorStop(0, stageColor[night[j - 1]]);
+      seg.addColorStop(1, stageColor[night[j]]);
+      ctx.strokeStyle = seg;
+      ctx.beginPath();
+      ctx.moveTo(px(j - 1), py(j - 1));
+      ctx.lineTo(px(j), py(j - 1));
+      ctx.lineTo(px(j), py(j));
+      ctx.stroke();
+    }
+
+    // --- moving head dot ---
+    var pulse = 4 + Math.sin(ts / 220) * 1.6;
+    ctx.beginPath();
+    ctx.arc(headX, headY, pulse + 3, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(69,215,255,0.18)";
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(headX, headY, 3.4, 0, Math.PI * 2);
+    ctx.fillStyle = "#eaf6ff";
+    ctx.fill();
+
+    // --- wake target marker (only once revealed) ---
+    if (shown >= wakeIdx) {
+      var wx = px(wakeIdx), wy = py(wakeIdx);
+      var halo = 7 + Math.sin(ts / 320) * 2.5;
+      ctx.beginPath();
+      ctx.arc(wx, wy, halo + 4, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255,207,107,0.18)";
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(wx, wy, 5.5, 0, Math.PI * 2);
+      ctx.fillStyle = "#ffcf6b";
+      ctx.fill();
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+
+      ctx.fillStyle = "rgba(255,255,255,0.92)";
+      ctx.font = "700 12px Inter, sans-serif";
+      ctx.textAlign = "center";
+      var labelY = wy - 16 < padT ? wy + 26 : wy - 16;
+      ctx.fillText("Wake here · 6:46 AM", wx, labelY);
+    }
+
+    // --- axis labels ---
+    ctx.fillStyle = "rgba(154,163,199,0.7)";
+    ctx.font = "500 11px Inter, sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText("11 PM", padL, h - 8);
+    ctx.textAlign = "center";
+    ctx.fillText("2 AM", padL + plotW * 0.33, h - 8);
+    ctx.fillText("4 AM", padL + plotW * 0.6, h - 8);
+    ctx.textAlign = "right";
+    ctx.fillText("7 AM", w - padR, h - 8);
+
+    requestAnimationFrame(drawHypnogram);
+  }
+
+  /* ---------- Mini chart in phone ---------- */
+  var mini = document.getElementById("miniChart");
+  if (mini) {
+    var mctx = mini.getContext("2d");
+    var mdpr = Math.min(window.devicePixelRatio || 1, 2);
+    var mW = mini.clientWidth || 260, mH = 80;
+    mini.width = mW * mdpr; mini.height = mH * mdpr;
+    mini.style.height = mH + "px";
+    mctx.scale(mdpr, mdpr);
+
+    function drawMini(ts) {
+      mctx.clearRect(0, 0, mW, mH);
+      var pts = night.slice(-30);
+      var step = mW / (pts.length - 1);
+      mctx.beginPath();
+      for (var i = 0; i < pts.length; i++) {
+        var x = i * step;
+        var y = 12 + (pts[i] / 3) * (mH - 24);
+        if (i === 0) mctx.moveTo(x, y);
+        else { mctx.lineTo(x, 12 + (pts[i - 1] / 3) * (mH - 24)); mctx.lineTo(x, y); }
+      }
+      var g = mctx.createLinearGradient(0, 0, mW, 0);
+      g.addColorStop(0, "#8b7dff");
+      g.addColorStop(1, "#45d7ff");
+      mctx.strokeStyle = g;
+      mctx.lineWidth = 2;
+      mctx.lineJoin = "round";
+      mctx.stroke();
+      // pulse marker at end
+      var ex = mW, ey = 12 + (pts[pts.length - 1] / 3) * (mH - 24);
+      mctx.beginPath();
+      mctx.arc(ex - 2, ey, 3 + Math.sin(ts / 250) * 1.2, 0, Math.PI * 2);
+      mctx.fillStyle = "#45d7ff";
+      mctx.fill();
+      requestAnimationFrame(drawMini);
+    }
+    requestAnimationFrame(drawMini);
+  }
+
+  /* ---------- Live clock + phone phase cycling ---------- */
+  var clockEl = document.getElementById("liveClock");
+  function tickClock() {
+    var d = new Date();
+    var hh = d.getHours(), mm = String(d.getMinutes()).padStart(2, "0");
+    var ss = String(d.getSeconds()).padStart(2, "0");
+    var ampm = hh >= 12 ? "PM" : "AM";
+    var h12 = hh % 12 || 12;
+    if (clockEl) clockEl.textContent = "· live " + h12 + ":" + mm + ":" + ss + " " + ampm;
+  }
+  setInterval(tickClock, 1000);
+  tickClock();
+
+  /* ---------- Pricing toggle ---------- */
+  var toggle = document.getElementById("billToggle");
+  var premium = document.getElementById("premiumPrice");
+  var premiumPer = document.getElementById("premiumPer");
+  var family = document.getElementById("familyPrice");
+  var familyPer = document.getElementById("familyPer");
+  var lblM = document.getElementById("lblMonthly");
+  var lblY = document.getElementById("lblYearly");
+  function updatePricing() {
+    var yearly = toggle.checked;
+    premium.textContent = yearly ? "6" : "9";
+    family.textContent = yearly ? "13" : "19";
+    premiumPer.textContent = yearly ? "/mo billed yearly" : "/month";
+    familyPer.textContent = yearly ? "/mo billed yearly" : "/month";
+    lblM.style.color = yearly ? "var(--muted)" : "var(--ink)";
+    lblY.style.color = yearly ? "var(--ink)" : "var(--muted)";
+  }
+  toggle.addEventListener("change", updatePricing);
+
+  /* ---------- FAQ accordion ---------- */
+  document.querySelectorAll(".qa button").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var qa = btn.parentElement;
+      var ans = qa.querySelector(".ans");
+      var isOpen = qa.classList.contains("open");
+      document.querySelectorAll(".qa").forEach(function (other) {
+        other.classList.remove("open");
+        other.querySelector(".ans").style.maxHeight = null;
+      });
+      if (!isOpen) {
+        qa.classList.add("open");
+        ans.style.maxHeight = ans.scrollHeight + "px";
+      }
+    });
+  });
+
+  /* ---------- Scroll reveal ---------- */
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
+    });
+  }, { threshold: 0.12 });
+  document.querySelectorAll(".reveal").forEach(function (el) { io.observe(el); });
+
+  /* ---------- Handle resize for main chart ---------- */
+  var resizeTimer;
+  window.addEventListener("resize", function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function () { dims = setupHiDPI(canvas, ctx); }, 180);
+  });
+
+  /* ---------- Kick off animation ---------- */
+  requestAnimationFrame(drawHypnogram);
+})();
+</script>
+</body>
+</html>
