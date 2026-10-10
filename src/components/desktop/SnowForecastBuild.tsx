@@ -72,7 +72,7 @@ function fmtDay(iso: string) {
   if (!iso) return '\u2003'
   try {
     const d = new Date(iso + 'T12:00:00')
-    return d.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase()
+    return d.toLocaleDateString(undefined, { weekday: 'short' })
   } catch { return '\u2003' }
 }
 
@@ -169,7 +169,7 @@ export default function SnowForecastBuild(props: Props) {
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
             <div className="fh-build-good">Planning</div>
-            <h1 className="fh-build-title">FORECAST</h1>
+            <h1 className="fh-build-title">Forecast</h1>
           </div>
 
           <div className={`fh-build-focus fh-build-window-card is-${windowTone}`}>

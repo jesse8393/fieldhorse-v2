@@ -726,7 +726,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
               }}
             >
               <Check size={14} />
-              {submitting ? 'APPROVING…' : 'APPROVE QUOTE'}
+              {submitting ? 'Approving…' : 'Approve quote'}
             </motion.button>
           </div>
         </form>

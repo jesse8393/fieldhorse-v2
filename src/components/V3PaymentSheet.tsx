@@ -387,7 +387,7 @@ export default function V3PaymentSheet({ contact, balance, invoice = null, onClo
                 }}
               >
                 <Check size={14} />
-                {saving ? 'RECORDING…' : showsAmount ? `RECORD ${money(numeric)}` : 'RECORD PAYMENT'}
+                {saving ? 'Recording…' : showsAmount ? `Record ${money(numeric)}` : 'Record payment'}
               </motion.button>
             </div>
           </form>

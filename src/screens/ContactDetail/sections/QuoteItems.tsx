@@ -900,7 +900,7 @@ function DraftCard({ eyebrow, draft, onChange, primaryLabel, onPrimary, primaryD
                     border: '1px solid var(--v3-border)',
                     color: s.source === 'rates' ? 'var(--v3-primary-text)' : 'var(--v3-text-muted)'
                   }}>
-                    {s.source === 'rates' ? 'RATE CARD' : `×${s.uses}`}
+                    {s.source === 'rates' ? 'Rate card' : `×${s.uses}`}
                   </span>
                 </button>
               ))}

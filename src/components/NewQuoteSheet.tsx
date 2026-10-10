@@ -128,7 +128,7 @@ export default function NewQuoteSheet({ open, userId, onClose, onStarted }: any)
                 minWidth: 0, boxSizing: 'border-box', touchAction: 'manipulation'
               }}
             >
-              {starting ? 'STARTING…' : 'START QUOTE'}
+              {starting ? 'Starting…' : 'Start quote'}
               {!starting && <ArrowRight size={15} />}
             </motion.button>
           </div>

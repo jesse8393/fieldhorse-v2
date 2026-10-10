@@ -470,11 +470,11 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
   }
 
   const voiceLabel = {
-    idle: 'TAP TO SPEAK',
-    listening: 'TAP TO STOP',
-    parsing: 'PARSING…',
-    error: 'VOICE NOT AVAILABLE',
-    denied: 'MIC BLOCKED'
+    idle: 'Tap to speak',
+    listening: 'Tap to stop',
+    parsing: 'Parsing…',
+    error: 'Voice not available',
+    denied: 'Mic blocked'
   }[voiceState]
 
   function onVoiceTap(e: any) {
@@ -519,7 +519,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
   // language carries through. Quote uses its own noun for the same reason.
   const stageNoun = form.stage === 'job' ? 'job' : form.stage === 'quote' ? 'quote' : 'lead'
   const NounCap = stageNoun.charAt(0).toUpperCase() + stageNoun.slice(1)
-  const commitVerb = form.stage === 'lead' ? 'CAPTURE' : form.stage === 'quote' ? 'START' : 'CREATE'
+  const commitVerb = form.stage === 'lead' ? 'Capture' : form.stage === 'quote' ? 'Start' : 'Create'
   const drawerDescription = form.stage === 'lead'
     ? 'Capture the customer, scope, value, and next follow up once. This record becomes the quote and job later.'
     : form.stage === 'quote'
@@ -901,7 +901,7 @@ export default function NewLeadSheet({ open, userId, initialStage = 'lead', lock
               }}
             >
               <Check size={14} />
-              {saving ? 'COMMITTING…' : committed ? 'CAPTURED' : `${commitVerb} ${stageNoun.toUpperCase()}`}
+              {saving ? 'Committing…' : committed ? 'Captured' : `${commitVerb} ${stageNoun}`}
             </motion.button>
           </div>
         </form>

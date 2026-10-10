@@ -210,7 +210,7 @@ export default function SendInvoiceSheet({
         onDone?.()
         onClose?.()
       } else if (res.reason === 'sender_not_configured') {
-        toastError("Email NOT sent, sender isn't configured", 'Downloaded the PDF so you can email it manually. The invoice is saved as a draft.')
+        toastError("Email not sent, sender isn't configured", 'Downloaded the PDF so you can email it manually. The invoice is saved as a draft.')
         onDone?.()
         onClose?.()
       } else {
@@ -476,10 +476,10 @@ export default function SendInvoiceSheet({
               >
                 <Send size={14} />
                 {busy === 'send'
-                  ? 'SENDING…'
+                  ? 'Sending…'
                   : recipientEmail
-                    ? `SEND TO ${recipientEmail.toUpperCase()}`
-                    : 'SEND INVOICE'}
+                    ? `Send to ${recipientEmail}`
+                    : 'Send invoice'}
               </motion.button>
               <button
                 type="button"

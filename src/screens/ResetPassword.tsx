@@ -163,7 +163,7 @@ export default function ResetPassword() {
                 opacity: busy ? 0.6 : 1
               }}
             >
-              {busy ? 'SAVING…' : (<>UPDATE PASSWORD<ArrowRight size={18} /></>)}
+              {busy ? 'Saving…' : (<>Update password<ArrowRight size={18} /></>)}
             </motion.button>
           </form>
         ) : (

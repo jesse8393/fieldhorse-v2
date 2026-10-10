@@ -345,7 +345,7 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
               }}
             >
               <Check size={14} />
-              {saving ? 'SAVING…' : editing ? 'SAVE CHANGES' : 'SAVE EVENT'}
+              {saving ? 'Saving…' : editing ? 'Save changes' : 'Save event'}
             </motion.button>
           </div>
         </form>

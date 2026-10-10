@@ -253,7 +253,7 @@ export default function Crew() {
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
             <div className="fh-build-good">{fmtDayHeading(new Date())}</div>
-            <h1 className="fh-build-title">CREW</h1>
+            <h1 className="fh-build-title">Crew</h1>
             {/* Only shows for people in more than one company, so a crew
                 member can switch back to their own workspace on mobile. */}
             <div style={{ marginTop: 12, maxWidth: 320 }}>

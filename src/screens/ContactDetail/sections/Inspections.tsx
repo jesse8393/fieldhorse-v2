@@ -58,7 +58,7 @@ export default function InspectionsSection({ contact, inspections = [], userId, 
     }
     notifySelf(userId, {
       kind: 'inspection_logged',
-      title: `${trade} · ${String(result).toUpperCase()}`,
+      title: `${trade} · ${RESULT_META[result]?.label || String(result)}`,
       body: contact?.name ? `Inspection logged on ${contact.name}` : 'Inspection logged',
       link: `/jobs/${contact.id}`
     }).catch(() => {})

@@ -463,7 +463,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
         // Same fallback InvoiceDetail uses, download so the operator
         // can email manually while they set up Resend env.
         toastError(
-          "Email NOT sent, sender isn't configured",
+          "Email not sent, sender isn't configured",
           'Downloaded the PDF so you can email it manually.'
         )
         downloadPdf(result)

@@ -283,7 +283,7 @@ export default function SnowHomeBuild(props: Props) {
         <section className="fh-build-hero-row">
           <div>
             <div className="fh-build-good">{greetingFor(now)}, {firstName || 'there'}</div>
-            <h1 className="fh-build-title">TODAY</h1>
+            <h1 className="fh-build-title">Today</h1>
           </div>
 
           <FocusCard onGoToSchedule={onGoToSchedule} />

@@ -513,7 +513,7 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
                   }}
                 >
                   <Check size={14} />
-                  {saving ? 'SAVING…' : (isReopening ? 'SAVE CHANGES' : 'MARK COMPLETE')}
+                  {saving ? 'Saving…' : (isReopening ? 'Save changes' : 'Mark complete')}
                 </motion.button>
               </div>
             </>

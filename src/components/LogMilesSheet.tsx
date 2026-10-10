@@ -208,7 +208,7 @@ export default function LogMilesSheet({ open, userId, onOpenChange, onSaved }: a
               }}
             >
               <SaveIcon size={14} />
-              {saving ? 'SAVING…' : 'SAVE'}
+              {saving ? 'Saving…' : 'Save'}
             </motion.button>
           </div>
         </form>

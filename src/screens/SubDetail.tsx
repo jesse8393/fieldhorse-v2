@@ -50,7 +50,7 @@ const PAYMENT_METHODS = [
 
 const DOC_SLOTS = [
   { id: 'w9',      label: 'W9',                 path: 'w9_path',      hint: 'Required for 1099 reporting' },
-  { id: 'coi',     label: 'Certificate of Insurance', path: 'coi_path', hint: 'COI / liability cert' },
+  { id: 'coi',     label: 'Certificate of insurance', path: 'coi_path', hint: 'COI / liability cert' },
   { id: 'license', label: 'License',             path: 'license_path', hint: 'Trade or contractor license' }
 ]
 
@@ -1029,7 +1029,7 @@ function DocumentsSection({ profile, onChanged }: any) {
         await supabase.storage.from('sub-docs').remove([previousPath])
       }
       onChanged?.(data)
-      toastSuccess('Uploaded', `${slotId.toUpperCase()} on file`)
+      toastSuccess('Uploaded', `${DOC_SLOTS.find((s) => s.id === slotId)?.label || slotId} on file`)
       hapticSuccess()
     } catch (e: any) {
       toastError("Couldn't upload", e?.message || 'Try again')
@@ -1040,7 +1040,7 @@ function DocumentsSection({ profile, onChanged }: any) {
 
   async function handleRemove(slotId: any, pathField: any, currentPath: any) {
     if (!currentPath) return
-    const label = DOC_SLOTS.find((s) => s.id === slotId)?.label || slotId.toUpperCase()
+    const label = DOC_SLOTS.find((s) => s.id === slotId)?.label || slotId
     const owned = contractorOwnsDoc(currentPath, profile, user?.id)
     const ok = await confirm({
       title: `Remove the ${label}?`,

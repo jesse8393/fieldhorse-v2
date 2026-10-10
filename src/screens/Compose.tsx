@@ -222,7 +222,7 @@ export default function Compose() {
           <BuildTopbar />
           <div style={{ padding: '12px var(--v3-gutter) 12px' }}>
             <div className="fh-build-good">Dispatch</div>
-            <h1 className="fh-build-title">MESSAGE COMPOSER</h1>
+            <h1 className="fh-build-title">Message composer</h1>
           </div>
         </div>
       )}
@@ -767,7 +767,7 @@ function SmsHero({ draft, contact }: any) {
   const initials = (contact?.name || '·').trim().split(/\s+/).slice(0, 2).map((s: any) => s.charAt(0).toUpperCase()).join('') || '·'
   const now = new Date()
   const timeStr = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-  const dayStr = now.toLocaleDateString([], { weekday: 'short' }).toUpperCase()
+  const dayStr = now.toLocaleDateString([], { weekday: 'short' })
   return (
     <div style={{
       borderRadius: 10,

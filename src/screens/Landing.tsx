@@ -100,7 +100,6 @@ export default function Landing() {
             fontSize: 12,
             fontWeight: 800,
             letterSpacing: 0,
-            textTransform: 'uppercase',
             color: GOLD,
             margin: 0
           }}
@@ -159,7 +158,7 @@ export default function Landing() {
               cursor: 'pointer'
             }}
           >
-            CREATE A FREE ACCOUNT
+            Create a free account
           </button>
           <button
             type="button"
@@ -202,7 +201,6 @@ export default function Landing() {
             fontSize: 12,
             fontWeight: 800,
             letterSpacing: 0,
-            textTransform: 'uppercase',
             color: MUTE,
             margin: '0 0 16px'
           }}
@@ -254,7 +252,7 @@ export default function Landing() {
                 background: 'rgba(20, 20, 20, 0.25)'
               }}
             >
-              <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 0, textTransform: 'uppercase', color: MUTE }}>
+              <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 0, color: MUTE }}>
                 Active pipeline
               </div>
               <div
@@ -284,7 +282,7 @@ export default function Landing() {
                       background: 'rgba(242, 237, 228, 0.02)'
                     }}
                   >
-                    <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 0, textTransform: 'uppercase', color: MUTE }}>{label}</div>
+                    <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 0, color: MUTE }}>{label}</div>
                     <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, color: INK, margin: '4px 0 2px' }}>{amt}</div>
                     <div style={{ fontSize: 12, color: MUTE }}>{n}</div>
                   </div>
@@ -303,7 +301,7 @@ export default function Landing() {
                 flexDirection: 'column'
               }}
             >
-              <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 0, textTransform: 'uppercase', color: MUTE, marginBottom: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 0, color: MUTE, marginBottom: 12 }}>
                 Owner queue
               </div>
               {[
@@ -337,7 +335,7 @@ export default function Landing() {
                 ].map(([v, l]) => (
                   <div key={l} style={{ textAlign: 'center', padding: '8px 4px', borderRadius: 10, background: 'rgba(242, 237, 228, 0.02)', border: '1px solid rgba(242, 237, 228, 0.05)' }}>
                     <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, color: GOLD }}>{v}</div>
-                    <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: MUTE, marginTop: 2 }}>{l}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, color: MUTE, marginTop: 2 }}>{l}</div>
                   </div>
                 ))}
               </div>
@@ -450,7 +448,6 @@ export default function Landing() {
             fontSize: 14,
             fontWeight: 800,
             letterSpacing: 0,
-            textTransform: 'uppercase',
             color: MUTE
           }}
         >

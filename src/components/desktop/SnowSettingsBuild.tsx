@@ -56,7 +56,7 @@ export default function SnowSettingsBuild(props: Props) {
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
             <div className="fh-build-good">Account</div>
-            <h1 className="fh-build-title">SETTINGS</h1>
+            <h1 className="fh-build-title">Settings</h1>
           </div>
 
           <div className="fh-build-focus">

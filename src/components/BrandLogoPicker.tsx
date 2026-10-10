@@ -247,7 +247,7 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
             }}
           >
             <Upload size={14} />
-            {logoUrl ? 'REPLACE LOGO' : 'UPLOAD LOGO'}
+            {logoUrl ? 'Replace logo' : 'Upload logo'}
           </motion.button>
           {logoUrl && (
             <motion.button
@@ -323,7 +323,7 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
             }}
           >
             <Check size={14} />
-            {busy ? 'SAVING…' : 'SAVE LOGO'}
+            {busy ? 'Saving…' : 'Save logo'}
           </motion.button>
         </div>
       )}

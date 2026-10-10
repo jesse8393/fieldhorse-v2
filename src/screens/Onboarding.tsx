@@ -392,11 +392,11 @@ export default function Onboarding() {
         <p className="fh-hero-coord">
           {coords
             ? `${coords.lat.toFixed(4)}° N`
-            : 'LOCATION NOT SET'}
+            : 'Location not set'}
           <span className="fh-hero-coord__dot">·</span>
-          {coords ? `${coords.lon.toFixed(4)}° W` : 'OPTIONAL'}
+          {coords ? `${coords.lon.toFixed(4)}° W` : 'optional'}
           <span className="fh-hero-coord__dot">·</span>
-          {(companyName || 'YOUR COMPANY').toUpperCase()}
+          {companyName || 'Your company'}
         </p>
       </section>
 

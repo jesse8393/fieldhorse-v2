@@ -33,6 +33,9 @@ import MiniMetric from '../components/MiniMetric.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
 import { Eyebrow } from '../components/v3'
 
+// Toast words for each document kind; acronyms stay in capitals.
+const DOC_KIND_LABEL: Record<DocKind, string> = { coi: 'COI', w9: 'W9', license: 'License' }
+
 // Insurance expiry is a date only column, so parse it as a local calendar
 // date. new Date('2026-12-31') is UTC midnight, the day before in the US.
 function fmtDate(iso: string | null): string {
@@ -152,7 +155,7 @@ export default function SubPortal() {
     setUploading(kind)
     try {
       await subUploadDoc(file, kind)
-      toastSuccess(`${kind.toUpperCase()} uploaded`)
+      toastSuccess(`${DOC_KIND_LABEL[kind]} uploaded`)
       await load()
     } catch (e: any) {
       toastError('Upload failed', e?.detail || e?.message || '')
@@ -196,7 +199,7 @@ export default function SubPortal() {
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
             <div className="fh-build-good">Sub portal</div>
-            <h1 className="fh-build-title">YOUR JOBS.</h1>
+            <h1 className="fh-build-title">Your jobs.</h1>
           </div>
 
           <div className="fh-build-focus">

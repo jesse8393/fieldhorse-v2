@@ -385,7 +385,7 @@ export default function Bid() {
             fontWeight: 700,
             color: 'var(--v3-text)'
           }}>
-            {isDesktop ? 'ESTIMATE BUILDER' : 'Build a clean estimate'}
+            {isDesktop ? 'Estimate builder' : 'Build a clean estimate'}
           </h1>
           <p style={{
             margin: '6px 0 0',

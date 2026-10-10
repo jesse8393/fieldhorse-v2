@@ -210,7 +210,7 @@ export default function NewClientSheet({ open, userId, onClose, onSaved }: any) 
               }}
             >
               <SaveIcon size={14} />
-              {saving ? 'SAVING…' : 'SAVE CLIENT'}
+              {saving ? 'Saving…' : 'Save client'}
             </motion.button>
           </div>
         </form>

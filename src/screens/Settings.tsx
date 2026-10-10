@@ -850,7 +850,7 @@ export default function Settings() {
         <Section
           variants={item}
           title={<>Remove <em>sample data.</em></>}
-          meta="DEMO"
+          meta="Demo"
           metaTone="red"
         >
           <p style={{ margin: 0, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontSize: 12 }}>
@@ -885,7 +885,7 @@ export default function Settings() {
                   disabled={wiping}
                   style={{ padding: '12px 12px', borderRadius: 10, background: 'linear-gradient(135deg, #C0392B, #C0392B)', border: 'none', color: 'var(--raw-linen)', fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: 0, cursor: 'pointer', boxShadow: '0 6px 16px rgba(192,57,43,0.4)' }}
                 >
-                  {wiping ? 'REMOVING…' : 'REMOVE SAMPLE DATA'}
+                  {wiping ? 'Removing…' : 'Remove sample data'}
                 </motion.button>
               </div>
             )}
@@ -942,7 +942,7 @@ export default function Settings() {
           }}
         >
           <UploadIcon size={16} />
-          {saving ? 'SAVING...' : saved ? 'SAVED' : 'SAVE CHANGES'}
+          {saving ? 'Saving...' : saved ? 'Saved' : 'Save changes'}
         </motion.button>
       </div>}
     </>
@@ -1174,7 +1174,6 @@ function Section({ variants, title, sub, meta, metaTone, children }: any) {
               fontSize: 12,
               fontWeight: 700,
               letterSpacing: 0,
-              textTransform: 'uppercase',
               ...metaBg
             }}
           >
@@ -1307,7 +1306,7 @@ function EstimateTemplatePicker({ value, onChange }: any) {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>{t.name}</span>
-              {on && <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, color: 'var(--v3-primary-text)' }}>SELECTED</span>}
+              {on && <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, color: 'var(--v3-primary-text)' }}>Selected</span>}
             </div>
             <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, lineHeight: 1.4, color: 'var(--ink-muted)' }}>{t.blurb}</span>
           </button>
@@ -1423,10 +1422,9 @@ function BrandColorEditor({ value, onChange, companyName }: any) {
               fontFamily: 'var(--font-display)',
               fontSize: 20, fontWeight: 600,
               letterSpacing: 0,
-              color: '#141414', marginTop: 2,
-              textTransform: 'uppercase'
+              color: '#141414', marginTop: 2
             }}>
-              {(companyName || 'My Company').toUpperCase()}
+              {companyName || 'My company'}
             </div>
           </div>
           {/* Status pill */}

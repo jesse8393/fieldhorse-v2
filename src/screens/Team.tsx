@@ -119,7 +119,7 @@ export default function Team() {
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
             <div className="fh-build-good">Office</div>
-            <h1 className="fh-build-title">TEAM</h1>
+            <h1 className="fh-build-title">Team</h1>
           </div>
 
           <div className="fh-build-focus">

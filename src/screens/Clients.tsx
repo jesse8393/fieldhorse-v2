@@ -448,7 +448,7 @@ export default function Clients() {
           const initials = (top.name || '·').trim().split(/\s+/).slice(0, 2).map(s => s.charAt(0).toUpperCase()).join('')
           return (
             <div className="cl-card cl-card--top">
-              <div className="cl-card__rib">TOP CLIENT</div>
+              <div className="cl-card__rib">Top client</div>
               <button type="button" className="cl-card__tap" onClick={() => { hapticTap(); navigate(`/clients/${top.id}`) }}>
                 <div className="cl-card__hdr">
                   <div className="cl-card__avatar" aria-hidden="true">{initials || '·'}</div>

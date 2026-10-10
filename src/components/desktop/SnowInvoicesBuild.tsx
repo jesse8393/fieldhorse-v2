@@ -235,7 +235,7 @@ export default function SnowInvoicesBuild({
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
             <div className="fh-build-good">Get paid</div>
-            <h1 className="fh-build-title">INVOICES</h1>
+            <h1 className="fh-build-title">Invoices</h1>
           </div>
 
           <div className="fh-build-focus">

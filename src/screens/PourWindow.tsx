@@ -57,7 +57,7 @@ function asLocalDate(iso: any) {
 function fmtDay(iso: any) {
   try {
     const d = asLocalDate(iso)
-    return d!.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase()
+    return d!.toLocaleDateString(undefined, { weekday: 'short' })
   } catch { return '\u2003' }
 }
 function fmtDate(iso: any) {
@@ -448,7 +448,7 @@ useEffect(() => {
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
                         <span style={{ fontFamily: 'var(--font-display)', fontSize: 16, letterSpacing: 0, color: i === 0 ? 'var(--v3-primary-text)' : 'var(--ink-strong)' }}>
-                          {i === 0 ? 'TODAY' : fmtDay(d.time)}
+                          {i === 0 ? 'Today' : fmtDay(d.time)}
                         </span>
                         <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--ink-muted)' }}>
                           {fmtDate(d.time)}

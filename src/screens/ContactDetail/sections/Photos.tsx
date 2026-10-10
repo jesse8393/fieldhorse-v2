@@ -409,8 +409,8 @@ export default function PhotosSection({ jobId, userId }: any) {
             fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
             letterSpacing: 0, color: 'var(--v3-primary-text)'
           }}>
-            {!compareBefore ? 'Tap the BEFORE photo' :
-              !compareAfter ? 'Now tap the AFTER photo' :
+            {!compareBefore ? 'Tap the before photo' :
+              !compareAfter ? 'Now tap the after photo' :
                 'Drag the slider'}
           </div>
           {compareBefore && compareAfter && (
@@ -447,8 +447,8 @@ export default function PhotosSection({ jobId, userId }: any) {
             const url = thumbUrls[r.id]
             const captioning = captioningIds.has(r.id)
             const compareLabel = compareBefore?.row.id === r.id
-              ? 'BEFORE'
-              : compareAfter?.row.id === r.id ? 'AFTER' : ''
+              ? 'Before'
+              : compareAfter?.row.id === r.id ? 'After' : ''
             const selected = compareMode && !!compareLabel
             return (
               <motion.button
@@ -900,7 +900,7 @@ function BeforeAfterSlider({ beforeUrl, afterUrl, beforeLabel, afterLabel }: any
         fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
         letterSpacing: 0, color: '#F2EDE4'
       }}>
-        BEFORE
+        Before
       </div>
       <div style={{
         position: 'absolute', top: 8, right: 8,
@@ -909,7 +909,7 @@ function BeforeAfterSlider({ beforeUrl, afterUrl, beforeLabel, afterLabel }: any
         fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
         letterSpacing: 0, color: '#F2EDE4'
       }}>
-        AFTER
+        After
       </div>
     </div>
   )
