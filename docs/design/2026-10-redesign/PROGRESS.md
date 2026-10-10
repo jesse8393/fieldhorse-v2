@@ -50,11 +50,11 @@ Status is one of todo, done, blocked, skipped.
 | 2 | 12 Job page on a phone | done | 1132b5a | Includes the Set follow up action in the more menu |
 | 2 | 13 Capture sheet attachable to a job | done | 90b387b | `openCapture` stub in 86c335b |
 | 2 | 14 Side by side review | done | 6013498 | Fix pass in 046e21d |
-| 3 | 3.1 Money view model | todo | | |
-| 3 | 3.2 Money on a phone | todo | | |
-| 3 | 3.3 Quote view model | todo | | |
-| 3 | 3.4 Quote editor on a phone | todo | | |
-| 3 | 3.5 Phase 3 review and pull request | todo | | |
+| 3 | 3.1 Money view model | done | 9aad8ea | |
+| 3 | 3.2 Money on a phone | done | 5d3ae27 | Sub pages for statements, all invoices, job balances |
+| 3 | 3.3 Quote view model | done | 5dac52a | |
+| 3 | 3.4 Quote editor on a phone | done | c2b2bce | |
+| 3 | 3.5 Phase 3 review and pull request | done | see git log | #218, images in phase3-review |
 | 4 | 4.1 Schedule layout helpers | todo | | |
 | 4 | 4.2 Week board and Unscheduled tray | todo | | |
 | 4 | 4.3 Desktop Job page | todo | | |
@@ -93,3 +93,10 @@ Status is one of todo, done, blocked, skipped.
   * The gold action shows on every tab, following the stage.
   * Lead, Quote and Lost jobs show "Estimated value" or "Quote total" on the vault card, never "Balance".
   * No `spine` prop was added to `SnowJobDetailBuild`: the Overview tab already renders the Spine.
+
+### Phase 3 notes
+
+* Decisions D15 to D18 in `SPEC.md` cover the Money group rules, where the old phone Money features went, the Quote deposit and status rules, and the Quote tab capsule.
+* The Quote tab on a phone sits under the Job page header (rail, money strip, quick actions, tabs), so the render's bare Quote page layout differs by design.
+* `src/lib/queries.ts` gained `cost` on the invoices bundle jobs so Money can compute margin. `tests/e2e/mock-workflows.spec.ts` changed two phone assertions that named old phone cards.
+* Full suite on the Phase 3 head: lint 0 errors (50 warnings, down from 57), typecheck, build and design audit pass, 720 of 720 unit tests, Playwright 95 passed and 75 skipped by project.

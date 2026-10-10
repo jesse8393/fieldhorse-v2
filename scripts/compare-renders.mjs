@@ -58,7 +58,9 @@ const SHOTS = [
   { phase: 2, name: 'capture-day', path: '/', mode: 'day', action: 'capture', render: 'base/capture.jpg' },
   { phase: 2, name: 'capture-night', path: '/', mode: 'night', action: 'capture', render: 'base/capture.jpg' },
   { phase: 3, name: 'money-day', path: '/invoices', mode: 'day', render: 'glamor/g-money.jpg', tables: moneyTables },
-  { phase: 3, name: 'money-night', path: '/invoices', mode: 'night', render: 'glamor/g-money.jpg', tables: moneyTables }
+  { phase: 3, name: 'money-night', path: '/invoices', mode: 'night', render: 'glamor/g-money.jpg', tables: moneyTables },
+  { phase: 3, name: 'quote-day', path: '/quotes/c-quote?tab=quote', mode: 'day', render: 'glamor/g-quote.jpg', tables: quoteTables },
+  { phase: 3, name: 'quote-night', path: '/quotes/c-quote?tab=quote', mode: 'night', render: 'glamor/g-quote.jpg', tables: quoteTables }
 ]
 
 // Phase 3 money screen: an overdue invoice, two due soon, a sent and a
@@ -104,6 +106,27 @@ function moneyTables(clock) {
       payment({ id: 'p-dep', contact_id: 'c-darnell', amount: 6187.5, paid_on: day(-8), kind: 'deposit', invoice_id: 'i-paid', created_at: at(-8) }),
       payment({ id: 'p-gail', contact_id: 'c-gail', amount: 620, paid_on: day(-4), created_at: at(-4) }),
       payment({ id: 'p-rosa', contact_id: 'c-rosa', amount: 3000, paid_on: day(-2), created_at: at(-2) })
+    ]
+  }
+}
+
+// Phase 3 quote editor: the render's pool deck quote. Five base lines and
+// one optional upgrade on the sent quote contact c-quote.
+function quoteTables(clock) {
+  const at = new Date(clock.getTime() - 86400e3).toISOString()
+  const item = (id, description, over = {}) => ({
+    id, user_id: session.user.id, contact_id: 'c-quote', section: null, description, qty: 1, unit: null,
+    rate: 0, amount: 0, notes: null, is_optional: false, is_excluded: false, sort_order: 0,
+    created_at: at, updated_at: at, ...over
+  })
+  return {
+    fh_quote_items: [
+      item('qi1', 'Excavate and grade', { qty: 1100, unit: 'sq ft', rate: 2, amount: 2200, sort_order: 0 }),
+      item('qi2', 'Rebar, #4 at 18 in on center', { qty: 1100, unit: 'sq ft', rate: 2.6, amount: 2860, sort_order: 1 }),
+      item('qi3', '4 in slab, 4,000 psi fiber mix', { qty: 1100, unit: 'sq ft', rate: 8.5, amount: 9350, notes: 'broom finish', sort_order: 2 }),
+      item('qi4', 'Expansion and control joints', { qty: 160, unit: 'lf', rate: 4, amount: 640, sort_order: 3 }),
+      item('qi5', 'Pump truck', { qty: 1, unit: 'day', rate: 950, amount: 950, sort_order: 4 }),
+      item('qi6', 'Stamped ashlar, charcoal release', { qty: 1, rate: 4950, amount: 4950, is_optional: true, sort_order: 5 })
     ]
   }
 }
