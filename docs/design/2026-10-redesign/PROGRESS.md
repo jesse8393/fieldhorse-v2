@@ -23,7 +23,7 @@ Nothing failed persistently on the first full `npm run test:all` of this run, on
 | --- | --- | --- | --- |
 | 2 | `claude/audit-fix-pass-2026-10-09` | #217 | `main` |
 | 3 | `redesign/phase-3` | #218 (draft) | the Phase 2 branch |
-| 4 | `redesign/phase-4` | not opened yet | `redesign/phase-3` |
+| 4 | `redesign/phase-4` | #219 (draft) | `redesign/phase-3` |
 | 5 | `redesign/phase-5` | not opened yet | `redesign/phase-4` |
 | 6 | `redesign/phase-6` | not opened yet | `redesign/phase-5` |
 | 7 | `redesign/phase-7` | not opened yet | `redesign/phase-6` |
@@ -61,7 +61,7 @@ Status is one of todo, done, blocked, skipped.
 | 4 | 4.4 Command palette actions | done | 9d704ed | |
 | 4 | 4.5 Desktop Today (stretch) | todo | | agent running |
 | 4 | 4.6 Desktop Money (stretch) | todo | | agent running |
-| 4 | 4.7 Phase 4 review and pull request | todo | | Opened as a draft with 4.1 to 4.4; stretch tasks 4.5 and 4.6 are in progress |
+| 4 | 4.7 Phase 4 review and pull request | todo | | #219 opened as a draft with 4.1 to 4.4, images in phase4-review; stretch tasks 4.5 and 4.6 are in progress |
 | 5 | 5.1 Portal view model | todo | | |
 | 5 | 5.2 Fieldhorse proposal theme | todo | | |
 | 5 | 5.3 Welcome and Login | todo | | |
