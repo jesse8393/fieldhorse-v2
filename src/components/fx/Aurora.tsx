@@ -1,9 +1,0 @@
-export default function Aurora({ className = '' }: { className?: string }) {
-  return (
-    <div className={`fh-fx-aurora ${className}`} aria-hidden="true">
-      <div className="fh-fx-aurora__a" />
-      <div className="fh-fx-aurora__b" />
-      <div className="fh-fx-aurora__c" />
-    </div>
-  )
-}

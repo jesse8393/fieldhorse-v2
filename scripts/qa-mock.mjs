@@ -4,7 +4,9 @@
 // intercepted at the network layer; zero real network.
 
 export const USER = { id: 'qa-user-1', email: 'qa@fieldhorse.local', aud: 'authenticated', role: 'authenticated', app_metadata: {}, user_metadata: {}, created_at: '2026-01-01T00:00:00Z' }
-const now = Date.now()
+// QA_NOW (an ISO time) fixes the clock the mock builds its dates from, so a
+// screenshot run is repeatable. Unset, the mock uses the real time as before.
+const now = process.env.QA_NOW ? Date.parse(process.env.QA_NOW) : Date.now()
 const day = 86400000
 const iso = (d) => new Date(d).toISOString()
 const CLIENT = { id: 'cl-1', name: 'Jeff Roy', phone: '555-0101', email: 'jeff@roy.com' }

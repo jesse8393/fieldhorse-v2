@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ChevronLeft, MapPin, Wind, Droplets, Thermometer, CloudSun, AlertTriangle, Check, X } from 'lucide-react'
@@ -7,7 +7,7 @@ import { getWeather, workWindow, hourlyStrip, weatherLabel, tradeStatus, reverse
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
-import Spotlight from '../components/fx/Spotlight.tsx'
+import { OnyxStage } from '../components/fh'
 import CountUp from '../components/fx/CountUp.tsx'
 import { Eyebrow } from '../components/v3'
 const SnowForecast = lazy(() => import('../components/desktop/SnowForecastBuild.tsx'))
@@ -262,22 +262,21 @@ useEffect(() => {
       </motion.div>
 
       {/* TODAY HERO */}
-      <motion.div className="fh-card-raised"
-        variants={item}
+      <motion.div variants={item} style={{ margin: '0 20px 14px' }}>
+      <OnyxStage
+        as="header"
+        glow
+        hairline={false}
         style={{
-          position: 'relative',
           overflow: 'hidden',
-          margin: '0 20px 14px',
-          padding: '24px 24px 24px',
-          borderRadius: 10,
-          // Canvas colored veil: onyx in dark (as before), linen in daylight,
-          // so the theme colored temperature and labels stay readable.
-          background: 'linear-gradient(135deg, color-mix(in srgb, var(--v3-bg) 90%, transparent), color-mix(in srgb, var(--v3-bg) 60%, transparent))',
-          border: `1px solid ${tone.border}`
-        }}
+          padding: 24,
+          borderRadius: 14,
+          border: `1px solid ${tone.border}`,
+          // The metric tiles below paint --surface-2, which the onyx scope
+          // does not remap, so give them the onyx wash here.
+          ['--surface-2' as string]: 'var(--fh-wash)'
+        } as CSSProperties}
       >
-        <Spotlight />
-        <Spotlight style={{ animationDelay: '-1.5s' }} />
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', position: 'relative', gap: 12 }}>
           <div style={{ minWidth: 0, flex: 1 }}>
             <Eyebrow as="div" style={{ color: 'var(--ink-muted)' }}>
@@ -334,6 +333,7 @@ useEffect(() => {
           <Metric Icon={Droplets} label="Rain now" value={currentRain == null ? '\u2003' : currentRain.toFixed(2)} unit='in/h' />
           <Metric Icon={Thermometer} label="Humidity" value={currentHumidity != null ? `${Math.round(currentHumidity)}` : '\u2003'} unit="%" />
         </div>
+      </OnyxStage>
       </motion.div>
 
       {/* 24-HOUR STRIP */}
