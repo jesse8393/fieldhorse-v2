@@ -56,8 +56,57 @@ const SHOTS = [
   { phase: 2, name: 'job-day', path: '/jobs/c-job1', mode: 'day', render: 'glamor/g-job.jpg' },
   { phase: 2, name: 'job-night', path: '/jobs/c-job1', mode: 'night', render: 'glamor/g-job.jpg' },
   { phase: 2, name: 'capture-day', path: '/', mode: 'day', action: 'capture', render: 'base/capture.jpg' },
-  { phase: 2, name: 'capture-night', path: '/', mode: 'night', action: 'capture', render: 'base/capture.jpg' }
+  { phase: 2, name: 'capture-night', path: '/', mode: 'night', action: 'capture', render: 'base/capture.jpg' },
+  { phase: 3, name: 'money-day', path: '/invoices', mode: 'day', render: 'glamor/g-money.jpg', tables: moneyTables },
+  { phase: 3, name: 'money-night', path: '/invoices', mode: 'night', render: 'glamor/g-money.jpg', tables: moneyTables }
 ]
+
+// Phase 3 money screen: an overdue invoice, two due soon, a sent and a
+// viewed quote, and payments this week and last, all relative to the
+// frozen morning so the groups fill the same way on any day.
+function moneyTables(clock) {
+  const day = (offset) => {
+    const d = new Date(clock.getTime() + offset * 86400e3)
+    const parts = Object.fromEntries(
+      new Intl.DateTimeFormat('en-US', { timeZone: TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit' })
+        .formatToParts(d).map((p) => [p.type, p.value])
+    )
+    return `${parts.year}-${parts.month}-${parts.day}`
+  }
+  const at = (offset) => new Date(clock.getTime() + offset * 86400e3).toISOString()
+  const client = { id: 'cl-1', name: 'Jeff Roy', phone: '555-0101', email: 'jeff@roy.com' }
+  const contact = (p) => ({
+    user_id: session.user.id, client_id: 'cl-1', phone: '555-0101', email: 'x@y.com', address: '412 Burkitt Station Rd',
+    notes: null, scope_text: null, milestones: [], created_at: at(-30), updated_at: at(-5), proposal_status: null,
+    follow_up_on: null, completed_at: null, invoice_no: null, cost: null, fh_clients: client, ...p
+  })
+  const invoice = (p) => ({
+    user_id: session.user.id, description: null, notes: null, status: 'sent', sequence_number: 1,
+    issued_at: at(-12), created_at: at(-12), updated_at: at(-12), ...p
+  })
+  const payment = (p) => ({ user_id: session.user.id, method: 'check', reference: null, invoice_id: null, kind: null, ...p })
+  return {
+    fh_contacts: [
+      contact({ id: 'c-rosa', stage: 'job', name: 'Rosa Delgado', email: 'rosa@example.com', job_title: 'Concrete steps', amount: 8000 }),
+      contact({ id: 'c-lorraine', stage: 'job', name: 'Lorraine Beasley', job_title: 'Bath retile', amount: 9000 }),
+      contact({ id: 'c-gail', stage: 'job', name: 'Gail Abernathy', job_title: 'Roof repair', amount: 6000 }),
+      contact({ id: 'c-darnell', stage: 'closed', name: 'Darnell Whitcomb', job_title: 'Garage slab', amount: 9600, cost: 6960, completed_at: at(-9) }),
+      contact({ id: 'c-marco', stage: 'quote', name: 'Marco Castellanos', job_title: 'Pool deck pour', amount: 18458, proposal_status: 'sent', quote_sent_at: at(-1) }),
+      contact({ id: 'c-chidi', stage: 'quote', name: 'Chidi Okafor', job_title: 'Ridge vent and shingle repair', amount: 3180, proposal_status: 'viewed', quote_sent_at: at(-4) })
+    ],
+    fh_invoices: [
+      invoice({ id: 'i-rosa', contact_id: 'c-rosa', title: 'Final', amount: 1240, sequence_number: 2, due_at: day(-6) }),
+      invoice({ id: 'i-lorraine', contact_id: 'c-lorraine', title: 'Final balance', amount: 4850, due_at: day(1) }),
+      invoice({ id: 'i-gail', contact_id: 'c-gail', title: 'Balance', amount: 2960, due_at: day(5) }),
+      invoice({ id: 'i-paid', contact_id: 'c-darnell', title: 'Deposit', amount: 6187.5, status: 'paid', due_at: day(-9) })
+    ],
+    fh_payments: [
+      payment({ id: 'p-dep', contact_id: 'c-darnell', amount: 6187.5, paid_on: day(-8), kind: 'deposit', invoice_id: 'i-paid', created_at: at(-8) }),
+      payment({ id: 'p-gail', contact_id: 'c-gail', amount: 620, paid_on: day(-4), created_at: at(-4) }),
+      payment({ id: 'p-rosa', contact_id: 'c-rosa', amount: 3000, paid_on: day(-2), created_at: at(-2) })
+    ]
+  }
+}
 
 // Named steps that run after the page has loaded.
 const STEPS = {
