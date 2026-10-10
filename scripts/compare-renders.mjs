@@ -60,7 +60,10 @@ const SHOTS = [
   { phase: 3, name: 'money-day', path: '/invoices', mode: 'day', render: 'glamor/g-money.jpg', tables: moneyTables },
   { phase: 3, name: 'money-night', path: '/invoices', mode: 'night', render: 'glamor/g-money.jpg', tables: moneyTables },
   { phase: 3, name: 'quote-day', path: '/quotes/c-quote?tab=quote', mode: 'day', render: 'glamor/g-quote.jpg', tables: quoteTables },
-  { phase: 3, name: 'quote-night', path: '/quotes/c-quote?tab=quote', mode: 'night', render: 'glamor/g-quote.jpg', tables: quoteTables }
+  { phase: 3, name: 'quote-night', path: '/quotes/c-quote?tab=quote', mode: 'night', render: 'glamor/g-quote.jpg', tables: quoteTables },
+  { phase: 4, name: 'schedule-day', title: 'Schedule, Day', path: '/schedule', mode: 'day', view: DESKTOP, weekday: 4, clock: [9, 0], render: 'base/desktop-schedule.jpg', tables: weekTables },
+  { phase: 4, name: 'deskjob-day', title: 'Job, Day', path: '/jobs/c-job1', mode: 'day', view: DESKTOP, weekday: 4, render: 'glamor/g-desktop-job.jpg' },
+  { phase: 4, name: 'palette-day', title: 'Command palette, Day', path: '/schedule', mode: 'day', view: DESKTOP, weekday: 4, clock: [9, 0], action: 'palette', render: 'base/desktop-command.jpg', tables: paletteTables }
 ]
 
 // Phase 3 money screen: an overdue invoice, two due soon, a sent and a
@@ -131,6 +134,59 @@ function quoteTables(clock) {
   }
 }
 
+// Phase 4 desktop schedule: a working week of visits around a Thursday,
+// and three jobs with no visit yet for the Unscheduled tray. `clock` is
+// the frozen Thursday, so offsets are in days from it.
+function weekTables(clock) {
+  const at = (days, hour, minute = 0) => {
+    const d = new Date(clock.getTime() + days * 86400e3)
+    d.setTime(d.getTime() + ((hour * 60 + minute) - (6 * 60 + 40)) * 60e3)
+    return d.toISOString()
+  }
+  const client = { id: 'cl-1', name: 'Jeff Roy', phone: '555-0101', email: 'jeff@roy.com' }
+  const contact = (p) => ({
+    user_id: session.user.id, client_id: 'cl-1', phone: '555-0101', email: 'x@y.com', address: '2210 Ridgecrest Dr',
+    notes: null, scope_text: null, milestones: [], created_at: at(-30, 9), updated_at: at(-5, 9), proposal_status: null,
+    follow_up_on: null, completed_at: null, invoice_no: null, cost: null, client_name: client.name, fh_clients: client, ...p
+  })
+  const visit = (id, contactId, title, days, from, to) => ({
+    id, user_id: session.user.id, contact_id: contactId, title, description: null,
+    start_at: at(days, ...from), end_at: at(days, ...to), created_at: at(-14, 9)
+  })
+  return {
+    fh_contacts: [
+      contact({ id: 'c-job1', stage: 'job', name: 'Darnell Whitcomb', job_title: 'Whitcomb garage slab', amount: 12375 }),
+      contact({ id: 'c-job2', stage: 'job', name: 'Lorraine Beasley', job_title: 'Beasley bath retile', amount: 9700 }),
+      contact({ id: 'c-job3', stage: 'job', name: 'Anya Kowalczyk', job_title: 'Kowalczyk covered patio', amount: 27800 }),
+      contact({ id: 'c-job4', stage: 'job', name: 'Chidi Okafor', job_title: 'Okafor ridge vent repair', amount: 3180 }),
+      contact({ id: 'c-job5', stage: 'job', name: 'Hollis Tran', job_title: 'Tran fence and gate', amount: 5400 }),
+      contact({ id: 'c-quote', stage: 'quote', name: 'Marco Castellanos', job_title: 'Castellanos pool deck', amount: 18458, proposal_status: 'sent' }),
+      contact({ id: 'c-lead1', stage: 'lead', name: 'Priya Rangarajan', job_title: 'Rangarajan patio cover', amount: 6200 })
+    ],
+    fh_schedule: [
+      visit('w1', 'c-job2', 'Beasley bath retile', -3, [8, 0], [16, 0]),
+      visit('w2', 'c-job2', 'Beasley bath retile', -2, [8, 0], [13, 0]),
+      visit('w3', 'c-job1', 'Whitcomb garage slab', -1, [7, 0], [14, 0]),
+      visit('w4', 'c-job1', 'Whitcomb inspection', -1, [16, 0], [17, 0]),
+      visit('w5', 'c-job1', 'Whitcomb garage slab', 0, [7, 30], [10, 30]),
+      visit('w6', 'c-lead1', 'Rangarajan patio cover', 0, [11, 30], [12, 30]),
+      visit('w7', 'c-job2', 'Beasley walkthrough', 0, [14, 30], [15, 30]),
+      visit('w8', 'c-job1', 'Whitcomb final inspection', 1, [9, 0], [9, 30]),
+      visit('w9', 'c-quote', 'Castellanos pool deck', 1, [13, 0], [14, 0])
+    ]
+  }
+}
+
+// The palette shot: the mock ignores search filters, so keep only the one
+// job the search typed in the shot would find, and its visits.
+function paletteTables(clock) {
+  const week = weekTables(clock)
+  return {
+    fh_contacts: week.fh_contacts.filter((c) => c.id === 'c-job1'),
+    fh_schedule: week.fh_schedule.filter((v) => v.contact_id === 'c-job1')
+  }
+}
+
 // Named steps that run after the page has loaded.
 const STEPS = {
   async capture(page) {
@@ -141,15 +197,28 @@ const STEPS = {
     await page.getByRole('button', { name: 'File it' }).click()
     await page.getByRole('button', { name: 'Save', exact: true }).waitFor({ timeout: 15_000 })
     await page.waitForTimeout(500)
+  },
+  async palette(page) {
+    await page.keyboard.press('Control+K')
+    await page.getByRole('dialog').getByRole('combobox').fill('whit')
+    await page.waitForTimeout(900)
   }
 }
 
-// Today's date in Murfreesboro at a given local time, as an instant.
-function localInstant([hour, minute]) {
+// A date in Murfreesboro at a given local time, as an instant. By default
+// it is today; `weekday` (0 is Sunday) picks the most recent such day, so
+// the desktop schedule can be shot on a Thursday as the render is.
+function localInstant([hour, minute], weekday = null) {
+  const target = new Date()
+  if (weekday !== null) {
+    const name = new Intl.DateTimeFormat('en-US', { timeZone: TIMEZONE, weekday: 'short' }).format(target)
+    const today = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(name)
+    target.setTime(target.getTime() - ((today - weekday + 7) % 7) * 86400e3)
+  }
   const parts = Object.fromEntries(
     new Intl.DateTimeFormat('en-US', {
       timeZone: TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit', timeZoneName: 'longOffset'
-    }).formatToParts(new Date()).map((p) => [p.type, p.value])
+    }).formatToParts(target).map((p) => [p.type, p.value])
   )
   const offset = parts.timeZoneName.replace('GMT', '') || '+00:00'
   const hh = String(hour).padStart(2, '0')
@@ -273,7 +342,7 @@ function captureReply(clock) {
 }
 
 async function capture(browser, shot) {
-  const clock = localInstant(shot.clock || [6, 40])
+  const clock = localInstant(shot.clock || [6, 40], shot.weekday ?? null)
   const view = shot.view || PHONE
   const context = await browser.newContext({
     viewport: { width: view.width, height: view.height },
@@ -283,7 +352,7 @@ async function capture(browser, shot) {
     timezoneId: TIMEZONE,
     serviceWorkers: 'block'
   })
-  const morning = localInstant([6, 40])
+  const morning = localInstant([6, 40], shot.weekday ?? null)
   const photos = photoRows(morning)
   await installMock(context, {
     supabaseHosts: ['qa-mock.supabase.co', 'pnmhblvslftdzfcdezbw.supabase.co'],
@@ -295,7 +364,7 @@ async function capture(browser, shot) {
     contentType: 'application/json',
     body: JSON.stringify({ content: [{ type: 'text', text: JSON.stringify(captureReply(clock)) }] })
   }))
-  const weather = JSON.stringify(forecast(localInstant([0, 0])))
+  const weather = JSON.stringify(forecast(localInstant([0, 0], shot.weekday ?? null)))
   await context.route('https://api.open-meteo.com/**', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: weather }))
   await context.addInitScript(([saved, mode]) => {
