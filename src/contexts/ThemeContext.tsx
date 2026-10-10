@@ -44,16 +44,14 @@ type Location = { lat: number; lon: number } | null
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [mode, setModeState] = useState<ThemeMode>(readMode)
   const [location, setLocationState] = useState<Location>(readCachedLocation)
-  // Bumped when Auto reaches a sunrise or sunset, or the app comes back
-  // to the foreground, so the theme is worked out again.
-  const [tick, setTick] = useState(0)
+  // The moment the theme was last worked out. Moved forward when Auto
+  // reaches a sunrise or sunset, or the app comes back to the foreground.
+  const [clock, setClock] = useState(() => Date.now())
 
   const { theme, nextChange, windows } = useMemo(() => {
-    const now = new Date()
-    const windows = dayWindows(now, location?.lat, location?.lon)
-    return { ...resolveTheme(mode, now.getTime(), windows), windows }
-    // tick is a dependency on purpose: it stands in for the clock.
-  }, [mode, location, tick])
+    const windows = dayWindows(new Date(clock), location?.lat, location?.lon)
+    return { ...resolveTheme(mode, clock, windows), windows }
+  }, [mode, location, clock])
 
   useEffect(() => {
     const root = document.documentElement
@@ -71,13 +69,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (nextChange == null) return
     const delay = Math.max(1000, Math.min(nextChange - Date.now() + 1000, 6 * 60 * 60 * 1000))
-    const id = window.setTimeout(() => setTick((n) => n + 1), delay)
+    const id = window.setTimeout(() => setClock(Date.now()), delay)
     return () => window.clearTimeout(id)
   }, [nextChange])
 
   useEffect(() => {
     function onVisible() {
-      if (document.visibilityState === 'visible') setTick((n) => n + 1)
+      if (document.visibilityState === 'visible') setClock(Date.now())
     }
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
