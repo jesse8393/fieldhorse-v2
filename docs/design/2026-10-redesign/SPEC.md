@@ -1,6 +1,6 @@
 # Fieldhorse redesign: design spec
 
-Status: approved design, checked against the code on October 10, 2026. Section 16 lists every correction from that check. Section 17 lists the decisions still open.
+Status: approved design, checked against the code on October 10, 2026. Section 16 lists every correction from that check. Section 17 records the decisions made on October 10.
 Date: October 9, 2026
 Owner: Jesse Parker
 Applies to: `fieldhorse-v2` (React 18, Vite 6, Tailwind 4, shadcn on the `radix-ui` package, TanStack Query, Supabase)
@@ -183,7 +183,7 @@ Rules: sentence case everywhere, never all caps labels, `font-variant-numeric: t
 ### 5.7 Space, shape, depth, motion
 
 * Spacing scale: 4, 8, 12, 16, 20, 24, 32, 48. Phone gutter 20. Desktop gutter 28.
-* Radius: chips 7, buttons and inputs 12, large buttons 14, cards and panels 14, photo cards 18, vault card 22, sheet top corners 22, dock 28, Capture coin round. This replaces the 2 px industrial radius in the current tokens.
+* Radius: chips 7, buttons and inputs 12, large buttons 14, cards and panels 14, photo cards 18, vault card 22, sheet top corners 22, dock 28, Capture coin round. This replaces the single 10 px radius the current tokens use everywhere.
 * Touch: primary actions 56 tall, anything tappable at least 48 (inline 36 px buttons get a 44 px hit area), 8 px between targets.
 * Elevation:
   * Flat: hairline only. Default for lists.
@@ -237,7 +237,7 @@ New components live in `src/components/fh/`. Each one reads only `--fh-` tokens,
 | `OnyxStage` | The one dark band per screen | Grain layer, optional warm glow top right, gold hairline at the bottom |
 | `PhotoCard` | Photo in a paper tray, scrim, text in linen | Falls back to an onyx stage with no photo |
 | `VaultCard` | Onyx card in a paper tray with the big number | Money and desktop facts panel |
-| `Monogram` | Company badge: logo from `profiles.logo_url`, else initials in brushed gold on onyx with a gold edge | Already exists as `Monogram.tsx`; restyle it |
+| `Monogram` | Company badge: logo from `profiles.logo_url`, else initials in brushed gold on onyx with a gold edge | `src/components/Monogram.tsx` today is an unused Fieldhorse app mark; the new badge replaces it |
 | `Dock` | Floating onyx capsule, five items, brass Capture coin | Replaces `BottomNav.tsx` and keeps its role filter |
 | `Sheet` | Bottom sheet with grabber and paper surface | Built on `vaul`; swipe down closes; confirm before closing with unsaved changes |
 | `Toast` | Onyx toast with an Undo action | Built on `sonner` through `AppToaster.tsx` and `lib/toast.ts`; `toastUndo` already holds 8 seconds; clears the Dynamic Island |
@@ -266,7 +266,9 @@ New components live in `src/components/fh/`. Each one reads only `--fh-` tokens,
 | 2 | Jobs | `/work` | `Work.tsx` (keep the `/leads`, `/quotes`, `/jobs` and `/pipeline` redirects and the detail routes) |
 | 3 | Capture | opens `CaptureSheet` | `CaptureFab.tsx` folds into the dock; keep ⌘J, which `CaptureSheet.tsx` handles today |
 | 4 | Money | `/invoices` | `Invoices.tsx`; Reports link goes to `/analytics` |
-| 5 | Inbox | `/inbox` (new) | Phase 6. Until then the slot shows Schedule (`/schedule`) so the dock never points at an empty screen. |
+| 5 | Inbox | `/inbox` (new) | Phase 6. Until then the slot shows Schedule (`/schedule`) so the dock never points at an empty screen (decision D2). |
+
+Items follow the role filter, so a crew member without money access sees Today, Jobs, Capture and Schedule. The Capture coin stays in the middle of whatever items remain.
 
 Dock spec: onyx capsule (`--fh-dock`), 16 px from each side, floating above the home indicator with safe area padding, 28 radius, overlay shadow. Active item in linen with a 4 px gold dot under the label; inactive in smoke. Capture is a 56 px brushed gold coin raised above the capsule, ink plus icon. Scroll content gets bottom padding so nothing hides behind the dock. The dock hides while the keyboard is open (see `src/styles/mobile-keyboard-fix.css`), on full screen flows, and on detail screens that carry their own onyx action capsule (Job in 9.4, Quote in 9.6), as the glamor Job render shows. Those capsules keep the camera and microphone, so Capture is still one tap away.
 
@@ -277,9 +279,10 @@ Tapping the company monogram opens a sheet that replaces the old "More tools" dr
 * Work: Schedule, Estimates (`/bid`), Forecast (`/pour-window`), Clients, Field reports (`/notes`)
 * Team: Crew home (`/crew`), Tasks, Timesheets, Team
 * Office: Subs, Partners, Sub portal, Activity, Compose, Import, Settings (message templates live at `/settings#templates`)
+* Day, Night and Auto, as a small three way control. Settings is owner and admin only, so crew need this here.
 * Sign out, set apart at the bottom
 
-Search stays one tap away through `MobileSearchOverlay`. Where the monogram and the search button appear is decision D4 in section 17: if the monogram lives only on Today, routes in this menu take three taps from Jobs or Money, which breaks the two tap goal in section 1.
+Decision D4: the monogram sits at the top left of the phone header on every screen, with search and the bell at the right, so every route in this menu is two taps from anywhere and search is one. When Today gets its own onyx stage in Phase 2, the same three controls move onto the stage.
 
 ### 8.3 Desktop: sidebar
 
@@ -312,7 +315,7 @@ Every screen follows: one onyx stage, one gold action, hairline lists on plaster
 ### 9.3 Jobs (`Work.tsx`), Phase 2
 
 * Condensed title "Jobs", search and filter icon buttons.
-* Stage tabs with counts. Gold 2 px underline on the active tab. Today's tabs are All, Leads, Quotes, Active, Done and Lost. The canvas drew All, Leads, Quotes, Jobs, Invoices, but there is no invoice stage any more, and dropping Done and Lost would hide closed and lost records. The final set is decision D3 in section 17.
+* Stage tabs with counts: All, Leads, Quotes, Jobs, Done (decision D3). Lost sits behind the filter button. Gold 2 px underline on the active tab. Invoices stay on the Money screen. The old `?stage=active` and `?stage=lost` links keep working.
 * Grouped `Row` lists with a group total ("$49,875.00 in progress").
 * Row: name, job line, amount, then a chip or a gray next step.
 * The existing board layouts in `Work.tsx` stay available on desktop as a view toggle.
@@ -399,9 +402,9 @@ The quote editor lives inside the job detail and `Bid.tsx`; confirm the exact co
 
 ## 10. Day and Night
 
-* Extend `ThemeContext` with three modes: Auto, Day, Night. The default is decision D1 in section 17 (the canvas note says Night switches at sunset). The choice lives in Settings.
-* Auto switches to Night at local sunset and back at sunrise, using `profiles.location_lat` and `profiles.location_lon`. `lib/weather.ts` already calls Open Meteo but does not ask for sunrise and sunset today; add `daily=sunrise,sunset` to that call. Fall back to 7 pm and 7 am when there is no location.
-* The theme must be right on the first frame. The pre paint script in `index.html` cannot fetch, so the app caches the latest sunrise and sunset times in local storage, and the script picks Day or Night from those times (or the 7 pm and 7 am fallback). Update the script's sha256 hash in the CSP in `netlify.toml` with it.
+* Extend `ThemeContext` with three modes: Auto (default, decision D1), Day, Night. The choice lives in Settings and in the workspace menu. Everyone starts in Auto once Phase 1 ships, because the old `fh:theme` key was written on every launch and cannot tell a real choice from the old dark default.
+* Auto switches to Night at local sunset and back at sunrise, using `profiles.location_lat` and `profiles.location_lon`. The times are computed in the app with the standard NOAA sunrise equation instead of fetched from Open Meteo, so Auto works offline and needs no extra request (`lib/weather.ts` does not ask Open Meteo for sunrise or sunset today). Fall back to 7 pm and 7 am when there is no location.
+* The theme must be right on the first frame. The app caches today's and tomorrow's sunrise and sunset in local storage, and the pre paint script in `index.html` picks Day or Night from them (or the 7 pm and 7 am fallback). Update the script's sha256 hash in the CSP in `netlify.toml` with it.
 * Night uses the same layouts. Only the token values change.
 
 ## 11. Photography rules
@@ -443,7 +446,7 @@ The quote editor lives inside the job detail and `Bid.tsx`; confirm the exact co
 
 ## 13. Verification
 
-* `npm run test:all` passes after every phase.
+* `npm run test:all` passes after every phase, and so does `npm run audit:design`, which Phase 1 moves from the old six color palette and single radius to the scales in section 5.
 * A unit test that reads the token values and asserts every pair in section 12 meets its threshold in Day and Night.
 * Playwright screenshots for each finished screen at 390 by 844 (Day and Night) and 1440 by 900, kept as baselines in `tests/`.
 * Manual check on Jesse's iPhone as an installed PWA: safe areas, dock above the home indicator, keyboard hides the dock, toasts clear the Dynamic Island, voice capture still records.
@@ -461,8 +464,8 @@ The quote editor lives inside the job detail and `Bid.tsx`; confirm the exact co
 ## 15. Open questions for Jesse
 
 1. Can you send two or three real photos of finished Parker Construction or Shyld work for the Welcome screen and the portal fallback?
-2. Should Night switch on automatically at sunset, or start in Day until someone turns it on? (D1)
-3. Is it fine for the fifth dock slot to show Schedule until the Inbox ships in Phase 6? (D2)
+2. Should Night switch on automatically at sunset, or start in Day until someone turns it on? Built as Auto for now (D1).
+3. Settled: the fifth dock slot shows Schedule until the Inbox ships (D2).
 
 ## 16. Review log, October 10, 2026
 
@@ -495,11 +498,11 @@ Every claim in the October 9 draft was checked against the `main` branch at `d40
 
 All eleven contrast figures in the October 9 table matched the WCAG formula within 0.1.
 
-## 17. Decisions still open
+## 17. Decisions, October 10, 2026
 
-| Id | Question | Recommendation |
+| Id | Question | Decision |
 |---|---|---|
-| D1 | Night at sunset by default, or Day until someone turns Night on | Auto at sunset, as the canvas note says |
-| D2 | Fifth dock slot before the Inbox ships | Schedule until Phase 6 |
-| D3 | Jobs tabs | All, Leads, Quotes, Jobs, Done, with Lost behind the filter button |
-| D4 | Where the workspace menu and search live on a phone | Monogram at the top left of every main screen (Today, Jobs, Money and the fifth slot), search beside the bell, so every route stays within two taps |
+| D1 | Night at sunset by default, or Day until someone turns Night on | Auto at sunset, as the canvas note says. Not answered directly yet; a one line change if Jesse prefers Day |
+| D2 | Fifth dock slot before the Inbox ships | Schedule until Phase 6 (Jesse) |
+| D3 | Jobs tabs | All, Leads, Quotes, Jobs, Done, with Lost behind the filter button (Jesse) |
+| D4 | Where the workspace menu and search live on a phone | Monogram at the top left of the header on every screen, search beside the bell (Jesse) |
