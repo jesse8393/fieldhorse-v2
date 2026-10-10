@@ -189,7 +189,7 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }: an
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                   <Eyebrow style={{ color: STATUS_COLOR[s.status] || 'var(--v3-text-muted)' }}>
-                    {s.status}
+                    {SUB_STATUSES.find((o) => o.value === s.status)?.label || s.status}
                   </Eyebrow>
                   <span style={{
                     fontFamily: 'var(--font-display)', fontSize: 14,

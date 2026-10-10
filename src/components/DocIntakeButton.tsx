@@ -98,7 +98,6 @@ export default function DocIntakeButton({
           fontFamily: 'var(--font-display)',
           fontSize: 12,
           letterSpacing: 0,
-          textTransform: 'uppercase',
           cursor: 'pointer'
         }}
       >
@@ -179,7 +178,7 @@ export default function DocIntakeButton({
 
             {!busy && (
               <Eyebrow as="p" style={{ margin: '10px 0 0', color: 'var(--ink-faint)', display: 'flex', justifyContent: 'center' }}>
-                or paste an image · ⌘V
+                Or paste an image · ⌘V
               </Eyebrow>
             )}
 

@@ -178,7 +178,7 @@ export default function Login() {
         style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 400 }}
       >
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 24, letterSpacing: 0, lineHeight: 1 }}>
+          <div style={{ fontFamily: 'var(--font-wordmark)', fontSize: 24, letterSpacing: 0, lineHeight: 1 }}>
             <span style={{ color: 'var(--v3-primary-text)' }}>FIELD</span>
             <span style={{ color: 'var(--v3-text)' }}>HORSE</span>
           </div>

@@ -1137,7 +1137,6 @@ function KindPicker({ value, onChange }: any) {
               fontSize: 12,
               fontWeight: 700,
               letterSpacing: 0,
-              textTransform: 'uppercase',
               cursor: 'pointer',
               WebkitTapHighlightColor: 'transparent',
               transition: 'background 160ms ease, color 160ms ease'

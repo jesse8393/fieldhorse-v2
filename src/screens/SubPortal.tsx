@@ -493,7 +493,7 @@ function DocSlot({ kind, label, path, uploading, onUpload }: {
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <FileText size={14} aria-hidden="true" style={{ color: path ? 'var(--v3-primary-text)' : 'var(--v3-text-muted)' }} />
-        <strong style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: 'var(--v3-text)' }}>
+        <strong style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, color: 'var(--v3-text)' }}>
           {label}
         </strong>
       </div>
@@ -630,7 +630,7 @@ function EditProfileDialog({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
             <div className="fh-build-eyebrow" style={{ color: 'var(--v3-primary-text)' }}>Edit profile</div>
-            <h2 style={{ margin: '6px 0 18px', fontFamily: 'var(--font-display, "Bebas Neue", Impact, sans-serif)', fontSize: 24, letterSpacing: 0, color: 'var(--v3-text)' }}>
+            <h2 style={{ margin: '6px 0 18px', fontFamily: 'var(--font-display)', fontSize: 24, letterSpacing: 0, color: 'var(--v3-text)' }}>
               Keep your details current.
             </h2>
           </div>

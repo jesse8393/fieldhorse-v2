@@ -33,7 +33,6 @@ export default function StageTimeline({ currentStage }: { currentStage?: string 
         fontSize: 12,
         fontWeight: 700,
         letterSpacing: 0,
-        textTransform: 'uppercase',
         textAlign: 'center'
       }}>
         Lost, closed without conversion
@@ -172,7 +171,6 @@ export default function StageTimeline({ currentStage }: { currentStage?: string 
               fontSize: 12,
               fontWeight: isCurrent ? 700 : 600,
               letterSpacing: 0,
-              textTransform: 'uppercase',
               color: labelColor,
               textAlign: 'center',
               lineHeight: 1.2,

@@ -704,7 +704,6 @@ function QuoteViewToggle({ value, onChange }: any) {
               fontSize: 12,
               fontWeight: 700,
               letterSpacing: 0,
-              textTransform: 'uppercase',
               cursor: on ? 'default' : 'pointer',
               WebkitTapHighlightColor: 'transparent'
             }}
@@ -936,8 +935,8 @@ function WorkspaceHead({ contact, companyName, status, baseCount, busy, disabled
   // page (numbers.ts), the raw first block of the record UUID
   // ("EST · DFAEFF81") leaked a database id as the estimate number
   // (UI audit #21).
-  const idShort = contact?.id ? proposalNumber(companyName, contact.id) : 'ESTIMATE'
-  const statusLabel = (status?.label || 'Draft').toUpperCase()
+  const idShort = contact?.id ? proposalNumber(companyName, contact.id) : 'Estimate'
+  const statusLabel = status?.label || 'Draft'
   const titleText = contact?.job_title || contact?.name || 'Estimate'
   const subBits = [
     contact?.name && contact.job_title ? contact.name : null,
@@ -1107,7 +1106,7 @@ function ApproveBand({ contact, baseCount, busy, pastQuote = false, onOpenApprov
           <ShieldCheck size={16} aria-hidden="true" style={{ color: 'var(--v3-success-text)' }} />
           <span style={{
             fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-            letterSpacing: 0, textTransform: 'uppercase',
+            letterSpacing: 0,
             color: 'var(--v3-success-text)'
           }}>
             {implicit ? 'Approved · job stage' : 'Quote approved'}

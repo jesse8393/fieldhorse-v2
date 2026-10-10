@@ -465,7 +465,7 @@ export default function Home() {
             color: 'var(--v3-text-muted)',
             letterSpacing: 0
           }}>
-            Total Pipeline
+            Total pipeline
           </span>
 
           {/* Money + trend row, money baseline-aligned with a tiny
@@ -600,7 +600,7 @@ export default function Home() {
           margin: '0 var(--v3-gutter) 16px'
         }}
       >
-        <SectionHeader label="Quick Actions" />
+        <SectionHeader label="Quick actions" />
         <div
           style={{
             display: 'grid',
@@ -630,7 +630,7 @@ export default function Home() {
           <div className="v3-section-header">
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
               <span className="v3-eyebrow" style={{ color: 'var(--v3-text-muted)' }}>
-                Next Actions
+                Next actions
               </span>
               <span style={{
                 display: 'inline-flex',
@@ -699,7 +699,7 @@ export default function Home() {
           margin: '0 var(--v3-gutter) 16px'
         }}
       >
-        <SectionHeader label="Today's Priorities" />
+        <SectionHeader label="Today's priorities" />
         <div
           style={{
             display: 'grid',
@@ -750,7 +750,7 @@ export default function Home() {
         }}
       >
         <SectionHeader
-          label="Today on Site"
+          label="Today on site"
           action={{ label: 'View schedule', onTap: () => navigate('/schedule') }}
         />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
@@ -794,7 +794,7 @@ export default function Home() {
         }}
       >
         <SectionHeader
-          label="Pipeline Preview"
+          label="Pipeline preview"
           action={{ label: 'View all', onTap: () => navigate('/jobs') }}
         />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>

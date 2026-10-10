@@ -48,11 +48,11 @@ export default class AppErrorBoundary extends React.Component<{ children?: React
           // Always dark, so the ink is pinned to linen; the theme's ink
           // turns onyx in daylight and would vanish here.
           color: 'var(--linen)',
-          fontFamily: 'DM Sans, system-ui, sans-serif'
+          fontFamily: 'var(--font-body)'
         }}
       >
         <div style={{ maxWidth: 420, width: '100%', textAlign: 'center' }}>
-          <div style={{ fontFamily: 'Bebas Neue, sans-serif', fontSize: 24, letterSpacing: 0, marginBottom: 12 }}>
+          <div style={{ fontFamily: 'var(--font-wordmark)', fontSize: 24, letterSpacing: 0, marginBottom: 12 }}>
             <span style={{ color: '#C9963A' }}>FIELD</span>HORSE
           </div>
           <h1 style={{ fontSize: 20, margin: '12px 0', color: '#C9963A' }}>Something broke loading this page.</h1>
@@ -78,13 +78,13 @@ export default class AppErrorBoundary extends React.Component<{ children?: React
               border: 'none',
               background: 'linear-gradient(135deg, #C9963A, #5C5C5C)',
               color: '#141414',
-              fontFamily: 'Bebas Neue, sans-serif',
+              fontFamily: 'var(--font-display)',
               fontSize: 14,
               letterSpacing: 0,
               cursor: 'pointer'
             }}
           >
-            RELOAD
+            Reload
           </button>
         </div>
       </div>

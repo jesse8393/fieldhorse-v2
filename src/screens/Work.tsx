@@ -353,7 +353,7 @@ export default function Work() {
           is the list. */}
       <motion.div className="fh-work__head" variants={item} style={{ padding: '12px 24px 8px' }}>
         <h1 className="jobs-title">
-          Work <span style={{ color: 'var(--v3-primary-text)' }}>&amp; Deals</span>
+          Work <span style={{ color: 'var(--v3-primary-text)' }}>&amp; deals</span>
         </h1>
         <div className="jobs-stats">
           {loading ? (

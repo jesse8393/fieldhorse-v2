@@ -468,7 +468,7 @@ export default function Importer() {
                   background: 'rgba(201,150,58,0.14)',
                   color: 'var(--field-gold-bright)',
                   fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-                  letterSpacing: 0, textTransform: 'uppercase',
+                  letterSpacing: 0,
                   cursor: aiMapping ? 'wait' : 'pointer',
                   opacity: aiMapping ? 0.7 : 1
                 }}

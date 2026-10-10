@@ -194,7 +194,7 @@ export default function InvitePartnerSheet({ open, onOpenChange, contactId, cont
     }
   }
 
-  const labelStyle: import('react').CSSProperties = { fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: 'var(--ink-muted)' }
+  const labelStyle: import('react').CSSProperties = { fontSize: 12, fontWeight: 700, letterSpacing: 0, color: 'var(--ink-muted)' }
   const fieldStyle: import('react').CSSProperties = {
     padding: '12px 12px',
     borderRadius: 10,

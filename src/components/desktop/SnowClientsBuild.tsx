@@ -280,7 +280,7 @@ export default function SnowClientsBuild(props: Props) {
               <div className="fh-build-table__empty">Loading clients…</div>
             )}
             {!loading && viewRows.length === 0 && (
-              <div className="fh-build-table__empty">No clients match. <button type="button" className="fh-build-inline-link" onClick={onNewClient}>+ New Client</button>.</div>
+              <div className="fh-build-table__empty">No clients match. <button type="button" className="fh-build-inline-link" onClick={onNewClient}>+ New client</button>.</div>
             )}
             {!loading && viewRows.slice(0, 60).map((tr) => {
               const { client: r, status, outstanding, activeCount, nextAction } = tr.original

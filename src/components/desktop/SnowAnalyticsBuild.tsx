@@ -343,7 +343,7 @@ export default function SnowAnalyticsBuild(props: Props) {
 function KpiCell({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
   return (
     <div className="fh-build-kpi-cell">
-      <strong style={muted ? { color: 'var(--v3-text-faint)', fontSize: 14, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase' } : undefined}>
+      <strong style={muted ? { color: 'var(--v3-text-faint)', fontSize: 14, fontWeight: 700, letterSpacing: 0 } : undefined}>
         {value}
       </strong>
       <span>{label}</span>

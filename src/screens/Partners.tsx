@@ -38,6 +38,12 @@ const STATUS_FILTERS = [
   { id: 'revoked',  label: 'Revoked',  match: (p: any) => p.status === 'revoked' }
 ]
 
+// Display word for a partner or partner job status (pending, accepted,
+// revoked), the same words the filter chips use.
+function statusWord(status: any) {
+  return STATUS_FILTERS.find((f) => f.id !== 'all' && f.id === status)?.label || status
+}
+
 function relTime(input: any) {
   if (!input) return ''
   const d = input instanceof Date ? input : new Date(input)
@@ -374,7 +380,7 @@ function PartnerCard({ partner, onResend, onRevoke, busy, resendingKey }: any) {
                 <Eyebrow style={{ color: j.status === 'accepted' ? 'var(--v3-success-text)'
                     : j.status === 'revoked' ? 'var(--v3-text-muted)'
                     : 'var(--v3-primary-text)' }}>
-                  {j.status}
+                  {statusWord(j.status)}
                 </Eyebrow>
                 {j.status !== 'revoked' && (
                   <button
@@ -443,7 +449,7 @@ function StatusBadge({ status }: any) {
       : { bg: 'var(--v3-primary-soft)', border: 'color-mix(in srgb, var(--v3-primary) 35%, transparent)', color: 'var(--v3-primary-text)' }
   return (
     <Eyebrow style={{ flexShrink: 0, padding: '4px 8px', borderRadius: 10, background: palette.bg, border: `1px solid ${palette.border}`, color: palette.color }}>
-      {status}
+      {statusWord(status)}
     </Eyebrow>
   )
 }

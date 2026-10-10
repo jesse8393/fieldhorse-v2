@@ -586,7 +586,7 @@ export default function DailyLogsSection({ jobId, userId }: any) {
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
-                    <strong style={{ fontFamily: 'var(--font-display, "Bebas Neue", Impact, sans-serif)', fontSize: 20, letterSpacing: 0, color: 'var(--v3-text)' }}>
+                    <strong style={{ fontFamily: 'var(--font-display)', fontSize: 20, letterSpacing: 0, color: 'var(--v3-text)' }}>
                       {fmtDay(r.log_date)}
                     </strong>
                     <span style={{ fontSize: 12, color: 'var(--v3-text-muted)' }}>

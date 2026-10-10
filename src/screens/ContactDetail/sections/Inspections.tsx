@@ -242,7 +242,6 @@ function InspectionLog({ open, trade, onOpenChange, onSave }: any) {
                       color: on ? meta.color : 'var(--v3-text)',
                       fontFamily: 'var(--font-body)',
                       fontSize: 12, fontWeight: 700, letterSpacing: 0,
-                      textTransform: 'uppercase',
                       cursor: 'pointer'
                     }}
                   >

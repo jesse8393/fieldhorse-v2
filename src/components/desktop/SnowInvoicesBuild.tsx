@@ -264,7 +264,7 @@ export default function SnowInvoicesBuild({
 
           <div className="fh-build-mini-grid">
             <MiniMetric label="Outstanding"    value={money(totals.total ?? 0)} accent />
-            <MiniMetric label="Current 0-30 d" value={money(totals['0-30'] ?? 0)} />
+            <MiniMetric label="Current 0 to 30 d" value={money(totals['0-30'] ?? 0)} />
             <MiniMetric label="Late 31 to 60 d" value={money(totals['31-60'] ?? 0)} tone={(totals['31-60'] ?? 0) > 0 ? 'warn' : undefined} />
             <MiniMetric label="Overdue 60+ d"  value={money(totals['60+'] ?? 0)}  tone={(totals['60+'] ?? 0) > 0 ? 'bad' : undefined} />
           </div>

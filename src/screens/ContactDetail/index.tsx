@@ -1198,7 +1198,6 @@ function Header({
                 fontSize: 12,
                 fontWeight: 700,
                 letterSpacing: 0,
-                textTransform: 'uppercase',
                 cursor: 'pointer',
                 WebkitTapHighlightColor: 'transparent',
                 boxShadow: '0 0 0 2px rgba(201, 150, 58, 0.10), 0 3px 8px rgba(201, 150, 58, 0.16)'

@@ -488,7 +488,7 @@ function PipelineHero({ pipeline, trendUp, trendPct, rows, totalOppCount, active
   return (
     <section className="fh-build-card fh-build-pipeline" onClick={() => onGoToPipeline?.()}>
       <div className="fh-build-card__overlay" />
-      <div className="fh-build-eyebrow">Active Pipeline · All stages</div>
+      <div className="fh-build-eyebrow">Active pipeline · all stages</div>
 
       <div className="fh-build-pipeline__top">
         <div className="fh-build-money">
@@ -609,7 +609,7 @@ function RailMetric({ title, value, sub, chart }: any) {
 function OwnerQueue({ rows, loading, onOpenJobAtTab, onViewAll }: any) {
   return (
     <section className="fh-build-card fh-build-table fh-build-owner">
-      <CardHeader title="Owner Queue" />
+      <CardHeader title="Owner queue" />
       <div className="fh-build-table__head is-owner">
         <span>#</span>
         <span>Action</span>
@@ -658,7 +658,7 @@ function OwnerQueue({ rows, loading, onOpenJobAtTab, onViewAll }: any) {
 function RevenueOpportunities({ rows, loading, onOpenJob, onViewAll }: any) {
   return (
     <section className="fh-build-card fh-build-table fh-build-revenue">
-      <CardHeader title="Revenue Opportunities" />
+      <CardHeader title="Revenue opportunities" />
       <div className="fh-build-table__head is-revenue">
         <span>Job / Client</span>
         <span>Stage</span>
@@ -699,14 +699,14 @@ function RevenueOpportunities({ rows, loading, onOpenJob, onViewAll }: any) {
 function JobHealthPreview({ rows, loading, onGoToJobs, onOpenJob }: any) {
   return (
     <section className="fh-build-card fh-build-table fh-build-health">
-      <CardHeader title="Job Health Preview" action="Operational Risks" />
+      <CardHeader title="Job health preview" action="Operational risks" />
       <div className="fh-build-table__head is-health">
         <span>Job</span>
         <span>Stage</span>
         <span>Schedule</span>
         <span>Billing</span>
         <span>Risk</span>
-        <span>Next Action</span>
+        <span>Next action</span>
       </div>
 
       {loading ? (

@@ -422,7 +422,7 @@ export default function Schedule() {
             const day = addDays(cursor, i - cursorDow)
             const isSelected = sameDay(day, cursor)
             const isToday = sameDay(day, today)
-            const dayName = day.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase().slice(0, 3)
+            const dayName = day.toLocaleDateString(undefined, { weekday: 'short' }).slice(0, 3)
             const dayNum = day.getDate()
             const forecastFor = dailyForecast[dayKey(day)] || null
             const hasJobsPip = forecastFor && forecastFor.precipProb >= 50
@@ -818,7 +818,7 @@ function DayView({ events, now, onClick, onEdit, onDelete, onAdd }: any) {
                 background: 'linear-gradient(180deg, var(--v3-primary-hot, var(--v3-primary)) 0%, var(--v3-primary) 100%)',
                 color: 'var(--v3-on-primary)',
                 fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
-                letterSpacing: 0, textTransform: 'uppercase',
+                letterSpacing: 0,
                 cursor: 'pointer',
                 boxShadow:
                   '0 0 0 3px rgba(201, 150, 58, 0.14),' +
@@ -909,11 +909,11 @@ function deriveStatus(e: any, now: any) {
 // share the muted "up" pill; DONE uses the soft-gold "done" pill;
 // SCHEDULED falls back to the neutral "default" pill.
 const PILL_FOR_STATUS: Record<string, any> = {
-  'On Site':     { variant: 'live',    label: 'LIVE' },
-  'In Progress': { variant: 'live',    label: 'LIVE' },
-  'Upcoming':    { variant: 'up',      label: 'UP NEXT' },
-  'Scheduled':   { variant: 'default', label: 'UPCOMING' },
-  'Done':        { variant: 'done',    label: 'DONE' }
+  'On Site':     { variant: 'live',    label: 'Live' },
+  'In Progress': { variant: 'live',    label: 'Live' },
+  'Upcoming':    { variant: 'up',      label: 'Up next' },
+  'Scheduled':   { variant: 'default', label: 'Upcoming' },
+  'Done':        { variant: 'done',    label: 'Done' }
 }
 
 // Split "8:15 AM" into ["8:15", "AM"] for the dispatch-card time

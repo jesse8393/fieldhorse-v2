@@ -174,7 +174,6 @@ export default function SegmentedTabs({ value, onChange, tabs, variant = 'underl
                 fontSize: 12,
                 fontWeight: 700,
                 letterSpacing: 0,
-                textTransform: 'uppercase',
                 cursor: 'pointer',
                 WebkitTapHighlightColor: 'transparent',
                 transition: 'color 160ms ease'

@@ -12,7 +12,7 @@ import { useMemo } from 'react'
  *
  * Tiers (mockup-aligned):
  *   80–100 → "Good"      (success green)
- *   50–79  → "At Risk"   (gold)
+ *   50–79  → "At risk"   (gold)
  *    0–49  → "Behind"    (danger red)
  *
  * @param {number} value 0..100
@@ -30,7 +30,7 @@ export default function HealthDonut({ value = 0, size = 110, stroke = 9, label }
   // tone for the number and the label under it.
   const tier = useMemo(() => {
     if (safe >= 80) return { name: 'Good',    color: 'var(--v3-success-bright)', ink: 'var(--v3-success-text)', soft: 'var(--v3-success-soft)' }
-    if (safe >= 50) return { name: 'At Risk', color: 'var(--v3-warn)',            ink: 'var(--v3-primary-text)', soft: 'var(--v3-warn-soft)' }
+    if (safe >= 50) return { name: 'At risk', color: 'var(--v3-warn)',            ink: 'var(--v3-primary-text)', soft: 'var(--v3-warn-soft)' }
     return                  { name: 'Behind',  color: 'var(--v3-danger-bright)',  ink: 'var(--v3-danger-text)',  soft: 'var(--v3-danger-soft)' }
   }, [safe])
   // Screen readers hear the same word sighted users see: a caller's label
@@ -58,10 +58,9 @@ export default function HealthDonut({ value = 0, size = 110, stroke = 9, label }
         fontSize: 12,
         fontWeight: 700,
         letterSpacing: 0,
-        textTransform: 'uppercase',
         color: 'var(--v3-text-muted)'
       }}>
-        Job Health
+        Job health
       </span>
 
       <div style={{
@@ -120,7 +119,6 @@ export default function HealthDonut({ value = 0, size = 110, stroke = 9, label }
             fontSize: 12,
             fontWeight: 700,
             letterSpacing: 0,
-            textTransform: 'uppercase',
             color: tier.ink
           }}>
             {shownLabel}

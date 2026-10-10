@@ -652,7 +652,7 @@ export default function Invoices() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
             <Eyebrow tone="gold">
               <Receipt size={11} aria-hidden="true" />
-              Money Owed
+              Money owed
             </Eyebrow>
             {!loading && <BalanceStateChip totals={totals} />}
           </div>
@@ -670,7 +670,7 @@ export default function Invoices() {
                 {fmtMoney(totals.total)}
               </StampNumber>
             )}
-            <Eyebrow as="div" style={{ marginTop: 6 }}>Total Outstanding</Eyebrow>
+            <Eyebrow as="div" style={{ marginTop: 6 }}>Total outstanding</Eyebrow>
           </div>
 
           {/* Aging visualization + 3-cell breakdown */}

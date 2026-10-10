@@ -194,11 +194,11 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
               style={{ maxHeight: 36, maxWidth: '70%', objectFit: 'contain' }}
             />
           ) : companyName ? (
-            <span style={{ fontFamily: 'var(--font-display)', fontSize: 20, letterSpacing: 0, textTransform: 'uppercase', color: 'var(--v3-primary-text)' }}>{companyName}</span>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: 20, letterSpacing: 0, color: 'var(--v3-primary-text)' }}>{companyName}</span>
           ) : fullName ? (
-            <span style={{ fontFamily: 'var(--font-display)', fontSize: 20, letterSpacing: 0, textTransform: 'uppercase', color: 'var(--ink-strong)' }}>{fullName}</span>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: 20, letterSpacing: 0, color: 'var(--ink-strong)' }}>{fullName}</span>
           ) : (
-            <span style={{ fontFamily: 'var(--font-display)', fontSize: 16, letterSpacing: 0 }}>
+            <span style={{ fontFamily: 'var(--font-wordmark)', fontSize: 16, letterSpacing: 0 }}>
               <span style={{ color: 'var(--field-gold)' }}>FIELD</span>
               <span style={{ color: 'var(--ink-strong)' }}>HORSE</span>
             </span>

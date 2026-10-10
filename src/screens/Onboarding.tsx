@@ -378,7 +378,7 @@ export default function Onboarding() {
       </header>
 
       <section className="fh-onb__hero" style={{ animationDelay: '40ms' }}>
-        <p className="fh-onb__eyebrow">Onboarding · Three steps</p>
+        <p className="fh-onb__eyebrow">Onboarding · three steps</p>
         <h1 className="fh-onb__title fh-font-serif" style={{ fontWeight: 400 }}>
           Set up<br />
           shop.
@@ -554,7 +554,6 @@ export default function Onboarding() {
                 fontSize: 12,
                 fontWeight: 700,
                 letterSpacing: 0,
-                textTransform: 'uppercase',
                 cursor: (canSubmit && !busy) ? 'pointer' : 'default',
                 opacity: (canSubmit && !busy) ? 1 : 0.5,
                 textDecoration: 'underline',

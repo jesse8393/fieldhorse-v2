@@ -216,7 +216,7 @@ export default function SnowForecastBuild(props: Props) {
                 <div className="fh-build-eyebrow">7 day outlook</div>
                 {onGoToSchedule && (
                   <button type="button" onClick={onGoToSchedule}>
-                    <CalendarDays size={11} /> Open Schedule
+                    <CalendarDays size={11} /> Open schedule
                   </button>
                 )}
               </header>
@@ -323,7 +323,7 @@ export default function SnowForecastBuild(props: Props) {
               </span>
               {onGoToSchedule && (
                 <button type="button" className="fh-build-rail-card__action" onClick={onGoToSchedule}>
-                  Open Schedule <ChevronRight size={13} />
+                  Open schedule <ChevronRight size={13} />
                 </button>
               )}
             </section>

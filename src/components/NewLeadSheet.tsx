@@ -989,7 +989,7 @@ function TemplatePickerInline({ templates, value, onChange }: any) {
 
 const V3_LABEL = {
   fontSize: 12, fontWeight: 700, letterSpacing: 0,
-  textTransform: 'uppercase', color: 'var(--ink-muted)'
+  color: 'var(--ink-muted)'
 }
 
 const V3_INPUT: import('react').CSSProperties = {

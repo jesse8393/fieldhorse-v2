@@ -209,7 +209,7 @@ function PrimaryBtn({ children, onClick }: { children: React.ReactNode; onClick:
         background: 'var(--v3-primary, #C9963A)',
         color: '#141414',
         border: 'none',
-        fontFamily: 'var(--font-body, "DM Sans", system-ui, sans-serif)',
+        fontFamily: 'var(--font-body)',
         fontWeight: 800,
         fontSize: 14,
         letterSpacing: 0,
@@ -223,7 +223,7 @@ function PrimaryBtn({ children, onClick }: { children: React.ReactNode; onClick:
 
 const titleStyle: React.CSSProperties = {
   margin: '10px 0 8px',
-  fontFamily: 'var(--font-display, "Bebas Neue", Impact, sans-serif)',
+  fontFamily: 'var(--font-display)',
   fontSize: 24,
   letterSpacing: 0,
   color: 'var(--v3-text)',
@@ -246,7 +246,7 @@ const secondaryBtnStyle: React.CSSProperties = {
   background: 'transparent',
   color: 'var(--v3-text-muted)',
   border: '1px solid var(--v3-border-mid)',
-  fontFamily: 'var(--font-body, "DM Sans", system-ui, sans-serif)',
+  fontFamily: 'var(--font-body)',
   fontWeight: 700,
   fontSize: 14,
   cursor: 'pointer',

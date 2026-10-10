@@ -1104,7 +1104,6 @@ function ViewModeToggle({ value, onChange }: any) {
               fontSize: 12,
               fontWeight: 700,
               letterSpacing: 0,
-              textTransform: 'uppercase',
               cursor: on ? 'default' : 'pointer',
               WebkitTapHighlightColor: 'transparent'
             }}

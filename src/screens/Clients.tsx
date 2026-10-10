@@ -422,7 +422,7 @@ export default function Clients() {
               border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
               padding: '12px 16px', borderRadius: 10,
               fontWeight: 700, fontSize: 12,
-              letterSpacing: 0, textTransform: 'uppercase',
+              letterSpacing: 0,
               cursor: 'pointer',
               boxShadow: '0 0 0 2px rgba(201, 150, 58, 0.14), 0 4px 12px rgba(201, 150, 58, 0.28)'
             }}>

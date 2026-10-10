@@ -451,7 +451,7 @@ function InviteDialog({ callerRole, onClose, onSent }: { callerRole: OrgRole | n
         }}
       >
         <div className="fh-build-eyebrow" style={{ color: 'var(--v3-primary-text)' }}>Invite teammate</div>
-        <h2 style={{ margin: '6px 0 18px', fontFamily: 'var(--font-display, "Bebas Neue", Impact, sans-serif)', fontSize: 24, letterSpacing: 0, color: 'var(--v3-text)' }}>
+        <h2 style={{ margin: '6px 0 18px', fontFamily: 'var(--font-display)', fontSize: 24, letterSpacing: 0, color: 'var(--v3-text)' }}>
           Add someone to the field.
         </h2>
 
