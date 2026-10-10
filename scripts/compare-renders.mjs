@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-// Side by side review images for the redesign (Phase 2 plan, Task 14):
-// our build on the left, the approved render on the right, both scaled
-// to the same height, one PNG per screen and theme.
+// Side by side review images for the redesign (Phase 2 plan Task 14 and
+// the review task that closes each later phase): our build on the left,
+// the approved render on the right, both scaled to the same height, one
+// PNG per screen and theme.
 //
 // It starts nothing itself. Run the dev server against the mocked
 // Supabase project first (the env in playwright.config.ts webServer):
@@ -10,13 +11,15 @@
 //   VITE_SUPABASE_ANON_KEY=<the mock key in playwright.config.ts> npm run dev
 //   node scripts/compare-renders.mjs
 //
-// Env: BASE_URL (default http://127.0.0.1:5173), OUT_DIR (default
-// docs/design/2026-10-redesign/phase2-review), PW_EXECUTABLE_PATH to use
-// a specific Chromium binary, ONLY to capture a subset by name.
+// Env: BASE_URL (default http://127.0.0.1:5173), PHASE (a phase number,
+// to capture only that phase's shots; writes to phase<N>-review),
+// OUT_DIR (override the output folder; without PHASE it defaults to
+// final-review), PW_EXECUTABLE_PATH to use a specific Chromium binary,
+// ONLY to capture a comma separated subset by name.
 //
-// The mock has no job photos, so c-job1 gets a stand-in: the slab cut
-// from the g-job render itself, served through a mocked storage bucket.
-// It shows where photos land and how they are framed, not real content.
+// The mock has no job photos, so job c-job1 gets a placeholder: the slab
+// cut from the g-job render, served through a mocked storage bucket. It
+// shows where photos land and how they are framed, not real content.
 // Callbacks passed to the page run in the browser.
 /* global document, localStorage */
 import { mkdirSync } from 'node:fs'
@@ -27,7 +30,8 @@ import { installMock, session } from './qa-mock.mjs'
 
 const ROOT = join(import.meta.dirname, '..')
 const RENDERS = join(ROOT, 'docs/design/2026-10-redesign')
-const OUT = process.env.OUT_DIR || join(RENDERS, 'phase2-review')
+const PHASE = process.env.PHASE ? Number(process.env.PHASE) : null
+const OUT = process.env.OUT_DIR || join(RENDERS, PHASE ? `phase${PHASE}-review` : 'final-review')
 const BASE = process.env.BASE_URL || 'http://127.0.0.1:5173'
 const ONLY = process.env.ONLY ? new Set(process.env.ONLY.split(',')) : null
 
@@ -35,19 +39,38 @@ const ONLY = process.env.ONLY ? new Set(process.env.ONLY.split(',')) : null
 const TIMEZONE = 'America/Chicago'
 const LAT = 35.84
 const LON = -86.36
-const HEIGHT = 1200
 
+const PHONE = { width: 390, height: 844, scale: 2, mobile: true, outHeight: 1200 }
+const DESKTOP = { width: 1440, height: 900, scale: 1, mobile: false, outHeight: 900 }
+
+// One entry per image. Fields: name, phase, title, path, mode (day or
+// night), clock ([hour, minute] local), render (a file under the design
+// folder), view (PHONE by default), action (a named step in `steps`),
+// tables (a function from the frozen clock to extra mock tables).
 const SHOTS = [
-  { name: 'today-day', path: '/', mode: 'day', clock: [6, 40], render: 'glamor/g-today.jpg' },
-  { name: 'today-night', path: '/', mode: 'night', clock: [6, 40], render: 'glamor/g-today.jpg' },
-  { name: 'evening-night', path: '/', mode: 'night', clock: [19, 40], render: 'base/night.jpg' },
-  { name: 'jobs-day', path: '/work', mode: 'day', clock: [6, 40], render: 'base/jobs.jpg' },
-  { name: 'jobs-night', path: '/work', mode: 'night', clock: [6, 40], render: 'base/jobs.jpg' },
-  { name: 'job-day', path: '/jobs/c-job1', mode: 'day', clock: [6, 40], render: 'glamor/g-job.jpg' },
-  { name: 'job-night', path: '/jobs/c-job1', mode: 'night', clock: [6, 40], render: 'glamor/g-job.jpg' },
-  { name: 'capture-day', path: '/', mode: 'day', clock: [6, 40], action: 'capture', render: 'base/capture.jpg' },
-  { name: 'capture-night', path: '/', mode: 'night', clock: [6, 40], action: 'capture', render: 'base/capture.jpg' }
+  { phase: 2, name: 'today-day', path: '/', mode: 'day', render: 'glamor/g-today.jpg' },
+  { phase: 2, name: 'today-night', path: '/', mode: 'night', render: 'glamor/g-today.jpg' },
+  { phase: 2, name: 'evening-night', path: '/', mode: 'night', clock: [19, 40], render: 'base/night.jpg' },
+  { phase: 2, name: 'jobs-day', path: '/work', mode: 'day', render: 'base/jobs.jpg' },
+  { phase: 2, name: 'jobs-night', path: '/work', mode: 'night', render: 'base/jobs.jpg' },
+  { phase: 2, name: 'job-day', path: '/jobs/c-job1', mode: 'day', render: 'glamor/g-job.jpg' },
+  { phase: 2, name: 'job-night', path: '/jobs/c-job1', mode: 'night', render: 'glamor/g-job.jpg' },
+  { phase: 2, name: 'capture-day', path: '/', mode: 'day', action: 'capture', render: 'base/capture.jpg' },
+  { phase: 2, name: 'capture-night', path: '/', mode: 'night', action: 'capture', render: 'base/capture.jpg' }
 ]
+
+// Named steps that run after the page has loaded.
+const STEPS = {
+  async capture(page) {
+    await page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: /Capture/ }).click()
+    await page.waitForTimeout(900)
+    await page.getByRole('dialog').getByRole('textbox').first()
+      .fill('Remind me to call the inspector tomorrow morning about the Bellevue slab final.')
+    await page.getByRole('button', { name: 'File it' }).click()
+    await page.getByRole('button', { name: 'Save', exact: true }).waitFor({ timeout: 15_000 })
+    await page.waitForTimeout(500)
+  }
+}
 
 // Today's date in Murfreesboro at a given local time, as an instant.
 function localInstant([hour, minute]) {
@@ -178,19 +201,21 @@ function captureReply(clock) {
 }
 
 async function capture(browser, shot) {
-  const clock = localInstant(shot.clock)
+  const clock = localInstant(shot.clock || [6, 40])
+  const view = shot.view || PHONE
   const context = await browser.newContext({
-    viewport: { width: 390, height: 844 },
-    deviceScaleFactor: 2,
-    isMobile: true,
-    hasTouch: true,
+    viewport: { width: view.width, height: view.height },
+    deviceScaleFactor: view.scale,
+    isMobile: view.mobile,
+    hasTouch: view.mobile,
     timezoneId: TIMEZONE,
     serviceWorkers: 'block'
   })
-  const photos = photoRows(localInstant([6, 40]))
+  const morning = localInstant([6, 40])
+  const photos = photoRows(morning)
   await installMock(context, {
     supabaseHosts: ['qa-mock.supabase.co', 'pnmhblvslftdzfcdezbw.supabase.co'],
-    tables: { fh_schedule: scheduleFor(localInstant([6, 40])), fh_job_files: photos }
+    tables: { fh_schedule: scheduleFor(morning), fh_job_files: photos, ...(shot.tables ? shot.tables(morning) : {}) }
   })
   await mockPhotos(context, photos)
   await context.route('**/api/claude', (route) => route.fulfill({
@@ -214,15 +239,7 @@ async function capture(browser, shot) {
   await page.waitForLoadState('load')
   await page.evaluate(() => document.fonts.ready)
   await page.waitForTimeout(1500)
-  if (shot.action === 'capture') {
-    await page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: /Capture/ }).click()
-    await page.waitForTimeout(900)
-    await page.getByRole('dialog').getByRole('textbox').first()
-      .fill('Remind me to call the inspector tomorrow morning about the Bellevue slab final.')
-    await page.getByRole('button', { name: 'File it' }).click()
-    await page.getByRole('button', { name: 'Save', exact: true }).waitFor({ timeout: 15_000 })
-    await page.waitForTimeout(500)
-  }
+  if (shot.action) await STEPS[shot.action](page)
   const png = await page.screenshot({ animations: 'disabled' })
   await context.close()
   return png
@@ -235,7 +252,7 @@ function label(text, width) {
   return Buffer.from(svg)
 }
 
-async function sideBySide(ours, renderPath, title) {
+async function sideBySide(ours, renderPath, title, HEIGHT) {
   const left = await sharp(ours).resize({ height: HEIGHT }).toBuffer({ resolveWithObject: true })
   const right = await sharp(renderPath).resize({ height: HEIGHT }).toBuffer({ resolveWithObject: true })
   const gap = 32
@@ -257,11 +274,13 @@ const browser = await chromium.launch(process.env.PW_EXECUTABLE_PATH ? { executa
 mkdirSync(OUT, { recursive: true })
 try {
   for (const shot of SHOTS) {
+    if (PHASE && shot.phase !== PHASE) continue
     if (ONLY && !ONLY.has(shot.name)) continue
     const ours = await capture(browser, shot)
-    const title = `${shot.name.split('-')[0][0].toUpperCase()}${shot.name.split('-')[0].slice(1)}, ${shot.mode === 'day' ? 'Day' : 'Night'}`
+    const [screen] = shot.name.split('-')
+    const title = shot.title || `${screen[0].toUpperCase()}${screen.slice(1)}, ${shot.mode === 'day' ? 'Day' : 'Night'}`
     const out = join(OUT, `${shot.name}.png`)
-    await sharp(await sideBySide(ours, join(RENDERS, shot.render), title)).toFile(out)
+    await sharp(await sideBySide(ours, join(RENDERS, shot.render), title, (shot.view || PHONE).outHeight)).toFile(out)
     console.log('wrote', out)
   }
 } finally {
