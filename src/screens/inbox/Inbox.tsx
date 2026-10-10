@@ -29,6 +29,7 @@ import {
   useInbox,
   type InboxRow
 } from '../../lib/inbox.ts'
+import Thread from './Thread.tsx'
 import './inbox.css'
 
 function nameOf(row: InboxRow): string {
@@ -129,12 +130,13 @@ export default function Inbox() {
   const engine = useEngineEnabled()
   const inbox = useInbox({ enabled: engine === true })
 
-  // The heading takes focus when the screen opens, so a screen reader
-  // starts at the top of the page.
+  // The heading takes focus when the list opens, so a screen reader
+  // starts at the top of the page. A thread has its own heading.
   const titleRef = useRef<HTMLHeadingElement>(null)
+  const listOnly = !conversationId
   useEffect(() => {
-    titleRef.current?.focus({ preventScroll: true })
-  }, [])
+    if (listOnly) titleRef.current?.focus({ preventScroll: true })
+  }, [listOnly])
 
   const rows = inbox.data ?? []
   const loading = engine === undefined || (engine === true && inbox.isLoading)
@@ -148,6 +150,13 @@ export default function Inbox() {
         <EngineOff />
       </div>
     )
+  }
+
+  const openRow = conversationId ? rows.find((r) => r.conversation_id === conversationId) : undefined
+
+  // A phone shows one thing at a time: the thread when one is open.
+  if (!isDesktop && conversationId && engine === true) {
+    return <Thread conversationId={conversationId} row={openRow} />
   }
 
   const list = (
@@ -168,9 +177,13 @@ export default function Inbox() {
           {list}
         </aside>
         <section className="fhi-split__detail" aria-label="Conversation">
-          <div className="fhi-split__empty">
-            <EmptyState icon={MessageSquare} title="Choose a conversation to read it." />
-          </div>
+          {conversationId && engine === true ? (
+            <Thread key={conversationId} conversationId={conversationId} row={openRow} embedded />
+          ) : (
+            <div className="fhi-split__empty">
+              <EmptyState icon={MessageSquare} title="Choose a conversation to read it." />
+            </div>
+          )}
         </section>
       </div>
     )

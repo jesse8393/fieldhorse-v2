@@ -5,6 +5,7 @@
 // Every test runs against the mock, so nothing is ever really sent.
 import { expect, test, type Page } from '@playwright/test'
 import { signIn, type SignInOptions } from './helpers/signIn.ts'
+import { rpcCalls } from './helpers/rpcCalls.ts'
 
 // The mock company is in Tennessee, so the phone runs on Central time and
 // the clock is fixed: Saturday, October 10, 2026, 10:00 am.
@@ -223,5 +224,249 @@ test.describe('the Inbox list', () => {
     const box = await list.boundingBox()
     expect(box?.x).toBeGreaterThan(200)
     expect(box?.width).toBeLessThan(480)
+  })
+})
+
+// ---- A thread ---------------------------------------------------------------
+
+function message(partial: Record<string, unknown>) {
+  return {
+    org_id: 'org-1', conversation_id: 'conv-priya', client_id: 'cl-priya', channel: 'sms', subject: null,
+    direction: 'inbound', status: 'received', read_at: null, hold_reason: null, sent_by_kind: 'contact',
+    agent_run_id: null, sent_at: null, call_status: null, ...partial
+  }
+}
+
+const MESSAGES = [
+  message({
+    id: 'm1', direction: 'outbound', status: 'sent', sent_by_kind: 'user', created_at: '2026-10-09T21:48:00Z',
+    body: "Hi Priya, Jesse with Parker Construction. We're set for Thursday at 11:00 to look at the patio cover."
+  }),
+  message({ id: 'm2', created_at: '2026-10-09T22:02:00Z', body: 'Perfect, thank you!' }),
+  message({ id: 'm3', created_at: '2026-10-10T13:14:00Z', body: 'Can we push to 11:30? Daycare pickup ran long.' })
+]
+
+const DRAFT_TEXT = "Of course, 11:30 works. I'll bring a fan option so we can see where the power run would go."
+const RUNS = [
+  {
+    id: 'run-1', agent_id: 'agent-1', conversation_id: 'conv-priya', client_id: 'cl-priya', status: 'proposed',
+    created_at: '2026-10-10T13:15:00Z', proposal: { channel: 'sms', body: DRAFT_TEXT }
+  }
+]
+
+const JOB = {
+  id: 'c-priya', user_id: 'qa-user-1', client_id: 'cl-priya', stage: 'quote', name: 'Priya Rangarajan',
+  job_title: 'Rangarajan patio cover', amount: 14800, created_at: '2026-09-20T12:00:00Z',
+  updated_at: '2026-10-09T12:00:00Z', fh_clients: { name: 'Priya Rangarajan', phone: '555-0142', email: null }
+}
+
+const THREAD = { ...ENGINE_ON, fh_v_inbox: INBOX, fh_messages: MESSAGES, fh_agent_runs: RUNS, fh_contacts: [JOB] }
+
+async function openThread(
+  context: Parameters<typeof signIn>[0],
+  page: Page,
+  tables: SignInOptions['tables'] = THREAD,
+  id = 'conv-priya'
+) {
+  await start(context, page, `/inbox/${id}`, { tables })
+  await expect(page.locator('.fhi-thread')).toBeVisible({ timeout: 30_000 })
+}
+
+const draftBox = (page: Page) => page.getByRole('textbox', { name: 'Draft reply' })
+const sendDraft = (page: Page) => page.getByRole('button', { name: 'Send', exact: true })
+
+test.describe('a thread', () => {
+  test('shows the name, the job chip, the bubbles under day labels and the draft', async ({ context, page }) => {
+    await openThread(context, page)
+    const thread = page.locator('.fhi-thread')
+    await expect(thread.getByRole('heading', { name: 'Priya Rangarajan' })).toBeVisible()
+    await expect(thread.getByRole('link', { name: /Rangarajan patio cover/ })).toHaveAttribute('href', '/jobs/c-priya')
+    await expect(thread.getByRole('link', { name: 'Call Priya Rangarajan' })).toHaveAttribute('href', 'tel:555-0142')
+
+    await expect(thread.getByText('Yesterday', { exact: true })).toBeVisible()
+    await expect(thread.getByText('Today', { exact: true })).toBeVisible()
+    await expect(thread.getByText('Perfect, thank you!')).toBeVisible()
+    await expect(thread.getByText('4:48 pm', { exact: true })).toBeVisible()
+    await expect(thread.getByText('8:14 am', { exact: true })).toBeVisible()
+
+    // Sent bubbles sit on the right, received on the left.
+    const sent = thread.locator('.fhi-msg.is-out').first()
+    const received = thread.locator('.fhi-msg.is-in').first()
+    const [a, b] = [await sent.boundingBox(), await received.boundingBox()]
+    expect(a && b && a.x > b.x).toBe(true)
+
+    await expect(draftBox(page)).toHaveValue(DRAFT_TEXT)
+    await expect(sendDraft(page)).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Discard', exact: true })).toBeVisible()
+  })
+
+  test('opening it marks the conversation read once and not again on later renders', async ({ context, page }) => {
+    await openThread(context, page)
+    await expect.poll(() => rpcCalls(context, 'fh_conversation_mark_read').length).toBe(1)
+    expect(rpcCalls(context, 'fh_conversation_mark_read')[0].body).toEqual({ p_conversation_id: 'conv-priya' })
+    // Typing, refocusing the window and waiting out a refetch re-render the screen.
+    await page.getByRole('textbox', { name: 'Write a reply' }).fill('Thursday works')
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')))
+    await page.waitForTimeout(1500)
+    expect(rpcCalls(context, 'fh_conversation_mark_read')).toHaveLength(1)
+  })
+
+  test('nothing is sent just by opening a thread with a draft in it', async ({ context, page }) => {
+    await openThread(context, page)
+    await expect(draftBox(page)).toBeVisible()
+    await page.waitForTimeout(1000)
+    expect(rpcCalls(context, 'fh_agent_run_approve')).toHaveLength(0)
+    expect(rpcCalls(context, 'fh_send_message')).toHaveLength(0)
+    expect(rpcCalls(context, 'fh_agent_run_reject')).toHaveLength(0)
+  })
+
+  test('Send approves the draft with the text as edited, in one call', async ({ context, page }) => {
+    await openThread(context, page)
+    await draftBox(page).fill('Of course, 11:30 works. See you then.')
+    await sendDraft(page).click()
+    await expect.poll(() => rpcCalls(context, 'fh_agent_run_approve').length).toBe(1)
+    expect(rpcCalls(context, 'fh_agent_run_approve')[0].body).toEqual({
+      p_agent_run_id: 'run-1',
+      p_body: 'Of course, 11:30 works. See you then.'
+    })
+    // The draft is gone and what went out is in the thread.
+    await expect(page.getByRole('textbox', { name: 'Draft reply' })).toHaveCount(0)
+    await expect(page.locator('.fhi-thread').getByText('Of course, 11:30 works. See you then.')).toBeVisible()
+    expect(rpcCalls(context, 'fh_send_message')).toHaveLength(0)
+  })
+
+  test('sending the draft untouched sends the proposed words', async ({ context, page }) => {
+    await openThread(context, page)
+    await sendDraft(page).click()
+    await expect.poll(() => rpcCalls(context, 'fh_agent_run_approve').length).toBe(1)
+    expect(rpcCalls(context, 'fh_agent_run_approve')[0].body.p_body).toBe(DRAFT_TEXT)
+  })
+
+  test('a double tap on Send makes exactly one call', async ({ context, page }) => {
+    await openThread(context, page)
+    await draftBox(page).fill('Double tap test')
+    await sendDraft(page).dblclick()
+    await page.waitForTimeout(1200)
+    expect(rpcCalls(context, 'fh_agent_run_approve')).toHaveLength(1)
+  })
+
+  test('Discard rejects the draft and the panel goes away', async ({ context, page }) => {
+    await openThread(context, page)
+    await page.getByRole('button', { name: 'Discard', exact: true }).click()
+    await expect.poll(() => rpcCalls(context, 'fh_agent_run_reject').length).toBe(1)
+    expect(rpcCalls(context, 'fh_agent_run_reject')[0].body).toEqual({ p_agent_run_id: 'run-1' })
+    await expect(page.getByRole('textbox', { name: 'Draft reply' })).toHaveCount(0)
+    expect(rpcCalls(context, 'fh_agent_run_approve')).toHaveLength(0)
+    expect(rpcCalls(context, 'fh_send_message')).toHaveLength(0)
+  })
+
+  test('a failed approval keeps the edits and says nothing was confirmed', async ({ context, page }) => {
+    await openThread(context, page)
+    let attempts = 0
+    await context.route('**/rest/v1/rpc/fh_agent_run_approve', (route) => {
+      attempts += 1
+      return route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ code: 'P0001', message: 'run already handled' }) })
+    })
+    await draftBox(page).fill('My edit that must survive')
+    await sendDraft(page).click()
+    await expect(page.getByText("That reply didn't go out")).toBeVisible()
+    await expect(draftBox(page)).toHaveValue('My edit that must survive')
+    // The button is usable again for a second try.
+    await expect(sendDraft(page)).toBeEnabled()
+    expect(attempts).toBe(1)
+  })
+
+  test('the composer sends through fh_send_message, once, and clears itself', async ({ context, page }) => {
+    await openThread(context, page, { ...THREAD, fh_agent_runs: [] })
+    const field = page.getByRole('textbox', { name: 'Write a reply' })
+    await field.fill('Thursday at 11:30 it is.')
+    await page.getByRole('button', { name: 'Send reply' }).dblclick()
+    await expect.poll(() => rpcCalls(context, 'fh_send_message').length).toBe(1)
+    expect(rpcCalls(context, 'fh_send_message')[0].body).toEqual({
+      p_body: 'Thursday at 11:30 it is.',
+      p_channel: 'sms',
+      p_client_id: 'cl-priya'
+    })
+    await expect(field).toHaveValue('')
+    await expect(page.locator('.fhi-thread').getByText('Thursday at 11:30 it is.')).toBeVisible()
+    await page.waitForTimeout(800)
+    expect(rpcCalls(context, 'fh_send_message')).toHaveLength(1)
+  })
+
+  test('the composer will not send an empty reply', async ({ context, page }) => {
+    await openThread(context, page, { ...THREAD, fh_agent_runs: [] })
+    await expect(page.getByRole('button', { name: 'Send reply' })).toBeDisabled()
+    await page.getByRole('textbox', { name: 'Write a reply' }).fill('   ')
+    await expect(page.getByRole('button', { name: 'Send reply' })).toBeDisabled()
+    expect(rpcCalls(context, 'fh_send_message')).toHaveLength(0)
+  })
+
+  test('a held reply says why in words and never looks sent', async ({ context, page }) => {
+    const held = message({
+      id: 'm-held', direction: 'outbound', status: 'queued', sent_by_kind: 'user',
+      hold_reason: 'outside_send_window', created_at: '2026-10-10T14:30:00Z', body: 'Great, see you at 11:30 on Thursday.'
+    })
+    await openThread(context, page, { ...THREAD, fh_messages: [...MESSAGES, held], fh_agent_runs: [] })
+    const bubble = page.locator('.fhi-msg.is-held')
+    await expect(bubble).toHaveCount(1)
+    await expect(bubble.getByText('Held: outside sending hours')).toBeVisible()
+    await expect(bubble.getByText('Great, see you at 11:30 on Thursday.')).toBeVisible()
+    // No send time under it, and it is not drawn as a sent bubble.
+    await expect(bubble.getByText(/\d:\d\d (am|pm)/)).toHaveCount(0)
+    await expect(page.locator('.fhi-msg.is-out.is-sent').filter({ hasText: 'Great, see you at 11:30' })).toHaveCount(0)
+  })
+
+  test('a held reason it does not know reads Held for review', async ({ context, page }) => {
+    const held = message({
+      id: 'm-held', direction: 'outbound', status: 'held', sent_by_kind: 'agent',
+      hold_reason: 'zodiac_sign_mismatch', created_at: '2026-10-10T14:30:00Z', body: 'Held body'
+    })
+    await openThread(context, page, { ...THREAD, fh_messages: [...MESSAGES, held], fh_agent_runs: [] })
+    await expect(page.locator('.fhi-msg.is-held').getByText('Held for review', { exact: true })).toBeVisible()
+  })
+
+  test('the draft Send is the only gold button, and a thread with no draft has none', async ({ context, page }) => {
+    await openThread(context, page)
+    await expect(page.locator('.fhc-btn--primary')).toHaveCount(1)
+    await expect(page.locator('.fhc-btn--primary')).toHaveText('Send')
+  })
+
+  test('a thread with no draft has no draft panel and no gold', async ({ context, page }) => {
+    await openThread(context, page, { ...THREAD, fh_agent_runs: [] })
+    await expect(page.getByText('Draft reply')).toHaveCount(0)
+    await expect(page.locator('.fhc-btn--primary')).toHaveCount(0)
+  })
+
+  test('the Draft ready chip leaves the list once the draft is sent', async ({ context, page }, testInfo) => {
+    test.skip(testInfo.project.name.startsWith('mobile'), 'Needs the list beside the thread')
+    await openThread(context, page)
+    const list = page.getByRole('complementary', { name: 'Conversations' })
+    await expect(list.getByText('Draft ready', { exact: true })).toBeVisible()
+    await sendDraft(page).click()
+    await expect(list.getByText('Draft ready', { exact: true })).toHaveCount(0)
+  })
+
+  test('a phone thread brings its own header and hides the dock', async ({ context, page }, testInfo) => {
+    test.skip(!testInfo.project.name.startsWith('mobile'), 'Phone only')
+    await openThread(context, page)
+    await expect(page.getByRole('navigation', { name: 'Primary' })).toBeHidden()
+    await expect(page.getByRole('button', { name: 'Open workspace menu' })).toBeHidden()
+    await page.getByRole('link', { name: 'Back to inbox' }).click()
+    await expect(page).toHaveURL(/\/inbox$/)
+    await expect(page.getByRole('heading', { level: 1, name: 'Inbox' })).toBeVisible()
+  })
+
+  test('on a desktop the thread opens beside the list and the capture button leaves Send clear', async ({ context, page }, testInfo) => {
+    test.skip(testInfo.project.name.startsWith('mobile'), 'Desktop only')
+    await openThread(context, page, { ...THREAD, fh_agent_runs: [] })
+    const list = page.getByRole('complementary', { name: 'Conversations' })
+    await expect(list.getByText('Marcus Bell')).toBeVisible()
+    const send = await page.getByRole('button', { name: 'Send reply' }).boundingBox()
+    const fab = await page.locator('.fh-fab').first().boundingBox()
+    expect(send).not.toBeNull()
+    if (send && fab) {
+      const apart = send.x + send.width <= fab.x || fab.x + fab.width <= send.x || send.y + send.height <= fab.y || fab.y + fab.height <= send.y
+      expect(apart).toBe(true)
+    }
   })
 })

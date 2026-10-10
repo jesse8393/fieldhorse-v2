@@ -145,3 +145,487 @@
     padding: 0 var(--fh-gutter-desktop);
   }
 }
+
+/* ================================================================
+   The thread (render base/inbox.jpg)
+   ================================================================ */
+
+/* The thread brings its own header, so on a phone the shared header
+   steps aside, as on the Job page. */
+@media (max-width: 899px) {
+  body:has(.fhi-thread) .fh-app-header {
+    display: none;
+  }
+}
+
+.fhi-thread {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  color: var(--fh-ink);
+  font-family: var(--fh-font-body);
+}
+
+/* The shell keeps room under every page for the dock. A thread has no
+   dock, so it takes that room back and the composer can sit on the
+   bottom edge. */
+@media (max-width: 899px) {
+  .fhi-thread:not(.is-embedded) {
+    margin-bottom: calc(-1 * (var(--fh-mobile-dock-height) + 32px));
+  }
+}
+
+/* Focus: 2 px --fh-focus. global.css forces a muted outline color on
+   every focused control, so these restate it with the same weight. */
+.fhi-jobchip:focus-visible,
+.fhi-composer__switch:focus-visible,
+.fhi-composer__mic:focus-visible {
+  outline: 2px solid var(--fh-focus) !important;
+  outline-color: var(--fh-focus) !important;
+  outline-offset: 2px;
+}
+
+/* ---- Header: back, name and job chip, call ---- */
+.fhi-thread__head {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: calc(8px + env(safe-area-inset-top, 0px)) 12px 8px 8px;
+  background: var(--fh-plaster);
+  box-shadow: inset 0 -1px 0 var(--fh-hairline);
+}
+
+.fhi-thread__who {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+}
+
+.fhi-thread__name {
+  max-width: 100%;
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 20px;
+  line-height: 24px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--fh-ink);
+  overflow-wrap: anywhere;
+}
+
+/* The job, as a pill with a hard hat, linking to the job. */
+.fhi-jobchip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 4px 12px 4px 8px;
+  border-radius: 999px;
+  background: var(--fh-paper);
+  box-shadow: inset 0 0 0 1px var(--fh-hairline);
+  color: var(--fh-ink);
+  font-family: var(--fh-font-body);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.fhi-jobchip span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A 44 px tap target around a 28 px pill. */
+.fhi-jobchip::before {
+  content: '';
+  position: absolute;
+  inset: -8px 0;
+}
+
+/* ---- Messages ---- */
+.fhi-thread__scroll {
+  flex: 1;
+  min-height: 0;
+}
+
+.fhi-flow {
+  display: flex;
+  flex-direction: column;
+  padding: 8px var(--fh-gutter) 16px;
+}
+
+.fhi-quiet {
+  margin: 24px 0 0;
+  text-align: center;
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--fh-ink-2);
+}
+
+.fhi-skel {
+  margin-bottom: 12px;
+  border-radius: 18px;
+}
+
+.fhi-skel--out {
+  align-self: flex-end;
+}
+
+.fhi-day {
+  display: flex;
+  flex-direction: column;
+}
+
+.fhi-day__label {
+  margin: 16px 0 12px;
+  text-align: center;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+.fhi-msg {
+  display: flex;
+  flex-direction: column;
+  max-width: 84%;
+  margin-bottom: 12px;
+}
+
+.fhi-msg.is-out {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.fhi-msg.is-in {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+
+.fhi-bubble {
+  box-sizing: border-box;
+  padding: 12px 16px;
+  border-radius: 18px;
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 400;
+  letter-spacing: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Received: paper with a hairline. */
+.fhi-msg.is-in .fhi-bubble {
+  background: var(--fh-paper);
+  box-shadow: inset 0 0 0 1px var(--fh-hairline);
+  color: var(--fh-ink);
+}
+
+/* Sent: ink with linen text. At night the stage token is a step lighter
+   with a faint gold edge, so the bubble still reads as its own layer. */
+.fhi-msg.is-out .fhi-bubble {
+  background: var(--fh-stage);
+  box-shadow: inset 0 0 0 1px var(--fh-stage-edge);
+  color: var(--fh-linen);
+}
+
+.fhi-msg.is-sending .fhi-bubble {
+  opacity: 0.72;
+}
+
+/* Held and failed replies are outlines, never the solid ink of a sent
+   bubble, so they cannot be mistaken for something that went out. */
+.fhi-msg.is-held .fhi-bubble,
+.fhi-msg.is-failed .fhi-bubble {
+  background: transparent;
+  box-shadow: none;
+  border: 1px dashed var(--fh-edge-strong);
+  color: var(--fh-ink);
+}
+
+.fhi-msg.is-failed .fhi-bubble {
+  border-color: var(--fh-danger);
+}
+
+.fhi-bubble__subject {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.fhi-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 4px 4px 0;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 400;
+  color: var(--fh-ink-3);
+}
+
+.fhi-meta--held {
+  font-weight: 500;
+  color: var(--fh-ink-2);
+}
+
+/* ---- The agent's draft ---- */
+.fhi-draft {
+  margin: 16px 0 4px;
+  padding: 16px;
+  border-radius: 18px;
+  background: var(--fh-paper);
+  box-shadow: inset 0 0 0 1px var(--fh-hairline);
+}
+
+.fhi-draft__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--fh-ink-2);
+}
+
+.fhi-draft__label {
+  flex: 1;
+  margin: 0;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--fh-ink-2);
+}
+
+/* The text is the panel's content, editable in place. A step of wash on
+   hover and a focus ring show it takes typing. */
+.fhi-draft__text {
+  display: block;
+  width: calc(100% + 16px);
+  box-sizing: border-box;
+  margin: 8px -8px 0;
+  padding: 8px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--fh-ink);
+  font-family: var(--fh-font-body);
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 400;
+  letter-spacing: 0;
+  resize: none;
+  overflow-y: auto;
+}
+
+.fhi-draft__text:hover {
+  background: var(--fh-wash);
+}
+
+.fhi-draft__text:focus {
+  outline: none;
+}
+
+.fhi-draft__text:focus-visible,
+.fhi-draft__text:focus {
+  background: var(--fh-wash);
+  box-shadow: inset 0 0 0 2px var(--fh-focus);
+}
+
+.fhi-draft__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.fhi-draft__send {
+  flex: 1 1 auto;
+  max-width: 360px;
+}
+
+/* ---- Composer: a text field with a mic, and a dark send button ---- */
+.fhi-composer {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  padding: 4px var(--fh-gutter) calc(12px + env(safe-area-inset-bottom, 0px));
+  background: var(--fh-plaster);
+}
+
+.fhi-composer__channel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 4px;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+  color: var(--fh-ink-3);
+}
+
+.fhi-composer__switch {
+  position: relative;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fh-ink-2);
+  font-family: var(--fh-font-body);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  text-decoration: underline;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.fhi-composer__switch::before {
+  content: '';
+  position: absolute;
+  inset: -12px -8px;
+}
+
+.fhi-composer__row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.fhi-composer__field {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-end;
+  box-sizing: border-box;
+  min-height: 48px;
+  border-radius: 22px;
+  background: var(--fh-paper);
+  box-shadow: inset 0 0 0 1px var(--fh-edge-strong);
+}
+
+.fhi-composer__field:focus-within {
+  box-shadow: inset 0 0 0 2px var(--fh-focus);
+}
+
+/* 16 px, so iOS never zooms on focus. */
+.fhi-composer__input {
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 12px 0 12px 16px;
+  border: 0;
+  background: transparent;
+  color: var(--fh-ink);
+  font-family: var(--fh-font-body);
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 400;
+  letter-spacing: 0;
+  resize: none;
+  overflow-y: auto;
+}
+
+.fhi-composer__input:focus {
+  outline: none;
+}
+
+.fhi-composer__input::placeholder {
+  color: var(--fh-ink-3);
+  opacity: 1;
+}
+
+.fhi-composer__mic {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fh-ink-2);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.fhi-composer__mic.is-listening {
+  background: var(--fh-info-fill);
+  color: var(--fh-info-ink);
+}
+
+.fhi-composer__mic:disabled {
+  color: var(--fh-ink-4);
+  cursor: not-allowed;
+}
+
+/* The send button is a dark square: the onyx stage surface, linen glyph. */
+.fhc-iconbtn.fhi-send {
+  --fhc-radius: 14px;
+  background: var(--fh-stage);
+  box-shadow: inset 0 0 0 1px var(--fh-stage-edge);
+  color: var(--fh-linen);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* Disabled keeps the dark square and dims the arrow, so the composer
+   looks the same before and after the first word. */
+.fhc-iconbtn.fhi-send:disabled {
+  color: var(--fh-smoke);
+}
+
+/* ---- Beside the list on a desktop ---- */
+@media (min-width: 900px) {
+  .fhi-split__detail > .fhi-thread {
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+  }
+
+  .fhi-thread.is-embedded .fhi-thread__head {
+    position: static;
+    padding: 12px var(--fh-gutter-desktop);
+  }
+
+  .fhi-thread.is-embedded .fhi-thread__scroll {
+    overflow-y: auto;
+  }
+
+  .fhi-thread.is-embedded .fhi-flow {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 8px var(--fh-gutter-desktop) 16px;
+  }
+
+  .fhi-thread.is-embedded .fhi-msg {
+    max-width: 72%;
+  }
+
+  /* The capture button floats at the bottom right; the composer stops
+     short of it. */
+  .fhi-thread.is-embedded .fhi-composer {
+    position: static;
+    padding: 8px var(--fh-gutter-desktop) 16px;
+  }
+
+  .fhi-thread.is-embedded .fhi-composer__row {
+    margin-right: 48px;
+  }
+}

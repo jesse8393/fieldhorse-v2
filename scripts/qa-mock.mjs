@@ -104,8 +104,9 @@ function restResponse(url, headers, tables = TABLES) {
 // answered. Read the record for a browser context with rpcCalls(context) or
 // rpcCalls(context, 'fh_agent_run_approve'), or pass your own array as
 // installMock's `rpcLog` option and read that. Callers that never look at the
-// record are unaffected. A test can make one function fail with
-// `rpcFail: { fh_agent_run_approve: 'Run already handled' }` (HTTP 400).
+// record are unaffected. To make one call fail, register a later
+// context.route for that function in the test (Playwright runs the most
+// recently registered matching route first).
 //
 // The four Inbox functions also change this context's own copy of the inbox
 // tables, so the screen behaves as it would against the real database:
@@ -163,12 +164,9 @@ function addOutbound(tables, message) {
   return row
 }
 
-function rpcResponse(name, body, tables, options) {
+function rpcResponse(name, body, tables) {
   const json = (data) => ({ status: 200, body: JSON.stringify(data) })
   const empty = { status: 204, body: '' }
-  if (options.rpcFail && options.rpcFail[name]) {
-    return { status: 400, body: JSON.stringify({ code: 'P0001', message: String(options.rpcFail[name]), details: null, hint: null }) }
-  }
   switch (name) {
     case 'fh_send_message': {
       const inbox = tables.fh_v_inbox.find((r) => r.client_id === body.p_client_id)
@@ -252,7 +250,7 @@ export async function installMock(ctx, options = {}) {
       let body = {}
       try { body = req.postDataJSON() ?? {} } catch { /* no JSON body */ }
       rpcLog.push({ name, body, at: Date.now() })
-      const r = rpcResponse(name, body, tables, options)
+      const r = rpcResponse(name, body, tables)
       return route.fulfill({ status: r.status, contentType: 'application/json', body: r.body })
     }
     if (url.includes('/rest/v1/')) {
