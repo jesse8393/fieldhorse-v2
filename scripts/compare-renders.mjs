@@ -21,7 +21,7 @@
 // cut from the g-job render, served through a mocked storage bucket. It
 // shows where photos land and how they are framed, not real content.
 // Callbacks passed to the page run in the browser.
-/* global document, localStorage */
+/* global document, localStorage, window */
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { chromium } from '@playwright/test'
