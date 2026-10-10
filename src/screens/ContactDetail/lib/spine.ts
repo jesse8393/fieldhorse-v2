@@ -140,8 +140,13 @@ function eventItem(e: ActivityEvent, now: Date): SpineItem {
       if (from && to) return item(e.id, e.when, now, `Moved from ${lowerStage(from)} to ${lowerStage(to)}`, sub, tone)
       const fresh = /^New (\w+)$/.exec(e.title)
       if (fresh) return item(e.id, e.when, now, `New ${lowerStage(fresh[1])}`, sub, tone)
+      const legacy = /^Stage: (\w+)$/.exec(e.title)
+      if (legacy) return item(e.id, e.when, now, `Moved to ${lowerStage(legacy[1])}`, sub, tone)
       return item(e.id, e.when, now, e.title, sub, tone)
     }
+    case 'schedule':
+      // The time column already says when; the subline says what it is.
+      return item(e.id, e.when, now, e.title, 'On the schedule', 'neutral')
     default:
       return item(e.id, e.when, now, e.title, sub, tone)
   }

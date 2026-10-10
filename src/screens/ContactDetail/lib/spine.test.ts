@@ -176,6 +176,23 @@ describe('buildSpine', () => {
     }
   })
 
+  it('says a schedule event is on the schedule instead of repeating its time', () => {
+    const events = composeActivityEvents({
+      scheduleItems: [{ id: 's1', title: 'Pour slab, crew A', start_at: at(9, 10, 11, 0).toISOString(), created_at: at(9, 9, 9, 0).toISOString() }]
+    })
+    const [item] = buildSpine({ events, photos: [], inspections: [], now: NOW })
+    expect(item).toMatchObject({ title: 'Pour slab, crew A', subline: 'On the schedule', time: '11:00', day: 'today' })
+  })
+
+  it('reads a stage marker as a sentence', () => {
+    const events = composeActivityEvents({
+      contact: { id: 'c1', stage: 'job', updated_at: at(9, 6, 9, 0).toISOString() },
+      stageTransitions: []
+    })
+    const items = buildSpine({ events, photos: [], inspections: [], now: NOW })
+    expect(items.map((i) => i.title)).toContain('Moved to job')
+  })
+
   it('drops items with an unreadable date', () => {
     const items = buildSpine({
       events: [],

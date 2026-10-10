@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { SegmentedTabs } from '../../../components/v3'
 import { tabPanelProps } from '../../../lib/tabs.ts'
 import PhotosSection from '../sections/Photos.tsx'
@@ -11,6 +11,9 @@ import MessagesSection from '../sections/Messages.tsx'
  * Sub-tabs: Photos · Files · Messages
  *
  * Default sub: Photos (highest-frequency for jobsite documentation).
+ *
+ * incomingPhotos: files the phone page's camera button took. They switch
+ * the tab to Photos, which uploads them the same way as Add Photos.
  */
 const SUB_TABS = [
   { id: 'photos',   label: 'Photos' },
@@ -18,8 +21,12 @@ const SUB_TABS = [
   { id: 'messages', label: 'Messages' }
 ]
 
-export default function FilesTab({ contact, notes = [], userId, fetchAll }: any) {
+export default function FilesTab({ contact, notes = [], userId, fetchAll, incomingPhotos = null, onIncomingPhotosHandled }: any) {
   const [sub, setSub] = useState('photos')
+  const hasIncoming = Array.isArray(incomingPhotos) && incomingPhotos.length > 0
+  useEffect(() => {
+    if (hasIncoming) setSub('photos')
+  }, [hasIncoming])
 
   return (
     <div>
@@ -36,7 +43,12 @@ export default function FilesTab({ contact, notes = [], userId, fetchAll }: any)
 
       <div className="v3-section" {...tabPanelProps('fh-job-files', sub)} style={{ margin: '12px var(--v3-gutter) 24px' }}>
         {sub === 'photos' && (
-          <PhotosSection jobId={contact?.id} userId={userId} />
+          <PhotosSection
+            jobId={contact?.id}
+            userId={userId}
+            incomingFiles={incomingPhotos}
+            onIncomingHandled={onIncomingPhotosHandled}
+          />
         )}
         {sub === 'files' && (
           <FilesSection jobId={contact?.id} userId={userId} />

@@ -506,3 +506,4 @@ All eleven contrast figures in the October 9 table matched the WCAG formula with
 | D2 | Fifth dock slot before the Inbox ships | Schedule until Phase 6 (Jesse) |
 | D3 | Jobs tabs | All, Leads, Quotes, Jobs, Done, with Lost behind the filter button (Jesse) |
 | D4 | Where the workspace menu and search live on a phone | Monogram at the top left of the header on every screen, search beside the bell (Jesse) |
+| D5 | Where a job's sections live on a phone, in place of the "Details" sheet in 9.4 | The existing section tabs stay below the quick actions, restyled as text tabs with the gold underline, and Overview becomes the Spine. Quote, Details, Selections, Materials, Change orders, Daily logs, Financials and Files each stay one tap away, with less risk than moving them into a sheet (Phase 2 plan) |
