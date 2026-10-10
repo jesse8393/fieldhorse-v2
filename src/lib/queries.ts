@@ -460,14 +460,15 @@ export function useActivityFeed(userId: string | undefined, pageSize = 60) {
 
 // Projected, the AR screen renders identity/billing fields only; the
 // wide text columns on fh_contacts (scope, notes, proposal bodies) never
-// appear on this surface.
+// appear on this surface. `cost` is one number per job; Money reads it
+// for the margin on its vault card (lib/moneyView.ts).
 export const INVOICE_JOB_COLUMNS =
-  'id, user_id, client_id, name, email, phone, address, stage, amount, job_title, job_type, completed_at, created_at, updated_at'
+  'id, user_id, client_id, name, email, phone, address, stage, amount, cost, job_title, job_type, completed_at, created_at, updated_at'
 
 export type InvoiceJob = Pick<
   Contact,
   | 'id' | 'user_id' | 'client_id' | 'name' | 'email' | 'phone' | 'address'
-  | 'stage' | 'amount' | 'job_title' | 'job_type' | 'completed_at'
+  | 'stage' | 'amount' | 'cost' | 'job_title' | 'job_type' | 'completed_at'
   | 'created_at' | 'updated_at'
 > & {
   fh_clients: Pick<Client, 'name' | 'email' | 'phone' | 'address'> | null
