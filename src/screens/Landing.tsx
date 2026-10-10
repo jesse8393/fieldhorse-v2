@@ -37,9 +37,11 @@ export default function Landing() {
 
   return (
     <main
+      className="fh-onyx-scope"
       style={{
         minHeight: '100vh',
-        background: 'var(--v3-bg, #141414)',
+        // Always the onyx stage, in Day and Night alike.
+        background: 'var(--fh-onyx)',
         color: INK,
         fontFamily: 'var(--font-body)',
         display: 'flex',

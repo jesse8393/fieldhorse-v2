@@ -34,7 +34,7 @@ async function installSession(context: BrowserContext) {
   await installMock(context)
   await context.addInitScript((savedSession) => {
     localStorage.setItem('sb-qa-mock-auth-token', JSON.stringify(savedSession))
-    localStorage.setItem('fh:theme', 'dark')
+    localStorage.setItem('fh:theme-mode', 'night')
     localStorage.setItem('fh-onboarding-seen', '1')
   }, session)
 }
@@ -143,7 +143,7 @@ test('keeps the core desktop workspace coherent in light theme', async ({ page }
     await page.goto(route.path, { waitUntil: 'domcontentloaded' })
     await expect(page.locator(route.ready).first()).toBeVisible()
     await page.evaluate(() => {
-      localStorage.setItem('fh:theme', 'light')
+      localStorage.setItem('fh:theme-mode', 'day')
       document.documentElement.setAttribute('data-theme', 'light')
     })
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')

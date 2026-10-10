@@ -1,241 +1,50 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { NotebookPen, Search } from 'lucide-react'
+import { Search } from 'lucide-react'
 import { useProfile } from '../contexts/ProfileContext.tsx'
-import FieldhorseEmblem from './FieldhorseEmblem.tsx'
+import Icon from './fh/Icon.tsx'
+import Monogram from './fh/Monogram.tsx'
 import NotificationsBell from './NotificationsBell.tsx'
+import { openWorkspaceMenu } from './WorkspaceMenu.tsx'
 
-function openPalette() {
-  if (typeof window === 'undefined') return
+// Single entry point for search. CommandPalette opens at 900px and up,
+// MobileSearchOverlay below it; both listen for fh:open-palette and gate
+// themselves, so only one ever opens.
+function openSearch() {
   window.dispatchEvent(new CustomEvent('fh:open-palette'))
 }
 
-// Single entry point, dispatches `fh:open-palette`. CommandPalette
-// only opens at >=900px width; MobileSearchOverlay only opens at
-// <900px. Both gate themselves so we never get a dual-open. The old
-// mobile-routes-to-/jobs hack was a workaround for the cmdk popover
-// rendering clipped on iOS, superseded by the dedicated mobile
-// overlay.
-function openSearch() {
-  openPalette()
-}
-
 /**
- * AppHeader, the shared top bar.
+ * AppHeader, the shared top bar (spec 8.2, decision D4).
  *
- * Layout:
- *   [FH badge] · · · [USER COMPANY LOGO / NAME centered] · · · [Notes shortcut]
+ * Phone: the company monogram on the left opens the workspace menu, the
+ * company name sits beside it, and search and the bell are on the right.
+ * The menu is in the same place on every screen, so every route is two
+ * taps away and search is one.
  *
- * Fallback chain for center slot:
- *   1. profile.logo_url     -> <img>
- *   2. profile.company_name -> Bebas Neue, Field Gold tint
- *   3. profile.full_name    -> Bebas Neue, white
- *   4. (everything blank)   -> FIELDHORSE wordmark
- *
- * Partner view: always renders THIS user's brand (not the inviter's).
- * Shared-job content is shared; chrome is not.
- *
- * Phase 18.1: right slot swapped from Bell + red-dot notification stub
- * to a plain Notes shortcut. Notes moved out of BottomNav; header becomes
- * the jump point. No unread badge until a real notifications system
- * backs it.
+ * Desktop: the sidebar carries identity and navigation, so only search
+ * and the bell show, at the right.
  */
 export default function AppHeader() {
   const { profile } = useProfile()
-  const navigate = useNavigate()
-
-  const logoSrc = profile?.logo_url
-  const company = profile?.company_name?.trim()
-  const fullName = profile?.full_name?.trim()
+  const company = profile?.company_name?.trim() || profile?.full_name?.trim() || ''
 
   return (
-    <header
-      className="fh-app-header"
-      style={{
-        position: 'sticky',
-        top: 0,
-        zIndex: 30,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 8,
-        // Padding longhand ONLY, never use the `padding:` shorthand
-        // here. The desktop sidebar offset is applied via the CSS rule
-        // `@media(min-width:900px) .fh-app-header { padding-left: calc(12px + 48px) }`,
-        // which loses to inline shorthand. The audit on 5/13 found
-        // the search/notifications/notes cluster pinned behind the
-        // 256px sidebar because the inline `padding: '8px 12px 4px'`
-        // was forcing padding-left:14 over the responsive rule. Keep
-        // top/right/bottom inline; let CSS own padding-left.
-        paddingTop: 'calc(6px + env(safe-area-inset-top, 0px))',
-        paddingRight: 12,
-        paddingBottom: 4,
-        paddingLeft: 12, // mobile default, overridden by desktop CSS rule
-        minHeight: 0,
-        background: 'linear-gradient(180deg, var(--fh-chrome-veil-1) 0%, var(--fh-chrome-veil-2) 82%, var(--fh-chrome-veil-0) 100%)',
-        backdropFilter: 'blur(14px)',
-        WebkitBackdropFilter: 'blur(14px)',
-        pointerEvents: 'auto'
-      }}
-    >
-      {/* Brand emblem, phone-only. Desktop mounts the wordmark in the
-          left rail (DesktopSidebar) so the header strip can stay quiet.
-          Replaces the prior FieldhorseBadge (FH text wordmark) with the
-          glassy gold emblem the user shared. */}
-      <span className="fh-app-header__badge">
-        <FieldhorseEmblem size={28} />
-      </span>
-
-      <div
-        className="fh-app-header__brand"
-        style={{
-          flex: 1,
-          minWidth: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 8,
-          overflow: 'hidden'
-        }}
+    <header className="fh-app-header fhs-header">
+      <button
+        type="button"
+        className="fhs-header__menu"
+        aria-label="Open workspace menu"
+        aria-haspopup="dialog"
+        onClick={openWorkspaceMenu}
       >
-        <BrandSlot logoSrc={logoSrc} company={company} fullName={fullName} />
-      </div>
-
-      {/* Right slot: search + notifications + notes shortcut.
-          Search opens the universal palette (jobs/clients/notes/events/
-          files in one query, also bound to ⌘K). The bell shows unread
-          count badge + opens the inbox drawer. Notes is a quick jump
-          to /notes. */}
-      {/* Trio of header actions at 44×44 / r11 with a 16px icon, the
-          full Apple/Material minimum touch target. The audit flagged the
-          earlier 34–36px frames as sub-target; restored to 44 so search,
-          notifications, and notes are all comfortably tappable one-handed. */}
-      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-        <button
-          type="button"
-          aria-label="Search everything"
-          onClick={() => openSearch()}
-          className="fh-header-search-btn"
-          style={{
-            width: 44,
-            height: 44,
-            minWidth: 44,
-            borderRadius: 10,
-            background: 'var(--v3-glass-tint)',
-            border: '1px solid var(--v3-border-mid)',
-            backdropFilter: 'blur(8px)',
-            WebkitBackdropFilter: 'blur(8px)',
-            display: 'grid',
-            placeItems: 'center',
-            color: 'var(--ink-strong)',
-            cursor: 'pointer',
-            padding: 0,
-            transition: 'color 160ms ease, background 160ms ease, border-color 160ms ease'
-          }}
-        >
-          <Search size={16} />
+        <Monogram name={company} logoUrl={profile?.logo_url} size={40} />
+      </button>
+      <span className="fhs-header__company">{company || 'Fieldhorse'}</span>
+      <div className="fhs-header__actions">
+        <button type="button" className="fhs-icon-btn" aria-label="Search everything" onClick={openSearch}>
+          <Icon icon={Search} size={22} />
         </button>
         <NotificationsBell />
-        <button
-          type="button"
-          aria-label="Notes"
-          onClick={() => navigate('/notes')}
-          className="fh-header-notes-btn"
-          style={{
-            width: 44,
-            height: 44,
-            minWidth: 44,
-            borderRadius: 10,
-            background: 'var(--v3-glass-tint)',
-            border: '1px solid var(--v3-border-mid)',
-            backdropFilter: 'blur(8px)',
-            WebkitBackdropFilter: 'blur(8px)',
-            display: 'grid',
-            placeItems: 'center',
-            color: 'var(--ink-strong)',
-            cursor: 'pointer',
-            padding: 0,
-            transition: 'color 160ms ease, background 160ms ease, border-color 160ms ease'
-          }}
-        >
-          <NotebookPen size={16} />
-        </button>
       </div>
     </header>
-  )
-}
-
-function BrandSlot({ logoSrc, company, fullName }: any) {
-  // The logo URL that failed to load (expired signed URL, deleted object,
-  // offline cold start). While it is the current logo, the slot falls
-  // through to the company name, full name or wordmark below. Keyed by
-  // URL rather than a flag, so a new upload (a new logoSrc) is tried.
-  const [failedSrc, setFailedSrc] = useState<string | null>(null)
-  // Mobile-header-fix: the thin-ribbon trim left the wordmark visibly
-  // weak on iPhone, at clamp(12px, 2.6vw, 14px) on a 390px viewport the
-  // brand max'd at 14px and read as a faint placeholder. Bumped to
-  // clamp(15px, 4vw, 18px) so the contractor's name registers as
-  // immediate identification without taking over the header strip.
-  if (logoSrc && logoSrc !== failedSrc) {
-    // Not lazy loaded: the sticky header is always on screen.
-    return (
-      <img
-        src={logoSrc}
-        alt={company || 'Company logo'}
-        style={{
-          maxHeight: 'clamp(22px, 4.6vw, 30px)',
-          maxWidth: 'min(38vw, 200px)',
-          width: 'auto',
-          height: 'auto',
-          objectFit: 'contain',
-          display: 'block'
-        }}
-        onError={() => setFailedSrc(logoSrc)}
-      />
-    )
-  }
-  const fallbackTextStyle = {
-    fontFamily: 'var(--font-display)',
-    fontSize: 24,
-    fontWeight: 600,
-    letterSpacing: 0,
-    lineHeight: 1,
-    textTransform: 'uppercase',
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    maxWidth: 'min(56vw, 240px)'
-  }
-  if (company) {
-    return (
-      <span style={{ ...fallbackTextStyle, color: 'var(--ink-strong)' }}>
-        {company}
-      </span>
-    )
-  }
-  if (fullName) {
-    return (
-      <span style={{ ...fallbackTextStyle, color: 'var(--ink-strong)' }}>
-        {fullName}
-      </span>
-    )
-  }
-  // Final fallback, FIELDHORSE wordmark with the gold-split FIELD/HORSE.
-  return (
-    <span
-      style={{
-        fontFamily: 'var(--font-display)',
-        fontSize: 24,
-        fontWeight: 600,
-        letterSpacing: 0,
-        lineHeight: 1,
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 4
-      }}
-    >
-      <span style={{ color: 'var(--field-gold)' }}>FIELD</span>
-      <span style={{ color: 'var(--ink-strong)' }}>HORSE</span>
-    </span>
   )
 }

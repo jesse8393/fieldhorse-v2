@@ -1,120 +1,94 @@
-// DesktopSidebar, grouped nav for the Build dashboard direction.
+// DesktopSidebar, the onyx rail at 900px and up (spec 8.3).
 //
-// Mounted in AppShell at >=900px. Below 900px the sidebar is
-// display:none and the existing BottomNav remains the primary nav
-// surface (mobile experience untouched).
+// Top: the company monogram, name and city, then search with ⌘K.
+// Main list: Today, Schedule, Jobs, Money, Customers, Reports. A
+// collapsible Team and office group holds the rest, so every route the
+// role allows is in reach. Bottom: Settings, then the signed in person.
 //
-// Brand area: corrected FieldHorseMark emblem + wordmark.
-// Nav: four labeled groups, COMMAND / EXECUTION / INTELLIGENCE /
-// SETTINGS, routed to the closest existing app routes.
-// Foot: account email + sign out (preserved from the prior sidebar).
+// Mounted by AppShell only on desktop widths; global.css keeps
+// .fh-desktop-sidebar hidden below 900px.
 
+import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import {
-  PlayCircle,
-  Clock,
-  Briefcase,
-  LayoutDashboard,
-  Radio,
-  Sparkles,
-  Hammer,
-  Calendar,
-  FileSpreadsheet,
-  Receipt,
-  ClipboardCheck,
-  BarChart3,
-  TrendingUp,
-  LineChart,
-  Users,
-  UsersRound,
-  FileText,
-  Settings as SettingsIcon,
-  LogOut,
-} from 'lucide-react'
+import { ChevronDown, LogOut, Search } from 'lucide-react'
+import Icon from './fh/Icon.tsx'
+import Monogram, { initialsFor } from './fh/Monogram.tsx'
+import OrgSwitcher from './OrgSwitcher.tsx'
 import { useAuth } from '../contexts/AuthContext.tsx'
+import { useProfile } from '../contexts/ProfileContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { prefetchRoute } from '../lib/routePrefetch.ts'
-import OrgSwitcher from './OrgSwitcher.tsx'
+import { SETTINGS, SIDEBAR_MORE, SIDEBAR_PRIMARY, isActive, type NavItem } from '../lib/navItems.ts'
+import { useNavAccess } from '../lib/useNavAccess.ts'
+import { cityLine } from '../lib/companyLine.ts'
 
-type Item = {
-  label: string
-  to: string
-  Icon: any
-  // Optional custom match, returns true when this item should show
-  // as active for the given location pathname.
-  match?: (pathname: string) => boolean
+const MORE_KEY = 'fh:sidebar-more-open'
+
+function readMoreOpen(pathname: string) {
+  try {
+    const stored = localStorage.getItem(MORE_KEY)
+    if (stored === '1') return true
+    if (stored === '0') return false
+  } catch { /* private mode */ }
+  // Open by default when the current route lives in the group.
+  return SIDEBAR_MORE.some((g) => g.items.some((it) => isActive(it, pathname)))
 }
 
-type Group = { label: string; items: Item[] }
+function openPalette() {
+  window.dispatchEvent(new CustomEvent('fh:open-palette'))
+}
 
-const exact = (target: string) => (p: string) => p === target
-const prefix = (target: string) => (p: string) => p === target || p.startsWith(target + '/')
-
-// Solo mode IA (redesign W3). A one man company saw sixteen nav items,
-// half of them crew management for a crew that doesn't exist. The
-// sidebar now carries the solo backbone only; everything crew flavored
-// lives in a Team group that renders exclusively when the org has more
-// than one active member (membership.hasCrew). Sub Portal disappears
-// for role holders (it's the landing page for partner-only accounts).
-// Templates moved inside Settings where it already lives.
-type GateGroup = Group & { crewOnly?: boolean }
-
-const GROUPS: GateGroup[] = [
-  {
-    label: 'Today',
-    items: [
-      { label: 'Home',           to: '/',         Icon: LayoutDashboard, match: (p) => p === '/' || p === '/home' },
-    ],
-  },
-  {
-    label: 'Work',
-    items: [
-      // One list for the whole deal lifecycle, the detail routes
-      // (/leads/:id, /quotes/:id, /jobs/:id) still exist, so Work
-      // stays lit while any deal is open.
-      { label: 'Work & Deals',   to: '/work',     Icon: Hammer,          match: (p) => p === '/work' || p.startsWith('/leads') || p.startsWith('/quotes') || p.startsWith('/jobs') },
-      { label: 'Schedule',       to: '/schedule', Icon: Calendar,        match: prefix('/schedule') },
-      { label: 'Estimates',      to: '/bid',      Icon: FileSpreadsheet, match: prefix('/bid') },
-      { label: 'Forecast',       to: '/pour-window', Icon: LineChart,    match: prefix('/pour-window') },
-    ],
-  },
-  {
-    label: 'Get paid',
-    items: [
-      { label: 'Invoices',       to: '/invoices', Icon: Receipt,         match: prefix('/invoices') },
-      { label: 'Analytics',      to: '/analytics',Icon: TrendingUp,      match: prefix('/analytics') },
-    ],
-  },
-  {
-    label: 'Team',
-    crewOnly: true,
-    items: [
-      { label: 'Crew Home',      to: '/crew',     Icon: PlayCircle,      match: prefix('/crew') },
-      { label: 'Tasks',          to: '/tasks',    Icon: ClipboardCheck,  match: prefix('/tasks') },
-      { label: 'Timesheets',     to: '/timesheets', Icon: Clock,         match: prefix('/timesheets') },
-      { label: 'Team',           to: '/team',     Icon: UsersRound,      match: prefix('/team') },
-    ],
-  },
-  {
-    label: 'Office',
-    items: [
-      { label: 'Clients',        to: '/clients',  Icon: Users,           match: prefix('/clients') },
-      { label: 'Subs',           to: '/subs',     Icon: Hammer,          match: prefix('/subs') },
-      { label: 'Field Reports',  to: '/notes',    Icon: ClipboardCheck,  match: prefix('/notes') },
-      { label: 'Dispatch',       to: '/compose',  Icon: Radio,           match: prefix('/compose') },
-      { label: 'Sub Portal',     to: '/sub-portal', Icon: Briefcase,     match: prefix('/sub-portal') },
-      { label: 'Settings',       to: '/settings', Icon: SettingsIcon,    match: (p) => p === '/settings' },
-    ],
-  },
-]
+function SidebarLink({ item, pathname, onGo }: { item: NavItem; pathname: string; onGo: (to: string) => void }) {
+  const active = isActive(item, pathname)
+  return (
+    <li>
+      <button
+        type="button"
+        className={`fhs-side__link${active ? ' is-active' : ''}`}
+        aria-current={active ? 'page' : undefined}
+        // Hover intent warms the lazy route chunk.
+        onMouseEnter={() => prefetchRoute(item.to)}
+        onFocus={() => prefetchRoute(item.to)}
+        onClick={() => onGo(item.to)}
+      >
+        <Icon icon={item.icon} size={18} />
+        <span>{item.label}</span>
+      </button>
+    </li>
+  )
+}
 
 export default function DesktopSidebar() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const { signOut, user } = useAuth()
-  const { canViewRoute, role, loading: membershipLoading, hasCrew, isPartner, memberships } = useMembership()
+  const { profile } = useProfile()
+  const { memberships } = useMembership()
+  const { canSee, hasCrew } = useNavAccess()
+  const [moreOpen, setMoreOpen] = useState(() => readMoreOpen(pathname))
 
-  const userEmail = user?.email || ''
+  const company = profile?.company_name?.trim() || profile?.full_name?.trim() || 'Your workspace'
+  const city = cityLine(profile?.company_address)
+  const person = profile?.full_name?.trim() || user?.email || ''
+
+  const primary = SIDEBAR_PRIMARY.filter((it) => canSee(it.to))
+  const more = SIDEBAR_MORE
+    .filter((g) => !g.crewOnly || hasCrew)
+    .map((g) => ({ ...g, items: g.items.filter((it) => canSee(it.to)) }))
+    .filter((g) => g.items.length > 0)
+
+  function go(to: string) {
+    const [pathAndSearch, hash = ''] = to.split('#')
+    const [path, search = ''] = pathAndSearch.split('?')
+    navigate({ pathname: path, search: search ? `?${search}` : '', hash: hash ? `#${hash}` : '' })
+  }
+
+  function toggleMore() {
+    setMoreOpen((open) => {
+      try { localStorage.setItem(MORE_KEY, open ? '0' : '1') } catch { /* private mode */ }
+      return !open
+    })
+  }
 
   async function handleSignOut() {
     await signOut()
@@ -122,96 +96,47 @@ export default function DesktopSidebar() {
   }
 
   return (
-    <aside className="fh-desktop-sidebar" aria-label="Primary navigation">
-      <div className="fh-desktop-sidebar__brand fh-desktop-sidebar__brand--build">
-        <FieldHorseMark />
-        <div className="fh-desktop-sidebar__brand-text">
-          <span className="fh-desktop-sidebar__brand-name">FieldHorse</span>
-          <span className="fh-desktop-sidebar__brand-sub">Construction Command</span>
+    <aside className="fh-desktop-sidebar fhs-side fh-onyx-scope fh-grain" aria-label="Primary navigation">
+      <div className="fhs-side__brand">
+        <Monogram name={company} logoUrl={profile?.logo_url} size={40} />
+        <div className="fhs-side__brand-text">
+          <span className="fhs-side__company">{company}</span>
+          {city && <span className="fhs-side__city">{city}</span>}
         </div>
       </div>
 
-      <nav className="fh-desktop-sidebar__nav" aria-label="Primary">
-        {GROUPS.map((group, gi) => {
-          // Solo mode: the Team group only exists when the org has
-          // more than one active member. While membership is loading
-          // it stays hidden too, a solo owner's first paint should
-          // never flash crew nav that's about to disappear.
-          if (group.crewOnly && !hasCrew) return null
-          // Filter items by the caller's role. While membership is
-          // still resolving (role === null), show everything so the
-          // first paint doesn't hide owner nav, once the membership
-          // query settles, items the role can't reach disappear.
-          // Filter rules:
-          //   - membership still loading → show everything so the
-          //     first paint doesn't strip owner nav
-          //   - has a role → use canViewRoute (the role-aware gate);
-          //     Sub Portal is additionally hidden for role holders
-          //     (it's the landing surface for partner-only accounts)
-          //   - settled with NO role (sub-only / pre-onboarding) →
-          //     only show the Sub Portal so they don't bounce off
-          //     RLS errors on every owner screen
-          const visibleItems = group.items.filter((it) => {
-            const path = it.to.split('?')[0].split('#')[0]
-            if (membershipLoading) return path !== '/sub-portal'
-            if (role) {
-              // Role holders lose the Sub Portal entry UNLESS they also
-              // sub on someone else's jobs (accepted partnership).
-              if (path === '/sub-portal') return isPartner
-              return canViewRoute(path)
-            }
-            return path === '/sub-portal'
-          })
-          if (visibleItems.length === 0) return null
-          return (
-          <div key={group.label} className="fh-desktop-sidebar__group">
-            <span className="fh-desktop-sidebar__eyebrow fh-desktop-sidebar__eyebrow--build">
-              {group.label}
-            </span>
-            <ul className="fh-desktop-sidebar__list">
-              {visibleItems.map((it) => {
-                const active = it.match
-                  ? it.match(pathname)
-                  : pathname === it.to.split('?')[0]
-                const I = it.Icon
-                return (
-                  <li key={`${gi}-${it.label}`}>
-                    <button
-                      type="button"
-                      className={`fh-desktop-sidebar__link${active ? ' is-active' : ''}`}
-                      // Speed pass: hover intent warms the lazy route chunk
-                      // so first navigation skips the download+parse wait.
-                      onMouseEnter={() => prefetchRoute(it.to)}
-                      onFocus={() => prefetchRoute(it.to)}
-                      onClick={() => {
-                        // Split path/search/hash so React Router treats
-                        // each portion explicitly. Passing the raw
-                        // '/settings#templates' string was sending the
-                        // navigator to /settings%23templates, which then
-                        // fell through to the catch-all and bounced to
-                        // /. (Audit Jun 2026.)
-                        const raw = it.to
-                        const hashIdx = raw.indexOf('#')
-                        const beforeHash = hashIdx >= 0 ? raw.slice(0, hashIdx) : raw
-                        const hash = hashIdx >= 0 ? raw.slice(hashIdx) : ''
-                        const searchIdx = beforeHash.indexOf('?')
-                        const pathname = searchIdx >= 0 ? beforeHash.slice(0, searchIdx) : beforeHash
-                        const search = searchIdx >= 0 ? beforeHash.slice(searchIdx) : ''
-                        navigate({ pathname, search, hash })
-                      }}
-                    >
-                      <span className="fh-desktop-sidebar__link-icon" aria-hidden="true">
-                        <I size={15} />
-                      </span>
-                      <span className="fh-desktop-sidebar__link-label">{it.label}</span>
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
+      <button type="button" className="fhs-side__search" onClick={openPalette} aria-label="Search everything (⌘K)">
+        <Icon icon={Search} size={18} />
+        <span>Search</span>
+        <kbd className="fhs-side__kbd">⌘K</kbd>
+      </button>
+
+      <nav className="fhs-side__nav" aria-label="Primary">
+        <ul className="fhs-side__list">
+          {primary.map((it) => <SidebarLink key={it.to} item={it} pathname={pathname} onGo={go} />)}
+        </ul>
+
+        {more.length > 0 && (
+          <div className="fhs-side__more">
+            <button
+              type="button"
+              className="fhs-side__more-toggle"
+              aria-expanded={moreOpen}
+              aria-controls="fhs-side-more"
+              onClick={toggleMore}
+            >
+              <span>Team and office</span>
+              <Icon icon={ChevronDown} size={18} className={`fhs-side__chevron${moreOpen ? ' is-open' : ''}`} />
+            </button>
+            <div id="fhs-side-more" hidden={!moreOpen}>
+              {more.map((g) => (
+                <ul key={g.label} className="fhs-side__list fhs-side__list--more" aria-label={g.label}>
+                  {g.items.map((it) => <SidebarLink key={it.to} item={it} pathname={pathname} onGo={go} />)}
+                </ul>
+              ))}
+            </div>
           </div>
-          )
-        })}
+        )}
       </nav>
 
       {/* Renders only for people in more than one company. It lives here,
@@ -219,73 +144,28 @@ export default function DesktopSidebar() {
           someone who switches into a crew workspace must be able to switch
           back. */}
       {memberships.length > 1 && (
-        <div style={{ padding: '0 12px 12px' }}>
+        <div className="fhs-side__switcher">
           <OrgSwitcher />
         </div>
       )}
 
-      <div className="fh-desktop-sidebar__foot">
-        <div className="fh-desktop-sidebar__account">
-          <span className="fh-desktop-sidebar__account-eyebrow">Account</span>
-          {userEmail && (
-            <span className="fh-desktop-sidebar__account-email" title={userEmail}>
-              {userEmail}
-            </span>
-          )}
+      <div className="fhs-side__foot">
+        {canSee(SETTINGS.to) && (
+          <ul className="fhs-side__list">
+            <SidebarLink item={SETTINGS} pathname={pathname} onGo={go} />
+          </ul>
+        )}
+        <div className="fhs-side__person">
+          <span className="fhs-side__avatar" aria-hidden="true">{initialsFor(person)}</span>
+          <div className="fhs-side__person-text">
+            <span className="fhs-side__person-name" title={person}>{person}</span>
+            {profile?.full_name && user?.email && <span className="fhs-side__person-email" title={user.email}>{user.email}</span>}
+          </div>
+          <button type="button" className="fhs-icon-btn fhs-icon-btn--small" onClick={handleSignOut} aria-label="Sign out" title="Sign out">
+            <Icon icon={LogOut} size={18} />
+          </button>
         </div>
-        <button
-          type="button"
-          className="fh-desktop-sidebar__icon-btn"
-          onClick={handleSignOut}
-          aria-label="Sign out"
-          title="Sign out"
-        >
-          <LogOut size={14} />
-        </button>
       </div>
     </aside>
-  )
-}
-
-function FieldHorseMark() {
-  // F + H rendered as non-overlapping rects so the F middle bar can't
-  // be visually clipped by an H/mask paint order. Coordinates centered
-  // in the 72x72 viewBox with a 4px gap between the two letters.
-  return (
-    <div className="fh-mark" aria-label="FieldHorse">
-      <svg
-        className="fh-mark__svg"
-        viewBox="0 0 72 72"
-        role="img"
-        aria-hidden="true"
-      >
-        <defs>
-          <linearGradient id="fhOrange" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#C9963A" />
-            <stop offset="100%" stopColor="#C9963A" />
-          </linearGradient>
-        </defs>
-
-        <rect
-          x="2"
-          y="2"
-          width="68"
-          height="68"
-          rx="16"
-          fill="#141414"
-          stroke="var(--v3-border-mid)"
-        />
-
-        {/* F, white. Stem + top bar + middle bar, no overlap with H. */}
-        <rect x="12" y="14" width="8"  height="44" fill="#F2EDE4" />
-        <rect x="12" y="14" width="22" height="8"  fill="#F2EDE4" />
-        <rect x="12" y="30" width="18" height="8"  fill="#F2EDE4" />
-
-        {/* H, orange gradient. Left stem + right stem + crossbar. */}
-        <rect x="38" y="14" width="8"  height="44" fill="url(#fhOrange)" />
-        <rect x="52" y="14" width="8"  height="44" fill="url(#fhOrange)" />
-        <rect x="38" y="30" width="22" height="8"  fill="url(#fhOrange)" />
-      </svg>
-    </div>
   )
 }

@@ -179,10 +179,13 @@
   --space-8: 48px;
 
   /* Mobile chrome geometry. The dock is a 64px capsule floating
-     max(12px, safe area) above the bottom edge; this is the space a
-     floating control or the page end needs to clear it. */
+     max(12px, safe area) above the bottom edge, and its Capture coin
+     rises 25px above the capsule (20px plus its 5px ring). This is the
+     space a floating control or the page end needs, before its own
+     16px of air: 64 + 25 for the coin, rounded up to 84 so full width
+     bars sit 11px clear of the coin. */
   --fh-dock-gap: max(12px, env(safe-area-inset-bottom, 0px));
-  --fh-mobile-dock-height: calc(72px + max(12px, env(safe-area-inset-bottom, 0px)));
+  --fh-mobile-dock-height: calc(84px + max(12px, env(safe-area-inset-bottom, 0px)));
 
   /* Motion */
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
