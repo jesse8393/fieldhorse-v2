@@ -2,7 +2,8 @@ import { createPortal } from 'react-dom'
 import { Link, useLocation } from 'react-router-dom'
 import { Moon, Plus } from 'lucide-react'
 import Icon from './Icon.tsx'
-import { DOCK_LEFT, DOCK_RIGHT, TODAY, isActive, type NavItem } from '../../lib/navItems.ts'
+import { DOCK_LEFT, INBOX, TODAY, dockRight, isActive, type NavItem } from '../../lib/navItems.ts'
+import { useEngineEnabled } from '../../lib/inbox.ts'
 import { useNavAccess } from '../../lib/useNavAccess.ts'
 import { useDockHidden } from '../../lib/dockVisibility.ts'
 import { useKeyboardOpen } from '../../lib/useKeyboardOpen.ts'
@@ -12,8 +13,10 @@ import { prefetchRoute } from '../../lib/routePrefetch.ts'
 import { openCapture } from '../../lib/captureAttach.ts'
 
 // The phone dock (spec 8.1): a floating onyx capsule with Today, Jobs,
-// the brushed gold Capture coin, Money and Schedule. Items follow the
-// role filter and the coin stays centered on whatever remains. Hidden
+// the brushed gold Capture coin, Money and Schedule. The fifth slot is
+// Inbox instead of Schedule once the company's messaging engine is on and
+// the role may open it (decision D9). Items follow the role filter and the
+// coin stays centered on whatever remains. Hidden
 // at desktop widths (the sidebar takes over), while the keyboard is
 // open, and on screens that carry their own action capsule.
 //
@@ -45,11 +48,13 @@ export default function Dock() {
   const { theme } = useTheme()
   const hiddenByScreen = useDockHidden()
   const keyboardOpen = useKeyboardOpen()
+  const engineEnabled = useEngineEnabled()
 
   if (typeof document === 'undefined') return null
 
   const left = DOCK_LEFT.filter((it) => canSee(it.to))
-  const right = DOCK_RIGHT.filter((it) => canSee(it.to))
+  // A role that cannot open the Inbox keeps Schedule in the fifth slot.
+  const right = dockRight(engineEnabled && canSee(INBOX.to)).filter((it) => canSee(it.to))
   const hidden = hiddenByScreen || keyboardOpen
   const night = theme === 'dark'
 

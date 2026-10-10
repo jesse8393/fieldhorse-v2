@@ -85,6 +85,8 @@ export const canDoFieldWork     = (r: MaybeRole) =>
  */
 export function canViewRoute(role: MaybeRole, route: string): boolean {
   if (!role) return false
+  // An open conversation (/inbox/:id) follows the Inbox itself.
+  if (route.startsWith('/inbox/')) return canSeeFinancials(role)
   switch (route) {
     case '/':               return true                            // home redirects foreman/crew to /crew (handled in screen)
     case '/crew':           return canDoFieldWork(role)            // everyone with a role; crew/foreman LAND here
@@ -99,6 +101,7 @@ export function canViewRoute(role: MaybeRole, route: string): boolean {
     case '/activity':       return true                            // notifications hub
     case '/bid':            return canCreateFinancialDocs(role)    // estimate builder
     case '/compose':        return canSeeFinancials(role)          // client comms
+    case '/inbox':          return canSeeFinancials(role)          // client comms: owner, admin, manager. Field roles never see customer messages.
     case '/analytics':      return canSeeFinancials(role)
     case '/import':         return isOwnerOrAdmin(role)
     case '/settings':       return isOwnerOrAdmin(role)

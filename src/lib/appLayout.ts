@@ -10,6 +10,7 @@ const RESPONSIVE_ROUTES = new Set([
   '/clients',
   '/schedule',
   '/compose',
+  '/inbox',
   '/bid',
   '/invoices',
   '/analytics',
@@ -35,6 +36,7 @@ const RESPONSIVE_PREFIXES = [
   '/clients/',
   '/subs/',
   '/invoices/',
+  '/inbox/',
 ]
 
 /**
