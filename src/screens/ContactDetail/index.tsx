@@ -852,11 +852,16 @@ export default function ContactDetail() {
           {tabPanels}
         </div>
 
-        <JobActionCapsule
-          action={stageCta}
-          onPhotos={(files) => { setPendingPhotos(files); openSection('files') }}
-          onVoice={() => openCapture({ jobId: contact.id })}
-        />
+        {/* The Quote tab brings its own capsule (the total variant, from
+            phone/QuotePhone.tsx), so this one steps aside there. Every
+            other tab keeps the actions capsule. */}
+        {tab !== 'quote' && (
+          <JobActionCapsule
+            action={stageCta}
+            onPhotos={(files) => { setPendingPhotos(files); openSection('files') }}
+            onVoice={() => openCapture({ jobId: contact.id })}
+          />
+        )}
 
         <JobMoreSheet
           open={moreOpen}

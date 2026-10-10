@@ -161,15 +161,20 @@ const BUSINESS_WORDS = new Set([
 const NAME_WORD = /^[A-Z][a-z]*(?:[A-Z][a-z]+)?(?:['’-][A-Z]?[a-z]+)*$/
 
 /**
- * "Preview as Taylor" for a person, the whole name for a company, and
- * "Preview as customer" when there is no name or it is too long to fit.
+ * What to call the customer: the first name of a person, the whole name of
+ * a company, and "customer" when there is no name or it is too long to fit.
  */
-export function previewAsLabel(clientName: string | null | undefined): string {
+export function previewAsName(clientName: string | null | undefined): string {
   const name = String(clientName ?? '').trim().replace(/\s+/g, ' ')
-  if (!name) return 'Preview as customer'
+  if (!name) return 'customer'
   const words = name.split(' ')
   const personLike = words.length <= 3
     && words.every((w) => NAME_WORD.test(w) && !BUSINESS_WORDS.has(w.toLowerCase()))
-  if (personLike) return `Preview as ${words[0]}`
-  return name.length <= 22 ? `Preview as ${name}` : 'Preview as customer'
+  if (personLike) return words[0]
+  return name.length <= 22 ? name : 'customer'
+}
+
+/** "Preview as Taylor", "Preview as MMC Properties" or "Preview as customer". */
+export function previewAsLabel(clientName: string | null | undefined): string {
+  return `Preview as ${previewAsName(clientName)}`
 }

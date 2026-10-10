@@ -456,7 +456,15 @@ test('keeps customer quote change requests in the workflow', async ({ page }, te
   await capture(page, testInfo, 'quote-change-requested-customer', true)
 
   await openRoute(page, '/quotes/c-change?tab=quote')
-  await expect(page.getByRole('button', { name: 'Review changes' }).first()).toBeVisible()
+  if (testInfo.project.name.startsWith('mobile')) {
+    // The phone's Quote tab is the editor itself (tests/e2e/quote.spec.ts):
+    // the request sits in a panel at the top and the capsule carries the
+    // send. "Review changes" stays the stage action on the other tabs.
+    await expect(page.getByRole('region', { name: 'Customer requested changes' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Send for approval' })).toBeVisible()
+  } else {
+    await expect(page.getByRole('button', { name: 'Review changes' }).first()).toBeVisible()
+  }
   await expect(page.getByText('Please separate the cabinet allowance.', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: /approve quote/i })).toHaveCount(0)
   await capture(page, testInfo, 'quote-change-requested-operator', true)

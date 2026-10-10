@@ -533,6 +533,74 @@
   padding: 0 16px;
 }
 
+/* The Quote tab's variant (spec 9.6): the total on the left, the one gold
+   "Send for approval" on the right with a hint under it when it is
+   disabled or shares a link, and the deposit line across the bottom. */
+.fhj-capsule--total {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 164px;
+  grid-template-areas:
+    'sum send'
+    'note note';
+  align-items: center;
+  gap: 4px 12px;
+  padding: 16px;
+}
+
+.fhj-capsule__sum {
+  grid-area: sum;
+  min-width: 0;
+  display: grid;
+  align-content: center;
+}
+
+.fhj-capsule__label {
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--fh-smoke);
+}
+
+.fhj-capsule__amount {
+  font-family: var(--fh-font-display);
+  font-size: 30px;
+  line-height: 32px;
+  font-weight: 600;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--fh-linen);
+  white-space: nowrap;
+}
+
+.fhj-capsule__note {
+  grid-area: note;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 400;
+  color: var(--fh-smoke);
+}
+
+.fhj-capsule__send {
+  grid-area: send;
+  display: grid;
+  gap: 4px;
+  align-content: center;
+}
+
+.fhj-capsule--total .fhc-btn.fhj-capsule__primary {
+  flex: none;
+  width: 100%;
+  padding: 0 12px;
+}
+
+.fhj-capsule__hint {
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--fh-smoke);
+  text-align: center;
+}
+
 @media (min-width: 900px) {
   .fhj-capsule {
     display: none;
