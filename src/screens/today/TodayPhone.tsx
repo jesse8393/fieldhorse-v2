@@ -382,7 +382,7 @@ export default function TodayPhone({
   )
 
   const answersSection = view.answersTotal > 0 && (
-    <section className="fht-section" aria-labelledby="fht-answers">
+    <section className="fht-section fht-section--answers" aria-labelledby="fht-answers">
       <SectionHead id="fht-answers" title="Needs an answer" end={<span className="fht-head__count">{view.answersTotal}</span>} />
       <ul className="fht-list">
         {answers.map((action) => {

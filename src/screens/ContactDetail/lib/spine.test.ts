@@ -150,6 +150,16 @@ describe('buildSpine', () => {
     expect(byTitle['Beyond a week'].day).toBe('Sep 30')
   })
 
+  it('calls a visit on the schedule for the next day tomorrow', () => {
+    const items = buildSpine({
+      events: [note('t', at(9, 11, 9, 0), 'Final slab inspection')],
+      photos: [],
+      inspections: [],
+      now: NOW
+    })
+    expect(items[0]).toMatchObject({ time: '9:00', day: 'tomorrow' })
+  })
+
   it('never writes a dash in titles it makes itself, and leaves typed note text untouched', () => {
     const events = composeActivityEvents({
       contact: { id: 'c1', created_at: at(8, 1, 9, 0).toISOString(), stage: 'job', quote_sent_at: at(8, 10, 9, 0).toISOString(), quote_expires_at: at(9, 10, 9, 0).toISOString() },

@@ -623,12 +623,12 @@ export default function CaptureSheet() {
             )}
 
             <div className="fh-capture__actions">
-              <Button type="submit" variant="primary" size="lg" block loading={saving}>
+              <Button type="submit" variant="primary" size="md" block loading={saving}>
                 Save
               </Button>
               <Button
                 variant="secondary"
-                size="lg"
+                size="md"
                 block
                 aria-expanded={editing}
                 aria-controls={editing ? `${ids}-fields` : undefined}

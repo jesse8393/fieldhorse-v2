@@ -77,10 +77,11 @@ export function spineTime(at: Date): string {
   return `${h}:${String(at.getMinutes()).padStart(2, '0')}`
 }
 
-/** "today", "Wed" inside a week either side, otherwise "Sep 30". */
+/** "today", "tomorrow", "Wed" inside a week either side, otherwise "Sep 30". */
 export function spineDay(at: Date, now: Date): string {
   const days = Math.round((startOfDay(at).getTime() - startOfDay(now).getTime()) / DAY_MS)
   if (days === 0) return 'today'
+  if (days === 1) return 'tomorrow'
   if (Math.abs(days) < 7) return WEEKDAYS[at.getDay()]
   const date = `${MONTHS[at.getMonth()]} ${at.getDate()}`
   return at.getFullYear() === now.getFullYear() ? date : `${date}, ${at.getFullYear()}`

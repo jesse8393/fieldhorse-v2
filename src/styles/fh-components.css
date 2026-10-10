@@ -691,7 +691,9 @@
   gap: 12px;
   min-height: 64px;
   margin: 0 -12px;
-  padding: 12px;
+  /* Two lines of text plus this padding come to just under the 64 px
+     minimum, so a two line row is 64 tall, the density of the renders. */
+  padding: 8px 12px;
   border: 0;
   border-radius: var(--fhc-radius);
   box-sizing: border-box;

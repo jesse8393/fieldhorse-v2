@@ -103,6 +103,22 @@
   line-height: 20px;
 }
 
+/* With the card in place, the gold hairline sits just above it, as in
+   the render, instead of at the stage's very bottom where the card would
+   hide all but its two ends. */
+.fht.has-card .fht-stage.fhc-stage--hairline {
+  border-bottom-color: transparent;
+  background-image: linear-gradient(var(--fh-gold-line), var(--fh-gold-line));
+  background-size: 100% 1px;
+  background-position: 0 calc(100% - 68px);
+  background-repeat: no-repeat;
+}
+
+/* Answers read as questions, not names: medium weight, as rendered. */
+.fht .fht-section--answers .fhc-row__title {
+  font-weight: 500;
+}
+
 /* ---- Next stop card, overlapping the stage edge ---- */
 
 .fht-card {
