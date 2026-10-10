@@ -1,18 +1,11 @@
 // The redesigned shell (docs/design/2026-10-redesign/SPEC.md, sections
 // 8 and 10): the phone dock, the workspace menu behind the header
 // monogram, the desktop sidebar and the Day, Night and Auto modes.
-import { expect, test, type BrowserContext, type Page } from '@playwright/test'
-import { installMock, session } from '../../scripts/qa-mock.mjs'
+import { expect, test, type Page } from '@playwright/test'
+import { signIn as signInWith } from './helpers/signIn.ts'
 
-async function signIn(context: BrowserContext, mode: 'auto' | 'day' | 'night' = 'day') {
-  await installMock(context, { supabaseHosts: ['qa-mock.supabase.co', 'pnmhblvslftdzfcdezbw.supabase.co'] })
-  await context.addInitScript(([savedSession, themeMode]) => {
-    localStorage.setItem('sb-qa-mock-auth-token', JSON.stringify(savedSession))
-    localStorage.setItem('sb-pnmhblvslftdzfcdezbw-auth-token', JSON.stringify(savedSession))
-    // Seed the mode once; a reload keeps whatever the test switched to.
-    if (!localStorage.getItem('fh:theme-mode')) localStorage.setItem('fh:theme-mode', themeMode)
-    localStorage.setItem('fh-onboarding-seen', '1')
-  }, [session, mode] as const)
+function signIn(context: Parameters<typeof signInWith>[0], mode: 'auto' | 'day' | 'night' = 'day') {
+  return signInWith(context, { mode })
 }
 
 async function open(page: Page, path: string) {

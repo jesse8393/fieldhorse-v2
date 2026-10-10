@@ -79,11 +79,11 @@ function applyFilters(rows, url) {
   return out
 }
 
-function restResponse(url, headers) {
+function restResponse(url, headers, tables = TABLES) {
   const path = new URL(url).pathname
   const table = path.split('/rest/v1/')[1]?.split('?')[0] || ''
   if (path.includes('/rpc/')) return { status: 200, body: JSON.stringify([]) }
-  const rows = applyFilters(TABLES[table] ?? [], url)
+  const rows = applyFilters(tables[table] ?? [], url)
   const wantsObject = (headers['accept'] || '').includes('vnd.pgrst.object')
   if (wantsObject) {
     if (rows.length === 0) return { status: 406, body: JSON.stringify({ message: 'no rows' }) }
@@ -99,8 +99,23 @@ export const session = {
 }
 
 
+// Per context table set. options.tables replaces whole tables for this
+// browser context only (rows get org-1 like the defaults), and
+// options.role overrides the org_members role instead of the QA_ROLE
+// env var. Callers that pass neither get the shared defaults unchanged.
+function tablesFor(options) {
+  if (!options.tables && !options.role) return TABLES
+  const tables = { ...TABLES }
+  for (const [name, rows] of Object.entries(options.tables || {})) {
+    tables[name] = (rows || []).map((row) => ({ org_id: 'org-1', ...row }))
+  }
+  if (options.role) tables.org_members = tables.org_members.map((m) => ({ ...m, role: options.role }))
+  return tables
+}
+
 export async function installMock(ctx, options = {}) {
   const supabaseHosts = new Set(options.supabaseHosts || ['qa-mock.supabase.co'])
+  const tables = tablesFor(options)
   await ctx.route((u) => supabaseHosts.has(u.hostname), async (route) => {
     const req = route.request()
     const url = req.url()
@@ -110,7 +125,7 @@ export async function installMock(ctx, options = {}) {
     if (url.includes('/realtime/')) return route.abort()
     if (url.includes('/storage/')) return route.fulfill({ status: 404, body: '' })
     if (url.includes('/rest/v1/')) {
-      const r = restResponse(url, req.headers())
+      const r = restResponse(url, req.headers(), tables)
       return route.fulfill({ status: r.status, contentType: 'application/json', body: r.body, headers: { 'content-range': '0-9/10' } })
     }
     return route.fulfill({ status: 200, body: '{}' })
