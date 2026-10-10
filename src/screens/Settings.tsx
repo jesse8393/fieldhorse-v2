@@ -1270,6 +1270,12 @@ const COLOR_PRESETS = [
   { hex: '#141414', name: 'Onyx' }
 ]
 
+// The database check on profiles.estimate_template (migration 031) only allows
+// the first four keys, so saving 'fieldhorse' would fail the whole Settings
+// save. The Fieldhorse choice stays hidden until a migration adds the key,
+// then this flag turns to true (D22 in the redesign spec).
+const FIELDHORSE_TEMPLATE_SAVES = false
+
 const ESTIMATE_TEMPLATES = [
   { key: 'classic',   name: 'Classic',   blurb: 'Editorial dark accent layout grouped by trade.', swatch: ['#141414', '#C9963A', '#F2EDE4'] },
   { key: 'slate',     name: 'Slate',     blurb: 'Gray header bar, From/For blocks, itemized rows.', swatch: ['#5C5C5C', '#F2EDE4', '#F2EDE4'] },
@@ -1280,9 +1286,10 @@ const ESTIMATE_TEMPLATES = [
 
 function EstimateTemplatePicker({ value, onChange }: any) {
   const selected = value || 'classic'
+  const choices = ESTIMATE_TEMPLATES.filter((t) => t.key !== 'fieldhorse' || FIELDHORSE_TEMPLATE_SAVES || selected === 'fieldhorse')
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12 }}>
-      {ESTIMATE_TEMPLATES.map((t) => {
+      {choices.map((t) => {
         const on = selected === t.key
         return (
           <button

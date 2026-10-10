@@ -62,9 +62,9 @@ Status is one of todo, done, blocked, skipped.
 | 4 | 4.5 Desktop Today (stretch) | todo | | agent running |
 | 4 | 4.6 Desktop Money (stretch) | todo | | agent running |
 | 4 | 4.7 Phase 4 review and pull request | todo | | #219 opened as a draft with 4.1 to 4.4, images in phase4-review; stretch tasks 4.5 and 4.6 are in progress |
-| 5 | 5.1 Portal view model | todo | | |
-| 5 | 5.2 Fieldhorse proposal theme | todo | | |
-| 5 | 5.3 Welcome and Login | todo | | |
+| 5 | 5.1 Portal view model | done | c6f44a0 | |
+| 5 | 5.2 Fieldhorse proposal theme | done | 17b7d31 | Settings choice hidden until a migration allows it (D22) |
+| 5 | 5.3 Welcome and Login | done | fd12c62 | |
 | 5 | 5.4 Phase 5 review and pull request | todo | | |
 | 6 | 6.1 Inbox data and engine switch | todo | | |
 | 6 | 6.2 Inbox list | todo | | |
