@@ -112,3 +112,31 @@ test.describe('desktop shell', () => {
     await expect(page).toHaveURL(/\/subs/)
   })
 })
+
+// The component sheet at /design exists in development builds (the e2e
+// server is one). It must render every component without errors or
+// sideways scroll. Screenshot baselines are opt in (FH_VISUAL=1) because
+// font rendering differs between machines; refresh them with
+// FH_VISUAL=1 npx playwright test redesign-shell --update-snapshots.
+test.describe('component sheet', () => {
+  for (const width of [390, 1440]) {
+    test(`renders every component at ${width} px`, async ({ page }, testInfo) => {
+      test.skip(testInfo.project.name !== 'desktop-chrome', 'One browser is enough for the sheet')
+      const errors: string[] = []
+      page.on('pageerror', (e) => errors.push(String(e)))
+      await page.setViewportSize({ width, height: 900 })
+      await page.goto('/design', { waitUntil: 'domcontentloaded' })
+      await expect(page.getByRole('heading', { name: 'Component sheet' })).toBeVisible({ timeout: 30_000 })
+      for (const name of ['Day', 'Night']) {
+        await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
+      }
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+      expect(overflow).toBeLessThanOrEqual(0)
+      expect(errors).toEqual([])
+      if (process.env.FH_VISUAL === '1') {
+        await page.evaluate(() => document.fonts.ready)
+        await expect(page).toHaveScreenshot(`design-sheet-${width}.png`, { fullPage: true, maxDiffPixelRatio: 0.01, animations: 'disabled' })
+      }
+    })
+  }
+})
