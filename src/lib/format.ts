@@ -58,6 +58,20 @@ export function moneyExact(n: number | string | null | undefined): string {
 // Compact K-notation for list cards ($24.4K / $135K / $840). Extracted
 // from Work + DetailListRail (audit: third hand-rolled copy). Millions
 // read "$1.2M" instead of running on as "$1200K".
+// Money with cents, as the redesign always shows it (spec 5.6):
+// "$12,375.00", never "$12,375" or "$12.4k". Same locale and sign handling
+// as moneyExact ("-$1,200.00", never "$-1,200.00").
+export function moneyCents(n: number | string | null | undefined): string {
+  const v = Number(n ?? 0)
+  const value = Number.isFinite(v) ? v : 0
+  return value.toLocaleString(undefined, {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })
+}
+
 export function moneyK(n: number | string | null | undefined): string | null {
   const v = toNumber(n)
   if (!v) return null

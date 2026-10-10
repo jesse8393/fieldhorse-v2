@@ -1,4 +1,1937 @@
 /*
  * Redesign component styles (src/components/fh). Class prefix fhc-.
  * Spec: docs/design/2026-10-redesign/SPEC.md, section 7. Reads only --fh- tokens.
+ *
+ * Every rule reads --fh- tokens (or the motion tokens --ease, --ease-out,
+ * --ease-mechanical and --dur-*), so a component flips between Day and
+ * Night with [data-theme='dark'] on any ancestor, and turns to linen text
+ * and a linen focus ring inside .fh-onyx-scope.
+ *
+ * Motion moves transform and opacity only, and falls back to fades or
+ * stillness under prefers-reduced-motion.
+ *
+ * Local custom properties (--fhc-*) only ever hold values derived from
+ * the tokens, plus two geometry constants:
+ *   --fhc-radius  each control's corner radius, restated on focus because
+ *                 global.css gives every focused control a 10 px radius;
+ *   --fhc-bezel   the 6 px of paper around a hero card, the "double
+ *                 bezel" of spec 5.7 ("5 to 6 px padding around a hero
+ *                 card"). It sits between the 4 and 8 px steps of the
+ *                 spacing scale on purpose.
  */
+
+/* ================================================================
+   Shared
+   ================================================================ */
+
+.fhc-vh {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Focus (spec 12): 2 px --fh-focus, which .fh-onyx-scope turns linen.
+   global.css forces a muted outline color and a 10 px radius on every
+   focused control with !important; these selectors outrank it. */
+.fhc-btn:focus-visible,
+.fhc-iconbtn:focus-visible,
+.fhc-row__main.is-interactive:focus-visible,
+.fhc-field__control:focus-visible {
+  outline: 2px solid var(--fh-focus) !important;
+  outline-color: var(--fh-focus) !important;
+  outline-offset: 2px;
+  border-radius: var(--fhc-radius);
+}
+
+@keyframes fhc-shimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+@keyframes fhc-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@keyframes fhc-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fhc-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* ================================================================
+   Button
+   ================================================================ */
+
+.fhc-btn {
+  --fhc-radius: 12px;
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  height: 48px;
+  margin: 0;
+  padding: 0 20px;
+  border: 0;
+  border-radius: var(--fhc-radius);
+  box-sizing: border-box;
+  background: transparent;
+  color: var(--fh-ink);
+  font-family: var(--fh-font-body);
+  font-size: 16px;
+  line-height: 20px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  vertical-align: middle;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: transform var(--dur-instant) var(--ease-mechanical);
+}
+
+.fhc-btn__label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.fhc-btn__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* State layer: a wash of the label color, so hover and press darken on
+   light buttons and lighten on onyx. */
+.fhc-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: currentColor;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.fhc-btn:hover::after { opacity: 0.06; }
+.fhc-btn:active::after { opacity: 0.12; }
+.fhc-btn:active { transform: translateY(1px); }
+
+/* Sizes */
+.fhc-btn--lg {
+  --fhc-radius: 14px;
+  height: 56px;
+  padding: 0 24px;
+  font-family: var(--fh-font-display);
+  font-size: 20px;
+  line-height: 24px;
+}
+
+.fhc-btn--md {
+  --fhc-radius: 12px;
+  height: 48px;
+}
+
+.fhc-btn--mini {
+  --fhc-radius: 12px;
+  height: 36px;
+  min-width: 44px;
+  padding: 0 12px;
+  font-size: 14px;
+  line-height: 18px;
+}
+
+/* 36 tall, 44 to the finger (spec 5.7). */
+.fhc-btn--mini::before {
+  content: '';
+  position: absolute;
+  inset: -4px 0;
+}
+
+.fhc-btn--block {
+  display: flex;
+  width: 100%;
+}
+
+/* Variants */
+.fhc-btn--primary {
+  background: var(--fh-gold-brushed);
+  box-shadow: var(--fh-gold-edge), 0 8px 16px -10px rgba(80, 52, 12, 0.6);
+  color: var(--fh-on-gold);
+}
+
+.fhc-btn--secondary {
+  background: var(--fh-paper);
+  box-shadow: inset 0 0 0 1px var(--fh-edge);
+  color: var(--fh-ink);
+}
+
+.fhc-btn--quiet {
+  background: transparent;
+  color: var(--fh-ink);
+}
+
+.fhc-btn--quiet.fhc-btn--md,
+.fhc-btn--quiet.fhc-btn--lg {
+  padding: 0 16px;
+}
+
+.fhc-btn--destructive {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fh-danger) 42%, transparent);
+  color: var(--fh-danger-ink);
+}
+
+/* On onyx: outlined linen, as on the Welcome screen and photo cards. */
+.fh-onyx-scope .fhc-btn--secondary {
+  background: rgba(22, 20, 15, 0.35);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fh-linen) 40%, transparent);
+  color: var(--fh-linen);
+}
+
+.fh-onyx-scope .fhc-btn--destructive {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fh-danger) 60%, transparent);
+  color: color-mix(in srgb, var(--fh-danger) 50%, var(--fh-linen));
+}
+
+/* Disabled */
+.fhc-btn:disabled,
+.fhc-btn.is-disabled {
+  cursor: not-allowed;
+  background: var(--fh-tray);
+  box-shadow: inset 0 0 0 1px var(--fh-hairline);
+  color: var(--fh-ink-3);
+}
+
+.fhc-btn--quiet:disabled,
+.fhc-btn--quiet.is-disabled {
+  background: transparent;
+  box-shadow: none;
+}
+
+.fh-onyx-scope .fhc-btn:disabled,
+.fh-onyx-scope .fhc-btn.is-disabled {
+  background: var(--fh-onyx-2);
+  box-shadow: inset 0 0 0 1px var(--fh-hairline);
+  color: var(--fh-ink-3);
+}
+
+.fh-onyx-scope .fhc-btn--quiet:disabled,
+.fh-onyx-scope .fhc-btn--quiet.is-disabled {
+  background: transparent;
+  box-shadow: none;
+}
+
+.fhc-btn:disabled::after,
+.fhc-btn.is-disabled::after,
+.fhc-btn.is-loading::after {
+  opacity: 0;
+}
+
+.fhc-btn:disabled:active,
+.fhc-btn.is-disabled:active,
+.fhc-btn.is-loading:active {
+  transform: none;
+}
+
+/* Loading: a skeleton bar where the label was. The label stays in the
+   layout (and in the accessible name) so the width never changes. */
+.fhc-btn.is-loading {
+  cursor: progress;
+}
+
+.fhc-btn.is-loading .fhc-btn__label {
+  opacity: 0;
+}
+
+.fhc-btn__skel {
+  --fhc-shine: color-mix(in srgb, var(--fh-paper) 70%, transparent);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(56%, 112px);
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 18%, transparent);
+  transform: translate(-50%, -50%);
+}
+
+.fhc-btn--lg .fhc-btn__skel {
+  height: 10px;
+}
+
+.fhc-btn--primary .fhc-btn__skel {
+  --fhc-shine: rgba(255, 244, 214, 0.65);
+}
+
+/* ================================================================
+   IconButton
+   ================================================================ */
+
+.fhc-iconbtn {
+  --fhc-radius: 999px;
+  position: relative;
+  isolation: isolate;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 48px;
+  height: 48px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--fhc-radius);
+  box-sizing: border-box;
+  background: transparent;
+  color: var(--fh-ink);
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: transform var(--dur-instant) var(--ease-mechanical);
+}
+
+.fhc-iconbtn--44 {
+  width: 44px;
+  height: 44px;
+}
+
+.fhc-iconbtn--square {
+  --fhc-radius: 12px;
+}
+
+.fhc-iconbtn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: currentColor;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.fhc-iconbtn:hover::after { opacity: 0.06; }
+.fhc-iconbtn:active::after { opacity: 0.12; }
+.fhc-iconbtn:active { transform: translateY(1px); }
+
+.fhc-iconbtn--paper {
+  background: var(--fh-paper);
+  box-shadow: inset 0 0 0 1px var(--fh-hairline);
+}
+
+/* A raised dark disc on onyx (spec 5.3, onyx 2). */
+.fh-onyx-scope .fhc-iconbtn--paper {
+  background: var(--fh-onyx-2);
+}
+
+/* Translucent dark over a photo (g-job back and more buttons). Always
+   linen, with the onyx focus ring, wherever it sits. */
+.fhc-iconbtn--onyx {
+  --fh-focus: var(--fh-focus-on-onyx);
+  background: rgba(22, 20, 15, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(242, 237, 228, 0.16);
+  color: var(--fh-linen);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  backdrop-filter: blur(12px) saturate(1.2);
+}
+
+.fhc-iconbtn:disabled {
+  cursor: not-allowed;
+  color: var(--fh-ink-4);
+}
+
+.fhc-iconbtn--onyx:disabled {
+  color: var(--fh-smoke);
+}
+
+.fhc-iconbtn:disabled::after { opacity: 0; }
+.fhc-iconbtn:disabled:active { transform: none; }
+
+/* ================================================================
+   Field
+   ================================================================ */
+
+.fhc-field {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.fhc-field__label {
+  font-family: var(--fh-font-body);
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--fh-ink-2);
+}
+
+.fhc-field__control {
+  --fhc-radius: 12px;
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  margin: 0;
+  padding: 12px 16px;
+  border: 1px solid var(--fh-edge-strong);
+  border-radius: var(--fhc-radius);
+  box-sizing: border-box;
+  background: var(--fh-paper);
+  color: var(--fh-ink);
+  font-family: var(--fh-font-body);
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 400;
+  letter-spacing: 0;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.fhc-field__control::placeholder {
+  color: var(--fh-ink-3);
+  opacity: 1;
+}
+
+.fhc-field__control--multiline {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.fhc-field__control:focus-visible {
+  border-color: var(--fh-ink);
+}
+
+.fhc-field.is-invalid .fhc-field__control {
+  border-color: var(--fh-danger);
+}
+
+.fhc-field.is-disabled .fhc-field__control {
+  cursor: not-allowed;
+  background: var(--fh-tray);
+  border-color: var(--fh-hairline);
+  color: var(--fh-ink-3);
+}
+
+/* The live region stays in the accessibility tree while empty, so an
+   error that appears later is announced; it just takes no space. */
+.fhc-field__message:empty {
+  margin-top: -8px;
+}
+
+.fhc-field__helper,
+.fhc-field__error {
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+}
+
+.fhc-field__helper {
+  color: var(--fh-ink-3);
+}
+
+.fhc-field__error {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  color: var(--fh-danger-ink);
+}
+
+.fhc-field__error svg {
+  margin-top: -1px;
+}
+
+/* ================================================================
+   Chip
+   ================================================================ */
+
+.fhc-chip {
+  --fhc-dot: var(--fh-neutral);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  padding: 4px 8px;
+  border-radius: 7px;
+  box-sizing: border-box;
+  font-family: var(--fh-font-body);
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: 0;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.fhc-chip--success {
+  --fhc-dot: var(--fh-success);
+  background: var(--fh-success-fill);
+  color: var(--fh-success-ink);
+}
+
+.fhc-chip--info {
+  --fhc-dot: var(--fh-info);
+  background: var(--fh-info-fill);
+  color: var(--fh-info-ink);
+}
+
+.fhc-chip--danger {
+  --fhc-dot: var(--fh-danger);
+  background: var(--fh-danger-fill);
+  color: var(--fh-danger-ink);
+}
+
+.fhc-chip--neutral {
+  background: var(--fh-paper);
+  box-shadow: inset 0 0 0 1px var(--fh-hairline);
+  color: var(--fh-ink-2);
+}
+
+.fh-onyx-scope .fhc-chip--neutral {
+  background: var(--fh-onyx-2);
+}
+
+.fhc-chip__dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--fhc-dot);
+}
+
+/* ================================================================
+   SyncPill
+   ================================================================ */
+
+.fhc-sync {
+  --fhc-sync-dot: var(--fh-success);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  box-sizing: border-box;
+  background: var(--fh-paper);
+  box-shadow: inset 0 0 0 1px var(--fh-hairline);
+  color: var(--fh-ink);
+  font-family: var(--fh-font-body);
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.fh-onyx-scope .fhc-sync {
+  background: var(--fh-wash);
+}
+
+.fhc-sync__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--fhc-sync-dot);
+}
+
+.fhc-sync--syncing { --fhc-sync-dot: var(--fh-info); }
+
+.fhc-sync--syncing .fhc-sync__dot {
+  animation: fhc-pulse 1.6s var(--ease) infinite;
+}
+
+/* Offline: a hollow ring; the word carries the meaning. */
+.fhc-sync--offline .fhc-sync__dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--fh-ink-3);
+}
+
+/* Dots lifted toward linen so they read on the dark stage. */
+.fh-onyx-scope .fhc-sync--synced { --fhc-sync-dot: color-mix(in srgb, var(--fh-success) 70%, var(--fh-linen)); }
+.fh-onyx-scope .fhc-sync--syncing { --fhc-sync-dot: color-mix(in srgb, var(--fh-info) 55%, var(--fh-linen)); }
+
+.fhc-sync__detail {
+  padding-left: 8px;
+  border-left: 1px solid var(--fh-hairline);
+  color: var(--fh-ink-3);
+}
+
+/* ================================================================
+   StageRail
+   ================================================================ */
+
+.fhc-rail {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.fhc-rail__list {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fhc-rail__seg {
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  gap: 8px;
+  min-width: 0;
+  text-align: center;
+}
+
+.fhc-rail__bar {
+  display: block;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--fh-hairline);
+}
+
+.fhc-rail__seg.is-done .fhc-rail__bar { background: var(--fh-ink-4); }
+.fhc-rail__seg.is-current .fhc-rail__bar { background: var(--fh-gold); }
+
+.fhc-rail__label {
+  max-width: 100%;
+  font-family: var(--fh-font-body);
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+  overflow-wrap: anywhere;
+}
+
+.fhc-rail__seg.is-current .fhc-rail__label {
+  color: var(--fh-ink);
+  font-weight: 600;
+}
+
+/* Notes are a desktop detail (spec 9.11). */
+.fhc-rail__note {
+  display: none;
+  max-width: 100%;
+  margin-top: -4px;
+  font-family: var(--fh-font-body);
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+.fhc-rail__lost {
+  flex: none;
+  align-self: center;
+}
+
+@media (min-width: 900px) {
+  .fhc-rail__note { display: block; }
+}
+
+/* ================================================================
+   Row
+   ================================================================ */
+
+.fhc-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+  list-style: none;
+}
+
+/* Between rows, never after the last one. */
+.fhc-row + .fhc-row {
+  border-top: 1px solid var(--fh-hairline);
+}
+
+/* The tap target runs 12 px past the text on each side, so the hover
+   wash and focus ring frame it while the text stays on the gutter. */
+.fhc-row__main {
+  --fhc-radius: 12px;
+  position: relative;
+  isolation: isolate;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 64px;
+  margin: 0 -12px;
+  padding: 12px;
+  border: 0;
+  border-radius: var(--fhc-radius);
+  box-sizing: border-box;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: 0;
+  text-align: left;
+  text-decoration: none;
+}
+
+.fhc-row.has-action .fhc-row__main {
+  margin-right: 0;
+}
+
+.fhc-row__main.is-interactive {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: transform var(--dur-instant) var(--ease-mechanical);
+}
+
+.fhc-row__main.is-interactive::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--fh-ink);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.fhc-row__main.is-interactive:hover::after { opacity: 0.04; }
+.fhc-row__main.is-interactive:active::after { opacity: 0.08; }
+.fhc-row__main.is-interactive:active { transform: translateY(1px); }
+
+.fhc-row__main:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.fhc-row__main:disabled::after { opacity: 0; }
+.fhc-row__main:disabled:active { transform: none; }
+
+.fhc-row__dot {
+  --fhc-dot: var(--fh-neutral);
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: 7px;
+  border-radius: 999px;
+  background: var(--fhc-dot);
+}
+
+.fhc-row__dot--success { --fhc-dot: var(--fh-success); }
+.fhc-row__dot--info { --fhc-dot: var(--fh-info); }
+.fhc-row__dot--danger { --fhc-dot: var(--fh-danger); }
+
+.fhc-row__body {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 4px;
+}
+
+.fhc-row__title {
+  font-family: var(--fh-font-body);
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+  color: var(--fh-ink);
+  overflow-wrap: anywhere;
+}
+
+.fhc-row__sub {
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 400;
+  color: var(--fh-ink-2);
+  overflow-wrap: anywhere;
+}
+
+.fhc-row__end {
+  flex: none;
+  max-width: 50%;
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+  text-align: right;
+}
+
+.fhc-row__money {
+  font-family: var(--fh-font-body);
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--fh-ink);
+  white-space: nowrap;
+}
+
+.fhc-row__next {
+  font-family: var(--fh-font-body);
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--fh-ink-2);
+}
+
+.fhc-row__action {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ================================================================
+   SpineEntry
+   ================================================================ */
+
+.fhc-spine {
+  --fhc-spine-ground: var(--fh-plaster);
+  display: grid;
+  grid-template-columns: 52px 12px minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fhc-spine__time {
+  display: grid;
+  justify-items: end;
+  font-family: var(--fh-font-body);
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.fhc-spine__rail {
+  position: relative;
+  align-self: stretch;
+}
+
+/* One line through the entries, marker center to marker center. */
+.fhc-spine__rail::before {
+  content: '';
+  position: absolute;
+  top: 11px;
+  bottom: -11px;
+  left: 50%;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 999px;
+  background: var(--fh-hairline);
+}
+
+.fhc-spine:last-child .fhc-spine__rail::before {
+  display: none;
+}
+
+.fhc-spine__marker {
+  position: absolute;
+  z-index: 1;
+  top: 6px;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  border-radius: 999px;
+  background: var(--fh-ink-4);
+  box-shadow: 0 0 0 3px var(--fhc-spine-ground);
+}
+
+.fhc-spine--success .fhc-spine__marker {
+  background: var(--fh-success);
+}
+
+.fhc-spine__body {
+  min-width: 0;
+  padding-bottom: 24px;
+}
+
+.fhc-spine:last-child .fhc-spine__body {
+  padding-bottom: 0;
+}
+
+.fhc-spine__title {
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+  color: var(--fh-ink);
+  overflow-wrap: anywhere;
+}
+
+.fhc-spine__sub {
+  margin: 4px 0 0;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 400;
+  color: var(--fh-ink-2);
+  overflow-wrap: anywhere;
+}
+
+.fhc-spine__photos {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  max-width: 432px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fhc-spine__photo {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+  border-radius: 12px;
+  background: var(--fh-tray);
+}
+
+.fhc-spine__photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* A hairline over the photo edge so light photos keep their shape. */
+.fhc-spine__photo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgba(22, 20, 15, 0.12);
+  pointer-events: none;
+}
+
+.fhc-spine__more {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(22, 20, 15, 0.58);
+  color: var(--fh-linen);
+  font-family: var(--fh-font-body);
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+}
+
+@media (min-width: 900px) {
+  .fhc-spine {
+    grid-template-columns: 64px 12px minmax(0, 1fr);
+  }
+}
+
+/* ================================================================
+   OnyxStage
+   ================================================================ */
+
+.fhc-stage {
+  position: relative;
+  isolation: isolate;
+  display: block;
+  padding: 20px;
+  background: var(--fh-onyx);
+  color: var(--fh-ink);
+}
+
+.fhc-stage--hairline {
+  border-bottom: 1px solid var(--fh-gold-line);
+}
+
+/* Warm light from the top right, under the content and the grain. */
+.fhc-stage--glow::before,
+.fhc-vault__card::before,
+.fhc-photo--empty .fhc-photo__frame::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: radial-gradient(120% 90% at 100% 0%, rgba(201, 150, 58, 0.24) 0%, rgba(201, 150, 58, 0.08) 40%, rgba(201, 150, 58, 0) 72%);
+  pointer-events: none;
+}
+
+@media (min-width: 900px) {
+  .fhc-stage {
+    padding: 28px;
+  }
+}
+
+/* ================================================================
+   PhotoCard
+   ================================================================ */
+
+.fhc-photo {
+  --fhc-bezel: 6px;
+  /* Text sizes follow the card's width, so a card in a narrow column
+     on a wide screen keeps phone sized type. */
+  container-type: inline-size;
+  display: block;
+  padding: var(--fhc-bezel);
+  border-radius: 18px;
+  background: var(--fh-paper);
+  box-shadow: inset 0 0 0 1px var(--fh-hairline), var(--fh-shadow-raised);
+}
+
+.fhc-photo__frame {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--fh-onyx);
+}
+
+.fhc-photo__img {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity var(--dur-slow) var(--ease);
+}
+
+.fhc-photo__img.is-loaded {
+  opacity: 1;
+}
+
+.fhc-photo__overlay {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 48px 16px 16px;
+  background: var(--fh-scrim);
+}
+
+.fhc-photo--empty .fhc-photo__overlay {
+  background: none;
+}
+
+.fhc-photo__text {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.fhc-photo__eyebrow {
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--fh-ink);
+}
+
+.fhc-photo__title {
+  margin: 0;
+  font-family: var(--fh-font-display);
+  font-size: 24px;
+  line-height: 28px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--fh-ink);
+  overflow-wrap: anywhere;
+}
+
+.fhc-photo__action {
+  flex: none;
+}
+
+@container (min-width: 560px) {
+  .fhc-photo__overlay {
+    padding: 48px 20px 20px;
+  }
+  .fhc-photo__title {
+    font-size: 30px;
+    line-height: 32px;
+  }
+}
+
+/* ================================================================
+   VaultCard
+   ================================================================ */
+
+.fhc-vault {
+  --fhc-bezel: 6px;
+  /* Padding and number sizes follow the card's width. */
+  container-type: inline-size;
+  display: block;
+  padding: var(--fhc-bezel);
+  border-radius: 28px;
+  background: var(--fh-paper);
+  box-shadow: inset 0 0 0 1px var(--fh-hairline), var(--fh-shadow-raised);
+}
+
+.fhc-vault__card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: 20px;
+  border-radius: 22px;
+  background: var(--fh-onyx);
+  color: var(--fh-ink);
+}
+
+.fhc-vault__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.fhc-vault__label {
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--fh-ink-2);
+}
+
+.fhc-vault__corner {
+  flex: none;
+  margin-top: -4px;
+}
+
+.fhc-vault__amount {
+  margin: 8px 0 0;
+  font-family: var(--fh-font-display);
+  font-size: 52px;
+  line-height: 54px;
+  font-weight: 600;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--fh-ink);
+  overflow-wrap: anywhere;
+}
+
+.fhc-vault__rule {
+  display: block;
+  height: 1px;
+  margin: 16px 0;
+  background: var(--fh-gold-line);
+}
+
+.fhc-vault__facts {
+  display: grid;
+  margin: 0;
+}
+
+.fhc-vault__fact {
+  min-width: 0;
+}
+
+.fhc-vault__fact dt {
+  font-family: var(--fh-font-body);
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+.fhc-vault__fact dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--fh-ink);
+}
+
+/* Columns start at their content's width and share what is left, so a
+   long amount never breaks across lines while a short one sits wide. */
+.fhc-vault__facts--columns {
+  grid-auto-flow: column;
+  grid-auto-columns: auto;
+}
+
+.fhc-vault__facts--columns .fhc-vault__fact {
+  display: grid;
+  gap: 4px;
+}
+
+.fhc-vault__facts--columns .fhc-vault__fact + .fhc-vault__fact {
+  padding-left: 12px;
+  border-left: 1px solid var(--fh-hairline);
+}
+
+.fhc-vault__facts--columns .fhc-vault__fact:not(:last-child) {
+  padding-right: 12px;
+}
+
+.fhc-vault__facts--columns dd {
+  font-family: var(--fh-font-display);
+  font-size: 20px;
+  line-height: 24px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.fhc-vault__facts--rows {
+  gap: 8px;
+}
+
+.fhc-vault__facts--rows .fhc-vault__fact {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.fhc-vault__facts--rows dt {
+  font-size: 14px;
+  line-height: 18px;
+}
+
+.fhc-vault__facts--rows dd {
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+@container (min-width: 420px) {
+  .fhc-vault__card {
+    padding: 24px;
+  }
+  .fhc-vault__facts--columns dd {
+    font-size: 24px;
+    line-height: 28px;
+  }
+}
+
+/* A 320 px phone. */
+@container (max-width: 320px) {
+  .fhc-vault__card {
+    padding: 16px;
+  }
+  .fhc-vault__amount {
+    font-size: 38px;
+    line-height: 40px;
+  }
+  .fhc-vault__facts--columns dd {
+    font-size: 18px;
+    line-height: 22px;
+  }
+}
+
+/* ================================================================
+   Skeleton
+   ================================================================ */
+
+.fhc-skel {
+  --fhc-shine: color-mix(in srgb, var(--fh-paper) 70%, transparent);
+  position: relative;
+  display: block;
+  overflow: hidden;
+  max-width: 100%;
+  border-radius: 999px;
+  background: var(--fh-wash-2);
+}
+
+.fh-onyx-scope .fhc-skel {
+  --fhc-shine: var(--fh-wash-2);
+}
+
+.fhc-skel--line {
+  width: 100%;
+  height: 12px;
+}
+
+.fhc-skel--block {
+  width: 100%;
+  height: 64px;
+  border-radius: 12px;
+}
+
+.fhc-skel--circle {
+  border-radius: 999px;
+}
+
+.fhc-skel::after,
+.fhc-btn__skel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, var(--fhc-shine) 50%, transparent 100%);
+  transform: translateX(-100%);
+  animation: fhc-shimmer 1.6s var(--ease) infinite;
+}
+
+.fhc-skel-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 64px;
+  padding: 12px 0;
+  box-sizing: border-box;
+}
+
+.fhc-skel-row + .fhc-skel-row {
+  border-top: 1px solid var(--fh-hairline);
+}
+
+.fhc-skel-row__left {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.fhc-skel-row__right {
+  flex: none;
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+/* ================================================================
+   EmptyState
+   ================================================================ */
+
+.fhc-empty {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  padding: 32px 20px;
+  text-align: center;
+}
+
+.fhc-empty__icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: var(--fh-tray);
+  box-shadow: inset 0 0 0 1px var(--fh-hairline);
+  color: var(--fh-ink-2);
+}
+
+.fhc-empty__title {
+  max-width: 32ch;
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+  color: var(--fh-ink);
+}
+
+.fhc-empty__action {
+  margin-top: 4px;
+}
+
+/* ================================================================
+   KeyCap
+   ================================================================ */
+
+.fhc-keycap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  border-radius: 7px;
+  box-sizing: border-box;
+  background: var(--fh-paper);
+  box-shadow: inset 0 0 0 1px var(--fh-edge), inset 0 -1px 0 var(--fh-edge);
+  color: var(--fh-ink-2);
+  font-family: var(--fh-font-body);
+  font-size: 12px;
+  line-height: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.fh-onyx-scope .fhc-keycap {
+  background: var(--fh-onyx-2);
+}
+
+.fhc-btn--primary .fhc-keycap {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fh-on-gold) 40%, transparent);
+  color: var(--fh-on-gold);
+}
+
+.fhc-btn .fhc-keycap {
+  margin-left: 4px;
+}
+
+/* ================================================================
+   Sheet (vaul)
+   ================================================================ */
+
+.fhc-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  background: rgba(22, 20, 15, 0.45);
+}
+
+.fhc-sheet {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 640px;
+  max-height: calc(100dvh - 48px);
+  margin: 0 auto;
+  border: 1px solid var(--fh-hairline);
+  border-bottom: 0;
+  border-radius: 22px 22px 0 0;
+  box-sizing: border-box;
+  background: var(--fh-paper);
+  box-shadow: var(--fh-shadow-overlay);
+  color: var(--fh-ink);
+  font-family: var(--fh-font-body);
+}
+
+.fhc-sheet:focus,
+.fhc-sheet:focus-visible {
+  outline: none !important;
+}
+
+/* Rise in 280 ms, leave in 180 ms (spec 5.7). vaul sets 500 ms. */
+.fhc-sheet[data-vaul-drawer][data-state='open'],
+.fhc-sheet-overlay[data-vaul-overlay][data-state='open'] {
+  animation-duration: var(--dur-sheet-in);
+  animation-timing-function: var(--ease-out);
+}
+
+.fhc-sheet[data-vaul-drawer][data-state='closed'],
+.fhc-sheet-overlay[data-vaul-overlay][data-state='closed'] {
+  animation-duration: var(--dur-sheet-out);
+  animation-timing-function: var(--ease-mechanical);
+}
+
+.fhc-sheet__grabber {
+  flex: none;
+  width: 40px;
+  height: 4px;
+  margin: 8px auto 0;
+  border-radius: 999px;
+  background: var(--fh-edge);
+}
+
+.fhc-sheet__head {
+  flex: none;
+  display: grid;
+  gap: 4px;
+  padding: 8px 20px 0;
+}
+
+.fhc-sheet__titlebar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+
+.fhc-sheet__title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-family: var(--fh-font-display);
+  font-size: 30px;
+  line-height: 32px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--fh-ink);
+}
+
+.fhc-sheet__close {
+  margin-right: -8px;
+}
+
+.fhc-sheet__desc {
+  margin: 0;
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--fh-ink-2);
+}
+
+.fhc-sheet__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 16px 20px max(20px, env(safe-area-inset-bottom, 0px));
+}
+
+.fhc-sheet.has-footer .fhc-sheet__body {
+  padding-bottom: 16px;
+}
+
+.fhc-sheet__foot {
+  flex: none;
+  display: flex;
+  gap: 12px;
+  padding: 12px 20px max(20px, env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--fh-hairline-soft);
+  background: var(--fh-paper);
+}
+
+/* ================================================================
+   Reduced motion: fades only, shimmer and pulse hold still
+   ================================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  .fhc-btn,
+  .fhc-iconbtn,
+  .fhc-row__main.is-interactive {
+    transition: none;
+  }
+
+  .fhc-btn:active,
+  .fhc-iconbtn:active,
+  .fhc-row__main.is-interactive:active {
+    transform: none;
+  }
+
+  .fhc-skel::after,
+  .fhc-btn__skel::after {
+    animation: none;
+    opacity: 0;
+  }
+
+  .fhc-sync--syncing .fhc-sync__dot {
+    animation: none;
+  }
+
+  /* vaul names its slide animations at five attributes deep. */
+  .fhc-sheet[data-vaul-drawer][data-vaul-drawer-direction='bottom'][data-vaul-snap-points='false'][data-state='open'] {
+    animation-name: fhc-fade-in;
+  }
+
+  .fhc-sheet[data-vaul-drawer][data-vaul-drawer-direction='bottom'][data-vaul-snap-points='false'][data-state='closed'] {
+    animation-name: fhc-fade-out;
+  }
+}
+
+/* ================================================================
+   Design sheet (src/screens/DesignSheet.tsx, /design, development
+   only). Layout for the specimen board, not a component.
+   ================================================================ */
+
+.fhc-ds {
+  min-height: 100dvh;
+  background: var(--fh-plaster);
+  color: var(--fh-ink);
+  font-family: var(--fh-font-body);
+  font-variant-numeric: tabular-nums;
+}
+
+.fhc-ds__intro {
+  display: grid;
+  gap: 8px;
+  padding: 32px 20px 24px;
+  border-bottom: 1px solid var(--fh-hairline);
+}
+
+.fhc-ds__eyebrow {
+  margin: 0;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+.fhc-ds__title {
+  margin: 0;
+  font-family: var(--fh-font-display);
+  font-size: 36px;
+  line-height: 40px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--fh-ink);
+}
+
+.fhc-ds__lede {
+  max-width: 64ch;
+  margin: 0;
+  font-size: 16px;
+  line-height: 22px;
+  color: var(--fh-ink-2);
+}
+
+.fhc-ds__cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.fhc-ds__col {
+  min-width: 0;
+  padding: 24px 20px 48px;
+  background: var(--fh-plaster);
+  color: var(--fh-ink);
+}
+
+.fhc-ds__coltitle {
+  margin: 0;
+  padding-bottom: 12px;
+  font-family: var(--fh-font-display);
+  font-size: 34px;
+  line-height: 36px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--fh-ink);
+}
+
+.fhc-ds__group {
+  display: grid;
+  gap: 20px;
+  padding: 28px 0;
+  border-top: 1px solid var(--fh-hairline);
+}
+
+.fhc-ds__grouphead {
+  display: grid;
+  gap: 4px;
+}
+
+.fhc-ds__grouptitle {
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--fh-ink);
+}
+
+.fhc-ds__groupnote {
+  max-width: 60ch;
+  margin: 0;
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--fh-ink-2);
+}
+
+.fhc-ds__specimens {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: 24px;
+}
+
+.fhc-ds__spec {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.fhc-ds__spec--wide {
+  grid-column: 1 / -1;
+}
+
+.fhc-ds__cap {
+  margin: 0;
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+.fhc-ds__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.fhc-ds__row--nowrap {
+  flex-wrap: nowrap;
+}
+
+.fhc-ds__stack {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.fhc-ds__stack--loose {
+  gap: 20px;
+}
+
+.fhc-ds__grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.fhc-ds__note {
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+.fhc-ds__stage {
+  border-radius: 14px;
+}
+
+.fhc-ds__stage--tight {
+  padding: 16px;
+}
+
+.fhc-ds__list {
+  display: grid;
+  min-width: 0;
+}
+
+.fhc-ds__listhead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 0 8px;
+  border-bottom: 1px solid var(--fh-hairline);
+}
+
+.fhc-ds__listtitle {
+  font-family: var(--fh-font-display);
+  font-size: 24px;
+  line-height: 28px;
+  font-weight: 600;
+  color: var(--fh-ink);
+}
+
+.fhc-ds__listmeta {
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--fh-ink-2);
+}
+
+.fhc-ds__spine {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fhc-ds__photobar {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  height: 132px;
+  padding: 12px;
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--fh-onyx);
+}
+
+.fhc-ds__photobar-img {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.fhc-ds__tray {
+  --fhc-bezel: 6px;
+  padding: var(--fhc-bezel);
+  border-radius: 18px;
+  background: var(--fh-paper);
+  box-shadow: inset 0 0 0 1px var(--fh-hairline);
+}
+
+.fhc-ds__frame-loading {
+  display: grid;
+  align-content: end;
+  gap: 8px;
+  aspect-ratio: 16 / 9;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--fh-onyx);
+}
+
+.fhc-ds__vault-loading {
+  display: grid;
+  gap: 12px;
+  padding: 24px;
+  border-radius: 22px;
+  background: var(--fh-onyx);
+}
+
+.fhc-ds__monogram {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px var(--fh-gold-line);
+  color: var(--fh-gold);
+  font-family: var(--fh-font-display);
+  font-size: 20px;
+  line-height: 24px;
+  font-weight: 600;
+}
+
+.fhc-ds-today {
+  display: grid;
+  margin: 0 -20px;
+}
+
+.fhc-ds-today__stage {
+  display: grid;
+  gap: 12px;
+}
+
+/* Room under the weather line for the card that overlaps the edge. */
+.fhc-ds-today .fhc-ds-today__stage {
+  padding-bottom: 48px;
+}
+
+.fhc-ds-today .fhc-ds-today__weather {
+  margin-bottom: 16px;
+}
+
+.fhc-ds-today__top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.fhc-ds-today__company {
+  flex: 1;
+  min-width: 0;
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 500;
+  color: var(--fh-ink-2);
+}
+
+.fhc-ds-today__date {
+  margin: 0;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+.fhc-ds-today__hero {
+  margin: 0;
+  font-family: var(--fh-font-display);
+  font-size: 38px;
+  line-height: 40px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--fh-ink);
+}
+
+.fhc-ds-today__weather {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 0;
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--fh-ink-2);
+}
+
+.fhc-ds-today__card {
+  position: relative;
+  margin-top: -48px;
+  padding: 0 20px;
+}
+
+.fhc-ds-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 12px;
+  border-radius: 12px;
+  background: var(--fh-onyx-2);
+  box-shadow: inset 0 0 0 1px var(--fh-hairline);
+  color: var(--fh-ink-3);
+}
+
+.fhc-ds-search__text {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  line-height: 20px;
+}
+
+@media (min-width: 900px) {
+  .fhc-ds__intro {
+    padding: 48px 28px 28px;
+  }
+  .fhc-ds__col {
+    padding: 32px 28px 48px;
+  }
+  .fhc-ds-today {
+    margin: 0;
+  }
+  .fhc-ds-today__stage {
+    border-radius: 14px 14px 0 0;
+  }
+}
+
+@media (min-width: 1100px) {
+  .fhc-ds__cols {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

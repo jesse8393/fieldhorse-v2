@@ -30,6 +30,23 @@ select:focus-visible,
   outline: 2px solid var(--fh-focus);
   outline-offset: 2px;
 }
+/* global.css forces a muted ring color with !important on these; the
+   spec ring is ink on Day, linen on Night and on onyx (--fh-focus). */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+summary:focus-visible,
+[role="button"]:focus-visible,
+[role="tab"]:focus-visible,
+[tabindex]:focus-visible,
+.v3-btn:focus-visible,
+.v3-card--interactive:focus-visible,
+.dispatch-card__tap:focus-visible,
+.cl-card__tap:focus-visible {
+  outline-color: var(--fh-focus) !important;
+}
 
 /* ---- Onyx scope ----
  * Anything drawn on onyx (the dock, the desktop sidebar, onyx stages,

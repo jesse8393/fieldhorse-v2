@@ -20,8 +20,8 @@ Spec: `SPEC.md` in this folder, with the October 10 decisions in its section 17.
   * Drop the `prefers-color-scheme` block. The theme script always sets `data-theme`.
 * Status colors for stages (spec 5.4): lead neutral, quote info, job and invoice success, closed neutral ink 3, lost neutral. Red stays for late money and failed safety only.
 * Add `src/styles/redesign.css`, loaded after `v3.css` and before `mobile-keyboard-fix.css`. It holds the overrides that keep older screens in line with the new system:
-  * `text-transform: none` everywhere, so there are no all caps labels
   * tabular numbers on the app root
+  * the spec focus ring color, over the muted one global.css forces
   * the 232 px sidebar offset
   * the dock clearance
   * focus rings
@@ -31,6 +31,7 @@ Spec: `SPEC.md` in this folder, with the October 10 decisions in its section 17.
   * Bebas Neue 400
 * Remove the Google Fonts link, its preconnects and the Google Fonts runtime caching. Add `woff2` to the precache patterns.
 * Replace the hard coded `'Bebas Neue'` and `'DM Sans'` font stacks in components with the font tokens. Wordmarks use `--font-wordmark`.
+* Remove every uppercase transform from the older screens and rewrite the labels in sentence case at the source (done as a sweep, not a global override, so `capitalize` styles keep working).
 
 ### 2. Theme modes (`src/contexts/ThemeContext.tsx`, `src/lib/sunTimes.ts`, `src/lib/themeMode.ts`, `index.html`, `netlify.toml`, `vite.config.js`)
 
