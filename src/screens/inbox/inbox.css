@@ -1,0 +1,147 @@
+/*
+ * The Inbox (spec 9.8, render base/inbox.jpg). Class prefix fhi-. Reads
+ * only --fh- tokens, so Day and Night follow on their own. Rows, chips,
+ * buttons and the empty state come from the fh components; this file
+ * lays out the title, the list rows' right side, the desktop two column
+ * split and (in the thread) the bubbles, the draft panel and the composer.
+ */
+
+.fhi {
+  padding-bottom: 24px;
+}
+
+/* ---- Title row ---- */
+.fhi-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px var(--fh-gutter) 8px;
+}
+
+.fhi-title {
+  min-width: 0;
+  margin: 0;
+  font-family: var(--fh-font-display);
+  font-size: 36px;
+  line-height: 40px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--fh-ink);
+  overflow-wrap: anywhere;
+}
+
+.fhi-title:focus {
+  outline: none;
+}
+
+/* ---- The list ---- */
+.fhi-body {
+  padding: 8px var(--fh-gutter) 0;
+}
+
+.fhi-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The preview runs to two lines, then stops. */
+.fhi-row .fhc-row__sub {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+/* The unread dot sits in the gutter, left of the text, so every name
+   lines up whether or not the conversation is unread. */
+.fhi-row .fhc-row__dot {
+  position: absolute;
+  top: 15px;
+  left: -1px;
+  margin: 0;
+}
+
+/* An unread conversation reads a step darker. */
+.fhi-row.is-unread .fhc-row__sub {
+  color: var(--fh-ink);
+  font-weight: 500;
+}
+
+.fhi-row.is-selected .fhc-row__main {
+  background: var(--fh-wash);
+}
+
+/* The right side of a row: the time, then the chips under it. */
+.fhi-end {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+}
+
+.fhi-time {
+  font-family: var(--fh-font-body);
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 400;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--fh-ink-3);
+}
+
+.fhi-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+/* ---- Engine off ---- */
+.fhi-off {
+  padding: 16px var(--fh-gutter) 0;
+}
+
+.fhi-off__note {
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 400;
+  color: var(--fh-ink-2);
+}
+
+/* ---- Desktop: the list on the left, the open conversation on the right ---- */
+@media (min-width: 900px) {
+  .fhi--split {
+    --fhi-chrome: 72px;
+    display: grid;
+    grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
+    height: calc(100dvh - var(--fhi-chrome));
+    min-height: 480px;
+    padding-bottom: 0;
+    border-top: 1px solid var(--fh-hairline);
+  }
+
+  .fhi-split__list {
+    min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
+    padding-bottom: 24px;
+    border-right: 1px solid var(--fh-hairline);
+  }
+
+  .fhi-split__detail {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .fhi-split__empty {
+    margin: auto;
+    padding: 0 var(--fh-gutter-desktop);
+  }
+}
