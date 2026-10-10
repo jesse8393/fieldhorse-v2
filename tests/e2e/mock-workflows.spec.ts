@@ -36,7 +36,9 @@ test('keeps the work lifecycle action ready', async ({ page }, testInfo) => {
   const expectNoPageErrors = failOnPageErrors(page)
 
   await openRoute(page, '/work')
-  await expect(page.getByRole('heading', { name: /work & deals/i })).toBeVisible()
+  // Phones get the redesigned Jobs list (spec 9.3); desktop keeps the deal board.
+  const workHeading = testInfo.project.name.startsWith('mobile') ? /^jobs$/i : /work & deals/i
+  await expect(page.getByRole('heading', { level: 1, name: workHeading })).toBeVisible()
   await expect(page.getByText('Justin Bryan', { exact: true })).toBeVisible()
   await expect(page.getByText('MMC Properties', { exact: true })).toBeVisible()
   await expect(page.getByText('Plumbing Bellevue', { exact: true })).toBeVisible()

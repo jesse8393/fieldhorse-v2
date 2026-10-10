@@ -25,13 +25,13 @@ import { useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Search, Phone as PhoneIcon, MessageSquare as MsgIcon, Sparkles,
-  CalendarClock, CalendarDays, Trophy, XCircle, MoreHorizontal, RotateCcw, Plus
+  CalendarClock, CalendarDays, Trophy, XCircle, MoreHorizontal, RotateCcw
 } from 'lucide-react'
 import SwipeableRow from '../components/SwipeableRow.tsx'
 import { SkeletonList } from '../components/Skeleton.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
 import { FilterPill, FloatingActionButton, ScreenCloser, StatusPill } from '../components/v3'
-import { Button } from '../components/fh'
+import JobsPhone from './jobs/JobsPhone.tsx'
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuItem, DropdownMenuSeparator
@@ -72,6 +72,36 @@ const CHIPS: { id: ChipId; label: string; match: (c: JobRow) => boolean }[] = [
   { id: 'lost',   label: 'Lost',   match: (c) => c.stage === 'lost' }
 ]
 
+// Old and new ?stage= values for the desktop chips. The phone tabs write
+// 'jobs' (decision D3), which is the desktop 'active' chip.
+function chipFromStage(stage: string | null): ChipId | null {
+  const id = stage === 'jobs' ? 'active' : stage
+  return id && CHIPS.some((c) => c.id === id) ? (id as ChipId) : null
+}
+
+// The search both layouts share. Local (cached) rows: filter the recent
+// window by a naive substring. Server hits already matched the WHOLE book
+// via a wildcard ilike that normalizes punctuation ('615-555-1234' ~
+// '(615) 555-1234'). Do NOT run a raw .includes() over them again, that
+// discarded exactly the punctuation normalized hits the server search
+// found. Union them in applying only the view filter + dedupe. Dedupe
+// against the rows we're KEEPING, so a cached row the naive filter
+// dropped but the server matched is recovered via its server hit twin.
+function searchJobs(contacts: JobRow[], serverHits: JobRow[], search: string, match: (c: JobRow) => boolean): JobRow[] {
+  const q = search.trim().toLowerCase()
+  let localRows = contacts.filter(match)
+  if (q) {
+    localRows = localRows.filter((c) =>
+      [c.name, c.phone, c.email, c.address, c.referred_by, c.job_type, c.job_title]
+        .filter(Boolean)
+        .some((s) => String(s).toLowerCase().includes(q))
+    )
+  }
+  if (!q || !serverHits.length) return localRows
+  const seen = new Set(localRows.map((c) => c.id))
+  const extra = serverHits.filter((h) => !seen.has(h.id) && match(h))
+  return localRows.concat(extra)
+}
 
 function followUpMeta(c: Pick<JobRow, 'follow_up_on'>): { label: string; tone: 'danger' | 'warn' | 'muted' } | null {
   if (!c.follow_up_on) return null
@@ -104,8 +134,12 @@ export default function Work() {
   // '$ in play', Leads/Quotes rows, and dollar amounts to a crew member
   // on every cold open until membership resolved. Owners simply see the
   // money view a beat later, the correct trade.
-  const { canCreateFinancialDocs, loading: membershipLoading } = useMembership()
+  const { canCreateFinancialDocs, canSeeFinancials, loading: membershipLoading } = useMembership()
   const isMoneyRole = !membershipLoading && canCreateFinancialDocs
+  // Amounts on the phone rows, group totals and notes: the same rule the
+  // job page uses (owner, admin, manager), failing closed while loading.
+  const showMoney = !membershipLoading && canSeeFinancials
+  const isDesktop = useIsDesktop()
   const [searchParams, setSearchParams] = useSearchParams()
   const [chip, setChip] = useState<ChipId>('all')
   const [search, setSearch] = useState('')
@@ -135,7 +169,8 @@ export default function Work() {
     const requested = searchParams.get('stage')
     const wantsNew = searchParams.get('new') === '1'
     const asStage = searchParams.get('asStage')
-    if (requested && CHIPS.some((c) => c.id === requested)) setChip(requested as ChipId)
+    const requestedChip = chipFromStage(requested)
+    if (requestedChip) setChip(requestedChip)
     if (!requested) setChip('all')
     if (wantsNew) {
       setAddStage(asStage === 'job' ? 'job' : asStage === 'quote' ? 'quote' : 'lead')
@@ -187,43 +222,26 @@ export default function Work() {
   // and a fresh list have loaded: membership fails closed (field view)
   // while it resolves, and a cached list can be missing newer lost deals.
   useEffect(() => {
+    // The phone tabs read ?stage= themselves (JobsPhone).
+    if (!isDesktop) return
     if (loading || membershipLoading || isError || isFetching) return
     if (chip === effectiveChip || !searchParams.has('stage')) return
     const sp = new URLSearchParams(searchParams)
     sp.delete('stage')
     setSearchParams(sp, { replace: true })
-  }, [loading, membershipLoading, isError, isFetching, chip, effectiveChip, searchParams, setSearchParams])
+  }, [isDesktop, loading, membershipLoading, isError, isFetching, chip, effectiveChip, searchParams, setSearchParams])
 
-  const baseChip = CHIPS.find((c) => c.id === effectiveChip) || CHIPS[0]
   // Field roles never see lead/quote rows, even under the All chip.
-  const activeChip = isMoneyRole
-    ? baseChip
-    : { ...baseChip, match: (c: JobRow) => baseChip.match(c) && c.stage !== 'lead' && c.stage !== 'quote' }
+  // Memoized so the list below filters again only when the view changes.
+  const activeChip = useMemo(() => {
+    const baseChip = CHIPS.find((c) => c.id === effectiveChip) || CHIPS[0]
+    return isMoneyRole
+      ? baseChip
+      : { ...baseChip, match: (c: JobRow) => baseChip.match(c) && c.stage !== 'lead' && c.stage !== 'quote' }
+  }, [effectiveChip, isMoneyRole])
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    // Local (cached) rows: filter the recent window by a naive substring.
-    let localRows = contacts.filter(activeChip.match)
-    if (q) {
-      localRows = localRows.filter((c) =>
-        [c.name, c.phone, c.email, c.address, c.referred_by, c.job_type, c.job_title]
-          .filter(Boolean)
-          .some((s) => String(s).toLowerCase().includes(q))
-      )
-    }
-    // Server hits already matched the WHOLE book via a wildcard ilike that
-    // normalizes punctuation ('615-555-1234' ~ '(615) 555-1234'). Do NOT
-    // re-run a raw .includes() over them, that discarded exactly the
-    // punctuation-normalized hits the server search found. Union them in
-    // applying only the chip filter + dedupe. Dedupe against the rows
-    // we're KEEPING, so a cached row the naive filter dropped but the
-    // server matched is recovered via its server-hit twin.
-    let rows = localRows
-    if (q && serverHits.length) {
-      const seen = new Set(localRows.map((c) => c.id))
-      const extra = serverHits.filter((h) => !seen.has(h.id) && activeChip.match(h))
-      rows = localRows.concat(extra)
-    }
+    const rows = searchJobs(contacts, serverHits, search, activeChip.match)
     // Follow ups due float to the top; inside each band, newest first.
     // Decorate-sort-undecorate: parse each row's dates ONCE (O(n)) instead
     // of up to 4× per comparison (O(n log n) parses), matters on long lists.
@@ -235,6 +253,16 @@ export default function Work() {
     decorated.sort((a, b) => (a.fu !== b.fu ? a.fu - b.fu : b.up - a.up))
     return decorated.map((d) => d.c)
   }, [contacts, serverHits, activeChip, search])
+
+  // Phone rows: everything the role may see that matches the search;
+  // JobsPhone splits them into tabs and groups. Field roles never see
+  // lead or quote rows, as on desktop.
+  const phoneRows = useMemo(
+    () => isDesktop
+      ? []
+      : searchJobs(contacts, serverHits, search, (c) => isMoneyRole || (c.stage !== 'lead' && c.stage !== 'quote')),
+    [isDesktop, contacts, serverHits, search, isMoneyRole]
+  )
 
   const { visible, sentinelRef, hasMore } = useInfiniteRender(filtered, `${effectiveChip}|${search}`)
 
@@ -341,7 +369,57 @@ export default function Work() {
   const handleFollowUp = useCallback((c: JobRow, when: number | Date | null) => setFollowUp(c, when), [setFollowUp])
 
   const { stagger, item } = useFhMotion()
-  const isDesktop = useIsDesktop()
+
+  const openNewLead = () => { setAddStage('lead'); setAddOpen(true) }
+
+  // ONE way in. Everything starts as a deal; Home's "New Job" tile
+  // deep links with ?asStage=job for work that skips selling.
+  const newLeadSheet = (
+    <Suspense fallback={null}>
+      <NewLeadSheet
+        open={addOpen}
+        userId={user?.id}
+        initialStage={addStage}
+        lockStage={addStage === 'lead'}
+        onClose={() => setAddOpen(false)}
+        onCreated={async (created: any) => {
+          setAddOpen(false)
+          if (created?.id && created.stage === 'quote') {
+            navigate(`/quotes/${created.id}?tab=quote`)
+            return
+          }
+          if (created?.id) setJustAddedId(created.id)
+          await refresh()
+          setTimeout(() => setJustAddedId(null), 1200)
+          toastSuccess('Added', created?.name ? `${created.name} is on the board` : 'On the board')
+        }}
+      />
+    </Suspense>
+  )
+
+  // Phone (below 900 px): the redesigned Jobs list (spec 9.3). The deal
+  // cards, the stats line and their per row menus stay on desktop until
+  // Phase 4; on a phone the stage actions live on the job page.
+  if (!isDesktop) {
+    return (
+      <>
+        <JobsPhone
+          jobs={phoneRows}
+          loading={loading}
+          loadError={loadError}
+          retrying={isFetching}
+          onRetry={() => { void refetch() }}
+          search={search}
+          onSearchChange={setSearch}
+          searchDegraded={searchDegraded}
+          showMoney={showMoney}
+          fieldView={!isMoneyRole}
+          onNewLead={openNewLead}
+        />
+        {newLeadSheet}
+      </>
+    )
+  }
 
   return (
     <motion.div
@@ -359,11 +437,6 @@ export default function Work() {
           <h1 className="jobs-title">
             Work <span style={{ color: 'var(--v3-primary-text)' }}>&amp; deals</span>
           </h1>
-          {!isDesktop && (
-            <Button variant="secondary" size="mini" icon={Plus} onClick={() => { setAddStage('lead'); setAddOpen(true) }}>
-              New lead
-            </Button>
-          )}
         </div>
         <div className="jobs-stats">
           {loading ? (
@@ -523,31 +596,10 @@ export default function Work() {
         </motion.div>
       )}
 
-      {/* ONE way in. Everything starts as a deal; Home's "New Job" tile
-          deep-links with ?asStage=job for work that skips selling. */}
-      <Suspense fallback={null}>
-        <NewLeadSheet
-          open={addOpen}
-          userId={user?.id}
-          initialStage={addStage}
-          lockStage={addStage === 'lead'}
-          onClose={() => setAddOpen(false)}
-          onCreated={async (created: any) => {
-            setAddOpen(false)
-            if (created?.id && created.stage === 'quote') {
-              navigate(`/quotes/${created.id}?tab=quote`)
-              return
-            }
-            if (created?.id) setJustAddedId(created.id)
-            await refresh()
-            setTimeout(() => setJustAddedId(null), 1200)
-            toastSuccess('Added', created?.name ? `${created.name} is on the board` : 'On the board')
-          }}
-        />
-      </Suspense>
+      {newLeadSheet}
 
       <FloatingActionButton
-        onClick={() => { setAddStage('lead'); setAddOpen(true) }}
+        onClick={openNewLead}
         ariaLabel="New deal"
         hideOnDesktop={false}
       />
