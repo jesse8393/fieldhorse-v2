@@ -1,7 +1,9 @@
 // The Money screen on a phone (docs/design/2026-10-redesign/SPEC.md,
 // section 9.7, decision D6): the vault card, the four groups, a Remind
 // button that sends only when it is tapped, the invoice actions in a sheet,
-// and everything the old screen offered still one tap away.
+// and everything the old screen offered still one tap away. The second
+// describe at the bottom covers the same screen at 900 px and wider: the
+// vault card and the four groups as tables.
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { signIn, type SignInOptions } from './helpers/signIn.ts'
 
@@ -342,5 +344,261 @@ test.describe('money on a phone', () => {
     }
     await expect(aging.getByText('Total outstanding', { exact: true })).toBeVisible()
     await expect(page.getByRole('link', { name: /Rosa Delgado/ })).toHaveAttribute('href', '/invoices/c-rosa')
+  })
+})
+
+// The desktop Money screen (Phase 4, task 4.6): the same numbers and
+// the same sheets as the phone, laid out as a vault card and four tables
+// with the columns Customer, Job, Amount, Status and Action.
+test.describe('money on a desktop', () => {
+  test.skip(({ isMobile }) => isMobile, 'Desktop Money screen')
+  test.use({ viewport: { width: 1440, height: 900 } })
+
+  const COLUMNS = ['Customer', 'Job', 'Amount', 'Status', 'Action']
+
+  test('desktop money vault and four group tables', async ({ context, page }) => {
+    await openMoney(context, page)
+
+    const vault = page.locator('.fhc-vault')
+    await expect(vault.getByText('Collected this week', { exact: true })).toBeVisible()
+    await expect(vault.getByText('$3,620.00', { exact: true }).first()).toBeVisible()
+    await expect(vault.getByText('Due this week', { exact: true })).toBeVisible()
+    await expect(vault.getByText('$6,090.00', { exact: true })).toBeVisible()
+    await expect(vault.getByText('October so far', { exact: true })).toBeVisible()
+    await expect(vault.getByText('$4,620.50', { exact: true })).toBeVisible()
+    await expect(vault.getByText('Margin', { exact: true })).toBeVisible()
+    await expect(vault.getByText('27.5%', { exact: true })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Reports' })).toHaveAttribute('href', '/analytics')
+
+    // Four groups, each a table with the same five column heads.
+    for (const title of ['Overdue', 'Due soon', 'Waiting on approval', 'Paid']) {
+      const group = page.getByRole('region', { name: title, exact: true })
+      await expect(group.getByRole('heading', { level: 2, name: title, exact: true })).toBeVisible()
+      const table = group.getByRole('table')
+      await expect(table).toBeVisible()
+      for (const name of COLUMNS) {
+        await expect(table.getByRole('columnheader', { name, exact: true })).toBeVisible()
+      }
+    }
+
+    // Overdue: the customer, the job and what it is for, the money in cents,
+    // the status as a word, and Remind in the Action column.
+    const overdue = page.getByRole('region', { name: 'Overdue', exact: true })
+    const rosa = overdue.getByRole('row', { name: /Rosa Delgado/ })
+    await expect(rosa.getByText('Rosa Delgado', { exact: true })).toBeVisible()
+    await expect(rosa.getByText('Concrete steps, final', { exact: true })).toBeVisible()
+    await expect(rosa.getByText('$1,240.00', { exact: true })).toBeVisible()
+    await expect(rosa.getByText('6 days overdue', { exact: true })).toBeVisible()
+    await expect(rosa.getByRole('button', { name: 'Remind Rosa Delgado' })).toBeVisible()
+    await expect(overdue.getByText('1 invoice', { exact: true })).toBeVisible()
+
+    // Due soon: today and next Thursday, each with Open and no Remind.
+    const soon = page.getByRole('region', { name: 'Due soon', exact: true })
+    await expect(soon.getByText('Due today', { exact: true })).toBeVisible()
+    await expect(soon.getByText('Due Oct 15', { exact: true })).toBeVisible()
+    await expect(soon.getByText('2 invoices', { exact: true })).toBeVisible()
+    await expect(soon.getByRole('button', { name: /^Open Lorraine Beasley/ })).toBeVisible()
+    await expect(soon.getByRole('button', { name: /^Remind/ })).toHaveCount(0)
+
+    // Waiting on approval: the sent quote, with its total.
+    const waiting = page.getByRole('region', { name: 'Waiting on approval', exact: true })
+    await expect(waiting.getByText('Marco Castellanos', { exact: true })).toBeVisible()
+    await expect(waiting.getByText('Sent yesterday', { exact: true })).toBeVisible()
+    await expect(waiting.getByText('$18,458.00', { exact: true })).toHaveCount(2)
+
+    // Paid: the last 10 days.
+    const paid = page.getByRole('region', { name: 'Paid', exact: true })
+    await expect(paid.getByText('Last 10 days', { exact: true })).toBeVisible()
+    await expect(paid.getByText('Paid Sep 30', { exact: true })).toBeVisible()
+    await expect(paid.getByText('Garage slab, deposit', { exact: true })).toBeVisible()
+    await expect(paid.getByText('$6,187.50', { exact: true })).toBeVisible()
+
+    // Nothing gold on the page: the only brushed gold button is inside the
+    // Remind sheet.
+    await expect(page.locator('.fhc-btn--primary')).toHaveCount(0)
+  })
+
+  test('desktop remind sends only on tap', async ({ context, page }) => {
+    await openMoney(context, page)
+    const sends: string[] = []
+    const uploads: string[] = []
+    await context.route('**/storage/v1/object/**', (route) => {
+      uploads.push(route.request().url())
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ Key: 'job-files/test.pdf' }) })
+    })
+    await context.route('**/api/send-invoice', (route) => {
+      sends.push(route.request().postData() || '')
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) })
+    })
+    const stray: string[] = []
+    await context.route(/\/api\/(send-(?!invoice$)|docusign-send)/, (route) => {
+      stray.push(route.request().url())
+      return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' })
+    })
+
+    await page.getByRole('button', { name: 'Remind Rosa Delgado' }).click()
+    const sheet = page.getByRole('dialog', { name: 'Send a reminder' })
+    await expect(sheet).toBeVisible()
+    await expect(sheet.getByText('rosa@example.com', { exact: true })).toBeVisible()
+    await expect(sheet.getByText('$1,240.00', { exact: true })).toBeVisible()
+    // Opening the sheet sends nothing.
+    await page.waitForTimeout(800)
+    expect(sends).toHaveLength(0)
+    expect(uploads).toHaveLength(0)
+
+    await sheet.getByRole('button', { name: 'Send reminder' }).click()
+    await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(1)
+    const body = JSON.parse(sends[0])
+    expect(body.recipient_email).toBe('rosa@example.com')
+    expect(body.contact_id).toBe('c-rosa')
+    expect(body.amount_due).toBe(1240)
+    await expect(sheet).toBeHidden({ timeout: 15_000 })
+    await expect(page.getByText('Reminder sent to rosa@example.com', { exact: false }).first()).toBeVisible()
+    await page.waitForTimeout(800)
+    expect(sends).toHaveLength(1)
+    expect(uploads).toHaveLength(1)
+    expect(stray).toHaveLength(0)
+  })
+
+  test('desktop remind needs an email', async ({ context, page }) => {
+    await openMoney(context, page, { tables: NO_EMAIL_TABLES })
+    await page.getByRole('button', { name: 'Remind Priya Shah' }).click()
+    const sheet = page.getByRole('dialog', { name: 'Send a reminder' })
+    await expect(sheet.getByText('Add an email to send reminders.', { exact: true })).toBeVisible()
+    await expect(sheet.getByRole('button', { name: 'Send reminder' })).toBeDisabled()
+  })
+
+  test('a row and its Open button open the invoice actions', async ({ context, page }) => {
+    await openMoney(context, page)
+    const soon = page.getByRole('region', { name: 'Due soon', exact: true })
+
+    // A click anywhere on the row.
+    await soon.getByText('Roof repair, balance', { exact: true }).click()
+    let sheet = page.getByRole('dialog', { name: 'Balance' })
+    await expect(sheet).toBeVisible()
+    for (const name of ['Resend', 'PDF', 'Mark paid', 'Void']) {
+      await expect(sheet.getByRole('button', { name, exact: true })).toBeVisible()
+    }
+    await expect(sheet.getByRole('link', { name: 'Open job' })).toHaveAttribute('href', '/jobs/c-gail?tab=financials')
+    await page.keyboard.press('Escape')
+    await expect(sheet).toBeHidden()
+
+    // The Open button in the Action column does the same.
+    await soon.getByRole('button', { name: /^Open Gail Abernathy/ }).click()
+    sheet = page.getByRole('dialog', { name: 'Balance' })
+    await expect(sheet).toBeVisible()
+    // Mark paid hands over to the existing payment sheet.
+    await sheet.getByRole('button', { name: 'Mark paid', exact: true }).click()
+    await expect(page.getByText('Log what was paid.')).toBeVisible({ timeout: 15_000 })
+    await expect(sheet).toBeHidden()
+  })
+
+  test('an overdue row opens its actions from the keyboard', async ({ context, page }) => {
+    await openMoney(context, page)
+    const overdue = page.getByRole('region', { name: 'Overdue', exact: true })
+    await overdue.getByRole('button', { name: 'Rosa Delgado', exact: true }).press('Enter')
+    await expect(page.getByRole('dialog', { name: 'Final' })).toBeVisible()
+  })
+
+  test('void asks first', async ({ context, page }) => {
+    await openMoney(context, page)
+    await page.getByRole('region', { name: 'Due soon', exact: true }).getByRole('button', { name: /^Open Gail Abernathy/ }).click()
+    await page.getByRole('dialog', { name: 'Balance' }).getByRole('button', { name: 'Void', exact: true }).click()
+    await expect(page.getByText('Void balance?', { exact: false })).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('button', { name: 'Void invoice' })).toBeVisible()
+  })
+
+  test('quote and paid rows open the job', async ({ context, page }) => {
+    await openMoney(context, page)
+    const waiting = page.getByRole('region', { name: 'Waiting on approval', exact: true })
+    await expect(waiting.getByRole('link', { name: /^Open Marco Castellanos/ })).toHaveAttribute('href', /\/quotes\/c-marco/)
+    const paid = page.getByRole('region', { name: 'Paid', exact: true })
+    await expect(paid.getByRole('link', { name: 'Open Darnell Whitcomb, Garage slab, deposit' })).toHaveAttribute('href', '/jobs/c-darnell?tab=financials')
+    // A click on the row does what Open does.
+    await waiting.getByText('Pool deck pour', { exact: true }).click()
+    await expect(page).toHaveURL(/\/quotes\/c-marco/)
+  })
+
+  test('empty money', async ({ context, page }) => {
+    await openMoney(context, page, { tables: { fh_invoices: [], fh_payments: [] } })
+    await expect(page.locator('.fhc-vault').getByText('$0.00').first()).toBeVisible()
+    await expect(page.getByText('No open invoices', { exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 2, name: 'Overdue', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('heading', { level: 2, name: 'Due soon', exact: true })).toHaveCount(0)
+    // An invoice starts from a job, from the empty state or the toolbar.
+    await page.getByRole('button', { name: 'Create an invoice' }).click()
+    const picker = page.getByRole('dialog', { name: 'Which job is it for?' })
+    await expect(picker).toBeVisible()
+    await expect(picker.getByText('Rosa Delgado', { exact: true })).toBeVisible()
+    await expect(picker.getByText('Marco Castellanos', { exact: true })).toHaveCount(0)
+    await page.keyboard.press('Escape')
+    await expect(picker).toBeHidden()
+    await page.getByRole('button', { name: 'New invoice', exact: true }).click()
+    await expect(page.getByRole('dialog', { name: 'Which job is it for?' })).toBeVisible()
+  })
+
+  test('crew cannot open money', async ({ context, page }) => {
+    await signIn(context, { role: 'crew', tables: TABLES })
+    await page.goto('/invoices', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    await page.waitForURL((url) => !url.pathname.startsWith('/invoices'), { timeout: 30_000 })
+    await expect(page.getByRole('heading', { level: 1, name: 'Money' })).toHaveCount(0)
+  })
+
+  test('statements, all invoices and job balances stay reachable', async ({ context, page }) => {
+    await openMoney(context, page)
+
+    // Who owes you, with a statement for each customer.
+    await page.getByRole('link', { name: /^Statements/ }).click()
+    await expect(page).toHaveURL(/panel=statements/)
+    await expect(page.getByRole('heading', { level: 1, name: 'Who owes you' })).toBeVisible()
+    for (const name of ['Customer', 'Properties', 'Status', 'Balance', 'Action']) {
+      await expect(page.getByRole('columnheader', { name, exact: true })).toBeVisible()
+    }
+    await page.getByRole('button', { name: /^Statement for/ }).first().click()
+    await expect(page.getByRole('dialog', { name: /^Statement for/ })).toBeVisible({ timeout: 15_000 })
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog', { name: /^Statement for/ })).toBeHidden()
+    await page.getByRole('button', { name: 'Back to Money' }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Money' })).toBeVisible()
+
+    // All invoices: drafts and invoices due later are here, with the old
+    // Outstanding and All choice.
+    await page.getByRole('link', { name: /^All invoices/ }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'All invoices' })).toBeVisible()
+    await expect(page.getByText('Draft', { exact: true })).toBeVisible()
+    await expect(page.getByText('Due Oct 29', { exact: true })).toBeVisible()
+    await page.getByRole('row', { name: /Gail Abernathy.*progress draw 2/i }).getByRole('button', { name: /^Open/ }).click()
+    await expect(page.getByRole('dialog', { name: 'Progress draw 2' })).toBeVisible()
+    await page.keyboard.press('Escape')
+    await page.getByRole('radio', { name: 'All', exact: true }).click({ force: true })
+    await expect(page).toHaveURL(/view=all/)
+    await expect(page.getByRole('radio', { name: 'All', exact: true })).toBeChecked()
+    await page.getByRole('button', { name: 'Back to Money' }).click()
+
+    // Job balances: the aging summary, a sortable table with each job's
+    // balance, Log payment, and the CSV export.
+    await page.getByRole('link', { name: /^Job balances/ }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Job balances' })).toBeVisible()
+    const aging = page.getByRole('region', { name: 'Outstanding by age' })
+    for (const label of ['Current', 'Late', 'Overdue']) {
+      await expect(aging.getByText(label, { exact: true })).toBeVisible()
+    }
+    await expect(aging.getByText('Total outstanding', { exact: true })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Rosa Delgado', exact: true })).toHaveAttribute('href', '/invoices/c-rosa')
+    await page.getByRole('button', { name: 'Sort by Balance' }).click()
+    await page.getByRole('button', { name: 'Log payment for Rosa Delgado' }).click()
+    await expect(page.getByText('Log what was paid.')).toBeVisible({ timeout: 15_000 })
+  })
+
+  test('job balances filter and export the rows on screen', async ({ context, page }) => {
+    await openMoney(context, page)
+    await page.goto('/invoices?panel=balances', { waitUntil: 'domcontentloaded' })
+    await expect(page.getByRole('heading', { level: 1, name: 'Job balances' })).toBeVisible()
+    await page.getByRole('searchbox', { name: 'Filter jobs' }).fill('lorraine')
+    await expect(page.getByRole('link', { name: 'Lorraine Beasley', exact: true })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Rosa Delgado', exact: true })).toHaveCount(0)
+    const download = page.waitForEvent('download')
+    await page.getByRole('button', { name: 'Export CSV' }).click()
+    expect((await download).suggestedFilename()).toBe('fieldhorse-invoices-outstanding.csv')
   })
 })

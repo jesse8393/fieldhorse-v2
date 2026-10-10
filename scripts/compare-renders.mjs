@@ -64,6 +64,8 @@ const SHOTS = [
   { phase: 3, name: 'quote-day', path: '/quotes/c-quote?tab=quote', mode: 'day', render: 'glamor/g-quote.jpg', tables: quoteTables },
   { phase: 3, name: 'quote-night', path: '/quotes/c-quote?tab=quote', mode: 'night', render: 'glamor/g-quote.jpg', tables: quoteTables },
   { phase: 4, name: 'schedule-day', title: 'Schedule, Day', path: '/schedule', mode: 'day', view: DESKTOP, weekday: 4, clock: [9, 0], render: 'base/desktop-schedule.jpg', tables: weekTables },
+  { phase: 4, name: 'deskhome-day', title: 'Today on a desktop, Day', path: '/', mode: 'day', view: DESKTOP, weekday: 4, render: 'glamor/g-today.jpg' },
+  { phase: 4, name: 'deskmoney-day', title: 'Money on a desktop, Day', path: '/invoices', mode: 'day', view: DESKTOP, weekday: 4, render: 'glamor/g-money.jpg', tables: moneyTables },
   { phase: 4, name: 'deskjob-day', title: 'Job, Day', path: '/jobs/c-job1', mode: 'day', view: DESKTOP, weekday: 4, render: 'glamor/g-desktop-job.jpg' },
   { phase: 4, name: 'palette-day', title: 'Command palette, Day', path: '/schedule', mode: 'day', view: DESKTOP, weekday: 4, clock: [9, 0], action: 'palette', render: 'base/desktop-command.jpg', tables: paletteTables },
   { phase: 6, name: 'thread-day', title: 'Inbox thread, Day', path: '/inbox/conv-priya', mode: 'day', clock: [8, 20], render: 'base/inbox.jpg', tables: inboxTables },

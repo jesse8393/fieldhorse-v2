@@ -89,9 +89,14 @@ test('audits every authenticated workspace at the reported desktop size', async 
     }
 
     if (route.name === 'invoices') {
-      const paymentButton = page.locator('.fh-build-row-btn').filter({ hasText: 'Log payment' }).first()
-      await expect(paymentButton).toHaveCSS('height', '32px')
-      const wraps = await paymentButton.evaluate((button) => button.scrollHeight > button.clientHeight)
+      // Money: the Action column's button keeps its label on one line.
+      const actionButton = page.locator('.fhmd-table .fhc-btn').first()
+      await expect(actionButton).toBeVisible()
+      // The button's hit area runs past its box, so measure the label's lines.
+      const wraps = await actionButton.evaluate((button) => {
+        const text = button.querySelector('.fhc-btn__text') ?? button
+        return text.getBoundingClientRect().height > parseFloat(getComputedStyle(text).lineHeight) * 1.5
+      })
       expect(wraps, 'Invoice row action wraps onto multiple lines').toBe(false)
     }
 
