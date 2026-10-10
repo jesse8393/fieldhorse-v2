@@ -10,7 +10,7 @@ Paste this whole file into Claude Code for the `jesse8393/fieldhorse-v2` reposit
    * `glamor/g-today.jpg`, `glamor/g-job.jpg`
    * `base/today.jpg`, `base/jobs.jpg`, `base/job-spine.jpg`, `base/capture.jpg`, `base/night.jpg`
 4. Execute the tasks in order. Test first where a task has tests. Commit after each task with a plain sentence case message.
-5. **Done rule.** A screen is not done until Task 13 has produced its side by side image (our build next to the matching render, Day and Night) and you have looked at it and fixed every difference that the spec does not excuse. Put the side by side images in the pull request description. If a difference is deliberate, say why in one line under the image.
+5. **Done rule.** A screen is not done until Task 14 has produced its side by side image (our build next to the matching render, Day and Night) and you have looked at it and fixed every difference that the spec does not excuse. Put the side by side images in the pull request description. If a difference is deliberate, say why in one line under the image.
 6. `npm run test:all` and `npm run audit:design` must pass before you open or update the pull request.
 
 ---

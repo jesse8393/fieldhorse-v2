@@ -15,6 +15,7 @@ import {
 
 // The phone and the company sit in Murfreesboro, Tennessee.
 const originalTz = process.env.TZ
+process.env.TZ = 'America/Chicago'
 beforeAll(() => { process.env.TZ = 'America/Chicago' })
 afterAll(() => {
   if (originalTz === undefined) delete process.env.TZ

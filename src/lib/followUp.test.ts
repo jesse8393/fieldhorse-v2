@@ -1,5 +1,17 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi, beforeAll, afterAll } from 'vitest'
 import { QueryClient } from '@tanstack/react-query'
+
+// These checks read the local hour, day or week. Pin Central time, where
+// Jesse works, so the result is the same on every machine and in CI (UTC).
+// Set it as the file loads too, because the fixtures below build local
+// dates before any hook runs.
+const originalTz = process.env.TZ
+process.env.TZ = 'America/Chicago'
+beforeAll(() => { process.env.TZ = 'America/Chicago' })
+afterAll(() => {
+  if (originalTz === undefined) delete process.env.TZ
+  else process.env.TZ = originalTz
+})
 
 const updates: { values: unknown; id: string }[] = []
 let failNext: { message: string } | null = null

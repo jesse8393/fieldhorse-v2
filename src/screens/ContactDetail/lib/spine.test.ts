@@ -1,7 +1,19 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { buildSpine, jobMoney } from './spine.ts'
 import { composeActivityEvents } from '../sections/composeActivityEvents.ts'
 import type { ActivityEvent } from '../sections/composeActivityEvents.ts'
+
+// These checks read the local hour, day or week. Pin Central time, where
+// Jesse works, so the result is the same on every machine and in CI (UTC).
+// Set it as the file loads too, because the fixtures below build local
+// dates before any hook runs.
+const originalTz = process.env.TZ
+process.env.TZ = 'America/Chicago'
+beforeAll(() => { process.env.TZ = 'America/Chicago' })
+afterAll(() => {
+  if (originalTz === undefined) delete process.env.TZ
+  else process.env.TZ = originalTz
+})
 
 // Saturday, October 10, 2026 at 9:30 in the local timezone.
 const NOW = new Date(2026, 9, 10, 9, 30)

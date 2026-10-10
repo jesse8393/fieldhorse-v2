@@ -1,5 +1,17 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, beforeAll, afterAll } from 'vitest'
 import { dayHeadline, isPour, nightHeadline, type HeadlineStop } from './todayHeadline.ts'
+
+// These checks read the local hour, day or week. Pin Central time, where
+// Jesse works, so the result is the same on every machine and in CI (UTC).
+// Set it as the file loads too, because the fixtures below build local
+// dates before any hook runs.
+const originalTz = process.env.TZ
+process.env.TZ = 'America/Chicago'
+beforeAll(() => { process.env.TZ = 'America/Chicago' })
+afterAll(() => {
+  if (originalTz === undefined) delete process.env.TZ
+  else process.env.TZ = originalTz
+})
 
 // Local times, as the phone reads them.
 function at(hours: number, minutes: number) {
