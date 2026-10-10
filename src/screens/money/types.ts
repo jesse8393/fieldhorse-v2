@@ -54,3 +54,33 @@ export type CollectionPace = {
 export type MoneyFilter = 'outstanding' | 'all'
 
 export type SendInvoiceOptions = { reminder?: boolean }
+
+/**
+ * What Invoices.tsx hands the Money screen, on a phone and on a desktop:
+ * the loaded bundle, the rows it builds from it and the handlers that
+ * send, download, void and record payments, so both layouts share one
+ * code path.
+ */
+export type MoneyScreenProps = {
+  bundle: InvoicesBundle | undefined
+  loading: boolean
+  /** Issued invoices with their job and displayed status (every one, unfiltered). */
+  invoiceRows: IssuedInvoiceRow[]
+  /** Job balances, already narrowed by the filter. */
+  jobBalances: JobBalanceRow[]
+  totals: AgingTotals
+  clientAR: ClientBalanceGroup[]
+  collectionPace: CollectionPace
+  filter: MoneyFilter
+  onFilterChange: (next: MoneyFilter) => void
+  /** The invoice id that is mid send, if any. */
+  sendingId: string | null
+  /** Sends the invoice email. Resolves true once it has gone out. */
+  onSendInvoice: (row: IssuedInvoiceRow, options?: SendInvoiceOptions) => Promise<boolean>
+  onDownloadInvoice: (row: IssuedInvoiceRow) => void
+  onPayInvoice: (row: IssuedInvoiceRow) => void
+  onVoidInvoice: (row: IssuedInvoiceRow) => void
+  onStatement: (group: ClientBalanceGroup) => void
+  /** Reload the invoices after a new one is saved. */
+  onRefresh: () => void
+}

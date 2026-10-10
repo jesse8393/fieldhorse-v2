@@ -137,6 +137,75 @@ export function buildTodayView({ bundle, now, lat, lon, weather }: TodayViewInpu
   }
 }
 
+/* ---------------- The week strip (desktop) ---------------- */
+
+export type WeekStripDay = {
+  /** The local day as "2026-10-08", for keys and the Schedule link. */
+  key: string
+  weekday: string
+  dayOfMonth: number
+  count: number
+  today: boolean
+  /** "3 visits", "1 visit" or "None", for the cell. */
+  countText: string
+  /** The whole cell for a screen reader: "Thursday, October 8, today, 3 visits". */
+  label: string
+}
+
+function startOfWeekSunday(now: Date): Date {
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay())
+}
+
+/**
+ * The week the desktop strip draws and the range to fetch for it: local
+ * midnight on Sunday up to the next Sunday, the same seven days as the
+ * desktop Schedule board.
+ */
+export function weekBounds(now: Date): { start: Date; end: Date } {
+  const start = startOfWeekSunday(now)
+  return { start, end: new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7) }
+}
+
+function pad2(n: number): string {
+  return String(n).padStart(2, '0')
+}
+
+/**
+ * Seven days, Sunday to Saturday around today, each with its number of
+ * visits. A visit counts on the local day it starts; rows with no start
+ * or from another week are left out, so a range query that returns more
+ * than the week still counts right.
+ */
+export function weekStrip(visits: { start_at?: string | null }[], now: Date): WeekStripDay[] {
+  const first = startOfWeekSunday(now)
+  const todayKey = dayKey(now)
+  const counts = new Map<string, number>()
+  for (const visit of visits) {
+    const start = parse(visit.start_at)
+    if (Number.isNaN(start)) continue
+    const key = dayKey(new Date(start))
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+
+  return Array.from({ length: 7 }, (_, i) => {
+    const date = new Date(first.getFullYear(), first.getMonth(), first.getDate() + i)
+    const count = counts.get(dayKey(date)) ?? 0
+    const today = dayKey(date) === todayKey
+    const countText = count === 0 ? 'None' : `${count} ${count === 1 ? 'visit' : 'visits'}`
+    const spoken = count === 0 ? 'no visits' : countText
+    const long = date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+    return {
+      key: `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`,
+      weekday: date.toLocaleDateString('en-US', { weekday: 'short' }),
+      dayOfMonth: date.getDate(),
+      count,
+      today,
+      countText,
+      label: `${long}, ${today ? 'today, ' : ''}${spoken}`
+    }
+  })
+}
+
 /* ---------------- Times ---------------- */
 
 /** "7:30" and "am", for the time column and the next stop label. */

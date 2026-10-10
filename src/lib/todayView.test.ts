@@ -10,7 +10,9 @@ import {
   stopTime,
   todayWeather,
   tomorrowLine,
-  weatherLine
+  weatherLine,
+  weekBounds,
+  weekStrip
 } from './todayView.ts'
 
 // The phone and the company sit in Murfreesboro, Tennessee.
@@ -374,5 +376,74 @@ describe('stopTime and navigateHref', () => {
     expect(navigateHref('412 Burkitt Station Rd', android)).toBe('https://www.google.com/maps/dir/?api=1&destination=412%20Burkitt%20Station%20Rd')
     // iPadOS reports a Mac, with touch.
     expect(navigateHref('A & B', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', 5)).toBe('https://maps.apple.com/?daddr=A%20%26%20B')
+  })
+})
+
+describe('weekBounds and weekStrip', () => {
+  const row = (start: Date | null) => ({ start_at: start ? start.toISOString() : null })
+
+  it('runs Sunday to the next Sunday around today, as the desktop Schedule does', () => {
+    const { start, end } = weekBounds(at(6, 40))
+    expect(start.getFullYear()).toBe(2026)
+    expect([start.getMonth(), start.getDate(), start.getHours()]).toEqual([9, 4, 0])
+    expect([end.getMonth(), end.getDate(), end.getHours()]).toEqual([9, 11, 0])
+  })
+
+  it('has seven days, Sunday to Saturday, with today marked once', () => {
+    const days = weekStrip([], at(6, 40))
+    expect(days.map((d) => d.weekday)).toEqual(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'])
+    expect(days.map((d) => d.dayOfMonth)).toEqual([4, 5, 6, 7, 8, 9, 10])
+    expect(days.filter((d) => d.today).map((d) => d.weekday)).toEqual(['Thu'])
+    expect(days.map((d) => d.key)).toEqual(['2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09', '2026-10-10'])
+  })
+
+  it('counts the visits on each local day and ignores other weeks and rows with no start', () => {
+    const days = weekStrip(
+      [
+        row(at(7, 30)),
+        row(at(13, 30)),
+        row(at(23, 50)),
+        row(at(9, 0, 1)),
+        row(at(9, 0, -5)),
+        row(at(9, 0, 3)),
+        row(null)
+      ],
+      at(6, 40)
+    )
+    expect(days.map((d) => d.count)).toEqual([0, 0, 0, 0, 3, 1, 0])
+  })
+
+  it('puts a late night visit on the day it starts in local time, not in UTC', () => {
+    const days = weekStrip([row(at(21, 30))], at(6, 40))
+    expect(days.find((d) => d.today)?.count).toBe(1)
+    expect(days.find((d) => d.key === '2026-10-09')?.count).toBe(0)
+  })
+
+  it('words each day for a screen reader and for the cell', () => {
+    const days = weekStrip([row(at(7, 30)), row(at(9, 0, 1)), row(at(13, 0, 1))], at(6, 40))
+    const thu = days.find((d) => d.today)
+    expect(thu?.label).toBe('Thursday, October 8, today, 1 visit')
+    expect(thu?.countText).toBe('1 visit')
+    const fri = days.find((d) => d.key === '2026-10-09')
+    expect(fri?.label).toBe('Friday, October 9, 2 visits')
+    expect(fri?.countText).toBe('2 visits')
+    const sat = days.find((d) => d.key === '2026-10-10')
+    expect(sat?.label).toBe('Saturday, October 10, no visits')
+    expect(sat?.countText).toBe('None')
+  })
+
+  it('writes no dashes of its own', () => {
+    for (const day of weekStrip([row(at(7, 30))], at(6, 40))) {
+      expect(day.label).not.toMatch(/[-\u2013\u2014]/)
+      expect(day.countText).not.toMatch(/[-\u2013\u2014]/)
+    }
+  })
+
+  it('starts the week on Sunday when today is Sunday and ends it on Saturday when today is Saturday', () => {
+    const sunday = weekStrip([], new Date(2026, 9, 4, 8))
+    expect(sunday[0].today).toBe(true)
+    const saturday = weekStrip([], new Date(2026, 9, 10, 8))
+    expect(saturday[6].today).toBe(true)
+    expect(saturday[0].dayOfMonth).toBe(4)
   })
 })

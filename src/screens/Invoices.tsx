@@ -18,7 +18,7 @@ import { useConfirm } from '../components/ConfirmSheet.tsx'
 import StatementSheet from '../components/StatementSheet.tsx'
 import { approvedCoByContact } from '../lib/statement.ts'
 import { parseDateOnly } from '../lib/dates.ts'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 const SnowInvoices = lazy(() => import('../components/desktop/SnowInvoicesBuild.tsx'))
 import MoneyPhone from './money/MoneyPhone.tsx'
@@ -34,11 +34,12 @@ import type { MoneyFilter } from './money/types.ts'
 // The per-job Email action now creates a first-class invoice for the
 // balance instead of firing an untracked ad-hoc PDF.
 //
-// Below 900 px the screen is MoneyPhone (src/screens/money/): this file
+// Below 900 px the screen is MoneyPhone (src/screens/money/) and from
+// 900 px up it is SnowInvoicesBuild (src/components/desktop/): this file
 // still loads the data and owns the send, download, void and payment
-// handlers, and hands them down. Per job Email, Download and Mark paid
-// live on the job's invoice page (InvoiceDetail, /invoices/:id), which
-// the phone's Job balances list links to.
+// handlers, and hands them down to both. Per job Email, Download and Mark
+// paid live on the job's invoice page (InvoiceDetail, /invoices/:id),
+// which the Job balances list links to.
 
 function bucketFor(days: any) {
   if (days <= 30) return '0-30'
@@ -88,10 +89,9 @@ export default function Invoices() {
   // When the sheet was opened from a specific issued invoice, `invoice`
   // rides along so the payment settles that fh_invoices row.
   const [payingRow, setPayingRow] = useState<any>(null)
-  // Which row is mid-send (job.id or invoice.id) and which just
-  // succeeded, drives the per-row Email button's loading + Sent morph.
+  // Which invoice is mid send, drives the Resend and Send reminder
+  // buttons' loading state.
   const [sendingId, setSendingId] = useState<any>(null)
-  const [sentId, setSentId] = useState<any>(null)
   const confirm = useConfirm()
 
   // Fast lookup: contact_id → job row (for invoice card labels + sends).
@@ -215,12 +215,6 @@ export default function Invoices() {
     })
   }, [invoices, jobById])
 
-  const shownInvoiceRows = useMemo(
-    () => filter === 'outstanding'
-      ? invoiceRows.filter((r) => ['draft', 'sent', 'overdue'].includes(r.effStatus))
-      : invoiceRows,
-    [invoiceRows, filter]
-  )
   const totals = useMemo(() => {
     const out: Record<string, number> = { '0-30': 0, '31-60': 0, '60+': 0, total: 0, count: 0 }
     for (const r of rows) {
@@ -330,8 +324,6 @@ export default function Invoices() {
       })
       if (res.ok) {
         toastSuccess(`${options.reminder ? 'Reminder' : 'Invoice'} sent to ${res.recipient}`, res.filename)
-        setSentId(invoice.id)
-        setTimeout(() => setSentId(null), 2400)
         refresh()
         return true
       } else if (res.reason === 'sender_not_configured') {
@@ -385,7 +377,6 @@ export default function Invoices() {
     refresh()
   }
 
-  const navigate = useNavigate()
   const isDesktop = useIsDesktop()
 
   // Never render financial totals from a failed load, a fetch error would
@@ -408,24 +399,23 @@ export default function Invoices() {
       <>
         <Suspense fallback={null}>
           <SnowInvoices
-            rows={rows}
-            filtered={filtered}
-            issuedInvoices={shownInvoiceRows}
-            totals={totals}
+            bundle={bundle}
             loading={loading}
-            filter={filter as 'outstanding' | 'all'}
-            setFilter={(f) => setFilter(f)}
-            sendingId={sendingId}
-            sentId={sentId}
+            invoiceRows={invoiceRows}
+            jobBalances={filtered}
+            totals={totals}
             clientAR={clientAR}
-            onOpenJob={(jobId) => navigate(`/jobs/${jobId}?tab=financials`)}
-            onOpenClient={(clientId) => navigate(`/clients/${clientId}`)}
-            onStatement={(g) => setStatementClient(g)}
-            onPayRow={(r) => setPayingRow(r)}
+            collectionPace={collectionPace}
+            filter={filter as MoneyFilter}
+            onFilterChange={(f) => setFilter(f)}
+            sendingId={sendingId}
             onSendInvoice={handleInvoiceSend}
             onDownloadInvoice={handleInvoiceDownload}
             onPayInvoice={openInvoicePayment}
             onVoidInvoice={handleInvoiceVoid}
+            onStatement={(g) => setStatementClient(g)}
+            onPayRow={(r) => setPayingRow(r)}
+            onRefresh={() => refresh()}
           />
         </Suspense>
         <AnimatePresence>
