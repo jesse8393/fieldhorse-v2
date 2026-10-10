@@ -22,7 +22,7 @@ Nothing failed persistently on the first full `npm run test:all` of this run, on
 | Phase | Branch | Pull request | Base |
 | --- | --- | --- | --- |
 | 2 | `claude/audit-fix-pass-2026-10-09` | #217 | `main` |
-| 3 | `redesign/phase-3` | not opened yet | the Phase 2 branch |
+| 3 | `redesign/phase-3` | #218 (draft) | the Phase 2 branch |
 | 4 | `redesign/phase-4` | not opened yet | `redesign/phase-3` |
 | 5 | `redesign/phase-5` | not opened yet | `redesign/phase-4` |
 | 6 | `redesign/phase-6` | not opened yet | `redesign/phase-5` |
@@ -80,3 +80,16 @@ Status is one of todo, done, blocked, skipped.
 
 * Decision numbers: the Phase 2 pull request first recorded the Job page header decision as D6. D6 to D13 were then assigned to the later phases, so it is now D14 in `SPEC.md`. The text of #217's description still says D6 for it.
 * Unit tests that read the local hour, day or week pin `America/Chicago` as the file loads and in `beforeAll`, and restore it in `afterAll`. Setting it only in `beforeAll` is too late for fixtures that build dates at load time.
+
+### Phase 4 decisions to put in SPEC section 17 when Phase 4 is assembled
+
+* **Palette shortcuts (palette agent).** Plain letters always type. A shortcut is Alt plus I, M or N (Option on a Mac), only while the palette is open and a job row or one of that job's action rows is highlighted. The key caps print the modifier. The handler is on the palette's own key handler, so nothing listens while it is closed.
+* **Palette Message action.** No compose flow takes a job, so Message uses the existing `sms:` link (as the phone Job header does) and opens the job when it has no phone. Nothing is sent.
+* **Palette results.** `universalSearch` now also returns phone and address for jobs, and the job sub line no longer shows an amount, so crew never see money there.
+* **Desktop Job page (jobdesk agent).**
+  * No key cap on the gold button, because no global shortcut exists (shortcuts live in the palette only).
+  * The shared header strip is hidden on this page and the bell moves into the banner; search stays in the sidebar and under Control or Command K. This extends D14 to desktop.
+  * The old rail cards (health, schedule, reports, billing, change orders) are gone; their facts moved to the rail notes, the Balance card and a Change orders section of the facts panel. Health score and next action stay under "More about this job" in the Spine.
+  * The gold action shows on every tab, following the stage.
+  * Lead, Quote and Lost jobs show "Estimated value" or "Quote total" on the vault card, never "Balance".
+  * No `spine` prop was added to `SnowJobDetailBuild`: the Overview tab already renders the Spine.
