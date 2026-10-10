@@ -49,6 +49,7 @@ import { useIsDesktop } from '../../lib/useMediaQuery.ts'
 import { useHideDock } from '../../lib/dockVisibility.ts'
 import { openCapture } from '../../lib/captureAttach.ts'
 import { jobMoney } from './lib/spine.ts'
+import { assignedCrewIds, railNotes } from './lib/jobDesktop.ts'
 import JobHeaderPhone, { JobSectionTabs, JobMoreSheet } from './phone/JobHeaderPhone.tsx'
 import type { JobMoreAction } from './phone/JobHeaderPhone.tsx'
 import JobActionCapsule from './phone/JobActionCapsule.tsx'
@@ -354,9 +355,10 @@ export default function ContactDetail() {
 
   // Phone (spec 8.1 and 9.4): the page brings its own onyx action
   // capsule, so the dock steps aside while it is mounted. The header's
-  // cover and count and the Spine share one photo query.
+  // cover and count and the Spine share one photo query, and so does the
+  // desktop banner.
   useHideDock(!isDesktop)
-  const jobPhotos = useJobPhotos(isDesktop ? null : id)
+  const jobPhotos = useJobPhotos(id)
   const tabsRef = useRef<HTMLDivElement | null>(null)
   const [moreOpen, setMoreOpen] = useState(false)
   // Photos the capsule's camera took, waiting for the Files tab to upload.
@@ -627,7 +629,7 @@ export default function ContactDetail() {
           onOpenMarkComplete={() => setCompleteOpen(true)}
           onOpenSendInvoice={() => setInvoiceOpen(true)}
           onOpenQuote={() => setTab('quote')}
-          spineFirst={!isDesktop}
+          spineFirst
           inspections={inspections}
           onAddToSpine={() => openCapture({ jobId: contact.id })}
         />
@@ -781,6 +783,21 @@ export default function ContactDetail() {
             }
           })()
 
+          // Notes under the stage rail segments and the teammates the job
+          // names, for the redesigned desktop page (spec 9.11).
+          const deskNow = new Date()
+          const deskRailNotes = railNotes({
+            contact,
+            scheduleItems,
+            stageTransitions,
+            contractTotal: Number(contractTotal || 0),
+            paid: Number(paid || 0),
+            balance: Number(balance || 0),
+            canSeeMoney,
+            now: deskNow
+          })
+          const deskCrewIds = assignedCrewIds({ scheduleItems, todos, now: deskNow })
+
           return (
             <Suspense fallback={null}><SnowJobDetailBuild
               // The shell reads Contract straight off contact.amount, so
@@ -795,8 +812,15 @@ export default function ContactDetail() {
               onEdit={handleEditClick}
               onDelete={canDeleteJob ? () => setDeleteOpen(true) : undefined}
               onAddEvent={() => setEventOpen(true)}
-              primaryAction={tab === 'overview' ? null : stageCta}
+              primaryAction={stageCta}
               isEditing={isEditing}
+              coverUrl={jobPhotos.cover?.url ?? null}
+              coverAlt={jobPhotos.cover?.alt}
+              money={phoneMoney}
+              railNotes={deskRailNotes}
+              crewIds={deskCrewIds}
+              onInvitePartner={() => setInviteOpen(true)}
+              onOpenClient={isOwnerView && contact.client_id ? () => navigate(`/clients/${contact.client_id}`) : undefined}
               scheduleStatus={scheduleStatus}
               reportsMissing={reportsMissing}
               billingStatus={canSeeMoney ? billingStatus : null}
