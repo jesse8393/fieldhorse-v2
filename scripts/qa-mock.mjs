@@ -54,7 +54,13 @@ const TABLES = {
   fh_subs: [], fh_expenses: [], fh_inspections: [], fh_job_todos: [],
   fh_insurance_claims: [], fh_stage_transitions: [], fh_notifications: [],
   fh_public_links: [], fh_partnerships: [], fh_push_subscriptions: [],
-  fh_documents: [], fh_files: []
+  fh_documents: [], fh_files: [],
+  // Growth Engine tables behind the Inbox (Phase 6). Empty by default, which
+  // means the engine is off (no fh_org_settings row) and the Inbox is hidden.
+  // A test turns it on and seeds conversations with signIn's `tables`:
+  //   fh_org_settings: [{ engine_enabled: true }]
+  //   fh_v_inbox, fh_messages, fh_agent_runs
+  fh_v_inbox: [], fh_messages: [], fh_agent_runs: [], fh_org_settings: []
 }
 
 // Every row belongs to org-1, mirroring production where migration 032
@@ -93,6 +99,119 @@ function restResponse(url, headers, tables = TABLES) {
 }
 
 
+// ---- RPC calls (Phase 6) ----------------------------------------------------
+// Every POST to /rest/v1/rpc/<name> is recorded as { name, body, at } and
+// answered. Read the record for a browser context with rpcCalls(context) or
+// rpcCalls(context, 'fh_agent_run_approve'), or pass your own array as
+// installMock's `rpcLog` option and read that. Callers that never look at the
+// record are unaffected. To make one call fail, register a later
+// context.route for that function in the test (Playwright runs the most
+// recently registered matching route first).
+//
+// The four Inbox functions also change this context's own copy of the inbox
+// tables, so the screen behaves as it would against the real database:
+//   fh_send_message          adds an outbound message and returns its id
+//   fh_conversation_mark_read  sets unread_count to 0 on the conversation
+//   fh_agent_run_approve     marks the run approved, adds the sent message
+//                            (the body passed as p_body wins) and returns its id
+//   fh_agent_run_reject      marks the run rejected
+// Nothing is ever really sent. Every other function answers [] as before.
+const RPC_LOGS = new WeakMap()
+const INBOX_TABLES = ['fh_v_inbox', 'fh_messages', 'fh_agent_runs', 'fh_org_settings']
+
+export function rpcCalls(ctx, name) {
+  const log = RPC_LOGS.get(ctx) ?? []
+  return name ? log.filter((call) => call.name === name) : [...log]
+}
+
+// Copies of the inbox tables that belong to one browser context, so the state
+// an RPC changes never leaks into another context or the shared defaults.
+function withOwnInboxTables(tables) {
+  const own = { ...tables }
+  for (const name of INBOX_TABLES) own[name] = (tables[name] ?? []).map((row) => ({ ...row }))
+  return own
+}
+
+let rpcSeq = 0
+function nextId(prefix) {
+  rpcSeq += 1
+  return `${prefix}-${rpcSeq}`
+}
+
+function proposalBody(proposal) {
+  if (typeof proposal === 'string') return proposal
+  if (!proposal || typeof proposal !== 'object') return ''
+  for (const key of ['body', 'text', 'message', 'draft', 'reply', 'content']) {
+    if (typeof proposal[key] === 'string' && proposal[key].trim()) return proposal[key]
+  }
+  return ''
+}
+
+function touchConversation(tables, conversationId, patch) {
+  const row = tables.fh_v_inbox.find((r) => r.conversation_id === conversationId)
+  if (row) Object.assign(row, typeof patch === 'function' ? patch(row) : patch)
+}
+
+function addOutbound(tables, message) {
+  const sentAt = new Date().toISOString()
+  const row = {
+    id: nextId('msg-out'), org_id: 'org-1', direction: 'outbound', subject: null, status: 'sent',
+    read_at: sentAt, hold_reason: null, sent_by_kind: 'user', agent_run_id: null,
+    created_at: sentAt, sent_at: sentAt, call_status: null, ...message
+  }
+  tables.fh_messages.push(row)
+  touchConversation(tables, row.conversation_id, { last_preview: row.body, last_message_at: sentAt, last_channel: row.channel })
+  return row
+}
+
+function rpcResponse(name, body, tables) {
+  const json = (data) => ({ status: 200, body: JSON.stringify(data) })
+  const empty = { status: 204, body: '' }
+  switch (name) {
+    case 'fh_send_message': {
+      const inbox = tables.fh_v_inbox.find((r) => r.client_id === body.p_client_id)
+      const conversationId = inbox?.conversation_id ?? tables.fh_messages.find((m) => m.client_id === body.p_client_id)?.conversation_id ?? null
+      const sent = addOutbound(tables, {
+        conversation_id: conversationId, client_id: body.p_client_id, channel: body.p_channel,
+        subject: body.p_subject ?? null, body: body.p_body
+      })
+      return json(sent.id)
+    }
+    case 'fh_conversation_mark_read': {
+      const readAt = new Date().toISOString()
+      touchConversation(tables, body.p_conversation_id, { unread_count: 0 })
+      for (const m of tables.fh_messages) {
+        if (m.conversation_id === body.p_conversation_id && m.direction === 'inbound' && !m.read_at) m.read_at = readAt
+      }
+      return empty
+    }
+    case 'fh_agent_run_approve': {
+      const run = tables.fh_agent_runs.find((r) => r.id === body.p_agent_run_id)
+      if (!run) return { status: 400, body: JSON.stringify({ code: 'P0002', message: 'agent run not found' }) }
+      run.status = 'approved'
+      const text = body.p_body ?? proposalBody(run.proposal)
+      const channel = body.p_channel ?? run.proposal?.channel ?? 'sms'
+      const sent = addOutbound(tables, {
+        conversation_id: run.conversation_id, client_id: run.client_id ?? tables.fh_v_inbox.find((r) => r.conversation_id === run.conversation_id)?.client_id,
+        channel, body: text, sent_by_kind: 'agent', agent_run_id: run.id
+      })
+      run.executed_message_id = sent.id
+      touchConversation(tables, run.conversation_id, (row) => ({ pending_drafts: Math.max(0, (row.pending_drafts ?? 0) - 1) }))
+      return json(sent.id)
+    }
+    case 'fh_agent_run_reject': {
+      const run = tables.fh_agent_runs.find((r) => r.id === body.p_agent_run_id)
+      if (run) {
+        run.status = 'rejected'
+        touchConversation(tables, run.conversation_id, (row) => ({ pending_drafts: Math.max(0, (row.pending_drafts ?? 0) - 1) }))
+      }
+      return empty
+    }
+    default:
+      return json([])
+  }
+}
+
 export const session = {
   access_token: 'qa.fake.token', refresh_token: 'qa-refresh', token_type: 'bearer',
   expires_in: 86400, expires_at: Math.floor(now / 1000) + 86400, user: USER
@@ -115,7 +234,9 @@ function tablesFor(options) {
 
 export async function installMock(ctx, options = {}) {
   const supabaseHosts = new Set(options.supabaseHosts || ['qa-mock.supabase.co'])
-  const tables = tablesFor(options)
+  const tables = withOwnInboxTables(tablesFor(options))
+  const rpcLog = Array.isArray(options.rpcLog) ? options.rpcLog : []
+  RPC_LOGS.set(ctx, rpcLog)
   await ctx.route((u) => supabaseHosts.has(u.hostname), async (route) => {
     const req = route.request()
     const url = req.url()
@@ -124,6 +245,14 @@ export async function installMock(ctx, options = {}) {
     if (url.includes('/auth/v1/')) return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' })
     if (url.includes('/realtime/')) return route.abort()
     if (url.includes('/storage/')) return route.fulfill({ status: 404, body: '' })
+    if (url.includes('/rest/v1/rpc/')) {
+      const name = new URL(url).pathname.split('/rpc/')[1]?.split('?')[0] || ''
+      let body = {}
+      try { body = req.postDataJSON() ?? {} } catch { /* no JSON body */ }
+      rpcLog.push({ name, body, at: Date.now() })
+      const r = rpcResponse(name, body, tables)
+      return route.fulfill({ status: r.status, contentType: 'application/json', body: r.body })
+    }
     if (url.includes('/rest/v1/')) {
       const r = restResponse(url, req.headers(), tables)
       return route.fulfill({ status: r.status, contentType: 'application/json', body: r.body, headers: { 'content-range': '0-9/10' } })

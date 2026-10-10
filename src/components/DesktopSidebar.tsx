@@ -1,7 +1,8 @@
 // DesktopSidebar, the onyx rail at 900px and up (spec 8.3).
 //
 // Top: the company monogram, name and city, then search with ⌘K.
-// Main list: Today, Schedule, Jobs, Money, Customers, Reports. A
+// Main list: Today, Schedule, Jobs, Money, Inbox (only when the company's
+// messaging engine is on, decision D9), Customers, Reports. A
 // collapsible Team and office group holds the rest, so every route the
 // role allows is in reach. Bottom: Settings, then the signed in person.
 //
@@ -18,7 +19,8 @@ import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { prefetchRoute } from '../lib/routePrefetch.ts'
-import { SETTINGS, SIDEBAR_MORE, SIDEBAR_PRIMARY, isActive, type NavItem } from '../lib/navItems.ts'
+import { SETTINGS, SIDEBAR_MORE, isActive, sidebarPrimary, type NavItem } from '../lib/navItems.ts'
+import { useEngineEnabled } from '../lib/inbox.ts'
 import { useNavAccess } from '../lib/useNavAccess.ts'
 import { cityLine } from '../lib/companyLine.ts'
 
@@ -65,13 +67,14 @@ export default function DesktopSidebar() {
   const { profile } = useProfile()
   const { memberships } = useMembership()
   const { canSee, hasCrew } = useNavAccess()
+  const engineEnabled = useEngineEnabled()
   const [moreOpen, setMoreOpen] = useState(() => readMoreOpen(pathname))
 
   const company = profile?.company_name?.trim() || profile?.full_name?.trim() || 'Your workspace'
   const city = cityLine(profile?.company_address)
   const person = profile?.full_name?.trim() || user?.email || ''
 
-  const primary = SIDEBAR_PRIMARY.filter((it) => canSee(it.to))
+  const primary = sidebarPrimary(engineEnabled).filter((it) => canSee(it.to))
   const more = SIDEBAR_MORE
     .filter((g) => !g.crewOnly || hasCrew)
     .map((g) => ({ ...g, items: g.items.filter((it) => canSee(it.to)) }))

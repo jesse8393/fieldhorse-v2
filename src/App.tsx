@@ -51,6 +51,7 @@ const SubDetail      = lazy(() => import('./screens/SubDetail.tsx'))
 const Invoices       = lazy(() => import('./screens/Invoices.tsx'))
 const Landing        = lazy(() => import('./screens/Landing.tsx'))
 const InvoiceDetail  = lazy(() => import('./screens/InvoiceDetail.tsx'))
+const Inbox          = lazy(() => import('./screens/inbox/Inbox.tsx'))
 // The redesign component sheet, in development builds only: the
 // condition is a build time constant, so production drops the chunk.
 const DesignSheet    = import.meta.env.DEV ? lazy(() => import('./screens/DesignSheet.tsx')) : null
@@ -240,6 +241,10 @@ export default function App() {
           <Route path="/sub-portal" element={<SubPortal />} />
           <Route path="/invoices" element={<Invoices />} />
           <Route path="/invoices/:id" element={<InvoiceDetail />} />
+          {/* The Inbox exists only while the company's messaging engine is
+              on; the screen explains itself when it is off (decision D9). */}
+          <Route path="/inbox" element={<Inbox />} />
+          <Route path="/inbox/:conversationId" element={<Inbox />} />
           {/* Alias routes, these URLs exist in muscle memory / older
               links but the screens live elsewhere. Explicit redirects
               beat the silent catch-all bounce to Home. (/leads is a

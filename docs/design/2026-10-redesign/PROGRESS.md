@@ -25,7 +25,7 @@ Nothing failed persistently on the first full `npm run test:all` of this run, on
 | 3 | `redesign/phase-3` | #218 (draft) | the Phase 2 branch |
 | 4 | `redesign/phase-4` | #219 (draft) | `redesign/phase-3` |
 | 5 | `redesign/phase-5` | #220 (draft) | `redesign/phase-4` |
-| 6 | `redesign/phase-6` | not opened yet | `redesign/phase-5` |
+| 6 | `redesign/phase-6` | #221 (draft) | `redesign/phase-5` |
 | 7 | `redesign/phase-7` | not opened yet | `redesign/phase-6` |
 
 ## Tasks
@@ -66,10 +66,10 @@ Status is one of todo, done, blocked, skipped.
 | 5 | 5.2 Fieldhorse proposal theme | done | 17b7d31 | Settings choice hidden until a migration allows it (D22) |
 | 5 | 5.3 Welcome and Login | done | fd12c62 | |
 | 5 | 5.4 Phase 5 review and pull request | done | see git log | #220, images in phase5-review |
-| 6 | 6.1 Inbox data and engine switch | todo | | |
-| 6 | 6.2 Inbox list | todo | | |
-| 6 | 6.3 Thread with the AI draft | todo | | |
-| 6 | 6.4 Phase 6 review and pull request | todo | | |
+| 6 | 6.1 Inbox data and engine switch | done | 45a0515 | Also touched `permissions.ts` and `appLayout.ts`, both additive |
+| 6 | 6.2 Inbox list | done | d5588e8 | |
+| 6 | 6.3 Thread with the AI draft | done | 0ca4345 | |
+| 6 | 6.4 Phase 6 review and pull request | done | see git log | #221, images in phase6-review |
 | 7 | 7.1 Unused components | todo | | |
 | 7 | 7.2 Dead CSS guarded by screenshots | todo | | |
 | 7 | 7.3 Final record and morning summary | todo | | |
@@ -101,6 +101,11 @@ Status is one of todo, done, blocked, skipped.
 * `src/lib/queries.ts` gained `cost` on the invoices bundle jobs so Money can compute margin. `tests/e2e/mock-workflows.spec.ts` changed two phone assertions that named old phone cards.
 * Full suite on the Phase 3 head: lint 0 errors (50 warnings, down from 57), typecheck, build and design audit pass, 720 of 720 unit tests, Playwright 95 passed and 75 skipped by project.
 
+### Phase 6 notes
+
+* Decisions D26 and D27 in `SPEC.md` cover the Inbox data guesses and who sees the Inbox. **Check D26 against the live schema:** the Growth Engine tables are not in `supabase/migrations`, so the held reasons and draft status values are best guesses.
+* The inbox agent added `tests/e2e/helpers/rpcCalls.ts` and RPC call recording to `scripts/qa-mock.mjs` (an `rpcLog` option and an `rpcCalls(context, name)` reader).
+
 ### Phase 5 notes
 
 * Decisions D22 to D25 in `SPEC.md` cover the Settings choice, the portal numbers, the portal layout and the Welcome and Login shell.
@@ -115,7 +120,7 @@ Status is one of todo, done, blocked, skipped.
 * The desktop shots in the review images are Day only, as the plan says. There is no desktop render for Today or Money, so those two shots sit next to the phone renders.
 * CI on #219 caught two timing sensitive desktop tests (`palette.spec` waited for network idle, `schedule.spec` dropped a keyboard drag before the highlight). Both now wait for the page. Network idle took up to 41 seconds under CPU load locally.
 
-### Phase 4 stretch decisions (recorded in SPEC section 17 as D28 and D29 on the Phase 6 branch)
+### Phase 4 stretch decisions (D28 and D29 in SPEC section 17)
 
 * **D28, desktop Today.**
   * Today now takes the same props as the phone and shares its parts (`todayParts.tsx`). Both layouts read `buildTodayView`.
