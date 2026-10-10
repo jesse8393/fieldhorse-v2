@@ -156,7 +156,7 @@ Rule: every status color travels with a word. Red only for late money or failed 
 
 Correction from the review: the canvas night caption `#948C7E` measures 4.48 to 1 on the night tray, just under AA, so captions inside the voice panel and AI notes would fail at night. Night ink 3 is now smoke `#9A9183`: about 5.8 to 1 on night plaster, 5.3 on night paper and 4.8 on the night tray.
 
-At night the onyx stage stays `#16140F` and sits almost level with night plaster (about 1.02 to 1). That matches the night render, where the whole screen reads as the stage; the gold hairline carries the edge. The dock moves to `#1E1C16` so it still reads as a separate layer.
+At night the onyx stage stays `#16140F` and sits almost level with night plaster (about 1.02 to 1). That matches the night render, where the whole screen reads as the stage; the gold hairline carries the edge. The dock moves to `#1E1C16` so it still reads as a separate layer. Changed in Phase 2: stages and vault cards paint `--fh-stage`, which is onyx by day and `#24211B` with a faint gold edge (`--fh-stage-edge`) at night, about 1.13 to 1 against night plaster, so they stay visible; linen on it measures 13.8 to 1 and smoke 5.2 to 1.
 
 ### 5.6 Type
 

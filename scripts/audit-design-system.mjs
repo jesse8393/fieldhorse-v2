@@ -16,7 +16,7 @@ const allowedColors = new Set([
   // Gold
   '#E6C278', '#AD7E2E',
   // Onyx stage
-  '#16140F', '#211F19', '#352F26', '#1E1C16', '#9A9183',
+  '#16140F', '#211F19', '#352F26', '#1E1C16', '#9A9183', '#24211B',
   // Status, Day
   '#2E7D4F', '#DCEADF', '#1D5536', '#3B5F85', '#DCE5EE', '#2C4A6B',
   '#B3362A', '#F2DCD8', '#7E2419',

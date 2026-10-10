@@ -148,6 +148,20 @@ describe('redesign token contrast (spec section 12)', () => {
     check(onyxDay, onyxPairs)
   })
 
+  it('night stage is lighter than the night ground', () => {
+    const stage = resolve(night, '--fh-stage')
+    const ground = resolve(night, '--fh-plaster')
+    expect(luminance(stage)).toBeGreaterThan(luminance(ground))
+    expect(ratio(stage, ground)).toBeGreaterThanOrEqual(1.12)
+  })
+
+  it('text on the night stage passes', () => {
+    check(night, [
+      ['--fh-linen', '--fh-stage', TEXT],
+      ['--fh-smoke', '--fh-stage', TEXT]
+    ])
+  })
+
   it('keeps the spec figures it quotes', () => {
     // Spot checks against the numbers printed in spec section 12, so the
     // document and the tokens cannot drift apart unnoticed.
