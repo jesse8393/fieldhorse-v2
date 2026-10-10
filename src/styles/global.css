@@ -4654,11 +4654,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     grid-template-columns: 1.15fr .8fr .8fr .8fr .7fr 1fr 14px;
   }
 
-  .fh-build-placeholder {
-    color: var(--v3-text-faint);
-  }
-
-  .fh-build-dot {
+    .fh-build-dot {
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -4684,14 +4680,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     color: var(--v3-text-muted);
   }
 
-  .fh-build-footer-link {
-    width: 100%;
-    justify-content: center;
-    min-height: 40px;
-    border-top: 1px solid var(--v3-glass-tint-2);
-  }
-
-  /* Phase 0 (Jun 10 rollout): collapse threshold dropped 1280 → 1000.
+    /* Phase 0 (Jun 10 rollout): collapse threshold dropped 1280 → 1000.
      Jesse's laptop runs Windows 150% scaling and tops out at ~1003 CSS
      px, so the old 1280 collapse rendered the stacked phone layout on
      every screen for him. New cascade:
@@ -4713,10 +4702,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
       grid-auto-flow: row dense;
       gap: 12px;
     }
-    .fh-build-health {
-      grid-column: 1 / -1;
-    }
-    /* Hero row still stacks at this tier — the mock's 3-col hero
+        /* Hero row still stacks at this tier — the mock's 3-col hero
        (title | view-card | mini-grid) needs ~1330px to fit cleanly. */
     .fh-build-hero-row {
       grid-template-columns: 1fr;
@@ -4834,37 +4820,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   }
 
   /* Date nav (chevrons + Today) */
-  .fh-build-datenav {
-    display: inline-flex;
-    margin-top: 14px;
-    gap: 4px;
-  }
-
-  .fh-build-datenav button {
-    height: 28px;
-    min-width: 32px;
-    padding: 0 12px;
-    border: 1px solid var(--v3-border-mid);
-    background: var(--v3-glass-tint);
-    color: var(--v3-text-secondary);
-    border-radius: 10px;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
-    font-weight: 700;
-  }
-
-  .fh-build-datenav button:hover {
-    background: var(--v3-glass-tint-2);
-  }
-
-  .fh-build-datenav__today {
-    padding: 0 12px !important;
-  }
-
-  /* Filter pills row */
+          /* Filter pills row */
   .fh-build-filterbar {
     display: flex;
     flex-wrap: wrap;
@@ -4952,26 +4908,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     text-align: center;
   }
 
-  .fh-build-row-btn {
-    display: inline-flex;
-    align-items: center;
-    height: 26px;
-    padding: 0 12px;
-    border-radius: 10px;
-    border: 1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent);
-    background: transparent;
-    color: var(--v3-primary-text, #C9963A);
-    font-size: 12px;
-    font-weight: 800;
-    letter-spacing: 0;
-    cursor: pointer;
-  }
-
-  .fh-build-row-btn:hover {
-    background: color-mix(in srgb, var(--v3-primary, #C9963A) 12%, transparent);
-  }
-
-  /* ---------- JOBS / JOB DESK ---------- */
+      /* ---------- JOBS / JOB DESK ---------- */
   .fh-build-content-grid--jobs {
     grid-template-columns: minmax(0, 1fr) 290px;
   }
@@ -5004,11 +4941,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   }
 
   /* ---------- INVOICES ---------- */
-  .fh-build-content-grid--invoices {
-    grid-template-columns: minmax(0, 1fr) 290px;
-  }
-
-  .fh-build-table__head.is-invoices,
+    .fh-build-table__head.is-invoices,
   .fh-build-table__row.is-invoices {
     grid-template-columns: 1.4fr 110px 60px 110px 90px 100px 130px;
   }
@@ -5017,67 +4950,13 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     cursor: pointer;
   }
 
-  .fh-build-inv-name {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    min-width: 0;
-  }
-
-  .fh-build-inv-actions {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    justify-content: flex-end;
-  }
-
-  /* ---------- SCHEDULE ---------- */
+      /* ---------- SCHEDULE ---------- */
   .fh-build-content-grid--schedule {
     grid-template-columns: minmax(0, 1fr) 290px;
   }
 
-  .fh-build-agenda {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  /* Upcoming card in the rail */
-  .fh-build-upnext {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    margin-top: 8px;
-  }
-
-  .fh-build-upnext__time {
-    color: var(--v3-primary-text, #C9963A);
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0;
-  }
-
-  .fh-build-upnext__title {
-    color: var(--v3-text);
-    font-size: 16px;
-    font-weight: 700;
-    line-height: 1.25;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-  }
-
-  .fh-build-upnext__loc {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    color: var(--v3-text-muted);
-    font-size: 12px;
-  }
-
-  .fh-build-rail-list {
+    /* Upcoming card in the rail */
+          .fh-build-rail-list {
     margin: 10px 0 0;
     padding: 0;
     list-style: none;
@@ -5115,29 +4994,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     white-space: nowrap;
   }
 
-  .fh-build-rail-cta {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    text-align: center;
-    cursor: pointer;
-    border-radius: 10px;
-    color: var(--v3-primary-text, #C9963A);
-    font-weight: 800;
-    letter-spacing: 0;
-    height: 44px;
-    font-size: 16px;
-    min-height: 44px;
-    padding: 0 16px !important;
-  }
-
-  .fh-build-rail-cta:hover {
-    background:
-      linear-gradient(180deg, color-mix(in srgb, var(--v3-primary) 10%, transparent), color-mix(in srgb, var(--v3-primary) 5%, transparent));
-  }
-
-  /* Phase 1 narrow-viewport collapse */
+      /* Phase 1 narrow-viewport collapse */
   /* Phase 0: keep the 1fr + 290px sidebar layout down to 1000 (was
      1280). Below 1000 the page collapses to single-column stack. */
   @media (max-width: 999px) {
@@ -5769,11 +5626,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     margin-top: 14px;
   }
   .fh-build-dot-sep { color: var(--v3-border-strong); }
-  .fh-build-stage-action {
-    margin-top: 16px;
-  }
-
-  /* 4-up mini grid sits on the right side of the detail hero. */
+    /* 4-up mini grid sits on the right side of the detail hero. */
   .fh-build-mini-grid--detail {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -6299,12 +6152,6 @@ em.fh-text-gradient-gold {
 }
 
 /* Hero-card radial gold glow → flat surface. */
-.v3-card--hero {
-  background: var(--v3-surface, #141414) !important;
-  border-color: var(--v3-border, rgba(242, 237, 228, 0.06)) !important;
-  box-shadow: none !important;
-}
-
 /* Action-sheet title accent (the gold-colored emphasis word inside a
    bottom-sheet headline) → neutral. The 12 inline eyebrow tags in
    sheet components are scrubbed at the source; this catches the CSS
@@ -6379,9 +6226,6 @@ select[style*="outline"]:focus-visible,
      • Desktop .dt-icon-btn / .dt-pill-btn hover border tint
    All flipped to a neutral hairline so the interaction feedback
    remains visible but no longer reads as yellow. */
-.v3-card--accent-primary {
-  border-color: var(--v3-border-mid) !important;
-}
 .fh-loc__btn:hover:not(:disabled) {
   border-color: var(--v3-text-faint) !important;
 }
@@ -6931,174 +6775,6 @@ select[style*="outline"]:focus-visible,
    Shared premium polish for the existing app, not a separate template.
    ================================================================ */
 
-.fh-crm-os {
-  display: grid;
-  gap: 12px;
-}
-
-.fh-crm-brief,
-.fh-crm-flow,
-.fh-crm-saved {
-  position: relative;
-  overflow: hidden;
-  border: 1px solid var(--v3-border-mid);
-  background:
-    linear-gradient(180deg, var(--v3-glass-tint), var(--v3-glass-tint)),
-    var(--v3-surface-glass);
-  box-shadow:
-    inset 0 1px 0 var(--v3-border),
-    0 18px 46px rgba(20, 20, 20, 0.32);
-  border-radius: 10px;
-}
-
-.fh-crm-brief {
-  padding: 16px;
-}
-
-.fh-crm-brief h2 {
-  margin: 8px 0 0;
-  max-width: 18ch;
-  color: var(--ink-strong, #F2EDE4);
-  font-family: var(--font-body);
-  font-size: 24px;
-  line-height: 1.02;
-  letter-spacing: 0;
-  font-weight: 800;
-}
-
-.fh-crm-brief p {
-  margin: 12px 0 0;
-  max-width: 58ch;
-  color: var(--v3-text-muted);
-  font-size: 14px;
-  line-height: 1.55;
-}
-
-.fh-crm-brief__chips,
-.fh-crm-brief__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 14px;
-}
-
-.fh-crm-brief__chips span {
-  border: 1px solid var(--v3-border-mid);
-  background: var(--v3-glass-tint);
-  color: var(--v3-text-secondary);
-  border-radius: 10px;
-  padding: 8px 8px;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.fh-crm-brief__actions button,
-.fh-crm-saved button {
-  border: 1px solid var(--v3-border-mid);
-  background: var(--v3-glass-tint);
-  color: var(--ink-strong, #F2EDE4);
-  border-radius: 10px;
-  min-height: 36px;
-  padding: 8px 12px;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0;
-}
-
-.fh-crm-brief__actions button:first-child {
-  background: linear-gradient(180deg, var(--v3-primary-hot), var(--v3-primary));
-  border-color: color-mix(in srgb, var(--v3-primary) 68%, transparent);
-  color: #141414;
-  box-shadow: 0 10px 26px color-mix(in srgb, var(--v3-primary) 22%, transparent);
-}
-
-.fh-crm-flow {
-  padding: 16px;
-}
-
-.fh-crm-flow__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.fh-crm-flow__head strong {
-  display: block;
-  margin-top: 6px;
-  color: var(--ink-strong, #F2EDE4);
-  font-size: 20px;
-  line-height: 1.1;
-}
-
-.fh-crm-flow__head > span {
-  color: var(--v3-text-muted);
-  font-size: 12px;
-  text-align: right;
-}
-
-.fh-crm-flow__stages {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
-  gap: 8px;
-}
-
-.fh-crm-flow__stages button {
-  min-width: 0;
-  border: 1px solid var(--v3-border-mid);
-  background:
-    linear-gradient(180deg, var(--v3-glass-tint), var(--v3-glass-tint)),
-    var(--v3-glass-tint);
-  border-radius: 10px;
-  padding: 12px;
-  text-align: left;
-  cursor: pointer;
-  color: var(--ink-strong, #F2EDE4);
-}
-
-.fh-crm-flow__stages button:hover,
-.fh-crm-saved button:hover,
-.fh-crm-brief__actions button:hover {
-  transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--v3-primary) 38%, transparent);
-}
-
-.fh-crm-flow__stages span,
-.fh-crm-flow__stages small {
-  display: block;
-  color: var(--v3-text-muted);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0;
-}
-
-.fh-crm-flow__stages strong {
-  display: block;
-  margin: 8px 0 5px;
-  color: var(--v3-primary-text, #C9963A);
-  font-family: var(--font-display, var(--font-body));
-  font-size: 24px;
-  font-weight: 500;
-  line-height: 1;
-  letter-spacing: 0;
-}
-
-.fh-crm-saved {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 16px;
-}
-
-.fh-crm-saved > span {
-  margin-top: 2px;
-  color: rgba(201, 150, 58, 0.88);
-  font-size: 12px;
-  line-height: 1.35;
-}
-
 @media (min-width: 900px) {
   /* The old three-column rule floored its tracks at 340+420+220 = 980px
      plus gaps, but with the sidebar open the container can be ~700px —
@@ -7108,26 +6784,11 @@ select[style*="outline"]:focus-visible,
      overflow, and the column count steps with real available width:
      1 col from 900, 2 cols + full-width saved rail from 1200, the
      original 3-col layout from 1500. */
-  .fh-crm-os {
-    align-items: stretch;
   }
-}
 @media (min-width: 1440px) {
-  .fh-crm-os {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
-  }
-  .fh-crm-saved {
-    grid-column: 1 / -1;
-  }
-}
+    }
 @media (min-width: 1500px) {
-  .fh-crm-os {
-    grid-template-columns: minmax(0, 1.06fr) minmax(0, 1.44fr) minmax(0, 0.62fr);
-  }
-  .fh-crm-saved {
-    grid-column: auto;
-  }
-}
+    }
 @media (min-width: 900px) {
 
   .fh-build-page {
@@ -7180,117 +6841,13 @@ select[style*="outline"]:focus-visible,
 }
 
 @media (max-width: 899px) {
-  .fh-crm-os {
-    padding: 0 16px;
-  }
-
-  .fh-crm-brief h2 {
-    font-size: 20px;
-  }
-
-  .fh-crm-flow__head {
-    flex-direction: column;
-  }
-
-  .fh-crm-flow__head > span {
-    text-align: left;
-  }
-}
-
-.fh-command-dialog {
-  border: 1px solid var(--v3-border-mid) !important;
-  background:
-    linear-gradient(180deg, var(--v3-glass-tint-2), var(--v3-glass-tint)),
-    var(--v3-surface-glass) !important;
-  color: var(--ink-strong, #F2EDE4) !important;
-  box-shadow: 0 30px 90px rgba(20, 20, 20, 0.48) !important;
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-}
-
-.fh-command-dialog [data-slot='command'] {
-  background: transparent !important;
-  color: inherit !important;
-}
-
-.fh-command-dialog [data-slot='command-input-wrapper'] {
-  border-color: var(--v3-border-mid) !important;
-}
-
-.fh-command-dialog [data-slot='command-input'] {
-  color: var(--ink-strong, #F2EDE4) !important;
-}
-
-.fh-command-dialog [cmdk-group-heading] {
-  color: var(--v3-text-faint) !important;
-  letter-spacing: 0;
-}
-
-.fh-command-dialog [data-slot='command-item'] {
-  border-radius: 10px !important;
-  color: var(--v3-text-secondary) !important;
-}
-
-.fh-command-dialog [data-slot='command-item'][data-selected='true'] {
-  background: color-mix(in srgb, var(--v3-primary) 16%, transparent) !important;
-  color: var(--ink-strong, #F2EDE4) !important;
-}
-
-[data-theme='light'] .fh-crm-brief, [data-theme='light'] .fh-crm-flow, [data-theme='light'] .fh-crm-saved {
-  border: 1px solid var(--v3-border);
-  background: var(--v3-surface);
-  box-shadow: var(--v3-shadow);
-  color: var(--v3-text);
-}
-[data-theme='light'] .fh-lead-command__focus > span:not(.fh-lead-command__eyebrow) {
-  color: var(--v3-text-secondary);
-}
-[data-theme='light'] .fh-crm-brief p,
-[data-theme='light'] .fh-crm-brief__chips span {
-  color: var(--v3-text-secondary);
-}
-[data-theme='light'] .fh-crm-flow__head > span,
-[data-theme='light'] .fh-crm-flow__stages span,
-[data-theme='light'] .fh-crm-flow__stages small {
-  color: var(--v3-text-muted);
-}
-[data-theme='light'] .fh-command-dialog [cmdk-group-heading] {
-  color: var(--v3-text-muted) !important;
-}
-[data-theme='light'] .fh-command-dialog [data-slot='command-item'] {
-  color: var(--v3-text-secondary) !important;
-}
+        }
 
 /* Uploaded brand logos are usually white lettering on transparent —
    made for the dark header. On paper they vanish. A soft dark halo
    keeps white glyphs legible without assuming the logo's color. */
-[data-theme='light'] .fh-app-header__brand img {
-  filter: drop-shadow(0 0 1px rgba(20, 20, 20, 0.55)) drop-shadow(0 1px 5px rgba(20, 20, 20, 0.35));
-}
-
-.fh-lead-command__focus > span:not(.fh-lead-command__eyebrow) {
-  color: var(--v3-text-muted);
-  font-size: 12px;
-  line-height: 1.45;
-}
-
 @media (min-width: 900px) {
-  .fh-app--layout-responsive .v3-screen--leads {
-    max-width: 1280px !important;
-    margin-left: auto;
-    margin-right: auto;
-    display: grid;
-    grid-template-columns: minmax(280px, 1fr) minmax(240px, 380px) minmax(0, auto);
-    grid-template-areas:
-      "head search tabs"
-      "conversion conversion conversion"
-      "list list list";
-    column-gap: 16px;
-    row-gap: 12px;
-    align-items: center;
-    padding: 4px 0 48px !important;
   }
-}
 
 .fh-data-error {
   display: flex;
@@ -7886,34 +7443,6 @@ select[style*="outline"]:focus-visible,
 .fh-build-table__head .fh-build-sort.is-sorted { color: var(--v3-primary-text); }
 .fh-build-table__head .fh-build-sort .fh-build-sort__hint { opacity: 0; transition: opacity 120ms ease; }
 .fh-build-table__head .fh-build-sort:hover .fh-build-sort__hint { opacity: 0.65; }
-
-.fh-build-table-tools {
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-}
-.fh-build-table-filter {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border: 1px solid var(--v3-border-mid);
-  border-radius: 10px;
-  background: var(--v3-glass-tint-2);
-  color: var(--v3-text-muted);
-}
-.fh-build-table-filter input {
-  width: 160px;
-  border: none;
-  background: transparent;
-  color: var(--v3-text);
-  font-size: 12px;
-  outline: none;
-}
-.fh-build-table-filter input::placeholder { color: var(--v3-text-faint); }
-.fh-build-table-filter:focus-within {
-  border-color: color-mix(in srgb, var(--v3-primary) 55%, transparent);
-}
 
 /* Legal pages (Privacy, Terms). Their mailto links carry an inline
    brand gold, 2.28:1 on the daylight canvas, so links on these pages

@@ -33,37 +33,8 @@
   color: var(--v3-text);
 }
 
-.v3-h2 {
-  font-family: var(--font-body);
-  font-size: 20px;
-  font-weight: 600;
-  line-height: 1.25;
-  letter-spacing: 0;
-  color: var(--v3-text);
-  margin: 0;
-}
 @media (min-width: 480px) {
-  .v3-h2 { font-size: 24px; }
-}
-
-.v3-h3 {
-  font-family: var(--font-body);
-  font-size: 16px;
-  font-weight: 600;
-  line-height: 1.3;
-  letter-spacing: 0;
-  color: var(--v3-text);
-  margin: 0;
-}
-
-.v3-body {
-  font-family: var(--font-body);
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 1.5;
-  color: var(--v3-text);
-}
-.v3-body-lg { font-size: 16px; line-height: 1.55; }
+  }
 
 .v3-caption {
   font-family: var(--font-body);
@@ -92,10 +63,6 @@
 }
 
 .v3-text-muted { color: var(--v3-text-muted); }
-.v3-text-success { color: var(--v3-success-text); }
-.v3-text-danger { color: var(--v3-danger-text); }
-.v3-text-primary { color: var(--v3-primary-text); }
-
 /* ---------- Button primitive ---------- */
 .v3-btn {
   display: inline-flex;
@@ -154,99 +121,11 @@
 .v3-btn--lg.v3-btn--icon-only { width: 44px; }
 
 /* ---------- Card primitive — premium push ---------- */
-.v3-card {
-  background: var(--v3-surface-glass);
-  backdrop-filter: blur(14px) saturate(1.1);
-  -webkit-backdrop-filter: blur(14px) saturate(1.1);
-  border: 1px solid var(--v3-border-strong);
-  border-radius: var(--v3-radius-card);
-  box-shadow:
-    inset 0 1px 0 rgba(242, 237, 228, 0.04),
-    var(--v3-shadow);
-  position: relative;
-  overflow: hidden;
-}
 /* Glass top-sheen — a faint light sweep across the top edge so the
    card catches light like a physical panel. Pointer-events:none so it
    never blocks taps; sits above the surface but below content. */
-.v3-card::before {
-  content: '';
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 40%;
-  background: linear-gradient(180deg, rgba(242, 237, 228, 0.05) 0%, transparent 100%);
-  pointer-events: none;
-  z-index: 0;
-}
-.v3-card > * { position: relative; z-index: 1; }
-.v3-card--surface-2 { background: var(--v3-surface-2); }
-.v3-card--flat { box-shadow: none; }
-.v3-card--padded { padding: 16px; }
-.v3-card--padded-sm { padding: 12px; }
-.v3-card--padded-lg { padding: 24px; }
-.v3-card--interactive {
-  cursor: pointer;
-  transition: transform 140ms var(--ease-mechanical), border-color 200ms ease, box-shadow 200ms ease;
-  -webkit-tap-highlight-color: transparent;
-}
-.v3-card--interactive:active {
-  transform: scale(0.99);
-  border-color: var(--v3-border-strong);
-}
-.v3-card--accent-primary {
-  border-color: rgba(201, 150, 58, 0.28);
-}
-.v3-card--accent-success {
-  border-color: rgba(45, 122, 79, 0.28);
-}
-.v3-card--accent-danger {
-  border-color: rgba(192, 57, 43, 0.32);
-}
-
 /* Hero card with subtle gold inner glow — used for Revenue Opportunity */
-.v3-card--hero {
-  background:
-    radial-gradient(120% 80% at 100% 0%, rgba(201, 150, 58, 0.10), transparent 55%),
-    var(--v3-surface);
-  border-color: rgba(201, 150, 58, 0.15);
-}
-
 /* ---------- Pill primitive ---------- */
-.v3-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 12px;
-  border-radius: var(--v3-radius-pill);
-  font-family: var(--font-body);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0;
-  line-height: 1.4;
-  border: 1px solid transparent;
-  white-space: nowrap;
-}
-.v3-pill--primary {
-  background: var(--v3-primary-soft);
-  color: var(--v3-primary-text);
-  border-color: rgba(201, 150, 58, 0.30);
-}
-.v3-pill--success {
-  background: var(--v3-success-soft);
-  color: var(--v3-success-text);
-  border-color: rgba(45, 122, 79, 0.30);
-}
-.v3-pill--danger {
-  background: var(--v3-danger-soft);
-  color: var(--v3-danger-text);
-  border-color: rgba(192, 57, 43, 0.40);
-}
-.v3-pill--neutral {
-  background: rgba(242, 237, 228, 0.05);
-  color: var(--v3-text-muted);
-  border-color: var(--v3-border);
-}
-
 /* ---------- Section header ---------- */
 .v3-section-header {
   display: flex;
@@ -347,7 +226,6 @@
 .v3-section > * { position: relative; z-index: 1; }
 
 /* Section variants */
-.v3-section--tight { padding: var(--v3-pad-section-tight); }
 .v3-section--flush { padding: 0; }
 .v3-section--quiet {
   /* Lower-key variant for secondary zones — no inner highlight,
