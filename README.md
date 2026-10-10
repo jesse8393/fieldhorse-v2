@@ -57,4 +57,6 @@ Field Gold `#C9963A`, Onyx `#141414`, Raw Linen `#F2EDE4`, Alert Red `#C0392B`, 
 * `DEPLOY_CHECKLIST.md`: the short list to run before and after a deploy.
 * `supabase/README.md`: database and edge function state.
 * `AUDIT_2026-10-09.md`: the latest full audit and what changed.
+* `docs/design/2026-10-redesign/SPEC.md`: the approved redesign, its phases and the concept renders beside it.
+* `docs/NORTH_STAR.md`: the Universal Capture plan and its trust rules.
 * `docs/archive/`: earlier audits and plans, kept for history.
