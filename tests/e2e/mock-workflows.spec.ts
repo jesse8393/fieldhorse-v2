@@ -236,7 +236,7 @@ test('uses the full desktop workspace without changing the mobile screens', asyn
     await capture(page, testInfo, `desktop-${route.name}`, true)
   }
 
-  const sidebarOverflow = await page.locator('.fh-desktop-sidebar__nav').evaluate((element) => ({
+  const sidebarOverflow = await page.locator('.fhs-side__nav').evaluate((element) => ({
     overflowY: getComputedStyle(element).overflowY,
     scrollbarWidth: getComputedStyle(element).scrollbarWidth,
   }))

@@ -112,6 +112,12 @@ select:focus-visible,
     width: calc(100% - var(--fh-sidebar-w));
     margin-left: var(--fh-sidebar-w);
   }
+  /* The invoice action bar centers on the content column, right of the
+     sidebar (global.css centered it for the old 256 px rail). */
+  .fh-invoice-actionbar {
+    width: min(1280px, calc(100% - var(--fh-sidebar-w) - 64px));
+    left: calc(50% + var(--fh-sidebar-w) / 2) !important;
+  }
 }
 
 /* ---- Reduced motion (spec 5.7): fades only ---- */
