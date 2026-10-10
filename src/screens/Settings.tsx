@@ -1274,7 +1274,8 @@ const ESTIMATE_TEMPLATES = [
   { key: 'classic',   name: 'Classic',   blurb: 'Editorial dark accent layout grouped by trade.', swatch: ['#141414', '#C9963A', '#F2EDE4'] },
   { key: 'slate',     name: 'Slate',     blurb: 'Gray header bar, From/For blocks, itemized rows.', swatch: ['#5C5C5C', '#F2EDE4', '#F2EDE4'] },
   { key: 'mint',      name: 'Mint',      blurb: 'Large green ESTIMATE wordmark, itemized rows.', swatch: ['#2D7A4F', '#F2EDE4', '#F2EDE4'] },
-  { key: 'editorial', name: 'Editorial', blurb: 'Sand + serif, Scope of Work and Cost Breakdown.', swatch: ['#F2EDE4', '#C9963A', '#141414'] }
+  { key: 'editorial', name: 'Editorial', blurb: 'Sand + serif, Scope of Work and Cost Breakdown.', swatch: ['#F2EDE4', '#C9963A', '#141414'] },
+  { key: 'fieldhorse', name: 'Fieldhorse', blurb: 'Phone first quote page with your job photo, a total, three steps and an Approve button. Customers see it on their quote link.', swatch: ['#16140F', '#C9963A', '#F2EDE4'] }
 ]
 
 function EstimateTemplatePicker({ value, onChange }: any) {

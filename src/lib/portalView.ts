@@ -99,7 +99,7 @@ export type PublicDocPayload = {
   ok?: boolean
   message?: string
   /** 'proposal', 'invoice', 'change_order' or 'statement'. */
-  kind?: string
+  kind: string
   change_order_id?: string | null
   contact?: PublicDocContact | null
   company?: PublicDocCompany | null
