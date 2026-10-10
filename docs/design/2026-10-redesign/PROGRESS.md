@@ -120,7 +120,7 @@ Status is one of todo, done, blocked, skipped.
 * The desktop shots in the review images are Day only, as the plan says. There is no desktop render for Today or Money, so those two shots sit next to the phone renders.
 * CI on #219 caught two timing sensitive desktop tests (`palette.spec` waited for network idle, `schedule.spec` dropped a keyboard drag before the highlight). Both now wait for the page. Network idle took up to 41 seconds under CPU load locally.
 
-### Phase 4 stretch decisions (recorded in SPEC section 17 as D28 and D29 on the Phase 6 branch)
+### Phase 4 stretch decisions (D28 and D29 in SPEC section 17)
 
 * **D28, desktop Today.**
   * Today now takes the same props as the phone and shares its parts (`todayParts.tsx`). Both layouts read `buildTodayView`.
