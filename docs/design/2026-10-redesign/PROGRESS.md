@@ -55,13 +55,13 @@ Status is one of todo, done, blocked, skipped.
 | 3 | 3.3 Quote view model | done | 5dac52a | |
 | 3 | 3.4 Quote editor on a phone | done | c2b2bce | |
 | 3 | 3.5 Phase 3 review and pull request | done | see git log | #218, images in phase3-review |
-| 4 | 4.1 Schedule layout helpers | todo | | |
-| 4 | 4.2 Week board and Unscheduled tray | todo | | |
-| 4 | 4.3 Desktop Job page | todo | | |
-| 4 | 4.4 Command palette actions | todo | | |
-| 4 | 4.5 Desktop Today (stretch) | todo | | |
-| 4 | 4.6 Desktop Money (stretch) | todo | | |
-| 4 | 4.7 Phase 4 review and pull request | todo | | |
+| 4 | 4.1 Schedule layout helpers | done | cec29b2 | |
+| 4 | 4.2 Week board and Unscheduled tray | done | 053d488 | `@dnd-kit/core` added in 2146dc7 |
+| 4 | 4.3 Desktop Job page | done | 940e23a | |
+| 4 | 4.4 Command palette actions | done | 9d704ed | |
+| 4 | 4.5 Desktop Today (stretch) | todo | | agent running |
+| 4 | 4.6 Desktop Money (stretch) | todo | | agent running |
+| 4 | 4.7 Phase 4 review and pull request | todo | | Opened as a draft with 4.1 to 4.4; stretch tasks 4.5 and 4.6 are in progress |
 | 5 | 5.1 Portal view model | todo | | |
 | 5 | 5.2 Fieldhorse proposal theme | todo | | |
 | 5 | 5.3 Welcome and Login | todo | | |
@@ -100,3 +100,9 @@ Status is one of todo, done, blocked, skipped.
 * The Quote tab on a phone sits under the Job page header (rail, money strip, quick actions, tabs), so the render's bare Quote page layout differs by design.
 * `src/lib/queries.ts` gained `cost` on the invoices bundle jobs so Money can compute margin. `tests/e2e/mock-workflows.spec.ts` changed two phone assertions that named old phone cards.
 * Full suite on the Phase 3 head: lint 0 errors (50 warnings, down from 57), typecheck, build and design audit pass, 720 of 720 unit tests, Playwright 95 passed and 75 skipped by project.
+
+### Phase 4 notes
+
+* Decisions D19 to D21 in `SPEC.md` cover the palette shortcuts, the desktop Job page and the Schedule board. The schedule agent also found that a second `NotificationsBell` throws ("cannot add postgres_changes callbacks after subscribe") because the two instances share a channel name, and a CSS hidden header still mounts its bell, so any screen that hides the header must not render its own bell.
+* The first dev server load after `@dnd-kit/core` is imported re-optimizes dependencies once and can break a single e2e run.
+* The desktop shots in the review images are Day only, as the plan says.
