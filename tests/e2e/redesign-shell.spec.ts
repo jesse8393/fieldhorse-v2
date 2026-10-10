@@ -116,6 +116,22 @@ test.describe('phone shell', () => {
   })
 })
 
+test.describe('phone header name', () => {
+  test('a long company name wraps to two lines and is never cut off', async ({ context, page }, testInfo) => {
+    test.skip(!testInfo.project.name.startsWith('mobile'), 'Phone header')
+    const long = 'Parker Construction and Concrete Restoration'
+    await signInWith(context, { tables: { organizations: [{ id: 'org-1', name: long }] } })
+    await open(page, '/')
+    const name = page.locator('.fhs-header__company')
+    await expect(name).toHaveText(long)
+    const box = await name.evaluate((el) => ({
+      lines: Math.round(el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight)),
+      clipped: el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1
+    }))
+    expect(box).toEqual({ lines: 2, clipped: false })
+  })
+})
+
 test.describe('first paint', () => {
   test('the theme is set before React renders', async ({ context, page }) => {
     await signIn(context, 'night')

@@ -104,10 +104,15 @@
   min-width: 0;
   font: 600 17px/22px var(--fh-font-body);
   color: var(--fh-ink);
-  white-space: nowrap;
+  /* Wraps between words, up to two lines, before anything is cut off. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: break-word;
 }
+.fhs-header__company--long { font: 600 15px/20px var(--fh-font-body); }
 .fhs-header__actions {
   display: inline-flex;
   align-items: center;

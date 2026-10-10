@@ -1,5 +1,7 @@
 import { Search } from 'lucide-react'
 import { useProfile } from '../contexts/ProfileContext.tsx'
+import { useMembership } from '../contexts/MembershipContext.tsx'
+import { headerName } from '../lib/headerName.ts'
 import Icon from './fh/Icon.tsx'
 import Monogram from './fh/Monogram.tsx'
 import NotificationsBell from './NotificationsBell.tsx'
@@ -20,12 +22,20 @@ function openSearch() {
  * The menu is in the same place on every screen, so every route is two
  * taps away and search is one.
  *
+ * The name is the short one (headerName): the workspace name, without
+ * a trailing "Company" or "LLC". Long names wrap to two lines at 15 px
+ * before anything is cut off.
+ *
  * Desktop: the sidebar carries identity and navigation, so only search
  * and the bell show, at the right.
  */
 export default function AppHeader() {
   const { profile } = useProfile()
-  const company = profile?.company_name?.trim() || profile?.full_name?.trim() || ''
+  const { orgName } = useMembership()
+  const company = headerName(orgName, profile?.company_name, profile?.full_name)
+  // About as many characters as fit on one line at 17 px beside the
+  // monogram and the two icons on a 390 px phone.
+  const long = company.length > 20
 
   return (
     <header className="fh-app-header fhs-header">
@@ -38,7 +48,7 @@ export default function AppHeader() {
       >
         <Monogram name={company} logoUrl={profile?.logo_url} size={40} />
       </button>
-      <span className="fhs-header__company">{company || 'Fieldhorse'}</span>
+      <span className={`fhs-header__company${long ? ' fhs-header__company--long' : ''}`}>{company}</span>
       <div className="fhs-header__actions">
         <button type="button" className="fhs-icon-btn" aria-label="Search everything" onClick={openSearch}>
           <Icon icon={Search} size={22} />
