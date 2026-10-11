@@ -21,7 +21,7 @@
 // cut from the g-job render, served through a mocked storage bucket. It
 // shows where photos land and how they are framed, not real content.
 // Callbacks passed to the page run in the browser.
-/* global document, localStorage */
+/* global document, localStorage, window */
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { chromium } from '@playwright/test'
@@ -46,7 +46,9 @@ const DESKTOP = { width: 1440, height: 900, scale: 1, mobile: false, outHeight: 
 // One entry per image. Fields: name, phase, title, path, mode (day or
 // night), clock ([hour, minute] local), render (a file under the design
 // folder), view (PHONE by default), action (a named step in `steps`),
-// tables (a function from the frozen clock to extra mock tables).
+// tables (a function from the frozen clock to extra mock tables), public
+// (a signed out screen: `setup(context)` mocks it, `ready` is the selector
+// to wait for).
 const SHOTS = [
   { phase: 2, name: 'today-day', path: '/', mode: 'day', render: 'glamor/g-today.jpg' },
   { phase: 2, name: 'today-night', path: '/', mode: 'night', render: 'glamor/g-today.jpg' },
@@ -65,8 +67,52 @@ const SHOTS = [
   { phase: 4, name: 'deskhome-day', title: 'Today on a desktop, Day', path: '/', mode: 'day', view: DESKTOP, weekday: 4, render: 'glamor/g-today.jpg' },
   { phase: 4, name: 'deskmoney-day', title: 'Money on a desktop, Day', path: '/invoices', mode: 'day', view: DESKTOP, weekday: 4, render: 'glamor/g-money.jpg', tables: moneyTables },
   { phase: 4, name: 'deskjob-day', title: 'Job, Day', path: '/jobs/c-job1', mode: 'day', view: DESKTOP, weekday: 4, render: 'glamor/g-desktop-job.jpg' },
-  { phase: 4, name: 'palette-day', title: 'Command palette, Day', path: '/schedule', mode: 'day', view: DESKTOP, weekday: 4, clock: [9, 0], action: 'palette', render: 'base/desktop-command.jpg', tables: paletteTables }
+  { phase: 4, name: 'palette-day', title: 'Command palette, Day', path: '/schedule', mode: 'day', view: DESKTOP, weekday: 4, clock: [9, 0], action: 'palette', render: 'base/desktop-command.jpg', tables: paletteTables },
+  { phase: 6, name: 'thread-day', title: 'Inbox thread, Day', path: '/inbox/conv-priya', mode: 'day', clock: [8, 20], render: 'base/inbox.jpg', tables: inboxTables },
+  { phase: 6, name: 'thread-night', title: 'Inbox thread, Night', path: '/inbox/conv-priya', mode: 'night', clock: [8, 20], render: 'base/inbox.jpg', tables: inboxTables },
+  { phase: 5, name: 'portal-day', path: '/p/t1', mode: 'day', public: true, ready: 'h1', setup: portalSetup, render: 'glamor/g-portal.jpg' },
+  { phase: 5, name: 'portal-approve-day', title: 'Portal, end of page, Day', path: '/p/t1', mode: 'day', public: true, ready: 'h1', setup: portalSetup, action: 'scrollEnd', render: 'glamor/g-portal.jpg' },
+  { phase: 5, name: 'portal-night', path: '/p/t1', mode: 'night', public: true, ready: 'h1', setup: portalSetup, render: 'glamor/g-portal.jpg' },
+  { phase: 5, name: 'login-none', title: 'Login, no photo', path: '/login', mode: 'day', public: true, ready: '.fha', setup: loginSetup(false), render: 'glamor/g-welcome.jpg' },
+  { phase: 5, name: 'login-photo', title: 'Login, with a photo', path: '/login', mode: 'day', public: true, ready: '.fha', setup: loginSetup(true), render: 'glamor/g-welcome.jpg' }
 ]
+
+// Phase 6 Inbox: the engine is on, and Priya's thread has the render's
+// words, with the AI draft waiting. Times are relative to the frozen day
+// (yesterday 4:48 pm and 5:02 pm, today 8:14 am).
+function inboxTables(clock) {
+  const at = (minutes) => new Date(clock.getTime() + minutes * 60e3).toISOString()
+  const yesterdayFour48 = -(13 * 60 + 52)
+  const message = (props) => ({
+    org_id: 'org-1', conversation_id: 'conv-priya', client_id: 'cl-priya', channel: 'sms', subject: null,
+    status: 'received', read_at: null, hold_reason: null, sent_by_kind: 'contact', agent_run_id: null,
+    sent_at: null, call_status: null, direction: 'inbound', ...props
+  })
+  const conversation = (props) => ({
+    org_id: 'org-1', company_name: null, last_channel: 'sms', unread_count: 0, pending_drafts: 0, held_messages: 0,
+    starred: false, status: 'open', snoozed_until: null, email: null, phone: '555-0142', ...props
+  })
+  const ask = 'Can we push to 11:30? Daycare pickup ran long. Also wanted to ask about adding a ceiling fan in the patio cover.'
+  return {
+    fh_org_settings: [{ engine_enabled: true }],
+    fh_v_inbox: [
+      conversation({ conversation_id: 'conv-priya', client_id: 'cl-priya', client_name: 'Priya Rangarajan', last_preview: ask, last_message_at: at(94), unread_count: 1, pending_drafts: 1, latest_stage: 'quote' }),
+      conversation({ conversation_id: 'conv-marcus', client_id: 'cl-marcus', client_name: 'Marcus Bell', last_preview: 'Thanks, the crew did great work.', last_message_at: at(-(10 * 60)), latest_stage: 'job', last_channel: 'email', email: 'marcus@example.com' }),
+      conversation({ conversation_id: 'conv-tessa', client_id: 'cl-tessa', client_name: 'Tessa Holloway', last_preview: 'We can start Monday if the weather holds.', last_message_at: at(-(3 * 1440)), held_messages: 1, latest_stage: 'lead' })
+    ],
+    fh_messages: [
+      message({ id: 'm1', direction: 'outbound', status: 'sent', sent_by_kind: 'user', read_at: at(yesterdayFour48), created_at: at(yesterdayFour48), body: "Hi Priya, Jesse with Parker Construction. We're set for Thursday at 11:00 to look at the patio cover. I'll bring material samples." }),
+      message({ id: 'm2', created_at: at(yesterdayFour48 + 14), read_at: at(yesterdayFour48 + 17), body: 'Perfect, thank you!' }),
+      message({ id: 'm3', created_at: at(94), body: ask })
+    ],
+    fh_agent_runs: [
+      { id: 'run-1', org_id: 'org-1', conversation_id: 'conv-priya', client_id: 'cl-priya', agent_id: 'agent-1', status: 'proposed', created_at: at(95), proposal: { channel: 'sms', body: "Of course, 11:30 works. I'll bring a fan option so we can see where the power run would go. See you then." } }
+    ],
+    fh_contacts: [
+      { id: 'c-priya', user_id: session.user.id, client_id: 'cl-priya', stage: 'quote', name: 'Priya Rangarajan', job_title: 'Rangarajan patio cover', amount: 14800, updated_at: at(-1440), created_at: at(-14 * 1440), proposal_status: 'sent', fh_clients: { name: 'Priya Rangarajan', phone: '555-0142', email: null } }
+    ]
+  }
+}
 
 // Phase 3 money screen: an overdue invoice, two due soon, a sent and a
 // viewed quote, and payments this week and last, all relative to the
@@ -191,6 +237,11 @@ function paletteTables(clock) {
 
 // Named steps that run after the page has loaded.
 const STEPS = {
+  // The end of the page, where the portal's approve capsule sits.
+  async scrollEnd(page) {
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+    await page.waitForTimeout(600)
+  },
   async capture(page) {
     await page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: /Capture/ }).click()
     await page.waitForTimeout(900)
@@ -289,6 +340,74 @@ const STAND_IN = await sharp(join(RENDERS, 'glamor/g-job.jpg'))
   .jpeg({ quality: 88 })
   .toBuffer()
 
+// Stand ins for the two photos the renders show. The app ships neither:
+// the portal cover is the job's own first photo, and decision D11 says
+// Welcome and Login show onyx until a real photo is supplied.
+const PORTAL_COVER = await sharp(join(RENDERS, 'glamor/g-portal.jpg'))
+  .extract({ left: 180, top: 135, width: 670, height: 220 })
+  .resize(1340, 440)
+  .jpeg({ quality: 88 })
+  .toBuffer()
+const WELCOME_PHOTO = await sharp(join(RENDERS, 'glamor/g-welcome.jpg'))
+  .extract({ left: 175, top: 45, width: 675, height: 740 })
+  .jpeg({ quality: 88 })
+  .toBuffer()
+
+// Public screens have no sign in. Nothing may reach Supabase.
+async function blockSupabase(context) {
+  await context.route(/supabase\.co/, (route) => route.abort())
+}
+
+// The customer quote page for token t1, with the render's numbers.
+async function portalSetup(context) {
+  await blockSupabase(context)
+  const line = (id, section, description, amount, extra = {}) => ({
+    id, section, description, qty: 1, rate: amount, amount, is_optional: false, is_excluded: false, sort_order: Number(id.slice(1)), ...extra
+  })
+  const payload = {
+    ok: true,
+    kind: 'proposal',
+    contact: {
+      id: 'c-portal', name: 'Marco Castellanos', address: '1150 Cherry Blossom Ln, La Vergne', phone: '615 555 0101',
+      email: 'marco@example.com', job_title: 'Pool deck pour', stage: 'quote', proposal_status: 'sent', amount: 18458,
+      created_at: '2026-10-01T12:00:00.000Z', quote_sent_at: '2026-10-02T12:00:00.000Z', terms_text: ''
+    },
+    company: {
+      name: 'Parker Construction', phone: '615 555 0100', email: 'office@parker.co',
+      insured_text: 'Licensed and insured, Murfreesboro', license_number: '', logo_url: null,
+      estimate_template: 'fieldhorse', payment_link: ''
+    },
+    items: [
+      line('i1', 'Site', 'Excavate and grade, 1,100 sq ft', 2200),
+      line('i2', 'Steel', 'Rebar, #4 at 18 in on center', 2860),
+      line('i3', 'Concrete', '4 in slab, 4,000 psi fiber mix, broom finish', 9350),
+      line('i4', 'Finish', 'Joints, pump truck and haul off', 2370),
+      line('i5', 'Finish', 'Overhead and profit, 10%', 1678),
+      line('i6', 'Finish', 'Stamped ashlar pattern', 4950, { is_optional: true })
+    ],
+    payments: [],
+    changeOrders: [],
+    insurance: null,
+    invoices: [],
+    photos: [{ url: 'https://img.example.com/cover.jpg' }]
+  }
+  await context.route((u) => u.pathname === '/api/public-link', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Cache-Control': 'no-store' }, body: JSON.stringify(payload) }))
+  await context.route('https://img.example.com/**', (route) =>
+    route.fulfill({ status: 200, contentType: 'image/jpeg', body: PORTAL_COVER }))
+}
+
+// Login, signed out. The shell asks for /welcome.jpg once; answer with a
+// photo or a 404.
+function loginSetup(withPhoto) {
+  return async (context) => {
+    await blockSupabase(context)
+    await context.route('**/welcome.jpg', (route) => withPhoto
+      ? route.fulfill({ status: 200, contentType: 'image/jpeg', body: WELCOME_PHOTO })
+      : route.fulfill({ status: 404, contentType: 'text/plain', body: 'not found' }))
+  }
+}
+
 function photoRows(clock) {
   const ago = (minutes) => new Date(clock.getTime() - minutes * 60e3).toISOString()
   const recent = [28, 32, 36].map((m, i) => ({
@@ -355,30 +474,35 @@ async function capture(browser, shot) {
     serviceWorkers: 'block'
   })
   const morning = localInstant([6, 40], shot.weekday ?? null)
-  const photos = photoRows(morning)
-  await installMock(context, {
-    supabaseHosts: ['qa-mock.supabase.co', 'pnmhblvslftdzfcdezbw.supabase.co'],
-    tables: { fh_schedule: scheduleFor(morning), fh_job_files: photos, ...(shot.tables ? shot.tables(morning) : {}) }
-  })
-  await mockPhotos(context, photos)
-  await context.route('**/api/claude', (route) => route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    body: JSON.stringify({ content: [{ type: 'text', text: JSON.stringify(captureReply(clock)) }] })
-  }))
-  const weather = JSON.stringify(forecast(localInstant([0, 0], shot.weekday ?? null)))
-  await context.route('https://api.open-meteo.com/**', (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: weather }))
-  await context.addInitScript(([saved, mode]) => {
-    localStorage.setItem('sb-qa-mock-auth-token', JSON.stringify(saved))
-    localStorage.setItem('fh:theme-mode', mode)
-    localStorage.setItem('fh-onboarding-seen', '1')
-  }, [session, shot.mode])
+  if (shot.public) {
+    await shot.setup(context)
+    await context.addInitScript((mode) => localStorage.setItem('fh:theme-mode', mode), shot.mode)
+  } else {
+    const photos = photoRows(morning)
+    await installMock(context, {
+      supabaseHosts: ['qa-mock.supabase.co', 'pnmhblvslftdzfcdezbw.supabase.co'],
+      tables: { fh_schedule: scheduleFor(morning), fh_job_files: photos, ...(shot.tables ? shot.tables(morning) : {}) }
+    })
+    await mockPhotos(context, photos)
+    await context.route('**/api/claude', (route) => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ content: [{ type: 'text', text: JSON.stringify(captureReply(clock)) }] })
+    }))
+    const weather = JSON.stringify(forecast(localInstant([0, 0], shot.weekday ?? null)))
+    await context.route('https://api.open-meteo.com/**', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: weather }))
+    await context.addInitScript(([saved, mode]) => {
+      localStorage.setItem('sb-qa-mock-auth-token', JSON.stringify(saved))
+      localStorage.setItem('fh:theme-mode', mode)
+      localStorage.setItem('fh-onboarding-seen', '1')
+    }, [session, shot.mode])
+  }
 
   const page = await context.newPage()
   await page.clock.setFixedTime(clock)
   await page.goto(BASE + shot.path, { waitUntil: 'domcontentloaded', timeout: 60_000 })
-  await page.locator('.fh-app').waitFor({ timeout: 30_000 })
+  await page.locator(shot.ready || '.fh-app').first().waitFor({ timeout: 30_000 })
   await page.waitForLoadState('load')
   await page.evaluate(() => document.fonts.ready)
   await page.waitForTimeout(1500)

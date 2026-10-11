@@ -12,6 +12,12 @@
 // contractor's company name + the project so the link looks like
 // it came from them.
 //
+// The one exception is the Fieldhorse proposal theme (spec 9.9), a
+// phone first page a company picks in Settings: it fills the screen on
+// the --fh- tokens (Day and Night follow the customer's phone) and ends
+// with a small "Powered by Fieldhorse". A company with no
+// estimate_template keeps the classic page above (decision D13).
+//
 // Auth: this route renders OUTSIDE the AppShell (no Gated wrapper).
 // Anyone with the token can view; the on the server function gates
 // expiry / revocation / not-found.
@@ -25,12 +31,25 @@ import {
   resolveBrandGold
 } from '../components/documents'
 import ApproveProposalBar from '../components/public/ApproveProposalBar.tsx'
+import type { ProposalPortal } from '../components/documents/proposalThemes.tsx'
+import '../components/documents/fieldhorse-proposal.css'
 import { safePayUrl } from '../lib/payLink.ts'
+import { buildPortalView, type PublicDocPayload } from '../lib/portalView.ts'
 import { gatherStatement } from '../lib/statement.ts'
+
+type PublicDocState = { loading: boolean; data: PublicDocPayload | null; error: string | null }
+
+// "Ask about this" on an optional item opens the request changes form with
+// this text in the box. A new id each tap, so tapping again reopens it.
+type AskSeed = { id: number; text: string }
 
 export default function PublicDoc() {
   const { token } = useParams()
-  const [state, setState] = useState<any>({ loading: true, data: null, error: null })
+  const [state, setState] = useState<PublicDocState>({ loading: true, data: null, error: null })
+  const [ask, setAsk] = useState<AskSeed | null>(null)
+  const onAsk = useCallback((item: string) => {
+    setAsk((prev) => ({ id: (prev?.id ?? 0) + 1, text: `About \u201c${item}\u201d: ` }))
+  }, [])
 
   const load = useCallback(async () => {
     if (!token) return
@@ -62,6 +81,39 @@ export default function PublicDoc() {
 
   const { loading, data, error } = state
   const proposalStatus = String(data?.contact?.proposal_status || '').toLowerCase()
+  // The Fieldhorse theme draws its own approve capsule and fills the page;
+  // every other template keeps the classic page and bar below.
+  const fieldhorse = data?.kind === 'proposal'
+    && String(data.company?.estimate_template || '').toLowerCase() === 'fieldhorse'
+
+  if (!loading && data && fieldhorse) {
+    const open = proposalStatus !== 'approved' && proposalStatus !== 'changes_requested'
+    // The page's total, so the approval sentence quotes what the page shows.
+    const total = buildPortalView(data, new Date()).total
+    return (
+      <div className="fhp-ground">
+        <ProposalView
+          data={data}
+          portal={{
+            payload: data,
+            onAsk,
+            approveBar: open ? (
+              <ApproveProposalBar
+                skin="fieldhorse"
+                token={token}
+                companyName={data.company?.name || ''}
+                contactName={data.contact?.name || ''}
+                contractTotal={total > 0 ? total : (Number(data.contact?.amount || 0) || null)}
+                initialName={data.contact?.name || ''}
+                onApproved={load}
+                requestSeed={ask}
+              />
+            ) : null
+          }}
+        />
+      </div>
+    )
+  }
 
   return (
     <div
@@ -368,9 +420,9 @@ function ErrorState({ message }: any) {
   )
 }
 
-function ProposalView({ data }: any) {
+function ProposalView({ data, portal }: { data: PublicDocPayload; portal?: ProposalPortal }) {
   const { contact, company, items, changeOrders, insurance, photos } = data
-  const mapped = mapItemsToScope(items)
+  const mapped = mapItemsToScope(items ?? undefined)
   const exclusionsArray = [
     ...(mapped.exclusions || []),
     ...((contact?.exclusions_text || '').split(/\n+/).map((s: any) => s.trim()).filter(Boolean))
@@ -405,6 +457,7 @@ function ProposalView({ data }: any) {
         expiresAt: contact?.quote_expires_at || null
       }}
       status={(contact?.proposal_status || 'sent').toLowerCase()}
+      portal={portal}
     />
   )
 }

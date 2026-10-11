@@ -244,6 +244,25 @@ export function AnswerList({ answers, now, actionPath }: { answers: HomeNextActi
   )
 }
 
+/**
+ * See all and Show fewer under the answers. While See all is open and more
+ * wait than the dashboard keeps, a quiet line says how many it lists.
+ */
+export function AnswersMore({ view, showAll }: { view: TodayView; showAll: boolean }) {
+  if (view.answersTotal <= 3) return null
+  const listed = view.seeAll.length
+  return (
+    <div className="fht-more">
+      <Button variant="quiet" size="mini" to={{ search: showAll ? '' : '?answers=all' }} replace>
+        {showAll ? 'Show fewer' : 'See all'}
+      </Button>
+      {showAll && listed < view.answersTotal && (
+        <p className="fht-more__note">{`Showing ${listed} of ${view.answersTotal}, most urgent first.`}</p>
+      )}
+    </div>
+  )
+}
+
 /* ---------------- The day ---------------- */
 
 /** The job name, and what happens there, for a visit row. */

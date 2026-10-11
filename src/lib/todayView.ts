@@ -30,7 +30,11 @@ export type TodayView = {
   title: [string, string]
   weatherLine: string | null
   nextStop: TodayNextStop | null
+  /** The first three next actions, for the section as it opens. */
   answers: HomeNextAction[]
+  /** Every next action the bundle keeps, most urgent first, for See all. */
+  seeAll: HomeNextAction[]
+  /** How many next actions there are in all, past what seeAll lists. */
   answersTotal: number
   day: HomeTodayOnSite[]
   done: HomeTodayOnSite[]
@@ -119,9 +123,12 @@ export function buildTodayView({ bundle, now, lat, lon, weather }: TodayViewInpu
     : null
 
   const actions = bundle.nextActions ?? []
+  // The bundle keeps the most urgent few and counts them all. A bundle
+  // cached by an older build has no total, so count what it lists.
+  const answersTotal = Math.max(bundle.nextActionsTotal ?? 0, actions.length)
   const evening = isEvening(now, lat, lon)
   const title = evening
-    ? nightHeadline({ stopsToday: done.length, openAnswers: actions.length }).title
+    ? nightHeadline({ stopsToday: done.length, openAnswers: answersTotal }).title
     : dayHeadline(day.map((item) => ({ startAt: item.startAt ?? '', title: item.title }))).title
 
   return {
@@ -130,7 +137,8 @@ export function buildTodayView({ bundle, now, lat, lon, weather }: TodayViewInpu
     weatherLine: weatherLine(weather),
     nextStop,
     answers: actions.slice(0, 3),
-    answersTotal: actions.length,
+    seeAll: actions,
+    answersTotal,
     day,
     done,
     tomorrow

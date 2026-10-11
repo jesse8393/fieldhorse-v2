@@ -1,0 +1,343 @@
+/*
+ * Welcome, Login, Reset password and Partner invite (spec 9.1, render
+ * glamor/g-welcome.jpg, decision D11). Class prefix fha-. Reads only --fh-
+ * tokens.
+ *
+ * The stage is always onyx and never follows Day or Night, so the main
+ * element carries .fh-onyx-scope: linen text, the linen focus ring
+ * (--fh-focus-on-onyx) and the onyx values of the ink tokens. The fh
+ * Button already draws outlined linen on onyx; Field is repainted here,
+ * because its paper fill and ink border belong on plaster.
+ *
+ * Two local values, both derived from tokens: --fha-danger and
+ * --fha-success, the error and notice inks, lifted toward linen so they
+ * read on onyx in both themes (7 to 1 or better). --fha-kbd is the height
+ * of the soft keyboard, written by AuthShell.
+ */
+
+/* global.css reserves a scrollbar gutter on the page, which shows the page
+   color beside the stage and under an iOS overscroll bounce. Paint the page
+   onyx while this stage is on screen. */
+html:has(.fha) {
+  background: var(--fh-onyx);
+}
+
+.fha {
+  --fha-danger: color-mix(in srgb, var(--fh-danger) 50%, var(--fh-linen));
+  --fha-success: color-mix(in srgb, var(--fh-success) 55%, var(--fh-linen));
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--fh-onyx);
+  color: var(--fh-linen);
+  overflow-x: hidden;
+}
+
+/* ---- Photo: the top 55 percent, fading into onyx ---- */
+.fha-hero {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 0;
+  height: 55vh;
+  height: 55dvh;
+  overflow: hidden;
+  pointer-events: none;
+  animation: fhc-fade-in var(--dur-slow) var(--ease) both;
+}
+
+.fha-hero__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* The fade, down to onyx at the bottom of the photo. */
+.fha-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--fh-onyx) 0%, transparent) 0%,
+    color-mix(in srgb, var(--fh-onyx) 0%, transparent) 30%,
+    color-mix(in srgb, var(--fh-onyx) 70%, transparent) 72%,
+    var(--fh-onyx) 100%
+  );
+}
+
+/* ---- The column ---- */
+.fha__body {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 auto;
+}
+
+/* The column is 380 px wide inside the 20 px gutters, centered on wide
+   screens; padding does the centering so the veil below can run full width.
+
+   Its top sits where the sign in column (about 560 px tall) would be
+   centered, and stays there: an error line appearing or Forgot password
+   leaving in sign up mode never moves the wordmark. A taller screen gets
+   more air above, a shorter one scrolls. */
+.fha__col {
+  --fha-top: max(32px, calc((100vh - 560px) / 2));
+  --fha-top: max(32px, calc((100dvh - 560px) / 2));
+  position: relative;
+  isolation: isolate;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 32px max(var(--fh-gutter), calc((100% - 380px) / 2));
+  padding-top: calc(var(--fha-top) + env(safe-area-inset-top));
+  padding-bottom: calc(32px + env(safe-area-inset-bottom) + var(--fha-kbd, 0px));
+}
+
+/* With a photo the column sits low, like the render: the wordmark starts
+   at the bottom of the screen less the column. */
+.fha--photo .fha__col {
+  --fha-top: max(80px, calc(100vh - 592px));
+  --fha-top: max(80px, calc(100dvh - 592px));
+}
+
+/* Over a photo, a veil runs from clear to onyx in the 80 px above the
+   wordmark and stays onyx below it, so no line of text ever sits on a bright
+   part of the picture. The stops ease the fade instead of cutting it off. */
+.fha--photo .fha__col::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  top: calc(var(--fha-top) - 80px);
+  right: 0;
+  bottom: 0;
+  left: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--fh-onyx) 0%, transparent) 0,
+    color-mix(in srgb, var(--fh-onyx) 20%, transparent) 16px,
+    color-mix(in srgb, var(--fh-onyx) 55%, transparent) 36px,
+    color-mix(in srgb, var(--fh-onyx) 86%, transparent) 56px,
+    var(--fh-onyx) 80px
+  );
+}
+
+/* ---- Wordmark: FIELD in brushed gold, HORSE in linen, a gold hairline ---- */
+.fha-wordmark {
+  display: flex;
+  justify-content: space-between;
+  max-width: 306px;
+  margin: 0 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--fh-gold-line);
+  font-family: var(--fh-font-wordmark);
+  font-size: 52px;
+  line-height: 52px;
+  font-weight: 400;
+  letter-spacing: 0;
+  user-select: none;
+}
+
+.fha-wordmark__field {
+  color: var(--fh-gold);
+}
+
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .fha-wordmark__field {
+    background: var(--fh-gold-brushed);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+}
+
+.fha-wordmark__horse {
+  color: var(--fh-linen);
+}
+
+/* ---- Words ---- */
+.fha-line {
+  margin: 16px 8px 0;
+  font-family: var(--fh-font-body);
+  font-size: 20px;
+  line-height: 26px;
+  font-weight: 400;
+  color: var(--fh-linen);
+}
+
+.fha-title {
+  margin: 24px 8px 0;
+  font-family: var(--fh-font-display);
+  font-size: 34px;
+  line-height: 36px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--fh-linen);
+  overflow-wrap: anywhere;
+}
+
+.fha-line:focus,
+.fha-title:focus {
+  outline: none;
+}
+
+.fha-lede {
+  margin: 12px 8px 0;
+  font-family: var(--fh-font-body);
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 400;
+  color: var(--fh-ink-2);
+}
+
+.fha-lede strong {
+  font-weight: 600;
+  color: var(--fh-linen);
+}
+
+.fha-chips {
+  margin: 24px 8px 0;
+}
+
+.fha-smoke {
+  margin: 24px 0 0;
+  text-align: center;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 400;
+  color: var(--fh-smoke);
+}
+
+/* ---- Form ---- */
+.fha-form {
+  display: grid;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.fha-actions {
+  display: grid;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.fha-links {
+  display: grid;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.fha-form + .fha-actions,
+.fha-links + .fha-smoke {
+  margin-top: 12px;
+}
+
+/* Linen labels, an onyx field with an outline that holds 3 to 1 against it.
+   The focus ring and the focused border come from the scope (linen). */
+.fha .fhc-field__label {
+  color: var(--fh-linen);
+}
+
+.fha .fhc-field__control {
+  background: var(--fh-onyx-2);
+  border-color: var(--fh-edge-strong);
+  color: var(--fh-linen);
+  caret-color: var(--fh-linen);
+}
+
+.fha .fhc-field__control::placeholder {
+  color: var(--fh-smoke);
+}
+
+.fha .fhc-field.is-disabled .fhc-field__control {
+  background: var(--fh-onyx-2);
+  border-color: var(--fh-onyx-line);
+  color: var(--fh-smoke);
+}
+
+.fha .fhc-field__control:focus-visible {
+  outline-color: var(--fh-focus-on-onyx) !important;
+}
+
+.fha .fhc-btn:focus-visible {
+  outline-color: var(--fh-focus-on-onyx) !important;
+}
+
+/* The quiet link under the buttons reads a step below linen. */
+.fha .fhc-btn--quiet {
+  color: var(--fh-ink-2);
+}
+
+.fha .fhc-btn--quiet:disabled {
+  color: var(--fh-smoke);
+}
+
+/* ---- Messages ---- */
+.fha-alert,
+.fha-notice {
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+}
+
+.fha-alert {
+  color: var(--fha-danger);
+}
+
+.fha-notice {
+  color: var(--fha-success);
+}
+
+.fha-banner {
+  margin: 24px 0 0;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--fh-danger) 60%, transparent);
+  background: color-mix(in srgb, var(--fh-danger) 14%, transparent);
+  color: var(--fha-danger);
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.fha-banner + .fha-links,
+.fha-banner + .fha-actions {
+  margin-top: 16px;
+}
+
+.fha-note {
+  margin: 24px 0 0;
+  padding: 16px;
+  border-radius: 14px;
+  box-shadow: inset 0 0 0 1px var(--fh-onyx-line);
+  text-align: center;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 400;
+  color: var(--fh-ink-2);
+}
+
+.fha-status {
+  margin: 24px 0 0;
+  text-align: center;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 400;
+  color: var(--fh-ink-2);
+}
+
+.fha-back {
+  margin-top: 12px;
+}

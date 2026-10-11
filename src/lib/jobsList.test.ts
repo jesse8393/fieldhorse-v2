@@ -33,6 +33,7 @@ const now = NOW.getTime()
 function row(partial: Partial<JobRow> & { id: string; stage: string }, i: number): JobRow {
   return {
     user_id: 'qa-user-1',
+    org_id: 'org-1',
     client_id: 'cl-1',
     name: null,
     phone: '555-0101',

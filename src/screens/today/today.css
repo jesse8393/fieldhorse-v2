@@ -241,7 +241,18 @@
 
 .fht-more {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 8px;
   padding-top: 4px;
+}
+
+.fht-more__note {
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--fh-ink-3);
 }
 
 .fht-more .fhc-btn--quiet {

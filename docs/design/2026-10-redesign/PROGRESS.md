@@ -4,9 +4,143 @@ Run rules and plans: `PHASE2_PLAN.md` to `PHASE7_PLAN.md` in this folder, decisi
 
 **If this run is picked up by a new session:** read this file first and continue from the first task that is not `done`.
 
+## Phase 8, audit fixes
+
+Plan: `PHASE8_PLAN.md` in this folder. Branch `redesign/phase-8` from `redesign/phase-7`, draft pull request against `redesign/phase-7`. New decisions start at D31 in `SPEC.md` section 17.
+
+**If a new session picks this up:** continue from the first Phase 8 task below that is not `done`, `blocked` or `skipped`.
+
+### Failing before Phase 8
+
+Baseline `npm run test:all` steps on `cdcbc23` (the Phase 7 code plus the plan), run at 10:35 pm Central on October 10:
+
+* lint 0 errors (46 warnings that were already there), typecheck, build and `audit:design` pass, 850 of 850 unit tests.
+* Playwright 269 passed, 184 skipped by project, 1 failed: `mock-workflows` "keeps the desktop schedule planning workflow complete" (desktop). It depends on the time of day (see the notes below) and is fixed in `8ff6cb7`, before any task.
+
+### Phase 8 tasks
+
+Status is one of todo, done, blocked, skipped.
+
+| Tier | Task | Status | Commit | Notes |
+| --- | --- | --- | --- | --- |
+| 1 | 1 Make the test mock honest | done | `8b14809` | Reviewed twice, one fix round. Data fixed in one test (see notes) |
+| 1 | 2 Today counts stop at 6 | done | `07a9071` | Reviewed by two lenses, approved with no fix round. Decision D34 |
+| 1 | 3 Capture from a job page shows up on the job | done | `1766c46` | Reviewed by two lenses, approved with no fix round. Decision D35 |
+| 1 | 4 Morning cold open says "Clear day" | todo | | |
+| 1 | 5 What each invoice actually owes | todo | | |
+| 1 | 6 Money timing and double sends | todo | | |
+| 1 | 7 Jobs and quotes stay inside the active company | done | this commit | Reviewed by two lenses, approved with no fix round. Decision D36 |
+| 1 | 8 The Unscheduled tray tells the truth | todo | | |
+| 1 | 9 One quote total and one deposit everywhere | todo | | |
+| 1 | 10 The customer page after approval and on bad data | todo | | |
+| 1 | 11 Inbox sends exactly once, only when tapped, only when online | todo | | |
+| 2 | 12 Next stop card without a photo, and job tabs | todo | | |
+| 2 | 13 Desktop Capture button | todo | | |
+| 2 | 14 Desktop between 900 and 1279 px | todo | | |
+| 2 | 15 Small behavior fixes | todo | | |
+| 2 | 16 Login wordmark | todo | | |
+| 3 | 17 CSS and test hygiene | todo | | |
+| 3 | 18 Private line notes on the customer page | skipped | | The approval line in the plan reads no, so `netlify/functions/public-link.js` is unchanged |
+
+### Phase 8 notes
+
+* **Task 1, the honest mock.** REST reads in `scripts/qa-mock.mjs` now honor eq, neq, in, gt, gte, lt, lte, is, order, limit and offset, several filters per column, and counts (the filtered total before limit and offset, with Content-Range exposed to the page). Unknown operators, `not.`, `or=`, `and=`, embedded columns with a dot and embedded ordering are still ignored. A single object read returns PostgREST's 406 when none or several rows match, unless the mock ignored part of the query. A date column compares with a time filter by the date as written. `QA_NOW` must be an ISO time with a zone, or loading the mock throws an error that names it. Writes keep the old rules.
+  * Test data fixed (no assertion changed): `mock-workflows` "keeps money, schedule, settings, and missing routes usable" on the phone. The phone Day view filters visits to today, and the default visit starts two hours after the mock loads, so after 10 pm Central it fell on tomorrow. The test now seeds its own visit and pins the page clock.
+  * Default rows whose meaning changed: Money now counts only job, invoice and closed jobs (desktop Total outstanding $156,850.00 with 7 jobs became $49,100.00 with 3); the default visit no longer counts as a past visit, so Today's Needs an answer loses "Plumbing Bellevue is behind schedule"; the Add event job picker no longer offers the lost job. The six cleanup guard baselines for Today and Money were retaken for this reason.
+  * The cleanup guard has one unstable shot: phone Analytics in Day (Won YTD and Profit YTD show $55K against $56K between runs). Task 17 widens the guard and should make that shot stable.
+  * Known minor gap, left as is: `QA_NOW` with an impossible date such as February 30 rolls over to March instead of throwing.
+
+* **Task 2, Today counts.** Today reads up to 50 visits a day (`VISITS_PER_DAY`) and keeps the 20 most urgent next actions (`NEXT_ACTIONS_KEPT`) with a full count beside them (`nextActionsTotal`). See all shows the 20 with a note when more wait. D28 said up to 6 rows; it now points at D34.
+  * Known issue, not changed: a job counts as behind schedule when any of its visits ended in the last 14 days (`overdueScheduleQuery` in `homeDashboard.ts`), because visits have no done state. The cap of 6 used to hide this. With the honest count, a company with 30 jobs visited in the last two weeks will read about 30 things before tomorrow. The rule needs Jesse's call (for example: behind means the last visit ended and nothing is booked next, and the job is not marked done).
+  * Small follow up, not changed: cover photos are still signed for every job in the kept actions and today's visits (up to 73), though only the next stop shows one.
+  * Days with more than 50 visits still cut off quietly at 50.
+
+* **Task 3, Capture on a job.** `refreshAfterCapture` in `captureActions.ts` refreshes `jobDetail` for the job, `jobsKey` and `homeDashboardKey` after a save. The offline outbox keeps `job_id` and inserts it as `contact_id`; items queued before this change flush with no job, as before.
+  * The offline e2e fakes no signal through `navigator.onLine` and the online and offline events, not `context.setOffline`: with `setOffline`, a module still loading made the stale chunk guard reload onto the browser's offline page under load.
+  * Known gap, not changed: a queued job capture that the database refuses for permission (the job still exists but this person lost access) stays queued and the pill reads Syncing. Only a deleted job falls back to a note on no job.
+
+* **Task 7, the active company.** `org_id` joined `JOB_LIST_COLUMNS`. New `src/lib/activeCompany.ts` (`inActiveCompany`) and `useCompanyJobs` in `queries.ts`; `dropRefusal` in `scheduleBoard.ts` refuses another company's job before any insert. The filter sits in a hook rather than in `moneyView.ts`, because the invoices bundle carries no quotes. Places that use `useJobs` rows:
+  * Changed: the desktop Schedule tray and its drop, phone Money Waiting on approval, desktop Money Waiting on approval.
+  * Left alone on purpose, lists meant to show partner shared jobs: the Jobs list in `Work.tsx` with its row actions (won, lost, reopen, follow up), `DetailListRail.tsx`, `useJobSearch`. The Jobs list's group money notes still add up partner amounts, matching the rows shown.
+  * Link only: `inbox/Thread.tsx` picks a job chip and creates nothing. Already scoped: the Add event job picker.
+  * Outside Task 7, not changed: the Capture sheet's job picker reads jobs with no company filter (it does not use `useJobs`).
+
+* The first CI run on #223 (a docs only commit) failed `mock-workflows` "keeps the desktop schedule planning workflow complete" on desktop. The default mock visit starts two hours after the mock loads, so between 10 pm and midnight Central it lands on tomorrow and the Day view is empty. It failed here too at 10:48 pm Central and passed after the test pinned its page clock to a Thursday morning and seeded that day's visit. It is listed under "Failing before Phase 8".
+
 ## Morning summary
 
-Not written yet. It goes here when the run finishes or has to stop.
+Good morning, Jesse. Phases 2 to 7 are all built and pushed. Nothing is merged, nothing was deployed, and no database or server file was touched. Every pull request is a draft, stacked in order, so you can read them one at a time.
+
+### 1. What is done, phase by phase
+
+| Phase | What | Pull request | Checks on its head |
+| --- | --- | --- | --- |
+| 2 | Today, Jobs, the Job page, Capture and the Night stage on a phone | #217 (existing, a Phase 2 section was added to its description) | Full suite passed: 651 unit tests, Playwright 64 passed |
+| 3 | Money and the quote editor on a phone | #218 | 720 unit tests, Playwright 95 passed |
+| 4 | Desktop Schedule board, desktop Job page, command palette, and the two stretch tasks: desktop Today and desktop Money | #219 | 801 unit tests, Playwright 153 passed |
+| 5 | Customer quote page in the Fieldhorse theme, Welcome and Login | #220 | 812 unit tests, Playwright 198 passed (before the Phase 4 stretch work was merged in, and covered again by the Phase 6 run) |
+| 6 | Inbox list and thread with the AI draft | #221 | 850 unit tests, Playwright 270 passed |
+| 7 | Cleanup: unused components, dead CSS removed behind a screenshot guard, the final image record | #222 | 850 unit tests, Playwright 270 passed, 184 skipped (the screenshot guard only runs on request) |
+
+On every head lint has 0 errors, and typecheck, build and the design audit pass. No test failed on any final head, and nothing failed persistently before this run either (see "Failing before this run" below). The only trouble was two timing sensitive desktop tests that CI caught on #219. Both now wait for the page, and the fix is on the Phase 4 branch and every branch above it.
+
+### 2. Images worth looking at first
+
+All in `docs/design/2026-10-redesign/final-review/`, our build on the left and the approved render on the right.
+
+* `today-day.png` and `today-night.png`: the new Today.
+* `job-day.png`: the Job page on a phone.
+* `money-day.png` and `quote-day.png`: the two big Phase 3 screens.
+* `schedule-day.png`, `deskjob-day.png`, `palette-day.png`: the three desktop renders.
+* `deskhome-day.png` and `deskmoney-day.png`: desktop Today and Money (they sit next to the phone renders, because there is no desktop render for them).
+* `portal-day.png`, `portal-approve-day.png` and `portal-night.png`: what your customer sees.
+* `login-none.png` and `login-photo.png`: the sign in screen with no photo, and with a stand in photo.
+* `thread-day.png` and `thread-night.png`: the Inbox thread.
+
+### 3. Blocked, and things that need you
+
+Nothing is blocked. Five things need your eye:
+
+1. **The Fieldhorse customer page cannot be chosen in Settings yet.** The database only allows four template names, and saving a fifth would fail the whole Settings save. I may not write migrations, so the Fieldhorse card is hidden behind one flag. The SQL to widen the check is in #220 and in decision D22. After you run it, change `FIELDHORSE_TEMPLATE_SAVES` to true in `src/screens/Settings.tsx`.
+2. **The Inbox guesses at three live values** (what a held reason looks like, the status of a waiting draft, and where the draft text sits). The Growth Engine tables are not in the migrations. Nothing can send by accident, but please check D26 against the live schema before you turn the engine on for anyone.
+3. **Two numbers vanished from desktop Today:** the "N at risk" dollar value and "N behind". Each lead or job behind still shows as a Needs an answer row (up to 6). See D28.
+4. **Three design calls are open for you:** the Job page hides the shared header strip (D14, D20), Navigate is outlined rather than gold on Today, and a capture made offline from a job is still saved as a note with no job.
+5. **Left alone on purpose:** the six legacy brand colors are still used by the mobile app, the email and document templates, the customer pages and older screens, so they stay in the design audit list. A few unused files outside the plan's list (for example `HomeActivityCard.tsx`, `NewQuoteSheet.tsx`, `SpecTabs.tsx`, `Toaster.tsx` and the unused shadcn parts in `src/components/ui`) are still there.
+
+### 4. New decisions in SPEC.md section 17
+
+D1 to D13 were yours or set before this run. New in this run:
+
+* D14 The shared header strip is hidden on the Job page, which runs the photo under it.
+* D15 How the Money groups are counted (overdue, due soon, due this week).
+* D16 Where the old phone Money features went (Statements, All invoices, Job balances pages).
+* D17 Deposit and status chips on the Quote tab.
+* D18 The Quote tab capsule shows Total, deposit and Send for approval.
+* D19 Palette shortcuts are Alt plus I, M and N, and only fire inside the open palette.
+* D20 Desktop Job page details.
+* D21 Desktop Schedule board details.
+* D22 The Fieldhorse template choice is hidden until a migration allows it.
+* D23 Portal numbers and wording (total, deposit, trust line, approver name).
+* D24 Portal layout details (capsule at the end of the page, Full details, Ask about this).
+* D25 One onyx shell for Welcome, Login, Reset password and Partner invite.
+* D26 The Inbox values it has to guess.
+* D27 Who sees the Inbox and how the thread behaves.
+* D28 Desktop Today.
+* D29 Desktop Money.
+* D30 Phase 7 choices (the forecast screen's hero, what was deleted, and what was kept).
+
+### 5. iPhone test checklist
+
+1. Open Today in the morning and again after dark. Look at Day and Night.
+2. Tap Capture on Today, then Capture from inside a job. Save a note and a to do.
+3. Open a job. Walk the tabs, tap Call and Message, and check the gold button follows the stage.
+4. Jobs: switch tabs, open the filter, open a job.
+5. Money: open Remind on an overdue invoice and read it, then close it without sending. Open an invoice sheet and the Statements page.
+6. Open a quote, switch to the Quote tab, open the preview and check Send for approval.
+7. Open a customer link on your phone with a real quote. It will still look like your current template, because the Fieldhorse choice is held back (item 1 above).
+8. Sign out and look at Login. Tap the password field, and check Sign in stays above the keyboard.
+9. Turn the phone sideways on Today and Jobs, and check nothing overlaps.
+10. If you turn the messaging engine on for a test company, open Inbox, open a thread, edit a draft and tap Send once. Do this only for a test customer.
 
 ## Failing before this run
 
@@ -24,9 +158,9 @@ Nothing failed persistently on the first full `npm run test:all` of this run, on
 | 2 | `claude/audit-fix-pass-2026-10-09` | #217 | `main` |
 | 3 | `redesign/phase-3` | #218 (draft) | the Phase 2 branch |
 | 4 | `redesign/phase-4` | #219 (draft) | `redesign/phase-3` |
-| 5 | `redesign/phase-5` | not opened yet | `redesign/phase-4` |
-| 6 | `redesign/phase-6` | not opened yet | `redesign/phase-5` |
-| 7 | `redesign/phase-7` | not opened yet | `redesign/phase-6` |
+| 5 | `redesign/phase-5` | #220 (draft) | `redesign/phase-4` |
+| 6 | `redesign/phase-6` | #221 (draft) | `redesign/phase-5` |
+| 7 | `redesign/phase-7` | #222 (draft) | `redesign/phase-6` |
 
 ## Tasks
 
@@ -62,17 +196,17 @@ Status is one of todo, done, blocked, skipped.
 | 4 | 4.5 Desktop Today (stretch) | done | bd4e0a3 | Changed the Today parts the phone shares; phone tests unchanged |
 | 4 | 4.6 Desktop Money (stretch) | done | c5b7ea4 | Phone sheet logic moved into two shared hooks |
 | 4 | 4.7 Phase 4 review and pull request | done | see git log | #219, images in phase4-review |
-| 5 | 5.1 Portal view model | todo | | |
-| 5 | 5.2 Fieldhorse proposal theme | todo | | |
-| 5 | 5.3 Welcome and Login | todo | | |
-| 5 | 5.4 Phase 5 review and pull request | todo | | |
-| 6 | 6.1 Inbox data and engine switch | todo | | |
-| 6 | 6.2 Inbox list | todo | | |
-| 6 | 6.3 Thread with the AI draft | todo | | |
-| 6 | 6.4 Phase 6 review and pull request | todo | | |
-| 7 | 7.1 Unused components | todo | | |
-| 7 | 7.2 Dead CSS guarded by screenshots | todo | | |
-| 7 | 7.3 Final record and morning summary | todo | | |
+| 5 | 5.1 Portal view model | done | c6f44a0 | |
+| 5 | 5.2 Fieldhorse proposal theme | done | 17b7d31 | Settings choice hidden until a migration allows it (D22) |
+| 5 | 5.3 Welcome and Login | done | fd12c62 | |
+| 5 | 5.4 Phase 5 review and pull request | done | see git log | #220, images in phase5-review |
+| 6 | 6.1 Inbox data and engine switch | done | 45a0515 | Also touched `permissions.ts` and `appLayout.ts`, both additive |
+| 6 | 6.2 Inbox list | done | d5588e8 | |
+| 6 | 6.3 Thread with the AI draft | done | 0ca4345 | |
+| 6 | 6.4 Phase 6 review and pull request | done | see git log | #221, images in phase6-review |
+| 7 | 7.1 Unused components | done | see git log | Pour window hero is now an OnyxStage |
+| 7 | 7.2 Dead CSS guarded by screenshots | done | see git log | 392 rules removed in 4 batches, 0 changed pixels |
+| 7 | 7.3 Final record and morning summary | done | see git log | #222, images in final-review |
 
 ## Notes and differences from the plans
 
@@ -101,6 +235,26 @@ Status is one of todo, done, blocked, skipped.
 * `src/lib/queries.ts` gained `cost` on the invoices bundle jobs so Money can compute margin. `tests/e2e/mock-workflows.spec.ts` changed two phone assertions that named old phone cards.
 * Full suite on the Phase 3 head: lint 0 errors (50 warnings, down from 57), typecheck, build and design audit pass, 720 of 720 unit tests, Playwright 95 passed and 75 skipped by project.
 
+### Phase 7 notes
+
+* Decision D30 in `SPEC.md` covers what was deleted and what was kept.
+* The screenshot guard is `tests/e2e/cleanup-guard.spec.ts`. It runs only with `FH_VISUAL=1`. To check a change: `QA_NOW=2026-10-08T14:00:00.000Z FH_VISUAL=1 npx playwright test cleanup-guard`. To retake the baselines add `--update-snapshots`. `QA_NOW` also makes `scripts/qa-mock.mjs` build its dates from that time, so runs repeat. The baselines were shown to be stable over two runs, and a deliberate one rule change (a 0.4 px letter spacing on `.fh-app`) made the guard fail with 872 changed pixels.
+* `scripts/find-dead-css.mjs` lists the rules the app can no longer match. It reports none now.
+* **Legacy colors still in use (design audit list):** all six, `#C9963A`, `#141414`, `#F2EDE4`, `#5C5C5C`, `#C0392B` and `#2D7A4F`, with their rgb forms. They are named by the mobile app, the email and PDF templates in `netlify/functions`, `src/components/documents`, the public quote and invoice pages, Landing, Settings and many older screens, plus `tokens.css` and `global.css`. None could be dropped.
+* Unused files that the plan did not list were left alone, and are named in D30.
+
+### Phase 6 notes
+
+* Decisions D26 and D27 in `SPEC.md` cover the Inbox data guesses and who sees the Inbox. **Check D26 against the live schema:** the Growth Engine tables are not in `supabase/migrations`, so the held reasons and draft status values are best guesses.
+* The inbox agent added `tests/e2e/helpers/rpcCalls.ts` and RPC call recording to `scripts/qa-mock.mjs` (an `rpcLog` option and an `rpcCalls(context, name)` reader).
+
+### Phase 5 notes
+
+* Decisions D22 to D25 in `SPEC.md` cover the Settings choice, the portal numbers, the portal layout and the Welcome and Login shell.
+* **Needs a migration (not written, the run rules forbid it).** `profiles_estimate_template_check` allows only classic, slate, mint and editorial, so the Fieldhorse card in Settings is hidden behind `FIELDHORSE_TEMPLATE_SAVES` in `src/screens/Settings.tsx`. The portal theme itself works for any company whose `estimate_template` is `fieldhorse`.
+* CI on #219 caught two timing sensitive desktop tests (`palette.spec` waited for network idle, `schedule.spec` dropped a keyboard drag before the highlight). Both now wait for the page. Network idle took up to 41 seconds under CPU load locally.
+* Full suite on the Phase 5 head: lint 0 errors (46 warnings), typecheck, build and design audit pass, 812 of 812 unit tests, Playwright 198 passed and 116 skipped by project.
+
 ### Phase 4 notes
 
 * Decisions D19 to D21 in `SPEC.md` cover the palette shortcuts, the desktop Job page and the Schedule board. The schedule agent also found that a second `NotificationsBell` throws ("cannot add postgres_changes callbacks after subscribe") because the two instances share a channel name, and a CSS hidden header still mounts its bell, so any screen that hides the header must not render its own bell.
@@ -108,7 +262,7 @@ Status is one of todo, done, blocked, skipped.
 * The desktop shots in the review images are Day only, as the plan says. There is no desktop render for Today or Money, so those two shots sit next to the phone renders.
 * CI on #219 caught two timing sensitive desktop tests (`palette.spec` waited for network idle, `schedule.spec` dropped a keyboard drag before the highlight). Both now wait for the page. Network idle took up to 41 seconds under CPU load locally.
 
-### Phase 4 stretch decisions (recorded in SPEC section 17 as D28 and D29 on the Phase 6 branch)
+### Phase 4 stretch decisions (D28 and D29 in SPEC section 17)
 
 * **D28, desktop Today.**
   * Today now takes the same props as the phone and shares its parts (`todayParts.tsx`). Both layouts read `buildTodayView`.

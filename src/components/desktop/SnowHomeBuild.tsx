@@ -25,6 +25,7 @@ import { buildTodayView, todayWeather, weekBounds, weekStrip } from '../../lib/t
 import type { HomeTodayOnSite } from '../../lib/homeDashboard.ts'
 import {
   AnswerList,
+  AnswersMore,
   NextStopCard,
   SectionHead,
   StageHero,
@@ -151,7 +152,7 @@ export default function SnowHomeBuild({
   /* ----- Right column ----- */
   let answersSection
   if (view) {
-    const answers = showAllAnswers ? bundle?.nextActions ?? view.answers : view.answers
+    const answers = showAllAnswers ? view.seeAll : view.answers
     answersSection = (
       <section className="fht-section fht-section--answers" aria-labelledby="fht-answers">
         <SectionHead id="fht-answers" title="Needs an answer" end={<span className="fht-head__count">{view.answersTotal}</span>} />
@@ -160,13 +161,7 @@ export default function SnowHomeBuild({
         ) : (
           <p className="fht-quiet">Nothing needs an answer right now.</p>
         )}
-        {view.answersTotal > 3 && (
-          <div className="fht-more">
-            <Button variant="quiet" size="mini" to={{ search: showAllAnswers ? '' : '?answers=all' }} replace>
-              {showAllAnswers ? 'Show fewer' : 'See all'}
-            </Button>
-          </div>
-        )}
+        <AnswersMore view={view} showAll={showAllAnswers} />
       </section>
     )
   } else if (loading) {

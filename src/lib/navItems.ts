@@ -12,6 +12,7 @@ import {
   Hammer,
   HardHat,
   Handshake,
+  Inbox,
   MessageSquare,
   PlayCircle,
   Settings,
@@ -47,11 +48,27 @@ export const MONEY: NavItem = { to: '/invoices', label: 'Money', icon: Banknote,
 export const SCHEDULE: NavItem = { to: '/schedule', label: 'Schedule', icon: CalendarDays, match: under('/schedule') }
 export const CUSTOMERS: NavItem = { to: '/clients', label: 'Customers', icon: Users, match: under('/clients') }
 export const REPORTS: NavItem = { to: '/analytics', label: 'Reports', icon: BarChart3, match: under('/analytics') }
+export const INBOX: NavItem = { to: '/inbox', label: 'Inbox', icon: Inbox, match: under('/inbox') }
 export const SETTINGS: NavItem = { to: '/settings', label: 'Settings', icon: Settings, match: under('/settings') }
 
 /** The phone dock: two items, the Capture coin, two items (decision D2). */
 export const DOCK_LEFT: NavItem[] = [TODAY, JOBS]
 export const DOCK_RIGHT: NavItem[] = [MONEY, SCHEDULE]
+
+/**
+ * The dock's fifth slot (decision D9): Inbox once the company's messaging
+ * engine is on, Schedule until then. While the setting is still loading
+ * (undefined) the slot stays Schedule, so the dock never points at an Inbox
+ * that turns out to be off.
+ */
+export function dockFifthItem(engineEnabled: boolean | undefined): NavItem {
+  return engineEnabled === true ? INBOX : SCHEDULE
+}
+
+/** The dock items right of the Capture coin. */
+export function dockRight(engineEnabled: boolean | undefined): NavItem[] {
+  return [MONEY, dockFifthItem(engineEnabled)]
+}
 
 const ESTIMATES: NavItem = { to: '/bid', label: 'Estimates', icon: Calculator, match: under('/bid') }
 const FORECAST: NavItem = { to: '/pour-window', label: 'Forecast', icon: CloudSun, match: under('/pour-window') }
@@ -78,6 +95,12 @@ export const MENU_GROUPS: NavGroup[] = [
 
 /** The desktop sidebar's main list (spec 8.3). */
 export const SIDEBAR_PRIMARY: NavItem[] = [TODAY, SCHEDULE, JOBS, MONEY, CUSTOMERS, REPORTS]
+
+/** The sidebar's main list, with Inbox after Money once the engine is on (decision D9). */
+export function sidebarPrimary(engineEnabled: boolean | undefined): NavItem[] {
+  if (engineEnabled !== true) return SIDEBAR_PRIMARY
+  return [TODAY, SCHEDULE, JOBS, MONEY, INBOX, CUSTOMERS, REPORTS]
+}
 
 /** The sidebar's collapsible Team and office group. */
 export const SIDEBAR_MORE: NavGroup[] = [

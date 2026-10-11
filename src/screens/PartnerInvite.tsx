@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams, Link } from 'react-router-dom'
-import { Users, ArrowRight } from 'lucide-react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext.tsx'
-import Aurora from '../components/fx/Aurora.tsx'
-import GridPattern from '../components/fx/GridPattern.tsx'
-import { Eyebrow } from '../components/v3'
+import { Button, Chip } from '../components/fh'
+import AuthShell from './auth/AuthShell.tsx'
 
 function friendlyError(code: any) {
   if (!code) return ''
@@ -156,144 +154,61 @@ export default function PartnerInvite() {
   const showSoftError = !fatal && infoErr && !showSignIn && !showLinking
 
   return (
-    <div
-      style={{
-        position: 'relative',
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 24,
-        background: 'var(--surface-0, #141414)',
-        color: 'var(--ink-strong, #F2EDE4)',
-        overflow: 'hidden',
-        boxSizing: 'border-box'
-      }}
-    >
-      <Aurora />
-      <GridPattern />
-      <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 420, opacity: 1 }}>
-        <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{ fontFamily: 'var(--font-wordmark)', fontSize: 24, letterSpacing: 0, lineHeight: 1 }}>
-            <span style={{ color: 'var(--v3-primary-text)' }}>FIELD</span>
-            <span style={{ color: 'var(--ink-strong, #F2EDE4)' }}>HORSE</span>
-          </div>
-          <Eyebrow as="div" style={{ marginTop: 20, padding: '4px 12px', borderRadius: 10, background: 'rgba(201,150,58,0.12)', border: '1px solid rgba(201,150,58,0.3)', color: 'var(--v3-primary-text)' }}>
-            <Users size={11} />
-            Partner invite
-          </Eyebrow>
-          <h1
-            className="fh-font-serif"
-            style={{ fontSize: 24, lineHeight: 1.15, letterSpacing: 0, marginTop: 14, marginBottom: 6, fontWeight: 400, color: 'var(--ink-strong, #F2EDE4)' }}
-          >
-            {inviterName} invited you to{' '}
-            manage together.
-          </h1>
-          <p style={{ margin: 0, fontSize: 14, color: 'var(--ink-muted, #5C5C5C)', lineHeight: 1.5, fontFamily: 'var(--font-body)' }}>
-            You'll get access to <strong style={{ color: 'var(--ink-strong, #F2EDE4)' }}>{jobTitle}</strong>, notes, schedule, payments, subs, expenses. Nothing else from their account.
-          </p>
+    <AuthShell labelledBy="fh-invite-title">
+      <div className="fha-chips">
+        <Chip label="Partner invite" />
+      </div>
+      <h1 id="fh-invite-title" className="fha-title">
+        {inviterName} invited you to{' '}
+        manage together.
+      </h1>
+      <p className="fha-lede">
+        You'll get access to <strong>{jobTitle}</strong>, notes, schedule, payments, subs, expenses. Nothing else from their account.
+      </p>
+
+      {showFatal && (
+        <div role="alert" className="fha-banner">
+          {infoErr}
         </div>
+      )}
 
-        {showFatal && (
-          <div
-            role="alert"
-            style={{ padding: '12px 16px', borderRadius: 10, background: 'rgba(192,57,43,0.10)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--v3-danger-text)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, textAlign: 'center' }}
-          >
-            {infoErr}
-          </div>
-        )}
+      {showSoftError && (
+        <div role="alert" className="fha-banner">
+          {infoErr}
+        </div>
+      )}
 
-        {showSoftError && (
-          <div
-            role="alert"
-            style={{ padding: '12px 12px', borderRadius: 10, background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--v3-danger-text)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, marginBottom: 14 }}
-          >
-            {infoErr}
-          </div>
-        )}
-
-        {/* Signed in with a different email than the invite: offer the way
-            out instead of a dead end. */}
-        {showSoftError && session && infoErr === friendlyError('email_mismatch') && (
-          <button
-            type="button"
+      {/* Signed in with a different email than the invite: offer the way
+          out instead of a dead end. */}
+      {showSoftError && session && infoErr === friendlyError('email_mismatch') && (
+        <div className="fha-actions">
+          <Button
+            variant="secondary"
+            size="lg"
+            block
             onClick={async () => {
               await signOut()
               navigate(`/login?partner_invite=${encodeURIComponent(token || '')}`, { replace: true })
             }}
-            style={{ width: '100%', padding: '12px 16px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule, rgba(242, 237, 228,0.08))', color: 'var(--ink-strong, #F2EDE4)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, cursor: 'pointer', marginBottom: 14 }}
           >
             Switch account
-          </button>
-        )}
+          </Button>
+        </div>
+      )}
 
-        {showSignIn && (
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 12,
-              padding: 24,
-              borderRadius: 10,
-              background: 'var(--surface-2)',
-              border: '1px solid var(--rule, rgba(242, 237, 228,0.08))'
-            }}
-          >
-            {loading && (
-              <p style={{ margin: '0 0 4px', textAlign: 'center', fontSize: 12, color: 'var(--ink-muted, #5C5C5C)', letterSpacing: 0 }}>
-                Checking session…
-              </p>
-            )}
-            <Link
-              to={`/login?partner_invite=${encodeURIComponent(token || '')}`}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-                padding: '12px 16px',
-                borderRadius: 10,
-                background: 'linear-gradient(135deg, var(--field-gold-bright, #C9963A), var(--field-gold-deep, #5C5C5C))',
-                color: 'var(--onyx, #141414)',
-                fontFamily: 'var(--font-display)',
-                fontSize: 16,
-                letterSpacing: 0,
-                textDecoration: 'none',
-                boxShadow: '0 8px 24px rgba(201,150,58,0.35)'
-              }}
-            >
-              Sign in
-              <ArrowRight size={16} />
-            </Link>
-            <Link
-              to={`/login?partner_invite=${encodeURIComponent(token || '')}&mode=signup`}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-                padding: '12px 16px',
-                borderRadius: 10,
-                background: 'var(--surface-2)',
-                border: '1px solid var(--rule, rgba(242, 237, 228,0.08))',
-                color: 'var(--ink-strong, #F2EDE4)',
-                fontFamily: 'var(--font-display)',
-                fontSize: 14,
-                letterSpacing: 0,
-                textDecoration: 'none'
-              }}
-            >
-              Create account
-            </Link>
-          </div>
-        )}
+      {showSignIn && (
+        <div className="fha-links">
+          {loading && <p className="fha-status">Checking session…</p>}
+          <Button to={`/login?partner_invite=${encodeURIComponent(token || '')}`} variant="primary" size="lg" block>
+            Sign in
+          </Button>
+          <Button to={`/login?partner_invite=${encodeURIComponent(token || '')}&mode=signup`} variant="secondary" size="lg" block>
+            Create account
+          </Button>
+        </div>
+      )}
 
-        {showLinking && (
-          <p style={{ textAlign: 'center', fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--ink-muted, #5C5C5C)' }}>
-            Linking you to the job…
-          </p>
-        )}
-      </div>
-    </div>
+      {showLinking && <p className="fha-status">Linking you to the job…</p>}
+    </AuthShell>
   )
 }

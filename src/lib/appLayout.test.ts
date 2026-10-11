@@ -10,6 +10,8 @@ describe('layoutForPath', () => {
     '/sub-portal',
     '/subs/vendor-1',
     '/invoices/invoice-1',
+    '/inbox',
+    '/inbox/conversation-1',
   ])('gives %s the responsive workspace', (pathname) => {
     expect(layoutForPath(pathname)).toBe('responsive')
   })
