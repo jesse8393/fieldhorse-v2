@@ -12,7 +12,10 @@ Plan: `PHASE8_PLAN.md` in this folder. Branch `redesign/phase-8` from `redesign/
 
 ### Failing before Phase 8
 
-Baseline not run yet.
+Baseline `npm run test:all` steps on `cdcbc23` (the Phase 7 code plus the plan), run at 10:35 pm Central on October 10:
+
+* lint 0 errors (46 warnings that were already there), typecheck, build and `audit:design` pass, 850 of 850 unit tests.
+* Playwright 269 passed, 184 skipped by project, 1 failed: `mock-workflows` "keeps the desktop schedule planning workflow complete" (desktop). It depends on the time of day (see the notes below) and is fixed in `8ff6cb7`, before any task.
 
 ### Phase 8 tasks
 
