@@ -1,4 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { fetchHomeDashboard } from './homeDashboard.ts'
 import type { HomeDashboardBundle, HomeNextAction, HomeTodayOnSite } from './homeDashboard.ts'
 import { dayHeadline, nightHeadline } from './todayHeadline.ts'
 import {
@@ -23,6 +24,45 @@ afterAll(() => {
   if (originalTz === undefined) delete process.env.TZ
   else process.env.TZ = originalTz
 })
+
+// A stand in for the database behind fetchHomeDashboard, so the tests
+// below read Today through the same queries the app sends. Each read
+// returns the seeded rows of its table, kept by gte and lt and then cut by
+// limit and range in the order the query calls them, as PostgREST does.
+// Other calls (select, eq, in, not, order) pass every row.
+const fakeDb = vi.hoisted(() => {
+  type DbRow = Record<string, unknown>
+  const tables: Record<string, DbRow[]> = {}
+  function from(table: string): unknown {
+    const calls: [string, unknown[]][] = []
+    const respond = () => {
+      let rows = tables[table] ?? []
+      for (const [method, args] of calls) {
+        const [column, value] = args
+        if (method === 'gte') rows = rows.filter((row) => String(row[column as string]) >= String(value))
+        else if (method === 'lt') rows = rows.filter((row) => String(row[column as string]) < String(value))
+        else if (method === 'limit') rows = rows.slice(0, Number(args[0]))
+        else if (method === 'range') rows = rows.slice(Number(args[0]), Number(args[1]) + 1)
+      }
+      return { data: rows, error: null }
+    }
+    const query: unknown = new Proxy({}, {
+      get(_target, prop) {
+        if (prop === 'then') {
+          return (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) =>
+            Promise.resolve(respond()).then(resolve, reject)
+        }
+        return (...args: unknown[]) => {
+          calls.push([String(prop), args])
+          return query
+        }
+      }
+    })
+    return query
+  }
+  return { tables, from }
+})
+vi.mock('./supabase.ts', () => ({ supabase: { from: (table: string) => fakeDb.from(table) } }))
 
 const LAT = 35.85
 const LON = -86.39
@@ -236,6 +276,108 @@ describe('buildTodayView', () => {
       weather: { tempF: 71.4, code: 2, window: { status: 'go', label: 'Clear to work until 3 pm' } }
     })
     expect(view.weatherLine).toBe('71° and partly cloudy. Clear to work until 3 pm.')
+  })
+})
+
+describe('Today past six, read through the dashboard queries', () => {
+  beforeEach(() => {
+    for (const table of Object.keys(fakeDb.tables)) delete fakeDb.tables[table]
+  })
+
+  async function todayAt(now: Date) {
+    return buildTodayView({ bundle: await fetchHomeDashboard('user-1', now, 'org-1'), now, lat: LAT, lon: LON })
+  }
+
+  // Eight visits on one day, 7:30 am to 4:00 pm, each 45 minutes, with the
+  // job embedded as the schedule query reads it.
+  function eightVisits(dayOffset: number) {
+    const starts = [[7, 30], [8, 30], [9, 30], [10, 30], [11, 30], [12, 30], [14, 30], [16, 0]]
+    return starts.map(([hours, minutes], i) => ({
+      id: `d${dayOffset}-v${i + 1}`,
+      contact_id: `job-${i + 1}`,
+      start_at: at(hours, minutes, dayOffset).toISOString(),
+      end_at: at(hours, minutes + 45, dayOffset).toISOString(),
+      title: i === 0 ? 'Pour slab, crew A' : `Visit ${i + 1}`,
+      fh_contacts: { name: `Job ${i + 1}`, stage: 'job', address: `${i + 1} Main St`, job_title: null }
+    }))
+  }
+
+  // Leads gone quiet for ten days or more, each one a follow up to answer.
+  // The last one has waited longest.
+  function quietLeads(count: number) {
+    return Array.from({ length: count }, (_, i) => ({
+      id: `lead-${i + 1}`,
+      name: `Lead ${i + 1}`,
+      amount: 1000,
+      stage: 'lead',
+      created_at: at(9, 0, -60).toISOString(),
+      updated_at: at(9, 0, -(10 + i)).toISOString(),
+      completed_at: null,
+      follow_up_on: null,
+      proposal_status: null
+    }))
+  }
+
+  it('with eight visits reads "Eight stops." and the seventh can be the next stop', async () => {
+    fakeDb.tables.fh_schedule = [...eightVisits(0), ...eightVisits(1)]
+    const view = await todayAt(at(14))
+    expect(view.evening).toBe(false)
+    expect(view.title).toEqual(['Eight stops.', 'First pour at 7:30.'])
+    expect(view.day).toHaveLength(8)
+    expect(view.done).toHaveLength(6)
+    expect(view.nextStop).toMatchObject({ jobId: 'job-7', title: 'Job 7', address: '7 Main St' })
+  })
+
+  it('in the evening "Today, done" counts all eight, and tomorrow lists all eight', async () => {
+    fakeDb.tables.fh_schedule = [...eightVisits(0), ...eightVisits(1)]
+    const view = await todayAt(at(19, 40))
+    expect(view.evening).toBe(true)
+    expect(view.title[0]).toBe('Eight stops done.')
+    expect(`${view.done.length} of ${view.day.length}`).toBe('8 of 8')
+    expect(view.tomorrow).toHaveLength(8)
+  })
+
+  it('with 14 actions the Needs an answer count reads 14', async () => {
+    fakeDb.tables.fh_contacts = quietLeads(14)
+    const view = await todayAt(at(8))
+    expect(view.answers).toHaveLength(3)
+    expect(view.answersTotal).toBe(14)
+  })
+
+  it('in the evening with 14 actions, says 14 things before tomorrow', async () => {
+    fakeDb.tables.fh_contacts = quietLeads(14)
+    const view = await todayAt(at(19, 40))
+    expect(view.title).toEqual(['Quiet day.', '14 things before tomorrow.'])
+  })
+
+  it('See all lists the 20 most urgent and the count keeps every one', async () => {
+    fakeDb.tables.fh_contacts = quietLeads(25)
+    const view = await todayAt(at(8))
+    expect(view.answersTotal).toBe(25)
+    expect(view.seeAll).toHaveLength(20)
+    expect(view.seeAll[0].contactId).toBe('lead-25')
+    expect(view.answers.map((a) => a.id)).toEqual(view.seeAll.slice(0, 3).map((a) => a.id))
+  })
+
+  it('a bundle that carries a total counts past its list', () => {
+    const view = buildTodayView({
+      bundle: bundle({ nextActions: Array.from({ length: 20 }, (_, i) => action(i + 1)), nextActionsTotal: 34 }),
+      now: at(19, 40),
+      lat: LAT,
+      lon: LON
+    })
+    expect(view.answersTotal).toBe(34)
+    expect(view.seeAll).toHaveLength(20)
+    expect(view.title[1]).toBe('34 things before tomorrow.')
+  })
+
+  it('a bundle cached before the total existed counts its own list', () => {
+    const cached = bundle({ nextActions: [action(1), action(2), action(3), action(4)] })
+    delete (cached as Partial<HomeDashboardBundle>).nextActionsTotal
+    const view = buildTodayView({ bundle: cached, now: at(19, 40), lat: LAT, lon: LON })
+    expect(view.answersTotal).toBe(4)
+    expect(view.seeAll).toHaveLength(4)
+    expect(view.title[1]).toBe('Four things before tomorrow.')
   })
 })
 

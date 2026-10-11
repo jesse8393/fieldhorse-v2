@@ -23,8 +23,8 @@ Status is one of todo, done, blocked, skipped.
 
 | Tier | Task | Status | Commit | Notes |
 | --- | --- | --- | --- | --- |
-| 1 | 1 Make the test mock honest | done | this commit | Reviewed twice, one fix round. Data fixed in one test (see notes) |
-| 1 | 2 Today counts stop at 6 | todo | | |
+| 1 | 1 Make the test mock honest | done | `8b14809` | Reviewed twice, one fix round. Data fixed in one test (see notes) |
+| 1 | 2 Today counts stop at 6 | done | this commit | Reviewed by two lenses, approved with no fix round. Decision D34 |
 | 1 | 3 Capture from a job page shows up on the job | todo | | |
 | 1 | 4 Morning cold open says "Clear day" | todo | | |
 | 1 | 5 What each invoice actually owes | todo | | |
@@ -49,6 +49,11 @@ Status is one of todo, done, blocked, skipped.
   * Default rows whose meaning changed: Money now counts only job, invoice and closed jobs (desktop Total outstanding $156,850.00 with 7 jobs became $49,100.00 with 3); the default visit no longer counts as a past visit, so Today's Needs an answer loses "Plumbing Bellevue is behind schedule"; the Add event job picker no longer offers the lost job. The six cleanup guard baselines for Today and Money were retaken for this reason.
   * The cleanup guard has one unstable shot: phone Analytics in Day (Won YTD and Profit YTD show $55K against $56K between runs). Task 17 widens the guard and should make that shot stable.
   * Known minor gap, left as is: `QA_NOW` with an impossible date such as February 30 rolls over to March instead of throwing.
+
+* **Task 2, Today counts.** Today reads up to 50 visits a day (`VISITS_PER_DAY`) and keeps the 20 most urgent next actions (`NEXT_ACTIONS_KEPT`) with a full count beside them (`nextActionsTotal`). See all shows the 20 with a note when more wait. D28 said up to 6 rows; it now points at D34.
+  * Known issue, not changed: a job counts as behind schedule when any of its visits ended in the last 14 days (`overdueScheduleQuery` in `homeDashboard.ts`), because visits have no done state. The cap of 6 used to hide this. With the honest count, a company with 30 jobs visited in the last two weeks will read about 30 things before tomorrow. The rule needs Jesse's call (for example: behind means the last visit ended and nothing is booked next, and the job is not marked done).
+  * Small follow up, not changed: cover photos are still signed for every job in the kept actions and today's visits (up to 73), though only the next stop shows one.
+  * Days with more than 50 visits still cut off quietly at 50.
 
 * The first CI run on #223 (a docs only commit) failed `mock-workflows` "keeps the desktop schedule planning workflow complete" on desktop. The default mock visit starts two hours after the mock loads, so between 10 pm and midnight Central it lands on tomorrow and the Day view is empty. It failed here too at 10:48 pm Central and passed after the test pinned its page clock to a Thursday morning and seeded that day's visit. It is listed under "Failing before Phase 8".
 
