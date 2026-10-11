@@ -12,15 +12,60 @@ test.use({ timezoneId: 'America/Chicago' })
 const MORNING = new Date('2026-10-08T11:40:00Z') // 6:40 am Central
 const EVENING = new Date('2026-10-09T00:40:00Z') // 7:40 pm Central
 
-// Three visits today and one tomorrow, in UTC. The mock returns every row
-// for both day queries; the screen keeps each to its own day. The rows
-// carry no embedded job, so names and addresses come from the job rows.
+// Three visits today and one tomorrow, in UTC. The mock honors each day
+// query's start_at range, as the database does, so today's query gets the
+// three and tomorrow's the one. The rows carry no embedded job, so names
+// and addresses come from the job rows.
 const SCHEDULE = [
   { id: 's1', contact_id: 'c-job1', title: 'Pour slab, crew A', start_at: '2026-10-08T12:30:00Z', end_at: '2026-10-08T16:00:00Z' },
   { id: 's2', contact_id: 'c-lead1', title: 'Site visit and quote walk', start_at: '2026-10-08T16:30:00Z', end_at: '2026-10-08T17:30:00Z' },
   { id: 's3', contact_id: 'c-job2', title: 'Walkthrough', start_at: '2026-10-08T19:30:00Z', end_at: '2026-10-08T20:30:00Z' },
   { id: 's4', contact_id: 'c-job1', title: 'Final slab inspection', start_at: '2026-10-09T14:00:00Z', end_at: '2026-10-09T15:00:00Z' }
 ].map((row) => ({ user_id: 'qa-user-1', description: null, created_at: '2026-10-01T12:00:00Z', ...row }))
+
+// Eight visits today, 7:30 am to 4:00 pm Central, more than the six the
+// day query used to stop at, and the same visit tomorrow. By 2:00 pm the
+// first six are over and the seventh, at 2:30, is next.
+const AFTERNOON = new Date('2026-10-08T19:00:00Z') // 2:00 pm Central
+const EIGHT_VISITS = [
+  { id: 'e1', contact_id: 'c-job1', title: 'Pour slab, crew A', start_at: '2026-10-08T12:30:00Z', end_at: '2026-10-08T13:15:00Z' },
+  { id: 'e2', contact_id: 'c-lead1', title: 'Site visit and quote walk', start_at: '2026-10-08T13:30:00Z', end_at: '2026-10-08T14:15:00Z' },
+  { id: 'e3', contact_id: 'c-job2', title: 'Driveway forms', start_at: '2026-10-08T14:30:00Z', end_at: '2026-10-08T15:15:00Z' },
+  { id: 'e4', contact_id: 'c-quote', title: 'Measure the lot', start_at: '2026-10-08T15:30:00Z', end_at: '2026-10-08T16:15:00Z' },
+  { id: 'e5', contact_id: 'c-lead2', title: 'Wall layout', start_at: '2026-10-08T16:30:00Z', end_at: '2026-10-08T17:15:00Z' },
+  { id: 'e6', contact_id: 'c-change', title: 'Kitchen walk', start_at: '2026-10-08T17:30:00Z', end_at: '2026-10-08T18:15:00Z' },
+  { id: 'e7', contact_id: 'c-job2', title: 'Walkthrough', start_at: '2026-10-08T19:30:00Z', end_at: '2026-10-08T20:15:00Z' },
+  { id: 'e8', contact_id: 'c-job1', title: 'Trench check', start_at: '2026-10-08T21:00:00Z', end_at: '2026-10-08T21:45:00Z' },
+  { id: 'e9', contact_id: 'c-job1', title: 'Final slab inspection', start_at: '2026-10-09T14:00:00Z', end_at: '2026-10-09T15:00:00Z' }
+].map((row) => ({ user_id: 'qa-user-1', description: null, created_at: '2026-10-01T12:00:00Z', ...row }))
+
+// Twenty five leads gone quiet for ten days or more, each a follow up to
+// answer: more than the 20 that See all lists.
+const QUIET_LEADS = Array.from({ length: 25 }, (_, i) => ({
+  id: `q-${i + 1}`,
+  user_id: 'qa-user-1',
+  stage: 'lead',
+  name: `Quiet lead ${i + 1}`,
+  amount: 1000 + i * 100,
+  address: null,
+  job_title: 'Driveway',
+  created_at: '2026-08-01T12:00:00Z',
+  updated_at: new Date(Date.parse('2026-09-28T15:00:00Z') - i * 86_400_000).toISOString(),
+  proposal_status: null,
+  follow_up_on: null,
+  completed_at: null
+}))
+
+async function seeAllAnswers(page: Page) {
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(/ 25 things before tomorrow\.$/)
+  const answers = page.getByRole('region', { name: 'Needs an answer' })
+  await expect(answers.getByText('25', { exact: true })).toBeVisible()
+  await expect(answers.getByRole('listitem')).toHaveCount(3)
+  await answers.getByRole('link', { name: 'See all' }).click()
+  await expect(answers.getByRole('listitem')).toHaveCount(20)
+  await expect(answers.getByText('Showing 20 of 25, most urgent first.')).toBeVisible()
+  await expect(answers.getByRole('listitem').first()).toContainText('Quiet lead 25')
+}
 
 // Open Meteo as getWeather asks for it: 71 and partly cloudy now, rain
 // from 3 pm that stops a concrete pour, 68 and clear tomorrow.
@@ -116,6 +161,28 @@ test.describe('today on a phone', () => {
     expect(await page.locator('main .fhc-btn--primary').count()).toBeLessThanOrEqual(1)
   })
 
+  test('eight visits all count in the headline and the day', async ({ context, page }) => {
+    await setUp(context, page, { at: MORNING, tables: { fh_schedule: EIGHT_VISITS } })
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Eight stops. First pour at 7:30.')
+    const day = page.getByRole('region', { name: 'Your day' })
+    await expect(day.getByRole('listitem')).toHaveCount(8)
+    await expect(day.getByText('Trench check')).toBeVisible()
+  })
+
+  test('with eight visits the seventh is the next stop in the afternoon', async ({ context, page }) => {
+    await setUp(context, page, { at: AFTERNOON, tables: { fh_schedule: EIGHT_VISITS } })
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Eight stops. First pour at 7:30.')
+    const nextStop = page.getByRole('region', { name: 'Next stop' })
+    await expect(nextStop.getByText('Next stop, 2:30 pm')).toBeVisible()
+    await expect(nextStop.getByText('Harold Wickham')).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Your day' }).getByText('Done', { exact: true })).toHaveCount(6)
+  })
+
+  test('every thing waiting counts in the evening, and See all lists the 20 most urgent', async ({ context, page }) => {
+    await setUp(context, page, { at: EVENING, tables: { fh_contacts: QUIET_LEADS } })
+    await seeAllAnswers(page)
+  })
+
   test('evening content', async ({ context, page }) => {
     await setUp(context, page, { at: EVENING })
     await expect(page.getByText(/Today, done|Tomorrow/).first()).toBeVisible()
@@ -158,6 +225,23 @@ test.describe('today on a desktop', () => {
     await expect(day.getByRole('link', { name: 'Week' })).toHaveAttribute('href', '/schedule')
     // Tomorrow's visit stays out of today.
     await expect(day.getByText('Final slab inspection')).toHaveCount(0)
+  })
+
+  test('eight visits all count, and the seventh is the next stop in the afternoon', async ({ context, page }) => {
+    await setUp(context, page, { at: AFTERNOON, tables: { fh_schedule: EIGHT_VISITS } })
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Eight stops. First pour at 7:30.')
+    const day = page.getByRole('region', { name: 'Your day' })
+    await expect(day.getByRole('listitem')).toHaveCount(8)
+    await expect(day.getByText('Done', { exact: true })).toHaveCount(6)
+    const nextStop = page.getByRole('region', { name: 'Next stop' })
+    await expect(nextStop.getByText('Next stop, 2:30 pm')).toBeVisible()
+    await expect(nextStop.getByText('Harold Wickham')).toBeVisible()
+    await expect(page.getByRole('region', { name: 'This week' }).getByRole('link', { name: 'Thursday, October 8, today, 8 visits' })).toBeVisible()
+  })
+
+  test('every thing waiting counts in the evening, and See all lists the 20 most urgent', async ({ context, page }) => {
+    await setUp(context, page, { at: EVENING, tables: { fh_contacts: QUIET_LEADS } })
+    await seeAllAnswers(page)
   })
 
   test('the week strip shows seven days with their visits, today marked, each linking to the schedule', async ({ context, page }) => {

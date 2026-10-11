@@ -160,7 +160,14 @@ export type HomeDashboardBundle = {
   todayOnSite: HomeTodayOnSite[]
   /** The next local day's visits, the same shape as todayOnSite. */
   tomorrowOnSite: HomeTodayOnSite[]
+  /** The most urgent next actions, at most NEXT_ACTIONS_KEPT, for See all. */
   nextActions: HomeNextAction[]
+  /**
+   * How many next actions there are in all, which can be more than
+   * nextActions holds. Missing on a bundle cached by an older build, which
+   * counts nextActions instead.
+   */
+  nextActionsTotal?: number
   photoUrlByJob: Record<string, string>
 }
 
@@ -214,6 +221,10 @@ function daysBetween(now: Date, thenMs: number) {
 function contactName(contact: ContactRow | undefined, fallback = 'Job') {
   return contact?.name || fallback
 }
+
+// Today counts every next action but keeps only this many, most urgent
+// first, for its See all list.
+export const NEXT_ACTIONS_KEPT = 20
 
 export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashboardBundle {
   const now = source.now
@@ -617,7 +628,8 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
     stageRail,
     todayOnSite,
     tomorrowOnSite,
-    nextActions: actions.slice(0, 6),
+    nextActions: actions.slice(0, NEXT_ACTIONS_KEPT),
+    nextActionsTotal: actions.length,
     photoUrlByJob: source.photoUrlByJob,
   }
 }
@@ -644,6 +656,11 @@ const CONTACT_COLUMNS =
 
 // Visits with the job they belong to, for Today's next stop and day list.
 const SCHEDULE_COLUMNS = 'id, contact_id, start_at, end_at, title, fh_contacts(name, stage, address, job_title)'
+
+// The most visits Today reads for one day. Its headline, next stop and
+// "Today, done" count every visit it gets, so this sits well above a full
+// day for any crew.
+export const VISITS_PER_DAY = 50
 
 // Cover photos are not part of this fetch (photoUrlByJob comes back
 // empty): useHomeDashboard loads them in their own query once the bundle
@@ -718,7 +735,7 @@ export async function fetchHomeDashboard(
     .gte('start_at', from.toISOString())
     .lt('start_at', to.toISOString())
     .order('start_at', { ascending: true })
-    .limit(6)
+    .limit(VISITS_PER_DAY)
   const todayScheduleQuery = scheduleForDay(todayStart, todayEnd)
   const tomorrowScheduleQuery = scheduleForDay(todayEnd, tomorrowEnd)
 

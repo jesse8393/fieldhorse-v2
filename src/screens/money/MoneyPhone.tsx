@@ -23,7 +23,7 @@ import { ChevronRight, Receipt } from 'lucide-react'
 import { Button, Chip, EmptyState, Row, Skeleton, SkeletonRows, VaultCard, formatMoney } from '../../components/fh'
 import Monogram from '../../components/fh/Monogram.tsx'
 import { useProfile } from '../../contexts/ProfileContext.tsx'
-import { useJobs } from '../../lib/queries.ts'
+import { useCompanyJobs } from '../../lib/queries.ts'
 import { buildInvoiceList, buildMoneyView, type MoneyRow } from '../../lib/moneyView.ts'
 import { hapticTap } from '../../lib/haptics.ts'
 import {
@@ -126,7 +126,7 @@ export default function MoneyPhone({
   onRefresh
 }: MoneyPhoneProps) {
   const { profile } = useProfile()
-  const jobsQuery = useJobs()
+  const jobsQuery = useCompanyJobs()
   const { panel, titleRef, panelHref, openPanel, closePanel } = useMoneyPanel()
 
   const waiting = loading || jobsQuery.isLoading
