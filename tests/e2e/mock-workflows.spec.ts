@@ -66,6 +66,24 @@ test('keeps the work lifecycle action ready', async ({ page }, testInfo) => {
 
 test('keeps money, schedule, settings, and missing routes usable', async ({ page }, testInfo) => {
   const expectNoPageErrors = failOnPageErrors(page)
+  // The default mock visit starts two hours after the mock loads, so after
+  // 10 pm Central it falls on tomorrow, outside the start_at range the
+  // phone's Day view asks for (the mock honors that range). Seed a visit
+  // that starts as the test starts and pin the page clock to that instant,
+  // so the page's today is the visit's day at any hour, even when the test
+  // crosses midnight before it opens Schedule.
+  const startsAt = Date.now()
+  await page.clock.setFixedTime(new Date(startsAt))
+  await installMock(page.context(), {
+    tables: {
+      fh_schedule: [{
+        id: 's1', user_id: session.user.id, contact_id: 'c-job1', title: 'Pour slab, crew A',
+        description: 'Bellevue site', start_at: new Date(startsAt).toISOString(),
+        end_at: new Date(startsAt + 4 * 3_600_000).toISOString(),
+        created_at: new Date(startsAt - 86_400_000).toISOString()
+      }]
+    }
+  })
 
   await openRoute(page, '/')
   await expect(page.locator('body')).toContainText(/pipeline|owner queue|today/i)
@@ -122,6 +140,20 @@ test('keeps the desktop schedule planning workflow complete', async ({ page }, t
   const expectNoPageErrors = failOnPageErrors(page)
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.setViewportSize({ width: 1440, height: 900 })
+  // The default mock visit starts two hours after the mock loads, so after
+  // 10 pm Central it lands on tomorrow and the Day view is empty. Pin the
+  // page clock to a Thursday morning and seed that day's visit, so the test
+  // never depends on the time it runs.
+  await page.clock.setFixedTime(new Date('2026-10-08T14:00:00.000Z'))
+  await installMock(page.context(), {
+    tables: {
+      fh_schedule: [{
+        id: 's1', user_id: session.user.id, contact_id: 'c-job1', title: 'Pour slab, crew A',
+        description: 'Bellevue site', start_at: '2026-10-08T15:00:00.000Z', end_at: '2026-10-08T19:00:00.000Z',
+        created_at: '2026-10-07T14:00:00.000Z'
+      }]
+    }
+  })
 
   await openRoute(page, '/schedule')
   await expect(page.locator('.fh-build-weekplan')).toBeVisible()
