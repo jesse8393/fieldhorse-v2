@@ -1,0 +1,436 @@
+/*
+ * The Quote tab on a phone (spec 9.6, render glamor/g-quote.jpg). Class
+ * prefix fhq-. Reads only the --fh- tokens, so Day and Night follow the
+ * theme on their own. The capsule at the bottom is the Job page's, with
+ * its total variant (phone/job-phone.css).
+ */
+
+.fhq-page {
+  padding: 24px 20px 32px;
+  color: var(--fh-ink);
+  font-family: var(--fh-font-body);
+}
+
+/* global.css forces a muted outline color on every focused control, so
+   these restate the 2 px --fh-focus ring with the same weight. */
+.fhq-opt__main:focus-visible,
+.fhq-seg__option:focus-visible,
+.fhq-suggest__item:focus-visible,
+.fhq-switch:focus-visible {
+  outline: 2px solid var(--fh-focus) !important;
+  outline-color: var(--fh-focus) !important;
+  outline-offset: 2px;
+}
+
+/* ================================================================
+   Header: the title, the status chip, "Preview as", the line under them
+   ================================================================ */
+
+.fhq-head {
+  display: grid;
+  gap: 8px;
+}
+
+.fhq-head__row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.fhq-head__title {
+  margin: 0;
+  font-family: var(--fh-font-display);
+  font-size: 24px;
+  line-height: 28px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--fh-ink);
+}
+
+.fhq-head .fhq-head__preview {
+  margin-left: auto;
+  margin-right: -12px;
+  color: var(--fh-ink-2);
+}
+
+.fhq-head__sub {
+  margin: 0;
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--fh-ink-2);
+}
+
+/* ================================================================
+   Panels: the customer's change request, the approved note
+   ================================================================ */
+
+.fhq-panel {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 14px;
+  background: var(--fh-tray);
+  box-shadow: inset 0 0 0 1px var(--fh-hairline-soft);
+}
+
+.fhq-panel__title {
+  font-family: var(--fh-font-body);
+  margin: 0;
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+  color: var(--fh-ink);
+}
+
+.fhq-panel__body {
+  margin: 8px 0 0;
+  font-size: 16px;
+  line-height: 22px;
+  color: var(--fh-ink);
+  overflow-wrap: anywhere;
+}
+
+.fhq-panel__note {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+/* ================================================================
+   Lines
+   ================================================================ */
+
+.fhq-loading {
+  margin-top: 16px;
+}
+
+.fhq-lines {
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--fh-hairline);
+  border-bottom: 1px solid var(--fh-hairline);
+}
+
+.fhq-excluded .fhq-lines {
+  margin-top: 8px;
+}
+
+.fhq-excluded__title {
+  font-family: var(--fh-font-body);
+  margin: 24px 0 0;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--fh-ink-2);
+}
+
+.fhq-page .fhq-add {
+  margin-top: 4px;
+  margin-left: -12px;
+  padding: 0 12px;
+  color: var(--fh-ink-2);
+}
+
+/* ================================================================
+   Optional items: a paper panel, a switch each
+   ================================================================ */
+
+.fhq-optional {
+  margin-top: 24px;
+  padding: 16px;
+  border-radius: 14px;
+  background: var(--fh-paper);
+  box-shadow: inset 0 0 0 1px var(--fh-hairline);
+}
+
+.fhq-optional__title {
+  font-family: var(--fh-font-body);
+  margin: 0;
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+  color: var(--fh-ink);
+  overflow-wrap: anywhere;
+}
+
+.fhq-optional__list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fhq-opt {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 0;
+}
+
+.fhq-opt + .fhq-opt {
+  border-top: 1px solid var(--fh-hairline-soft);
+}
+
+.fhq-opt__main {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  min-height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.fhq-opt__main:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.fhq-opt__title {
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+  color: var(--fh-ink);
+  overflow-wrap: anywhere;
+}
+
+.fhq-opt__sub {
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--fh-ink-2);
+  overflow-wrap: anywhere;
+}
+
+/* The shadcn Switch, drawn from the tokens: a 52 by 32 track outlined in
+   --fh-edge-strong (a light track off, an ink track on), a paper thumb, a
+   44 px tall hit area. Tailwind's classes sit in its layer, so these
+   unlayered rules win. At night the off thumb is --fh-ink-2, because a
+   paper thumb would vanish into the dark track. */
+.fhq-page .fhq-switch {
+  --fhq-thumb: var(--fh-paper);
+  position: relative;
+  flex: none;
+  width: 52px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--fh-edge-strong);
+  border-radius: 999px;
+  background: var(--fh-edge);
+  box-shadow: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+[data-theme='dark'] .fhq-page .fhq-switch {
+  --fhq-thumb: var(--fh-ink-2);
+}
+
+.fhq-page .fhq-switch::after {
+  content: '';
+  position: absolute;
+  inset: -8px -4px;
+}
+
+.fhq-page .fhq-switch[data-state='checked'] {
+  border-color: var(--fh-ink);
+  background: var(--fh-ink);
+}
+
+.fhq-page .fhq-switch:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.fhq-page .fhq-switch [data-slot='switch-thumb'] {
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  border-radius: 999px;
+  background: var(--fhq-thumb);
+  box-shadow: 0 1px 2px rgba(27, 26, 22, 0.35);
+  translate: 3px 0;
+}
+
+.fhq-page .fhq-switch[data-state='checked'] [data-slot='switch-thumb'] {
+  background: var(--fh-paper);
+  translate: 23px 0;
+}
+
+/* ================================================================
+   The rows that keep the rest of the quote reachable
+   ================================================================ */
+
+.fhq-rows {
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--fh-hairline);
+  border-bottom: 1px solid var(--fh-hairline);
+}
+
+.fhq-rows .fhc-row__end,
+.fhq-more-list .fhc-row__end {
+  align-self: center;
+}
+
+.fhq-chevron {
+  color: var(--fh-ink-4);
+}
+
+.fhq-danger {
+  margin-top: 32px;
+}
+
+.fhq-danger-note {
+  margin: 24px 0 0;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+/* ================================================================
+   Sheets: a line, scope and terms, share, preview
+   ================================================================ */
+
+.fhq-form {
+  display: grid;
+  gap: 16px;
+}
+
+.fhq-form__pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.fhq-form__extras {
+  display: grid;
+  gap: 24px;
+  padding-top: 8px;
+}
+
+.fhq-suggest {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px var(--fh-hairline);
+}
+
+.fhq-suggest li + li {
+  border-top: 1px solid var(--fh-hairline-soft);
+}
+
+.fhq-suggest__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  margin: 0;
+  padding: 8px 12px;
+  border: 0;
+  background: var(--fh-paper);
+  color: var(--fh-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.fhq-suggest__name {
+  min-width: 0;
+  font-size: 16px;
+  line-height: 22px;
+  overflow-wrap: anywhere;
+}
+
+.fhq-suggest__rate {
+  flex: none;
+  font-size: 14px;
+  line-height: 18px;
+  color: var(--fh-ink-3);
+}
+
+.fhq-kind {
+  display: grid;
+  gap: 8px;
+}
+
+.fhq-kind__label {
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--fh-ink-2);
+}
+
+.fhq-kind__help {
+  margin: 0;
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+.fhq-seg {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--fh-tray);
+  box-shadow: inset 0 0 0 1px var(--fh-edge-strong);
+}
+
+.fhq-seg__option {
+  min-height: 44px;
+  margin: 0;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--fh-ink-2);
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.fhq-seg__option.is-on {
+  background: var(--fh-ink);
+  color: var(--fh-paper);
+  font-weight: 600;
+}
+
+.fhq-more-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fhq-preview {
+  overflow-x: auto;
+  border-radius: 12px;
+}
+
+@media (min-width: 900px) {
+  .fhq-page {
+    display: none;
+  }
+}

@@ -1,0 +1,241 @@
+/*
+ * Today on a desktop (spec 9.2, Phase 4 Task 4.5). Class prefix fhtd-.
+ * Reads only --fh- tokens, so Day and Night follow the theme and the stage
+ * reads linen through .fh-onyx-scope.
+ *
+ * The visit rows, section heads, hero, date and weather line are the
+ * phone's (fht-, src/screens/today/today.css); this file lays them out in
+ * two columns and adds the week strip.
+ */
+
+/* .fh-build-page stays on the root so the shell specs and the scroll checks
+   find the screen; its page height and backdrop (global.css) are not wanted
+   here. */
+.fhtd.fh-build-page {
+  min-height: 0;
+  background: transparent;
+  color: var(--fh-ink);
+  font-family: var(--fh-font-body);
+}
+
+.fhtd {
+  box-sizing: border-box;
+  min-width: 0;
+  /* The shell already pads the page (32 px on every side). */
+  padding: 0;
+  color: var(--fh-ink);
+  font-family: var(--fh-font-body);
+}
+
+/* The shared header strip keeps its search and bell but takes the page
+   ground and loses its rule, as on the Schedule, so the stage reads as
+   the top of the screen. global.css paints it with !important, so these
+   do too. */
+@media (min-width: 900px) {
+  body:has(.fhtd) .fh-app-header {
+    background: var(--fh-canvas) !important;
+    border-bottom: 0 !important;
+    padding-right: 32px !important;
+  }
+}
+
+.fhtd-error {
+  margin-bottom: 20px;
+}
+
+/* ---- Two columns: stage, next stop and the day; answers and the week ---- */
+
+.fhtd-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 416px;
+  gap: 32px;
+  align-items: start;
+}
+
+.fhtd-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.fhtd-main > * + * {
+  margin-top: 32px;
+}
+
+.fhtd-side {
+  display: grid;
+  align-content: start;
+  gap: 32px;
+  min-width: 0;
+}
+
+/* Below 1100 px the second column drops under the first. */
+@media (max-width: 1099px) {
+  .fhtd-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---- Stage: a rounded onyx panel closed by the gold hairline ---- */
+
+.fhtd .fhtd-stage {
+  display: grid;
+  gap: 12px;
+  padding: 24px 28px 28px;
+  overflow: hidden;
+  border-radius: 18px;
+  box-shadow: inset 0 0 0 1px var(--fh-stage-edge), var(--fh-shadow-raised);
+}
+
+/* With the next stop card hanging off the edge by 48 px, the hairline sits
+   20 px above the card instead of at the foot, as on the phone. */
+.fhtd.has-card .fhtd-stage {
+  padding-bottom: calc(48px + 28px);
+  border-bottom-color: transparent;
+  background-image: linear-gradient(var(--fh-gold-line), var(--fh-gold-line));
+  background-size: 100% 1px;
+  background-position: 0 calc(100% - 68px);
+  background-repeat: no-repeat;
+}
+
+.fhtd-stage__tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ---- Next stop card ---- */
+
+.fhtd .fht-card {
+  padding: 0 28px;
+}
+
+.fhtd-main > .fht-card {
+  margin-top: -48px;
+}
+
+.fhtd .fht-card__frame {
+  aspect-ratio: 21 / 8;
+}
+
+/* ---- Lists on plaster, as on the phone ---- */
+
+.fhtd .fht-section--answers .fhc-row__title {
+  font-weight: 500;
+}
+
+.fhtd .fhtd-empty {
+  padding-top: 16px;
+}
+
+.fhtd-inline-link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.fhtd-inline-link:focus-visible {
+  outline: 2px solid var(--fh-focus);
+  outline-offset: 2px;
+  border-radius: 7px;
+}
+
+/* ---- The week strip: seven days on one paper panel, today tinted ---- */
+
+.fhtd-week__strip {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  margin: 16px 0 0;
+  padding: 0;
+  overflow: hidden;
+  list-style: none;
+  border: 1px solid var(--fh-hairline);
+  border-radius: 14px;
+  background: var(--fh-paper);
+}
+
+.fhtd-day {
+  min-width: 0;
+  border-left: 1px solid var(--fh-hairline-soft);
+}
+
+.fhtd-day:first-child {
+  border-left: 0;
+}
+
+/* Today is tinted and wears a gold dot with the word. */
+.fhtd-day.is-today {
+  background: color-mix(in srgb, var(--fh-gold) 9%, var(--fh-paper));
+}
+
+.fhtd-day__link {
+  position: relative;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 4px;
+  min-height: 96px;
+  padding: 12px 4px;
+  box-sizing: border-box;
+  color: inherit;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+a.fhtd-day__link:hover {
+  background: var(--fh-wash);
+}
+
+a.fhtd-day__link:focus-visible {
+  outline: 2px solid var(--fh-focus) !important;
+  outline-offset: -4px;
+}
+
+.fhtd-day__week {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--fh-font-body);
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+.fhtd-day.is-today .fhtd-day__week {
+  font-weight: 600;
+  color: var(--fh-ink);
+}
+
+.fhtd-day__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--fh-gold);
+}
+
+.fhtd-day__num {
+  font-family: var(--fh-font-display);
+  font-size: 24px;
+  line-height: 28px;
+  font-weight: 600;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--fh-ink);
+}
+
+.fhtd-day__count {
+  font-family: var(--fh-font-body);
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--fh-ink-2);
+}
+
+.fhtd-day.is-empty .fhtd-day__count {
+  color: var(--fh-ink-3);
+}

@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useId, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Camera, Mic } from 'lucide-react'
 import { Button, IconButton } from '../../../components/fh'
@@ -9,31 +9,82 @@ import './job-phone.css'
 
 // The Job page's own bottom bar (spec 8.1 and 9.4): a floating onyx
 // capsule above the home indicator, in place of the dock, which hides on
-// this screen. Camera and microphone keep Capture one tap away; the one
-// brushed gold button follows the stage (its label and action come from
-// the page's stageCta). Field roles get no stage action, so their capsule
-// carries only the camera and the microphone.
+// this screen. It has two variants.
+//
+// actions (every tab but Quote): camera and microphone keep Capture one
+// tap away; the one brushed gold button follows the stage (its label and
+// action come from the page's stageCta). Field roles get no stage action,
+// so their capsule carries only the camera and the microphone.
 //
 // The camera opens the phone's camera (or photo picker) straight from the
 // tap, then hands the files to the Files tab, which uploads them. The
 // microphone opens Capture already attached to this job.
 //
+// total (the Quote tab, spec 9.6): "Total" with the base total in linen
+// and the deposit line under it, and the one brushed gold "Send for
+// approval" beside them. When the button is disabled, or does something
+// other than the plain send, a short hint sits under it.
+//
 // Rendered into document.body so no transformed or clipped ancestor can
 // pull it off the viewport. Like the dock, it steps aside while the
 // on screen keyboard is open, so it never rides up over a field.
 
-export type JobActionCapsuleProps = {
-  action: { label: string; onClick: () => void } | null
-  onPhotos: (files: File[]) => void
-  onVoice: () => void
-}
+type StageAction = { label: string; onClick: () => void }
 
-export default function JobActionCapsule({ action, onPhotos, onVoice }: JobActionCapsuleProps) {
+export type JobActionCapsuleProps =
+  | {
+      variant?: 'actions'
+      action: StageAction | null
+      onPhotos: (files: File[]) => void
+      onVoice: () => void
+    }
+  | {
+      variant: 'total'
+      /** The amount as printed ("$18,458.00") and the line under it. */
+      total: { amount: string; note: string }
+      action: StageAction & { disabled?: boolean; loading?: boolean; hint?: string }
+    }
+
+export default function JobActionCapsule(props: JobActionCapsuleProps) {
   const inputRef = useRef<HTMLInputElement | null>(null)
   const keyboardOpen = useKeyboardOpen()
+  const hintId = useId()
 
   if (typeof document === 'undefined') return null
 
+  if (props.variant === 'total') {
+    const { total, action } = props
+    return createPortal(
+      <div
+        className={cx('fhj-capsule fhj-capsule--total fh-onyx-scope', keyboardOpen && 'is-hidden')}
+        role="group"
+        aria-label="Quote total and send"
+      >
+        <div className="fhj-capsule__sum">
+          <span className="fhj-capsule__label">Total</span>
+          <span className="fhj-capsule__amount">{total.amount}</span>
+        </div>
+        <div className="fhj-capsule__send">
+          <Button
+            variant="primary"
+            size="lg"
+            className="fhj-capsule__primary"
+            disabled={action.disabled}
+            loading={action.loading}
+            aria-describedby={action.hint ? hintId : undefined}
+            onClick={() => { hapticTap(); action.onClick() }}
+          >
+            {action.label}
+          </Button>
+          {action.hint && <span id={hintId} className="fhj-capsule__hint">{action.hint}</span>}
+        </div>
+        <span className="fhj-capsule__note">{total.note}</span>
+      </div>,
+      document.body
+    )
+  }
+
+  const { action, onPhotos, onVoice } = props
   return createPortal(
     <div className={cx('fhj-capsule fh-onyx-scope', !action && 'is-compact', keyboardOpen && 'is-hidden')} role="group" aria-label="Job actions">
       <IconButton

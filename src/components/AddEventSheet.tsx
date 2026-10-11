@@ -5,9 +5,11 @@
 // Drawer pattern shared with NewClientSheet / MarkCompleteSheet so the
 // schedule entry experience matches the rest of the system.
 //
-// Business logic untouched: same fh_schedule insert, same recurrence
-// loop (every N days × 4 follow-ups), same default time, same contact
-// pre-selection from defaultContactId.
+// Business logic untouched: same fh_schedule insert (now through the
+// shared createScheduleEvents in lib/scheduleWrite.ts, which also sends
+// org_id), same recurrence loop (every N days × 4 follow-ups), same
+// default time, same contact pre-selection from defaultContactId. The
+// desktop board's "Schedule" button also presets the title.
 
 import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
@@ -16,6 +18,7 @@ import { Calendar as CalendarIcon, Check, X } from 'lucide-react'
 import { hapticTap } from '../lib/haptics.ts'
 import { supabase } from '../lib/supabase.ts'
 import { useOrgScope } from '../lib/orgScope.ts'
+import { createScheduleEvents } from '../lib/scheduleWrite.ts'
 import { toastError } from '../lib/toast.ts'
 import { useDrawerKeyboard } from '../lib/useDrawerKeyboard.ts'
 import { todayYmd, toYmd } from '../lib/dates.ts'
@@ -23,7 +26,7 @@ import { localDateTimeMs, eventDurationMs } from '../lib/scheduleDates.ts'
 import { countNoun } from '../lib/format.ts'
 import { Eyebrow } from './v3'
 
-export default function AddEventSheet({ open, userId, onClose, onSaved, defaultContactId = '', event = null }: any) {
+export default function AddEventSheet({ open, userId, onClose, onSaved, defaultContactId = '', defaultTitle = '', event = null }: any) {
   const editing = !!event?.id
   const [title, setTitle] = useState('')
   const [date, setDate] = useState(() => todayYmd())
@@ -78,8 +81,11 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
       setTime(start.toTimeString().slice(0, 5))
     } else {
       setContactId(defaultContactId)
+      // A preset title (the board's "Schedule" button names the visit
+      // after the job) only fills an empty field, never a typed one.
+      if (defaultTitle) setTitle((t) => t || defaultTitle)
     }
-  }, [open, defaultContactId, event])
+  }, [open, defaultContactId, defaultTitle, event])
 
   async function save(e: any) {
     e?.preventDefault?.()
@@ -125,9 +131,10 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
       // of orphaning the other 4 rows.
       const seriesId = recurs ? (crypto.randomUUID?.() || `series-${startMs}`) : null
       const mkRow = (s: number) => ({
-        user_id: userId,
-        contact_id: contactId || null,
-        title: title.trim(),
+        userId,
+        orgId: orgScope ?? null,
+        contactId: contactId || null,
+        title,
         start_at: new Date(s).toISOString(),
         end_at: new Date(s + 60 * 60 * 1000).toISOString(),
         recurring: seriesId
@@ -141,11 +148,11 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
           if (s != null) rows.push(mkRow(s))
         }
       }
-      // Capture the error, a silent insert failure previously closed the
+      // Surface the error, a silent insert failure previously closed the
       // sheet as "saved" and lost the event.
-      const { error } = await supabase.from('fh_schedule').insert(rows)
-      if (error) {
-        toastError("Couldn't save the event", error.message || 'Try again.')
+      const result = await createScheduleEvents(rows)
+      if ('error' in result) {
+        toastError("Couldn't save the event", result.error || 'Try again.')
         return
       }
       onSaved?.()
