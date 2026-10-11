@@ -6,6 +6,7 @@
 // Save.
 import { expect, test, type Page } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
+import { USER, restResponse } from '../../scripts/qa-mock.mjs'
 
 async function open(page: Page, path: string) {
   await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 60_000 })
@@ -29,6 +30,43 @@ async function mockModel(page: Page, reply: object) {
     contentType: 'application/json',
     body: JSON.stringify({ content: [{ type: 'text', text: JSON.stringify(reply) }] })
   }))
+}
+
+// The mock answers writes without keeping them. This keeps fh_notes for one
+// page: a POST adds its rows, and every read is answered from the rows so
+// far through the mock's own filters, as the database would. Returns the
+// rows that were posted.
+async function keepNotes(page: Page) {
+  const posted: Record<string, unknown>[] = []
+  const notes: Record<string, unknown>[] = [{
+    id: 'n1', org_id: 'org-1', user_id: USER.id, contact_id: 'c-job1', text: 'Inspector confirmed Friday.',
+    category: 'note', created_at: new Date(Date.now() - 2 * 86400000).toISOString()
+  }]
+  await page.route((url) => url.pathname.endsWith('/rest/v1/fh_notes'), async (route) => {
+    const req = route.request()
+    if (req.method() === 'POST') {
+      const body = req.postDataJSON()
+      for (const row of Array.isArray(body) ? body : [body]) {
+        const saved = { org_id: 'org-1', created_at: new Date().toISOString(), ...row }
+        posted.push(saved)
+        notes.push(saved)
+      }
+      return route.fulfill({ status: 201, contentType: 'application/json', body: '' })
+    }
+    const r = restResponse(req.url(), { method: req.method(), headers: req.headers(), tables: { fh_notes: notes } })
+    return route.fulfill({ status: r.status, contentType: 'application/json', body: r.body, headers: r.headers })
+  })
+  return posted
+}
+
+// No signal, as the app reads it: navigator.onLine and the online and
+// offline events. The page keeps its real connection, since a module cut
+// off mid load makes the app reload itself onto Chrome's offline page.
+async function setSignal(page: Page, online: boolean) {
+  await page.evaluate((on) => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => on })
+    window.dispatchEvent(new Event(on ? 'online' : 'offline'))
+  }, online)
 }
 
 test.describe('capture sheet', () => {
@@ -169,5 +207,56 @@ test.describe('capture sheet', () => {
     const chips = sheet.getByRole('list', { name: 'Filed as' })
     await expect(chips.getByRole('listitem')).toHaveText(['Payment', '$2,500.00', 'Deposit by check', 'Vintage Burkitt Station Drainage'])
     await expect(sheet.getByRole('button', { name: 'Just save it as a note' })).toBeVisible()
+  })
+
+  test('a note captured from the job page shows on its Spine without leaving the page', async ({ context, page }) => {
+    await signIn(context)
+    await mockModel(page, { kind: 'note', summary: 'Save a note', job_id: null, confidence: 0.8, text: 'Rebar is four sticks short' })
+    const posted = await keepNotes(page)
+
+    await page.goto('/jobs/c-job1', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    const spine = page.locator('.fhj-spine')
+    await expect(spine.getByText('Inspector confirmed Friday.')).toBeVisible({ timeout: 30_000 })
+
+    await page.getByRole('group', { name: 'Job actions' }).getByRole('button', { name: 'Capture a voice note for this job' }).click()
+    const sheet = page.getByRole('dialog', { name: 'Capture' })
+    await expect(sheet.getByText('Attached to Slab + trench.')).toBeVisible()
+    await sheet.getByRole('textbox', { name: 'Or type it' }).fill('Rebar is four sticks short')
+    await sheet.getByRole('button', { name: 'File it' }).click()
+    await expect(sheet.getByText('Opened from Slab + trench, so it files there.')).toBeVisible()
+    await sheet.getByRole('button', { name: 'Save' }).click()
+    await expect(sheet).toBeHidden()
+
+    expect(posted).toHaveLength(1)
+    expect(posted[0]).toMatchObject({ contact_id: 'c-job1', text: 'Rebar is four sticks short', category: 'note' })
+    // Same page, no reload: the job's Spine reads the note it just saved.
+    await expect(spine.getByText('Rebar is four sticks short')).toBeVisible()
+    await expect(spine.getByText('Inspector confirmed Friday.')).toBeVisible()
+    await expect(page).toHaveURL(/\/jobs\/c-job1$/)
+  })
+
+  test('with no signal on the job page, the note waits and lands on the job', async ({ context, page }) => {
+    await signIn(context)
+    const posted = await keepNotes(page)
+    await page.goto('/jobs/c-job1', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    const spine = page.locator('.fhj-spine')
+    await expect(spine.getByText('Inspector confirmed Friday.')).toBeVisible({ timeout: 30_000 })
+
+    await setSignal(page, false)
+    await page.getByRole('group', { name: 'Job actions' }).getByRole('button', { name: 'Capture a voice note for this job' }).click()
+    const sheet = page.getByRole('dialog', { name: 'Capture' })
+    await sheet.getByRole('textbox', { name: 'Or type it' }).fill('Pump truck at seven')
+    await sheet.getByRole('button', { name: 'File it' }).click()
+    await expect(sheet).toBeHidden()
+    const queued = await page.evaluate(() => JSON.parse(localStorage.getItem('fh:capture-outbox') || '[]'))
+    expect(queued).toMatchObject([{ text: 'Pump truck at seven', user_id: USER.id, job_id: 'c-job1' }])
+    expect(posted).toEqual([])
+
+    // Back in signal: the note lands on the job and its Spine shows it.
+    await setSignal(page, true)
+    await expect(spine.getByText(/^Pump truck at seven/)).toBeVisible()
+    expect(posted).toHaveLength(1)
+    expect(posted[0]).toMatchObject({ contact_id: 'c-job1', category: 'note' })
+    expect(await page.evaluate(() => localStorage.getItem('fh:capture-outbox'))).toBeNull()
   })
 })

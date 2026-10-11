@@ -9,7 +9,9 @@
 //
 // Each capture is tagged with the user who took it, and a flush only
 // lands the flushing user's captures, so text captured under one account
-// never posts as a note under another on a shared device.
+// never posts as a note under another on a shared device. A capture taken
+// with the sheet open on a job keeps that job, and its note lands on the
+// job (contact_id), as it would have online.
 
 import { supabase } from './supabase.ts'
 
@@ -17,8 +19,10 @@ const KEY = 'fh:capture-outbox'
 const MAX_ITEMS = 100
 
 // user_id is missing on captures queued before tagging existed; those
-// go to whoever flushes, as they always did.
-type OutboxItem = { text: string; captured_at: string; user_id?: string | null }
+// go to whoever flushes, as they always did. job_id is missing on
+// captures taken with no job, and on any queued before jobs were kept;
+// those land as notes on no job, as they always did.
+type OutboxItem = { text: string; captured_at: string; user_id?: string | null; job_id?: string | null }
 
 function read(): OutboxItem[] {
   try {
@@ -44,6 +48,14 @@ function belongsTo(item: OutboxItem, userId: string): boolean {
   return !item.user_id || item.user_id === userId
 }
 
+function jobOf(item: OutboxItem): string | null {
+  return typeof item.job_id === 'string' && item.job_id ? item.job_id : null
+}
+
+// Postgres foreign key violation: the job was deleted while the capture
+// waited in the queue.
+const MISSING_JOB = '23503'
+
 // Callers that don't pass a user id get the capture tagged from the
 // stored session as soon as it has been read.
 function tagFromSession(capturedAt: string) {
@@ -66,9 +78,10 @@ function tagFromSession(capturedAt: string) {
  * Queue a capture taken with no signal. Returns false when it could NOT
  * be kept (the queue already holds 100 captures, or storage is blocked)
  * so the caller can report it instead of confirming a save. Pass the
- * signed in user's id so the capture only ever lands under their account.
+ * signed in user's id so the capture only ever lands under their account,
+ * and the job the sheet was opened on so its note lands on that job.
  */
-export function pushOutbox(text: string, userId?: string | null): boolean {
+export function pushOutbox(text: string, userId?: string | null, jobId?: string | null): boolean {
   const t = (text || '').trim()
   if (!t) return false
   const items = read()
@@ -76,7 +89,12 @@ export function pushOutbox(text: string, userId?: string | null): boolean {
   // kept the oldest 100, silently dropping the one just taken.
   if (items.length >= MAX_ITEMS) return false
   const capturedAt = new Date().toISOString()
-  const ok = write([...items, { text: t, captured_at: capturedAt, ...(userId ? { user_id: userId } : {}) }])
+  const ok = write([...items, {
+    text: t,
+    captured_at: capturedAt,
+    ...(userId ? { user_id: userId } : {}),
+    ...(jobId ? { job_id: jobId } : {})
+  }])
   if (ok && !userId) tagFromSession(capturedAt)
   return ok
 }
@@ -122,14 +140,15 @@ export async function flushOutbox(userId: string): Promise<number> {
       const stamp = Number.isNaN(when.getTime())
         ? ''
         : ` (captured offline ${when.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })})`
+      const note = { user_id: userId, contact_id: jobOf(item), text: `${item.text}${stamp}`, category: 'note' }
       let landed = false
       try {
-        const { error } = await supabase.from('fh_notes').insert({
-          user_id: userId,
-          contact_id: null,
-          text: `${item.text}${stamp}`,
-          category: 'note'
-        })
+        let { error } = await supabase.from('fh_notes').insert(note)
+        // The job is gone: the words still land, as a note on no job,
+        // rather than failing on every flush from now on.
+        if (error?.code === MISSING_JOB && note.contact_id) {
+          ({ error } = await supabase.from('fh_notes').insert({ ...note, contact_id: null }))
+        }
         landed = !error
       } catch { /* transport failure: keep it queued */ }
       if (landed) synced += 1

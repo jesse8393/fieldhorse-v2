@@ -24,8 +24,8 @@ Status is one of todo, done, blocked, skipped.
 | Tier | Task | Status | Commit | Notes |
 | --- | --- | --- | --- | --- |
 | 1 | 1 Make the test mock honest | done | `8b14809` | Reviewed twice, one fix round. Data fixed in one test (see notes) |
-| 1 | 2 Today counts stop at 6 | done | this commit | Reviewed by two lenses, approved with no fix round. Decision D34 |
-| 1 | 3 Capture from a job page shows up on the job | todo | | |
+| 1 | 2 Today counts stop at 6 | done | `07a9071` | Reviewed by two lenses, approved with no fix round. Decision D34 |
+| 1 | 3 Capture from a job page shows up on the job | done | this commit | Reviewed by two lenses, approved with no fix round. Decision D35 |
 | 1 | 4 Morning cold open says "Clear day" | todo | | |
 | 1 | 5 What each invoice actually owes | todo | | |
 | 1 | 6 Money timing and double sends | todo | | |
@@ -54,6 +54,10 @@ Status is one of todo, done, blocked, skipped.
   * Known issue, not changed: a job counts as behind schedule when any of its visits ended in the last 14 days (`overdueScheduleQuery` in `homeDashboard.ts`), because visits have no done state. The cap of 6 used to hide this. With the honest count, a company with 30 jobs visited in the last two weeks will read about 30 things before tomorrow. The rule needs Jesse's call (for example: behind means the last visit ended and nothing is booked next, and the job is not marked done).
   * Small follow up, not changed: cover photos are still signed for every job in the kept actions and today's visits (up to 73), though only the next stop shows one.
   * Days with more than 50 visits still cut off quietly at 50.
+
+* **Task 3, Capture on a job.** `refreshAfterCapture` in `captureActions.ts` refreshes `jobDetail` for the job, `jobsKey` and `homeDashboardKey` after a save. The offline outbox keeps `job_id` and inserts it as `contact_id`; items queued before this change flush with no job, as before.
+  * The offline e2e fakes no signal through `navigator.onLine` and the online and offline events, not `context.setOffline`: with `setOffline`, a module still loading made the stale chunk guard reload onto the browser's offline page under load.
+  * Known gap, not changed: a queued job capture that the database refuses for permission (the job still exists but this person lost access) stays queued and the pill reads Syncing. Only a deleted job falls back to a note on no job.
 
 * The first CI run on #223 (a docs only commit) failed `mock-workflows` "keeps the desktop schedule planning workflow complete" on desktop. The default mock visit starts two hours after the mock loads, so between 10 pm and midnight Central it lands on tomorrow and the Day view is empty. It failed here too at 10:48 pm Central and passed after the test pinned its page clock to a Thursday morning and seeded that day's visit. It is listed under "Failing before Phase 8".
 
