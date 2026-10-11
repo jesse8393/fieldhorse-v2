@@ -1,0 +1,847 @@
+/*
+ * Desktop Schedule (spec 9.10, render base/desktop-schedule.jpg).
+ * Class prefix fhsch-. Reads only --fh- tokens, so Day and Night follow on
+ * their own. Buttons, chips and skeletons come from src/components/fh; this
+ * file lays out the toolbar, the paper board, the visit blocks and the
+ * right rail.
+ *
+ * .fh-build-weekplan and .fh-build-weekplan__day stay on the week columns
+ * (the desktop specs find the board by them); the legacy rules for those
+ * two names in fixes-2026-07.css are cancelled below.
+ */
+
+/* .fh-build-page stays on the root so the shell specs and the scroll checks
+   find the screen; its page height and backdrop (global.css) are not wanted
+   here. */
+.fhsch.fh-build-page {
+  min-height: 0;
+  background: transparent;
+  color: var(--fh-ink);
+  font-family: var(--fh-font-body);
+}
+
+.fhsch {
+  --fhsch-hour: 60px;
+  --fhsch-gutter: 48px;
+  box-sizing: border-box;
+  min-width: 0;
+  /* The shell already pads the page (32 px on every side). */
+  padding: 0;
+  color: var(--fh-ink);
+  font-family: var(--fh-font-body);
+}
+
+/* The shared header strip keeps its search and bell, but takes the page
+   ground and loses its rule, so the toolbar reads as the top of the screen
+   (the render has no strip). It stays pinned, so the ground has to be
+   solid. global.css paints it with !important, so these do too. */
+@media (min-width: 900px) {
+  body:has(.fhsch) .fh-app-header {
+    background: var(--fh-canvas) !important;
+    border-bottom: 0 !important;
+    padding-right: 32px !important;
+  }
+}
+
+/* ---- Toolbar: title and range, weather, Today and arrows, view, actions ---- */
+.fhsch-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  padding: 0 0 20px;
+}
+
+.fhsch-toolbar__title {
+  flex: 1 1 320px;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+
+.fhsch-title {
+  margin: 0;
+  font-family: var(--fh-font-display);
+  font-size: 36px;
+  line-height: 40px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--fh-ink);
+}
+
+.fhsch-range {
+  margin: 0;
+  font-family: var(--fh-font-display);
+  font-size: 24px;
+  line-height: 28px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--fh-ink-3);
+}
+
+.fhsch-toolbar__weather {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+.fhsch-toolbar__weather:empty {
+  display: none;
+}
+
+.fhsch-toolbar__weather .fh-build-sun {
+  color: var(--fh-gold-ink);
+}
+
+.fhsch-toolbar__nav,
+.fhsch-toolbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The Day, Week, Month control: a tray with the current choice raised on paper. */
+.fhsch-seg {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  height: 48px;
+  padding: 4px;
+  box-sizing: border-box;
+  border: 1px solid var(--fh-hairline);
+  border-radius: 12px;
+  background: var(--fh-tray);
+}
+
+.fhsch-seg__opt {
+  position: relative;
+  min-width: 72px;
+  height: 38px;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--fh-ink-3);
+  font-family: var(--fh-font-body);
+  font-size: 16px;
+  line-height: 20px;
+  font-weight: 500;
+  letter-spacing: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease);
+}
+
+/* A 44 px hit area around the 38 px option. */
+.fhsch-seg__opt::before {
+  content: '';
+  position: absolute;
+  inset: -3px 0;
+}
+
+.fhsch-seg__opt:hover {
+  color: var(--fh-ink);
+}
+
+.fhsch-seg__opt[aria-pressed='true'] {
+  border-color: var(--fh-edge);
+  background: var(--fh-paper);
+  color: var(--fh-ink);
+  font-weight: 600;
+}
+
+/* ---- Board and rail ---- */
+.fhsch-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 24px;
+  align-items: start;
+}
+
+.fhsch-main {
+  min-width: 0;
+}
+
+.fhsch-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  min-width: 0;
+}
+
+.fhsch-rail__section {
+  min-width: 0;
+}
+
+.fhsch-rail__title {
+  margin: 0;
+  font-family: var(--fh-font-display);
+  font-size: 30px;
+  line-height: 32px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--fh-ink);
+}
+
+.fhsch-rail__hint {
+  margin: 4px 0 12px;
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--fh-ink-3);
+}
+
+.fhsch-rail__empty {
+  margin: 12px 0 0;
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--fh-ink-3);
+}
+
+.fhsch-rail__empty p {
+  margin: 0 0 8px;
+}
+
+/* Below 1280 px the rail drops under the board and its sections sit side by side. */
+@media (max-width: 1279px) {
+  .fhsch-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fhsch-rail {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px;
+  }
+}
+
+/* ---- The paper board: Day and Week ---- */
+.fhsch-board {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--fhsch-gutter) minmax(0, 1fr);
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--fh-hairline);
+  border-radius: 14px;
+  background: var(--fh-paper);
+}
+
+.fhsch-gutter {
+  border-right: 1px solid var(--fh-hairline-soft);
+}
+
+.fhsch-gutter__head {
+  height: 56px;
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--fh-hairline);
+}
+
+.fhsch-gutter__hour {
+  display: block;
+  box-sizing: border-box;
+  padding: 4px 8px 0;
+  border-bottom: 1px solid var(--fh-hairline-soft);
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+  text-align: right;
+  color: var(--fh-ink-3);
+}
+
+.fhsch .fhsch-cols {
+  display: grid;
+  grid-template-columns: repeat(var(--fhsch-cols, 7), minmax(0, 1fr));
+  min-width: 0;
+}
+
+/* Cancel the old week plan rules (fixes-2026-07.css) for the two names the
+   specs still use. */
+.fhsch .fhsch-cols.fh-build-weekplan {
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  grid-template-columns: repeat(var(--fhsch-cols, 7), minmax(0, 1fr));
+}
+
+.fhsch .fhsch-day.fh-build-weekplan__day {
+  min-width: 0;
+  border-right: 0;
+  border-left: 1px solid var(--fh-hairline-soft);
+}
+
+.fhsch .fhsch-day.fh-build-weekplan__day:first-child {
+  border-left: 0;
+}
+
+/* Today is tinted, header included, and wears a gold dot with the word. */
+.fhsch .fhsch-day.fh-build-weekplan__day.is-today {
+  background: color-mix(in srgb, var(--fh-gold) 9%, var(--fh-paper));
+}
+
+.fhsch-day__head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 56px;
+  margin: 0;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border: 0;
+  border-bottom: 1px solid var(--fh-hairline);
+  border-radius: 0;
+  background: transparent;
+  color: var(--fh-ink);
+  font-family: var(--fh-font-body);
+  font-size: 16px;
+  line-height: 20px;
+  font-weight: 500;
+  letter-spacing: 0;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.fhsch-day__head:hover:not(:disabled) {
+  background: var(--fh-wash);
+}
+
+.fhsch-day__head:disabled {
+  cursor: default;
+  color: var(--fh-ink);
+}
+
+.fhsch-day.is-today .fhsch-day__head {
+  font-weight: 600;
+}
+
+.fhsch-day__today {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--fh-ink-2);
+}
+
+.fhsch-day__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--fh-gold);
+}
+
+.fhsch-day__body {
+  position: relative;
+}
+
+.fhsch-slot {
+  height: var(--fhsch-hour);
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--fh-hairline-soft);
+}
+
+/* While a card is held, hours that have passed show as unavailable. */
+.fhsch-body.is-dragging .fhsch-slot.is-past {
+  background: var(--fh-wash);
+}
+
+.fhsch-slot.is-over {
+  background: color-mix(in srgb, var(--fh-gold) 24%, transparent);
+  box-shadow: inset 0 0 0 2px var(--fh-gold);
+}
+
+.fhsch-slot.is-over.is-past {
+  background: var(--fh-wash-2);
+  box-shadow: inset 0 0 0 2px var(--fh-edge-strong);
+  cursor: not-allowed;
+}
+
+/* ---- Now line ---- */
+.fhsch-now {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  height: 2px;
+  background: var(--fh-gold);
+  pointer-events: none;
+}
+
+.fhsch-now::before {
+  content: '';
+  position: absolute;
+  top: -3px;
+  left: -1px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--fh-gold);
+}
+
+.fhsch-now > span {
+  position: absolute;
+  top: 4px;
+  left: 8px;
+  padding: 0 4px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--fh-gold) 9%, var(--fh-paper));
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--fh-ink-2);
+}
+
+/* ---- Visit blocks ---- */
+.fhsch-event {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  min-width: 0;
+  margin: 0;
+  padding: 4px 8px;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  font-family: var(--fh-font-body);
+  letter-spacing: 0;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: box-shadow var(--dur-fast) var(--ease);
+}
+
+.fhsch-event.is-short {
+  padding: 0 8px;
+}
+
+.fhsch-event:hover {
+  box-shadow: var(--fh-shadow-soft);
+}
+
+.fhsch-event__title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 600;
+}
+
+.fhsch-event.is-short .fhsch-event__title {
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+}
+
+.fhsch-event__meta {
+  flex: none;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Tones follow spec 5.4. Each one is printed as a word in the meta line. */
+/* The word always shows. The time joins it where there is room: on its own
+   line in a tall block, after a comma in a wide one. Its place on the grid
+   and the hover title carry it everywhere else. */
+.fhsch-event {
+  container-type: inline-size;
+}
+
+.fhsch-event__time,
+.fhsch-event__comma {
+  display: none;
+}
+
+.fhsch-event.is-tall .fhsch-event__meta {
+  display: flex;
+  flex-direction: column;
+  white-space: normal;
+}
+
+.fhsch-event.is-tall .fhsch-event__time {
+  display: inline;
+}
+
+@container (min-width: 150px) {
+  .fhsch-event__time {
+    display: inline;
+  }
+
+  .fhsch-event:not(.is-tall) .fhsch-event__comma {
+    display: inline;
+  }
+}
+
+.fhsch-event--live {
+  border-color: color-mix(in srgb, var(--fh-success) 45%, transparent);
+  background: var(--fh-success-fill);
+  color: var(--fh-success-ink);
+}
+
+.fhsch-event--upcoming {
+  border-color: color-mix(in srgb, var(--fh-info) 40%, transparent);
+  background: var(--fh-info-fill);
+  color: var(--fh-info-ink);
+}
+
+.fhsch-event--visit {
+  border-color: var(--fh-ink-3);
+  background: var(--fh-paper);
+  color: var(--fh-ink);
+}
+
+.fhsch-event--done {
+  border-color: var(--fh-hairline);
+  background: var(--fh-plaster);
+  color: var(--fh-ink-3);
+}
+
+/* ---- Empty and loading ---- */
+.fhsch-hint {
+  position: absolute;
+  top: 96px;
+  right: 0;
+  left: var(--fhsch-gutter);
+  z-index: 1;
+  margin: 0;
+  padding: 0 24px;
+  font-size: 16px;
+  line-height: 22px;
+  text-align: center;
+  color: var(--fh-ink-3);
+  pointer-events: none;
+}
+
+.fhsch-loading {
+  position: absolute;
+  top: 56px;
+  right: 0;
+  left: var(--fhsch-gutter);
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  pointer-events: none;
+}
+
+/* ---- Month ---- */
+.fhsch-month {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--fh-hairline);
+  border-radius: 14px;
+  background: var(--fh-paper);
+}
+
+.fhsch-month__week,
+.fhsch-month__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.fhsch-month__week {
+  border-bottom: 1px solid var(--fh-hairline);
+}
+
+.fhsch-month__week span {
+  padding: 12px;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+.fhsch-month__day {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  min-width: 0;
+  min-height: 112px;
+  margin: 0;
+  padding: 8px;
+  appearance: none;
+  border: 0;
+  border-top: 1px solid var(--fh-hairline-soft);
+  border-left: 1px solid var(--fh-hairline-soft);
+  border-radius: 0;
+  background: transparent;
+  color: var(--fh-ink);
+  font-family: var(--fh-font-body);
+  text-align: left;
+  cursor: pointer;
+}
+
+.fhsch-month__day:nth-child(7n + 1) {
+  border-left: 0;
+}
+
+.fhsch-month__day:nth-child(-n + 7) {
+  border-top: 0;
+}
+
+.fhsch-month__day:hover {
+  background: var(--fh-wash);
+}
+
+.fhsch-month__day.is-out {
+  background: var(--fh-tray);
+  color: var(--fh-ink-3);
+}
+
+.fhsch-month__num {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 16px;
+  line-height: 20px;
+  font-weight: 600;
+}
+
+.fhsch-month__today {
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--fh-ink-2);
+}
+
+.fhsch-month__chips {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.fhsch-month__chip {
+  display: block;
+  padding: 4px 8px;
+  overflow: hidden;
+  border: 1px solid var(--fh-hairline);
+  border-radius: 7px;
+  background: var(--fh-tray);
+  color: var(--fh-ink);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.fhsch-month__more {
+  padding-left: 4px;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+/* ---- Unscheduled tray ---- */
+.fhsch-tray {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 456px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.fhsch-card {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  grid-template-areas:
+    'handle text'
+    'handle action';
+  align-items: start;
+  padding: 8px 12px 12px 0;
+  border: 1px solid var(--fh-hairline);
+  border-radius: 14px;
+  background: var(--fh-paper);
+  color: var(--fh-ink);
+}
+
+.fhsch-card.is-dragging {
+  opacity: 0.4;
+}
+
+.fhsch-card--floating {
+  grid-template-areas: 'handle text';
+  padding-bottom: 8px;
+  border-color: var(--fh-edge);
+  box-shadow: var(--fh-shadow-overlay);
+  cursor: grabbing;
+}
+
+.fhsch-handle,
+.fhsch-handle__dots {
+  grid-area: handle;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--fh-ink-3);
+}
+
+.fhsch-handle {
+  cursor: grab;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.fhsch-handle:hover {
+  background: var(--fh-wash);
+  color: var(--fh-ink);
+}
+
+.fhsch-card__text {
+  grid-area: text;
+  min-width: 0;
+  padding-top: 4px;
+}
+
+.fhsch-card__title {
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+  color: var(--fh-ink);
+}
+
+.fhsch-card__line {
+  margin: 0;
+  font-size: 15px;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+  color: var(--fh-ink-2);
+}
+
+.fhsch-card__line--soft {
+  font-size: 14px;
+  line-height: 18px;
+  color: var(--fh-ink-3);
+}
+
+.fhsch-card__action {
+  grid-area: action;
+  padding-top: 8px;
+}
+
+/* ---- Crew this week ---- */
+.fhsch-crew {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fhsch-crew__row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.fhsch-crew__avatar {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: var(--fh-onyx);
+  box-shadow: inset 0 0 0 1px var(--fh-edge);
+  color: var(--fh-linen);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+}
+
+.fhsch-crew__name {
+  min-width: 0;
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.fhsch-crew__hours {
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--fh-ink-3);
+}
+
+/* ---- Up next: hairline rows ---- */
+.fhsch-rail__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.fhsch-upnext {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fhsch-upnext li + li {
+  border-top: 1px solid var(--fh-hairline-soft);
+}
+
+.fhsch-upnext__row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 48px;
+  margin: 0;
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
+  color: var(--fh-ink);
+  font-family: var(--fh-font-body);
+  text-align: left;
+  cursor: pointer;
+}
+
+.fhsch-upnext__when {
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+.fhsch-upnext__title {
+  min-width: 0;
+  font-size: 16px;
+  line-height: 20px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}

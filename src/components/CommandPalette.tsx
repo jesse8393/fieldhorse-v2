@@ -1,44 +1,80 @@
-import { useEffect, useState } from 'react'
+// Command palette (SPEC.md 9.12, render base/desktop-command.jpg).
+//
+// Desktop only: it opens at 900 px and up, from Control or Cmd+K or the
+// `fh:open-palette` event. Below 900 px MobileSearchOverlay takes over.
+//
+// Search groups: Jobs, Actions (for the highlighted job), Customers,
+// Documents (only when files match), then Notes and Schedule when they
+// match. With nothing typed it lists the quick actions and the places to
+// go. universalSearch has already filtered on the server, so cmdk's own
+// matcher is off.
+//
+// Keyboard rule for the job actions: plain letters always type into the
+// search field. A shortcut is Alt plus I, M or N (Option on a Mac), it
+// fires only while this palette is open and a job, or one of its action
+// rows, is highlighted, and the key caps print the modifier. There is no
+// listener while the palette is closed, so typing "i" in any other text
+// field does nothing. The rule itself is in lib/paletteActions.ts.
+
+import { useEffect, useMemo, useState } from 'react'
+import type { KeyboardEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-  CommandSeparator,
-} from '@/components/ui/command'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Command } from 'cmdk'
+import { Dialog as DialogPrimitive } from 'radix-ui'
 import {
   BarChart3,
   Briefcase,
   Calendar,
   Calculator,
+  ChevronRight,
   ClipboardCheck,
   FileText,
+  HardHat,
   Home,
   Image as ImageIcon,
   LineChart,
+  MapPin,
   MessageSquare,
   Mic,
-  Paperclip,
+  NotepadText,
   Plus,
   Receipt,
+  Search,
   Settings,
   Target,
   Upload,
   Users,
   UsersRound,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+import { Icon, KeyCap } from './fh/index.ts'
 import { universalSearch } from '../lib/universalSearch.ts'
+import type { SearchResult, SearchResults } from '../lib/universalSearch.ts'
+import {
+  actionForShortcut,
+  paletteActions,
+  shortcutModifier,
+} from '../lib/paletteActions.ts'
+import type { PaletteAction, PaletteActionId, PaletteJob } from '../lib/paletteActions.ts'
+import { openCapture } from '../lib/captureAttach.ts'
+import { stageLabel } from '../lib/stages.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
+import '../styles/command-palette.css'
+
+type NavEntry = {
+  id: string
+  label: string
+  hint: string
+  icon: LucideIcon
+  to?: string
+  event?: string
+}
 
 // Target /work directly (the collapsed deal list) rather than the legacy
 // board paths, so these don't round-trip through LegacyBoardRedirect and
 // its stage-synonym table. asStage seeds the New-deal sheet's stage.
-const QUICK_ACTIONS = [
+const QUICK_ACTIONS: NavEntry[] = [
   { id: 'capture', label: 'Capture anything', hint: 'Voice, text, receipt, or photo', icon: Mic, event: 'fh:open-capture' },
   { id: 'newLead', label: 'New lead', hint: 'Add an opportunity', icon: Plus, to: '/work?new=1' },
   { id: 'newQuote', label: 'New quote', hint: 'Start a proposal with scope', icon: FileText, to: '/work?new=1&asStage=quote' },
@@ -55,21 +91,21 @@ function homeHint() {
   return 'Evening closeout'
 }
 
-const NAV_ITEMS = [
+const NAV_ITEMS: NavEntry[] = [
   { id: 'home', label: 'Command Center', hint: homeHint(), icon: Home, to: '/' },
   { id: 'work', label: 'Work & Deals', hint: 'Every deal, lead to done, one list', icon: Briefcase, to: '/work' },
   { id: 'clients', label: 'Clients', hint: 'Customer profiles', icon: Users, to: '/clients' },
   { id: 'schedule', label: 'Schedule', hint: 'Day, week, and month planning', icon: Calendar, to: '/schedule' },
 ]
 
-const REVENUE_ITEMS = [
+const REVENUE_ITEMS: NavEntry[] = [
   { id: 'bid', label: 'Estimates', hint: 'Scope to number', icon: Calculator, to: '/bid' },
   { id: 'invoices', label: 'Invoices', hint: 'Collect and reconcile', icon: Receipt, to: '/invoices' },
   { id: 'analytics', label: 'Analytics', hint: 'Pipeline and margin', icon: BarChart3, to: '/analytics' },
   { id: 'forecast', label: 'Forecast', hint: 'Pour window and capacity', icon: LineChart, to: '/pour-window' },
 ]
 
-const SYSTEM_ITEMS = [
+const SYSTEM_ITEMS: NavEntry[] = [
   { id: 'notes', label: 'Activity feed', hint: 'Notes and field intelligence', icon: FileText, to: '/notes' },
   { id: 'tasks', label: 'Tasks', hint: 'Owner queue', icon: ClipboardCheck, to: '/tasks' },
   { id: 'team', label: 'Team', hint: 'Roles and operators', icon: UsersRound, to: '/team' },
@@ -77,27 +113,96 @@ const SYSTEM_ITEMS = [
   { id: 'settings', label: 'Settings', hint: 'Profile, templates, billing', icon: Settings, to: '/settings' },
 ]
 
-const ICON_FOR_KIND: Record<string, any> = {
-  job: Briefcase,
+const ICON_FOR_KIND: Record<string, LucideIcon> = {
+  job: HardHat,
   client: Users,
-  note: FileText,
+  note: NotepadText,
   event: Calendar,
-  file: Paperclip,
+  file: FileText,
   photo: ImageIcon,
+}
+
+const ICON_FOR_ACTION: Record<PaletteActionId, LucideIcon> = {
+  invoice: FileText,
+  message: MessageSquare,
+  note: NotepadText,
+  navigate: MapPin,
+}
+
+const EMPTY_RESULTS: SearchResults = { jobs: [], clients: [], notes: [], events: [], files: [], total: 0 }
+
+// Row values. cmdk tracks the highlighted row by value, so these say what
+// a highlight means: a job row, or an action row of a job.
+const jobValue = (result: SearchResult) => result.id
+const actionValue = (jobId: string, actionId: PaletteActionId) => `act:${jobId}:${actionId}`
+
+function jobIdOfValue(value: string, jobs: SearchResult[]): string | null {
+  if (value.startsWith('job:')) return jobs.find((j) => j.id === value)?.job?.id ?? null
+  if (value.startsWith('act:')) return value.slice(4, value.lastIndexOf(':'))
+  return null
+}
+
+function jobLine(job: PaletteJob) {
+  const title = job.job_title?.trim()
+  return [stageLabel(job.stage), title ? job.name : null, job.address?.trim() || null].filter(Boolean).join(', ')
+}
+
+type PaletteRowProps = {
+  value: string
+  icon: LucideIcon
+  title: string
+  sub?: string
+  chevron?: boolean
+  keys?: { modifier: string; key: string }
+  shortcut?: string
+  onSelect: () => void
+}
+
+function PaletteRow({ value, icon, title, sub, chevron, keys, shortcut, onSelect }: PaletteRowProps) {
+  return (
+    <Command.Item
+      value={value}
+      onSelect={onSelect}
+      className={sub ? 'fhp-item fhp-item--rich' : 'fhp-item'}
+      aria-keyshortcuts={shortcut}
+    >
+      <Icon icon={icon} size={22} className="fhp-item__icon" />
+      <span className="fhp-item__body">
+        <span className="fhp-item__title">{title}</span>
+        {sub ? <span className="fhp-item__sub">{sub}</span> : null}
+      </span>
+      {keys ? (
+        <span className="fhp-keys" aria-hidden="true">
+          <KeyCap>{keys.modifier}</KeyCap>
+          <KeyCap>{keys.key}</KeyCap>
+        </span>
+      ) : null}
+      {chevron ? <Icon icon={ChevronRight} size={18} className="fhp-item__chevron" /> : null}
+    </Command.Item>
+  )
 }
 
 export default function CommandPalette() {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<any>({ jobs: [], clients: [], notes: [], events: [], files: [], total: 0 })
+  const [results, setResults] = useState<SearchResults>(EMPTY_RESULTS)
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState('')
+  // The highlighted row's cmdk value, and the job the Actions group is for.
+  const [highlight, setHighlight] = useState('')
+  const [activeJobId, setActiveJobId] = useState<string | null>(null)
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { canViewRoute, role, loading: membershipLoading } = useMembership()
+  const { canViewRoute, canCreateFinancialDocs, role, loading: membershipLoading } = useMembership()
+
+  const env = useMemo(
+    () => (typeof navigator === 'undefined' ? {} : { userAgent: navigator.userAgent, maxTouchPoints: navigator.maxTouchPoints }),
+    [],
+  )
+  const modifier = shortcutModifier(env)
 
   useEffect(() => {
-    function onKey(e: any) {
+    function onKey(e: globalThis.KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
         setOpen((v) => !v)
@@ -117,9 +222,11 @@ export default function CommandPalette() {
   useEffect(() => {
     if (!open) {
       setQuery('')
-      setResults({ jobs: [], clients: [], notes: [], events: [], files: [], total: 0 })
+      setResults(EMPTY_RESULTS)
       setSearching(false)
       setSearchError('')
+      setHighlight('')
+      setActiveJobId(null)
     }
   }, [open])
 
@@ -127,7 +234,7 @@ export default function CommandPalette() {
     if (!open) return
     const q = query.trim()
     if (!q) {
-      setResults({ jobs: [], clients: [], notes: [], events: [], files: [], total: 0 })
+      setResults(EMPTY_RESULTS)
       setSearching(false)
       setSearchError('')
       return
@@ -139,10 +246,10 @@ export default function CommandPalette() {
       try {
         const data = await universalSearch(q, user?.id)
         if (!cancelled) setResults(data)
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (!cancelled) {
-          setResults({ jobs: [], clients: [], notes: [], events: [], files: [], total: 0 })
-          setSearchError(e?.message || 'Search is unavailable right now.')
+          setResults(EMPTY_RESULTS)
+          setSearchError(e instanceof Error && e.message ? e.message : 'Search is unavailable right now.')
         }
       } finally {
         if (!cancelled) setSearching(false)
@@ -159,7 +266,22 @@ export default function CommandPalette() {
     navigate(to)
   }
 
-  function itemAllowed(it: any) {
+  function runAction(action: PaletteAction, job: PaletteJob) {
+    setOpen(false)
+    if (action.id === 'note') {
+      openCapture({ jobId: job.id })
+    } else if (action.event) {
+      window.dispatchEvent(new CustomEvent(action.event))
+    } else if (action.to?.startsWith('/')) {
+      navigate(action.to)
+    } else if (action.to?.startsWith('sms:')) {
+      window.location.href = action.to
+    } else if (action.to) {
+      window.open(action.to, '_blank', 'noopener,noreferrer')
+    }
+  }
+
+  function itemAllowed(it: NavEntry) {
     if (it.event) return true
     if (!it.to) return true
     const path = it.to.split('?')[0].split('#')[0]
@@ -168,66 +290,69 @@ export default function CommandPalette() {
     return path === '/sub-portal'
   }
 
-  function renderEntityGroup(heading: string, items: any[], kindFallback?: string) {
+  const jobs = results.jobs
+  const activeJob =
+    jobs.find((j) => j.job?.id === activeJobId)?.job ?? jobs.find((j) => j.job)?.job ?? null
+  const actions = paletteActions(activeJob, !membershipLoading && canCreateFinancialDocs, env)
+  // A job is highlighted when the highlight sits on a job row or on one of
+  // its action rows. Only then does a shortcut run.
+  const jobHighlighted = highlight.startsWith('job:') || highlight.startsWith('act:')
+
+  function onHighlight(value: string) {
+    setHighlight(value)
+    const id = jobIdOfValue(value, jobs)
+    if (id) setActiveJobId(id)
+  }
+
+  function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+    if (e.nativeEvent.isComposing || !activeJob || !jobHighlighted) return
+    const hit = actionForShortcut(actions, e)
+    if (!hit) return
+    e.preventDefault()
+    runAction(hit, activeJob)
+  }
+
+  function renderEntityGroup(heading: string, items: SearchResult[]) {
     if (!items.length) return null
     return (
-      <CommandGroup heading={heading}>
-        {items.map((item: any) => {
-          const I = ICON_FOR_KIND[item.kind || kindFallback || 'note'] || FileText
-          return (
-            <CommandItem
-              key={item.id}
-              value={`${item.id} ${item.title} ${item.sub || ''}`}
-              onSelect={() => go(item.to)}
-              className="ui:gap-3"
-            >
-              <I className="ui:text-fh-gold-bright" style={{ width: 16, height: 16, flexShrink: 0 }} />
-              <div className="ui:flex ui:flex-col" style={{ minWidth: 0 }}>
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {item.title}
-                </span>
-                {item.sub && (
-                  <span className="ui:text-xs ui:text-muted-foreground" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {item.sub}
-                  </span>
-                )}
-              </div>
-            </CommandItem>
-          )
-        })}
-      </CommandGroup>
+      <Command.Group heading={heading} className="fhp-group">
+        {items.map((item) => (
+          <PaletteRow
+            key={item.id}
+            value={item.id}
+            icon={ICON_FOR_KIND[item.kind] || FileText}
+            title={item.title}
+            sub={item.sub || undefined}
+            chevron
+            onSelect={() => go(item.to)}
+          />
+        ))}
+      </Command.Group>
     )
   }
 
-  function renderNavGroup(heading: string, items: any[]) {
+  function renderNavGroup(heading: string, items: NavEntry[]) {
     if (!items.length) return null
     return (
-      <CommandGroup heading={heading}>
-        {items.map((it: any) => {
-          const I = it.icon
-          return (
-            <CommandItem
-              key={it.id}
-              value={`${it.id} ${it.label} ${it.hint}`}
-              onSelect={() => {
-                if (it.event) {
-                  setOpen(false)
-                  window.dispatchEvent(new CustomEvent(it.event))
-                } else {
-                  go(it.to)
-                }
-              }}
-              className="ui:gap-3"
-            >
-              <I className="ui:text-fh-gold-bright" style={{ width: 16, height: 16 }} />
-              <div className="ui:flex ui:flex-col">
-                <span>{it.label}</span>
-                <span className="ui:text-xs ui:text-muted-foreground">{it.hint}</span>
-              </div>
-            </CommandItem>
-          )
-        })}
-      </CommandGroup>
+      <Command.Group heading={heading} className="fhp-group">
+        {items.map((it) => (
+          <PaletteRow
+            key={it.id}
+            value={`nav:${it.id}`}
+            icon={it.icon}
+            title={it.label}
+            sub={it.hint}
+            onSelect={() => {
+              if (it.event) {
+                setOpen(false)
+                window.dispatchEvent(new CustomEvent(it.event))
+              } else if (it.to) {
+                go(it.to)
+              }
+            }}
+          />
+        ))}
+      </Command.Group>
     )
   }
 
@@ -238,63 +363,109 @@ export default function CommandPalette() {
   const revenueItems = REVENUE_ITEMS.filter(itemAllowed)
   const systemItems = SYSTEM_ITEMS.filter(itemAllowed)
 
-  // Same shell as ui/command's CommandDialog, which can't pass props to
-  // its inner Command. shouldFilter is off because universalSearch has
-  // already filtered on the server: cmdk's own fuzzy matcher only sees
-  // each row's title and subtitle, so it hid jobs and clients found by
-  // address, phone or email. With an empty query nothing is filtered
-  // anyway, so the menu below is unchanged.
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogHeader className="ui:sr-only">
-        <DialogTitle>Command Palette</DialogTitle>
-        <DialogDescription>Search for a command to run...</DialogDescription>
-      </DialogHeader>
-      <DialogContent className="ui:overflow-hidden ui:p-0 fh-command-dialog" showCloseButton>
-        <Command
-          shouldFilter={false}
-          className="ui:**:data-[slot=command-input-wrapper]:h-12 ui:[&_[cmdk-group-heading]]:px-2 ui:[&_[cmdk-group-heading]]:font-medium ui:[&_[cmdk-group-heading]]:text-muted-foreground ui:[&_[cmdk-group]]:px-2 ui:[&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 ui:[&_[cmdk-input-wrapper]_svg]:h-5 ui:[&_[cmdk-input-wrapper]_svg]:w-5 ui:[&_[cmdk-input]]:h-12 ui:[&_[cmdk-item]]:px-2 ui:[&_[cmdk-item]]:py-3 ui:[&_[cmdk-item]_svg]:h-5 ui:[&_[cmdk-item]_svg]:w-5"
-        >
-          <CommandInput
-            placeholder="Search leads, jobs, clients, notes, events, files..."
-            value={query}
-            onValueChange={setQuery}
-          />
-          <CommandList>
-            {hasQuery ? (
-              <>
-                {searching && !hasResults && (
-                  <div className="ui:py-6 ui:text-center ui:text-sm ui:text-muted-foreground">
-                    Searching...
-                  </div>
-                )}
-                {!searching && searchError && <CommandEmpty>{searchError}</CommandEmpty>}
-                {!searching && !searchError && !hasResults && <CommandEmpty>Nothing matched.</CommandEmpty>}
-                {renderEntityGroup('Jobs', results.jobs)}
-                {results.jobs.length > 0 && (results.clients.length || results.notes.length || results.events.length || results.files.length) > 0 && <CommandSeparator />}
-                {renderEntityGroup('Clients', results.clients)}
-                {results.clients.length > 0 && (results.notes.length || results.events.length || results.files.length) > 0 && <CommandSeparator />}
-                {renderEntityGroup('Notes', results.notes)}
-                {results.notes.length > 0 && (results.events.length || results.files.length) > 0 && <CommandSeparator />}
-                {renderEntityGroup('Schedule', results.events)}
-                {results.events.length > 0 && results.files.length > 0 && <CommandSeparator />}
-                {renderEntityGroup('Files', results.files)}
-              </>
-            ) : (
-              <>
-                <CommandEmpty>Type to search across everything.</CommandEmpty>
-                {renderNavGroup('Quick actions', quickActions)}
-                <CommandSeparator />
-                {renderNavGroup('CRM workspace', navItems)}
-                <CommandSeparator />
-                {renderNavGroup('Revenue tools', revenueItems)}
-                <CommandSeparator />
-                {renderNavGroup('System', systemItems)}
-              </>
-            )}
-          </CommandList>
-        </Command>
-      </DialogContent>
-    </Dialog>
+    <DialogPrimitive.Root open={open} onOpenChange={setOpen}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="fhp-scrim" />
+        <DialogPrimitive.Content className="fhp-panel">
+          <DialogPrimitive.Title className="fhc-vh">Command palette</DialogPrimitive.Title>
+          <DialogPrimitive.Description className="fhc-vh">
+            Search jobs, customers and documents, or run a quick action.
+          </DialogPrimitive.Description>
+          <Command
+            className="fhp-cmd"
+            label="Search jobs, customers and documents"
+            shouldFilter={false}
+            loop
+            value={highlight}
+            onValueChange={onHighlight}
+            onKeyDown={onKeyDown}
+          >
+            <div className="fhp-search">
+              <Icon icon={Search} size={24} />
+              <Command.Input
+                className="fhp-input"
+                placeholder="Search jobs, customers, notes and files"
+                value={query}
+                onValueChange={setQuery}
+              />
+              <KeyCap>esc</KeyCap>
+            </div>
+            <Command.List className="fhp-list">
+              {hasQuery ? (
+                <>
+                  {searching && !hasResults && (
+                    <div className="fhp-note" role="status">Searching...</div>
+                  )}
+                  {!searching && searchError && <Command.Empty className="fhp-note">{searchError}</Command.Empty>}
+                  {!searching && !searchError && !hasResults && (
+                    <Command.Empty className="fhp-note">Nothing matched.</Command.Empty>
+                  )}
+                  {jobs.length > 0 && (
+                    <Command.Group heading="Jobs" className="fhp-group">
+                      {jobs.map((item) => (
+                        <PaletteRow
+                          key={item.id}
+                          value={jobValue(item)}
+                          icon={ICON_FOR_KIND.job}
+                          title={item.job ? item.job.job_title?.trim() || item.job.name : item.title}
+                          sub={item.job ? jobLine(item.job) : item.sub}
+                          chevron
+                          onSelect={() => go(item.to)}
+                        />
+                      ))}
+                    </Command.Group>
+                  )}
+                  {activeJob && actions.length > 0 && (
+                    <Command.Group heading="Actions" className="fhp-group">
+                      {actions.map((action) => (
+                        <PaletteRow
+                          key={action.id}
+                          value={actionValue(activeJob.id, action.id)}
+                          icon={ICON_FOR_ACTION[action.id]}
+                          title={action.label}
+                          keys={action.key ? { modifier, key: action.key } : undefined}
+                          shortcut={action.key ? `Alt+${action.key}` : undefined}
+                          onSelect={() => runAction(action, activeJob)}
+                        />
+                      ))}
+                    </Command.Group>
+                  )}
+                  {renderEntityGroup('Customers', results.clients)}
+                  {renderEntityGroup('Documents', results.files)}
+                  {renderEntityGroup('Notes', results.notes)}
+                  {renderEntityGroup('Schedule', results.events)}
+                </>
+              ) : (
+                <>
+                  <Command.Empty className="fhp-note">Type to search across everything.</Command.Empty>
+                  {renderNavGroup('Quick actions', quickActions)}
+                  {renderNavGroup('CRM workspace', navItems)}
+                  {renderNavGroup('Revenue tools', revenueItems)}
+                  {renderNavGroup('System', systemItems)}
+                </>
+              )}
+            </Command.List>
+            <div className="fhp-foot">
+              <span className="fhp-hint">
+                <span className="fhp-hint__keys">
+                  <KeyCap label="Up arrow">↑</KeyCap>
+                  <KeyCap label="Down arrow">↓</KeyCap>
+                </span>
+                <span>to move,</span>
+              </span>
+              <span className="fhp-hint">
+                <KeyCap label="Enter">↵</KeyCap>
+                <span>to open,</span>
+              </span>
+              <span className="fhp-hint">
+                <KeyCap>esc</KeyCap>
+                <span>to close.</span>
+              </span>
+            </div>
+          </Command>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   )
 }
