@@ -41,7 +41,7 @@ Status is one of todo, done, blocked, skipped.
 
 ### Phase 8 notes
 
-* Nothing yet.
+* The first CI run on #223 (a docs only commit) failed `mock-workflows` "keeps the desktop schedule planning workflow complete" on desktop. The default mock visit starts two hours after the mock loads, so between 10 pm and midnight Central it lands on tomorrow and the Day view is empty. It failed here too at 10:48 pm Central and passed after the test pinned its page clock to a Thursday morning and seeded that day's visit. It is listed under "Failing before Phase 8".
 
 ## Morning summary
 
