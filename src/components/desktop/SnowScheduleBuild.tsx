@@ -40,8 +40,9 @@ import './schedule/schedule.css'
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useOrgScope } from '../../lib/orgScope.ts'
 import {
+  useActiveCompany,
+  useCompanyJobs,
   useInvalidateSchedule,
-  useJobs,
   useScheduleEvents,
   type JobRow
 } from '../../lib/queries.ts'
@@ -51,6 +52,7 @@ import {
   boardHours,
   crewHours,
   dayLabel,
+  dropRefusal,
   jobLabel,
   monthLabel,
   parseSlotId,
@@ -157,6 +159,7 @@ export default function SnowScheduleBuild(props: Props) {
 
   const { user } = useAuth()
   const orgId = useOrgScope(user?.id)
+  const company = useActiveCompany()
   const now = useNow()
   const invalidateSchedule = useInvalidateSchedule()
 
@@ -191,7 +194,9 @@ export default function SnowScheduleBuild(props: Props) {
 
   // ---- The Unscheduled tray (decision D10) ----
   // Every visit from today on, whatever week the board shows, decides
-  // which jobs still need a date.
+  // which jobs still need a date. Only the active company's jobs wait
+  // here: a partner's shared job, or one from another workspace, never
+  // goes on this calendar.
   const todayKey = ymdKey(now)
   const bookedRange = useMemo(() => {
     const [y, m, d] = todayKey.split('-').map(Number)
@@ -199,7 +204,7 @@ export default function SnowScheduleBuild(props: Props) {
     return { from: from.toISOString(), to: new Date(y, m - 1, d + 400).toISOString() }
   }, [todayKey])
   const { data: booked } = useScheduleEvents(user?.id, bookedRange.from, bookedRange.to)
-  const jobsQuery = useJobs()
+  const jobsQuery = useCompanyJobs()
   const jobs = jobsQuery.data
   const trayJobs = useMemo(
     () => unscheduledJobs(jobs ?? [], (booked ?? []).map((e) => ({ contact_id: e.contact_id, start_at: e.start_at as string })), now),
@@ -292,9 +297,11 @@ export default function SnowScheduleBuild(props: Props) {
     const job = (active.data.current as { job?: JobRow } | undefined)?.job
     if (!slot || !job) return
     const range = slotToRange(slot.day, slot.hour)
-    // A slot that has already begun is the past: refuse, write nothing.
-    if (Date.parse(range.start_at) < Date.now()) {
-      toast('Pick a time from now on.')
+    // Another company's job, or a slot that has already begun: refuse,
+    // write nothing.
+    const refusal = dropRefusal(job, company, Date.parse(range.start_at), Date.now())
+    if (refusal) {
+      toast(refusal)
       return
     }
     if (!user?.id) return
@@ -324,7 +331,7 @@ export default function SnowScheduleBuild(props: Props) {
         toastSuccess('Removed', label)
       }
     })
-  }, [user?.id, orgId, invalidateSchedule])
+  }, [user?.id, orgId, company, invalidateSchedule])
 
   const onDragCancel = useCallback(() => {
     cursorSlot.current = null

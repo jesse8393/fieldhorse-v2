@@ -12,7 +12,7 @@
 // Reuse target: these hooks are platform-agnostic (plain Supabase +
 // Query), so the future Expo app imports them verbatim.
 
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import {
   useQuery,
   useQueryClient,
@@ -23,6 +23,7 @@ import { supabase } from './supabase.ts'
 import { subMatchesKey } from './subIdentity.ts'
 import { loadPartnerDirectory } from './partners.ts'
 import { useOrgScope } from './orgScope.ts'
+import { activeCompanyFrom, onlyActiveCompany, type ActiveCompany } from './activeCompany.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import type { Database } from './database.types.ts'
 
@@ -35,13 +36,14 @@ export type Payment = Database['public']['Tables']['fh_payments']['Row']
 // full width, fh_contacts carries big text fields (notes, scope,
 // proposal HTML) that the list never shows. completed_at and
 // quote_sent_at feed the phone Jobs rows ("Sent yesterday", the Done
-// group's last 30 days).
+// group's last 30 days). org_id tells the active company's jobs from a
+// partner's shared ones (lib/activeCompany.ts, useCompanyJobs below).
 export const JOB_LIST_COLUMNS =
-  'id, user_id, client_id, name, phone, email, address, stage, amount, job_title, job_type, referred_by, proposal_status, follow_up_on, completed_at, quote_sent_at, updated_at, created_at'
+  'id, user_id, org_id, client_id, name, phone, email, address, stage, amount, job_title, job_type, referred_by, proposal_status, follow_up_on, completed_at, quote_sent_at, updated_at, created_at'
 
 export type JobRow = Pick<
   Contact,
-  | 'id' | 'user_id' | 'client_id' | 'name' | 'phone' | 'email' | 'address'
+  | 'id' | 'user_id' | 'org_id' | 'client_id' | 'name' | 'phone' | 'email' | 'address'
   | 'stage' | 'amount' | 'job_title' | 'job_type' | 'referred_by'
   | 'proposal_status' | 'follow_up_on' | 'completed_at' | 'quote_sent_at'
   | 'updated_at' | 'created_at'
@@ -150,6 +152,47 @@ export function useJobs() {
     enabled: !!user?.id,
     staleTime: 30_000
   })
+}
+
+// ---- Jobs of the active company ----
+// useJobs carries every company the person belongs to plus the jobs a
+// partner shared, which the Jobs list is meant to show. Screens that act on
+// a job (the Schedule tray writes visits, Money counts quotes waiting on
+// approval) read this instead: the same cached list, narrowed to the
+// active company (lib/activeCompany.ts). Until the company is known it
+// reads as loading, so a screen never shows an empty or unfiltered list.
+
+/** The company the screens act for, or null while it is not known. */
+export function useActiveCompany(): ActiveCompany | null {
+  const { user } = useAuth()
+  const scope = useOrgScope(user?.id)
+  const userId = user?.id
+  return useMemo(() => activeCompanyFrom(userId, scope), [userId, scope])
+}
+
+export type CompanyJobs = {
+  data: JobRow[] | undefined
+  isPending: boolean
+  isLoading: boolean
+  isError: boolean
+  error: Error | null
+  refetch: () => Promise<unknown>
+}
+
+export function useCompanyJobs(): CompanyJobs {
+  const jobs = useJobs()
+  const company = useActiveCompany()
+  const all = jobs.data
+  const data = useMemo(() => (all && company ? onlyActiveCompany(all, company) : undefined), [all, company])
+  const known = company !== null
+  return {
+    data,
+    isPending: jobs.isPending || !known,
+    isLoading: jobs.isLoading || (!known && !jobs.isError),
+    isError: jobs.isError,
+    error: jobs.error,
+    refetch: jobs.refetch
+  }
 }
 
 // Subscribe to Supabase Realtime for the user's fh_contacts and

@@ -5,6 +5,7 @@
 // done by hand, same tables, same helpers (logPayment, recalcCost),
 // so captured data is indistinguishable from manually entered data.
 
+import type { QueryClient, QueryKey } from '@tanstack/react-query'
 import { supabase } from './supabase.ts'
 import { resilientInsert } from './outbox.ts'
 import { findOrCreateClient } from './clients.ts'
@@ -158,4 +159,28 @@ export async function commitCapture({ intent, userId, contacts }: {
       }
     }
   }
+}
+
+/**
+ * After a capture saves, mark the cached reads it changed as stale, so
+ * the screen it was taken on shows it without a reload (the sheet never
+ * navigates). Screens on view refetch now; the rest when next opened.
+ *
+ *   ['jobDetail', jobId]       the job it was filed on: its page and Spine
+ *                              (useJobData), phone and desktop
+ *   ['jobs', userId]           jobsKey: Work, the Jobs list, the desktop
+ *                              rail and Money's job rows
+ *   ['homeDashboard', userId]  homeDashboardKey(userId, orgId) by prefix,
+ *                              so Today refreshes whichever tenant scope
+ *                              it is cached under
+ *
+ * The keys are written out rather than imported so the sheet, which loads
+ * with the app shell, does not pull the screens' query modules in with
+ * it; captureActions.test.ts checks them against jobsKey and
+ * homeDashboardKey.
+ */
+export function refreshAfterCapture(client: QueryClient, userId: string, jobId: string | null): Promise<unknown> {
+  const keys: QueryKey[] = [['jobs', userId], ['homeDashboard', userId]]
+  if (jobId) keys.unshift(['jobDetail', jobId])
+  return Promise.all(keys.map((queryKey) => client.invalidateQueries({ queryKey })))
 }

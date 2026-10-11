@@ -26,6 +26,15 @@ describe('canViewRoute', () => {
     expect(canViewRoute('crew', '/pipeline')).toBe(false)
   })
 
+  it('keeps the Inbox with the people who talk to customers, like Compose', () => {
+    expect(canViewRoute('owner', '/inbox')).toBe(true)
+    expect(canViewRoute('admin', '/inbox')).toBe(true)
+    expect(canViewRoute('manager', '/inbox')).toBe(true)
+    expect(canViewRoute('foreman', '/inbox')).toBe(false)
+    expect(canViewRoute('crew', '/inbox')).toBe(false)
+    expect(canViewRoute(null, '/inbox')).toBe(false)
+  })
+
   it('fails closed for a route with no rule', () => {
     expect(canViewRoute('owner', '/some-new-screen')).toBe(true)
     expect(canViewRoute('admin', '/some-new-screen')).toBe(true)

@@ -68,12 +68,51 @@ const SHOTS = [
   { phase: 4, name: 'deskmoney-day', title: 'Money on a desktop, Day', path: '/invoices', mode: 'day', view: DESKTOP, weekday: 4, render: 'glamor/g-money.jpg', tables: moneyTables },
   { phase: 4, name: 'deskjob-day', title: 'Job, Day', path: '/jobs/c-job1', mode: 'day', view: DESKTOP, weekday: 4, render: 'glamor/g-desktop-job.jpg' },
   { phase: 4, name: 'palette-day', title: 'Command palette, Day', path: '/schedule', mode: 'day', view: DESKTOP, weekday: 4, clock: [9, 0], action: 'palette', render: 'base/desktop-command.jpg', tables: paletteTables },
+  { phase: 6, name: 'thread-day', title: 'Inbox thread, Day', path: '/inbox/conv-priya', mode: 'day', clock: [8, 20], render: 'base/inbox.jpg', tables: inboxTables },
+  { phase: 6, name: 'thread-night', title: 'Inbox thread, Night', path: '/inbox/conv-priya', mode: 'night', clock: [8, 20], render: 'base/inbox.jpg', tables: inboxTables },
   { phase: 5, name: 'portal-day', path: '/p/t1', mode: 'day', public: true, ready: 'h1', setup: portalSetup, render: 'glamor/g-portal.jpg' },
   { phase: 5, name: 'portal-approve-day', title: 'Portal, end of page, Day', path: '/p/t1', mode: 'day', public: true, ready: 'h1', setup: portalSetup, action: 'scrollEnd', render: 'glamor/g-portal.jpg' },
   { phase: 5, name: 'portal-night', path: '/p/t1', mode: 'night', public: true, ready: 'h1', setup: portalSetup, render: 'glamor/g-portal.jpg' },
   { phase: 5, name: 'login-none', title: 'Login, no photo', path: '/login', mode: 'day', public: true, ready: '.fha', setup: loginSetup(false), render: 'glamor/g-welcome.jpg' },
   { phase: 5, name: 'login-photo', title: 'Login, with a photo', path: '/login', mode: 'day', public: true, ready: '.fha', setup: loginSetup(true), render: 'glamor/g-welcome.jpg' }
 ]
+
+// Phase 6 Inbox: the engine is on, and Priya's thread has the render's
+// words, with the AI draft waiting. Times are relative to the frozen day
+// (yesterday 4:48 pm and 5:02 pm, today 8:14 am).
+function inboxTables(clock) {
+  const at = (minutes) => new Date(clock.getTime() + minutes * 60e3).toISOString()
+  const yesterdayFour48 = -(13 * 60 + 52)
+  const message = (props) => ({
+    org_id: 'org-1', conversation_id: 'conv-priya', client_id: 'cl-priya', channel: 'sms', subject: null,
+    status: 'received', read_at: null, hold_reason: null, sent_by_kind: 'contact', agent_run_id: null,
+    sent_at: null, call_status: null, direction: 'inbound', ...props
+  })
+  const conversation = (props) => ({
+    org_id: 'org-1', company_name: null, last_channel: 'sms', unread_count: 0, pending_drafts: 0, held_messages: 0,
+    starred: false, status: 'open', snoozed_until: null, email: null, phone: '555-0142', ...props
+  })
+  const ask = 'Can we push to 11:30? Daycare pickup ran long. Also wanted to ask about adding a ceiling fan in the patio cover.'
+  return {
+    fh_org_settings: [{ engine_enabled: true }],
+    fh_v_inbox: [
+      conversation({ conversation_id: 'conv-priya', client_id: 'cl-priya', client_name: 'Priya Rangarajan', last_preview: ask, last_message_at: at(94), unread_count: 1, pending_drafts: 1, latest_stage: 'quote' }),
+      conversation({ conversation_id: 'conv-marcus', client_id: 'cl-marcus', client_name: 'Marcus Bell', last_preview: 'Thanks, the crew did great work.', last_message_at: at(-(10 * 60)), latest_stage: 'job', last_channel: 'email', email: 'marcus@example.com' }),
+      conversation({ conversation_id: 'conv-tessa', client_id: 'cl-tessa', client_name: 'Tessa Holloway', last_preview: 'We can start Monday if the weather holds.', last_message_at: at(-(3 * 1440)), held_messages: 1, latest_stage: 'lead' })
+    ],
+    fh_messages: [
+      message({ id: 'm1', direction: 'outbound', status: 'sent', sent_by_kind: 'user', read_at: at(yesterdayFour48), created_at: at(yesterdayFour48), body: "Hi Priya, Jesse with Parker Construction. We're set for Thursday at 11:00 to look at the patio cover. I'll bring material samples." }),
+      message({ id: 'm2', created_at: at(yesterdayFour48 + 14), read_at: at(yesterdayFour48 + 17), body: 'Perfect, thank you!' }),
+      message({ id: 'm3', created_at: at(94), body: ask })
+    ],
+    fh_agent_runs: [
+      { id: 'run-1', org_id: 'org-1', conversation_id: 'conv-priya', client_id: 'cl-priya', agent_id: 'agent-1', status: 'proposed', created_at: at(95), proposal: { channel: 'sms', body: "Of course, 11:30 works. I'll bring a fan option so we can see where the power run would go. See you then." } }
+    ],
+    fh_contacts: [
+      { id: 'c-priya', user_id: session.user.id, client_id: 'cl-priya', stage: 'quote', name: 'Priya Rangarajan', job_title: 'Rangarajan patio cover', amount: 14800, updated_at: at(-1440), created_at: at(-14 * 1440), proposal_status: 'sent', fh_clients: { name: 'Priya Rangarajan', phone: '555-0142', email: null } }
+    ]
+  }
+}
 
 // Phase 3 money screen: an overdue invoice, two due soon, a sent and a
 // viewed quote, and payments this week and last, all relative to the
