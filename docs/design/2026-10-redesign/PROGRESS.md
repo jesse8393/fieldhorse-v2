@@ -25,11 +25,11 @@ Status is one of todo, done, blocked, skipped.
 | --- | --- | --- | --- | --- |
 | 1 | 1 Make the test mock honest | done | `8b14809` | Reviewed twice, one fix round. Data fixed in one test (see notes) |
 | 1 | 2 Today counts stop at 6 | done | `07a9071` | Reviewed by two lenses, approved with no fix round. Decision D34 |
-| 1 | 3 Capture from a job page shows up on the job | done | this commit | Reviewed by two lenses, approved with no fix round. Decision D35 |
+| 1 | 3 Capture from a job page shows up on the job | done | `1766c46` | Reviewed by two lenses, approved with no fix round. Decision D35 |
 | 1 | 4 Morning cold open says "Clear day" | todo | | |
 | 1 | 5 What each invoice actually owes | todo | | |
 | 1 | 6 Money timing and double sends | todo | | |
-| 1 | 7 Jobs and quotes stay inside the active company | todo | | |
+| 1 | 7 Jobs and quotes stay inside the active company | done | this commit | Reviewed by two lenses, approved with no fix round. Decision D36 |
 | 1 | 8 The Unscheduled tray tells the truth | todo | | |
 | 1 | 9 One quote total and one deposit everywhere | todo | | |
 | 1 | 10 The customer page after approval and on bad data | todo | | |
@@ -58,6 +58,12 @@ Status is one of todo, done, blocked, skipped.
 * **Task 3, Capture on a job.** `refreshAfterCapture` in `captureActions.ts` refreshes `jobDetail` for the job, `jobsKey` and `homeDashboardKey` after a save. The offline outbox keeps `job_id` and inserts it as `contact_id`; items queued before this change flush with no job, as before.
   * The offline e2e fakes no signal through `navigator.onLine` and the online and offline events, not `context.setOffline`: with `setOffline`, a module still loading made the stale chunk guard reload onto the browser's offline page under load.
   * Known gap, not changed: a queued job capture that the database refuses for permission (the job still exists but this person lost access) stays queued and the pill reads Syncing. Only a deleted job falls back to a note on no job.
+
+* **Task 7, the active company.** `org_id` joined `JOB_LIST_COLUMNS`. New `src/lib/activeCompany.ts` (`inActiveCompany`) and `useCompanyJobs` in `queries.ts`; `dropRefusal` in `scheduleBoard.ts` refuses another company's job before any insert. The filter sits in a hook rather than in `moneyView.ts`, because the invoices bundle carries no quotes. Places that use `useJobs` rows:
+  * Changed: the desktop Schedule tray and its drop, phone Money Waiting on approval, desktop Money Waiting on approval.
+  * Left alone on purpose, lists meant to show partner shared jobs: the Jobs list in `Work.tsx` with its row actions (won, lost, reopen, follow up), `DetailListRail.tsx`, `useJobSearch`. The Jobs list's group money notes still add up partner amounts, matching the rows shown.
+  * Link only: `inbox/Thread.tsx` picks a job chip and creates nothing. Already scoped: the Add event job picker.
+  * Outside Task 7, not changed: the Capture sheet's job picker reads jobs with no company filter (it does not use `useJobs`).
 
 * The first CI run on #223 (a docs only commit) failed `mock-workflows` "keeps the desktop schedule planning workflow complete" on desktop. The default mock visit starts two hours after the mock loads, so between 10 pm and midnight Central it lands on tomorrow and the Day view is empty. It failed here too at 10:48 pm Central and passed after the test pinned its page clock to a Thursday morning and seeded that day's visit. It is listed under "Failing before Phase 8".
 
