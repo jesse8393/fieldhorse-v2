@@ -368,7 +368,7 @@ export default function InvoiceDetail() {
       setTimeout(() => setSent(false), 2400)
     } else if (res.reason === 'sender_not_configured') {
       toastError(
-        "Email NOT sent, sender isn't configured",
+        "Email not sent, sender isn't configured",
         wasDraft
           ? 'Downloaded the PDF so you can email it manually. The invoice is saved as a draft.'
           : 'Downloaded the PDF so you can email it manually.'
@@ -459,7 +459,7 @@ export default function InvoiceDetail() {
 
       if (sendRes.status === 503 && sendBody?.error === 'sender_not_configured') {
         toastError(
-          "Email NOT sent, sender isn't configured",
+          "Email not sent, sender isn't configured",
           'Downloaded the PDF so you can email it manually. To send direct, add Resend keys in Netlify env.'
         )
         downloadPdf(result)
@@ -651,7 +651,7 @@ export default function InvoiceDetail() {
           {/* Balance / Total */}
           <div>
             <StampNumber size="2xl" tone={totals.isPaid ? 'success' : 'default'} style={{ display: 'block', lineHeight: 0.95 }}>
-              {totals.isPaid ? 'PAID' : fmtMoney(totals.balance)}
+              {totals.isPaid ? 'Paid' : fmtMoney(totals.balance)}
             </StampNumber>
             <Eyebrow as="div" style={{ marginTop: 6 }}>
               {totals.isPaid ? `${fmtMoney(totals.amount)} fully paid` : `Balance · ${fmtMoney(totals.amount)} contract`}
@@ -1104,7 +1104,6 @@ function ViewModeToggle({ value, onChange }: any) {
               fontSize: 12,
               fontWeight: 700,
               letterSpacing: 0,
-              textTransform: 'uppercase',
               cursor: on ? 'default' : 'pointer',
               WebkitTapHighlightColor: 'transparent'
             }}

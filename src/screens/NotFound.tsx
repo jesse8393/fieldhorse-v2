@@ -15,7 +15,7 @@ export default function NotFound() {
         <section style={{ textAlign: 'center', maxWidth: 420, padding: '32px 24px' }}>
           <Compass size={28} aria-hidden="true" style={{ color: 'var(--v3-text-muted)', marginBottom: 12 }} />
           <div className="fh-build-eyebrow">Page not found</div>
-          <h1 className="fh-build-title" style={{ margin: '8px 0 10px' }}>NOTHING HERE.</h1>
+          <h1 className="fh-build-title" style={{ margin: '8px 0 10px' }}>Nothing here.</h1>
           <p style={{ margin: '0 0 18px', fontSize: 14, lineHeight: 1.5, color: 'var(--v3-text-muted)' }}>
             <code style={{ fontFamily: 'inherit', color: 'var(--v3-text)' }}>{pathname}</code> doesn&rsquo;t match
             anything in FieldHorse. The link may be stale or mistyped.

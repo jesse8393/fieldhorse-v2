@@ -237,7 +237,7 @@ export default function Tasks() {
           <section className="fh-build-hero-row fh-build-hero-row--page">
             <div>
               <div className="fh-build-good">Tasks</div>
-              <h1 className="fh-build-title">RESTRICTED ACCESS</h1>
+              <h1 className="fh-build-title">Restricted access</h1>
             </div>
           </section>
           <div className="fh-build-table__empty">
@@ -281,7 +281,7 @@ export default function Tasks() {
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
             <div className="fh-build-good">Team</div>
-            <h1 className="fh-build-title">TASKS</h1>
+            <h1 className="fh-build-title">Tasks</h1>
           </div>
 
           <div className="fh-build-focus">

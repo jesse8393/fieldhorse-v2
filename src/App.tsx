@@ -51,6 +51,9 @@ const SubDetail      = lazy(() => import('./screens/SubDetail.tsx'))
 const Invoices       = lazy(() => import('./screens/Invoices.tsx'))
 const Landing        = lazy(() => import('./screens/Landing.tsx'))
 const InvoiceDetail  = lazy(() => import('./screens/InvoiceDetail.tsx'))
+// The redesign component sheet, in development builds only: the
+// condition is a build time constant, so production drops the chunk.
+const DesignSheet    = import.meta.env.DEV ? lazy(() => import('./screens/DesignSheet.tsx')) : null
 
 function RequireAuth({ children }: { children: ReactNode }) {
   const { session, loading } = useAuth()
@@ -111,7 +114,7 @@ function AppLoading({ label }: { label: string }) {
       }}
     >
       <div style={{ display: 'grid', gap: 12, justifyItems: 'center' }}>
-        <div style={{ fontFamily: 'var(--font-display, sans-serif)', fontSize: 24, letterSpacing: 0, lineHeight: 1 }}>
+        <div style={{ fontFamily: 'var(--font-wordmark)', fontSize: 24, letterSpacing: 0, lineHeight: 1 }}>
           <span style={{ color: 'var(--v3-primary, #C9963A)' }}>FIELD</span>HORSE
         </div>
         <div style={{ color: 'var(--v3-text-muted, rgba(242,237,228,.55))', fontSize: 14 }}>
@@ -197,6 +200,7 @@ export default function App() {
         <Route path="/p/:token" element={<PublicDoc />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
+        {DesignSheet && <Route path="/design" element={<DesignSheet />} />}
         <Route
           path="/onboarding"
           element={

@@ -58,7 +58,7 @@ export default function InspectionsSection({ contact, inspections = [], userId, 
     }
     notifySelf(userId, {
       kind: 'inspection_logged',
-      title: `${trade} · ${String(result).toUpperCase()}`,
+      title: `${trade} · ${RESULT_META[result]?.label || String(result)}`,
       body: contact?.name ? `Inspection logged on ${contact.name}` : 'Inspection logged',
       link: `/jobs/${contact.id}`
     }).catch(() => {})
@@ -242,7 +242,6 @@ function InspectionLog({ open, trade, onOpenChange, onSave }: any) {
                       color: on ? meta.color : 'var(--v3-text)',
                       fontFamily: 'var(--font-body)',
                       fontSize: 12, fontWeight: 700, letterSpacing: 0,
-                      textTransform: 'uppercase',
                       cursor: 'pointer'
                     }}
                   >

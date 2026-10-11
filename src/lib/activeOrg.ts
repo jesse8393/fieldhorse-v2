@@ -1,7 +1,7 @@
 // Which workspace (org) a signed in user is working in.
 //
 // A user can hold active memberships in several orgs, for example an
-// owner who also accepted a crew invite from a general contractor.
+// owner who also accepted a crew invite from another construction company.
 // The pick decides the role, the nav and the org that new rows are
 // stamped with, so it has to be stable and predictable:
 //   1. the workspace the user chose on this device, if they still

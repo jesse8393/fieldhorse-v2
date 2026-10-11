@@ -174,7 +174,7 @@ export default function PartnerInvite() {
       <GridPattern />
       <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 420, opacity: 1 }}>
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{ fontFamily: 'var(--font-display, "Bebas Neue", sans-serif)', fontSize: 24, letterSpacing: 0, lineHeight: 1 }}>
+          <div style={{ fontFamily: 'var(--font-wordmark)', fontSize: 24, letterSpacing: 0, lineHeight: 1 }}>
             <span style={{ color: 'var(--v3-primary-text)' }}>FIELD</span>
             <span style={{ color: 'var(--ink-strong, #F2EDE4)' }}>HORSE</span>
           </div>
@@ -189,7 +189,7 @@ export default function PartnerInvite() {
             {inviterName} invited you to{' '}
             manage together.
           </h1>
-          <p style={{ margin: 0, fontSize: 14, color: 'var(--ink-muted, #5C5C5C)', lineHeight: 1.5, fontFamily: 'var(--font-body, "DM Sans", sans-serif)' }}>
+          <p style={{ margin: 0, fontSize: 14, color: 'var(--ink-muted, #5C5C5C)', lineHeight: 1.5, fontFamily: 'var(--font-body)' }}>
             You'll get access to <strong style={{ color: 'var(--ink-strong, #F2EDE4)' }}>{jobTitle}</strong>, notes, schedule, payments, subs, expenses. Nothing else from their account.
           </p>
         </div>
@@ -197,7 +197,7 @@ export default function PartnerInvite() {
         {showFatal && (
           <div
             role="alert"
-            style={{ padding: '12px 16px', borderRadius: 10, background: 'rgba(192,57,43,0.10)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--v3-danger-text)', fontFamily: 'var(--font-body, "DM Sans", sans-serif)', fontSize: 14, fontWeight: 600, textAlign: 'center' }}
+            style={{ padding: '12px 16px', borderRadius: 10, background: 'rgba(192,57,43,0.10)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--v3-danger-text)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, textAlign: 'center' }}
           >
             {infoErr}
           </div>
@@ -206,7 +206,7 @@ export default function PartnerInvite() {
         {showSoftError && (
           <div
             role="alert"
-            style={{ padding: '12px 12px', borderRadius: 10, background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--v3-danger-text)', fontFamily: 'var(--font-body, "DM Sans", sans-serif)', fontSize: 14, fontWeight: 600, marginBottom: 14 }}
+            style={{ padding: '12px 12px', borderRadius: 10, background: 'rgba(192,57,43,0.12)', border: '1px solid rgba(192,57,43,0.35)', color: 'var(--v3-danger-text)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, marginBottom: 14 }}
           >
             {infoErr}
           </div>
@@ -221,7 +221,7 @@ export default function PartnerInvite() {
               await signOut()
               navigate(`/login?partner_invite=${encodeURIComponent(token || '')}`, { replace: true })
             }}
-            style={{ width: '100%', padding: '12px 16px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule, rgba(242, 237, 228,0.08))', color: 'var(--ink-strong, #F2EDE4)', fontFamily: 'var(--font-body, "DM Sans", sans-serif)', fontSize: 14, fontWeight: 700, cursor: 'pointer', marginBottom: 14 }}
+            style={{ width: '100%', padding: '12px 16px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule, rgba(242, 237, 228,0.08))', color: 'var(--ink-strong, #F2EDE4)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, cursor: 'pointer', marginBottom: 14 }}
           >
             Switch account
           </button>
@@ -240,7 +240,7 @@ export default function PartnerInvite() {
             }}
           >
             {loading && (
-              <p style={{ margin: '0 0 4px', textAlign: 'center', fontSize: 12, color: 'var(--ink-muted, #5C5C5C)', letterSpacing: 0, textTransform: 'uppercase' }}>
+              <p style={{ margin: '0 0 4px', textAlign: 'center', fontSize: 12, color: 'var(--ink-muted, #5C5C5C)', letterSpacing: 0 }}>
                 Checking session…
               </p>
             )}
@@ -255,14 +255,14 @@ export default function PartnerInvite() {
                 borderRadius: 10,
                 background: 'linear-gradient(135deg, var(--field-gold-bright, #C9963A), var(--field-gold-deep, #5C5C5C))',
                 color: 'var(--onyx, #141414)',
-                fontFamily: 'var(--font-display, "Bebas Neue", sans-serif)',
+                fontFamily: 'var(--font-display)',
                 fontSize: 16,
                 letterSpacing: 0,
                 textDecoration: 'none',
                 boxShadow: '0 8px 24px rgba(201,150,58,0.35)'
               }}
             >
-              SIGN IN
+              Sign in
               <ArrowRight size={16} />
             </Link>
             <Link
@@ -277,19 +277,19 @@ export default function PartnerInvite() {
                 background: 'var(--surface-2)',
                 border: '1px solid var(--rule, rgba(242, 237, 228,0.08))',
                 color: 'var(--ink-strong, #F2EDE4)',
-                fontFamily: 'var(--font-display, "Bebas Neue", sans-serif)',
+                fontFamily: 'var(--font-display)',
                 fontSize: 14,
                 letterSpacing: 0,
                 textDecoration: 'none'
               }}
             >
-              CREATE ACCOUNT
+              Create account
             </Link>
           </div>
         )}
 
         {showLinking && (
-          <p style={{ textAlign: 'center', fontFamily: 'var(--font-body, "DM Sans", sans-serif)', fontSize: 14, color: 'var(--ink-muted, #5C5C5C)' }}>
+          <p style={{ textAlign: 'center', fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--ink-muted, #5C5C5C)' }}>
             Linking you to the job…
           </p>
         )}

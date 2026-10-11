@@ -425,7 +425,7 @@ function ClusterCard({ cluster, survivorId, skippedIds, onPick, onToggleSkip, on
             background: 'var(--v3-primary)',
             color: 'var(--v3-on-primary)',
             fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-            letterSpacing: 0, textTransform: 'uppercase',
+            letterSpacing: 0,
             cursor: busy || disabled ? 'wait' : 'pointer',
             boxShadow: 'var(--v3-gold-glow)',
             opacity: busy || disabled ? 0.7 : 1

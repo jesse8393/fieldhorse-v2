@@ -9,20 +9,33 @@
          input font-size in global.css) removed the trigger, and iOS 10+
          ignores user-scalable=no anyway, so it only hurt Android users. -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#141414" />
-    <!-- Apply the saved theme before the first paint. ThemeContext only
-         sets data-theme after React's first render, so a light theme user
-         saw a dark frame and a dark status bar on every launch. Mirrors
-         ThemeContext.tsx (storage key fh:theme, light color #F2EDE4); with
-         nothing saved the dark default needs no attribute. The CSP in
-         netlify.toml allows this script by its sha256 hash: update that
-         hash whenever this script changes. -->
+    <meta name="theme-color" content="#EDE8DF" />
+    <!-- Apply the theme before the first paint (spec section 10). Mirrors
+         resolveTheme in src/lib/themeMode.ts: the mode lives in
+         fh:theme-mode (auto, day or night; auto when unset), and Auto
+         reads the daylight windows ThemeContext caches in fh:sun, or 7 am
+         to 7 pm when there are none. themeMode.test.ts runs this script
+         against resolveTheme. The CSP in netlify.toml allows it by its
+         sha256 hash: update that hash whenever this script changes. -->
     <script>
       try {
-        const theme = localStorage.getItem('fh:theme')
-        if (theme === 'light' || theme === 'dark') document.documentElement.setAttribute('data-theme', theme)
-        if (theme === 'light') document.querySelector('meta[name="theme-color"]').setAttribute('content', '#F2EDE4')
-      } catch (e) {}
+        var m = localStorage.getItem('fh:theme-mode'), t = 'light', n = Date.now(), d, i, h
+        if (m === 'night') t = 'dark'
+        else if (m !== 'day') {
+          try { d = JSON.parse(localStorage.getItem('fh:sun') || '{}').days } catch (e) {}
+          if (d && d.length && n >= d[0][0] && n < d[d.length - 1][1]) {
+            t = 'dark'
+            for (i = 0; i < d.length; i++) if (n >= d[i][0] && n < d[i][1]) t = 'light'
+          } else {
+            h = new Date().getHours()
+            t = h >= 7 && h < 19 ? 'light' : 'dark'
+          }
+        }
+        document.documentElement.setAttribute('data-theme', t)
+        document.querySelector('meta[name="theme-color"]').setAttribute('content', t === 'dark' ? '#171611' : '#EDE8DF')
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light')
+      }
     </script>
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
@@ -45,20 +58,11 @@
     <meta name="twitter:title" content="Fieldhorse" />
     <meta name="twitter:description" content="Field operations for contractors. Run jobs, schedule crews, send proposals, and collect payments, all on your phone." />
     <meta name="twitter:image" content="https://fieldhorse.io/icon-512.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Supabase project origin: open TCP+TLS in parallel with HTML parse
          so the first auth + bootstrap query lands ~150-300ms sooner on
          cold visits. `crossorigin` matches the fetch credentials mode
          the Supabase client uses. -->
     <link rel="preconnect" href="https://pnmhblvslftdzfcdezbw.supabase.co" crossorigin />
-    <!-- ASYNC font load. The plain stylesheet link was render-blocking:
-         if the fonts CDN is slow or unreachable (job sites, filtered
-         networks) the app sat on a black screen before React mounted.
-         media="print" + onload swap paints the app immediately with
-         system fallbacks and swaps the brand fonts in when they land. -->
-    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
-    <noscript><link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" /></noscript>
     <title>Fieldhorse</title>
   </head>
   <body>

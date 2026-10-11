@@ -6,7 +6,8 @@ import { toast, toastSuccess, toastUndo, toastError } from '../lib/toast.ts'
 import ActionSheet from '../components/ActionSheet.tsx'
 import AddEventSheet from '../components/AddEventSheet.tsx'
 import { SkeletonList } from '../components/Skeleton.tsx'
-import { FloatingActionButton, ScreenCloser, Eyebrow } from '../components/v3'
+import { ScreenCloser, Eyebrow } from '../components/v3'
+import { Button } from '../components/fh'
 import { supabase } from '../lib/supabase.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import {
@@ -22,6 +23,7 @@ import { canHover } from '../lib/hover.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { startOfWeek } from '../lib/scheduleDates.ts'
+import { jobLabel } from '../lib/scheduleBoard.ts'
 const SnowSchedule = lazy(() => import('../components/desktop/SnowScheduleBuild.tsx'))
 
 const VIEWS = [
@@ -108,6 +110,9 @@ export default function Schedule() {
   const [weather, setWeather] = useState<any>(null)
   const [weatherFailed, setWeatherFailed] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
+  // The desktop tray's Schedule button opens the same sheet with its job
+  // already picked and the visit named after it.
+  const [addPreset, setAddPreset] = useState<{ contactId: string; title: string } | null>(null)
   const [editEvent, setEditEvent] = useState<any>(null)
   // Destructive-confirm sheet for delete event. pendingDeleteEvt is the
   // event row being deleted (for title display); deletingEvt is the
@@ -289,15 +294,23 @@ export default function Schedule() {
             setCursor={setCursor}
             view={view}
             setView={setView}
-            onAddEvent={() => setAddOpen(true)}
+            weather={hasCoords && !weatherFailed ? weather : undefined}
+            onAddEvent={() => { setAddPreset(null); setAddOpen(true) }}
+            onNewJob={() => navigate('/work?new=1&asStage=job')}
+            onScheduleJob={(job) => {
+              setAddPreset({ contactId: job.id, title: jobLabel(job) })
+              setAddOpen(true)
+            }}
             onOpenEvent={(event: any) => setEditEvent(event)}
           />
         </Suspense>
         <AddEventSheet
           open={addOpen}
           userId={user?.id}
-          onClose={() => setAddOpen(false)}
-          onSaved={() => { setAddOpen(false); load() }}
+          defaultContactId={addPreset?.contactId ?? ''}
+          defaultTitle={addPreset?.title ?? ''}
+          onClose={() => { setAddOpen(false); setAddPreset(null) }}
+          onSaved={() => { setAddOpen(false); setAddPreset(null); load() }}
         />
         <AddEventSheet
           open={!!editEvent}
@@ -324,17 +337,22 @@ export default function Schedule() {
             <> · {cursorDayCount} {cursorDayCount === 1 ? 'visit' : 'visits'}</>
           )}
         </Eyebrow>
-        <h1 style={{
-          margin: 0,
-          fontFamily: 'var(--font-display)',
-          fontSize: 24,
-          lineHeight: 1, letterSpacing: 0,
-          color: 'var(--v3-text)'
-        }}>
-          {sameDay(cursor, startOfDay(new Date()))
-            ? 'Today'
-            : cursor.toLocaleDateString(undefined, { weekday: 'long' })}
-        </h1>
+        <div className="fhs-screen-head">
+          <h1 style={{
+            margin: 0,
+            fontFamily: 'var(--font-display)',
+            fontSize: 24,
+            lineHeight: 1, letterSpacing: 0,
+            color: 'var(--v3-text)'
+          }}>
+            {sameDay(cursor, startOfDay(new Date()))
+              ? 'Today'
+              : cursor.toLocaleDateString(undefined, { weekday: 'long' })}
+          </h1>
+          <Button variant="secondary" size="mini" icon={Plus} onClick={() => setAddOpen(true)}>
+            New event
+          </Button>
+        </div>
         {upcoming.length > 0 && (
           <div style={{
             marginTop: 4,
@@ -422,7 +440,7 @@ export default function Schedule() {
             const day = addDays(cursor, i - cursorDow)
             const isSelected = sameDay(day, cursor)
             const isToday = sameDay(day, today)
-            const dayName = day.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase().slice(0, 3)
+            const dayName = day.toLocaleDateString(undefined, { weekday: 'short' }).slice(0, 3)
             const dayNum = day.getDate()
             const forecastFor = dailyForecast[dayKey(day)] || null
             const hasJobsPip = forecastFor && forecastFor.precipProb >= 50
@@ -539,19 +557,6 @@ export default function Schedule() {
           )}
         </motion.div>
       </SwipeShell>
-
-      {/* FAB, canonical portal-rendered primitive, immune to
-          containing-block traps from transformed ancestors. Hidden
-          when the day view is showing its own "Schedule a job" empty
-          state CTA so the screen never has two stacked gold +
-          buttons fighting for the operator's tap. */}
-      {events && events.length > 0 && (
-        <FloatingActionButton
-          onClick={() => setAddOpen(true)}
-          ariaLabel="New event"
-          iconStrokeWidth={2.5}
-        />
-      )}
 
       <ScreenCloser caption="Tap a day above to plan the week ahead." />
 
@@ -818,7 +823,7 @@ function DayView({ events, now, onClick, onEdit, onDelete, onAdd }: any) {
                 background: 'linear-gradient(180deg, var(--v3-primary-hot, var(--v3-primary)) 0%, var(--v3-primary) 100%)',
                 color: 'var(--v3-on-primary)',
                 fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
-                letterSpacing: 0, textTransform: 'uppercase',
+                letterSpacing: 0,
                 cursor: 'pointer',
                 boxShadow:
                   '0 0 0 3px rgba(201, 150, 58, 0.14),' +
@@ -909,11 +914,11 @@ function deriveStatus(e: any, now: any) {
 // share the muted "up" pill; DONE uses the soft-gold "done" pill;
 // SCHEDULED falls back to the neutral "default" pill.
 const PILL_FOR_STATUS: Record<string, any> = {
-  'On Site':     { variant: 'live',    label: 'LIVE' },
-  'In Progress': { variant: 'live',    label: 'LIVE' },
-  'Upcoming':    { variant: 'up',      label: 'UP NEXT' },
-  'Scheduled':   { variant: 'default', label: 'UPCOMING' },
-  'Done':        { variant: 'done',    label: 'DONE' }
+  'On Site':     { variant: 'live',    label: 'Live' },
+  'In Progress': { variant: 'live',    label: 'Live' },
+  'Upcoming':    { variant: 'up',      label: 'Up next' },
+  'Scheduled':   { variant: 'default', label: 'Upcoming' },
+  'Done':        { variant: 'done',    label: 'Done' }
 }
 
 // Split "8:15 AM" into ["8:15", "AM"] for the dispatch-card time

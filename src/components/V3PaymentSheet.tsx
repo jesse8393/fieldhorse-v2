@@ -129,7 +129,7 @@ export default function V3PaymentSheet({ contact, balance, invoice = null, onClo
   const numeric = Number(amount) || 0
   const showsAmount = amount !== '' && Number.isFinite(numeric) && numeric > 0
   const overage = numeric > Number(balance || 0)
-  const labelStyle = { fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: 'var(--ink-muted)' }
+  const labelStyle = { fontSize: 12, fontWeight: 700, letterSpacing: 0, color: 'var(--ink-muted)' }
 
   return (
     <Drawer open={open} onOpenChange={requestClose}>
@@ -387,7 +387,7 @@ export default function V3PaymentSheet({ contact, balance, invoice = null, onClo
                 }}
               >
                 <Check size={14} />
-                {saving ? 'RECORDING…' : showsAmount ? `RECORD ${money(numeric)}` : 'RECORD PAYMENT'}
+                {saving ? 'Recording…' : showsAmount ? `Record ${money(numeric)}` : 'Record payment'}
               </motion.button>
             </div>
           </form>

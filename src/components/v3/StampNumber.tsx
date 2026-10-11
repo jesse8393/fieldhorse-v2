@@ -75,7 +75,7 @@ export default function StampNumber({
         fontWeight: 400,
         fontSize: px,
         lineHeight: 0.95,
-        letterSpacing: px >= 40 ? '-0.005em' : '0.005em',
+        letterSpacing: 0,
         fontVariantNumeric: 'tabular-nums',
         fontFeatureSettings: '"tnum", "lnum"',
         color: TONE_COLOR[tone] || TONE_COLOR.default,

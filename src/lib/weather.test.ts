@@ -24,7 +24,7 @@ function hourly(days = 2, overrides: Record<number, Partial<Record<string, numbe
 }
 
 describe('workWindow', () => {
-  it('falls back to the general contractor rules when no trades are set', () => {
+  it('falls back to the general building rules when no trades are set', () => {
     const storm = { temperature_2m: 60, precipitation: 0, wind_speed_10m: 40, relative_humidity_2m: 50 }
     const w = workWindow(storm, [])
     expect(w.status).toBe('stop')

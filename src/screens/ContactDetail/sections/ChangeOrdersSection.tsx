@@ -345,11 +345,11 @@ function Row({ co, readOnly, onEdit, onApprove, onGetSignature, onVoid, onDelete
           </div>
         )}
         <div style={{ marginTop: 6, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {isDraft && <Tag tone="muted">DRAFT</Tag>}
-          {isApproved && <Tag tone="green">APPROVED{co.approved_at ? ` · ${shortDate(co.approved_at)}` : ''}</Tag>}
-          {isVoid && <Tag tone="muted">VOID</Tag>}
-          {co.status === 'sent' && <Tag tone="gold">SENT</Tag>}
-          {co.status === 'rejected' && <Tag tone="red">REJECTED</Tag>}
+          {isDraft && <Tag tone="muted">Draft</Tag>}
+          {isApproved && <Tag tone="green">Approved{co.approved_at ? ` · ${shortDate(co.approved_at)}` : ''}</Tag>}
+          {isVoid && <Tag tone="muted">Void</Tag>}
+          {co.status === 'sent' && <Tag tone="gold">Sent</Tag>}
+          {co.status === 'rejected' && <Tag tone="red">Rejected</Tag>}
         </div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
@@ -587,7 +587,7 @@ function IconBtn({ children, onClick, tone, title, ...rest }: any) {
 
 const labelStyle = {
   fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-  letterSpacing: 0, color: 'var(--v3-text-muted)', textTransform: 'uppercase'
+  letterSpacing: 0, color: 'var(--v3-text-muted)'
 }
 const inputStyle: import('react').CSSProperties = {
   width: '100%', boxSizing: 'border-box',
@@ -617,7 +617,7 @@ const primaryBtnStyle = {
   background: 'linear-gradient(180deg, var(--v3-primary-bright) 0%, var(--v3-primary) 100%)',
   color: '#141414',
   fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-  letterSpacing: 0, textTransform: 'uppercase', cursor: 'pointer'
+  letterSpacing: 0, cursor: 'pointer'
 }
 const ghostBtnStyle = {
   display: 'inline-flex', alignItems: 'center', gap: 8,

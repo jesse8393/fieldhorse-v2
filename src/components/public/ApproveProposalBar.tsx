@@ -329,18 +329,18 @@ const panelStyle: import('react').CSSProperties = {
   background: '#F2EDE4',
   border: '1px solid rgba(201, 150, 58, 0.45)',
   boxShadow: '0 24px 64px -32px rgba(20, 20, 20, 0.25)',
-  fontFamily: "'DM Sans', system-ui, sans-serif",
+  fontFamily: 'var(--font-body)',
   color: '#141414'
 }
 
 const eyebrowStyle: import('react').CSSProperties = {
   fontSize: 12, fontWeight: 700, letterSpacing: 0,
-  textTransform: 'uppercase', color: 'color-mix(in srgb, var(--v3-primary-text) 54%, #141414 46%)', marginBottom: 8
+  color: 'color-mix(in srgb, var(--v3-primary-text) 54%, #141414 46%)', marginBottom: 8
 }
 
 const headlineStyle: import('react').CSSProperties = {
   margin: 0,
-  fontFamily: "'Bebas Neue', Impact, sans-serif",
+  fontFamily: 'var(--font-display)',
   fontSize: 24, fontWeight: 400, color: '#141414',
   letterSpacing: 0
 }
@@ -356,7 +356,7 @@ const fieldStackStyle: import('react').CSSProperties = {
 
 const labelStyle: import('react').CSSProperties = {
   fontSize: 12, fontWeight: 700,
-  letterSpacing: 0, textTransform: 'uppercase',
+  letterSpacing: 0,
   color: '#5C5C5C'
 }
 
@@ -366,7 +366,7 @@ const inputStyle: import('react').CSSProperties = {
   background: '#F2EDE4',
   border: '1px solid #5C5C5C',
   color: '#141414',
-  fontFamily: "'DM Sans', system-ui, sans-serif",
+  fontFamily: 'var(--font-body)',
   fontSize: 14,
   outline: 'none',
   width: '100%',
@@ -387,9 +387,9 @@ const buttonStyle: import('react').CSSProperties = {
   borderRadius: 10, border: 'none',
   background: 'linear-gradient(135deg, #C9963A 0%, #C9963A 100%)',
   color: '#141414',
-  fontFamily: "'DM Sans', system-ui, sans-serif",
+  fontFamily: 'var(--font-body)',
   fontSize: 14, fontWeight: 700,
-  letterSpacing: 0, textTransform: 'uppercase',
+  letterSpacing: 0,
   boxShadow: '0 6px 16px rgba(201, 150, 58, 0.3)'
 }
 
@@ -400,7 +400,7 @@ const secondaryButtonStyle: import('react').CSSProperties = {
   border: '1px solid #5C5C5C',
   background: '#F2EDE4',
   color: '#141414',
-  fontFamily: "'DM Sans', system-ui, sans-serif",
+  fontFamily: 'var(--font-body)',
   fontSize: 14,
   fontWeight: 700,
   cursor: 'pointer'

@@ -139,7 +139,7 @@ function ChangeOrderView({ data, token, onApproved }: any) {
         padding: '32px 24px 24px',
         borderRadius: 10, background: 'white',
         boxShadow: '0 24px 64px -32px rgba(20, 20, 20, 0.3)',
-        fontFamily: "'DM Sans', system-ui, sans-serif", color: '#141414'
+        fontFamily: 'var(--font-body)', color: '#141414'
       }}>
         {/* Letterhead */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingBottom: 16, borderBottom: '2px solid #141414' }}>
@@ -157,7 +157,7 @@ function ChangeOrderView({ data, token, onApproved }: any) {
             )}
           </div>
           <div style={{ textAlign: 'right', flexShrink: 0 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: brand }}>
+            <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, color: brand }}>
               Change order
             </div>
             <div style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 24, fontWeight: 600 }}>
@@ -168,7 +168,7 @@ function ChangeOrderView({ data, token, onApproved }: any) {
 
         {/* Project + change */}
         <div style={{ padding: '16px 0 4px' }}>
-          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: '#5C5C5C' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, color: '#5C5C5C' }}>
             Project
           </div>
           <div style={{ fontSize: 14, fontWeight: 600, marginTop: 3 }}>
@@ -178,7 +178,7 @@ function ChangeOrderView({ data, token, onApproved }: any) {
             <div style={{ fontSize: 12, color: '#5C5C5C', marginTop: 2 }}>{contact.address}</div>
           )}
 
-          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: '#5C5C5C', marginTop: 18 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, color: '#5C5C5C', marginTop: 18 }}>
             Change in scope
           </div>
           <div style={{ fontSize: 16, fontWeight: 600, marginTop: 3 }}>{co.title}</div>
@@ -217,9 +217,9 @@ function ChangeOrderView({ data, token, onApproved }: any) {
           maxWidth: 760, margin: '24px auto 0', padding: '24px 24px',
           borderRadius: 10, background: 'rgba(45, 122, 79, 0.10)',
           border: '1px solid rgba(45, 122, 79, 0.40)',
-          fontFamily: "'DM Sans', system-ui, sans-serif", color: '#141414', textAlign: 'center'
+          fontFamily: 'var(--font-body)', color: '#141414', textAlign: 'center'
         }}>
-          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: 'color-mix(in srgb, var(--v3-success-text) 75%, #141414 25%)', marginBottom: 6 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, color: 'color-mix(in srgb, var(--v3-success-text) 75%, #141414 25%)', marginBottom: 6 }}>
             Change order approved
           </div>
           <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5 }}>
@@ -267,14 +267,14 @@ function ApprovedNote({ companyName }: any) {
         borderRadius: 10,
         background: 'rgba(45, 122, 79, 0.10)',
         border: '1px solid rgba(45, 122, 79, 0.40)',
-        fontFamily: "'DM Sans', system-ui, sans-serif",
+        fontFamily: 'var(--font-body)',
         color: '#141414',
         textAlign: 'center'
       }}
     >
       <div style={{
         fontSize: 12, fontWeight: 700, letterSpacing: 0,
-        textTransform: 'uppercase', color: 'color-mix(in srgb, var(--v3-success-text) 75%, #141414 25%)', marginBottom: 6
+        color: 'color-mix(in srgb, var(--v3-success-text) 75%, #141414 25%)', marginBottom: 6
       }}>
         Proposal approved
       </div>
@@ -295,7 +295,7 @@ function ChangesRequestedNote({ companyName, requestedNote, requestedAt }: any) 
         borderRadius: 10,
         background: 'rgba(201, 150, 58, 0.10)',
         border: '1px solid rgba(201, 150, 58, 0.40)',
-        fontFamily: "'DM Sans', system-ui, sans-serif",
+        fontFamily: 'var(--font-body)',
         color: '#141414',
         textAlign: 'center'
       }}
@@ -304,7 +304,6 @@ function ChangesRequestedNote({ companyName, requestedNote, requestedAt }: any) 
         fontSize: 12,
         fontWeight: 700,
         letterSpacing: 0,
-        textTransform: 'uppercase',
         color: 'color-mix(in srgb, var(--v3-primary-text) 54%, #141414 46%)',
         marginBottom: 8
       }}>
@@ -337,7 +336,7 @@ function Loading() {
       style={{
         maxWidth: 600, margin: '20vh auto',
         padding: 24, background: 'white', borderRadius: 10,
-        fontFamily: "'DM Sans', sans-serif", color: '#5C5C5C',
+        fontFamily: 'var(--font-body)', color: '#5C5C5C',
         textAlign: 'center', boxShadow: '0 24px 48px -24px rgba(20, 20, 20,0.15)'
       }}
     >
@@ -352,13 +351,13 @@ function ErrorState({ message }: any) {
       style={{
         maxWidth: 480, margin: '20vh auto',
         padding: 24, background: 'white', borderRadius: 10,
-        fontFamily: "'DM Sans', sans-serif", color: '#141414',
+        fontFamily: 'var(--font-body)', color: '#141414',
         textAlign: 'center', boxShadow: '0 24px 48px -24px rgba(20, 20, 20,0.2)'
       }}
     >
       <div style={{
         fontSize: 12, fontWeight: 700, letterSpacing: 0,
-        textTransform: 'uppercase', color: 'color-mix(in srgb, var(--v3-primary-text) 54%, #141414 46%)', marginBottom: 10
+        color: 'color-mix(in srgb, var(--v3-primary-text) 54%, #141414 46%)', marginBottom: 10
       }}>
         Unavailable
       </div>
@@ -487,7 +486,7 @@ function StatementView({ data }: any) {
         padding: '32px 24px 24px',
         borderRadius: 10, background: 'white',
         boxShadow: '0 24px 64px -32px rgba(20, 20, 20, 0.3)',
-        fontFamily: "'DM Sans', system-ui, sans-serif", color: '#141414'
+        fontFamily: 'var(--font-body)', color: '#141414'
       }}>
         {/* Letterhead */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingBottom: 16, borderBottom: '2px solid #141414' }}>
@@ -505,7 +504,7 @@ function StatementView({ data }: any) {
             )}
           </div>
           <div style={{ textAlign: 'right', flexShrink: 0 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: brand }}>
+            <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, color: brand }}>
               Statement
             </div>
             <div style={{ fontSize: 12, color: '#5C5C5C', marginTop: 4 }}>{today}</div>
@@ -514,7 +513,7 @@ function StatementView({ data }: any) {
 
         {/* Billed-to */}
         <div style={{ padding: '16px 0 4px' }}>
-          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: '#5C5C5C' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, color: '#5C5C5C' }}>
             Statement for
           </div>
           <div style={{ fontSize: 14, fontWeight: 600, marginTop: 3 }}>{who}</div>
@@ -577,10 +576,10 @@ function PayNowBar({ company, amount }: any) {
       padding: '24px 24px', borderRadius: 10,
       background: '#F2EDE4', border: '1px solid rgba(201, 150, 58, 0.45)',
       boxShadow: '0 24px 64px -32px rgba(20, 20, 20, 0.25)',
-      fontFamily: "'DM Sans', system-ui, sans-serif", color: '#141414',
+      fontFamily: 'var(--font-body)', color: '#141414',
       textAlign: 'center'
     }}>
-      <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: brand, marginBottom: 10 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, color: brand, marginBottom: 10 }}>
         Pay your balance
       </div>
       {url && (

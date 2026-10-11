@@ -26,7 +26,7 @@ async function makeCtx(theme, viewport) {
   await ctx.addInitScript(([s, t]) => {
     try {
       localStorage.setItem('sb-qa-mock-auth-token', JSON.stringify(s))
-      localStorage.setItem('fh:theme', t)
+      localStorage.setItem('fh:theme-mode', t === 'light' ? 'day' : 'night')
       localStorage.setItem('fh-onboarding-seen', '1')
     } catch {}
   }, [session, theme])

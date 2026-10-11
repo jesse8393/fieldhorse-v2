@@ -210,7 +210,7 @@ export default function SendInvoiceSheet({
         onDone?.()
         onClose?.()
       } else if (res.reason === 'sender_not_configured') {
-        toastError("Email NOT sent, sender isn't configured", 'Downloaded the PDF so you can email it manually. The invoice is saved as a draft.')
+        toastError("Email not sent, sender isn't configured", 'Downloaded the PDF so you can email it manually. The invoice is saved as a draft.')
         onDone?.()
         onClose?.()
       } else {
@@ -264,7 +264,7 @@ export default function SendInvoiceSheet({
 
   const labelStyle: import('react').CSSProperties = {
     fontSize: 12, fontWeight: 700, letterSpacing: 0,
-    textTransform: 'uppercase', color: 'var(--ink-muted)'
+    color: 'var(--ink-muted)'
   }
   const fieldStyle: import('react').CSSProperties = {
     padding: '12px 12px', borderRadius: 10,
@@ -476,10 +476,10 @@ export default function SendInvoiceSheet({
               >
                 <Send size={14} />
                 {busy === 'send'
-                  ? 'SENDING…'
+                  ? 'Sending…'
                   : recipientEmail
-                    ? `SEND TO ${recipientEmail.toUpperCase()}`
-                    : 'SEND INVOICE'}
+                    ? `Send to ${recipientEmail}`
+                    : 'Send invoice'}
               </motion.button>
               <button
                 type="button"
@@ -527,7 +527,7 @@ function ghostBtnStyle(busy: boolean): import('react').CSSProperties {
     background: 'var(--surface-2)', border: '1px solid var(--v3-border-strong)',
     color: 'var(--ink-strong)',
     fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-    letterSpacing: 0, textTransform: 'uppercase',
+    letterSpacing: 0,
     cursor: busy ? 'wait' : 'pointer',
     opacity: busy ? 0.7 : 1
   }

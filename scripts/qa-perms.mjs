@@ -19,7 +19,7 @@ async function leg(role, theme) {
   await installMock(ctx)
   await ctx.addInitScript(([s, t]) => {
     localStorage.setItem('sb-qa-mock-auth-token', JSON.stringify(s))
-    localStorage.setItem('fh:theme', t)
+    localStorage.setItem('fh:theme-mode', t === 'light' ? 'day' : 'night')
     localStorage.setItem('fh-onboarding-seen', '1')
   }, [session, theme])
   const page = await ctx.newPage()

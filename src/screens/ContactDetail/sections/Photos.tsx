@@ -12,6 +12,7 @@ import { toastError, toastSuccess } from '../../../lib/toast.ts'
 import { hapticTap, hapticSuccess } from '../../../lib/haptics.ts'
 import { queuePhoto, isNetworkError } from '../../../lib/outbox.ts'
 import { SkeletonList } from '../../../components/Skeleton.tsx'
+import { jobPhotosKey } from '../phone/SpineList.tsx'
 import ActionSheet from '../../../components/ActionSheet.tsx'
 import { Eyebrow } from '../../../components/v3'
 
@@ -52,8 +53,10 @@ const SCOPE_SECTIONS = [
  *   - 3-col responsive grid with signed URL thumbnails (1h TTL).
  *   - Lightbox with swipe-between + caption editor.
  *   - Compare mode: select 2 photos, drag the before/after slider.
+ *   - incomingFiles: photos the phone Job page's camera took; they upload
+ *     once, exactly as if picked with Add Photos.
  */
-export default function PhotosSection({ jobId, userId }: any) {
+export default function PhotosSection({ jobId, userId, incomingFiles = null, onIncomingHandled }: any) {
   const queryClient = useQueryClient()
   const [rows, setRows] = useState<any[]>([])
   const [thumbUrls, setThumbUrls] = useState<any>({}) // { [rowId]: signedUrl }
@@ -108,8 +111,31 @@ export default function PhotosSection({ jobId, userId }: any) {
 
   function pick() { inputRef.current?.click() }
 
+  // The phone header and Spine read their own photo query; refresh it
+  // after this section adds or removes a photo.
+  function refreshJobPhotos() {
+    queryClient.invalidateQueries({ queryKey: jobPhotosKey(jobId) })
+  }
+
+  // Camera photos from the Job page: upload each batch once. The ref
+  // survives StrictMode's second effect run, so nothing uploads twice.
+  const handledIncoming = useRef<any>(null)
+  useEffect(() => {
+    if (!Array.isArray(incomingFiles) || incomingFiles.length === 0) return
+    if (!jobId || !userId || handledIncoming.current === incomingFiles) return
+    handledIncoming.current = incomingFiles
+    onIncomingHandled?.()
+    void uploadFiles(incomingFiles)
+    // uploadFiles reads the current job and user; the batch is the trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [incomingFiles, jobId, userId])
+
   async function handleFile(e: any) {
-    const files: any[] = Array.from(e.target.files || [])
+    await uploadFiles(Array.from(e.target.files || []))
+  }
+
+  async function uploadFiles(picked: any[]) {
+    const files: any[] = picked
     if (files.length === 0) return
     setUploading(true)
     const newPhotoIds: any[] = []
@@ -176,6 +202,7 @@ export default function PhotosSection({ jobId, userId }: any) {
         toastSuccess('Photos uploaded', `Added ${newPhotoIds.length}`)
       }
       await fetchRows()
+      refreshJobPhotos()
       // Vision captioning runs async. If column missing → silent.
       if (newPhotoIds.length > 0) {
         setCaptioningIds((prev) => {
@@ -282,6 +309,7 @@ export default function PhotosSection({ jobId, userId }: any) {
       if (!gone?.length) toastError('Delete failed', 'This photo may already be gone.')
       else toastSuccess('Deleted', row.filename)
       await fetchRows()
+      refreshJobPhotos()
     } catch (ex: any) {
       toastError('Delete failed', ex?.message || 'Try again')
     } finally {
@@ -409,8 +437,8 @@ export default function PhotosSection({ jobId, userId }: any) {
             fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
             letterSpacing: 0, color: 'var(--v3-primary-text)'
           }}>
-            {!compareBefore ? 'Tap the BEFORE photo' :
-              !compareAfter ? 'Now tap the AFTER photo' :
+            {!compareBefore ? 'Tap the before photo' :
+              !compareAfter ? 'Now tap the after photo' :
                 'Drag the slider'}
           </div>
           {compareBefore && compareAfter && (
@@ -447,8 +475,8 @@ export default function PhotosSection({ jobId, userId }: any) {
             const url = thumbUrls[r.id]
             const captioning = captioningIds.has(r.id)
             const compareLabel = compareBefore?.row.id === r.id
-              ? 'BEFORE'
-              : compareAfter?.row.id === r.id ? 'AFTER' : ''
+              ? 'Before'
+              : compareAfter?.row.id === r.id ? 'After' : ''
             const selected = compareMode && !!compareLabel
             return (
               <motion.button
@@ -900,7 +928,7 @@ function BeforeAfterSlider({ beforeUrl, afterUrl, beforeLabel, afterLabel }: any
         fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
         letterSpacing: 0, color: '#F2EDE4'
       }}>
-        BEFORE
+        Before
       </div>
       <div style={{
         position: 'absolute', top: 8, right: 8,
@@ -909,7 +937,7 @@ function BeforeAfterSlider({ beforeUrl, afterUrl, beforeLabel, afterLabel }: any
         fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
         letterSpacing: 0, color: '#F2EDE4'
       }}>
-        AFTER
+        After
       </div>
     </div>
   )

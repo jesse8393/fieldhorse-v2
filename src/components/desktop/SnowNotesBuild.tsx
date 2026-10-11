@@ -123,7 +123,7 @@ export default function SnowNotesBuild(props: Props) {
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
             <div className="fh-build-good">Operations</div>
-            <h1 className="fh-build-title">FIELD REPORTS</h1>
+            <h1 className="fh-build-title">Field reports</h1>
           </div>
 
           <div className="fh-build-focus">

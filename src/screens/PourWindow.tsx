@@ -57,7 +57,7 @@ function asLocalDate(iso: any) {
 function fmtDay(iso: any) {
   try {
     const d = asLocalDate(iso)
-    return d!.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase()
+    return d!.toLocaleDateString(undefined, { weekday: 'short' })
   } catch { return '\u2003' }
 }
 function fmtDate(iso: any) {
@@ -448,7 +448,7 @@ useEffect(() => {
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
                         <span style={{ fontFamily: 'var(--font-display)', fontSize: 16, letterSpacing: 0, color: i === 0 ? 'var(--v3-primary-text)' : 'var(--ink-strong)' }}>
-                          {i === 0 ? 'TODAY' : fmtDay(d.time)}
+                          {i === 0 ? 'Today' : fmtDay(d.time)}
                         </span>
                         <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--ink-muted)' }}>
                           {fmtDate(d.time)}
@@ -464,7 +464,7 @@ useEffect(() => {
                           {Math.round(d.windMax)} mph
                         </span>
                         <Eyebrow style={{ gap: 4, padding: '4px 8px', borderRadius: 10, background: t.bg, border: `1px solid ${t.border}`, color: t.ink }}>
-                          {dayStatus === 'go' ? 'GO' : dayStatus === 'warn' ? 'TIGHT' : 'STOP'}
+                          {dayStatus === 'go' ? 'Go' : dayStatus === 'warn' ? 'Tight' : 'Stop'}
                         </Eyebrow>
                       </div>
                     </div>
@@ -534,7 +534,7 @@ useEffect(() => {
                   )}
                 </div>
                 <Eyebrow style={{ flexShrink: 0, padding: '4px 8px', borderRadius: 10, background: t.bg, border: `1px solid ${t.border}`, color: t.ink }}>
-                  {r.status === 'go' ? 'GO' : r.status === 'warn' ? 'TIGHT' : 'STOP'}
+                  {r.status === 'go' ? 'Go' : r.status === 'warn' ? 'Tight' : 'Stop'}
                 </Eyebrow>
               </div>
             )
@@ -592,7 +592,7 @@ function Metric({ Icon, label, value, unit }: any) {
           {value}
         </span>
         {unit && (
-          <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--ink-faint)', letterSpacing: 0, textTransform: 'uppercase' }}>
+          <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--ink-faint)', letterSpacing: 0 }}>
             {unit}
           </span>
         )}

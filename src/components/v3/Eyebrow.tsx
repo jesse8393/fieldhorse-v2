@@ -1,11 +1,11 @@
 import type { HTMLAttributes, ElementType } from 'react'
 
 /**
- * Eyebrow, canonical small uppercase label.
+ * Eyebrow, canonical small label. Sentence case: the text renders as
+ * typed, so callers write it the way it should read (spec 5.6).
  *
  * Replaces 50+ inline `<span style={{ fontSize: 12, fontWeight: 700,
- * letterSpacing: 0, textTransform: 'uppercase', color: ... }}>`
- * blocks scattered across screens.
+ * letterSpacing: 0, color: ... }}>` blocks scattered across screens.
  *
  * Tone variants:
  *   default → muted text
@@ -15,7 +15,7 @@ import type { HTMLAttributes, ElementType } from 'react'
  *
  * Usage:
  *   <Eyebrow>Section label</Eyebrow>
- *   <Eyebrow tone="gold">Today's Priorities</Eyebrow>
+ *   <Eyebrow tone="gold">Today's priorities</Eyebrow>
  *   <Eyebrow tone="alert">Needs attention today</Eyebrow>
  *   <Eyebrow as="div" tone="gold">Account</Eyebrow>
  */
@@ -52,7 +52,6 @@ export default function Eyebrow({
         fontSize: 12,
         fontWeight: 700,
         letterSpacing: 0,
-        textTransform: 'uppercase',
         lineHeight: 1,
         color: TONE_COLOR[tone] || TONE_COLOR.default,
         ...style

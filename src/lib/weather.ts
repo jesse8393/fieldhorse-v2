@@ -132,7 +132,7 @@ export function tradeStatus(trade: string, snapshot: WeatherSnapshot | null | un
 }
 
 // Aggregate across all selected trades. Worst status wins. With no trades
-// picked, read the general contractor rules (the same fallback the
+// picked, read the general building rules, key 'gc' (the same fallback the
 // Forecast trade list uses) instead of calling every hour clear.
 export function workWindow(snapshot: WeatherSnapshot | null | undefined, services: string[] = []): { status: 'go' | 'warn' | 'stop'; label: string; reasons: string[] } {
   if (!snapshot) return { status: 'go', label: 'Awaiting forecast', reasons: [] }

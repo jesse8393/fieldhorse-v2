@@ -5,7 +5,7 @@ async function installSession(context: BrowserContext) {
   await installMock(context)
   await context.addInitScript((savedSession) => {
     localStorage.setItem('sb-qa-mock-auth-token', JSON.stringify(savedSession))
-    localStorage.setItem('fh:theme', 'dark')
+    localStorage.setItem('fh:theme-mode', 'night')
     localStorage.setItem('fh-onboarding-seen', '1')
   }, session)
 }
@@ -36,7 +36,9 @@ test('keeps the work lifecycle action ready', async ({ page }, testInfo) => {
   const expectNoPageErrors = failOnPageErrors(page)
 
   await openRoute(page, '/work')
-  await expect(page.getByRole('heading', { name: /work & deals/i })).toBeVisible()
+  // Phones get the redesigned Jobs list (spec 9.3); desktop keeps the deal board.
+  const workHeading = testInfo.project.name.startsWith('mobile') ? /^jobs$/i : /work & deals/i
+  await expect(page.getByRole('heading', { level: 1, name: workHeading })).toBeVisible()
   await expect(page.getByText('Justin Bryan', { exact: true })).toBeVisible()
   await expect(page.getByText('MMC Properties', { exact: true })).toBeVisible()
   await expect(page.getByText('Plumbing Bellevue', { exact: true })).toBeVisible()
@@ -71,18 +73,22 @@ test('keeps money, schedule, settings, and missing routes usable', async ({ page
   if (await pipelineButton.count()) {
     await expect(pipelineButton.locator('.v3-skeleton')).toHaveCount(0)
   }
-  if (testInfo.project.name.startsWith('desktop')) {
-    await expect(page.getByText(/collected this week/i)).toHaveCount(1)
-  }
+  // Both layouts show Today (tests/e2e/today.spec.ts) and neither keeps the
+  // old dashboard tiles; collected this week lives on Money.
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(/stops?( done)?\.|Clear day\.|Quiet day\./)
+  await expect(page.getByText(/collected this week/i)).toHaveCount(0)
   await expect(page.getByText(/\+?0(?:\.0)?%\s*[·•]\s*7d/i)).toHaveCount(0)
   if (testInfo.project.name.startsWith('mobile')) {
-    await expect(page.getByText('Job Behind', { exact: true })).toBeVisible()
     await expect(page.getByText('Jobs Behind', { exact: true })).toHaveCount(0)
   }
   await capture(page, testInfo, 'home', true)
 
   await openRoute(page, '/invoices')
-  await expect(page.getByText('Progress draw 1', { exact: true })).toBeVisible()
+  // Phone and desktop both show Money (tests/e2e/money.spec.ts): the invoice
+  // is a row under Due soon, named for the customer, with the job and the
+  // invoice.
+  await expect(page.getByRole('heading', { level: 1, name: 'Money' })).toBeVisible()
+  await expect(page.getByText('Driveway replacement, progress draw 1', { exact: true })).toBeVisible()
   await capture(page, testInfo, 'invoices')
 
   await openRoute(page, '/schedule')
@@ -123,8 +129,8 @@ test('keeps the desktop schedule planning workflow complete', async ({ page }, t
   await capture(page, testInfo, 'desktop-schedule-week', true)
 
   await page.getByRole('button', { name: 'Day', exact: true }).click()
-  await expect(page.locator('.fh-build-dayplan')).toBeVisible()
-  const event = page.locator('.fh-build-dayplan__event').first()
+  await expect(page.locator('.fhsch-board[data-view="day"]')).toBeVisible()
+  const event = page.locator('.fhsch-event').first()
   await expect(event).toContainText('Pour slab')
   await capture(page, testInfo, 'desktop-schedule-day', true)
   await event.click()
@@ -133,7 +139,7 @@ test('keeps the desktop schedule planning workflow complete', async ({ page }, t
   await page.getByRole('button', { name: 'Cancel', exact: true }).click()
 
   await page.getByRole('button', { name: 'Month', exact: true }).click()
-  await expect(page.locator('.fh-build-cal')).toBeVisible()
+  await expect(page.locator('.fhsch-month')).toBeVisible()
   await capture(page, testInfo, 'desktop-schedule-month', true)
   await page.getByRole('button', { name: 'Week', exact: true }).click()
   await expect(page.locator('.fh-build-weekplan')).toBeVisible()
@@ -236,7 +242,7 @@ test('uses the full desktop workspace without changing the mobile screens', asyn
     await capture(page, testInfo, `desktop-${route.name}`, true)
   }
 
-  const sidebarOverflow = await page.locator('.fh-desktop-sidebar__nav').evaluate((element) => ({
+  const sidebarOverflow = await page.locator('.fhs-side__nav').evaluate((element) => ({
     overflowY: getComputedStyle(element).overflowY,
     scrollbarWidth: getComputedStyle(element).scrollbarWidth,
   }))
@@ -445,7 +451,15 @@ test('keeps customer quote change requests in the workflow', async ({ page }, te
   await capture(page, testInfo, 'quote-change-requested-customer', true)
 
   await openRoute(page, '/quotes/c-change?tab=quote')
-  await expect(page.getByRole('button', { name: 'Review changes' }).first()).toBeVisible()
+  if (testInfo.project.name.startsWith('mobile')) {
+    // The phone's Quote tab is the editor itself (tests/e2e/quote.spec.ts):
+    // the request sits in a panel at the top and the capsule carries the
+    // send. "Review changes" stays the stage action on the other tabs.
+    await expect(page.getByRole('region', { name: 'Customer requested changes' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Send for approval' })).toBeVisible()
+  } else {
+    await expect(page.getByRole('button', { name: 'Review changes' }).first()).toBeVisible()
+  }
   await expect(page.getByText('Please separate the cabinet allowance.', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: /approve quote/i })).toHaveCount(0)
   await capture(page, testInfo, 'quote-change-requested-operator', true)

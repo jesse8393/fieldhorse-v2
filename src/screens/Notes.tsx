@@ -359,7 +359,7 @@ export default function Notes() {
       >
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <span className="v3-eyebrow" style={{ color: 'var(--v3-primary-text)' }}>Field Notes</span>
+            <span className="v3-eyebrow" style={{ color: 'var(--v3-primary-text)' }}>Field notes</span>
             <h1 style={{ margin: '6px 0 0', fontSize: 24, lineHeight: 1.1, letterSpacing: 0, fontWeight: 600, color: 'var(--v3-text)' }}>
               Notes, fast.
             </h1>
@@ -560,7 +560,7 @@ export default function Notes() {
             >
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <Sparkles size={12} color="var(--v3-primary)" />
-                <span className="v3-eyebrow" style={{ color: 'var(--v3-primary-text)' }}>AI Summary</span>
+                <span className="v3-eyebrow" style={{ color: 'var(--v3-primary-text)' }}>AI summary</span>
               </div>
               <p style={{ margin: 0, fontSize: 14, color: 'var(--v3-text)', fontFamily: 'var(--font-body)', lineHeight: 1.5 }}>
                 {parsed.summary}
@@ -585,7 +585,7 @@ export default function Notes() {
         className="v3-section"
         style={{ margin: '0 var(--v3-gutter) var(--v3-rhythm-screen)' }}
       >
-        <SectionHeader label="Recent Activity" />
+        <SectionHeader label="Recent activity" />
 
         {loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
@@ -629,7 +629,7 @@ export default function Notes() {
           className="v3-section"
           style={{ margin: '0 var(--v3-gutter) var(--v3-rhythm-screen)' }}
         >
-          <SectionHeader label="Linked to Jobs" />
+          <SectionHeader label="Linked to jobs" />
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 4 }}>
             {linkedGroups.map((g) => (
@@ -714,7 +714,7 @@ export default function Notes() {
         <div className="v3-section-header">
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
             <Sparkles size={14} color="var(--v3-primary)" />
-            <span className="v3-eyebrow">AI Action Items</span>
+            <span className="v3-eyebrow">AI action items</span>
           </span>
         </div>
 

@@ -22,8 +22,8 @@ Use a real account on https://fieldhorse.io, on a phone and on a desktop browser
 3. Open Schedule. Today's events show, and adding an event works.
 4. Open Invoices. Open an invoice and download its PDF.
 5. Send yourself a customer link from a quote. It opens signed out and shows the right company name and logo.
-6. Switch between light and dark (the More menu on a phone, Settings on a desktop). Text stays readable on every screen you visited.
-7. If you belong to more than one company, switch companies from the sidebar or the More menu and confirm the lists change.
+6. Switch between Day, Night and Auto (the workspace menu behind the company badge on a phone, Settings on a desktop). Text stays readable on every screen you visited, and Auto shows Night after local sunset.
+7. If you belong to more than one company, switch companies from the sidebar or the workspace menu and confirm the lists change.
 8. In Netlify, open Functions and check the last few minutes of logs for errors.
 
 ## If something is wrong

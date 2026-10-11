@@ -1,0 +1,634 @@
+/*
+ * The Job page on a desktop (spec 9.11, render glamor/g-desktop-job.jpg).
+ * Class prefix fhd-. Reads only the --fh- tokens, so Day and Night follow
+ * the theme on their own, and anything inside .fh-onyx-scope reads linen
+ * text and the linen focus ring.
+ *
+ * It reuses the phone page's Spine, section tabs and "More about this
+ * job" disclosure (phone/job-phone.css, class fhj-), which are laid out
+ * edge to edge for a phone. Inside .fhd-main they lose that side padding
+ * so the composer, the tabs and the Spine share one left edge.
+ */
+
+.fhd-page {
+  color: var(--fh-ink);
+  font-family: var(--fh-font-body);
+}
+
+/* The banner sits flush at the top, as in the render, and carries the
+   page's own weather, activity, edit and delete buttons. Search stays one
+   click away in the sidebar (and with Command K), so the shared strip
+   with its search and bell steps aside, as the older detail topbar made
+   it do. */
+@media (min-width: 900px) {
+  body:has(.fhd-page) .fh-app-header {
+    display: none !important;
+  }
+}
+
+.fhd-page .fh-build-main {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 0 0 48px;
+}
+
+/* Focus: 2 px --fh-focus (linen inside .fh-onyx-scope). global.css forces
+   a muted outline color on every focused control, so these restate it. */
+.fhd-back:focus-visible,
+.fhd-composer:focus-visible,
+.fhd-doc--link:focus-visible,
+.fhd-link:focus-visible {
+  outline: 2px solid var(--fh-focus) !important;
+  outline-color: var(--fh-focus) !important;
+  outline-offset: 2px;
+}
+
+/* ================================================================
+   Banner
+   ================================================================ */
+
+.fhc-stage.fhd-banner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 210px;
+  padding: 24px 28px;
+  overflow: hidden;
+  border-radius: 18px;
+  box-shadow: inset 0 0 0 1px var(--fh-stage-edge), var(--fh-shadow-raised);
+}
+
+.fhd-banner__photo {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--fh-stage);
+}
+
+.fhd-banner__img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity var(--dur-slow) var(--ease);
+}
+
+.fhd-banner__img.is-loaded {
+  opacity: 1;
+}
+
+/* A dark wash under the round buttons, and the scrim every line of text
+   over a photo sits on (spec 11). */
+.fhd-banner__photo::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 96px;
+  background: linear-gradient(180deg, rgba(22, 20, 15, 0.6) 0%, rgba(22, 20, 15, 0) 100%);
+  pointer-events: none;
+}
+
+.fhd-banner__photo::after {
+  content: '';
+  position: absolute;
+  inset: 25% 0 0;
+  background: var(--fh-scrim);
+  pointer-events: none;
+}
+
+.fhd-banner__util {
+  position: absolute;
+  z-index: 2;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Weather reads as a quiet pill beside the round buttons. */
+.fhd-weather {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(22, 20, 15, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(242, 237, 228, 0.16);
+  color: var(--fh-linen);
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.fhd-weather .fh-build-sun {
+  color: var(--fh-gold);
+}
+
+.fhd-banner__body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+}
+
+.fhd-banner__text {
+  flex: 1 1 360px;
+  min-width: 0;
+}
+
+.fhd-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  margin: 0 0 0 -8px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--fh-linen);
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.fhd-back:hover {
+  background: rgba(242, 237, 228, 0.1);
+}
+
+.fhd-banner__title {
+  margin: 0;
+  font-family: var(--fh-font-display);
+  font-size: 38px;
+  line-height: 40px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--fh-linen);
+  overflow-wrap: break-word;
+}
+
+.fhd-banner__sub {
+  margin: 4px 0 0;
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 400;
+  color: var(--fh-linen);
+  overflow-wrap: break-word;
+}
+
+.fhd-banner:not(.has-photo) .fhd-banner__sub {
+  color: var(--fh-smoke);
+}
+
+.fhd-banner__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ================================================================
+   Stage rail
+   ================================================================ */
+
+.fhd-rail {
+  padding: 0 4px;
+}
+
+/* ================================================================
+   Two columns
+   ================================================================ */
+
+.fhd-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+@media (min-width: 1280px) {
+  .fhd-grid {
+    grid-template-columns: minmax(0, 1fr) 320px;
+  }
+  .fhd-grid.is-wide {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* One column: the facts sit under the content, two sections across. */
+@media (max-width: 1279px) {
+  .fhd-facts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 0 24px;
+  }
+  .fhd-vault {
+    grid-column: 1 / -1;
+    max-width: 420px;
+  }
+}
+
+.fhd-main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* ================================================================
+   Composer
+   ================================================================ */
+
+.fhd-composer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 64px;
+  margin: 0;
+  padding: 12px 16px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--fh-paper);
+  box-shadow: inset 0 0 0 1px var(--fh-edge);
+  color: var(--fh-ink-3);
+  font-family: var(--fh-font-body);
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 400;
+  text-align: left;
+  cursor: text;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.fhd-composer:hover {
+  box-shadow: inset 0 0 0 1px var(--fh-edge-strong);
+}
+
+.fhd-composer__hint {
+  flex: 1;
+  min-width: 0;
+}
+
+.fhd-composer__pill {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 16px;
+  border-radius: 12px;
+  background: var(--fh-paper);
+  box-shadow: inset 0 0 0 1px var(--fh-edge);
+  color: var(--fh-ink);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+}
+
+.fhd-avatar {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: var(--fh-tray);
+  box-shadow: inset 0 0 0 1px var(--fh-edge);
+  color: var(--fh-ink);
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 600;
+}
+
+/* ================================================================
+   The phone page's pieces, set for the left column
+   ================================================================ */
+
+/* A mouse has no sideways swipe, so on a narrow window the tabs wrap
+   instead of scrolling out of reach. */
+.fhd-main .fhj-tabs__strip {
+  flex-wrap: wrap;
+  padding: 0;
+  overflow: visible;
+}
+
+.fhd-main .fhj-tabs__strip::after {
+  display: none;
+}
+
+.fhd-panel {
+  min-width: 0;
+}
+
+.fhd-panel .fhj-spine {
+  padding: 8px 0 8px;
+}
+
+/* The composer above already adds to the job, so the Spine's own title row
+   stays for screen readers only. */
+.fhd-panel .fhj-spine__head {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.fhd-panel .fhj-more {
+  margin: 16px 0 0;
+}
+
+.fhd-panel .fhj-edit {
+  padding: 0;
+}
+
+/* ================================================================
+   Facts panel
+   ================================================================ */
+
+.fhd-facts {
+  min-width: 0;
+}
+
+.fhd-vault {
+  margin-bottom: 16px;
+}
+
+.fhd-sec {
+  padding: 20px 0;
+  border-top: 1px solid var(--fh-hairline);
+}
+
+.fhd-vault + .fhd-sec {
+  border-top: 0;
+  padding-top: 8px;
+}
+
+.fhd-facts > .fhd-sec:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.fhd-sec__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 24px;
+  margin-bottom: 8px;
+}
+
+.fhd-sec__title {
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+.fhd-sec__aside {
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+.fhd-sec__head .fhd-sec__action {
+  margin-right: -12px;
+  color: var(--fh-ink-2);
+}
+
+.fhd-text {
+  margin: 0;
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 500;
+  color: var(--fh-ink);
+  overflow-wrap: anywhere;
+}
+
+.fhd-empty,
+.fhd-note {
+  margin: 0;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 400;
+  color: var(--fh-ink-3);
+}
+
+.fhd-note {
+  margin-top: 8px;
+}
+
+.fhd-link {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fh-ink);
+  font: inherit;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-color: var(--fh-edge-strong);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.fhd-link:hover {
+  text-decoration-color: var(--fh-ink);
+}
+
+/* A text link keeps its line height and borrows a 44 px hit area. */
+.fhd-link,
+a.fhd-person__line {
+  position: relative;
+}
+
+.fhd-link::after,
+a.fhd-person__line::after {
+  content: '';
+  position: absolute;
+  inset: -12px -8px;
+}
+
+.fhd-nav {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+}
+
+.fhd-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fhd-person {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+}
+
+.fhd-person--stack {
+  align-items: flex-start;
+  padding: 8px 0;
+}
+
+.fhd-person--row {
+  min-height: 48px;
+}
+
+.fhd-person__text {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.fhd-person__name {
+  margin: 0;
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+  color: var(--fh-ink);
+  overflow-wrap: anywhere;
+}
+
+.fhd-person--row .fhd-person__name {
+  flex: 1;
+}
+
+button.fhd-person__name {
+  text-decoration: none;
+}
+
+.fhd-person__line {
+  margin: 0;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 400;
+  color: var(--fh-ink-2);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+a.fhd-person__line {
+  text-decoration: underline;
+  text-decoration-color: var(--fh-edge);
+  text-underline-offset: 3px;
+}
+
+.fhd-person__role {
+  flex: none;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+.fhd-pairs {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+}
+
+.fhd-pairs > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.fhd-pairs dt {
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--fh-ink-3);
+}
+
+.fhd-pairs dd {
+  margin: 0;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  text-align: right;
+  color: var(--fh-ink);
+  overflow-wrap: anywhere;
+}
+
+/* Documents and change orders: label left, status or date right. */
+.fhd-doc {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  padding: 8px 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--fh-ink);
+  font-family: var(--fh-font-body);
+  text-align: left;
+  align-items: center;
+}
+
+.fhd-doc--link {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.fhd-doc--link:hover .fhd-doc__label {
+  text-decoration: underline;
+  text-decoration-color: var(--fh-edge-strong);
+  text-underline-offset: 3px;
+}
+
+.fhd-doc__label {
+  min-width: 0;
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.fhd-doc__detail {
+  flex: none;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.fhd-more {
+  margin: 8px 0 0 -12px;
+  color: var(--fh-ink-2);
+}

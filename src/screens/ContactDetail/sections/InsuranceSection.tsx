@@ -274,7 +274,6 @@ function panelHeaderStyle() {
     fontWeight: 700,
     letterSpacing: 0,
     color: 'var(--v3-primary-text)',
-    textTransform: 'uppercase'
   }
 }
 function labelStyle(): import('react').CSSProperties {
@@ -284,7 +283,6 @@ function labelStyle(): import('react').CSSProperties {
     fontWeight: 700,
     letterSpacing: 0,
     color: 'var(--v3-text-muted)',
-    textTransform: 'uppercase'
   }
 }
 function valueStyle(): import('react').CSSProperties {
@@ -325,7 +323,6 @@ function primaryBtnStyle() {
     fontSize: 12,
     fontWeight: 700,
     letterSpacing: 0,
-    textTransform: 'uppercase',
     cursor: 'pointer'
   }
 }

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { Plus, Pencil, X as XIcon, ShieldCheck, Receipt, RotateCcw } from 'lucide-react'
+import { Plus, Pencil, X as XIcon, ShieldCheck, Receipt, RotateCcw, ChevronDown } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
 import { toYmd } from '../../../lib/dates.ts'
 import {
@@ -24,6 +24,7 @@ import { resolvePrimaryAction, resolveNextAction, type JobNextAction } from '../
 import ClientPicker from '../../../components/ClientPicker.tsx'
 import { money } from '../lib/format.ts'
 import { countNoun } from '../../../lib/format.ts'
+import SpineList from '../phone/SpineList.tsx'
 
 /**
  * v3 OVERVIEW tab, the "money screen" of the Job Detail.
@@ -43,6 +44,10 @@ import { countNoun } from '../../../lib/format.ts'
  *                 done flag, and it is not the job, so nothing is completed)
  *   - stage     → call pipelineFn from pipeline.ts (markComplete/etc)
  *   - idle      → open AddEventSheet
+ *
+ * Phone (spineFirst): the Spine comes first, and everything above sits
+ * under a "More about this job" disclosure below it. The Spine carries
+ * every event the activity feed would, so the feed is not repeated.
  *
  * Money is role gated by the parent: canSeeMoney (owner, admin, manager)
  * shows the contract cockpit, canMoveMoney adds billing actions, pipeline
@@ -75,9 +80,13 @@ export default function OverviewTab({
   onOpenSendInvoice,
   onOpenQuote,
   canSeeMoney = false,
-  canMoveMoney = false
+  canMoveMoney = false,
+  spineFirst = false,
+  inspections = [],
+  onAddToSpine
 }: any) {
   const [actionLoading, setActionLoading] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
   const queryClient = useQueryClient()
   const navigate = useNavigate()
 
@@ -243,24 +252,22 @@ export default function OverviewTab({
   const showCockpit = canSeeMoney && contractValue > 0 && isExecutionStage
   const isJobStage = contact?.stage === 'job' || contact?.stage === 'invoice'
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '8px 24px 32px' }}>
+  // The edit form, keyed by job so another job always starts from its
+  // own values. Shown above everything while the header's Edit is on.
+  const editCard = isEditing ? (
+    <EditFieldsCard
+      key={contact?.id}
+      contact={contact}
+      patch={patch}
+      onExitEdit={onExitEdit}
+      userId={userId}
+      canEditAmount={canMoveMoney}
+    />
+  ) : null
 
-      {/* EDIT FIELDS, only shown when header EDIT toggle is on. Renders ABOVE
-          the dashboard so the operator's eye lands on the form. Cancel/Save
-          collapses back to the read-only Overview. Keyed by job so another
-          job always starts from its own values. */}
-      {isEditing && (
-        <EditFieldsCard
-          key={contact?.id}
-          contact={contact}
-          patch={patch}
-          onExitEdit={onExitEdit}
-          userId={userId}
-          canEditAmount={canMoveMoney}
-        />
-      )}
-
+  // Cockpit, next action, progress, time clock and the daily actions.
+  const cards = (
+    <>
       {/* COCKPIT HEADLINE, contract-value hero. Ported from the v3 design
           handoff (.cockpit-headline). Only renders once the job has a real
           contract value AND has moved past quote, before that, the
@@ -384,6 +391,72 @@ export default function OverviewTab({
           Invite partner
         </Button>
       </div>
+    </>
+  )
+
+  // Inline grid CSS, mobile first stack, 1.5fr and 1fr at 768 px and up.
+  const gridCss = (
+    <style>{`
+      .v3-overview-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+      @media (min-width: 768px) {
+        .v3-overview-grid {
+          grid-template-columns: 1.5fr 1fr;
+          align-items: start;
+        }
+      }
+    `}</style>
+  )
+
+  if (spineFirst) {
+    return (
+      <div className="fhj-overview">
+        {editCard && <div className="fhj-edit">{editCard}</div>}
+        <SpineList
+          contact={contact}
+          notes={notes}
+          payments={payments}
+          scheduleItems={scheduleItems}
+          changeOrders={changeOrders}
+          stageTransitions={stageTransitions}
+          inspections={inspections}
+          canSeeMoney={canSeeMoney}
+          onAdd={() => onAddToSpine?.()}
+        />
+        <div className="fhj-more">
+          <button
+            type="button"
+            className="fhj-more__toggle"
+            aria-expanded={moreOpen}
+            aria-controls="fhj-more-body"
+            onClick={() => { hapticTap(); setMoreOpen((v) => !v) }}
+          >
+            More about this job
+            <ChevronDown size={22} strokeWidth={1.75} aria-hidden="true" />
+          </button>
+          {moreOpen && (
+            <div id="fhj-more-body" className="fhj-more__body">
+              {cards}
+            </div>
+          )}
+        </div>
+        {gridCss}
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '8px 24px 32px' }}>
+
+      {/* EDIT FIELDS, only shown when header EDIT toggle is on. Renders ABOVE
+          the dashboard so the operator's eye lands on the form. Cancel/Save
+          collapses back to the read-only Overview. */}
+      {editCard}
+
+      {cards}
 
       {/* ACTIVITY, single chronological timeline synthesized from existing
           arrays (notes, payments, schedule, change orders, stage history,
@@ -401,20 +474,7 @@ export default function OverviewTab({
         stageTransitions={stageTransitions}
       />
 
-      {/* Inline grid CSS, mobile-first stack, 1.5fr/1fr at ≥768px */}
-      <style>{`
-        .v3-overview-grid {
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 12px;
-        }
-        @media (min-width: 768px) {
-          .v3-overview-grid {
-            grid-template-columns: 1.5fr 1fr;
-            align-items: start;
-          }
-        }
-      `}</style>
+      {gridCss}
     </div>
   )
 }

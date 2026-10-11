@@ -18,9 +18,10 @@
 // known item, not for browsing, go to the dedicated screen for that.
 
 import { supabase } from './supabase.ts'
-import { detailRoute } from './stages.ts'
+import { detailRoute, stageLabel } from './stages.ts'
 import { escapeLikeText, ilikeAnyOf } from './searchFilter.ts'
 import { lastKnownOrg } from './orgScope.ts'
+import type { PaletteJob } from './paletteActions.ts'
 
 const PER_KIND = 6
 
@@ -32,6 +33,8 @@ export type SearchResult = {
   title: string
   sub: string
   to: string
+  /** Job rows only: what the command palette needs for its job actions. */
+  job?: PaletteJob
 }
 
 export type SearchResults = {
@@ -85,7 +88,7 @@ export async function universalSearch(
   const [jobsRes, clientsRes, notesRes, eventsRes, filesRes] = await Promise.all([
     scoped(supabase
       .from('fh_contacts')
-      .select('id, name, job_title, job_type, stage, amount'))
+      .select('id, name, job_title, job_type, stage, amount, phone, address'))
       .or(ilikeAnyOf(['name', 'job_title', 'job_type', 'phone', 'email', 'address'], q))
       .order('updated_at', { ascending: false })
       .limit(PER_KIND),
@@ -137,8 +140,16 @@ export async function universalSearch(
     id: `job:${j.id}`,
     kind: 'job',
     title: j.name || 'Untitled',
-    sub: [j.job_title || j.job_type, j.stage?.toUpperCase(), j.amount ? `$${Math.round(j.amount).toLocaleString()}` : null].filter(Boolean).join(' · '),
-    to: contactRoute(j)
+    sub: [j.job_title || j.job_type, j.stage ? stageLabel(String(j.stage)) : null, j.amount ? `$${Math.round(j.amount).toLocaleString()}` : null].filter(Boolean).join(' · '),
+    to: contactRoute(j),
+    job: {
+      id: String(j.id),
+      name: j.name || 'Untitled',
+      job_title: j.job_title || null,
+      address: j.address || null,
+      stage: String(j.stage || ''),
+      phone: j.phone || null
+    }
   }))
   const clients: SearchResult[] = asRows(clientsRes.data).map((c) => ({
     id: `client:${c.id}`,

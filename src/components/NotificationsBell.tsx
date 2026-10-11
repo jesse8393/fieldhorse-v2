@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import Icon from './fh/Icon.tsx'
 import { useNavigate } from 'react-router-dom'
 import { Bell, Check, Inbox, Users, ClipboardCheck, DollarSign, Calendar, MessageSquare, Eye, ShieldCheck, FileEdit, PenLine } from 'lucide-react'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
@@ -118,51 +119,11 @@ export default function NotificationsBell() {
         type="button"
         aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
         onClick={() => { hapticTap(); setOpen(true) }}
-        className="fh-header-search-btn"
-        style={{
-          // Matches the search + notes trio in AppHeader at 44/r11/16 :
-          // the full minimum touch target. Unread dot stays 14×14 and
-          // sits 3px in from the top-right corner.
-          width: 44,
-          height: 44,
-          minWidth: 44,
-          borderRadius: 10,
-          background: 'var(--v3-glass-tint)',
-          border: '1px solid var(--v3-border-mid)',
-          backdropFilter: 'blur(8px)',
-          WebkitBackdropFilter: 'blur(8px)',
-          display: 'grid',
-          placeItems: 'center',
-          color: 'var(--ink-strong)',
-          cursor: 'pointer',
-          padding: 0,
-          position: 'relative',
-          transition: 'color 160ms ease, background 160ms ease, border-color 160ms ease'
-        }}
+        className="fhs-icon-btn"
       >
-        <Bell size={16} />
+        <Icon icon={Bell} size={22} />
         {unread > 0 && (
-          <span
-            aria-hidden="true"
-            style={{
-              position: 'absolute',
-              top: 3,
-              right: 3,
-              minWidth: 14,
-              height: 14,
-              padding: '0 4px',
-              borderRadius: 10,
-              background: 'var(--alert-red)',
-              color: '#F2EDE4',
-              fontFamily: 'var(--font-display)',
-              fontSize: 12,
-              fontWeight: 700,
-              letterSpacing: 0,
-              lineHeight: '14px',
-              textAlign: 'center',
-              boxShadow: '0 0 0 2px var(--surface-1)'
-            }}
-          >
+          <span aria-hidden="true" className="fhs-icon-btn__badge">
             {unread > 9 ? '9+' : unread}
           </span>
         )}

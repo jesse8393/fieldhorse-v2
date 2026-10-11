@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { countNoun, money, moneyExact, moneyK } from './format.ts'
+import { countNoun, money, moneyCents, moneyExact, moneyK } from './format.ts'
 
 describe('countNoun', () => {
   it('uses the singular noun only for exactly one', () => {
@@ -73,5 +73,19 @@ describe('moneyExact', () => {
 
   it('puts the sign before the currency symbol', () => {
     expect(moneyExact(-1200)).toBe('-$1,200')
+  })
+})
+
+describe('moneyCents', () => {
+  it('always shows cents', () => {
+    expect(moneyCents(12375)).toBe('$12,375.00')
+    expect(moneyCents(9229.5)).toBe('$9,229.50')
+    expect(moneyCents('6187.5')).toBe('$6,187.50')
+  })
+
+  it('puts the sign before the dollar sign and treats junk as zero', () => {
+    expect(moneyCents(-1200)).toBe('-$1,200.00')
+    expect(moneyCents(null)).toBe('$0.00')
+    expect(moneyCents('abc')).toBe('$0.00')
   })
 })

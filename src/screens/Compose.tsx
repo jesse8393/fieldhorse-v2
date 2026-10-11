@@ -222,7 +222,7 @@ export default function Compose() {
           <BuildTopbar />
           <div style={{ padding: '12px var(--v3-gutter) 12px' }}>
             <div className="fh-build-good">Dispatch</div>
-            <h1 className="fh-build-title">MESSAGE COMPOSER</h1>
+            <h1 className="fh-build-title">Message composer</h1>
           </div>
         </div>
       )}
@@ -246,7 +246,7 @@ export default function Compose() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
             <Eyebrow tone="gold">
               <PenLine size={11} aria-hidden="true" />
-              AI Compose
+              AI compose
             </Eyebrow>
             <Eyebrow as="div" style={{ alignSelf: 'flex-start', maxWidth: '100%', padding: '4px 8px', borderRadius: 10, background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)', opacity: contact ? 1 : 0.75 }}>
               <span style={{ color: 'var(--v3-text-muted)' }}>To</span>
@@ -375,7 +375,6 @@ export default function Compose() {
                 fontSize: 14,
                 fontWeight: 700,
                 letterSpacing: 0,
-                textTransform: 'uppercase',
                 cursor: loading ? 'default' : 'pointer',
                 boxShadow: loading
                   ? 'none'
@@ -622,7 +621,6 @@ export default function Compose() {
                       fontSize: 12,
                       fontWeight: 700,
                       letterSpacing: 0,
-                      textTransform: 'uppercase',
                       cursor: (sending || !canEmail) ? 'not-allowed' : 'pointer',
                       WebkitTapHighlightColor: 'transparent',
                       boxShadow: (sending || !canEmail)
@@ -658,7 +656,6 @@ export default function Compose() {
                       fontSize: 12,
                       fontWeight: 700,
                       letterSpacing: 0,
-                      textTransform: 'uppercase',
                       cursor: canSms ? 'pointer' : 'not-allowed',
                       WebkitTapHighlightColor: 'transparent',
                       boxShadow: canSms
@@ -770,7 +767,7 @@ function SmsHero({ draft, contact }: any) {
   const initials = (contact?.name || '·').trim().split(/\s+/).slice(0, 2).map((s: any) => s.charAt(0).toUpperCase()).join('') || '·'
   const now = new Date()
   const timeStr = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-  const dayStr = now.toLocaleDateString([], { weekday: 'short' }).toUpperCase()
+  const dayStr = now.toLocaleDateString([], { weekday: 'short' })
   return (
     <div style={{
       borderRadius: 10,

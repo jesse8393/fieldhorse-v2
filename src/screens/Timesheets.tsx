@@ -215,7 +215,7 @@ export default function Timesheets() {
           <section className="fh-build-hero-row fh-build-hero-row--page">
             <div>
               <div className="fh-build-good">Timesheets</div>
-              <h1 className="fh-build-title">RESTRICTED ACCESS</h1>
+              <h1 className="fh-build-title">Restricted access</h1>
             </div>
           </section>
           <div className="fh-build-table__empty">
@@ -259,7 +259,7 @@ export default function Timesheets() {
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
             <div className="fh-build-good">Team</div>
-            <h1 className="fh-build-title">TIMESHEETS</h1>
+            <h1 className="fh-build-title">Timesheets</h1>
           </div>
 
           <div className="fh-build-focus">

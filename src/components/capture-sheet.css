@@ -1,0 +1,361 @@
+/*
+ * Universal Capture sheet (SPEC.md 9.5, base/capture.jpg). The sheet
+ * itself is the fh Sheet; these rules lay out what sits inside it and
+ * read only --fh- tokens, so Day and Night follow the theme.
+ *
+ * The voice panel sits on --fh-tray, the inset panel color, in both the
+ * input and the confirm phase. Below it, "Or start with" is a hairline
+ * Row list with an icon tile, a gray hint and a chevron.
+ */
+
+/* "Done" sits on the gutter like the close button it replaces. */
+.fh-capture__done {
+  margin-right: -16px;
+}
+
+.fh-capture__form {
+  margin: 0;
+}
+
+/* ---------------- Voice panel ---------------- */
+
+.fh-capture__panel {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+  border-radius: 14px;
+  background: var(--fh-tray);
+  color: var(--fh-ink);
+}
+
+/* Input phase: the microphone and what it is doing. */
+.fh-capture__voice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.fh-capture__mic {
+  --fhc-radius: 999px;
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--fh-paper);
+  box-shadow: inset 0 0 0 1px var(--fh-edge);
+  color: var(--fh-ink);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: transform var(--dur-instant) var(--ease-mechanical);
+}
+
+.fh-capture__mic:active {
+  transform: translateY(1px);
+}
+
+/* Listening: the disc turns to ink, the square says tap to stop. */
+.fh-capture__mic.is-listening {
+  background: var(--fh-ink);
+  box-shadow: none;
+  color: var(--fh-paper);
+}
+
+.fh-capture__mic:disabled {
+  cursor: not-allowed;
+  color: var(--fh-ink-4);
+}
+
+.fh-capture__mic:focus-visible,
+.fh-capture__change:focus-visible {
+  outline: 2px solid var(--fh-focus) !important;
+  outline-color: var(--fh-focus) !important;
+  outline-offset: 2px;
+  border-radius: var(--fhc-radius);
+}
+
+.fh-capture__voice-text {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.fh-capture__voice-label {
+  font-family: var(--fh-font-body);
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+  color: var(--fh-ink);
+}
+
+.fh-capture__voice-hint {
+  font-family: var(--fh-font-body);
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+.fh-capture__time {
+  flex: none;
+  align-self: center;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--fh-ink-3);
+}
+
+/* Confirm phase: what was heard. */
+.fh-capture__heard {
+  display: grid;
+  gap: 12px;
+}
+
+.fh-capture__heard-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--fh-ink-2);
+}
+
+.fh-capture__heard-label {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--fh-ink-2);
+}
+
+.fh-capture__quote {
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 400;
+  color: var(--fh-ink);
+  overflow-wrap: anywhere;
+}
+
+.fh-capture__rule {
+  height: 1px;
+  margin: 0;
+  border: 0;
+  background: var(--fh-hairline);
+}
+
+.fh-capture__filed {
+  display: grid;
+  gap: 8px;
+}
+
+.fh-capture__caption {
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+.fh-capture__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fh-capture__chips > li {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Chips here can hold a job name or a model's title, so long ones wrap
+   instead of running out of the panel. */
+.fh-capture__chips .fhc-chip {
+  max-width: 100%;
+  min-height: 32px;
+  padding: 4px 12px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.fh-capture__detail {
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 400;
+  color: var(--fh-ink-2);
+  overflow-wrap: anywhere;
+}
+
+/* "Files on Whitcomb. Change." */
+.fh-capture__attach {
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+  overflow-wrap: anywhere;
+}
+
+.fh-capture__change {
+  --fhc-radius: 7px;
+  position: relative;
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fh-ink);
+  font: inherit;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-decoration: underline;
+  text-decoration-color: var(--fh-edge);
+  text-underline-offset: 3px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* A 44 px target around the word. */
+.fh-capture__change::before {
+  content: '';
+  position: absolute;
+  inset: -12px -8px;
+}
+
+.fh-capture__fields {
+  display: grid;
+  gap: 16px;
+}
+
+.fh-capture__pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.fh-capture__select {
+  padding-right: 48px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--fh-ink-2) 50%),
+    linear-gradient(135deg, var(--fh-ink-2) 50%, transparent 50%);
+  background-position:
+    calc(100% - 24px) 50%,
+    calc(100% - 19px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+
+/* Save takes the larger share, as in the render. */
+.fh-capture__actions {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 12px;
+}
+
+.fh-capture__quiet {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  margin: -8px -16px -8px;
+}
+
+/* ---------------- Or start with ---------------- */
+
+.fh-capture__start {
+  margin-top: 24px;
+}
+
+.fh-capture__start-title {
+  margin: 0 0 4px;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+.fh-capture__starts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Icon tile, label, then the hint in its own column, as in the render. */
+.fh-capture__starts .fhc-row__main {
+  align-items: center;
+}
+
+.fh-capture__starts .fhc-row__end {
+  width: 55%;
+  max-width: none;
+  justify-items: stretch;
+  text-align: left;
+}
+
+.fh-capture__start-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.fh-capture__tile {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--fh-tray);
+  color: var(--fh-ink-2);
+}
+
+.fh-capture__hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  min-width: 0;
+  font-family: var(--fh-font-body);
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+.fh-capture__chev {
+  flex: none;
+  color: var(--fh-ink-4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fh-capture__mic {
+    transition: none;
+  }
+
+  .fh-capture__mic:active {
+    transform: none;
+  }
+}

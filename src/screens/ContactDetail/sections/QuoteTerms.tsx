@@ -122,7 +122,7 @@ export default function QuoteTermsSection({ contact, patch, valuesRef }: any) {
         />
       </FieldLabel>
 
-      <FieldLabel label="Exclusions" hint="What's NOT included. Spelling these out prevents change order surprises.">
+      <FieldLabel label="Exclusions" hint="What's not included. Spelling these out prevents change order surprises.">
         <textarea
           value={exclusions}
           onChange={(e) => setExclusions(e.target.value)}

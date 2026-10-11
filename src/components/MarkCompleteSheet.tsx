@@ -253,7 +253,7 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
     }
   }
 
-  const labelStyle: import('react').CSSProperties = { fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: 'var(--ink-muted)' }
+  const labelStyle: import('react').CSSProperties = { fontSize: 12, fontWeight: 700, letterSpacing: 0, color: 'var(--ink-muted)' }
   const fieldStyle: import('react').CSSProperties = {
     padding: '12px 12px',
     borderRadius: 10,
@@ -513,7 +513,7 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
                   }}
                 >
                   <Check size={14} />
-                  {saving ? 'SAVING…' : (isReopening ? 'SAVE CHANGES' : 'MARK COMPLETE')}
+                  {saving ? 'Saving…' : (isReopening ? 'Save changes' : 'Mark complete')}
                 </motion.button>
               </div>
             </>
@@ -529,7 +529,7 @@ function certificateBtnStyle(variant: any, busy: any) {
     display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
     padding: '12px 12px', borderRadius: 10,
     fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-    letterSpacing: 0, textTransform: 'uppercase',
+    letterSpacing: 0,
     cursor: busy ? 'wait' : 'pointer',
     opacity: busy ? 0.7 : 1
   }

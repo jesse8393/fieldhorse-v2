@@ -73,7 +73,7 @@ export default function NewClientSheet({ open, userId, onClose, onSaved }: any) 
     scrollMarginTop: 96,
     scrollMarginBottom: 120
   }
-  const labelStyle: import('react').CSSProperties = { fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: 'var(--ink-muted)' }
+  const labelStyle: import('react').CSSProperties = { fontSize: 12, fontWeight: 700, letterSpacing: 0, color: 'var(--ink-muted)' }
 
   return (
     <Drawer open={open} onOpenChange={(v: any) => { if (!v && !saving) onClose?.() }}>
@@ -210,7 +210,7 @@ export default function NewClientSheet({ open, userId, onClose, onSaved }: any) 
               }}
             >
               <SaveIcon size={14} />
-              {saving ? 'SAVING…' : 'SAVE CLIENT'}
+              {saving ? 'Saving…' : 'Save client'}
             </motion.button>
           </div>
         </form>
