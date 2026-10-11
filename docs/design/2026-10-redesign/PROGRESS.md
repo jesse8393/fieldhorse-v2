@@ -4,6 +4,45 @@ Run rules and plans: `PHASE2_PLAN.md` to `PHASE7_PLAN.md` in this folder, decisi
 
 **If this run is picked up by a new session:** read this file first and continue from the first task that is not `done`.
 
+## Phase 8, audit fixes
+
+Plan: `PHASE8_PLAN.md` in this folder. Branch `redesign/phase-8` from `redesign/phase-7`, draft pull request against `redesign/phase-7`. New decisions start at D31 in `SPEC.md` section 17.
+
+**If a new session picks this up:** continue from the first Phase 8 task below that is not `done`, `blocked` or `skipped`.
+
+### Failing before Phase 8
+
+Baseline not run yet.
+
+### Phase 8 tasks
+
+Status is one of todo, done, blocked, skipped.
+
+| Tier | Task | Status | Commit | Notes |
+| --- | --- | --- | --- | --- |
+| 1 | 1 Make the test mock honest | todo | | |
+| 1 | 2 Today counts stop at 6 | todo | | |
+| 1 | 3 Capture from a job page shows up on the job | todo | | |
+| 1 | 4 Morning cold open says "Clear day" | todo | | |
+| 1 | 5 What each invoice actually owes | todo | | |
+| 1 | 6 Money timing and double sends | todo | | |
+| 1 | 7 Jobs and quotes stay inside the active company | todo | | |
+| 1 | 8 The Unscheduled tray tells the truth | todo | | |
+| 1 | 9 One quote total and one deposit everywhere | todo | | |
+| 1 | 10 The customer page after approval and on bad data | todo | | |
+| 1 | 11 Inbox sends exactly once, only when tapped, only when online | todo | | |
+| 2 | 12 Next stop card without a photo, and job tabs | todo | | |
+| 2 | 13 Desktop Capture button | todo | | |
+| 2 | 14 Desktop between 900 and 1279 px | todo | | |
+| 2 | 15 Small behavior fixes | todo | | |
+| 2 | 16 Login wordmark | todo | | |
+| 3 | 17 CSS and test hygiene | todo | | |
+| 3 | 18 Private line notes on the customer page | skipped | | The approval line in the plan reads no, so `netlify/functions/public-link.js` is unchanged |
+
+### Phase 8 notes
+
+* Nothing yet.
+
 ## Morning summary
 
 Good morning, Jesse. Phases 2 to 7 are all built and pushed. Nothing is merged, nothing was deployed, and no database or server file was touched. Every pull request is a draft, stacked in order, so you can read them one at a time.
