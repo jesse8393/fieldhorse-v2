@@ -12,9 +12,10 @@ test.use({ timezoneId: 'America/Chicago' })
 const MORNING = new Date('2026-10-08T11:40:00Z') // 6:40 am Central
 const EVENING = new Date('2026-10-09T00:40:00Z') // 7:40 pm Central
 
-// Three visits today and one tomorrow, in UTC. The mock returns every row
-// for both day queries; the screen keeps each to its own day. The rows
-// carry no embedded job, so names and addresses come from the job rows.
+// Three visits today and one tomorrow, in UTC. The mock honors each day
+// query's start_at range, as the database does, so today's query gets the
+// three and tomorrow's the one. The rows carry no embedded job, so names
+// and addresses come from the job rows.
 const SCHEDULE = [
   { id: 's1', contact_id: 'c-job1', title: 'Pour slab, crew A', start_at: '2026-10-08T12:30:00Z', end_at: '2026-10-08T16:00:00Z' },
   { id: 's2', contact_id: 'c-lead1', title: 'Site visit and quote walk', start_at: '2026-10-08T16:30:00Z', end_at: '2026-10-08T17:30:00Z' },
