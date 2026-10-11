@@ -269,6 +269,26 @@ describe('buildHomeDashboardBundle', () => {
     const health = bundle.jobHealth.find((row) => row.id === 'job-1')
     expect(health?.billing).toBe('Outstanding') // the $2K CO is still owed
   })
+
+  it('keeps the 20 most urgent next actions and counts every one', () => {
+    // 25 leads quiet for 10 to 34 days; the longest wait is the most urgent.
+    const contacts = Array.from({ length: 25 }, (_, i) => ({
+      id: `lead-${i + 1}`,
+      name: `Lead ${i + 1}`,
+      amount: 1000,
+      stage: 'lead',
+      created_at: '2026-04-01T12:00:00.000Z',
+      updated_at: new Date(Date.parse('2026-06-08T12:00:00.000Z') - i * 86400000).toISOString(),
+      completed_at: null,
+      follow_up_on: null,
+      proposal_status: null,
+    }))
+    const bundle = buildHomeDashboardBundle(baseSource({ contacts }))
+    expect(bundle.nextActionsTotal).toBe(25)
+    expect(bundle.nextActions).toHaveLength(20)
+    expect(bundle.nextActions[0].contactId).toBe('lead-25')
+    expect(bundle.nextActions[19].contactId).toBe('lead-6')
+  })
 })
 
 describe('today and tomorrow on site', () => {

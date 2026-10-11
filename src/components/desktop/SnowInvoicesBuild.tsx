@@ -26,7 +26,7 @@ import { ArrowLeft } from 'lucide-react'
 import { Button, EmptyState, IconButton, Skeleton, SkeletonRows, VaultCard, formatMoney } from '../fh'
 import Monogram from '../fh/Monogram.tsx'
 import { useProfile } from '../../contexts/ProfileContext.tsx'
-import { useJobs } from '../../lib/queries.ts'
+import { useCompanyJobs } from '../../lib/queries.ts'
 import { buildInvoiceList, buildMoneyView } from '../../lib/moneyView.ts'
 import { PANEL_TITLES, plural } from '../../screens/money/MoneyPanels.tsx'
 import { useMoneyPanel } from '../../screens/money/useMoneyPanel.ts'
@@ -63,7 +63,7 @@ export default function SnowInvoicesBuild({
 }: SnowInvoicesBuildProps) {
   const { profile } = useProfile()
   const navigate = useNavigate()
-  const jobsQuery = useJobs()
+  const jobsQuery = useCompanyJobs()
   const { panel, titleRef, panelHref, openPanel, closePanel } = useMoneyPanel()
 
   const waiting = loading || jobsQuery.isLoading

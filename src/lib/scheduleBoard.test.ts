@@ -21,6 +21,7 @@ import {
   crewHours,
   dayLayout,
   dayLabel,
+  dropRefusal,
   eventStatus,
   hourLabel,
   jobLabel,
@@ -341,5 +342,41 @@ describe('job names', () => {
     expect(jobSubline({ name: 'Plumbing Bellevue', job_title: 'Slab and trench' })).toBe('Slab and trench')
     expect(jobSubline({ name: 'Patio', job_title: 'Patio' })).toBe('')
     expect(jobSubline({ name: 'Patio' })).toBe('')
+  })
+})
+
+describe('dropRefusal', () => {
+  const company = { orgId: 'org-1', userId: 'qa-user-1' }
+  const now = new Date(2026, 9, 8, 9, 0).getTime()
+  const friday = new Date(2026, 9, 9, 13, 0).getTime()
+  const yesterday = new Date(2026, 9, 7, 8, 0).getTime()
+  const own = job({ id: 'own', org_id: 'org-1' } as Partial<JobRow> & { id: string })
+  const partner = job({ id: 'partner', org_id: 'org-2', user_id: 'partner-user-1' } as Partial<JobRow> & { id: string })
+
+  it('lets a job from the active company onto a slot from now on', () => {
+    expect(dropRefusal(own, company, friday, now)).toBeNull()
+  })
+
+  it('refuses a partner job from another company with words for the toast', () => {
+    expect(dropRefusal(partner, company, friday, now)).toBe('That job belongs to another company.')
+  })
+
+  it('refuses another company first, even on a slot that has passed', () => {
+    expect(dropRefusal(partner, company, yesterday, now)).toBe('That job belongs to another company.')
+  })
+
+  it('refuses a slot that has already begun', () => {
+    expect(dropRefusal(own, company, yesterday, now)).toBe('Pick a time from now on.')
+    expect(dropRefusal(own, company, new Date(2026, 9, 8, 9, 0).getTime() - 1, now)).toBe('Pick a time from now on.')
+  })
+
+  it('refuses while the company is not known yet', () => {
+    expect(dropRefusal(own, null, friday, now)).toBe('Still loading your company. Try again in a moment.')
+  })
+
+  it('never writes a dash in what it says', () => {
+    for (const words of [dropRefusal(partner, company, friday, now), dropRefusal(own, company, yesterday, now), dropRefusal(own, null, friday, now)]) {
+      expect(words).not.toMatch(/[-\u2013\u2014]/)
+    }
   })
 })

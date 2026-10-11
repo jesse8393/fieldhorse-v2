@@ -1,10 +1,12 @@
 // Layout helpers for the desktop Schedule board (spec 9.10, decision D10).
 //
 // Pure functions, no React and no network: packing overlapping events into
-// side by side columns, deciding which jobs still need a visit, and
-// turning a dropped slot into the timestamps a schedule row stores.
+// side by side columns, deciding which jobs still need a visit, turning a
+// dropped slot into the timestamps a schedule row stores, and deciding
+// when a drop must be refused.
 
 import type { JobRow } from './queries.ts'
+import { inActiveCompany, type ActiveCompany } from './activeCompany.ts'
 import { isJobStage } from './stages.ts'
 
 export type PackInput = { id: string; start: Date; end: Date }
@@ -117,6 +119,26 @@ export function slotToRange(
   const start = new Date(y, m, d, hour, minutes)
   const end = new Date(y, m, d, hour, minutes + durationMinutes)
   return { start_at: start.toISOString(), end_at: end.toISOString() }
+}
+
+/**
+ * Why a drop on the board must be refused, in words for the toast, or
+ * null when the visit may be written. A job from another company (a
+ * partner's shared job, or one from a workspace the person is not looking
+ * at) never goes on this company's calendar, so that check comes first.
+ * Then a slot that has already begun is the past. Until the company is
+ * known nothing is written.
+ */
+export function dropRefusal(
+  job: { org_id?: string | null; user_id?: string | null },
+  company: ActiveCompany | null,
+  startMs: number,
+  nowMs: number
+): string | null {
+  if (!company) return 'Still loading your company. Try again in a moment.'
+  if (!inActiveCompany(job, company)) return 'That job belongs to another company.'
+  if (startMs < nowMs) return 'Pick a time from now on.'
+  return null
 }
 
 // ---- What the board writes in words ----
