@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import { DollarSign, FileDown, Send } from 'lucide-react'
 import { Button, Chip, Sheet, formatMoney } from '../../components/fh'
 import type { MoneyInvoiceRow } from '../../lib/moneyView.ts'
@@ -13,6 +14,13 @@ import type { IssuedInvoiceRow } from './types.ts'
 // Mark paid, PDF and Void close the sheet and hand over to the payment
 // sheet, the download or the confirmation. Resend stays open while it
 // sends and closes when the email has gone out.
+//
+// While an email of this invoice is going out (`sending`, a resend or a
+// reminder), Mark paid and Void wait, and a line above the buttons says
+// why: the email landing marks the invoice sent, and a payment or a void
+// recorded meanwhile would read as sent again (review of Phase 8, task 6).
+// The sheet sits on the bottom edge, so a line above the buttons grows it
+// upward and leaves every button where the finger is.
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -45,6 +53,7 @@ export default function InvoiceSheet({
   onMarkPaid,
   onVoid
 }: InvoiceSheetProps) {
+  const waitId = useId()
   const invoice = issued?.invoice
   const title = (invoice?.title || '').trim() || (invoice ? `Invoice #${invoice.sequence_number}` : 'Invoice')
   const settled = row?.status === 'paid' || row?.status === 'void'
@@ -68,18 +77,41 @@ export default function InvoiceSheet({
           </div>
 
           <div className="fhm-inv__actions">
+            {/* Above the buttons, so none of them moves when it comes and goes. */}
+            {!settled && sending && (
+              <p className="fhm-helper" id={waitId}>Mark paid and Void are paused while the email goes out.</p>
+            )}
             {!settled && (
               <>
                 <Button variant="secondary" size="md" block icon={Send} loading={sending} onClick={onResend}>
                   {isDraft ? 'Send' : 'Resend'}
                 </Button>
                 <Button variant="secondary" size="md" block icon={FileDown} onClick={onPdf}>PDF</Button>
-                <Button variant="secondary" size="md" block icon={DollarSign} onClick={onMarkPaid}>Mark paid</Button>
+                <Button
+                  variant="secondary"
+                  size="md"
+                  block
+                  icon={DollarSign}
+                  disabled={sending}
+                  aria-describedby={sending ? waitId : undefined}
+                  onClick={onMarkPaid}
+                >
+                  Mark paid
+                </Button>
               </>
             )}
             <Button variant="quiet" size="md" block to={row.to}>Open job</Button>
             {!settled && (
-              <Button variant="destructive" size="md" block onClick={onVoid}>Void</Button>
+              <Button
+                variant="destructive"
+                size="md"
+                block
+                disabled={sending}
+                aria-describedby={sending ? waitId : undefined}
+                onClick={onVoid}
+              >
+                Void
+              </Button>
             )}
           </div>
         </div>

@@ -21,6 +21,8 @@ import { parseDateOnly } from '../lib/dates.ts'
 import { invoiceDueNow, knownInvoices } from '../lib/moneyView.ts'
 import { useSearchParams } from 'react-router-dom'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
+import { useNow } from '../lib/useNow.ts'
+import { startInvoiceSend, useInvoicesSending } from '../lib/invoiceSends.ts'
 const SnowInvoices = lazy(() => import('../components/desktop/SnowInvoicesBuild.tsx'))
 import MoneyPhone from './money/MoneyPhone.tsx'
 import type { MoneyFilter } from './money/types.ts'
@@ -65,8 +67,16 @@ function resolveClient(job: any) {
 export default function Invoices() {
   const { user } = useAuth()
   const { profile } = useProfile()
-  const { data: bundle, isLoading: loading, isError } = useInvoicesBundle(user?.id)
+  // isPending, not isLoading: the query waits, disabled, until the company
+  // is known (useOrgScope), and TanStack does not call a waiting query
+  // loading, so both screens would draw $0.00 and "paid in full" for money
+  // nobody has asked for yet.
+  const { data: bundle, isPending: loading, isError } = useInvoicesBundle(user?.id)
   const refresh = useInvalidateInvoices()
+  // The clock every number below reads, refreshed each minute and when the
+  // tab comes back, so ages, the week and the month roll over while the
+  // screen stays open (Phase 8, task 6).
+  const now = useNow()
   // Memoized so the lists below keep one identity until the bundle changes.
   const jobs = useMemo(() => bundle?.jobs ?? [], [bundle])
   const payments = useMemo(() => bundle?.payments ?? [], [bundle])
@@ -90,9 +100,13 @@ export default function Invoices() {
   // When the sheet was opened from a specific issued invoice, `invoice`
   // rides along so the payment settles that fh_invoices row.
   const [payingRow, setPayingRow] = useState<any>(null)
-  // Which invoice is mid send, drives the Resend and Send reminder
-  // buttons' loading state.
-  const [sendingId, setSendingId] = useState<any>(null)
+  // The invoices whose email is mid send, one entry each, drive the Resend
+  // and Send reminder buttons' loading state. A set, not one id: a
+  // reminder for B finishing must not free A's button, and a second tap
+  // on A while it is in flight sends nothing. It lives in lib/invoiceSends,
+  // not here, so leaving Money mid send and coming back still finds the
+  // invoice busy.
+  const sendingIds = useInvoicesSending()
   const confirm = useConfirm()
 
   // Fast lookup: contact_id → job row (for invoice card labels + sends).
@@ -138,7 +152,7 @@ export default function Invoices() {
   // closed+fully-paid since they're done.
   const rows = useMemo(() => {
     const out = []
-    const now = Date.now()
+    const nowMs = now.getTime()
     for (const j of jobs) {
       const amount = Number(j.amount || 0) + (approvedCoByJob.get(j.id) || 0)
       const paid = paidByJob.get(j.id) || 0
@@ -146,13 +160,13 @@ export default function Invoices() {
       // Age from the receivable date (oldest open invoice), not the job
       // creation date. Unbilled jobs anchor to created_at as a fallback.
       const anchorMs = arAnchorByJob.get(j.id) ?? new Date(j.created_at as any).getTime()
-      const ageDays = Math.floor((now - anchorMs) / 86400000)
+      const ageDays = Math.floor((nowMs - anchorMs) / 86400000)
       const bucket = bucketFor(ageDays)
       const isOutstanding = balance > 0.5 && j.stage !== 'lost'
       out.push({ job: j, amount, paid, balance, ageDays, bucket, isOutstanding })
     }
     return out.sort((a, b) => b.balance - a.balance)
-  }, [jobs, paidByJob, approvedCoByJob, arAnchorByJob])
+  }, [jobs, paidByJob, approvedCoByJob, arAnchorByJob, now])
 
   // Memoized so `filtered` keeps a stable identity across unrelated
   // re-renders, it feeds TanStack Table (SnowInvoicesBuild) as `data`,
@@ -228,7 +242,6 @@ export default function Invoices() {
   // as the cockpit's "X collected this month · pace ±Y% vs avg" tip
   // (ported from owed-hero__tip in the design handoff).
   const collectionPace = useMemo(() => {
-    const now = new Date()
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime()
     const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1).getTime()
     let monthCollected = 0
@@ -248,7 +261,7 @@ export default function Invoices() {
       deltaPct = Math.round(((monthCollected - priorMonthlyAvg) / priorMonthlyAvg) * 100)
     }
     return { monthCollected, deltaPct }
-  }, [payments])
+  }, [payments, now])
 
   const company = useMemo(() => ({
     name: profile?.company_name || profile?.full_name || 'My Company',
@@ -297,9 +310,11 @@ export default function Invoices() {
   }
 
   // Per-invoice actions, operate on the first-class fh_invoices rows.
-  // Resolves true once the email has gone out, so the phone's Remind and
-  // Resend sheets know when to close. A reminder is the same email sent
-  // again; only the toast words it differently (decision D6).
+  // Resolves true once the email has gone out. The Remind and Resend
+  // sheets close when lib/invoiceSends reports the email went out, not on
+  // this promise, so a sheet on a Money screen opened again mid send
+  // closes too. A reminder is the same email sent again; only the toast
+  // words it differently (decision D6).
   async function handleInvoiceSend(r: any, options: { reminder?: boolean } = {}): Promise<boolean> {
     const { invoice, job } = r
     if (!user || !job) {
@@ -311,7 +326,11 @@ export default function Invoices() {
       toastError('Add a client email first', `Open the linked client to add an email for ${c.name || 'this client'}.`)
       return false
     }
-    setSendingId(invoice.id)
+    // A tap while this invoice's email is already going out does nothing,
+    // even from a Money screen opened again since that send started.
+    const finish = startInvoiceSend(invoice.id, { reminder: !!options.reminder })
+    if (!finish) return false
+    let sent = false
     try {
       const res = await sendInvoiceEmail({
         invoice,
@@ -326,7 +345,7 @@ export default function Invoices() {
       if (res.ok) {
         toastSuccess(`${options.reminder ? 'Reminder' : 'Invoice'} sent to ${res.recipient}`, res.filename)
         refresh()
-        return true
+        sent = true
       } else if (res.reason === 'sender_not_configured') {
         toastError("Email not sent, sender isn't configured", 'Downloaded the PDF so you can email it manually.')
       } else {
@@ -335,9 +354,11 @@ export default function Invoices() {
     } catch (e: any) {
       toastError("Couldn't send invoice", e?.message || 'Try again')
     } finally {
-      setSendingId(null)
+      // Frees the buttons, and closes a sheet still showing this invoice
+      // once its email went out (useMoneySheets listens for it).
+      finish(sent)
     }
-    return false
+    return sent
   }
 
   async function handleInvoiceDownload(r: any) {
@@ -410,7 +431,8 @@ export default function Invoices() {
             collectionPace={collectionPace}
             filter={filter as MoneyFilter}
             onFilterChange={(f) => setFilter(f)}
-            sendingId={sendingId}
+            now={now}
+            sendingIds={sendingIds}
             onSendInvoice={handleInvoiceSend}
             onDownloadInvoice={handleInvoiceDownload}
             onPayInvoice={openInvoicePayment}
@@ -461,7 +483,8 @@ export default function Invoices() {
         collectionPace={collectionPace}
         filter={filter as MoneyFilter}
         onFilterChange={(f) => setFilter(f)}
-        sendingId={sendingId}
+        now={now}
+        sendingIds={sendingIds}
         onSendInvoice={handleInvoiceSend}
         onDownloadInvoice={handleInvoiceDownload}
         onPayInvoice={openInvoicePayment}

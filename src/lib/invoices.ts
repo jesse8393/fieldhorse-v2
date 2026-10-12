@@ -296,11 +296,16 @@ export async function sendInvoiceEmail({ invoice, contact, company, userId, reci
   }
 
   // Don't downgrade a paid invoice just because the PDF was sent again.
+  // `invoice` is the row as it was when this send started, and the email
+  // can take seconds on a weak signal: only a row still in that status
+  // moves to sent, so a void or a payment recorded meanwhile stays
+  // (review of Phase 8, task 6).
   if (invoice.status !== 'paid') {
     await supabase
       .from('fh_invoices')
       .update({ status: 'sent', issued_at: invoice.issued_at || new Date().toISOString() })
       .eq('id', invoice.id)
+      .eq('status', invoice.status)
   }
   return { ok: true, filename: result.filename, recipient }
 }

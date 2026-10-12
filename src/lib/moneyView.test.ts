@@ -603,6 +603,39 @@ describe('what each invoice actually owes', () => {
   })
 })
 
+// The screen feeds a clock that moves while the app stays open (Phase 8,
+// task 6), so the view must read every week, day and month from `now`
+// alone. Payments on Monday Oct 5 and Saturday Oct 10, on another job so
+// they pay nothing off the bill, sit in the week of Sunday Oct 4 to
+// Saturday Oct 10.
+describe('the clock rolling over', () => {
+  const b = bundle({
+    jobs: [job({ id: 'j1' }), job({ id: 'j2', name: 'MMC Properties', job_title: 'Parking lot repour' })],
+    payments: [
+      payment({ id: 'p-mon', contact_id: 'j2', amount: 500, paid_on: '2026-10-05', created_at: new Date(2026, 9, 5, 15).toISOString() }),
+      payment({ id: 'p-sat', contact_id: 'j2', amount: 2000, paid_on: '2026-10-10', created_at: new Date(2026, 9, 10, 15).toISOString() })
+    ],
+    invoices: [invoice({ id: 'sun', amount: 1240, due_at: '2026-10-11' })]
+  })
+
+  it('counts last week\'s payments on Saturday night', () => {
+    const view = buildMoneyView({ bundle: b, quotes: [], now: new Date(2026, 9, 10, 23, 59) })
+    expect(view.collectedThisWeek).toBe(2500)
+    // A bill due Sunday is not due by this Saturday.
+    expect(view.dueThisWeek).toBe(0)
+    expect(view.dueSoon.map((r) => r.note)).toEqual(['Due Oct 11'])
+  })
+
+  it('gives $0.00 collected this week on Sunday at 8 am for last week\'s payments', () => {
+    const view = buildMoneyView({ bundle: b, quotes: [], now: new Date(2026, 9, 11, 8, 0) })
+    expect(view.collectedThisWeek).toBe(0)
+    expect(view.monthToDate).toBe(2500)
+    // The same bill is now due today, and due this week.
+    expect(view.dueThisWeek).toBe(1240)
+    expect(view.dueSoon.map((r) => r.note)).toEqual(['Due today'])
+  })
+})
+
 describe('classifyInvoice', () => {
   it('calls an issued bill overdue only once its due day has ended', () => {
     expect(classifyInvoice({ status: 'sent', due_at: '2026-10-08', amount: 900 }, 900, NOW).status).toBe('sent')

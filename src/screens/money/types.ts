@@ -62,6 +62,7 @@ export type SendInvoiceOptions = { reminder?: boolean }
  */
 export type MoneyScreenProps = {
   bundle: InvoicesBundle | undefined
+  /** True until the bundle arrives, including while its query waits for the company to be known. */
   loading: boolean
   /** Issued invoices with their job (every one, unfiltered). */
   invoiceRows: IssuedInvoiceRow[]
@@ -72,8 +73,10 @@ export type MoneyScreenProps = {
   collectionPace: CollectionPace
   filter: MoneyFilter
   onFilterChange: (next: MoneyFilter) => void
-  /** The invoice id that is mid send, if any. */
-  sendingId: string | null
+  /** The time, refreshed each minute and when the tab comes back (useNow), so the week, the day and the month roll over. */
+  now: Date
+  /** The invoice ids whose email is mid send, one entry each, so one finishing never frees another's button. */
+  sendingIds: ReadonlySet<string>
   /** Sends the invoice email. Resolves true once it has gone out. */
   onSendInvoice: (row: IssuedInvoiceRow, options?: SendInvoiceOptions) => Promise<boolean>
   onDownloadInvoice: (row: IssuedInvoiceRow) => void

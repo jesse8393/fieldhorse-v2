@@ -28,7 +28,7 @@ Status is one of todo, done, blocked, skipped.
 | 1 | 3 Capture from a job page shows up on the job | done | `1766c46` | Reviewed by two lenses, approved with no fix round. Decision D35 |
 | 1 | 4 Morning cold open says "Clear day" | done | `84ccf0d` | Reviewed by two lenses, approved with no fix round. Decision D40 |
 | 1 | 5 What each invoice actually owes | done | `33a5b55` | One fix round (email and PDF agreement, jobs with no contract amount, drafts in the allocator), then approved. Decision D37 |
-| 1 | 6 Money timing and double sends | todo | | |
+| 1 | 6 Money timing and double sends | done | this commit | Three fix rounds (panel pages before the company loads, a send surviving a trip away from Money, a tap as the email lands), then approved. Decision D43 |
 | 1 | 7 Jobs and quotes stay inside the active company | done | `222e8f6` | Reviewed by two lenses, approved with no fix round. Decision D36 |
 | 1 | 8 The Unscheduled tray tells the truth | done | `d4dc086` | Two fix rounds (overlapping drops, rollback by value), then approved. Decision D39 |
 | 1 | 9 One quote total and one deposit everywhere | done | `8c3f6c9` | Reviewed by two lenses, approved with no fix round. Decision D31 |
@@ -38,7 +38,7 @@ Status is one of todo, done, blocked, skipped.
 | 2 | 13 Desktop Capture button | done | `7d8351b` | One fix round (an Inbox test still waited for the removed button), then approved. Decision D33 |
 | 2 | 14 Desktop between 900 and 1279 px | todo | | |
 | 2 | 15 Small behavior fixes | todo | | |
-| 2 | 16 Login wordmark | done | this commit | Two fix rounds (the fallback face ran off a phone while Bebas Neue loaded, WebKit's early font answer), then approved. Decision D42 |
+| 2 | 16 Login wordmark | done | `74cd854` | Two fix rounds (the fallback face ran off a phone while Bebas Neue loaded, WebKit's early font answer), then approved. Decision D42 |
 | 3 | 17 CSS and test hygiene | todo | | |
 | 3 | 18 Private line notes on the customer page | skipped | | The approval line in the plan reads no, so `netlify/functions/public-link.js` is unchanged |
 
@@ -103,6 +103,11 @@ Status is one of todo, done, blocked, skipped.
 * **Task 16, the login wordmark.** Three lane commits squashed into one. The wordmark Login shows is the local one in `src/screens/auth/AuthShell.tsx`, shared by Reset password and Partner invite, not `src/components/Wordmark.tsx` as the lead's note said; the lane changed the AuthShell one and left Onboarding as it was.
   * Shared file, allowed by the task: `scripts/audit-design-system.mjs` gained one documented exception for the 68 px wordmark rule in `auth.css`.
   * The WebKit font behavior was imitated in Chromium (only Chromium is installed here); it is on the iPhone checklist.
+
+* **Task 6, Money timing and double sends.** Four lane commits squashed into one. New `src/lib/useNow.ts` and `src/lib/invoiceSends.ts`; `sendInvoiceEmail` now filters its status update on the status it started from (`sendInvoiceEmail.test.ts`). `money.spec` grew from 27 to 49 tests, every new one pinned to a fixed clock.
+  * At integration: the desktop Schedule board dropped its private minute ticker for the shared `useNow`, so it also catches up when its tab comes back into view; the paused Mark paid and Void line was reworded to "Mark paid and Void are paused while the email goes out.", because the sheet closes when the email lands rather than turning the buttons back on.
+  * Plan and code differ: the named Sunday 8 am unit test passes on the old code too, because the pure function already honored `now`; the screen level failure is pinned by the rollover e2e tests.
+  * Known small gaps, not changed: the job page draws (`InvoiceDrawsSection`) still send with an unfiltered status update and keep their own busy state, as do the invoice page and the Send invoice sheet; only Money's sends go through the shared set.
 
 * The first CI run on #223 (a docs only commit) failed `mock-workflows` "keeps the desktop schedule planning workflow complete" on desktop. The default mock visit starts two hours after the mock loads, so between 10 pm and midnight Central it lands on tomorrow and the Day view is empty. It failed here too at 10:48 pm Central and passed after the test pinned its page clock to a Thursday morning and seeded that day's visit. It is listed under "Failing before Phase 8".
 

@@ -39,6 +39,10 @@ import type { BoardEvent, BoardView } from './schedule/types.ts'
 import './schedule/schedule.css'
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useOrgScope } from '../../lib/orgScope.ts'
+// The shared clock (lib/useNow.ts): it ticks each minute and again when
+// the tab comes back into view, so the now line and the past slots keep up
+// after a night in a background tab without a reload.
+import { useNow } from '../../lib/useNow.ts'
 import {
   addBookedJob,
   bookedKey,
@@ -108,17 +112,6 @@ function startOfDay(d: Date) {
 
 function addDays(d: Date, n: number) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n)
-}
-
-// The clock the board reads, refreshed each minute so the now line and
-// the past slots keep up without a reload.
-function useNow(intervalMs = 60_000) {
-  const [now, setNow] = useState(() => new Date())
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), intervalMs)
-    return () => window.clearInterval(timer)
-  }, [intervalMs])
-  return now
 }
 
 // How far the pointer or keyboard is from the slot under the dragged

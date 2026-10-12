@@ -16,8 +16,14 @@
 // sheet. There is no gold action on the page; the one brushed gold button
 // is "Send reminder" inside the Remind sheet, as on the phone.
 //
-// The numbers come from buildMoneyView (lib/moneyView.ts). The handlers
-// that send, download, void and record payments are Invoices.tsx's own.
+// The numbers come from buildMoneyView (lib/moneyView.ts), read against
+// the clock Invoices.tsx passes down (`now`, from useNow), so the week,
+// "Due today" and the month label roll over while the page stays open.
+// Until the bundle arrives, the vault card, the aging summary, the link
+// strip and the groups are all skeletons, and so is a page opened by its
+// ?panel= link: no $0.00 stands in for money that has not loaded. The
+// handlers that send, download, void and record payments are
+// Invoices.tsx's own.
 
 import { useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
@@ -52,7 +58,8 @@ export default function SnowInvoicesBuild({
   collectionPace,
   filter,
   onFilterChange,
-  sendingId,
+  now,
+  sendingIds,
   onSendInvoice,
   onDownloadInvoice,
   onPayInvoice,
@@ -68,10 +75,10 @@ export default function SnowInvoicesBuild({
 
   const waiting = loading || jobsQuery.isLoading
   const view = useMemo(
-    () => (bundle ? buildMoneyView({ bundle, quotes: jobsQuery.data ?? [], now: new Date() }) : null),
-    [bundle, jobsQuery.data]
+    () => (bundle ? buildMoneyView({ bundle, quotes: jobsQuery.data ?? [], now }) : null),
+    [bundle, jobsQuery.data, now]
   )
-  const invoiceList = useMemo(() => (bundle ? buildInvoiceList({ bundle, now: new Date() }) : []), [bundle])
+  const invoiceList = useMemo(() => (bundle ? buildInvoiceList({ bundle, now }) : []), [bundle, now])
   const openInvoiceCount = useMemo(
     () => invoiceList.filter((r) => r.status === 'draft' || r.status === 'sent' || r.status === 'overdue').length,
     [invoiceList]
@@ -81,7 +88,7 @@ export default function SnowInvoicesBuild({
     bundle,
     invoiceRows,
     invoiceList,
-    sendingId,
+    sendingIds,
     onSendInvoice,
     onDownloadInvoice,
     onPayInvoice,
@@ -90,9 +97,12 @@ export default function SnowInvoicesBuild({
   })
 
   const openJob = (to: string) => navigate(to)
-  const month = new Date().toLocaleDateString('en-US', { month: 'long' })
+  const month = now.toLocaleDateString('en-US', { month: 'long' })
   const hasDue = view ? view.overdue.length + view.dueSoon.length > 0 : false
   const countLine = (n: number) => plural(n, 'invoice', 'invoices')
+  // The aging summary and the link strip wait with the rest: nothing on
+  // the page reads $0.00 or "0 open" before the money is here.
+  const pending = waiting || !view
 
   if (panel) {
     return (
@@ -102,20 +112,31 @@ export default function SnowInvoicesBuild({
           <h1 className="fhmd-title" ref={titleRef} tabIndex={-1}>{PANEL_TITLES[panel]}</h1>
         </header>
         <main className="fhmd-main">
-          {panel === 'statements' && <StatementsTable groups={clientAR} onStatement={onStatement} />}
-          {panel === 'invoices' && (
-            <InvoicesTable rows={invoiceList} filter={filter} onFilterChange={onFilterChange} onOpenInvoice={openActions} />
-          )}
-          {panel === 'balances' && (
-            <BalancesTable
-              rows={jobBalances}
-              totals={totals}
-              pace={collectionPace}
-              filter={filter}
-              onFilterChange={onFilterChange}
-              onPayRow={onPayRow}
-              onOpenJob={(id) => navigate(`/jobs/${id}?tab=financials`)}
-            />
+          {loading || !bundle ? (
+            // Opened by its URL before the bundle arrived, or before it was
+            // even asked for while the company is unknown: no empty table
+            // and no $0.00 total stands in for it.
+            <div className="fhmd-state">
+              <SkeletonRows rows={6} label="Loading money" />
+            </div>
+          ) : (
+            <>
+              {panel === 'statements' && <StatementsTable groups={clientAR} onStatement={onStatement} />}
+              {panel === 'invoices' && (
+                <InvoicesTable rows={invoiceList} filter={filter} onFilterChange={onFilterChange} onOpenInvoice={openActions} />
+              )}
+              {panel === 'balances' && (
+                <BalancesTable
+                  rows={jobBalances}
+                  totals={totals}
+                  pace={collectionPace}
+                  filter={filter}
+                  onFilterChange={onFilterChange}
+                  onPayRow={onPayRow}
+                  onOpenJob={(id) => navigate(`/jobs/${id}?tab=financials`)}
+                />
+              )}
+            </>
           )}
         </main>
         {sheets}
@@ -151,28 +172,43 @@ export default function SnowInvoicesBuild({
               />
             )}
           </div>
-          <AgingSummary totals={totals} />
+          {pending ? (
+            <Skeleton shape="block" height={222} className="fhmd-aging__skel" />
+          ) : (
+            <AgingSummary totals={totals} />
+          )}
         </div>
 
-        <nav className="fhmd-more" aria-label="More on money">
-          <Link className="fhmd-link" to={panelHref('statements')} onClick={openPanel}>
-            <span className="fhmd-link__label">Statements</span>
-            <span className="fhmd-link__value">
-              {clientAR.length === 0 ? 'Nobody owes you' : `${clientAR.length} ${clientAR.length === 1 ? 'customer owes' : 'customers owe'} you`}
-            </span>
-            <ChevronRight className="fhmd-link__chevron" size={18} aria-hidden="true" />
-          </Link>
-          <Link className="fhmd-link" to={panelHref('invoices')} onClick={openPanel}>
-            <span className="fhmd-link__label">All invoices</span>
-            <span className="fhmd-link__value">{openInvoiceCount} open</span>
-            <ChevronRight className="fhmd-link__chevron" size={18} aria-hidden="true" />
-          </Link>
-          <Link className="fhmd-link" to={panelHref('balances')} onClick={openPanel}>
-            <span className="fhmd-link__label">Job balances</span>
-            <span className="fhmd-link__value">{plural(totals.count ?? 0, 'job', 'jobs')} with a balance</span>
-            <ChevronRight className="fhmd-link__chevron" size={18} aria-hidden="true" />
-          </Link>
-        </nav>
+        {pending ? (
+          <div className="fhmd-more" aria-hidden="true">
+            {['statements', 'invoices', 'balances'].map((id) => (
+              <div key={id} className="fhmd-link fhmd-link--skel">
+                <Skeleton width={104} height={14} />
+                <Skeleton width={132} height={12} />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <nav className="fhmd-more" aria-label="More on money">
+            <Link className="fhmd-link" to={panelHref('statements')} onClick={openPanel}>
+              <span className="fhmd-link__label">Statements</span>
+              <span className="fhmd-link__value">
+                {clientAR.length === 0 ? 'Nobody owes you' : `${clientAR.length} ${clientAR.length === 1 ? 'customer owes' : 'customers owe'} you`}
+              </span>
+              <ChevronRight className="fhmd-link__chevron" size={18} aria-hidden="true" />
+            </Link>
+            <Link className="fhmd-link" to={panelHref('invoices')} onClick={openPanel}>
+              <span className="fhmd-link__label">All invoices</span>
+              <span className="fhmd-link__value">{openInvoiceCount} open</span>
+              <ChevronRight className="fhmd-link__chevron" size={18} aria-hidden="true" />
+            </Link>
+            <Link className="fhmd-link" to={panelHref('balances')} onClick={openPanel}>
+              <span className="fhmd-link__label">Job balances</span>
+              <span className="fhmd-link__value">{plural(totals.count ?? 0, 'job', 'jobs')} with a balance</span>
+              <ChevronRight className="fhmd-link__chevron" size={18} aria-hidden="true" />
+            </Link>
+          </nav>
+        )}
 
         {waiting || !view ? (
           <div className="fhmd-state">
