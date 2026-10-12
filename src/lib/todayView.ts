@@ -63,14 +63,6 @@ function parse(iso: string | null | undefined): number {
   return iso ? Date.parse(iso) : Number.NaN
 }
 
-// The queries already ask for one local day each. Checking again here
-// keeps a bundle cached before midnight from showing yesterday as today.
-// A visit with no start stays where its query put it.
-function onDay(item: HomeTodayOnSite, key: string): boolean {
-  const start = parse(item.startAt)
-  return Number.isNaN(start) || dayKey(new Date(start)) === key
-}
-
 function byStart(a: HomeTodayOnSite, b: HomeTodayOnSite): number {
   const x = parse(a.startAt)
   const y = parse(b.startAt)
@@ -83,6 +75,35 @@ function byStart(a: HomeTodayOnSite, b: HomeTodayOnSite): number {
 function isOver(item: HomeTodayOnSite, nowMs: number): boolean {
   const end = parse(item.endAt ?? item.startAt)
   return !Number.isNaN(end) && end <= nowMs
+}
+
+// The queries ask for one local day each, from the clock at fetch time,
+// so a bundle cached at 9 pm lists yesterday as today and today as
+// tomorrow when it is read at 6:30 the next morning. Both lists are read
+// as one here and every visit is placed by its own local start day: on
+// today, on tomorrow, or nowhere. A visit with no start stays where its
+// query put it, and one listed twice counts once.
+function placeByDay(bundle: HomeDashboardBundle, now: Date): { day: HomeTodayOnSite[]; tomorrow: HomeTodayOnSite[] } {
+  const todayKey = dayKey(now)
+  const tomorrowKey = dayKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1))
+  const day: HomeTodayOnSite[] = []
+  const tomorrow: HomeTodayOnSite[] = []
+  const seen = new Set<string>()
+  const place = (rows: HomeTodayOnSite[] | undefined, own: HomeTodayOnSite[]) => {
+    for (const item of rows ?? []) {
+      if (seen.has(item.id)) continue
+      seen.add(item.id)
+      const start = parse(item.startAt)
+      const key = Number.isNaN(start) ? null : dayKey(new Date(start))
+      if (key === null) own.push(item)
+      else if (key === todayKey) day.push(item)
+      else if (key === tomorrowKey) tomorrow.push(item)
+    }
+  }
+  place(bundle.todayOnSite, day)
+  // A bundle cached by an older build has no tomorrow yet.
+  place(bundle.tomorrowOnSite, tomorrow)
+  return { day: day.sort(byStart), tomorrow: tomorrow.sort(byStart) }
 }
 
 /** "71° and partly cloudy. Clear to work until 3 pm." */
@@ -101,12 +122,7 @@ export function weatherLine(weather: TodayWeather | null | undefined): string | 
 
 export function buildTodayView({ bundle, now, lat, lon, weather }: TodayViewInput): TodayView {
   const nowMs = now.getTime()
-  const todayKey = dayKey(now)
-  const tomorrowKey = dayKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1))
-
-  const day = (bundle.todayOnSite ?? []).filter((item) => onDay(item, todayKey)).sort(byStart)
-  // A bundle cached by an older build has no tomorrow yet.
-  const tomorrow = (bundle.tomorrowOnSite ?? []).filter((item) => onDay(item, tomorrowKey)).sort(byStart)
+  const { day, tomorrow } = placeByDay(bundle, now)
   const done = day.filter((item) => isOver(item, nowMs))
 
   // The card links to a job and opens maps, so visits with no job or no
@@ -248,6 +264,20 @@ function asForecast(value: unknown): Forecast | null {
 
 function finite(n: unknown): n is number {
   return typeof n === 'number' && Number.isFinite(n)
+}
+
+/** How long a fetched forecast counts as the weather now: 90 minutes. */
+export const FORECAST_CURRENT_MS = 90 * 60_000
+
+/**
+ * The forecast when it was fetched within the last 90 minutes, else null,
+ * so a snapshot restored from last night's cache never reads as the
+ * weather now and no stale temperature shows. `fetchedAt` is the query's
+ * dataUpdatedAt in epoch ms, 0 before the first fetch.
+ */
+export function currentForecast(forecast: unknown, fetchedAt: number | null | undefined, now: Date): unknown {
+  if (forecast == null || !finite(fetchedAt) || fetchedAt <= 0) return null
+  return now.getTime() - fetchedAt <= FORECAST_CURRENT_MS ? forecast : null
 }
 
 /** "3 pm" from an Open Meteo hour such as "2026-10-09T15:00", local to the forecast. */

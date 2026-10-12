@@ -1,9 +1,11 @@
 import { Suspense, useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
-import { getWeather, MURFREESBORO } from '../lib/weather.ts'
+import { MURFREESBORO, weatherQuery } from '../lib/weather.ts'
+import { currentForecast } from '../lib/todayView.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { useHomeDashboard, useHomeDashboardRealtime } from '../lib/homeDashboard.ts'
 import type { HomeNextAction } from '../lib/homeDashboard.ts'
@@ -20,7 +22,7 @@ const SnowHome = lazyWithRetry(() => import('../components/desktop/SnowHomeBuild
 
 export default function Home() {
   const { user } = useAuth()
-  const { profile, upsertProfile, refresh } = useProfile()
+  const { profile, loading: profileLoading, upsertProfile, refresh } = useProfile()
 
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
@@ -28,11 +30,20 @@ export default function Home() {
     return () => clearInterval(id)
   }, [])
 
-  // Weather
-  const [weather, setWeather] = useState<any>(null)
-  const [weatherErr, setWeatherErr] = useState('')
-
+  // Weather, through the query cache: one request per location, fresh for
+  // 30 minutes and read again on focus. The query waits for the profile
+  // so it asks for the company's own spot, not the fallback first. A
+  // snapshot restored from last night's cache is hours old, so
+  // currentForecast hides it until the refetch lands; the pin errors are
+  // the screen's own.
   const hasCoords = profile?.location_lat != null && profile?.location_lon != null
+  const lat = profile?.location_lat ?? MURFREESBORO.lat
+  const lon = profile?.location_lon ?? MURFREESBORO.lon
+  const weather = useQuery({ ...weatherQuery(lat, lon), enabled: !profileLoading })
+  const forecast = currentForecast(weather.data, weather.dataUpdatedAt, now)
+  const [pinError, setPinError] = useState('')
+  const forecastError = pinError || (weather.error ? weather.error.message || 'Forecast unavailable' : '')
+
   const membership = useMembership()
   const dashboard = useHomeDashboard(user?.id, membership.orgId)
   useHomeDashboardRealtime(user?.id, membership.orgId)
@@ -43,26 +54,15 @@ export default function Home() {
       ? 'Dashboard data could not refresh.'
       : ''
 
-  /* ----- Weather ----- */
-  useEffect(() => {
-    let cancelled = false
-    const lat = profile?.location_lat ?? MURFREESBORO.lat
-    const lon = profile?.location_lon ?? MURFREESBORO.lon
-    setWeatherErr('')
-    getWeather(lat, lon)
-      .then((d) => { if (!cancelled) setWeather(d) })
-      .catch((e) => { if (!cancelled) setWeatherErr(e.message || 'Forecast unavailable') })
-    return () => { cancelled = true }
-  }, [profile?.location_lat, profile?.location_lon])
-
   function pinLocation() {
-    if (!('geolocation' in navigator)) return setWeatherErr('Geolocation not supported')
+    if (!('geolocation' in navigator)) return setPinError('Geolocation not supported')
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
+        setPinError('')
         await upsertProfile({ location_lat: pos.coords.latitude, location_lon: pos.coords.longitude })
         refresh()
       },
-      () => setWeatherErr('Location denied'),
+      () => setPinError('Location denied'),
       { enableHighAccuracy: false, timeout: 8000, maximumAge: 60 * 60 * 1000 }
     )
   }
@@ -102,8 +102,8 @@ export default function Home() {
           lat={profile?.location_lat}
           lon={profile?.location_lon}
           services={profile?.services}
-          forecast={weather}
-          forecastError={weatherErr}
+          forecast={forecast}
+          forecastError={forecastError}
           hasLocation={hasCoords}
           onPinLocation={pinLocation}
           actionPath={nextActionPath}
@@ -125,8 +125,8 @@ export default function Home() {
       lat={profile?.location_lat}
       lon={profile?.location_lon}
       services={profile?.services}
-      forecast={weather}
-      forecastError={weatherErr}
+      forecast={forecast}
+      forecastError={forecastError}
       hasLocation={hasCoords}
       onPinLocation={pinLocation}
       actionPath={nextActionPath}

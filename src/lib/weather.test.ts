@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { workWindow, hourlyStrip } from './weather.ts'
+import { workWindow, hourlyStrip, weatherQuery } from './weather.ts'
 
 // Two forecast days of hourly slots in Open-Meteo's shape: local wall
 // clock strings with no offset, starting at midnight today.
@@ -86,5 +86,21 @@ describe('hourlyStrip', () => {
 
   it('returns nothing without hourly data', () => {
     expect(hourlyStrip(null, ['gc'])).toEqual([])
+  })
+})
+
+describe('weatherQuery', () => {
+  it('is one query per location', () => {
+    const here = weatherQuery(35.84, -86.36)
+    expect(here.queryKey).toEqual(['weather', 35.84, -86.36])
+    expect(weatherQuery(35.84, -86.36).queryKey).toEqual(here.queryKey)
+    expect(weatherQuery(36.16, -86.78).queryKey).not.toEqual(here.queryKey)
+  })
+
+  it('stays fresh for 30 minutes, then fetches again on focus and while the screen is open', () => {
+    const query = weatherQuery(35.84, -86.36)
+    expect(query.staleTime).toBe(30 * 60_000)
+    expect(query.refetchOnWindowFocus).toBe(true)
+    expect(query.refetchInterval).toBe(30 * 60_000)
   })
 })

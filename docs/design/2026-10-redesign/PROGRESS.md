@@ -26,11 +26,11 @@ Status is one of todo, done, blocked, skipped.
 | 1 | 1 Make the test mock honest | done | `8b14809` | Reviewed twice, one fix round. Data fixed in one test (see notes) |
 | 1 | 2 Today counts stop at 6 | done | `07a9071` | Reviewed by two lenses, approved with no fix round. Decision D34 |
 | 1 | 3 Capture from a job page shows up on the job | done | `1766c46` | Reviewed by two lenses, approved with no fix round. Decision D35 |
-| 1 | 4 Morning cold open says "Clear day" | todo | | |
+| 1 | 4 Morning cold open says "Clear day" | done | this commit | Reviewed by two lenses, approved with no fix round. Decision D40 |
 | 1 | 5 What each invoice actually owes | todo | | |
 | 1 | 6 Money timing and double sends | todo | | |
 | 1 | 7 Jobs and quotes stay inside the active company | done | `222e8f6` | Reviewed by two lenses, approved with no fix round. Decision D36 |
-| 1 | 8 The Unscheduled tray tells the truth | done | this commit | Two fix rounds (overlapping drops, rollback by value), then approved. Decision D39 |
+| 1 | 8 The Unscheduled tray tells the truth | done | `d4dc086` | Two fix rounds (overlapping drops, rollback by value), then approved. Decision D39 |
 | 1 | 9 One quote total and one deposit everywhere | todo | | |
 | 1 | 10 The customer page after approval and on bad data | todo | | |
 | 1 | 11 Inbox sends exactly once, only when tapped, only when online | done | `36e4c88` | Reviewed by two lenses, approved with no fix round. Decision D38 |
@@ -76,6 +76,10 @@ Status is one of todo, done, blocked, skipped.
   * Fixed at integration: Show all N used to unmount under keyboard focus; it now moves focus to the first revealed card.
   * Known small gaps, not changed: a drop that succeeds during the one round trip at midnight can bring its card back with drag enabled until the next refetch; rollback by value can remove a teammate's real booked row for the same job when three things coincide (slow insert, a refetch landing mid insert that carries the teammate's row, then a failure). Both are one round trip wide.
   * The mock ignores `not.` filters, so the booked read's `contact_id not null` is only applied by the real database.
+
+* **Task 4, the morning cold open.** `onDay` became `placeByDay` in `todayView.ts`; `weatherQuery` and `currentForecast` are new; `Home.tsx` lost its weather effect and state. `getWeather` is untouched, so every test and compare script that answers `api.open-meteo.com` still works.
+  * Plan and brief mismatch, kept on purpose: the cold open e2e pins the clock with `page.clock.setSystemTime`, not `setFixedTime`, because the offline cache writer (TanStack's throttle) loops on `Date.now` and never writes under a fixed clock. The time still never drifts within the test's reads.
+  * Known small gaps, not changed: when the browser has fired an offline event, a stale forecast's paused refetch leaves the stage on the forecast skeleton rather than the unavailable line; Today's clock ticks once a minute, so after a backgrounded tab resumes the 90 minute gate and the day placement can lag one tick.
 
 * The first CI run on #223 (a docs only commit) failed `mock-workflows` "keeps the desktop schedule planning workflow complete" on desktop. The default mock visit starts two hours after the mock loads, so between 10 pm and midnight Central it lands on tomorrow and the Day view is empty. It failed here too at 10:48 pm Central and passed after the test pinned its page clock to a Thursday morning and seeded that day's visit. It is listed under "Failing before Phase 8".
 
