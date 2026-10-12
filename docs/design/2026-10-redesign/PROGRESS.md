@@ -65,6 +65,8 @@ Status is one of todo, done, blocked, skipped.
   * Link only: `inbox/Thread.tsx` picks a job chip and creates nothing. Already scoped: the Add event job picker.
   * Outside Task 7, not changed: the Capture sheet's job picker reads jobs with no company filter (it does not use `useJobs`).
 
+* **Flaky test made steady, no assertion changed.** `quote.spec` "a draft can be deleted, an approved quote cannot" (phone) opened the draft and then the approved quote in the same browser context. The job page keeps its last read in the offline cache for 30 seconds, so the second visit could show the draft it had just seen and never ask the mock again. It passed in CI and in the baseline but failed here on every lane after Task 1 (the honest mock answers in a different order, which tips the race). The approved half now opens in a fresh browser context; it passed three runs in a row.
+
 * The first CI run on #223 (a docs only commit) failed `mock-workflows` "keeps the desktop schedule planning workflow complete" on desktop. The default mock visit starts two hours after the mock loads, so between 10 pm and midnight Central it lands on tomorrow and the Day view is empty. It failed here too at 10:48 pm Central and passed after the test pinned its page clock to a Thursday morning and seeded that day's visit. It is listed under "Failing before Phase 8".
 
 ## Morning summary

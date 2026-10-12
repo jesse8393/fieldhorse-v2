@@ -377,15 +377,25 @@ test.describe('quote tab on a phone', () => {
     }
   })
 
-  test('a draft can be deleted, an approved quote cannot', async ({ context, page }) => {
+  test('a draft can be deleted, an approved quote cannot', async ({ browser, contextOptions, context, page }) => {
     await signIn(context, { tables: { fh_quote_items: ITEMS, fh_contacts: [quoteContact({ proposal_status: 'draft' })] } })
     await openQuote(page)
     await expect(page.getByRole('button', { name: 'Delete draft quote' })).toBeVisible()
 
-    await signIn(context, { tables: { fh_quote_items: ITEMS, fh_contacts: [quoteContact({ proposal_status: 'approved' })] } })
-    await openQuote(page)
-    await expect(page.getByRole('button', { name: 'Delete draft quote' })).toHaveCount(0)
-    await expect(page.getByText('Approved quotes cannot be deleted. Create a revision instead.')).toBeVisible()
+    // The approved quote opens in a fresh browser context. The job page
+    // keeps the last read in the offline cache for 30 seconds, so a second
+    // visit in the same context could still show the draft it just saw and
+    // never ask the mock again. That made this test a race.
+    const approvedContext = await browser.newContext(contextOptions)
+    try {
+      const approved = await approvedContext.newPage()
+      await signIn(approvedContext, { tables: { fh_quote_items: ITEMS, fh_contacts: [quoteContact({ proposal_status: 'approved' })] } })
+      await openQuote(approved)
+      await expect(approved.getByRole('button', { name: 'Delete draft quote' })).toHaveCount(0)
+      await expect(approved.getByText('Approved quotes cannot be deleted. Create a revision instead.')).toBeVisible()
+    } finally {
+      await approvedContext.close()
+    }
   })
 
   test('the other tabs keep the action capsule', async ({ context, page }) => {
