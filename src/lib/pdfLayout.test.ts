@@ -158,6 +158,34 @@ describe('money columns', () => {
   })
 })
 
+describe('amount due hero', () => {
+  // Review of task 5: callers that already know what the invoice still owes
+  // (the allocator in invoiceSettlement.ts) hand it in, so the hero never
+  // disagrees with the email it travels with.
+  const base = {
+    company, contact,
+    lineItems: [{ description: 'Deposit', qty: 1, rate: 5000, amount: 5000 }],
+    currentInvoice: { id: 'i1', sequence_number: 1, amount: 5000, status: 'overdue', due_at: '2026-10-02' },
+    payments: [{ amount: 2000, paid_on: '2026-10-03', method: 'check' }],
+    contractTotal: 10000,
+    previouslyPaid: 2000
+  }
+
+  it('prints the figure it is handed instead of the invoice amount capped at the balance', async () => {
+    const before: any = await generateInvoice(base as any)
+    const beforeText = textRuns(before.doc).map((r) => r.text).join(' ')
+    expect(beforeText).toContain('$5,000.00')
+    expect(beforeText).not.toContain('$3,000.00')
+    const after: any = await generateInvoice({ ...base, amountDue: 3000 } as any)
+    expect(textRuns(after.doc).map((r) => r.text).join(' ')).toContain('$3,000.00')
+  })
+
+  it('reads Paid in full when it is handed zero', async () => {
+    const r: any = await generateInvoice({ ...base, amountDue: 0 } as any)
+    expect(textRuns(r.doc).map((r) => r.text).join(' ')).toContain('Paid in full')
+  })
+})
+
 describe('characters the standard fonts cannot draw', () => {
   it('prints credits and payments with a readable minus sign', async () => {
     const r: any = await generateInvoice({

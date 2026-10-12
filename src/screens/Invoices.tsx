@@ -18,6 +18,7 @@ import { useConfirm } from '../components/ConfirmSheet.tsx'
 import StatementSheet from '../components/StatementSheet.tsx'
 import { approvedCoByContact } from '../lib/statement.ts'
 import { parseDateOnly } from '../lib/dates.ts'
+import { invoiceDueNow, knownInvoices } from '../lib/moneyView.ts'
 import { useSearchParams } from 'react-router-dom'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 const SnowInvoices = lazy(() => import('../components/desktop/SnowInvoicesBuild.tsx'))
@@ -199,21 +200,17 @@ export default function Invoices() {
 
   const [statementClient, setStatementClient] = useState<any>(null)
 
-  // Issued invoices (first-class fh_invoices rows), enriched with their
-  // job + effective status, a 'sent' invoice past its due date reads
-  // as overdue at display time without a background job mutating rows.
-  const invoiceRows = useMemo(() => {
-    const now = Date.now()
-    return invoices.map((inv) => {
-      const job = jobById.get(inv.contact_id) || null
-      // due_at can be date-only, LOCAL parse, and a bill due "July 25"
-      // isn't overdue until July 25 has fully passed locally.
-      const due = parseDateOnly(inv.due_at)
-      const pastDue = inv.status === 'sent' && due != null && due.getTime() + 86400000 <= now
-      const effStatus = pastDue ? 'overdue' : (inv.status || 'draft')
-      return { invoice: inv, job, effStatus }
-    })
-  }, [invoices, jobById])
+  // Issued invoices (first-class fh_invoices rows) with their job. The
+  // status and amount each screen shows come from moneyView's classify.
+  const invoiceRows = useMemo(
+    () => invoices.map((inv) => ({ invoice: inv, job: jobById.get(inv.contact_id) || null })),
+    [invoices, jobById]
+  )
+
+  // Every invoice the bundle knows (the display list, every open one and
+  // the paid and void ones), so a reminder email asks for what the row
+  // shows: invoiceAmountDue spreads money logged against the job over them.
+  const allInvoices = useMemo(() => (bundle ? knownInvoices(bundle) : []), [bundle])
 
   const totals = useMemo(() => {
     const out: Record<string, number> = { '0-30': 0, '31-60': 0, '60+': 0, total: 0, count: 0 }
@@ -272,14 +269,13 @@ export default function Invoices() {
   }), [profile])
 
   // Mark paid on an issued invoice links the payment to it, prefilled
-  // with what is still due on it: never more than the job's remaining
+  // with what is still due on it (the amount its Money row shows): less
+  // what was paid against it, never more than the job's remaining
   // balance, so clearing a bill the job already paid can't record the
   // same money a second time.
   function openInvoicePayment(r: any) {
-    if (!r?.job) return
-    const amount = Number(r.invoice.amount || 0)
-    const jobBalance = rows.find((x) => x.job.id === r.job.id)?.balance ?? amount
-    const due = Math.max(0, Math.min(amount, jobBalance))
+    if (!r?.job || !bundle) return
+    const due = invoiceDueNow(bundle, r.invoice.id)
     setPayingRow({ job: r.job, balance: due, invoice: { ...r.invoice, amount: due } })
   }
 
@@ -294,6 +290,10 @@ export default function Invoices() {
   // (the A/R row already includes it, so the doc would understate).
   function changeOrdersForJob(jobId: string) {
     return changeOrders.filter((co) => (co as any).contact_id === jobId)
+  }
+
+  function invoicesForJob(jobId: string) {
+    return allInvoices.filter((inv) => inv.contact_id === jobId)
   }
 
   // Per-invoice actions, operate on the first-class fh_invoices rows.
@@ -320,7 +320,8 @@ export default function Invoices() {
         userId: user.id,
         recipientEmail: c.email,
         payments: paymentsForJob(job.id),
-        changeOrders: changeOrdersForJob(job.id)
+        changeOrders: changeOrdersForJob(job.id),
+        invoices: invoicesForJob(job.id)
       })
       if (res.ok) {
         toastSuccess(`${options.reminder ? 'Reminder' : 'Invoice'} sent to ${res.recipient}`, res.filename)
@@ -349,7 +350,8 @@ export default function Invoices() {
       const result = await buildInvoicePdf({
         invoice, contact: job, company,
         payments: paymentsForJob(job.id),
-        changeOrders: changeOrdersForJob(job.id)
+        changeOrders: changeOrdersForJob(job.id),
+        invoices: invoicesForJob(job.id)
       })
       const { downloadPdf } = await loadPdf()
       downloadPdf(result)

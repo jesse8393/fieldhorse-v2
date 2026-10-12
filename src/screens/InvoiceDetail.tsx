@@ -15,7 +15,7 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, authHeaders } from '../lib/supabase.ts'
 import { useInvoiceDetail, useInvalidateInvoiceDetail } from '../lib/queries.ts'
-import { fetchInvoicesForContact, createInvoice, sendInvoiceEmail } from '../lib/invoices.ts'
+import { fetchInvoicesForContact, createInvoice, invoiceAmountDue, sendInvoiceEmail } from '../lib/invoices.ts'
 import { pickBalanceInvoice } from '../lib/invoiceSettlement.ts'
 import { moneyExact } from '../lib/format.ts'
 import { parseDateOnly } from '../lib/dates.ts'
@@ -239,8 +239,12 @@ export default function InvoiceDetail() {
           amount: totals.amount
         }]
   ), [billingDraw, contact?.job_title, totals.amount])
+  // What this screen bills now: for an open draw, the allocator's figure
+  // (what Money, the reminder email and the job page name for it, with the
+  // job's other draws letting money logged against the job count); with no
+  // open draw, the whole balance.
   const amountDueNow = billingDraw
-    ? Math.min(totals.balance, Number(billingDraw.amount || 0))
+    ? invoiceAmountDue({ invoice: billingDraw, contact, payments, changeOrders, invoices: invoiceRows })
     : totals.balance
 
   async function handleGeneratePDF() {
@@ -270,6 +274,8 @@ export default function InvoiceDetail() {
         payments,
         contractTotal: Number(contact?.amount || 0),
         previouslyPaid: totals.paid,
+        // The hero names the same figure as amount_due below.
+        amountDue: billingDraw ? amountDueNow : null,
         insurance,
         changeOrders,
         invoices: invoiceRows,
@@ -358,6 +364,8 @@ export default function InvoiceDetail() {
       recipientEmail: resolved.email,
       payments,
       changeOrders,
+      // The job's invoices, so this asks for what Money asks for on it.
+      invoices: rows,
       insurance
     })
     if (res.ok) {
@@ -411,6 +419,8 @@ export default function InvoiceDetail() {
         payments,
         contractTotal: Number(contact?.amount || 0),
         previouslyPaid: totals.paid,
+        // The hero names the same figure as amount_due below.
+        amountDue: billingDraw ? amountDueNow : null,
         insurance,
         changeOrders,
         invoices: invoiceRows,
@@ -589,6 +599,7 @@ export default function InvoiceDetail() {
           changeOrders={changeOrders}
           invoices={invoiceRows}
           currentInvoice={billingDraw}
+          amountDue={billingDraw ? amountDueNow : null}
         />
       ) : null}
       {viewMode === 'document' ? null : (
@@ -1001,7 +1012,7 @@ export default function InvoiceDetail() {
    out of state and shapes them into the template's prop contract.
    No new queries; no schema changes.
    ───────────────────────────────────────────────────────── */
-function DocumentPreviewPane({ company, contact, resolved, payments, totals, status, item, insurance, changeOrders, invoices = [], currentInvoice = null }: any) {
+function DocumentPreviewPane({ company, contact, resolved, payments, totals, status, item, insurance, changeOrders, invoices = [], currentInvoice = null, amountDue = null }: any) {
   const docStatus = (() => {
     const tone = status?.tone
     if (tone === 'good')   return 'paid'
@@ -1015,8 +1026,10 @@ function DocumentPreviewPane({ company, contact, resolved, payments, totals, sta
   // the Draws tab sent the same customer a $5K draw.
   const drawIsOpen = currentInvoice
     && !['paid', 'void', 'draft'].includes(String(currentInvoice.status || '').toLowerCase())
+  // The screen hands in the allocator's figure for the open draw, so the
+  // preview reads the same amount as the PDF and the email.
   const thisInvoiceAmount = drawIsOpen
-    ? Math.min(totals.balance, Number(currentInvoice.amount || 0))
+    ? (amountDue ?? Math.min(totals.balance, Number(currentInvoice.amount || 0)))
     : totals.balance
 
   return (

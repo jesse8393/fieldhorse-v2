@@ -951,6 +951,11 @@ export async function generateInvoice({
   payments = [],
   contractTotal,
   previouslyPaid,
+  // What this invoice still owes, when the caller has worked it out
+  // (invoices.ts invoiceAmountDue, the figure the email names). The hero
+  // prints it as given; without it the hero falls back to the invoice
+  // amount capped at the job balance.
+  amountDue = null,
   insurance = null,
   changeOrders = [],
   invoices = [],
@@ -1020,19 +1025,22 @@ export async function generateInvoice({
     ? Number(previouslyPaid)
     : (payments || []).reduce((s, p) => s + Number(p.amount || 0), 0)
   const balance = Math.max(0, ct - pp)
-  const isPaid = balance < 0.5
-  // The hero "Amount due" is THIS invoice's amount (capped at the
-  // remaining contract balance), matching the email subject, the
-  // line item table, and the public web link. It used to print the
-  // whole remaining contract balance, so a $2,500 deposit draw arrived
-  // with a PDF banner demanding $10,000 while every other surface said
-  // $2,500. Jobs billed without draw rows (no currentInvoice, no line
-  // items) still show the full balance, for them the invoice IS the
-  // balance. The Contract position section below reconciles either way.
+  const handedDue = amountDue != null && Number.isFinite(Number(amountDue)) ? Number(amountDue) : null
+  const isPaid = handedDue != null ? handedDue < 0.5 : balance < 0.5
+  // The hero "Amount due" is what THIS invoice still owes: the figure the
+  // caller hands in when it has one (the same one the email names), else
+  // the invoice amount capped at the remaining contract balance. It used
+  // to print the whole remaining contract balance, so a $2,500 deposit
+  // draw arrived with a PDF banner demanding $10,000 while every other
+  // surface said $2,500. Jobs billed without draw rows (no currentInvoice,
+  // no line items) still show the full balance, for them the invoice IS
+  // the balance. The Contract position section below reconciles either way.
   const drawAmount = currentInvoice != null && currentInvoice.amount != null
     ? Number(currentInvoice.amount)
     : (rows.length > 0 ? thisInvoice : null)
-  const amountDue = !isPaid && drawAmount != null ? Math.min(balance, drawAmount) : balance
+  const heroAmount = handedDue != null
+    ? handedDue
+    : (!isPaid && drawAmount != null ? Math.min(balance, drawAmount) : balance)
 
   // 2. Hero band, Amount due (this invoice)
   const heroRight = []
@@ -1041,7 +1049,7 @@ export async function generateInvoice({
   cursor = drawHeroBand(doc, {
     startY: cursor, margin, pageWidth, brandRGB,
     label: isPaid ? 'Balance' : 'Amount due',
-    amount: amountDue, isPaid, rightLines: heroRight,
+    amount: heroAmount, isPaid, rightLines: heroRight,
     paid: pp, contractTotal: ct
   })
 

@@ -24,6 +24,7 @@ import { subMatchesKey } from './subIdentity.ts'
 import { loadPartnerDirectory } from './partners.ts'
 import { useOrgScope } from './orgScope.ts'
 import { activeCompanyFrom, onlyActiveCompany, type ActiveCompany } from './activeCompany.ts'
+import { OPEN_INVOICE_STATUSES } from './invoiceSettlement.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import type { Database } from './database.types.ts'
 
@@ -98,7 +99,7 @@ export function scoped<Q extends { eq(column: string, value: string): Q }>(
 // Lookups by id are chunked so a long id list never overflows the
 // request URL.
 const ID_CHUNK = 150
-function chunkIds(ids: string[]): string[][] {
+export function chunkIds(ids: string[]): string[][] {
   const out: string[][] = []
   for (let i = 0; i < ids.length; i += ID_CHUNK) out.push(ids.slice(i, i + ID_CHUNK))
   return out
@@ -595,18 +596,41 @@ export type InvoiceJob = Pick<
 
 export type InvoiceRecord = Database['public']['Tables']['fh_invoices']['Row']
 
+// The few columns the allocator (invoiceSettlement.ts) reads from an
+// invoice that is not an open bill: a draft, or a paid or void row.
+export const SETTLED_INVOICE_COLUMNS = 'id, contact_id, amount, status, due_at, sequence_number, created_at'
+
+export type SettledInvoice = Pick<
+  InvoiceRecord,
+  'id' | 'contact_id' | 'amount' | 'status' | 'due_at' | 'sequence_number' | 'created_at'
+>
+
 export type InvoicesBundle = {
   jobs: InvoiceJob[]
   payments: Payment[]
+  /** What the lists show: the 500 newest invoices of any status, plus every open one older than those. */
   invoices: InvoiceRecord[]
+  /**
+   * Every open invoice (sent, viewed, overdue), with no cap. Money's groups
+   * and totals read these. A bundle built by hand may leave it out; the
+   * open rows of `invoices` stand in.
+   */
+  openInvoices?: InvoiceRecord[]
+  /**
+   * Every invoice that is not an open bill (draft, paid, void), a few
+   * columns each, with no cap, so what an open invoice still owes never
+   * depends on the display cap: a deposit draft covered by money logged
+   * against the job, or a paid bill that money already took.
+   */
+  settledInvoices?: SettledInvoice[]
   changeOrders: Database['public']['Tables']['fh_change_orders']['Row'][]
 }
 
 export const invoicesKey = (userId: string | undefined, orgId?: string | null) =>
   ['invoices', userId, orgId ?? null] as const
 
-async function fetchInvoicesBundle(userId: string, orgId?: string | null): Promise<InvoicesBundle> {
-  const [jobs, payments, invoicesRes, changeOrders] = await Promise.all([
+export async function fetchInvoicesBundle(userId: string, orgId?: string | null): Promise<InvoicesBundle> {
+  const [jobs, payments, invoicesRes, openInvoices, settledInvoices, changeOrders] = await Promise.all([
     fetchAllRows<InvoiceJob>((from, to) =>
       scoped(supabase
         .from('fh_contacts')
@@ -625,14 +649,30 @@ async function fetchInvoicesBundle(userId: string, orgId?: string | null): Promi
         .order('id', { ascending: true })
         .range(from, to)
     ),
+    // The issued-invoice DISPLAY list: the 500 most recent cover the
+    // lists, so a huge invoice history no longer ships every row. Nothing
+    // is added up from it; the two uncapped reads below feed the totals.
     scoped(supabase.from('fh_invoices').select('*'), userId, orgId)
       .order('created_at', { ascending: false })
-      // Bound the issued-invoice DISPLAY list, the Invoices screen only
-      // renders these rows (invoiceRows), it does NOT compute A/R totals
-      // from them (totals derive from the uncapped jobs + payments +
-      // change orders sets above). So a huge invoice history no longer
-      // ships every row; the 500 most-recent cover the list.
       .limit(500),
+    // Every open invoice, uncapped: Money's groups, Due this week and
+    // the reminders read these, so an old unpaid bill past the newest 500
+    // still counts.
+    fetchAllRows<InvoiceRecord>((from, to) =>
+      scoped(supabase.from('fh_invoices').select('*'), userId, orgId)
+        .in('status', [...OPEN_INVOICE_STATUSES])
+        .order('id', { ascending: true })
+        .range(from, to)
+    ),
+    // Every draft, paid and void invoice, a few columns each, uncapped: the
+    // allocator needs them so money that already paid one bill (or covers
+    // an unsent deposit draft) is never counted against another.
+    fetchAllRows<SettledInvoice>((from, to) =>
+      scoped(supabase.from('fh_invoices').select(SETTLED_INVOICE_COLUMNS), userId, orgId)
+        .in('status', ['draft', 'paid', 'void'])
+        .order('id', { ascending: true })
+        .range(from, to)
+    ),
     // Approved change orders adjust each job's true contract, needed so
     // "Who owes you" / statements don't understate a job with signed COs.
     fetchAllRows<InvoicesBundle['changeOrders'][number]>((from, to) =>
@@ -643,10 +683,19 @@ async function fetchInvoicesBundle(userId: string, orgId?: string | null): Promi
     )
   ])
   if (invoicesRes.error) throw invoicesRes.error
+  const shown = (invoicesRes.data ?? []) as InvoiceRecord[]
+  // An open invoice older than the newest 500 joins the list after them,
+  // newest first, so its row can be opened, reminded and marked paid.
+  const shownIds = new Set(shown.map((inv) => inv.id))
+  const older = openInvoices
+    .filter((inv) => !shownIds.has(inv.id))
+    .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
   return {
     jobs,
     payments,
-    invoices: (invoicesRes.data ?? []) as InvoiceRecord[],
+    invoices: [...shown, ...older],
+    openInvoices,
+    settledInvoices,
     changeOrders
   }
 }

@@ -148,6 +148,9 @@ function moneyTables(clock) {
       contact({ id: 'c-chidi', stage: 'quote', name: 'Chidi Okafor', job_title: 'Ridge vent and shingle repair', amount: 3180, proposal_status: 'viewed', quote_sent_at: at(-4) })
     ],
     fh_invoices: [
+      // Rosa's $3,000 payment pays her paid deposit (invoice 1), so the Final
+      // below still asks for its $1,240 under the Phase 8 allocator.
+      invoice({ id: 'i-rosa-dep', contact_id: 'c-rosa', title: 'Deposit', amount: 3000, status: 'paid', sequence_number: 1, due_at: day(-13) }),
       invoice({ id: 'i-rosa', contact_id: 'c-rosa', title: 'Final', amount: 1240, sequence_number: 2, due_at: day(-6) }),
       invoice({ id: 'i-lorraine', contact_id: 'c-lorraine', title: 'Final balance', amount: 4850, due_at: day(1) }),
       invoice({ id: 'i-gail', contact_id: 'c-gail', title: 'Balance', amount: 2960, due_at: day(5) }),

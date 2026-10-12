@@ -67,6 +67,10 @@ const CONTACTS = [
 ]
 
 const INVOICES = [
+  // Rosa's deposit, paid by the $3,000 she sent on Tuesday. Her Final is
+  // invoice 2; without its paid deposit, money logged against the job
+  // would read as paying the Final (Phase 8, task 5).
+  invoice({ id: 'i-rosa-dep', contact_id: 'c-rosa', title: 'Deposit', amount: 3000, status: 'paid', sequence_number: 1, due_at: '2026-09-25', issued_at: '2026-09-18T12:00:00Z', created_at: '2026-09-18T12:00:00Z' }),
   // Six days overdue.
   invoice({ id: 'i-rosa', contact_id: 'c-rosa', title: 'Final', amount: 1240, sequence_number: 2, due_at: '2026-10-02' }),
   // Due today and due next Thursday.
@@ -107,6 +111,51 @@ const NO_EMAIL_TABLES = {
   ],
   fh_invoices: [invoice({ id: 'i-priya', contact_id: 'c-priya', title: 'Final', amount: 900, due_at: '2026-10-05' })],
   fh_payments: []
+}
+
+// What each invoice actually owes (Phase 8, task 5), with the plan's
+// numbers: a $10,000 job, invoice 1 for $5,000 overdue with a $2,000
+// payment linked to it, and invoice 2 for $5,000 due Friday, October 9.
+const PARTIAL_TABLES = {
+  fh_contacts: [
+    contact({ id: 'c-sam', stage: 'job', name: 'Sam Whitfield', email: 'sam@example.com', job_title: 'Patio pour', amount: 10000 })
+  ],
+  fh_invoices: [
+    invoice({ id: 'i-sam-1', contact_id: 'c-sam', title: 'Deposit', amount: 5000, sequence_number: 1, due_at: '2026-10-02' }),
+    invoice({ id: 'i-sam-2', contact_id: 'c-sam', title: 'Final', amount: 5000, sequence_number: 2, due_at: '2026-10-09' })
+  ],
+  fh_payments: [
+    payment({ id: 'p-sam', contact_id: 'c-sam', invoice_id: 'i-sam-1', amount: 2000, paid_on: '2026-10-03', created_at: '2026-10-03T15:00:00Z' })
+  ]
+}
+
+// 620 invoices: 619 paid in the last weeks and, oldest of all, an open
+// one from January 2025. The screen lists the 500 newest; the totals must
+// still count the old one.
+const MANY_TABLES = {
+  fh_contacts: [contact({ id: 'c-rosa', stage: 'job', name: 'Rosa Delgado', email: 'rosa@example.com', job_title: 'Concrete steps', amount: 200000 })],
+  fh_invoices: [
+    ...Array.from({ length: 619 }, (_, n) => invoice({
+      id: `i-paid-${n}`, contact_id: 'c-rosa', title: `Progress draw ${n + 2}`, amount: 100, status: 'paid',
+      sequence_number: n + 2, due_at: '2026-09-30', created_at: new Date(Date.UTC(2026, 8, 30, 12) - n * 3_600_000).toISOString()
+    })),
+    invoice({ id: 'i-old', contact_id: 'c-rosa', title: 'Final', amount: 1240, sequence_number: 1, due_at: '2025-01-15', issued_at: '2025-01-02T12:00:00Z', created_at: '2025-01-01T12:00:00Z' })
+  ],
+  fh_payments: []
+}
+
+// Mocks the reminder's PDF upload and send, and counts what reaches the
+// send endpoint. Nothing is ever really sent.
+async function routeSends(context: BrowserContext) {
+  const sends: string[] = []
+  await context.route('**/storage/v1/object/**', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ Key: 'job-files/test.pdf' }) })
+  )
+  await context.route('**/api/send-invoice', (route) => {
+    sends.push(route.request().postData() || '')
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) })
+  })
+  return sends
 }
 
 test.describe('money on a phone', () => {
@@ -220,6 +269,44 @@ test.describe('money on a phone', () => {
     expect(sends).toHaveLength(1)
     expect(uploads).toHaveLength(1)
     expect(stray).toHaveLength(0)
+  })
+
+  test('a partial payment lowers what the invoice asks for everywhere', async ({ context, page }) => {
+    await openMoney(context, page, { tables: PARTIAL_TABLES })
+    const sends = await routeSends(context)
+
+    const vault = page.locator('.fhc-vault')
+    await expect(vault.getByText('Due this week', { exact: true })).toBeVisible()
+    await expect(vault.getByText('$8,000.00', { exact: true })).toBeVisible()
+    const overdue = page.getByRole('region', { name: 'Overdue' })
+    await expect(overdue.getByText('$3,000.00', { exact: true })).toBeVisible()
+    await expect(overdue.getByText('6 days overdue', { exact: true })).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Due soon' }).getByText('$5,000.00', { exact: true })).toBeVisible()
+
+    // The reminder asks for the same $3,000.00, in the sheet and the email.
+    await page.getByRole('button', { name: 'Remind Sam Whitfield' }).click()
+    const sheet = page.getByRole('dialog', { name: 'Send a reminder' })
+    await expect(sheet.getByText('$3,000.00', { exact: true })).toBeVisible()
+    await sheet.getByRole('button', { name: 'Send reminder' }).click()
+    await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(1)
+    expect(JSON.parse(sends[0]).amount_due).toBe(3000)
+    await expect(sheet).toBeHidden({ timeout: 15_000 })
+
+    // Mark paid prefills $3,000.
+    await overdue.getByRole('button', { name: /^Sam Whitfield/ }).click()
+    const actions = page.getByRole('dialog', { name: 'Deposit' })
+    await expect(actions.getByText('$3,000.00', { exact: true })).toBeVisible()
+    await actions.getByRole('button', { name: 'Mark paid', exact: true }).click()
+    await expect(page.getByText('Log what was paid.')).toBeVisible({ timeout: 15_000 })
+    await expect(page.locator('#v3-pay-amount')).toHaveValue('3000')
+  })
+
+  test('an old open invoice still counts when 620 invoices outgrow the list', async ({ context, page }) => {
+    await openMoney(context, page, { tables: MANY_TABLES })
+    const overdue = page.getByRole('region', { name: 'Overdue' })
+    await expect(overdue.getByText('$1,240.00', { exact: true })).toBeVisible()
+    await expect(overdue.getByText('1 invoice', { exact: true })).toBeVisible()
+    await expect(page.locator('.fhc-vault').getByText('$1,240.00', { exact: true })).toBeVisible()
   })
 
   test('crew cannot open money', async ({ context, page }) => {
@@ -458,6 +545,40 @@ test.describe('money on a desktop', () => {
     expect(sends).toHaveLength(1)
     expect(uploads).toHaveLength(1)
     expect(stray).toHaveLength(0)
+  })
+
+  test('desktop partial payment lowers what the invoice asks for everywhere', async ({ context, page }) => {
+    await openMoney(context, page, { tables: PARTIAL_TABLES })
+    const sends = await routeSends(context)
+
+    await expect(page.locator('.fhc-vault').getByText('$8,000.00', { exact: true })).toBeVisible()
+    const overdue = page.getByRole('region', { name: 'Overdue', exact: true })
+    const row = overdue.getByRole('row', { name: /Sam Whitfield/ })
+    await expect(row.getByText('$3,000.00', { exact: true })).toBeVisible()
+    await expect(row.getByText('6 days overdue', { exact: true })).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Due soon', exact: true }).getByText('$5,000.00', { exact: true })).toBeVisible()
+
+    await row.getByRole('button', { name: 'Remind Sam Whitfield' }).click()
+    const sheet = page.getByRole('dialog', { name: 'Send a reminder' })
+    await expect(sheet.getByText('$3,000.00', { exact: true })).toBeVisible()
+    await sheet.getByRole('button', { name: 'Send reminder' }).click()
+    await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(1)
+    expect(JSON.parse(sends[0]).amount_due).toBe(3000)
+    await expect(sheet).toBeHidden({ timeout: 15_000 })
+
+    await overdue.getByRole('button', { name: 'Sam Whitfield', exact: true }).click()
+    const actions = page.getByRole('dialog', { name: 'Deposit' })
+    await expect(actions.getByText('$3,000.00', { exact: true })).toBeVisible()
+    await actions.getByRole('button', { name: 'Mark paid', exact: true }).click()
+    await expect(page.getByText('Log what was paid.')).toBeVisible({ timeout: 15_000 })
+    await expect(page.locator('#v3-pay-amount')).toHaveValue('3000')
+  })
+
+  test('desktop old open invoice still counts when 620 invoices outgrow the list', async ({ context, page }) => {
+    await openMoney(context, page, { tables: MANY_TABLES })
+    const overdue = page.getByRole('region', { name: 'Overdue', exact: true })
+    await expect(overdue.getByRole('row', { name: /Rosa Delgado/ }).getByText('$1,240.00', { exact: true })).toBeVisible()
+    await expect(page.locator('.fhc-vault').getByText('$1,240.00', { exact: true })).toBeVisible()
   })
 
   test('desktop remind needs an email', async ({ context, page }) => {
