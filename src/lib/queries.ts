@@ -406,26 +406,102 @@ export function useUpcomingEvents(userId: string | undefined) {
   })
 }
 
-// Invalidate both schedule queries (range + upcoming) after a mutation.
+// ---- Jobs with a visit from today on (the desktop Unscheduled tray) ----
+// Which jobs already have a date (decision D10), whatever week the board
+// shows. Only contact_id is read, for every visit from the start of today
+// with no end date, paged past the server's row cap, so a busy calendar
+// never drops a booked job back into the tray. The rows carry no visit
+// id, so the list has its own prefix beside the visit caches: a patch by
+// visit id never reaches it, and useInvalidateSchedule refreshes it with
+// them. The tray adds a job here optimistically while its drop saves
+// (see the updaters below).
+
+export type BookedVisit = { contact_id: string | null }
+
+export const bookedKey = (
+  userId: string | undefined,
+  orgId: string | null | undefined,
+  fromIso: string
+) => ['scheduleBooked', userId ?? null, orgId ?? null, fromIso] as const
+
+async function fetchBooked(userId: string, fromIso: string, orgId?: string | null): Promise<BookedVisit[]> {
+  return fetchAllRows<BookedVisit>((from, to) =>
+    scoped(supabase.from('fh_schedule').select('contact_id'), userId, orgId)
+      .gte('start_at', fromIso)
+      .not('contact_id', 'is', null)
+      // A stable order so the pages never overlap or skip.
+      .order('start_at', { ascending: true })
+      .order('id', { ascending: true })
+      .range(from, to)
+  )
+}
+
+/** The job of every visit from `fromIso` on, for the active company. */
+export function useBookedVisits(userId: string | undefined, fromIso: string) {
+  const orgId = useOrgScope(userId)
+  return useQuery({
+    queryKey: bookedKey(userId, orgId, fromIso),
+    queryFn: () => fetchBooked(userId as string, fromIso, orgId),
+    enabled: !!userId && orgId !== undefined,
+    // `fromIso` moves at midnight. Keep yesterday's list on screen while
+    // today's loads, so a board left open overnight never drops to a
+    // skeleton for a round trip.
+    placeholderData: keepPreviousData
+  })
+}
+
+// The booked list while a drop saves. Each updater takes the cached rows
+// and matches them by value, never by identity: the cache rebuilds equal
+// rows on every write (structural sharing), so a row kept by identity is
+// lost the moment a row ahead of it goes. A list that has not loaded yet
+// is left alone (an updater that returns undefined writes nothing), so it
+// never turns into a short list that reads as every other job being free.
+
+/** One more row for `jobId`, when its drop starts. */
+export const addBookedJob = (jobId: string) => (rows: BookedVisit[] | undefined) =>
+  rows && [...rows, { contact_id: jobId }]
+
+/** One row for `jobId` fewer, when its drop fails. A second row (a visit the server has) stays. */
+export const removeBookedJob = (jobId: string) => (rows: BookedVisit[] | undefined) => {
+  if (!rows) return rows
+  const at = rows.findIndex((row) => row.contact_id === jobId)
+  return at < 0 ? rows : [...rows.slice(0, at), ...rows.slice(at + 1)]
+}
+
+/** A row for `jobId` if none is there, after its write, in case a reload from before the write landed without it. */
+export const ensureBookedJob = (jobId: string) => (rows: BookedVisit[] | undefined) =>
+  rows && (rows.some((row) => row.contact_id === jobId) ? rows : [...rows, { contact_id: jobId }])
+
+// Invalidate every schedule query (range, upcoming and the booked list)
+// after a mutation. A fetch already in flight is dropped and started over,
+// so what lands was asked for after the write.
 export function useInvalidateSchedule() {
   const client = useQueryClient()
   return () => {
     client.invalidateQueries({ queryKey: ['schedule'] })
     client.invalidateQueries({ queryKey: ['scheduleUpcoming'] })
+    client.invalidateQueries({ queryKey: ['scheduleBooked'] })
   }
 }
 
 // Optimistically drop a deleted event from every cached schedule query
 // (range + upcoming) so it vanishes immediately, before the server
-// round-trip, replaces the old setEvents/setUpcoming filters.
+// round-trip, replaces the old setEvents/setUpcoming filters. A query that
+// has not loaded yet is left alone (an empty list would read as "nothing
+// scheduled" until its fetch lands). The booked list holds job ids, not
+// visit ids, so it is refetched instead: the deleted visit may have been
+// its job's only one from today on.
+export function dropScheduleEvent(client: QueryClient, evtId: string) {
+  const drop = (rows: ScheduleEvent[] | undefined) =>
+    rows?.filter((e) => e.id !== evtId)
+  client.setQueriesData({ queryKey: ['schedule'] }, drop)
+  client.setQueriesData({ queryKey: ['scheduleUpcoming'] }, drop)
+  client.invalidateQueries({ queryKey: ['scheduleBooked'] })
+}
+
 export function useDropScheduleEvent() {
   const client = useQueryClient()
-  return (evtId: string) => {
-    const drop = (rows: ScheduleEvent[] | undefined) =>
-      (rows ?? []).filter((e) => e.id !== evtId)
-    client.setQueriesData({ queryKey: ['schedule'] }, drop)
-    client.setQueriesData({ queryKey: ['scheduleUpcoming'] }, drop)
-  }
+  return (evtId: string) => dropScheduleEvent(client, evtId)
 }
 
 // ---- Activity feed ----

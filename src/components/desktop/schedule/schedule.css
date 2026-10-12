@@ -207,6 +207,11 @@
   margin: 0 0 8px;
 }
 
+/* The error line above a list that is still on screen. */
+.fhsch-rail__empty.is-above {
+  margin-bottom: 12px;
+}
+
 /* Below 1280 px the rail drops under the board and its sections sit side by side. */
 @media (max-width: 1279px) {
   .fhsch-body {
@@ -681,6 +686,24 @@
   opacity: 0.4;
 }
 
+/* A drop of this job is saving: the card waits, dimmed, and holds still. */
+.fhsch-card.is-saving {
+  opacity: 0.55;
+}
+
+.fhsch-card__saving {
+  margin-left: 12px;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+/* Below the cards, outside the scroll, so it is always in reach. */
+.fhsch-tray__more {
+  padding-top: 12px;
+}
+
 .fhsch-card--floating {
   grid-template-areas: 'handle text';
   padding-bottom: 8px;
@@ -713,6 +736,14 @@
 .fhsch-handle:hover {
   background: var(--fh-wash);
   color: var(--fh-ink);
+}
+
+/* Month view, or a drop that is saving: the grip stays, but it does not drag. */
+.fhsch-handle[aria-disabled='true'],
+.fhsch-handle[aria-disabled='true']:hover {
+  cursor: default;
+  background: transparent;
+  color: var(--fh-ink-3);
 }
 
 .fhsch-card__text {
@@ -748,6 +779,8 @@
 
 .fhsch-card__action {
   grid-area: action;
+  display: flex;
+  align-items: center;
   padding-top: 8px;
 }
 

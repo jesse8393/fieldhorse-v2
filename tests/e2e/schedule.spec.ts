@@ -38,7 +38,9 @@ async function setUp(
   context: BrowserContext,
   page: Page,
   tables?: SignInOptions['tables'],
-  routes?: (context: BrowserContext) => Promise<void>
+  routes?: (context: BrowserContext) => Promise<void>,
+  // The page's clock: fixed at NOW unless a test needs one that moves.
+  clock: (page: Page) => Promise<void> = (p) => p.clock.setFixedTime(NOW)
 ) {
   await signIn(context, { tables: { fh_schedule: SCHEDULE, ...tables } })
   const writes: Write[] = []
@@ -58,7 +60,7 @@ async function setUp(
     return route.fallback()
   })
   await routes?.(context)
-  await page.clock.setFixedTime(NOW)
+  await clock(page)
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.goto('/schedule', { waitUntil: 'domcontentloaded', timeout: 60_000 })
   await expect(page.locator('.fh-build-weekplan')).toBeVisible({ timeout: 30_000 })
@@ -229,6 +231,364 @@ test.describe('drag to schedule', () => {
     await page.waitForTimeout(300)
     expect(writes).toEqual([])
     await expect(page.getByText('Pick a time from now on.', { exact: true })).toHaveCount(0)
+  })
+})
+
+// The tray tells the truth (Phase 8, Task 8): it waits for both the jobs
+// and the visits from today on before it lists anything, says so when
+// either fails, holds a card still while its drop saves, stays put in
+// Month view, and shows 50 cards before "Show all".
+test.describe('the tray tells the truth', () => {
+  const tray = (page: Page) => page.getByRole('region', { name: 'Unscheduled jobs' })
+
+  test('shows a skeleton while the visits from today on load, never every job as unscheduled', async ({ context, page }) => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    // The jobs list read (the only fh_contacts read capped at 2000 rows),
+    // awaited below once its body has reached the page.
+    const jobsRead = page.waitForResponse((response) =>
+      response.request().method() === 'GET' && /\/rest\/v1\/fh_contacts\?.*\blimit=2000\b/.test(response.url()))
+    await setUp(context, page, undefined, async (ctx) => {
+      await ctx.route('**/rest/v1/fh_schedule*', async (route) => {
+        if (route.request().method() === 'GET') await gate
+        return route.fallback()
+      })
+    })
+    // The jobs are in; only the visits are still on their way. The skeleton
+    // has to hold from here on, not just at one instant.
+    await (await jobsRead).finished()
+    for (let pass = 0; pass < 3; pass++) {
+      await page.waitForTimeout(250)
+      await expect(tray(page).getByRole('status')).toContainText('Loading')
+      await expect(tray(page).locator('.fhsch-card')).toHaveCount(0)
+    }
+    release()
+    await expect(tray(page).getByText('Harold Wickham', { exact: true })).toBeVisible()
+    await expect(tray(page).getByText('Plumbing Bellevue', { exact: true })).toHaveCount(0)
+    await expect(tray(page).getByRole('status')).toHaveCount(0)
+  })
+
+  test('keeps the list on screen while the next day\'s booked list loads at midnight', async ({ context, page }) => {
+    // 11:59:30 pm on Thursday, Oct 8 in Central time, on a clock the test
+    // can move. The booked read for Friday is held, so the moment while it
+    // loads is what the tray shows.
+    const LATE = new Date('2026-10-09T04:59:30Z')
+    const FRIDAY = 'gte.2026-10-09T05:00:00.000Z'
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const fridayReads: string[] = []
+    await setUp(context, page, undefined, async (ctx) => {
+      await ctx.route('**/rest/v1/fh_schedule*', async (route) => {
+        const request = route.request()
+        const q = new URL(request.url()).searchParams
+        if (request.method() === 'GET' && q.get('select') === 'contact_id' && q.getAll('start_at').includes(FRIDAY)) {
+          fridayReads.push(request.url())
+          await gate
+        }
+        return route.fallback()
+      })
+    }, (p) => p.clock.install({ time: LATE }))
+    await expect(tray(page).getByText('Harold Wickham', { exact: true })).toBeVisible()
+    await expect(tray(page).getByRole('status')).toHaveCount(0)
+    // The clock passes midnight and the board's minute tick notices.
+    await page.clock.fastForward(61_000)
+    await expect.poll(() => fridayReads.length).toBe(1)
+    // Friday's list is on its way. Thursday's stays on screen meanwhile.
+    for (let pass = 0; pass < 3; pass++) {
+      await page.waitForTimeout(250)
+      await expect(tray(page).getByRole('status')).toHaveCount(0)
+      await expect(tray(page).getByText('Harold Wickham', { exact: true })).toBeVisible()
+    }
+    release()
+    await page.waitForTimeout(400)
+    await expect(tray(page).getByText('Harold Wickham', { exact: true })).toBeVisible()
+    await expect(tray(page).getByText('Plumbing Bellevue', { exact: true })).toHaveCount(0)
+    await expect(tray(page).getByRole('status')).toHaveCount(0)
+  })
+
+  test('reads only the job of each visit from today on, a page at a time', async ({ context, page }) => {
+    const reads: URL[] = []
+    await setUp(context, page, undefined, async (ctx) => {
+      await ctx.route('**/rest/v1/fh_schedule*', (route) => {
+        if (route.request().method() === 'GET') reads.push(new URL(route.request().url()))
+        return route.fallback()
+      })
+    })
+    await expect(tray(page).getByText('Harold Wickham', { exact: true })).toBeVisible()
+    const booked = reads.filter((u) => u.searchParams.get('select') === 'contact_id')
+    expect(booked.length, reads.map(String).join('\n')).toBeGreaterThan(0)
+    const q = booked[0].searchParams
+    // From the start of Thursday, Oct 8 in Central time, with no end.
+    expect(q.getAll('start_at')).toEqual(['gte.2026-10-08T05:00:00.000Z'])
+    expect(q.get('org_id')).toBe('eq.org-1')
+    expect(q.get('offset')).toBe('0')
+    expect(q.get('limit')).toBe('1000')
+    // No read of whole visits a year ahead.
+    const far = reads.filter((u) => {
+      const lt = u.searchParams.getAll('start_at').find((v) => v.startsWith('lt.'))
+      return lt && Date.parse(lt.slice(3)) > Date.parse('2026-12-31T00:00:00Z')
+    })
+    expect(far.map(String)).toEqual([])
+  })
+
+  test('says so when the visits fail to load, and Try again loads them', async ({ context, page }) => {
+    let fail = true
+    await setUp(context, page, undefined, async (ctx) => {
+      await ctx.route('**/rest/v1/fh_schedule*', (route) => {
+        if (fail && route.request().method() === 'GET') {
+          return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'Server error' }) })
+        }
+        return route.fallback()
+      })
+    })
+    await expect(tray(page).getByRole('alert')).toContainText("Couldn't load", { timeout: 10_000 })
+    await expect(tray(page).locator('.fhsch-card')).toHaveCount(0)
+    fail = false
+    await tray(page).getByRole('button', { name: 'Try again', exact: true }).click()
+    await expect(tray(page).getByText('Harold Wickham', { exact: true })).toBeVisible()
+    await expect(tray(page).getByText('Plumbing Bellevue', { exact: true })).toHaveCount(0)
+    await expect(tray(page).getByRole('alert')).toHaveCount(0)
+  })
+
+  test('a reload that fails after the list is in keeps the cards and says the list may be out of date', async ({ context, page }) => {
+    // A small server: the booked read answers with what the POSTs
+    // committed, or fails while `fail` is set.
+    const committed: string[] = []
+    let fail = false
+    await setUp(context, page, { fh_schedule: [] }, async (ctx) => {
+      await ctx.route('**/rest/v1/fh_schedule*', async (route) => {
+        const request = route.request()
+        if (request.method() === 'POST') {
+          committed.push(JSON.parse(request.postData() || 'null')[0].contact_id)
+          return route.fallback()
+        }
+        if (request.method() !== 'GET' || new URL(request.url()).searchParams.get('select') !== 'contact_id') return route.fallback()
+        if (fail) return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'Server error' }) })
+        const body = committed.map((contact_id) => ({ contact_id }))
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) })
+      })
+    })
+    const harold = tray(page).getByText('Harold Wickham', { exact: true })
+    const plumbing = tray(page).getByText('Plumbing Bellevue', { exact: true })
+    await expect(harold).toBeVisible()
+    await expect(plumbing).toBeVisible()
+    // The connection drops. A drop still writes, and the reload of the
+    // booked list that follows fails.
+    fail = true
+    await dragHandleToSlot(page, /Drag Plumbing Bellevue/, '2026-10-09', 13)
+    await expect(page.getByText('Scheduled Plumbing Bellevue', { exact: false })).toBeVisible()
+    await expect(tray(page).getByRole('alert')).toBeVisible({ timeout: 10_000 })
+    // The cards that were in stay, under a line that says the list may be stale.
+    await expect(harold).toBeVisible()
+    await expect(plumbing).toHaveCount(0)
+    await expect(tray(page).getByRole('alert')).toContainText('may be out of date')
+    await expect(tray(page).getByRole('status')).toHaveCount(0)
+    // Try again loads the list and clears the line.
+    fail = false
+    await tray(page).getByRole('button', { name: 'Try again', exact: true }).click()
+    await expect(tray(page).getByRole('alert')).toHaveCount(0)
+    await expect(harold).toBeVisible()
+    await expect(plumbing).toHaveCount(0)
+  })
+
+  test('a slow insert followed by a second drag of the same card creates one visit', async ({ context, page }) => {
+    const posts: any[] = []
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    await setUp(context, page, { fh_schedule: [] }, async (ctx) => {
+      await ctx.route('**/rest/v1/fh_schedule*', async (route) => {
+        if (route.request().method() !== 'POST') return route.fallback()
+        posts.push(JSON.parse(route.request().postData() || 'null'))
+        const id = `new-${posts.length}`
+        await gate
+        return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify([{ id }]) })
+      })
+    })
+    await dragHandleToSlot(page, /Drag Plumbing Bellevue/, '2026-10-09', 13)
+    await expect.poll(() => posts.length).toBe(1)
+    // The insert is still on its way. A second drag of the same card writes nothing.
+    await dragHandleToSlot(page, /Drag Plumbing Bellevue/, '2026-10-09', 15)
+    await page.waitForTimeout(400)
+    expect(posts.length).toBe(1)
+    // The card waits, dimmed, with its drag and Schedule button off.
+    const card = tray(page).locator('.fhsch-card', { hasText: 'Plumbing Bellevue' })
+    await expect(card).toHaveAttribute('aria-busy', 'true')
+    await expect(card.getByText('Saving', { exact: true })).toBeVisible()
+    await expect(card.getByRole('button', { name: /Drag Plumbing Bellevue/ })).toHaveAttribute('aria-disabled', 'true')
+    await expect(card.getByRole('button', { name: 'Schedule', exact: true })).toBeDisabled()
+    release()
+    await expect(page.getByText('Scheduled Plumbing Bellevue', { exact: false })).toBeVisible()
+    await page.waitForTimeout(400)
+    expect(posts.length).toBe(1)
+    expect(posts[0][0]).toMatchObject({ contact_id: 'c-job1', start_at: '2026-10-09T18:00:00.000Z' })
+  })
+
+  test('two overlapping drops, the second finishing first, write one visit each and the slow card never comes back', async ({ context, page }) => {
+    // A small server: a POST commits its row once it is released, and the
+    // booked read answers with what is committed so far.
+    const committed: string[] = []
+    const posts: any[] = []
+    const bookedReads: string[][] = []
+    let releaseSlow!: () => void
+    const slowGate = new Promise<void>((resolve) => { releaseSlow = resolve })
+    let holdBooked = false
+    let releaseBooked!: () => void
+    const bookedGate = new Promise<void>((resolve) => { releaseBooked = resolve })
+    await setUp(context, page, { fh_schedule: [] }, async (ctx) => {
+      await ctx.route('**/rest/v1/fh_schedule*', async (route) => {
+        const request = route.request()
+        if (request.method() === 'GET') {
+          if (new URL(request.url()).searchParams.get('select') !== 'contact_id') return route.fallback()
+          if (holdBooked) await bookedGate
+          bookedReads.push(committed.slice())
+          const body = committed.map((contact_id) => ({ contact_id }))
+          return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) })
+        }
+        if (request.method() !== 'POST') return route.fallback()
+        const row = JSON.parse(request.postData() || 'null')[0]
+        posts.push(row)
+        const id = `new-${posts.length}`
+        if (row.contact_id === 'c-job1') await slowGate
+        committed.push(row.contact_id)
+        return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify([{ id }]) })
+      })
+    })
+    const plumbing = tray(page).locator('.fhsch-card', { hasText: 'Plumbing Bellevue' })
+    // Plumbing Bellevue's insert hangs.
+    await dragHandleToSlot(page, /Drag Plumbing Bellevue/, '2026-10-09', 13)
+    await expect.poll(() => posts.length).toBe(1)
+    await expect(plumbing).toHaveAttribute('aria-busy', 'true')
+    // Harold Wickham's insert answers at once. Its success reloads the
+    // booked list, which the server answers without Plumbing Bellevue.
+    await dragHandleToSlot(page, /Drag Harold Wickham/, '2026-10-09', 15)
+    await expect(page.getByText('Scheduled Harold Wickham', { exact: false })).toBeVisible()
+    await expect.poll(() => bookedReads.some((read) => read.includes('c-job2'))).toBe(true)
+    await expect(tray(page).getByText('Harold Wickham', { exact: true })).toHaveCount(0)
+    await expect(plumbing).toHaveAttribute('aria-busy', 'true')
+    // Now the slow insert commits. The booked reload that follows is held
+    // back, so the moment between the two is what the tray shows.
+    holdBooked = true
+    releaseSlow()
+    await expect(page.getByText('Scheduled Plumbing Bellevue', { exact: false })).toBeVisible()
+    await expect(tray(page).getByText('Plumbing Bellevue', { exact: true })).toHaveCount(0)
+    await page.waitForTimeout(400)
+    await expect(tray(page).getByText('Plumbing Bellevue', { exact: true })).toHaveCount(0)
+    releaseBooked()
+    await expect.poll(() => bookedReads.some((read) => read.includes('c-job1'))).toBe(true)
+    await expect(tray(page).getByText('Plumbing Bellevue', { exact: true })).toHaveCount(0)
+    expect(posts.map((row) => row.contact_id)).toEqual(['c-job1', 'c-job2'])
+  })
+
+  test('a failed insert puts the card back and says so', async ({ context, page }) => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    await setUp(context, page, { fh_schedule: [] }, async (ctx) => {
+      await ctx.route('**/rest/v1/fh_schedule*', async (route) => {
+        if (route.request().method() !== 'POST') return route.fallback()
+        await gate
+        return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'Insert failed' }) })
+      })
+    })
+    await dragHandleToSlot(page, /Drag Plumbing Bellevue/, '2026-10-09', 13)
+    const card = tray(page).locator('.fhsch-card', { hasText: 'Plumbing Bellevue' })
+    await expect(card).toHaveAttribute('aria-busy', 'true')
+    release()
+    await expect(page.getByText("Couldn't schedule the job", { exact: false })).toBeVisible()
+    await expect(card).not.toHaveAttribute('aria-busy', 'true')
+    await expect(card.getByRole('button', { name: /Drag Plumbing Bellevue/ })).toHaveAttribute('aria-disabled', 'false')
+    await expect(card.getByRole('button', { name: 'Schedule', exact: true })).toBeEnabled()
+  })
+
+  test('two overlapping drops that both fail, the first failing first, put both cards back', async ({ context, page }) => {
+    // Each insert hangs until its gate opens, then fails.
+    const posts: any[] = []
+    const gates = new Map<string, () => void>()
+    const held = (id: string) => new Promise<void>((resolve) => gates.set(id, resolve))
+    await setUp(context, page, { fh_schedule: [] }, async (ctx) => {
+      await ctx.route('**/rest/v1/fh_schedule*', async (route) => {
+        const request = route.request()
+        if (request.method() !== 'POST') return route.fallback()
+        const row = JSON.parse(request.postData() || 'null')[0]
+        posts.push(row)
+        await held(row.contact_id)
+        return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'Insert failed' }) })
+      })
+    })
+    const plumbing = tray(page).locator('.fhsch-card', { hasText: 'Plumbing Bellevue' })
+    const harold = tray(page).locator('.fhsch-card', { hasText: 'Harold Wickham' })
+    await dragHandleToSlot(page, /Drag Plumbing Bellevue/, '2026-10-09', 13)
+    await expect.poll(() => posts.length).toBe(1)
+    await expect(plumbing).toHaveAttribute('aria-busy', 'true')
+    await dragHandleToSlot(page, /Drag Harold Wickham/, '2026-10-09', 15)
+    await expect.poll(() => posts.length).toBe(2)
+    await expect(harold).toHaveAttribute('aria-busy', 'true')
+    // Plumbing Bellevue, dropped first, fails first.
+    gates.get('c-job1')!()
+    await expect(page.getByText("Couldn't schedule the job", { exact: false }).first()).toBeVisible()
+    await expect(plumbing).not.toHaveAttribute('aria-busy', 'true')
+    // Then Harold Wickham fails.
+    gates.get('c-job2')!()
+    await expect(page.getByText("Couldn't schedule the job", { exact: false })).toHaveCount(2)
+    await page.waitForTimeout(400)
+    // Both cards are back in the tray, enabled.
+    await expect(plumbing).toBeVisible()
+    await expect(harold).toBeVisible()
+    await expect(harold).not.toHaveAttribute('aria-busy', 'true')
+    await expect(harold.getByRole('button', { name: /Drag Harold Wickham/ })).toHaveAttribute('aria-disabled', 'false')
+    await expect(plumbing.getByRole('button', { name: /Drag Plumbing Bellevue/ })).toHaveAttribute('aria-disabled', 'false')
+    expect(posts.map((row) => row.contact_id)).toEqual(['c-job1', 'c-job2'])
+  })
+
+  test('in Month view the cards do not drag and the hint says to switch to Week', async ({ context, page }) => {
+    const writes = await setUp(context, page, { fh_schedule: [] })
+    await page.getByRole('button', { name: 'Month', exact: true }).click()
+    await expect(page.locator('.fhsch-month')).toBeVisible()
+    await expect(tray(page).getByText('Switch to Week to drag a job onto a day.', { exact: true })).toBeVisible()
+    const card = tray(page).locator('.fhsch-card', { hasText: 'Plumbing Bellevue' })
+    const handle = card.getByRole('button', { name: /Drag Plumbing Bellevue/ })
+    await expect(handle).toHaveAttribute('aria-disabled', 'true')
+    // A mouse drag picks nothing up.
+    const box = (await handle.boundingBox())!
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(box.x - 200, box.y + 40, { steps: 8 })
+    await expect(page.locator('.fhsch-card--floating')).toHaveCount(0)
+    await page.mouse.up()
+    expect(writes).toEqual([])
+    // Schedule still opens the sheet.
+    await expect(card.getByRole('button', { name: 'Schedule', exact: true })).toBeEnabled()
+    // Back in Week, the hint and the drag come back.
+    await page.getByRole('button', { name: 'Week', exact: true }).click()
+    await expect(tray(page).getByText('Drag onto the week, or use Schedule.', { exact: true })).toBeVisible()
+    await expect(handle).toHaveAttribute('aria-disabled', 'false')
+  })
+
+  test('shows the newest 50 cards, then Show all N', async ({ context, page }) => {
+    const many = Array.from({ length: 60 }, (_, i) => ({
+      id: `c-many-${i + 1}`,
+      user_id: 'qa-user-1',
+      client_id: 'cl-1',
+      stage: 'job',
+      name: `Crew job ${i + 1}`,
+      job_title: null,
+      address: null,
+      completed_at: null,
+      created_at: new Date(Date.UTC(2026, 8, 1, 12) + i * 3_600_000).toISOString(),
+      updated_at: '2026-10-01T12:00:00Z',
+      fh_clients: null
+    }))
+    await setUp(context, page, { fh_contacts: many, fh_schedule: [] })
+    await expect(tray(page).locator('.fhsch-card')).toHaveCount(50)
+    // Newest first: job 60 leads and job 11 is the last one shown.
+    await expect(tray(page).locator('.fhsch-card').first()).toContainText('Crew job 60')
+    await expect(tray(page).locator('.fhsch-card').last()).toContainText('Crew job 11')
+    await tray(page).getByRole('button', { name: 'Show all 60', exact: true }).click()
+    await expect(tray(page).locator('.fhsch-card')).toHaveCount(60)
+    await expect(tray(page).getByRole('button', { name: /Show all/ })).toHaveCount(0)
+    // The button unmounts itself, so focus moves to the first card it revealed
+    // (the 51st) instead of falling back to the page.
+    await expect(tray(page).locator('.fhsch-handle').nth(50)).toBeFocused()
+    await expect(tray(page).locator('.fhsch-card').nth(50)).toContainText('Crew job 10')
   })
 })
 

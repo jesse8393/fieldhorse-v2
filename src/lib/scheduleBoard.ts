@@ -90,15 +90,41 @@ export function unscheduledJobs(
   now: Date
 ): JobRow[] {
   const from = startOfDay(now).getTime()
-  const booked = new Set<string>()
+  const booked: string[] = []
   for (const e of events) {
-    if (!e.contact_id) continue
     const t = Date.parse(e.start_at)
-    if (Number.isFinite(t) && t >= from) booked.add(e.contact_id)
+    if (e.contact_id && Number.isFinite(t) && t >= from) booked.push(e.contact_id)
   }
+  return trayJobs(jobs, booked)
+}
+
+/**
+ * The same list from the job ids that already have a visit from today on,
+ * which is what the tray's booked query reads (the database applies "from
+ * today on"). A job in `saving` stays listed in its place even when the
+ * booked cache already holds it, so the card of a drop that is still
+ * saving waits in the tray, dimmed, instead of vanishing and coming back
+ * if the save fails.
+ */
+export function trayJobs(
+  jobs: JobRow[],
+  bookedJobIds: Iterable<string | null | undefined>,
+  saving: ReadonlySet<string> = new Set()
+): JobRow[] {
+  const booked = new Set<string>()
+  for (const id of bookedJobIds) if (id) booked.add(id)
   return jobs
-    .filter((j) => isJobStage(j.stage) && !j.completed_at && !booked.has(j.id))
+    .filter((j) => isJobStage(j.stage) && !j.completed_at && (saving.has(j.id) || !booked.has(j.id)))
     .sort((a, b) => createdMs(b) - createdMs(a) || a.id.localeCompare(b.id))
+}
+
+/** How many cards the tray shows before "Show all". */
+export const TRAY_LIMIT = 50
+
+/** The cards the tray shows, the first TRAY_LIMIT until Show all is pressed, and how many wait behind it. */
+export function capTray<T>(jobs: T[], showAll: boolean, limit = TRAY_LIMIT): { shown: T[]; hidden: number } {
+  if (showAll || jobs.length <= limit) return { shown: jobs, hidden: 0 }
+  return { shown: jobs.slice(0, limit), hidden: jobs.length - limit }
 }
 
 /**

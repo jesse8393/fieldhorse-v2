@@ -30,10 +30,10 @@ Status is one of todo, done, blocked, skipped.
 | 1 | 5 What each invoice actually owes | todo | | |
 | 1 | 6 Money timing and double sends | todo | | |
 | 1 | 7 Jobs and quotes stay inside the active company | done | `222e8f6` | Reviewed by two lenses, approved with no fix round. Decision D36 |
-| 1 | 8 The Unscheduled tray tells the truth | todo | | |
+| 1 | 8 The Unscheduled tray tells the truth | done | this commit | Two fix rounds (overlapping drops, rollback by value), then approved. Decision D39 |
 | 1 | 9 One quote total and one deposit everywhere | todo | | |
 | 1 | 10 The customer page after approval and on bad data | todo | | |
-| 1 | 11 Inbox sends exactly once, only when tapped, only when online | done | this commit | Reviewed by two lenses, approved with no fix round. Decision D38 |
+| 1 | 11 Inbox sends exactly once, only when tapped, only when online | done | `36e4c88` | Reviewed by two lenses, approved with no fix round. Decision D38 |
 | 2 | 12 Next stop card without a photo, and job tabs | todo | | |
 | 2 | 13 Desktop Capture button | todo | | |
 | 2 | 14 Desktop between 900 and 1279 px | todo | | |
@@ -71,6 +71,11 @@ Status is one of todo, done, blocked, skipped.
   * `QUERY_CACHE_VERSION` was not bumped: a cache saved before this change rehydrates old Inbox rows once, they refetch at once and are never saved again.
   * Known small gaps, not changed: a cold open with no signal shows the failure toast rather than the no signal one; words typed after tapping the mic to stop can be overwritten by a late dictation result; when the drafts read fails, draft Send stays disabled.
   * For other tests: under `page.clock.setFixedTime` the cache writer (TanStack's throttle waits on `Date.now`) writes once and then stalls, so persistence tests run on the real clock.
+
+* **Task 8, the tray.** Three lane commits squashed into one. Round 1 found a major (two overlapping drops could re enable the slow card before its refetch and a second drag wrote a duplicate visit); round 2 found another (rollback by identity missed after another drop's rollback, so a failed card vanished). Both fixed with new e2e tests. The third round's second reviewer never finished (it waited on a shared dev server), the first approved with three small notes.
+  * Fixed at integration: Show all N used to unmount under keyboard focus; it now moves focus to the first revealed card.
+  * Known small gaps, not changed: a drop that succeeds during the one round trip at midnight can bring its card back with drag enabled until the next refetch; rollback by value can remove a teammate's real booked row for the same job when three things coincide (slow insert, a refetch landing mid insert that carries the teammate's row, then a failure). Both are one round trip wide.
+  * The mock ignores `not.` filters, so the booked read's `contact_id not null` is only applied by the real database.
 
 * The first CI run on #223 (a docs only commit) failed `mock-workflows` "keeps the desktop schedule planning workflow complete" on desktop. The default mock visit starts two hours after the mock loads, so between 10 pm and midnight Central it lands on tomorrow and the Day view is empty. It failed here too at 10:48 pm Central and passed after the test pinned its page clock to a Thursday morning and seeded that day's visit. It is listed under "Failing before Phase 8".
 
