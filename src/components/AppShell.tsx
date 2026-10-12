@@ -10,7 +10,6 @@ import { lazyWithRetry } from '../lib/lazyWithRetry.ts'
 const DesktopSidebar = lazyWithRetry(() => import('./DesktopSidebar.tsx'))
 import CommandPalette from './CommandPalette.tsx'
 import MobileSearchOverlay from './MobileSearchOverlay.tsx'
-import CaptureFab from './CaptureFab.tsx'
 import CaptureSheet from './CaptureSheet.tsx'
 import InstallPrompt from './InstallPrompt.tsx'
 import RouteErrorBoundary from './RouteErrorBoundary.tsx'
@@ -240,9 +239,10 @@ export default function AppShell() {
 
       {/* Phone: the dock (its Capture coin is the phone's capture entry)
           and the workspace menu the header monogram opens. Desktop: the
-          sidebar above, and the capture button. The sheet also answers
-          Cmd/Ctrl+J and the `fh:open-capture` event everywhere. */}
-      {isDesktop ? <CaptureFab /> : <Dock />}
+          sidebar above carries the Capture row (D33); nothing floats over
+          the page. The sheet also answers Cmd/Ctrl+J and the
+          `fh:open-capture` event everywhere. */}
+      {!isDesktop && <Dock />}
       <WorkspaceMenu />
       <CaptureSheet />
       <CommandPalette />

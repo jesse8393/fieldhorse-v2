@@ -476,18 +476,41 @@ test.describe('a thread', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Inbox' })).toBeVisible()
   })
 
-  test('on a desktop the thread opens beside the list and the capture button leaves Send clear', async ({ context, page }, testInfo) => {
+  test('on a desktop the thread opens beside the list and nothing floats over Send', async ({ context, page }, testInfo) => {
     test.skip(testInfo.project.name.startsWith('mobile'), 'Desktop only')
     await openThread(context, page, { ...THREAD, fh_agent_runs: [] })
     const list = page.getByRole('complementary', { name: 'Conversations' })
     await expect(list.getByText('Marcus Bell')).toBeVisible()
-    const send = await page.getByRole('button', { name: 'Send reply' }).boundingBox()
-    const fab = await page.locator('.fh-fab').first().boundingBox()
-    expect(send).not.toBeNull()
-    if (send && fab) {
-      const apart = send.x + send.width <= fab.x || fab.x + fab.width <= send.x || send.y + send.height <= fab.y || fab.y + fab.height <= send.y
-      expect(apart).toBe(true)
-    }
+
+    // No capture button floats over a desktop page any more (PHASE8_PLAN.md
+    // Task 13, D33): the one Capture control is the sidebar row.
+    const sidebar = page.getByRole('complementary', { name: 'Primary navigation' })
+    await expect(sidebar.getByRole('button', { name: /^Capture/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^Capture/ })).toHaveCount(1)
+    await expect(page.locator('.fh-fab')).toHaveCount(0)
+
+    // Send is on screen and nothing covers it: the topmost element at its
+    // middle and at four points around it is Send itself.
+    const send = page.getByRole('button', { name: 'Send reply' })
+    await expect(send).toBeVisible()
+    await expect(send).toBeInViewport()
+    const covered = await send.evaluate((button) => {
+      const r = button.getBoundingClientRect()
+      const points = [[0.5, 0.5], [0.25, 0.5], [0.75, 0.5], [0.5, 0.25], [0.5, 0.75]]
+      return points
+        .map(([fx, fy]) => document.elementFromPoint(r.left + r.width * fx, r.top + r.height * fy))
+        .filter((hit) => !hit || !button.contains(hit))
+        .map((hit) => (hit ? `${hit.tagName.toLowerCase()} ${hit.getAttribute('class') ?? ''}`.trim() : 'nothing'))
+    })
+    expect(covered).toEqual([])
+
+    // With nothing in the corner, the composer no longer stops short of it:
+    // Send ends on the same right edge as the messages above it.
+    const [sendBox, bubbleBox] = await Promise.all([
+      send.boundingBox(),
+      page.locator('.fhi-msg.is-out .fhi-bubble').first().boundingBox()
+    ])
+    expect(Math.abs((sendBox!.x + sendBox!.width) - (bubbleBox!.x + bubbleBox!.width))).toBeLessThanOrEqual(1)
   })
 })
 

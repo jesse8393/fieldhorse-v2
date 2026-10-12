@@ -678,14 +678,10 @@
     max-width: 72%;
   }
 
-  /* The capture button floats at the bottom right; the composer stops
-     short of it. */
+  /* Nothing floats over a desktop page (Capture is a sidebar row, D33),
+     so the composer runs to the same right edge as the messages. */
   .fhi-thread.is-embedded .fhi-composer {
     position: static;
     padding: 8px var(--fh-gutter-desktop) 16px;
-  }
-
-  .fhi-thread.is-embedded .fhi-composer__row {
-    margin-right: 48px;
   }
 }

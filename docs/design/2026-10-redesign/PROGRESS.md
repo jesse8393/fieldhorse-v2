@@ -34,8 +34,8 @@ Status is one of todo, done, blocked, skipped.
 | 1 | 9 One quote total and one deposit everywhere | done | `8c3f6c9` | Reviewed by two lenses, approved with no fix round. Decision D31 |
 | 1 | 10 The customer page after approval and on bad data | todo | | |
 | 1 | 11 Inbox sends exactly once, only when tapped, only when online | done | `36e4c88` | Reviewed by two lenses, approved with no fix round. Decision D38 |
-| 2 | 12 Next stop card without a photo, and job tabs | done | this commit | Two fix rounds (a class clash with the Jobs list, tabs under the fade), then approved. Decisions D32 and D41 |
-| 2 | 13 Desktop Capture button | todo | | |
+| 2 | 12 Next stop card without a photo, and job tabs | done | `988deb0` | Two fix rounds (a class clash with the Jobs list, tabs under the fade), then approved. Decisions D32 and D41 |
+| 2 | 13 Desktop Capture button | done | this commit | One fix round (an Inbox test still waited for the removed button), then approved. Decision D33 |
 | 2 | 14 Desktop between 900 and 1279 px | todo | | |
 | 2 | 15 Small behavior fixes | todo | | |
 | 2 | 16 Login wordmark | todo | | |
@@ -95,6 +95,10 @@ Status is one of todo, done, blocked, skipped.
   * The opt in pixel baselines (`FH_VISUAL=1`) for Today, the job page and `/design` were refreshed for the band and the fade (seven images). Task 17 reruns the whole guard.
   * Known small gaps, not changed: after the tab strip changes width (turning the phone), the selected last tab can end a few pixels under the fade until the next tab change; at about 1100 px on a desktop the photo version of the next stop clips the top of a two line eyebrow (passed to Task 14); with `QA_NOW` set, `redesign-shell` "last item clears the dock" fails on the base too.
 * A one off failure in the background run after Task 5: `mock-workflows` "uses the full desktop workspace" timed out on desktop while three agent groups were running browsers (load average 18). It passed twice alone and in CI.
+
+* **Task 13, desktop Capture.** Two lane commits squashed into one. New `src/lib/shortcutKeys.ts` (`isMacLike`, `desktopShortcut`) prints ⌘ or Ctrl on the sidebar caps. `CaptureFab.tsx` was deleted: it never rendered below 900 px (the phone uses the dock coin), so nothing was left to keep on the phone.
+  * Test changed with the behavior the plan asks for: the desktop Inbox test that measured the floating button now asserts nothing floats over Send (a hit test at five points) and the only Capture button is the sidebar row. The desktop capture test was strengthened at integration to assert no `.fh-fab` and exactly one Capture button on Today, Money and the job page, whatever a future button's class.
+  * Known small gaps, not changed: older desktop pages outside the redesign (Customers, Settings, Notes, Reports and others) still print a fixed ⌘K in their own search bars; with the Inbox switched on and Team and office open, the sidebar's last row (Import) is clipped on a 900 px tall window and needs a scroll; focus does not return to the row that opened a sheet after it closes, for every `fh/Sheet` (it did not before either); `.fhs-side__kbd` in `fh-shell.css` is now dead (Task 17).
 
 * The first CI run on #223 (a docs only commit) failed `mock-workflows` "keeps the desktop schedule planning workflow complete" on desktop. The default mock visit starts two hours after the mock loads, so between 10 pm and midnight Central it lands on tomorrow and the Day view is empty. It failed here too at 10:48 pm Central and passed after the test pinned its page clock to a Thursday morning and seeded that day's visit. It is listed under "Failing before Phase 8".
 

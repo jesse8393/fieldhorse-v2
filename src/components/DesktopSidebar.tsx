@@ -1,6 +1,11 @@
 // DesktopSidebar, the onyx rail at 900px and up (spec 8.3).
 //
-// Top: the company monogram, name and city, then search with ⌘K.
+// Top: the company monogram, name and city, then search with ⌘K and a
+// quiet Capture row with its key cap (⌘J on a Mac, Ctrl J elsewhere),
+// which opens Universal Capture the way the dock coin does on a phone
+// (PHASE8_PLAN.md Task 13, D33). There is no floating capture button on
+// a desktop any more: it covered page content and made a second gold
+// element on pages meant to have one.
 // Main list: Today, Schedule, Jobs, Money, Inbox (only when the company's
 // messaging engine is on, decision D9), Customers, Reports. A
 // collapsible Team and office group holds the rest, so every route the
@@ -9,10 +14,11 @@
 // Mounted by AppShell only on desktop widths; global.css keeps
 // .fh-desktop-sidebar hidden below 900px.
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { ChevronDown, LogOut, Search } from 'lucide-react'
+import { ChevronDown, LogOut, Mic, Search } from 'lucide-react'
 import Icon from './fh/Icon.tsx'
+import KeyCap from './fh/KeyCap.tsx'
 import Monogram, { initialsFor } from './fh/Monogram.tsx'
 import OrgSwitcher from './OrgSwitcher.tsx'
 import { useAuth } from '../contexts/AuthContext.tsx'
@@ -23,6 +29,8 @@ import { SETTINGS, SIDEBAR_MORE, isActive, sidebarPrimary, type NavItem } from '
 import { useEngineEnabled } from '../lib/inbox.ts'
 import { useNavAccess } from '../lib/useNavAccess.ts'
 import { cityLine } from '../lib/companyLine.ts'
+import { openCapture } from '../lib/captureAttach.ts'
+import { browserEnv, desktopShortcut } from '../lib/shortcutKeys.ts'
 
 const MORE_KEY = 'fh:sidebar-more-open'
 
@@ -69,6 +77,11 @@ export default function DesktopSidebar() {
   const { canSee, hasCrew } = useNavAccess()
   const engineEnabled = useEngineEnabled()
   const [moreOpen, setMoreOpen] = useState(() => readMoreOpen(pathname))
+  // The key caps follow the keyboard in front of the person: ⌘ on a Mac,
+  // Ctrl elsewhere. Read once, the browser does not change underneath us.
+  const env = useMemo(() => browserEnv(), [])
+  const searchKeys = desktopShortcut('K', env)
+  const captureKeys = desktopShortcut('J', env)
 
   const company = profile?.company_name?.trim() || profile?.full_name?.trim() || 'Your workspace'
   const city = cityLine(profile?.company_address)
@@ -108,10 +121,30 @@ export default function DesktopSidebar() {
         </div>
       </div>
 
-      <button type="button" className="fhs-side__search" onClick={openPalette} aria-label="Search everything (⌘K)">
+      <button
+        type="button"
+        className="fhs-side__search"
+        onClick={openPalette}
+        aria-label={`Search everything (${searchKeys.spoken})`}
+        aria-keyshortcuts={searchKeys.combo}
+      >
         <Icon icon={Search} size={18} />
         <span>Search</span>
-        <kbd className="fhs-side__kbd">⌘K</kbd>
+        <KeyCap aria-hidden="true">{searchKeys.keys}</KeyCap>
+      </button>
+
+      {/* Universal Capture, the same path the dock coin takes. CaptureSheet
+          also answers Cmd or Ctrl J and the palette's Capture anything. */}
+      <button
+        type="button"
+        className="fhs-side__link fhs-side__capture"
+        onClick={() => openCapture()}
+        aria-label={`Capture (${captureKeys.spoken})`}
+        aria-keyshortcuts={captureKeys.combo}
+      >
+        <Icon icon={Mic} size={18} />
+        <span className="fhs-side__capture-label">Capture</span>
+        <KeyCap aria-hidden="true">{captureKeys.keys}</KeyCap>
       </button>
 
       <nav className="fhs-side__nav" aria-label="Primary">

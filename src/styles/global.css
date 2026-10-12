@@ -2308,10 +2308,11 @@ a {
   top: calc(env(safe-area-inset-top, 0px) + 16px) !important;
 }
 
-/* FABs float over the scroll content; without reserved space they sit
-   on top of the last rows, row-action menus, sticky save bars, and
-   send buttons (UI audit #16). Reserve the height of the two-button
-   stack at the bottom of every scrollable page body. */
+/* A floating button sits over the scroll content; without reserved space
+   it covers the last rows, row-action menus, sticky save bars and send
+   buttons (UI audit #16). On a desktop the only one left is the Jobs
+   New deal button (Capture is a sidebar row since D33), so every
+   scrollable page body keeps this room at the bottom. */
 @media (min-width: 900px) {
   .fh-build-main,
   .v3-screen {
@@ -2363,34 +2364,27 @@ a {
   height: 44px;
 }
 
-/* Universal Capture FAB — the circular mic variant of .fh-fab.
-   Default position is the canonical FAB spot. When the current screen
-   renders its own "+" FAB (Leads / Jobs / Clients / Schedule), capture
-   slides up to stack above it instead of overlapping. Both buttons are
-   portaled to <body>, so body:has() sees them regardless of route. */
-.fh-fab--capture {
-  border-radius: 10px;
-  transition: transform 160ms ease, box-shadow 160ms ease, bottom 200ms ease;
-}
-body:has(.fh-fab:not(.fh-fab--capture)) .fh-fab--capture {
-  bottom: calc(var(--fh-mobile-dock-height) + var(--space-4) + 56px);
-}
-/* Desktop: screens that hide their own FAB at >=900px (inline header
-   action instead) release the stacked offset — capture drops back to
-   the canonical spot. Schedule keeps its FAB on desktop, so the
-   stacked rule above still applies there. */
+/* Desktop: the one "+" FAB a screen keeps at >=900px (Jobs) sits in the
+   canonical corner. Universal Capture no longer floats here: the sidebar
+   carries a Capture row under Search (Task 13, D33), and the phone's
+   dock coin is unchanged. */
 @media (min-width: 900px) {
   .fh-fab {
     right: 24px;
     bottom: 24px;
   }
-  body:has(.fh-fab:not(.fh-fab--capture)) .fh-fab--capture {
-    bottom: 80px;
-  }
-  body:has(.fh-fab--hide-desktop) .fh-fab.fh-fab--capture {
-    bottom: 24px;
-  }
 }
+
+/* Desktop sidebar Capture row (D33). It borrows .fhs-side__link from
+   fh-shell.css for its colors, hover, height and left padding; these
+   rules only lay the label and the key cap out. fh-shell.css loads after
+   this file, so the padding rule names both classes to outrank
+   .fhs-side__link's own padding. The cap lands on the Search cap's right
+   edge: Search keeps 8 px inside its 1 px border, this row has no
+   border, so it keeps the same 8 px and the cap steps in the 1 px. */
+.fhs-side__link.fhs-side__capture { padding-right: 8px; }
+.fhs-side__capture .fhc-keycap { margin-right: 1px; }
+.fhs-side__capture-label { flex: 1; }
 
 /* Single-column mobile screens that don't have a dedicated desktop
    composition (Activity feed, Importer) shouldn't stretch their content
