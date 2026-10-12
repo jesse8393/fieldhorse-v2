@@ -335,6 +335,9 @@
   overscroll-behavior-x: contain;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
+  /* A tab the arrow keys bring into view keeps the gutter on the left and
+     clears the 32 px fade on the right (JobSectionTabs' TAB_END_ROOM). */
+  scroll-padding-inline: 20px 40px;
 }
 
 .fhj-tabs__strip::-webkit-scrollbar {
@@ -345,6 +348,23 @@
 .fhj-tabs__strip::after {
   content: '';
   flex: 0 0 1px;
+}
+
+/* While more tabs wait past the right edge, the last 32 px fade into the
+   page. JobSectionTabs sets the class and clears it at the end. */
+.fhj-tabs--fade {
+  position: relative;
+}
+
+.fhj-tabs--fade::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 32px;
+  background: linear-gradient(to right, transparent, var(--fh-plaster));
+  pointer-events: none;
 }
 
 .fhj-tabs__tab {

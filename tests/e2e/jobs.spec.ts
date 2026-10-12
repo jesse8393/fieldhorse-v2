@@ -61,7 +61,7 @@ test.describe('jobs on a phone', () => {
   test('crew sees no money', async ({ context, page }) => {
     await signIn(context, { role: 'crew' })
     await openJobs(page)
-    const list = page.locator('.fhj-list')
+    const list = page.locator('.fhjl-list')
     await expect(list.getByText('Plumbing Bellevue', { exact: true })).toBeVisible()
     await expect(list.getByText('2 in progress', { exact: true })).toBeVisible()
     // Let the role settle (the screen hides money while it loads), then
@@ -77,5 +77,22 @@ test.describe('jobs on a phone', () => {
     await openJobs(page)
     await page.getByText('Plumbing Bellevue', { exact: true }).click()
     await expect(page).toHaveURL(/\/jobs\/c-job1$/)
+  })
+
+  test('back from a job, the list keeps its own look', async ({ context, page }) => {
+    await signIn(context)
+    await openJobs(page)
+    const stages = page.getByRole('tablist', { name: 'Job stages' })
+    const look = () => stages.evaluate((el) => {
+      const s = getComputedStyle(el)
+      return { border: s.borderBottomWidth, rule: s.boxShadow, padding: `${s.paddingLeft} ${s.paddingRight}` }
+    })
+    const first = await look()
+    // The job page's styles stay on the page once it has drawn.
+    await page.getByText('Plumbing Bellevue', { exact: true }).click()
+    await expect(page.locator('.fhj-page')).toBeVisible({ timeout: 30_000 })
+    await page.goBack()
+    await expect(page.getByRole('heading', { level: 1, name: 'Jobs' })).toBeVisible({ timeout: 30_000 })
+    expect(await look()).toEqual(first)
   })
 })

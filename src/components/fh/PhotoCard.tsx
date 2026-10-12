@@ -6,8 +6,9 @@ import { cx } from './cx.ts'
 // photo with a hairline edge, radius 18, and the raised shadow. Text sits
 // in linen on --fh-scrim at the bottom, with an optional action such as a
 // "Navigate" pill. The photo box is reserved with aspect-ratio and loads
-// lazily. With no photo, or one that fails to load, the frame falls back
-// to the onyx stage look with the same text.
+// lazily. With no photo, or one that fails to load, the same tray holds a
+// compact onyx band about 96 px tall (decision D32): the eyebrow and the
+// title on the left, the action on the right, and no empty image box.
 
 type PhotoCardOwnProps = {
   /** Small line above the title, such as "Next stop, 7:30 am". */
@@ -15,7 +16,7 @@ type PhotoCardOwnProps = {
   title: ReactNode
   /** One control at the bottom right, such as a Navigate Button. */
   action?: ReactNode
-  /** CSS aspect ratio of the photo box. */
+  /** CSS aspect ratio of the photo box. Without a photo the band is compact and ignores it. */
   ratio?: string
   /** Heading level for the title, or a plain paragraph. */
   titleAs?: 'h2' | 'h3' | 'p'
@@ -52,7 +53,7 @@ export default function PhotoCard({
     <div className={cx('fhc-photo', !hasPhoto && 'fhc-photo--empty', className)}>
       <div
         className={cx('fhc-photo__frame', !hasPhoto && 'fh-grain')}
-        style={{ aspectRatio: ratio }}
+        style={hasPhoto ? { aspectRatio: ratio } : undefined}
       >
         {hasPhoto && (
           <img

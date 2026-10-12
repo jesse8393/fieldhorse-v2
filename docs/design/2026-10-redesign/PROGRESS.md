@@ -27,14 +27,14 @@ Status is one of todo, done, blocked, skipped.
 | 1 | 2 Today counts stop at 6 | done | `07a9071` | Reviewed by two lenses, approved with no fix round. Decision D34 |
 | 1 | 3 Capture from a job page shows up on the job | done | `1766c46` | Reviewed by two lenses, approved with no fix round. Decision D35 |
 | 1 | 4 Morning cold open says "Clear day" | done | `84ccf0d` | Reviewed by two lenses, approved with no fix round. Decision D40 |
-| 1 | 5 What each invoice actually owes | done | this commit | One fix round (email and PDF agreement, jobs with no contract amount, drafts in the allocator), then approved. Decision D37 |
+| 1 | 5 What each invoice actually owes | done | `33a5b55` | One fix round (email and PDF agreement, jobs with no contract amount, drafts in the allocator), then approved. Decision D37 |
 | 1 | 6 Money timing and double sends | todo | | |
 | 1 | 7 Jobs and quotes stay inside the active company | done | `222e8f6` | Reviewed by two lenses, approved with no fix round. Decision D36 |
 | 1 | 8 The Unscheduled tray tells the truth | done | `d4dc086` | Two fix rounds (overlapping drops, rollback by value), then approved. Decision D39 |
 | 1 | 9 One quote total and one deposit everywhere | done | `8c3f6c9` | Reviewed by two lenses, approved with no fix round. Decision D31 |
 | 1 | 10 The customer page after approval and on bad data | todo | | |
 | 1 | 11 Inbox sends exactly once, only when tapped, only when online | done | `36e4c88` | Reviewed by two lenses, approved with no fix round. Decision D38 |
-| 2 | 12 Next stop card without a photo, and job tabs | todo | | |
+| 2 | 12 Next stop card without a photo, and job tabs | done | this commit | Two fix rounds (a class clash with the Jobs list, tabs under the fade), then approved. Decisions D32 and D41 |
 | 2 | 13 Desktop Capture button | todo | | |
 | 2 | 14 Desktop between 900 and 1279 px | todo | | |
 | 2 | 15 Small behavior fixes | todo | | |
@@ -89,6 +89,12 @@ Status is one of todo, done, blocked, skipped.
   * Plan and code differ on purpose: the plan says unlinked money settles "oldest due first"; the code settles by invoice number, then due date, then creation, because draws made from terms have no due date and the deposit draft would otherwise come last. This matches `logPayment` and the job page. The unit test that asserted the due date order was restated with flipped expectations and a stated reason.
   * Shared file `scripts/qa-mock.mjs`: Harold (`c-job2`) had a $6,400 unlinked payment and one open $6,400 draw, which the honest rule read as paid. A paid deposit row `inv0` was added and `inv1` became invoice 2, so `mock-workflows` and `redesign-shell` keep their rows. `money.spec` Rosa gained a paid $3,000 deposit for the same reason; no assertion changed. The lead gave Rosa the same paid deposit in `scripts/compare-renders.mjs`, so her Overdue row stays in the Phase 8 render comparison.
   * Known small gaps, not changed: Mark paid from Money on a bill the allocator says is covered opens an empty payment sheet; the job page's Mark paid prefill (`InvoiceDrawsSection.handleMarkPaid`) subtracts only linked payments; the PDF hero's "collected of contract" line can read collected above contract on a job with no recorded amount; Money loads every settled invoice in the company for the allocator (Today narrows to jobs with an open invoice).
+
+* **Task 12, the next stop band and the job tabs.** Three lane commits squashed into one. `PhotoCard` with no photo is a compact onyx band; the job tabs fade where they overflow.
+  * Found by review and fixed in this task: the Jobs list's `jobs.css` used the job page's own class names (`.fhj-tabs`, `.fhj-head`), so after opening a job from the Jobs list on a phone the header became a flex row and the fade sat on the wrong box. The Jobs list moved to `fhjl-` (D41); new e2e tests walk Jobs list to job and back.
+  * The opt in pixel baselines (`FH_VISUAL=1`) for Today, the job page and `/design` were refreshed for the band and the fade (seven images). Task 17 reruns the whole guard.
+  * Known small gaps, not changed: after the tab strip changes width (turning the phone), the selected last tab can end a few pixels under the fade until the next tab change; at about 1100 px on a desktop the photo version of the next stop clips the top of a two line eyebrow (passed to Task 14); with `QA_NOW` set, `redesign-shell` "last item clears the dock" fails on the base too.
+* A one off failure in the background run after Task 5: `mock-workflows` "uses the full desktop workspace" timed out on desktop while three agent groups were running browsers (load average 18). It passed twice alone and in CI.
 
 * The first CI run on #223 (a docs only commit) failed `mock-workflows` "keeps the desktop schedule planning workflow complete" on desktop. The default mock visit starts two hours after the mock loads, so between 10 pm and midnight Central it lands on tomorrow and the Day view is empty. It failed here too at 10:48 pm Central and passed after the test pinned its page clock to a Thursday morning and seeded that day's visit. It is listed under "Failing before Phase 8".
 

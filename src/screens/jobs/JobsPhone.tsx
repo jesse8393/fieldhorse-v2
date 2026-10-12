@@ -219,12 +219,12 @@ export default function JobsPhone({
     body = view.groups.map((g) => {
       const headingId = `${idBase}-group-${g.id}`
       return (
-        <section key={g.id} className="fhj-group" aria-labelledby={headingId}>
-          <div className="fhj-group__head">
-            <h2 className="fhj-group__title" id={headingId}>{g.title}</h2>
-            <p className="fhj-group__note">{g.note}</p>
+        <section key={g.id} className="fhjl-group" aria-labelledby={headingId}>
+          <div className="fhjl-group__head">
+            <h2 className="fhjl-group__title" id={headingId}>{g.title}</h2>
+            <p className="fhjl-group__note">{g.note}</p>
           </div>
-          <ul className="fhj-rows">
+          <ul className="fhjl-rows">
             {g.rows.map((r) => (
               <Row
                 key={r.id}
@@ -243,10 +243,10 @@ export default function JobsPhone({
   }
 
   return (
-    <div className="v3-screen fhj">
-      <div className="fhj-head">
-        <h1 className="fhj-title">Jobs</h1>
-        <div className="fhj-head__actions">
+    <div className="v3-screen fhjl">
+      <div className="fhjl-head">
+        <h1 className="fhjl-title">Jobs</h1>
+        <div className="fhjl-head__actions">
           <Button variant="secondary" size="mini" icon={Plus} onClick={onNewLead}>
             New lead
           </Button>
@@ -269,7 +269,7 @@ export default function JobsPhone({
       </div>
 
       {searchOpen && (
-        <div className="fhj-search">
+        <div className="fhjl-search">
           <Field
             ref={searchRef}
             id={searchFieldId}
@@ -288,7 +288,7 @@ export default function JobsPhone({
         </div>
       )}
 
-      <div className="fhj-tabs" role="tablist" aria-label="Job stages" onKeyDown={handleTablistKeyDown}>
+      <div className="fhjl-tabs" role="tablist" aria-label="Job stages" onKeyDown={handleTablistKeyDown}>
         {tabs.map((t) => {
           const selected = t.id === tab
           return (
@@ -300,19 +300,19 @@ export default function JobsPhone({
               aria-selected={selected}
               aria-controls={tabPanelId(idBase, t.id)}
               tabIndex={selected ? 0 : -1}
-              className="fhj-tab"
+              className="fhjl-tab"
               onClick={() => { if (!selected) selectTab(t.id) }}
             >
-              <span className="fhj-tab__label">{t.label}</span>
-              {!loading && <span className="fhj-tab__count">{view.counts[t.id]}</span>}
+              <span className="fhjl-tab__label">{t.label}</span>
+              {!loading && <span className="fhjl-tab__count">{view.counts[t.id]}</span>}
             </button>
           )
         })}
       </div>
 
-      <div className="fhj-list" {...tabPanelProps(idBase, tab)}>
+      <div className="fhjl-list" {...tabPanelProps(idBase, tab)}>
         {loadError && jobs.length > 0 && (
-          <div className="fhj-notice">
+          <div className="fhjl-notice">
             <DataErrorState
               compact
               title="Could not refresh"
@@ -322,7 +322,7 @@ export default function JobsPhone({
             />
           </div>
         )}
-        {hasRows ? body : <div className="fhj-state">{body}</div>}
+        {hasRows ? body : <div className="fhjl-state">{body}</div>}
       </div>
 
       <JobsFilterSheet

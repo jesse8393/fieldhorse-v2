@@ -178,6 +178,46 @@ async function setUp(
   await expect(page.locator('.fh-app')).toBeVisible({ timeout: 30_000 })
 }
 
+// Today with its schedule held, so the loading card draws first. Returns
+// the loading card's height, then the next stop's once the schedule lands.
+async function loadingThenNextStop(context: BrowserContext, page: Page) {
+  await signIn(context, { tables: { fh_schedule: SCHEDULE } })
+  await context.route('https://api.open-meteo.com/**', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(forecast()) })
+  )
+  let release = () => {}
+  const held = new Promise<void>((resolve) => { release = resolve })
+  await context.route((url) => url.pathname.endsWith('/rest/v1/fh_schedule'), async (route) => {
+    await held
+    await route.fallback()
+  })
+  await page.clock.setFixedTime(MORNING)
+  await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  const card = page.locator('.fht-card[aria-hidden="true"]')
+  await expect(card).toBeVisible({ timeout: 30_000 })
+  const loading = (await card.boundingBox())!.height
+  release()
+  const nextStop = page.getByRole('region', { name: 'Next stop' })
+  await expect(nextStop.getByText('Next stop, 7:30 am')).toBeVisible({ timeout: 30_000 })
+  return { loading, band: (await nextStop.boundingBox())!.height }
+}
+
+// Tabs onto the next stop's job name and reads the rings it draws: its
+// own outline, and the one its ::after draws around the whole band.
+async function nextStopFocus(page: Page) {
+  const link = page.getByRole('region', { name: 'Next stop' }).getByRole('link', { name: 'Plumbing Bellevue' })
+  await expect(link).toBeVisible()
+  // Back one and forward one with the keyboard, so the focus is visible.
+  await link.focus()
+  await page.keyboard.press('Shift+Tab')
+  await page.keyboard.press('Tab')
+  await expect(link).toBeFocused()
+  return link.evaluate((el) => {
+    const ring = getComputedStyle(el, '::after')
+    return { visible: el.matches(':focus-visible'), name: getComputedStyle(el).outlineStyle, band: `${ring.outlineStyle} ${ring.outlineWidth}` }
+  })
+}
+
 test.describe('today on a phone', () => {
   test.skip(({ isMobile }) => !isMobile, 'Phone layout')
 
@@ -217,6 +257,28 @@ test.describe('today on a phone', () => {
     await setUp(context, page, { at: MORNING })
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(/stops?\./)
     expect(await page.locator('main .fhc-btn--primary').count()).toBeLessThanOrEqual(1)
+  })
+
+  test('the next stop with no photo is a compact band, not an empty picture', async ({ context, page }) => {
+    await setUp(context, page, { at: MORNING })
+    const nextStop = page.getByRole('region', { name: 'Next stop' })
+    await expect(nextStop.getByText('Next stop, 7:30 am')).toBeVisible()
+    await expect(nextStop.getByRole('link', { name: 'Plumbing Bellevue' })).toBeVisible()
+    await expect(nextStop.getByRole('link', { name: 'Navigate', exact: true })).toBeVisible()
+    await page.waitForLoadState('networkidle')
+    await expect(nextStop.locator('img')).toHaveCount(0)
+    const box = await nextStop.boundingBox()
+    expect(box!.height).toBeLessThanOrEqual(120)
+  })
+
+  test('the loading card is the size of the band, so the next stop does not jump when it lands', async ({ context, page }) => {
+    const { loading, band } = await loadingThenNextStop(context, page)
+    expect(Math.abs(loading - band), `loading ${loading}, band ${band}`).toBeLessThanOrEqual(1)
+  })
+
+  test('keyboard focus on the next stop rings the whole band, not a clipped name', async ({ context, page }) => {
+    await setUp(context, page, { at: MORNING })
+    expect(await nextStopFocus(page)).toEqual({ visible: true, name: 'none', band: 'solid 2px' })
   })
 
   test('empty day', async ({ context, page }) => {
@@ -297,6 +359,28 @@ test.describe('today on a desktop', () => {
     await expect(day.getByRole('link', { name: 'Week' })).toHaveAttribute('href', '/schedule')
     // Tomorrow's visit stays out of today.
     await expect(day.getByText('Final slab inspection')).toHaveCount(0)
+  })
+
+  test('the next stop with no photo is a compact band, not an empty picture', async ({ context, page }) => {
+    await setUp(context, page, { at: MORNING })
+    const nextStop = page.getByRole('region', { name: 'Next stop' })
+    await expect(nextStop.getByText('Next stop, 7:30 am')).toBeVisible()
+    await expect(nextStop.getByRole('link', { name: 'Plumbing Bellevue' })).toBeVisible()
+    await expect(nextStop.getByRole('link', { name: 'Navigate', exact: true })).toBeVisible()
+    await page.waitForLoadState('networkidle')
+    await expect(nextStop.locator('img')).toHaveCount(0)
+    const box = await nextStop.boundingBox()
+    expect(box!.height).toBeLessThanOrEqual(120)
+  })
+
+  test('the loading card is the size of the band, so the next stop does not jump when it lands', async ({ context, page }) => {
+    const { loading, band } = await loadingThenNextStop(context, page)
+    expect(Math.abs(loading - band), `loading ${loading}, band ${band}`).toBeLessThanOrEqual(1)
+  })
+
+  test('keyboard focus on the next stop rings the whole band, not a clipped name', async ({ context, page }) => {
+    await setUp(context, page, { at: MORNING })
+    expect(await nextStopFocus(page)).toEqual({ visible: true, name: 'none', band: 'solid 2px' })
   })
 
   test('eight visits all count, and the seventh is the next stop in the afternoon', async ({ context, page }) => {
