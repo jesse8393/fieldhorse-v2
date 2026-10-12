@@ -128,7 +128,7 @@ export function DocumentPreviewPane({ company, contact, items, photos = [], load
  * "Roofing" tags the photo for the Roofing scope), a lightweight
  * convention that doesn't require a schema change.
  */
-export async function loadProjectPhotosForPdf(jobId: any, userId: any) {
+export async function loadProjectPhotosForPdf(jobId: any, userId: any, limit = 8) {
   if (!jobId || !userId) return []
   // Every photo on the job, whoever uploaded it (RLS scopes the tenant).
   const { data, error } = await supabase
@@ -137,7 +137,7 @@ export async function loadProjectPhotosForPdf(jobId: any, userId: any) {
     .eq('job_id', jobId)
     .eq('kind', 'photo')
     .order('uploaded_at', { ascending: true })
-    .limit(8)
+    .limit(limit)
   if (error || !Array.isArray(data) || data.length === 0) return []
 
   // Sign each path. Failures filter out, the renderer handles missing
@@ -166,4 +166,18 @@ export async function loadProjectPhotosForPdf(jobId: any, userId: any) {
     })
   )
   return signed.filter(Boolean)
+}
+
+// How many photos the customer page gets: the oldest twelve, in upload
+// order (netlify/functions/public-link.js). Change both together.
+const CUSTOMER_PAGE_PHOTOS = 12
+
+/**
+ * The photos the in app preview draws (the desktop Document view and
+ * "Preview as"): the same ones the customer page gets, so the preview
+ * picks the same cover (the newest of them, PortalView.coverUrl) and shows
+ * the same photo blocks. The PDF keeps its eight.
+ */
+export function loadPreviewPhotos(jobId: any, userId: any) {
+  return loadProjectPhotosForPdf(jobId, userId, CUSTOMER_PAGE_PHOTOS)
 }

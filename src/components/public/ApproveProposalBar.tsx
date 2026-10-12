@@ -17,9 +17,36 @@
 // quote that has not picked the new theme looks the same to its customer.
 
 import { useEffect, useRef, useState } from 'react'
+import type { KeyboardEvent } from 'react'
 import { Button, Chip, Field, formatMoney } from '../fh'
 import { DOC_COLORS } from '../documents/tokens.ts'
+import { personFirstName } from '../../lib/quoteView.ts'
 import '../documents/fieldhorse-proposal.css'
+
+/**
+ * What the page found when it read the quote again just before posting an
+ * approval: ok to post, the total changed, something else the customer
+ * agrees to changed (the lines, the terms, the warranty), the page redrawn
+ * from that read no longer offers approval (see PublicDoc), the read
+ * failed for a moment (no answer, too many requests, a server error), or
+ * the server refused the link itself (revoked, expired, removed), with the
+ * error and message it answered.
+ */
+export type ApproveCheck =
+  | 'ok' | 'changed' | 'updated' | 'closed' | 'failed'
+  | { refused: { error: string | null; message: string | null } }
+
+// What the customer reads for an error the link answers, the same words
+// whether the read before an approval or the approval itself got it.
+function approveErrorText(error: unknown, message: unknown, docLabel: string, companyName: string, fallback: string): string {
+  if (error === 'already_approved') return `This ${docLabel} has already been approved, thank you.`
+  if (error === 'expired') return 'This link has expired. Please ask the contractor for a fresh one.'
+  if (error === 'revoked') return 'This link has been revoked.'
+  if (error === 'quote_expired') return `This quote has expired. Ask ${companyName || 'the contractor'} for an updated one.`
+  if (error === 'empty_proposal') return 'This proposal is empty, please contact the sender.'
+  if (error === 'gone') return `This ${docLabel} is no longer open for approval.`
+  return (typeof message === 'string' && message.trim()) || fallback
+}
 
 export default function ApproveProposalBar({
   token,
@@ -27,15 +54,28 @@ export default function ApproveProposalBar({
   contactName,
   contractTotal,
   initialName = '',
+  // Reads the quote again before the approval posts; see ApproveCheck.
+  onBeforeApprove = null,
   onApproved,
+  // Called once a question (a change request) has been sent.
+  onRequested = null,
+  // The server said the quote is not what the page shows (a 409 or 410 to
+  // an approval, a 404, 409 or 410 to a question), so the page should read
+  // it again.
+  onStale = null,
   // 'proposal' (default) or 'change_order', switches the endpoint and
   // the customer facing copy; the signature mechanics are identical.
   variant = 'proposal',
   // 'fieldhorse' draws the onyx capsule; anything else is the classic panel.
   skin = 'classic',
   // "Ask about this" on an optional item: a new seed opens the request
-  // changes form with its text in the box. Each tap makes a new object.
-  requestSeed = null
+  // changes form with its text in the box, and its opener (the button
+  // tapped) gets focus back on Back. Each tap makes a new object.
+  requestSeed = null,
+  // False when the request changes endpoint would refuse a question (a
+  // declined quote, a job already started, a refused link): the capsule
+  // then offers none, and an open question form closes.
+  canAsk = true
 }: any) {
   const isCO = variant === 'change_order'
   const endpoint = isCO ? '/api/public-co-approve' : '/api/public-link-approve'
@@ -51,6 +91,15 @@ export default function ApproveProposalBar({
   const [requestDone, setRequestDone] = useState<any>(null)
 
   const capsuleRef = useRef<HTMLElement | null>(null)
+  // Where focus goes when the capsule's question form closes: Back returns
+  // it to the control that opened the form (the "Ask about this" button
+  // tapped, else the question link); a form closed because the server
+  // stopped taking questions puts it on the message that says so.
+  const openerRef = useRef<HTMLElement | null>(null)
+  const questionRef = useRef<HTMLButtonElement | HTMLAnchorElement | null>(null)
+  const errorRef = useRef<HTMLDivElement | null>(null)
+  const focusOnClose = useRef<'opener' | 'message' | null>(null)
+  const askable = canAsk !== false
 
   const ready = name.trim().length > 1 && authorized && !busy
   // A seeded question that is still only its prefilled lead in has nothing
@@ -65,6 +114,7 @@ export default function ApproveProposalBar({
   // name in the box, and brings the capsule into view.
   useEffect(() => {
     if (!requestSeed || isCO) return
+    openerRef.current = requestSeed.opener ?? null
     setRequestText(String(requestSeed.text || ''))
     setRequestMode(true)
     setError('')
@@ -72,12 +122,44 @@ export default function ApproveProposalBar({
     capsuleRef.current?.scrollIntoView?.({ block: 'center', behavior: reduced ? 'auto' : 'smooth' })
   }, [requestSeed, isCO])
 
+  // A question the server refused makes the page read the link again. Once
+  // that read says no question can be sent any more (declined, a job
+  // started, the link refused), the question form closes and its message
+  // stays with the approve form, so Send request is never a dead button.
+  useEffect(() => {
+    if (askable || !requestMode) return
+    focusOnClose.current = 'message'
+    setRequestMode(false)
+  }, [askable, requestMode])
+
+  useEffect(() => {
+    const target = focusOnClose.current
+    if (requestMode || !target) return
+    focusOnClose.current = null
+    const opener = openerRef.current
+    const el = target === 'message' ? errorRef.current
+      : opener?.isConnected ? opener
+      : questionRef.current
+    el?.focus()
+  }, [requestMode])
+
   async function submit(e: any) {
     e?.preventDefault?.()
     if (!ready) return
     setBusy(true)
     setError('')
     try {
+      // Nothing posts until the quote on the page is the quote on the server.
+      if (onBeforeApprove) {
+        const check: ApproveCheck = await onBeforeApprove()
+        if (typeof check === 'object') {
+          throw new Error(approveErrorText(check.refused.error, check.refused.message, docLabel, companyName, 'This link is no longer available.'))
+        }
+        if (check === 'changed') throw new Error('This quote was just updated. Please review the new total.')
+        if (check === 'updated') throw new Error('This quote was just updated. Please review it before approving.')
+        if (check === 'closed') throw new Error(`This ${docLabel} is no longer open for approval.`)
+        if (check === 'failed') throw new Error('We could not check this quote for updates. Please try again.')
+      }
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -89,13 +171,9 @@ export default function ApproveProposalBar({
       })
       const body = await res.json().catch(() => ({}))
       if (!res.ok || !body?.ok) {
-        const friendly =
-          body?.error === 'already_approved' ? `This ${docLabel} has already been approved, thank you.`
-          : body?.error === 'expired' ? 'This link has expired. Please ask the contractor for a fresh one.'
-          : body?.error === 'revoked' ? 'This link has been revoked.'
-          : body?.error === 'empty_proposal' ? 'This proposal is empty, please contact the sender.'
-          : body?.error === 'gone' ? `This ${docLabel} is no longer open for approval.`
-          : body?.message || 'We could not record your approval. Please try again.'
+        const friendly = approveErrorText(body?.error, body?.message, docLabel, companyName, 'We could not record your approval. Please try again.')
+        // Already approved, closed, expired or revoked: the page is stale.
+        if (res.status === 409 || res.status === 410) onStale?.()
         throw new Error(friendly)
       }
       setDone({
@@ -134,12 +212,17 @@ export default function ApproveProposalBar({
           : body?.error === 'gone' ? 'This proposal is no longer open for changes.'
           : body?.error === 'rate_limited' ? 'Too many requests. Please wait a minute and try again.'
           : body?.message || 'We could not send your request. Please try again.'
+        // Revoked or expired (404), already approved (409), declined, a job
+        // started or the quote gone (410): the page is stale, as after a
+        // refused approval, so it reads the link again.
+        if (res.status === 404 || res.status === 409 || res.status === 410) onStale?.()
         throw new Error(friendly)
       }
       setRequestDone({
         name: body.requested_by || name.trim(),
         at: body.requested_at || new Date().toISOString()
       })
+      onRequested?.()
     } catch (err: any) {
       setError(err.message || 'Something went wrong.')
     } finally {
@@ -169,8 +252,11 @@ export default function ApproveProposalBar({
         done={done}
         requestDone={requestDone}
         requestMode={requestMode}
-        openRequest={() => { setError(''); setRequestMode(true) }}
-        closeRequest={() => { setError(''); setRequestMode(false) }}
+        canAsk={askable}
+        questionRef={questionRef}
+        errorRef={errorRef}
+        openRequest={() => { setError(''); openerRef.current = null; setRequestMode(true) }}
+        closeRequest={() => { setError(''); focusOnClose.current = 'opener'; setRequestMode(false) }}
         onApprove={submit}
         onSendRequest={submitChangeRequest}
       />
@@ -389,10 +475,28 @@ type CapsuleProps = {
   done: { name: string; at: string } | null
   requestDone: { name: string; at: string } | null
   requestMode: boolean
+  /** The server still takes a question, so the question link may show. */
+  canAsk: boolean
+  /** The question link, for focus after Back. */
+  questionRef: { current: HTMLButtonElement | HTMLAnchorElement | null }
+  /** The message under the fields, for focus when the question form closes on it. */
+  errorRef: { current: HTMLDivElement | null }
   openRequest: () => void
   closeRequest: () => void
   onApprove: (e: unknown) => void
   onSendRequest: (e: unknown) => void
+}
+
+// Only the Approve button (or Send request) submits. Return anywhere else
+// in the capsule's form would submit it implicitly, from the name field or
+// from the ticked authority box alike, so it is swallowed everywhere but
+// in a note (a new line) and on a button or link (which it presses), and
+// never while an input method is composing a word.
+function swallowReturn(e: KeyboardEvent<HTMLFormElement>) {
+  if (e.key !== 'Enter' || e.nativeEvent.isComposing) return
+  const tag = (e.target as HTMLElement | null)?.tagName
+  if (tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'A') return
+  e.preventDefault()
 }
 
 // The capsule: onyx, rounded 28, the one gold button inside it.
@@ -400,7 +504,12 @@ function FieldhorseCapsule(p: CapsuleProps) {
   const company = p.companyName?.trim() || ''
   const who = company || 'the contractor'
   const askName = company ? company.split(/\s+/)[0] : 'the contractor'
-  const shell = (children: import('react').ReactNode, onSubmit?: (e: unknown) => void) => {
+  // Each form has its own key, so switching between asking and approving
+  // mounts a new form instead of reusing the old one's elements. Reused,
+  // the Back button just tapped (type button) became Approve (type submit)
+  // in the re-render that runs before the browser finishes the tap, and
+  // the tap then submitted the approval. A removed button submits nothing.
+  const shell = (children: import('react').ReactNode, onSubmit?: (e: unknown) => void, formKey?: string) => {
     const props = {
       className: 'fhp-dock',
       ref: p.capsuleRef as import('react').Ref<HTMLDivElement>
@@ -408,7 +517,7 @@ function FieldhorseCapsule(p: CapsuleProps) {
     return (
       <div {...props}>
         {onSubmit ? (
-          <form className="fhp-capsule fh-onyx-scope fh-grain" onSubmit={onSubmit}>{children}</form>
+          <form key={formKey} className="fhp-capsule fh-onyx-scope fh-grain" onSubmit={onSubmit} onKeyDown={swallowReturn}>{children}</form>
         ) : (
           <section className="fhp-capsule fh-onyx-scope fh-grain" aria-live="polite">{children}</section>
         )}
@@ -435,7 +544,7 @@ function FieldhorseCapsule(p: CapsuleProps) {
     return shell(
       <>
         <Chip label="Approved" tone="success" dot />
-        <h2 className="fhp-capsule__title">Thanks, {p.done.name.split(' ')[0] || p.done.name}.</h2>
+        <h2 className="fhp-capsule__title">Thanks, {personFirstName(p.done.name) || p.done.name}.</h2>
         <p className="fhp-capsule__text">
           {company ? `${company} has been notified` : 'The contractor has been notified'} of your approval{p.contactName ? ` for ${p.contactName}` : ''}.
           You can reopen this link to view the approved proposal.
@@ -458,6 +567,7 @@ function FieldhorseCapsule(p: CapsuleProps) {
           <Field
             label="Your full name"
             autoComplete="name"
+            autoCapitalize="words"
             required
             disabled={p.busy}
             value={p.name}
@@ -478,7 +588,7 @@ function FieldhorseCapsule(p: CapsuleProps) {
             placeholder="Describe the scope, price, timing, or terms you want updated"
           />
         </div>
-        {p.error && <div role="alert" className="fhp-error">{p.error}</div>}
+        {p.error && <div role="alert" className="fhp-error" ref={p.errorRef} tabIndex={-1}>{p.error}</div>}
         <div className="fhp-actions fhp-actions--row">
           <Button variant="secondary" size="lg" disabled={p.busy} onClick={p.closeRequest}>Back</Button>
           <Button variant="primary" size="lg" block type="submit" disabled={!p.requestReady && !p.busy} loading={p.busy}>
@@ -486,7 +596,8 @@ function FieldhorseCapsule(p: CapsuleProps) {
           </Button>
         </div>
       </>,
-      p.onSendRequest
+      p.onSendRequest,
+      'ask'
     )
   }
 
@@ -504,6 +615,7 @@ function FieldhorseCapsule(p: CapsuleProps) {
         <Field
           label="Your full name"
           autoComplete="name"
+          autoCapitalize="words"
           required
           disabled={p.busy}
           value={p.name}
@@ -531,17 +643,20 @@ function FieldhorseCapsule(p: CapsuleProps) {
           </span>
         </label>
       </div>
-      {p.error && <div role="alert" className="fhp-error">{p.error}</div>}
+      {p.error && <div role="alert" className="fhp-error" ref={p.errorRef} tabIndex={-1}>{p.error}</div>}
       <div className="fhp-actions">
         <Button variant="primary" size="lg" block type="submit" disabled={!p.ready && !p.busy} loading={p.busy}>
           Approve this quote
         </Button>
-        <Button variant="quiet" size="md" block className="fhp-question" disabled={p.busy} onClick={p.openRequest}>
-          Ask {askName} a question first
-        </Button>
+        {p.canAsk && (
+          <Button ref={p.questionRef} variant="quiet" size="md" block className="fhp-question" disabled={p.busy} onClick={p.openRequest}>
+            Ask {askName} a question first
+          </Button>
+        )}
       </div>
     </>,
-    p.onApprove
+    p.onApprove,
+    'approve'
   )
 }
 

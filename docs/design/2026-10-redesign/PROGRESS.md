@@ -28,11 +28,11 @@ Status is one of todo, done, blocked, skipped.
 | 1 | 3 Capture from a job page shows up on the job | done | `1766c46` | Reviewed by two lenses, approved with no fix round. Decision D35 |
 | 1 | 4 Morning cold open says "Clear day" | done | `84ccf0d` | Reviewed by two lenses, approved with no fix round. Decision D40 |
 | 1 | 5 What each invoice actually owes | done | `33a5b55` | One fix round (email and PDF agreement, jobs with no contract amount, drafts in the allocator), then approved. Decision D37 |
-| 1 | 6 Money timing and double sends | done | this commit | Three fix rounds (panel pages before the company loads, a send surviving a trip away from Money, a tap as the email lands), then approved. Decision D43 |
+| 1 | 6 Money timing and double sends | done | `244804d` | Three fix rounds (panel pages before the company loads, a send surviving a trip away from Money, a tap as the email lands), then approved. Decision D43 |
 | 1 | 7 Jobs and quotes stay inside the active company | done | `222e8f6` | Reviewed by two lenses, approved with no fix round. Decision D36 |
 | 1 | 8 The Unscheduled tray tells the truth | done | `d4dc086` | Two fix rounds (overlapping drops, rollback by value), then approved. Decision D39 |
 | 1 | 9 One quote total and one deposit everywhere | done | `8c3f6c9` | Reviewed by two lenses, approved with no fix round. Decision D31 |
-| 1 | 10 The customer page after approval and on bad data | todo | | |
+| 1 | 10 The customer page after approval and on bad data | done | this commit | Four fix rounds (Ask controls left as dead buttons, Enter on the authority box approving, a stale page approving changed terms), then approved. Decision D44 |
 | 1 | 11 Inbox sends exactly once, only when tapped, only when online | done | `36e4c88` | Reviewed by two lenses, approved with no fix round. Decision D38 |
 | 2 | 12 Next stop card without a photo, and job tabs | done | `988deb0` | Two fix rounds (a class clash with the Jobs list, tabs under the fade), then approved. Decisions D32 and D41 |
 | 2 | 13 Desktop Capture button | done | `7d8351b` | One fix round (an Inbox test still waited for the removed button), then approved. Decision D33 |
@@ -108,6 +108,11 @@ Status is one of todo, done, blocked, skipped.
   * At integration: the desktop Schedule board dropped its private minute ticker for the shared `useNow`, so it also catches up when its tab comes back into view; the paused Mark paid and Void line was reworded to "Mark paid and Void are paused while the email goes out.", because the sheet closes when the email lands rather than turning the buttons back on.
   * Plan and code differ: the named Sunday 8 am unit test passes on the old code too, because the pure function already honored `now`; the screen level failure is pinned by the rollover e2e tests.
   * Known small gaps, not changed: the job page draws (`InvoiceDrawsSection`) still send with an unfiltered status update and keep their own busy state, as do the invoice page and the Send invoice sheet; only Money's sends go through the shared set.
+
+* **Task 10, the customer page.** Five lane commits squashed into one. `portal.spec` grew to 54 tests per project; a real bright photo (`tests/e2e/fixtures/bright-cover.jpg`) checks the header contrast. Three existing assertions changed because the plan asks for it (the newest cover, the empty signature), one round 3 assertion changed with a stated reason.
+  * At integration: while changes are requested the steps used to drop the deposit step but keep the balance step, so the listed payments covered half the price. The steps now start with the revised proposal and keep every open quote step; the unit test checks that against the open quote, and the e2e list was updated with it.
+  * Lead decision recorded in D44: the quote number keeps its hyphens so it matches the PDF and the letter themes; it is the one exception to the no dash rule.
+  * Known gaps, not changed: the classic page keeps its prefilled signature and Return submit, and its Request changes button is a dead button on declined and closed quotes (D24 keeps the classic bar as it was; Jesse's call); sentence case company names with no business word ("Elite pools") are greeted by their first word; the cover is the newest of the 12 oldest photos the server sends (`netlify/functions/public-link.js` would need to order by upload date, not allowed in this run); a refused question that ends on the Approved or Closed capsule drops focus to the page; a question refused because the job was deleted says to try again; the deposit after a change order follows D31.
 
 * The first CI run on #223 (a docs only commit) failed `mock-workflows` "keeps the desktop schedule planning workflow complete" on desktop. The default mock visit starts two hours after the mock loads, so between 10 pm and midnight Central it lands on tomorrow and the Day view is empty. It failed here too at 10:48 pm Central and passed after the test pinned its page clock to a Thursday morning and seeded that day's visit. It is listed under "Failing before Phase 8".
 

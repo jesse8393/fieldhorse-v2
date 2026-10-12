@@ -22,7 +22,7 @@
 // Anyone with the token can view; the on the server function gates
 // expiry / revocation / not-found.
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   ProposalTemplate,
@@ -30,45 +30,137 @@ import {
   mapItemsToScope,
   resolveBrandGold
 } from '../components/documents'
-import ApproveProposalBar from '../components/public/ApproveProposalBar.tsx'
+import ApproveProposalBar, { type ApproveCheck } from '../components/public/ApproveProposalBar.tsx'
 import type { ProposalPortal } from '../components/documents/proposalThemes.tsx'
 import '../components/documents/fieldhorse-proposal.css'
 import { safePayUrl } from '../lib/payLink.ts'
-import { buildPortalView, type PublicDocPayload } from '../lib/portalView.ts'
+import { buildPortalView, quoteFingerprint, type PublicDocPayload } from '../lib/portalView.ts'
 import { gatherStatement } from '../lib/statement.ts'
 
 type PublicDocState = { loading: boolean; data: PublicDocPayload | null; error: string | null }
 
+// The Fieldhorse theme draws its own approve capsule and fills the page;
+// every other template keeps the classic page and bar.
+function isFieldhorse(payload: PublicDocPayload): boolean {
+  return payload.kind === 'proposal'
+    && String(payload.company?.estimate_template || '').toLowerCase() === 'fieldhorse'
+}
+
+// Whether the page drawn from this payload offers the approve bar. The
+// render and the check before an approval posts both ask this, so nothing
+// posts from a page that, once redrawn, no longer offers approval. The
+// Fieldhorse page offers it while the quote is open (PortalView.open); the
+// classic page unless it is approved or has changes requested, as it
+// always did (D24).
+function approvable(payload: PublicDocPayload, now: Date): boolean {
+  if (payload.kind !== 'proposal') return false
+  if (isFieldhorse(payload)) return buildPortalView(payload, now).open
+  const status = String(payload.contact?.proposal_status || '').toLowerCase()
+  return status !== 'approved' && status !== 'changes_requested'
+}
+
 // "Ask about this" on an optional item opens the request changes form with
-// this text in the box. A new id each tap, so tapping again reopens it.
-type AskSeed = { id: number; text: string }
+// this text in the box; Back puts focus back on the button tapped (opener).
+// A new id each tap, so tapping again reopens it.
+type AskSeed = { id: number; text: string; opener: HTMLElement | null }
+
+// One read of the link: the quote, or why there is none. `refused` holds
+// the server's error and message when it refused the link itself (a 404 or
+// 410: revoked, expired, the job deleted, an unknown token); it is null
+// when the read failed in a way worth retrying (no answer, too many
+// requests, a server error).
+type LinkRead =
+  | { ok: true; payload: PublicDocPayload }
+  | { ok: false; refused: { error: string | null; message: string | null } | null }
 
 export default function PublicDoc() {
   const { token } = useParams()
   const [state, setState] = useState<PublicDocState>({ loading: true, data: null, error: null })
   const [ask, setAsk] = useState<AskSeed | null>(null)
-  const onAsk = useCallback((item: string) => {
-    setAsk((prev) => ({ id: (prev?.id ?? 0) + 1, text: `About \u201c${item}\u201d: ` }))
+  // Set once the bar has recorded an approval or sent a question. Neither
+  // leaves anything to ask, even when the read after it fails and the page
+  // still shows the quote as it was.
+  const [finished, setFinished] = useState(false)
+  // Set while the latest read of the link was refused (revoked, expired,
+  // removed). The server takes no question then, so the page offers none;
+  // a read that works clears it.
+  const [linkRefused, setLinkRefused] = useState(false)
+  const onAsk = useCallback((item: string, opener?: HTMLElement) => {
+    setAsk((prev) => ({ id: (prev?.id ?? 0) + 1, text: `About \u201c${item}\u201d: `, opener: opener ?? null }))
   }, [])
+  // The payload on the page, for the check before an approval posts.
+  const shown = useRef<PublicDocPayload | null>(null)
+  shown.current = state.data
 
-  const load = useCallback(async () => {
-    if (!token) return
+  // Reads the link. The first read fills the page or shows why it cannot;
+  // a later read that fails leaves the page as it is, so a reload after an
+  // approval never replaces the thank you with an error.
+  const load = useCallback(async (): Promise<LinkRead> => {
+    if (!token) return { ok: false, refused: null }
+    const keepOrFail = (message: string) => {
+      setState((prev) => (prev.data ? prev : { loading: false, data: null, error: message }))
+    }
     try {
       const res = await fetch(`/api/public-link?token=${encodeURIComponent(token)}`)
       const body = await res.json().catch(() => ({}))
       if (!res.ok || !body?.ok) {
-        setState({ loading: false, data: null, error: body?.message || 'This link is no longer available.' })
-        return
+        keepOrFail(body?.message || 'This link is no longer available.')
+        const refused = res.status === 404 || res.status === 410
+          ? {
+              error: typeof body?.error === 'string' ? body.error : null,
+              message: typeof body?.message === 'string' ? body.message : null
+            }
+          : null
+        if (refused) setLinkRefused(true)
+        return { ok: false, refused }
       }
+      setLinkRefused(false)
       setState({ loading: false, data: body, error: null })
       // Brand the browser tab as the contractor's, not ours.
       const co = body.company?.name || 'Document'
       const proj = body.contact?.job_title || body.contact?.name || ''
       document.title = `${co}${proj ? `, ${proj}` : ''}`
-    } catch (e: any) {
-      setState({ loading: false, data: null, error: 'Could not load this document. Check the link and try again.' })
+      return { ok: true, payload: body as PublicDocPayload }
+    } catch {
+      keepOrFail('Could not load this document. Check the link and try again.')
+      return { ok: false, refused: null }
     }
   }, [token])
+
+  const reload = useCallback(() => { void load() }, [load])
+
+  // After an approval or a question on the Fieldhorse page: read the link
+  // again so the page shows what the server now holds, as reopening it
+  // would, and drop the question buttons whatever that read brings.
+  const afterDecision = useCallback(() => {
+    setFinished(true)
+    void load()
+  }, [load])
+
+  // Before an approval posts, read the quote again, which also redraws the
+  // page from what the server now says. When the redrawn page offers no
+  // approve bar (approved or sent back for changes meanwhile; on the
+  // Fieldhorse page also expired, say at midnight, or closed), nothing
+  // posts and the page shows the real state. A total that changed stops
+  // the approval with its own message; any other change to what the
+  // customer agrees to (the lines, the terms, the warranty) stops it too.
+  // A read the server refused (the link revoked, expired or removed)
+  // carries its reason to the bar; a read that failed for a moment asks
+  // for another try. The classic page still leaves expiry and a closed job
+  // to the server, which answers with the reason (D24). The read records a
+  // view, which is fine.
+  const checkBeforeApprove = useCallback(async (): Promise<ApproveCheck> => {
+    const before = shown.current
+    const read = await load()
+    if (!read.ok) return read.refused ? { refused: read.refused } : 'failed'
+    const fresh = read.payload
+    const now = new Date()
+    if (!approvable(fresh, now)) return 'closed'
+    if (!before) return 'ok'
+    if (Math.round(buildPortalView(before, now).total * 100) !== Math.round(buildPortalView(fresh, now).total * 100)) return 'changed'
+    if (quoteFingerprint(before) !== quoteFingerprint(fresh)) return 'updated'
+    return 'ok'
+  }, [load])
 
   useEffect(() => {
     let cancelled = false
@@ -81,32 +173,36 @@ export default function PublicDoc() {
 
   const { loading, data, error } = state
   const proposalStatus = String(data?.contact?.proposal_status || '').toLowerCase()
-  // The Fieldhorse theme draws its own approve capsule and fills the page;
-  // every other template keeps the classic page and bar below.
-  const fieldhorse = data?.kind === 'proposal'
-    && String(data.company?.estimate_template || '').toLowerCase() === 'fieldhorse'
 
-  if (!loading && data && fieldhorse) {
-    const open = proposalStatus !== 'approved' && proposalStatus !== 'changes_requested'
-    // The page's total, so the approval sentence quotes what the page shows.
-    const total = buildPortalView(data, new Date()).total
+  if (!loading && data && isFieldhorse(data)) {
+    // Open means approvable: not approved, no changes requested, not
+    // expired, not closed (approvable() below says the same). The page's
+    // total, so the approval sentence quotes what the page shows.
+    const pv = buildPortalView(data, new Date())
+    // Only while the server still takes a question (PortalView.canAsk), the
+    // link was not just refused, and the customer has not just approved or
+    // asked one.
+    const canAsk = pv.canAsk && !finished && !linkRefused
     return (
       <div className="fhp-ground">
         <ProposalView
           data={data}
           portal={{
             payload: data,
-            onAsk,
-            approveBar: open ? (
+            onAsk: canAsk ? onAsk : undefined,
+            approveBar: pv.open ? (
               <ApproveProposalBar
                 skin="fieldhorse"
                 token={token}
                 companyName={data.company?.name || ''}
                 contactName={data.contact?.name || ''}
-                contractTotal={total > 0 ? total : (Number(data.contact?.amount || 0) || null)}
-                initialName={data.contact?.name || ''}
-                onApproved={load}
+                contractTotal={pv.total > 0 ? pv.total : (Number(data.contact?.amount || 0) || null)}
+                onBeforeApprove={checkBeforeApprove}
+                onApproved={afterDecision}
+                onRequested={afterDecision}
+                onStale={reload}
                 requestSeed={ask}
+                canAsk={canAsk}
               />
             ) : null
           }}
@@ -129,14 +225,16 @@ export default function PublicDoc() {
       {!loading && data && data.kind === 'proposal' && (
         <>
           <ProposalView data={data} />
-          {proposalStatus !== 'approved' && proposalStatus !== 'changes_requested' && (
+          {approvable(data, new Date()) && (
             <ApproveProposalBar
               token={token}
               companyName={data.company?.name || ''}
               contactName={data.contact?.name || ''}
               contractTotal={Number(data.contact?.amount || 0) || null}
               initialName={data.contact?.name || ''}
-              onApproved={load}
+              onBeforeApprove={checkBeforeApprove}
+              onApproved={reload}
+              onStale={reload}
             />
           )}
           {proposalStatus === 'approved' && (
@@ -153,7 +251,7 @@ export default function PublicDoc() {
       )}
       {!loading && data && data.kind === 'invoice'  && <InvoiceView  data={data} />}
       {!loading && data && data.kind === 'change_order' && (
-        <ChangeOrderView data={data} token={token} onApproved={load} />
+        <ChangeOrderView data={data} token={token} onApproved={reload} />
       )}
       {!loading && data && data.kind === 'statement' && <StatementView data={data} />}
       {/* Fallback so an unrecognized link kind never renders a blank page. */}

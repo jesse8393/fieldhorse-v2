@@ -20,6 +20,10 @@
 
 .fhp {
   --fhp-col: 560px;
+  /* The cover photo: how much of it shows, and the height of the onyx
+     veil that runs under every line of header text. */
+  --fhp-photo: 136px;
+  --fhp-veil: 80px;
   overflow-x: clip;
   background: var(--fh-plaster);
   color: var(--fh-ink);
@@ -59,18 +63,25 @@
   object-fit: cover;
 }
 
+/* A dark cap under the status bar, the photo, then the onyx veil: clear
+   to onyx over the 80 px above the first line of text and onyx from there
+   on (the same eased stops the auth shell uses), so no line of text ever
+   sits on a bright part of the picture, whatever the picture is. */
 .fhp-cover::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    180deg,
-    rgba(22, 20, 15, 0.35) 0%,
-    rgba(22, 20, 15, 0) 24%,
-    rgba(22, 20, 15, 0) 40%,
-    color-mix(in srgb, var(--fh-stage) 72%, transparent) 70%,
-    var(--fh-stage) 100%
-  );
+  background:
+    linear-gradient(180deg, rgba(22, 20, 15, 0.35) 0, rgba(22, 20, 15, 0) 72px),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--fh-stage) 0%, transparent) calc(env(safe-area-inset-top, 0px) + var(--fhp-photo)),
+      color-mix(in srgb, var(--fh-stage) 20%, transparent) calc(env(safe-area-inset-top, 0px) + var(--fhp-photo) + 16px),
+      color-mix(in srgb, var(--fh-stage) 55%, transparent) calc(env(safe-area-inset-top, 0px) + var(--fhp-photo) + 36px),
+      color-mix(in srgb, var(--fh-stage) 86%, transparent) calc(env(safe-area-inset-top, 0px) + var(--fhp-photo) + 56px),
+      var(--fh-stage) calc(env(safe-area-inset-top, 0px) + var(--fhp-photo) + var(--fhp-veil)),
+      var(--fh-stage) 100%
+    );
 }
 
 .fhp-head__inner {
@@ -79,8 +90,9 @@
   padding: calc(env(safe-area-inset-top, 0px) + 24px) var(--fh-gutter) 24px;
 }
 
+/* The text starts 8 px below where the veil becomes solid onyx. */
 .fhp-head--photo .fhp-head__inner {
-  padding-top: calc(env(safe-area-inset-top, 0px) + 188px);
+  padding-top: calc(env(safe-area-inset-top, 0px) + var(--fhp-photo) + var(--fhp-veil) + 8px);
 }
 
 .fhp-brand {
@@ -143,6 +155,22 @@
   line-height: 22px;
   color: var(--fh-ink-2);
   overflow-wrap: anywhere;
+}
+
+/* Quote number, issue date and valid until, as short facts that wrap. */
+.fhp-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 12px 0 0;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+.fhp-meta > span {
+  white-space: nowrap;
 }
 
 /* ---- Body ---- */
@@ -519,6 +547,18 @@
 
 .fhp-capsule .fhc-chip {
   margin-bottom: 12px;
+}
+
+/* Approved and Deposit received side by side. */
+.fhp-capsule__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.fhp-capsule .fhp-capsule__chips .fhc-chip {
+  margin-bottom: 0;
 }
 
 /* ---- The foot ---- */

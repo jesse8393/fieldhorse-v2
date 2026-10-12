@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Sheet } from '../../../components/fh'
-import { DocumentPreviewPane, loadProjectPhotosForPdf } from '../sections/DocumentPreviewPane.tsx'
+import { DocumentPreviewPane, loadPreviewPhotos } from '../sections/DocumentPreviewPane.tsx'
 import './quote-phone.css'
 
 // "Preview as {first name}" (spec 9.6, decision D8): the customer's view of
@@ -43,7 +43,7 @@ export default function QuotePreviewSheet({
     if (!open || !jobId || !userId) return
     let alive = true
     setLoading(true)
-    loadProjectPhotosForPdf(jobId, userId)
+    loadPreviewPhotos(jobId, userId)
       .catch(() => [])
       .then((list) => {
         if (!alive) return

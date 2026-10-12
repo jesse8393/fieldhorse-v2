@@ -16,7 +16,7 @@ import QuoteTermsSection from '../sections/QuoteTerms.tsx'
 import ChangeOrdersSection from '../sections/ChangeOrdersSection.tsx'
 import { useConfirm } from '../../../components/ConfirmSheet.tsx'
 import { proposalNumber } from '../../../components/documents/numbers.ts'
-import { DocumentPreviewPane, loadProjectPhotosForPdf } from '../sections/DocumentPreviewPane.tsx'
+import { DocumentPreviewPane, loadPreviewPhotos, loadProjectPhotosForPdf } from '../sections/DocumentPreviewPane.tsx'
 import { deriveStatus, shortDate } from '../lib/quoteStatus.ts'
 import { mintPublicLink } from '../../../lib/publicLink.ts'
 import { Eyebrow } from '../../../components/v3'
@@ -129,7 +129,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
           .select('*')
           .eq('contact_id', contact.id)
           .order('sort_order', { ascending: true }),
-        loadProjectPhotosForPdf(contact.id, userId).catch(() => [])
+        loadPreviewPhotos(contact.id, userId).catch(() => [])
       ])
       if (alive) {
         setDocItems(items || [])

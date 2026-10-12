@@ -293,6 +293,17 @@ test.describe('quote tab on a phone', () => {
     expect(calls.send).toEqual([])
   })
 
+  test('a customer name saved in sentence case shows whole in the labels', async ({ context, page }) => {
+    // Read as a person only by recasing it, "Elite pools" is a guess, so the
+    // labels in the app keep the name as it was saved.
+    await signIn(context, { tables: { fh_contacts: [quoteContact({ name: 'Elite pools', email: null })], fh_quote_items: ITEMS } })
+    await openQuote(page)
+
+    await expect(page.getByRole('button', { name: 'Preview as Elite pools' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Optional for Elite pools' })).toBeVisible()
+    await expect(page.locator('.fhq-head').getByText('No email on file for Elite pools.', { exact: false })).toBeVisible()
+  })
+
   test('changes requested', async ({ context, page }) => {
     await signIn(context)
     await openQuote(page, '/quotes/c-change?tab=quote')

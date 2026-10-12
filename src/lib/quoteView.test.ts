@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   buildQuoteView,
   previewAsLabel,
+  previewAsName,
+  personFirstName,
   quoteCapsule,
   type QuoteItemRow
 } from './quoteView.ts'
@@ -279,5 +281,180 @@ describe('previewAsLabel', () => {
     expect(previewAsLabel('')).toBe('Preview as customer')
     expect(previewAsLabel(null)).toBe('Preview as customer')
     expect(previewAsLabel('The Castellanos Family Revocable Living Trust')).toBe('Preview as customer')
+  })
+
+  it('drops a leading article and keeps the rest of a company name', () => {
+    expect(previewAsLabel('The Roof Doctor')).toBe('Preview as Roof Doctor')
+    expect(previewAsLabel('A Cut Above Lawn')).toBe('Preview as Cut Above Lawn')
+  })
+
+  it('reads a name written last name first', () => {
+    expect(previewAsLabel('Castellanos, Marco')).toBe('Preview as Marco')
+    expect(previewAsLabel("O'Neil, Jeff A.")).toBe('Preview as Jeff')
+  })
+})
+
+describe('personFirstName', () => {
+  it('is the first name of a person and null for a company', () => {
+    expect(personFirstName('Marco Castellanos')).toBe('Marco')
+    expect(personFirstName('  Jeff  O\'Neil ')).toBe('Jeff')
+    expect(personFirstName('Castellanos, Marco')).toBe('Marco')
+    expect(personFirstName('MMC Properties')).toBeNull()
+    expect(personFirstName('The Roof Doctor')).toBeNull()
+    expect(personFirstName('Acme, Inc')).toBeNull()
+    expect(personFirstName('')).toBeNull()
+    expect(personFirstName(null)).toBeNull()
+  })
+
+  it('reads names with accents, a name typed in capitals, and ignores a suffix', () => {
+    expect(personFirstName('José García')).toBe('José')
+    expect(personFirstName('Zoë Smith')).toBe('Zoë')
+    expect(personFirstName('MARCO CASTELLANOS')).toBe('Marco')
+    expect(personFirstName('Marco Castellanos Jr.')).toBe('Marco')
+    expect(personFirstName('Marco Castellanos III')).toBe('Marco')
+    expect(personFirstName('Smith, John, Jr.')).toBe('John')
+    // A single word in capitals is still a company.
+    expect(personFirstName('IBM')).toBeNull()
+    expect(personFirstName('HOA')).toBeNull()
+    expect(personFirstName('MMC Properties')).toBeNull()
+  })
+
+  it('treats A or An as an article only before two or more words, so An is a first name', () => {
+    expect(personFirstName('An Nguyen')).toBe('An')
+    expect(previewAsLabel('An Nguyen')).toBe('Preview as An')
+    expect(personFirstName('An Affordable Plumber')).toBeNull()
+    expect(previewAsLabel('An Affordable Plumber')).toBe('Preview as Affordable Plumber')
+    expect(personFirstName('A Cut Above Lawn')).toBeNull()
+    // An initial is not a first name to greet someone by.
+    expect(personFirstName('J Smith')).toBeNull()
+    expect(personFirstName('A Nguyen')).toBeNull()
+  })
+
+  // Review round 2: names the first word greeting used to get right.
+  it('reads a middle initial, name particles and a title as parts of a person\'s name', () => {
+    expect(personFirstName('John Q. Public')).toBe('John')
+    expect(personFirstName('Marco A. Castellanos')).toBe('Marco')
+    expect(personFirstName('MARCO A. CASTELLANOS')).toBe('Marco')
+    expect(personFirstName('Public, John Q.')).toBe('John')
+    expect(personFirstName('Maria de Souza')).toBe('Maria')
+    expect(personFirstName('Ludwig van Beethoven')).toBe('Ludwig')
+    expect(personFirstName('Maria de los Santos')).toBe('Maria')
+    expect(personFirstName('Jan van der Berg')).toBe('Jan')
+    expect(personFirstName('MARIA DE LOS SANTOS')).toBe('Maria')
+    expect(personFirstName('Omar al-Rashid')).toBe('Omar')
+    expect(personFirstName('de la Cruz, Maria')).toBe('Maria')
+    expect(personFirstName('Dr. Marco Castellanos')).toBe('Marco')
+    expect(personFirstName('MR. JOHN SMITH')).toBe('John')
+    // A first name that is also a particle elsewhere is still a first name.
+    expect(personFirstName('Al Smith')).toBe('Al')
+    expect(personFirstName('Van Morrison')).toBe('Van')
+    expect(previewAsLabel('John Q. Public')).toBe('Preview as John')
+  })
+
+  it('does not greet by a last name or an initial', () => {
+    // What is left after a title or a suffix is a last name.
+    expect(personFirstName('Smith, Jr.')).toBeNull()
+    expect(personFirstName('Mrs. Smith')).toBeNull()
+    expect(personFirstName('Dr. Castellanos')).toBeNull()
+    // Initials alone are not a first name.
+    expect(personFirstName('J.R. Smith')).toBeNull()
+    expect(personFirstName('J. Smith')).toBeNull()
+  })
+
+  it('reads a name in capitals as a company when it starts like an acronym', () => {
+    expect(personFirstName('IBM GLOBAL')).toBeNull()
+    expect(personFirstName('JM EAGLE')).toBeNull()
+    expect(personFirstName('ACE HVAC')).toBeNull()
+    expect(personFirstName('JB CONTRACTING')).toBeNull()
+    expect(personFirstName('ABC REMODELING')).toBeNull()
+    expect(personFirstName('XYZ PAINTING')).toBeNull()
+    expect(previewAsLabel('JB CONTRACTING')).toBe('Preview as JB CONTRACTING')
+    expect(previewAsLabel('IBM GLOBAL')).toBe('Preview as IBM GLOBAL')
+    // Typed in mixed case the acronym already says company.
+    expect(personFirstName('IBM Global')).toBeNull()
+    // A person's name in capitals still reads as a person's.
+    expect(personFirstName('MARCO CASTELLANOS')).toBe('Marco')
+    expect(personFirstName('JOSÉ GARCÍA')).toBe('José')
+    expect(personFirstName('BOB SMITH')).toBe('Bob')
+    expect(personFirstName('IAN WRIGHT')).toBe('Ian')
+  })
+
+  // Review round 3: a phone keyboard capitalizes only the first word, so
+  // contact names are often saved in sentence case.
+  it('reads a name typed in sentence case or in lower case as a person\'s', () => {
+    expect(personFirstName('Marco castellanos')).toBe('Marco')
+    expect(personFirstName('Jane smith')).toBe('Jane')
+    expect(personFirstName('marco castellanos')).toBe('Marco')
+    expect(personFirstName('Maria de los santos')).toBe('Maria')
+    expect(personFirstName('John q. public')).toBe('John')
+    expect(personFirstName('Marco castellanos jr')).toBe('Marco')
+    expect(personFirstName('Castellanos, marco')).toBe('Marco')
+    expect(personFirstName('MARCO castellanos')).toBe('Marco')
+    // Recasing is a guess, so the in app label keeps the name as saved
+    // (review round 4); the customer page still greets Marco.
+    expect(previewAsLabel('Marco castellanos')).toBe('Preview as Marco castellanos')
+    // A company stays a company whatever its case.
+    expect(personFirstName('Sunrise roofing')).toBeNull()
+    expect(personFirstName('Acme, inc')).toBeNull()
+    expect(personFirstName('the roof doctor')).toBeNull()
+    expect(personFirstName('jb contracting')).toBeNull()
+    // In lower case, as in capitals, a first word like an acronym is a company's.
+    expect(personFirstName('jm eagle')).toBeNull()
+    expect(personFirstName('JM eagle')).toBeNull()
+    // One word in lower case says nothing about a person.
+    expect(personFirstName('marco')).toBeNull()
+  })
+
+  it('reads a household or a family business as a company, not a first name', () => {
+    expect(personFirstName('Johnson Residence')).toBeNull()
+    expect(personFirstName('Johnson Household')).toBeNull()
+    expect(personFirstName('Lowe Bros')).toBeNull()
+    expect(personFirstName('Lowe Brothers')).toBeNull()
+    expect(personFirstName('Johnson residence')).toBeNull()
+    expect(previewAsLabel('Johnson Residence')).toBe('Preview as Johnson Residence')
+    expect(previewAsLabel('Lowe Bros')).toBe('Preview as Lowe Bros')
+  })
+
+  // Review round 4: recasing a name saved without its capitals must not undo
+  // the capitals the person did type.
+  it('keeps a word typed with its own inner capitals, and recases only words in all lower case or all capitals', () => {
+    expect(personFirstName('DeShawn jones')).toBe('DeShawn')
+    expect(personFirstName('LaToya smith')).toBe('LaToya')
+    expect(personFirstName('McKenzie brown')).toBe('McKenzie')
+    expect(personFirstName('JoAnn baker')).toBe('JoAnn')
+    expect(personFirstName('MaryBeth carter')).toBe('MaryBeth')
+    expect(personFirstName('Mary-Beth carter')).toBe('Mary-Beth')
+    // A word with no capitals, or nothing but capitals, is still recased.
+    expect(personFirstName('deshawn jones')).toBe('Deshawn')
+    expect(personFirstName('DESHAWN JONES')).toBe('Deshawn')
+    expect(personFirstName("jeff o'neil")).toBe('Jeff')
+    expect(personFirstName('MARCO castellanos')).toBe('Marco')
+  })
+
+  it('reads and, or an ampersand, as joining a company rather than naming a person', () => {
+    expect(personFirstName('Smith and sons')).toBeNull()
+    expect(personFirstName('Smith And Sons')).toBeNull()
+    expect(personFirstName('SMITH AND SONS')).toBeNull()
+    expect(personFirstName('Smith & Sons')).toBeNull()
+    expect(personFirstName('Smith & sons')).toBeNull()
+    expect(previewAsLabel('Smith And Sons')).toBe('Preview as Smith And Sons')
+  })
+
+  it('keeps the whole name in the in app labels whenever the name was recased', () => {
+    // previewAsName fills "Preview as", "Optional for" and "No email on file for".
+    expect(previewAsName('Elite pools')).toBe('Elite pools')
+    expect(previewAsLabel('Elite pools')).toBe('Preview as Elite pools')
+    expect(previewAsName('Hill country lawn')).toBe('Hill country lawn')
+    expect(previewAsName('Smith and sons')).toBe('Smith and sons')
+    expect(previewAsName('DeShawn jones')).toBe('DeShawn jones')
+    expect(previewAsName('MARCO CASTELLANOS')).toBe('MARCO CASTELLANOS')
+    expect(previewAsName('Castellanos, marco')).toBe('Castellanos, marco')
+    // Too long for the label, it falls back as a long company name does.
+    expect(previewAsName('maria de los santos garcia')).toBe('customer')
+    // Typed with its capitals, a person is still called by first name.
+    expect(previewAsName('Marco Castellanos')).toBe('Marco')
+    expect(previewAsName('DeShawn Jones')).toBe('DeShawn')
+    expect(previewAsName('Castellanos, Marco')).toBe('Marco')
+    expect(previewAsName('Dr. Marco Castellanos')).toBe('Marco')
   })
 })
