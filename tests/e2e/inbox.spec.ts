@@ -273,7 +273,7 @@ async function openThread(
 }
 
 const draftBox = (page: Page) => page.getByRole('textbox', { name: 'Draft reply' })
-const sendDraft = (page: Page) => page.getByRole('button', { name: 'Send', exact: true })
+const sendDraft = (page: Page) => page.getByRole('button', { name: 'Send draft reply', exact: true })
 
 test.describe('a thread', () => {
   test('shows the name, the job chip, the bubbles under day labels and the draft', async ({ context, page }) => {
@@ -367,11 +367,30 @@ test.describe('a thread', () => {
       attempts += 1
       return route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ code: 'P0001', message: 'run already handled' }) })
     })
+    // Hold the thread's next read, so the check after the failure is still
+    // running when the toast shows.
+    let release: () => void = () => {}
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    let hold = false
+    let refetches = 0
+    await context.route((url) => url.pathname.endsWith('/rest/v1/fh_messages'), async (route) => {
+      if (hold) {
+        refetches += 1
+        await gate
+      }
+      await route.fallback()
+    })
     await draftBox(page).fill('My edit that must survive')
+    hold = true
     await sendDraft(page).click()
-    await expect(page.getByText("That reply didn't go out")).toBeVisible()
+    await expect(page.getByText("We couldn't confirm this went out.")).toBeVisible()
+    await expect(page.getByText('Check the thread before sending again.')).toBeVisible()
     await expect(draftBox(page)).toHaveValue('My edit that must survive')
-    // The button is usable again for a second try.
+    // The thread is read again after the failure, and Send waits for it.
+    await expect.poll(() => refetches).toBeGreaterThan(0)
+    await expect(sendDraft(page)).toBeDisabled()
+    release()
+    // Then the button is usable again for a second try.
     await expect(sendDraft(page)).toBeEnabled()
     expect(attempts).toBe(1)
   })
@@ -429,6 +448,7 @@ test.describe('a thread', () => {
     await openThread(context, page)
     await expect(page.locator('.fhc-btn--primary')).toHaveCount(1)
     await expect(page.locator('.fhc-btn--primary')).toHaveText('Send')
+    await expect(page.locator('.fhc-btn--primary')).toHaveAccessibleName('Send draft reply')
   })
 
   test('a thread with no draft has no draft panel and no gold', async ({ context, page }) => {
@@ -468,5 +488,354 @@ test.describe('a thread', () => {
       const apart = send.x + send.width <= fab.x || fab.x + fab.width <= send.x || send.y + send.height <= fab.y || fab.y + fab.height <= send.y
       expect(apart).toBe(true)
     }
+  })
+})
+
+// ---- Sends exactly once, only when tapped, only when online (Phase 8, Task 11)
+
+/** Every Growth Engine function the mock recorded for this context. */
+const engineCalls = (context: Parameters<typeof signIn>[0]) => rpcCalls(context).filter((call) => call.name.startsWith('fh_'))
+
+const replyField = (page: Page) => page.getByRole('textbox', { name: 'Write a reply' })
+
+// A stand in for the browser's SpeechRecognition. say() delivers a final
+// result the way the browser does, through onresult. A late result goes to
+// the handler the recognizer had when it started, as a result already in
+// flight when the person tapped Send would.
+async function stubDictation(context: Parameters<typeof signIn>[0]) {
+  await context.addInitScript(() => {
+    type Handler = ((event?: unknown) => void) | null
+    class FakeRecognition {
+      continuous = false
+      interimResults = false
+      lang = ''
+      onresult: Handler = null
+      onend: Handler = null
+      onerror: Handler = null
+      private atStart: Handler = null
+      start() {
+        this.atStart = this.onresult
+        ;(window as unknown as { __speech: FakeRecognition }).__speech = this
+      }
+      stop() { /* a real recognizer may still deliver a final result after this */ }
+      abort() { this.onend?.() }
+      say(text: string, late = false) {
+        const handler = late ? this.atStart : this.onresult
+        const result = Object.assign([{ transcript: text }], { isFinal: true })
+        handler?.({ resultIndex: 0, results: [result] })
+      }
+    }
+    const w = window as unknown as Record<string, unknown>
+    w.SpeechRecognition = FakeRecognition
+    w.webkitSpeechRecognition = FakeRecognition
+  })
+}
+
+async function say(page: Page, text: string, late = false) {
+  await page.evaluate(([words, isLate]) => {
+    (window as unknown as { __speech?: { say: (t: string, l: boolean) => void } }).__speech?.say(words as string, isLate as boolean)
+  }, [text, late] as const)
+}
+
+test.describe('sending exactly once, only when tapped and online', () => {
+  test('offline, Send makes no call, then or after the signal comes back', async ({ context, page }) => {
+    await openThread(context, page)
+    await expect(draftBox(page)).toHaveValue(DRAFT_TEXT)
+    await expect.poll(() => rpcCalls(context, 'fh_conversation_mark_read').length).toBe(1)
+    await replyField(page).fill('Thursday at 11:30 it is.')
+    const before = engineCalls(context).length
+
+    await context.setOffline(true)
+    await page.getByRole('button', { name: 'Send reply' }).click()
+    await sendDraft(page).click()
+    await page.waitForTimeout(800)
+    expect(engineCalls(context)).toHaveLength(before)
+
+    await context.setOffline(false)
+    await page.waitForTimeout(2500)
+    expect(engineCalls(context)).toHaveLength(before)
+    expect(rpcCalls(context, 'fh_send_message')).toHaveLength(0)
+    expect(rpcCalls(context, 'fh_agent_run_approve')).toHaveLength(0)
+  })
+
+  test('offline, Send says nothing was sent and keeps the words', async ({ context, page }) => {
+    await openThread(context, page)
+    await replyField(page).fill('Thursday at 11:30 it is.')
+    await draftBox(page).fill('Of course. See you at 11:30.')
+    await context.setOffline(true)
+    await page.getByRole('button', { name: 'Send reply' }).click()
+    await expect(page.getByText('No signal. Nothing was sent.').first()).toBeVisible()
+    await expect(replyField(page)).toHaveValue('Thursday at 11:30 it is.')
+    await sendDraft(page).click()
+    await expect(page.getByText('No signal. Nothing was sent.').first()).toBeVisible()
+    await expect(draftBox(page)).toHaveValue('Of course. See you at 11:30.')
+    // Both stay ready for when the signal is back.
+    await expect(page.getByRole('button', { name: 'Send reply' })).toBeEnabled()
+    await expect(sendDraft(page)).toBeEnabled()
+    await context.setOffline(false)
+  })
+
+  test('a dictation result that lands after Send does not refill the composer', async ({ context, page }) => {
+    await stubDictation(context)
+    await openThread(context, page, { ...THREAD, fh_agent_runs: [] })
+    const mic = page.getByRole('button', { name: 'Dictate a reply' })
+    await mic.click()
+    await expect(mic).toHaveAttribute('aria-pressed', 'true')
+    await say(page, 'Thursday works for us')
+    await expect(replyField(page)).toHaveValue('Thursday works for us')
+
+    await page.getByRole('button', { name: 'Send reply' }).click()
+    await expect.poll(() => rpcCalls(context, 'fh_send_message').length).toBe(1)
+    expect(rpcCalls(context, 'fh_send_message')[0].body.p_body).toBe('Thursday works for us')
+    await expect(replyField(page)).toHaveValue('')
+
+    // The recognizer delivers one more result after the send.
+    await say(page, 'and bring the fan', true)
+    await page.waitForTimeout(300)
+    await expect(replyField(page)).toHaveValue('')
+    // The label never changes; the pressed state says whether it listens.
+    await expect(mic).toHaveAttribute('aria-pressed', 'false')
+    await expect(page.getByRole('button', { name: 'Stop dictating' })).toHaveCount(0)
+  })
+
+  test('the mic and Send wait while a reply is going out', async ({ context, page }) => {
+    await stubDictation(context)
+    await openThread(context, page, { ...THREAD, fh_agent_runs: [] })
+    let release: () => void = () => {}
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    await context.route('**/rest/v1/rpc/fh_send_message', async (route) => {
+      await gate
+      await route.fallback()
+    })
+    const mic = page.getByRole('button', { name: 'Dictate a reply' })
+    await mic.click()
+    await say(page, 'See you Thursday')
+    await page.getByRole('button', { name: 'Send reply' }).click()
+    await expect(mic).toBeDisabled()
+    await expect(mic).toHaveAttribute('aria-pressed', 'false')
+    await expect(page.getByRole('button', { name: 'Send reply' })).toBeDisabled()
+    // A result that arrives mid send is ignored too.
+    await say(page, 'stray words', true)
+    release()
+    await expect.poll(() => rpcCalls(context, 'fh_send_message').length).toBe(1)
+    await expect(replyField(page)).toHaveValue('')
+    await expect(mic).toBeEnabled()
+    await expect(replyField(page)).toBeFocused()
+  })
+
+  test('a draft whose words sit under keys it does not know shows no draft', async ({ context, page }) => {
+    const runs = [{ ...RUNS[0], proposal: { channel: 'sms', reply_text: 'Of course, 11:30 works.', rationale: 'The customer asked to move the visit.' } }]
+    await openThread(context, page, { ...THREAD, fh_agent_runs: runs })
+    const thread = page.locator('.fhi-thread')
+    await expect(thread.getByText('Daycare pickup ran long.')).toBeVisible()
+    await expect(thread.getByText('Draft reply')).toHaveCount(0)
+    await expect(thread.getByText('Of course, 11:30 works.')).toHaveCount(0)
+    await expect(thread.getByText('The customer asked to move the visit.')).toHaveCount(0)
+    await expect(page.locator('.fhc-btn--primary')).toHaveCount(0)
+  })
+
+  test('a reply with a status it does not know reads Not sent yet', async ({ context, page }) => {
+    const odd = message({
+      id: 'm-odd', direction: 'outbound', status: 'accepted', sent_by_kind: 'user',
+      created_at: '2026-10-10T14:30:00Z', body: 'On my way at 11:30.'
+    })
+    const stamped = message({
+      id: 'm-stamped', direction: 'outbound', status: 'accepted', sent_by_kind: 'user',
+      created_at: '2026-10-10T14:40:00Z', sent_at: '2026-10-10T14:40:05Z', body: 'Gate code is 4412.'
+    })
+    await openThread(context, page, { ...THREAD, fh_messages: [...MESSAGES, odd, stamped], fh_agent_runs: [] })
+    const bubble = page.locator('.fhi-msg').filter({ hasText: 'On my way at 11:30.' })
+    await expect(bubble.getByText('Not sent yet', { exact: true })).toBeVisible()
+    await expect(bubble.getByText(/\d:\d\d (am|pm)/)).toHaveCount(0)
+    await expect(bubble).not.toHaveClass(/is-sent/)
+    // A send time on file is proof enough that it went out.
+    const sent = page.locator('.fhi-msg').filter({ hasText: 'Gate code is 4412.' })
+    await expect(sent).toHaveClass(/is-sent/)
+    await expect(sent.getByText('9:40 am', { exact: true })).toBeVisible()
+  })
+
+  test('switching from one conversation to another on a phone clears the composer', async ({ context, page }, testInfo) => {
+    test.skip(!testInfo.project.name.startsWith('mobile'), 'Phone only')
+    await openThread(context, page, { ...THREAD, fh_agent_runs: [] })
+    await replyField(page).fill('For Priya only')
+    // A link from elsewhere in the app opens Marcus without leaving the thread screen.
+    await page.evaluate(() => {
+      history.pushState({}, '', '/inbox/conv-marcus')
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    })
+    await expect(page.locator('.fhi-thread').getByRole('heading', { name: 'Marcus Bell' })).toBeVisible()
+    await expect(replyField(page)).toHaveValue('')
+  })
+
+  test('a conversation from another company says so and offers no actions', async ({ context, page }) => {
+    const other = conversation({
+      org_id: 'org-2', conversation_id: 'conv-other', client_id: 'cl-other', client_name: 'Dana Whitfield',
+      last_preview: 'Is the deck still on?', last_message_at: '2026-10-10T12:00:00Z', unread_count: 1, pending_drafts: 1
+    })
+    const theirs = message({ org_id: 'org-2', id: 'o1', conversation_id: 'conv-other', client_id: 'cl-other', created_at: '2026-10-10T12:00:00Z', body: 'Is the deck still on?' })
+    const theirRun = { ...RUNS[0], id: 'run-other', org_id: 'org-2', conversation_id: 'conv-other', client_id: 'cl-other' }
+    await openThread(context, page, {
+      ...THREAD,
+      fh_v_inbox: [...INBOX, other],
+      fh_messages: [...MESSAGES, theirs],
+      fh_agent_runs: [...RUNS, theirRun]
+    }, 'conv-other')
+    const thread = page.locator('.fhi-thread')
+    await expect(thread.getByText('Not in this company', { exact: true })).toBeVisible()
+    await expect(thread.getByText('Is the deck still on?')).toHaveCount(0)
+    await expect(replyField(page)).toHaveCount(0)
+    await expect(sendDraft(page)).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Dictate a reply' })).toHaveCount(0)
+    await expect(thread.getByRole('link', { name: /^Call / })).toHaveCount(0)
+    await page.waitForTimeout(800)
+    // Not even marked read.
+    expect(engineCalls(context)).toHaveLength(0)
+  })
+
+  test('an email reply goes out under the latest subject', async ({ context, page }) => {
+    const mail = [
+      message({ id: 'e1', conversation_id: 'conv-marcus', client_id: 'cl-marcus', channel: 'email', subject: 'Deck estimate', created_at: '2026-10-01T15:00:00Z', body: 'Can you quote the deck?' }),
+      message({ id: 'e2', conversation_id: 'conv-marcus', client_id: 'cl-marcus', channel: 'email', subject: 'Final walkthrough', created_at: '2026-10-09T21:30:00Z', body: 'Thanks, the crew did great work.' })
+    ]
+    await openThread(context, page, { ...THREAD, fh_messages: mail, fh_agent_runs: [] }, 'conv-marcus')
+    await expect(page.locator('.fhi-thread').getByText('Can you quote the deck?')).toBeVisible()
+    await replyField(page).fill('Glad to hear it.')
+    await page.getByRole('button', { name: 'Send reply' }).click()
+    await expect.poll(() => rpcCalls(context, 'fh_send_message').length).toBe(1)
+    expect(rpcCalls(context, 'fh_send_message')[0].body).toEqual({
+      p_body: 'Glad to hear it.', p_channel: 'email', p_client_id: 'cl-marcus', p_subject: 'Re: Final walkthrough'
+    })
+  })
+
+  test('the draft says how it will go out', async ({ context, page }) => {
+    await openThread(context, page)
+    await expect(page.locator('.fhi-draft').getByText('Sends by text to Priya Rangarajan', { exact: true })).toBeVisible()
+  })
+
+  test('an email draft names its subject', async ({ context, page }) => {
+    const mail = [
+      message({ id: 'e2', conversation_id: 'conv-marcus', client_id: 'cl-marcus', channel: 'email', subject: 'Final walkthrough', created_at: '2026-10-09T21:30:00Z', body: 'Thanks, the crew did great work.' })
+    ]
+    const runs = [{
+      id: 'run-mail', agent_id: 'agent-1', conversation_id: 'conv-marcus', client_id: 'cl-marcus', status: 'proposed',
+      created_at: '2026-10-09T21:35:00Z', proposal: { channel: 'email', subject: 'Re: Final walkthrough', body: 'Thank you, Marcus. It was a pleasure.' }
+    }]
+    await openThread(context, page, { ...THREAD, fh_messages: mail, fh_agent_runs: runs }, 'conv-marcus')
+    await expect(page.locator('.fhi-draft').getByText('Sends by email: Re: Final walkthrough', { exact: true })).toBeVisible()
+  })
+
+  test('a draft written before the customer last wrote is folded under Older draft', async ({ context, page }) => {
+    // Written yesterday evening, before Priya asked to move the visit this morning.
+    const runs = [{ ...RUNS[0], created_at: '2026-10-09T22:05:00Z' }]
+    await openThread(context, page, { ...THREAD, fh_agent_runs: runs })
+    const older = page.getByRole('button', { name: 'Older draft' })
+    await expect(older).toBeVisible()
+    await expect(older).toHaveAttribute('aria-expanded', 'false')
+    await expect(sendDraft(page)).toHaveCount(0)
+    await expect(draftBox(page)).toHaveCount(0)
+    await older.click()
+    await expect(older).toHaveAttribute('aria-expanded', 'true')
+    await expect(draftBox(page)).toHaveValue(DRAFT_TEXT)
+    await expect(sendDraft(page)).toBeVisible()
+  })
+
+  test('the draft Send waits until the drafts were read again after opening', async ({ context, page }, testInfo) => {
+    await openThread(context, page)
+    await expect(sendDraft(page)).toBeEnabled()
+    // Leave the conversation and come back; the drafts in memory are not trusted until read again.
+    let release: () => void = () => {}
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    await context.route((url) => url.pathname.endsWith('/rest/v1/fh_agent_runs'), async (route) => {
+      await gate
+      await route.fallback()
+    })
+    if (testInfo.project.name.startsWith('mobile')) {
+      await page.getByRole('link', { name: 'Back to inbox' }).click()
+      await page.locator('.fhi-rows > li').filter({ hasText: 'Priya Rangarajan' }).getByRole('link').click()
+    } else {
+      const list = page.getByRole('complementary', { name: 'Conversations' })
+      await list.locator('.fhi-rows > li').filter({ hasText: 'Marcus Bell' }).getByRole('link').click()
+      await expect(page).toHaveURL(/\/inbox\/conv-marcus$/)
+      await list.locator('.fhi-rows > li').filter({ hasText: 'Priya Rangarajan' }).getByRole('link').click()
+    }
+    await expect(page).toHaveURL(/\/inbox\/conv-priya$/)
+    await expect(draftBox(page)).toHaveValue(DRAFT_TEXT)
+    await expect(sendDraft(page)).toBeDisabled()
+    release()
+    await expect(sendDraft(page)).toBeEnabled()
+  })
+
+  test('the Inbox is never written to the offline cache', async ({ context, page }) => {
+    // The real clock: the cache writer waits on Date.now, which a fixed clock stops.
+    await signIn(context, { tables: THREAD })
+    await page.goto('/inbox/conv-priya', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    await expect(draftBox(page)).toHaveValue(DRAFT_TEXT, { timeout: 30_000 })
+    // The cache is written at most every two seconds.
+    await page.waitForTimeout(3000)
+    const saved = await page.evaluate(() => new Promise<string | null>((resolve) => {
+      const open = indexedDB.open('keyval-store')
+      open.onerror = () => resolve(null)
+      open.onsuccess = () => {
+        try {
+          const read = open.result.transaction('keyval', 'readonly').objectStore('keyval').get('fh-query-cache')
+          read.onsuccess = () => resolve(typeof read.result === 'string' ? read.result : null)
+          read.onerror = () => resolve(null)
+        } catch {
+          resolve(null)
+        }
+      }
+    }))
+    expect(saved).not.toBeNull()
+    const cache = JSON.parse(saved as string) as { clientState: { queries: Array<{ queryKey: unknown[] }>; mutations: Array<{ mutationKey?: unknown[] }> } }
+    expect(cache.clientState.queries.length).toBeGreaterThan(0)
+    expect(cache.clientState.queries.filter((q) => q.queryKey[0] === 'inbox')).toEqual([])
+    expect(cache.clientState.mutations.filter((m) => m.mutationKey?.[0] === 'inbox')).toEqual([])
+  })
+
+  test('a failed send keeps the words, reads the thread again and says nothing was confirmed', async ({ context, page }) => {
+    await openThread(context, page, { ...THREAD, fh_agent_runs: [] })
+    await context.route('**/rest/v1/rpc/fh_send_message', (route) =>
+      route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ code: 'XX000', message: 'upstream timeout' }) })
+    )
+    let reads = 0
+    let counting = false
+    await context.route((url) => url.pathname.endsWith('/rest/v1/fh_messages'), async (route) => {
+      if (counting) reads += 1
+      await route.fallback()
+    })
+    await replyField(page).fill('Thursday at 11:30 it is.')
+    counting = true
+    await page.getByRole('button', { name: 'Send reply' }).click()
+    await expect(page.getByText("We couldn't confirm this went out.")).toBeVisible()
+    await expect(page.getByText('Check the thread before sending again.')).toBeVisible()
+    await expect(replyField(page)).toHaveValue('Thursday at 11:30 it is.')
+    await expect.poll(() => reads).toBeGreaterThan(0)
+    await expect(page.getByRole('button', { name: 'Send reply' })).toBeEnabled()
+  })
+
+  test('bubbles say who said them, and focus returns to the reply field', async ({ context, page }) => {
+    await openThread(context, page)
+    const thread = page.locator('.fhi-thread')
+    await expect(thread.locator('.fhi-msg.is-out').first().getByText('You said', { exact: true })).toBeAttached()
+    await expect(thread.locator('.fhi-msg.is-in').first().getByText('Priya Rangarajan said', { exact: true })).toBeAttached()
+
+    await sendDraft(page).click()
+    await expect.poll(() => rpcCalls(context, 'fh_agent_run_approve').length).toBe(1)
+    await expect(draftBox(page)).toHaveCount(0)
+    await expect(replyField(page)).toBeFocused()
+
+    await replyField(page).fill('See you then.')
+    await page.getByRole('button', { name: 'Send reply' }).click()
+    await expect.poll(() => rpcCalls(context, 'fh_send_message').length).toBe(1)
+    await expect(replyField(page)).toHaveValue('')
+    await expect(replyField(page)).toBeFocused()
+  })
+
+  test('focus returns to the reply field after a draft is discarded', async ({ context, page }) => {
+    await openThread(context, page)
+    await page.getByRole('button', { name: 'Discard', exact: true }).click()
+    await expect.poll(() => rpcCalls(context, 'fh_agent_run_reject').length).toBe(1)
+    await expect(draftBox(page)).toHaveCount(0)
+    await expect(replyField(page)).toBeFocused()
   })
 })
