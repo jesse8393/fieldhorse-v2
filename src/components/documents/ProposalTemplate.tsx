@@ -28,6 +28,7 @@ import { money, longDate } from './format.ts'
 import { proposalNumber } from './numbers.ts'
 import { groupPhotosByTag } from './photoGroups.ts'
 import { SlateProposal, MintProposal, EditorialProposal, FieldhorseProposal } from './proposalThemes.tsx'
+import { quoteMoney } from '../../lib/quoteMoney.ts'
 
 // 'fieldhorse' is the phone first customer portal (spec 9.9). It is a
 // choice in Settings, never the default: a company with no estimate_template
@@ -82,13 +83,25 @@ export default function ProposalTemplate({
   const projectTitle = (project?.title || project?.name || contact?.job_title || '').trim()
 
   const coAdjustment = (changeOrders || [])
-    .filter((co: any) => co?.status === 'approved')
+    .filter((co: any) => String(co?.status || '').toLowerCase() === 'approved')
     .reduce((s: any, co: any) => s + Number(co.amount || 0), 0)
+
+  // The quote's total is the one rule the Quote tab capsule and the
+  // customer page use too (lib/quoteMoney.ts, decision D31): base lines plus
+  // approved change orders, or the contact amount when no line is priced.
+  const quote = quoteMoney({
+    items: [
+      ...groups.flatMap((g: any) => g.items),
+      ...upgradeGroupsFlat.map((it: any) => ({ ...it, is_optional: true }))
+    ],
+    changeOrders,
+    contactAmount: contact?.amount
+  })
 
   const subtotal = Math.max(0, Number(pricing.baseTotal || 0))
   const discount = Math.max(0, Number(pricing.discount || 0))
   const tax = (subtotal - discount) * Number(pricing.taxRate || 0)
-  const grandTotal = Math.max(0, subtotal - discount + tax + coAdjustment)
+  const grandTotal = Math.max(0, quote.total - discount + tax)
   const itemCount = groups.reduce((s: number, g: any) => s + g.items.length, 0)
 
   const statusChip = statusToChip(status)

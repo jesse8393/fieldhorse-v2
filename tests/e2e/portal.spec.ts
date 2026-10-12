@@ -158,7 +158,10 @@ test('shows the headline, the address and the total with cents', async ({ page, 
   await expect(page.getByText('Parker Construction', { exact: true }).first()).toBeVisible()
   await expect(page.getByText('Licensed and insured', { exact: true })).toBeVisible()
   await expect(page.getByRole('region', { name: 'Total' }).getByText('$18,458.00', { exact: true })).toBeVisible()
-  await expect(page.getByText('Pay $9,229.00 now to reserve your start date. The balance is due after the walkthrough.')).toBeVisible()
+  // Empty terms: the default schedule's 50 percent, with no fixed promise
+  // about a walkthrough the schedule never mentions (decision D31).
+  await expect(page.getByText('Pay $9,229.00 now to reserve your start date.', { exact: true })).toBeVisible()
+  await expect(page.getByText(/walkthrough/)).toHaveCount(0)
   await expect(page.getByRole('link', { name: 'Call Parker Construction' })).toHaveAttribute('href', 'tel:6155550100')
   // Included rows are priced, optional and excluded items are not in them.
   await expect(page.getByRole('heading', { name: "What's included" })).toBeVisible()
@@ -344,8 +347,70 @@ test('what happens next is three numbered steps', async ({ page, context }) => {
   await expect(steps).toHaveText([
     'You approve and pay the deposit.',
     'Parker sends you a start date.',
+    'You pay 40% at material delivery and 10% at completion.'
+  ])
+})
+
+// The deposit, the sentence under the total and the steps follow the
+// payment terms (decision D31), the same rule the Quote tab capsule uses.
+test('terms that name no deposit say payment follows the terms', async ({ page, context }) => {
+  await mockPortal(context, proposalPayload({ contact: { terms_text: '50% down at rough in, 50% at completion.' } }))
+  await openPortal(page)
+
+  const total = page.getByRole('region', { name: 'Total' })
+  await expect(total.getByText('$18,458.00', { exact: true })).toBeVisible()
+  await expect(total.getByText('Payment follows the terms below.', { exact: true })).toBeVisible()
+  await expect(page.getByText(/Pay \$/)).toHaveCount(0)
+  await expect(page.getByRole('list', { name: 'What happens next' }).getByRole('listitem')).toHaveText([
+    'You approve the quote.',
+    'Parker sends you a start date.',
+    'You pay as the payment terms say.'
+  ])
+  await page.getByRole('button', { name: 'Full details' }).click()
+  await expect(page.getByText('50% down at rough in, 50% at completion.')).toBeVisible()
+})
+
+test('a quote with no deposit says so plainly', async ({ page, context }) => {
+  await mockPortal(context, proposalPayload({ contact: { terms_text: 'No deposit required. Net 30 after completion.' } }))
+  await openPortal(page)
+
+  await expect(page.getByRole('region', { name: 'Total' }).getByText('No deposit is due. Payment follows the terms below.', { exact: true })).toBeVisible()
+  await expect(page.getByText(/Pay \$/)).toHaveCount(0)
+  await expect(page.getByText('You approve the quote.', { exact: true })).toBeVisible()
+})
+
+test('a deposit the terms name as an amount is the amount asked for', async ({ page, context }) => {
+  await mockPortal(context, proposalPayload({ contact: { terms_text: '$2,500 deposit on signing, balance after the final walkthrough.' } }))
+  await openPortal(page)
+
+  await expect(page.getByText('Pay $2,500.00 now to reserve your start date.', { exact: true })).toBeVisible()
+  // The terms mention the walkthrough, so the last step does too.
+  await expect(page.getByRole('list', { name: 'What happens next' }).getByRole('listitem')).toHaveText([
+    'You approve and pay the deposit.',
+    'Parker sends you a start date.',
     'You pay the balance after the walkthrough.'
   ])
+})
+
+test('after approval, Pay deposit asks for the deposit the terms name', async ({ page, context }) => {
+  await mockPortal(context, proposalPayload({
+    contact: { proposal_status: 'approved', terms_text: '30% deposit on signing.' },
+    company: { payment_link: 'venmo.com/u/parker' }
+  }))
+  await openPortal(page)
+  await expect(page.getByRole('link', { name: 'Pay deposit $5,537.40' })).toBeVisible()
+})
+
+test('after approval with no deposit, the payment link asks for no deposit', async ({ page, context }) => {
+  await mockPortal(context, proposalPayload({
+    contact: { proposal_status: 'approved', terms_text: 'No deposit required. Net 30 after completion.' },
+    company: { payment_link: 'venmo.com/u/parker' }
+  }))
+  await openPortal(page)
+  const pay = page.getByRole('link', { name: 'Make a payment' })
+  await expect(pay).toBeVisible()
+  await expect(pay).toHaveAttribute('href', 'https://venmo.com/u/parker')
+  await expect(page.getByRole('link', { name: /Pay deposit/ })).toHaveCount(0)
 })
 
 test('full details keep the terms, warranty and exclusions reachable', async ({ page, context }) => {

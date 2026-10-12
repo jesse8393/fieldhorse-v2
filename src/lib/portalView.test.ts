@@ -135,7 +135,7 @@ describe('buildPortalView', () => {
 
   it('takes the deposit as the first step of the payment schedule, to the cent', () => {
     const v = buildPortalView(payload(), NOW)
-    expect(v.deposit).toEqual({ pct: 50, amount: 9229 })
+    expect(v.deposit).toEqual({ kind: 'percent', pct: 50, amount: 9229 })
     const odd = buildPortalView(payload({
       items: [{ id: 'a', description: 'Slab', qty: 1, rate: 3000.5, amount: 3000.5 }]
     }), NOW)
@@ -185,15 +185,39 @@ describe('buildPortalView', () => {
     expect(v.steps).toEqual([
       'You approve and pay the deposit.',
       'Parker sends you a start date.',
-      'You pay the balance after the walkthrough.'
+      'You pay 40% at material delivery and 10% at completion.'
     ])
     const solo = buildPortalView(payload({}, {}, { name: 'Shyld' }), NOW)
     expect(solo.steps[1]).toBe('Shyld sends you a start date.')
   })
 
   it('writes the deposit sentence with cents', () => {
-    expect(depositSentence({ pct: 50, amount: 9229 })).toBe('Pay $9,229.00 now to reserve your start date. The balance is due after the walkthrough.')
-    expect(depositSentence({ pct: 50, amount: 0 })).toBe('')
+    expect(depositSentence({ kind: 'percent', pct: 50, amount: 9229 })).toBe('Pay $9,229.00 now to reserve your start date.')
+    expect(depositSentence({ kind: 'amount', pct: null, amount: 2500 })).toBe('Pay $2,500.00 now to reserve your start date.')
+    expect(depositSentence({ kind: 'percent', pct: 50, amount: 0 })).toBe('')
+  })
+
+  it('says plainly when there is no deposit, and that payment follows the terms when they name none', () => {
+    expect(depositSentence({ kind: 'none', pct: 0, amount: 0 })).toBe('No deposit is due. Payment follows the terms below.')
+    expect(depositSentence({ kind: 'per_terms', pct: null, amount: 0 })).toBe('Payment follows the terms below.')
+  })
+
+  it('reads the deposit from the payment terms (decision D31)', () => {
+    const tenK = { items: [{ id: 'a', description: 'Slab', qty: 1, rate: 10000, amount: 10000 }] }
+    const at = (terms_text: string) => buildPortalView(payload(tenK, { terms_text }), NOW)
+    expect(at('30% deposit on signing.').deposit).toEqual({ kind: 'percent', pct: 30, amount: 3000 })
+    expect(at('$2,500 deposit on signing.').deposit).toEqual({ kind: 'amount', pct: null, amount: 2500 })
+    expect(at('No deposit required.').deposit).toEqual({ kind: 'none', pct: 0, amount: 0 })
+    expect(at('50% down at rough in, 50% at completion.').deposit).toEqual({ kind: 'per_terms', pct: null, amount: 0 })
+    expect(at('').deposit).toEqual({ kind: 'percent', pct: 50, amount: 5000 })
+  })
+
+  it('says the balance is due after the walkthrough only when the terms say it', () => {
+    const v = buildPortalView(payload({}, { terms_text: '30% deposit, balance after the walkthrough.' }), NOW)
+    expect(v.steps[2]).toBe('You pay the balance after the walkthrough.')
+    const plain = buildPortalView(payload({}, { terms_text: 'Net 30 after completion.' }), NOW)
+    expect(plain.steps).toEqual(['You approve the quote.', 'Parker sends you a start date.', 'You pay as the payment terms say.'])
+    expect(depositSentence(plain.deposit)).not.toMatch(/walkthrough/)
   })
 
   it('writes no dash of any kind in the strings it generates', () => {

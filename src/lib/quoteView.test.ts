@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildQuoteView,
-  depositScheduleFromTerms,
   previewAsLabel,
+  quoteCapsule,
   type QuoteItemRow
 } from './quoteView.ts'
 
@@ -72,20 +72,34 @@ describe('buildQuoteView totals', () => {
 describe('buildQuoteView deposit', () => {
   it('is 50 percent of the base total, rounded to cents', () => {
     const view = buildQuoteView(THREE_BASE_ONE_OPTIONAL)
-    expect(view.deposit).toEqual({ pct: 50, amount: 3005 })
+    expect(view.money.deposit).toEqual({ kind: 'percent', pct: 50, amount: 3005 })
     const odd = buildQuoteView([item({ id: 'a', amount: 100.01 })])
-    expect(odd.deposit).toEqual({ pct: 50, amount: 50.01 })
+    expect(odd.money.deposit).toEqual({ kind: 'percent', pct: 50, amount: 50.01 })
   })
 
   it('never counts optional items', () => {
     const withOptional = buildQuoteView(THREE_BASE_ONE_OPTIONAL)
     const without = buildQuoteView(THREE_BASE_ONE_OPTIONAL.filter((r) => !r.is_optional))
-    expect(withOptional.deposit).toEqual(without.deposit)
+    expect(withOptional.money.deposit).toEqual(without.money.deposit)
   })
 
-  it('follows a payment schedule passed in, using its first step', () => {
-    const view = buildQuoteView(THREE_BASE_ONE_OPTIONAL, [{ pct: 30 }, { pct: 70 }])
-    expect(view.deposit).toEqual({ pct: 30, amount: 1803 })
+  it('follows the deposit the payment terms name', () => {
+    const view = buildQuoteView(THREE_BASE_ONE_OPTIONAL, { termsText: '30% deposit on signing, 70% on completion.' })
+    expect(view.money.deposit).toEqual({ kind: 'percent', pct: 30, amount: 1803 })
+  })
+
+  it('adds approved change orders to the total, as the customer page does', () => {
+    const view = buildQuoteView(THREE_BASE_ONE_OPTIONAL, { changeOrders: [{ amount: 3990, status: 'approved' }, { amount: 500, status: 'sent' }] })
+    expect(view.baseTotal).toBe(6010)
+    expect(view.money.total).toBe(10000)
+    expect(view.money.deposit).toEqual({ kind: 'percent', pct: 50, amount: 5000 })
+  })
+
+  it('stands in the contact amount until there is a priced line', () => {
+    const view = buildQuoteView([], { contactAmount: 10000 })
+    expect(view.baseTotal).toBe(0)
+    expect(view.money.total).toBe(10000)
+    expect(view.canSend).toBe(false)
   })
 })
 
@@ -97,7 +111,8 @@ describe('quote with only optional items', () => {
 
   it('has a zero total and a zero deposit', () => {
     expect(view.baseTotal).toBe(0)
-    expect(view.deposit).toEqual({ pct: 50, amount: 0 })
+    expect(view.money.total).toBe(0)
+    expect(view.money.deposit).toEqual({ kind: 'percent', pct: 50, amount: 0 })
     expect(view.lines).toEqual([])
     expect(view.optional).toHaveLength(2)
   })
@@ -115,7 +130,11 @@ describe('an empty quote', () => {
       optional: [],
       excluded: [],
       baseTotal: 0,
-      deposit: { pct: 50, amount: 0 },
+      money: {
+        total: 0,
+        deposit: { kind: 'percent', pct: 50, amount: 0 },
+        steps: ['You approve the quote.', 'Your contractor sends you a start date.', 'You pay as the payment terms say.']
+      },
       canSend: false
     })
   })
@@ -186,28 +205,60 @@ describe('line order and titles', () => {
   })
 })
 
-describe('depositScheduleFromTerms', () => {
+// These cases were the depositScheduleFromTerms tests. That reader is gone:
+// the deposit now comes from quoteMoney (decision D31), so each input is
+// checked through buildQuoteView, and the terms that used to fall back to
+// 50 percent now read as no deposit or "per the terms".
+describe('deposit read from the payment terms', () => {
+  const depositFor = (termsText: string | null | undefined) =>
+    buildQuoteView(THREE_BASE_ONE_OPTIONAL, { termsText }).money.deposit
+
   it('reads the deposit percent the contractor wrote', () => {
-    expect(depositScheduleFromTerms('30% deposit on signing, 70% on completion.')).toEqual([{ pct: 30 }])
-    expect(depositScheduleFromTerms('A deposit of 25 percent is due at approval.')).toEqual([{ pct: 25 }])
-    expect(depositScheduleFromTerms('Deposit: 40%, balance on completion')).toEqual([{ pct: 40 }])
-    expect(depositScheduleFromTerms('12.5% down payment to schedule the pour')).toEqual([{ pct: 12.5 }])
+    expect(depositFor('30% deposit on signing, 70% on completion.')).toMatchObject({ kind: 'percent', pct: 30 })
+    expect(depositFor('A deposit of 25 percent is due at approval.')).toMatchObject({ kind: 'percent', pct: 25 })
+    expect(depositFor('Deposit: 40%, balance on completion')).toMatchObject({ kind: 'percent', pct: 40 })
+    expect(depositFor('12.5% down payment to schedule the pour')).toMatchObject({ kind: 'percent', pct: 12.5 })
   })
 
-  it('returns null when the terms say nothing usable', () => {
-    expect(depositScheduleFromTerms('')).toBeNull()
-    expect(depositScheduleFromTerms(null)).toBeNull()
-    expect(depositScheduleFromTerms(undefined)).toBeNull()
-    expect(depositScheduleFromTerms('Net 30. 10% retainage held until punch list.')).toBeNull()
-    expect(depositScheduleFromTerms('No deposit required.')).toBeNull()
-    expect(depositScheduleFromTerms('0% deposit')).toBeNull()
-    expect(depositScheduleFromTerms('150% deposit')).toBeNull()
+  it('takes the default schedule only when there are no terms', () => {
+    expect(depositFor('')).toMatchObject({ kind: 'percent', pct: 50 })
+    expect(depositFor(null)).toMatchObject({ kind: 'percent', pct: 50 })
+    expect(depositFor(undefined)).toMatchObject({ kind: 'percent', pct: 50 })
+  })
+
+  it('reads no deposit, or payment per the terms, when the terms name no deposit', () => {
+    expect(depositFor('Net 30. 10% retainage held until punch list.')).toEqual({ kind: 'per_terms', pct: null, amount: 0 })
+    expect(depositFor('No deposit required.')).toEqual({ kind: 'none', pct: 0, amount: 0 })
+    expect(depositFor('0% deposit')).toEqual({ kind: 'none', pct: 0, amount: 0 })
+    expect(depositFor('150% deposit')).toEqual({ kind: 'per_terms', pct: null, amount: 0 })
   })
 
   it('feeds the deposit the screen shows', () => {
-    const schedule = depositScheduleFromTerms('30% deposit on signing')
-    const view = buildQuoteView(THREE_BASE_ONE_OPTIONAL, schedule ?? undefined)
-    expect(view.deposit).toEqual({ pct: 30, amount: 1803 })
+    const view = buildQuoteView(THREE_BASE_ONE_OPTIONAL, { termsText: '30% deposit on signing' })
+    expect(view.money.deposit).toEqual({ kind: 'percent', pct: 30, amount: 1803 })
+    expect(quoteCapsule(view.money).note).toBe('Deposit $1,803.00 at approval')
+  })
+})
+
+describe('quoteCapsule', () => {
+  const capsule = (termsText: string) =>
+    quoteCapsule(buildQuoteView([item({ id: 'a', amount: 10000 })], { termsText }).money)
+
+  it('prints the total with cents and the deposit due at approval', () => {
+    expect(capsule('')).toEqual({ amount: '$10,000.00', note: 'Deposit $5,000.00 at approval' })
+    expect(capsule('30% deposit on signing.')).toEqual({ amount: '$10,000.00', note: 'Deposit $3,000.00 at approval' })
+    expect(capsule('$2,500 deposit on signing.')).toEqual({ amount: '$10,000.00', note: 'Deposit $2,500.00 at approval' })
+  })
+
+  it('says so when there is no deposit, or when the terms name none', () => {
+    expect(capsule('No deposit required.')).toEqual({ amount: '$10,000.00', note: 'No deposit' })
+    expect(capsule('50% down at rough in, 50% at completion.')).toEqual({ amount: '$10,000.00', note: 'Payment follows the terms' })
+  })
+
+  it('writes no dash of any kind', () => {
+    for (const terms of ['', 'No deposit.', 'Net 30.', '$2,500 deposit']) {
+      expect(capsule(terms).note).not.toMatch(/[-‐-―−]/)
+    }
   })
 })
 

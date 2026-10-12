@@ -601,7 +601,9 @@ export { fmtLongDate }
    name, trust line and a call button. The headline, a total tray,
    what is included, optional additions as read only rows, three
    numbered steps and a bottom onyx capsule: the approve bar while
-   the quote is open, "Approved" and a Pay deposit button after.
+   the quote is open, "Approved" and a Pay deposit button after. The
+   total, the deposit sentence and the steps come from quoteMoney
+   through the portal view (D31), as the Quote tab capsule's do.
    ============================================================ */
 
 // The in app preview (Quote tab) has no payload; rebuild the little the
@@ -722,9 +724,13 @@ function FullDetails({ id, view }: { id: string; view: ProposalView }) {
 }
 
 // After approval: the word Approved, who and when only if the payload has
-// it (D12), and "Pay deposit" when the company set a payment link (D7).
+// it (D12), and the company payment link when one is set (D7). It reads
+// "Pay deposit" with the amount when the quote has a deposit (D31), and
+// "Make a payment" when the terms say there is none or name none, so the
+// page never asks for a deposit the terms do not state.
 function ApprovedCapsule({ pv }: { pv: PortalView }) {
   const { name, date } = pv.approved || { name: null, date: null }
+  const depositDue = (pv.deposit.kind === 'percent' || pv.deposit.kind === 'amount') && pv.deposit.amount > 0
   const stamp = name && date ? `Approved by ${name} on ${date}.`
     : name ? `Approved by ${name}.`
     : date ? `Approved on ${date}.`
@@ -740,7 +746,7 @@ function ApprovedCapsule({ pv }: { pv: PortalView }) {
         {pv.payUrl && (
           <div className="fhp-actions">
             <Button variant="primary" size="lg" block href={pv.payUrl} target="_blank" rel="noopener noreferrer">
-              {pv.deposit.amount > 0 ? `Pay deposit ${formatMoney(pv.deposit.amount)}` : 'Pay deposit'}
+              {depositDue ? `Pay deposit ${formatMoney(pv.deposit.amount)}` : 'Make a payment'}
             </Button>
           </div>
         )}

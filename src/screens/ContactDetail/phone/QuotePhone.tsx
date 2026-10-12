@@ -4,7 +4,7 @@ import { Button, Chip, EmptyState, Icon, Row, SkeletonRows } from '../../../comp
 import { formatMoney } from '../../../components/fh/money.ts'
 import { Switch } from '@/components/ui/switch'
 import { hapticTap } from '../../../lib/haptics.ts'
-import { buildQuoteView, depositScheduleFromTerms, previewAsLabel, previewAsName } from '../../../lib/quoteView.ts'
+import { buildQuoteView, previewAsLabel, previewAsName, quoteCapsule } from '../../../lib/quoteView.ts'
 import { useItemSuggestions, useQuoteItems } from '../sections/QuoteItems.tsx'
 import { shortDate, statusChip } from '../lib/quoteStatus.ts'
 import JobActionCapsule from './JobActionCapsule.tsx'
@@ -21,9 +21,12 @@ import './quote-phone.css'
 // capsule at the bottom carries the total, the deposit and the one gold
 // "Send for approval".
 //
-// The money comes from lib/quoteView.ts. There is no overhead line: the
-// deposit is the first step of the payment schedule (50 percent unless the
-// quote's payment terms name another). Lines save through the same
+// The money comes from lib/quoteView.ts, which reads lib/quoteMoney.ts, the
+// one rule the preview and the customer page use too (D31): the total is
+// the base lines plus approved change orders (the contact's own amount
+// until a line is priced, so the capsule never flashes $0.00 while the
+// lines load), and the deposit is what the payment terms name. There is
+// no overhead line. Lines save through the same
 // useQuoteItems writes the desktop builder uses. "Preview as" draws the
 // proposal in the app and never mints a link or calls a send route.
 //
@@ -110,15 +113,14 @@ export default function QuotePhone({
     () => rows.map((r) => (r.id in optimistic ? { ...r, is_optional: optimistic[r.id] } : r)),
     [rows, optimistic]
   )
-  const schedule = useMemo(() => depositScheduleFromTerms(contact?.terms_text) ?? undefined, [contact?.terms_text])
-  const live = useMemo(() => buildQuoteView(effective, schedule), [effective, schedule])
-  // Until the lines load, the contact's own total (kept in step with the
-  // lines by the database) stands in, so the capsule does not flash $0.00.
-  const placeholder = useMemo(
-    () => buildQuoteView([{ id: 'total', description: 'Total', qty: 1, rate: contact?.amount ?? 0, amount: contact?.amount ?? 0 }], schedule),
-    [contact?.amount, schedule]
-  )
-  const view = loading ? placeholder : live
+  const contactAmount = contact?.amount
+  const termsText = contact?.terms_text
+  const moneyTerms = useMemo(() => ({ changeOrders, contactAmount, termsText }), [changeOrders, contactAmount, termsText])
+  const live = useMemo(() => buildQuoteView(effective, moneyTerms), [effective, moneyTerms])
+  // While the lines load no line is priced, so the contact's own amount
+  // stands in and the capsule does not flash $0.00.
+  const loadingMoney = useMemo(() => buildQuoteView([], moneyTerms).money, [moneyTerms])
+  const capsule = quoteCapsule(loading ? loadingMoney : live.money)
 
   const byId = useMemo(
     () => new Map([...live.lines, ...live.optional, ...live.excluded].map((l) => [l.id, l])),
@@ -185,7 +187,7 @@ export default function QuotePhone({
 
   // The send button: the email path with an address, the link path without.
   const sendLabel = approved ? 'Send again' : 'Send for approval'
-  const sendHint = !loading && !view.canSend
+  const sendHint = !loading && !live.canSend
     ? 'Add at least one line'
     : !hasClientEmail ? 'Copies a link' : undefined
   const chip = statusChip(status)
@@ -364,14 +366,11 @@ export default function QuotePhone({
 
       <JobActionCapsule
         variant="total"
-        total={{
-          amount: formatMoney(view.baseTotal),
-          note: `Deposit ${formatMoney(view.deposit.amount)} at approval`
-        }}
+        total={capsule}
         action={{
           label: sendLabel,
           onClick: hasClientEmail ? onSend : onShare,
-          disabled: loading || !view.canSend || busy !== null,
+          disabled: loading || !live.canSend || busy !== null,
           loading: busy === 'send' || busy === 'share',
           hint: sendHint
         }}

@@ -196,9 +196,44 @@ test.describe('quote tab on a phone', () => {
     const capsule = page.locator('.fhj-capsule')
     await expect(capsule.getByRole('button', { name: 'Send for approval' })).toBeDisabled()
     await expect(capsule.getByText('Add at least one line')).toBeVisible()
-    await expect(capsule.getByText('$0.00', { exact: true })).toBeVisible()
-    await expect(capsule.getByText('Deposit $0.00 at approval')).toBeVisible()
+    // No line has a price, so the job's own amount ($46,200 in the mock)
+    // stands in, as it does on the customer page (decision D31).
+    await expect(capsule.getByText('$46,200.00', { exact: true })).toBeVisible()
+    await expect(capsule.getByText('Deposit $23,100.00 at approval')).toBeVisible()
   })
+
+  test('the capsule total adds approved change orders and the deposit follows the terms', async ({ context, page }) => {
+    const changeOrders = [
+      { id: 'co-1', user_id: 'qa-user-1', contact_id: 'c-quote', sequence_number: 1, title: 'Extra curb', amount: 850, status: 'approved', approved_at: iso(NOW - DAY), created_at: iso(NOW - DAY) },
+      { id: 'co-2', user_id: 'qa-user-1', contact_id: 'c-quote', sequence_number: 2, title: 'Sealer', amount: 400, status: 'sent', approved_at: null, created_at: iso(NOW - DAY) }
+    ]
+    await signIn(context, {
+      tables: {
+        fh_quote_items: ITEMS,
+        fh_contacts: [quoteContact({ terms_text: '$2,500 deposit on signing, balance at completion.' })],
+        fh_change_orders: changeOrders
+      }
+    })
+    await openQuote(page)
+    const capsule = page.locator('.fhj-capsule')
+    // $3,150 of lines plus the approved $850 change order; the sent one waits.
+    await expect(capsule.getByText('$4,000.00', { exact: true })).toBeVisible()
+    await expect(capsule.getByText('Deposit $2,500.00 at approval')).toBeVisible()
+  })
+
+  for (const [terms, note] of [
+    ['No deposit required. Net 30 after completion.', 'No deposit'],
+    ['50% down at rough in, 50% at completion.', 'Payment follows the terms']
+  ]) {
+    test(`terms that name no deposit read "${note}"`, async ({ context, page }) => {
+      await signIn(context, { tables: { fh_quote_items: ITEMS, fh_contacts: [quoteContact({ terms_text: terms })] } })
+      await openQuote(page)
+      const capsule = page.locator('.fhj-capsule')
+      await expect(capsule.getByText('$3,150.00', { exact: true })).toBeVisible()
+      await expect(capsule.getByText(note, { exact: true })).toBeVisible()
+      await expect(capsule.getByText(/^Deposit /)).toHaveCount(0)
+    })
+  }
 
   test('only optional lines cannot be sent', async ({ context, page }) => {
     await signIn(context, { tables: { fh_quote_items: [ITEMS[2]] } })

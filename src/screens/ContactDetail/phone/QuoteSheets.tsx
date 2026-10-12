@@ -358,7 +358,7 @@ export function QuoteTermsSheet({ open, onOpenChange, contact, patch }: QuoteTer
           multiline
           rows={4}
           value={terms}
-          helper="Deposit, progress payments, warranty. Write the deposit as a percent, such as 30% deposit on signing, and the deposit on this screen follows it."
+          helper="Deposit, progress payments, warranty. Name the deposit, such as 30% deposit, $2,500 deposit or no deposit, and this screen and the customer page follow it."
           onChange={(e) => setTerms(e.target.value)}
         />
         <Field

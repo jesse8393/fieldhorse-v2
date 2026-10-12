@@ -1,5 +1,5 @@
 // The customer portal (/p/:token) as a pure view model (spec 9.9, decisions
-// D7, D12 and D13). PublicDoc.tsx used to hold the response of
+// D7, D12, D13 and D31). PublicDoc.tsx used to hold the response of
 // /api/public-link as `any`; PublicDocPayload below names the fields the
 // page actually reads, and buildPortalView turns a proposal payload into
 // what the Fieldhorse proposal theme draws: who it is from, the headline,
@@ -14,14 +14,17 @@
 // * The approver's name and date (D12). `approved` holds them only when
 //   the payload has `contact.approved_by_name` and `contact.approved_at`
 //   (the names change order rows already use), otherwise both are null.
-// * A payment schedule. The deposit is the first step of the default
-//   schedule, 50 percent (D8), the same split the draws are generated from.
+// * A payment schedule. The total, the deposit and the three steps come
+//   from lib/quoteMoney.ts, which reads the deposit from the payment terms
+//   (D31), so this page, the in app preview and the Quote tab capsule
+//   print the same money.
 
-import { DEFAULT_PAYMENT_SCHEDULE } from '../components/documents/PaymentTermsBlock.tsx'
 import { initialsFor } from '../components/fh/Monogram.tsx'
 import { moneyCents } from './format.ts'
 import { safePayUrl } from './payLink.ts'
-import { splitByPercents } from './paymentSchedule.ts'
+import { lineAmount, quoteMoney, type QuoteDeposit } from './quoteMoney.ts'
+
+export { companyFirstWord } from './quoteMoney.ts'
 
 /* ---- The /api/public-link payload, from the fields PublicDoc reads ---- */
 
@@ -128,7 +131,7 @@ export type PortalView = {
   headline: string
   addressLine: string
   total: number
-  deposit: { pct: number; amount: number }
+  deposit: QuoteDeposit
   included: PortalLine[]
   optional: PortalLine[]
   steps: string[]
@@ -147,16 +150,6 @@ function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-function toCents(value: unknown): number {
-  const n = Number(value)
-  return Number.isFinite(n) ? Math.round(n * 100) : 0
-}
-
-function itemAmount(item: PublicDocItem): number {
-  const raw = item.amount != null ? Number(item.amount) : Number(item.qty ?? 1) * Number(item.rate ?? 0)
-  return Number.isFinite(raw) ? raw : 0
-}
-
 // A line's words: the description without the "OPTION:" prefix the quote
 // editor used to type, else the section it sits in.
 function itemTitle(item: PublicDocItem): string {
@@ -168,12 +161,6 @@ function endSentence(s: string): string {
   const t = s.trim()
   if (!t) return ''
   return /[.!?]$/.test(t) ? t : `${t}.`
-}
-
-/** The first word of a company name: "Parker Construction" gives "Parker". */
-export function companyFirstWord(companyName: string): string {
-  const first = companyName.trim().split(/\s+/)[0]
-  return first || FALLBACK_COMPANY
 }
 
 // "October 9" in the current year, "December 30, 2025" in any other.
@@ -195,10 +182,17 @@ function trustLineFor(company: PublicDocCompany): string | null {
   return null
 }
 
-/** The sentence under the total: what to pay now and when the rest is due. */
-export function depositSentence(deposit: { pct: number; amount: number }): string {
+/**
+ * The sentence under the total: the deposit to pay now, a plain "no
+ * deposit", or that payment follows the terms when they name no deposit.
+ * When and how the rest is paid is in the steps and the terms, never a
+ * fixed line here.
+ */
+export function depositSentence(deposit: QuoteDeposit): string {
+  if (deposit.kind === 'none') return 'No deposit is due. Payment follows the terms below.'
+  if (deposit.kind === 'per_terms') return 'Payment follows the terms below.'
   if (!(deposit.amount > 0)) return ''
-  return `Pay ${moneyCents(deposit.amount)} now to reserve your start date. The balance is due after the walkthrough.`
+  return `Pay ${moneyCents(deposit.amount)} now to reserve your start date.`
 }
 
 export function buildPortalView(payload: PublicDocPayload, now: Date): PortalView {
@@ -223,13 +217,13 @@ export function buildPortalView(payload: PublicDocPayload, now: Date): PortalVie
   const optional: PortalLine[] = []
   for (const item of items) {
     if (item.is_excluded) continue
-    const line = { title: itemTitle(item), amount: itemAmount(item) }
+    const line = { title: itemTitle(item), amount: lineAmount(item) }
     if (item.is_optional) optional.push(line)
     else included.push(line)
   }
 
   // Approved change orders are part of the contract total, so they show as
-  // lines too and the rows always add up to the total.
+  // lines too and the rows add up to the total whenever a line is priced.
   for (const co of payload.changeOrders || []) {
     if (String(co?.status || '').toLowerCase() !== 'approved') continue
     const label = co.sequence_number != null ? `Change order ${co.sequence_number}` : 'Change order'
@@ -237,23 +231,13 @@ export function buildPortalView(payload: PublicDocPayload, now: Date): PortalVie
     included.push({ title: title ? `${label}, ${title}` : label, amount: Number(co.amount) || 0 })
   }
 
-  const totalCents = included.length > 0
-    ? included.reduce((sum, line) => sum + toCents(line.amount), 0)
-    : toCents(contact.amount)
-  const total = totalCents / 100
-
-  const schedule = DEFAULT_PAYMENT_SCHEDULE
-  const deposit = {
-    pct: Number(schedule[0]?.pct || 0),
-    amount: splitByPercents(total, schedule.map((row) => row.pct))[0] || 0
-  }
-
-  const firstWord = companyFirstWord(text(company.name))
-  const steps = [
-    'You approve and pay the deposit.',
-    `${firstWord} sends you a start date.`,
-    'You pay the balance after the walkthrough.'
-  ]
+  const { total, deposit, steps } = quoteMoney({
+    items: payload.items,
+    changeOrders: payload.changeOrders,
+    contactAmount: contact.amount,
+    termsText: contact.terms_text,
+    companyName: company.name
+  })
 
   const jobTitle = text(contact.job_title)
   const address = text(contact.address)

@@ -1,18 +1,17 @@
-// The quote editor on a phone (spec 9.6, decision D8), as a pure view model.
+// The quote editor on a phone (spec 9.6, decisions D8 and D31), as a pure
+// view model.
 //
 // Lines come from the job's fh_quote_items rows. Base lines make up the
 // quoted price, optional lines are shown beside it and never counted,
 // excluded lines are out of scope and never counted either. There is no
-// overhead line (the app has no overhead concept): the deposit is the
-// first step of the payment schedule, 50 percent by default
-// (DEFAULT_PAYMENT_SCHEDULE), split the same way the proposal's payment
-// terms and the generated draws split it.
+// overhead line (the app has no overhead concept). The total and the
+// deposit the capsule prints come from lib/quoteMoney.ts, the same rule
+// the proposal preview and the customer page use (D31).
 //
 // Every line this module writes itself avoids dashes of any kind. Titles
 // and notes that people typed pass through untouched. Money prints cents.
 
-import { DEFAULT_PAYMENT_SCHEDULE } from '../components/documents/PaymentTermsBlock.tsx'
-import { splitByPercents } from './paymentSchedule.ts'
+import { lineAmount, quoteMoney, type QuoteMoney, type QuoteMoneyInput } from './quoteMoney.ts'
 import { moneyCents } from './format.ts'
 
 /** The fields of an fh_quote_items row this view reads. */
@@ -39,15 +38,17 @@ export type QuoteLineView = {
   amount: number
 }
 
-/** One step of a payment schedule; only the percent matters here. */
-export type ScheduleStep = { pct: number | string | null | undefined }
+/** What the quote's money reads besides its lines (see quoteMoney). */
+export type QuoteTerms = Omit<QuoteMoneyInput, 'items'>
 
 export type QuoteView = {
   lines: QuoteLineView[]
   optional: QuoteLineView[]
   excluded: QuoteLineView[]
+  /** The base lines alone, without change orders or the contact amount. */
   baseTotal: number
-  deposit: { pct: number; amount: number }
+  /** The quote's total, deposit and steps, as every other place prints them. */
+  money: QuoteMoney
   canSend: boolean
 }
 
@@ -86,7 +87,7 @@ function lineView(row: QuoteItemRow): QuoteLineView {
     id: row.id,
     title: String(row.description ?? '').trim() || 'Line item',
     detail: detailFor(row),
-    amount: cents(row.amount) / 100
+    amount: cents(lineAmount(row)) / 100
   }
 }
 
@@ -100,14 +101,11 @@ function byOrder(a: { row: QuoteItemRow; i: number }, b: { row: QuoteItemRow; i:
 }
 
 /**
- * Lines, optional and excluded lists, the base total and the deposit.
- * `schedule` defaults to the standard payment schedule; pass the quote's
- * own steps (see depositScheduleFromTerms) to follow what it says.
+ * Lines, optional and excluded lists, the base total and the quote's
+ * money. Pass the quote's change orders, contact amount and payment terms
+ * so the total and the deposit match the preview and the customer page.
  */
-export function buildQuoteView(
-  items: QuoteItemRow[],
-  schedule: ScheduleStep[] = DEFAULT_PAYMENT_SCHEDULE
-): QuoteView {
+export function buildQuoteView(items: QuoteItemRow[], terms: QuoteTerms = {}): QuoteView {
   const ordered = items.map((row, i) => ({ row, i })).sort(byOrder).map((x) => x.row)
 
   const lines: QuoteLineView[] = []
@@ -119,34 +117,30 @@ export function buildQuoteView(
     else if (row.is_optional) optional.push(lineView(row))
     else {
       lines.push(lineView(row))
-      baseCents += cents(row.amount)
+      baseCents += cents(lineAmount(row))
     }
   }
 
-  const baseTotal = baseCents / 100
-  const steps = schedule.length > 0 ? schedule : DEFAULT_PAYMENT_SCHEDULE
-  const pct = num(steps[0]?.pct)
-  const amount = splitByPercents(baseTotal, steps.map((s) => s.pct))[0] ?? 0
-
-  return { lines, optional, excluded, baseTotal, deposit: { pct, amount }, canSend: lines.length > 0 }
+  return {
+    lines,
+    optional,
+    excluded,
+    baseTotal: baseCents / 100,
+    money: quoteMoney({ ...terms, items }),
+    canSend: lines.length > 0
+  }
 }
 
-const DEPOSIT_BEFORE = /(\d{1,3}(?:\.\d+)?)\s*(?:%|percent)\s*(?:deposit|down\s*payment|down\b)/i
-const DEPOSIT_AFTER = /\b(?:deposit|down\s*payment)\s*(?:of|is|:)?\s*(\d{1,3}(?:\.\d+)?)\s*(?:%|percent)/i
-
 /**
- * The deposit step the contractor wrote into the quote's payment terms
- * ("30% deposit on signing"), or null when the terms name none. A quote
- * stores no structured schedule, only this text, so this is how the
- * screen respects what the quote already says.
+ * What the Quote tab capsule prints: the total, and under it the deposit
+ * due at approval, "No deposit", or "Payment follows the terms" when the
+ * terms name no deposit.
  */
-export function depositScheduleFromTerms(terms: string | null | undefined): ScheduleStep[] | null {
-  const text = String(terms ?? '')
-  const hit = DEPOSIT_BEFORE.exec(text) ?? DEPOSIT_AFTER.exec(text)
-  if (!hit) return null
-  const pct = Number(hit[1])
-  if (!Number.isFinite(pct) || pct <= 0 || pct > 100) return null
-  return [{ pct }]
+export function quoteCapsule(money: QuoteMoney): { amount: string; note: string } {
+  const amount = moneyCents(money.total)
+  if (money.deposit.kind === 'none') return { amount, note: 'No deposit' }
+  if (money.deposit.kind === 'per_terms') return { amount, note: 'Payment follows the terms' }
+  return { amount, note: `Deposit ${moneyCents(money.deposit.amount)} at approval` }
 }
 
 // Words that mark a company, so "Plumbing Bellevue" or "MMC Properties"

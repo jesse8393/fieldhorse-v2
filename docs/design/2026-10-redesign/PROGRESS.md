@@ -26,12 +26,12 @@ Status is one of todo, done, blocked, skipped.
 | 1 | 1 Make the test mock honest | done | `8b14809` | Reviewed twice, one fix round. Data fixed in one test (see notes) |
 | 1 | 2 Today counts stop at 6 | done | `07a9071` | Reviewed by two lenses, approved with no fix round. Decision D34 |
 | 1 | 3 Capture from a job page shows up on the job | done | `1766c46` | Reviewed by two lenses, approved with no fix round. Decision D35 |
-| 1 | 4 Morning cold open says "Clear day" | done | this commit | Reviewed by two lenses, approved with no fix round. Decision D40 |
+| 1 | 4 Morning cold open says "Clear day" | done | `84ccf0d` | Reviewed by two lenses, approved with no fix round. Decision D40 |
 | 1 | 5 What each invoice actually owes | todo | | |
 | 1 | 6 Money timing and double sends | todo | | |
 | 1 | 7 Jobs and quotes stay inside the active company | done | `222e8f6` | Reviewed by two lenses, approved with no fix round. Decision D36 |
 | 1 | 8 The Unscheduled tray tells the truth | done | `d4dc086` | Two fix rounds (overlapping drops, rollback by value), then approved. Decision D39 |
-| 1 | 9 One quote total and one deposit everywhere | todo | | |
+| 1 | 9 One quote total and one deposit everywhere | done | this commit | Reviewed by two lenses, approved with no fix round. Decision D31 |
 | 1 | 10 The customer page after approval and on bad data | todo | | |
 | 1 | 11 Inbox sends exactly once, only when tapped, only when online | done | `36e4c88` | Reviewed by two lenses, approved with no fix round. Decision D38 |
 | 2 | 12 Next stop card without a photo, and job tabs | todo | | |
@@ -80,6 +80,10 @@ Status is one of todo, done, blocked, skipped.
 * **Task 4, the morning cold open.** `onDay` became `placeByDay` in `todayView.ts`; `weatherQuery` and `currentForecast` are new; `Home.tsx` lost its weather effect and state. `getWeather` is untouched, so every test and compare script that answers `api.open-meteo.com` still works.
   * Plan and brief mismatch, kept on purpose: the cold open e2e pins the clock with `page.clock.setSystemTime`, not `setFixedTime`, because the offline cache writer (TanStack's throttle) loops on `Date.now` and never writes under a fixed clock. The time still never drifts within the test's reads.
   * Known small gaps, not changed: when the browser has fired an offline event, a stale forecast's paused refetch leaves the stage on the forecast skeleton rather than the unavailable line; Today's clock ticks once a minute, so after a backgrounded tab resumes the 90 minute gate and the day placement can lag one tick.
+
+* **Task 9, one quote total and one deposit.** New `src/lib/quoteMoney.ts` with `quoteMoney.test.ts` (25 tests on a $10,000 quote) and `quoteMoneyAgree.test.tsx`, which renders the real preview pane and checks the capsule, the preview and the customer page agree. `buildQuoteView(items, terms)` now returns `money`; `depositScheduleFromTerms` is gone. `quoteStatus.ts` lives at `src/screens/ContactDetail/lib/` and computes no money, so it is unchanged.
+  * Assertions changed with the behavior the plan asks for (none weakened): the portal headline test no longer expects the fixed walkthrough line and now asserts it is absent; step 3 with empty terms reads the default schedule; the empty quote capsule shows `contact.amount` ($46,200.00 with a $23,100.00 deposit) instead of $0.00, as the customer page already did; `depositScheduleFromTerms` tests were restated for `quoteMoney` with the same inputs, and "No deposit required." and "0% deposit" now give no deposit where they used to fall back to 50 percent (the bug).
+  * Known small gaps, not changed: on a $0.00 quote with a named dollar deposit the capsule prints "Deposit $0.00 at approval" while the customer page prints no sentence; phrasings such as "$500 non refundable deposit" or "Deposit due at signing: 30%" fall to "per the terms"; the desktop payment terms hint still lists the old helper text; the classic letter's totals block still adds tax from the priced lines only; `InvoiceDrawsSection` still generates draws from the default schedule whatever the terms say.
 
 * The first CI run on #223 (a docs only commit) failed `mock-workflows` "keeps the desktop schedule planning workflow complete" on desktop. The default mock visit starts two hours after the mock loads, so between 10 pm and midnight Central it lands on tomorrow and the Day view is empty. It failed here too at 10:48 pm Central and passed after the test pinned its page clock to a Thursday morning and seeded that day's visit. It is listed under "Failing before Phase 8".
 
