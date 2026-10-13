@@ -517,10 +517,15 @@ async function tapThroughTheLanding(page: Page, phone: boolean, sheet: Locator, 
     }).observe(sheetNode, { attributes: true, attributeFilter: ['aria-busy', 'data-state'], subtree: true })
   })
   // What the spot hits: the button, bare sheet, another control of the
-  // sheet, nothing of the sheet, or the sheet is gone.
+  // sheet, nothing of the sheet, the sheet sliding away, or the sheet is
+  // gone. No tap goes in while the sheet slides away: the observer above
+  // already clicks the button the instant it starts to close, and a tap
+  // aimed at the moving sheet could land on the dock behind it once the
+  // sheet has moved on (it opened Capture over Money in CI).
   const spot = () => page.evaluate(([px, py]) => {
     const sheetNode = document.querySelector('[data-test-sheet]')
     if (!sheetNode) return 'gone'
+    if (sheetNode.getAttribute('data-state') === 'closed') return 'closing'
     const hit = document.elementFromPoint(px, py)
     if (!hit || !sheetNode.contains(hit)) return 'off'
     if (hit.closest('[data-test-button]')) return 'button'
