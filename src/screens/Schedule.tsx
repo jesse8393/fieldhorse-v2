@@ -94,15 +94,32 @@ export default function Schedule() {
   // preserves the "keep the grid rendered during a view switch" behavior
   // the old setLoading guard provided. events defaults to null on first
   // load so the skeleton-vs-empty distinction below still holds.
-  const { data: events = null, isPending: eventsPending } = useScheduleEvents(
+  // The board says a range could not be read only when no read of it has
+  // worked (isLoadingError). After a failed refresh the visits it read stay
+  // on screen, and a range that read as empty keeps saying so.
+  const {
+    data: events = null,
+    isPending: eventsPending,
+    isPlaceholderData: eventsPlaceholder,
+    isLoadingError: eventsFailed,
+    refetch: refetchEvents
+  } = useScheduleEvents(
     user?.id,
     range.start.toISOString(),
     range.end.toISOString()
   )
-  const { data: upcoming = [] } = useUpcomingEvents(user?.id)
+  // Up next keeps its read's state, so the desktop rail can show a
+  // skeleton while it is out and an error when it fails, and says nothing
+  // is scheduled only after a read that found nothing.
+  const upcomingQuery = useUpcomingEvents(user?.id)
+  const upcoming = upcomingQuery.data ?? []
   const invalidateSchedule = useInvalidateSchedule()
   const dropScheduleEvent = useDropScheduleEvent()
   const loading = eventsPending
+  // The desktop board also waits while a new week or day loads: until then
+  // the cache holds the last range (keepPreviousData), whose visits the
+  // board filters out, so it would read as an empty week.
+  const boardLoading = eventsPending || eventsPlaceholder
   // Aliases so the existing delete/undo + FAB-save call sites keep working.
   const load = invalidateSchedule
   const loadUpcoming = invalidateSchedule
@@ -288,8 +305,13 @@ export default function Schedule() {
         <Suspense fallback={null}>
           <SnowSchedule
             events={events}
-            upcoming={upcoming}
-            loading={loading}
+            loading={boardLoading}
+            failed={eventsFailed}
+            onRetry={() => { void refetchEvents() }}
+            upcoming={upcomingQuery.data ?? null}
+            upcomingLoading={upcomingQuery.isPending}
+            upcomingFailed={upcomingQuery.isError}
+            onRetryUpcoming={() => { void upcomingQuery.refetch() }}
             cursor={cursor}
             setCursor={setCursor}
             view={view}

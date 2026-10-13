@@ -27,9 +27,10 @@ import {
   createColumnHelper,
 } from '@tanstack/react-table'
 import type { SortingState } from '@tanstack/react-table'
-import { money, moneyFull } from '../../lib/format.ts'
+import { countNoun, money, moneyFull } from '../../lib/format.ts'
 import { buildCsv, downloadCsv } from '../../lib/csv.ts'
 import MiniMetric from '../MiniMetric.tsx'
+import LoadingValue from '../LoadingValue.tsx'
 import TopbarWeather from './TopbarWeather.tsx'
 import PaletteKeyCap from './PaletteKeyCap.tsx'
 
@@ -77,6 +78,14 @@ const FILTERS: { key: string; label: string }[] = [
   { key: 'active', label: 'Active' },
   { key: 'recent', label: 'Recent' },
 ]
+
+// What the Book of business line calls the clients a filter shows:
+// "12 clients", "5 active clients", "1 recent client".
+const BOOK_NOUN: Record<string, string> = {
+  all: 'client',
+  active: 'active client',
+  recent: 'recent client',
+}
 
 // One enriched row per client, rollup + status derived once so the
 // sort accessors and the render read the same values.
@@ -168,6 +177,13 @@ export default function SnowClientsBuild(props: Props) {
   })
   const viewRows = table.getRowModel().rows
 
+  // The Book of business line counts the same clients twice: those the
+  // search and filter show, then how many of those have open jobs.
+  const openInView = enriched.filter((r) => r.activeCount > 0).length
+  // While the book loads, a skeleton stands in each count's place.
+  const pending = (label: string, width = 56) => <LoadingValue label={label} width={width} height={20} />
+  const railPending = <strong>{pending('Loading', 64)}</strong>
+
   function exportCsv() {
     downloadCsv('fieldhorse-clients.csv', toCsv(viewRows.map((r) => r.original)))
   }
@@ -186,7 +202,11 @@ export default function SnowClientsBuild(props: Props) {
           <PaletteKeyCap />
         </div>
         <div className="fh-build-topbar__meta">
-          <span>{rows.length.toLocaleString()} clients on file</span>
+          <span>
+            {loading
+              ? <LoadingValue label="Loading your clients" width={96} height={12} />
+              : `${rows.length.toLocaleString()} ${countNoun(rows.length, 'client')} on file`}
+          </span>
           <TopbarWeather lead />
         </div>
         <button className="fh-build-icon-btn" type="button" onClick={() => window.dispatchEvent(new CustomEvent('fh:navigate', { detail: { to: '/activity' } }))} aria-label="Open activity" title="Activity"><Bell size={16} /></button>
@@ -208,16 +228,22 @@ export default function SnowClientsBuild(props: Props) {
           <div className="fh-build-focus">
             <div className="fh-build-eyebrow">Book of business</div>
             <p>
-              {filtered.length.toLocaleString()} {FILTERS.find((f) => f.key === filter)?.label.toLowerCase()} ·
-              {' '}{screenStats.activeAccounts} with open jobs
+              {loading ? (
+                <LoadingValue label="Loading your book of business" width={200} height={14} />
+              ) : (
+                <>
+                  {filtered.length.toLocaleString()} {countNoun(filtered.length, BOOK_NOUN[filter] ?? 'client')} ·
+                  {' '}{openInView.toLocaleString()} with open jobs
+                </>
+              )}
             </p>
           </div>
 
           <div className="fh-build-mini-grid">
-            <MiniMetric label="Total clients" value={rows.length.toLocaleString()} />
-            <MiniMetric label="Active relationships" value={String(screenStats.activeAccounts)} accent />
-            <MiniMetric label="Outstanding AR" value={money(screenStats.outstanding)} tone={screenStats.outstanding > 0 ? 'warn' : undefined} />
-            <MiniMetric label="Needs follow up" value={String(needsFollowUp)} tone={needsFollowUp > 0 ? 'warn' : undefined} />
+            <MiniMetric label="Total clients" value={loading ? pending('Loading total clients') : rows.length.toLocaleString()} />
+            <MiniMetric label="Active relationships" value={loading ? pending('Loading active relationships') : String(screenStats.activeAccounts)} accent />
+            <MiniMetric label="Outstanding AR" value={loading ? pending('Loading outstanding', 72) : money(screenStats.outstanding)} tone={screenStats.outstanding > 0 ? 'warn' : undefined} />
+            <MiniMetric label="Needs follow up" value={loading ? pending('Loading follow ups') : String(needsFollowUp)} tone={needsFollowUp > 0 ? 'warn' : undefined} />
           </div>
         </section>
 
@@ -241,7 +267,7 @@ export default function SnowClientsBuild(props: Props) {
                 onClick={() => setFilter(f.key)}
               >
                 {f.label}
-                <span className="fh-build-pill__count">{count}</span>
+                {!loading && <span className="fh-build-pill__count">{count}</span>}
               </button>
             )
           })}
@@ -250,7 +276,7 @@ export default function SnowClientsBuild(props: Props) {
         <section className="fh-build-content-grid fh-build-content-grid--clients">
           <section className="fh-build-card fh-build-table fh-build-clients-table">
             <header className="fh-build-card-head">
-              <div className="fh-build-eyebrow">All relationships · {filtered.length.toLocaleString()}</div>
+              <div className="fh-build-eyebrow">{loading ? 'All relationships' : <>All relationships · {filtered.length.toLocaleString()}</>}</div>
               <button type="button" onClick={exportCsv} disabled={loading || viewRows.length === 0}>
                 <FileDown size={12} aria-hidden="true" /> Export CSV
               </button>
@@ -314,38 +340,58 @@ export default function SnowClientsBuild(props: Props) {
           <aside className="fh-build-rail fh-build-rail--page">
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Total clients</div>
-              <strong>{rows.length.toLocaleString()}</strong>
-              <span>relationships in book</span>
+              {loading ? railPending : (
+                <>
+                  <strong>{rows.length.toLocaleString()}</strong>
+                  <span>{countNoun(rows.length, 'relationship')} in book</span>
+                </>
+              )}
             </section>
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Active relationships</div>
-              <strong>{screenStats.activeAccounts}</strong>
-              <span>with open jobs</span>
+              {loading ? railPending : (
+                <>
+                  <strong>{screenStats.activeAccounts}</strong>
+                  <span>with open jobs</span>
+                </>
+              )}
             </section>
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Needs follow up</div>
-              <strong style={{ color: needsFollowUp > 0 ? 'var(--v3-primary-text)' : undefined }}>{needsFollowUp}</strong>
-              <span>cooled 30+ days</span>
-              {needsFollowUp > 0 && <div className="fh-build-spark is-gold" />}
+              {loading ? railPending : (
+                <>
+                  <strong style={{ color: needsFollowUp > 0 ? 'var(--v3-primary-text)' : undefined }}>{needsFollowUp}</strong>
+                  <span>cooled 30+ days</span>
+                  {needsFollowUp > 0 && <div className="fh-build-spark is-gold" />}
+                </>
+              )}
             </section>
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Lifetime value</div>
-              <strong>{money(totalLifetime || 0)}</strong>
-              <span>booked revenue all time</span>
+              {loading ? railPending : (
+                <>
+                  <strong>{money(totalLifetime || 0)}</strong>
+                  <span>booked revenue all time</span>
+                </>
+              )}
             </section>
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">New this month</div>
-              <strong>{newThisMonth}</strong>
-              <span>added in last 30d</span>
-              {newThisMonth > 0 && (
-                <div className="fh-build-rail-card__spark">
-                  <ArrowUpRight size={14} />
-                  <span>growing</span>
-                </div>
+              {loading ? railPending : (
+                <>
+                  <strong>{newThisMonth}</strong>
+                  <span>added in last 30d</span>
+                  {newThisMonth > 0 && (
+                    <div className="fh-build-rail-card__spark">
+                      <ArrowUpRight size={14} />
+                      <span>growing</span>
+                    </div>
+                  )}
+                </>
               )}
             </section>
           </aside>

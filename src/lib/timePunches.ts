@@ -71,9 +71,16 @@ async function tryGeolocate(): Promise<{ lat: number | null; lon: number | null;
   })
 }
 
+/** How a read answers when it fails. By default a failed read answers as
+ *  if there were nothing (null, or an empty list), which is what punchIn
+ *  and the older callers expect. throwOnError makes it throw instead, for
+ *  a screen that has to tell "could not check" from "nothing there", such
+ *  as Crew home (Phase 8 follow up A). */
+export type PunchReadOptions = { throwOnError?: boolean }
+
 /** Fetch the caller's active (un-clocked-out) punch, if any.
  *  Used to restore meter state on page load. */
-export async function getActivePunch(userId: string): Promise<TimePunch | null> {
+export async function getActivePunch(userId: string, options: PunchReadOptions = {}): Promise<TimePunch | null> {
   const { data, error } = await supabase
     .from('fh_time_punches')
     .select('*')
@@ -83,6 +90,7 @@ export async function getActivePunch(userId: string): Promise<TimePunch | null> 
     .limit(1)
     .maybeSingle()
   if (error) {
+    if (options.throwOnError) throw error
     console.warn('[timePunches] active fetch error', error)
     return null
   }
@@ -152,6 +160,9 @@ export async function punchIn(opts: {
 }
 
 /** Punch out the active row. Optional hourly_rate snapshot + notes. */
+/** What punchOut throws when the shift it was asked to end had already ended. */
+export const ALREADY_CLOCKED_OUT = 'This shift was already clocked out.'
+
 export async function punchOut(opts: {
   punchId: string
   hourlyRate?: number | null
@@ -180,10 +191,14 @@ export async function punchOut(opts: {
     .from('fh_time_punches')
     .update(patch)
     .eq('id', opts.punchId)
+    // Only a shift still open: a second clock out (from an older screen, or
+    // after the shift ended elsewhere) never moves an ended shift's end.
+    .is('punch_out_at', null)
     .select('*')
-    .single()
+    .maybeSingle()
   if (error) throw error
   rememberActive(null)
+  if (!data) throw new Error(ALREADY_CLOCKED_OUT)
   return data as TimePunch
 }
 
@@ -212,6 +227,7 @@ export async function fetchMyDefaultRate(userId: string, orgId?: string | null):
 export async function listMyRecentPunches(
   userId: string,
   limit = 14,
+  options: PunchReadOptions = {},
 ): Promise<TimePunch[]> {
   const { data, error } = await supabase
     .from('fh_time_punches')
@@ -220,6 +236,7 @@ export async function listMyRecentPunches(
     .order('punch_in_at', { ascending: false })
     .limit(limit)
   if (error) {
+    if (options.throwOnError) throw error
     console.warn('[timePunches] list error', error)
     return []
   }

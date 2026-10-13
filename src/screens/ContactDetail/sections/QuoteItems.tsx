@@ -6,9 +6,11 @@ import { toastError, toastSuccess, toastUndo } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { canHover } from '../../../lib/hover.ts'
 import { SkeletonList } from '../../../components/Skeleton.tsx'
+import DataErrorState from '../../../components/DataErrorState.tsx'
 import { loadUserRateCard } from '../../../lib/rateCard.ts'
 import { Eyebrow } from '../../../components/v3'
 import { planReorder } from './quoteItemOrder.ts'
+import { keepFocusOnRetry } from '../../../lib/retryFocus.ts'
 
 /**
  * Quote items section, fh_quote_items CRUD editor.
@@ -282,15 +284,51 @@ export function applySuggestion(setter: any, s: ItemSuggestion) {
   })
 }
 
+/** What an editor of the lines knows about them, for the Send and Approve gates. */
+export type QuoteLinesState = {
+  /** A read of this job's lines has worked. */
+  loaded: boolean
+  /** The latest read of the lines failed. */
+  failed: boolean
+  /** Base lines on screen (neither optional nor excluded), saving ones included. */
+  baseCount: number
+}
+
 /**
  * The job's quote lines and the writes on them. QuoteItemsSection (the
  * desktop builder) and the phone editor (phone/QuotePhone.tsx) share this,
  * so both save through the same updateItem, addItem, removeItem and
  * reorderItem. Moved out of the component unchanged.
+ *
+ * A failed read never reads as "no lines" (Phase 8 follow up A): the rows
+ * and the sort order counter stay as they were, `failed` stays set until a
+ * read works, and a failed reread after a read that worked says so in a
+ * toast. Until a read has worked (`loaded`) no line can be added, since the
+ * sort order counter is not seeded yet. A failed delete or move puts the
+ * lines back as they were before it rereads. Reads that overlap land in
+ * any order, so only the latest one sets anything. `onLoaded` runs after
+ * each read that works; `onState` hears what the editor knows, and null
+ * when it goes away.
  */
-export function useQuoteItems({ jobId, userId, onContactRefresh }: any) {
+export function useQuoteItems({ jobId, userId, onContactRefresh, onLoaded, onState }: any) {
   const [rows, setRows] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  // The latest read of the lines failed. The lines an earlier read brought
+  // stay on screen; with none, the screens show the error, not "No lines".
+  const [failed, setFailed] = useState(false)
+  // A read of this job's lines has worked. The ref is for addItem, which
+  // may run from a sheet opened a render ago.
+  const [loaded, setLoaded] = useState(false)
+  const loadedRef = useRef(false)
+  // Each read takes the next number and sets state only while it is the
+  // latest: an older read that lands after a newer one, its failure
+  // included, never undoes what the newer one brought.
+  const readSeq = useRef(0)
+  useEffect(() => () => { readSeq.current += 1 }, [])
+  const onLoadedRef = useRef(onLoaded)
+  onLoadedRef.current = onLoaded
+  const onStateRef = useRef(onState)
+  onStateRef.current = onState
 
   // Monotonic next sort_order, seeded from loaded rows and bumped per add.
   // Keeps rapid optimistic adds in entry order without reading (possibly
@@ -303,24 +341,58 @@ export function useQuoteItems({ jobId, userId, onContactRefresh }: any) {
   // Only the initial load shows the skeleton.
   const fetchRows = useCallback(async (opts?: { silent?: boolean }) => {
     if (!jobId || !userId) return
+    const seq = ++readSeq.current
     if (!opts?.silent) setLoading(true)
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('fh_quote_items')
       .select('*')
       .eq('contact_id', jobId)
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: true })
+    // A newer read has gone out since: it decides.
+    if (seq !== readSeq.current) return
+    if (error) {
+      // Keep the lines on screen and the sort counter: wiping them read as
+      // "No lines yet." and let the next line take sort order 0.
+      setFailed(true)
+      setLoading(false)
+      if (opts?.silent && loadedRef.current) {
+        toastError("Couldn't refresh the lines", 'The lines on screen may be out of date. Check your connection and try again.')
+      }
+      return
+    }
     const list = data || []
     setRows(list)
+    setFailed(false)
     // Seed the next sort_order above the current max so optimistic adds
     // always append in order.
     sortRef.current = list.length
       ? Math.max(...list.map((r: any) => Number(r.sort_order) || 0)) + 1
       : 0
+    loadedRef.current = true
+    setLoaded(true)
     setLoading(false)
+    onLoadedRef.current?.()
   }, [jobId, userId])
 
+  // Another job's lines never stand in for this one's, nor does a read of
+  // them still out.
+  useEffect(() => {
+    readSeq.current += 1
+    setRows((rs) => (rs.length ? [] : rs))
+    setFailed(false)
+    loadedRef.current = false
+    setLoaded(false)
+    sortRef.current = 0
+  }, [jobId])
+
   useEffect(() => { fetchRows() }, [fetchRows])
+
+  // Tell the Quote tab what this editor knows, so Send and Approve follow
+  // the lines on screen; null once the editor goes (the desktop Document view).
+  const baseCount = useMemo(() => rows.filter((r) => !r.is_optional && !r.is_excluded).length, [rows])
+  useEffect(() => { onStateRef.current?.({ loaded, failed, baseCount }) }, [loaded, failed, baseCount])
+  useEffect(() => () => { onStateRef.current?.(null) }, [])
 
   // ============================================================
   // CRUD, scoped by row id or job with RLS as the tenant boundary. The
@@ -330,6 +402,12 @@ export function useQuoteItems({ jobId, userId, onContactRefresh }: any) {
 
   async function addItem(input: any) {
     if (!jobId || !userId) return null
+    // Until a read of the lines works the sort counter is not seeded, so a
+    // new line would take sort order 0 and land among the first ones.
+    if (!loadedRef.current) {
+      toastError("Couldn't add item", 'Wait for the lines to load, then add it.')
+      return null
+    }
     if (!input.description) {
       toastError("Couldn't add item", 'Description is required')
       return null
@@ -379,7 +457,8 @@ export function useQuoteItems({ jobId, userId, onContactRefresh }: any) {
     // reconciles (its actions are disabled in the UI too).
     if (String(id).startsWith('temp-')) return false
     hapticTap()
-    const snapshot = rows.find((r) => r.id === id)
+    const index = rows.findIndex((r) => r.id === id)
+    const snapshot = index >= 0 ? rows[index] : undefined
     setRows((rs) => rs.filter((r) => r.id !== id))
     const { error } = await supabase
       .from('fh_quote_items')
@@ -387,6 +466,11 @@ export function useQuoteItems({ jobId, userId, onContactRefresh }: any) {
       .eq('id', id)
     if (error) {
       toastError("Couldn't delete item", error.message)
+      // The line was not deleted: put it back where it was now, so a reread
+      // that fails too cannot leave it hidden.
+      if (snapshot) {
+        setRows((rs) => (rs.some((r) => r.id === id) ? rs : [...rs.slice(0, index), snapshot, ...rs.slice(index)]))
+      }
       fetchRows({ silent: true })
       return false
     }
@@ -419,29 +503,36 @@ export function useQuoteItems({ jobId, userId, onContactRefresh }: any) {
     // A renumber also rewrites rows that are still saving; wait for them.
     if (plan.updates.some((u) => String(u.id).startsWith('temp-'))) return false
     hapticTap()
+    const before = rows
     setRows(plan.rows)
     // Keep optimistic adds numbered after the (possibly renumbered) list.
     sortRef.current = Math.max(sortRef.current, ...plan.rows.map((r: any) => (Number(r.sort_order) || 0) + 1))
     const results = await Promise.all(plan.updates.map((u) =>
       supabase.from('fh_quote_items').update({ sort_order: u.sort_order }).eq('id', u.id)
     ))
-    const failed = results.find((r) => r.error)
-    if (failed?.error) {
-      toastError("Couldn't reorder", failed.error.message)
+    const failedWrite = results.find((r) => r.error)
+    if (failedWrite?.error) {
+      toastError("Couldn't reorder", failedWrite.error.message)
+      // The move did not save: put the lines back in their order now,
+      // unless something else changed them meanwhile. The reread settles
+      // any write of the move that did land.
+      setRows((rs) => (rs === plan.rows ? before : rs))
       fetchRows({ silent: true })
       return false
     }
     return true
   }
 
-  return { rows, loading, fetchRows, addItem, updateItem, removeItem, reorderItem }
+  return { rows, loading, loaded, failed, fetchRows, addItem, updateItem, removeItem, reorderItem }
 }
 
-export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: any) {
-  const { rows, loading, addItem, updateItem, removeItem, reorderItem } = useQuoteItems({ jobId, userId, onContactRefresh })
+export default function QuoteItemsSection({ jobId, userId, onContactRefresh, onLinesLoaded, onLinesState }: any) {
+  const { rows, loading, loaded, failed, fetchRows, addItem, updateItem, removeItem, reorderItem } = useQuoteItems({ jobId, userId, onContactRefresh, onLoaded: onLinesLoaded, onState: onLinesState })
 
   const [draft, setDraft] = useState(emptyDraft)
   const suggestions = useItemSuggestions(userId)
+  // The section's heading, where focus waits while Try again reads the lines again.
+  const titleRef = useRef<HTMLHeadingElement>(null)
 
   const [editingId, setEditingId] = useState<any>(null)
   const [editDraft, setEditDraft] = useState(emptyDraft)
@@ -516,7 +607,7 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
           <Receipt size={11} aria-hidden="true" style={{ marginRight: 4, verticalAlign: 'middle' }} />
           Quote
         </span>
-        <h2 style={{
+        <h2 ref={titleRef} tabIndex={-1} style={{
           margin: '6px 0 0',
           fontSize: 24,
           lineHeight: 1.1,
@@ -566,14 +657,15 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
         </p>
       </section>
 
-      {/* Add line item */}
+      {/* Add line item. It waits for a read of the lines that works: before
+          one, a new line would take sort order 0 (useQuoteItems). */}
       <DraftCard
         eyebrow="Add line item"
         draft={draft}
         onChange={(k: any, v: any) => patchDraft(setDraft, k, v)}
         primaryLabel="Add line item"
         onPrimary={handleAdd}
-        primaryDisabled={!draft.description.trim()}
+        primaryDisabled={!loaded || !draft.description.trim()}
         showCancel={false}
         suggestions={suggestions}
         onPickSuggestion={(s: ItemSuggestion) => applySuggestion(setDraft, s)}
@@ -583,6 +675,16 @@ export default function QuoteItemsSection({ jobId, userId, onContactRefresh }: a
       {/* Items list */}
       {loading ? (
         <SkeletonList rows={3} card={false} />
+      ) : failed && !loaded ? (
+        <DataErrorState
+          title="Couldn't load the lines"
+          message="Check your connection and try again."
+          actionLabel="Try again"
+          onRetry={() => {
+            keepFocusOnRetry(titleRef.current)
+            void fetchRows()
+          }}
+        />
       ) : rows.length === 0 ? (
         <div style={{
           padding: '24px 16px',

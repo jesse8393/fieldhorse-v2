@@ -17,6 +17,7 @@ import { pushSupport, pushEnabled, enablePush, disablePush } from '../lib/push.t
 import { safePayUrl } from '../lib/payLink.ts'
 import { hapticMedium, hapticSuccess } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
+import { countNoun } from '../lib/format.ts'
 import { Switch } from '@/components/ui/switch'
 import { Eyebrow } from '../components/v3'
 import {
@@ -189,8 +190,8 @@ export default function Settings() {
       if (clErr) throw new Error(clErr.message)
       total += clCount ?? 0
 
-      setWipeResult(total > 0 ? `Removed ${total} sample rows.` : 'No sample data to remove.')
-      toastSuccess('Sample data removed', total > 0 ? `${total} demo rows cleared` : 'Nothing to remove')
+      setWipeResult(total > 0 ? `Removed ${total} sample ${countNoun(total, 'row')}.` : 'No sample data to remove.')
+      toastSuccess('Sample data removed', total > 0 ? `${total} demo ${countNoun(total, 'row')} cleared` : 'Nothing to remove')
       setConfirmWipe(false)
     } catch (e: any) {
       setWipeResult(`Couldn't remove sample data: ${e.message}`)

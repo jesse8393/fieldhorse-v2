@@ -82,8 +82,18 @@ type EventRow = BoardEvent
 // string at the call-site, etc.).
 type Props = {
   events: EventRow[] | null
-  upcoming: EventRow[] | null
+  /** True while the board's range loads, a new week or day included. */
   loading: boolean
+  /** No read of the board's range has worked and the last one failed: an error line with Try again stands where the empty hint would. */
+  failed?: boolean
+  onRetry?: () => void
+  /** Up next: null until its first read is in. */
+  upcoming: EventRow[] | null
+  /** True while Up next's first read is out. */
+  upcomingLoading?: boolean
+  /** Up next's read failed. */
+  upcomingFailed?: boolean
+  onRetryUpcoming?: () => void
   cursor: Date
   setCursor: (d: Date) => void
   view: string
@@ -147,12 +157,12 @@ function slotWords(id: unknown): string {
 
 export default function SnowScheduleBuild(props: Props) {
   const {
-    events: eventsIn, upcoming: upcomingIn, loading, cursor, setCursor,
+    events: eventsIn, loading, failed = false, onRetry, cursor, setCursor,
+    upcoming, upcomingLoading = false, upcomingFailed = false, onRetryUpcoming,
     view: viewIn, setView, weather, onAddEvent, onNewJob, onScheduleJob, onOpenEvent,
   } = props
 
   const events = useMemo<EventRow[]>(() => eventsIn || [], [eventsIn])
-  const upcoming = useMemo<EventRow[]>(() => upcomingIn || [], [upcomingIn])
   const view: BoardView = (viewIn === 'day' || viewIn === 'week' || viewIn === 'month') ? viewIn : 'week'
 
   const { user } = useAuth()
@@ -455,13 +465,15 @@ export default function SnowScheduleBuild(props: Props) {
         <div className={`fhsch-body${activeJob ? ' is-dragging' : ''}`}>
           <div className="fhsch-main">
             {view === 'month' ? (
-              <MonthGrid cursor={cursor} events={events} loading={loading} now={now} onOpenDay={openDay} />
+              <MonthGrid cursor={cursor} events={events} loading={loading} failed={failed} onRetry={onRetry} now={now} onOpenDay={openDay} />
             ) : (
               <BoardGrid
                 days={days}
                 view={view}
                 events={inView}
                 loading={loading}
+                failed={failed}
+                onRetry={onRetry}
                 now={now}
                 onOpenEvent={onOpenEvent}
                 onOpenDay={openDay}
@@ -481,7 +493,14 @@ export default function SnowScheduleBuild(props: Props) {
               onSchedule={scheduleJob}
             />
             {crewRows.length > 0 && <CrewThisWeek title={crewTitle} crew={crewRows} />}
-            <UpNext events={upcoming} onOpenEvent={onOpenEvent} onAddEvent={onAddEvent} />
+            <UpNext
+              events={upcoming}
+              loading={upcomingLoading}
+              failed={upcomingFailed}
+              onRetry={() => onRetryUpcoming?.()}
+              onOpenEvent={onOpenEvent}
+              onAddEvent={onAddEvent}
+            />
           </aside>
         </div>
 

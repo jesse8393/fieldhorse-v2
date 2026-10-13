@@ -10,6 +10,7 @@ import {
 import { supabase } from '../lib/supabase.ts'
 import { useSubDetail, subDetailKey } from '../lib/queries.ts'
 import { formatPhone } from '../lib/utils.ts'
+import { countNoun } from '../lib/format.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { hapticTap, hapticSuccess } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
@@ -545,7 +546,7 @@ function SubDetailDesktop({
           <PaletteKeyCap />
         </button>
         <div className="fh-build-topbar__meta">
-          <span>{subRows.length.toLocaleString()} job links</span>
+          <span>{subRows.length.toLocaleString()} {countNoun(subRows.length, 'job link')}</span>
           <span className="fh-build-vline" />
           <span style={{ opacity: 0.6 }}>{primaryTrade}</span>
         </div>

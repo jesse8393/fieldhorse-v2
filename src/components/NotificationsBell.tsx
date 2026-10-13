@@ -7,6 +7,7 @@ import { Eyebrow } from './v3'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { supabase } from '../lib/supabase.ts'
 import { fetchInbox, markRead, markAllRead, fmtAge } from '../lib/notifications.ts'
+import { countNoun } from '../lib/format.ts'
 import { hapticTap } from '../lib/haptics.ts'
 
 // Map notification kind → icon + accent color. Add cases as new kinds
@@ -146,7 +147,7 @@ export default function NotificationsBell() {
                     className="fh-font-serif"
                     style={{ margin: '6px 0 0', fontSize: 24, lineHeight: 1.1, letterSpacing: 0, fontWeight: 400, fontStyle: 'normal', color: 'var(--ink-strong)' }}
                   >
-                    {unread > 0 ? <>{unread} new <em style={{ fontStyle: 'normal', fontWeight: 600 }}>notifications.</em></> : <>All <em style={{ fontStyle: 'normal', fontWeight: 600 }}>caught up.</em></>}
+                    {unread > 0 ? <>{unread} new <em style={{ fontStyle: 'normal', fontWeight: 600 }}>{countNoun(unread, 'notification')}.</em></> : <>All <em style={{ fontStyle: 'normal', fontWeight: 600 }}>caught up.</em></>}
                   </h2>
                 </DrawerTitle>
               </div>

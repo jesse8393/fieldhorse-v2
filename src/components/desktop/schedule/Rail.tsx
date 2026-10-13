@@ -10,6 +10,7 @@ import { Button, Icon, SkeletonRows } from '../../fh'
 import { capTray, hoursLabel, jobLabel, jobSubline, timeLabel, TRAY_LIMIT, WEEKDAYS } from '../../../lib/scheduleBoard.ts'
 import type { JobRow } from '../../../lib/queries.ts'
 import type { BoardEvent } from './types.ts'
+import { keepFocusOnRetry } from '../../../lib/retryFocus.ts'
 
 export const TRAY_HINT_ID = 'fhsch-tray-hint'
 
@@ -189,37 +190,78 @@ export function CrewThisWeek({
   )
 }
 
+// Up next tells the truth the way the tray does (D39): skeleton rows until
+// its read is in, an error line with Try again when the read fails (alone
+// when there is nothing to show, above the list when a reload failed), and
+// "Nothing scheduled" only after a read that found nothing. Try again leaves
+// focus on the section, which stays while the error goes.
 export function UpNext({
   events,
+  loading,
+  failed,
+  onRetry,
   onOpenEvent,
   onAddEvent
 }: {
-  events: BoardEvent[]
+  /** Null until the first read is in. */
+  events: BoardEvent[] | null
+  /** True while the first read is out. */
+  loading: boolean
+  /** True when the read failed. */
+  failed: boolean
+  onRetry: () => void
   onOpenEvent?: (event: BoardEvent) => void
   onAddEvent: () => void
 }) {
+  const sectionRef = useRef<HTMLElement>(null)
   return (
-    <section className="fhsch-rail__section" aria-label="Up next">
+    <section ref={sectionRef} className="fhsch-rail__section" aria-label="Up next" tabIndex={-1}>
       <div className="fhsch-rail__head">
         <h2 className="fhsch-rail__title">Up next</h2>
         <Button variant="secondary" size="mini" icon={Plus} onClick={onAddEvent}>New event</Button>
       </div>
-      {events.length === 0 ? (
-        <p className="fhsch-rail__empty">Nothing scheduled in the next 7 days.</p>
+      {loading ? (
+        <SkeletonRows rows={2} label="Loading what is up next" />
       ) : (
-        <ul className="fhsch-upnext">
-          {events.slice(0, 4).map((e) => {
-            const start = new Date(e.start_at as string)
-            return (
-              <li key={e.id}>
-                <button type="button" className="fhsch-upnext__row" onClick={() => onOpenEvent?.(e)}>
-                  <span className="fhsch-upnext__when">{WEEKDAYS[start.getDay()]} {timeLabel(start)}</span>
-                  <span className="fhsch-upnext__title">{e.title || 'Untitled event'}</span>
-                </button>
-              </li>
-            )
-          })}
-        </ul>
+        <>
+          {failed && (
+            <div className={`fhsch-rail__empty${events ? ' is-above' : ''}`} role="alert">
+              <p>
+                {events
+                  ? "Couldn't refresh this list, so it may be out of date. Check your connection and try again."
+                  : "Couldn't load the next 7 days. Check your connection and try again."}
+              </p>
+              <Button
+                variant="quiet"
+                size="mini"
+                onClick={() => {
+                  keepFocusOnRetry(sectionRef.current)
+                  onRetry()
+                }}
+              >
+                Try again
+              </Button>
+            </div>
+          )}
+          {events && events.length === 0 && (
+            <p className="fhsch-rail__empty">Nothing scheduled in the next 7 days.</p>
+          )}
+          {events && events.length > 0 && (
+            <ul className="fhsch-upnext">
+              {events.slice(0, 4).map((e) => {
+                const start = new Date(e.start_at as string)
+                return (
+                  <li key={e.id}>
+                    <button type="button" className="fhsch-upnext__row" onClick={() => onOpenEvent?.(e)}>
+                      <span className="fhsch-upnext__when">{WEEKDAYS[start.getDay()]} {timeLabel(start)}</span>
+                      <span className="fhsch-upnext__title">{e.title || 'Untitled event'}</span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </>
       )}
     </section>
   )

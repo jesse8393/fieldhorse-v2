@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
@@ -23,6 +23,9 @@ import SectionHeader from '../components/v3/SectionHeader.tsx'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { useConfirm } from '../components/ConfirmSheet.tsx'
 import { Eyebrow } from '../components/v3'
+import DataErrorState from '../components/DataErrorState.tsx'
+import { SkeletonRows } from '../components/fh'
+import { keepFocusOnRetry } from '../lib/retryFocus.ts'
 const SnowNotes = lazy(() => import('../components/desktop/SnowNotesBuild.tsx'))
 
 const SYSTEM = `You are Fieldhorse, a construction operations AI. You receive rough field notes dictated or typed by a contractor from a jobsite. Parse them into structured JSON with fields: summary (one sentence), action_items (array of strings with owners if mentioned), risks (array), materials_needed (array), follow_up_date (ISO date if mentioned or null). Return ONLY JSON, no prose.`
@@ -50,7 +53,9 @@ export default function Notes() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { data: bundle, isLoading: loading } = useNotesBundle(user?.id)
+  // isPending, not isLoading, so nothing reads as empty before the first
+  // read lands; isError, so a failed read is never "All clear".
+  const { data: bundle, isPending: loading, isError, refetch } = useNotesBundle(user?.id)
   const notes = bundle?.notes ?? []
   const contacts = bundle?.contacts ?? []
   const [draft, setDraft] = useState('')
@@ -211,6 +216,9 @@ export default function Notes() {
     setParsed(null)
     setContactId('')
     patchNotes((n: any) => [localRow, ...n])
+    // Saved while the reports could not be read: read them again, so the
+    // note shows once the connection is back.
+    if (!bundle) void refetch()
     toastSuccess('Note saved', queued ? 'Will sync when signal returns' : 'Synced across devices')
   }
 
@@ -309,11 +317,35 @@ export default function Notes() {
     return out.slice(0, 10)
   }, [notes])
 
+  // A failed read with nothing to show says so where the reports go, on
+  // both layouts, never "0 reports captured", "All clear" or an empty feed:
+  // the compact error, inside the reports card. The composer stays, so a
+  // report can still be written and saved. A failed refresh keeps the
+  // reports already on screen. Try again leaves focus on the reports card,
+  // which stays while the error gives way to the skeleton.
+  const readFailed = isError && !bundle
+  const reportsEl = useRef<HTMLElement | null>(null)
+  const setReportsEl = useCallback((el: HTMLElement | null) => { reportsEl.current = el }, [])
+  const readError = (
+    <DataErrorState
+      compact
+      title="Couldn't load your field reports"
+      message="We couldn't reach your reports. Check your connection and try again."
+      actionLabel="Try again"
+      onRetry={() => {
+        keepFocusOnRetry(reportsEl.current)
+        void refetch()
+      }}
+    />
+  )
+
   if (isDesktop) {
     return (
       <Suspense fallback={null}>
         <SnowNotes
           loading={loading}
+          readError={readFailed ? readError : null}
+          reportsRef={setReportsEl}
           contacts={contacts}
           recent={recent}
           linkedGroups={linkedGroups}
@@ -582,15 +614,24 @@ export default function Notes() {
       {/* ─────────── RECENT ACTIVITY ─────────── */}
       <motion.div
         variants={item}
+        ref={setReportsEl}
         className="v3-section"
         style={{ margin: '0 var(--v3-gutter) var(--v3-rhythm-screen)' }}
+        role="group"
+        aria-label="Recent activity"
+        tabIndex={-1}
       >
         <SectionHeader label="Recent activity" />
 
-        {loading ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
+        {readFailed ? (
+          <div style={{ marginTop: 4 }}>{readError}</div>
+        ) : loading ? (
+          // The feed's own skeleton, in a polite busy region with a hidden
+          // line, as SkeletonRows does.
+          <div role="status" aria-live="polite" aria-busy="true" style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
+            <span className="fhc-vh">Loading recent activity</span>
             {[0, 1, 2].map((i) => (
-              <div key={i} className="v3-skeleton" style={{ height: 76, borderRadius: 10, opacity: 1 - i * 0.2 }} />
+              <div key={i} className="v3-skeleton" aria-hidden="true" style={{ height: 76, borderRadius: 10, opacity: 1 - i * 0.2 }} />
             ))}
           </div>
         ) : recent.length === 0 ? (
@@ -705,78 +746,83 @@ export default function Notes() {
       {/* ─────────── ACTION ITEMS (AI) ───────────
           Surfaces the parsed action items across all notes as a single
           actionable list. If no notes have been parsed yet, render a
-          placeholder so the section's purpose is visible. */}
-      <motion.div
-        variants={item}
-        className="v3-section v3-section--quiet"
-        style={{ margin: '0 var(--v3-gutter) 40px' }}
-      >
-        <div className="v3-section-header">
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-            <Sparkles size={14} color="var(--v3-primary)" />
-            <span className="v3-eyebrow">AI action items</span>
-          </span>
-        </div>
-
-        {actionItems.length === 0 ? (
-          <div className="v3-empty" style={{ marginTop: 4 }}>
-            <ClipboardCheck size={22} color="var(--v3-text-muted)" style={{ margin: '0 auto 8px' }} />
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
-              No action items yet.
-            </div>
-            <div style={{ fontSize: 12, lineHeight: 1.5 }}>
-              Tap <strong style={{ color: 'var(--v3-primary-text)' }}>AI parse</strong> on a note above to extract action items, risks, and materials.
-            </div>
+          placeholder so the section's purpose is visible. After a failed
+          read there is nothing to list, so the section waits. */}
+      {!readFailed && (
+        <motion.div
+          variants={item}
+          className="v3-section v3-section--quiet"
+          style={{ margin: '0 var(--v3-gutter) 40px' }}
+        >
+          <div className="v3-section-header">
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <Sparkles size={14} color="var(--v3-primary)" />
+              <span className="v3-eyebrow">AI action items</span>
+            </span>
           </div>
-        ) : (
-          <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
-            {actionItems.map((a, i) => {
-              const c = contacts.find((x) => x.id === a.contactId)
-              return (
-                <li
-                  key={`${a.noteId}-${i}`}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: 12,
-                    padding: '12px 12px',
-                    borderRadius: 10,
-                    background: 'var(--v3-surface)',
-                    border: '1px solid var(--v3-border)'
-                  }}
-                >
-                  <span style={{
-                    flexShrink: 0,
-                    marginTop: 2,
-                    width: 16, height: 16, borderRadius: 10,
-                    background: 'var(--v3-primary-soft)',
-                    border: '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)',
-                    display: 'grid', placeItems: 'center'
-                  }}>
-                    <ClipboardCheck size={10} color="var(--v3-primary)" />
-                  </span>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{
-                      fontSize: 14,
-                      color: 'var(--v3-text)',
-                      fontFamily: 'var(--font-body)',
-                      lineHeight: 1.45,
-                      overflowWrap: 'anywhere'
+
+          {loading ? (
+            <SkeletonRows rows={2} label="Loading action items" />
+          ) : actionItems.length === 0 ? (
+            <div className="v3-empty" style={{ marginTop: 4 }}>
+              <ClipboardCheck size={22} color="var(--v3-text-muted)" style={{ margin: '0 auto 8px' }} />
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
+                No action items yet.
+              </div>
+              <div style={{ fontSize: 12, lineHeight: 1.5 }}>
+                Tap <strong style={{ color: 'var(--v3-primary-text)' }}>AI parse</strong> on a note above to extract action items, risks, and materials.
+              </div>
+            </div>
+          ) : (
+            <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+              {actionItems.map((a, i) => {
+                const c = contacts.find((x) => x.id === a.contactId)
+                return (
+                  <li
+                    key={`${a.noteId}-${i}`}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 12,
+                      padding: '12px 12px',
+                      borderRadius: 10,
+                      background: 'var(--v3-surface)',
+                      border: '1px solid var(--v3-border)'
+                    }}
+                  >
+                    <span style={{
+                      flexShrink: 0,
+                      marginTop: 2,
+                      width: 16, height: 16, borderRadius: 10,
+                      background: 'var(--v3-primary-soft)',
+                      border: '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)',
+                      display: 'grid', placeItems: 'center'
                     }}>
-                      {a.text}
-                    </div>
-                    {c?.name && (
-                      <div style={{ marginTop: 4, fontSize: 12, color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)' }}>
-                        From {c.name}
+                      <ClipboardCheck size={10} color="var(--v3-primary)" />
+                    </span>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{
+                        fontSize: 14,
+                        color: 'var(--v3-text)',
+                        fontFamily: 'var(--font-body)',
+                        lineHeight: 1.45,
+                        overflowWrap: 'anywhere'
+                      }}>
+                        {a.text}
                       </div>
-                    )}
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </motion.div>
+                      {c?.name && (
+                        <div style={{ marginTop: 4, fontSize: 12, color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)' }}>
+                          From {c.name}
+                        </div>
+                      )}
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </motion.div>
+      )}
     </motion.div>
   )
 }

@@ -10,7 +10,7 @@ import {
   Plus,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { money } from '../../lib/format.ts'
+import { countNoun, money } from '../../lib/format.ts'
 import MiniMetric from '../MiniMetric.tsx'
 import PaletteKeyCap from './PaletteKeyCap.tsx'
 
@@ -116,7 +116,7 @@ export default function SnowSubsBuild(props: Props) {
           <PaletteKeyCap />
         </div>
         <div className="fh-build-topbar__meta">
-          <span>{filtered.length.toLocaleString()} vendors in network</span>
+          <span>{filtered.length.toLocaleString()} {countNoun(filtered.length, 'vendor')} in network</span>
           <span className="fh-build-vline" />
           <span style={{ opacity: 0.6 }}>{screenStats.activeRecent} active in 30d</span>
         </div>

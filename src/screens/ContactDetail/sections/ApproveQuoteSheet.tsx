@@ -14,6 +14,9 @@ import { proposalNumber } from '../../../components/documents/numbers.ts'
 import SignaturePad from '../../../components/SignaturePad.tsx'
 import { useDrawerKeyboard } from '../../../lib/useDrawerKeyboard.ts'
 import { Eyebrow } from '../../../components/v3'
+import DataErrorState from '../../../components/DataErrorState.tsx'
+import LoadingValue from '../../../components/LoadingValue.tsx'
+import { keepFocusOnRetry } from '../../../lib/retryFocus.ts'
 
 /**
  * Approve Quote sheet, Phase 4C-2.
@@ -75,8 +78,15 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
 
   const [items, setItems] = useState<any[]>([])
   const [loadingItems, setLoadingItems] = useState(false)
+  // The lines could not be read: never "0 base" or "add a line", and
+  // approving waits. Try again bumps the key to read again.
+  const [itemsFailed, setItemsFailed] = useState(false)
+  const [itemsKey, setItemsKey] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [err, setErr] = useState('')
+  // The sheet's title, where focus waits while Try again reads the lines
+  // again: it stays in the dialog, which the error does not.
+  const titleRef = useRef<HTMLHeadingElement>(null)
   const { formRef, drawerStyle, formStyle } = useDrawerKeyboard(open)
 
   // The customer's email, found the way the Quote tab sends and Money
@@ -94,9 +104,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
   // beat after the sheet opens then leaves what was typed alone.
   const emailEditedRef = useRef(false)
 
-  // Reset every time the sheet opens, then fetch fresh items so the
-  // snapshot reflects truth-of-the-moment (not a stale cache from the
-  // last open).
+  // Reset every time the sheet opens.
   useEffect(() => {
     if (!open) return
     setMethod('verbal')
@@ -113,6 +121,14 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
     setSignatureData(null)
     setErr('')
     setSubmitting(false)
+  }, [open, contact?.id, contact?.updated_at, contact?.name, contact?.email, userId])
+
+  // Then fetch fresh items so the snapshot reflects truth-of-the-moment
+  // (not a stale cache from the last open). Try again reads them again
+  // without clearing the form.
+  useEffect(() => {
+    if (!open) return
+    setItemsFailed(false)
     if (!contact?.id || !userId) { setItems([]); return }
     let alive = true
     setLoadingItems(true)
@@ -127,7 +143,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
         .order('created_at', { ascending: true })
       if (!alive) return
       if (error) {
-        setErr(error.message)
+        setItemsFailed(true)
         setItems([])
       } else {
         setItems(data || [])
@@ -135,7 +151,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
       setLoadingItems(false)
     })()
     return () => { alive = false }
-  }, [open, contact?.id, contact?.updated_at, contact?.name, contact?.email, userId])
+  }, [open, contact?.id, contact?.updated_at, contact?.name, contact?.email, userId, itemsKey])
 
   // The linked client's email lands after the sheet has opened: fill it
   // in, unless the email field has been typed in since.
@@ -431,6 +447,8 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
           </Eyebrow>
           <DrawerTitle asChild>
             <h2
+              ref={titleRef}
+              tabIndex={-1}
               className="fh-font-serif"
               style={{ margin: '6px 0 0', fontSize: 24, lineHeight: 1.1, letterSpacing: 0, fontWeight: 400, color: 'var(--ink-strong)' }}
             >
@@ -496,17 +514,19 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
                 fontFamily: 'var(--font-display)', fontSize: 20, lineHeight: 1,
                 color: 'var(--ink-strong)', fontVariantNumeric: 'tabular-nums'
               }}>
-                {money(totals.base)}
+                {loadingItems ? <LoadingValue label="Loading the total" width={72} height={18} /> : itemsFailed ? null : money(totals.base)}
               </span>
             </div>
-            <div style={{
-              fontFamily: 'var(--font-body)', fontSize: 12,
-              color: 'var(--ink-muted)'
-            }}>
-              {loadingItems
-                ? 'Loading items…'
-                : `${totals.baseCount} base · ${totals.optionalCount} optional${totals.optional > 0 ? ` (${money(totals.optional)})` : ''} · ${totals.excludedCount} excluded`}
-            </div>
+            {!itemsFailed && (
+              <div style={{
+                fontFamily: 'var(--font-body)', fontSize: 12,
+                color: 'var(--ink-muted)'
+              }}>
+                {loadingItems
+                  ? 'Loading items…'
+                  : `${totals.baseCount} base · ${totals.optionalCount} optional${totals.optional > 0 ? ` (${money(totals.optional)})` : ''} · ${totals.excludedCount} excluded`}
+              </div>
+            )}
             {contact?.proposal_status === 'sent' && contact?.quote_sent_at && (
               <div style={{
                 fontFamily: 'var(--font-body)', fontSize: 12,
@@ -706,7 +726,19 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
             </span>
           </label>
 
-          {totals.baseCount === 0 && !loadingItems && (
+          {itemsFailed && !loadingItems && (
+            <DataErrorState
+              compact
+              title="We couldn't load the lines."
+              message="Check your connection and try again."
+              actionLabel="Try again"
+              onRetry={() => {
+                keepFocusOnRetry(titleRef.current)
+                setItemsKey((k) => k + 1)
+              }}
+            />
+          )}
+          {totals.baseCount === 0 && !loadingItems && !itemsFailed && (
             <div style={{
               padding: '12px 12px', borderRadius: 10,
               background: 'var(--surface-2)', border: '1px dashed var(--rule)',

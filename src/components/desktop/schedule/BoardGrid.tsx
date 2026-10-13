@@ -3,19 +3,22 @@
 // blocks laid out side by side with packDay. Every slot is a drop target
 // for the Unscheduled tray's cards (@dnd-kit/core).
 
-import { useMemo, type CSSProperties } from 'react'
+import { useMemo, useRef, type CSSProperties } from 'react'
 import { useDroppable } from '@dnd-kit/core'
-import { Skeleton } from '../../fh'
+import { Button, Skeleton } from '../../fh'
 import {
   WEEKDAYS,
   boardHours,
+  dayLabel,
   dayLayout,
   eventStatus,
   hourLabel,
   slotId,
   timeRangeLabel,
+  weekRangeLabel,
   ymdKey
 } from '../../../lib/scheduleBoard.ts'
+import { keepFocusOnRetry } from '../../../lib/retryFocus.ts'
 import { HOUR_PX, type BoardEvent } from './types.ts'
 
 const FULL_WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -40,13 +43,17 @@ type BoardGridProps = {
   days: Date[]
   view: 'day' | 'week'
   events: BoardEvent[]
+  /** True while the range loads, a new week or day included: the board shows its loading state, never the empty hint. */
   loading: boolean
+  /** No read of the range has worked and the last one failed: an error line with Try again stands where the empty hint would. A failed refresh is not this: what the range read stays. */
+  failed?: boolean
+  onRetry?: () => void
   now: Date
   onOpenEvent?: (event: BoardEvent) => void
   onOpenDay: (day: Date) => void
 }
 
-export default function BoardGrid({ days, view, events, loading, now, onOpenEvent, onOpenDay }: BoardGridProps) {
+export default function BoardGrid({ days, view, events, loading, failed = false, onRetry, now, onOpenEvent, onOpenDay }: BoardGridProps) {
   const { first, last } = useMemo(() => boardHours(days, events), [days, events])
   const hours = useMemo(() => Array.from({ length: last - first }, (_, i) => first + i), [first, last])
 
@@ -67,9 +74,21 @@ export default function BoardGrid({ days, view, events, loading, now, onOpenEven
   const nowInRange = nowMinutes >= first * 60 && nowMinutes < last * 60
   const empty = !loading && events.length === 0
   const bodyHeight = hours.length * HOUR_PX
+  // The board is named for its range, and Try again leaves focus on it
+  // while the range is read again.
+  const boardRef = useRef<HTMLDivElement>(null)
+  const rangeName = view === 'day' ? dayLabel(days[0]) : weekRangeLabel(days[0], days[days.length - 1])
 
   return (
-    <div className="fhsch-board" data-view={view} aria-busy={loading || undefined}>
+    <div
+      ref={boardRef}
+      className="fhsch-board"
+      data-view={view}
+      aria-busy={loading || undefined}
+      role="group"
+      aria-label={rangeName}
+      tabIndex={-1}
+    >
       <div className="fhsch-gutter" aria-hidden="true">
         <div className="fhsch-gutter__head" />
         <div className="fhsch-gutter__hours" style={{ height: bodyHeight }}>
@@ -167,11 +186,28 @@ export default function BoardGrid({ days, view, events, loading, now, onOpenEven
           <Skeleton shape="block" width="12%" height={120} />
         </div>
       )}
-      {empty && (
+      {empty && (failed ? (
+        <div className="fhsch-hint" role="alert">
+          {view === 'day' ? "Couldn't load this day." : "Couldn't load this week."} Check your connection and try again.{' '}
+          {/* The hint lets clicks fall through to the slots; Try again takes them. */}
+          <span style={{ pointerEvents: 'auto' }}>
+            <Button
+              variant="quiet"
+              size="mini"
+              onClick={() => {
+                keepFocusOnRetry(boardRef.current)
+                onRetry?.()
+              }}
+            >
+              Try again
+            </Button>
+          </span>
+        </div>
+      ) : (
         <p className="fhsch-hint">
           {view === 'day' ? 'Nothing scheduled this day.' : 'Nothing scheduled this week.'} Drag a job in from the tray, or choose New event.
         </p>
-      )}
+      ))}
     </div>
   )
 }

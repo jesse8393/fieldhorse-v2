@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../../../lib/supabase.ts'
 import { ProposalTemplate, mapItemsToScope } from '../../../components/documents'
+import DataErrorState from '../../../components/DataErrorState.tsx'
+import { keepFocusOnRetry } from '../../../lib/retryFocus.ts'
 
 // The customer facing render of a quote, and the photo loader that feeds
 // it and the PDF. Both lived inside tabs/Quote.tsx; they moved here
@@ -9,7 +11,11 @@ import { ProposalTemplate, mapItemsToScope } from '../../../components/documents
 
 // `bare` drops the dark backdrop the desktop Document view sets behind the
 // letter, for the phone sheet, which already sits on its own surface.
-export function DocumentPreviewPane({ company, contact, items, photos = [], loading, insurance = null, changeOrders = [], bare = false }: any) {
+// `failed` means the lines could not be read: the pane says so, with Try
+// again (`onRetry`), and never draws a proposal with no lines. The pane is
+// one element in every state, named Proposal preview, so Try again leaves
+// focus on it while the lines are read again.
+export function DocumentPreviewPane({ company, contact, items, photos = [], loading, failed = false, onRetry, insurance = null, changeOrders = [], bare = false }: any) {
   // Group line items by their `section` field so each trade renders
   // as its own ScopeSectionCard. Order is preserved (groupByOrdered).
   // Optional items (is_optional=true) split into the upgrades array;
@@ -56,9 +62,16 @@ export function DocumentPreviewPane({ company, contact, items, photos = [], load
     return () => { cancelled = true }
   }, [status, contact?.id])
 
+  const rootRef = useRef<HTMLDivElement>(null)
+
   return (
     <div
-      style={bare ? { padding: 0 } : {
+      ref={rootRef}
+      role="group"
+      aria-label="Proposal preview"
+      tabIndex={-1}
+      // The error stands on its own, not on the letter's dark backdrop.
+      style={failed ? undefined : bare ? { padding: 0 } : {
         padding: '8px 0 24px',
         // Cream backdrop so the white letter-paper sits visibly on
         // the dark workspace surface without floating.
@@ -69,7 +82,18 @@ export function DocumentPreviewPane({ company, contact, items, photos = [], load
         borderRadius: 10
       }}
     >
-      {loading && (
+      {failed && (
+        <DataErrorState
+          title="Couldn't load the lines"
+          message="The preview needs the quote lines. Check your connection and try again."
+          actionLabel="Try again"
+          onRetry={onRetry ? () => {
+            keepFocusOnRetry(rootRef.current)
+            onRetry()
+          } : undefined}
+        />
+      )}
+      {!failed && loading && (
         <div style={{
           padding: '24px',
           textAlign: 'center',
@@ -80,7 +104,7 @@ export function DocumentPreviewPane({ company, contact, items, photos = [], load
           Loading preview…
         </div>
       )}
-      {!loading && (
+      {!failed && !loading && (
         <ProposalTemplate
           company={company}
           contact={contact}

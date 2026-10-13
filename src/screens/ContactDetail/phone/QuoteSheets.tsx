@@ -392,6 +392,8 @@ export type QuoteMoreSheetProps = {
   loading?: boolean
   /** The quote has no line in the total yet, so there is nothing to build or share. */
   needsLines?: boolean
+  /** The lines could not be read: the rows wait and say so, never that there are none. */
+  linesFailed?: boolean
   /** Something else is out: a send, a build, or an optional switch saving the total. */
   busy: boolean
   onOpenPdf: () => void
@@ -410,16 +412,18 @@ export type QuoteMoreSheetProps = {
    about lines or an email that are not known yet. An email that could not
    be read is said to be unchecked, never missing. */
 const NEEDS_A_LINE = 'Add at least one line.'
+const LINES_FAILED = "We couldn't load the lines."
 
-export function QuoteMoreSheet({ open, onOpenChange, email, emailFailed = false, loading = false, needsLines = false, busy, onOpenPdf, onDownload, onShare, onEsign }: QuoteMoreSheetProps) {
+export function QuoteMoreSheet({ open, onOpenChange, email, emailFailed = false, loading = false, needsLines = false, linesFailed = false, busy, onOpenPdf, onDownload, onShare, onEsign }: QuoteMoreSheetProps) {
   function run(fn: () => void) {
     onOpenChange(false)
     fn()
   }
   const chevron = <Icon icon={ChevronRight} size={18} className="fhq-chevron" />
   const off = busy || loading || needsLines
+  const linesLine = linesFailed ? LINES_FAILED : NEEDS_A_LINE
   const esignLine = needsLines
-    ? NEEDS_A_LINE
+    ? linesLine
     : email
       ? `DocuSign emails a signing request to ${email}.`
       : emailFailed
@@ -433,7 +437,7 @@ export function QuoteMoreSheet({ open, onOpenChange, email, emailFailed = false,
         <Row
           as="li"
           title="Open the PDF"
-          subline={needsLines ? NEEDS_A_LINE : 'Builds the proposal and opens it in a new tab.'}
+          subline={needsLines ? linesLine : 'Builds the proposal and opens it in a new tab.'}
           next={chevron}
           disabled={off}
           onClick={() => run(onOpenPdf)}
@@ -441,7 +445,7 @@ export function QuoteMoreSheet({ open, onOpenChange, email, emailFailed = false,
         <Row
           as="li"
           title="Download the PDF"
-          subline={needsLines ? NEEDS_A_LINE : 'Saves a copy to this phone.'}
+          subline={needsLines ? linesLine : 'Saves a copy to this phone.'}
           next={chevron}
           disabled={off}
           onClick={() => run(onDownload)}
@@ -449,7 +453,7 @@ export function QuoteMoreSheet({ open, onOpenChange, email, emailFailed = false,
         <Row
           as="li"
           title="Copy a share link"
-          subline={needsLines ? NEEDS_A_LINE : 'Makes a link the customer can open, and marks the quote as sent.'}
+          subline={needsLines ? linesLine : 'Makes a link the customer can open, and marks the quote as sent.'}
           next={chevron}
           disabled={off}
           onClick={() => run(onShare)}

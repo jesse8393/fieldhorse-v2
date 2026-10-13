@@ -46,6 +46,14 @@ select:focus-visible,
   outline-offset: 2px;
 }
 
+/* The page's main region takes focus only by script, after Try again on a
+   screen that was all error (lib/retryFocus.ts). It is not a control, so
+   it draws no ring and keeps its square corners. */
+#fh-main:focus-visible {
+  outline: none;
+  border-radius: 0;
+}
+
 /* Notes textarea placeholder — bumped from browser-default opacity
    (~0.4) to a properly readable token color so the hint passes WCAG
    AA on the dark surface in direct sunlight. */

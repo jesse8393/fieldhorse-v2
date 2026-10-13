@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronRight, Plus, Receipt } from 'lucide-react'
 import { Button, Chip, EmptyState, Icon, Row, SkeletonRows } from '../../../components/fh'
+import DataErrorState from '../../../components/DataErrorState.tsx'
+import { keepFocusOnRetry } from '../../../lib/retryFocus.ts'
 import { formatMoney } from '../../../components/fh/money.ts'
 import { Switch } from '@/components/ui/switch'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { buildQuoteView, previewAsLabel, previewAsName, quoteCapsule } from '../../../lib/quoteView.ts'
-import { useItemSuggestions, useQuoteItems } from '../sections/QuoteItems.tsx'
+import { useItemSuggestions, useQuoteItems, type QuoteLinesState } from '../sections/QuoteItems.tsx'
 import { shortDate, statusChip } from '../lib/quoteStatus.ts'
 import JobActionCapsule from './JobActionCapsule.tsx'
 import QuotePreviewSheet from './QuotePreviewSheet.tsx'
@@ -69,9 +71,17 @@ export type QuotePhoneProps = {
   onEsign: () => void
   onOpenApprove: () => void
   onClearDraft: () => void
+  /** Runs after each read of the lines that works. */
+  onLinesLoaded?: () => void
+  /** Hears what the editor knows about the lines, and null when it goes. */
+  onLinesState?: (state: QuoteLinesState | null) => void
 }
 
 type LineSheetState = { key: number; id: string | null }
+
+// What Approve, Send and the share rows say when the lines could not be
+// read: never that there are none.
+const LINES_FAILED = "We couldn't load the lines."
 
 export default function QuotePhone({
   contact,
@@ -95,13 +105,22 @@ export default function QuotePhone({
   onDownload,
   onEsign,
   onOpenApprove,
-  onClearDraft
+  onClearDraft,
+  onLinesLoaded,
+  onLinesState
 }: QuotePhoneProps) {
-  const { rows, loading, addItem, updateItem, removeItem, reorderItem } = useQuoteItems({
+  const { rows, loading, loaded, failed, fetchRows, addItem, updateItem, removeItem, reorderItem } = useQuoteItems({
     jobId: contact?.id,
     userId,
-    onContactRefresh
+    onContactRefresh,
+    onLoaded: onLinesLoaded,
+    onState: onLinesState
   })
+  // No read of the lines has worked yet and the last one failed: the lines
+  // are unknown, so nothing may say there are none.
+  const linesFailed = !loading && failed && !loaded
+  // The page's heading, where focus waits while Try again reads the lines again.
+  const titleRef = useRef<HTMLHeadingElement>(null)
   const suggestions = useItemSuggestions(userId)
 
   // Optional switches flip here at once (is_optional by line id), then save
@@ -229,7 +248,7 @@ export default function QuotePhone({
   const hasClientEmail = !!customerEmail
   const sendLabel = approved ? 'Send again' : 'Send for approval'
   const sendHint = !loading && !live.canSend
-    ? 'Add at least one line'
+    ? (linesFailed ? LINES_FAILED : 'Add at least one line')
     : emailFailed
       ? "Couldn't check the email"
       : emailKnown && !hasClientEmail ? 'Copies a link' : undefined
@@ -246,7 +265,7 @@ export default function QuotePhone({
     <div className="fhq-page">
       <header className="fhq-head">
         <div className="fhq-head__row">
-          <h2 className="fhq-head__title">Quote</h2>
+          <h2 className="fhq-head__title" ref={titleRef} tabIndex={-1}>Quote</h2>
           <Chip tone={chip.tone} label={chip.label} />
           <Button
             variant="quiet"
@@ -295,6 +314,18 @@ export default function QuotePhone({
 
       {loading ? (
         <div className="fhq-loading"><SkeletonRows rows={4} label="Loading the quote lines" /></div>
+      ) : linesFailed ? (
+        <div className="fhq-loading">
+          <DataErrorState
+            title="Couldn't load the lines"
+            message="Check your connection and try again."
+            actionLabel="Try again"
+            onRetry={() => {
+              keepFocusOnRetry(titleRef.current)
+              void fetchRows()
+            }}
+          />
+        </div>
       ) : lines.length === 0 ? (
         <EmptyState
           icon={Receipt}
@@ -404,7 +435,7 @@ export default function QuotePhone({
           <Row
             as="li"
             title="Approve quote"
-            subline={loading || live.canSend ? 'Record that the customer said yes.' : 'Add at least one line first.'}
+            subline={loading || live.canSend ? 'Record that the customer said yes.' : linesFailed ? LINES_FAILED : 'Add at least one line first.'}
             next={chevron}
             disabled={loading || !live.canSend || busy !== null || switchSaving}
             onClick={() => { hapticTap(); onOpenApprove() }}
@@ -464,6 +495,7 @@ export default function QuotePhone({
         emailFailed={emailFailed}
         loading={loading}
         needsLines={!loading && !live.canSend}
+        linesFailed={linesFailed}
         busy={busy !== null || switchSaving}
         onOpenPdf={onOpenPdf}
         onDownload={onDownload}
@@ -477,6 +509,9 @@ export default function QuotePhone({
         company={company}
         contact={contact}
         items={effective}
+        linesLoading={loading}
+        linesFailed={linesFailed}
+        onRetryLines={() => { void fetchRows() }}
         userId={userId}
         insurance={insurance}
         changeOrders={changeOrders}
