@@ -4,6 +4,106 @@ Run rules and plans: `PHASE2_PLAN.md` to `PHASE7_PLAN.md` in this folder, decisi
 
 **If this run is picked up by a new session:** read this file first and continue from the first task that is not `done`.
 
+## Phase 8 summary
+
+Hi Jesse. Phase 8 fixed what the October 10 audit found, and then some. All seventeen tasks in the plan are done and pushed; Task 18 was skipped because its approval line reads no. After Task 17, the final screenshots and a careful sweep of the app turned up more places where a screen said something untrue, so three follow ups fixed those too. Nothing was merged or deployed, no migration was written, and no file under `supabase/` or `netlify/functions/` changed. #223 (Task 1) and #224 (Tasks 2, 3 and 7) are already merged into `redesign/phase-7`; #225 carries the rest.
+
+Every task and follow up was written test first, then read by two independent reviewers (one for the plan and the tests, one for bugs and regressions), fixed and read again until both approved, before it landed. Reviews caught real bugs along the way, among them a reminder that could still go out twice, a void undone by a send that landed later, a customer page that could approve terms changed while it was open, a crew member on the clock being shown "Not clocked in", and a second Clock out that could move the end of a shift that had already ended.
+
+The full check (`npm run test:all` steps plus the design audit) passed on `1fc654f`: lint with no errors (the same 46 warnings as before Phase 8), typecheck, all 1187 unit tests, 674 end to end tests passed and 432 skipped by device with none failing, the build, and the design audit. The one commit after it (`4a05967`, the job page clock) passed the unit suite and its 26 related end to end tests. CI on the pull request is green. Before and after images for every visual task are in `phase8-review/` and in #225, and the render comparisons in `final-review/` were retaken on this branch.
+
+### What changed
+
+Correctness, money, sending and company boundaries:
+
+1. The test mock now answers like the real database, so a test can no longer pass on data the app would never get.
+2. Today counts every stop and every answer waiting, where it used to stop at six.
+3. A capture made from a job shows on that job at once, and one made with no signal keeps its job.
+4. Opening the app in the morning shows today's stops from last night's saved copy, and never last night's weather.
+5. Each invoice asks only for what is still owed after partial payments, everywhere: Money, Due this week, Remind, the email and its PDF, and Mark paid.
+6. Money rolls over to the new day, week and month while it stays open. A reminder can never go out twice, and a void or a payment recorded while an email goes out is no longer undone.
+7. The Schedule tray and Waiting on approval show only the active company's jobs and quotes, and a drop of another company's job is refused.
+8. The Unscheduled tray waits for the booked visits instead of listing every job, holds a card still while its drop saves, and shows 50 cards, then Show all.
+9. The Quote tab, the preview and the customer page show one total and one deposit, and the deposit follows the payment terms.
+10. The customer page tells the truth after approval, after payment and past expiry, stops an approval if the quote changed while it was open, and stays readable over a bright photo.
+11. Inbox sends happen once, only on a tap, and never with no signal.
+
+Design polish:
+
+12. The next stop with no photo is a slim band instead of an empty dark box, and the job tabs fade where they overflow. Opening a job from the Jobs list no longer breaks its header.
+13. The gold microphone no longer floats over desktop pages; Capture is a quiet row in the sidebar with its key cap.
+14. On a desktop from 900 to 1279 px the company name shows whole, the job page has a facts strip above the composer, and the Money tables keep their buttons and amounts whole.
+15. Thirteen small fixes: Reopen asks first, crew do not see New lead, tab counts match their lists, Navigate follows the device, notes show in full, no Murfreesboro forecast without a company location, key caps match the keyboard, a quote with no lines cannot be shared, the Quote tab finds the client's email, an optional line holds Send while it saves, and closing a sheet gives keyboard focus back to the button that opened it.
+16. The login wordmark is one word in Bebas Neue, FIELD in gold and HORSE in linen, with the hairline under it.
+
+Cleanup:
+
+17. The screenshot guard now covers 83 views, including Login, the customer page, an invoice, the Inbox and the Forecast screen. The dead CSS it proved unused is gone, and every check for things running off the side of the screen now measures each element. Counting numbers on Reports show their final value at once when Reduce Motion is on.
+
+Follow ups, found after the plan's tasks:
+
+* **A. Nothing says empty while it is still loading, or after a read failed.** The desktop Schedule (Up next, and the week, day and month), Crew home, Reports, Customers, a job's Photos and Files, Field reports and the quote lines now show a placeholder while they load and "Couldn't load" with Try again when a read fails, instead of "Nothing scheduled", "$0", "0 photos" or "No lines yet". Crew home matters most: a crew member already on the clock no longer sees "Not clocked in" with Clock in on while it loads, and Clock out can no longer move the end of a shift that already ended. Counts agree with their numbers too: "1 client on file", "1 new notification.", "Import 1 contact" and five more.
+* **B. The customer page after approval.** The headline says the quote is approved, What happens next lists only what is left, a job that is closed out promises nothing more, a company name that starts with The stays whole ("The Concrete Guys sends you a start date."), and the buttons wrap instead of running off a phone. The sign in screens also reach the right edge on a Windows desktop.
+* **C. The invoice page on a phone.** Collect Payment no longer runs off the screen; Email, Share link and Download are icons there, with their names kept for screen readers.
+* A Money test that failed now and then was fixed. Its taps landed on the dock after the sheet closed; the app was fine.
+
+### Blocked, and calls for you
+
+Nothing is blocked. These need you:
+
+1. **What "behind schedule" means.** Today now counts honestly, which shows an old rule: a job counts as behind whenever any of its visits ended in the last 14 days. A busy company could read 30 things before tomorrow. Pick a rule, for example: the last visit ended, nothing is booked next, and the job is not marked done.
+2. **Renaming the company does not rename the workspace.** A workspace that kept an old name (some were given "My Company") shows it in the sidebar and the phone header. Rename the workspace when Settings saves, or prefer the profile's name.
+3. **A quote can still change after the customer approved it.** Its lines can be edited afterwards, and the customer page then shows the new total and deposit under Approved, because nothing keeps a copy of what was approved. Decide whether approval should lock the quote or keep a snapshot the page shows.
+4. **An approved quote whose job is marked lost** still reads as approved and asks for the deposit (D51). Say what it should say.
+5. **The quote number keeps its hyphens** so it matches the PDF. It is the one exception to the no dashes rule (D44).
+6. **The classic customer page keeps its old approval bar** (D24): the name comes filled in, Return approves, and Request changes is a dead button on closed quotes. The Fieldhorse page has none of these.
+7. **The customer page's cover photo** is the newest of the 12 oldest photos the server sends. The server file would need to send the newest first; that file was off limits in this run.
+8. **Task 18** (each quote line's private notes reach the customer's browser, though the page never shows them) still waits for your yes.
+9. **The Fieldhorse customer page cannot be chosen in Settings yet** (D22, from Phase 7): the database check needs widening first. Follow up B's fixes are ready for the day it can.
+10. **Main does not carry phases 5 to 8 yet.** Phase 4 holds them; main also has the October 9 audit pass (#217) that the redesign branches do not.
+
+### New decisions in SPEC.md section 17
+
+* D19 updated: palette shortcuts are Control plus Option on a Mac, so Option still types accents.
+* D31 One quote total and one deposit, read from the terms.
+* D32 The next stop without a photo is a compact band.
+* D33 Desktop Capture is a sidebar row.
+* D34 Today counts past six.
+* D35 What Capture refreshes, and offline captures keep their job.
+* D36 The active company boundary.
+* D37 What each invoice owes.
+* D38 Inbox sends once, on a tap, with a signal.
+* D39 The Unscheduled tray tells the truth.
+* D40 The morning cold open.
+* D41 Each screen owns its class prefix.
+* D42 The login wordmark.
+* D43 Money keeps time and sends once.
+* D44 The customer page after approval.
+* D45 The small behavior rules.
+* D46 The desktop from 900 to 1279 px.
+* D47 Counting numbers and the screenshot guard.
+* D48 The phone invoice actions fit.
+* D49 Loading and failed reads never read as empty.
+* D50 Counts agree with their number.
+* D51 The customer page after approval, continued.
+* D52 The sign in screens reach the window edge.
+
+### iPhone checklist
+
+1. Leave Today open overnight, then look at 6:30 am: today's stops, and no weather from last night.
+2. On a day with more than six visits, every stop counts in the headline and the list.
+3. Capture a note from inside a job: it shows on the job at once. Then try it in airplane mode: it lands on that job when the signal returns.
+4. Money: record a partial payment, open Remind, and check the amount is what is left. Tap Send reminder several times fast on a test customer: one email.
+5. Leave Money open past midnight on a Saturday: Due this week and the month label roll over.
+6. Open an invoice from Money: Email, Share link and Download are icons, and Collect Payment reads whole.
+7. Open a test quote's customer link: the deposit sentence follows the terms. Approve it, open it again, and check it says approved.
+8. Login and Reset password: the wordmark shows as one word with no flash while the font loads. Safari's font behavior was only imitated in Chromium here, so this one matters.
+9. Sign in as crew while clocked in, on weak signal if you can: the card says "Checking your clock" first, never "Not clocked in", and Clock out works.
+10. Sign in as crew: no New lead on Jobs. Open a lost job and tap Reopen: it asks first.
+11. Sign out and back in, turn on airplane mode, then open Customers and Reports: each shows its loading placeholder, or "Couldn't load" with Try again once a read fails, never zero or empty. With data already on screen, a failed refresh keeps it there.
+12. Turn the phone sideways on Today and Jobs, and check nothing overlaps.
+13. If you turn the messaging engine on for a test company, open Inbox, turn on airplane mode and tap Send: nothing goes out. Turn it off and send once.
+
 ## Phase 8, audit fixes
 
 Plan: `PHASE8_PLAN.md` in this folder. Branch `redesign/phase-8` from `redesign/phase-7`, draft pull request against `redesign/phase-7`. New decisions start at D31 in `SPEC.md` section 17.
@@ -48,7 +148,7 @@ Found after Task 17 by the final screenshots, a read only sweep a skeptic checke
 
 | Follow up | Status | Commit | Notes |
 | --- | --- | --- | --- |
-| A Nothing reads as empty while it loads or after a failed read, and counts agree with their number | done | `95c9fba`, `0c796f6`, this commit | Three fix rounds (the desktop quote builder adding a line after a failed read, a running shift hidden by another failed read, a flaky race test), then approved. The lead added two fixes from the last review. Decisions D49 and D50 |
+| A Nothing reads as empty while it loads or after a failed read, and counts agree with their number | done | `95c9fba`, `0c796f6`, `4a05967` | Three fix rounds (the desktop quote builder adding a line after a failed read, a running shift hidden by another failed read, a flaky race test), then approved. The lead added two fixes from the last review. Decisions D49 and D50 |
 | B The customer page after approval, company short names, and the login edge | done | `b4659a0`, `1fc654f` | Two fix rounds (Login with the photo still short of the edge, a finished job's pay button, a whole company name pushing the capsule buttons off a phone), then approved. The lead merged its preview pane with follow up A's and fixed the preview's headline for a changes requested quote. Decisions D51 and D52 |
 | C The phone invoice actions fit | done | `49f3c87`, `d0b74d1` | Found by the Task 17 review. Reviewed by two lenses, approved; the lead then took up their minor points in a second commit. Decision D48 |
 
