@@ -29,7 +29,7 @@ async function loadPdf(): Promise<any> {
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { mintPublicLink } from '../lib/publicLink.ts'
 import { hapticTap } from '../lib/haptics.ts'
-import { useIsDesktop } from '../lib/useMediaQuery.ts'
+import { useMediaQuery } from '../lib/useMediaQuery.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { Eyebrow, StampNumber } from '../components/v3'
 // Lazy, only loads when an operator taps "Mark Paid" (avoids ~440KB
@@ -157,10 +157,16 @@ export default function InvoiceDetail() {
   // miss vs relying on the toast alone.
   const [sent, setSent] = useState(false)
   const [sharing, setSharing] = useState(false)
-  // On a phone the three quiet actions are icon buttons that keep their
-  // names, so the row fits a 320 px phone and Collect Payment reads whole
-  // on one line (D48). A desktop keeps the labels.
-  const quietIconsOnly = !useIsDesktop()
+  // Where the labelled row does not fit (below 600 px, so every phone),
+  // the three quiet actions are icon buttons that keep their names, so the
+  // row fits a 320 px phone and Collect Payment reads whole on one line
+  // (D48). Tablets and desktops keep the labels.
+  const quietIconsOnly = useMediaQuery('(max-width: 599px)')
+  // Each quiet action's name, shown as its text or, icon only, as its
+  // aria-label, so the two can never drift apart.
+  const emailLabel = sent ? 'Sent' : sending ? 'Sending…' : 'Email'
+  const shareLabel = sharing ? 'Minting…' : 'Share link'
+  const downloadLabel = generating ? 'Generating…' : 'Download'
 
   // Resolved client info, prefer the denormalized job-row fields, fall
   // back to fh_clients (the source of truth when edits happen on the
@@ -884,7 +890,7 @@ export default function InvoiceDetail() {
             handleSendInvoice()
           }}
           disabled={sending}
-          aria-label={quietIconsOnly ? (sent ? 'Sent' : sending ? 'Sending…' : 'Email') : undefined}
+          aria-label={quietIconsOnly ? emailLabel : undefined}
           title="Email the invoice"
           style={{
             ...(quietIconsOnly ? { flex: '0 0 48px', padding: 0 } : { flex: 1, padding: '12px 12px' }),
@@ -910,13 +916,13 @@ export default function InvoiceDetail() {
           }}
         >
           {sent ? <CheckCircle2 size={quietIconsOnly ? 18 : 14} aria-hidden="true" /> : <Send size={quietIconsOnly ? 18 : 14} aria-hidden="true" />}
-          {!quietIconsOnly && (sent ? 'Sent' : sending ? 'Sending…' : 'Email')}
+          {!quietIconsOnly && emailLabel}
         </button>
         <button
           type="button"
           onClick={() => { hapticTap(); handleShare() }}
           disabled={sharing}
-          aria-label={quietIconsOnly ? (sharing ? 'Minting…' : 'Share link') : undefined}
+          aria-label={quietIconsOnly ? shareLabel : undefined}
           title="Mint a public share link the customer can open in any browser"
           style={{
             ...(quietIconsOnly ? { flex: '0 0 48px', padding: 0 } : { flex: 1, padding: '12px 12px' }),
@@ -934,13 +940,13 @@ export default function InvoiceDetail() {
           }}
         >
           <LinkIcon size={quietIconsOnly ? 18 : 14} aria-hidden="true" />
-          {!quietIconsOnly && (sharing ? 'Minting…' : 'Share link')}
+          {!quietIconsOnly && shareLabel}
         </button>
         <button
           type="button"
           onClick={() => { hapticTap(); handleGeneratePDF() }}
           disabled={generating}
-          aria-label={quietIconsOnly ? (generating ? 'Generating…' : 'Download') : undefined}
+          aria-label={quietIconsOnly ? downloadLabel : undefined}
           title="Download the invoice as a PDF"
           style={{
             ...(quietIconsOnly ? { flex: '0 0 48px', padding: 0 } : { flex: 1, padding: '12px 12px' }),
@@ -958,7 +964,7 @@ export default function InvoiceDetail() {
           }}
         >
           <FileDown size={quietIconsOnly ? 18 : 14} aria-hidden="true" />
-          {!quietIconsOnly && (generating ? 'Generating…' : 'Download')}
+          {!quietIconsOnly && downloadLabel}
         </button>
         <button
           type="button"

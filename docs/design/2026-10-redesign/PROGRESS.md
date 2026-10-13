@@ -39,7 +39,7 @@ Status is one of todo, done, blocked, skipped.
 | 2 | 14 Desktop between 900 and 1279 px | done | `2477a34` | Two fix rounds (an overflow check that could not fail, a company name cut to a fragment), then approved. Decision D46 |
 | 2 | 15 Small behavior fixes | done | `5a2fd06` | Two fix rounds (the closeout Reopen, a frozen app after back, focus on the deal card), then approved. Decisions D19 updated, D45 |
 | 2 | 16 Login wordmark | done | `74cd854` | Two fix rounds (the fallback face ran off a phone while Bebas Neue loaded, WebKit's early font answer), then approved. Decision D42 |
-| 3 | 17 CSS and test hygiene | done | this commit | Reviewed by two lenses, approved with no fix round; the lead added a test for the dead CSS finder and fixed the two gaps it found. Decision D47 |
+| 3 | 17 CSS and test hygiene | done | `3f06868` | Reviewed by two lenses, approved with no fix round; the lead added a test for the dead CSS finder and fixed the two gaps it found. Decision D47 |
 | 3 | 18 Private line notes on the customer page | skipped | | The approval line in the plan reads no, so `netlify/functions/public-link.js` is unchanged |
 
 ### Phase 8 follow ups
@@ -50,7 +50,7 @@ Found after Task 17 by the final screenshots, a read only sweep a skeptic checke
 | --- | --- | --- | --- |
 | A Nothing reads as empty while it loads or after a failed read, and counts agree with their number | todo | | |
 | B The customer page after approval, company short names, and the login edge | todo | | |
-| C The phone invoice actions fit | done | this commit | Found by the Task 17 review. Decision D48 |
+| C The phone invoice actions fit | done | `49f3c87`, this commit | Found by the Task 17 review. Reviewed by two lenses, approved; the lead then took up their minor points in a second commit. Decision D48 |
 
 ### Phase 8 notes
 
@@ -142,7 +142,9 @@ Found after Task 17 by the final screenshots, a read only sweep a skeptic checke
   * `login.spec.ts` checks the onyx shell (scope, background, text color and grain) instead of the removed effect markup. The overflow check from `mid-width.spec.ts` is now `tests/e2e/helpers/overflow.ts`, used by `mid-width`, `redesign-shell`, `desktop-route-audit`, `mock-workflows` and `portal`. It found no overflow on their pages, which closes the Task 14 gap above about checks that could not fail.
   * Known gaps, not changed: `scroll-behavior.spec.ts` still uses the page scroll width check; under Reduce Motion the dock coin still shrinks a little when pressed (the old rule meant to stop it named a class that no longer exists and went as dead).
 
-* **Follow up C, the phone invoice actions.** On a phone the invoice page's action row (Email, Share link, Download and the gold Collect Payment) was wider than the window, so Collect Payment was cut off at the right edge on every phone up to 412 px (Money's invoice rows open this page). Below 900 px the three quiet actions are now 48 px icon buttons that keep their names and a tooltip; Collect Payment reads whole on one line from 375 px up, and on a 320 px phone its two words stack inside the button. A desktop keeps the labels. New `tests/e2e/invoice-actions.spec.ts` checks 320, 375, 390 and 412 px with the shared overflow check, and that no word or icon is drawn outside its button. Only the two phone invoice shots in the screenshot guard changed, and only in the action row; both were retaken.
+* **Follow up C, the phone invoice actions.** On a phone the invoice page's action row (Email, Share link, Download and the gold Collect Payment) was wider than the window, so Collect Payment was cut off at the right edge on every phone up to 412 px (Money's invoice rows open this page). Below 600 px the three quiet actions are now 48 by 44 px icon buttons that keep their names for screen readers and a hover tooltip; Collect Payment reads whole on one line from 375 px up, and on a 320 px phone its two words stack inside the button. From 600 px up, tablets and desktops keep the labels. New `tests/e2e/invoice-actions.spec.ts` checks 320, 375, 390, 412 and 599 px with the shared overflow check and that no word or icon is drawn outside its button, that the labels are drawn on one line at 600, 899 and 900 px, and that an icon button is named for what it is doing while it works ("Minting…"). Only the two phone invoice shots in the screenshot guard changed: the action row, plus 81 card corner pixels a shade apart in the Day shot. Both were retaken.
+  * Review: both reviewers approved with minor points. The lead's second commit keeps the labels wherever the labelled row fits (the first commit hid them below 900 px, so tablets lost them), gives each quiet action one label for both its text and its name, adds the tests at 599, 600, 899 and 900 px and the busy name test, and corrects the size and tooltip wording here and in D48.
+  * Known gap, not changed: on a phone a busy quiet action shows only its dimmed icon; its name says what it is doing, and a toast follows when it finishes.
 
 * The first CI run on #223 (a docs only commit) failed `mock-workflows` "keeps the desktop schedule planning workflow complete" on desktop. The default mock visit starts two hours after the mock loads, so between 10 pm and midnight Central it lands on tomorrow and the Day view is empty. It failed here too at 10:48 pm Central and passed after the test pinned its page clock to a Thursday morning and seeded that day's visit. It is listed under "Failing before Phase 8".
 
