@@ -299,7 +299,15 @@ test.describe('quote tab on a phone', () => {
   test('a customer name saved in sentence case shows whole in the labels', async ({ context, page }) => {
     // Read as a person only by recasing it, "Elite pools" is a guess, so the
     // labels in the app keep the name as it was saved.
-    await signIn(context, { tables: { fh_contacts: [quoteContact({ name: 'Elite pools', email: null })], fh_quote_items: ITEMS } })
+    await signIn(context, {
+      tables: {
+        fh_contacts: [quoteContact({ name: 'Elite pools', email: null })],
+        // No email on the job or its linked client, so the line naming
+        // the customer shows (the Quote tab looks on the client too).
+        fh_clients: [{ id: 'cl-1', user_id: 'qa-user-1', name: 'Jeff Roy', phone: '555-0101', email: null }],
+        fh_quote_items: ITEMS
+      }
+    })
     await openQuote(page)
 
     await expect(page.getByRole('button', { name: 'Preview as Elite pools' })).toBeVisible()
