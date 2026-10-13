@@ -3,7 +3,7 @@ import { Clock, Play, Square, AlertTriangle } from 'lucide-react'
 import { supabase } from '../lib/supabase.ts'
 import { todayYmd } from '../lib/dates.ts'
 import { recalcCost } from '../lib/stages.ts'
-import { getActivePunchForContact, punchIn as dbPunchIn, punchOut as dbPunchOut } from '../lib/timePunches.ts'
+import { ALREADY_CLOCKED_OUT, getActivePunchForContact, punchIn as dbPunchIn, punchOut as dbPunchOut } from '../lib/timePunches.ts'
 import { laborBooksAsExpense } from '../lib/labor.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { hapticTap, hapticSuccess } from '../lib/haptics.ts'
@@ -170,6 +170,9 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
     const hours = elapsedMs / 3_600_000
     const billable = Math.round(hours * rate * 100) / 100
     setSaving(true)
+    // The shift was clocked out somewhere else first: Clock out leaves an
+    // ended shift's end time as it was (D49), so the card says so.
+    let endedElsewhere = false
     try {
       if (bookAsExpense) {
         // OWNER: 1) Close the punch row. If we don't have a punchId in
@@ -186,8 +189,11 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
             })
           } catch (punchErr: any) {
             // Non-fatal, log it and continue with the cost insert so the
-            // operator's job cost stays accurate.
-            console.warn('[TimeClockCard] punch close failed', punchErr)
+            // operator's job cost stays accurate. A shift already clocked
+            // out elsewhere still books this meter, as before; the message
+            // says it had ended.
+            if (punchErr?.message === ALREADY_CLOCKED_OUT) endedElsewhere = true
+            else console.warn('[TimeClockCard] punch close failed', punchErr)
           }
         }
 
@@ -210,11 +216,25 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
         let id = punchId
         if (!id) id = (await getActivePunchForContact(userId, contact.id))?.id || null
         if (!id) throw new Error('No open shift found on this job. Refresh and try again.')
-        await dbPunchOut({
-          punchId: id,
-          hourlyRate: rate,
-          notes: note.trim() || null,
-        })
+        try {
+          await dbPunchOut({
+            punchId: id,
+            hourlyRate: rate,
+            notes: note.trim() || null,
+          })
+        } catch (punchErr: any) {
+          if (punchErr?.message !== ALREADY_CLOCKED_OUT) throw punchErr
+          // It ended elsewhere: its time stays as it was, and this meter
+          // stops instead of failing on every Log time.
+          writeActiveStart(contact.id, null)
+          setStart(null)
+          setPunchId(null)
+          setConfirming(false)
+          setNote('')
+          toastError('Already clocked out', 'This shift had already ended. Its time stays as it was.')
+          onLogged?.()
+          return
+        }
       }
       writePreferredRate(rate)
       writeActiveStart(contact.id, null)
@@ -226,6 +246,7 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
       toastSuccess(
         'Time logged',
         `${hours.toFixed(2)} ${countNoun(hours, 'hr')} · $${billable.toLocaleString()}`
+          + (endedElsewhere ? '. The shift had already been clocked out elsewhere, so its end time stays as it was.' : '')
       )
       // Refresh job cost / margin
       try { await recalcCost(contact.id, userId) } catch {}

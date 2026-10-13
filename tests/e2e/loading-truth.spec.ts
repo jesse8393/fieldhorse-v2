@@ -534,6 +534,32 @@ test.describe('Crew home', () => {
     await expect(clockIn(page)).toBeEnabled()
   })
 
+  // The shift on the card was clocked out elsewhere after Crew read it: the
+  // update that ends only an open shift matches nothing, the card says so,
+  // reads the clock again and shows what is true now (D49).
+  test('a shift clocked out elsewhere says Already clocked out and reads the clock again', async ({ context, page }) => {
+    await signIn(context, { role: 'crew', tables: { ...TABLES, fh_time_punches: [PUNCH] } })
+    let ended = false
+    await context.route((url) => url.pathname === '/rest/v1/fh_time_punches', (route) => {
+      const request = route.request()
+      if (request.method() === 'PATCH') {
+        ended = true
+        return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+      }
+      if (ended && activePunchRead(new URL(request.url()), request.method())) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+      }
+      return route.fallback()
+    })
+    await openCrew(page)
+    await expect(clockCard(page)).toContainText('On the clock')
+    await clockOut(page).click()
+    await expect(page.getByText('Already clocked out', { exact: true })).toBeVisible()
+    await expect(clockCard(page)).toContainText('Not clocked in')
+    await expect(clockIn(page)).toBeEnabled()
+    await expect(page.getByText('Clock out failed', { exact: true })).toHaveCount(0)
+  })
+
   // The first time Crew opens, one of the other reads fails while the punch
   // read finds a running shift: the shift stays on the card with Clock out,
   // since Crew home is the only place to end a shift that has no job.

@@ -159,10 +159,11 @@ export async function punchIn(opts: {
   return data as TimePunch
 }
 
-/** Punch out the active row. Optional hourly_rate snapshot + notes. */
 /** What punchOut throws when the shift it was asked to end had already ended. */
 export const ALREADY_CLOCKED_OUT = 'This shift was already clocked out.'
 
+/** Punch out the active row. Optional hourly_rate snapshot + notes. Only a
+ *  shift still open is ended; one that ended already throws ALREADY_CLOCKED_OUT. */
 export async function punchOut(opts: {
   punchId: string
   hourlyRate?: number | null

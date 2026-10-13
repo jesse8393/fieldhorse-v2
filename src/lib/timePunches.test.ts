@@ -83,6 +83,10 @@ describe('punchOut', () => {
     await punchOut({ punchId: 'p1' })
     expect(calls).toContainEqual(['eq', ['id', 'p1']])
     expect(calls).toContainEqual(['is', ['punch_out_at', null]])
+    // maybeSingle, not single: PostgREST answers an update that matched no
+    // row with an empty list, which single() turns into a 406 error.
+    expect(calls).toContainEqual(['maybeSingle', []])
+    expect(calls.some(([method]) => method === 'single')).toBe(false)
   })
 
   it('says the shift was already clocked out when no open punch matched', async () => {

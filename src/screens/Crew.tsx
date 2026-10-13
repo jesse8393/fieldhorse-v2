@@ -265,7 +265,8 @@ export default function Crew() {
     } catch (e: any) {
       if (e?.message === ALREADY_CLOCKED_OUT) {
         // It ended elsewhere, or on an older screen: its time stays as it
-        // was, and the page reads the clock again.
+        // was, the card lets go of it, and the page reads the clock again.
+        setActivePunch(null)
         toastError('Already clocked out', 'This shift had already ended. Its time stays as it was.')
         await load()
       } else {
