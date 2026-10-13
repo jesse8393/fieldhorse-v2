@@ -197,6 +197,24 @@ function insideVisualViewport(page: Page, target: Locator) {
   })
 }
 
+// The one stage every signed out screen shares (AuthShell, decision D25):
+// the main landmark is the onyx scope, so its text, focus ring and fields
+// read their onyx values whatever Day or Night says, painted onyx, with the
+// grain layer (about 3 percent noise) over it.
+async function expectOnyxShell(page: Page) {
+  const main = page.getByRole('main')
+  await expect(main).toHaveClass(/(^|\s)fh-onyx-scope(\s|$)/)
+  await expect(main).toHaveCSS('background-color', ONYX)
+  await expect(main).toHaveCSS('color', LINEN)
+  const grain = await main.evaluate((el) => {
+    const layer = getComputedStyle(el, '::after')
+    return { image: layer.backgroundImage, opacity: Number(layer.opacity), position: layer.position }
+  })
+  expect(grain.image, 'the grain layer draws its noise').toContain('data:image/svg+xml')
+  expect(grain.opacity, 'the grain stays faint').toBeCloseTo(0.03, 3)
+  expect(grain.position).toBe('absolute')
+}
+
 test.describe('Welcome and Login', () => {
   for (const mode of ['day', 'night'] as const) {
     test(`shows the line and Sign in on onyx with linen labels in ${mode}`, async ({ context, page }) => {
@@ -591,14 +609,14 @@ test.describe('The wordmark on a screen that mounts while Bebas Neue loads', () 
 })
 
 test.describe('Reset password and partner invite use the same shell', () => {
-  test('reset password is onyx with no aurora or grid', async ({ context, page }) => {
+  test('reset password sits on the onyx shell with its grain', async ({ context, page }) => {
     await stubSignedOut(context, 'missing')
     await page.goto('/reset-password')
 
     await expect(page.getByRole('heading', { level: 1, name: 'Reset your password.' })).toBeVisible()
     await expect(page.getByRole('img', { name: 'Fieldhorse' })).toBeVisible()
     await expect(page.getByRole('main')).toHaveCSS('background-color', ONYX)
-    await expect(page.locator('.fh-fx-aurora, .fh-fx-grid')).toHaveCount(0)
+    await expectOnyxShell(page)
     await expect(page.getByText('If nothing happens, the link may have expired.')).toBeVisible()
     await expect(page.getByRole('button', { name: 'Back to sign in' })).toBeVisible()
   })
@@ -616,7 +634,7 @@ test.describe('Reset password and partner invite use the same shell', () => {
 
     await expect(page.getByRole('heading', { level: 1, name: 'Parker Construction invited you to manage together.' })).toBeVisible()
     await expect(page.getByRole('main')).toHaveCSS('background-color', ONYX)
-    await expect(page.locator('.fh-fx-aurora, .fh-fx-grid')).toHaveCount(0)
+    await expectOnyxShell(page)
     await expect(page.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/login?partner_invite=tok123')
     await expect(page.getByRole('link', { name: 'Create account' })).toHaveAttribute('href', '/login?partner_invite=tok123&mode=signup')
   })

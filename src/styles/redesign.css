@@ -42,7 +42,6 @@ summary:focus-visible,
 [role="tab"]:focus-visible,
 [tabindex]:focus-visible,
 .v3-btn:focus-visible,
-.v3-card--interactive:focus-visible,
 .dispatch-card__tap:focus-visible,
 .cl-card__tap:focus-visible {
   outline-color: var(--fh-focus) !important;
@@ -125,13 +124,5 @@ summary:focus-visible,
   .fh-invoice-actionbar {
     width: min(1280px, calc(100% - var(--fh-sidebar-w) - 64px));
     left: calc(50% + var(--fh-sidebar-w) / 2) !important;
-  }
-}
-
-/* ---- Reduced motion (spec 5.7): fades only ---- */
-@media (prefers-reduced-motion: reduce) {
-  .fh-dock__coin,
-  .fh-sheet {
-    transition-property: opacity !important;
   }
 }

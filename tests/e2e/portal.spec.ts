@@ -8,6 +8,7 @@
 // a Supabase host, fails the test.
 import { readFileSync } from 'node:fs'
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
+import { nothingRunsOffTheSide } from './helpers/overflow.ts'
 
 test.use({ viewport: { width: 390, height: 844 } })
 
@@ -595,8 +596,7 @@ test('nothing scrolls sideways on a phone, even with a long company and job name
   }))
   await openPortal(page)
 
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
-  expect(overflow).toBeLessThanOrEqual(0)
+  await nothingRunsOffTheSide(page)
 })
 
 /* ---- Task 10: after approval and on bad data ---- */

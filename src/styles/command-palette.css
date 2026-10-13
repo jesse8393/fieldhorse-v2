@@ -3,8 +3,7 @@
 
    A centered paper panel over a 45 percent onyx scrim: the search field
    with its esc key cap, hairline grouped rows, and a footer of key hints.
-   It reads only --fh- tokens, so Day and Night follow on their own. It
-   does not use the legacy .fh-command-dialog rules.
+   It reads only --fh- tokens, so Day and Night follow on their own.
    ================================================================ */
 
 .fhp-scrim {

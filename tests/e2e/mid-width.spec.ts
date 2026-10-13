@@ -33,6 +33,7 @@
 //   FH_MID_WIDTH=900 npx playwright test mid-width --project=desktop-chrome
 import { expect, test, type BrowserContext, type Locator, type Page } from '@playwright/test'
 import { signIn, type SignInOptions } from './helpers/signIn.ts'
+import { nothingRunsOffTheSide, pastTheRightEdge } from './helpers/overflow.ts'
 
 const WIDTH = Number(process.env.FH_MID_WIDTH) || 1024
 test.use({ viewport: { width: WIDTH, height: 768 }, timezoneId: 'America/Chicago' })
@@ -138,39 +139,6 @@ async function open(context: BrowserContext, page: Page, path: string, options: 
   await page.clock.setFixedTime(MORNING)
   await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 60_000 })
   await expect(page.locator('.fh-app')).toBeVisible({ timeout: 30_000 })
-}
-
-// Every visible element that runs past the window's right edge, by name,
-// text and where it ends. Each element is measured because the page never
-// grows wider than the window: html, body and #root clip what overflows
-// (overflow-x: clip in global.css), so documentElement.scrollWidth stays
-// at the window's width whatever hides past it. A box that scrolls
-// sideways (overflow-x auto or scroll: a tab strip, the sidebar's list)
-// may hold more than it shows; only the box itself has to fit.
-function pastTheRightEdge(page: Page) {
-  return page.evaluate(() => {
-    const edge = document.documentElement.clientWidth
-    const scrollsSideways = (el: Element) => /^(auto|scroll)$/.test(getComputedStyle(el).overflowX)
-    const past: string[] = []
-    for (const el of document.body.querySelectorAll('*')) {
-      const box = el.getBoundingClientRect()
-      if (box.width === 0 || box.height === 0 || box.right <= edge + 0.5) continue
-      if (getComputedStyle(el).visibility === 'hidden') continue
-      let up = el.parentElement
-      while (up && up !== document.body && !scrollsSideways(up)) up = up.parentElement
-      if (up && up !== document.body) continue
-      const classes = typeof el.className === 'string' ? el.className.split(/\s+/).filter(Boolean) : []
-      const text = (el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 40)
-      past.push(`${[el.tagName.toLowerCase(), ...classes].join('.')}${text ? ` "${text}"` : ''} ends at ${Math.round(box.right)} px`)
-    }
-    return { edge, past }
-  })
-}
-
-// Nothing hides off the right edge.
-async function nothingRunsOffTheSide(page: Page) {
-  const { edge, past } = await pastTheRightEdge(page)
-  expect(past, `drawn past the right edge of a ${edge} px window`).toEqual([])
 }
 
 // Wholly on screen with the page still at its top.

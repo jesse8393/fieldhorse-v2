@@ -1,5 +1,6 @@
 import { expect, test, type BrowserContext, type Page, type TestInfo } from '@playwright/test'
 import { installMock, session } from '../../scripts/qa-mock.mjs'
+import { nothingRunsOffTheSide } from './helpers/overflow.ts'
 
 async function installSession(context: BrowserContext) {
   await installMock(context)
@@ -204,11 +205,10 @@ test('uses the full desktop workspace without changing the mobile screens', asyn
         return {
           contentWidth: inner?.getBoundingClientRect().width || 0,
           viewportWidth: window.innerWidth,
-          scrollWidth: document.documentElement.scrollWidth,
         }
       })
       expect(dimensions.contentWidth).toBeLessThanOrEqual(dimensions.viewportWidth)
-      expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.viewportWidth + 1)
+      await nothingRunsOffTheSide(page, route.path)
       await page.waitForTimeout(500)
       await capture(page, testInfo, `mobile-${route.name}`, true)
     }
@@ -231,16 +231,9 @@ test('uses the full desktop workspace without changing the mobile screens', asyn
     await openRoute(page, route.path)
     await expect(page.locator('.fh-app')).toHaveAttribute('data-layout', 'responsive')
     await expect(page.locator(route.ready)).toBeVisible()
-    const dimensions = await page.evaluate((selector) => {
-      const content = document.querySelector(selector)
-      return {
-        contentWidth: content?.getBoundingClientRect().width || 0,
-        viewportWidth: window.innerWidth,
-        scrollWidth: document.documentElement.scrollWidth,
-      }
-    }, route.ready)
-    expect(dimensions.contentWidth).toBeGreaterThan(route.minWidth)
-    expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.viewportWidth + 1)
+    const contentWidth = await page.evaluate((selector) => document.querySelector(selector)?.getBoundingClientRect().width || 0, route.ready)
+    expect(contentWidth).toBeGreaterThan(route.minWidth)
+    await nothingRunsOffTheSide(page, route.path)
 
     if (route.name === 'invoice-detail') {
       const alignment = await page.evaluate(() => {
@@ -296,7 +289,6 @@ test('uses the full desktop workspace without changing the mobile screens', asyn
       const screen = document.querySelector('.v3-screen--invoice-detail')?.getBoundingClientRect()
       const actionbar = document.querySelector('.fh-invoice-actionbar')?.getBoundingClientRect()
       return {
-        pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
         tableOverflow: tableElement ? tableElement.scrollWidth - tableElement.clientWidth : 0,
         invoiceCenterDelta: screen && actionbar
           ? Math.abs((screen.left + screen.width / 2) - (actionbar.left + actionbar.width / 2))
@@ -306,7 +298,7 @@ test('uses the full desktop workspace without changing the mobile screens', asyn
           : true,
       }
     }, route)
-    expect(geometry.pageOverflow).toBeLessThanOrEqual(1)
+    await nothingRunsOffTheSide(page, `${route.path} at 1024 px`)
     expect(geometry.tableOverflow).toBeLessThanOrEqual(1)
     expect(geometry.invoiceCenterDelta).toBeLessThanOrEqual(1)
     expect(geometry.invoiceContained).toBe(true)
@@ -330,11 +322,10 @@ test('keeps estimating and dispatch desktop-native while preserving their mobile
       await expect(page.locator('[data-build-screen]')).toHaveCount(0)
       const geometry = await page.evaluate(() => ({
         viewportWidth: window.innerWidth,
-        pageWidth: document.documentElement.scrollWidth,
         rootWidth: document.querySelector('.fh-app__main-inner')?.firstElementChild?.getBoundingClientRect().width || 0,
       }))
       expect(geometry.rootWidth).toBeLessThanOrEqual(geometry.viewportWidth)
-      expect(geometry.pageWidth).toBeLessThanOrEqual(geometry.viewportWidth + 1)
+      await nothingRunsOffTheSide(page, path)
       await page.waitForTimeout(500)
       await capture(page, testInfo, `mobile-${path.slice(1)}`, true)
     }
@@ -353,12 +344,11 @@ test('keeps estimating and dispatch desktop-native while preserving their mobile
     return {
       rootWidth: root?.width || 0,
       sideBySide: Boolean(scope && result && result.left >= scope.right),
-      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     }
   })
   expect(bidWide.rootWidth).toBeGreaterThan(1000)
   expect(bidWide.sideBySide).toBe(true)
-  expect(bidWide.overflow).toBeLessThanOrEqual(1)
+  await nothingRunsOffTheSide(page, '/bid at 1440 px')
   await capture(page, testInfo, 'desktop-bid-workspace', true)
 
   await openRoute(page, '/compose')
@@ -369,12 +359,11 @@ test('keeps estimating and dispatch desktop-native while preserving their mobile
     return {
       inputTop: input?.top || Number.POSITIVE_INFINITY,
       sideBySide: Boolean(input && output && output.left >= input.right),
-      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     }
   })
   expect(composeWide.inputTop).toBeLessThan(260)
   expect(composeWide.sideBySide).toBe(true)
-  expect(composeWide.overflow).toBeLessThanOrEqual(1)
+  await nothingRunsOffTheSide(page, '/compose at 1440 px')
   await capture(page, testInfo, 'desktop-compose-workspace', true)
 
   await page.setViewportSize({ width: 1024, height: 900 })
@@ -386,11 +375,10 @@ test('keeps estimating and dispatch desktop-native while preserving their mobile
     const result = document.querySelector('.fh-bid-workspace__result')?.getBoundingClientRect()
     return {
       stacked: Boolean(scope && result && result.top >= scope.bottom),
-      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     }
   })
   expect(bidCompact.stacked).toBe(true)
-  expect(bidCompact.overflow).toBeLessThanOrEqual(1)
+  await nothingRunsOffTheSide(page, '/bid at 1024 px')
 
   expectNoPageErrors()
 })
