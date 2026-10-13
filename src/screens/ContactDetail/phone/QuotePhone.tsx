@@ -44,7 +44,19 @@ export type QuotePhoneProps = {
   pastQuote: boolean
   /** The Quote tab's busy flag: preview, download, send, share, esign or null. */
   busy: string | null
-  hasClientEmail: boolean
+  /**
+   * The customer's email, found the way Money finds it (the job's own,
+   * then its linked client's, lib/customerEmail.ts): empty when there is
+   * none, null while the linked client is still being read or when that
+   * read failed.
+   */
+  customerEmail: string | null
+  /** The linked client's email could not be read: unknown, not missing. */
+  emailFailed?: boolean
+  /** That read is being tried again. */
+  emailRetrying?: boolean
+  /** Reads the linked client's email again. */
+  onRetryEmail?: () => void
   clearing: boolean
   patch: (updates: Record<string, any>) => Promise<{ error?: unknown } | undefined> | undefined
   onContactRefresh: () => void
@@ -70,7 +82,10 @@ export default function QuotePhone({
   status,
   pastQuote,
   busy,
-  hasClientEmail,
+  customerEmail,
+  emailFailed = false,
+  emailRetrying = false,
+  onRetryEmail,
   clearing,
   patch,
   onContactRefresh,
@@ -134,17 +149,37 @@ export default function QuotePhone({
   const changesRequested = status.label === 'Changes requested'
   const deletable = !approved && !(status.label === 'Draft' && rows.length === 0)
 
+  // Switch saves in flight, by line id (Phase 8, Task 15). While one is
+  // out, its switch, Send for approval, Approve quote and every Share or
+  // download row wait: a quick second tap cannot race the first save, and
+  // the quote never goes out, or gets approved, with a total that is still
+  // saving (the PDF is built from the saved lines). The switch waits with
+  // aria-disabled, not disabled: a disabled control that has focus drops
+  // it to the page, so a keyboard or switch access user would lose their
+  // place on every toggle. The ref turns away the taps meanwhile.
+  const switchSavesRef = useRef<Set<string>>(new Set())
+  const [switchSaves, setSwitchSaves] = useState<ReadonlySet<string>>(() => new Set())
+  const switchSaving = switchSaves.size > 0
+
   function toggleOptional(id: string, include: boolean) {
+    if (switchSavesRef.current.has(id)) return
+    switchSavesRef.current.add(id)
+    setSwitchSaves(new Set(switchSavesRef.current))
     hapticTap()
     setToggled((s) => new Set(s).add(id))
     setOptimistic((o) => ({ ...o, [id]: !include }))
-    void updateItem(id, { is_optional: !include }).then((ok) => {
-      if (ok) return
-      setOptimistic((o) => {
-        const { [id]: _gone, ...rest } = o
-        return rest
+    void updateItem(id, { is_optional: !include })
+      .then((ok) => {
+        if (ok) return
+        setOptimistic((o) => {
+          const { [id]: _gone, ...rest } = o
+          return rest
+        })
       })
-    })
+      .finally(() => {
+        switchSavesRef.current.delete(id)
+        setSwitchSaves(new Set(switchSavesRef.current))
+      })
   }
 
   // Sheets. The line sheet and the terms sheet remount on every opening
@@ -185,11 +220,19 @@ export default function QuotePhone({
     return ok
   }
 
-  // The send button: the email path with an address, the link path without.
+  // The send button: the email path with an address, the link path
+  // without. While the linked client's email is still being read, the
+  // button waits and nothing is said about the email. When that read
+  // failed, the button waits too and says why: there may well be an
+  // address, so it never falls back to the link path.
+  const emailKnown = customerEmail !== null
+  const hasClientEmail = !!customerEmail
   const sendLabel = approved ? 'Send again' : 'Send for approval'
   const sendHint = !loading && !live.canSend
     ? 'Add at least one line'
-    : !hasClientEmail ? 'Copies a link' : undefined
+    : emailFailed
+      ? "Couldn't check the email"
+      : emailKnown && !hasClientEmail ? 'Copies a link' : undefined
   const chip = statusChip(status)
   const terms = [
     contact?.scope_text && 'Scope',
@@ -215,10 +258,26 @@ export default function QuotePhone({
           </Button>
         </div>
         {status.sub && <p className="fhq-head__sub">{status.sub}</p>}
-        {!hasClientEmail && !approved && (
+        {emailKnown && !hasClientEmail && !approved && (
           <p className="fhq-head__sub">
             No email on file for {who}. Send for approval copies a link you can text or paste.
           </p>
+        )}
+        {emailFailed && (
+          <div className="fhq-head__retry">
+            <p className="fhq-head__sub">
+              Couldn't check the email for {who}. {sendLabel} waits until it can.
+            </p>
+            <Button
+              variant="quiet"
+              size="mini"
+              className="fhq-head__retry-btn"
+              loading={emailRetrying}
+              onClick={onRetryEmail}
+            >
+              Try again
+            </Button>
+          </div>
         )}
       </header>
 
@@ -282,6 +341,7 @@ export default function QuotePhone({
                     className="fhq-switch"
                     checked={included}
                     disabled={pending(r.id)}
+                    aria-disabled={switchSaves.has(r.id) || undefined}
                     aria-label={`Include ${line.title} in the total`}
                     onCheckedChange={(on: boolean) => toggleOptional(r.id, on)}
                   />
@@ -335,15 +395,18 @@ export default function QuotePhone({
             title={contact?.proposal_status === 'approved' ? 'Approve a new version' : 'Lock the snapshot'}
             subline="Saves the current quote as the approved version."
             next={chevron}
+            // A snapshot of the lines, so it waits for a switch that is
+            // still saving, the same as Approve quote and Send.
+            disabled={loading || busy !== null || switchSaving}
             onClick={() => { hapticTap(); onOpenApprove() }}
           />
         ) : !changesRequested && (
           <Row
             as="li"
             title="Approve quote"
-            subline={live.canSend ? 'Record that the customer said yes.' : 'Add at least one line first.'}
+            subline={loading || live.canSend ? 'Record that the customer said yes.' : 'Add at least one line first.'}
             next={chevron}
-            disabled={!live.canSend || busy !== null}
+            disabled={loading || !live.canSend || busy !== null || switchSaving}
             onClick={() => { hapticTap(); onOpenApprove() }}
           />
         )}
@@ -370,7 +433,7 @@ export default function QuotePhone({
         action={{
           label: sendLabel,
           onClick: hasClientEmail ? onSend : onShare,
-          disabled: loading || !live.canSend || busy !== null,
+          disabled: loading || !live.canSend || busy !== null || !emailKnown || switchSaving,
           loading: busy === 'send' || busy === 'share',
           hint: sendHint
         }}
@@ -397,8 +460,11 @@ export default function QuotePhone({
       <QuoteMoreSheet
         open={moreOpen}
         onOpenChange={setMoreOpen}
-        email={String(contact?.email || '').trim()}
-        busy={busy !== null}
+        email={customerEmail}
+        emailFailed={emailFailed}
+        loading={loading}
+        needsLines={!loading && !live.canSend}
+        busy={busy !== null || switchSaving}
         onOpenPdf={onOpenPdf}
         onDownload={onDownload}
         onShare={onShare}

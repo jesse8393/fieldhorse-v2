@@ -8,6 +8,11 @@
 // (uploads carry the default one hour max-age). The query cache is
 // cleared on sign out and reset on a workspace switch, so a URL never
 // outlives the session that signed it.
+//
+// A caller that keeps a URL (in its own query data, which the offline
+// cache saves) keeps when it was signed too, and checks isSignedUrlFresh
+// before it draws it: a URL reused from this cache may already be 49
+// minutes into its hour, however recent the read that handed it out.
 
 import type { QueryClient } from '@tanstack/react-query'
 import { supabase } from './supabase.ts'
@@ -17,29 +22,41 @@ export const SIGNED_URL_TTL_SECONDS = 3600
 // that renders it never races the expiry.
 export const SIGNED_URL_REUSE_MS = (SIGNED_URL_TTL_SECONDS - 10 * 60) * 1000
 
-type CachedUrl = { url: string; signedAt: number }
+/** A signed URL and when it was signed (epoch ms). */
+export type SignedUrl = { url: string; signedAt: number }
 
 function cacheKey(bucket: string, path: string) {
   return ['signedUrl', bucket, path]
 }
 
 /**
- * Signed URLs for `paths` in `bucket`, keyed by path. URLs signed in the
- * last 50 minutes are reused; the rest are signed in one request. Paths
- * that fail to sign are left out of the result.
+ * True while a URL signed at `signedAt` has at least ten minutes of its
+ * hour left at `now`. A missing time, or one after `now` (the clock moved
+ * back), is never fresh.
  */
-export async function signedUrlsFor(
+export function isSignedUrlFresh(signedAt: number | null | undefined, now: number = Date.now()): boolean {
+  if (typeof signedAt !== 'number' || !Number.isFinite(signedAt)) return false
+  const age = now - signedAt
+  return age >= 0 && age < SIGNED_URL_REUSE_MS
+}
+
+/**
+ * Signed URLs for `paths` in `bucket`, keyed by path, each with when it was
+ * signed. URLs signed in the last 50 minutes are reused with their first
+ * signing time; the rest are signed in one request. Paths that fail to
+ * sign are left out of the result.
+ */
+export async function signedUrlEntriesFor(
   queryClient: QueryClient,
   bucket: string,
   paths: readonly string[],
   now: number = Date.now()
-): Promise<Map<string, string>> {
-  const out = new Map<string, string>()
+): Promise<Map<string, SignedUrl>> {
+  const out = new Map<string, SignedUrl>()
   const missing: string[] = []
   for (const path of new Set(paths.filter(Boolean))) {
-    const hit = queryClient.getQueryData<CachedUrl>(cacheKey(bucket, path))
-    const age = hit ? now - hit.signedAt : -1
-    if (hit?.url && age >= 0 && age < SIGNED_URL_REUSE_MS) out.set(path, hit.url)
+    const hit = queryClient.getQueryData<SignedUrl>(cacheKey(bucket, path))
+    if (hit?.url && isSignedUrlFresh(hit.signedAt, now)) out.set(path, { url: hit.url, signedAt: hit.signedAt })
     else missing.push(path)
   }
   if (missing.length === 0) return out
@@ -50,8 +67,20 @@ export async function signedUrlsFor(
   if (error || !data) return out
   for (const s of data) {
     if (!s?.path || !s.signedUrl || s.error) continue
-    out.set(s.path, s.signedUrl)
-    queryClient.setQueryData<CachedUrl>(cacheKey(bucket, s.path), { url: s.signedUrl, signedAt: now })
+    const entry = { url: s.signedUrl, signedAt: now }
+    out.set(s.path, entry)
+    queryClient.setQueryData<SignedUrl>(cacheKey(bucket, s.path), entry)
   }
   return out
+}
+
+/** signedUrlEntriesFor without the signing times, for callers that draw the URLs at once. */
+export async function signedUrlsFor(
+  queryClient: QueryClient,
+  bucket: string,
+  paths: readonly string[],
+  now: number = Date.now()
+): Promise<Map<string, string>> {
+  const entries = await signedUrlEntriesFor(queryClient, bucket, paths, now)
+  return new Map(Array.from(entries, ([path, entry]) => [path, entry.url]))
 }

@@ -26,6 +26,7 @@ import {
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { recalcCost } from '../lib/stages.ts'
 import OrgSwitcher from '../components/OrgSwitcher.tsx'
+import PaletteKeyCap, { paletteShortcut } from '../components/desktop/PaletteKeyCap.tsx'
 
 type ScheduleRow = {
   id: string
@@ -228,10 +229,11 @@ export default function Crew() {
           className="fh-build-search"
           onClick={() => window.dispatchEvent(new CustomEvent('fh:open-palette'))}
           aria-label="Open command palette"
+          aria-keyshortcuts={paletteShortcut().combo}
         >
           <Search size={14} />
           <span>Search jobs, clients, invoices, notes...</span>
-          <kbd>⌘K</kbd>
+          <PaletteKeyCap />
         </button>
         <div className="fh-build-topbar__meta">
           <span>{orgName || 'Field crew'}</span>

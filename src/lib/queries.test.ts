@@ -10,6 +10,7 @@ import {
   dropScheduleEvent,
   ensureBookedJob,
   invoicesKey,
+  jobVisitsKey,
   noteContactsKey,
   notesKey,
   removeBookedJob,
@@ -71,6 +72,8 @@ describe('query keys', () => {
     // visit caches, never under their prefix, where a patch by visit id
     // would reach it.
     expect(bookedKey('user-1', 'org-1', 'a')[0]).toBe('scheduleBooked')
+    // The Jobs list visits carry no visit id either (Phase 8, Task 15).
+    expect(jobVisitsKey('user-1', 'org-1', 'a', 'b')).toEqual(['scheduleJobVisits', 'user-1', 'org-1', 'a', 'b'])
   })
 })
 
@@ -93,6 +96,15 @@ describe('dropScheduleEvent', () => {
     // was its only one from today on comes back to the tray.
     expect(client.getQueryData(booked)).toEqual([{ contact_id: 'c-1' }])
     expect(client.getQueryState(booked)?.isInvalidated).toBe(true)
+  })
+
+  it('sends the Jobs list visits back to the server, since they carry no visit id', () => {
+    const client = new QueryClient()
+    const visits = jobVisitsKey('user-1', 'org-1', 'a', 'b')
+    client.setQueryData(visits, [{ contact_id: 'c-1', start_at: '2026-10-10T14:00:00Z' }])
+    dropScheduleEvent(client, 'e1')
+    expect(client.getQueryData(visits)).toEqual([{ contact_id: 'c-1', start_at: '2026-10-10T14:00:00Z' }])
+    expect(client.getQueryState(visits)?.isInvalidated).toBe(true)
   })
 
   it('leaves a schedule query that has not loaded yet alone, never marking it loaded with no visits', () => {

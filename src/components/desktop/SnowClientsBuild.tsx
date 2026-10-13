@@ -31,6 +31,7 @@ import { money, moneyFull } from '../../lib/format.ts'
 import { buildCsv, downloadCsv } from '../../lib/csv.ts'
 import MiniMetric from '../MiniMetric.tsx'
 import TopbarWeather from './TopbarWeather.tsx'
+import PaletteKeyCap from './PaletteKeyCap.tsx'
 
 type Rollup = {
   activeCount: number
@@ -182,12 +183,11 @@ export default function SnowClientsBuild(props: Props) {
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search clients..."
           />
-          <kbd>⌘K</kbd>
+          <PaletteKeyCap />
         </div>
         <div className="fh-build-topbar__meta">
           <span>{rows.length.toLocaleString()} clients on file</span>
-          <span className="fh-build-vline" />
-          <TopbarWeather />
+          <TopbarWeather lead />
         </div>
         <button className="fh-build-icon-btn" type="button" onClick={() => window.dispatchEvent(new CustomEvent('fh:navigate', { detail: { to: '/activity' } }))} aria-label="Open activity" title="Activity"><Bell size={16} /></button>
         <button className="fh-build-new-btn" type="button" onClick={onNewClient}>

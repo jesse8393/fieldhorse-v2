@@ -22,6 +22,8 @@ import { mintPublicLink } from '../../../lib/publicLink.ts'
 import { Eyebrow } from '../../../components/v3'
 import { quoteFollowUpDate } from '../../../lib/quoteFollowUp.ts'
 import { useIsDesktop } from '../../../lib/useMediaQuery.ts'
+import { useLinkedClientEmail } from '../../../lib/queries.ts'
+import { customerEmail } from '../../../lib/customerEmail.ts'
 import QuotePhone from '../phone/QuotePhone.tsx'
 
 // An iPhone running the app from the home screen. Safari's share sheet is
@@ -146,15 +148,45 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
   const disabled = baseCount === 0 || busy !== null
   // Phase 1 send requires a recipient, the proposal email is attached to
   // the client's email address. Preview and Download don't require this.
-  const hasClientEmail = Boolean((contact?.email || '').trim())
-  const sendDisabled = disabled || !hasClientEmail
+  // The address is found the way Money finds it: the job's own email, then
+  // the linked client's (lib/customerEmail.ts). The job page's contact
+  // carries no client, so the client's email is read when the job has none.
+  const ownEmail = String(contact?.email || '').trim()
+  const readsLinkedEmail = !ownEmail && !!contact?.client_id
+  const linkedEmail = useLinkedClientEmail(contact?.client_id, !ownEmail)
+  const recipientEmail = customerEmail({ email: ownEmail, fh_clients: { email: linkedEmail.data ?? null } })
+  // Still reading the linked client: say nothing about the email yet. The
+  // tab reads it again each time it opens, and a copy from before (an
+  // earlier visit, or the one saved for offline use) is not sent to: the
+  // address may have changed on the client page since. Offline, when that
+  // read cannot go out, the saved copy stands. Trying again after a failed
+  // read counts as reading.
+  const emailPending = readsLinkedEmail && (
+    linkedEmail.isPending
+    || (linkedEmail.isFetching && (!linkedEmail.isFetchedAfterMount || linkedEmail.isError))
+  )
+  // The read failed, its retry too: whether the client has an email is
+  // unknown, not no. Nothing claims there is none, Send waits instead of
+  // falling back to a share link, and the phone offers Try again.
+  const emailFailed = readsLinkedEmail && !emailPending && linkedEmail.isError
+  // Reading again after a failure: the phone keeps its line and shows Try
+  // again as busy, so the button does not vanish from under a finger or
+  // the keyboard focus, and the line does not flicker if it fails again.
+  const emailRetrying = readsLinkedEmail && linkedEmail.isError && linkedEmail.isFetching
+  const emailUnknown = emailPending || emailFailed
+  const hasClientEmail = recipientEmail !== ''
+  const sendDisabled = disabled || emailUnknown || !hasClientEmail
   const sendDisabledReason = baseCount === 0
     ? (pastQuote
         ? "This job is past the quote phase. There's nothing to send unless you rebuild the proposal."
         : 'Add at least one base line item to enable Send.')
-    : !hasClientEmail
-      ? "Add a client email first so we know where to send."
-      : null
+    : emailPending
+      ? null
+      : emailFailed
+        ? "Couldn't check the client email. Reload the page to try again."
+        : !hasClientEmail
+          ? "Add a client email first so we know where to send."
+          : null
 
   // Mirror of QuoteTermsSection's local state. The terms editor pushes
   // its current values here on every change; buildPdf reads from this
@@ -252,7 +284,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
         name: contact.name,
         address: contact.address,
         phone: contact.phone,
-        email: contact.email,
+        email: recipientEmail || null,
         job_title: contact.job_title
       },
       items: items as any,
@@ -434,7 +466,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
   }
 
   async function handleSend() {
-    if (disabled) return
+    if (disabled || emailUnknown) return
     // Phase 1 send-by-email, require a client email. The Send button is
     // already disabled in this state, so this is a belt-and-suspenders
     // guard for the desktop WorkspaceHead path which doesn't see the
@@ -486,7 +518,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
         body: JSON.stringify({
           contact_id: contact.id,
           sender_user_id: userId,
-          recipient_email: contact.email,
+          recipient_email: recipientEmail,
           recipient_name: contact.name || null,
           storage_path: path,
           filename: result.filename,
@@ -514,7 +546,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
       if (fetchAll) await fetchAll()
 
       toastSuccess(
-        `Proposal sent to ${contact.email}`,
+        `Proposal sent to ${recipientEmail}`,
         result.filename
       )
     } catch (e: any) {
@@ -529,7 +561,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
   // function degrades gracefully (503 esign_not_configured) until the
   // DOCUSIGN_* env vars are set in Netlify.
   async function handleEsign() {
-    if (disabled) return
+    if (disabled || emailUnknown) return
     if (!hasClientEmail) {
       toastError('Add a client email first', 'DocuSign sends the signing request to the client email.')
       return
@@ -559,7 +591,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
         body: JSON.stringify({
           contact_id: contact.id,
           sender_user_id: userId,
-          recipient_email: contact.email,
+          recipient_email: recipientEmail,
           recipient_name: contact.name || null,
           storage_path: path
         })
@@ -573,7 +605,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
         throw new Error(data?.detail || data?.error || 'DocuSign send failed.')
       }
       if (fetchAll) await fetchAll()
-      toastSuccess(`Sent to ${contact.email} for signature`, 'DocuSign will email the signing request.')
+      toastSuccess(`Sent to ${recipientEmail} for signature`, 'DocuSign will email the signing request.')
     } catch (e: any) {
       toastError("Couldn't send for electronic signature", e?.message || 'Try again')
     } finally {
@@ -592,7 +624,10 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
         status={status}
         pastQuote={pastQuote}
         busy={busy}
-        hasClientEmail={hasClientEmail}
+        customerEmail={emailUnknown ? null : recipientEmail}
+        emailFailed={emailFailed || emailRetrying}
+        emailRetrying={emailRetrying}
+        onRetryEmail={() => { void linkedEmail.refetch() }}
         clearing={clearing}
         patch={patch}
         onContactRefresh={fetchAll}

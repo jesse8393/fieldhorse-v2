@@ -12,6 +12,7 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { money } from '../../lib/format.ts'
 import MiniMetric from '../MiniMetric.tsx'
+import PaletteKeyCap from './PaletteKeyCap.tsx'
 
 type Sub = {
   key: string
@@ -112,7 +113,7 @@ export default function SnowSubsBuild(props: Props) {
             aria-label="Search vendors and trades"
             autoComplete="off"
           />
-          <kbd>⌘K</kbd>
+          <PaletteKeyCap />
         </div>
         <div className="fh-build-topbar__meta">
           <span>{filtered.length.toLocaleString()} vendors in network</span>

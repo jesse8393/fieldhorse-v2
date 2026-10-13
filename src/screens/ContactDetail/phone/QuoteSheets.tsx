@@ -380,8 +380,19 @@ export function QuoteTermsSheet({ open, onOpenChange, contact, patch }: QuoteTer
 export type QuoteMoreSheetProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
-  /** The customer's email, when the contact has one. */
-  email: string
+  /**
+   * The customer's email, the job's own or its linked client's
+   * (lib/customerEmail.ts): empty when there is none, null while the
+   * linked client is still being read or when that read failed.
+   */
+  email: string | null
+  /** The linked client's email could not be read, so it is unknown, not missing. */
+  emailFailed?: boolean
+  /** The lines are still loading, so it is not known yet whether there are any. */
+  loading?: boolean
+  /** The quote has no line in the total yet, so there is nothing to build or share. */
+  needsLines?: boolean
+  /** Something else is out: a send, a build, or an optional switch saving the total. */
   busy: boolean
   onOpenPdf: () => void
   onDownload: () => void
@@ -391,25 +402,64 @@ export type QuoteMoreSheetProps = {
 
 /* The other ways out the door, which the desktop action bar offers: the
    PDF in a new tab, a download, a share link, and DocuSign. Each closes
-   the sheet first, then runs the same handler the desktop uses. */
-export function QuoteMoreSheet({ open, onOpenChange, email, busy, onOpenPdf, onDownload, onShare, onEsign }: QuoteMoreSheetProps) {
+   the sheet first, then runs the same handler the desktop uses. A quote
+   with no line in the total has nothing to build, so every row waits and
+   says so (Phase 8, Task 15), where the handlers used to do nothing.
+   While the lines are still loading every row waits too, with its usual
+   line, and the electronic signature waits for the email: nothing is said
+   about lines or an email that are not known yet. An email that could not
+   be read is said to be unchecked, never missing. */
+const NEEDS_A_LINE = 'Add at least one line.'
+
+export function QuoteMoreSheet({ open, onOpenChange, email, emailFailed = false, loading = false, needsLines = false, busy, onOpenPdf, onDownload, onShare, onEsign }: QuoteMoreSheetProps) {
   function run(fn: () => void) {
     onOpenChange(false)
     fn()
   }
   const chevron = <Icon icon={ChevronRight} size={18} className="fhq-chevron" />
+  const off = busy || loading || needsLines
+  const esignLine = needsLines
+    ? NEEDS_A_LINE
+    : email
+      ? `DocuSign emails a signing request to ${email}.`
+      : emailFailed
+        ? "Couldn't check the customer email."
+        : email === ''
+          ? 'Add a customer email first.'
+          : 'DocuSign emails the customer a signing request.'
   return (
     <Sheet open={open} onOpenChange={onOpenChange} title="Share or download" className="fhq-more-sheet">
       <ul className="fhq-more-list">
-        <Row as="li" title="Open the PDF" subline="Builds the proposal and opens it in a new tab." next={chevron} disabled={busy} onClick={() => run(onOpenPdf)} />
-        <Row as="li" title="Download the PDF" subline="Saves a copy to this phone." next={chevron} disabled={busy} onClick={() => run(onDownload)} />
-        <Row as="li" title="Copy a share link" subline="Makes a link the customer can open, and marks the quote as sent." next={chevron} disabled={busy} onClick={() => run(onShare)} />
+        <Row
+          as="li"
+          title="Open the PDF"
+          subline={needsLines ? NEEDS_A_LINE : 'Builds the proposal and opens it in a new tab.'}
+          next={chevron}
+          disabled={off}
+          onClick={() => run(onOpenPdf)}
+        />
+        <Row
+          as="li"
+          title="Download the PDF"
+          subline={needsLines ? NEEDS_A_LINE : 'Saves a copy to this phone.'}
+          next={chevron}
+          disabled={off}
+          onClick={() => run(onDownload)}
+        />
+        <Row
+          as="li"
+          title="Copy a share link"
+          subline={needsLines ? NEEDS_A_LINE : 'Makes a link the customer can open, and marks the quote as sent.'}
+          next={chevron}
+          disabled={off}
+          onClick={() => run(onShare)}
+        />
         <Row
           as="li"
           title="Send for electronic signature"
-          subline={email ? `DocuSign emails a signing request to ${email}.` : 'Add a customer email first.'}
+          subline={esignLine}
           next={chevron}
-          disabled={busy || !email}
+          disabled={off || !email}
           onClick={() => run(onEsign)}
         />
       </ul>

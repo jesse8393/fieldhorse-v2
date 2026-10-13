@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { MapPin, Trash2, LogOut, Upload as UploadIcon, Bell, CalendarClock } from 'lucide-react'
 import BrandLogoPicker from '../components/BrandLogoPicker.tsx'
@@ -84,6 +84,8 @@ export default function Settings() {
   const { user, signOut } = useAuth()
   const { profile, upsertProfile, refresh } = useProfile()
   const navigate = useNavigate()
+  // Every route change, a same page hash link included (see the hash jump).
+  const { key: routeKey } = useLocation()
   const [displayName, setDisplayName] = useState(profile?.full_name || '')
   const [companyName, setCompanyName] = useState(profile?.company_name || '')
   // Customer facing branding fields (migration 015). Empty strings save
@@ -404,6 +406,11 @@ export default function Settings() {
   // React Router's programmatic navigate uses pushState (which does
   // NOT fire hashchange), the prior code only re-fired the jump on
   // a real <a> click between hash routes.
+  //
+  // Neither event fires for a router link to a hash on this same page,
+  // such as the topbar's "Set location" (/settings#location) while
+  // Settings is open (Phase 8, Task 15): the route's key changes, so the
+  // jump runs again on every route change.
   useEffect(() => {
     if (typeof window === 'undefined') return
     let cancelled = false
@@ -442,7 +449,7 @@ export default function Settings() {
       window.removeEventListener('hashchange', jumpToHash)
       window.removeEventListener('popstate', jumpToHash)
     }
-  }, [])
+  }, [routeKey])
 
   // Real, honest "setup readiness" calculation, only counts fields
   // that actually map to columns the profile screen exposes. No fake
@@ -751,7 +758,9 @@ export default function Settings() {
           available as muted secondary text so the operator can still
           eyeball precision when needed. */}
       <Section variants={item} title={<>Where you <em>work.</em></>}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        {/* /settings#location lands here: the weather slots link to it
+            when the company has no pinned spot. */}
+        <div id="location" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', scrollMarginTop: 96 }}>
           <div style={{
             flex: 1,
             minWidth: 180,

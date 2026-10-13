@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { weatherLabel } from '../../lib/weather.ts'
 import MiniMetric from '../MiniMetric.tsx'
+import PaletteKeyCap, { paletteShortcut } from './PaletteKeyCap.tsx'
 
 type DailyRow = {
   time: string
@@ -139,10 +140,11 @@ export default function SnowForecastBuild(props: Props) {
           className="fh-build-search"
           onClick={() => window.dispatchEvent(new CustomEvent('fh:open-palette'))}
           aria-label="Open command palette"
+          aria-keyshortcuts={paletteShortcut().combo}
         >
           <Search size={14} />
           <span>Search jobs, clients, invoices, notes...</span>
-          <kbd>⌘K</kbd>
+          <PaletteKeyCap />
         </button>
         <div className="fh-build-topbar__meta">
           <span>

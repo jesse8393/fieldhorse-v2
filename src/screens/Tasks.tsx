@@ -27,6 +27,7 @@ import { orgMembersList, type OrgMember } from '../lib/orgApi.ts'
 import { toastError, toastSuccess, toastUndo } from '../lib/toast.ts'
 import MiniMetric from '../components/MiniMetric.tsx'
 import { Button } from '../ui/index.ts'
+import PaletteKeyCap, { paletteShortcut } from '../components/desktop/PaletteKeyCap.tsx'
 
 type TaskRow = {
   id: string
@@ -256,10 +257,11 @@ export default function Tasks() {
           className="fh-build-search"
           onClick={() => window.dispatchEvent(new CustomEvent('fh:open-palette'))}
           aria-label="Open command palette"
+          aria-keyshortcuts={paletteShortcut().combo}
         >
           <Search size={14} />
           <span>Search jobs, clients, invoices, notes...</span>
-          <kbd>⌘K</kbd>
+          <PaletteKeyCap />
         </button>
         <div className="fh-build-topbar__meta">
           <span>{orgName || 'Your team'}</span>

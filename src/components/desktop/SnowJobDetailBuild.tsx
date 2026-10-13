@@ -133,7 +133,9 @@ export default function SnowJobDetailBuild(props: Props) {
           )}
 
           <div className="fhd-banner__util">
-            <span className="fhd-weather"><TopbarWeather /></span>
+            {/* The forecast pill, a Set location link for an owner when
+                the company has no pinned spot, or nothing at all. */}
+            <TopbarWeather className="fhd-weather" />
             <IconButton
               variant="onyx"
               size={44}

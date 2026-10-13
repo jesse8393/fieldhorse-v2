@@ -6,8 +6,9 @@ import { Plus, Pencil, X as XIcon, ShieldCheck, Receipt, RotateCcw, ChevronDown 
 import { supabase } from '../../../lib/supabase.ts'
 import { toYmd } from '../../../lib/dates.ts'
 import {
-  startQuote, approveQuote, markComplete, reopen
+  startQuote, approveQuote, markComplete, reopen, reopenQuestion
 } from '../../../lib/pipeline.ts'
+import { useConfirm } from '../../../components/ConfirmSheet.tsx'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
 import { hapticTap, hapticStageChange } from '../../../lib/haptics.ts'
 import {
@@ -89,6 +90,7 @@ export default function OverviewTab({
   const [moreOpen, setMoreOpen] = useState(false)
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+  const confirm = useConfirm() as (options: { title: string; body?: string; confirmLabel?: string }) => Promise<boolean>
 
   const health = useMemo(
     () => computeJobHealth({ contact, payments, scheduleItems }),
@@ -111,6 +113,8 @@ export default function OverviewTab({
 
   async function handleNextActionComplete() {
     if (actionLoading) return
+    // Reopen asks first, as everywhere else (Phase 8, Task 15).
+    if (nextAction.kind === 'stage' && nextAction.pipelineFn === 'reopen' && !(await confirm(reopenQuestion(contact)))) return
     setActionLoading(true)
     try {
       switch (nextAction.kind) {

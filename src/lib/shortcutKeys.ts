@@ -4,9 +4,10 @@
 // the copy rules), says "Command J" or "Control J" to a screen reader,
 // and declares "Meta+J" or "Control+J" in aria-keyshortcuts. The handlers
 // themselves (CaptureSheet for J, CommandPalette for K) accept either
-// modifier, so only the label changes by platform. The platform test is
-// the one shortcutModifier in lib/paletteActions.ts uses for Option and
-// Alt.
+// modifier, so only the label changes by platform. The palette's job
+// shortcuts (lib/paletteActions.ts) read the same platform test: Control
+// plus Option on a Mac, Alt elsewhere. The older desktop search bars
+// print their K the same way (components/desktop/PaletteKeyCap.tsx).
 
 export type ShortcutEnv = { userAgent?: string }
 

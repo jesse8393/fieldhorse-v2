@@ -277,6 +277,9 @@ test.describe('quote tab on a phone', () => {
     await signIn(context, {
       tables: {
         fh_contacts: [quoteContact({ email: null })],
+        // Neither the job nor its linked client has an email: the Quote tab
+        // looks on the client too, as Money does (Phase 8, Task 15).
+        fh_clients: [{ id: 'cl-1', user_id: 'qa-user-1', name: 'Jeff Roy', phone: '555-0101', email: null }],
         fh_quote_items: ITEMS,
         // The mock answers an insert with the first row of the table.
         fh_public_links: [{ id: 'l1', user_id: 'qa-user-1', contact_id: 'c-quote', kind: 'proposal', token: 'abc123', created_at: iso(NOW) }]

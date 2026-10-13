@@ -215,6 +215,35 @@ describe('buildSpine', () => {
     expect(items.map((i) => i.title)).toContain('Moved to job')
   })
 
+  // Phase 8, Task 15: the Spine shows every note, each in full, so the
+  // count under "Show N more" is the real one. The old activity log kept
+  // the newest five notes and the first 80 characters of each.
+  it('shows every note, each in full, with its line breaks', () => {
+    const long = 'Inspector wants twelve inches at the east wall, not ten, because the soil report came back soft near the drain line.\nRebar chaired before Friday.'
+    const notes = Array.from({ length: 7 }, (_, i) => ({
+      id: `n${i}`,
+      text: i === 0 ? long : `Note ${i}`,
+      created_at: at(9, 9, 8 + i, 0).toISOString()
+    }))
+    const events = composeActivityEvents({ notes, fullNotes: true })
+    const items = buildSpine({ events, photos: [], inspections: [], now: NOW })
+    const noteItems = items.filter((i) => i.id.startsWith('note:'))
+    expect(noteItems).toHaveLength(7)
+    expect(noteItems.find((i) => i.id === 'note:n0')?.title).toBe(long)
+    expect(noteItems.map((i) => i.title)).toContain('Note 6')
+  })
+
+  it('keeps the short preview for the activity log, which asks for no full notes', () => {
+    const notes = Array.from({ length: 7 }, (_, i) => ({
+      id: `n${i}`,
+      text: `${'x'.repeat(100)}\nsecond line ${i}`,
+      created_at: at(9, 9, 8 + i, 0).toISOString()
+    }))
+    const events = composeActivityEvents({ notes }).filter((e) => e.kind === 'note')
+    expect(events).toHaveLength(5)
+    for (const e of events) expect(e.sub).toBe('x'.repeat(80))
+  })
+
   it('drops items with an unreadable date', () => {
     const items = buildSpine({
       events: [],

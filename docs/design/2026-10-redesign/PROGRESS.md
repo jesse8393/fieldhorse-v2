@@ -32,12 +32,12 @@ Status is one of todo, done, blocked, skipped.
 | 1 | 7 Jobs and quotes stay inside the active company | done | `222e8f6` | Reviewed by two lenses, approved with no fix round. Decision D36 |
 | 1 | 8 The Unscheduled tray tells the truth | done | `d4dc086` | Two fix rounds (overlapping drops, rollback by value), then approved. Decision D39 |
 | 1 | 9 One quote total and one deposit everywhere | done | `8c3f6c9` | Reviewed by two lenses, approved with no fix round. Decision D31 |
-| 1 | 10 The customer page after approval and on bad data | done | this commit | Four fix rounds (Ask controls left as dead buttons, Enter on the authority box approving, a stale page approving changed terms), then approved. Decision D44 |
+| 1 | 10 The customer page after approval and on bad data | done | `69391d8` | Four fix rounds (Ask controls left as dead buttons, Enter on the authority box approving, a stale page approving changed terms), then approved. Decision D44 |
 | 1 | 11 Inbox sends exactly once, only when tapped, only when online | done | `36e4c88` | Reviewed by two lenses, approved with no fix round. Decision D38 |
 | 2 | 12 Next stop card without a photo, and job tabs | done | `988deb0` | Two fix rounds (a class clash with the Jobs list, tabs under the fade), then approved. Decisions D32 and D41 |
 | 2 | 13 Desktop Capture button | done | `7d8351b` | One fix round (an Inbox test still waited for the removed button), then approved. Decision D33 |
 | 2 | 14 Desktop between 900 and 1279 px | todo | | |
-| 2 | 15 Small behavior fixes | todo | | |
+| 2 | 15 Small behavior fixes | done | this commit | Two fix rounds (the closeout Reopen, a frozen app after back, focus on the deal card), then approved. Decisions D19 updated, D45 |
 | 2 | 16 Login wordmark | done | `74cd854` | Two fix rounds (the fallback face ran off a phone while Bebas Neue loaded, WebKit's early font answer), then approved. Decision D42 |
 | 3 | 17 CSS and test hygiene | todo | | |
 | 3 | 18 Private line notes on the customer page | skipped | | The approval line in the plan reads no, so `netlify/functions/public-link.js` is unchanged |
@@ -113,6 +113,11 @@ Status is one of todo, done, blocked, skipped.
   * At integration: while changes are requested the steps used to drop the deposit step but keep the balance step, so the listed payments covered half the price. The steps now start with the revised proposal and keep every open quote step; the unit test checks that against the open quote, and the e2e list was updated with it.
   * Lead decision recorded in D44: the quote number keeps its hyphens so it matches the PDF and the letter themes; it is the one exception to the no dash rule.
   * Known gaps, not changed: the classic page keeps its prefilled signature and Return submit, and its Request changes button is a dead button on declined and closed quotes (D24 keeps the classic bar as it was; Jesse's call); sentence case company names with no business word ("Elite pools") are greeted by their first word; the cover is the newest of the 12 oldest photos the server sends (`netlify/functions/public-link.js` would need to order by upload date, not allowed in this run); a refused question that ends on the Approved or Closed capsule drops focus to the page; a question refused because the job was deleted says to try again; the deposit after a change order follows D31.
+
+* **Task 15, small behavior fixes.** Three lane commits squashed into one: all thirteen bullets, plus the lead's addition (a closing sheet gives focus back to its opener). New `tests/e2e/small-fixes.spec.ts`, `src/lib/customerEmail.ts`, `src/screens/ContactDetail/lib/jobPhotos.ts` and `src/components/desktop/PaletteKeyCap.tsx`. Shared files changed, backward compatible: `fh/Sheet.tsx`, `fh/SpineEntry.tsx` and `ConfirmSheet.tsx` (an optional abort signal and `freePageForQuestion`).
+  * At integration: `useMoneySheets` took Task 15's shared `customerEmail` beside Task 6's send store (one conflict, resolved); any open question now closes when the page changes (it stayed over the next screen after the back button, and a yes there moved the previous job's stage; Mark lost behaved the same); Approve a new version now waits while an optional line saves. Both with tests that failed first.
+  * One existing test's data changed, no assertion: `quote.spec` "shares a link when there is no email" gave the linked client an email, which now counts.
+  * Known gaps, not changed: invoice draws on the Financials tab still read only the job's own email; the Forecast screen still defaults to Murfreesboro; when one sheet opens another, closing the second cannot return focus to the first sheet's opener.
 
 * The first CI run on #223 (a docs only commit) failed `mock-workflows` "keeps the desktop schedule planning workflow complete" on desktop. The default mock visit starts two hours after the mock loads, so between 10 pm and midnight Central it lands on tomorrow and the Day view is empty. It failed here too at 10:48 pm Central and passed after the test pinned its page clock to a Thursday morning and seeded that day's visit. It is listed under "Failing before Phase 8".
 

@@ -3,6 +3,8 @@ import { motion } from 'framer-motion'
 import { Lock, AlertTriangle, ShieldCheck, X, Check } from 'lucide-react'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 import { supabase } from '../../../lib/supabase.ts'
+import { useLinkedClientEmail } from '../../../lib/queries.ts'
+import { customerEmail } from '../../../lib/customerEmail.ts'
 import { useProfile } from '../../../contexts/ProfileContext.tsx'
 import { toastError, toastSuccess } from '../../../lib/toast.ts'
 import { hapticStageChange, hapticTap } from '../../../lib/haptics.ts'
@@ -77,6 +79,21 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
   const [err, setErr] = useState('')
   const { formRef, drawerStyle, formStyle } = useDrawerKeyboard(open)
 
+  // The customer's email, found the way the Quote tab sends and Money
+  // reminds (lib/customerEmail.ts): the job's own, then its linked
+  // client's (Phase 8, Task 15). The job page's contact carries no client,
+  // so the client's is read while the sheet is open and the job has none.
+  // It starts the approval's email and goes on the approved copy, so the
+  // archived PDF shows the address the proposal went to.
+  const ownEmail = String(contact?.email || '').trim()
+  const linkedEmail = useLinkedClientEmail(contact?.client_id, open && !ownEmail)
+  const foundEmail = customerEmail({ email: ownEmail, fh_clients: { email: linkedEmail.data ?? null } })
+  const foundEmailRef = useRef(foundEmail)
+  foundEmailRef.current = foundEmail
+  // Set once the email field is typed in: the client's email arriving a
+  // beat after the sheet opens then leaves what was typed alone.
+  const emailEditedRef = useRef(false)
+
   // Reset every time the sheet opens, then fetch fresh items so the
   // snapshot reflects truth-of-the-moment (not a stale cache from the
   // last open).
@@ -88,7 +105,8 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
     // submit. Avoids the "placeholder looks filled but submit is
     // disabled" trap from the prior empty-string default.
     setName(contact?.name || '')
-    setEmail(contact?.email || '')
+    emailEditedRef.current = false
+    setEmail(foundEmailRef.current)
     setNote('')
     setMoveToJob(true)
     setSignatureKind(null)
@@ -118,6 +136,13 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
     })()
     return () => { alive = false }
   }, [open, contact?.id, contact?.updated_at, contact?.name, contact?.email, userId])
+
+  // The linked client's email lands after the sheet has opened: fill it
+  // in, unless the email field has been typed in since.
+  useEffect(() => {
+    if (!open || emailEditedRef.current) return
+    setEmail(foundEmail)
+  }, [open, foundEmail])
 
   const totals = useMemo(() => {
     let base = 0, optional = 0, excludedCount = 0, baseCount = 0, optionalCount = 0
@@ -205,7 +230,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
           name: contact.name || null,
           address: contact.address || null,
           phone: contact.phone || null,
-          email: contact.email || null,
+          email: foundEmail || null,
           job_title: contact.job_title || null
         },
         scope_text: contact.scope_text || null,
@@ -631,7 +656,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
               type="email"
               inputMode="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => { emailEditedRef.current = true; setEmail(e.target.value) }}
               placeholder="name@domain.com"
               disabled={submitting}
               style={fieldStyle}

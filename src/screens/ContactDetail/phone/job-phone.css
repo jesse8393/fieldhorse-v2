@@ -443,6 +443,11 @@
   list-style: none;
 }
 
+/* A note is shown in full, with the line breaks it was typed with. */
+.fhj-spine__note .fhc-spine__title {
+  white-space: pre-line;
+}
+
 .fhj-spine__more {
   margin: 8px 0 0 52px;
 }

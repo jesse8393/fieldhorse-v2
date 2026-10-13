@@ -9,6 +9,7 @@ import {
   forecastWindow,
   isEvening,
   navigateHref,
+  navigateHrefHere,
   stopTime,
   todayWeather,
   tomorrowLine,
@@ -583,6 +584,23 @@ describe('stopTime and navigateHref', () => {
     expect(navigateHref('412 Burkitt Station Rd', android)).toBe('https://www.google.com/maps/dir/?api=1&destination=412%20Burkitt%20Station%20Rd')
     // iPadOS reports a Mac, with touch.
     expect(navigateHref('A & B', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', 5)).toBe('https://maps.apple.com/?daddr=A%20%26%20B')
+  })
+
+  it('navigateHrefHere reads the device the page runs on', () => {
+    const mac = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15'
+    try {
+      // An iPad in landscape: the desktop job page, a Mac user agent, touch.
+      vi.stubGlobal('navigator', { userAgent: mac, maxTouchPoints: 5 })
+      expect(navigateHrefHere('412 Burkitt Station Rd')).toBe('https://maps.apple.com/?daddr=412%20Burkitt%20Station%20Rd')
+      // A Mac with no touch screen.
+      vi.stubGlobal('navigator', { userAgent: mac, maxTouchPoints: 0 })
+      expect(navigateHrefHere('412 Burkitt Station Rd')).toBe('https://www.google.com/maps/dir/?api=1&destination=412%20Burkitt%20Station%20Rd')
+      // No navigator at all (a server render).
+      vi.stubGlobal('navigator', undefined)
+      expect(navigateHrefHere('412 Burkitt Station Rd')).toBe('https://www.google.com/maps/dir/?api=1&destination=412%20Burkitt%20Station%20Rd')
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 })
 

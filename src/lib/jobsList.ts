@@ -3,7 +3,9 @@
 // Tabs: All, Leads, Quotes, Jobs, Done. Lost jobs sit behind the filter
 // sheet's "Show lost jobs" switch and never count toward a tab. Under All
 // the groups run Jobs, Quotes, Leads, Done; the Done group there holds
-// only the last 30 days, while the Done tab holds every finished job.
+// only the last 30 days, while the Done tab holds every finished job. Each
+// tab's count is the number of rows that tab lists, so All counts only the
+// recent finished work it shows.
 //
 // Every line this module writes itself (next steps, chip labels, group
 // titles and notes) avoids dashes of any kind. Names and job titles that
@@ -68,6 +70,10 @@ export type JobsList = { counts: Record<JobsTab, number>; groups: JobsGroup[] }
 
 const DAY_MS = 86400000
 const DONE_WINDOW_DAYS = 30
+/** Days of visits the list reads before today ("Next visit" rather than "Starts"). */
+export const VISIT_LOOKBACK_DAYS = 14
+/** Days of visits the list reads from today on (the "On site" and "Starts" chips). */
+export const VISIT_LOOKAHEAD_DAYS = 15
 const NEW_LEAD_MS = 48 * 3600 * 1000
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -89,6 +95,19 @@ function bucketOf(stage: string | null | undefined): Bucket {
 
 function startOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate())
+}
+
+/**
+ * The visits the Jobs list reads for the local day `dayKey` (YYYY-MM-DD):
+ * from local midnight 14 days back to local midnight 15 days ahead, as ISO
+ * times for the query.
+ */
+export function jobsVisitWindow(dayKey: string): { start: string; end: string } {
+  const [y, m, d] = dayKey.split('-').map(Number)
+  return {
+    start: new Date(y, m - 1, d - VISIT_LOOKBACK_DAYS).toISOString(),
+    end: new Date(y, m - 1, d + VISIT_LOOKAHEAD_DAYS).toISOString()
+  }
 }
 
 /** Whole calendar days from `from` to `to`, local time, DST safe. */
@@ -317,15 +336,18 @@ export function buildJobsList(input: JobsListInput): JobsList {
     byBucket[bucketOf(row.stage)].push(row)
   }
 
+  // All lists only the last 30 days of finished work, so it counts only those.
+  const doneCutoff = startOfDay(now).getTime() - DONE_WINDOW_DAYS * DAY_MS
+  const recentDone = byBucket.done.filter((r) => (finishedAt(r)?.getTime() ?? 0) >= doneCutoff)
+
   const counts: Record<JobsTab, number> = {
     leads: byBucket.leads.length,
     quotes: byBucket.quotes.length,
     jobs: byBucket.jobs.length,
     done: byBucket.done.length,
-    all: byBucket.leads.length + byBucket.quotes.length + byBucket.jobs.length + byBucket.done.length
+    all: byBucket.leads.length + byBucket.quotes.length + byBucket.jobs.length + recentDone.length
   }
 
-  const doneCutoff = startOfDay(now).getTime() - DONE_WINDOW_DAYS * DAY_MS
   const order: Record<JobsTab, Bucket[]> = {
     all: ['jobs', 'quotes', 'leads', 'done'],
     leads: ['leads'],
@@ -338,9 +360,7 @@ export function buildJobsList(input: JobsListInput): JobsList {
   const groups: JobsGroup[] = []
   for (const bucket of buckets) {
     const recentOnly = bucket === 'done' && tab === 'all'
-    const source = recentOnly
-      ? byBucket.done.filter((r) => (finishedAt(r)?.getTime() ?? 0) >= doneCutoff)
-      : byBucket[bucket]
+    const source = recentOnly ? recentDone : byBucket[bucket]
     if (source.length === 0) continue
     const built = sortRows(source.map((r) => buildRow(r, bucket, showMoney, now, visits)), bucket, sort)
     groups.push({

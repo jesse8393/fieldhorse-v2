@@ -13,6 +13,7 @@ import {
 import { countNoun, money } from '../../lib/format.ts'
 import MiniMetric from '../MiniMetric.tsx'
 import TopbarWeather from './TopbarWeather.tsx'
+import PaletteKeyCap, { paletteShortcut } from './PaletteKeyCap.tsx'
 
 type StageRow = {
   id: string
@@ -122,15 +123,15 @@ export default function SnowAnalyticsBuild(props: Props) {
           className="fh-build-search"
           onClick={() => window.dispatchEvent(new CustomEvent('fh:open-palette'))}
           aria-label="Open command palette"
+          aria-keyshortcuts={paletteShortcut().combo}
         >
           <Search size={14} />
           <span>Search reports, KPIs...</span>
-          <kbd>⌘K</kbd>
+          <PaletteKeyCap />
         </button>
         <div className="fh-build-topbar__meta">
           <span>Year to date · {new Date().getFullYear()}</span>
-          <span className="fh-build-vline" />
-          <TopbarWeather />
+          <TopbarWeather lead />
         </div>
         <button className="fh-build-icon-btn" type="button" onClick={() => window.dispatchEvent(new CustomEvent('fh:navigate', { detail: { to: '/activity' } }))} aria-label="Open activity" title="Activity"><Bell size={16} /></button>
       </header>

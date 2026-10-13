@@ -2,7 +2,7 @@ import { useCallback, useEffect } from 'react'
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from './supabase.ts'
 import { ACTIVE_STAGES } from './stages.ts'
-import { fetchCoverPhotosByJob } from './photos.ts'
+import { fetchCoverPhotos, freshCoverUrls } from './photos.ts'
 import { chunkIds, fetchAllRows } from './queries.ts'
 import { useOrgScope } from './orgScope.ts'
 import { OPEN_INVOICE_STATUSES, amountsDueByInvoice, knownContractTotal } from './invoiceSettlement.ts'
@@ -873,16 +873,21 @@ export function useHomeDashboard(userId: string | undefined, _orgId?: string | n
   const coverIds = useQuery({ ...bundleQuery, select: coverPhotoJobIds }).data
   const covers = useQuery({
     queryKey: homeCoversKey(userId, coverIds ?? []),
-    queryFn: () => fetchCoverPhotosByJob(coverIds ?? []),
+    queryFn: () => fetchCoverPhotos(coverIds ?? []),
     enabled: !!userId && !!coverIds && coverIds.length > 0,
     // Signed URLs live an hour; refresh well before they lapse.
     staleTime: 30 * 60_000,
     // Keep the current thumbnails while a changed job list loads.
     placeholderData: keepPreviousData,
   }).data
+  // Only links that are still fresh by when they were signed: a copy the
+  // offline cache brings back hours later shows no photo until the read
+  // above signs new ones, instead of a link that has run out.
   const withCovers = useCallback(
-    (bundle: HomeDashboardBundle): HomeDashboardBundle =>
-      covers ? { ...bundle, photoUrlByJob: covers } : bundle,
+    (bundle: HomeDashboardBundle): HomeDashboardBundle => {
+      const urls = freshCoverUrls(covers)
+      return urls ? { ...bundle, photoUrlByJob: urls } : bundle
+    },
     [covers]
   )
   return useQuery({ ...bundleQuery, select: withCovers })

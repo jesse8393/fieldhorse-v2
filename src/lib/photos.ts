@@ -9,8 +9,15 @@
 // of the whole photo table.
 
 import { supabase } from './supabase.ts'
+import { isSignedUrlFresh, SIGNED_URL_TTL_SECONDS } from './signedUrls.ts'
 
-const SIGN_TTL_SECONDS = 3600 // 1 hour, long enough for a session, short enough that leaked URLs expire
+/**
+ * Cover photo links by job id, and when they were signed (Phase 8, Task
+ * 15). The dashboard query that holds them is saved in the offline cache,
+ * so a cold open can bring back links that ran out hours ago; the signing
+ * time says whether they still work.
+ */
+export type CoverPhotos = { urls: Record<string, string>; signedAt: number }
 
 type CoverRow = {
   id: string
@@ -29,6 +36,27 @@ type CoverRow = {
  * per job: PostgREST applies an embedded limit per parent row.
  */
 export async function fetchCoverPhotosByJob(jobIds: readonly string[]): Promise<Record<string, string>> {
+  return (await fetchCoverPhotos(jobIds)).urls
+}
+
+/** fetchCoverPhotosByJob with the time the links were signed. */
+export async function fetchCoverPhotos(jobIds: readonly string[], now: number = Date.now()): Promise<CoverPhotos> {
+  return { urls: await signCovers(jobIds), signedAt: now }
+}
+
+/**
+ * The cover links while they are fresh by when they were signed, or null:
+ * then the screen draws no photo until the next read signs new ones. A
+ * copy saved before the signing time was kept (a bare map) is never fresh.
+ */
+export function freshCoverUrls(covers: unknown, now: number = Date.now()): Record<string, string> | null {
+  if (!covers || typeof covers !== 'object') return null
+  const { urls, signedAt } = covers as Partial<CoverPhotos>
+  if (!urls || typeof urls !== 'object' || !isSignedUrlFresh(signedAt, now)) return null
+  return urls
+}
+
+async function signCovers(jobIds: readonly string[]): Promise<Record<string, string>> {
   const ids = Array.from(new Set(jobIds.filter(Boolean)))
   if (ids.length === 0) return {}
 
@@ -61,7 +89,7 @@ export async function fetchCoverPhotosByJob(jobIds: readonly string[]): Promise<
   // ONE batch sign call. createSignedUrls returns { path, signedUrl, error } per entry.
   const { data: signed, error: signErr } = await supabase.storage
     .from('job-photos')
-    .createSignedUrls(uniquePaths, SIGN_TTL_SECONDS)
+    .createSignedUrls(uniquePaths, SIGNED_URL_TTL_SECONDS)
 
   if (signErr || !signed) return {}
 

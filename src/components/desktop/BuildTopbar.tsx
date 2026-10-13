@@ -5,6 +5,7 @@
 // instead.
 import { Search, Bell } from 'lucide-react'
 import type { ReactNode } from 'react'
+import PaletteKeyCap, { paletteShortcut } from './PaletteKeyCap.tsx'
 
 type BuildTopbarProps = {
   /** Optional override for the placeholder text. */
@@ -28,10 +29,11 @@ export default function BuildTopbar({
         className="fh-build-search"
         onClick={() => window.dispatchEvent(new CustomEvent('fh:open-palette'))}
         aria-label="Open command palette"
+        aria-keyshortcuts={paletteShortcut().combo}
       >
         <Search size={14} />
         <span>{searchPlaceholder}</span>
-        <kbd>⌘K</kbd>
+        <PaletteKeyCap />
       </button>
       <div className="fh-build-topbar__meta">
         {(meta || []).map((node, i) => (

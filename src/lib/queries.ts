@@ -407,6 +407,79 @@ export function useUpcomingEvents(userId: string | undefined) {
   })
 }
 
+// ---- Visits behind the phone Jobs list chips ----
+// The Jobs list only needs which job each visit is on and when it starts,
+// from 14 days back to 15 days ahead (jobsVisitWindow in lib/jobsList.ts).
+// Newest first, so if the server's row cap ever cuts the list short it
+// drops the oldest past visits, never a job's next one. The rows carry no
+// visit id, so the list has its own prefix beside the visit caches (a
+// patch by visit id never reaches it) and every schedule invalidation and
+// visit delete refetches it.
+
+export type JobVisit = { contact_id: string | null; start_at: string | null }
+
+export const jobVisitsKey = (
+  userId: string | undefined,
+  orgId: string | null | undefined,
+  startIso: string,
+  endIso: string
+) => ['scheduleJobVisits', userId ?? null, orgId ?? null, startIso, endIso] as const
+
+async function fetchJobVisits(userId: string, startIso: string, endIso: string, orgId?: string | null): Promise<JobVisit[]> {
+  const { data, error } = await scoped(supabase.from('fh_schedule').select('contact_id, start_at'), userId, orgId)
+    .gte('start_at', startIso)
+    .lt('start_at', endIso)
+    .not('contact_id', 'is', null)
+    .order('start_at', { ascending: false })
+  if (error) throw error
+  return (data ?? []) as JobVisit[]
+}
+
+/** Each visit's job and start in the window, newest first, for the active company. */
+export function useJobVisits(userId: string | undefined, startIso: string, endIso: string) {
+  const orgId = useOrgScope(userId)
+  return useQuery({
+    queryKey: jobVisitsKey(userId, orgId, startIso, endIso),
+    queryFn: () => fetchJobVisits(userId as string, startIso, endIso, orgId),
+    enabled: !!userId && orgId !== undefined,
+    // The window moves at midnight; keep yesterday's chips while it loads.
+    placeholderData: keepPreviousData
+  })
+}
+
+// ---- A job's linked client email (the Quote tab's send) ----
+// The job page reads its contact with select('*'), which carries no client.
+// The Quote tab finds the customer's email the way Money does, the job's
+// own and then its linked client's (lib/customerEmail.ts), so it reads the
+// client's email when the job has none of its own. RLS decides who may
+// read the client; a partner on a shared job gets nothing back.
+//
+// Always stale (staleTime 0): the address is edited on the client page,
+// and a proposal must go to the address as it is now, so every mount reads
+// it again, a reload included (the cache is saved for offline use). The
+// Quote tab waits for that read before it sends (see emailPending there).
+
+export const linkedClientEmailKey = (clientId: string | null | undefined) =>
+  ['linkedClientEmail', clientId ?? null] as const
+
+/** The email on the client `clientId`, or null. Pass enabled false when the job has its own. */
+export function useLinkedClientEmail(clientId: string | null | undefined, enabled = true) {
+  return useQuery({
+    queryKey: linkedClientEmailKey(clientId),
+    queryFn: async (): Promise<string | null> => {
+      const { data, error } = await supabase
+        .from('fh_clients')
+        .select('email')
+        .eq('id', clientId as string)
+        .maybeSingle()
+      if (error) throw error
+      return (data as { email?: string | null } | null)?.email ?? null
+    },
+    enabled: enabled && !!clientId,
+    staleTime: 0
+  })
+}
+
 // ---- Jobs with a visit from today on (the desktop Unscheduled tray) ----
 // Which jobs already have a date (decision D10), whatever week the board
 // shows. Only contact_id is read, for every visit from the start of today
@@ -473,15 +546,16 @@ export const removeBookedJob = (jobId: string) => (rows: BookedVisit[] | undefin
 export const ensureBookedJob = (jobId: string) => (rows: BookedVisit[] | undefined) =>
   rows && (rows.some((row) => row.contact_id === jobId) ? rows : [...rows, { contact_id: jobId }])
 
-// Invalidate every schedule query (range, upcoming and the booked list)
-// after a mutation. A fetch already in flight is dropped and started over,
-// so what lands was asked for after the write.
+// Invalidate every schedule query (range, upcoming, the booked list and
+// the Jobs list visits) after a mutation. A fetch already in flight is
+// dropped and started over, so what lands was asked for after the write.
 export function useInvalidateSchedule() {
   const client = useQueryClient()
   return () => {
     client.invalidateQueries({ queryKey: ['schedule'] })
     client.invalidateQueries({ queryKey: ['scheduleUpcoming'] })
     client.invalidateQueries({ queryKey: ['scheduleBooked'] })
+    client.invalidateQueries({ queryKey: ['scheduleJobVisits'] })
   }
 }
 
@@ -489,15 +563,17 @@ export function useInvalidateSchedule() {
 // (range + upcoming) so it vanishes immediately, before the server
 // round-trip, replaces the old setEvents/setUpcoming filters. A query that
 // has not loaded yet is left alone (an empty list would read as "nothing
-// scheduled" until its fetch lands). The booked list holds job ids, not
-// visit ids, so it is refetched instead: the deleted visit may have been
-// its job's only one from today on.
+// scheduled" until its fetch lands). The booked list and the Jobs list
+// visits hold no visit ids, so they are refetched instead: the deleted
+// visit may have been its job's only one from today on, or the one its
+// chip read.
 export function dropScheduleEvent(client: QueryClient, evtId: string) {
   const drop = (rows: ScheduleEvent[] | undefined) =>
     rows?.filter((e) => e.id !== evtId)
   client.setQueriesData({ queryKey: ['schedule'] }, drop)
   client.setQueriesData({ queryKey: ['scheduleUpcoming'] }, drop)
   client.invalidateQueries({ queryKey: ['scheduleBooked'] })
+  client.invalidateQueries({ queryKey: ['scheduleJobVisits'] })
 }
 
 export function useDropScheduleEvent() {

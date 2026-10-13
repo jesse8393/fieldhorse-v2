@@ -8,6 +8,7 @@ import { handleTablistKeyDown, tabId, tabPanelId } from '../../../lib/tabs.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { FOLLOW_UP_PRESETS, followUpMeta, localYmd } from '../../../lib/followUp.ts'
 import type { FollowUpWhen } from '../../../lib/followUp.ts'
+import { navigateHrefHere } from '../../../lib/todayView.ts'
 import type { JobMoney } from '../lib/spine.ts'
 import type { JobPhotos } from './SpineList.tsx'
 import './job-phone.css'
@@ -27,10 +28,6 @@ import './job-phone.css'
 
 function photoLabel(count: number) {
   return count === 1 ? '1 photo' : `${count} photos`
-}
-
-function mapsHref(address: string) {
-  return `https://maps.apple.com/?daddr=${encodeURIComponent(address)}`
 }
 
 export type JobHeaderPhoneProps = {
@@ -136,7 +133,7 @@ export default function JobHeaderPhone({ contact, photos, money, backLabel, onBa
             <QuickAction
               icon={Navigation}
               label="Navigate"
-              href={address ? mapsHref(address) : undefined}
+              href={address ? navigateHrefHere(address) : undefined}
               external
               aria-label={address ? `Navigate to ${address}` : 'Navigate, no address on file'}
             />

@@ -23,6 +23,7 @@ import { useMembership } from '../contexts/MembershipContext.tsx'
 import { EmptyState } from '../ui/index.ts'
 import { parseDateOnly } from '../lib/dates.ts'
 import { useConfirm } from '../components/ConfirmSheet.tsx'
+import PaletteKeyCap, { paletteShortcut } from '../components/desktop/PaletteKeyCap.tsx'
 
 // SubDetail, vendor profile surface at /subs/:key.
 //
@@ -537,10 +538,11 @@ function SubDetailDesktop({
           className="fh-build-search"
           onClick={() => window.dispatchEvent(new CustomEvent('fh:open-palette'))}
           aria-label="Open command palette"
+          aria-keyshortcuts={paletteShortcut().combo}
         >
           <Search size={14} />
           <span>Search vendors, jobs, payments...</span>
-          <kbd>Ctrl K</kbd>
+          <PaletteKeyCap />
         </button>
         <div className="fh-build-topbar__meta">
           <span>{subRows.length.toLocaleString()} job links</span>

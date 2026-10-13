@@ -6,7 +6,8 @@ import {
   X, Trash2, Sparkles, Image as ImageIcon
 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
-import { signedUrlsFor } from '../../../lib/signedUrls.ts'
+import { isSignedUrlFresh, signedUrlEntriesFor, signedUrlsFor } from '../../../lib/signedUrls.ts'
+import type { SignedUrl } from '../../../lib/signedUrls.ts'
 import { compressImageToBlob, compressImageToDataUrl, captionPhoto } from '../../../lib/docIntelligence.ts'
 import { toastError, toastSuccess } from '../../../lib/toast.ts'
 import { hapticTap, hapticSuccess } from '../../../lib/haptics.ts'
@@ -59,7 +60,8 @@ const SCOPE_SECTIONS = [
 export default function PhotosSection({ jobId, userId, incomingFiles = null, onIncomingHandled }: any) {
   const queryClient = useQueryClient()
   const [rows, setRows] = useState<any[]>([])
-  const [thumbUrls, setThumbUrls] = useState<any>({}) // { [rowId]: signedUrl }
+  // Each grid photo's signed URL by row id, with when it was signed.
+  const [thumbUrls, setThumbUrls] = useState<Record<string, SignedUrl>>({})
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [captioningIds, setCaptioningIds] = useState(() => new Set())
@@ -95,11 +97,11 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
     // 50 minutes are reused, so coming back to the job lets the browser
     // cache serve the images instead of downloading them again.
     if (list.length > 0) {
-      const byPath = await signedUrlsFor(queryClient, BUCKET, list.map((r) => r.storage_path))
-      const next: Record<string, any> = {}
+      const byPath = await signedUrlEntriesFor(queryClient, BUCKET, list.map((r) => r.storage_path))
+      const next: Record<string, SignedUrl> = {}
       for (const r of list) {
-        const url = byPath.get(r.storage_path)
-        if (url) next[r.id] = url
+        const entry = byPath.get(r.storage_path)
+        if (entry) next[r.id] = entry
       }
       setThumbUrls(next)
     } else {
@@ -318,8 +320,11 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
     }
   }
 
+  // The grid's URL while it is fresh by when it was signed (the grid can
+  // stay open past its hour); otherwise a fresh one.
   async function urlFor(row: any) {
-    if (thumbUrls[row.id]) return thumbUrls[row.id]
+    const thumb = thumbUrls[row.id]
+    if (thumb && isSignedUrlFresh(thumb.signedAt)) return thumb.url
     const byPath = await signedUrlsFor(queryClient, BUCKET, [row.storage_path])
     return byPath.get(row.storage_path) || ''
   }
@@ -472,7 +477,7 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
       {!loading && rows.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
           {rows.map((r, i) => {
-            const url = thumbUrls[r.id]
+            const url = thumbUrls[r.id]?.url
             const captioning = captioningIds.has(r.id)
             const compareLabel = compareBefore?.row.id === r.id
               ? 'Before'

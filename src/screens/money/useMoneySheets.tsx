@@ -24,6 +24,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import type { ReactNode } from 'react'
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { onInvoiceSent } from '../../lib/invoiceSends.ts'
+import { customerEmail } from '../../lib/customerEmail.ts'
 import type { MoneyInvoiceRow, MoneyRow } from '../../lib/moneyView.ts'
 import InvoiceJobPicker from './InvoiceJobPicker.tsx'
 import InvoiceSheet from './InvoiceSheet.tsx'
@@ -33,10 +34,6 @@ import type { IssuedInvoiceRow, MoneyJob, MoneyScreenProps } from './types.ts'
 // The Send invoice sheet is the existing create invoice flow. It is heavy
 // and only needed after someone picks a job, so it loads on demand.
 const SendInvoiceSheet = lazy(() => import('../../components/SendInvoiceSheet.tsx'))
-
-function emailFor(job: MoneyJob | null | undefined): string {
-  return (job?.email || job?.fh_clients?.email || '').trim()
-}
 
 export type UseMoneySheetsInput = Pick<
   MoneyScreenProps,
@@ -172,7 +169,7 @@ export function useMoneySheets({
         open={remindOpen}
         onOpenChange={showRemind}
         row={remindRow}
-        email={emailFor(remindIssued?.job)}
+        email={customerEmail(remindIssued?.job)}
         sending={remindId !== null && sendingIds.has(remindId)}
         onSend={sendReminder}
       />

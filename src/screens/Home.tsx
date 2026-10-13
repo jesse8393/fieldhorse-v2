@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
-import { MURFREESBORO, weatherQuery } from '../lib/weather.ts'
+import { weatherQuery } from '../lib/weather.ts'
 import { currentForecast } from '../lib/todayView.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { useHomeDashboard, useHomeDashboardRealtime } from '../lib/homeDashboard.ts'
@@ -32,14 +32,16 @@ export default function Home() {
 
   // Weather, through the query cache: one request per location, fresh for
   // 30 minutes and read again on focus. The query waits for the profile
-  // so it asks for the company's own spot, not the fallback first. A
-  // snapshot restored from last night's cache is hours old, so
-  // currentForecast hides it until the refetch lands; the pin errors are
-  // the screen's own.
+  // so it asks for the company's own spot, and with no pinned spot it asks
+  // for nothing: the stage offers the location instead, never another
+  // town's forecast (Phase 8, Task 15). A snapshot restored from last
+  // night's cache is hours old, so currentForecast hides it until the
+  // refetch lands; the pin errors are the screen's own.
   const hasCoords = profile?.location_lat != null && profile?.location_lon != null
-  const lat = profile?.location_lat ?? MURFREESBORO.lat
-  const lon = profile?.location_lon ?? MURFREESBORO.lon
-  const weather = useQuery({ ...weatherQuery(lat, lon), enabled: !profileLoading })
+  const weather = useQuery({
+    ...weatherQuery(Number(profile?.location_lat ?? 0), Number(profile?.location_lon ?? 0)),
+    enabled: !profileLoading && hasCoords
+  })
   const forecast = currentForecast(weather.data, weather.dataUpdatedAt, now)
   const [pinError, setPinError] = useState('')
   const forecastError = pinError || (weather.error ? weather.error.message || 'Forecast unavailable' : '')

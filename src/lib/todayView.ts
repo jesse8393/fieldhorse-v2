@@ -420,3 +420,13 @@ export function navigateHref(address: string, userAgent = '', maxTouchPoints = 0
     ? `https://maps.apple.com/?daddr=${destination}`
     : `https://www.google.com/maps/dir/?api=1&destination=${destination}`
 }
+
+/**
+ * navigateHref for the device this page runs on, for a Navigate link drawn
+ * by a screen: the phone job header and the desktop job page's facts panel,
+ * which an iPad in landscape gets.
+ */
+export function navigateHrefHere(address: string): string {
+  const device = typeof navigator === 'undefined' ? undefined : navigator
+  return navigateHref(address, device?.userAgent ?? '', device?.maxTouchPoints ?? 0)
+}

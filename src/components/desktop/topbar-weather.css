@@ -1,0 +1,24 @@
+/* The "Set location" link a weather slot shows an owner or an admin when
+   the company has no pinned spot (Phase 8, Task 15). It reads in the
+   slot's own color: muted in the older topbars, linen on the job banner's
+   onyx pill. */
+.fh-weather-pin {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.fh-weather-pin:focus-visible {
+  outline: 2px solid var(--fh-focus);
+  outline-offset: 2px;
+  border-radius: var(--fh-r-chip);
+}
+
+.fhd-weather .fh-weather-pin:focus-visible {
+  outline-color: var(--fh-focus-on-onyx);
+}

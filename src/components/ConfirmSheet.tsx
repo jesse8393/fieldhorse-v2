@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { hapticTap } from '../lib/haptics.ts'
 
@@ -24,8 +25,39 @@ import { hapticTap } from '../lib/haptics.ts'
  *     // user confirmed
  *   }
  *
+ * The question is drawn at the app root, so it outlives the screen that
+ * asked. A caller whose question only makes sense while it is on screen
+ * (a sheet asking over itself) passes `signal`, an AbortSignal, and aborts
+ * it when it closes or leaves the page: the question then closes and
+ * answers no (Phase 8, Task 15). Every question also closes, answering
+ * no, when the page changes (the back button while Reopen or Mark lost
+ * asks), so a yes can never act on a job that is no longer on screen.
+ *
  * Mount once at the app root via <ConfirmProvider>.
  */
+
+/**
+ * Lets the page take taps while a question is asked over an open modal
+ * sheet, and returns what puts the sheet's lock back afterwards.
+ *
+ * A modal sheet (vaul, on Radix's dialog) turns pointer events off on the
+ * page while it is open: Radix sets the body's pointer-events to none and
+ * puts back what was there once its last modal layer leaves the page. The
+ * question is drawn on the page, so it needs them back while it asks. The
+ * lock goes back only while the sheet is still in the page, and only over
+ * the value set here: once the sheet has gone (the back button while it
+ * asked), Radix has already freed the page, and writing none again would
+ * leave every tap on the next screen dead until a reload.
+ */
+export function freePageForQuestion(sheet: HTMLElement | null): () => void {
+  const body = document.body
+  const locked = body.style.pointerEvents
+  body.style.pointerEvents = 'auto'
+  return () => {
+    if (!sheet?.isConnected || body.style.pointerEvents !== 'auto') return
+    body.style.pointerEvents = locked
+  }
+}
 
 const ConfirmContext = createContext<any>(null)
 
@@ -45,7 +77,21 @@ export function ConfirmProvider({ children }: any) {
 
   const confirm = useCallback((opts: any) => {
     return new Promise((resolve) => {
+      const signal: AbortSignal | undefined = opts?.signal
+      // Taken back before it opened: nothing to ask.
+      if (signal?.aborted) {
+        resolve(false)
+        return
+      }
       resolverRef.current = resolve
+      // Taken back while it is open: it closes and answers no. A newer
+      // question that has replaced it stays open.
+      signal?.addEventListener('abort', () => {
+        if (resolverRef.current !== resolve) return
+        resolverRef.current = null
+        resolve(false)
+        setState(null)
+      }, { once: true })
       setState({
         title: opts?.title || 'Are you sure?',
         body: opts?.body || '',
@@ -63,6 +109,19 @@ export function ConfirmProvider({ children }: any) {
     }
     setState(null)
   }
+
+  // A new page takes any open question with it, unanswered. Only the path
+  // counts, so a tab change inside the same page (?tab=) leaves it open.
+  const { pathname } = useLocation()
+  const pathRef = useRef(pathname)
+  useEffect(() => {
+    if (pathRef.current === pathname) return
+    pathRef.current = pathname
+    if (!resolverRef.current) return
+    resolverRef.current(false)
+    resolverRef.current = null
+    setState(null)
+  }, [pathname])
 
   return (
     <ConfirmContext.Provider value={confirm}>
@@ -138,8 +197,12 @@ function ConfirmSheet({ state, onCancel, onConfirm }: any) {
     <AnimatePresence>
       {state && (
         <>
+          {/* A tap on the dimmed page answers the question and goes no
+              further, as a tap on the panel already does: a sheet or menu
+              under the question (a Radix layer listening on the document)
+              would otherwise take it as a tap outside itself and close. */}
           <motion.div
-            onPointerDown={(e) => { e.preventDefault(); onCancel() }}
+            onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); onCancel() }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
