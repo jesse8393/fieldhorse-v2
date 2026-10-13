@@ -5,6 +5,10 @@ import { supabase } from '../../../lib/supabase.ts'
 import { toastError, toastSuccess } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { SkeletonList } from '../../../components/Skeleton.tsx'
+import DataErrorState from '../../../components/DataErrorState.tsx'
+import LoadingValue from '../../../components/LoadingValue.tsx'
+import { countNoun } from '../../../lib/format.ts'
+import { keepFocusOnRetry } from '../../../lib/retryFocus.ts'
 import ActionSheet from '../../../components/ActionSheet.tsx'
 import { Eyebrow } from '../../../components/v3'
 import { extensionOf, isBlockedUpload, opensInline } from '../lib/fileTypes.ts'
@@ -26,26 +30,59 @@ function fmtSize(n: any) {
 export default function FilesSection({ jobId, userId }: any) {
   const [rows, setRows] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  // A read of this job's files has landed, so the count and the empty card
+  // can show; until then neither does.
+  const [loaded, setLoaded] = useState(false)
+  // The latest read failed. Files an earlier read brought stay on screen.
+  const [failed, setFailed] = useState(false)
   const [uploading, setUploading] = useState(false)
   // Destructive-confirm sheet state for delete file.
   const [pendingDelete, setPendingDelete] = useState<any>(null)
   const [deleting, setDeleting] = useState(false)
   const inputRef = useRef<any>(null)
+  // The section; Try again leaves focus on the sub tab's panel around it.
+  const rootRef = useRef<HTMLDivElement>(null)
+  // Each read takes the next number and sets state only while it is the
+  // latest: an upload's reread that fails late never marks the files a
+  // delete just read again as failed.
+  const readSeq = useRef(0)
+  useEffect(() => () => { readSeq.current += 1 }, [])
 
   const fetchRows = useCallback(async () => {
     if (!jobId || !userId) return
+    const seq = ++readSeq.current
     setLoading(true)
     // Every file on the job, whoever added it: org RLS scopes the read
     // to teammates and accepted partners.
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('fh_job_files')
       .select('*')
       .eq('job_id', jobId)
       .eq('kind', 'file')
       .order('uploaded_at', { ascending: false })
+    // A newer read has gone out since: it decides.
+    if (seq !== readSeq.current) return
+    // A failed read is never "0 files" or the empty card: it says so, with
+    // Try again, and keeps what an earlier read brought.
+    if (error) {
+      setFailed(true)
+      setLoading(false)
+      return
+    }
     setRows(data || [])
+    setLoaded(true)
+    setFailed(false)
     setLoading(false)
   }, [jobId, userId])
+
+  // Another job's files never stand in for this one's, nor does a read of
+  // them still out.
+  useEffect(() => {
+    readSeq.current += 1
+    setRows([])
+    setLoaded(false)
+    setFailed(false)
+  }, [jobId])
 
   useEffect(() => { fetchRows() }, [fetchRows])
 
@@ -86,7 +123,7 @@ export default function FilesSection({ jobId, userId }: any) {
         if (insErr) throw insErr
         added += 1
       }
-      if (added > 0) toastSuccess('Files uploaded', `Added ${added}`)
+      if (added > 0) toastSuccess(`${countNoun(added, 'File')} uploaded`, `Added ${added}`)
       await fetchRows()
     } catch (ex: any) {
       toastError('Upload failed', ex?.message || 'Try again')
@@ -149,12 +186,16 @@ export default function FilesSection({ jobId, userId }: any) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 24px 24px' }}>
+    <div ref={rootRef} style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 24px 24px' }}>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-        <Eyebrow>
-          {rows.length} {rows.length === 1 ? 'file' : 'files'}
-        </Eyebrow>
+        {loaded ? (
+          <Eyebrow>
+            {rows.length} {rows.length === 1 ? 'file' : 'files'}
+          </Eyebrow>
+        ) : loading ? (
+          <LoadingValue label="Loading files" width={64} height={12} />
+        ) : <span aria-hidden="true" />}
         <motion.button
           type="button"
           whileTap={{ scale: 0.97 }}
@@ -178,8 +219,22 @@ export default function FilesSection({ jobId, userId }: any) {
 
       <input ref={inputRef} type="file" multiple hidden onChange={handleFile} />
 
-      {loading && <SkeletonList rows={2} card={false} />}
-      {!loading && rows.length === 0 && (
+      {/* The skeleton stands in only until a read lands: a reread (after an
+          upload, or Try again) keeps what is on screen. */}
+      {loading && !loaded && <SkeletonList rows={2} card={false} />}
+      {!loading && failed && (
+        <DataErrorState
+          compact
+          title={loaded ? "Couldn't refresh the files" : "Couldn't load the files"}
+          message="Check your connection and try again."
+          actionLabel="Try again"
+          onRetry={() => {
+            keepFocusOnRetry(rootRef.current?.closest<HTMLElement>('[role="tabpanel"]') ?? rootRef.current)
+            void fetchRows()
+          }}
+        />
+      )}
+      {loaded && rows.length === 0 && (
         <div style={{
           padding: '32px 24px', borderRadius: 10,
           background: 'var(--v3-surface)', border: '1px dashed var(--v3-border-strong)',
@@ -192,7 +247,7 @@ export default function FilesSection({ jobId, userId }: any) {
         </div>
       )}
 
-      {!loading && rows.length > 0 && (
+      {rows.length > 0 && (
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
           {rows.map((r) => (
             <li key={r.id} style={{

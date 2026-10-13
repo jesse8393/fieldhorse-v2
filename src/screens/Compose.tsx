@@ -461,7 +461,7 @@ export default function Compose() {
                   Draft · {CHANNELS.find((c) => c.id === channel)?.label}
                 </Eyebrow>
                 <Eyebrow style={{ fontVariantNumeric: 'tabular-nums' }}>
-                  {countWords(draft)} words · {draft.length} chars
+                  {countWords(draft)} {countNoun(countWords(draft), 'word')} · {draft.length} {countNoun(draft.length, 'char')}
                 </Eyebrow>
               </div>
 

@@ -11,13 +11,19 @@
 // second half is the data: hooks for the engine switch, the list and a
 // thread, and mutations for the four functions. Nothing here sends on its
 // own. Every send is a function the person's tap calls, and each mutation
-// refuses a second call while one is still running, so a double tap makes
-// one request.
+// refuses a second call while one is still running or while the thread is
+// being read again after it, so a double tap makes one request.
+//
+// Sends happen now or not at all (Phase 8, Task 11). The mutations run
+// with networkMode 'always' and refuse up front when there is no signal,
+// so none ever waits offline and goes out later. Nothing under the
+// 'inbox' key is saved to the offline cache (lib/queryPersistence.ts), and
+// every thread read is scoped to the active company.
 
-import { useCallback, useMemo } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useCallback, useMemo, useRef, useState } from 'react'
+import { onlineManager, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from './supabase.ts'
-import { useOrgScope } from './orgScope.ts'
+import { useOrgScope, type OrgScope } from './orgScope.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import type { Database, Json } from './database.types.ts'
 import type { ChipTone } from '../components/fh/Chip.tsx'
@@ -78,60 +84,97 @@ export function holdReasonWords(reason: string | null | undefined): string {
 // The draft an agent proposed
 // ---------------------------------------------------------------------------
 
-const BODY_KEYS = ['body', 'text', 'message', 'draft', 'reply', 'content', 'proposed_body']
-// Keys that hold something other than the words of the reply, so the
-// longest string fallback never picks them.
-const NOT_BODY_KEYS = new Set([
-  'channel', 'subject', 'to', 'from', 'kind', 'type', 'action', 'reason', 'rationale', 'reasoning',
-  'confidence', 'status', 'model', 'agent', 'agent_key', 'purpose', 'summary', 'note', 'notes'
-])
+// The keys D26 names for the words of a proposed reply, in the order they
+// are read. Nothing else is ever taken for the reply: a proposal with its
+// words anywhere else shows no draft, so a reason, a note or a summary
+// can never be sent to a customer by mistake.
+const BODY_KEYS = ['body', 'text', 'message', 'draft', 'reply'] as const
+
+type JsonObject = Record<string, Json | undefined>
+
+function asObject(value: Json | undefined): JsonObject | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as JsonObject) : null
+}
 
 function asText(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
 
 /**
- * The words of an agent's proposed reply. Reads the usual keys first
- * (body, text, message, draft, reply, content), one level of nesting, and
- * otherwise the longest sentence in the proposal. Empty when there is none.
+ * The words of an agent's proposed reply: proposal.body, then text,
+ * message, draft or reply, also one level down under those same keys
+ * (proposal.message.body). Empty when none of them holds words.
  */
 export function draftText(proposal: Json | undefined): string {
-  if (typeof proposal === 'string') return proposal.trim()
-  if (!proposal || typeof proposal !== 'object' || Array.isArray(proposal)) return ''
-  const obj = proposal as Record<string, Json | undefined>
-
+  const obj = asObject(proposal)
+  if (!obj) return ''
   for (const key of BODY_KEYS) {
     const direct = asText(obj[key])
     if (direct) return direct
-    const nested = obj[key]
-    if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+    const nested = asObject(obj[key])
+    if (nested) {
       for (const inner of BODY_KEYS) {
-        const text = asText((nested as Record<string, Json | undefined>)[inner])
+        const text = asText(nested[inner])
         if (text) return text
       }
     }
   }
-
-  let best = ''
-  for (const [key, value] of Object.entries(obj)) {
-    if (NOT_BODY_KEYS.has(key)) continue
-    const text = asText(value)
-    if (text.length > best.length) best = text
-  }
-  return best
+  return ''
 }
 
-function draftChannel(proposal: Json | undefined): string | null {
-  if (!proposal || typeof proposal !== 'object' || Array.isArray(proposal)) return null
-  return asText((proposal as Record<string, Json | undefined>).channel) || null
+function proposalField(proposal: Json | undefined, key: string): string | null {
+  return asText(asObject(proposal)?.[key]) || null
+}
+
+/** A channel in the two words a reply can go out by, or null when it is neither. */
+export function draftChannel(channel: string | null | undefined): ReplyChannel | null {
+  const c = String(channel ?? '').trim().toLowerCase()
+  if (c === 'sms' || c === 'text' || c === 'mms') return 'sms'
+  if (c === 'email') return 'email'
+  return null
+}
+
+/** The line on a draft that says how it will go out. */
+export function draftSendsLine({ channel, subject, name }: {
+  channel: ReplyChannel | null
+  subject: string | null | undefined
+  name: string
+}): string {
+  if (channel === 'email') {
+    const s = String(subject ?? '').trim()
+    return s ? `Sends by email: ${s}` : `Sends by email to ${name}`
+  }
+  if (channel === 'sms') return `Sends by text to ${name}`
+  return `Sends to ${name}`
+}
+
+/**
+ * The subject an email reply goes out under: the latest subject in the
+ * thread with "Re: " in front (once), or null when no message has one.
+ */
+export function replySubject(messages: Array<Pick<ThreadMessage, 'subject' | 'created_at'>>): string | null {
+  let latest: { subject: string; at: number } | null = null
+  for (const m of messages) {
+    const subject = String(m.subject ?? '').trim()
+    if (!subject) continue
+    const parsed = Date.parse(m.created_at)
+    const at = Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY
+    if (!latest || at > latest.at) latest = { subject, at }
+  }
+  if (!latest) return null
+  return /^re:/i.test(latest.subject) ? latest.subject : `Re: ${latest.subject}`
 }
 
 // ---------------------------------------------------------------------------
 // A thread in time order
 // ---------------------------------------------------------------------------
 
-/** How a message stands. Only 'sent' and 'received' may look delivered. */
-export type MessageState = 'received' | 'sent' | 'sending' | 'held' | 'failed'
+/**
+ * How a message stands. Only 'sent' and 'received' may look delivered.
+ * 'unsent' reads "Not sent yet": queued, scheduled, or any status this
+ * screen does not know.
+ */
+export type MessageState = 'received' | 'sent' | 'unsent' | 'held' | 'failed'
 
 export type ThreadMessageItem = {
   kind: 'message'
@@ -154,21 +197,29 @@ export type ThreadDraftItem = {
   runId: string
   at: string
   body: string
+  /** The channel the proposal names, as written (see draftChannel). */
   channel: string | null
+  /** The email subject the proposal names, if any. */
+  subject: string | null
+  /** Written before the customer's newest message, so it may answer the wrong thing. */
+  older: boolean
 }
 
 export type ThreadItem = ThreadMessageItem | ThreadDraftItem
 
-const SENDING = new Set(['queued', 'pending', 'sending', 'scheduled', 'draft'])
+const SENT = new Set(['sent', 'delivered', 'read'])
 const FAILED = new Set(['failed', 'bounced', 'undelivered', 'error', 'rejected', 'canceled', 'cancelled'])
 
+// A reply looks sent only on proof: a sent, delivered or read status, or a
+// send time on file. Anything else, including a status this screen has
+// never seen, reads "Not sent yet".
 function messageState(m: ThreadMessage): MessageState {
   if (m.direction !== 'outbound') return 'received'
-  const status = String(m.status ?? '').toLowerCase()
+  const status = String(m.status ?? '').trim().toLowerCase()
   if (String(m.hold_reason ?? '').trim() || status === 'held') return 'held'
   if (FAILED.has(status)) return 'failed'
-  if (SENDING.has(status)) return 'sending'
-  return 'sent'
+  if (SENT.has(status) || String(m.sent_at ?? '').trim()) return 'sent'
+  return 'unsent'
 }
 
 function time(iso: string | null | undefined): number {
@@ -180,11 +231,18 @@ function time(iso: string | null | undefined): number {
  * The messages of a conversation and the drafts agents proposed for it,
  * oldest first. A draft that shares a moment with a message comes after
  * it. A held message carries its reason in words in `held`, and a message
- * that is held, still sending or failed never has the state 'sent'. Runs
- * that are not waiting for approval, and drafts with no words, are left out.
+ * that is held, not sent yet or failed never has the state 'sent'. Runs
+ * that are not waiting for approval, and drafts with no words, are left
+ * out. A draft written before the customer's newest message is `older`.
  */
 export function threadItems(messages: ThreadMessage[], runs: AgentRunRow[]): ThreadItem[] {
   const items: ThreadItem[] = []
+  let newestIn = Number.NEGATIVE_INFINITY
+  for (const m of messages) {
+    if (m.direction === 'outbound') continue
+    const at = Date.parse(m.created_at)
+    if (Number.isFinite(at) && at > newestIn) newestIn = at
+  }
   for (const m of messages) {
     const state = messageState(m)
     items.push({
@@ -203,7 +261,17 @@ export function threadItems(messages: ThreadMessage[], runs: AgentRunRow[]): Thr
     if (r.status !== PROPOSED_STATUS) continue
     const body = draftText(r.proposal)
     if (!body) continue
-    items.push({ kind: 'draft', id: r.id, runId: r.id, at: r.created_at, body, channel: draftChannel(r.proposal) })
+    const at = Date.parse(r.created_at)
+    items.push({
+      kind: 'draft',
+      id: r.id,
+      runId: r.id,
+      at: r.created_at,
+      body,
+      channel: proposalField(r.proposal, 'channel'),
+      subject: proposalField(r.proposal, 'subject'),
+      older: Number.isFinite(at) && at < newestIn
+    })
   }
   return items
     .map((item, index) => ({ item, index }))
@@ -362,14 +430,27 @@ export function onceAtATime<A extends unknown[], T>(fn: (...args: A) => Promise<
 // Query keys
 // ---------------------------------------------------------------------------
 
+export type InboxWrite = 'send' | 'markRead' | 'approve' | 'reject'
+
+// Everything the Inbox reads or writes sits under 'inbox', which the
+// offline cache never saves (lib/queryPersistence.ts). The engine switch
+// has its own key so it is saved, and an offline cold open still shows
+// the Inbox in the dock instead of saying messaging is off. Thread keys
+// carry the company, so a company switch never shows another's rows.
 export const inboxKeys = {
   all: ['inbox'] as const,
-  engine: (orgId: string | null | undefined) => ['inbox', 'engine', orgId ?? null] as const,
+  engine: (orgId: string | null | undefined) => ['inboxEngine', orgId ?? null] as const,
   list: (userId: string | undefined, orgId: string | null | undefined) => ['inbox', 'list', userId ?? null, orgId ?? null] as const,
   listAll: ['inbox', 'list'] as const,
-  thread: (conversationId: string | undefined) => ['inbox', 'thread', conversationId ?? null] as const,
-  messages: (conversationId: string | undefined) => ['inbox', 'thread', conversationId ?? null, 'messages'] as const,
-  runs: (conversationId: string | undefined) => ['inbox', 'thread', conversationId ?? null, 'runs'] as const
+  thread: (orgId: OrgScope, conversationId: string | undefined) =>
+    ['inbox', 'thread', orgId ?? null, conversationId ?? null] as const,
+  messages: (orgId: OrgScope, conversationId: string | undefined) =>
+    ['inbox', 'thread', orgId ?? null, conversationId ?? null, 'messages'] as const,
+  runs: (orgId: OrgScope, conversationId: string | undefined) =>
+    ['inbox', 'thread', orgId ?? null, conversationId ?? null, 'runs'] as const,
+  conversation: (orgId: OrgScope, conversationId: string | undefined) =>
+    ['inbox', 'thread', orgId ?? null, conversationId ?? null, 'conversation'] as const,
+  write: (name: InboxWrite) => ['inbox', name] as const
 }
 
 // A short stale time so coming back to the app, or to the tab, refetches
@@ -439,29 +520,59 @@ const MESSAGE_COLUMNS =
 const NO_MESSAGES: ThreadMessage[] = []
 const NO_RUNS: AgentRunRow[] = []
 
-/** A conversation's messages, plus the agent drafts waiting for approval. */
+/**
+ * A conversation's messages and the agent drafts waiting for approval, read
+ * inside the active company only, plus the conversation's own row.
+ *
+ * The row is read by its id without the company filter, on purpose: it is
+ * how the screen learns that the open conversation belongs to another
+ * company (`outside`), and then it shows "Not in this company" with no
+ * actions. `runsFresh` is true once the drafts were read from the server
+ * after this screen opened; drafts held in memory from an earlier visit
+ * show, but cannot be sent until then.
+ */
 export function useThread(conversationId: string | undefined) {
+  const { user } = useAuth()
+  const orgId = useOrgScope(user?.id)
+  const ready = !!conversationId && typeof orgId === 'string'
+
+  const conversationQuery = useQuery({
+    queryKey: inboxKeys.conversation(orgId, conversationId),
+    queryFn: async (): Promise<InboxRow | null> => {
+      const { data, error } = await supabase
+        .from('fh_v_inbox')
+        .select(INBOX_COLUMNS)
+        .eq('conversation_id', conversationId as string)
+        .limit(1)
+      if (error) throw error
+      return ((data ?? []) as InboxRow[])[0] ?? null
+    },
+    enabled: ready,
+    staleTime: STALE_MS
+  })
   const messagesQuery = useQuery({
-    queryKey: inboxKeys.messages(conversationId),
+    queryKey: inboxKeys.messages(orgId, conversationId),
     queryFn: async (): Promise<ThreadMessage[]> => {
       const { data, error } = await supabase
         .from('fh_messages')
         .select(MESSAGE_COLUMNS)
+        .eq('org_id', orgId as string)
         .eq('conversation_id', conversationId as string)
         .order('created_at', { ascending: false })
         .limit(200)
       if (error) throw error
       return (data ?? []) as ThreadMessage[]
     },
-    enabled: !!conversationId,
+    enabled: ready,
     staleTime: STALE_MS
   })
   const runsQuery = useQuery({
-    queryKey: inboxKeys.runs(conversationId),
+    queryKey: inboxKeys.runs(orgId, conversationId),
     queryFn: async (): Promise<AgentRunRow[]> => {
       const { data, error } = await supabase
         .from('fh_agent_runs')
         .select('id, conversation_id, status, proposal, created_at')
+        .eq('org_id', orgId as string)
         .eq('conversation_id', conversationId as string)
         .eq('status', PROPOSED_STATUS)
         .order('created_at', { ascending: false })
@@ -469,8 +580,12 @@ export function useThread(conversationId: string | undefined) {
       if (error) throw error
       return (data ?? []) as AgentRunRow[]
     },
-    enabled: !!conversationId,
-    staleTime: STALE_MS
+    enabled: ready,
+    staleTime: STALE_MS,
+    // Always read the drafts again on opening, even when the copy in
+    // memory is new: a draft approved or discarded elsewhere must not be
+    // sendable from here.
+    refetchOnMount: 'always'
   })
   const refetchMessages = messagesQuery.refetch
   const refetchRuns = runsQuery.refetch
@@ -478,11 +593,20 @@ export function useThread(conversationId: string | undefined) {
     void refetchMessages()
     void refetchRuns()
   }, [refetchMessages, refetchRuns])
+
+  const conversation = conversationQuery.data ?? null
+  const outside = !!conversation?.org_id && typeof orgId === 'string' && conversation.org_id !== orgId
   return {
+    orgId,
+    /** The conversation's row in fh_v_inbox, whichever company it is in; null when not found or not read yet. */
+    conversation,
+    /** True when the open conversation belongs to another company. */
+    outside,
     messages: messagesQuery.data ?? NO_MESSAGES,
     runs: runsQuery.data ?? NO_RUNS,
+    runsFresh: runsQuery.isFetchedAfterMount && !runsQuery.isError,
     // Drafts are an extra: a failed drafts read leaves the messages usable.
-    isLoading: messagesQuery.isLoading,
+    isLoading: orgId === undefined || messagesQuery.isLoading,
     isError: messagesQuery.isError,
     refetch
   }
@@ -533,58 +657,114 @@ async function rpcRejectDraft(runId: string, reason?: string): Promise<void> {
 
 export type ActionResult<T = void> =
   | { ok: true; data: T }
-  | { ok: false; skipped: true }
-  | { ok: false; skipped?: false; error: unknown }
+  /** Another call is still running, or the thread is still being read after one. */
+  | { ok: false; reason: 'busy' }
+  /** No signal: nothing was sent, and nothing will be sent later. */
+  | { ok: false; reason: 'offline' }
+  /** The request failed or never answered, so it may or may not have gone out. */
+  | { ok: false; reason: 'failed'; error: unknown }
 
 /**
- * A mutation that refuses a second call while one is running. `run` never
- * throws: it resolves { ok: true, data }, { ok: false, skipped: true } for
- * a call made mid flight, or { ok: false, error }.
+ * A mutation that runs now or not at all, and once at a time.
+ *
+ *   * networkMode 'always': TanStack never parks it to run when the signal
+ *     comes back. With no signal, `run` refuses before calling anything.
+ *   * After every attempt, failed or not, `settle` reads the thread again
+ *     (onSettled), and the next call waits until that read lands, so a
+ *     second Send happens only once the person can see what went out.
+ *   * The mutation key is under 'inbox', which the offline cache never
+ *     saves, so it is never persisted or resumed.
+ *
+ * `run` never throws. The caller hears the outcome as soon as the request
+ * settles; `pending` stays true until the read after it lands.
  */
 function useGuardedMutation<V, D>(options: {
+  name: InboxWrite
   mutationFn: (vars: V) => Promise<D>
   onSuccess?: (data: D, vars: V) => void
+  settle: () => Promise<unknown>
 }) {
-  const mutation = useMutation<D, unknown, V>({ mutationFn: options.mutationFn, onSuccess: options.onSuccess })
-  const { mutateAsync } = mutation
-  const guarded = useMemo(() => onceAtATime((vars: V) => mutateAsync(vars)), [mutateAsync])
-  const run = useCallback(async (vars: V): Promise<ActionResult<D>> => {
-    try {
-      const result = await guarded(vars)
-      return result.ran ? { ok: true, data: result.value } : { ok: false, skipped: true }
-    } catch (error) {
-      return { ok: false, error }
+  const { name, mutationFn, onSuccess, settle } = options
+  const settling = useRef<Promise<unknown>>(Promise.resolve())
+  const mutation = useMutation<D, unknown, V>({
+    mutationKey: inboxKeys.write(name),
+    mutationFn,
+    networkMode: 'always',
+    retry: 0,
+    onSuccess,
+    // Not returned, so the outcome is not held back by the read.
+    onSettled: () => {
+      settling.current = settle()
     }
-  }, [guarded])
-  return { run, pending: mutation.isPending }
+  })
+  const { mutateAsync } = mutation
+  const [busy, setBusy] = useState(false)
+
+  const guarded = useMemo(
+    () =>
+      onceAtATime(async (vars: V, report: (result: ActionResult<D>) => void) => {
+        setBusy(true)
+        try {
+          try {
+            report({ ok: true, data: await mutateAsync(vars) })
+          } catch (error) {
+            report({ ok: false, reason: 'failed', error })
+          }
+          await settling.current.catch(() => undefined)
+        } finally {
+          setBusy(false)
+        }
+      }),
+    [mutateAsync]
+  )
+
+  const run = useCallback(
+    (vars: V) =>
+      new Promise<ActionResult<D>>((resolve) => {
+        if (!onlineManager.isOnline()) {
+          resolve({ ok: false, reason: 'offline' })
+          return
+        }
+        void guarded(vars, resolve).then((outcome) => {
+          if (!outcome.ran) resolve({ ok: false, reason: 'busy' })
+        })
+      }),
+    [guarded]
+  )
+  return { run, pending: busy || mutation.isPending }
 }
 
 /**
- * The four writes for one conversation, as guarded TanStack mutations.
- * After each, the list and the thread are fetched again, and an approved
- * or discarded draft leaves the cache at once so it cannot be tapped twice.
+ * The four writes for one conversation in the active company, as guarded
+ * TanStack mutations. After each, the list and the thread are read again,
+ * and an approved or discarded draft leaves the cache at once so it cannot
+ * be tapped twice.
  */
-export function useInboxActions(conversationId: string | undefined) {
+export function useInboxActions(conversationId: string | undefined, orgId: OrgScope) {
   const queryClient = useQueryClient()
 
-  const refresh = useCallback(() => {
+  const settle = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: inboxKeys.listAll })
-    void queryClient.invalidateQueries({ queryKey: inboxKeys.thread(conversationId) })
-  }, [queryClient, conversationId])
+    return queryClient.invalidateQueries({ queryKey: inboxKeys.thread(orgId, conversationId) })
+  }, [queryClient, orgId, conversationId])
 
   const dropRun = useCallback((runId: string) => {
-    queryClient.setQueryData<AgentRunRow[]>(inboxKeys.runs(conversationId), (old) => old?.filter((r) => r.id !== runId))
-  }, [queryClient, conversationId])
+    queryClient.setQueryData<AgentRunRow[]>(inboxKeys.runs(orgId, conversationId), (old) => old?.filter((r) => r.id !== runId))
+  }, [queryClient, orgId, conversationId])
 
-  const send = useGuardedMutation({ mutationFn: rpcSendMessage, onSuccess: refresh })
-  const mark = useGuardedMutation({ mutationFn: rpcMarkRead, onSuccess: refresh })
+  const send = useGuardedMutation({ name: 'send', mutationFn: rpcSendMessage, settle })
+  const mark = useGuardedMutation({ name: 'markRead', mutationFn: rpcMarkRead, settle })
   const approve = useGuardedMutation({
+    name: 'approve',
     mutationFn: (vars: { runId: string; body: string }) => rpcApproveDraft(vars.runId, vars.body),
-    onSuccess: (_id, vars) => { dropRun(vars.runId); refresh() }
+    onSuccess: (_id, vars) => dropRun(vars.runId),
+    settle
   })
   const reject = useGuardedMutation({
+    name: 'reject',
     mutationFn: (vars: { runId: string; reason?: string }) => rpcRejectDraft(vars.runId, vars.reason),
-    onSuccess: (_void, vars) => { dropRun(vars.runId); refresh() }
+    onSuccess: (_void, vars) => dropRun(vars.runId),
+    settle
   })
 
   return {

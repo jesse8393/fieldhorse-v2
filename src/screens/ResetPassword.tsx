@@ -85,7 +85,11 @@ export default function ResetPassword() {
           />
 
           {error && <p role="alert" className="fha-alert">{error}</p>}
-          {notice && <p role="status" className="fha-notice">{notice}</p>}
+          {/* Screen readers announce the notice (password updated) from
+              this region. It stays mounted, as on Login, because a live
+              region added together with its text is often skipped. */}
+          <p role="status" className="fhc-vh">{notice}</p>
+          {notice && <p aria-hidden="true" className="fha-notice">{notice}</p>}
 
           <div className="fha-actions">
             <Button type="submit" variant="primary" size="lg" block data-fha-primary loading={busy}>

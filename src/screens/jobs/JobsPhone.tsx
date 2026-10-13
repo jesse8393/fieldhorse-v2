@@ -1,7 +1,8 @@
 // Jobs on a phone (spec 9.3, render base/jobs.jpg). Below 900 px Work.tsx
 // renders this in place of the deal cards: a condensed "Jobs" title with
-// New lead, search and filter beside it, text tabs with counts (All,
-// Leads, Quotes, Jobs, Done, decision D3), then grouped hairline rows.
+// New lead (for the roles that sell, never crew or a foreman), search and
+// filter beside it, text tabs with counts (All, Leads, Quotes, Jobs, Done,
+// decision D3), then grouped hairline rows.
 // Lost jobs sit behind the filter sheet. Each row links to its job,
 // where the stage actions live.
 //
@@ -17,8 +18,8 @@ import { Button, Chip, EmptyState, Field, IconButton, Row, SkeletonRows } from '
 import DataErrorState from '../../components/DataErrorState.tsx'
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useNavAccess } from '../../lib/useNavAccess.ts'
-import { useScheduleEvents, type JobRow } from '../../lib/queries.ts'
-import { buildJobsList, JOBS_TABS, type JobsRowView, type JobsSort, type JobsTab } from '../../lib/jobsList.ts'
+import { useJobVisits, type JobRow } from '../../lib/queries.ts'
+import { buildJobsList, jobsVisitWindow, JOBS_TABS, type JobsRowView, type JobsSort, type JobsTab } from '../../lib/jobsList.ts'
 import { handleTablistKeyDown, tabId, tabPanelId, tabPanelProps } from '../../lib/tabs.ts'
 import { todayYmd } from '../../lib/dates.ts'
 import { hapticTap } from '../../lib/haptics.ts'
@@ -41,7 +42,8 @@ export type JobsPhoneProps = {
   showMoney: boolean
   /** Field roles see only the work they are on: no Leads or Quotes tabs. */
   fieldView: boolean
-  onNewLead: () => void
+  /** Opens the new lead sheet. Left out for field roles, who get no New lead. */
+  onNewLead?: () => void
 }
 
 // Old links: ?stage=active was the Jobs tab, ?stage=lost the Lost chip.
@@ -62,16 +64,6 @@ const EMPTY_TAB: Record<JobsTab, string> = {
   quotes: 'No quotes waiting.',
   jobs: 'No jobs in progress.',
   done: 'Nothing finished yet.'
-}
-
-// Visits from 60 days back (so a job already under way reads "Next visit"
-// rather than "Starts") to two weeks ahead.
-function visitWindow(dayKey: string): { start: string; end: string } {
-  const [y, m, d] = dayKey.split('-').map(Number)
-  return {
-    start: new Date(y, m - 1, d - 60).toISOString(),
-    end: new Date(y, m - 1, d + 15).toISOString()
-  }
 }
 
 function rowEnd(row: JobsRowView): ReactNode {
@@ -125,9 +117,11 @@ export default function JobsPhone({
   const requestedTab = tabFromStage(stageParam)
   const tab: JobsTab = tabs.some((t) => t.id === requestedTab) ? requestedTab : 'all'
 
+  // Visits from 14 days back (so a job already under way reads "Next visit"
+  // rather than "Starts") to two weeks ahead: only each visit's job and start.
   const dayKey = todayYmd()
-  const range = useMemo(() => visitWindow(dayKey), [dayKey])
-  const { data: visits } = useScheduleEvents(user?.id, range.start, range.end)
+  const range = useMemo(() => jobsVisitWindow(dayKey), [dayKey])
+  const { data: visits } = useJobVisits(user?.id, range.start, range.end)
 
   const view = useMemo(
     () => buildJobsList({ jobs, tab, showLost, showMoney, now: new Date(), visits, sort }),
@@ -219,12 +213,12 @@ export default function JobsPhone({
     body = view.groups.map((g) => {
       const headingId = `${idBase}-group-${g.id}`
       return (
-        <section key={g.id} className="fhj-group" aria-labelledby={headingId}>
-          <div className="fhj-group__head">
-            <h2 className="fhj-group__title" id={headingId}>{g.title}</h2>
-            <p className="fhj-group__note">{g.note}</p>
+        <section key={g.id} className="fhjl-group" aria-labelledby={headingId}>
+          <div className="fhjl-group__head">
+            <h2 className="fhjl-group__title" id={headingId}>{g.title}</h2>
+            <p className="fhjl-group__note">{g.note}</p>
           </div>
-          <ul className="fhj-rows">
+          <ul className="fhjl-rows">
             {g.rows.map((r) => (
               <Row
                 key={r.id}
@@ -243,13 +237,15 @@ export default function JobsPhone({
   }
 
   return (
-    <div className="v3-screen fhj">
-      <div className="fhj-head">
-        <h1 className="fhj-title">Jobs</h1>
-        <div className="fhj-head__actions">
-          <Button variant="secondary" size="mini" icon={Plus} onClick={onNewLead}>
-            New lead
-          </Button>
+    <div className="v3-screen fhjl">
+      <div className="fhjl-head">
+        <h1 className="fhjl-title">Jobs</h1>
+        <div className="fhjl-head__actions">
+          {onNewLead && (
+            <Button variant="secondary" size="mini" icon={Plus} onClick={onNewLead}>
+              New lead
+            </Button>
+          )}
           <IconButton
             aria-label="Search jobs"
             icon={Search}
@@ -269,7 +265,7 @@ export default function JobsPhone({
       </div>
 
       {searchOpen && (
-        <div className="fhj-search">
+        <div className="fhjl-search">
           <Field
             ref={searchRef}
             id={searchFieldId}
@@ -288,7 +284,7 @@ export default function JobsPhone({
         </div>
       )}
 
-      <div className="fhj-tabs" role="tablist" aria-label="Job stages" onKeyDown={handleTablistKeyDown}>
+      <div className="fhjl-tabs" role="tablist" aria-label="Job stages" onKeyDown={handleTablistKeyDown}>
         {tabs.map((t) => {
           const selected = t.id === tab
           return (
@@ -300,19 +296,19 @@ export default function JobsPhone({
               aria-selected={selected}
               aria-controls={tabPanelId(idBase, t.id)}
               tabIndex={selected ? 0 : -1}
-              className="fhj-tab"
+              className="fhjl-tab"
               onClick={() => { if (!selected) selectTab(t.id) }}
             >
-              <span className="fhj-tab__label">{t.label}</span>
-              {!loading && <span className="fhj-tab__count">{view.counts[t.id]}</span>}
+              <span className="fhjl-tab__label">{t.label}</span>
+              {!loading && <span className="fhjl-tab__count">{view.counts[t.id]}</span>}
             </button>
           )
         })}
       </div>
 
-      <div className="fhj-list" {...tabPanelProps(idBase, tab)}>
+      <div className="fhjl-list" {...tabPanelProps(idBase, tab)}>
         {loadError && jobs.length > 0 && (
-          <div className="fhj-notice">
+          <div className="fhjl-notice">
             <DataErrorState
               compact
               title="Could not refresh"
@@ -322,7 +318,7 @@ export default function JobsPhone({
             />
           </div>
         )}
-        {hasRows ? body : <div className="fhj-state">{body}</div>}
+        {hasRows ? body : <div className="fhjl-state">{body}</div>}
       </div>
 
       <JobsFilterSheet

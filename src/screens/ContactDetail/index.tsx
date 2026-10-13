@@ -6,7 +6,7 @@ import { XCircle, ArrowRight } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useMembership } from '../../contexts/MembershipContext.tsx'
 import { supabase } from '../../lib/supabase.ts'
-import { markLost, startQuote, reopen } from '../../lib/pipeline.ts'
+import { markLost, startQuote, reopen, reopenQuestion } from '../../lib/pipeline.ts'
 import { stageColor, margin } from '../../lib/stages.ts'
 import { toastSuccess, toastError } from '../../lib/toast.ts'
 import { hapticTap, hapticError } from '../../lib/haptics.ts'
@@ -508,8 +508,11 @@ export default function ContactDetail() {
     setTab('quote')
   }
 
+  // Reopen asks first, like Mark lost below (Phase 8, Task 15).
   async function onReopen() {
     if (!contact) return
+    const ok = await confirm(reopenQuestion(contact))
+    if (!ok) return
     const res: any = await reopen(contact)
     if (res?.error) {
       toastError("Couldn't reopen", res.error.message || 'Try again')

@@ -47,8 +47,13 @@ const contacts = [
 const payments = [
   { id: 'p1', user_id: USER.id, contact_id: 'c-job2', amount: 6400, method: 'check', reference: '1042', paid_on: iso(now - 6 * day).slice(0, 10), created_at: iso(now - 6 * day) }
 ]
+// Harold's $6,400 payment paid his deposit; progress draw 1 is the open
+// bill. Without the paid deposit, Money (Phase 8, task 5) reads money
+// logged against a job as paying its oldest open bill, as logPayment would
+// have marked the draw paid.
 const invoices = [
-  { id: 'inv1', user_id: USER.id, contact_id: 'c-job2', title: 'Progress draw 1', amount: 6400, status: 'sent', sequence_number: 1, issued_at: iso(now - 8 * day), due_at: iso(now + 6 * day), created_at: iso(now - 8 * day) }
+  { id: 'inv0', user_id: USER.id, contact_id: 'c-job2', title: 'Deposit', amount: 6400, status: 'paid', sequence_number: 1, issued_at: iso(now - 14 * day), due_at: iso(now - 7 * day), created_at: iso(now - 14 * day) },
+  { id: 'inv1', user_id: USER.id, contact_id: 'c-job2', title: 'Progress draw 1', amount: 6400, status: 'sent', sequence_number: 2, issued_at: iso(now - 8 * day), due_at: iso(now + 6 * day), created_at: iso(now - 8 * day) }
 ]
 const schedule = [
   { id: 's1', user_id: USER.id, contact_id: 'c-job1', title: 'Pour slab — crew A', description: 'Bellevue site', start_at: iso(now + 2 * 3600e3), end_at: iso(now + 6 * 3600e3), created_at: iso(now - day) }

@@ -3,12 +3,14 @@
 // visits carry assigned_to), and the Up next list so every visit in the
 // next days stays one click away.
 
+import { useLayoutEffect, useRef, useState } from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import { GripVertical, Plus } from 'lucide-react'
 import { Button, Icon, SkeletonRows } from '../../fh'
-import { hoursLabel, jobLabel, jobSubline, timeLabel, WEEKDAYS } from '../../../lib/scheduleBoard.ts'
+import { capTray, hoursLabel, jobLabel, jobSubline, timeLabel, TRAY_LIMIT, WEEKDAYS } from '../../../lib/scheduleBoard.ts'
 import type { JobRow } from '../../../lib/queries.ts'
 import type { BoardEvent } from './types.ts'
+import { keepFocusOnRetry } from '../../../lib/retryFocus.ts'
 
 export const TRAY_HINT_ID = 'fhsch-tray-hint'
 
@@ -30,13 +32,27 @@ export function TrayCardFace({ job, floating = false }: { job: JobRow; floating?
   )
 }
 
-function TrayCard({ job, onSchedule }: { job: JobRow; onSchedule: (job: JobRow) => void }) {
+type TrayCardProps = {
+  job: JobRow
+  /** False in Month view, where there is no hour to drop on. */
+  canDrag: boolean
+  /** A drop of this job is saving: the card waits, dimmed, and neither drags nor schedules. */
+  saving: boolean
+  onSchedule: (job: JobRow) => void
+}
+
+function TrayCard({ job, canDrag, saving, onSchedule }: TrayCardProps) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, isDragging } = useDraggable({
     id: `job:${job.id}`,
-    data: { job }
+    data: { job },
+    disabled: !canDrag || saving
   })
   return (
-    <article ref={setNodeRef} className={`fhsch-card${isDragging ? ' is-dragging' : ''}`}>
+    <article
+      ref={setNodeRef}
+      className={`fhsch-card${isDragging ? ' is-dragging' : ''}${saving ? ' is-saving' : ''}`}
+      aria-busy={saving || undefined}
+    >
       <button
         type="button"
         ref={setActivatorNodeRef}
@@ -57,44 +73,89 @@ function TrayCard({ job, onSchedule }: { job: JobRow; onSchedule: (job: JobRow) 
           variant="secondary"
           size="mini"
           aria-describedby={`fhsch-card-${job.id}`}
+          disabled={saving}
           onClick={() => onSchedule(job)}
         >
           Schedule
         </Button>
+        {saving && <span className="fhsch-card__saving">Saving</span>}
       </div>
     </article>
   )
 }
 
 type TrayProps = {
-  jobs: JobRow[]
+  /** Null until both the jobs and the visits from today on are in. */
+  jobs: JobRow[] | null
+  /** True while either list is still on its first load. */
   loading: boolean
+  /** True when either list failed: alone when there is nothing to show, above the cards when a reload failed. */
   failed: boolean
   hasAnyJob: boolean
+  /** False in Month view: the cards hold still and the hint says to switch to Week. */
+  canDrag: boolean
+  /** Jobs whose drop is saving. */
+  saving: ReadonlySet<string>
   onRetry: () => void
   onSchedule: (job: JobRow) => void
 }
 
-export function UnscheduledTray({ jobs, loading, failed, hasAnyJob, onRetry, onSchedule }: TrayProps) {
+export function UnscheduledTray({ jobs, loading, failed, hasAnyJob, canDrag, saving, onRetry, onSchedule }: TrayProps) {
+  // The first 50 cards, then "Show all N", so a long backlog never builds
+  // hundreds of drag handles at once.
+  const [showAll, setShowAll] = useState(false)
+  const { shown, hidden } = capTray(jobs ?? [], showAll)
+  // "Show all" unmounts itself, so focus would fall to the page. Move it to
+  // the first card the button revealed instead, so the keyboard path goes on.
+  const trayRef = useRef<HTMLDivElement>(null)
+  const focusRevealed = useRef(false)
+  useLayoutEffect(() => {
+    if (!showAll || !focusRevealed.current) return
+    focusRevealed.current = false
+    trayRef.current?.querySelectorAll<HTMLElement>('.fhsch-handle')[TRAY_LIMIT]?.focus()
+  }, [showAll])
   return (
     <section className="fhsch-rail__section" aria-label="Unscheduled jobs">
       <h2 className="fhsch-rail__title">Unscheduled</h2>
-      <p className="fhsch-rail__hint" id={TRAY_HINT_ID}>Drag onto the week, or use Schedule.</p>
+      <p className="fhsch-rail__hint" id={TRAY_HINT_ID}>
+        {canDrag ? 'Drag onto the week, or use Schedule.' : 'Switch to Week to drag a job onto a day.'}
+      </p>
       {loading ? (
-        <SkeletonRows rows={3} label="Loading jobs" />
-      ) : failed ? (
-        <div className="fhsch-rail__empty" role="alert">
-          <p>Couldn't load jobs.</p>
-          <Button variant="quiet" size="mini" onClick={onRetry}>Try again</Button>
-        </div>
-      ) : jobs.length === 0 ? (
-        <p className="fhsch-rail__empty">
-          {hasAnyJob ? 'Every job has a date on the calendar.' : 'No jobs yet. Add one with New job.'}
-        </p>
+        <SkeletonRows rows={3} label="Loading unscheduled jobs" />
       ) : (
-        <div className="fhsch-tray">
-          {jobs.map((job) => <TrayCard key={job.id} job={job} onSchedule={onSchedule} />)}
-        </div>
+        <>
+          {failed && (
+            <div className={`fhsch-rail__empty${jobs ? ' is-above' : ''}`} role="alert">
+              <p>
+                {jobs
+                  ? "Couldn't refresh this list, so it may be out of date. Check your connection and try again."
+                  : "Couldn't load unscheduled jobs. Check your connection and try again."}
+              </p>
+              <Button variant="quiet" size="mini" onClick={onRetry}>Try again</Button>
+            </div>
+          )}
+          {jobs && jobs.length === 0 && (
+            <p className="fhsch-rail__empty">
+              {hasAnyJob ? 'Every job has a date on the calendar.' : 'No jobs yet. Add one with New job.'}
+            </p>
+          )}
+          {jobs && jobs.length > 0 && (
+            <>
+              <div className="fhsch-tray" ref={trayRef}>
+                {shown.map((job) => (
+                  <TrayCard key={job.id} job={job} canDrag={canDrag} saving={saving.has(job.id)} onSchedule={onSchedule} />
+                ))}
+              </div>
+              {hidden > 0 && (
+                <div className="fhsch-tray__more">
+                  <Button variant="secondary" size="mini" onClick={() => { focusRevealed.current = true; setShowAll(true) }}>
+                    Show all {jobs.length}
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+        </>
       )}
     </section>
   )
@@ -129,37 +190,78 @@ export function CrewThisWeek({
   )
 }
 
+// Up next tells the truth the way the tray does (D39): skeleton rows until
+// its read is in, an error line with Try again when the read fails (alone
+// when there is nothing to show, above the list when a reload failed), and
+// "Nothing scheduled" only after a read that found nothing. Try again leaves
+// focus on the section, which stays while the error goes.
 export function UpNext({
   events,
+  loading,
+  failed,
+  onRetry,
   onOpenEvent,
   onAddEvent
 }: {
-  events: BoardEvent[]
+  /** Null until the first read is in. */
+  events: BoardEvent[] | null
+  /** True while the first read is out. */
+  loading: boolean
+  /** True when the read failed. */
+  failed: boolean
+  onRetry: () => void
   onOpenEvent?: (event: BoardEvent) => void
   onAddEvent: () => void
 }) {
+  const sectionRef = useRef<HTMLElement>(null)
   return (
-    <section className="fhsch-rail__section" aria-label="Up next">
+    <section ref={sectionRef} className="fhsch-rail__section" aria-label="Up next" tabIndex={-1}>
       <div className="fhsch-rail__head">
         <h2 className="fhsch-rail__title">Up next</h2>
         <Button variant="secondary" size="mini" icon={Plus} onClick={onAddEvent}>New event</Button>
       </div>
-      {events.length === 0 ? (
-        <p className="fhsch-rail__empty">Nothing scheduled in the next 7 days.</p>
+      {loading ? (
+        <SkeletonRows rows={2} label="Loading what is up next" />
       ) : (
-        <ul className="fhsch-upnext">
-          {events.slice(0, 4).map((e) => {
-            const start = new Date(e.start_at as string)
-            return (
-              <li key={e.id}>
-                <button type="button" className="fhsch-upnext__row" onClick={() => onOpenEvent?.(e)}>
-                  <span className="fhsch-upnext__when">{WEEKDAYS[start.getDay()]} {timeLabel(start)}</span>
-                  <span className="fhsch-upnext__title">{e.title || 'Untitled event'}</span>
-                </button>
-              </li>
-            )
-          })}
-        </ul>
+        <>
+          {failed && (
+            <div className={`fhsch-rail__empty${events ? ' is-above' : ''}`} role="alert">
+              <p>
+                {events
+                  ? "Couldn't refresh this list, so it may be out of date. Check your connection and try again."
+                  : "Couldn't load the next 7 days. Check your connection and try again."}
+              </p>
+              <Button
+                variant="quiet"
+                size="mini"
+                onClick={() => {
+                  keepFocusOnRetry(sectionRef.current)
+                  onRetry()
+                }}
+              >
+                Try again
+              </Button>
+            </div>
+          )}
+          {events && events.length === 0 && (
+            <p className="fhsch-rail__empty">Nothing scheduled in the next 7 days.</p>
+          )}
+          {events && events.length > 0 && (
+            <ul className="fhsch-upnext">
+              {events.slice(0, 4).map((e) => {
+                const start = new Date(e.start_at as string)
+                return (
+                  <li key={e.id}>
+                    <button type="button" className="fhsch-upnext__row" onClick={() => onOpenEvent?.(e)}>
+                      <span className="fhsch-upnext__when">{WEEKDAYS[start.getDay()]} {timeLabel(start)}</span>
+                      <span className="fhsch-upnext__title">{e.title || 'Untitled event'}</span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </>
       )}
     </section>
   )

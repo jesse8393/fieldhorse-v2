@@ -61,6 +61,18 @@
   color: var(--fh-ink-2);
 }
 
+/* The linked client's email could not be read: the line, then Try again
+   with its label on the line's left edge. */
+.fhq-head__retry {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+}
+
+.fhq-head .fhq-head__retry-btn {
+  margin-left: -12px;
+}
+
 /* ================================================================
    Panels: the customer's change request, the approved note
    ================================================================ */
@@ -247,7 +259,9 @@
   background: var(--fh-ink);
 }
 
-.fhq-page .fhq-switch:disabled {
+/* aria-disabled while its save is out: it keeps focus (QuotePhone.tsx). */
+.fhq-page .fhq-switch:disabled,
+.fhq-page .fhq-switch[aria-disabled='true'] {
   cursor: not-allowed;
   opacity: 0.55;
 }

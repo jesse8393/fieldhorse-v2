@@ -56,6 +56,33 @@ const QUIET_LEADS = Array.from({ length: 25 }, (_, i) => ({
   completed_at: null
 }))
 
+// Last night at 9:00 pm Central, and 6:30 the next morning. Last night's
+// bundle read Friday's two visits as tomorrow.
+const LAST_NIGHT = new Date('2026-10-09T02:00:00Z')
+const NEXT_MORNING = new Date('2026-10-09T11:30:00Z')
+const FRIDAY_MEASURE = { id: 's5', contact_id: 'c-job2', title: 'Castellanos site measure', start_at: '2026-10-09T18:00:00Z', end_at: '2026-10-09T19:00:00Z', user_id: 'qa-user-1', description: null, created_at: '2026-10-01T12:00:00Z' }
+
+// What the app saved in IndexedDB for an offline cold open, read without
+// creating the database when it is not there yet.
+function savedCache(page: Page) {
+  return page.evaluate(() => new Promise<string>((resolve) => {
+    const open = indexedDB.open('keyval-store')
+    open.onupgradeneeded = () => open.transaction?.abort()
+    open.onerror = () => resolve('')
+    open.onsuccess = () => {
+      const db = open.result
+      try {
+        const read = db.transaction('keyval', 'readonly').objectStore('keyval').get('fh-query-cache')
+        read.onsuccess = () => { db.close(); resolve(typeof read.result === 'string' ? read.result : '') }
+        read.onerror = () => { db.close(); resolve('') }
+      } catch {
+        db.close()
+        resolve('')
+      }
+    }
+  }))
+}
+
 async function seeAllAnswers(page: Page) {
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(/ 25 things before tomorrow\.$/)
   const answers = page.getByRole('region', { name: 'Needs an answer' })
@@ -65,6 +92,47 @@ async function seeAllAnswers(page: Page) {
   await expect(answers.getByRole('listitem')).toHaveCount(20)
   await expect(answers.getByText('Showing 20 of 25, most urgent first.')).toBeVisible()
   await expect(answers.getByRole('listitem').first()).toContainText('Quiet lead 25')
+}
+
+// Today loaded at 9:00 pm, then opened again at 6:30 the next morning with
+// no signal. Last night's bundle listed Friday's two visits as tomorrow,
+// and the forecast it saved is hours old, so neither may read as now.
+async function coldOpen(context: BrowserContext, page: Page) {
+  // The clock runs from 9:00 pm here, because the cache writer waits for
+  // time to pass between saves and a fixed clock would stop it.
+  await signIn(context, { tables: { fh_schedule: [...SCHEDULE, FRIDAY_MEASURE] } })
+  await context.route('https://api.open-meteo.com/**', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(forecast()) })
+  )
+  await page.clock.setSystemTime(LAST_NIGHT)
+  await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByRole('region', { name: 'Tomorrow' }).getByRole('listitem')).toHaveCount(2, { timeout: 30_000 })
+  await expect(page.getByText('Tomorrow 68° and clear. Final slab inspection at 9:00, then Castellanos site measure at 1:00.')).toBeVisible()
+  // The cache is saved a moment after the screen settles, the forecast
+  // with it.
+  await expect.poll(() => savedCache(page), { timeout: 20_000 }).toContain('Castellanos site measure')
+  await expect.poll(() => savedCache(page), { timeout: 20_000 }).toContain('["weather",')
+
+  // This morning neither the schedule nor the forecast can load, so Today
+  // reads last night's cache.
+  await context.route((url) => url.pathname.endsWith('/rest/v1/fh_schedule'), (route) => route.abort('internetdisconnected'))
+  await context.route('https://api.open-meteo.com/**', (route) => route.abort('internetdisconnected'))
+  await page.clock.setSystemTime(NEXT_MORNING)
+  await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 })
+
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Two stops. First at 9:00.', { timeout: 30_000 })
+  await expect(page.getByText('Friday, October 9')).toBeVisible()
+  const day = page.getByRole('region', { name: 'Your day' })
+  await expect(day.getByRole('listitem')).toHaveCount(2)
+  await expect(day.getByText('Final slab inspection')).toBeVisible()
+  await expect(day.getByText('Castellanos site measure')).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Next stop' }).getByText('Next stop, 9:00 am')).toBeVisible()
+  // Last night's forecast is hours old and this morning's never came, so
+  // the stage says so instead of showing last night's temperature.
+  await expect(page.getByText('Forecast unavailable right now.')).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByText(/\d+° and /)).toHaveCount(0)
+  // And the schedule it shows is last night's, which the screen says.
+  await expect(page.getByText('Today could not refresh')).toBeVisible({ timeout: 15_000 })
 }
 
 // Open Meteo as getWeather asks for it: 71 and partly cloudy now, rain
@@ -110,6 +178,46 @@ async function setUp(
   await expect(page.locator('.fh-app')).toBeVisible({ timeout: 30_000 })
 }
 
+// Today with its schedule held, so the loading card draws first. Returns
+// the loading card's height, then the next stop's once the schedule lands.
+async function loadingThenNextStop(context: BrowserContext, page: Page) {
+  await signIn(context, { tables: { fh_schedule: SCHEDULE } })
+  await context.route('https://api.open-meteo.com/**', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(forecast()) })
+  )
+  let release = () => {}
+  const held = new Promise<void>((resolve) => { release = resolve })
+  await context.route((url) => url.pathname.endsWith('/rest/v1/fh_schedule'), async (route) => {
+    await held
+    await route.fallback()
+  })
+  await page.clock.setFixedTime(MORNING)
+  await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  const card = page.locator('.fht-card[aria-hidden="true"]')
+  await expect(card).toBeVisible({ timeout: 30_000 })
+  const loading = (await card.boundingBox())!.height
+  release()
+  const nextStop = page.getByRole('region', { name: 'Next stop' })
+  await expect(nextStop.getByText('Next stop, 7:30 am')).toBeVisible({ timeout: 30_000 })
+  return { loading, band: (await nextStop.boundingBox())!.height }
+}
+
+// Tabs onto the next stop's job name and reads the rings it draws: its
+// own outline, and the one its ::after draws around the whole band.
+async function nextStopFocus(page: Page) {
+  const link = page.getByRole('region', { name: 'Next stop' }).getByRole('link', { name: 'Plumbing Bellevue' })
+  await expect(link).toBeVisible()
+  // Back one and forward one with the keyboard, so the focus is visible.
+  await link.focus()
+  await page.keyboard.press('Shift+Tab')
+  await page.keyboard.press('Tab')
+  await expect(link).toBeFocused()
+  return link.evaluate((el) => {
+    const ring = getComputedStyle(el, '::after')
+    return { visible: el.matches(':focus-visible'), name: getComputedStyle(el).outlineStyle, band: `${ring.outlineStyle} ${ring.outlineWidth}` }
+  })
+}
+
 test.describe('today on a phone', () => {
   test.skip(({ isMobile }) => !isMobile, 'Phone layout')
 
@@ -151,6 +259,28 @@ test.describe('today on a phone', () => {
     expect(await page.locator('main .fhc-btn--primary').count()).toBeLessThanOrEqual(1)
   })
 
+  test('the next stop with no photo is a compact band, not an empty picture', async ({ context, page }) => {
+    await setUp(context, page, { at: MORNING })
+    const nextStop = page.getByRole('region', { name: 'Next stop' })
+    await expect(nextStop.getByText('Next stop, 7:30 am')).toBeVisible()
+    await expect(nextStop.getByRole('link', { name: 'Plumbing Bellevue' })).toBeVisible()
+    await expect(nextStop.getByRole('link', { name: 'Navigate', exact: true })).toBeVisible()
+    await page.waitForLoadState('networkidle')
+    await expect(nextStop.locator('img')).toHaveCount(0)
+    const box = await nextStop.boundingBox()
+    expect(box!.height).toBeLessThanOrEqual(120)
+  })
+
+  test('the loading card is the size of the band, so the next stop does not jump when it lands', async ({ context, page }) => {
+    const { loading, band } = await loadingThenNextStop(context, page)
+    expect(Math.abs(loading - band), `loading ${loading}, band ${band}`).toBeLessThanOrEqual(1)
+  })
+
+  test('keyboard focus on the next stop rings the whole band, not a clipped name', async ({ context, page }) => {
+    await setUp(context, page, { at: MORNING })
+    expect(await nextStopFocus(page)).toEqual({ visible: true, name: 'none', band: 'solid 2px' })
+  })
+
   test('empty day', async ({ context, page }) => {
     await setUp(context, page, { at: MORNING, tables: { fh_schedule: [], fh_contacts: [] } })
     await expect(page.getByText('Clear day.')).toBeVisible()
@@ -181,6 +311,10 @@ test.describe('today on a phone', () => {
   test('every thing waiting counts in the evening, and See all lists the 20 most urgent', async ({ context, page }) => {
     await setUp(context, page, { at: EVENING, tables: { fh_contacts: QUIET_LEADS } })
     await seeAllAnswers(page)
+  })
+
+  test('a cold open at 6:30 am shows the morning from last night\'s cache, without last night\'s weather', async ({ context, page }) => {
+    await coldOpen(context, page)
   })
 
   test('evening content', async ({ context, page }) => {
@@ -225,6 +359,28 @@ test.describe('today on a desktop', () => {
     await expect(day.getByRole('link', { name: 'Week' })).toHaveAttribute('href', '/schedule')
     // Tomorrow's visit stays out of today.
     await expect(day.getByText('Final slab inspection')).toHaveCount(0)
+  })
+
+  test('the next stop with no photo is a compact band, not an empty picture', async ({ context, page }) => {
+    await setUp(context, page, { at: MORNING })
+    const nextStop = page.getByRole('region', { name: 'Next stop' })
+    await expect(nextStop.getByText('Next stop, 7:30 am')).toBeVisible()
+    await expect(nextStop.getByRole('link', { name: 'Plumbing Bellevue' })).toBeVisible()
+    await expect(nextStop.getByRole('link', { name: 'Navigate', exact: true })).toBeVisible()
+    await page.waitForLoadState('networkidle')
+    await expect(nextStop.locator('img')).toHaveCount(0)
+    const box = await nextStop.boundingBox()
+    expect(box!.height).toBeLessThanOrEqual(120)
+  })
+
+  test('the loading card is the size of the band, so the next stop does not jump when it lands', async ({ context, page }) => {
+    const { loading, band } = await loadingThenNextStop(context, page)
+    expect(Math.abs(loading - band), `loading ${loading}, band ${band}`).toBeLessThanOrEqual(1)
+  })
+
+  test('keyboard focus on the next stop rings the whole band, not a clipped name', async ({ context, page }) => {
+    await setUp(context, page, { at: MORNING })
+    expect(await nextStopFocus(page)).toEqual({ visible: true, name: 'none', band: 'solid 2px' })
   })
 
   test('eight visits all count, and the seventh is the next stop in the afternoon', async ({ context, page }) => {
@@ -322,6 +478,10 @@ test.describe('today on a desktop', () => {
     await expect(page.getByRole('region', { name: 'Next stop' })).toHaveCount(0)
     await expect(page.getByRole('region', { name: 'This week' })).toBeVisible()
     expect(await page.locator('main .fhc-btn--primary').count()).toBeLessThanOrEqual(1)
+  })
+
+  test('a cold open at 6:30 am shows the morning from last night\'s cache, without last night\'s weather', async ({ context, page }) => {
+    await coldOpen(context, page)
   })
 
   test('crew never see money on Today, they are sent to their own home', async ({ context, page }) => {

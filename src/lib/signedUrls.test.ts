@@ -24,7 +24,7 @@ vi.mock('./supabase.ts', () => ({
   }
 }))
 
-const { signedUrlsFor, SIGNED_URL_REUSE_MS } = await import('./signedUrls.ts')
+const { isSignedUrlFresh, signedUrlEntriesFor, signedUrlsFor, SIGNED_URL_REUSE_MS } = await import('./signedUrls.ts')
 
 let queryClient: QueryClient
 
@@ -77,5 +77,27 @@ describe('signedUrlsFor', () => {
   it('asks for nothing when there is nothing to sign', async () => {
     expect((await signedUrlsFor(queryClient, 'job-photos', [], 1_000)).size).toBe(0)
     expect(signCalls).toEqual([])
+  })
+
+  // Phase 8, Task 15: a caller has to know when a URL was signed, not when
+  // it asked, because a URL reused from the cache may be 49 minutes old.
+  it('tells when each URL was signed, keeping the first time when a URL is reused', async () => {
+    await signedUrlEntriesFor(queryClient, 'job-photos', ['a.jpg'], 1_000)
+    const later = await signedUrlEntriesFor(queryClient, 'job-photos', ['a.jpg', 'b.jpg'], 1_000 + 40 * 60_000)
+    expect(later.get('a.jpg')).toEqual({ url: 'https://signed/a.jpg?token=1', signedAt: 1_000 })
+    expect(later.get('b.jpg')).toEqual({ url: 'https://signed/b.jpg?token=2', signedAt: 1_000 + 40 * 60_000 })
+  })
+})
+
+describe('isSignedUrlFresh', () => {
+  it('calls a URL fresh only while at least ten minutes of its hour are left', () => {
+    const isFresh = isSignedUrlFresh
+    expect(isFresh(1_000, 1_000)).toBe(true)
+    expect(isFresh(1_000, 1_000 + SIGNED_URL_REUSE_MS - 1)).toBe(true)
+    expect(isFresh(1_000, 1_000 + SIGNED_URL_REUSE_MS)).toBe(false)
+    expect(isFresh(undefined, 1_000)).toBe(false)
+    expect(isFresh(null, 1_000)).toBe(false)
+    // A clock that moved back reads as stale, never as fresher than signed.
+    expect(isFresh(5_000, 1_000)).toBe(false)
   })
 })

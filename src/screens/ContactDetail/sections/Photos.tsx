@@ -6,12 +6,17 @@ import {
   X, Trash2, Sparkles, Image as ImageIcon
 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
-import { signedUrlsFor } from '../../../lib/signedUrls.ts'
+import { isSignedUrlFresh, signedUrlEntriesFor, signedUrlsFor } from '../../../lib/signedUrls.ts'
+import type { SignedUrl } from '../../../lib/signedUrls.ts'
 import { compressImageToBlob, compressImageToDataUrl, captionPhoto } from '../../../lib/docIntelligence.ts'
 import { toastError, toastSuccess } from '../../../lib/toast.ts'
 import { hapticTap, hapticSuccess } from '../../../lib/haptics.ts'
 import { queuePhoto, isNetworkError } from '../../../lib/outbox.ts'
 import { SkeletonList } from '../../../components/Skeleton.tsx'
+import DataErrorState from '../../../components/DataErrorState.tsx'
+import LoadingValue from '../../../components/LoadingValue.tsx'
+import { countNoun } from '../../../lib/format.ts'
+import { keepFocusOnRetry } from '../../../lib/retryFocus.ts'
 import { jobPhotosKey } from '../phone/SpineList.tsx'
 import ActionSheet from '../../../components/ActionSheet.tsx'
 import { Eyebrow } from '../../../components/v3'
@@ -59,8 +64,14 @@ const SCOPE_SECTIONS = [
 export default function PhotosSection({ jobId, userId, incomingFiles = null, onIncomingHandled }: any) {
   const queryClient = useQueryClient()
   const [rows, setRows] = useState<any[]>([])
-  const [thumbUrls, setThumbUrls] = useState<any>({}) // { [rowId]: signedUrl }
+  // Each grid photo's signed URL by row id, with when it was signed.
+  const [thumbUrls, setThumbUrls] = useState<Record<string, SignedUrl>>({})
   const [loading, setLoading] = useState(true)
+  // A read of this job's photos has landed, so the count and the empty
+  // card can show; until then neither does.
+  const [loaded, setLoaded] = useState(false)
+  // The latest read failed. Photos an earlier read brought stay on screen.
+  const [failed, setFailed] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [captioningIds, setCaptioningIds] = useState(() => new Set())
   // Destructive-confirm sheet state for delete photo.
@@ -75,37 +86,67 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
   const [compareAfter, setCompareAfter] = useState<any>(null)
 
   const inputRef = useRef<any>(null)
+  // The section; Try again leaves focus on the sub tab's panel around it.
+  const rootRef = useRef<HTMLDivElement>(null)
+  // Each read takes the next number and sets state only while it is the
+  // latest: an upload's reread that fails late never marks the photos a
+  // delete just read again as failed.
+  const readSeq = useRef(0)
+  useEffect(() => () => { readSeq.current += 1 }, [])
 
   const fetchRows = useCallback(async () => {
     if (!jobId || !userId) return
+    const seq = ++readSeq.current
     setLoading(true)
     // Every photo on the job, whoever took it: org RLS scopes the read
     // to teammates and accepted partners.
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('fh_job_files')
       .select('*')
       .eq('job_id', jobId)
       .eq('kind', 'photo')
       .order('uploaded_at', { ascending: false })
+    // A newer read has gone out since: it decides.
+    if (seq !== readSeq.current) return
+    // A failed read is never "0 photos" or the empty card: it says so, with
+    // Try again, and keeps what an earlier read brought.
+    if (error) {
+      setFailed(true)
+      setLoading(false)
+      return
+    }
     const list = data || []
     setRows(list)
+    setLoaded(true)
+    setFailed(false)
     setLoading(false)
 
     // Batch sign URLs for the grid thumbnails. URLs signed in the last
     // 50 minutes are reused, so coming back to the job lets the browser
     // cache serve the images instead of downloading them again.
     if (list.length > 0) {
-      const byPath = await signedUrlsFor(queryClient, BUCKET, list.map((r) => r.storage_path))
-      const next: Record<string, any> = {}
+      const byPath = await signedUrlEntriesFor(queryClient, BUCKET, list.map((r) => r.storage_path))
+      if (seq !== readSeq.current) return
+      const next: Record<string, SignedUrl> = {}
       for (const r of list) {
-        const url = byPath.get(r.storage_path)
-        if (url) next[r.id] = url
+        const entry = byPath.get(r.storage_path)
+        if (entry) next[r.id] = entry
       }
       setThumbUrls(next)
     } else {
       setThumbUrls({})
     }
   }, [jobId, userId, queryClient])
+
+  // Another job's photos never stand in for this one's, nor does a read of
+  // them still out.
+  useEffect(() => {
+    readSeq.current += 1
+    setRows([])
+    setThumbUrls({})
+    setLoaded(false)
+    setFailed(false)
+  }, [jobId])
 
   useEffect(() => { fetchRows() }, [fetchRows])
 
@@ -199,7 +240,7 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
         toastSuccess('Saved offline', `${queuedCount} photo${queuedCount === 1 ? '' : 's'} will upload when signal returns`)
       }
       if (newPhotoIds.length > 0) {
-        toastSuccess('Photos uploaded', `Added ${newPhotoIds.length}`)
+        toastSuccess(`${countNoun(newPhotoIds.length, 'Photo')} uploaded`, `Added ${newPhotoIds.length}`)
       }
       await fetchRows()
       refreshJobPhotos()
@@ -318,8 +359,11 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
     }
   }
 
+  // The grid's URL while it is fresh by when it was signed (the grid can
+  // stay open past its hour); otherwise a fresh one.
   async function urlFor(row: any) {
-    if (thumbUrls[row.id]) return thumbUrls[row.id]
+    const thumb = thumbUrls[row.id]
+    if (thumb && isSignedUrlFresh(thumb.signedAt)) return thumb.url
     const byPath = await signedUrlsFor(queryClient, BUCKET, [row.storage_path])
     return byPath.get(row.storage_path) || ''
   }
@@ -374,13 +418,17 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
   const lightboxRow = lightboxIdx >= 0 && lightboxIdx < rows.length ? rows[lightboxIdx] : null
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 24px 24px' }}>
+    <div ref={rootRef} style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 24px 24px' }}>
 
       {/* Header row */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-        <Eyebrow>
-          {rows.length} {rows.length === 1 ? 'photo' : 'photos'}
-        </Eyebrow>
+        {loaded ? (
+          <Eyebrow>
+            {rows.length} {rows.length === 1 ? 'photo' : 'photos'}
+          </Eyebrow>
+        ) : loading ? (
+          <LoadingValue label="Loading photos" width={72} height={12} />
+        ) : <span aria-hidden="true" />}
         <div style={{ display: 'inline-flex', gap: 8 }}>
           {rows.length >= 2 && (
             <motion.button
@@ -454,8 +502,22 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
 
       <input ref={inputRef} type="file" accept="image/*" multiple hidden onChange={handleFile} />
 
-      {loading && <SkeletonList rows={2} card={false} />}
-      {!loading && rows.length === 0 && (
+      {/* The skeleton stands in only until a read lands: a reread (after an
+          upload, or Try again) keeps what is on screen. */}
+      {loading && !loaded && <SkeletonList rows={2} card={false} />}
+      {!loading && failed && (
+        <DataErrorState
+          compact
+          title={loaded ? "Couldn't refresh the photos" : "Couldn't load the photos"}
+          message="Check your connection and try again."
+          actionLabel="Try again"
+          onRetry={() => {
+            keepFocusOnRetry(rootRef.current?.closest<HTMLElement>('[role="tabpanel"]') ?? rootRef.current)
+            void fetchRows()
+          }}
+        />
+      )}
+      {loaded && rows.length === 0 && (
         <div style={{
           padding: '32px 24px', borderRadius: 10,
           background: 'var(--v3-surface)', border: '1px dashed var(--v3-border-strong)',
@@ -469,10 +531,10 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
       )}
 
       {/* Photo grid */}
-      {!loading && rows.length > 0 && (
+      {rows.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
           {rows.map((r, i) => {
-            const url = thumbUrls[r.id]
+            const url = thumbUrls[r.id]?.url
             const captioning = captioningIds.has(r.id)
             const compareLabel = compareBefore?.row.id === r.id
               ? 'Before'

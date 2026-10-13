@@ -21,6 +21,7 @@ import { toastSuccess, toastError } from '../lib/toast.ts'
 import MiniMetric from '../components/MiniMetric.tsx'
 import { useConfirm } from '../components/ConfirmSheet.tsx'
 import { Eyebrow } from '../components/v3'
+import PaletteKeyCap, { paletteShortcut } from '../components/desktop/PaletteKeyCap.tsx'
 
 function fmtJoined(iso: string | null): string {
   if (!iso) return '\u2003'
@@ -94,10 +95,11 @@ export default function Team() {
           className="fh-build-search"
           onClick={() => window.dispatchEvent(new CustomEvent('fh:open-palette'))}
           aria-label="Open command palette"
+          aria-keyshortcuts={paletteShortcut().combo}
         >
           <Search size={14} />
           <span>Search jobs, clients, invoices, notes...</span>
-          <kbd>⌘K</kbd>
+          <PaletteKeyCap />
         </button>
         <div className="fh-build-topbar__meta">
           <span>{orgName || 'Your team'}</span>

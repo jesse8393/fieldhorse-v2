@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react'
-import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Clock } from 'lucide-react'
-import { supabase } from '../../../lib/supabase.ts'
-import { signedUrlsFor, SIGNED_URL_REUSE_MS } from '../../../lib/signedUrls.ts'
 import { Button, EmptyState, SpineEntry } from '../../../components/fh'
 import { buildSpine } from '../lib/spine.ts'
 import type { SpineInspectionInput } from '../lib/spine.ts'
+import { fetchJobPhotos, jobPhotosKey, jobPhotosView } from '../lib/jobPhotos.ts'
+import type { JobPhotos } from '../lib/jobPhotos.ts'
 import { composeActivityEvents } from '../sections/composeActivityEvents.ts'
 import './job-phone.css'
 
@@ -14,61 +14,16 @@ import './job-phone.css'
 // first, built by buildSpine. "Add" opens Capture attached to this job.
 //
 // Photos come from one query shared with the header (cover and count):
-// the job's photo rows, signed through signedUrlsFor so the Files tab
-// reuses the same URLs. A photo that fails to sign keeps its place in
-// the count but never renders as a thumbnail or a cover.
+// the job's photo rows, each signed URL with the time it was signed, so
+// the Files tab reuses the same URLs and none is drawn once it may have
+// run out (lib/jobPhotos.ts). A photo that fails to sign keeps its place
+// in the count but never renders as a thumbnail or a cover, and one that
+// fails to load leaves its entry (SpineEntry). Notes show in full.
 
-const BUCKET = 'job-photos'
 const FIRST_PAGE = 10
 
-export type JobPhotoRow = {
-  id: string
-  storage_path: string
-  uploaded_at: string
-  caption: string | null
-}
-
-type JobPhotoData = {
-  rows: JobPhotoRow[]
-  urls: Record<string, string>
-  signedAt: number
-}
-
-export type JobPhotos = {
-  /** Newest first, each with its signed url or null. */
-  rows: (JobPhotoRow & { url: string | null })[]
-  count: number
-  /** The newest photo that signed, for the header. */
-  cover: { url: string; alt: string } | null
-}
-
-export function jobPhotosKey(jobId: string | null | undefined) {
-  return ['jobDetailPhotos', jobId] as const
-}
-
-async function fetchJobPhotos(queryClient: QueryClient, jobId: string): Promise<JobPhotoData> {
-  const { data, error } = await supabase
-    .from('fh_job_files')
-    .select('id, storage_path, uploaded_at, caption')
-    .eq('job_id', jobId)
-    .eq('kind', 'photo')
-    .order('uploaded_at', { ascending: false })
-  if (error) throw error
-  const rows = ((data || []) as JobPhotoRow[]).filter((r) => r?.id && r.storage_path)
-  const urls: Record<string, string> = {}
-  if (rows.length > 0) {
-    try {
-      const byPath = await signedUrlsFor(queryClient, BUCKET, rows.map((r) => r.storage_path))
-      for (const r of rows) {
-        const url = byPath.get(r.storage_path)
-        if (url) urls[r.id] = url
-      }
-    } catch {
-      // Signing failed: the rows still count, the header falls back to onyx.
-    }
-  }
-  return { rows, urls, signedAt: Date.now() }
-}
+export { jobPhotosKey }
+export type { JobPhotoRow, JobPhotos } from '../lib/jobPhotos.ts'
 
 /** The job's photos for the header and the Spine. */
 export function useJobPhotos(jobId: string | null | undefined): JobPhotos {
@@ -82,20 +37,7 @@ export function useJobPhotos(jobId: string | null | undefined): JobPhotos {
     staleTime: 0
   })
 
-  return useMemo(() => {
-    // A persisted copy can outlive its signed URLs; never hand out one
-    // that may have expired, so no image ever renders broken.
-    const fresh = !!data && Date.now() - data.signedAt < SIGNED_URL_REUSE_MS
-    const rows = (data?.rows ?? [])
-      .map((r) => ({ ...r, url: fresh ? data?.urls[r.id] ?? null : null }))
-      .sort((a, b) => String(b.uploaded_at).localeCompare(String(a.uploaded_at)))
-    const first = rows.find((r) => r.url)
-    return {
-      rows,
-      count: rows.length,
-      cover: first?.url ? { url: first.url, alt: first.caption?.trim() || 'Newest job photo' } : null
-    }
-  }, [data])
+  return useMemo(() => jobPhotosView(data, Date.now()), [data])
 }
 
 export type SpineListProps = {
@@ -132,7 +74,9 @@ export default function SpineList({
       payments: canSeeMoney ? payments : [],
       scheduleItems,
       changeOrders: canSeeMoney ? changeOrders : [],
-      stageTransitions
+      stageTransitions,
+      // Every note, each in full, so "Show N more" counts what is there.
+      fullNotes: true
     })
     const inspectionRows: SpineInspectionInput[] = (inspections || []).map((i: any) => ({
       id: String(i.id),
@@ -175,6 +119,7 @@ export default function SpineList({
               <SpineEntry
                 key={item.id}
                 as="li"
+                className={item.id.startsWith('note:') ? 'fhj-spine__note' : undefined}
                 time={dated ? item.day : item.time}
                 day={dated ? undefined : item.day}
                 dateTime={item.at.toISOString()}

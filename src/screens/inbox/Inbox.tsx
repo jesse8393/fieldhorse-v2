@@ -154,9 +154,11 @@ export default function Inbox() {
 
   const openRow = conversationId ? rows.find((r) => r.conversation_id === conversationId) : undefined
 
-  // A phone shows one thing at a time: the thread when one is open.
+  // A phone shows one thing at a time: the thread when one is open. Keyed
+  // by conversation, as on a desktop, so typed words, a draft's edits and
+  // dictation never carry over to another customer.
   if (!isDesktop && conversationId && engine === true) {
-    return <Thread conversationId={conversationId} row={openRow} />
+    return <Thread key={conversationId} conversationId={conversationId} row={openRow} />
   }
 
   const list = (

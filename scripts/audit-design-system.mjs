@@ -33,6 +33,19 @@ const allowedColors = new Set([
 const allowedSpacing = new Set([0, 4, 8, 12, 16, 20, 24, 28, 32, 48])
 // Type: the role sizes in spec 5.6, plus the legacy 20 and 24.
 const allowedType = new Set([12, 13, 14, 15, 16, 17, 18, 20, 24, 30, 34, 36, 38, 52])
+// The one exception: the FIELDHORSE wordmark on the Welcome stage (spec 9.1,
+// Phase 8 Task 16) is Bebas Neue at 68 px, the size the approved render
+// shows. It is allowed in that one rule of that one file and nowhere else.
+const wordmarkType = { file: 'src/screens/auth/auth.css', selector: '.fha-wordmark', size: 68 }
+
+function isWordmarkType(file, text, index, value) {
+  if (value !== wordmarkType.size) return false
+  if (relative(root, file).replaceAll('\\', '/') !== wordmarkType.file) return false
+  const ruleStart = text.lastIndexOf('{', index)
+  const selectorStart = text.lastIndexOf('}', ruleStart) + 1
+  const selector = text.slice(selectorStart, ruleStart).replace(/\/\*[\s\S]*?\*\//g, '').trim()
+  return selector === wordmarkType.selector
+}
 // Radius: chips 7, legacy 10, controls 12, cards 14, photos 18, vault
 // and sheets 22, dock 28, pills 999 (spec 5.7).
 const allowedRadius = new Set([7, 10, 12, 14, 18, 22, 28, 999])
@@ -101,7 +114,9 @@ for (const file of auditedFiles) {
 
     for (const match of text.matchAll(/fontSize:\s*(\d+(?:\.\d+)?)|font-size:\s*(\d+(?:\.\d+)?)px/gi)) {
       const value = Number(match[1] || match[2])
-      if (!allowedType.has(value)) add(file, lineAt(text, match.index), `off scale type ${value}`)
+      if (!allowedType.has(value) && !isWordmarkType(file, text, match.index, value)) {
+        add(file, lineAt(text, match.index), `off scale type ${value}`)
+      }
     }
 
     for (const match of text.matchAll(/fontSize:\s*['"]clamp\(|font-size:\s*clamp\(/gi)) {

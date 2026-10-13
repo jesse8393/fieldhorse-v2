@@ -17,17 +17,23 @@ vi.mock('./supabase.ts', () => ({ supabase: {} }))
 
 import {
   dayLabel,
+  draftChannel,
+  draftSendsLine,
   draftText,
   groupByDay,
   holdReasonWords,
+  inboxKeys,
   listTimeLabel,
   onceAtATime,
   replyChannel,
+  replySubject,
   stageChip,
   threadItems,
   timeLabel,
   type AgentRunRow,
-  type ThreadMessage
+  type ThreadDraftItem,
+  type ThreadMessage,
+  type ThreadMessageItem
 } from './inbox.ts'
 import { INBOX, SCHEDULE, dockFifthItem, dockRight, sidebarPrimary } from './navItems.ts'
 
@@ -136,6 +142,62 @@ describe('threadItems', () => {
     const [item] = threadItems([], [run({ id: 'r1', created_at: '2026-10-10T13:00:00Z', proposal: { body: 'See you then.', channel: 'email' } })])
     expect(item).toMatchObject({ kind: 'draft', runId: 'r1', body: 'See you then.', channel: 'email' })
   })
+
+  it('calls a reply sent only for sent, delivered or read, or when it has a send time', () => {
+    const out = (id: string, partial: Partial<ThreadMessage>) =>
+      msg({ id, created_at: '2026-10-10T13:00:00Z', direction: 'outbound', sent_by_kind: 'user', ...partial })
+    const items = threadItems(
+      [
+        out('sent', { status: 'sent' }),
+        out('delivered', { status: 'Delivered' }),
+        out('read', { status: 'read' }),
+        out('accepted', { status: 'accepted' }),
+        out('unknown', { status: 'zodiac' }),
+        out('blank', { status: '' }),
+        out('queued', { status: 'queued' }),
+        out('stamped', { status: 'accepted', sent_at: '2026-10-10T13:00:05Z' }),
+        out('failed', { status: 'failed', sent_at: '2026-10-10T13:00:05Z' })
+      ],
+      []
+    )
+    const states = Object.fromEntries(items.map((i) => [i.id, (i as ThreadMessageItem).state]))
+    expect(states).toEqual({
+      sent: 'sent', delivered: 'sent', read: 'sent', accepted: 'unsent', unknown: 'unsent', blank: 'unsent',
+      queued: 'unsent', stamped: 'sent', failed: 'failed'
+    })
+  })
+
+  it('marks a draft written before the customer last wrote as older', () => {
+    const items = threadItems(
+      [
+        msg({ id: 'in1', created_at: '2026-10-10T13:00:00Z' }),
+        msg({ id: 'out', created_at: '2026-10-10T13:30:00Z', direction: 'outbound', status: 'sent' }),
+        msg({ id: 'in2', created_at: '2026-10-10T14:00:00Z' })
+      ],
+      [
+        run({ id: 'old', created_at: '2026-10-10T13:40:00Z' }),
+        run({ id: 'new', created_at: '2026-10-10T14:05:00Z' })
+      ]
+    )
+    const drafts = items.filter((i): i is ThreadDraftItem => i.kind === 'draft')
+    expect(drafts.map((d) => [d.id, d.older])).toEqual([['old', true], ['new', false]])
+  })
+
+  it('does not call a draft older because of our own later reply', () => {
+    const items = threadItems(
+      [
+        msg({ id: 'in1', created_at: '2026-10-10T13:00:00Z' }),
+        msg({ id: 'out', created_at: '2026-10-10T13:30:00Z', direction: 'outbound', status: 'sent' })
+      ],
+      [run({ id: 'mid', created_at: '2026-10-10T13:10:00Z' })]
+    )
+    expect(items.find((i) => i.id === 'mid')).toMatchObject({ kind: 'draft', older: false })
+  })
+
+  it('carries the subject of an email draft', () => {
+    const [item] = threadItems([], [run({ id: 'r1', created_at: '2026-10-10T13:00:00Z', proposal: { channel: 'email', subject: 'Re: Deck', body: 'Yes.' } })])
+    expect(item).toMatchObject({ kind: 'draft', channel: 'email', subject: 'Re: Deck' })
+  })
 })
 
 describe('holdReasonWords', () => {
@@ -161,16 +223,22 @@ describe('holdReasonWords', () => {
 })
 
 describe('draftText', () => {
-  it('reads the usual keys first', () => {
+  it('reads only the known keys: body, then text, message, draft or reply (D26)', () => {
     expect(draftText({ body: 'One' })).toBe('One')
     expect(draftText({ text: 'Two' })).toBe('Two')
     expect(draftText({ message: { body: 'Three' } })).toBe('Three')
-    expect(draftText('Four')).toBe('Four')
+    expect(draftText({ draft: 'Four' })).toBe('Four')
+    expect(draftText({ reply: 'Five' })).toBe('Five')
+    expect(draftText({ reply: 'Later key', body: 'Body wins' })).toBe('Body wins')
   })
 
-  it('falls back to the longest sentence when the keys are unfamiliar', () => {
-    expect(draftText({ reply_text: 'Of course, 11:30 works. See you then.', channel: 'sms', kind: 'reply' }))
-      .toBe('Of course, 11:30 works. See you then.')
+  it('shows nothing when the words are under keys it does not know', () => {
+    expect(draftText({ reply_text: 'Of course, 11:30 works. See you then.', channel: 'sms', kind: 'reply' })).toBe('')
+    expect(draftText({ rationale: 'The customer asked to move the visit to 11:30.', channel: 'sms' })).toBe('')
+    expect(draftText({ content: 'Not one of the keys D26 names' })).toBe('')
+    expect(draftText({ message: { reply_text: 'Nested under a key it does not know' } })).toBe('')
+    // A bare string is not a known key either.
+    expect(draftText('Of course, 11:30 works.')).toBe('')
   })
 
   it('returns nothing for a proposal with no words in it', () => {
@@ -178,6 +246,53 @@ describe('draftText', () => {
     expect(draftText({ channel: 'sms' })).toBe('')
     expect(draftText({ body: '  ' })).toBe('')
     expect(draftText(42)).toBe('')
+  })
+})
+
+describe('how a reply goes out', () => {
+  it('reads the draft channel in two words, text or email', () => {
+    expect(draftChannel('sms')).toBe('sms')
+    expect(draftChannel('SMS')).toBe('sms')
+    expect(draftChannel('text')).toBe('sms')
+    expect(draftChannel('mms')).toBe('sms')
+    expect(draftChannel('email')).toBe('email')
+    expect(draftChannel('webchat')).toBeNull()
+    expect(draftChannel(null)).toBeNull()
+  })
+
+  it('says how the draft will go out', () => {
+    expect(draftSendsLine({ channel: 'sms', subject: null, name: 'Priya Rangarajan' })).toBe('Sends by text to Priya Rangarajan')
+    expect(draftSendsLine({ channel: 'email', subject: 'Re: Final walkthrough', name: 'Marcus Bell' })).toBe('Sends by email: Re: Final walkthrough')
+    expect(draftSendsLine({ channel: 'email', subject: '  ', name: 'Marcus Bell' })).toBe('Sends by email to Marcus Bell')
+    expect(draftSendsLine({ channel: null, subject: null, name: 'Gus Okafor' })).toBe('Sends to Gus Okafor')
+    for (const line of [
+      draftSendsLine({ channel: 'sms', subject: null, name: 'A' }),
+      draftSendsLine({ channel: 'email', subject: 'B', name: 'A' })
+    ]) {
+      expect(line).not.toMatch(/[-\u2013\u2014]/)
+    }
+  })
+
+  it('answers an email under the latest subject, whatever order the messages come in', () => {
+    const older = msg({ id: 'a', created_at: '2026-10-01T15:00:00Z', channel: 'email', subject: 'Deck estimate' })
+    const newer = msg({ id: 'b', created_at: '2026-10-09T21:30:00Z', channel: 'email', subject: 'Final walkthrough' })
+    const noSubject = msg({ id: 'c', created_at: '2026-10-10T13:00:00Z', subject: null })
+    expect(replySubject([noSubject, newer, older])).toBe('Re: Final walkthrough')
+    expect(replySubject([older, newer, noSubject])).toBe('Re: Final walkthrough')
+    expect(replySubject([msg({ id: 'd', created_at: '2026-10-09T21:30:00Z', subject: 'RE: Final walkthrough' })])).toBe('RE: Final walkthrough')
+    expect(replySubject([noSubject])).toBeNull()
+    expect(replySubject([])).toBeNull()
+  })
+})
+
+describe('the thread keys', () => {
+  it('scope every thread read by company', () => {
+    expect(inboxKeys.messages('org-1', 'conv-1')).toEqual(['inbox', 'thread', 'org-1', 'conv-1', 'messages'])
+    expect(inboxKeys.runs('org-1', 'conv-1')).toEqual(['inbox', 'thread', 'org-1', 'conv-1', 'runs'])
+    expect(inboxKeys.conversation('org-1', 'conv-1')).toEqual(['inbox', 'thread', 'org-1', 'conv-1', 'conversation'])
+    expect(inboxKeys.messages('org-2', 'conv-1')).not.toEqual(inboxKeys.messages('org-1', 'conv-1'))
+    // The thread prefix covers all three, so one invalidation refreshes them.
+    expect(inboxKeys.messages('org-1', 'conv-1').slice(0, 4)).toEqual([...inboxKeys.thread('org-1', 'conv-1')])
   })
 })
 

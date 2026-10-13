@@ -2,9 +2,11 @@ import { useCallback, useEffect } from 'react'
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from './supabase.ts'
 import { ACTIVE_STAGES } from './stages.ts'
-import { fetchCoverPhotosByJob } from './photos.ts'
-import { fetchAllRows } from './queries.ts'
+import { fetchCoverPhotos, freshCoverUrls } from './photos.ts'
+import { chunkIds, fetchAllRows } from './queries.ts'
 import { useOrgScope } from './orgScope.ts'
+import { OPEN_INVOICE_STATUSES, amountsDueByInvoice, knownContractTotal } from './invoiceSettlement.ts'
+import { classifyInvoice } from './moneyView.ts'
 import type { Database } from './database.types.ts'
 
 // Local-calendar year month day (NOT UTC) so evening follow-ups don't read
@@ -36,7 +38,7 @@ type ScheduleWithContact = ScheduleRow & {
 type PaymentRow = Pick<
   Database['public']['Tables']['fh_payments']['Row'],
   'contact_id' | 'amount' | 'created_at' | 'paid_on'
->
+> & Partial<Pick<Database['public']['Tables']['fh_payments']['Row'], 'invoice_id'>>
 
 type ApprovedCoRow = Pick<
   Database['public']['Tables']['fh_change_orders']['Row'],
@@ -56,7 +58,7 @@ type ChangeOrderRow = Pick<
 type InvoiceRow = Pick<
   Database['public']['Tables']['fh_invoices']['Row'],
   'id' | 'contact_id' | 'title' | 'amount' | 'due_at' | 'status'
->
+> & Partial<Pick<Database['public']['Tables']['fh_invoices']['Row'], 'sequence_number' | 'created_at'>>
 
 export type DashboardTone = 'good' | 'warn' | 'bad' | 'neutral'
 export type HomePriorityTone = 'success' | 'warn' | 'danger'
@@ -184,6 +186,12 @@ export type HomeDashboardSource = {
   proposalViews: PublicLinkRow[]
   sentChangeOrders: ChangeOrderRow[]
   openInvoices: InvoiceRow[]
+  /**
+   * The drafts, paid and void invoices of the jobs with an open bill, so
+   * money that already paid one bill, or covers an unsent deposit draft, is
+   * not counted against an open one.
+   */
+  settledInvoices?: InvoiceRow[]
   approvedChangeOrders: ApprovedCoRow[]
 }
 
@@ -485,11 +493,32 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
     })
   }
 
+  // Money's rule (moneyView classifyInvoice): overdue once the due day has
+  // ended in local time, for what the allocator says is still owed.
+  const approvedCosByContact = new Map<string, ApprovedCoRow[]>()
+  for (const co of source.approvedChangeOrders) {
+    if (!co?.contact_id) continue
+    const list = approvedCosByContact.get(co.contact_id)
+    if (list) list.push(co)
+    else approvedCosByContact.set(co.contact_id, [co])
+  }
+  const owedByInvoice = amountsDueByInvoice({
+    invoices: [...source.openInvoices, ...(source.settledInvoices ?? [])],
+    payments: source.payments,
+    // As Money's contractOf: null when the job is unknown or has no recorded
+    // amount (and no approved change order), so there is nothing to cap at.
+    contractFor: (id) => {
+      const contact = contactsById.get(id)
+      return contact ? knownContractTotal({ amount: contact.amount, changeOrders: approvedCosByContact.get(id) ?? [] }) : null
+    },
+  })
   for (const invoice of source.openInvoices) {
-    if (!invoice.due_at) continue
-    const due = new Date(invoice.due_at)
-    if (Number.isNaN(due.getTime()) || due > now) continue
-    const daysLate = Math.round((now.getTime() - due.getTime()) / 86400000)
+    const standing = classifyInvoice(invoice, owedByInvoice.get(invoice.id), now)
+    if (standing.status !== 'overdue' || !standing.dueDay || standing.owed <= 0.005) continue
+    const daysLate = standing.daysLate
+    // Noon on the due day, as follow_up_on above, so the day and the days
+    // late read the same on Today as on Money.
+    const due = new Date(standing.dueDay.getFullYear(), standing.dueDay.getMonth(), standing.dueDay.getDate(), 12)
     const contact = contactsById.get(invoice.contact_id)
     actions.push({
       id: `inv-overdue-${invoice.id}`,
@@ -497,11 +526,11 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
       contactId: invoice.contact_id,
       verb: 'Nudge',
       contactName: contactName(contact),
-      contactAmount: Number(invoice.amount || 0),
+      contactAmount: standing.owed,
       dueIso: due.toISOString(),
       dueKind: 'overdue',
       title: `Invoice ${daysLate}d past due`,
-      detail: `${invoice.title || 'Invoice'} - $${Number(invoice.amount || 0).toLocaleString()} - ${contactName(contact, 'customer')}`,
+      detail: `${invoice.title || 'Invoice'}, ${standing.owed.toLocaleString('en-US', { style: 'currency', currency: 'USD' })} owed, ${contactName(contact, 'customer')}`,
       urgencyLabel: 'Past due',
       urgencyTone: 'danger',
       urgency: Math.max(1, 100 - daysLate),
@@ -654,6 +683,8 @@ async function fetchAllLabelled<T>(label: string, build: Parameters<typeof fetch
 const CONTACT_COLUMNS =
   'id, name, amount, stage, updated_at, created_at, completed_at, follow_up_on, proposal_status, quote_change_request_note, quote_change_requested_at, address, job_title'
 
+const INVOICE_COLUMNS = 'id, contact_id, title, amount, due_at, status, sequence_number, created_at'
+
 // Visits with the job they belong to, for Today's next stop and day list.
 const SCHEDULE_COLUMNS = 'id, contact_id, start_at, end_at, title, fh_contacts(name, stage, address, job_title)'
 
@@ -692,8 +723,8 @@ export async function fetchHomeDashboard(
   // on every job paid before this week.
   const paymentsPromise = fetchAllLabelled<PaymentRow>('payments', (from, to) =>
     (orgId
-      ? supabase.from('fh_payments').select('contact_id, amount, created_at, paid_on').eq('org_id', orgId)
-      : supabase.from('fh_payments').select('contact_id, amount, created_at, paid_on').eq('user_id', userId)
+      ? supabase.from('fh_payments').select('contact_id, invoice_id, amount, created_at, paid_on').eq('org_id', orgId)
+      : supabase.from('fh_payments').select('contact_id, invoice_id, amount, created_at, paid_on').eq('user_id', userId)
     )
       .order('id', { ascending: true })
       .range(from, to)
@@ -760,15 +791,26 @@ export async function fetchHomeDashboard(
       .range(from, to)
   )
 
-  const openInvoicesPromise = fetchAllLabelled<InvoiceRow>('open invoices', (from, to) =>
-    (orgId
-      ? supabase.from('fh_invoices').select('id, contact_id, title, amount, due_at, status').eq('org_id', orgId)
-      : supabase.from('fh_invoices').select('id, contact_id, title, amount, due_at, status').eq('user_id', userId)
-    )
-      .in('status', ['sent', 'overdue'])
-      .order('id', { ascending: true })
-      .range(from, to)
-  )
+  // Open invoices, and for the jobs that have one, the drafts, paid and void
+  // invoices the allocator reads, so an overdue row asks for what Money asks
+  // for. The second read names those jobs (in chunks, as the id lookups in
+  // queries.ts do) instead of paging the whole company's invoice history.
+  const invoicesFor = (statuses: readonly string[], jobIds?: string[]) => (from: number, to: number) => {
+    let query = (orgId
+      ? supabase.from('fh_invoices').select(INVOICE_COLUMNS).eq('org_id', orgId)
+      : supabase.from('fh_invoices').select(INVOICE_COLUMNS).eq('user_id', userId)
+    ).in('status', [...statuses])
+    if (jobIds) query = query.in('contact_id', jobIds)
+    return query.order('id', { ascending: true }).range(from, to)
+  }
+  const openInvoicesPromise = fetchAllLabelled<InvoiceRow>('open invoices', invoicesFor(OPEN_INVOICE_STATUSES))
+  const settledInvoicesPromise = openInvoicesPromise.then(async (open) => {
+    const jobIds = [...new Set(open.map((inv) => inv.contact_id).filter((id): id is string => !!id))]
+    const parts = await Promise.all(chunkIds(jobIds).map((chunk) =>
+      fetchAllLabelled<InvoiceRow>('settled invoices', invoicesFor(['draft', 'paid', 'void'], chunk))
+    ))
+    return parts.flat()
+  })
 
   const [
     contacts,
@@ -780,6 +822,7 @@ export async function fetchHomeDashboard(
     openInvoices,
     approvedChangeOrders,
     tomorrowSchedRes,
+    settledInvoices,
   ] = await Promise.all([
     contactsPromise,
     overdueScheduleQuery,
@@ -790,6 +833,7 @@ export async function fetchHomeDashboard(
     openInvoicesPromise,
     approvedCoPromise,
     tomorrowScheduleQuery,
+    settledInvoicesPromise,
   ])
 
   assertOk('overdue schedule', overdueSchedRes)
@@ -807,6 +851,7 @@ export async function fetchHomeDashboard(
     proposalViews,
     sentChangeOrders,
     openInvoices,
+    settledInvoices,
     approvedChangeOrders,
   })
 }
@@ -828,16 +873,21 @@ export function useHomeDashboard(userId: string | undefined, _orgId?: string | n
   const coverIds = useQuery({ ...bundleQuery, select: coverPhotoJobIds }).data
   const covers = useQuery({
     queryKey: homeCoversKey(userId, coverIds ?? []),
-    queryFn: () => fetchCoverPhotosByJob(coverIds ?? []),
+    queryFn: () => fetchCoverPhotos(coverIds ?? []),
     enabled: !!userId && !!coverIds && coverIds.length > 0,
     // Signed URLs live an hour; refresh well before they lapse.
     staleTime: 30 * 60_000,
     // Keep the current thumbnails while a changed job list loads.
     placeholderData: keepPreviousData,
   }).data
+  // Only links that are still fresh by when they were signed: a copy the
+  // offline cache brings back hours later shows no photo until the read
+  // above signs new ones, instead of a link that has run out.
   const withCovers = useCallback(
-    (bundle: HomeDashboardBundle): HomeDashboardBundle =>
-      covers ? { ...bundle, photoUrlByJob: covers } : bundle,
+    (bundle: HomeDashboardBundle): HomeDashboardBundle => {
+      const urls = freshCoverUrls(covers)
+      return urls ? { ...bundle, photoUrlByJob: urls } : bundle
+    },
     [covers]
   )
   return useQuery({ ...bundleQuery, select: withCovers })

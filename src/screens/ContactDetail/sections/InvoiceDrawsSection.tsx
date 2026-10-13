@@ -324,6 +324,13 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
     insured_text: profile?.insured_text || ''
   }
 
+  // What Money asks for on this draw: the job's other draws let money
+  // logged against the job count toward the oldest open one. The PDF hero
+  // and the email's amount_due both read it, so they name one figure.
+  function drawAmountDue(draw: any) {
+    return invoiceAmountDue({ invoice: draw, contact, payments, changeOrders, invoices: draws })
+  }
+
   // Shared per-draw PDF builder. Used by both Download (local save)
   // and Send (upload to job-files + POST to /api/send-invoice). The
   // job_title slot carries "Draw N of M, {label}" so the invoice
@@ -364,6 +371,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       // contractTotal here would double-count them in the balance box.
       contractTotal: Number(contact?.amount || 0),
       previouslyPaid,
+      amountDue: drawAmountDue(draw),
       insurance,
       changeOrders
     } as any)
@@ -453,8 +461,8 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
           recipient_name: contact.name || null,
           storage_path: path,
           filename: result.filename,
-          // Same cap as the PDF's "Amount due", so email and PDF agree.
-          amount_due: invoiceAmountDue({ invoice: draw, contact, payments, changeOrders })
+          // The same figure the PDF hero printed (drawAmountDue).
+          amount_due: drawAmountDue(draw)
         })
       })
       const sendBody = await sendRes.json().catch(() => ({}))

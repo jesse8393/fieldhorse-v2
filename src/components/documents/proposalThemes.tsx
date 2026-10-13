@@ -36,7 +36,7 @@ import ChangeOrdersBlock from './ChangeOrdersBlock.tsx'
 import { Button, Chip, Icon, OnyxStage, Row, formatMoney } from '../fh'
 import Monogram from '../fh/Monogram.tsx'
 import { cx } from '../fh/cx.ts'
-import { buildPortalView, depositSentence, type PortalView, type PublicDocPayload } from '../../lib/portalView.ts'
+import { approvalNote, buildPortalView, depositNote, type PortalView, type PublicDocPayload, type PublicDocPayment } from '../../lib/portalView.ts'
 import './fieldhorse-proposal.css'
 
 export type ProposalLineItem = {
@@ -70,6 +70,12 @@ export type ProposalView = {
   photos?: any[]
   insurance?: any
   changeOrders?: any[]
+  /**
+   * The job's payments, for the in app preview, so the Fieldhorse theme
+   * says what the customer page says once a deposit is in. The live link
+   * reads them from its payload instead.
+   */
+  payments?: PublicDocPayment[]
   /** Only the live customer link passes this; see FieldhorseProposal. */
   portal?: ProposalPortal
 }
@@ -78,12 +84,14 @@ export type ProposalView = {
  * What the public page hands the Fieldhorse theme besides the shared view:
  * the /api/public-link payload (the portal view model reads it), the
  * approve bar to draw in the bottom capsule while the quote is open, and
- * what "Ask about this" does. The in app preview passes none of it.
+ * what "Ask about this" does, given the item and the button tapped (focus
+ * goes back to it when the customer leaves the question). The in app
+ * preview passes none of it.
  */
 export type ProposalPortal = {
   payload: PublicDocPayload
   approveBar?: ReactNode
-  onAsk?: (itemTitle: string) => void
+  onAsk?: (itemTitle: string, opener?: HTMLElement) => void
 }
 
 const PAGE_W = 816
@@ -601,23 +609,38 @@ export { fmtLongDate }
    name, trust line and a call button. The headline, a total tray,
    what is included, optional additions as read only rows, three
    numbered steps and a bottom onyx capsule: the approve bar while
-   the quote is open, "Approved" and a Pay deposit button after.
+   the quote is open, "Approved" and a Pay deposit button after (or
+   "Deposit received" once the payments reach it), and an expired or
+   closed note with the call link once the valid until date has passed
+   or the contractor closed the quote (the steps go with it, since
+   approving is no longer one). Once a job approved here is closed
+   out, the page promises nothing more: no steps, no deposit sentence
+   and the approval alone in the capsule. The total,
+   the deposit sentence and the steps come from quoteMoney through
+   the portal view (D31), as the Quote tab capsule's do.
    ============================================================ */
 
 // The in app preview (Quote tab) has no payload; rebuild the little the
-// view model reads from the shared view, so one code path draws both.
+// view model reads from the shared view, so one code path draws both. The
+// payments are the job's, which the preview loads (DocumentPreviewPane),
+// so what is paid reads the same in the preview and on the link.
 function payloadFromView(view: ProposalView): PublicDocPayload {
   const lines = (view.lineItems || []).map((it, i) => ({ ...it, sort_order: i }))
   const extras = (view.upgrades || []).flatMap((group) =>
     (group.items || []).map((it) => ({ ...it, section: group.title, is_optional: true, sort_order: lines.length }))
   )
+  // The letter themes stamp a quote waiting on a revised proposal as sent;
+  // this page reads it as the customer page does (D44), so it keeps the
+  // quote's own changes requested status.
+  const own = String((view.recipient as { proposal_status?: unknown } | undefined)?.proposal_status ?? '').toLowerCase()
   return {
     kind: 'proposal',
-    contact: { ...(view.recipient || {}), proposal_status: view.status ?? null },
+    contact: { ...(view.recipient || {}), proposal_status: own === 'changes_requested' ? own : view.status ?? null },
     company: view.company || {},
     items: [...lines, ...extras],
     photos: view.photos || [],
-    changeOrders: view.changeOrders || []
+    changeOrders: view.changeOrders || [],
+    payments: view.payments || []
   }
 }
 
@@ -645,7 +668,7 @@ function DetailPhoto({ url, caption }: { url: string; caption?: string | null })
 
 // Everything the letter paper themes print that the portal's main column
 // leaves out, so a customer can still read the terms they are agreeing to.
-function FullDetails({ id, view }: { id: string; view: ProposalView }) {
+function FullDetails({ id, view, coverUrl }: { id: string; view: ProposalView; coverUrl: string | null }) {
   const scope = (view.scopeText || '').trim()
   const warranty = (view.warrantyText || '').trim()
   const exclusions = view.exclusions || []
@@ -656,7 +679,8 @@ function FullDetails({ id, view }: { id: string; view: ProposalView }) {
         .filter(([key]) => insurance[key] != null && insurance[key] !== '')
         .map(([key, label, isMoney]) => ({ label, value: isMoney ? money(insurance[key], { cents: true }) : String(insurance[key]) }))
     : []
-  const morePhotos = (view.photos || []).slice(1, 7).filter((p: any) => p?.url)
+  // The other photos, the cover (the newest one) left out.
+  const morePhotos = (view.photos || []).filter((p: any) => p?.url && p.url !== coverUrl).slice(0, 6)
   return (
     <div className="fhp-details" id={id}>
       {scope && (
@@ -722,25 +746,56 @@ function FullDetails({ id, view }: { id: string; view: ProposalView }) {
 }
 
 // After approval: the word Approved, who and when only if the payload has
-// it (D12), and "Pay deposit" when the company set a payment link (D7).
+// it (D12), and the company payment link when one is set (D7). It reads
+// "Pay deposit" with the amount when the quote has a deposit (D31), "Pay
+// remaining deposit" with what is left after a partial payment, and "Make
+// a payment" when the terms say there is none or name none, so the page
+// never asks for a deposit the terms do not state. Once the payments reach
+// the deposit the button goes and "Deposit received" takes its place. Once
+// the job is finished the capsule promises nothing: the approval alone,
+// and "Make a payment" in place of a deposit button while the deposit is
+// not in. portalView.ts writes the words (approvalNote).
 function ApprovedCapsule({ pv }: { pv: PortalView }) {
-  const { name, date } = pv.approved || { name: null, date: null }
-  const stamp = name && date ? `Approved by ${name} on ${date}.`
-    : name ? `Approved by ${name}.`
-    : date ? `Approved on ${date}.`
-    : 'Thank you.'
+  const note = approvalNote(pv)
+  if (!note) return null
   return (
     <div className="fhp-dock">
       <section className="fhp-capsule fh-onyx-scope fh-grain" aria-label="Approval">
-        <Chip label="Approved" tone="success" dot />
-        <h2 className="fhp-capsule__title">{stamp}</h2>
-        <p className="fhp-capsule__text">
-          {pv.companyName} has your approval and will be in touch with next steps.
-        </p>
-        {pv.payUrl && (
+        <div className="fhp-capsule__chips">
+          <Chip label="Approved" tone="success" dot />
+          {note.depositReceived && <Chip label="Deposit received" tone="success" dot />}
+        </div>
+        <h2 className="fhp-capsule__title">{note.title}</h2>
+        <p className="fhp-capsule__text">{note.text}</p>
+        {pv.payUrl && note.payLabel && (
           <div className="fhp-actions">
             <Button variant="primary" size="lg" block href={pv.payUrl} target="_blank" rel="noopener noreferrer">
-              {pv.deposit.amount > 0 ? `Pay deposit ${formatMoney(pv.deposit.amount)}` : 'Pay deposit'}
+              {note.payLabel}
+            </Button>
+          </div>
+        )}
+      </section>
+    </div>
+  )
+}
+
+// Past the valid until date, or closed by the contractor (marked lost, or
+// the job closed) before the customer approved: no approving, no asking,
+// just the way to get an updated quote. The server refuses an approval and
+// a question for both (public-link-approve, public-link-request-changes),
+// so the page says so before anyone types.
+function NotOpenCapsule({ pv, callDigits }: { pv: PortalView; callDigits: string }) {
+  const closed = pv.closed
+  return (
+    <div className="fhp-dock">
+      <section className="fhp-capsule fh-onyx-scope fh-grain" aria-label={closed ? 'Quote closed' : 'Quote expired'}>
+        <Chip label={closed ? 'Closed' : 'Expired'} tone="neutral" dot />
+        <h2 className="fhp-capsule__title">{closed ? 'This quote is no longer open.' : 'This quote has expired.'}</h2>
+        <p className="fhp-capsule__text">Ask {pv.companyName} for an updated one.</p>
+        {callDigits && (
+          <div className="fhp-actions">
+            <Button variant="primary" size="lg" block icon={Phone} href={`tel:${callDigits}`}>
+              Call {pv.companyName}
             </Button>
           </div>
         )}
@@ -781,10 +836,23 @@ export function FieldhorseProposal({ view }: { view: ProposalView }) {
   // A cover that fails to load leaves onyx alone, never a broken image.
   const cover = pv.coverUrl && pv.coverUrl !== failedCover ? pv.coverUrl : null
   const callDigits = String(payload.company?.phone || '').replace(/[^\d+]/g, '')
-  const sentence = depositSentence(pv.deposit)
+  const sentence = depositNote(pv)
+  // "Ask about this" only while the server still takes a question, so it
+  // is never a dead button (see PortalView.canAsk).
+  const onAsk = pv.canAsk ? portal?.onAsk : undefined
+  // A closed quote has no date it is good until any more.
+  const meta = [
+    pv.quoteNumber ? `Quote ${pv.quoteNumber}` : null,
+    pv.issuedOn ? `Issued ${pv.issuedOn}` : null,
+    pv.validUntil && !pv.closed ? `${pv.expired ? 'Expired' : 'Valid until'} ${pv.validUntil}` : null
+  ].filter((fact): fact is string => Boolean(fact))
 
+  // Approved first, then a closed job (the approve endpoint checks it right
+  // after an approval, and no revised proposal is coming), then changes
+  // requested, then expiry.
   let capsule: ReactNode = null
   if (pv.approved) capsule = <ApprovedCapsule pv={pv} />
+  else if (pv.closed) capsule = <NotOpenCapsule pv={pv} callDigits={callDigits} />
   else if (status === 'changes_requested') {
     capsule = (
       <ChangesRequestedCapsule
@@ -793,7 +861,8 @@ export function FieldhorseProposal({ view }: { view: ProposalView }) {
         requestedAt={payload.contact?.quote_change_requested_at}
       />
     )
-  } else if (portal?.approveBar) capsule = portal.approveBar
+  } else if (pv.expired) capsule = <NotOpenCapsule pv={pv} callDigits={callDigits} />
+  else if (portal?.approveBar) capsule = portal.approveBar
 
   return (
     <article className="fhp" aria-label={`Quote from ${pv.companyName}`}>
@@ -822,6 +891,13 @@ export function FieldhorseProposal({ view }: { view: ProposalView }) {
           </div>
           <h1 className="fhp-headline">{pv.headline}</h1>
           {pv.addressLine && <p className="fhp-address">{pv.addressLine}</p>}
+          {meta.length > 0 && (
+            <p className="fhp-meta">
+              {meta.map((fact, i) => (
+                <span key={fact}>{i > 0 ? ' ' : ''}<span>{fact}</span></span>
+              ))}
+            </p>
+          )}
         </div>
       </OnyxStage>
 
@@ -851,7 +927,7 @@ export function FieldhorseProposal({ view }: { view: ProposalView }) {
                 <Row key={i} as="li" title={line.title} money={line.amount} />
               ))}
             </ul>
-            {detailsOpen && <FullDetails id={detailsId} view={view} />}
+            {detailsOpen && <FullDetails id={detailsId} view={view} coverUrl={pv.coverUrl} />}
           </section>
         )}
         {pv.included.length === 0 && (
@@ -868,7 +944,7 @@ export function FieldhorseProposal({ view }: { view: ProposalView }) {
                 {detailsOpen ? 'Hide details' : 'Full details'}
               </Button>
             </div>
-            {detailsOpen && <FullDetails id={detailsId} view={view} />}
+            {detailsOpen && <FullDetails id={detailsId} view={view} coverUrl={pv.coverUrl} />}
           </section>
         )}
 
@@ -885,13 +961,13 @@ export function FieldhorseProposal({ view }: { view: ProposalView }) {
                   as="li"
                   title={line.title}
                   money={`+${formatMoney(line.amount)}`}
-                  next={portal?.onAsk ? (
+                  next={onAsk ? (
                     <Button
                       variant="quiet"
                       size="mini"
                       className="fhp-ask"
                       aria-label={`Ask about this, ${line.title}`}
-                      onClick={() => portal.onAsk?.(line.title)}
+                      onClick={(e) => onAsk(line.title, e.currentTarget)}
                     >
                       Ask about this
                     </Button>
@@ -902,14 +978,16 @@ export function FieldhorseProposal({ view }: { view: ProposalView }) {
           </section>
         )}
 
-        <section className="fhp-section" aria-labelledby={stepsId}>
-          <div className="fhp-section__head">
-            <h2 className="fhp-section__title" id={stepsId}>What happens next</h2>
-          </div>
-          <ol className="fhp-steps" role="list" aria-labelledby={stepsId}>
-            {pv.steps.map((step, i) => <li key={i}>{step}</li>)}
-          </ol>
-        </section>
+        {pv.steps.length > 0 && (
+          <section className="fhp-section" aria-labelledby={stepsId}>
+            <div className="fhp-section__head">
+              <h2 className="fhp-section__title" id={stepsId}>What happens next</h2>
+            </div>
+            <ol className="fhp-steps" role="list" aria-labelledby={stepsId}>
+              {pv.steps.map((step, i) => <li key={i}>{step}</li>)}
+            </ol>
+          </section>
+        )}
       </div>
 
       {capsule}

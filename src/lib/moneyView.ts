@@ -3,8 +3,10 @@
 // A vault card with what came in this week, what falls due this week, the
 // month so far and the margin; then four groups of rows: Overdue, Due soon,
 // Waiting on approval and Paid (the last 10 days). Every number comes from
-// what the screen already loads (the invoices bundle and the jobs list), so
-// there is no new query.
+// what the screen already loads (the invoices bundle and the jobs list).
+// What an invoice still asks for comes from the one allocator in
+// invoiceSettlement.ts, and the groups and totals read every open invoice,
+// not the display list capped at 500 (Phase 8, task 5).
 //
 // The week starts Sunday at 00:00 local time, as the desktop schedule does.
 // Dates that are only a calendar day (paid_on, due_at) are read in local
@@ -17,6 +19,7 @@
 
 import type { InvoicesBundle, JobRow } from './queries.ts'
 import { invoiceAmountDue } from './invoices.ts'
+import { amountsDueByInvoice, isOpenInvoice, knownContractTotal, type DueInvoice } from './invoiceSettlement.ts'
 import { avgMargin } from './rollups.ts'
 import { parseDateOnly } from './dates.ts'
 import { detailRoute } from './stages.ts'
@@ -142,23 +145,96 @@ type Context = {
   now: Date
   today: Date
   jobs: Map<string, InvoiceJob>
-  paymentsByJob: Map<string, Payment[]>
-  changeOrdersByJob: Map<string, ChangeOrder[]>
+  /** What each open invoice still owes (allocateInvoiceDue), by invoice id. */
+  owed: Map<string, number>
+}
+
+/**
+ * Every invoice the bundle knows, once each: the display list, every open
+ * invoice and the paid and void ones the allocator reads. A bundle built
+ * by hand without the uncapped lists falls back to the display list.
+ */
+export function knownInvoices(bundle: InvoicesBundle): DueInvoice[] {
+  const byId = new Map<string, DueInvoice>()
+  for (const list of [bundle.invoices, bundle.openInvoices ?? [], bundle.settledInvoices ?? []]) {
+    for (const inv of list) if (inv?.id && !byId.has(inv.id)) byId.set(inv.id, inv)
+  }
+  return [...byId.values()]
+}
+
+/** Every open invoice (sent, viewed, overdue), uncapped when the bundle carries the full list. */
+function openInvoicesOf(bundle: InvoicesBundle): Invoice[] {
+  return bundle.openInvoices ?? bundle.invoices.filter(isOpenInvoice)
+}
+
+// The job's contract for the allocator's cap, or null when the job left the
+// list or has no recorded amount (and no approved change order): then
+// there is nothing to cap at and its bills ask for their face less payments.
+function contractOf(job: InvoiceJob | undefined, changeOrders: ChangeOrder[]): number | null {
+  return job ? knownContractTotal({ amount: job.amount, changeOrders }) : null
 }
 
 function contextFor(bundle: InvoicesBundle, now: Date): Context {
+  const jobs = new Map(bundle.jobs.map((j) => [j.id, j]))
+  const changeOrdersByJob = groupBy(bundle.changeOrders, (c) => c.contact_id)
   return {
     now,
     today: startOfDay(now),
-    jobs: new Map(bundle.jobs.map((j) => [j.id, j])),
-    paymentsByJob: groupBy(bundle.payments, (p) => p.contact_id),
-    changeOrdersByJob: groupBy(bundle.changeOrders, (c) => c.contact_id)
+    jobs,
+    // A bill whose job left the list has no known contract, so no cap.
+    owed: amountsDueByInvoice({
+      invoices: knownInvoices(bundle),
+      payments: bundle.payments,
+      contractFor: (jobId) => contractOf(jobs.get(jobId), changeOrdersByJob.get(jobId) ?? [])
+    })
   }
+}
+
+/** When an invoice counts as overdue, how late it is and what it asks for. */
+export type InvoiceStanding = {
+  status: MoneyInvoiceStatus
+  /** Sent, viewed or overdue: a bill the customer has. */
+  issued: boolean
+  dueDay: Date | null
+  /** Calendar days from today to the due day; negative once it has passed. */
+  until: number | null
+  /** Whole days since the due day ended; 0 until then. */
+  daysLate: number
+  /** What is still owed on an issued bill, else its own amount. */
+  owed: number
+}
+
+/**
+ * Money's rule for one invoice, which Today reads too, so both screens
+ * agree on when a bill is overdue and for how much. An issued bill is
+ * overdue once its due day has ended in local time (a bill due today is
+ * due, not late), and it asks for `owed`, the allocator's figure from
+ * amountsDueByInvoice. A draft, paid or void invoice keeps its own amount.
+ */
+export function classifyInvoice(
+  inv: { status?: string | null; due_at?: string | null; amount?: number | string | null },
+  owed: number | null | undefined,
+  now: Date
+): InvoiceStanding {
+  const raw = String(inv.status || 'draft').toLowerCase()
+  const issued = isOpenInvoice(inv)
+  const due = parseDateOnly(inv.due_at ?? null)
+  const dueDay = due ? startOfDay(due) : null
+  const until = dueDay ? dayDiff(startOfDay(now), dueDay) : null
+  const daysLate = until != null && until < 0 ? -until : 0
+
+  let status: MoneyInvoiceStatus
+  if (issued) status = daysLate >= 1 ? 'overdue' : 'sent'
+  else if (raw === 'paid' || raw === 'void') status = raw
+  else status = 'draft'
+
+  const face = Number(inv.amount) || 0
+  return { status, issued, dueDay, until, daysLate, owed: issued ? (owed ?? 0) : face }
 }
 
 type Classified = {
   row: MoneyInvoiceRow
-  /** What is still owed on it (the job caps it), which can be zero. */
+  /** What is still owed on it (the allocator's figure), which can be zero. */
   owed: number
   dueDay: Date | null
   /** Calendar days from today to the due day; negative once it has passed. */
@@ -167,30 +243,8 @@ type Classified = {
 }
 
 function classify(inv: Invoice, ctx: Context): Classified {
-  const raw = String(inv.status || 'draft').toLowerCase()
-  const issued = raw === 'sent' || raw === 'overdue'
-  const due = parseDateOnly(inv.due_at)
-  const dueDay = due ? startOfDay(due) : null
-  const until = dueDay ? dayDiff(ctx.today, dueDay) : null
-  const late = until != null && until < 0 ? -until : 0
-
-  let status: MoneyInvoiceStatus
-  if (issued) status = late >= 1 ? 'overdue' : 'sent'
-  else if (raw === 'paid' || raw === 'void') status = raw
-  else status = 'draft'
-
+  const { status, issued, dueDay, until, daysLate: late, owed } = classifyInvoice(inv, ctx.owed.get(inv.id), ctx.now)
   const job = ctx.jobs.get(inv.contact_id)
-  const face = Number(inv.amount) || 0
-  // The email and its PDF ask for the invoice capped at what the job still
-  // owes; a bill whose job has left the list can only show its own amount.
-  const owed = job
-    ? invoiceAmountDue({
-        invoice: inv,
-        contact: job,
-        payments: ctx.paymentsByJob.get(job.id) ?? [],
-        changeOrders: ctx.changeOrdersByJob.get(job.id) ?? []
-      })
-    : face
 
   let chip: MoneyChip | null
   let note = ''
@@ -219,7 +273,7 @@ function classify(inv: Invoice, ctx: Context): Classified {
     id: inv.id,
     title: customerName(job),
     subline: job?.job_title ? `${job.job_title}, ${lowerFirst(title)}` : title,
-    amount: issued ? owed : face,
+    amount: owed,
     note,
     chip,
     to: job ? detailRoute(job, { financials: true }) : `/jobs/${inv.contact_id}?tab=financials`,
@@ -327,7 +381,9 @@ export function buildMoneyView(input: { bundle: InvoicesBundle; quotes: JobRow[]
   let dueThisWeek = 0
   const overdue: { row: MoneyRow; dueDay: Date }[] = []
   const dueSoon: { row: MoneyRow; dueDay: Date }[] = []
-  for (const inv of bundle.invoices) {
+  // Every open invoice, not the display list capped at 500, so an old
+  // unpaid bill still counts.
+  for (const inv of openInvoicesOf(bundle)) {
     const c = classify(inv, ctx)
     // Drafts, paid and void invoices never count, and neither does a bill
     // the job has already paid off: nothing is owed on it.
@@ -362,4 +418,25 @@ export function buildMoneyView(input: { bundle: InvoicesBundle; quotes: JobRow[]
 export function buildInvoiceList(input: { bundle: InvoicesBundle; now: Date }): MoneyInvoiceRow[] {
   const ctx = contextFor(input.bundle, input.now)
   return input.bundle.invoices.map((inv) => classify(inv, ctx).row)
+}
+
+/**
+ * What the customer owes on one invoice right now: the Mark paid prefill.
+ * The same allocation as the rows, with the job's invoices, payments and
+ * approved change orders; a draft counts as if it were sent.
+ */
+export function invoiceDueNow(bundle: InvoicesBundle, invoiceId: string): number {
+  const invoices = knownInvoices(bundle)
+  const invoice = invoices.find((inv) => inv.id === invoiceId)
+  if (!invoice) return 0
+  const jobId = invoice.contact_id ?? null
+  const job = jobId ? bundle.jobs.find((j) => j.id === jobId) : undefined
+  if (!job) return Math.max(0, Number(invoice.amount) || 0)
+  return invoiceAmountDue({
+    invoice,
+    contact: job,
+    payments: bundle.payments.filter((p) => p.contact_id === job.id),
+    changeOrders: bundle.changeOrders.filter((c) => c.contact_id === job.id),
+    invoices: invoices.filter((inv) => inv.contact_id === job.id)
+  })
 }

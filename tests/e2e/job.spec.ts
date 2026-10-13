@@ -3,12 +3,23 @@
 // falls back to the onyx band, the stage rail, the money strip, the
 // section tabs with the Spine first, and the floating action capsule
 // that takes the dock's place.
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page, type Route } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 
 async function open(page: Page, path: string) {
   await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 60_000 })
   await expect(page.locator('.fhj-page')).toBeVisible({ timeout: 30_000 })
+}
+
+// True when the tab sits wholly inside the strip and, while the row fades
+// at its right edge, ends before the 32 px fade begins.
+async function clearOfFade(row: Locator, strip: Locator, tab: Locator) {
+  const fading = /\bfhj-tabs--fade\b/.test((await row.getAttribute('class')) || '')
+  const stripBox = await strip.boundingBox()
+  const tabBox = await tab.boundingBox()
+  if (!stripBox || !tabBox) return false
+  const end = stripBox.x + stripBox.width - (fading ? 32 : 0)
+  return tabBox.x >= stripBox.x - 1 && tabBox.x + tabBox.width <= end
 }
 
 test.describe('job page on a phone', () => {
@@ -105,6 +116,150 @@ test.describe('job page on a phone', () => {
     // The quote stage keeps its Quote tab.
     await open(page, '/quotes/c-quote?tab=overview')
     await expect(page.getByRole('tablist', { name: 'Job sections' }).getByRole('tab', { name: 'Quote', exact: true })).toHaveCount(1)
+  })
+
+  test('the tab row fades at the right while it overflows, and not once scrolled to the end', async ({ context, page }) => {
+    await signIn(context)
+    await open(page, '/jobs/c-job1')
+    const tabs = page.getByRole('tablist', { name: 'Job sections' })
+    await expect(tabs.getByRole('tab', { name: 'Files', exact: true })).toHaveCount(1)
+    const row = page.locator('.fhj-tabs', { has: tabs })
+    // Eight tabs do not fit a phone, so the strip scrolls sideways.
+    expect(await tabs.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true)
+    await expect(row).toHaveClass(/fhj-tabs--fade/)
+    await tabs.evaluate((el) => { el.scrollLeft = el.scrollWidth })
+    await expect(row).not.toHaveClass(/fhj-tabs--fade/)
+    await tabs.evaluate((el) => { el.scrollLeft = 0 })
+    await expect(row).toHaveClass(/fhj-tabs--fade/)
+  })
+
+  test('opening the page on its last tab scrolls that tab into view, with no fade over it', async ({ context, page }) => {
+    await signIn(context)
+    await open(page, '/jobs/c-job1?tab=files')
+    const tabs = page.getByRole('tablist', { name: 'Job sections' })
+    const files = tabs.getByRole('tab', { name: 'Files', exact: true })
+    await expect(files).toHaveAttribute('aria-selected', 'true')
+    await expect.poll(async () => {
+      const strip = await tabs.boundingBox()
+      const tab = await files.boundingBox()
+      return strip && tab ? tab.x >= strip.x - 1 && tab.x + tab.width <= strip.x + strip.width + 1 : false
+    }).toBe(true)
+    await expect(page.locator('.fhj-tabs', { has: tabs })).not.toHaveClass(/fhj-tabs--fade/)
+  })
+
+  test('a tab selected when the page opens sits clear of the fade', async ({ context, page }) => {
+    await signIn(context)
+    for (const id of ['change_orders', 'logs', 'financials']) {
+      await open(page, `/jobs/c-job1?tab=${id}`)
+      const tabs = page.getByRole('tablist', { name: 'Job sections' })
+      const selected = tabs.locator('[role="tab"][aria-selected="true"]')
+      await expect(selected).toHaveCount(1)
+      await expect.poll(() => clearOfFade(page.locator('.fhj-tabs', { has: tabs }), tabs, selected), id).toBe(true)
+    }
+  })
+
+  test('a tab opened by a link stays clear of the fade when the money tabs arrive after the job', async ({ context, page }) => {
+    // On a cold open the job draws from the saved cache while the role is
+    // still loading, so the first strip has no Change orders and calls
+    // Financials Expenses. Hold the role's first read until the job draws.
+    await signIn(context)
+    const isMembers = (url: URL) => url.pathname.endsWith('/rest/v1/org_members')
+    for (const id of ['logs', 'financials', 'files']) {
+      let release = () => {}
+      const held = new Promise<void>((resolve) => { release = resolve })
+      const hold = async (route: Route) => { await held; await route.fallback() }
+      await context.route(isMembers, hold)
+      await open(page, `/jobs/c-job1?tab=${id}`)
+      const tabs = page.getByRole('tablist', { name: 'Job sections' })
+      const selected = tabs.locator('[role="tab"][aria-selected="true"]')
+      const changeOrders = tabs.getByRole('tab', { name: 'Change orders', exact: true })
+      await expect(selected).toHaveCount(1)
+      await expect(changeOrders, `${id}, before the role loads`).toHaveCount(0)
+      release()
+      await expect(changeOrders).toHaveCount(1)
+      await expect.poll(() => clearOfFade(page.locator('.fhj-tabs', { has: tabs }), tabs, selected), id).toBe(true)
+      await context.unroute(isMembers, hold)
+    }
+  })
+
+  test('a tab reached with the arrow keys sits clear of the fade', async ({ context, page }) => {
+    await signIn(context)
+    await open(page, '/jobs/c-job1')
+    const tabs = page.getByRole('tablist', { name: 'Job sections' })
+    const row = page.locator('.fhj-tabs', { has: tabs })
+    await tabs.getByRole('tab', { name: 'Spine', exact: true }).focus()
+    for (const name of ['Details', 'Selections', 'Materials', 'Change orders', 'Daily logs', 'Financials', 'Files']) {
+      await page.keyboard.press('ArrowRight')
+      const tab = tabs.getByRole('tab', { name, exact: true })
+      await expect(tab).toBeFocused()
+      await expect.poll(() => clearOfFade(row, tabs, tab), name).toBe(true)
+    }
+  })
+
+  test('opened from the Jobs list, the header spans the page and the fade sits on the tab strip', async ({ context, page }) => {
+    await signIn(context)
+    // By tapping a row, so the Jobs list's styles are already on the page
+    // when the job draws: the way most people reach a job.
+    await page.goto('/work', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    await expect(page.getByRole('heading', { level: 1, name: 'Jobs' })).toBeVisible({ timeout: 30_000 })
+    await page.getByText('Plumbing Bellevue', { exact: true }).click()
+    await expect(page).toHaveURL(/\/jobs\/c-job1$/)
+    await expect(page.locator('.fhj-page')).toBeVisible({ timeout: 30_000 })
+    const width = page.viewportSize()!.width
+    const near = (a: number, b: number) => Math.abs(a - b) <= 1
+
+    // One column: the onyx hero spans the page and the facts sit under it.
+    const hero = page.locator('.fhj-hero')
+    await expect(hero.getByRole('heading', { level: 1, name: 'Slab + trench' })).toBeVisible()
+    expect(await page.locator('.fhj-page .fhj-head').evaluate((el) => getComputedStyle(el).display)).not.toBe('flex')
+    const heroBox = (await hero.boundingBox())!
+    expect(near(heroBox.x, 0) && near(heroBox.width, width), `hero ${heroBox.x}, ${heroBox.width} wide`).toBe(true)
+    const factsBox = (await page.locator('.fhj-facts').boundingBox())!
+    expect(factsBox.y).toBeGreaterThanOrEqual(heroBox.y + heroBox.height - 1)
+
+    // The strip runs edge to edge and the fade covers its last 32 px.
+    const tabs = page.getByRole('tablist', { name: 'Job sections' })
+    const row = page.locator('.fhj-tabs', { has: tabs })
+    await expect(row).toHaveClass(/fhj-tabs--fade/)
+    const strip = (await tabs.boundingBox())!
+    expect(near(strip.x, 0) && near(strip.x + strip.width, width), `strip ${strip.x} to ${strip.x + strip.width}`).toBe(true)
+    const fade = await row.evaluate((el) => {
+      const box = el.getBoundingClientRect()
+      const after = getComputedStyle(el, '::after')
+      const right = box.right - parseFloat(after.right)
+      return { left: right - parseFloat(after.width), right }
+    })
+    expect(near(fade.right, strip.x + strip.width) && near(fade.left, strip.x + strip.width - 32), `fade ${fade.left} to ${fade.right}`).toBe(true)
+  })
+
+  test('the tab row measures itself once, not on every render of the page', async ({ context, page }) => {
+    // Count how often a ResizeObserver starts watching the tab strip.
+    await page.addInitScript(() => {
+      const observe = ResizeObserver.prototype.observe
+      const w = window as unknown as { __stripObserved: number }
+      w.__stripObserved = 0
+      ResizeObserver.prototype.observe = function (target: Element, options?: ResizeObserverOptions) {
+        if (target instanceof Element && target.classList.contains('fhj-tabs__strip')) w.__stripObserved += 1
+        return observe.call(this, target, options)
+      }
+    })
+    await signIn(context)
+    await open(page, '/jobs/c-job1')
+    const tabs = page.getByRole('tablist', { name: 'Job sections' })
+    await expect(tabs.getByRole('tab', { name: 'Files', exact: true })).toHaveCount(1)
+    await page.waitForLoadState('networkidle')
+    const observed = () => page.evaluate(() => (window as unknown as { __stripObserved: number }).__stripObserved)
+    const settled = await observed()
+    expect(settled).toBeGreaterThan(0)
+
+    // Opening and closing the more sheet renders the page again, with the
+    // same tabs.
+    await page.getByRole('button', { name: 'More actions for this job' }).click()
+    const sheet = page.getByRole('dialog', { name: 'Slab + trench' })
+    await expect(sheet).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(sheet).toBeHidden()
+    expect(await observed()).toBe(settled)
   })
 
   test('the page scrolls clear of the capsule', async ({ context, page }) => {
@@ -345,6 +500,15 @@ test.describe('job page on a desktop, redesigned', () => {
     expect(await page.evaluate(() => (window as unknown as { __captureDetail?: unknown }).__captureDetail)).toEqual({ jobId: 'c-job1' })
     await expect(page.getByRole('dialog', { name: 'Capture' })).toBeVisible()
     expect(writes).toEqual([])
+  })
+
+  test('the tab row wraps on a desktop, so it never fades', async ({ context, page }) => {
+    await signIn(context)
+    await openDesktop(page, '/jobs/c-job1')
+    const tabs = page.getByRole('tablist', { name: 'Job sections' })
+    await expect(tabs.getByRole('tab', { name: 'Files', exact: true })).toHaveCount(1)
+    expect(await tabs.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true)
+    await expect(page.locator('.fhj-tabs', { has: tabs })).not.toHaveClass(/fhj-tabs--fade/)
   })
 
   test('the Spine is the first tab and every section stays one click away', async ({ context, page }) => {

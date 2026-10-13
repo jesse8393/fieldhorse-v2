@@ -29,6 +29,25 @@ import {
   loadCloseout, saveCloseout, clearCloseout, snapshotJobTotals, closeoutBalance
 } from '../lib/closeout.ts'
 import { Eyebrow } from './v3'
+import { freePageForQuestion, useConfirm } from './ConfirmSheet.tsx'
+
+type Confirm = (options: {
+  title: string
+  body?: string
+  confirmLabel?: string
+  destructive?: boolean
+  signal?: AbortSignal
+}) => Promise<boolean>
+
+// Reopen from the closeout record deletes the record (sign off, warranty,
+// closing notes) and moves the job back, so it asks first, like every
+// other Reopen (Phase 8, Task 15). It used to act on one tap.
+const REOPEN_QUESTION = {
+  title: 'Reopen this job?',
+  body: 'It moves back to Jobs, and its closeout record is deleted, with the sign off, warranty and closing notes.',
+  confirmLabel: 'Reopen',
+  destructive: true
+}
 
 function moneyFmt(n: any) {
   return Number(n || 0).toLocaleString(undefined, {
@@ -52,6 +71,18 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
   const [existing, setExisting] = useState<any>(null)
   const [totals, setTotals] = useState({ paid: 0, photoCount: 0, approvedCO: 0 })
   const { formRef, drawerStyle, formStyle } = useDrawerKeyboard(open)
+  const confirm = useConfirm() as Confirm
+  const contentRef = useRef<HTMLDivElement | null>(null)
+  // True while the Reopen question is open over the sheet.
+  const askingRef = useRef(false)
+  // Takes that question back (it answers no) when the sheet closes or
+  // leaves the page while it asks: the back button would otherwise leave
+  // it over the next screen, where a yes would still delete this record.
+  const askAbortRef = useRef<AbortController | null>(null)
+  useEffect(() => {
+    if (!open) return
+    return () => askAbortRef.current?.abort()
+  }, [open])
 
   // Contract and balance include approved change orders, the same
   // figures saveCloseout snapshots onto the certificate.
@@ -125,8 +156,49 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
     }
   }
 
+  // Asks REOPEN_QUESTION over the sheet, the way the fh Sheet asks before a
+  // discard: the sheet goes inert so its focus trap cannot pull focus back
+  // from the question, the page takes pointer events again so the question
+  // can be tapped (a modal sheet turns them off; freePageForQuestion puts
+  // that back only while the sheet is still in the page), and nothing
+  // outside the sheet may close it meanwhile. A no puts focus back where it
+  // was; a question taken back because the sheet went away answers no and
+  // leaves focus alone.
+  async function askToReopen() {
+    if (askingRef.current) return false
+    askingRef.current = true
+    const node = contentRef.current
+    const returnTo = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const asking = new AbortController()
+    askAbortRef.current = asking
+    node?.setAttribute('inert', '')
+    const lockPageAgain = freePageForQuestion(node)
+    let ok = false
+    try {
+      ok = await confirm({ ...REOPEN_QUESTION, signal: asking.signal })
+    } finally {
+      if (askAbortRef.current === asking) askAbortRef.current = null
+      askingRef.current = false
+      node?.removeAttribute('inert')
+      lockPageAgain()
+    }
+    if (!ok && !asking.signal.aborted) {
+      requestAnimationFrame(() => {
+        if (returnTo && returnTo.isConnected && node?.contains(returnTo)) returnTo.focus()
+      })
+    }
+    return ok
+  }
+
+  // While the question is open, Escape and a tap or focus outside the
+  // sheet answer the question only.
+  const holdWhileAsking = (event: Event) => {
+    if (askingRef.current) event.preventDefault()
+  }
+
   async function reopen() {
     if (!isReopening || saving) return
+    if (!(await askToReopen())) return
     setSaving(true)
     try {
       await clearCloseout({ userId, contact, reopenTo: 'job' })
@@ -272,8 +344,11 @@ export default function MarkCompleteSheet({ open, userId, contact, onClose, onSa
   return (
     <Drawer open={open} onOpenChange={(v: any) => { if (!v && !saving) onClose?.() }}>
       <DrawerContent
+        ref={contentRef}
         className="ui:max-w-full ui:overflow-x-hidden"
         style={drawerStyle}
+        onEscapeKeyDown={holdWhileAsking}
+        onInteractOutside={holdWhileAsking}
       >
         <DrawerHeader className="ui:text-left" style={{ maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
           <Eyebrow as="div">

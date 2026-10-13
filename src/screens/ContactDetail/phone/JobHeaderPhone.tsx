@@ -8,6 +8,7 @@ import { handleTablistKeyDown, tabId, tabPanelId } from '../../../lib/tabs.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { FOLLOW_UP_PRESETS, followUpMeta, localYmd } from '../../../lib/followUp.ts'
 import type { FollowUpWhen } from '../../../lib/followUp.ts'
+import { navigateHrefHere } from '../../../lib/todayView.ts'
 import type { JobMoney } from '../lib/spine.ts'
 import type { JobPhotos } from './SpineList.tsx'
 import './job-phone.css'
@@ -27,10 +28,6 @@ import './job-phone.css'
 
 function photoLabel(count: number) {
   return count === 1 ? '1 photo' : `${count} photos`
-}
-
-function mapsHref(address: string) {
-  return `https://maps.apple.com/?daddr=${encodeURIComponent(address)}`
 }
 
 export type JobHeaderPhoneProps = {
@@ -136,7 +133,7 @@ export default function JobHeaderPhone({ contact, photos, money, backLabel, onBa
             <QuickAction
               icon={Navigation}
               label="Navigate"
-              href={address ? mapsHref(address) : undefined}
+              href={address ? navigateHrefHere(address) : undefined}
               external
               aria-label={address ? `Navigate to ${address}` : 'Navigate, no address on file'}
             />
@@ -200,9 +197,18 @@ function QuickAction({ icon, label, href, external, onClick, 'aria-label': ariaL
 
 export type JobSectionTab = { id: string; label: string }
 
+// Room a tab brought into view keeps from the strip's right edge: the
+// 32 px fade plus a little, so the selected tab never sits under it. The
+// strip's scroll-padding (job-phone.css) gives the arrow keys, which
+// scroll the focused tab into view, the same room.
+const TAB_END_ROOM = 40
+
 /* The job's sections as text tabs with the gold underline (decision D5).
    Overview reads "Spine". Manual activation per lib/tabs.ts; the strip
-   scrolls sideways and keeps the selected tab in view. */
+   scrolls sideways and keeps the selected tab in view, on load and when
+   the tabs change too. While more tabs wait past the right edge the row
+   fades there (fhj-tabs--fade), and the fade goes once the strip is
+   scrolled to its end. */
 export const JobSectionTabs = forwardRef<HTMLDivElement, {
   tabs: JobSectionTab[]
   value: string
@@ -210,8 +216,16 @@ export const JobSectionTabs = forwardRef<HTMLDivElement, {
   idBase: string
 }>(function JobSectionTabs({ tabs, value, onChange, idBase }, ref) {
   const stripRef = useRef<HTMLDivElement | null>(null)
+  const [fade, setFade] = useState(false)
   const selectedIndex = Math.max(0, tabs.findIndex((t) => t.id === value))
+  // The page builds a new tabs array on every render; the tabs as drawn,
+  // which ones and their labels, are what the effects below follow.
+  const tabsKey = tabs.map((t) => `${t.id}:${t.label}`).join('|')
 
+  // Brings the selected tab into view when it changes, and again when the
+  // tabs do: on a cold open the job draws from the saved cache before the
+  // viewer's role loads, and the money tabs (Quote, Change orders) join
+  // the strip after that, ahead of the tab a link opened.
   useEffect(() => {
     const strip = stripRef.current
     if (!strip || strip.scrollWidth <= strip.clientWidth) return
@@ -219,12 +233,40 @@ export const JobSectionTabs = forwardRef<HTMLDivElement, {
     if (!tab) return
     const stripBox = strip.getBoundingClientRect()
     const tabBox = tab.getBoundingClientRect()
-    if (tabBox.left < stripBox.left) strip.scrollLeft -= stripBox.left - tabBox.left + 20
-    else if (tabBox.right > stripBox.right) strip.scrollLeft += tabBox.right - stripBox.right + 20
-  }, [value])
+    if (tabBox.left < stripBox.left) {
+      strip.scrollLeft -= stripBox.left - tabBox.left + 20
+    } else if (tabBox.right > stripBox.right - TAB_END_ROOM) {
+      // The last tab lands at the strip's end, so the fade clears with it;
+      // any other stops short of the fade.
+      const last = tab.nextElementSibling?.getAttribute('role') !== 'tab'
+      strip.scrollLeft = last ? strip.scrollWidth : strip.scrollLeft + tabBox.right - stripBox.right + TAB_END_ROOM
+    }
+  }, [value, tabsKey])
+
+  // Measured on every scroll, and again when the strip or a tab changes
+  // size (a resize, or the web font arriving), since only the tabs' own
+  // boxes tell the strip's scroll width. Watched afresh only when the tabs
+  // change.
+  useEffect(() => {
+    const strip = stripRef.current
+    if (!strip) return
+    const measure = () => {
+      const room = strip.scrollWidth - strip.clientWidth
+      setFade(room > 1 && strip.scrollLeft < room - 1)
+    }
+    measure()
+    strip.addEventListener('scroll', measure, { passive: true })
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure)
+    observer?.observe(strip)
+    for (const child of Array.from(strip.children)) observer?.observe(child)
+    return () => {
+      strip.removeEventListener('scroll', measure)
+      observer?.disconnect()
+    }
+  }, [tabsKey])
 
   return (
-    <div className="fhj-tabs" ref={ref}>
+    <div className={cx('fhj-tabs', fade && 'fhj-tabs--fade')} ref={ref}>
       <div
         ref={stripRef}
         className="fhj-tabs__strip"

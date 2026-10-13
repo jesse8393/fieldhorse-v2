@@ -78,7 +78,8 @@ export function composeActivityEvents({
   payments = [],
   scheduleItems = [],
   changeOrders = [],
-  stageTransitions = []
+  stageTransitions = [],
+  fullNotes = false
 }: {
   contact?: any
   notes?: any[]
@@ -86,6 +87,12 @@ export function composeActivityEvents({
   scheduleItems?: any[]
   changeOrders?: any[]
   stageTransitions?: any[]
+  /**
+   * Every note with its whole text, for the Spine (Phase 8, Task 15).
+   * Without it the activity log keeps the newest five notes as one line
+   * previews.
+   */
+  fullNotes?: boolean
 }): ActivityEvent[] {
   const out: ActivityEvent[] = []
 
@@ -201,20 +208,22 @@ export function composeActivityEvents({
     })
   }
 
-  // 7. Notes, only the most recent 5 so the feed isn't dominated by
-  //    a chatty job. Older notes live on the Notes screen.
+  // 7. Notes. The activity log keeps only the most recent 5, each as a
+  //    one line preview, so the feed isn't dominated by a chatty job (older
+  //    notes live on the Notes screen). The Spine asks for every note in
+  //    full (fullNotes), so its "Show N more" counts what is really there.
   const sortedNotes = (notes || [])
     .slice()
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    .slice(0, 5)
-  for (const n of sortedNotes) {
-    const preview = (n.text || '').trim().split('\n')[0].slice(0, 80)
+  for (const n of fullNotes ? sortedNotes : sortedNotes.slice(0, 5)) {
+    const text = String(n.text || '').trim()
+    const shown = fullNotes ? text : text.split('\n')[0].slice(0, 80)
     out.push({
       id: `note:${n.id}`,
       when: new Date(n.created_at),
       kind: 'note',
       title: 'Note added',
-      sub: preview || '(empty note)',
+      sub: shown || '(empty note)',
       tone: 'neutral'
     })
   }

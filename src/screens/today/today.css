@@ -7,8 +7,6 @@
 .fht {
   /* The shared header: 8 px, a 44 px control row, 8 px, plus the notch. */
   --fht-header-h: calc(60px + env(safe-area-inset-top, 0px));
-  /* The paper around the loading card, as PhotoCard draws it. */
-  --fht-bezel: 6px;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -122,6 +120,10 @@
 /* ---- Next stop card, overlapping the stage edge ---- */
 
 .fht-card {
+  /* The paper around the loading card, as PhotoCard draws it. Set here
+     rather than on the phone's root, so the desktop's card (under .fhtd)
+     gets the same 6 px. */
+  --fht-bezel: 6px;
   position: relative;
   z-index: 1;
   margin-top: -48px;
@@ -142,8 +144,12 @@
   border-radius: 12px;
 }
 
+/* The ring around the whole band is the focus ring. global.css forces a
+   2 px outline on every focused link with !important, and the band's
+   title clamps with overflow hidden, which cut that one into four corner
+   pieces, so this drops it with the same weight. */
 .fht-next__link:focus-visible {
-  outline: none;
+  outline: none !important;
 }
 
 .fht-next__link:focus-visible::after {
@@ -156,7 +162,8 @@
   z-index: 1;
 }
 
-/* Loading: the card's tray and frame, empty. */
+/* Loading: the card's tray and frame, empty, the size of the compact band
+   (decision D32) since most jobs have no photo yet. */
 .fht-card__tray {
   padding: var(--fht-bezel);
   border-radius: 18px;
@@ -166,10 +173,10 @@
 
 .fht-card__frame {
   display: grid;
-  align-content: end;
+  align-content: center;
   gap: 8px;
-  aspect-ratio: 16 / 9;
-  padding: 16px;
+  min-height: 84px;
+  padding: 12px 16px;
   border-radius: 12px;
   background: var(--fh-stage);
 }

@@ -46,6 +46,14 @@ select:focus-visible,
   outline-offset: 2px;
 }
 
+/* The page's main region takes focus only by script, after Try again on a
+   screen that was all error (lib/retryFocus.ts). It is not a control, so
+   it draws no ring and keeps its square corners. */
+#fh-main:focus-visible {
+  outline: none;
+  border-radius: 0;
+}
+
 /* Notes textarea placeholder — bumped from browser-default opacity
    (~0.4) to a properly readable token color so the hint passes WCAG
    AA on the dark surface in direct sunlight. */
@@ -109,40 +117,12 @@ select:focus-visible,
   --radius: 6px;
 }
 
-/* Premium FX keyframes */
-@keyframes fh-aurora-drift {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(30px, 40px) scale(1.1); }
-}
-@keyframes fh-aurora-drift-alt {
-  0%, 100% { transform: translate(0, 0) scale(1.02); }
-  50% { transform: translate(-40px, 30px) scale(1.15); }
-}
-@keyframes fh-grid-drift {
-  0% { background-position: 0 0; }
-  100% { background-position: 80px 80px; }
-}
-@keyframes fh-spotlight-breathe {
-  0%, 100% { opacity: 0.5; transform: scale(1); }
-  50% { opacity: 0.9; transform: scale(1.2); }
-}
-@keyframes fh-shimmer-sweep {
-  0% { transform: translateX(-120%); }
-  100% { transform: translateX(120%); }
-}
-@keyframes fh-scan-line {
-  0%, 100% { transform: translateX(-100%); opacity: 0; }
-  50% { transform: translateX(100%); opacity: 1; }
-}
+/* The level bars of the Notes recorder (Notes.tsx sets the animation inline). */
 @keyframes fh-pulse-dot {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.5; transform: scale(0.85); }
 }
 
-/* Premium FX utility classes */
-/* Three warm layers, all gold — blueprint spec is constant yellow breathing.
-   Different positions + durations + directions + negative animation-delays
-   keep the three blobs from pulsing in lockstep. */
 /* Brand rule: no gradient text. Solid brand gold instead — same accent,
    no clipped-fill effect (UI audit #38). */
 .fh-text-gradient-gold {
@@ -718,8 +698,6 @@ select:focus-visible,
   letter-spacing: 0;
 }
 
-/* Raised cards — drop onto KPI tiles, job cards, client rows, weekly target.
-   Brand rule: surfaces lift off the base; never float in the void. */
 /* Instant press depress — tap registers before network/HMR completes.
    Pairs with framer-motion whileTap for the visual confirmation. */
 .fh-press-instant {
@@ -729,18 +707,6 @@ select:focus-visible,
 .fh-press-instant:active {
   transform: translateY(1px) scale(0.97);
   box-shadow: 0 0 0 rgba(20, 20, 20, 0);
-}
-
-/* Money numeric treatment — neon gold + 800 weight + tight tracking.
-   Apply to $amount renders only; never to labels or counts. */
-/* Stage pill — solid fill + onyx text. High-contrast, sunlight legible.
-   Color set via inline style or a stage-specific modifier. */
-/* Aceternity-style animated moving border. Wrap any container and the gradient ring
-   orbits its perimeter. Adds "premium shimmer" without affecting layout. */
-@keyframes fh-moving-border {
-  0%   { background-position: 0% 50%; }
-  50%  { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
 }
 
 /* END TAILWIND v4 ADDITIVE LAYER */
@@ -874,7 +840,6 @@ a {
 .fh-wordmark .horse { color: var(--ink-strong); }
 .fh-wordmark-stack--inverse .fh-wordmark .horse { color: #F2EDE4; }
 
-/* ---------- Auth surface ---------- */
 /* ---------- Form fields ---------- */
 .fh-field {
   display: flex;
@@ -947,7 +912,7 @@ a {
   cursor: not-allowed;
 }
 
-/* ---------- Auth toggle + messages ---------- */
+/* ---------- Error message (Onboarding) ---------- */
 .fh-auth__error {
   margin: 0;
   padding: var(--space-3) var(--space-4);
@@ -1306,10 +1271,6 @@ a {
   border-radius: 10px;
   background: var(--field-gold);
 }
-@keyframes fh-pulse {
-  0%,100% { transform: scale(1); }
-  50%     { transform: scale(1.35); }
-}
 
 /* ======================================================================
    LOGO UPLOADER
@@ -1569,32 +1530,6 @@ a {
 }
 
 /* =========================================================================
-   BOTTOM NAV — glass-lined, springy indicator dot
-   ========================================================================= */
-/* V3-SYSTEM-1A2: bottom nav cap follows the active layout mode on
-   .fh-app root, so the dock and the content column always agree. In
-   mobile-frame routes the dock floats centered at ~440px with rounded
-   top corners; phones (<720px) keep edge-to-edge behavior regardless.
-   Other layout modes (prose, responsive) leave the nav at its default
-   edge-to-edge state — desktop dashboard layouts will likely replace
-   the bottom nav with sidebar nav, and that decision happens when
-   those layouts ship, not here. */
-@media (min-width: 720px) {
-  }
-@media (min-width: 720px) {
-  }
-/* Phase 1: Responsive route at tablet widths keeps the same centered
-   440px BottomNav as mobile-frame, since Home looks the same at 720-
-   899px (sidebar hasn't activated yet). At >=900px the BottomNav is
-   hidden entirely by the desktop shell rules below. */
-@media (min-width: 720px) and (max-width: 899px) {
-  }
-/* V3-SYSTEM-1B-2: active state keeps the gold wash + inner stroke
-   pattern but quieter — alpha 0.18 → 0.12 and inner stroke gold@30%
-   → gold@22% so the dock reads as a calm mobile dock instead of
-   chunky control. Dot below also shrinks. Light theme tracks the
-   same demotion. */
-/* =========================================================================
    DESKTOP SHELL — Phase 1 of the Responsive Desktop Command Center
 
    Activates at >=900px. The persistent left rail (.fh-desktop-sidebar)
@@ -1608,7 +1543,6 @@ a {
        lives on .fh-app__main-inner so margin:auto can still center.
      - .fh-app-header gets the same padding-left so its right-side
        icons cluster within the visible content area.
-     - .fh-nav (BottomNav) hides via display:none.
 
    Below 900px every desktop rule is suppressed and the existing mobile
    layout (BottomNav-driven) renders unchanged.
@@ -1648,27 +1582,7 @@ a {
     overflow-y: hidden;
     scrollbar-width: none;
   }
-  /* Brand block — logo-first stack (Phase 5).
-     Layout: optional small "FIELDHORSE" system label, then the full
-     company logo (or wordmark fallback) as the visual anchor, then a
-     thin divider via padding/border-bottom. The logo image is
-     contained — never cropped, squeezed, or clipped — and given
-     enough room to breathe (max-height 84px). */
-    /* Small system label above the logo — pinned at the top so the
-     user always sees which app they're in even when a tenant brand
-     dominates. Reads as supporting chrome, not the brand. */
-    /* Logo container — full width of the rail (minus padding) so wide
-     logos render at full size. object-fit:contain prevents squeeze;
-     max-height caps tall marks so the brand block stays bounded. */
-      /* Wordmark fallback — when no logo_url is present. Wide serif
-     wordmark, centered, never clipped. Same component is used for
-     the tenant company name and the FIELDHORSE system mark. */
-    /* When the brand falls all the way through to the FIELDHORSE
-     wordmark, drop the system label above (it would just say the
-     same thing) and tighten letter-spacing back to the badge value. */
-    /* Nav stack */
-                          /* Foot — account chip + theme/sign-out icon buttons */
-              /* Shift the main content + header inset to clear the 256px sidebar
+  /* Shift the main content + header inset to clear the 256px sidebar
      (Phase 9 fit fix). */
   .fh-app__main {
     width: calc(100% - 256px);
@@ -1688,13 +1602,7 @@ a {
     padding-left: 24px !important;
     box-sizing: border-box;
   }
-  /* Hide the BottomNav on desktop — sidebar carries primary nav. */
-    /* Hide AppHeader's mobile-only brand slots — sidebar owns identity.
-     `!important` overrides the inline `display: flex` on the brand
-     wrapper div (Phase 2.5 fix — without it the centered tenant
-     wordmark was still rendering at the top of every desktop view,
-     reading as "Parker dominates the page"). */
-      /* Header content shifts to the right — give the action cluster more
+  /* Header content shifts to the right — give the action cluster more
      room to breathe and align with content gutter on desktop. */
   .fh-app-header { justify-content: flex-end !important; padding-right: 24px !important; }
   /* Phase 10b crisp-glass mandate: replace the mobile fade-to-
@@ -1748,22 +1656,12 @@ a {
       inset -1px 0 0 var(--v3-glass-tint),
       4px 0 24px rgba(20, 20, 20, 0.45);
   }
-  /* Lock sidebar inner text/icons to dark-theme equivalents so the
-     light-theme ink colors (which would render dark-on-dark) don't
-     blow out contrast. Hardcoded RGB ON PURPOSE — these MUST stay
-     independent of theme because the rail keeps its dark surface in
-     daylight. (The 7/4 desktop-parity sweep converted them to
-     var(--v3-text*) and the QA tour caught the whole rail going
-     invisible in light — do not re-tokenize this block.) */
-                    }
+}
 
 /* =========================================================================
    PHASE 11 STABILIZATION — desktop fixes (browser audit follow-ups)
 
-   Three CSS-only fixes addressing browser-audit feedback before PR:
-     #4 Duplicate Next Action — hide the OverviewTab's NextActionCard
-        when rendered inside DesktopJobDetail.main; the rail card
-        already surfaces it.
+   A CSS-only fix addressing browser-audit feedback before PR:
      #8 Brown / olive / hazy desktop background — scrub the gold-radial
         "stage light" that .v3-screen paints across the top 280px of
         every page on desktop, and replace the warm-onyx page floor
@@ -2173,74 +2071,20 @@ a {
 }
 
 /* =========================================================================
-   HOME — desktop dashboard grid (Phase 1)
-
-   Home renders inside <motion.div className="v3-screen v3-screen--home">.
-   On desktop we promote that single-column flow to a 2-column dashboard
-   grid. The first two children (greeting strip + pipeline revenue card)
-   span the full width to anchor the page; everything below distributes
-   into two columns by source order. Phones (<900px) keep the existing
-   single-column flow exactly as before.
-
-   The :nth-child rule is intentionally simple — Home's section order
-   is stable and the rule lives next to the layout-mode CSS so a future
-   reorder is easy to spot. Scoped to .v3-screen--home so Jobs / Clients
-   (also on the responsive layout from Phase 2 onward) don't inherit
-   Home's "first 2 full-width, rest split into 2 cols" pattern.
+   FAB ON DESKTOP, Phase 2
    ========================================================================= */
 @media (min-width: 900px) {
-    /* First two top-of-page rows (greeting strip + Today's Revenue
-     Opportunity card) span both columns so they read as the page
-     header. Items 3+ stack in two columns by source order. */
-    /* Reset per-section horizontal margins inside the grid — the inner
-     wrapper provides the gutter on desktop, so child cards should
-     hug the column they live in instead of carrying their own
-     mobile-tuned 0 var(--v3-gutter) shoulders. */
-  }
-
-/* =========================================================================
-   DESKTOP-ONLY INLINE ACTION BUTTON — Phase 2
-
-   Replaces the FAB on desktop for screens that opt in. Premium black-
-   glass with a restrained gold accent, matches sidebar hover language.
-   On mobile this stays display:none and the FAB carries the primary
-   action (thumb-reach pattern).
-   ========================================================================= */
-@media (min-width: 900px) {
-        /* FAB collapses on desktop when the screen has supplied an inline
+  /* FAB collapses on desktop when the screen has supplied an inline
      primary action (Jobs, Clients in Phase 2). Other screens that
      keep the FAB are unaffected because they don't pass the prop. */
   .fh-fab--hide-desktop { display: none !important; }
 }
 
 /* =========================================================================
-   JOBS — desktop command layout (Phase 2)
-
-   At >=900px the four mobile-stacked sections (head, search, tabs, grid)
-   reflow into a single sticky-feeling header row + a wide card grid.
-   Mobile layout is unchanged because all desktop rules live inside the
-   @media (min-width: 900px) block.
-
-       ┌─────────────── header row ──────────────────────────────────┐
-       │ [Title + caption] [── search ──] [tabs] [+ New Lead]        │
-       ├─────────────── card grid (3-4 cols) ────────────────────────┤
-       │ [card] [card] [card] [card]                                 │
-       │ [card] [card] [card] [card]                                 │
-       └─────────────────────────────────────────────────────────────┘
-
-   Section identity comes from explicit BEM-style classes added in
-   Jobs.jsx (.fh-jobs__head / __search / __tabs / __action / __grid)
-   so the grid placement isn't a fragile :nth-child contract.
-   ========================================================================= */
-@media (min-width: 900px) {
-  }
-
-/* =========================================================================
    CLIENTS — desktop directory layout (Phase 2)
 
    At >=900px the cockpit panel becomes a horizontal command strip
-   spanning the full canvas, the filter row stretches inline, and the
-   client tile grid takes the full width with 3-4 columns. Mobile
+   spanning the full canvas and the filter row stretches inline. Mobile
    unchanged.
    ========================================================================= */
 @media (min-width: 900px) {
@@ -2250,12 +2094,11 @@ a {
     row-gap: 12px;
     padding: 4px 0 32px;
   }
-  /* Cockpit + filters + grid stack vertically but each section drops
-     its mobile gutter so they can stretch to the canvas edges. The
+  /* Cockpit + filters stack vertically but each section drops its
+     mobile gutter so they can stretch to the canvas edges. The
      .fh-app__main-inner wrapper already provides the desktop gutter. */
   .v3-screen--clients > .fh-clients__cockpit,
-  .v3-screen--clients > .fh-clients__filters,
-  .v3-screen--clients > .fh-clients__grid {
+  .v3-screen--clients > .fh-clients__filters {
     padding-left: 0 !important;
     padding-right: 0 !important;
   }
@@ -2278,23 +2121,17 @@ a {
     padding-bottom: 0 !important;
     flex-wrap: nowrap;
   }
-  /* Card grid — bump minmax so tiles have breathing room on the wider
-     canvas (mobile 320 → desktop 320 unchanged but the column count
-     scales naturally with auto-fill). Slightly looser gap. */
-  }
+}
 
 /* =========================================================================
    DESKTOP DENSITY, Phase 6
 
-   Tightens the Clients grid and the Jobs and Clients head rows at
-   900px and up. Mobile rules are untouched. The Jobs screen now uses
-   its own board layout, so the old JobCard overrides were removed.
+   Tightens the Clients head row at 900px and up. Mobile rules are
+   untouched. The Jobs screen now uses its own board layout, so the old
+   JobCard overrides were removed.
    ========================================================================= */
 @media (min-width: 900px) {
-
-  /* Clients grid: slightly denser, smaller gap. */
-    /* Tighten Jobs and Clients head row to drop the slight top void. */
-  .fh-app--layout-responsive .v3-screen--jobs,
+  /* Tighten the Clients head row to drop the slight top void. */
   .fh-app--layout-responsive .v3-screen--clients {
     padding-top: 0 !important;
   }
@@ -2308,10 +2145,11 @@ a {
   top: calc(env(safe-area-inset-top, 0px) + 16px) !important;
 }
 
-/* FABs float over the scroll content; without reserved space they sit
-   on top of the last rows, row-action menus, sticky save bars, and
-   send buttons (UI audit #16). Reserve the height of the two-button
-   stack at the bottom of every scrollable page body. */
+/* A floating button sits over the scroll content; without reserved space
+   it covers the last rows, row-action menus, sticky save bars and send
+   buttons (UI audit #16). On a desktop the only one left is the Jobs
+   New deal button (Capture is a sidebar row since D33), so every
+   scrollable page body keeps this room at the bottom. */
 @media (min-width: 900px) {
   .fh-build-main,
   .v3-screen {
@@ -2363,33 +2201,39 @@ a {
   height: 44px;
 }
 
-/* Universal Capture FAB — the circular mic variant of .fh-fab.
-   Default position is the canonical FAB spot. When the current screen
-   renders its own "+" FAB (Leads / Jobs / Clients / Schedule), capture
-   slides up to stack above it instead of overlapping. Both buttons are
-   portaled to <body>, so body:has() sees them regardless of route. */
-.fh-fab--capture {
-  border-radius: 10px;
-  transition: transform 160ms ease, box-shadow 160ms ease, bottom 200ms ease;
-}
-body:has(.fh-fab:not(.fh-fab--capture)) .fh-fab--capture {
-  bottom: calc(var(--fh-mobile-dock-height) + var(--space-4) + 56px);
-}
-/* Desktop: screens that hide their own FAB at >=900px (inline header
-   action instead) release the stacked offset — capture drops back to
-   the canonical spot. Schedule keeps its FAB on desktop, so the
-   stacked rule above still applies there. */
+/* Desktop: the one "+" FAB a screen keeps at >=900px (Jobs) sits in the
+   canonical corner. Universal Capture no longer floats here: the sidebar
+   carries a Capture row under Search (Task 13, D33), and the phone's
+   dock coin is unchanged. */
 @media (min-width: 900px) {
   .fh-fab {
     right: 24px;
     bottom: 24px;
   }
-  body:has(.fh-fab:not(.fh-fab--capture)) .fh-fab--capture {
-    bottom: 80px;
-  }
-  body:has(.fh-fab--hide-desktop) .fh-fab.fh-fab--capture {
-    bottom: 24px;
-  }
+}
+
+/* Desktop sidebar Capture row (D33). It borrows .fhs-side__link from
+   fh-shell.css for its colors, hover, height and left padding; these
+   rules only lay the label and the key cap out. fh-shell.css loads after
+   this file, so the padding rule names both classes to outrank
+   .fhs-side__link's own padding. The cap lands on the Search cap's right
+   edge: Search keeps 8 px inside its 1 px border, this row has no
+   border, so it keeps the same 8 px and the cap steps in the 1 px. */
+.fhs-side__link.fhs-side__capture { padding-right: 8px; }
+.fhs-side__capture .fhc-keycap { margin-right: 1px; }
+.fhs-side__capture-label { flex: 1; }
+
+/* Desktop sidebar company name (Task 14): the short name the phone header
+   shows wraps to a second line before it is cut, and only then ends in an
+   ellipsis; its title holds the full name. fh-shell.css keeps it to one
+   line and loads after this file, so the rule names both classes. */
+.fhs-side__brand-text .fhs-side__company {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+  overflow: hidden;
+  overflow-wrap: break-word;
 }
 
 /* Single-column mobile screens that don't have a dedicated desktop
@@ -2980,9 +2824,6 @@ body:has(.fh-fab:not(.fh-fab--capture)) .fh-fab--capture {
   .fh-importer-build__intake { position: static; }
 }
 
-/* AppHeader right-slot icon buttons — steel at rest, gold on hover/active.
-   Same visual treatment for both the search and notes shortcuts so they
-   read as a coherent pair. */
 /* Importer "Advanced integrations" disclosure — hide the default
    browser arrow on summary and rotate our chevron on open. */
 details > summary::-webkit-details-marker { display: none; }
@@ -3006,14 +2847,6 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   right: 0;
 }
 
-/* Drawer root — portaled into document.body to escape any transform/stacking
-   contexts that would otherwise clip the scrim. */
-/* Tablet+ — render as a centered column, narrower than before so it
-   reads as a navigation panel, not a settings sheet. */
-@media (min-width: 560px) {
-  }
-
-/* Footer: theme (primary ghost) + sign out (destructive ghost), 2:1 ratio */
 .fh-kbd {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
@@ -3045,15 +2878,6 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   padding: 0 16px;
   border-radius: var(--radius-sm);
   transition: transform 160ms var(--ease), box-shadow 160ms var(--ease), border-color 160ms var(--ease), background 160ms var(--ease), color 160ms var(--ease);
-}
-/* Margin pill */
-
-/* =========================================================================
-   EMPTY STATES
-   ========================================================================= */
-@keyframes fh-shimmer {
-  0% { background-position: 100% 0; }
-  100% { background-position: -100% 0; }
 }
 
 /* =========================================================================
@@ -3355,12 +3179,6 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   bottom: var(--space-3);
 }
 .fh-svc.is-on .fh-spec-code { color: var(--v3-primary-text); }
-
-/* ---- Status pill: pulsing dot + uppercase mono label ---- */
-@keyframes fh-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
 
 /* ---- Hero coordinate line (monospace) ---- */
 .fh-hero-coord {
@@ -3769,20 +3587,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 .fh-asheet-money__input::-webkit-outer-spin-button,
 .fh-asheet-money__input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
-/* ================================================================
-   ActionSheet v2 scope — opt-in via variantClass="fh-asheet--v2".
-   Aligns NewLeadSheet's input rhythm to NewClientSheet (Vaul) without
-   touching other ActionSheet consumers (ApproveQuote, Subs, Expenses,
-   AddEvent). Pill inputs replace the underlined "spec sheet" look;
-   field-key labels switch to readable sentence case; step dots fade.
-   ================================================================ */
-/* Hide the legacy "01·NAME" code chip in v2 — kept in markup so we can
-   bring it back without a full pass, but visually quiet. */
-/* Money field stays high-contrast but loses the underline for parity. */
-/* Step dots become a quiet progress hint, not a hero element. */
-/* Title — drop the display caps face down to match NewClient's serif heading scale. */
 /* Disabled commit — clearer "not ready" state. */
-.fh-asheet--v2 .fh-asheet__commit:disabled,
 .fh-asheet__commit:disabled {
   background: var(--surface-2);
   color: var(--ink-muted);
@@ -3790,19 +3595,8 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   cursor: not-allowed;
   opacity: 1;
 }
-.fh-asheet--v2 .fh-asheet__commit:disabled::before,
 .fh-asheet__commit:disabled::before { content: none; }
 
-/* ---- v3 chip pill — overrides the older boxy industrial chip
-   inside the v2 sheet scope. Ports the lead-chip pattern from
-   styles-workflows.css: rounded pill, gold-soft fill when active,
-   slim padding, no diagonal stripe.
-   Applies to Stage + Job Type chip rows on the New Lead sheet.  */
-/* Kill the diagonal stripe + ribbon decorations the old style added. */
-/* ---- v3 commit button — uppercase gold gradient pill mirroring the
-   .lead-commit__cta from styles-workflows.css. The base ActionSheet
-   commit was square + ink-on-cream; this scope rebrands it for the
-   v3 sheets without affecting other consumers.  */
 /* Body padding — keep the bottom clearance with safe-area for notched phones. */
 .fh-asheet__body {
   padding-bottom: max(var(--space-6), calc(var(--space-4) + env(safe-area-inset-bottom)));
@@ -3998,10 +3792,6 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   place-items: center;
 }
 .fh-sheet-error__dismiss:hover { background: rgba(192, 57, 43, 0.12); }
-@keyframes fh-voice-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
 
 /* ---- Tablet+ sheet tops out at 640px centered ---- */
 @media (min-width: 720px) {
@@ -4259,12 +4049,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
    BUILD DIRECTION — desktop dashboard ("LET'S BUILD.")
    ============================================================
    Activates only at >=900px (mobile Home is untouched).
-   Pairs with src/components/desktop/SnowHomeBuild.tsx and the
-   refreshed grouped layout in DesktopSidebar.tsx. */
-
-/* Sidebar emblem block + grouped-label refresh */
-@media (min-width: 900px) {
-              }
+   Pairs with src/components/desktop/SnowHomeBuild.tsx. */
 
 /* Build dashboard page */
 @media (min-width: 900px) {
@@ -4449,7 +4234,6 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   }
 
   .fh-build-focus button,
-  .fh-build-footer-link,
   .fh-build-card-head button {
     display: inline-flex;
     align-items: center;
@@ -4505,32 +4289,14 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     border-radius: 10px;
   }
 
-      .fh-build-eyebrow {
+  .fh-build-eyebrow {
     color: var(--v3-text-muted);
     font-size: 12px;
     font-weight: 800;
     letter-spacing: 0;
   }
 
-              @container (max-width: 120px) {
-          }
-
-  /* Stage-key colored dot per cell — audit M2. Color comes from the
-     --stage-* tokens already defined for pills / cards elsewhere so
-     all surfaces stay in sync. Anchored absolute so the existing
-     text positioning inside each cell is untouched. */
-                    /* The label span (NOT the dot span) — scope by :not so the dot
-     stays its absolute 8px circle. nowrap + ellipsis so an oversized
-     label clips with an ellipsis instead of overflowing into the
-     neighbor cell (the audit's "INVOICING renders into WON"
-     collision). */
-                /* Removed external Unsplash dependency (audit M5). The mock used
-       a hero project photo here, not a generic interior stock shot —
-       and shipping a runtime request to images.unsplash.com from the
-       flagship screen is both off-brand and a privacy footgun. Until
-       we have a per-operator brand photo to wire in, render an
-       on-brand gradient panel. */
-                .fh-build-rail {
+  .fh-build-rail {
     grid-column: 3;
     grid-row: span 3;
     display: grid;
@@ -4582,7 +4348,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     display: none;
   }
 
-        .fh-build-card-head {
+  .fh-build-card-head {
     min-height: 54px;
     display: flex;
     align-items: center;
@@ -4644,17 +4410,13 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   .fh-build-table__head.is-revenue,
   .fh-build-table__row.is-revenue {
     grid-template-columns: 1.2fr .7fr .7fr .7fr .9fr;
-    /* Stage-key colored left border per row — audit M3. Matches the
-       mock's stage-keyed accent bar. Color set via the [data-stage]
-       attribute selectors below. Default neutral steel for rows
-       missing a stage key. */
   }
   .fh-build-table__head.is-health,
   .fh-build-table__row.is-health {
     grid-template-columns: 1.15fr .8fr .8fr .8fr .7fr 1fr 14px;
   }
 
-    .fh-build-dot {
+  .fh-build-dot {
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -4680,7 +4442,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     color: var(--v3-text-muted);
   }
 
-    /* Phase 0 (Jun 10 rollout): collapse threshold dropped 1280 → 1000.
+  /* Phase 0 (Jun 10 rollout): collapse threshold dropped 1280 → 1000.
      Jesse's laptop runs Windows 150% scaling and tops out at ~1003 CSS
      px, so the old 1280 collapse rendered the stacked phone layout on
      every screen for him. New cascade:
@@ -4702,7 +4464,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
       grid-auto-flow: row dense;
       gap: 12px;
     }
-        /* Hero row still stacks at this tier — the mock's 3-col hero
+    /* Hero row still stacks at this tier — the mock's 3-col hero
        (title | view-card | mini-grid) needs ~1330px to fit cleanly. */
     .fh-build-hero-row {
       grid-template-columns: 1fr;
@@ -4718,8 +4480,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
       grid-template-columns: 1fr;
     }
 
-    .fh-build-rail,
-    .fh-build-health {
+    .fh-build-rail {
       grid-column: auto;
     }
 
@@ -4819,8 +4580,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     color: var(--v3-surface);
   }
 
-  /* Date nav (chevrons + Today) */
-          /* Filter pills row */
+  /* Filter pills row */
   .fh-build-filterbar {
     display: flex;
     flex-wrap: wrap;
@@ -4908,7 +4668,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     text-align: center;
   }
 
-      /* ---------- JOBS / JOB DESK ---------- */
+  /* ---------- JOBS / JOB DESK ---------- */
   .fh-build-content-grid--jobs {
     grid-template-columns: minmax(0, 1fr) 290px;
   }
@@ -4941,7 +4701,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   }
 
   /* ---------- INVOICES ---------- */
-    .fh-build-table__head.is-invoices,
+  .fh-build-table__head.is-invoices,
   .fh-build-table__row.is-invoices {
     grid-template-columns: 1.4fr 110px 60px 110px 90px 100px 130px;
   }
@@ -4950,13 +4710,13 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     cursor: pointer;
   }
 
-      /* ---------- SCHEDULE ---------- */
+  /* ---------- SCHEDULE ---------- */
   .fh-build-content-grid--schedule {
     grid-template-columns: minmax(0, 1fr) 290px;
   }
 
-    /* Upcoming card in the rail */
-          .fh-build-rail-list {
+  /* Upcoming card in the rail */
+  .fh-build-rail-list {
     margin: 10px 0 0;
     padding: 0;
     list-style: none;
@@ -4994,12 +4754,11 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     white-space: nowrap;
   }
 
-      /* Phase 1 narrow-viewport collapse */
+  /* Phase 1 narrow-viewport collapse */
   /* Phase 0: keep the 1fr + 290px sidebar layout down to 1000 (was
      1280). Below 1000 the page collapses to single-column stack. */
   @media (max-width: 999px) {
     .fh-build-content-grid--jobs,
-    .fh-build-content-grid--invoices,
     .fh-build-content-grid--schedule {
       grid-template-columns: 1fr;
     }
@@ -5626,7 +5385,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     margin-top: 14px;
   }
   .fh-build-dot-sep { color: var(--v3-border-strong); }
-    /* 4-up mini grid sits on the right side of the detail hero. */
+  /* 4-up mini grid sits on the right side of the detail hero. */
   .fh-build-mini-grid--detail {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -6130,7 +5889,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   }
 }
 
-.gold-italic, .v3-h1 .v3-h1__accent, h1 em, h2 em, h3 em {
+.gold-italic, h1 em, h2 em, h3 em {
   font-style: normal !important;
   font-family: var(--font-body) !important;
   font-weight: 600;
@@ -6151,7 +5910,6 @@ em.fh-text-gradient-gold {
   font-family: var(--font-body) !important;
 }
 
-/* Hero-card radial gold glow → flat surface. */
 /* Action-sheet title accent (the gold-colored emphasis word inside a
    bottom-sheet headline) → neutral. The 12 inline eyebrow tags in
    sheet components are scrubbed at the source; this catches the CSS
@@ -6163,7 +5921,7 @@ em.fh-text-gradient-gold {
 /* Focus-ring + input-focus scrub.
    Every focused element previously lit up gold:
      • Global :focus-visible outline (every button/input/role=button)
-     • .v3-btn / .v3-card--interactive :focus-visible
+     • .v3-btn :focus-visible
      • .fh-field__input border-bottom on focus
      • .fh-form input / textarea / select border on focus
      • .fh-inline-add input focus border
@@ -6181,7 +5939,6 @@ summary:focus-visible,
 [role="tab"]:focus-visible,
 [tabindex]:focus-visible,
 .v3-btn:focus-visible,
-.v3-card--interactive:focus-visible,
 .dispatch-card__tap:focus-visible,
 .cl-card__tap:focus-visible {
   outline-color: var(--v3-text-muted) !important;
@@ -6203,7 +5960,6 @@ input[style*="outline"]:focus-visible,
 textarea[style*="outline"]:focus-visible,
 select[style*="outline"]:focus-visible,
 .v3-btn:focus-visible,
-.v3-card--interactive:focus-visible,
 .dispatch-card__tap:focus-visible,
 .cl-card__tap:focus-visible {
   outline-style: solid !important;
@@ -6216,16 +5972,9 @@ select[style*="outline"]:focus-visible,
   box-shadow: 0 0 0 3px var(--v3-text-faint) !important;
 }
 
-/* Card-accent + hover tint scrub.
-   Atmospheric gold lingered on:
-     • .v3-card--accent-primary — gold hairline border (other accents
-       like success/danger keep their semantic color, this one was
-       just "primary" = gold)
-     • .fh-home__ghost / .fh-loc__btn hover border tint
-     • .fh-qa hover arrow color
-     • Desktop .dt-icon-btn / .dt-pill-btn hover border tint
-   All flipped to a neutral hairline so the interaction feedback
-   remains visible but no longer reads as yellow. */
+/* Hover tint scrub. The .fh-loc__btn hover border tinted gold; it
+   flips to a neutral hairline so the interaction feedback remains
+   visible but no longer reads as yellow. */
 .fh-loc__btn:hover:not(:disabled) {
   border-color: var(--v3-text-faint) !important;
 }
@@ -6776,21 +6525,6 @@ select[style*="outline"]:focus-visible,
    ================================================================ */
 
 @media (min-width: 900px) {
-  /* The old three-column rule floored its tracks at 340+420+220 = 980px
-     plus gaps, but with the sidebar open the container can be ~700px —
-     the whole third column (saved views, "needs attention" total)
-     rendered past the right edge under overflow:hidden, unreachable
-     (UI audit #4). Tiers now use minmax(0, fr) so tracks can never
-     overflow, and the column count steps with real available width:
-     1 col from 900, 2 cols + full-width saved rail from 1200, the
-     original 3-col layout from 1500. */
-  }
-@media (min-width: 1440px) {
-    }
-@media (min-width: 1500px) {
-    }
-@media (min-width: 900px) {
-
   .fh-build-page {
     color: var(--ink-strong, #F2EDE4);
   }
@@ -6839,15 +6573,6 @@ select[style*="outline"]:focus-visible,
     background: var(--v3-glass-tint);
   }
 }
-
-@media (max-width: 899px) {
-        }
-
-/* Uploaded brand logos are usually white lettering on transparent —
-   made for the dark header. On paper they vanish. A soft dark halo
-   keeps white glyphs legible without assuming the logo's color. */
-@media (min-width: 900px) {
-  }
 
 .fh-data-error {
   display: flex;
@@ -7456,13 +7181,6 @@ select[style*="outline"]:focus-visible,
    spinner keeps turning because it is the only sign the upload is
    still running. */
 @media (prefers-reduced-motion: reduce) {
-  .fh-fx-aurora__a,
-  .fh-fx-aurora__b,
-  .fh-fx-aurora__c,
-  .fh-fx-grid,
-  .fh-fx-spotlight,
-  .fh-fx-shimmer-bar__fill::after,
-  .fh-fx-scan-line,
   .dispatch-state-pill--live::before,
   .fh-vmic__btn.is-on::after,
   .fh-vmic__pulse {

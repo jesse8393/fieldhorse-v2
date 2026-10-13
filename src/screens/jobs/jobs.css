@@ -1,16 +1,19 @@
 /*
- * Jobs on a phone (spec 9.3, render base/jobs.jpg). Class prefix fhj-.
+ * Jobs on a phone (spec 9.3, render base/jobs.jpg). Class prefix fhjl-,
+ * apart from the job page's fhj- (phone/job-phone.css): both sheets stay
+ * loaded after a tap from one screen to the other, so a shared name such
+ * as fhj-head or fhj-tabs laid each screen's rules on the other.
  * Reads only --fh- tokens, so Day and Night follow on their own. Rows
  * come from the fh Row component; this file lays out the title, the text
  * tabs, the group labels and the filter sheet's switch and sort.
  */
 
-.fhj {
+.fhjl {
   padding-bottom: 24px;
 }
 
 /* ---- Title row: Jobs, then New lead, search and filter ---- */
-.fhj-head {
+.fhjl-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -18,7 +21,7 @@
   padding: 12px var(--fh-gutter) 8px;
 }
 
-.fhj-title {
+.fhjl-title {
   min-width: 0;
   margin: 0;
   font-family: var(--fh-font-display);
@@ -29,19 +32,19 @@
   color: var(--fh-ink);
 }
 
-.fhj-head__actions {
+.fhjl-head__actions {
   flex: none;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.fhj-search {
+.fhjl-search {
   padding: 4px var(--fh-gutter) 12px;
 }
 
 /* ---- Text tabs: counts, a hairline, a gold underline on the current one ---- */
-.fhj-tabs {
+.fhjl-tabs {
   display: flex;
   gap: 20px;
   padding: 0 var(--fh-gutter);
@@ -52,11 +55,11 @@
   box-shadow: inset 0 -1px 0 var(--fh-hairline);
 }
 
-.fhj-tabs::-webkit-scrollbar {
+.fhjl-tabs::-webkit-scrollbar {
   display: none;
 }
 
-.fhj-tab {
+.fhjl-tab {
   position: relative;
   flex: none;
   display: inline-flex;
@@ -81,7 +84,7 @@
 
 /* The underline runs the width of the words; the hit area reaches 8 px
    past them on each side, so even "All 7" is at least 44 px wide. */
-.fhj-tab::before {
+.fhjl-tab::before {
   content: '';
   position: absolute;
   top: 0;
@@ -90,23 +93,23 @@
   right: -8px;
 }
 
-.fhj-tab__count {
+.fhjl-tab__count {
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   color: var(--fh-ink-3);
 }
 
-.fhj-tab[aria-selected='true'] {
+.fhjl-tab[aria-selected='true'] {
   color: var(--fh-ink);
   font-weight: 600;
 }
 
-.fhj-tab[aria-selected='true'] .fhj-tab__count {
+.fhjl-tab[aria-selected='true'] .fhjl-tab__count {
   color: var(--fh-ink-2);
 }
 
 /* Flat gold marks the current tab; the bold ink label carries the meaning. */
-.fhj-tab[aria-selected='true']::after {
+.fhjl-tab[aria-selected='true']::after {
   content: '';
   position: absolute;
   left: 0;
@@ -117,7 +120,7 @@
   background: var(--fh-gold);
 }
 
-.fhj-tab:focus-visible {
+.fhjl-tab:focus-visible {
   outline: 2px solid var(--fh-focus) !important;
   outline-color: var(--fh-focus) !important;
   outline-offset: -2px;
@@ -125,30 +128,30 @@
 }
 
 /* ---- Groups: a section label with its note, then hairline rows ---- */
-.fhj-list {
+.fhjl-list {
   display: flex;
   flex-direction: column;
 }
 
-.fhj-notice {
+.fhjl-notice {
   padding: 12px var(--fh-gutter) 0;
 }
 
-.fhj-state {
+.fhjl-state {
   padding: 16px var(--fh-gutter) 0;
 }
 
-.fhj-group {
+.fhjl-group {
   padding: 0 var(--fh-gutter) 8px;
 }
 
 /* A full width hairline between groups, as in the render. */
-.fhj-group + .fhj-group {
+.fhjl-group + .fhjl-group {
   margin-top: 8px;
   box-shadow: inset 0 1px 0 var(--fh-hairline);
 }
 
-.fhj-group__head {
+.fhjl-group__head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -157,7 +160,7 @@
   border-bottom: 1px solid var(--fh-hairline);
 }
 
-.fhj-group__title {
+.fhjl-group__title {
   margin: 0;
   font-family: var(--fh-font-body);
   font-size: 18px;
@@ -167,7 +170,7 @@
   color: var(--fh-ink-2);
 }
 
-.fhj-group__note {
+.fhjl-group__note {
   min-width: 0;
   margin: 0;
   font-family: var(--fh-font-body);
@@ -180,33 +183,33 @@
   color: var(--fh-ink-2);
 }
 
-.fhj-rows {
+.fhjl-rows {
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 /* ---- Filter sheet ---- */
-.fhj-filter {
+.fhjl-filter {
   display: grid;
   gap: 24px;
   padding-bottom: 8px;
 }
 
-.fhj-filter__switch {
+.fhjl-filter__switch {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
 }
 
-.fhj-filter__switch-text {
+.fhjl-filter__switch-text {
   min-width: 0;
   display: grid;
   gap: 4px;
 }
 
-.fhj-filter__label {
+.fhjl-filter__label {
   font-family: var(--fh-font-body);
   font-size: 17px;
   line-height: 22px;
@@ -215,7 +218,7 @@
   cursor: pointer;
 }
 
-.fhj-filter__hint {
+.fhjl-filter__hint {
   margin: 0;
   font-family: var(--fh-font-body);
   font-size: 14px;
@@ -227,7 +230,7 @@
 /* The switch: outlined in edge strong when off (spec 5.1), filled ink
    when on. The thumb's side says the state as well as the fill, and the
    role="switch" says it to a screen reader. */
-.fhj-switch {
+.fhjl-switch {
   position: relative;
   flex: none;
   width: 52px;
@@ -244,13 +247,13 @@
 }
 
 /* A 48 px tall hit area around the 32 px track. */
-.fhj-switch::before {
+.fhjl-switch::before {
   content: '';
   position: absolute;
   inset: -8px -4px;
 }
 
-.fhj-switch__thumb {
+.fhjl-switch__thumb {
   position: absolute;
   top: 3px;
   left: 3px;
@@ -261,31 +264,31 @@
   transition: transform var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease);
 }
 
-.fhj-switch[aria-checked='true'] {
+.fhjl-switch[aria-checked='true'] {
   border-color: var(--fh-ink);
   background: var(--fh-ink);
 }
 
-.fhj-switch[aria-checked='true'] .fhj-switch__thumb {
+.fhjl-switch[aria-checked='true'] .fhjl-switch__thumb {
   background: var(--fh-paper);
   transform: translateX(20px);
 }
 
-.fhj-switch:focus-visible {
+.fhjl-switch:focus-visible {
   outline: 2px solid var(--fh-focus) !important;
   outline-color: var(--fh-focus) !important;
   outline-offset: 2px;
   border-radius: 999px;
 }
 
-.fhj-filter__sort {
+.fhjl-filter__sort {
   min-width: 0;
   margin: 0;
   padding: 0;
   border: 0;
 }
 
-.fhj-filter__legend {
+.fhjl-filter__legend {
   padding: 0;
   margin-bottom: 8px;
   font-family: var(--fh-font-body);
@@ -295,7 +298,7 @@
   color: var(--fh-ink-3);
 }
 
-.fhj-seg {
+.fhjl-seg {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 4px;
@@ -305,12 +308,12 @@
   background: var(--fh-tray);
 }
 
-.fhj-seg__option {
+.fhjl-seg__option {
   position: relative;
   display: block;
 }
 
-.fhj-seg__option input {
+.fhjl-seg__option input {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -320,7 +323,7 @@
   cursor: pointer;
 }
 
-.fhj-seg__face {
+.fhjl-seg__face {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -335,23 +338,23 @@
   transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
 }
 
-.fhj-seg__option input:checked + .fhj-seg__face {
+.fhjl-seg__option input:checked + .fhjl-seg__face {
   background: var(--fh-paper);
   color: var(--fh-ink);
   font-weight: 600;
   box-shadow: var(--fh-shadow-soft);
 }
 
-.fhj-seg__option input:focus-visible + .fhj-seg__face {
+.fhjl-seg__option input:focus-visible + .fhjl-seg__face {
   outline: 2px solid var(--fh-focus);
   outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .fhj-tab,
-  .fhj-switch,
-  .fhj-switch__thumb,
-  .fhj-seg__face {
+  .fhjl-tab,
+  .fhjl-switch,
+  .fhjl-switch__thumb,
+  .fhjl-seg__face {
     transition: none;
   }
 }

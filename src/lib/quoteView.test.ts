@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildQuoteView,
-  depositScheduleFromTerms,
   previewAsLabel,
+  previewAsName,
+  personFirstName,
+  quoteCapsule,
   type QuoteItemRow
 } from './quoteView.ts'
 
@@ -72,20 +74,34 @@ describe('buildQuoteView totals', () => {
 describe('buildQuoteView deposit', () => {
   it('is 50 percent of the base total, rounded to cents', () => {
     const view = buildQuoteView(THREE_BASE_ONE_OPTIONAL)
-    expect(view.deposit).toEqual({ pct: 50, amount: 3005 })
+    expect(view.money.deposit).toEqual({ kind: 'percent', pct: 50, amount: 3005 })
     const odd = buildQuoteView([item({ id: 'a', amount: 100.01 })])
-    expect(odd.deposit).toEqual({ pct: 50, amount: 50.01 })
+    expect(odd.money.deposit).toEqual({ kind: 'percent', pct: 50, amount: 50.01 })
   })
 
   it('never counts optional items', () => {
     const withOptional = buildQuoteView(THREE_BASE_ONE_OPTIONAL)
     const without = buildQuoteView(THREE_BASE_ONE_OPTIONAL.filter((r) => !r.is_optional))
-    expect(withOptional.deposit).toEqual(without.deposit)
+    expect(withOptional.money.deposit).toEqual(without.money.deposit)
   })
 
-  it('follows a payment schedule passed in, using its first step', () => {
-    const view = buildQuoteView(THREE_BASE_ONE_OPTIONAL, [{ pct: 30 }, { pct: 70 }])
-    expect(view.deposit).toEqual({ pct: 30, amount: 1803 })
+  it('follows the deposit the payment terms name', () => {
+    const view = buildQuoteView(THREE_BASE_ONE_OPTIONAL, { termsText: '30% deposit on signing, 70% on completion.' })
+    expect(view.money.deposit).toEqual({ kind: 'percent', pct: 30, amount: 1803 })
+  })
+
+  it('adds approved change orders to the total, as the customer page does', () => {
+    const view = buildQuoteView(THREE_BASE_ONE_OPTIONAL, { changeOrders: [{ amount: 3990, status: 'approved' }, { amount: 500, status: 'sent' }] })
+    expect(view.baseTotal).toBe(6010)
+    expect(view.money.total).toBe(10000)
+    expect(view.money.deposit).toEqual({ kind: 'percent', pct: 50, amount: 5000 })
+  })
+
+  it('stands in the contact amount until there is a priced line', () => {
+    const view = buildQuoteView([], { contactAmount: 10000 })
+    expect(view.baseTotal).toBe(0)
+    expect(view.money.total).toBe(10000)
+    expect(view.canSend).toBe(false)
   })
 })
 
@@ -97,7 +113,8 @@ describe('quote with only optional items', () => {
 
   it('has a zero total and a zero deposit', () => {
     expect(view.baseTotal).toBe(0)
-    expect(view.deposit).toEqual({ pct: 50, amount: 0 })
+    expect(view.money.total).toBe(0)
+    expect(view.money.deposit).toEqual({ kind: 'percent', pct: 50, amount: 0 })
     expect(view.lines).toEqual([])
     expect(view.optional).toHaveLength(2)
   })
@@ -115,7 +132,11 @@ describe('an empty quote', () => {
       optional: [],
       excluded: [],
       baseTotal: 0,
-      deposit: { pct: 50, amount: 0 },
+      money: {
+        total: 0,
+        deposit: { kind: 'percent', pct: 50, amount: 0 },
+        steps: ['You approve the quote.', 'Your contractor sends you a start date.', 'You pay as the payment terms say.']
+      },
       canSend: false
     })
   })
@@ -186,28 +207,60 @@ describe('line order and titles', () => {
   })
 })
 
-describe('depositScheduleFromTerms', () => {
+// These cases were the depositScheduleFromTerms tests. That reader is gone:
+// the deposit now comes from quoteMoney (decision D31), so each input is
+// checked through buildQuoteView, and the terms that used to fall back to
+// 50 percent now read as no deposit or "per the terms".
+describe('deposit read from the payment terms', () => {
+  const depositFor = (termsText: string | null | undefined) =>
+    buildQuoteView(THREE_BASE_ONE_OPTIONAL, { termsText }).money.deposit
+
   it('reads the deposit percent the contractor wrote', () => {
-    expect(depositScheduleFromTerms('30% deposit on signing, 70% on completion.')).toEqual([{ pct: 30 }])
-    expect(depositScheduleFromTerms('A deposit of 25 percent is due at approval.')).toEqual([{ pct: 25 }])
-    expect(depositScheduleFromTerms('Deposit: 40%, balance on completion')).toEqual([{ pct: 40 }])
-    expect(depositScheduleFromTerms('12.5% down payment to schedule the pour')).toEqual([{ pct: 12.5 }])
+    expect(depositFor('30% deposit on signing, 70% on completion.')).toMatchObject({ kind: 'percent', pct: 30 })
+    expect(depositFor('A deposit of 25 percent is due at approval.')).toMatchObject({ kind: 'percent', pct: 25 })
+    expect(depositFor('Deposit: 40%, balance on completion')).toMatchObject({ kind: 'percent', pct: 40 })
+    expect(depositFor('12.5% down payment to schedule the pour')).toMatchObject({ kind: 'percent', pct: 12.5 })
   })
 
-  it('returns null when the terms say nothing usable', () => {
-    expect(depositScheduleFromTerms('')).toBeNull()
-    expect(depositScheduleFromTerms(null)).toBeNull()
-    expect(depositScheduleFromTerms(undefined)).toBeNull()
-    expect(depositScheduleFromTerms('Net 30. 10% retainage held until punch list.')).toBeNull()
-    expect(depositScheduleFromTerms('No deposit required.')).toBeNull()
-    expect(depositScheduleFromTerms('0% deposit')).toBeNull()
-    expect(depositScheduleFromTerms('150% deposit')).toBeNull()
+  it('takes the default schedule only when there are no terms', () => {
+    expect(depositFor('')).toMatchObject({ kind: 'percent', pct: 50 })
+    expect(depositFor(null)).toMatchObject({ kind: 'percent', pct: 50 })
+    expect(depositFor(undefined)).toMatchObject({ kind: 'percent', pct: 50 })
+  })
+
+  it('reads no deposit, or payment per the terms, when the terms name no deposit', () => {
+    expect(depositFor('Net 30. 10% retainage held until punch list.')).toEqual({ kind: 'per_terms', pct: null, amount: 0 })
+    expect(depositFor('No deposit required.')).toEqual({ kind: 'none', pct: 0, amount: 0 })
+    expect(depositFor('0% deposit')).toEqual({ kind: 'none', pct: 0, amount: 0 })
+    expect(depositFor('150% deposit')).toEqual({ kind: 'per_terms', pct: null, amount: 0 })
   })
 
   it('feeds the deposit the screen shows', () => {
-    const schedule = depositScheduleFromTerms('30% deposit on signing')
-    const view = buildQuoteView(THREE_BASE_ONE_OPTIONAL, schedule ?? undefined)
-    expect(view.deposit).toEqual({ pct: 30, amount: 1803 })
+    const view = buildQuoteView(THREE_BASE_ONE_OPTIONAL, { termsText: '30% deposit on signing' })
+    expect(view.money.deposit).toEqual({ kind: 'percent', pct: 30, amount: 1803 })
+    expect(quoteCapsule(view.money).note).toBe('Deposit $1,803.00 at approval')
+  })
+})
+
+describe('quoteCapsule', () => {
+  const capsule = (termsText: string) =>
+    quoteCapsule(buildQuoteView([item({ id: 'a', amount: 10000 })], { termsText }).money)
+
+  it('prints the total with cents and the deposit due at approval', () => {
+    expect(capsule('')).toEqual({ amount: '$10,000.00', note: 'Deposit $5,000.00 at approval' })
+    expect(capsule('30% deposit on signing.')).toEqual({ amount: '$10,000.00', note: 'Deposit $3,000.00 at approval' })
+    expect(capsule('$2,500 deposit on signing.')).toEqual({ amount: '$10,000.00', note: 'Deposit $2,500.00 at approval' })
+  })
+
+  it('says so when there is no deposit, or when the terms name none', () => {
+    expect(capsule('No deposit required.')).toEqual({ amount: '$10,000.00', note: 'No deposit' })
+    expect(capsule('50% down at rough in, 50% at completion.')).toEqual({ amount: '$10,000.00', note: 'Payment follows the terms' })
+  })
+
+  it('writes no dash of any kind', () => {
+    for (const terms of ['', 'No deposit.', 'Net 30.', '$2,500 deposit']) {
+      expect(capsule(terms).note).not.toMatch(/[-‐-―−]/)
+    }
   })
 })
 
@@ -228,5 +281,180 @@ describe('previewAsLabel', () => {
     expect(previewAsLabel('')).toBe('Preview as customer')
     expect(previewAsLabel(null)).toBe('Preview as customer')
     expect(previewAsLabel('The Castellanos Family Revocable Living Trust')).toBe('Preview as customer')
+  })
+
+  it('drops a leading article and keeps the rest of a company name', () => {
+    expect(previewAsLabel('The Roof Doctor')).toBe('Preview as Roof Doctor')
+    expect(previewAsLabel('A Cut Above Lawn')).toBe('Preview as Cut Above Lawn')
+  })
+
+  it('reads a name written last name first', () => {
+    expect(previewAsLabel('Castellanos, Marco')).toBe('Preview as Marco')
+    expect(previewAsLabel("O'Neil, Jeff A.")).toBe('Preview as Jeff')
+  })
+})
+
+describe('personFirstName', () => {
+  it('is the first name of a person and null for a company', () => {
+    expect(personFirstName('Marco Castellanos')).toBe('Marco')
+    expect(personFirstName('  Jeff  O\'Neil ')).toBe('Jeff')
+    expect(personFirstName('Castellanos, Marco')).toBe('Marco')
+    expect(personFirstName('MMC Properties')).toBeNull()
+    expect(personFirstName('The Roof Doctor')).toBeNull()
+    expect(personFirstName('Acme, Inc')).toBeNull()
+    expect(personFirstName('')).toBeNull()
+    expect(personFirstName(null)).toBeNull()
+  })
+
+  it('reads names with accents, a name typed in capitals, and ignores a suffix', () => {
+    expect(personFirstName('José García')).toBe('José')
+    expect(personFirstName('Zoë Smith')).toBe('Zoë')
+    expect(personFirstName('MARCO CASTELLANOS')).toBe('Marco')
+    expect(personFirstName('Marco Castellanos Jr.')).toBe('Marco')
+    expect(personFirstName('Marco Castellanos III')).toBe('Marco')
+    expect(personFirstName('Smith, John, Jr.')).toBe('John')
+    // A single word in capitals is still a company.
+    expect(personFirstName('IBM')).toBeNull()
+    expect(personFirstName('HOA')).toBeNull()
+    expect(personFirstName('MMC Properties')).toBeNull()
+  })
+
+  it('treats A or An as an article only before two or more words, so An is a first name', () => {
+    expect(personFirstName('An Nguyen')).toBe('An')
+    expect(previewAsLabel('An Nguyen')).toBe('Preview as An')
+    expect(personFirstName('An Affordable Plumber')).toBeNull()
+    expect(previewAsLabel('An Affordable Plumber')).toBe('Preview as Affordable Plumber')
+    expect(personFirstName('A Cut Above Lawn')).toBeNull()
+    // An initial is not a first name to greet someone by.
+    expect(personFirstName('J Smith')).toBeNull()
+    expect(personFirstName('A Nguyen')).toBeNull()
+  })
+
+  // Review round 2: names the first word greeting used to get right.
+  it('reads a middle initial, name particles and a title as parts of a person\'s name', () => {
+    expect(personFirstName('John Q. Public')).toBe('John')
+    expect(personFirstName('Marco A. Castellanos')).toBe('Marco')
+    expect(personFirstName('MARCO A. CASTELLANOS')).toBe('Marco')
+    expect(personFirstName('Public, John Q.')).toBe('John')
+    expect(personFirstName('Maria de Souza')).toBe('Maria')
+    expect(personFirstName('Ludwig van Beethoven')).toBe('Ludwig')
+    expect(personFirstName('Maria de los Santos')).toBe('Maria')
+    expect(personFirstName('Jan van der Berg')).toBe('Jan')
+    expect(personFirstName('MARIA DE LOS SANTOS')).toBe('Maria')
+    expect(personFirstName('Omar al-Rashid')).toBe('Omar')
+    expect(personFirstName('de la Cruz, Maria')).toBe('Maria')
+    expect(personFirstName('Dr. Marco Castellanos')).toBe('Marco')
+    expect(personFirstName('MR. JOHN SMITH')).toBe('John')
+    // A first name that is also a particle elsewhere is still a first name.
+    expect(personFirstName('Al Smith')).toBe('Al')
+    expect(personFirstName('Van Morrison')).toBe('Van')
+    expect(previewAsLabel('John Q. Public')).toBe('Preview as John')
+  })
+
+  it('does not greet by a last name or an initial', () => {
+    // What is left after a title or a suffix is a last name.
+    expect(personFirstName('Smith, Jr.')).toBeNull()
+    expect(personFirstName('Mrs. Smith')).toBeNull()
+    expect(personFirstName('Dr. Castellanos')).toBeNull()
+    // Initials alone are not a first name.
+    expect(personFirstName('J.R. Smith')).toBeNull()
+    expect(personFirstName('J. Smith')).toBeNull()
+  })
+
+  it('reads a name in capitals as a company when it starts like an acronym', () => {
+    expect(personFirstName('IBM GLOBAL')).toBeNull()
+    expect(personFirstName('JM EAGLE')).toBeNull()
+    expect(personFirstName('ACE HVAC')).toBeNull()
+    expect(personFirstName('JB CONTRACTING')).toBeNull()
+    expect(personFirstName('ABC REMODELING')).toBeNull()
+    expect(personFirstName('XYZ PAINTING')).toBeNull()
+    expect(previewAsLabel('JB CONTRACTING')).toBe('Preview as JB CONTRACTING')
+    expect(previewAsLabel('IBM GLOBAL')).toBe('Preview as IBM GLOBAL')
+    // Typed in mixed case the acronym already says company.
+    expect(personFirstName('IBM Global')).toBeNull()
+    // A person's name in capitals still reads as a person's.
+    expect(personFirstName('MARCO CASTELLANOS')).toBe('Marco')
+    expect(personFirstName('JOSÉ GARCÍA')).toBe('José')
+    expect(personFirstName('BOB SMITH')).toBe('Bob')
+    expect(personFirstName('IAN WRIGHT')).toBe('Ian')
+  })
+
+  // Review round 3: a phone keyboard capitalizes only the first word, so
+  // contact names are often saved in sentence case.
+  it('reads a name typed in sentence case or in lower case as a person\'s', () => {
+    expect(personFirstName('Marco castellanos')).toBe('Marco')
+    expect(personFirstName('Jane smith')).toBe('Jane')
+    expect(personFirstName('marco castellanos')).toBe('Marco')
+    expect(personFirstName('Maria de los santos')).toBe('Maria')
+    expect(personFirstName('John q. public')).toBe('John')
+    expect(personFirstName('Marco castellanos jr')).toBe('Marco')
+    expect(personFirstName('Castellanos, marco')).toBe('Marco')
+    expect(personFirstName('MARCO castellanos')).toBe('Marco')
+    // Recasing is a guess, so the in app label keeps the name as saved
+    // (review round 4); the customer page still greets Marco.
+    expect(previewAsLabel('Marco castellanos')).toBe('Preview as Marco castellanos')
+    // A company stays a company whatever its case.
+    expect(personFirstName('Sunrise roofing')).toBeNull()
+    expect(personFirstName('Acme, inc')).toBeNull()
+    expect(personFirstName('the roof doctor')).toBeNull()
+    expect(personFirstName('jb contracting')).toBeNull()
+    // In lower case, as in capitals, a first word like an acronym is a company's.
+    expect(personFirstName('jm eagle')).toBeNull()
+    expect(personFirstName('JM eagle')).toBeNull()
+    // One word in lower case says nothing about a person.
+    expect(personFirstName('marco')).toBeNull()
+  })
+
+  it('reads a household or a family business as a company, not a first name', () => {
+    expect(personFirstName('Johnson Residence')).toBeNull()
+    expect(personFirstName('Johnson Household')).toBeNull()
+    expect(personFirstName('Lowe Bros')).toBeNull()
+    expect(personFirstName('Lowe Brothers')).toBeNull()
+    expect(personFirstName('Johnson residence')).toBeNull()
+    expect(previewAsLabel('Johnson Residence')).toBe('Preview as Johnson Residence')
+    expect(previewAsLabel('Lowe Bros')).toBe('Preview as Lowe Bros')
+  })
+
+  // Review round 4: recasing a name saved without its capitals must not undo
+  // the capitals the person did type.
+  it('keeps a word typed with its own inner capitals, and recases only words in all lower case or all capitals', () => {
+    expect(personFirstName('DeShawn jones')).toBe('DeShawn')
+    expect(personFirstName('LaToya smith')).toBe('LaToya')
+    expect(personFirstName('McKenzie brown')).toBe('McKenzie')
+    expect(personFirstName('JoAnn baker')).toBe('JoAnn')
+    expect(personFirstName('MaryBeth carter')).toBe('MaryBeth')
+    expect(personFirstName('Mary-Beth carter')).toBe('Mary-Beth')
+    // A word with no capitals, or nothing but capitals, is still recased.
+    expect(personFirstName('deshawn jones')).toBe('Deshawn')
+    expect(personFirstName('DESHAWN JONES')).toBe('Deshawn')
+    expect(personFirstName("jeff o'neil")).toBe('Jeff')
+    expect(personFirstName('MARCO castellanos')).toBe('Marco')
+  })
+
+  it('reads and, or an ampersand, as joining a company rather than naming a person', () => {
+    expect(personFirstName('Smith and sons')).toBeNull()
+    expect(personFirstName('Smith And Sons')).toBeNull()
+    expect(personFirstName('SMITH AND SONS')).toBeNull()
+    expect(personFirstName('Smith & Sons')).toBeNull()
+    expect(personFirstName('Smith & sons')).toBeNull()
+    expect(previewAsLabel('Smith And Sons')).toBe('Preview as Smith And Sons')
+  })
+
+  it('keeps the whole name in the in app labels whenever the name was recased', () => {
+    // previewAsName fills "Preview as", "Optional for" and "No email on file for".
+    expect(previewAsName('Elite pools')).toBe('Elite pools')
+    expect(previewAsLabel('Elite pools')).toBe('Preview as Elite pools')
+    expect(previewAsName('Hill country lawn')).toBe('Hill country lawn')
+    expect(previewAsName('Smith and sons')).toBe('Smith and sons')
+    expect(previewAsName('DeShawn jones')).toBe('DeShawn jones')
+    expect(previewAsName('MARCO CASTELLANOS')).toBe('MARCO CASTELLANOS')
+    expect(previewAsName('Castellanos, marco')).toBe('Castellanos, marco')
+    // Too long for the label, it falls back as a long company name does.
+    expect(previewAsName('maria de los santos garcia')).toBe('customer')
+    // Typed with its capitals, a person is still called by first name.
+    expect(previewAsName('Marco Castellanos')).toBe('Marco')
+    expect(previewAsName('DeShawn Jones')).toBe('DeShawn')
+    expect(previewAsName('Castellanos, Marco')).toBe('Marco')
+    expect(previewAsName('Dr. Marco Castellanos')).toBe('Marco')
   })
 })

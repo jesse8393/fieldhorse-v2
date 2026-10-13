@@ -592,7 +592,7 @@ export default function Importer() {
               }}
             >
               <Upload size={16} />
-              {importing ? 'Importing…' : `Import ${toImport.length} contacts`}
+              {importing ? 'Importing…' : `Import ${toImport.length} ${countNoun(toImport.length, 'contact')}`}
             </motion.button>
           </div>
         )}

@@ -18,7 +18,7 @@
 }
 
 @media (min-width: 900px) {
-        /* Invoices table. minmax floor on the name track: at narrow card
+  /* Invoices table. minmax floor on the name track: at narrow card
      widths the old bare 1.4fr resolved to 0px, the fixed tracks plus
      gaps consumed the whole row, and the CLIENT/JOB cell (the one
      column that says WHO owes you) silently vanished. */
@@ -32,7 +32,7 @@
      layout needs ~780px. Below that, drop the PAID column (balance
      already tells the story) and tighten the rest so the name track
      keeps real room instead of scrolling sideways. */
-      .fh-build-table__head.is-issued-invoices,
+  .fh-build-table__head.is-issued-invoices,
   .fh-build-table__row.is-issued-invoices {
     grid-template-columns:
       minmax(180px, 1.5fr)
@@ -44,7 +44,7 @@
     min-width: 680px;
   }
 
-        @container (max-width: 789px) {
+  @container (max-width: 789px) {
     .fh-build-table__head.is-invoices,
     .fh-build-table__row.is-invoices {
       grid-template-columns: minmax(150px, 1.6fr) 84px 44px 92px 92px 108px;
@@ -56,23 +56,7 @@
       display: none;
     }
   }
-
-  /* Month calendar grid, desktop /schedule Month view. */
-                              }
-
-/* Rail card call to action (Add client info on an unattached deal). */
-/* ---- Cold load skeletons (Build dashboard, July 26 evening pass) ----
-   During the first seconds after sign in the dashboard used to print
-   em dash placeholders and "Loading" strings, and the three tables
-   printed their EMPTY states ("No actions queued, you are caught up")
-   while data was still in flight. These shimmer blocks replace all of
-   that: gray pulses read as "loading", never as a confident zero. */
-@keyframes fhSkelShimmer {
-  0%   { background-position: 160% 0; }
-  100% { background-position: -60% 0; }
 }
-@media (prefers-reduced-motion: reduce) {
-  }
 
 /* August 2026 desktop product pass.
    The Build screens share one quieter workspace treatment: neutral
@@ -157,10 +141,7 @@
   .fh-build-card,
   .fh-build-focus,
   .fh-build-mini,
-  .fh-build-window-card,
-  .fh-crm-brief,
-  .fh-crm-flow,
-  .fh-crm-saved {
+  .fh-build-window-card {
     background: var(--v3-surface);
     background-image: none;
     border-color: var(--v3-border-mid);
@@ -174,18 +155,14 @@
   .fh-build-eyebrow,
   .fh-build-mini span,
   .fh-build-rel,
-  .fh-build-table__head,
-  .fh-crm-flow__stages span,
-  .fh-crm-flow__stages small {
+  .fh-build-table__head {
     color: var(--v3-text);
     opacity: 0.58;
   }
 
   .fh-build-mini strong,
-  .fh-build-money,
   .fh-build-kpi-cell strong,
-  .fh-build-rail-card strong,
-  .fh-crm-flow__stages strong {
+  .fh-build-rail-card strong {
     font-family: var(--font-body);
     font-size: 20px;
     line-height: 1.1;
@@ -212,7 +189,7 @@
     border-right: 0;
   }
 
-    .fh-build-content-grid {
+  .fh-build-content-grid {
     align-items: start;
   }
 
@@ -298,7 +275,6 @@
     margin-bottom: 16px;
   }
 
-  .fh-build-dayplan,
   .fh-build-weekplan {
     min-width: 0;
     overflow: hidden;
@@ -308,7 +284,7 @@
     box-shadow: 0 8px 24px rgba(20, 20, 20, 0.24);
   }
 
-                              .fh-build-weekplan {
+  .fh-build-weekplan {
     display: grid;
     grid-template-columns: repeat(7, minmax(92px, 1fr));
     overflow-x: auto;
@@ -323,7 +299,7 @@
     border-right: 0;
   }
 
-                                                            [data-theme='light'] .fh-build-topbar {
+  [data-theme='light'] .fh-build-topbar {
     box-shadow: 0 4px 12px rgba(20, 20, 20, 0.08);
   }
 
@@ -331,11 +307,7 @@
   [data-theme='light'] .fh-build-focus,
   [data-theme='light'] .fh-build-mini,
   [data-theme='light'] .fh-build-window-card,
-  [data-theme='light'] .fh-crm-brief,
-  [data-theme='light'] .fh-crm-flow,
-  [data-theme='light'] .fh-crm-saved,
   [data-theme='light'] .fh-build-content-grid > .fh-build-rail--page,
-  [data-theme='light'] .fh-build-dayplan,
   [data-theme='light'] .fh-build-weekplan,
   [data-theme='light'] .fh-build-page[data-build-screen="SnowAnalyticsBuild"] .fh-build-kpi-strip {
     box-shadow: 0 4px 12px rgba(20, 20, 20, 0.08);
@@ -361,9 +333,4 @@
   .fh-build-hero-row--page {
     grid-template-columns: 1fr;
   }
-
-    }
-
-/* Loading tile for the Lead to cash stage strip. Mirrors the real
-   .fh-crm-flow__stages button shell (border, radius, padding) but is
-   inert and carries shimmer bars instead of $0 / 0 deals. */
+}

@@ -5,7 +5,10 @@
 // with the title, client and address and the actions; the full width stage
 // rail with a note under each segment; then two columns. Left, a composer
 // row that opens Capture on this job, the section tabs (Overview reads
-// "Spine") and the open tab's content. Right, the facts panel.
+// "Spine") and the open tab's content. Right, the facts panel. Below
+// 1280 px the facts panel drops under the Spine, so a compact strip with
+// the balance, the customer's phone and the address sits above the
+// composer (PHASE8_PLAN.md Task 14).
 //
 // Presentational. Receives the existing tab content (Overview, Quote,
 // Details, Financials, Files and the rest) as children. Forms, edit and
@@ -29,9 +32,11 @@ import { initialsFor } from '../fh/Monogram.tsx'
 import { useProfile } from '../../contexts/ProfileContext.tsx'
 import { openCapture } from '../../lib/captureAttach.ts'
 import { tabPanelProps } from '../../lib/tabs.ts'
+import { useMediaQuery } from '../../lib/useMediaQuery.ts'
 import { JobSectionTabs } from '../../screens/ContactDetail/phone/JobHeaderPhone.tsx'
 import type { JobMoney } from '../../screens/ContactDetail/lib/spine.ts'
 import JobFactsPanel from './JobFactsPanel.tsx'
+import JobFactsStrip from './JobFactsStrip.tsx'
 import TopbarWeather from './TopbarWeather.tsx'
 import './job-desktop.css'
 
@@ -114,6 +119,8 @@ export default function SnowJobDetailBuild(props: Props) {
 
   const wide = activeTab === 'quote'
   const me = String((profile as any)?.full_name || '').trim()
+  // The facts panel stands beside the Spine from 1280 px (job-desktop.css).
+  const factsBeside = useMediaQuery('(min-width: 1280px)')
 
   return (
     <div className="fh-build-page fh-build-detail fhd-page" data-build-screen="SnowJobDetailBuild">
@@ -133,7 +140,9 @@ export default function SnowJobDetailBuild(props: Props) {
           )}
 
           <div className="fhd-banner__util">
-            <span className="fhd-weather"><TopbarWeather /></span>
+            {/* The forecast pill, a Set location link for an owner when
+                the company has no pinned spot, or nothing at all. */}
+            <TopbarWeather className="fhd-weather" />
             <IconButton
               variant="onyx"
               size={44}
@@ -195,6 +204,10 @@ export default function SnowJobDetailBuild(props: Props) {
 
         <div className={cx('fhd-grid', wide && 'is-wide')}>
           <div className="fhd-main">
+            {!wide && !factsBeside && (
+              <JobFactsStrip contact={contact} client={client} money={showMoney ? money ?? null : null} />
+            )}
+
             <button
               type="button"
               className="fhd-composer"

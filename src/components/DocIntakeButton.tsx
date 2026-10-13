@@ -4,6 +4,7 @@ import { Camera, Upload, Sparkles, X, Loader2 } from 'lucide-react'
 import { compressImageToDataUrl, imageFromClipboardEvent } from '../lib/docIntelligence.ts'
 import { hapticTap, hapticSuccess } from './../lib/haptics.ts'
 import { toastError } from '../lib/toast.ts'
+import { browserEnv, desktopShortcut } from '../lib/shortcutKeys.ts'
 import { Eyebrow } from './v3'
 
 /**
@@ -178,7 +179,7 @@ export default function DocIntakeButton({
 
             {!busy && (
               <Eyebrow as="p" style={{ margin: '10px 0 0', color: 'var(--ink-faint)', display: 'flex', justifyContent: 'center' }}>
-                Or paste an image · ⌘V
+                Or paste an image · {desktopShortcut('V', browserEnv()).keys}
               </Eyebrow>
             )}
 

@@ -511,13 +511,6 @@
 }
 .fhs-side__search span { flex: 1; }
 .fhs-side__search:hover { color: var(--fh-linen); border-color: var(--fh-edge); }
-.fhs-side__kbd {
-  padding: 0 4px;
-  border: 1px solid var(--fh-onyx-line);
-  border-radius: 7px;
-  font: 500 12px/18px var(--fh-font-body);
-  color: var(--fh-smoke);
-}
 .fhs-side__nav {
   flex: 1;
   min-height: 0;

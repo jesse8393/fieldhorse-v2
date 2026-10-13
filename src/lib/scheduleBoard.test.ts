@@ -18,6 +18,7 @@ vi.mock('./supabase.ts', () => ({ supabase: {} }))
 
 import {
   boardHours,
+  capTray,
   crewHours,
   dayLayout,
   dayLabel,
@@ -35,6 +36,8 @@ import {
   slotToRange,
   timeLabel,
   timeRangeLabel,
+  TRAY_LIMIT,
+  trayJobs,
   unscheduledJobs,
   weekRangeLabel
 } from './scheduleBoard.ts'
@@ -154,6 +157,69 @@ describe('unscheduledJobs', () => {
     const jobs = [job({ id: 'old' }, 0), job({ id: 'new' }, 5), job({ id: 'mid' }, 2)]
     const result = unscheduledJobs(jobs, [{ contact_id: null, start_at: tomorrow }], now)
     expect(result.map((j) => j.id)).toEqual(['new', 'mid', 'old'])
+  })
+})
+
+// The tray reads one dedicated query: the job id of every visit from today
+// on (the database applies "from today on"), and keeps a card whose drop is
+// still saving in its place, even though the booked cache already holds it.
+describe('trayJobs', () => {
+  it('lists job stage work with no visit from today on, newest first', () => {
+    const jobs = [job({ id: 'old' }, 0), job({ id: 'booked' }, 3), job({ id: 'new' }, 5), job({ id: 'lead', stage: 'lead' }, 6)]
+    expect(trayJobs(jobs, ['booked']).map((j) => j.id)).toEqual(['new', 'old'])
+  })
+
+  it('lists the legacy invoice alias and never finished work', () => {
+    const jobs = [
+      job({ id: 'legacy', stage: 'invoice' }, 1),
+      job({ id: 'finished', stage: 'job', completed_at: new Date(2026, 9, 1).toISOString() }, 2),
+      job({ id: 'closed', stage: 'closed' }, 3)
+    ]
+    expect(trayJobs(jobs, []).map((j) => j.id)).toEqual(['legacy'])
+  })
+
+  it('ignores visits that carry no job', () => {
+    const jobs = [job({ id: 'a' }, 0)]
+    expect(trayJobs(jobs, [null, undefined, '']).map((j) => j.id)).toEqual(['a'])
+  })
+
+  it('keeps a job whose drop is saving in its place, though the booked cache already holds it', () => {
+    const jobs = [job({ id: 'a' }, 0), job({ id: 'saving' }, 1), job({ id: 'c' }, 2)]
+    const result = trayJobs(jobs, ['saving'], new Set(['saving']))
+    expect(result.map((j) => j.id)).toEqual(['c', 'saving', 'a'])
+    // Once the save settles the job leaves the tray.
+    expect(trayJobs(jobs, ['saving'], new Set()).map((j) => j.id)).toEqual(['c', 'a'])
+  })
+
+  it('agrees with unscheduledJobs for visits from today on', () => {
+    const now = new Date(2026, 9, 9, 9, 0)
+    const jobs = [job({ id: 'next' }, 0), job({ id: 'free' }, 1)]
+    const events = [{ contact_id: 'next', start_at: new Date(2026, 9, 10, 8, 0).toISOString() }]
+    expect(trayJobs(jobs, ['next'])).toEqual(unscheduledJobs(jobs, events, now))
+  })
+})
+
+describe('capTray', () => {
+  const many = Array.from({ length: 63 }, (_, i) => job({ id: `j${i}` }, i))
+
+  it('shows the first 50 and counts the rest', () => {
+    expect(TRAY_LIMIT).toBe(50)
+    const { shown, hidden } = capTray(many, false)
+    expect(shown).toHaveLength(50)
+    expect(shown[0].id).toBe('j0')
+    expect(hidden).toBe(13)
+  })
+
+  it('shows every job once Show all is pressed', () => {
+    const { shown, hidden } = capTray(many, true)
+    expect(shown).toHaveLength(63)
+    expect(hidden).toBe(0)
+  })
+
+  it('hides nothing at 50 or fewer', () => {
+    const { shown, hidden } = capTray(many.slice(0, 50), false)
+    expect(shown).toHaveLength(50)
+    expect(hidden).toBe(0)
   })
 })
 

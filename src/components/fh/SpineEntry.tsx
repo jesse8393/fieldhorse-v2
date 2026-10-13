@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { cx } from './cx.ts'
 
@@ -6,8 +7,10 @@ import { cx } from './cx.ts'
 // marker, then the title, a subline and optional photo thumbnails. The
 // marker is filled green for passed and paid events (tone success) and
 // neutral otherwise; the words say which. Thumbnails reserve their box
-// with aspect-ratio and load lazily. Entries that follow each other draw
-// one continuous line; the last entry stops at its marker.
+// with aspect-ratio and load lazily, and one that fails to load (a link
+// that ran out, a file gone from storage) leaves the row instead of
+// showing a broken image. Entries that follow each other draw one
+// continuous line; the last entry stops at its marker.
 
 export type SpinePhoto = { src: string; alt: string }
 
@@ -42,8 +45,12 @@ export default function SpineEntry({
   as: Tag = 'div',
   className
 }: SpineEntryProps) {
-  const shown = photos?.slice(0, Math.max(1, maxPhotos)) ?? []
-  const more = (photos?.length ?? 0) - shown.length
+  // Thumbnails that failed to load, by src. A new link for the same photo
+  // gets its own chance.
+  const [failed, setFailed] = useState<ReadonlySet<string>>(() => new Set())
+  const usable = photos?.filter((photo) => !failed.has(photo.src)) ?? []
+  const shown = usable.slice(0, Math.max(1, maxPhotos))
+  const more = usable.length - shown.length
 
   return (
     <Tag className={cx('fhc-spine', `fhc-spine--${tone}`, className)}>
@@ -61,7 +68,13 @@ export default function SpineEntry({
           <ul className="fhc-spine__photos">
             {shown.map((photo, i) => (
               <li key={`${photo.src}-${i}`} className="fhc-spine__photo">
-                <img src={photo.src} alt={photo.alt} loading="lazy" decoding="async" />
+                <img
+                  src={photo.src}
+                  alt={photo.alt}
+                  loading="lazy"
+                  decoding="async"
+                  onError={() => setFailed((prev) => new Set(prev).add(photo.src))}
+                />
                 {more > 0 && i === shown.length - 1 && (
                   <span className="fhc-spine__more">
                     <span aria-hidden="true">+{more}</span>

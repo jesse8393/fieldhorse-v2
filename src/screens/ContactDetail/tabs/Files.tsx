@@ -41,7 +41,9 @@ export default function FilesTab({ contact, notes = [], userId, fetchAll, incomi
         />
       </div>
 
-      <div className="v3-section" {...tabPanelProps('fh-job-files', sub)} style={{ margin: '12px var(--v3-gutter) 24px' }}>
+      {/* tabIndex -1: Try again in Photos or Files leaves focus on the panel
+          while the error gives way to the skeleton. */}
+      <div className="v3-section" {...tabPanelProps('fh-job-files', sub)} tabIndex={-1} style={{ margin: '12px var(--v3-gutter) 24px' }}>
         {sub === 'photos' && (
           <PhotosSection
             jobId={contact?.id}

@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronRight, Plus, Receipt } from 'lucide-react'
 import { Button, Chip, EmptyState, Icon, Row, SkeletonRows } from '../../../components/fh'
+import DataErrorState from '../../../components/DataErrorState.tsx'
+import { keepFocusOnRetry } from '../../../lib/retryFocus.ts'
 import { formatMoney } from '../../../components/fh/money.ts'
 import { Switch } from '@/components/ui/switch'
 import { hapticTap } from '../../../lib/haptics.ts'
-import { buildQuoteView, depositScheduleFromTerms, previewAsLabel, previewAsName } from '../../../lib/quoteView.ts'
-import { useItemSuggestions, useQuoteItems } from '../sections/QuoteItems.tsx'
+import { buildQuoteView, previewAsLabel, previewAsName, quoteCapsule } from '../../../lib/quoteView.ts'
+import { useItemSuggestions, useQuoteItems, type QuoteLinesState } from '../sections/QuoteItems.tsx'
 import { shortDate, statusChip } from '../lib/quoteStatus.ts'
 import JobActionCapsule from './JobActionCapsule.tsx'
 import QuotePreviewSheet from './QuotePreviewSheet.tsx'
@@ -21,9 +23,12 @@ import './quote-phone.css'
 // capsule at the bottom carries the total, the deposit and the one gold
 // "Send for approval".
 //
-// The money comes from lib/quoteView.ts. There is no overhead line: the
-// deposit is the first step of the payment schedule (50 percent unless the
-// quote's payment terms name another). Lines save through the same
+// The money comes from lib/quoteView.ts, which reads lib/quoteMoney.ts, the
+// one rule the preview and the customer page use too (D31): the total is
+// the base lines plus approved change orders (the contact's own amount
+// until a line is priced, so the capsule never flashes $0.00 while the
+// lines load), and the deposit is what the payment terms name. There is
+// no overhead line. Lines save through the same
 // useQuoteItems writes the desktop builder uses. "Preview as" draws the
 // proposal in the app and never mints a link or calls a send route.
 //
@@ -41,7 +46,19 @@ export type QuotePhoneProps = {
   pastQuote: boolean
   /** The Quote tab's busy flag: preview, download, send, share, esign or null. */
   busy: string | null
-  hasClientEmail: boolean
+  /**
+   * The customer's email, found the way Money finds it (the job's own,
+   * then its linked client's, lib/customerEmail.ts): empty when there is
+   * none, null while the linked client is still being read or when that
+   * read failed.
+   */
+  customerEmail: string | null
+  /** The linked client's email could not be read: unknown, not missing. */
+  emailFailed?: boolean
+  /** That read is being tried again. */
+  emailRetrying?: boolean
+  /** Reads the linked client's email again. */
+  onRetryEmail?: () => void
   clearing: boolean
   patch: (updates: Record<string, any>) => Promise<{ error?: unknown } | undefined> | undefined
   onContactRefresh: () => void
@@ -54,9 +71,17 @@ export type QuotePhoneProps = {
   onEsign: () => void
   onOpenApprove: () => void
   onClearDraft: () => void
+  /** Runs after each read of the lines that works. */
+  onLinesLoaded?: () => void
+  /** Hears what the editor knows about the lines, and null when it goes. */
+  onLinesState?: (state: QuoteLinesState | null) => void
 }
 
 type LineSheetState = { key: number; id: string | null }
+
+// What Approve, Send and the share rows say when the lines could not be
+// read: never that there are none.
+const LINES_FAILED = "We couldn't load the lines."
 
 export default function QuotePhone({
   contact,
@@ -67,7 +92,10 @@ export default function QuotePhone({
   status,
   pastQuote,
   busy,
-  hasClientEmail,
+  customerEmail,
+  emailFailed = false,
+  emailRetrying = false,
+  onRetryEmail,
   clearing,
   patch,
   onContactRefresh,
@@ -77,13 +105,22 @@ export default function QuotePhone({
   onDownload,
   onEsign,
   onOpenApprove,
-  onClearDraft
+  onClearDraft,
+  onLinesLoaded,
+  onLinesState
 }: QuotePhoneProps) {
-  const { rows, loading, addItem, updateItem, removeItem, reorderItem } = useQuoteItems({
+  const { rows, loading, loaded, failed, fetchRows, addItem, updateItem, removeItem, reorderItem } = useQuoteItems({
     jobId: contact?.id,
     userId,
-    onContactRefresh
+    onContactRefresh,
+    onLoaded: onLinesLoaded,
+    onState: onLinesState
   })
+  // No read of the lines has worked yet and the last one failed: the lines
+  // are unknown, so nothing may say there are none.
+  const linesFailed = !loading && failed && !loaded
+  // The page's heading, where focus waits while Try again reads the lines again.
+  const titleRef = useRef<HTMLHeadingElement>(null)
   const suggestions = useItemSuggestions(userId)
 
   // Optional switches flip here at once (is_optional by line id), then save
@@ -110,15 +147,14 @@ export default function QuotePhone({
     () => rows.map((r) => (r.id in optimistic ? { ...r, is_optional: optimistic[r.id] } : r)),
     [rows, optimistic]
   )
-  const schedule = useMemo(() => depositScheduleFromTerms(contact?.terms_text) ?? undefined, [contact?.terms_text])
-  const live = useMemo(() => buildQuoteView(effective, schedule), [effective, schedule])
-  // Until the lines load, the contact's own total (kept in step with the
-  // lines by the database) stands in, so the capsule does not flash $0.00.
-  const placeholder = useMemo(
-    () => buildQuoteView([{ id: 'total', description: 'Total', qty: 1, rate: contact?.amount ?? 0, amount: contact?.amount ?? 0 }], schedule),
-    [contact?.amount, schedule]
-  )
-  const view = loading ? placeholder : live
+  const contactAmount = contact?.amount
+  const termsText = contact?.terms_text
+  const moneyTerms = useMemo(() => ({ changeOrders, contactAmount, termsText }), [changeOrders, contactAmount, termsText])
+  const live = useMemo(() => buildQuoteView(effective, moneyTerms), [effective, moneyTerms])
+  // While the lines load no line is priced, so the contact's own amount
+  // stands in and the capsule does not flash $0.00.
+  const loadingMoney = useMemo(() => buildQuoteView([], moneyTerms).money, [moneyTerms])
+  const capsule = quoteCapsule(loading ? loadingMoney : live.money)
 
   const byId = useMemo(
     () => new Map([...live.lines, ...live.optional, ...live.excluded].map((l) => [l.id, l])),
@@ -132,17 +168,37 @@ export default function QuotePhone({
   const changesRequested = status.label === 'Changes requested'
   const deletable = !approved && !(status.label === 'Draft' && rows.length === 0)
 
+  // Switch saves in flight, by line id (Phase 8, Task 15). While one is
+  // out, its switch, Send for approval, Approve quote and every Share or
+  // download row wait: a quick second tap cannot race the first save, and
+  // the quote never goes out, or gets approved, with a total that is still
+  // saving (the PDF is built from the saved lines). The switch waits with
+  // aria-disabled, not disabled: a disabled control that has focus drops
+  // it to the page, so a keyboard or switch access user would lose their
+  // place on every toggle. The ref turns away the taps meanwhile.
+  const switchSavesRef = useRef<Set<string>>(new Set())
+  const [switchSaves, setSwitchSaves] = useState<ReadonlySet<string>>(() => new Set())
+  const switchSaving = switchSaves.size > 0
+
   function toggleOptional(id: string, include: boolean) {
+    if (switchSavesRef.current.has(id)) return
+    switchSavesRef.current.add(id)
+    setSwitchSaves(new Set(switchSavesRef.current))
     hapticTap()
     setToggled((s) => new Set(s).add(id))
     setOptimistic((o) => ({ ...o, [id]: !include }))
-    void updateItem(id, { is_optional: !include }).then((ok) => {
-      if (ok) return
-      setOptimistic((o) => {
-        const { [id]: _gone, ...rest } = o
-        return rest
+    void updateItem(id, { is_optional: !include })
+      .then((ok) => {
+        if (ok) return
+        setOptimistic((o) => {
+          const { [id]: _gone, ...rest } = o
+          return rest
+        })
       })
-    })
+      .finally(() => {
+        switchSavesRef.current.delete(id)
+        setSwitchSaves(new Set(switchSavesRef.current))
+      })
   }
 
   // Sheets. The line sheet and the terms sheet remount on every opening
@@ -183,11 +239,19 @@ export default function QuotePhone({
     return ok
   }
 
-  // The send button: the email path with an address, the link path without.
+  // The send button: the email path with an address, the link path
+  // without. While the linked client's email is still being read, the
+  // button waits and nothing is said about the email. When that read
+  // failed, the button waits too and says why: there may well be an
+  // address, so it never falls back to the link path.
+  const emailKnown = customerEmail !== null
+  const hasClientEmail = !!customerEmail
   const sendLabel = approved ? 'Send again' : 'Send for approval'
-  const sendHint = !loading && !view.canSend
-    ? 'Add at least one line'
-    : !hasClientEmail ? 'Copies a link' : undefined
+  const sendHint = !loading && !live.canSend
+    ? (linesFailed ? LINES_FAILED : 'Add at least one line')
+    : emailFailed
+      ? "Couldn't check the email"
+      : emailKnown && !hasClientEmail ? 'Copies a link' : undefined
   const chip = statusChip(status)
   const terms = [
     contact?.scope_text && 'Scope',
@@ -201,7 +265,7 @@ export default function QuotePhone({
     <div className="fhq-page">
       <header className="fhq-head">
         <div className="fhq-head__row">
-          <h2 className="fhq-head__title">Quote</h2>
+          <h2 className="fhq-head__title" ref={titleRef} tabIndex={-1}>Quote</h2>
           <Chip tone={chip.tone} label={chip.label} />
           <Button
             variant="quiet"
@@ -213,10 +277,26 @@ export default function QuotePhone({
           </Button>
         </div>
         {status.sub && <p className="fhq-head__sub">{status.sub}</p>}
-        {!hasClientEmail && !approved && (
+        {emailKnown && !hasClientEmail && !approved && (
           <p className="fhq-head__sub">
             No email on file for {who}. Send for approval copies a link you can text or paste.
           </p>
+        )}
+        {emailFailed && (
+          <div className="fhq-head__retry">
+            <p className="fhq-head__sub">
+              Couldn't check the email for {who}. {sendLabel} waits until it can.
+            </p>
+            <Button
+              variant="quiet"
+              size="mini"
+              className="fhq-head__retry-btn"
+              loading={emailRetrying}
+              onClick={onRetryEmail}
+            >
+              Try again
+            </Button>
+          </div>
         )}
       </header>
 
@@ -234,6 +314,18 @@ export default function QuotePhone({
 
       {loading ? (
         <div className="fhq-loading"><SkeletonRows rows={4} label="Loading the quote lines" /></div>
+      ) : linesFailed ? (
+        <div className="fhq-loading">
+          <DataErrorState
+            title="Couldn't load the lines"
+            message="Check your connection and try again."
+            actionLabel="Try again"
+            onRetry={() => {
+              keepFocusOnRetry(titleRef.current)
+              void fetchRows()
+            }}
+          />
+        </div>
       ) : lines.length === 0 ? (
         <EmptyState
           icon={Receipt}
@@ -280,6 +372,7 @@ export default function QuotePhone({
                     className="fhq-switch"
                     checked={included}
                     disabled={pending(r.id)}
+                    aria-disabled={switchSaves.has(r.id) || undefined}
                     aria-label={`Include ${line.title} in the total`}
                     onCheckedChange={(on: boolean) => toggleOptional(r.id, on)}
                   />
@@ -333,15 +426,18 @@ export default function QuotePhone({
             title={contact?.proposal_status === 'approved' ? 'Approve a new version' : 'Lock the snapshot'}
             subline="Saves the current quote as the approved version."
             next={chevron}
+            // A snapshot of the lines, so it waits for a switch that is
+            // still saving, the same as Approve quote and Send.
+            disabled={loading || busy !== null || switchSaving}
             onClick={() => { hapticTap(); onOpenApprove() }}
           />
         ) : !changesRequested && (
           <Row
             as="li"
             title="Approve quote"
-            subline={live.canSend ? 'Record that the customer said yes.' : 'Add at least one line first.'}
+            subline={loading || live.canSend ? 'Record that the customer said yes.' : linesFailed ? LINES_FAILED : 'Add at least one line first.'}
             next={chevron}
-            disabled={!live.canSend || busy !== null}
+            disabled={loading || !live.canSend || busy !== null || switchSaving}
             onClick={() => { hapticTap(); onOpenApprove() }}
           />
         )}
@@ -364,14 +460,11 @@ export default function QuotePhone({
 
       <JobActionCapsule
         variant="total"
-        total={{
-          amount: formatMoney(view.baseTotal),
-          note: `Deposit ${formatMoney(view.deposit.amount)} at approval`
-        }}
+        total={capsule}
         action={{
           label: sendLabel,
           onClick: hasClientEmail ? onSend : onShare,
-          disabled: loading || !view.canSend || busy !== null,
+          disabled: loading || !live.canSend || busy !== null || !emailKnown || switchSaving,
           loading: busy === 'send' || busy === 'share',
           hint: sendHint
         }}
@@ -398,8 +491,12 @@ export default function QuotePhone({
       <QuoteMoreSheet
         open={moreOpen}
         onOpenChange={setMoreOpen}
-        email={String(contact?.email || '').trim()}
-        busy={busy !== null}
+        email={customerEmail}
+        emailFailed={emailFailed}
+        loading={loading}
+        needsLines={!loading && !live.canSend}
+        linesFailed={linesFailed}
+        busy={busy !== null || switchSaving}
         onOpenPdf={onOpenPdf}
         onDownload={onDownload}
         onShare={onShare}
@@ -412,6 +509,9 @@ export default function QuotePhone({
         company={company}
         contact={contact}
         items={effective}
+        linesLoading={loading}
+        linesFailed={linesFailed}
+        onRetryLines={() => { void fetchRows() }}
         userId={userId}
         insurance={insurance}
         changeOrders={changeOrders}

@@ -28,7 +28,7 @@ import {
   type DragStartEvent,
   type KeyboardCoordinateGetter
 } from '@dnd-kit/core'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { Button, IconButton } from '../fh'
 import TopbarWeather from './TopbarWeather.tsx'
@@ -39,11 +39,20 @@ import type { BoardEvent, BoardView } from './schedule/types.ts'
 import './schedule/schedule.css'
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useOrgScope } from '../../lib/orgScope.ts'
+// The shared clock (lib/useNow.ts): it ticks each minute and again when
+// the tab comes back into view, so the now line and the past slots keep up
+// after a night in a background tab without a reload.
+import { useNow } from '../../lib/useNow.ts'
 import {
+  addBookedJob,
+  bookedKey,
+  ensureBookedJob,
+  removeBookedJob,
   useActiveCompany,
+  useBookedVisits,
   useCompanyJobs,
   useInvalidateSchedule,
-  useScheduleEvents,
+  type BookedVisit,
   type JobRow
 } from '../../lib/queries.ts'
 import { orgMembersList, type OrgMember } from '../../lib/orgApi.ts'
@@ -60,7 +69,7 @@ import {
   slotToRange,
   timeLabel,
   timeRangeLabel,
-  unscheduledJobs,
+  trayJobs as listTrayJobs,
   weekRangeLabel,
   ymdKey
 } from '../../lib/scheduleBoard.ts'
@@ -73,8 +82,18 @@ type EventRow = BoardEvent
 // string at the call-site, etc.).
 type Props = {
   events: EventRow[] | null
-  upcoming: EventRow[] | null
+  /** True while the board's range loads, a new week or day included. */
   loading: boolean
+  /** No read of the board's range has worked and the last one failed: an error line with Try again stands where the empty hint would. */
+  failed?: boolean
+  onRetry?: () => void
+  /** Up next: null until its first read is in. */
+  upcoming: EventRow[] | null
+  /** True while Up next's first read is out. */
+  upcomingLoading?: boolean
+  /** Up next's read failed. */
+  upcomingFailed?: boolean
+  onRetryUpcoming?: () => void
   cursor: Date
   setCursor: (d: Date) => void
   view: string
@@ -103,17 +122,6 @@ function startOfDay(d: Date) {
 
 function addDays(d: Date, n: number) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n)
-}
-
-// The clock the board reads, refreshed each minute so the now line and
-// the past slots keep up without a reload.
-function useNow(intervalMs = 60_000) {
-  const [now, setNow] = useState(() => new Date())
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), intervalMs)
-    return () => window.clearInterval(timer)
-  }, [intervalMs])
-  return now
 }
 
 // How far the pointer or keyboard is from the slot under the dragged
@@ -149,12 +157,12 @@ function slotWords(id: unknown): string {
 
 export default function SnowScheduleBuild(props: Props) {
   const {
-    events: eventsIn, upcoming: upcomingIn, loading, cursor, setCursor,
+    events: eventsIn, loading, failed = false, onRetry, cursor, setCursor,
+    upcoming, upcomingLoading = false, upcomingFailed = false, onRetryUpcoming,
     view: viewIn, setView, weather, onAddEvent, onNewJob, onScheduleJob, onOpenEvent,
   } = props
 
   const events = useMemo<EventRow[]>(() => eventsIn || [], [eventsIn])
-  const upcoming = useMemo<EventRow[]>(() => upcomingIn || [], [upcomingIn])
   const view: BoardView = (viewIn === 'day' || viewIn === 'week' || viewIn === 'month') ? viewIn : 'week'
 
   const { user } = useAuth()
@@ -162,6 +170,7 @@ export default function SnowScheduleBuild(props: Props) {
   const company = useActiveCompany()
   const now = useNow()
   const invalidateSchedule = useInvalidateSchedule()
+  const queryClient = useQueryClient()
 
   // The days on the board: one, the week from Sunday, or none for Month.
   const days: Date[] = useMemo(() => {
@@ -194,22 +203,52 @@ export default function SnowScheduleBuild(props: Props) {
 
   // ---- The Unscheduled tray (decision D10) ----
   // Every visit from today on, whatever week the board shows, decides
-  // which jobs still need a date. Only the active company's jobs wait
-  // here: a partner's shared job, or one from another workspace, never
-  // goes on this calendar.
+  // which jobs still need a date: a dedicated query reads only the job id
+  // of each one. Only the active company's jobs wait here: a partner's
+  // shared job, or one from another workspace, never goes on this
+  // calendar. Until both the jobs and the visits are in, the tray shows a
+  // skeleton, never every job as unscheduled. If either fails it says so:
+  // alone when there is nothing to show, above the cards it already has
+  // when a reload failed, since a list that is a little stale beats none.
   const todayKey = ymdKey(now)
-  const bookedRange = useMemo(() => {
+  const bookedFrom = useMemo(() => {
     const [y, m, d] = todayKey.split('-').map(Number)
-    const from = new Date(y, m - 1, d)
-    return { from: from.toISOString(), to: new Date(y, m - 1, d + 400).toISOString() }
+    return new Date(y, m - 1, d).toISOString()
   }, [todayKey])
-  const { data: booked } = useScheduleEvents(user?.id, bookedRange.from, bookedRange.to)
+  const bookedQuery = useBookedVisits(user?.id, bookedFrom)
+  const booked = bookedQuery.data
   const jobsQuery = useCompanyJobs()
   const jobs = jobsQuery.data
+
+  // The jobs whose drop is saving right now. Their card stays in the tray,
+  // dimmed, with its drag and Schedule button off, while the booked cache
+  // already counts them, so a second drag can never write a second visit.
+  // The ref answers at once, before React renders the disabled card.
+  const [saving, setSaving] = useState<ReadonlySet<string>>(() => new Set())
+  const savingRef = useRef(new Set<string>())
+  const markSaving = useCallback((jobId: string, on: boolean) => {
+    if (on) savingRef.current.add(jobId)
+    else savingRef.current.delete(jobId)
+    setSaving(new Set(savingRef.current))
+  }, [])
+
+  // Null until both lists are in: the tray then shows the skeleton or the
+  // error line alone, never an empty list that reads as all booked.
   const trayJobs = useMemo(
-    () => unscheduledJobs(jobs ?? [], (booked ?? []).map((e) => ({ contact_id: e.contact_id, start_at: e.start_at as string })), now),
-    [jobs, booked, now]
+    () => (jobs && booked ? listTrayJobs(jobs, booked.map((v) => v.contact_id), saving) : null),
+    [jobs, booked, saving]
   )
+  const trayLoading = jobsQuery.isPending || bookedQuery.isPending
+  const trayFailed = jobsQuery.isError || bookedQuery.isError
+  const { refetch: refetchJobs, isError: jobsFailed } = jobsQuery
+  const { refetch: refetchBooked, isError: bookedFailed } = bookedQuery
+  // Try again refetches what failed, or both when neither is flagged.
+  const retryTray = useCallback(() => {
+    const neither = !jobsFailed && !bookedFailed
+    if (jobsFailed || neither) void refetchJobs()
+    if (bookedFailed || neither) void refetchBooked()
+  }, [jobsFailed, bookedFailed, refetchJobs, refetchBooked])
+  const bookedCacheKey = useMemo(() => bookedKey(user?.id, orgId, bookedFrom), [user?.id, orgId, bookedFrom])
 
   // ---- Crew this week: only when visits carry assigned_to ----
   const crew = useMemo(() => crewHours(inView), [inView])
@@ -296,6 +335,8 @@ export default function SnowScheduleBuild(props: Props) {
     const slot = over ? parseSlotId(over.id) : null
     const job = (active.data.current as { job?: JobRow } | undefined)?.job
     if (!slot || !job) return
+    // A drop of this job is already saving: never write a second visit.
+    if (savingRef.current.has(job.id)) return
     const range = slotToRange(slot.day, slot.hour)
     // Another company's job, or a slot that has already begun: refuse,
     // write nothing.
@@ -306,17 +347,40 @@ export default function SnowScheduleBuild(props: Props) {
     }
     if (!user?.id) return
     const label = jobLabel(job)
-    const result = await createScheduleEvent({
-      userId: user.id,
-      orgId: orgId ?? null,
-      contactId: job.id,
-      title: label,
-      ...range
-    })
+    // Hold the card and count the job as booked before the insert goes out.
+    // The row is added and, on failure, removed by value (one row for this
+    // job), so another drop's row is never touched and a rollback still
+    // finds its row after the cache rebuilt it. While the insert is on its
+    // way the card is held by `saving` alone: a booked refetch that
+    // another save started in the meantime can land without this row, and
+    // that is fine until the write is in.
+    markSaving(job.id, true)
+    queryClient.setQueryData<BookedVisit[]>(bookedCacheKey, addBookedJob(job.id))
+    let result: Awaited<ReturnType<typeof createScheduleEvent>>
+    try {
+      result = await createScheduleEvent({
+        userId: user.id,
+        orgId: orgId ?? null,
+        contactId: job.id,
+        title: label,
+        ...range
+      })
+    } catch (e) {
+      result = { error: (e as { message?: string })?.message || 'Try again.' }
+    }
     if ('error' in result) {
+      queryClient.setQueryData<BookedVisit[]>(bookedCacheKey, removeBookedJob(job.id))
+      markSaving(job.id, false)
       toastError("Couldn't schedule the job", result.error)
       return
     }
+    // The visit is written. Put the row back in case a refetch from
+    // before the write landed without it, release the card, and refresh:
+    // the refetch starts now, after the write, and anything still in
+    // flight is dropped (cancelRefetch), so the list that lands holds this
+    // job and the card never comes back for a round trip.
+    queryClient.setQueryData<BookedVisit[]>(bookedCacheKey, ensureBookedJob(job.id))
+    markSaving(job.id, false)
     invalidateSchedule()
     const start = new Date(range.start_at)
     toastUndo(`Scheduled ${label}`, {
@@ -331,7 +395,7 @@ export default function SnowScheduleBuild(props: Props) {
         toastSuccess('Removed', label)
       }
     })
-  }, [user?.id, orgId, company, invalidateSchedule])
+  }, [user?.id, orgId, company, invalidateSchedule, markSaving, queryClient, bookedCacheKey])
 
   const onDragCancel = useCallback(() => {
     cursorSlot.current = null
@@ -401,13 +465,15 @@ export default function SnowScheduleBuild(props: Props) {
         <div className={`fhsch-body${activeJob ? ' is-dragging' : ''}`}>
           <div className="fhsch-main">
             {view === 'month' ? (
-              <MonthGrid cursor={cursor} events={events} loading={loading} now={now} onOpenDay={openDay} />
+              <MonthGrid cursor={cursor} events={events} loading={loading} failed={failed} onRetry={onRetry} now={now} onOpenDay={openDay} />
             ) : (
               <BoardGrid
                 days={days}
                 view={view}
                 events={inView}
                 loading={loading}
+                failed={failed}
+                onRetry={onRetry}
                 now={now}
                 onOpenEvent={onOpenEvent}
                 onOpenDay={openDay}
@@ -418,14 +484,23 @@ export default function SnowScheduleBuild(props: Props) {
           <aside className="fhsch-rail" aria-label="Unscheduled jobs, crew and up next">
             <UnscheduledTray
               jobs={trayJobs}
-              loading={jobsQuery.isPending}
-              failed={jobsQuery.isError}
+              loading={trayLoading}
+              failed={trayFailed}
               hasAnyJob={(jobs ?? []).length > 0}
-              onRetry={() => { void jobsQuery.refetch() }}
+              canDrag={view !== 'month'}
+              saving={saving}
+              onRetry={retryTray}
               onSchedule={scheduleJob}
             />
             {crewRows.length > 0 && <CrewThisWeek title={crewTitle} crew={crewRows} />}
-            <UpNext events={upcoming} onOpenEvent={onOpenEvent} onAddEvent={onAddEvent} />
+            <UpNext
+              events={upcoming}
+              loading={upcomingLoading}
+              failed={upcomingFailed}
+              onRetry={() => onRetryUpcoming?.()}
+              onOpenEvent={onOpenEvent}
+              onAddEvent={onAddEvent}
+            />
           </aside>
         </div>
 

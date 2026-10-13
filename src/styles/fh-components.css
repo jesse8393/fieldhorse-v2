@@ -1021,7 +1021,16 @@
 .fhc-photo__frame {
   position: relative;
   isolation: isolate;
+  /* The text sits in flow at the foot of the frame. A frame that clips
+     without scrolling keeps its aspect ratio as a floor, so text taller
+     than the photo box (two line eyebrow and title in a narrow column,
+     Today's next stop at 1100 px) grows the box instead of losing its top
+     line. Browsers without overflow: clip keep hidden. */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
   overflow: hidden;
+  overflow: clip;
   border-radius: 12px;
   background: var(--fh-stage);
 }
@@ -1043,10 +1052,7 @@
 }
 
 .fhc-photo__overlay {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
+  position: relative;
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
@@ -1055,8 +1061,28 @@
   background: var(--fh-scrim);
 }
 
+/* No photo (decision D32): the frame is a compact onyx band, about 96 px
+   tall with the tray, the eyebrow and title on the left and the action on
+   the right, so nothing reserves an empty picture. The title keeps the
+   phone size at every width and clamps at two lines. */
+.fhc-photo--empty .fhc-photo__frame {
+  aspect-ratio: auto;
+}
+
 .fhc-photo--empty .fhc-photo__overlay {
+  align-items: center;
+  min-height: 84px;
+  padding: 12px 16px;
   background: none;
+}
+
+.fhc-photo--empty .fhc-photo__title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 24px;
+  line-height: 28px;
 }
 
 .fhc-photo__text {
@@ -1096,6 +1122,9 @@
   .fhc-photo__title {
     font-size: 30px;
     line-height: 32px;
+  }
+  .fhc-photo--empty .fhc-photo__overlay {
+    padding: 12px 20px;
   }
 }
 
@@ -1803,10 +1832,10 @@
 
 .fhc-ds__frame-loading {
   display: grid;
-  align-content: end;
+  align-content: center;
   gap: 8px;
-  aspect-ratio: 16 / 9;
-  padding: 16px;
+  min-height: 84px;
+  padding: 12px 16px;
   border-radius: 12px;
   background: var(--fh-stage);
 }

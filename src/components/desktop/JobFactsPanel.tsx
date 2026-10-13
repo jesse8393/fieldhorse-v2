@@ -18,6 +18,7 @@ import { Button, VaultCard } from '../fh/index.ts'
 import type { VaultFact } from '../fh/index.ts'
 import { initialsFor } from '../fh/Monogram.tsx'
 import { moneyCents } from '../../lib/format.ts'
+import { navigateHrefHere } from '../../lib/todayView.ts'
 import type { JobMoney } from '../../screens/ContactDetail/lib/spine.ts'
 import { documentRows, MAX_FILE_ROWS } from '../../screens/ContactDetail/lib/jobDesktop.ts'
 import type { DocumentRow } from '../../screens/ContactDetail/lib/jobDesktop.ts'
@@ -44,7 +45,8 @@ export type JobFactsPanelProps = {
   onEdit?: () => void
 }
 
-const PRE_DEAL_LABEL: Record<string, string> = {
+/** What the money reads as before a deal: the facts panel and JobFactsStrip label it alike. */
+export const PRE_DEAL_LABEL: Record<string, string> = {
   lead: 'Estimated value',
   quote: 'Quote total',
   lost: 'Estimated value'
@@ -56,10 +58,6 @@ const ROLE_LABEL: Record<string, string> = {
   manager: 'Manager',
   foreman: 'Foreman',
   crew: 'Crew'
-}
-
-function mapsHref(address: string) {
-  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`
 }
 
 /** "31.2% margin" reads "31.2%" beside the Margin label; "12.0% loss" keeps its word. */
@@ -178,7 +176,10 @@ export default function JobFactsPanel({
         {address ? (
           <>
             <p className="fhd-text">{address}</p>
-            <a className="fhd-link fhd-nav" href={mapsHref(address)} target="_blank" rel="noopener noreferrer">
+            {/* Directions the way Today and the phone header build them
+                (Phase 8, Task 15): Apple Maps on an iPhone or iPad, which
+                gets this page in landscape, Google Maps everywhere else. */}
+            <a className="fhd-link fhd-nav" href={navigateHrefHere(address)} target="_blank" rel="noopener noreferrer">
               Navigate<span className="fhc-vh"> to {address}, opens in a new tab</span>
             </a>
           </>

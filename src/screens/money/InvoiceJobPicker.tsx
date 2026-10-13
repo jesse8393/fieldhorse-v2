@@ -1,5 +1,5 @@
 import { HardHat } from 'lucide-react'
-import { Button, EmptyState, Row, Sheet } from '../../components/fh'
+import { Button, EmptyState, Row, Sheet, SkeletonRows } from '../../components/fh'
 import { hapticTap } from '../../lib/haptics.ts'
 import type { MoneyJob } from './types.ts'
 
@@ -8,23 +8,29 @@ import type { MoneyJob } from './types.ts'
 // page opens (components/SendInvoiceSheet.tsx: deposit, progress draw or
 // final balance, amount, due window, send or save as a draft). So this
 // sheet only asks which job, then hands that job to the same sheet.
-// Leads, quotes and finished jobs are not offered.
+// Leads, quotes and finished jobs are not offered. Opened from the desktop
+// toolbar before Money has loaded, it waits with skeleton rows rather than
+// saying there are no jobs.
 
 export type InvoiceJobPickerProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** True until the jobs have loaded. */
+  loading?: boolean
   jobs: MoneyJob[]
   onPick: (job: MoneyJob) => void
 }
 
-export default function InvoiceJobPicker({ open, onOpenChange, jobs, onPick }: InvoiceJobPickerProps) {
+export default function InvoiceJobPicker({ open, onOpenChange, loading = false, jobs, onPick }: InvoiceJobPickerProps) {
   const active = jobs
     .filter((j) => j.stage === 'job' || j.stage === 'invoice')
     .sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')))
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange} title="Which job is it for?">
-      {active.length === 0 ? (
+      {loading ? (
+        <SkeletonRows rows={3} label="Loading jobs" />
+      ) : active.length === 0 ? (
         <EmptyState
           icon={HardHat}
           title="No jobs to invoice yet."

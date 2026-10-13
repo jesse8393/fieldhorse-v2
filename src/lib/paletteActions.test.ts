@@ -107,9 +107,42 @@ describe('actionForShortcut', () => {
   })
 })
 
+// Phase 8, Task 15 (D19): on a Mac, Option with a letter types a character
+// (Option N starts ñ, Option M is µ), so the shortcuts there need Control
+// plus Option. Everywhere else Alt alone, and never Control with Alt,
+// which is AltGr on a Windows keyboard and types characters too.
+describe('shortcuts on a Mac', () => {
+  const MAC = { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)' }
+  const WINDOWS = { userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+  const actions = paletteActions(JOB, true)
+  const press = (env: { userAgent: string }, code: string, mods: Partial<{ altKey: boolean; ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }> = {}) =>
+    actionForShortcut(actions, { code, altKey: false, ctrlKey: false, metaKey: false, shiftKey: false, ...mods }, env)
+
+  it('leaves Option and a letter to type its character', () => {
+    for (const code of ['KeyI', 'KeyM', 'KeyN']) expect(press(MAC, code, { altKey: true })).toBeNull()
+  })
+
+  it('runs an action on Control, Option and its letter', () => {
+    expect(press(MAC, 'KeyI', { altKey: true, ctrlKey: true })?.id).toBe('invoice')
+    expect(press(MAC, 'KeyM', { altKey: true, ctrlKey: true })?.id).toBe('message')
+    expect(press(MAC, 'KeyN', { altKey: true, ctrlKey: true })?.id).toBe('note')
+  })
+
+  it('ignores Command, Shift or Control alone with the letter on a Mac', () => {
+    expect(press(MAC, 'KeyN', { altKey: true, ctrlKey: true, metaKey: true })).toBeNull()
+    expect(press(MAC, 'KeyN', { altKey: true, ctrlKey: true, shiftKey: true })).toBeNull()
+    expect(press(MAC, 'KeyN', { ctrlKey: true })).toBeNull()
+  })
+
+  it('keeps Alt and the letter elsewhere, and never fires on AltGr', () => {
+    expect(press(WINDOWS, 'KeyN', { altKey: true })?.id).toBe('note')
+    expect(press(WINDOWS, 'KeyN', { altKey: true, ctrlKey: true })).toBeNull()
+  })
+})
+
 describe('shortcutModifier', () => {
-  it('prints Option on a Mac and Alt everywhere else', () => {
-    expect(shortcutModifier({ userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)' })).toBe('⌥')
+  it('prints Control and Option on a Mac and Alt everywhere else', () => {
+    expect(shortcutModifier({ userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)' })).toBe('⌃⌥')
     expect(shortcutModifier({ userAgent: 'Mozilla/5.0 (X11; Linux x86_64)' })).toBe('Alt')
     expect(shortcutModifier()).toBe('Alt')
   })

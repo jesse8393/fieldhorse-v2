@@ -1,8 +1,8 @@
 // src/components/CaptureSheet.tsx
 //
 // Universal Capture, the one gesture that replaces navigating the app
-// to do data entry. Opened from anywhere (the dock coin, the desktop
-// button, Cmd or Ctrl+J, the command palette) via the `fh:open-capture`
+// to do data entry. Opened from anywhere (the dock coin, the sidebar's
+// Capture row, Cmd or Ctrl+J, the command palette) via the `fh:open-capture`
 // window event; openCapture({ jobId }) in lib/captureAttach.ts opens it
 // attached to the job on screen. The contractor says it, types it, or
 // snaps a receipt; Claude routes it into the right action (note, task,

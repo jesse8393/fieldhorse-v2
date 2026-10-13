@@ -5,9 +5,11 @@ import { dayHeadline, nightHeadline } from './todayHeadline.ts'
 import {
   answerCopy,
   buildTodayView,
+  currentForecast,
   forecastWindow,
   isEvening,
   navigateHref,
+  navigateHrefHere,
   stopTime,
   todayWeather,
   tomorrowLine,
@@ -263,6 +265,25 @@ describe('buildTodayView', () => {
     expect(view.tomorrow.map((row) => row.id)).toEqual(['t1'])
   })
 
+  it('after midnight, moves the visits a bundle listed as tomorrow onto today', () => {
+    const view = buildTodayView({
+      bundle: bundle({
+        todayOnSite: threeStops(),
+        tomorrowOnSite: [
+          visit('t2', 'job-5', at(13, 0, 1), at(14, 0, 1), { title: 'Castellanos site measure' }),
+          visit('t1', 'job-4', at(9, 0, 1), at(10, 0, 1), { title: 'Final slab inspection' })
+        ]
+      }),
+      now: at(6, 30, 1),
+      lat: LAT,
+      lon: LON
+    })
+    expect(view.day.map((row) => row.id)).toEqual(['t1', 't2'])
+    expect(view.title).toEqual(['Two stops.', 'First at 9:00.'])
+    expect(view.nextStop?.jobId).toBe('job-4')
+    expect(view.tomorrow).toEqual([])
+  })
+
   it('reads a cached bundle that has no tomorrow yet', () => {
     const cached = bundle()
     delete (cached as Partial<HomeDashboardBundle>).tomorrowOnSite
@@ -335,6 +356,20 @@ describe('Today past six, read through the dashboard queries', () => {
     expect(view.title[0]).toBe('Eight stops done.')
     expect(`${view.done.length} of ${view.day.length}`).toBe('8 of 8')
     expect(view.tomorrow).toHaveLength(8)
+  })
+
+  it('a bundle fetched at 9:00 pm shows the right visits at 6:30 the next morning', async () => {
+    // Eight visits yesterday, three today.
+    fakeDb.tables.fh_schedule = [...eightVisits(0), ...eightVisits(1).slice(0, 3)]
+    const cached = await fetchHomeDashboard('user-1', at(21), 'org-1')
+    const view = buildTodayView({ bundle: cached, now: at(6, 30, 1), lat: LAT, lon: LON })
+    expect(view.evening).toBe(false)
+    expect(view.title).toEqual(['Three stops.', 'First pour at 7:30.'])
+    expect(view.day.map((row) => row.id)).toEqual(['d1-v1', 'd1-v2', 'd1-v3'])
+    expect(view.done).toEqual([])
+    expect(view.nextStop).toMatchObject({ jobId: 'job-1', startAt: at(7, 30, 1).toISOString(), address: '1 Main St' })
+    // The bundle never read the day after, so tomorrow waits for a refresh.
+    expect(view.tomorrow).toEqual([])
   })
 
   it('with 14 actions the Needs an answer count reads 14', async () => {
@@ -428,6 +463,37 @@ describe('forecastWindow and todayWeather', () => {
   })
 })
 
+describe('currentForecast', () => {
+  it('a weather snapshot three hours old gives no weather line', () => {
+    const now = at(9, 40)
+    const snapshot = currentForecast(forecast(), at(6, 40).getTime(), now)
+    expect(snapshot).toBeNull()
+    const view = buildTodayView({ bundle: bundle(), now, weather: todayWeather(snapshot, ['concrete']) })
+    expect(view.weatherLine).toBeNull()
+  })
+
+  it('keeps a snapshot up to 90 minutes old', () => {
+    const now = at(9, 40)
+    const fresh = forecast()
+    expect(currentForecast(fresh, at(8, 10).getTime(), now)).toBe(fresh)
+    expect(currentForecast(fresh, at(8, 9).getTime(), now)).toBeNull()
+    const view = buildTodayView({ bundle: bundle(), now, weather: todayWeather(currentForecast(fresh, at(9).getTime(), now), ['concrete']) })
+    expect(view.weatherLine).toBe('71° and partly cloudy. Clear to work all day.')
+  })
+
+  it('keeps a snapshot fetched a moment after the clock last ticked', () => {
+    const fresh = forecast()
+    expect(currentForecast(fresh, at(9, 41).getTime(), at(9, 40))).toBe(fresh)
+  })
+
+  it('has nothing to show without a forecast or the time it was fetched', () => {
+    expect(currentForecast(null, at(9).getTime(), at(9))).toBeNull()
+    expect(currentForecast(undefined, at(9).getTime(), at(9))).toBeNull()
+    expect(currentForecast(forecast(), 0, at(9))).toBeNull()
+    expect(currentForecast(forecast(), undefined, at(9))).toBeNull()
+  })
+})
+
 describe('tomorrowLine', () => {
   // Built inside each test, after the time zone is set.
   const tomorrowStops = () => [
@@ -518,6 +584,23 @@ describe('stopTime and navigateHref', () => {
     expect(navigateHref('412 Burkitt Station Rd', android)).toBe('https://www.google.com/maps/dir/?api=1&destination=412%20Burkitt%20Station%20Rd')
     // iPadOS reports a Mac, with touch.
     expect(navigateHref('A & B', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', 5)).toBe('https://maps.apple.com/?daddr=A%20%26%20B')
+  })
+
+  it('navigateHrefHere reads the device the page runs on', () => {
+    const mac = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15'
+    try {
+      // An iPad in landscape: the desktop job page, a Mac user agent, touch.
+      vi.stubGlobal('navigator', { userAgent: mac, maxTouchPoints: 5 })
+      expect(navigateHrefHere('412 Burkitt Station Rd')).toBe('https://maps.apple.com/?daddr=412%20Burkitt%20Station%20Rd')
+      // A Mac with no touch screen.
+      vi.stubGlobal('navigator', { userAgent: mac, maxTouchPoints: 0 })
+      expect(navigateHrefHere('412 Burkitt Station Rd')).toBe('https://www.google.com/maps/dir/?api=1&destination=412%20Burkitt%20Station%20Rd')
+      // No navigator at all (a server render).
+      vi.stubGlobal('navigator', undefined)
+      expect(navigateHrefHere('412 Burkitt Station Rd')).toBe('https://www.google.com/maps/dir/?api=1&destination=412%20Burkitt%20Station%20Rd')
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 })
 

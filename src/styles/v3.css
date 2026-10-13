@@ -1,15 +1,12 @@
 /* ================================================================
    FIELDHORSE v3 — FOUNDATION UTILITY LAYER
-   Typography scale, button/card/pill primitives, motion helpers.
+   Typography scale, button and section primitives, motion helpers.
    Mostly scoped via .v3-* class names, but this file also styles a
-   few shared legacy hooks (.fh-screen, .fh-badge, .fh-stat-card,
-   .fh-data-table) and the command palette's data-slot hooks.
+   few shared legacy hooks (.fh-screen, .fh-badge, .fh-data-table) and
+   the command palette's data-slot hooks.
    Load order (main.tsx): tokens, global, fixes-2026-07, this file,
    mobile-keyboard-fix. Equal specificity rules here beat global.css
-   and fixes-2026-07.css and lose to mobile-keyboard-fix.css. The
-   command palette is skinned both here and in mobile-keyboard-fix.css
-   (.fh-command-dialog), with !important on both sides, so check both
-   files before changing it.
+   and fixes-2026-07.css and lose to mobile-keyboard-fix.css.
    v3 tokens (--v3-*) are defined in tokens.css.
    ================================================================ */
 
@@ -26,15 +23,11 @@
 @media (min-width: 480px) {
   .v3-h1 { font-size: 24px; }
 }
-.v3-h1 em,
-.v3-h1 .v3-h1__accent {
+.v3-h1 em {
   font-style: italic;
   font-weight: 500;
   color: var(--v3-text);
 }
-
-@media (min-width: 480px) {
-  }
 
 .v3-caption {
   font-family: var(--font-body);
@@ -120,12 +113,6 @@
 .v3-btn--sm.v3-btn--icon-only { width: 32px; }
 .v3-btn--lg.v3-btn--icon-only { width: 44px; }
 
-/* ---------- Card primitive — premium push ---------- */
-/* Glass top-sheen — a faint light sweep across the top edge so the
-   card catches light like a physical panel. Pointer-events:none so it
-   never blocks taps; sits above the surface but below content. */
-/* Hero card with subtle gold inner glow — used for Revenue Opportunity */
-/* ---------- Pill primitive ---------- */
 /* ---------- Section header ---------- */
 .v3-section-header {
   display: flex;
@@ -189,8 +176,7 @@
      - 12% white hairline + inset highlight
      - ambient + key-light shadow stack
      - radial top-left light leak via ::before
-     - 1px gradient top stroke via ::after (Stripe/Linear premium look)
-   The card primitive (.v3-card) sits INSIDE this. */
+     - 1px gradient top stroke via ::after (Stripe/Linear premium look) */
 .v3-section {
   background: var(--v3-section-bg);
   border: 1px solid var(--v3-section-border);
@@ -295,9 +281,6 @@
   box-shadow: 0 0 4px rgba(201, 150, 58, 0.10);
 }
 
-/* When a card sits directly inside a section, give it a real edge —
-   stronger border + a bit of inset so the card READS as a card, not
-   a tinted block. Hover bumps the surface to surface-3. */
 /* Section header inside a section reads tighter — bottom-pad only */
 .v3-section > .v3-section-header { padding: 0 0 12px; }
 
@@ -344,8 +327,7 @@
 }
 
 /* ---------- Focus ring ---------- */
-.v3-btn:focus-visible,
-.v3-card--interactive:focus-visible {
+.v3-btn:focus-visible {
   outline: 2px solid var(--v3-primary);
   outline-offset: 2px;
 }
@@ -413,17 +395,6 @@
   font-size: 14px;
   text-align: center;
 }
-
-/* ---------- Hero ambient drift ----------
-   Very slow translate on the hero's gold corner blob — gives the card a
-   barely-perceptible "alive" quality without ever drawing the eye.
-   22s round-trip; opacity dips slightly mid-cycle so it breathes. */
-@keyframes fh-hero-drift {
-  0%, 100% { transform: translate(0, 0); opacity: 1; }
-  50%      { transform: translate(-22px, 10px); opacity: 0.82; }
-}
-@media (prefers-reduced-motion: reduce) {
-  }
 
 /* ---------- Command Palette (cmdk + shadcn dialog) — v3 polish ----------
    The shadcn dialog ships with --popover white and a thin gray border
