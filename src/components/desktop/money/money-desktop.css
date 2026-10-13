@@ -355,14 +355,49 @@
 }
 
 .fhmd-col--customer { width: 24%; }
-.fhmd-col--job { width: 30%; }
+/* The Job column takes what the others leave. */
+.fhmd-col--job { width: auto; }
 .fhmd-col--amount { width: 14%; }
 .fhmd-col--status { width: 20%; }
-.fhmd-col--action { width: 12%; }
+/* One mini button: a fixed 96 px, so Remind and Open keep their whole
+   label on a narrow window (Task 14). The cell keeps no left padding, which
+   leaves the button 84 px; Statement is wider and gets 112. */
+.fhmd-col--action { width: 96px; }
+.fhmd-col--statement { width: 112px; }
 .fhmd-col--wide-action { width: 23%; }
+
+/* A money figure never breaks inside its digits: "$1,242,500.0" over "0"
+   reads wrong, and "$33,10" over "0.00" reads as $33.10. Below 1280 px an
+   Amount column is a fixed 128 px, room for a seven figure amount with its
+   cents, where 14 percent of the table would cut it (Task 14). */
+.fhmd-table td.fhmd-num { white-space: nowrap; }
+
+@media (max-width: 1279px) {
+  .fhmd-col--amount { width: 128px; }
+}
+
+/* Below 1100 px the tables render without the Job column (and Who owes
+   you without Properties), reading that line under the customer's name:
+   the customer takes what is left. */
+.fhmd-table--compact .fhmd-col--customer { width: auto; }
+.fhmd-table--compact .fhmd-col--status { width: 32%; }
 
 .fhmd-table--balances .fhmd-col--status { width: 17%; }
 .fhmd-table--balances .fhmd-col--amount { width: 12%; }
+
+/* Below 1280 px Job balances' columns stop sharing the width by percent:
+   each money column holds a seven figure amount, Status holds its widest
+   chip ("Overdue, 1000 days"), the two actions stack, and the customer
+   takes what is left. Below 1100 px Paid steps aside and the age reads
+   under a one word chip (Task 14). These follow the rules above on
+   purpose, so they win for this table. */
+@media (max-width: 1279px) {
+  .fhmd-table--balances .fhmd-col--customer { width: auto; }
+  .fhmd-table--balances .fhmd-col--status { width: 152px; }
+  .fhmd-table--balances .fhmd-col--amount { width: 120px; }
+  .fhmd-table--balances .fhmd-col--wide-action { width: 120px; }
+  .fhmd-table--balances.fhmd-table--compact .fhmd-col--status { width: 112px; }
+}
 
 .fhmd-table th {
   padding: 8px 12px;
@@ -384,6 +419,11 @@
   font-weight: 400;
   color: var(--fh-ink-2);
   overflow-wrap: anywhere;
+}
+
+/* The column before Action keeps its own right padding. */
+.fhmd-table td.fhmd-end {
+  padding-left: 0;
 }
 
 .fhmd-table tbody tr + tr td {

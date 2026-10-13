@@ -45,7 +45,8 @@ export type JobFactsPanelProps = {
   onEdit?: () => void
 }
 
-const PRE_DEAL_LABEL: Record<string, string> = {
+/** What the money reads as before a deal: the facts panel and JobFactsStrip label it alike. */
+export const PRE_DEAL_LABEL: Record<string, string> = {
   lead: 'Estimated value',
   quote: 'Quote total',
   lost: 'Estimated value'

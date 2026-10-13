@@ -1,11 +1,14 @@
 // DesktopSidebar, the onyx rail at 900px and up (spec 8.3).
 //
-// Top: the company monogram, name and city, then search with ⌘K and a
-// quiet Capture row with its key cap (⌘J on a Mac, Ctrl J elsewhere),
-// which opens Universal Capture the way the dock coin does on a phone
-// (PHASE8_PLAN.md Task 13, D33). There is no floating capture button on
-// a desktop any more: it covered page content and made a second gold
-// element on pages meant to have one.
+// Top: the company monogram, the short company name the phone header
+// shows (two lines at most, the full name in its title) and the city
+// (PHASE8_PLAN.md Task 14). The city and the logo come from the person's
+// profile, so they show only in a workspace that is the company the
+// person runs. Then search with ⌘K and a quiet Capture row with its key
+// cap (⌘J on a Mac, Ctrl J elsewhere), which opens Universal Capture the
+// way the dock coin does on a phone (PHASE8_PLAN.md Task 13, D33). There
+// is no floating capture button on a desktop any more: it covered page
+// content and made a second gold element on pages meant to have one.
 // Main list: Today, Schedule, Jobs, Money, Inbox (only when the company's
 // messaging engine is on, decision D9), Customers, Reports. A
 // collapsible Team and office group holds the rest, so every route the
@@ -29,6 +32,7 @@ import { SETTINGS, SIDEBAR_MORE, isActive, sidebarPrimary, type NavItem } from '
 import { useEngineEnabled } from '../lib/inbox.ts'
 import { useNavAccess } from '../lib/useNavAccess.ts'
 import { cityLine } from '../lib/companyLine.ts'
+import { headerFullName, headerName, profileCompanyIsWorkspace } from '../lib/headerName.ts'
 import { openCapture } from '../lib/captureAttach.ts'
 import { browserEnv, desktopShortcut } from '../lib/shortcutKeys.ts'
 
@@ -73,7 +77,7 @@ export default function DesktopSidebar() {
   const { pathname } = useLocation()
   const { signOut, user } = useAuth()
   const { profile } = useProfile()
-  const { memberships } = useMembership()
+  const { memberships, orgName, isOwner } = useMembership()
   const { canSee, hasCrew } = useNavAccess()
   const engineEnabled = useEngineEnabled()
   const [moreOpen, setMoreOpen] = useState(() => readMoreOpen(pathname))
@@ -83,8 +87,22 @@ export default function DesktopSidebar() {
   const searchKeys = desktopShortcut('K', env)
   const captureKeys = desktopShortcut('J', env)
 
-  const company = profile?.company_name?.trim() || profile?.full_name?.trim() || 'Your workspace'
-  const city = cityLine(profile?.company_address)
+  // The short name the phone header shows (headerName): "Parker
+  // Construction", not "Parker Constructi..." It wraps to two lines before
+  // it is cut, and its title carries the full name (PHASE8_PLAN.md Task 14).
+  const company = headerName(orgName, profile?.company_name, profile?.full_name)
+  const companyFull = headerFullName(orgName, profile?.company_name, profile?.full_name)
+  // The profile is the person's: its city and logo are the company they
+  // run, so they stand beside the name only when that company is the
+  // workspace shown. In a company someone else owns, its initials.
+  const ownCompany = profileCompanyIsWorkspace({
+    orgName,
+    companyName: profile?.company_name,
+    ownsWorkspace: isOwner,
+    workspacesOwned: memberships.filter((m) => m.role === 'owner').length
+  })
+  const city = ownCompany ? cityLine(profile?.company_address) : null
+  const logoUrl = ownCompany ? profile?.logo_url : null
   const person = profile?.full_name?.trim() || user?.email || ''
 
   const primary = sidebarPrimary(engineEnabled).filter((it) => canSee(it.to))
@@ -114,9 +132,9 @@ export default function DesktopSidebar() {
   return (
     <aside className="fh-desktop-sidebar fhs-side fh-onyx-scope fh-grain" aria-label="Primary navigation">
       <div className="fhs-side__brand">
-        <Monogram name={company} logoUrl={profile?.logo_url} size={40} />
+        <Monogram name={company} logoUrl={logoUrl} size={40} />
         <div className="fhs-side__brand-text">
-          <span className="fhs-side__company">{company}</span>
+          <span className="fhs-side__company" title={companyFull}>{company}</span>
           {city && <span className="fhs-side__city">{city}</span>}
         </div>
       </div>

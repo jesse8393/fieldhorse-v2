@@ -6,9 +6,11 @@ import { cx } from './cx.ts'
 // photo with a hairline edge, radius 18, and the raised shadow. Text sits
 // in linen on --fh-scrim at the bottom, with an optional action such as a
 // "Navigate" pill. The photo box is reserved with aspect-ratio and loads
-// lazily. With no photo, or one that fails to load, the same tray holds a
-// compact onyx band about 96 px tall (decision D32): the eyebrow and the
-// title on the left, the action on the right, and no empty image box.
+// lazily; text taller than that box, as in a narrow column, grows the box
+// instead of being cut off at the top. With no photo, or one that fails
+// to load, the same tray holds a compact onyx band about 96 px tall
+// (decision D32): the eyebrow and the title on the left, the action on
+// the right, and no empty image box.
 
 type PhotoCardOwnProps = {
   /** Small line above the title, such as "Next stop, 7:30 am". */

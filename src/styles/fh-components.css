@@ -1021,7 +1021,16 @@
 .fhc-photo__frame {
   position: relative;
   isolation: isolate;
+  /* The text sits in flow at the foot of the frame. A frame that clips
+     without scrolling keeps its aspect ratio as a floor, so text taller
+     than the photo box (two line eyebrow and title in a narrow column,
+     Today's next stop at 1100 px) grows the box instead of losing its top
+     line. Browsers without overflow: clip keep hidden. */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
   overflow: hidden;
+  overflow: clip;
   border-radius: 12px;
   background: var(--fh-stage);
 }
@@ -1043,10 +1052,7 @@
 }
 
 .fhc-photo__overlay {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
+  position: relative;
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
@@ -1064,7 +1070,6 @@
 }
 
 .fhc-photo--empty .fhc-photo__overlay {
-  position: relative;
   align-items: center;
   min-height: 84px;
   padding: 12px 16px;

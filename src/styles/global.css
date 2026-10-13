@@ -2386,6 +2386,19 @@ a {
 .fhs-side__capture .fhc-keycap { margin-right: 1px; }
 .fhs-side__capture-label { flex: 1; }
 
+/* Desktop sidebar company name (Task 14): the short name the phone header
+   shows wraps to a second line before it is cut, and only then ends in an
+   ellipsis; its title holds the full name. fh-shell.css keeps it to one
+   line and loads after this file, so the rule names both classes. */
+.fhs-side__brand-text .fhs-side__company {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+  overflow: hidden;
+  overflow-wrap: break-word;
+}
+
 /* Single-column mobile screens that don't have a dedicated desktop
    composition (Activity feed, Importer) shouldn't stretch their content
    edge-to-edge across the 1600px desktop canvas — cap to a readable,
