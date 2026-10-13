@@ -29,6 +29,7 @@ async function loadPdf(): Promise<any> {
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { mintPublicLink } from '../lib/publicLink.ts'
 import { hapticTap } from '../lib/haptics.ts'
+import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { Eyebrow, StampNumber } from '../components/v3'
 // Lazy, only loads when an operator taps "Mark Paid" (avoids ~440KB
@@ -156,6 +157,10 @@ export default function InvoiceDetail() {
   // miss vs relying on the toast alone.
   const [sent, setSent] = useState(false)
   const [sharing, setSharing] = useState(false)
+  // On a phone the three quiet actions are icon buttons that keep their
+  // names, so the row fits a 320 px phone and Collect Payment reads whole
+  // on one line (D48). A desktop keeps the labels.
+  const quietIconsOnly = !useIsDesktop()
 
   // Resolved client info, prefer the denormalized job-row fields, fall
   // back to fh_clients (the source of truth when edits happen on the
@@ -879,10 +884,11 @@ export default function InvoiceDetail() {
             handleSendInvoice()
           }}
           disabled={sending}
+          aria-label={quietIconsOnly ? (sent ? 'Sent' : sending ? 'Sending…' : 'Email') : undefined}
+          title="Email the invoice"
           style={{
-            flex: 1,
+            ...(quietIconsOnly ? { flex: '0 0 48px', padding: 0 } : { flex: 1, padding: '12px 12px' }),
             minHeight: 48,
-            padding: '12px 12px',
             borderRadius: 10,
             background: sent
               ? 'linear-gradient(180deg, var(--v3-success-bright) 0%, var(--v3-success) 100%)'
@@ -903,18 +909,18 @@ export default function InvoiceDetail() {
             transition: 'background 200ms ease, border-color 200ms ease, color 200ms ease'
           }}
         >
-          {sent ? <CheckCircle2 size={14} aria-hidden="true" /> : <Send size={14} aria-hidden="true" />}
-          {sent ? 'Sent' : sending ? 'Sending…' : 'Email'}
+          {sent ? <CheckCircle2 size={quietIconsOnly ? 18 : 14} aria-hidden="true" /> : <Send size={quietIconsOnly ? 18 : 14} aria-hidden="true" />}
+          {!quietIconsOnly && (sent ? 'Sent' : sending ? 'Sending…' : 'Email')}
         </button>
         <button
           type="button"
           onClick={() => { hapticTap(); handleShare() }}
           disabled={sharing}
+          aria-label={quietIconsOnly ? (sharing ? 'Minting…' : 'Share link') : undefined}
           title="Mint a public share link the customer can open in any browser"
           style={{
-            flex: 1,
+            ...(quietIconsOnly ? { flex: '0 0 48px', padding: 0 } : { flex: 1, padding: '12px 12px' }),
             minHeight: 48,
-            padding: '12px 12px',
             borderRadius: 10,
             background: 'var(--v3-surface-2)',
             border: '1px solid var(--v3-border-strong)',
@@ -927,17 +933,18 @@ export default function InvoiceDetail() {
             touchAction: 'manipulation'
           }}
         >
-          <LinkIcon size={14} aria-hidden="true" />
-          {sharing ? 'Minting…' : 'Share link'}
+          <LinkIcon size={quietIconsOnly ? 18 : 14} aria-hidden="true" />
+          {!quietIconsOnly && (sharing ? 'Minting…' : 'Share link')}
         </button>
         <button
           type="button"
           onClick={() => { hapticTap(); handleGeneratePDF() }}
           disabled={generating}
+          aria-label={quietIconsOnly ? (generating ? 'Generating…' : 'Download') : undefined}
+          title="Download the invoice as a PDF"
           style={{
-            flex: 1,
+            ...(quietIconsOnly ? { flex: '0 0 48px', padding: 0 } : { flex: 1, padding: '12px 12px' }),
             minHeight: 48,
-            padding: '12px 12px',
             borderRadius: 10,
             background: 'var(--v3-surface-2)',
             border: '1px solid var(--v3-border-strong)',
@@ -950,8 +957,8 @@ export default function InvoiceDetail() {
             touchAction: 'manipulation'
           }}
         >
-          <FileDown size={14} aria-hidden="true" />
-          {generating ? 'Generating…' : 'Download'}
+          <FileDown size={quietIconsOnly ? 18 : 14} aria-hidden="true" />
+          {!quietIconsOnly && (generating ? 'Generating…' : 'Download')}
         </button>
         <button
           type="button"

@@ -42,6 +42,16 @@ Status is one of todo, done, blocked, skipped.
 | 3 | 17 CSS and test hygiene | done | this commit | Reviewed by two lenses, approved with no fix round; the lead added a test for the dead CSS finder and fixed the two gaps it found. Decision D47 |
 | 3 | 18 Private line notes on the customer page | skipped | | The approval line in the plan reads no, so `netlify/functions/public-link.js` is unchanged |
 
+### Phase 8 follow ups
+
+Found after Task 17 by the final screenshots, a read only sweep a skeptic checked, and the Task 17 review. They are outside the plan's eighteen tasks; each is written test first and reviewed like a task. Status is one of todo, done, blocked.
+
+| Follow up | Status | Commit | Notes |
+| --- | --- | --- | --- |
+| A Nothing reads as empty while it loads or after a failed read, and counts agree with their number | todo | | |
+| B The customer page after approval, company short names, and the login edge | todo | | |
+| C The phone invoice actions fit | done | this commit | Found by the Task 17 review. Decision D48 |
+
 ### Phase 8 notes
 
 * **Task 1, the honest mock.** REST reads in `scripts/qa-mock.mjs` now honor eq, neq, in, gt, gte, lt, lte, is, order, limit and offset, several filters per column, and counts (the filtered total before limit and offset, with Content-Range exposed to the page). Unknown operators, `not.`, `or=`, `and=`, embedded columns with a dot and embedded ordering are still ignored. A single object read returns PostgREST's 406 when none or several rows match, unless the mock ignored part of the query. A date column compares with a time filter by the date as written. `QA_NOW` must be an ISO time with a zone, or loading the mock throws an error that names it. Writes keep the old rules.
@@ -131,6 +141,8 @@ Status is one of todo, done, blocked, skipped.
   * `scripts/find-dead-css.mjs` reads every CSS file under src, counts netlify and the HTML files as use and test files as not, protects names built from a variable only inside class contexts, and lists rules a variable could build as unknown, never dead. It reports nothing left. At integration the lead added `src/lib/findDeadCss.test.ts`, which runs the script on a small fixture, and fixed two gaps the review found: a prop such as `overlayClassName` now counts as a class context, and a block holding only `@page` or `@font-face` is no longer listed as empty. A stale comment about a removed client grid went too.
   * `login.spec.ts` checks the onyx shell (scope, background, text color and grain) instead of the removed effect markup. The overflow check from `mid-width.spec.ts` is now `tests/e2e/helpers/overflow.ts`, used by `mid-width`, `redesign-shell`, `desktop-route-audit`, `mock-workflows` and `portal`. It found no overflow on their pages, which closes the Task 14 gap above about checks that could not fail.
   * Known gaps, not changed: `scroll-behavior.spec.ts` still uses the page scroll width check; under Reduce Motion the dock coin still shrinks a little when pressed (the old rule meant to stop it named a class that no longer exists and went as dead).
+
+* **Follow up C, the phone invoice actions.** On a phone the invoice page's action row (Email, Share link, Download and the gold Collect Payment) was wider than the window, so Collect Payment was cut off at the right edge on every phone up to 412 px (Money's invoice rows open this page). Below 900 px the three quiet actions are now 48 px icon buttons that keep their names and a tooltip; Collect Payment reads whole on one line from 375 px up, and on a 320 px phone its two words stack inside the button. A desktop keeps the labels. New `tests/e2e/invoice-actions.spec.ts` checks 320, 375, 390 and 412 px with the shared overflow check, and that no word or icon is drawn outside its button. Only the two phone invoice shots in the screenshot guard changed, and only in the action row; both were retaken.
 
 * The first CI run on #223 (a docs only commit) failed `mock-workflows` "keeps the desktop schedule planning workflow complete" on desktop. The default mock visit starts two hours after the mock loads, so between 10 pm and midnight Central it lands on tomorrow and the Day view is empty. It failed here too at 10:48 pm Central and passed after the test pinned its page clock to a Thursday morning and seeded that day's visit. It is listed under "Failing before Phase 8".
 
