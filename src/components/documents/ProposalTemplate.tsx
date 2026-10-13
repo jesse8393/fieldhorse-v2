@@ -62,6 +62,7 @@ export default function ProposalTemplate({
   status = 'draft',
   showInternalNotes = false,
   photos = [],
+  payments = [],           // the job's payments, which the 'fieldhorse' theme reads as the customer page does
   portal = undefined       // the live customer link's extras, read by the 'fieldhorse' theme only
 }: any) {
   const issuedAt = meta.issuedAt || new Date()
@@ -141,6 +142,7 @@ export default function ProposalTemplate({
       photos,
       insurance,
       changeOrders,
+      payments,
       portal
     }
     return <ThemeComponent view={view} />

@@ -12,7 +12,7 @@ afterAll(() => {
   else process.env.TZ = originalTz
 })
 
-import { buildPortalView, depositNote, depositSentence, quoteFingerprint, type PublicDocPayload } from './portalView.ts'
+import { approvalNote, buildPortalView, depositNote, depositSentence, quoteFingerprint, type ApprovalNote, type PublicDocPayload } from './portalView.ts'
 
 const NOW = new Date(2026, 9, 10, 9, 0, 0)
 
@@ -485,5 +485,284 @@ describe('buildPortalView', () => {
     for (const text of generated) {
       expect(text, String(text)).not.toMatch(DASH)
     }
+  })
+})
+
+// Phase 8 follow up B: the customer page after approval, continued. The
+// headline says where the quote stands, What happens next leaves out what
+// the customer has already done, a job closed out after approval promises
+// nothing more, and the company is called by a name that stands alone.
+describe('the customer page after approval, continued', () => {
+  const LINK = { payment_link: 'venmo.com/u/parker' }
+  const PART = [{ id: 'p1', amount: 5000, kind: 'deposit', paid_on: '2026-10-08' }]
+  const DEPOSIT_IN = [{ id: 'p1', amount: 9229, kind: 'deposit', paid_on: '2026-10-09' }]
+  const NO_DEPOSIT = 'No deposit required. Net 30 after completion.'
+  const OPEN_STEPS = [
+    'You approve and pay the deposit.',
+    'Parker sends you a start date.',
+    'You pay 40% at material delivery and 10% at completion.'
+  ]
+  const OWED_STEPS = [
+    'You pay the deposit.',
+    'Parker sends you a start date.',
+    'You pay 40% at material delivery and 10% at completion.'
+  ]
+
+  type Case = {
+    state: string
+    payload: PublicDocPayload
+    headline: string
+    steps: string[]
+    jobFinished: boolean
+    /** The sentence under the total. */
+    note: string
+    /** What the Approved capsule says and offers; null when it does not show. */
+    capsule: ApprovalNote | null
+  }
+
+  // Each state the page can be in, with a payment link set, so the capsule
+  // shows what its button reads.
+  const CASES: Case[] = [
+    {
+      state: 'open',
+      payload: payload({}, {}, LINK),
+      headline: 'Hi Marco, your quote is ready.',
+      steps: OPEN_STEPS,
+      jobFinished: false,
+      note: 'Pay $9,229.00 now to reserve your start date.',
+      capsule: null
+    },
+    {
+      state: 'approved with nothing paid',
+      payload: payload({}, { proposal_status: 'approved' }, LINK),
+      headline: 'Hi Marco, your quote is approved.',
+      steps: OWED_STEPS,
+      jobFinished: false,
+      note: 'Pay $9,229.00 now to reserve your start date.',
+      capsule: { title: 'Thank you.', text: 'Parker Construction has your approval and will be in touch with next steps.', depositReceived: false, payLabel: 'Pay deposit $9,229.00' }
+    },
+    {
+      state: 'approved with part of the deposit paid',
+      payload: payload({ payments: PART }, { proposal_status: 'approved' }, LINK),
+      headline: 'Hi Marco, your quote is approved.',
+      steps: OWED_STEPS,
+      jobFinished: false,
+      note: '$5,000.00 paid so far. Pay the remaining $4,229.00 to reserve your start date.',
+      capsule: { title: 'Thank you.', text: 'Parker Construction has your approval and $5,000.00 toward the deposit, and will be in touch with next steps.', depositReceived: false, payLabel: 'Pay remaining deposit $4,229.00' }
+    },
+    {
+      state: 'approved with the deposit received',
+      payload: payload({ payments: DEPOSIT_IN }, { proposal_status: 'approved' }, LINK),
+      headline: 'Hi Marco, your quote is approved.',
+      steps: ['Parker sends you a start date.', 'You pay 40% at material delivery and 10% at completion.'],
+      jobFinished: false,
+      note: 'Deposit of $9,229.00 received.',
+      capsule: { title: 'Thank you.', text: 'Parker Construction has your approval and your $9,229.00 deposit, and will be in touch with your start date.', depositReceived: true, payLabel: null }
+    },
+    {
+      state: 'approved with no deposit due',
+      payload: payload({}, { proposal_status: 'approved', terms_text: NO_DEPOSIT }, LINK),
+      headline: 'Hi Marco, your quote is approved.',
+      steps: ['Parker sends you a start date.', 'You pay as the payment terms say.'],
+      jobFinished: false,
+      note: 'No deposit is due. Payment follows the terms below.',
+      capsule: { title: 'Thank you.', text: 'Parker Construction has your approval and will be in touch with next steps.', depositReceived: false, payLabel: 'Make a payment' }
+    },
+    {
+      state: 'waiting on changes requested',
+      payload: payload({}, { proposal_status: 'changes_requested' }, LINK),
+      headline: 'Hi Marco, here is your quote.',
+      steps: ['Parker sends you a revised proposal.', ...OPEN_STEPS],
+      jobFinished: false,
+      note: 'Nothing is due while you wait for a revised proposal.',
+      capsule: null
+    },
+    {
+      state: 'expired',
+      payload: payload({}, { quote_expires_at: '2026-10-06T04:59:59.999Z' }, LINK),
+      headline: 'Hi Marco, here is your quote.',
+      steps: [],
+      jobFinished: false,
+      note: '',
+      capsule: null
+    },
+    {
+      state: 'closed',
+      payload: payload({}, { stage: 'lost' }, LINK),
+      headline: 'Hi Marco, here is your quote.',
+      steps: [],
+      jobFinished: false,
+      note: '',
+      capsule: null
+    },
+    {
+      state: 'approved and closed',
+      payload: payload({}, { proposal_status: 'approved', stage: 'closed' }, LINK),
+      headline: 'Hi Marco, your quote is approved.',
+      steps: [],
+      jobFinished: true,
+      note: '',
+      capsule: { title: 'Thank you.', text: 'Parker Construction has your approval.', depositReceived: false, payLabel: 'Make a payment' }
+    },
+    {
+      // Not a finished job: Jesse decides what a lost job that was
+      // approved should say, so it reads as any approved quote does.
+      state: 'approved and lost',
+      payload: payload({}, { proposal_status: 'approved', stage: 'lost' }, LINK),
+      headline: 'Hi Marco, your quote is approved.',
+      steps: OWED_STEPS,
+      jobFinished: false,
+      note: 'Pay $9,229.00 now to reserve your start date.',
+      capsule: { title: 'Thank you.', text: 'Parker Construction has your approval and will be in touch with next steps.', depositReceived: false, payLabel: 'Pay deposit $9,229.00' }
+    }
+  ]
+
+  for (const c of CASES) {
+    it(`reads right when the quote is ${c.state}`, () => {
+      const v = buildPortalView(c.payload, NOW)
+      expect(v.headline).toBe(c.headline)
+      expect(v.steps).toEqual(c.steps)
+      expect(v.jobFinished).toBe(c.jobFinished)
+      expect(depositNote(v)).toBe(c.note)
+      expect(approvalNote(v)).toEqual(c.capsule)
+      const capsule = approvalNote(v)
+      for (const text of [v.headline, ...v.steps, depositNote(v), capsule?.title, capsule?.text, capsule?.payLabel]) {
+        if (text) expect(text, text).not.toMatch(DASH)
+      }
+    })
+  }
+
+  it('greets a customer that is a company with Hi there in every headline', () => {
+    const customer = { name: 'MMC Properties' }
+    expect(buildPortalView(payload({}, customer), NOW).headline).toBe('Hi there, your quote is ready.')
+    expect(buildPortalView(payload({}, { ...customer, proposal_status: 'approved' }), NOW).headline).toBe('Hi there, your quote is approved.')
+    expect(buildPortalView(payload({}, { ...customer, proposal_status: 'approved', stage: 'closed' }), NOW).headline).toBe('Hi there, your quote is approved.')
+    expect(buildPortalView(payload({}, { ...customer, proposal_status: 'changes_requested' }), NOW).headline).toBe('Hi there, here is your quote.')
+    expect(buildPortalView(payload({}, { ...customer, proposal_status: 'expired' }), NOW).headline).toBe('Hi there, here is your quote.')
+    expect(buildPortalView(payload({}, { ...customer, stage: 'closed' }), NOW).headline).toBe('Hi there, here is your quote.')
+  })
+
+  it('keeps the ready headline on a quote that can still be approved, declined or already a job', () => {
+    expect(buildPortalView(payload({}, { proposal_status: 'rejected' }), NOW).headline).toBe('Hi Marco, your quote is ready.')
+    expect(buildPortalView(payload({}, { stage: 'job' }), NOW).headline).toBe('Hi Marco, your quote is ready.')
+  })
+
+  it('a finished job promises no start date and lists no steps whatever was paid, and offers a payment only until the deposit is in', () => {
+    const finished = { proposal_status: 'approved', stage: 'closed' }
+    // The deposit and the final payment: the whole $18,458.00.
+    const PAID_IN_FULL = [...DEPOSIT_IN, { id: 'p2', amount: 9229, kind: 'final', paid_on: '2026-10-12' }]
+    // The button that read "Pay deposit $X" or "Pay remaining deposit $X"
+    // reads "Make a payment" instead; once the deposit is in, no button
+    // shows, as D44 has it before the job is closed out.
+    for (const [label, payments, terms, payLabel, received] of [
+      ['nothing paid', [], '', 'Make a payment', false],
+      ['part paid', PART, '', 'Make a payment', false],
+      ['deposit received', DEPOSIT_IN, '', null, true],
+      ['paid in full', PAID_IN_FULL, '', null, true],
+      ['no deposit due', [], NO_DEPOSIT, 'Make a payment', false]
+    ] as const) {
+      const v = buildPortalView(payload({ payments: [...payments] }, { ...finished, terms_text: terms }, LINK), NOW)
+      expect(v.jobFinished, label).toBe(true)
+      expect(v.closed, label).toBe(false)
+      expect(v.steps, label).toEqual([])
+      expect(depositNote(v), label).toBe('')
+      const capsule = approvalNote(v)
+      expect(capsule?.text, label).toBe('Parker Construction has your approval.')
+      expect(capsule?.payLabel, label).toBe(payLabel)
+      expect(capsule?.depositReceived, label).toBe(received)
+      for (const text of [depositNote(v), capsule?.text ?? '', ...v.steps]) expect(text, label).not.toMatch(/start date|next steps/)
+    }
+    // No payment link, no button.
+    const noLink = buildPortalView(payload({}, finished), NOW)
+    expect(approvalNote(noLink)?.payLabel).toBeNull()
+    expect(approvalNote(noLink)?.text).toBe('Parker Construction has your approval.')
+  })
+
+  // A job on terms with no deposit has no deposit to be received, so its
+  // button read "Make a payment" whatever was paid. Paying the contract in
+  // full is what closes such a job (logPayment in stages.ts), so a finished
+  // job paid in full asked a customer who owes nothing for a payment
+  // (Phase 8 follow up B, second review).
+  it('a finished job asks for no payment once it is paid in full, whatever its terms', () => {
+    const finished = { proposal_status: 'approved', stage: 'closed' }
+    const PER_TERMS = '50% down at rough in, 50% at completion.'
+    // $18,458.00 is the total.
+    const FULL = [{ id: 'p1', amount: 18458, kind: 'final', paid_on: '2026-10-12' }]
+    const TWO_PARTS = [{ id: 'p1', amount: 9229, kind: 'progress', paid_on: '2026-10-08' }, { id: 'p2', amount: 9229, kind: 'final', paid_on: '2026-10-12' }]
+    const MORE = [{ id: 'p1', amount: 18500, kind: 'final', paid_on: '2026-10-12' }]
+    const CENT_SHORT = [{ id: 'p1', amount: 18457.99, kind: 'final', paid_on: '2026-10-12' }]
+    for (const [label, terms, payments, payLabel] of [
+      ['no deposit, paid in full', NO_DEPOSIT, FULL, null],
+      ['no deposit, paid in full in two payments', NO_DEPOSIT, TWO_PARTS, null],
+      ['no deposit, paid more than the total', NO_DEPOSIT, MORE, null],
+      ['no deposit, a cent short', NO_DEPOSIT, CENT_SHORT, 'Make a payment'],
+      ['no deposit, part paid', NO_DEPOSIT, PART, 'Make a payment'],
+      ['no deposit, nothing paid', NO_DEPOSIT, [], 'Make a payment'],
+      ['terms that name no deposit, paid in full', PER_TERMS, FULL, null],
+      ['terms that name no deposit, part paid', PER_TERMS, PART, 'Make a payment']
+    ] as const) {
+      const v = buildPortalView(payload({ payments: [...payments] }, { ...finished, terms_text: terms }, LINK), NOW)
+      expect(v.jobFinished, label).toBe(true)
+      const capsule = approvalNote(v)
+      expect(capsule?.payLabel, label).toBe(payLabel)
+      expect(capsule?.text, label).toBe('Parker Construction has your approval.')
+      // No deposit is named, so no chip says one was received.
+      expect(capsule?.depositReceived, label).toBe(false)
+    }
+  })
+
+  it('a job closed before approval is closed, not finished', () => {
+    const v = buildPortalView(payload({}, { stage: 'closed', proposal_status: 'sent' }, LINK), NOW)
+    expect(v.closed).toBe(true)
+    expect(v.jobFinished).toBe(false)
+    expect(approvalNote(v)).toBeNull()
+  })
+
+  it('stamps the capsule with who approved and when, when the payload has it', () => {
+    const stamped = (contact: Record<string, unknown>) =>
+      approvalNote(buildPortalView(payload({}, { proposal_status: 'approved', ...contact }), NOW))?.title
+    expect(stamped({ approved_by_name: 'Marco Castellanos', approved_at: '2026-10-09T15:30:00Z' })).toBe('Approved by Marco Castellanos on October 9.')
+    expect(stamped({ approved_by_name: 'Marco Castellanos' })).toBe('Approved by Marco Castellanos.')
+    expect(stamped({ approved_at: '2026-10-09T15:30:00Z' })).toBe('Approved on October 9.')
+    expect(stamped({})).toBe('Thank you.')
+    // The same on a finished job.
+    expect(stamped({ stage: 'closed', approved_by_name: 'Marco Castellanos', approved_at: '2026-10-09T15:30:00Z' })).toBe('Approved by Marco Castellanos on October 9.')
+  })
+
+  it('offers no pay button without a safe payment link, in any approved state', () => {
+    for (const contact of [{}, { stage: 'closed' }, { terms_text: NO_DEPOSIT }]) {
+      const v = buildPortalView(payload({}, { proposal_status: 'approved', ...contact }), NOW)
+      expect(approvalNote(v)?.payLabel, JSON.stringify(contact)).toBeNull()
+    }
+    const unsafe = buildPortalView(payload({}, { proposal_status: 'approved' }, { payment_link: 'javascript:alert(1)' }), NOW)
+    expect(approvalNote(unsafe)?.payLabel).toBeNull()
+  })
+
+  it('names the company by a name that stands alone in every step, in every state', () => {
+    const named = (name: string | null, cases = CASES) => cases.map((c) => {
+      const p = { ...c.payload, company: { ...c.payload.company, name } }
+      return { state: c.state, steps: buildPortalView(p, NOW).steps }
+    })
+    for (const [name, short] of [
+      ['The Concrete Guys', 'The Concrete Guys'],
+      ['Smith & Sons Paving', 'Smith & Sons Paving'],
+      ['Parker Construction', 'Parker'],
+      [null, 'Your contractor']
+    ] as const) {
+      for (const { state, steps } of named(name)) {
+        for (const step of steps.filter((s) => / sends you /.test(s))) {
+          expect(step, `${name} ${state}`).toMatch(new RegExp(`^${short.replace(/[&+]/g, '\\$&')} sends you (a start date|a revised proposal)\\.$`))
+        }
+      }
+    }
+    // The revised proposal and the start date, by the whole name.
+    const asked = buildPortalView(payload({}, { proposal_status: 'changes_requested' }, { name: 'The Concrete Guys' }), NOW)
+    expect(asked.steps.slice(0, 3)).toEqual([
+      'The Concrete Guys sends you a revised proposal.',
+      'You approve and pay the deposit.',
+      'The Concrete Guys sends you a start date.'
+    ])
+    const received = buildPortalView(payload({ payments: DEPOSIT_IN }, { proposal_status: 'approved' }, { name: 'Smith & Sons Paving' }), NOW)
+    expect(received.steps[0]).toBe('Smith & Sons Paving sends you a start date.')
   })
 })

@@ -503,9 +503,42 @@
   color: color-mix(in srgb, var(--fh-danger) 50%, var(--fh-linen));
 }
 
+/* One column, as wide as the capsule and never wider. An fh Button holds
+   its label on one line, so in a column sized to its content the widest
+   label set every button's width: a long company name ("Ask Smith & Sons
+   Paving Company a question first", "Call The Roof Doctor of Middle
+   Tennessee") or a six figure deposit pushed the gold button past the
+   capsule and off a phone. */
 .fhp-actions {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
+}
+
+/* A label longer than the capsule is wide wraps onto a second line inside
+   its button, centered, instead of running past it or losing its end. The
+   button grows to hold it and keeps its height when one line will do. */
+.fhp .fhp-actions .fhc-btn {
+  height: auto;
+  white-space: normal;
+}
+
+.fhp .fhp-actions .fhc-btn--lg {
+  min-height: 56px;
+  padding-top: 16px;
+  padding-bottom: 16px;
+}
+
+.fhp .fhp-actions .fhc-btn--md {
+  min-height: 48px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.fhp .fhp-actions .fhc-btn__text {
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
 }
 
 /* Until the name and the authority box are filled in, the approve button

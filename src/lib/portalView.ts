@@ -5,7 +5,8 @@
 // what the Fieldhorse proposal theme draws: who it is from, the headline,
 // the quote number and dates, the total and deposit, the included and
 // optional lines, the three steps, whether it is already approved, expired
-// or closed, what has been paid, and where "Pay deposit" goes.
+// or closed, whether the job it was approved for is finished, what has
+// been paid, and where "Pay deposit" goes.
 //
 // Money is returned as plain numbers; the screen prints cents. Every
 // sentence this module writes itself avoids dashes of any kind. Names,
@@ -32,10 +33,8 @@ import { proposalNumber } from '../components/documents/numbers.ts'
 import { parseDateOnly } from './dates.ts'
 import { moneyCents } from './format.ts'
 import { safePayUrl } from './payLink.ts'
-import { companyFirstWord, lineAmount, quoteMoney, type QuoteDeposit } from './quoteMoney.ts'
+import { companyShortName, lineAmount, quoteMoney, stepsAfterApproval, type QuoteDeposit } from './quoteMoney.ts'
 import { personFirstName } from './quoteView.ts'
-
-export { companyFirstWord } from './quoteMoney.ts'
 
 /* ---- The /api/public-link payload, from the fields PublicDoc reads ---- */
 
@@ -161,6 +160,11 @@ export type PortalView = {
   logoUrl: string | null
   coverUrl: string | null
   trustLine: string | null
+  /**
+   * "Hi Marco, your quote is ready." while it can be approved, "your quote
+   * is approved." once it is, and "here is your quote." while it waits on
+   * a revised proposal, after it expired and once it closed.
+   */
   headline: string
   addressLine: string
   /** "PC-2026-RTAL", the number the letter themes and the PDF print; null without a job id. */
@@ -182,6 +186,13 @@ export type PortalView = {
    * request changes endpoint too (410).
    */
   closed: boolean
+  /**
+   * The customer approved and the job is done: closeout moved its stage to
+   * closed and left the quote approved. The page then promises no start
+   * date and lists no next steps. An approved quote whose job was marked
+   * lost is not finished; it reads as any approved quote does.
+   */
+  jobFinished: boolean
   /** Approval is still possible: not approved, not changes requested, not expired, not closed. */
   open: boolean
   /** The customer asked for changes and the quote waits on a revised proposal. */
@@ -199,8 +210,10 @@ export type PortalView = {
   optional: PortalLine[]
   /**
    * What happens next; none once the quote has expired or closed, since
-   * approving is not a step. While it waits on a revised proposal, that
-   * proposal comes first and the open quote's steps follow it.
+   * approving is not a step, and none once the job is finished. While it
+   * waits on a revised proposal, that proposal comes first and the open
+   * quote's steps follow it. Once approved, the approve step goes, and a
+   * deposit still owed comes first.
    */
   steps: string[]
   approved: { name: string | null; date: string | null } | null
@@ -319,12 +332,13 @@ export function depositSentence(deposit: QuoteDeposit): string {
 
 /**
  * The sentence under the total once payments and the expiry are known:
- * nothing on an expired or closed quote, that nothing is due while the
- * customer waits on a revised proposal, the deposit received, what is
- * still owed of it after a partial payment, else the plain deposit sentence.
+ * nothing on an expired or closed quote or once the job is finished, that
+ * nothing is due while the customer waits on a revised proposal, the
+ * deposit received, what is still owed of it after a partial payment, else
+ * the plain deposit sentence.
  */
 export function depositNote(pv: PortalView): string {
-  if (pv.expired || pv.closed) return ''
+  if (pv.expired || pv.closed || pv.jobFinished) return ''
   if (pv.changesRequested) return 'Nothing is due while you wait for a revised proposal.'
   const due = (pv.deposit.kind === 'percent' || pv.deposit.kind === 'amount') && pv.deposit.amount > 0
   if (due && pv.paid.depositReceived) return `Deposit of ${moneyCents(pv.deposit.amount)} received.`
@@ -332,6 +346,62 @@ export function depositNote(pv: PortalView): string {
     return `${moneyCents(pv.paid.total)} paid so far. Pay the remaining ${moneyCents(pv.paid.depositRemaining)} to reserve your start date.`
   }
   return depositSentence(pv.deposit)
+}
+
+/** What the Approved capsule says and offers. */
+export type ApprovalNote = {
+  /** Who approved and when, as far as the payload says (D12), else "Thank you." */
+  title: string
+  /** The sentence under it. */
+  text: string
+  /** The deposit is in, so a Deposit received chip sits beside Approved. */
+  depositReceived: boolean
+  /** What the company payment link reads, or null when no button shows. */
+  payLabel: string | null
+}
+
+/**
+ * The Approved capsule, or null before approval. The payment link reads
+ * "Pay deposit $X" while the deposit the terms name is due, "Pay remaining
+ * deposit $X" after a partial payment, and "Make a payment" when the terms
+ * name none (D31); once the deposit is received no button shows (D44).
+ * Once the job is finished nothing is promised: the sentence is the
+ * approval alone, and while the deposit is not in, the payment link reads
+ * "Make a payment" with no amount where it asked for the deposit or what
+ * is left of it. Once the deposit is received there is no button, as D44
+ * has it, so closing out a paid job never starts asking for money; and on
+ * terms that name no deposit, none once the payments reach the total,
+ * since paying in full is what closes such a job (logPayment, stages.ts).
+ */
+export function approvalNote(pv: PortalView): ApprovalNote | null {
+  if (!pv.approved) return null
+  const { name, date } = pv.approved
+  const due = (pv.deposit.kind === 'percent' || pv.deposit.kind === 'amount') && pv.deposit.amount > 0
+  const received = due && pv.paid.depositReceived
+  const partial = due && !received && pv.paid.total > 0 && pv.paid.depositRemaining > 0
+  const title = name && date ? `Approved by ${name} on ${date}.`
+    : name ? `Approved by ${name}.`
+    : date ? `Approved on ${date}.`
+    : 'Thank you.'
+  if (pv.jobFinished) {
+    const paidInFull = pv.total > 0 && cents(pv.paid.total) >= cents(pv.total)
+    return {
+      title,
+      text: `${pv.companyName} has your approval.`,
+      depositReceived: received,
+      payLabel: pv.payUrl && !received && !paidInFull ? 'Make a payment' : null
+    }
+  }
+  const text = received
+    ? `${pv.companyName} has your approval and your ${moneyCents(pv.deposit.amount)} deposit, and will be in touch with your start date.`
+    : partial
+      ? `${pv.companyName} has your approval and ${moneyCents(pv.paid.total)} toward the deposit, and will be in touch with next steps.`
+      : `${pv.companyName} has your approval and will be in touch with next steps.`
+  const payLabel = !pv.payUrl || received ? null
+    : !due ? 'Make a payment'
+    : partial ? `Pay remaining deposit ${moneyCents(pv.paid.depositRemaining)}`
+    : `Pay deposit ${moneyCents(pv.deposit.amount)}`
+  return { title, text, depositReceived: received, payLabel }
 }
 
 // The lines in the order the quote editor shows them.
@@ -458,8 +528,19 @@ export function buildPortalView(payload: PublicDocPayload, now: Date): PortalVie
   // takes no question, though the approve endpoint still accepts those.
   const stage = text(contact.stage).toLowerCase()
   const closed = !isApproved && CLOSED_STAGES.has(stage)
+  // Closeout moves an approved job to closed and leaves the quote approved.
+  // An approved quote whose job was marked lost is not a finished job; what
+  // it should say is Jesse's call, so it reads as any approved quote does.
+  const jobFinished = isApproved && stage === 'closed'
   const open = !decided && !expired && !closed
   const canAsk = open && status !== 'rejected' && !NO_QUESTION_STAGES.has(stage)
+
+  const paid = paidFor(payload.payments, deposit)
+  const depositOwed = (deposit.kind === 'percent' || deposit.kind === 'amount') && deposit.amount > 0 && !paid.depositReceived
+  const greeting = `Hi ${firstName || 'there'}`
+  const headline = isApproved ? `${greeting}, your quote is approved.`
+    : open ? `${greeting}, your quote is ready.`
+    : `${greeting}, here is your quote.`
 
   const cover = coverPhoto(payload.photos)
 
@@ -470,26 +551,30 @@ export function buildPortalView(payload: PublicDocPayload, now: Date): PortalVie
     logoUrl: text(company.logo_url) || null,
     coverUrl: cover ? text(cover.url) : null,
     trustLine: trustLineFor(company),
-    headline: `Hi ${firstName || 'there'}, your quote is ready.`,
+    headline,
     addressLine,
     quoteNumber,
     issuedOn: pageDate(issuedIso, now),
     validUntil: pageDate(contact.quote_expires_at, now),
     expired,
     closed,
+    jobFinished,
     open,
     changesRequested,
     canAsk,
     total,
     deposit,
-    paid: paidFor(payload.payments, deposit),
+    paid,
     included,
     optional,
-    // Approving is not a next step once the quote has expired or closed.
-    // A request waits on a revised proposal first; after it come the open
-    // quote's own steps, so the deposit and the balance stay named.
-    steps: expired || closed ? []
-      : changesRequested ? [`${companyFirstWord(company.name)} sends you a revised proposal.`, ...steps]
+    // Approving is not a next step once the quote has expired or closed,
+    // and nothing is next once the job is finished. A request waits on a
+    // revised proposal first; after it come the open quote's own steps, so
+    // the deposit and the balance stay named. Once approved, approving is
+    // done, and a deposit still owed comes first.
+    steps: expired || closed || jobFinished ? []
+      : changesRequested ? [`${companyShortName(company.name)} sends you a revised proposal.`, ...steps]
+      : isApproved ? stepsAfterApproval(steps, depositOwed)
       : steps,
     approved,
     payUrl: safePayUrl(company.payment_link) || null

@@ -12,9 +12,11 @@
 
 const TRAILING_SUFFIX = /[\s,]+(company|co\.?|llc\.?)$/i
 // The legal word finishes the name: it follows a joining word, or an
-// article or a word like "My" opens the phrase it ends.
-const JOINS_WHAT_FOLLOWS = /(^|\s)(&|\+|and)$/i
-const OPENS_A_PHRASE = /^(the|a|an|my|our|your)(\s|$)/i
+// article or a word like "My" opens the phrase it ends. companyShortName
+// (quoteMoney.ts) reads the same two lists to tell when a company's first
+// word cannot stand for the whole name.
+export const JOINS_WHAT_FOLLOWS = /(^|\s)(&|\+|and)$/i
+export const OPENS_A_PHRASE = /^(the|a|an|my|our|your)(\s|$)/i
 
 // The name without its legal word, to tell whether two spellings name
 // the same company ("Smith & Co." and "Smith & Company").

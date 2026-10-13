@@ -26,6 +26,7 @@
 // Every sentence this module writes avoids dashes of any kind.
 
 import { DEFAULT_PAYMENT_SCHEDULE } from '../components/documents/PaymentTermsBlock.tsx'
+import { JOINS_WHAT_FOLLOWS, OPENS_A_PHRASE } from './headerName.ts'
 import { splitByPercents } from './paymentSchedule.ts'
 
 /** The fields of a quote line this reads (fh_quote_items, or a payload item). */
@@ -85,9 +86,29 @@ export function lineAmount(item: MoneyItem): number {
   return Number.isFinite(raw) ? raw : 0
 }
 
-/** "Parker Construction" gives "Parker"; no name gives "Your contractor". */
-export function companyFirstWord(companyName: string | null | undefined): string {
-  return String(companyName ?? '').trim().split(/\s+/)[0] || 'Your contractor'
+// A first word that ends in a comma or a period: the name goes on past it
+// ("Parker, Inc.") or the word is an abbreviation ("Mr. Handyman", "St.
+// Louis Paving", "J.R. Concrete").
+const ENDS_IN_PUNCTUATION = /[.,]$/
+
+/**
+ * The name a sentence calls the company by: its first word, so "Parker
+ * Construction" gives "Parker", unless that word cannot stand for the
+ * company on its own. Then it is the whole name: when the first word is
+ * The, A, An, My, Our or Your ("The Concrete Guys", "My Company"), when
+ * the next word joins it to more of the name with &, + or and ("Smith &
+ * Sons Paving"), or when the first word ends in a comma or a period
+ * ("Parker, Inc.", "Mr. Handyman of Nashville"). The first two are the
+ * word lists headerName.ts reads to tell when a company name cannot be cut
+ * short. No name gives the fallback: "Your contractor" to open a sentence,
+ * or what the sentence asks for ("the contractor").
+ */
+export function companyShortName(companyName: string | null | undefined, fallback = 'Your contractor'): string {
+  const name = String(companyName ?? '').trim()
+  if (!name) return fallback
+  const [first, next = ''] = name.split(/\s+/)
+  if (OPENS_A_PHRASE.test(name) || JOINS_WHAT_FOLLOWS.test(`${first} ${next}`) || ENDS_IN_PUNCTUATION.test(first)) return name
+  return first
 }
 
 /* ---- Reading the deposit from the payment terms ---- */
@@ -146,7 +167,7 @@ function readDeposit(termsText: string | null | undefined): DepositTerm {
 const WALKTHROUGH = /\bwalk[\s-]*through\b/i
 
 function stepsFor(deposit: QuoteDeposit, term: DepositTerm, termsText: string, companyName: string | null | undefined): string[] {
-  const start = `${companyFirstWord(companyName)} sends you a start date.`
+  const start = `${companyShortName(companyName)} sends you a start date.`
   const due = (deposit.kind === 'percent' || deposit.kind === 'amount') && deposit.amount > 0
   if (!due) return ['You approve the quote.', start, 'You pay as the payment terms say.']
 
@@ -159,6 +180,18 @@ function stepsFor(deposit: QuoteDeposit, term: DepositTerm, termsText: string, c
     rest = `You pay ${second.pct}% at material delivery and ${third.pct}% at completion.`
   }
   return ['You approve and pay the deposit.', start, rest]
+}
+
+/**
+ * What happens next once the customer has approved, from the open quote's
+ * steps above, whose first step is always the approval. That step is done,
+ * so it goes. While the deposit is still owed, nothing or only part of it
+ * paid, paying it comes first. The start date and the balance read as
+ * they did before the approval.
+ */
+export function stepsAfterApproval(steps: string[], depositOwed: boolean): string[] {
+  const rest = steps.slice(1)
+  return depositOwed ? ['You pay the deposit.', ...rest] : rest
 }
 
 export function quoteMoney({ items, changeOrders, contactAmount, termsText, companyName }: QuoteMoneyInput): QuoteMoney {

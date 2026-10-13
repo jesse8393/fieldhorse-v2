@@ -20,6 +20,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import { Button, Chip, Field, formatMoney } from '../fh'
 import { DOC_COLORS } from '../documents/tokens.ts'
+import { companyShortName } from '../../lib/quoteMoney.ts'
 import { personFirstName } from '../../lib/quoteView.ts'
 import '../documents/fieldhorse-proposal.css'
 
@@ -503,7 +504,9 @@ function swallowReturn(e: KeyboardEvent<HTMLFormElement>) {
 function FieldhorseCapsule(p: CapsuleProps) {
   const company = p.companyName?.trim() || ''
   const who = company || 'the contractor'
-  const askName = company ? company.split(/\s+/)[0] : 'the contractor'
+  // "Ask Parker a question first", but "Ask The Concrete Guys" in full: the
+  // short name the page's steps use (quoteMoney.ts).
+  const askName = companyShortName(company, 'the contractor')
   // Each form has its own key, so switching between asking and approving
   // mounts a new form instead of reusing the old one's elements. Reused,
   // the Back button just tapped (type button) became Approve (type submit)

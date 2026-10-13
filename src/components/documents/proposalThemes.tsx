@@ -36,7 +36,7 @@ import ChangeOrdersBlock from './ChangeOrdersBlock.tsx'
 import { Button, Chip, Icon, OnyxStage, Row, formatMoney } from '../fh'
 import Monogram from '../fh/Monogram.tsx'
 import { cx } from '../fh/cx.ts'
-import { buildPortalView, depositNote, type PortalView, type PublicDocPayload } from '../../lib/portalView.ts'
+import { approvalNote, buildPortalView, depositNote, type PortalView, type PublicDocPayload, type PublicDocPayment } from '../../lib/portalView.ts'
 import './fieldhorse-proposal.css'
 
 export type ProposalLineItem = {
@@ -70,6 +70,12 @@ export type ProposalView = {
   photos?: any[]
   insurance?: any
   changeOrders?: any[]
+  /**
+   * The job's payments, for the in app preview, so the Fieldhorse theme
+   * says what the customer page says once a deposit is in. The live link
+   * reads them from its payload instead.
+   */
+  payments?: PublicDocPayment[]
   /** Only the live customer link passes this; see FieldhorseProposal. */
   portal?: ProposalPortal
 }
@@ -607,25 +613,34 @@ export { fmtLongDate }
    "Deposit received" once the payments reach it), and an expired or
    closed note with the call link once the valid until date has passed
    or the contractor closed the quote (the steps go with it, since
-   approving is no longer one). The total,
+   approving is no longer one). Once a job approved here is closed
+   out, the page promises nothing more: no steps, no deposit sentence
+   and the approval alone in the capsule. The total,
    the deposit sentence and the steps come from quoteMoney through
    the portal view (D31), as the Quote tab capsule's do.
    ============================================================ */
 
 // The in app preview (Quote tab) has no payload; rebuild the little the
-// view model reads from the shared view, so one code path draws both.
+// view model reads from the shared view, so one code path draws both. The
+// payments are the job's, which the preview loads (DocumentPreviewPane),
+// so what is paid reads the same in the preview and on the link.
 function payloadFromView(view: ProposalView): PublicDocPayload {
   const lines = (view.lineItems || []).map((it, i) => ({ ...it, sort_order: i }))
   const extras = (view.upgrades || []).flatMap((group) =>
     (group.items || []).map((it) => ({ ...it, section: group.title, is_optional: true, sort_order: lines.length }))
   )
+  // The letter themes stamp a quote waiting on a revised proposal as sent;
+  // this page reads it as the customer page does (D44), so it keeps the
+  // quote's own changes requested status.
+  const own = String((view.recipient as { proposal_status?: unknown } | undefined)?.proposal_status ?? '').toLowerCase()
   return {
     kind: 'proposal',
-    contact: { ...(view.recipient || {}), proposal_status: view.status ?? null },
+    contact: { ...(view.recipient || {}), proposal_status: own === 'changes_requested' ? own : view.status ?? null },
     company: view.company || {},
     items: [...lines, ...extras],
     photos: view.photos || [],
-    changeOrders: view.changeOrders || []
+    changeOrders: view.changeOrders || [],
+    payments: view.payments || []
   }
 }
 
@@ -736,37 +751,26 @@ function FullDetails({ id, view, coverUrl }: { id: string; view: ProposalView; c
 // remaining deposit" with what is left after a partial payment, and "Make
 // a payment" when the terms say there is none or name none, so the page
 // never asks for a deposit the terms do not state. Once the payments reach
-// the deposit the button goes and "Deposit received" takes its place.
+// the deposit the button goes and "Deposit received" takes its place. Once
+// the job is finished the capsule promises nothing: the approval alone,
+// and "Make a payment" in place of a deposit button while the deposit is
+// not in. portalView.ts writes the words (approvalNote).
 function ApprovedCapsule({ pv }: { pv: PortalView }) {
-  const { name, date } = pv.approved || { name: null, date: null }
-  const depositDue = (pv.deposit.kind === 'percent' || pv.deposit.kind === 'amount') && pv.deposit.amount > 0
-  const received = depositDue && pv.paid.depositReceived
-  const partial = depositDue && !received && pv.paid.total > 0 && pv.paid.depositRemaining > 0
-  const stamp = name && date ? `Approved by ${name} on ${date}.`
-    : name ? `Approved by ${name}.`
-    : date ? `Approved on ${date}.`
-    : 'Thank you.'
-  const text = received
-    ? `${pv.companyName} has your approval and your ${formatMoney(pv.deposit.amount)} deposit, and will be in touch with your start date.`
-    : partial
-      ? `${pv.companyName} has your approval and ${formatMoney(pv.paid.total)} toward the deposit, and will be in touch with next steps.`
-      : `${pv.companyName} has your approval and will be in touch with next steps.`
-  const payLabel = !depositDue ? 'Make a payment'
-    : partial ? `Pay remaining deposit ${formatMoney(pv.paid.depositRemaining)}`
-    : `Pay deposit ${formatMoney(pv.deposit.amount)}`
+  const note = approvalNote(pv)
+  if (!note) return null
   return (
     <div className="fhp-dock">
       <section className="fhp-capsule fh-onyx-scope fh-grain" aria-label="Approval">
         <div className="fhp-capsule__chips">
           <Chip label="Approved" tone="success" dot />
-          {received && <Chip label="Deposit received" tone="success" dot />}
+          {note.depositReceived && <Chip label="Deposit received" tone="success" dot />}
         </div>
-        <h2 className="fhp-capsule__title">{stamp}</h2>
-        <p className="fhp-capsule__text">{text}</p>
-        {pv.payUrl && !received && (
+        <h2 className="fhp-capsule__title">{note.title}</h2>
+        <p className="fhp-capsule__text">{note.text}</p>
+        {pv.payUrl && note.payLabel && (
           <div className="fhp-actions">
             <Button variant="primary" size="lg" block href={pv.payUrl} target="_blank" rel="noopener noreferrer">
-              {payLabel}
+              {note.payLabel}
             </Button>
           </div>
         )}

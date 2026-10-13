@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { quoteMoney, type MoneyChangeOrder, type MoneyItem, type QuoteMoneyInput } from './quoteMoney.ts'
+import { companyShortName, quoteMoney, stepsAfterApproval, type MoneyChangeOrder, type MoneyItem, type QuoteMoneyInput } from './quoteMoney.ts'
 
 // One quote total and one deposit for the Quote tab capsule, the in app
 // preview and the customer page (PHASE8_PLAN.md Task 9, decision D31).
@@ -181,5 +181,104 @@ describe('quoteMoney steps', () => {
     for (const termsText of ['', '30% deposit, balance after the walk-through.', 'No deposit.', 'Net 30.']) {
       for (const step of money({ termsText }).steps) expect(step).not.toMatch(/[-‐-―−]/)
     }
+  })
+
+  // Phase 8 follow up B, bullet 4: "The Concrete Guys" printed "The sends
+  // you a start date.".
+  it('names the company in full when its first word cannot stand alone', () => {
+    expect(money({ companyName: 'The Concrete Guys' }).steps[1]).toBe('The Concrete Guys sends you a start date.')
+    expect(money({ companyName: 'Smith & Sons Paving' }).steps[1]).toBe('Smith & Sons Paving sends you a start date.')
+    expect(money({ companyName: 'Parker Construction' }).steps[1]).toBe('Parker sends you a start date.')
+  })
+})
+
+// The short name a sentence calls the company by (Phase 8 follow up B,
+// bullet 4): the customer page's steps and the question link on its
+// approve capsule share it.
+describe('companyShortName', () => {
+  it('is the first word when that word stands on its own', () => {
+    expect(companyShortName('Parker Construction')).toBe('Parker')
+    expect(companyShortName('Parker Construction Company')).toBe('Parker')
+    expect(companyShortName('Shyld')).toBe('Shyld')
+    expect(companyShortName('  Parker   Construction  ')).toBe('Parker')
+    // Words that only begin like an article or a joining word.
+    expect(companyShortName('Andersen Roofing')).toBe('Andersen')
+    expect(companyShortName('Theodore Builders')).toBe('Theodore')
+    expect(companyShortName('Smith Andrews Paving')).toBe('Smith')
+  })
+
+  it('is the whole name when the first word is The, A, An, My, Our or Your', () => {
+    for (const name of ['The Concrete Guys', 'the concrete guys', 'A Better Roof', 'An Honest Fence', 'My Company', 'Our Town Builders', 'Your Roof Pros']) {
+      expect(companyShortName(name), name).toBe(name)
+    }
+  })
+
+  it('is the whole name when the next word is &, + or and', () => {
+    for (const name of ['Smith & Sons Paving', 'Smith and Sons', 'Smith AND Sons', 'Smith + Jones']) {
+      expect(companyShortName(name), name).toBe(name)
+    }
+  })
+
+  // "Parker, Inc." printed "Parker, sends you a start date." and "Mr.
+  // Handyman of Nashville" printed "Ask Mr. a question first": a first
+  // word that ends in a comma or a period is a fragment, an abbreviation
+  // or a name that goes on.
+  it('is the whole name when the first word ends in a comma or a period', () => {
+    for (const name of ['Parker, Inc.', 'Smith, Jones & Co.', 'Mr. Handyman of Nashville', 'St. Louis Paving', 'J. Parker Construction', 'J.R. Concrete']) {
+      expect(companyShortName(name), name).toBe(name)
+    }
+    expect(money({ companyName: 'Parker, Inc.' }).steps[1]).toBe('Parker, Inc. sends you a start date.')
+    expect(companyShortName('Mr. Handyman of Nashville', 'the contractor')).toBe('Mr. Handyman of Nashville')
+    // Punctuation inside the first word, or later in the name, changes nothing.
+    expect(companyShortName("Parker's Paving")).toBe("Parker's")
+    expect(companyShortName('A1 Concrete, LLC')).toBe('A1')
+    expect(companyShortName('Parker Construction Co.')).toBe('Parker')
+  })
+
+  it('stands in with Your contractor, or the words a sentence asks for, when there is no name', () => {
+    expect(companyShortName(null)).toBe('Your contractor')
+    expect(companyShortName(undefined)).toBe('Your contractor')
+    expect(companyShortName('   ')).toBe('Your contractor')
+    expect(companyShortName('', 'the contractor')).toBe('the contractor')
+    expect(companyShortName('The Concrete Guys', 'the contractor')).toBe('The Concrete Guys')
+    expect(companyShortName('Parker Construction', 'the contractor')).toBe('Parker')
+  })
+})
+
+// What happens next once the customer has approved (Phase 8 follow up B,
+// bullet 2): the approve step is done, so it goes, and a deposit still owed
+// comes first.
+describe('stepsAfterApproval', () => {
+  it('asks for the deposit first while any of it is still owed', () => {
+    expect(stepsAfterApproval(money().steps, true)).toEqual([
+      'You pay the deposit.',
+      'Parker sends you a start date.',
+      'You pay 40% at material delivery and 10% at completion.'
+    ])
+    expect(stepsAfterApproval(money({ termsText: '30% deposit, balance after the walkthrough.' }).steps, true)).toEqual([
+      'You pay the deposit.',
+      'Parker sends you a start date.',
+      'You pay the balance after the walkthrough.'
+    ])
+  })
+
+  it('starts with the start date once the deposit is in', () => {
+    expect(stepsAfterApproval(money().steps, false)).toEqual([
+      'Parker sends you a start date.',
+      'You pay 40% at material delivery and 10% at completion.'
+    ])
+  })
+
+  it('starts with the start date when no deposit is due', () => {
+    for (const termsText of ['No deposit required.', '50% down at rough in, 50% at completion.']) {
+      expect(stepsAfterApproval(money({ termsText }).steps, false), termsText).toEqual([
+        'Parker sends you a start date.',
+        'You pay as the payment terms say.'
+      ])
+    }
+  })
+
+  it('keeps the company name the open steps use', () => {
+    expect(stepsAfterApproval(money({ companyName: 'The Concrete Guys' }).steps, false)[0]).toBe('The Concrete Guys sends you a start date.')
   })
 })
