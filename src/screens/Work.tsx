@@ -44,7 +44,8 @@ const Calendar = lazy(() => import('@/components/ui/calendar').then((m) => ({ de
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { supabase } from '../lib/supabase.ts'
-import { markWon, markLost, reopen } from '../lib/pipeline.ts'
+import { markWon, markLost, reopen, reopenQuestion } from '../lib/pipeline.ts'
+import { useConfirm } from '../components/ConfirmSheet.tsx'
 import { detailRoute, LIST_STAGE_META as STAGE_META } from '../lib/stages.ts'
 import { moneyK as money } from '../lib/format.ts'
 import { prefetchJobDetail } from './ContactDetail/hooks/useJobData.ts'
@@ -122,6 +123,7 @@ export default function Work() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const confirm = useConfirm() as (options: { title: string; body?: string; confirmLabel?: string }) => Promise<boolean>
   const { data: contacts = [], isLoading: loading, isError, error, refetch, isFetching } = useJobs()
   useJobsRealtime(user?.id, queryClient)
   // Role gate: the revenue stages (leads, quotes) and the sell actions
@@ -365,7 +367,12 @@ export default function Work() {
     run(c, markWon, null, "Couldn't mark won", () => navigate(`/jobs/${c.id}`))
   }, [run, navigate])
   const handleLost = useCallback((c: JobRow) => run(c, markLost, { stage: 'lost' } as Partial<JobRow>, "Couldn't mark lost"), [run])
-  const handleReopen = useCallback((c: JobRow) => run(c, reopen, { stage: c.stage === 'closed' ? 'job' : 'lead' } as Partial<JobRow>, "Couldn't reopen"), [run])
+  // Reopen asks first, like Mark lost on the job page: one tap used to move
+  // a closed or lost deal straight back (Phase 8, Task 15).
+  const handleReopen = useCallback(async (c: JobRow) => {
+    if (!(await confirm(reopenQuestion(c)))) return
+    await run(c, reopen, { stage: c.stage === 'closed' ? 'job' : 'lead' } as Partial<JobRow>, "Couldn't reopen")
+  }, [confirm, run])
   const handleFollowUp = useCallback((c: JobRow, when: number | Date | null) => setFollowUp(c, when), [setFollowUp])
 
   const { stagger, item } = useFhMotion()
@@ -414,7 +421,9 @@ export default function Work() {
           searchDegraded={searchDegraded}
           showMoney={showMoney}
           fieldView={!isMoneyRole}
-          onNewLead={openNewLead}
+          // Crew and foremen never sell, so they get no New lead (the
+          // same roles that see no Leads or Quotes tab).
+          onNewLead={isMoneyRole ? openNewLead : undefined}
         />
         {newLeadSheet}
       </>
@@ -643,6 +652,14 @@ const DealCard = memo(function DealCard({ contact: c, isNew, busy, canSell: mayM
   // Calendar popover for "Pick a date…", anchored to the ⋯ button so
   // it opens exactly where the menu just closed.
   const [dateOpen, setDateOpen] = useState(false)
+  // Reopen asks a question (Phase 8, Task 15). Asked from inside the menu,
+  // the question took focus and then the closing menu handed it back to
+  // the ⋯ button behind the question: a screen reader never read it, Tab
+  // walked the page and Enter opened the menu again over it. So the menu
+  // item only leaves the ask here, and it is asked once the menu has gone
+  // and focus is back on the ⋯ button, which is then where the question
+  // returns focus when it closes.
+  const askAfterMenuRef = useRef<(() => void) | null>(null)
   const meta = STAGE_META[c.stage || 'lead'] || STAGE_META.lead
   const follow = followUpMeta(c)
   const phone = c.phone || c.fh_clients?.phone || ''
@@ -784,7 +801,20 @@ const DealCard = memo(function DealCard({ contact: c, isNew, busy, canSell: mayM
             </button>
             </DropdownMenuTrigger>
           </PopoverAnchor>
-          <DropdownMenuContent side="bottom" align="end" sideOffset={6} collisionPadding={20}>
+          <DropdownMenuContent
+            side="bottom"
+            align="end"
+            sideOffset={6}
+            collisionPadding={20}
+            onCloseAutoFocus={() => {
+              const ask = askAfterMenuRef.current
+              if (!ask) return
+              askAfterMenuRef.current = null
+              // The menu puts focus back on its button right after this
+              // handler; ask once it has.
+              window.setTimeout(ask, 0)
+            }}
+          >
             {!isTerminal && (
               <>
                 <DropdownMenuItem onSelect={() => onFollowUp(c, 1)}>
@@ -824,7 +854,7 @@ const DealCard = memo(function DealCard({ contact: c, isNew, busy, canSell: mayM
               </>
             )}
             {canReopen && (
-              <DropdownMenuItem onSelect={() => onReopen(c)}>
+              <DropdownMenuItem onSelect={() => { askAfterMenuRef.current = () => onReopen(c) }}>
                 <RotateCcw size={13} /> Reopen
               </DropdownMenuItem>
             )}

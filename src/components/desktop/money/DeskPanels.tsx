@@ -8,6 +8,13 @@
 //   Job balances   contract minus payments per job, the aging summary and
 //                  the month's collection pace, a filter box, sortable
 //                  columns, Log payment and Export CSV
+//
+// As on the Money groups, the one button Action column is fixed (96 px,
+// 112 for Statement), and below 1100 px the Job and Properties columns
+// step aside and read under the customer's name (PHASE8_PLAN.md Task 14).
+// Job balances keeps every amount on one line: below 1100 px its Paid
+// column steps aside (Contract minus Balance, and the CSV keeps it) and
+// the age reads under the status chip.
 
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -21,9 +28,11 @@ import {
 import type { SortingState } from '@tanstack/react-table'
 import { ArrowDown, ArrowUp, ArrowUpDown, Check, FileDown, Receipt, Search } from 'lucide-react'
 import { Button, Chip, EmptyState, formatMoney } from '../../fh'
+import { cx } from '../../fh/cx.ts'
 import type { MoneyInvoiceRow } from '../../../lib/moneyView.ts'
 import { buildCsv, downloadCsv } from '../../../lib/csv.ts'
 import { useInfiniteRender } from '../../../lib/useInfiniteRender.ts'
+import { useCompactMoneyTable } from './useCompactMoneyTable.ts'
 import { AGING, FilterControl, agingLabel, plural } from '../../../screens/money/MoneyPanels.tsx'
 import type {
   AgingTotals,
@@ -79,6 +88,7 @@ export function StatementsTable({
   groups: ClientBalanceGroup[]
   onStatement: (group: ClientBalanceGroup) => void
 }) {
+  const compact = useCompactMoneyTable()
   if (groups.length === 0) {
     return <EmptyState icon={Check} title="Nobody owes you right now." />
   }
@@ -87,18 +97,18 @@ export function StatementsTable({
       <p className="fhmd-intro">
         Customers with a balance, the most overdue first. A statement rolls every open invoice into one document.
       </p>
-      <table className="fhmd-table fhmd-table--panel" aria-label="Who owes you">
+      <table className={cx('fhmd-table fhmd-table--panel', compact && 'fhmd-table--compact')} aria-label="Who owes you">
         <colgroup>
           <col className="fhmd-col--customer" />
-          <col className="fhmd-col--job" />
+          {!compact && <col className="fhmd-col--job" />}
           <col className="fhmd-col--status" />
           <col className="fhmd-col--amount" />
-          <col className="fhmd-col--action" />
+          <col className="fhmd-col--action fhmd-col--statement" />
         </colgroup>
         <thead>
           <tr>
             <th scope="col">Customer</th>
-            <th scope="col">Properties</th>
+            {!compact && <th scope="col">Properties</th>}
             <th scope="col">Status</th>
             <th scope="col" className="fhmd-num">Balance</th>
             <th scope="col" className="fhmd-end">Action</th>
@@ -111,8 +121,9 @@ export function StatementsTable({
               <tr key={g.clientId} className="fhmd-row">
                 <td className="fhmd-cell--customer">
                   <Link className="fhmd-name fhmd-name--link" to={`/clients/${g.clientId}`}>{name}</Link>
+                  {compact && <span className="fhmd-sub">{plural(g.jobs.length, 'property', 'properties')}</span>}
                 </td>
-                <td className="fhmd-cell--job">{plural(g.jobs.length, 'property', 'properties')}</td>
+                {!compact && <td className="fhmd-cell--job">{plural(g.jobs.length, 'property', 'properties')}</td>}
                 <td><div className="fhmd-status"><AgingChip bucket={g.worst} /></div></td>
                 <td className="fhmd-num fhmd-cell--amount">{formatMoney(g.total)}</td>
                 <td className="fhmd-end">
@@ -152,6 +163,7 @@ export function InvoicesTable({
     : rows
   // The list can hold years of invoices; mount a window and grow it on scroll.
   const { visible, sentinelRef, hasMore } = useInfiniteRender(shown, filter)
+  const compact = useCompactMoneyTable()
 
   return (
     <>
@@ -164,10 +176,10 @@ export function InvoicesTable({
       {shown.length === 0 ? (
         <EmptyState icon={Receipt} title={filter === 'outstanding' ? 'No open invoices.' : 'No invoices yet.'} />
       ) : (
-        <table className="fhmd-table fhmd-table--panel" aria-label="All invoices">
+        <table className={cx('fhmd-table fhmd-table--panel', compact && 'fhmd-table--compact')} aria-label="All invoices">
           <colgroup>
             <col className="fhmd-col--customer" />
-            <col className="fhmd-col--job" />
+            {!compact && <col className="fhmd-col--job" />}
             <col className="fhmd-col--amount" />
             <col className="fhmd-col--status" />
             <col className="fhmd-col--action" />
@@ -175,7 +187,7 @@ export function InvoicesTable({
           <thead>
             <tr>
               <th scope="col">Customer</th>
-              <th scope="col">Job</th>
+              {!compact && <th scope="col">Job</th>}
               <th scope="col" className="fhmd-num">Amount</th>
               <th scope="col">Status</th>
               <th scope="col" className="fhmd-end">Action</th>
@@ -188,8 +200,11 @@ export function InvoicesTable({
                 className="fhmd-row is-click"
                 onClick={(e) => { if (!(e.target as HTMLElement).closest('button, a')) onOpenInvoice(r.id) }}
               >
-                <td className="fhmd-cell--customer"><span className="fhmd-name">{r.title}</span></td>
-                <td className="fhmd-cell--job">{r.subline}</td>
+                <td className="fhmd-cell--customer">
+                  <span className="fhmd-name">{r.title}</span>
+                  {compact && r.subline && <span className="fhmd-sub">{r.subline}</span>}
+                </td>
+                {!compact && <td className="fhmd-cell--job">{r.subline}</td>}
                 <td className="fhmd-num fhmd-cell--amount">{formatMoney(r.amount)}</td>
                 <td>
                   <div className="fhmd-status">
@@ -211,7 +226,7 @@ export function InvoicesTable({
             ))}
             {hasMore && (
               <tr aria-hidden="true">
-                <td colSpan={5} style={{ height: 1, padding: 0, border: 0 }}>
+                <td colSpan={compact ? 4 : 5} style={{ height: 1, padding: 0, border: 0 }}>
                   <div ref={sentinelRef} style={{ height: 1 }} />
                 </td>
               </tr>
@@ -261,6 +276,9 @@ function toCsv(rows: JobBalanceRow[]): string {
 
 const NUMERIC = new Set(['amount', 'paid', 'balance'])
 
+// Biggest balance first: the money you would chase first.
+const BIGGEST_BALANCE_FIRST: SortingState = [{ id: 'balance', desc: true }]
+
 export function BalancesTable({
   rows,
   totals,
@@ -280,14 +298,17 @@ export function BalancesTable({
   onPayRow: (row: JobBalanceRow) => void
   onOpenJob: (jobId: string) => void
 }) {
-  // Biggest balance first: the money you would chase first.
-  const [sorting, setSorting] = useState<SortingState>([{ id: 'balance', desc: true }])
+  const [sorting, setSorting] = useState<SortingState>(BIGGEST_BALANCE_FIRST)
   const [search, setSearch] = useState('')
+  // Below 1100 px Paid has no column, so a sort by it shows as the
+  // biggest balance first until the window is wide enough again.
+  const compact = useCompactMoneyTable()
+  const sortingShown = compact && sorting.some((s) => s.id === 'paid') ? BIGGEST_BALANCE_FIRST : sorting
 
   const table = useReactTable({
     data: rows,
     columns: COLUMNS,
-    state: { sorting, globalFilter: search },
+    state: { sorting: sortingShown, globalFilter: search },
     onSortingChange: setSorting,
     onGlobalFilterChange: setSearch,
     globalFilterFn: rowMatches,
@@ -297,8 +318,10 @@ export function BalancesTable({
   })
 
   const viewRows = table.getRowModel().rows
-  const { visible, sentinelRef, hasMore } = useInfiniteRender(viewRows, `${filter}|${search}|${JSON.stringify(sorting)}`)
+  const { visible, sentinelRef, hasMore } = useInfiniteRender(viewRows, `${filter}|${search}|${JSON.stringify(sortingShown)}`)
   const resultCount = viewRows.length
+  const headers = table.getFlatHeaders().filter((header) => !(compact && header.id === 'paid'))
+  const columnCount = headers.length + 1
 
   const exportCsv = () => downloadCsv(`fieldhorse-invoices-${filter}.csv`, toCsv(viewRows.map((r) => r.original)))
 
@@ -336,18 +359,21 @@ export function BalancesTable({
             {plural(resultCount, 'job', 'jobs')}
             {search && ` of ${rows.length.toLocaleString()}`}
           </p>
-          <table className="fhmd-table fhmd-table--panel fhmd-table--balances" aria-label="Job balances">
+          <table
+            className={cx('fhmd-table fhmd-table--panel fhmd-table--balances', compact && 'fhmd-table--compact')}
+            aria-label="Job balances"
+          >
             <colgroup>
               <col className="fhmd-col--customer" />
               <col className="fhmd-col--status" />
               <col className="fhmd-col--amount" />
-              <col className="fhmd-col--amount" />
+              {!compact && <col className="fhmd-col--amount" />}
               <col className="fhmd-col--amount" />
               <col className="fhmd-col--wide-action" />
             </colgroup>
             <thead>
               <tr>
-                {table.getFlatHeaders().map((header) => {
+                {headers.map((header) => {
                   const dir = header.column.getIsSorted()
                   const text = String(header.column.columnDef.header)
                   return (
@@ -374,7 +400,7 @@ export function BalancesTable({
             </thead>
             <tbody>
               {visible.length === 0 && (
-                <tr><td colSpan={6} className="fhmd-none">{`Nothing matches "${search}".`}</td></tr>
+                <tr><td colSpan={columnCount} className="fhmd-none">{`Nothing matches "${search}".`}</td></tr>
               )}
               {visible.map((tr) => {
                 const r = tr.original
@@ -387,13 +413,20 @@ export function BalancesTable({
                     </td>
                     <td>
                       <div className="fhmd-status">
-                        {r.isOutstanding
-                          ? <AgingChip bucket={r.bucket} days={r.ageDays} />
-                          : <Chip label="Paid" tone="success" />}
+                        {!r.isOutstanding ? (
+                          <Chip label="Paid" tone="success" />
+                        ) : compact ? (
+                          <>
+                            <AgingChip bucket={r.bucket} />
+                            {r.ageDays > 0 && <span className="fhmd-status__sub">{plural(r.ageDays, 'day', 'days')}</span>}
+                          </>
+                        ) : (
+                          <AgingChip bucket={r.bucket} days={r.ageDays} />
+                        )}
                       </div>
                     </td>
                     <td className="fhmd-num">{formatMoney(r.amount)}</td>
-                    <td className="fhmd-num">{r.paid > 0 ? formatMoney(r.paid) : ''}</td>
+                    {!compact && <td className="fhmd-num">{r.paid > 0 ? formatMoney(r.paid) : ''}</td>}
                     <td className="fhmd-num fhmd-cell--amount">{r.balance > 0 ? formatMoney(r.balance) : 'Paid'}</td>
                     <td className="fhmd-end">
                       <div className="fhmd-actions">
@@ -422,7 +455,7 @@ export function BalancesTable({
               })}
               {hasMore && (
                 <tr aria-hidden="true">
-                  <td colSpan={6} style={{ height: 1, padding: 0, border: 0 }}>
+                  <td colSpan={columnCount} style={{ height: 1, padding: 0, border: 0 }}>
                     <div ref={sentinelRef} style={{ height: 1 }} />
                   </td>
                 </tr>

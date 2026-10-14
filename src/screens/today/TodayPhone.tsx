@@ -16,6 +16,7 @@ import { buildTodayView, todayWeather } from '../../lib/todayView.ts'
 import type { TodayScreenProps } from './todayParts.tsx'
 import {
   AnswerList,
+  AnswersMore,
   NextStopCard,
   SectionHead,
   StageHero,
@@ -164,7 +165,7 @@ export default function TodayPhone({
   /* ----- Sections ----- */
   const isOver = (item: HomeTodayOnSite) => view.done.includes(item)
   const next = !evening ? view.nextStop : null
-  const answers = showAllAnswers ? bundle?.nextActions ?? view.answers : view.answers
+  const answers = showAllAnswers ? view.seeAll : view.answers
 
   const nextCard = next && <NextStopCard next={next} maps={maps} />
 
@@ -172,13 +173,7 @@ export default function TodayPhone({
     <section className="fht-section fht-section--answers" aria-labelledby="fht-answers">
       <SectionHead id="fht-answers" title="Needs an answer" end={<span className="fht-head__count">{view.answersTotal}</span>} />
       <AnswerList answers={answers} now={now} actionPath={actionPath} />
-      {view.answersTotal > 3 && (
-        <div className="fht-more">
-          <Button variant="quiet" size="mini" to={{ search: showAllAnswers ? '' : '?answers=all' }} replace>
-            {showAllAnswers ? 'Show fewer' : 'See all'}
-          </Button>
-        </div>
-      )}
+      <AnswersMore view={view} showAll={showAllAnswers} />
     </section>
   )
 

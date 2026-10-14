@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { TrendingUp, BarChart3, DollarSign, Target, Car, Plus } from 'lucide-react'
 import { SkeletonStat } from '../components/Skeleton.tsx'
+import DataErrorState from '../components/DataErrorState.tsx'
 import { parseDateOnly } from '../lib/dates.ts'
 import CountUp from '../components/fx/CountUp.tsx'
 import LogMilesSheet from '../components/LogMilesSheet.tsx'
@@ -14,6 +15,7 @@ import { toastSuccess } from '../lib/toast.ts'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
+import { keepFocusOnRetry } from '../lib/retryFocus.ts'
 const SnowAnalytics = lazy(() => import('../components/desktop/SnowAnalyticsBuild.tsx'))
 import SectionHeader from '../components/v3/SectionHeader.tsx'
 import { Eyebrow } from '../components/v3'
@@ -35,7 +37,9 @@ export default function Analytics() {
   // Financial detail tables feed the "Reports & Insights" section below
   // the KPI tiles. fh_clients (id/name) lets the top-revenue list show
   // client names without N+1 lookups.
-  const { data: bundle, isLoading: loading } = useAnalyticsBundle(user?.id)
+  // isPending, not isLoading: the read waits for the company scope first,
+  // and that wait is loading too, never "Not enough data yet." or $0.
+  const { data: bundle, isPending: loading, isError, refetch } = useAnalyticsBundle(user?.id)
   const load = useInvalidateAnalytics()
   const contacts = bundle?.contacts ?? []
   const mileage = bundle?.mileage ?? []
@@ -349,6 +353,26 @@ export default function Analytics() {
   const { stagger, item } = useFhMotion()
   const isDesktop = useIsDesktop()
 
+  // A failed read with nothing to show says so on both layouts, never
+  // "Not enough data yet." or a book of zeros. A failed refresh keeps the
+  // numbers already on screen. The error is the whole screen, so Try again
+  // leaves focus on the page's main region while the screen reads again.
+  if (isError && !bundle) {
+    return (
+      <div className={isDesktop ? 'fh-build-page' : 'v3-screen'} style={{ padding: '24px 24px' }}>
+        <DataErrorState
+          title="Couldn't load your reports"
+          message="We couldn't reach your numbers. Check your connection and try again."
+          actionLabel="Try again"
+          onRetry={() => {
+            keepFocusOnRetry()
+            void refetch()
+          }}
+        />
+      </div>
+    )
+  }
+
   if (isDesktop) {
     return (
       <Suspense fallback={null}><SnowAnalytics
@@ -395,7 +419,14 @@ export default function Analytics() {
       </motion.div>
 
       {loading && (
-        <motion.div variants={item} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '0 var(--v3-gutter) 16px' }}>
+        <motion.div
+          variants={item}
+          role="status"
+          aria-live="polite"
+          aria-busy="true"
+          style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '0 var(--v3-gutter) 16px' }}
+        >
+          <span className="fhc-vh">Loading your reports</span>
           {Array.from({ length: 6 }, (_, i) => <SkeletonStat key={i} />)}
         </motion.div>
       )}

@@ -52,6 +52,26 @@ export async function getWeather(lat = MURFREESBORO.lat, lon = MURFREESBORO.lon)
   return res.json()
 }
 
+/** How long a forecast stays fresh before a screen asks for it again: 30 minutes. */
+export const WEATHER_FRESH_MS = 30 * 60_000
+
+/**
+ * The forecast for one spot as a TanStack query, so a screen reads it
+ * with useQuery and the cache holds one request per location. It is
+ * fresh for 30 minutes, then read again when the tab regains focus and
+ * every 30 minutes while a screen that uses it stays open. The request
+ * is getWeather's, so a test that answers api.open-meteo.com still does.
+ */
+export function weatherQuery(lat: number, lon: number) {
+  return {
+    queryKey: ['weather', lat, lon] as const,
+    queryFn: (): Promise<unknown> => getWeather(lat, lon),
+    staleTime: WEATHER_FRESH_MS,
+    refetchOnWindowFocus: true,
+    refetchInterval: WEATHER_FRESH_MS
+  }
+}
+
 // Per-trade work window constraints.
 // stop  = hard blocker (safety or quality ruin)
 // warn  = workable but margins tight

@@ -13,9 +13,12 @@
 // Download and Mark paid live on the job's invoice page, /invoices/:id,
 // which Job balances links to.
 //
-// The numbers come from buildMoneyView (lib/moneyView.ts). The handlers
-// that send, download, void and record payments are Invoices.tsx's own and
-// arrive as props, so the phone and the desktop table share one code path.
+// The numbers come from buildMoneyView (lib/moneyView.ts), read against
+// the clock Invoices.tsx passes down (`now`, from useNow), so the week,
+// "Due today" and the month label roll over while the screen stays open.
+// The handlers that send, download, void and record payments are
+// Invoices.tsx's own and arrive as props, so the phone and the desktop
+// table share one code path.
 
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
@@ -23,7 +26,7 @@ import { ChevronRight, Receipt } from 'lucide-react'
 import { Button, Chip, EmptyState, Row, Skeleton, SkeletonRows, VaultCard, formatMoney } from '../../components/fh'
 import Monogram from '../../components/fh/Monogram.tsx'
 import { useProfile } from '../../contexts/ProfileContext.tsx'
-import { useJobs } from '../../lib/queries.ts'
+import { useCompanyJobs } from '../../lib/queries.ts'
 import { buildInvoiceList, buildMoneyView, type MoneyRow } from '../../lib/moneyView.ts'
 import { hapticTap } from '../../lib/haptics.ts'
 import {
@@ -117,7 +120,8 @@ export default function MoneyPhone({
   collectionPace,
   filter,
   onFilterChange,
-  sendingId,
+  now,
+  sendingIds,
   onSendInvoice,
   onDownloadInvoice,
   onPayInvoice,
@@ -126,15 +130,15 @@ export default function MoneyPhone({
   onRefresh
 }: MoneyPhoneProps) {
   const { profile } = useProfile()
-  const jobsQuery = useJobs()
+  const jobsQuery = useCompanyJobs()
   const { panel, titleRef, panelHref, openPanel, closePanel } = useMoneyPanel()
 
   const waiting = loading || jobsQuery.isLoading
   const view = useMemo(
-    () => (bundle ? buildMoneyView({ bundle, quotes: jobsQuery.data ?? [], now: new Date() }) : null),
-    [bundle, jobsQuery.data]
+    () => (bundle ? buildMoneyView({ bundle, quotes: jobsQuery.data ?? [], now }) : null),
+    [bundle, jobsQuery.data, now]
   )
-  const invoiceList = useMemo(() => (bundle ? buildInvoiceList({ bundle, now: new Date() }) : []), [bundle])
+  const invoiceList = useMemo(() => (bundle ? buildInvoiceList({ bundle, now }) : []), [bundle, now])
   const openInvoiceCount = useMemo(
     () => invoiceList.filter((r) => r.status === 'draft' || r.status === 'sent' || r.status === 'overdue').length,
     [invoiceList]
@@ -144,7 +148,7 @@ export default function MoneyPhone({
     bundle,
     invoiceRows,
     invoiceList,
-    sendingId,
+    sendingIds,
     onSendInvoice,
     onDownloadInvoice,
     onPayInvoice,
@@ -156,23 +160,34 @@ export default function MoneyPhone({
     return (
       <>
         <PanelShell title={PANEL_TITLES[panel]} onBack={closePanel}>
-          {panel === 'statements' && <StatementsPanel groups={clientAR} onStatement={onStatement} />}
-          {panel === 'invoices' && (
-            <InvoicesPanel
-              rows={invoiceList}
-              filter={filter}
-              onFilterChange={onFilterChange}
-              onOpenInvoice={openActions}
-            />
-          )}
-          {panel === 'balances' && (
-            <BalancesPanel
-              rows={jobBalances}
-              totals={totals}
-              pace={collectionPace}
-              filter={filter}
-              onFilterChange={onFilterChange}
-            />
+          {loading || !bundle ? (
+            // Opened by its URL before the bundle arrived, or before it was
+            // even asked for while the company is unknown: no empty list
+            // and no $0.00 total stands in for it.
+            <div className="fhm-state">
+              <SkeletonRows rows={6} label="Loading money" />
+            </div>
+          ) : (
+            <>
+              {panel === 'statements' && <StatementsPanel groups={clientAR} onStatement={onStatement} />}
+              {panel === 'invoices' && (
+                <InvoicesPanel
+                  rows={invoiceList}
+                  filter={filter}
+                  onFilterChange={onFilterChange}
+                  onOpenInvoice={openActions}
+                />
+              )}
+              {panel === 'balances' && (
+                <BalancesPanel
+                  rows={jobBalances}
+                  totals={totals}
+                  pace={collectionPace}
+                  filter={filter}
+                  onFilterChange={onFilterChange}
+                />
+              )}
+            </>
           )}
         </PanelShell>
         {sheets}
@@ -180,7 +195,7 @@ export default function MoneyPhone({
     )
   }
 
-  const month = new Date().toLocaleDateString('en-US', { month: 'long' })
+  const month = now.toLocaleDateString('en-US', { month: 'long' })
   const hasDue = view ? view.overdue.length + view.dueSoon.length > 0 : false
 
   return (

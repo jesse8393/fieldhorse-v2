@@ -15,6 +15,7 @@ import { ProfileProvider } from './contexts/ProfileContext.tsx'
 import { MembershipProvider } from './contexts/MembershipContext.tsx'
 import { ThemeProvider } from './contexts/ThemeContext.tsx'
 import { queryClient } from './lib/queryClient.ts'
+import { shouldPersistMutation, shouldPersistQuery } from './lib/queryPersistence.ts'
 import { isChunkLoadError, reloadOnceForStaleChunk } from './lib/lazyWithRetry.ts'
 // Self hosted fonts (latin subset), so the installed app has its type
 // offline. Barlow for the interface, Barlow Condensed for titles and big
@@ -157,13 +158,12 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             maxAge: 7 * 24 * 60 * 60 * 1000,
             buster: QUERY_CACHE_VERSION,
             dehydrateOptions: {
-              // Don't persist per-keystroke search results, every
-              // ['jobSearch', pattern] entry carries up to 100 rows and
-              // there's one per pattern typed; they'd bloat the blob and
-              // are worthless offline (the cached list already covers
-              // recent rows). Persist only settled, successful queries.
-              shouldDehydrateQuery: (q) =>
-                q.state.status === 'success' && q.queryKey[0] !== 'jobSearch'
+              // Only settled, successful reads, never per keystroke
+              // searches, and nothing under the 'inbox' key, reads or
+              // writes, so a thread, a draft or a send never comes back
+              // from the cache (lib/queryPersistence.ts).
+              shouldDehydrateQuery: shouldPersistQuery,
+              shouldDehydrateMutation: shouldPersistMutation
             }
           }}
         >

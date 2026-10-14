@@ -5,6 +5,7 @@ import { Plus, Search, Briefcase, ChevronRight, AlertTriangle } from 'lucide-rea
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { SkeletonList } from '../components/Skeleton.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
+import LoadingValue from '../components/LoadingValue.tsx'
 import { useInfiniteRender } from '../lib/useInfiniteRender.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
@@ -18,6 +19,7 @@ import { FilterPill, Eyebrow, StampNumber, ScreenCloser } from '../components/v3
 import { Button } from '../components/fh'
 const SnowClients = lazy(() => import('../components/desktop/SnowClientsBuild.tsx'))
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
+import { keepFocusOnRetry } from '../lib/retryFocus.ts'
 
 function money(n: any) {
   const v = Number(n || 0)
@@ -30,7 +32,9 @@ function money(n: any) {
 export default function Clients() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const { data: bundle, isLoading: loading, isError } = useClientsBundle(user?.id)
+  // isPending, not isLoading: the read waits for the company scope first,
+  // and that wait is loading too, never "$0" over "0 accounts".
+  const { data: bundle, isPending: loading, isError } = useClientsBundle(user?.id)
   const rows = bundle?.clients ?? []
   const invalidateClients = useInvalidateClients()
   const [q, setQ] = useState('')
@@ -165,13 +169,19 @@ export default function Clients() {
 
   // A failed load must not fall through to the "No accounts yet" empty state :
   // that would tell a contractor with a full book of business it's empty.
-  if (isError) {
+  // A failed refresh keeps the list already on screen. The error is the
+  // whole screen, so Try again leaves focus on the page's main region.
+  if (isError && !bundle) {
     return (
       <div className="v3-screen" style={{ padding: '24px 24px' }}>
         <DataErrorState
           title="Couldn't load clients"
-          message="We couldn't reach your client list. Check your connection and retry, nothing was lost."
-          onRetry={() => invalidateClients()}
+          message="We couldn't reach your client list. Check your connection and try again, nothing was lost."
+          actionLabel="Try again"
+          onRetry={() => {
+            keepFocusOnRetry()
+            invalidateClients()
+          }}
         />
       </div>
     )
@@ -266,10 +276,10 @@ export default function Clients() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
               <Eyebrow tone="gold">Lifetime billed</Eyebrow>
               <StampNumber size="2xl" tone="gold" style={{ display: 'block', lineHeight: 0.95 }}>
-                {money(totalLifetime)}
+                {loading ? <LoadingValue label="Loading lifetime billed" width={112} height={28} /> : money(totalLifetime)}
               </StampNumber>
               <Eyebrow as="div" style={{ marginTop: 2 }}>
-                {rows.length} {rows.length === 1 ? 'account' : 'accounts'}
+                {loading ? <LoadingValue label="Loading your accounts" width={72} height={12} /> : <>{rows.length} {rows.length === 1 ? 'account' : 'accounts'}</>}
               </Eyebrow>
             </div>
             {screenStats.outstanding > 0 && (
@@ -311,7 +321,7 @@ export default function Clients() {
               key={f.id}
               size="sm"
               active={filter === f.id}
-              count={f.count}
+              count={loading ? undefined : f.count}
               onClick={() => { hapticTap(); setFilter(f.id) }}
             >
               {f.label}
@@ -522,7 +532,7 @@ export default function Clients() {
 
       <ScreenCloser
         variant="cta"
-        caption={`${rows.length} ${rows.length === 1 ? 'account' : 'accounts'} on file.`}
+        caption={loading ? undefined : `${rows.length} ${rows.length === 1 ? 'account' : 'accounts'} on file.`}
         ctaLabel="Add another client"
         onCta={() => setAddOpen(true)}
       />

@@ -3,6 +3,8 @@ import { motion } from 'framer-motion'
 import { Lock, AlertTriangle, ShieldCheck, X, Check } from 'lucide-react'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 import { supabase } from '../../../lib/supabase.ts'
+import { useLinkedClientEmail } from '../../../lib/queries.ts'
+import { customerEmail } from '../../../lib/customerEmail.ts'
 import { useProfile } from '../../../contexts/ProfileContext.tsx'
 import { toastError, toastSuccess } from '../../../lib/toast.ts'
 import { hapticStageChange, hapticTap } from '../../../lib/haptics.ts'
@@ -12,6 +14,9 @@ import { proposalNumber } from '../../../components/documents/numbers.ts'
 import SignaturePad from '../../../components/SignaturePad.tsx'
 import { useDrawerKeyboard } from '../../../lib/useDrawerKeyboard.ts'
 import { Eyebrow } from '../../../components/v3'
+import DataErrorState from '../../../components/DataErrorState.tsx'
+import LoadingValue from '../../../components/LoadingValue.tsx'
+import { keepFocusOnRetry } from '../../../lib/retryFocus.ts'
 
 /**
  * Approve Quote sheet, Phase 4C-2.
@@ -73,13 +78,33 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
 
   const [items, setItems] = useState<any[]>([])
   const [loadingItems, setLoadingItems] = useState(false)
+  // The lines could not be read: never "0 base" or "add a line", and
+  // approving waits. Try again bumps the key to read again.
+  const [itemsFailed, setItemsFailed] = useState(false)
+  const [itemsKey, setItemsKey] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [err, setErr] = useState('')
+  // The sheet's title, where focus waits while Try again reads the lines
+  // again: it stays in the dialog, which the error does not.
+  const titleRef = useRef<HTMLHeadingElement>(null)
   const { formRef, drawerStyle, formStyle } = useDrawerKeyboard(open)
 
-  // Reset every time the sheet opens, then fetch fresh items so the
-  // snapshot reflects truth-of-the-moment (not a stale cache from the
-  // last open).
+  // The customer's email, found the way the Quote tab sends and Money
+  // reminds (lib/customerEmail.ts): the job's own, then its linked
+  // client's (Phase 8, Task 15). The job page's contact carries no client,
+  // so the client's is read while the sheet is open and the job has none.
+  // It starts the approval's email and goes on the approved copy, so the
+  // archived PDF shows the address the proposal went to.
+  const ownEmail = String(contact?.email || '').trim()
+  const linkedEmail = useLinkedClientEmail(contact?.client_id, open && !ownEmail)
+  const foundEmail = customerEmail({ email: ownEmail, fh_clients: { email: linkedEmail.data ?? null } })
+  const foundEmailRef = useRef(foundEmail)
+  foundEmailRef.current = foundEmail
+  // Set once the email field is typed in: the client's email arriving a
+  // beat after the sheet opens then leaves what was typed alone.
+  const emailEditedRef = useRef(false)
+
+  // Reset every time the sheet opens.
   useEffect(() => {
     if (!open) return
     setMethod('verbal')
@@ -88,13 +113,22 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
     // submit. Avoids the "placeholder looks filled but submit is
     // disabled" trap from the prior empty-string default.
     setName(contact?.name || '')
-    setEmail(contact?.email || '')
+    emailEditedRef.current = false
+    setEmail(foundEmailRef.current)
     setNote('')
     setMoveToJob(true)
     setSignatureKind(null)
     setSignatureData(null)
     setErr('')
     setSubmitting(false)
+  }, [open, contact?.id, contact?.updated_at, contact?.name, contact?.email, userId])
+
+  // Then fetch fresh items so the snapshot reflects truth-of-the-moment
+  // (not a stale cache from the last open). Try again reads them again
+  // without clearing the form.
+  useEffect(() => {
+    if (!open) return
+    setItemsFailed(false)
     if (!contact?.id || !userId) { setItems([]); return }
     let alive = true
     setLoadingItems(true)
@@ -109,7 +143,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
         .order('created_at', { ascending: true })
       if (!alive) return
       if (error) {
-        setErr(error.message)
+        setItemsFailed(true)
         setItems([])
       } else {
         setItems(data || [])
@@ -117,7 +151,14 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
       setLoadingItems(false)
     })()
     return () => { alive = false }
-  }, [open, contact?.id, contact?.updated_at, contact?.name, contact?.email, userId])
+  }, [open, contact?.id, contact?.updated_at, contact?.name, contact?.email, userId, itemsKey])
+
+  // The linked client's email lands after the sheet has opened: fill it
+  // in, unless the email field has been typed in since.
+  useEffect(() => {
+    if (!open || emailEditedRef.current) return
+    setEmail(foundEmail)
+  }, [open, foundEmail])
 
   const totals = useMemo(() => {
     let base = 0, optional = 0, excludedCount = 0, baseCount = 0, optionalCount = 0
@@ -205,7 +246,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
           name: contact.name || null,
           address: contact.address || null,
           phone: contact.phone || null,
-          email: contact.email || null,
+          email: foundEmail || null,
           job_title: contact.job_title || null
         },
         scope_text: contact.scope_text || null,
@@ -406,6 +447,8 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
           </Eyebrow>
           <DrawerTitle asChild>
             <h2
+              ref={titleRef}
+              tabIndex={-1}
               className="fh-font-serif"
               style={{ margin: '6px 0 0', fontSize: 24, lineHeight: 1.1, letterSpacing: 0, fontWeight: 400, color: 'var(--ink-strong)' }}
             >
@@ -471,17 +514,19 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
                 fontFamily: 'var(--font-display)', fontSize: 20, lineHeight: 1,
                 color: 'var(--ink-strong)', fontVariantNumeric: 'tabular-nums'
               }}>
-                {money(totals.base)}
+                {loadingItems ? <LoadingValue label="Loading the total" width={72} height={18} /> : itemsFailed ? null : money(totals.base)}
               </span>
             </div>
-            <div style={{
-              fontFamily: 'var(--font-body)', fontSize: 12,
-              color: 'var(--ink-muted)'
-            }}>
-              {loadingItems
-                ? 'Loading items…'
-                : `${totals.baseCount} base · ${totals.optionalCount} optional${totals.optional > 0 ? ` (${money(totals.optional)})` : ''} · ${totals.excludedCount} excluded`}
-            </div>
+            {!itemsFailed && (
+              <div style={{
+                fontFamily: 'var(--font-body)', fontSize: 12,
+                color: 'var(--ink-muted)'
+              }}>
+                {loadingItems
+                  ? 'Loading items…'
+                  : `${totals.baseCount} base · ${totals.optionalCount} optional${totals.optional > 0 ? ` (${money(totals.optional)})` : ''} · ${totals.excludedCount} excluded`}
+              </div>
+            )}
             {contact?.proposal_status === 'sent' && contact?.quote_sent_at && (
               <div style={{
                 fontFamily: 'var(--font-body)', fontSize: 12,
@@ -631,7 +676,7 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
               type="email"
               inputMode="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => { emailEditedRef.current = true; setEmail(e.target.value) }}
               placeholder="name@domain.com"
               disabled={submitting}
               style={fieldStyle}
@@ -681,7 +726,19 @@ export default function ApproveQuoteSheet({ open, contact, userId, onClose, onAp
             </span>
           </label>
 
-          {totals.baseCount === 0 && !loadingItems && (
+          {itemsFailed && !loadingItems && (
+            <DataErrorState
+              compact
+              title="We couldn't load the lines."
+              message="Check your connection and try again."
+              actionLabel="Try again"
+              onRetry={() => {
+                keepFocusOnRetry(titleRef.current)
+                setItemsKey((k) => k + 1)
+              }}
+            />
+          )}
+          {totals.baseCount === 0 && !loadingItems && !itemsFailed && (
             <div style={{
               padding: '12px 12px', borderRadius: 10,
               background: 'var(--surface-2)', border: '1px dashed var(--rule)',

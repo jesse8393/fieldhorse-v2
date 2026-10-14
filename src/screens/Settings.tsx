@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { MapPin, Trash2, LogOut, Upload as UploadIcon, Bell, CalendarClock } from 'lucide-react'
 import BrandLogoPicker from '../components/BrandLogoPicker.tsx'
@@ -17,6 +17,7 @@ import { pushSupport, pushEnabled, enablePush, disablePush } from '../lib/push.t
 import { safePayUrl } from '../lib/payLink.ts'
 import { hapticMedium, hapticSuccess } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
+import { countNoun } from '../lib/format.ts'
 import { Switch } from '@/components/ui/switch'
 import { Eyebrow } from '../components/v3'
 import {
@@ -84,6 +85,8 @@ export default function Settings() {
   const { user, signOut } = useAuth()
   const { profile, upsertProfile, refresh } = useProfile()
   const navigate = useNavigate()
+  // Every route change, a same page hash link included (see the hash jump).
+  const { key: routeKey } = useLocation()
   const [displayName, setDisplayName] = useState(profile?.full_name || '')
   const [companyName, setCompanyName] = useState(profile?.company_name || '')
   // Customer facing branding fields (migration 015). Empty strings save
@@ -187,8 +190,8 @@ export default function Settings() {
       if (clErr) throw new Error(clErr.message)
       total += clCount ?? 0
 
-      setWipeResult(total > 0 ? `Removed ${total} sample rows.` : 'No sample data to remove.')
-      toastSuccess('Sample data removed', total > 0 ? `${total} demo rows cleared` : 'Nothing to remove')
+      setWipeResult(total > 0 ? `Removed ${total} sample ${countNoun(total, 'row')}.` : 'No sample data to remove.')
+      toastSuccess('Sample data removed', total > 0 ? `${total} demo ${countNoun(total, 'row')} cleared` : 'Nothing to remove')
       setConfirmWipe(false)
     } catch (e: any) {
       setWipeResult(`Couldn't remove sample data: ${e.message}`)
@@ -404,6 +407,11 @@ export default function Settings() {
   // React Router's programmatic navigate uses pushState (which does
   // NOT fire hashchange), the prior code only re-fired the jump on
   // a real <a> click between hash routes.
+  //
+  // Neither event fires for a router link to a hash on this same page,
+  // such as the topbar's "Set location" (/settings#location) while
+  // Settings is open (Phase 8, Task 15): the route's key changes, so the
+  // jump runs again on every route change.
   useEffect(() => {
     if (typeof window === 'undefined') return
     let cancelled = false
@@ -442,7 +450,7 @@ export default function Settings() {
       window.removeEventListener('hashchange', jumpToHash)
       window.removeEventListener('popstate', jumpToHash)
     }
-  }, [])
+  }, [routeKey])
 
   // Real, honest "setup readiness" calculation, only counts fields
   // that actually map to columns the profile screen exposes. No fake
@@ -751,7 +759,9 @@ export default function Settings() {
           available as muted secondary text so the operator can still
           eyeball precision when needed. */}
       <Section variants={item} title={<>Where you <em>work.</em></>}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        {/* /settings#location lands here: the weather slots link to it
+            when the company has no pinned spot. */}
+        <div id="location" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', scrollMarginTop: 96 }}>
           <div style={{
             flex: 1,
             minWidth: 180,
@@ -1270,18 +1280,26 @@ const COLOR_PRESETS = [
   { hex: '#141414', name: 'Onyx' }
 ]
 
+// The database check on profiles.estimate_template (migration 031) only allows
+// the first four keys, so saving 'fieldhorse' would fail the whole Settings
+// save. The Fieldhorse choice stays hidden until a migration adds the key,
+// then this flag turns to true (D22 in the redesign spec).
+const FIELDHORSE_TEMPLATE_SAVES = false
+
 const ESTIMATE_TEMPLATES = [
   { key: 'classic',   name: 'Classic',   blurb: 'Editorial dark accent layout grouped by trade.', swatch: ['#141414', '#C9963A', '#F2EDE4'] },
   { key: 'slate',     name: 'Slate',     blurb: 'Gray header bar, From/For blocks, itemized rows.', swatch: ['#5C5C5C', '#F2EDE4', '#F2EDE4'] },
   { key: 'mint',      name: 'Mint',      blurb: 'Large green ESTIMATE wordmark, itemized rows.', swatch: ['#2D7A4F', '#F2EDE4', '#F2EDE4'] },
-  { key: 'editorial', name: 'Editorial', blurb: 'Sand + serif, Scope of Work and Cost Breakdown.', swatch: ['#F2EDE4', '#C9963A', '#141414'] }
+  { key: 'editorial', name: 'Editorial', blurb: 'Sand + serif, Scope of Work and Cost Breakdown.', swatch: ['#F2EDE4', '#C9963A', '#141414'] },
+  { key: 'fieldhorse', name: 'Fieldhorse', blurb: 'Phone first quote page with your job photo, a total, three steps and an Approve button. Customers see it on their quote link.', swatch: ['#16140F', '#C9963A', '#F2EDE4'] }
 ]
 
 function EstimateTemplatePicker({ value, onChange }: any) {
   const selected = value || 'classic'
+  const choices = ESTIMATE_TEMPLATES.filter((t) => t.key !== 'fieldhorse' || FIELDHORSE_TEMPLATE_SAVES || selected === 'fieldhorse')
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12 }}>
-      {ESTIMATE_TEMPLATES.map((t) => {
+      {choices.map((t) => {
         const on = selected === t.key
         return (
           <button

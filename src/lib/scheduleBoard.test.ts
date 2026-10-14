@@ -18,9 +18,11 @@ vi.mock('./supabase.ts', () => ({ supabase: {} }))
 
 import {
   boardHours,
+  capTray,
   crewHours,
   dayLayout,
   dayLabel,
+  dropRefusal,
   eventStatus,
   hourLabel,
   jobLabel,
@@ -34,6 +36,8 @@ import {
   slotToRange,
   timeLabel,
   timeRangeLabel,
+  TRAY_LIMIT,
+  trayJobs,
   unscheduledJobs,
   weekRangeLabel
 } from './scheduleBoard.ts'
@@ -153,6 +157,69 @@ describe('unscheduledJobs', () => {
     const jobs = [job({ id: 'old' }, 0), job({ id: 'new' }, 5), job({ id: 'mid' }, 2)]
     const result = unscheduledJobs(jobs, [{ contact_id: null, start_at: tomorrow }], now)
     expect(result.map((j) => j.id)).toEqual(['new', 'mid', 'old'])
+  })
+})
+
+// The tray reads one dedicated query: the job id of every visit from today
+// on (the database applies "from today on"), and keeps a card whose drop is
+// still saving in its place, even though the booked cache already holds it.
+describe('trayJobs', () => {
+  it('lists job stage work with no visit from today on, newest first', () => {
+    const jobs = [job({ id: 'old' }, 0), job({ id: 'booked' }, 3), job({ id: 'new' }, 5), job({ id: 'lead', stage: 'lead' }, 6)]
+    expect(trayJobs(jobs, ['booked']).map((j) => j.id)).toEqual(['new', 'old'])
+  })
+
+  it('lists the legacy invoice alias and never finished work', () => {
+    const jobs = [
+      job({ id: 'legacy', stage: 'invoice' }, 1),
+      job({ id: 'finished', stage: 'job', completed_at: new Date(2026, 9, 1).toISOString() }, 2),
+      job({ id: 'closed', stage: 'closed' }, 3)
+    ]
+    expect(trayJobs(jobs, []).map((j) => j.id)).toEqual(['legacy'])
+  })
+
+  it('ignores visits that carry no job', () => {
+    const jobs = [job({ id: 'a' }, 0)]
+    expect(trayJobs(jobs, [null, undefined, '']).map((j) => j.id)).toEqual(['a'])
+  })
+
+  it('keeps a job whose drop is saving in its place, though the booked cache already holds it', () => {
+    const jobs = [job({ id: 'a' }, 0), job({ id: 'saving' }, 1), job({ id: 'c' }, 2)]
+    const result = trayJobs(jobs, ['saving'], new Set(['saving']))
+    expect(result.map((j) => j.id)).toEqual(['c', 'saving', 'a'])
+    // Once the save settles the job leaves the tray.
+    expect(trayJobs(jobs, ['saving'], new Set()).map((j) => j.id)).toEqual(['c', 'a'])
+  })
+
+  it('agrees with unscheduledJobs for visits from today on', () => {
+    const now = new Date(2026, 9, 9, 9, 0)
+    const jobs = [job({ id: 'next' }, 0), job({ id: 'free' }, 1)]
+    const events = [{ contact_id: 'next', start_at: new Date(2026, 9, 10, 8, 0).toISOString() }]
+    expect(trayJobs(jobs, ['next'])).toEqual(unscheduledJobs(jobs, events, now))
+  })
+})
+
+describe('capTray', () => {
+  const many = Array.from({ length: 63 }, (_, i) => job({ id: `j${i}` }, i))
+
+  it('shows the first 50 and counts the rest', () => {
+    expect(TRAY_LIMIT).toBe(50)
+    const { shown, hidden } = capTray(many, false)
+    expect(shown).toHaveLength(50)
+    expect(shown[0].id).toBe('j0')
+    expect(hidden).toBe(13)
+  })
+
+  it('shows every job once Show all is pressed', () => {
+    const { shown, hidden } = capTray(many, true)
+    expect(shown).toHaveLength(63)
+    expect(hidden).toBe(0)
+  })
+
+  it('hides nothing at 50 or fewer', () => {
+    const { shown, hidden } = capTray(many.slice(0, 50), false)
+    expect(shown).toHaveLength(50)
+    expect(hidden).toBe(0)
   })
 })
 
@@ -341,5 +408,41 @@ describe('job names', () => {
     expect(jobSubline({ name: 'Plumbing Bellevue', job_title: 'Slab and trench' })).toBe('Slab and trench')
     expect(jobSubline({ name: 'Patio', job_title: 'Patio' })).toBe('')
     expect(jobSubline({ name: 'Patio' })).toBe('')
+  })
+})
+
+describe('dropRefusal', () => {
+  const company = { orgId: 'org-1', userId: 'qa-user-1' }
+  const now = new Date(2026, 9, 8, 9, 0).getTime()
+  const friday = new Date(2026, 9, 9, 13, 0).getTime()
+  const yesterday = new Date(2026, 9, 7, 8, 0).getTime()
+  const own = job({ id: 'own', org_id: 'org-1' } as Partial<JobRow> & { id: string })
+  const partner = job({ id: 'partner', org_id: 'org-2', user_id: 'partner-user-1' } as Partial<JobRow> & { id: string })
+
+  it('lets a job from the active company onto a slot from now on', () => {
+    expect(dropRefusal(own, company, friday, now)).toBeNull()
+  })
+
+  it('refuses a partner job from another company with words for the toast', () => {
+    expect(dropRefusal(partner, company, friday, now)).toBe('That job belongs to another company.')
+  })
+
+  it('refuses another company first, even on a slot that has passed', () => {
+    expect(dropRefusal(partner, company, yesterday, now)).toBe('That job belongs to another company.')
+  })
+
+  it('refuses a slot that has already begun', () => {
+    expect(dropRefusal(own, company, yesterday, now)).toBe('Pick a time from now on.')
+    expect(dropRefusal(own, company, new Date(2026, 9, 8, 9, 0).getTime() - 1, now)).toBe('Pick a time from now on.')
+  })
+
+  it('refuses while the company is not known yet', () => {
+    expect(dropRefusal(own, null, friday, now)).toBe('Still loading your company. Try again in a moment.')
+  })
+
+  it('never writes a dash in what it says', () => {
+    for (const words of [dropRefusal(partner, company, friday, now), dropRefusal(own, company, yesterday, now), dropRefusal(own, null, friday, now)]) {
+      expect(words).not.toMatch(/[-\u2013\u2014]/)
+    }
   })
 })

@@ -672,7 +672,7 @@ function Board({ theme, photos, sheetContainer }: { theme: Theme; photos: Sample
       </Group>
 
       {/* ---------------- Photo card ---------------- */}
-      <Group id={id('photo')} title="PhotoCard" note="A paper tray around the photo, linen text on the scrim. With no photo it falls back to the onyx stage.">
+      <Group id={id('photo')} title="PhotoCard" note="A paper tray around the photo, linen text on the scrim. With no photo it is a compact onyx band with the same text.">
         <Spec label="With a photo and an action">
           {photos ? (
             <PhotoCard

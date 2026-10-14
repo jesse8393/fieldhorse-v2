@@ -41,11 +41,11 @@ export default function JobsFilterSheet({
   const hintId = `${id}-lost-hint`
   return (
     <Sheet open={open} onOpenChange={onOpenChange} title={title}>
-      <div className="fhj-filter">
-        <div className="fhj-filter__switch">
-          <div className="fhj-filter__switch-text">
-            <label className="fhj-filter__label" htmlFor={switchId}>Show lost jobs</label>
-            <p className="fhj-filter__hint" id={hintId}>They show at the end of the list and never count toward the tabs.</p>
+      <div className="fhjl-filter">
+        <div className="fhjl-filter__switch">
+          <div className="fhjl-filter__switch-text">
+            <label className="fhjl-filter__label" htmlFor={switchId}>Show lost jobs</label>
+            <p className="fhjl-filter__hint" id={hintId}>They show at the end of the list and never count toward the tabs.</p>
           </div>
           <button
             type="button"
@@ -53,19 +53,19 @@ export default function JobsFilterSheet({
             role="switch"
             aria-checked={showLost}
             aria-describedby={hintId}
-            className="fhj-switch"
+            className="fhjl-switch"
             onClick={() => { hapticTap(); onShowLostChange(!showLost) }}
           >
-            <span className="fhj-switch__thumb" aria-hidden="true" />
+            <span className="fhjl-switch__thumb" aria-hidden="true" />
           </button>
         </div>
 
         {canSortByAmount && (
-          <fieldset className="fhj-filter__sort">
-            <legend className="fhj-filter__legend">Sort by</legend>
-            <div className="fhj-seg">
+          <fieldset className="fhjl-filter__sort">
+            <legend className="fhjl-filter__legend">Sort by</legend>
+            <div className="fhjl-seg">
               {SORTS.map((s) => (
-                <label key={s.id} className="fhj-seg__option">
+                <label key={s.id} className="fhjl-seg__option">
                   <input
                     type="radio"
                     name={`${id}-sort`}
@@ -73,7 +73,7 @@ export default function JobsFilterSheet({
                     checked={sort === s.id}
                     onChange={() => { hapticTap(); onSortChange(s.id) }}
                   />
-                  <span className="fhj-seg__face">{s.label}</span>
+                  <span className="fhjl-seg__face">{s.label}</span>
                 </label>
               ))}
             </div>

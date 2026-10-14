@@ -196,9 +196,44 @@ test.describe('quote tab on a phone', () => {
     const capsule = page.locator('.fhj-capsule')
     await expect(capsule.getByRole('button', { name: 'Send for approval' })).toBeDisabled()
     await expect(capsule.getByText('Add at least one line')).toBeVisible()
-    await expect(capsule.getByText('$0.00', { exact: true })).toBeVisible()
-    await expect(capsule.getByText('Deposit $0.00 at approval')).toBeVisible()
+    // No line has a price, so the job's own amount ($46,200 in the mock)
+    // stands in, as it does on the customer page (decision D31).
+    await expect(capsule.getByText('$46,200.00', { exact: true })).toBeVisible()
+    await expect(capsule.getByText('Deposit $23,100.00 at approval')).toBeVisible()
   })
+
+  test('the capsule total adds approved change orders and the deposit follows the terms', async ({ context, page }) => {
+    const changeOrders = [
+      { id: 'co-1', user_id: 'qa-user-1', contact_id: 'c-quote', sequence_number: 1, title: 'Extra curb', amount: 850, status: 'approved', approved_at: iso(NOW - DAY), created_at: iso(NOW - DAY) },
+      { id: 'co-2', user_id: 'qa-user-1', contact_id: 'c-quote', sequence_number: 2, title: 'Sealer', amount: 400, status: 'sent', approved_at: null, created_at: iso(NOW - DAY) }
+    ]
+    await signIn(context, {
+      tables: {
+        fh_quote_items: ITEMS,
+        fh_contacts: [quoteContact({ terms_text: '$2,500 deposit on signing, balance at completion.' })],
+        fh_change_orders: changeOrders
+      }
+    })
+    await openQuote(page)
+    const capsule = page.locator('.fhj-capsule')
+    // $3,150 of lines plus the approved $850 change order; the sent one waits.
+    await expect(capsule.getByText('$4,000.00', { exact: true })).toBeVisible()
+    await expect(capsule.getByText('Deposit $2,500.00 at approval')).toBeVisible()
+  })
+
+  for (const [terms, note] of [
+    ['No deposit required. Net 30 after completion.', 'No deposit'],
+    ['50% down at rough in, 50% at completion.', 'Payment follows the terms']
+  ]) {
+    test(`terms that name no deposit read "${note}"`, async ({ context, page }) => {
+      await signIn(context, { tables: { fh_quote_items: ITEMS, fh_contacts: [quoteContact({ terms_text: terms })] } })
+      await openQuote(page)
+      const capsule = page.locator('.fhj-capsule')
+      await expect(capsule.getByText('$3,150.00', { exact: true })).toBeVisible()
+      await expect(capsule.getByText(note, { exact: true })).toBeVisible()
+      await expect(capsule.getByText(/^Deposit /)).toHaveCount(0)
+    })
+  }
 
   test('only optional lines cannot be sent', async ({ context, page }) => {
     await signIn(context, { tables: { fh_quote_items: [ITEMS[2]] } })
@@ -242,6 +277,9 @@ test.describe('quote tab on a phone', () => {
     await signIn(context, {
       tables: {
         fh_contacts: [quoteContact({ email: null })],
+        // Neither the job nor its linked client has an email: the Quote tab
+        // looks on the client too, as Money does (Phase 8, Task 15).
+        fh_clients: [{ id: 'cl-1', user_id: 'qa-user-1', name: 'Jeff Roy', phone: '555-0101', email: null }],
         fh_quote_items: ITEMS,
         // The mock answers an insert with the first row of the table.
         fh_public_links: [{ id: 'l1', user_id: 'qa-user-1', contact_id: 'c-quote', kind: 'proposal', token: 'abc123', created_at: iso(NOW) }]
@@ -256,6 +294,25 @@ test.describe('quote tab on a phone', () => {
     await expect.poll(() => calls.publicLinks, { timeout: 30_000 }).toBe(1)
     await expect(page.getByText(/Share link (copied|ready)/).first()).toBeVisible()
     expect(calls.send).toEqual([])
+  })
+
+  test('a customer name saved in sentence case shows whole in the labels', async ({ context, page }) => {
+    // Read as a person only by recasing it, "Elite pools" is a guess, so the
+    // labels in the app keep the name as it was saved.
+    await signIn(context, {
+      tables: {
+        fh_contacts: [quoteContact({ name: 'Elite pools', email: null })],
+        // No email on the job or its linked client, so the line naming
+        // the customer shows (the Quote tab looks on the client too).
+        fh_clients: [{ id: 'cl-1', user_id: 'qa-user-1', name: 'Jeff Roy', phone: '555-0101', email: null }],
+        fh_quote_items: ITEMS
+      }
+    })
+    await openQuote(page)
+
+    await expect(page.getByRole('button', { name: 'Preview as Elite pools' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Optional for Elite pools' })).toBeVisible()
+    await expect(page.locator('.fhq-head').getByText('No email on file for Elite pools.', { exact: false })).toBeVisible()
   })
 
   test('changes requested', async ({ context, page }) => {
@@ -377,15 +434,25 @@ test.describe('quote tab on a phone', () => {
     }
   })
 
-  test('a draft can be deleted, an approved quote cannot', async ({ context, page }) => {
+  test('a draft can be deleted, an approved quote cannot', async ({ browser, contextOptions, context, page }) => {
     await signIn(context, { tables: { fh_quote_items: ITEMS, fh_contacts: [quoteContact({ proposal_status: 'draft' })] } })
     await openQuote(page)
     await expect(page.getByRole('button', { name: 'Delete draft quote' })).toBeVisible()
 
-    await signIn(context, { tables: { fh_quote_items: ITEMS, fh_contacts: [quoteContact({ proposal_status: 'approved' })] } })
-    await openQuote(page)
-    await expect(page.getByRole('button', { name: 'Delete draft quote' })).toHaveCount(0)
-    await expect(page.getByText('Approved quotes cannot be deleted. Create a revision instead.')).toBeVisible()
+    // The approved quote opens in a fresh browser context. The job page
+    // keeps the last read in the offline cache for 30 seconds, so a second
+    // visit in the same context could still show the draft it just saw and
+    // never ask the mock again. That made this test a race.
+    const approvedContext = await browser.newContext(contextOptions)
+    try {
+      const approved = await approvedContext.newPage()
+      await signIn(approvedContext, { tables: { fh_quote_items: ITEMS, fh_contacts: [quoteContact({ proposal_status: 'approved' })] } })
+      await openQuote(approved)
+      await expect(approved.getByRole('button', { name: 'Delete draft quote' })).toHaveCount(0)
+      await expect(approved.getByText('Approved quotes cannot be deleted. Create a revision instead.')).toBeVisible()
+    } finally {
+      await approvedContext.close()
+    }
   })
 
   test('the other tabs keep the action capsule', async ({ context, page }) => {

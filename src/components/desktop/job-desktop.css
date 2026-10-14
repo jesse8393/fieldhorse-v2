@@ -251,6 +251,89 @@
 }
 
 /* ================================================================
+   Facts strip, below 1280 px
+   ================================================================ */
+
+/* Where the facts panel drops under the Spine, the balance, the
+   customer's phone and the address ride above the composer: one hairline
+   strip on plaster, a hairline between the facts, the address taking the
+   most room. Its links borrow the 44 px hit area .fhd-link draws. */
+.fhd-strip {
+  border-top: 1px solid var(--fh-hairline);
+  border-bottom: 1px solid var(--fh-hairline);
+}
+
+.fhd-strip__list {
+  display: flex;
+  margin: 0;
+}
+
+.fhd-strip__fact {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 12px 16px;
+}
+
+.fhd-strip__fact:first-child {
+  padding-left: 0;
+}
+
+.fhd-strip__fact + .fhd-strip__fact {
+  border-left: 1px solid var(--fh-hairline);
+}
+
+.fhd-strip__fact--address {
+  flex-grow: 2;
+}
+
+.fhd-strip__fact dt {
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+.fhd-strip__fact dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 16px;
+  margin: 4px 0 0;
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 500;
+  color: var(--fh-ink);
+  overflow-wrap: anywhere;
+}
+
+.fhd-strip__fact dd.fhd-strip__money {
+  margin-top: 2px;
+  font-family: var(--fh-font-display);
+  font-size: 20px;
+  line-height: 24px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.fhd-strip__text {
+  min-width: 0;
+}
+
+.fhd-strip__nav {
+  flex: none;
+  font-size: 15px;
+  line-height: 20px;
+}
+
+.fhd-strip__none {
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 400;
+  color: var(--fh-ink-3);
+}
+
+/* ================================================================
    Composer
    ================================================================ */
 

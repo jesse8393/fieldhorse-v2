@@ -269,6 +269,26 @@ describe('buildHomeDashboardBundle', () => {
     const health = bundle.jobHealth.find((row) => row.id === 'job-1')
     expect(health?.billing).toBe('Outstanding') // the $2K CO is still owed
   })
+
+  it('keeps the 20 most urgent next actions and counts every one', () => {
+    // 25 leads quiet for 10 to 34 days; the longest wait is the most urgent.
+    const contacts = Array.from({ length: 25 }, (_, i) => ({
+      id: `lead-${i + 1}`,
+      name: `Lead ${i + 1}`,
+      amount: 1000,
+      stage: 'lead',
+      created_at: '2026-04-01T12:00:00.000Z',
+      updated_at: new Date(Date.parse('2026-06-08T12:00:00.000Z') - i * 86400000).toISOString(),
+      completed_at: null,
+      follow_up_on: null,
+      proposal_status: null,
+    }))
+    const bundle = buildHomeDashboardBundle(baseSource({ contacts }))
+    expect(bundle.nextActionsTotal).toBe(25)
+    expect(bundle.nextActions).toHaveLength(20)
+    expect(bundle.nextActions[0].contactId).toBe('lead-25')
+    expect(bundle.nextActions[19].contactId).toBe('lead-6')
+  })
 })
 
 describe('today and tomorrow on site', () => {
@@ -348,6 +368,99 @@ describe('today and tomorrow on site', () => {
       jobTitle: 'Slab and trench',
     })
     expect(bundle.tomorrowOnSite).toEqual([])
+  })
+})
+
+// Today's overdue rule is Money's (Phase 8, task 5): the same classify
+// function decides when an invoice is overdue, and the same allocator
+// decides how much it still asks for. The numbers are the plan's.
+describe('overdue invoices agree with Money', () => {
+  const job = {
+    id: 'job-1',
+    name: 'Rosa Delgado',
+    amount: 10000,
+    stage: 'job',
+    created_at: '2026-06-01T12:00:00.000Z',
+    updated_at: '2026-06-01T12:00:00.000Z',
+    completed_at: null,
+    follow_up_on: null,
+    proposal_status: null,
+  }
+  const bill = (id: string, sequence: number, dueAt: string, status = 'sent') => ({
+    id, contact_id: 'job-1', title: sequence === 1 ? 'Deposit' : 'Final', amount: 5000, due_at: dueAt, status,
+    sequence_number: sequence, created_at: '2026-06-01T12:00:00.000Z',
+  })
+  const overdueActions = (source: Partial<HomeDashboardSource>) =>
+    buildHomeDashboardBundle(baseSource({ contacts: [job], ...source })).nextActions.filter((a) => a.kind === 'inv-overdue')
+
+  it('asks for what is left after a linked payment, as the Money row does', () => {
+    const actions = overdueActions({
+      openInvoices: [bill('i1', 1, '2026-06-10', 'overdue'), bill('i2', 2, '2026-06-19')],
+      payments: [{ contact_id: 'job-1', invoice_id: 'i1', amount: 2000, created_at: '2026-06-11T12:00:00.000Z', paid_on: '2026-06-11' }],
+    })
+    expect(actions.map((a) => [a.id, a.contactAmount])).toEqual([['inv-overdue-i1', 3000]])
+    expect(actions[0].title).toBe('Invoice 8d past due')
+    // The due day reads as the calendar day Money shows, June 10.
+    expect(new Date(actions[0].dueIso).getDate()).toBe(10)
+  })
+
+  it('spreads an unlinked payment over the open invoices oldest due first', () => {
+    const actions = overdueActions({
+      openInvoices: [bill('i1', 1, '2026-06-10'), bill('i2', 2, '2026-06-12')],
+      payments: [{ contact_id: 'job-1', invoice_id: null, amount: 4000, created_at: '2026-06-11T12:00:00.000Z', paid_on: '2026-06-11' }],
+    })
+    expect(actions.map((a) => [a.id, a.contactAmount])).toEqual([['inv-overdue-i1', 1000], ['inv-overdue-i2', 5000]])
+  })
+
+  it('does not count money that already paid a bill marked paid', () => {
+    const actions = overdueActions({
+      openInvoices: [bill('i2', 2, '2026-06-12')],
+      settledInvoices: [bill('i1', 1, '2026-06-01', 'paid')],
+      payments: [{ contact_id: 'job-1', invoice_id: null, amount: 5000, created_at: '2026-06-02T12:00:00.000Z', paid_on: '2026-06-02' }],
+    })
+    expect(actions.map((a) => [a.id, a.contactAmount])).toEqual([['inv-overdue-i2', 5000]])
+  })
+
+  it('leaves an invoice due today alone, as Money does', () => {
+    // A bare date parses as UTC midnight, the evening before in Chicago;
+    // the bill is not overdue until June 18 has ended.
+    expect(overdueActions({ openInvoices: [bill('i1', 1, '2026-06-18')] })).toEqual([])
+    expect(overdueActions({ openInvoices: [bill('i1', 1, '2026-06-17')] }).map((a) => a.title)).toEqual(['Invoice 1d past due'])
+  })
+
+  it('drops an overdue invoice the job has paid off', () => {
+    expect(overdueActions({
+      openInvoices: [bill('i1', 1, '2026-06-10')],
+      payments: [{ contact_id: 'job-1', invoice_id: 'i1', amount: 5000, created_at: '2026-06-11T12:00:00.000Z', paid_on: '2026-06-11' }],
+    })).toEqual([])
+  })
+
+  // Review of task 5: a job billed without a recorded contract amount has
+  // no balance to cap at, so its overdue bill still asks for its face less
+  // payments, as it did before the allocator.
+  it('keeps an overdue invoice on a job with no contract amount', () => {
+    const noAmount = { ...job, amount: null }
+    const actions = buildHomeDashboardBundle(baseSource({
+      contacts: [noAmount],
+      openInvoices: [bill('i1', 1, '2026-06-10')],
+      payments: [{ contact_id: 'job-1', invoice_id: 'i1', amount: 2000, created_at: '2026-06-11T12:00:00.000Z', paid_on: '2026-06-11' }],
+    })).nextActions.filter((a) => a.kind === 'inv-overdue')
+    expect(actions.map((a) => [a.id, a.contactAmount])).toEqual([['inv-overdue-i1', 3000]])
+  })
+
+  // Review of task 5: a deposit logged against the job before the draws
+  // were made covers the deposit draft, so the progress draw asks for all
+  // of its $4,000, as invoicesPaidInFull and the job page say.
+  it('lets a covered deposit draft keep the progress draw whole', () => {
+    const draw = (id: string, sequence: number, amount: number, status: string, dueAt: string | null) => ({
+      ...bill(id, sequence, dueAt ?? '2026-06-10', status), amount, due_at: dueAt, title: `Draw ${sequence}`,
+    })
+    const actions = overdueActions({
+      openInvoices: [draw('d2', 2, 4000, 'sent', '2026-06-10')],
+      settledInvoices: [draw('d1', 1, 3000, 'draft', null), draw('d3', 3, 3000, 'draft', null)],
+      payments: [{ contact_id: 'job-1', invoice_id: null, amount: 3000, created_at: '2026-06-02T12:00:00.000Z', paid_on: '2026-06-02' }],
+    })
+    expect(actions.map((a) => [a.id, a.contactAmount])).toEqual([['inv-overdue-d2', 4000]])
   })
 })
 

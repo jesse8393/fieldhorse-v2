@@ -1,10 +1,12 @@
 // Layout helpers for the desktop Schedule board (spec 9.10, decision D10).
 //
 // Pure functions, no React and no network: packing overlapping events into
-// side by side columns, deciding which jobs still need a visit, and
-// turning a dropped slot into the timestamps a schedule row stores.
+// side by side columns, deciding which jobs still need a visit, turning a
+// dropped slot into the timestamps a schedule row stores, and deciding
+// when a drop must be refused.
 
 import type { JobRow } from './queries.ts'
+import { inActiveCompany, type ActiveCompany } from './activeCompany.ts'
 import { isJobStage } from './stages.ts'
 
 export type PackInput = { id: string; start: Date; end: Date }
@@ -88,15 +90,41 @@ export function unscheduledJobs(
   now: Date
 ): JobRow[] {
   const from = startOfDay(now).getTime()
-  const booked = new Set<string>()
+  const booked: string[] = []
   for (const e of events) {
-    if (!e.contact_id) continue
     const t = Date.parse(e.start_at)
-    if (Number.isFinite(t) && t >= from) booked.add(e.contact_id)
+    if (e.contact_id && Number.isFinite(t) && t >= from) booked.push(e.contact_id)
   }
+  return trayJobs(jobs, booked)
+}
+
+/**
+ * The same list from the job ids that already have a visit from today on,
+ * which is what the tray's booked query reads (the database applies "from
+ * today on"). A job in `saving` stays listed in its place even when the
+ * booked cache already holds it, so the card of a drop that is still
+ * saving waits in the tray, dimmed, instead of vanishing and coming back
+ * if the save fails.
+ */
+export function trayJobs(
+  jobs: JobRow[],
+  bookedJobIds: Iterable<string | null | undefined>,
+  saving: ReadonlySet<string> = new Set()
+): JobRow[] {
+  const booked = new Set<string>()
+  for (const id of bookedJobIds) if (id) booked.add(id)
   return jobs
-    .filter((j) => isJobStage(j.stage) && !j.completed_at && !booked.has(j.id))
+    .filter((j) => isJobStage(j.stage) && !j.completed_at && (saving.has(j.id) || !booked.has(j.id)))
     .sort((a, b) => createdMs(b) - createdMs(a) || a.id.localeCompare(b.id))
+}
+
+/** How many cards the tray shows before "Show all". */
+export const TRAY_LIMIT = 50
+
+/** The cards the tray shows, the first TRAY_LIMIT until Show all is pressed, and how many wait behind it. */
+export function capTray<T>(jobs: T[], showAll: boolean, limit = TRAY_LIMIT): { shown: T[]; hidden: number } {
+  if (showAll || jobs.length <= limit) return { shown: jobs, hidden: 0 }
+  return { shown: jobs.slice(0, limit), hidden: jobs.length - limit }
 }
 
 /**
@@ -117,6 +145,26 @@ export function slotToRange(
   const start = new Date(y, m, d, hour, minutes)
   const end = new Date(y, m, d, hour, minutes + durationMinutes)
   return { start_at: start.toISOString(), end_at: end.toISOString() }
+}
+
+/**
+ * Why a drop on the board must be refused, in words for the toast, or
+ * null when the visit may be written. A job from another company (a
+ * partner's shared job, or one from a workspace the person is not looking
+ * at) never goes on this company's calendar, so that check comes first.
+ * Then a slot that has already begun is the past. Until the company is
+ * known nothing is written.
+ */
+export function dropRefusal(
+  job: { org_id?: string | null; user_id?: string | null },
+  company: ActiveCompany | null,
+  startMs: number,
+  nowMs: number
+): string | null {
+  if (!company) return 'Still loading your company. Try again in a moment.'
+  if (!inActiveCompany(job, company)) return 'That job belongs to another company.'
+  if (startMs < nowMs) return 'Pick a time from now on.'
+  return null
 }
 
 // ---- What the board writes in words ----

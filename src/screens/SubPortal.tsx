@@ -32,6 +32,7 @@ import { parseDateOnly } from '../lib/dates.ts'
 import MiniMetric from '../components/MiniMetric.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
 import { Eyebrow } from '../components/v3'
+import PaletteKeyCap, { paletteShortcut } from '../components/desktop/PaletteKeyCap.tsx'
 
 // Toast words for each document kind; acronyms stay in capitals.
 const DOC_KIND_LABEL: Record<DocKind, string> = { coi: 'COI', w9: 'W9', license: 'License' }
@@ -174,10 +175,11 @@ export default function SubPortal() {
           className="fh-build-search"
           onClick={() => window.dispatchEvent(new CustomEvent('fh:open-palette'))}
           aria-label="Open command palette"
+          aria-keyshortcuts={paletteShortcut().combo}
         >
           <Search size={14} />
           <span>Search…</span>
-          <kbd>⌘K</kbd>
+          <PaletteKeyCap />
         </button>
         <div className="fh-build-topbar__meta">
           <span>{user?.email || 'Sub portal'}</span>

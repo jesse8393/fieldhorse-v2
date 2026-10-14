@@ -200,9 +200,12 @@ export default function SendInvoiceSheet({
     try {
       const invoice = await makeInvoice()
       const company = companyFromProfile(profile)
+      // The job's other invoices let money logged against the job count, so
+      // this send asks for what Money will show for the invoice a minute
+      // later (review of Phase 8, task 5).
       const res = await sendInvoiceEmail({
         invoice, contact, company, userId,
-        recipientEmail, payments, changeOrders, insurance
+        recipientEmail, payments, changeOrders, insurance, invoices: existing
       })
       if (res.ok) {
         hapticSuccess()
@@ -230,7 +233,7 @@ export default function SendInvoiceSheet({
     try {
       const invoice = await makeInvoice()
       const company = companyFromProfile(profile)
-      const result = await buildInvoicePdf({ invoice, contact, company, payments, changeOrders, insurance })
+      const result = await buildInvoicePdf({ invoice, contact, company, payments, changeOrders, insurance, invoices: existing })
       const { downloadPdf } = await import('../lib/pdf.js')
       downloadPdf(result)
       hapticSuccess()

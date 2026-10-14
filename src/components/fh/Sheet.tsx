@@ -1,8 +1,8 @@
-import { createContext, useCallback, useContext, useMemo, useRef } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { Drawer } from 'vaul'
 import { X } from 'lucide-react'
-import { useConfirm } from '../ConfirmSheet.tsx'
+import { freePageForQuestion, useConfirm } from '../ConfirmSheet.tsx'
 import IconButton from './IconButton.tsx'
 import { cx } from './cx.ts'
 
@@ -12,6 +12,20 @@ import { cx } from './cx.ts'
 // Swipe down, Escape, a tap on the dimmed page or the close button all
 // close it, and with `dirty` each of those asks first through the app's
 // ConfirmSheet (useConfirm). The bottom edge clears the home indicator.
+//
+// When it closes, focus goes back to the control that opened it (Phase 8,
+// Task 15). The sheets are opened from the app's own state, not a vaul
+// Trigger, so Radix had no trigger to return to and focus fell to the page
+// body: a keyboard or screen reader user lost their place every time. The
+// sheet remembers what had focus as it opened and focuses it again once it
+// has gone, if that control is still in the page and focus has not moved
+// on somewhere else meanwhile (another sheet, a new screen).
+//
+// The discard question is drawn at the app root, so it would outlive the
+// sheet. When the sheet closes or leaves the page while it asks (the back
+// button), the question goes too, answered no, and the sheet's pointer
+// lock is only put back while the sheet is still there: written back after
+// the sheet had gone, it left every tap on the next screen dead.
 //
 // `title` is the dialog's accessible name; `description` its description.
 // Children can ask to close (with the same dirty check) through useSheet.
@@ -51,6 +65,7 @@ type ConfirmOptions = {
   confirmLabel?: string
   cancelLabel?: string
   destructive?: boolean
+  signal?: AbortSignal
 }
 type Confirm = (options: ConfirmOptions) => Promise<boolean>
 
@@ -92,6 +107,22 @@ export default function Sheet({
   const confirm = useConfirm() as Confirm
   const contentRef = useRef<HTMLDivElement>(null)
   const askingRef = useRef(false)
+  // The discard question while it is open, taken back if the sheet closes
+  // or leaves the page meanwhile.
+  const askAbortRef = useRef<AbortController | null>(null)
+  useEffect(() => {
+    if (!open) return
+    return () => askAbortRef.current?.abort()
+  }, [open])
+  // What had focus as the sheet opened, read while rendering the open
+  // (before the sheet takes focus), to give focus back when it closes.
+  const openerRef = useRef<HTMLElement | null>(null)
+  const wasOpenRef = useRef(false)
+  if (open && !wasOpenRef.current && typeof document !== 'undefined') {
+    const active = document.activeElement
+    openerRef.current = active instanceof HTMLElement && active !== document.body ? active : null
+  }
+  wasOpenRef.current = open
   // Read at call time, so a close attempt sees the latest dirty flag.
   const dirtyRef = useRef(dirty)
   dirtyRef.current = dirty
@@ -119,8 +150,9 @@ export default function Sheet({
     }
     // A modal sheet turns off pointer events on the page; the question is
     // rendered on the page, so it needs them back while it is open.
-    const bodyPointerEvents = document.body.style.pointerEvents
-    document.body.style.pointerEvents = 'auto'
+    const lockPageAgain = freePageForQuestion(node)
+    const asking = new AbortController()
+    askAbortRef.current = asking
 
     let discarded = false
     try {
@@ -130,8 +162,9 @@ export default function Sheet({
       // at once, the same key press would also cancel the question.
       await new Promise<void>((resolve) => window.setTimeout(resolve, 0))
       const copy = { ...DISCARD_DEFAULTS, ...copyRef.current }
-      discarded = await confirm({ ...copy, destructive: true })
+      discarded = await confirm({ ...copy, destructive: true, signal: asking.signal })
     } finally {
+      if (askAbortRef.current === asking) askAbortRef.current = null
       askingRef.current = false
       node?.removeAttribute('inert')
     }
@@ -140,7 +173,9 @@ export default function Sheet({
       onOpenChange(false)
       return
     }
-    document.body.style.pointerEvents = bodyPointerEvents
+    lockPageAgain()
+    // Taken back because the sheet closed or left: nowhere to go back to.
+    if (asking.signal.aborted) return
     // Back to where they were.
     requestAnimationFrame(() => {
       const target = contentRef.current
@@ -157,6 +192,20 @@ export default function Sheet({
   // While the question is open, nothing outside the sheet may close it.
   const holdWhileAsking = (event: Event) => {
     if (askingRef.current) event.preventDefault()
+  }
+
+  // Once the sheet has gone, focus the control that opened it, if it is
+  // still in the page and focus did not move on to something else (it
+  // falls to the body when the focused sheet leaves the page).
+  const returnFocus = (event: Event) => {
+    const opener = openerRef.current
+    openerRef.current = null
+    if (!opener || !opener.isConnected) return
+    const active = document.activeElement
+    const content = contentRef.current
+    if (active && active !== document.body && !(content && content.contains(active))) return
+    event.preventDefault()
+    opener.focus({ preventScroll: true })
   }
 
   return (
@@ -181,6 +230,7 @@ export default function Sheet({
           }}
           onEscapeKeyDown={holdWhileAsking}
           onInteractOutside={holdWhileAsking}
+          onCloseAutoFocus={returnFocus}
         >
           <SheetContext.Provider value={context}>
             <div className="fhc-sheet__grabber" aria-hidden="true" />

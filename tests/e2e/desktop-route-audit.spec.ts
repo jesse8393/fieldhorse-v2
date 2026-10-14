@@ -1,5 +1,6 @@
 import { expect, test, type BrowserContext, type Page, type TestInfo } from '@playwright/test'
 import { installMock, session } from '../../scripts/qa-mock.mjs'
+import { nothingRunsOffTheSide } from './helpers/overflow.ts'
 
 const routes = [
   { name: 'home', path: '/', ready: '[data-build-screen="SnowHomeBuild"]' },
@@ -113,13 +114,12 @@ test('audits every authenticated workspace at the reported desktop size', async 
         rootWidth: Math.round(rootRect?.width || 0),
         innerWidth: Math.round(innerRect?.width || 0),
         availableWidth: Math.round(window.innerWidth - (sidebarRect?.right || 0)),
-        pageOverflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
       }
     })
 
     measurements.push({ route: route.name, ...geometry })
     expect(geometry.rootWidth, `${route.path} fell back to an app-width desktop column`).toBeGreaterThanOrEqual(1200)
-    expect(geometry.pageOverflow, `${route.path} overflows horizontally`).toBeLessThanOrEqual(1)
+    await nothingRunsOffTheSide(page, route.path)
     await capture(page, testInfo, route.name)
   }
 
@@ -152,8 +152,7 @@ test('keeps the core desktop workspace coherent in light theme', async ({ page }
       document.documentElement.setAttribute('data-theme', 'light')
     })
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
-    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
-    expect(overflow, `${route.path} overflows in light theme`).toBeLessThanOrEqual(1)
+    await nothingRunsOffTheSide(page, `${route.path} in light theme`)
     await capture(page, testInfo, `light-${route.name}`)
   }
 })

@@ -7,6 +7,9 @@
 // failed), and the inspections from useJobData.
 //
 // Rules:
+// * Every note is an entry, its whole text as typed (the Spine asks
+//   composeActivityEvents for fullNotes), so "Show N more" counts what is
+//   really there.
 // * Photos uploaded within 15 minutes of the one before merge into one
 //   item, "3 photos", with up to three thumbnails. A photo without a url
 //   still counts, but never becomes a thumbnail, so no broken image box.

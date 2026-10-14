@@ -6,6 +6,7 @@
 // so "send an invoice" is callable from anywhere with one function.
 
 import { supabase, authHeaders } from './supabase.ts'
+import { allocateInvoiceDue, knownContractTotal, type DueInvoice } from './invoiceSettlement.ts'
 import type { Database } from './database.types.ts'
 
 // pdf.js pulls in jspdf (~390KB). Load it lazily at call time so merely
@@ -63,21 +64,39 @@ export function contractTotals({ contact, payments = [], changeOrders = [], invo
   }
 }
 
-// What the customer owes on one invoice right now: its amount, capped at
-// the job's remaining balance. The PDF's "Amount due" hero applies the
-// same cap, so the email and its attachment always show one figure (a
-// job with an earlier deposit used to get an email asking for the full
-// invoice while the PDF asked for the smaller balance).
-export function invoiceAmountDue({ invoice, contact, payments = [], changeOrders = [] }: {
-  invoice: { amount?: number | string | null } | null | undefined
+// What the customer owes on one invoice right now, from the one allocator
+// in invoiceSettlement.ts (allocateInvoiceDue): its amount, less the
+// payments linked to it, less its share of money logged against the job
+// (in settle order, drafts included) when `invoices` lists the job's
+// invoices, and never more than the job still owes. Money's rows, the
+// Remind sheet, the reminder email and the PDF it attaches (buildInvoicePdf
+// hands it to the hero) and the Mark paid prefill all read this figure. The
+// invoice counts as issued here even as a draft, since this is what sending
+// it would ask for. Without `invoices`, money logged against the job is
+// left alone (it may have paid a bill that is not passed in), so only the
+// linked payments and the job balance cap apply. A job with no recorded
+// contract amount (knownContractTotal null) has no balance to cap at.
+export function invoiceAmountDue({ invoice, contact, payments = [], changeOrders = [], invoices = null }: {
+  invoice: (Omit<DueInvoice, 'id'> & { id?: string | null }) | null | undefined
   contact: Partial<Contact> | null | undefined
-  payments?: { amount?: number | string | null }[]
+  payments?: { amount?: number | string | null; invoice_id?: string | null }[]
   changeOrders?: { amount?: number | string | null; status?: string | null }[]
+  /** Every invoice on the job (any status), so money logged against the job is spread over them. */
+  invoices?: DueInvoice[] | null
 }) {
   const amount = Number(invoice?.amount || 0)
   if (!Number.isFinite(amount) || amount <= 0) return 0
-  const { balance } = contractTotals({ contact, payments, changeOrders })
-  return Math.round(Math.min(amount, balance) * 100) / 100
+  const contractTotal = knownContractTotal({ amount: contact?.amount, changeOrders })
+  const id = invoice?.id || 'this-invoice'
+  const self: DueInvoice = { ...invoice, id, status: 'sent' }
+  const others = (invoices || []).filter((inv) => inv?.id !== id)
+  const due = allocateInvoiceDue({
+    invoices: [...others, self],
+    payments,
+    contractTotal,
+    applyUnlinked: invoices != null
+  })
+  return Math.round((due.get(id) ?? 0) * 100) / 100
 }
 
 export async function fetchInvoicesForContact(contactId: string) {
@@ -130,20 +149,32 @@ export async function setInvoiceStatus(invoice: Pick<InvoiceRow, 'id'>, status: 
 // Build the per-invoice PDF. The invoice's amount is "this invoice";
 // the balance-summary block on the PDF reconciles it against the
 // contract total + payments so the customer always sees where this
-// bill sits in the whole job.
-export async function buildInvoicePdf({ invoice, contact, company, payments = [], changeOrders = [], insurance = null }: {
+// bill sits in the whole job. The hero prints what the invoice still owes
+// (invoiceAmountDue, or `amountDue` when the caller already worked it out),
+// so the PDF and the email it travels with name one figure.
+export async function buildInvoicePdf({ invoice, contact, company, payments = [], changeOrders = [], insurance = null, invoices = null, amountDue = null }: {
   invoice: InvoiceRow
   contact: any
   company: any
   payments?: any[]
   changeOrders?: any[]
   insurance?: any
+  /** The job's invoices, so money logged against the job is spread over them as Money does. */
+  invoices?: DueInvoice[] | null
+  /** What this invoice still owes, when the caller has it; else it is worked out here. */
+  amountDue?: number | null
 }) {
   // generateInvoice folds approved COs into the balance summary itself
   // (it receives `changeOrders`), so pass the RAW contract amount here :
   // passing the CO-inclusive contractTotals().contractTotal double-counts.
+  // A job with no recorded contract (and no approved change order) passes
+  // null, and the PDF then reconciles against this invoice instead of
+  // calling a $0 contract paid in full.
   const { paid } = contractTotals({ contact, payments, changeOrders })
-  const contractTotal = Number(contact?.amount || 0)
+  const contractTotal = knownContractTotal({ amount: contact?.amount, changeOrders }) == null
+    ? null
+    : Number(contact?.amount || 0)
+  const due = amountDue ?? invoiceAmountDue({ invoice, contact, payments, changeOrders, invoices })
   const title = invoice.title?.trim() || `Invoice #${invoice.sequence_number}`
   // Customer facing "what is this for". Falls back to the job title.
   // No address here, the recipient block already prints it, and in
@@ -180,6 +211,7 @@ export async function buildInvoicePdf({ invoice, contact, company, payments = []
     payments,
     contractTotal,
     previouslyPaid: paid,
+    amountDue: due,
     insurance,
     changeOrders
   } as any)
@@ -193,7 +225,7 @@ export type SendInvoiceResult =
 // (server pulls it with service role) → POST /api/send-invoice → flip
 // the row to 'sent'. On a missing Resend config the PDF downloads
 // locally so the operator can email it by hand.
-export async function sendInvoiceEmail({ invoice, contact, company, userId, recipientEmail, payments = [], changeOrders = [], insurance = null }: {
+export async function sendInvoiceEmail({ invoice, contact, company, userId, recipientEmail, payments = [], changeOrders = [], invoices = null, insurance = null }: {
   invoice: InvoiceRow
   contact: any
   company: any
@@ -201,12 +233,16 @@ export async function sendInvoiceEmail({ invoice, contact, company, userId, reci
   recipientEmail?: string | null
   payments?: any[]
   changeOrders?: any[]
+  /** The job's invoices, so the email asks for what invoiceAmountDue allocates to this one. */
+  invoices?: DueInvoice[] | null
   insurance?: any
 }): Promise<SendInvoiceResult> {
   const recipient = (recipientEmail || contact?.email || contact?.fh_clients?.email || '').trim()
   if (!recipient) return { ok: false, reason: 'no_email' }
 
-  const result = await buildInvoicePdf({ invoice, contact, company, payments, changeOrders, insurance })
+  // One figure for the email and the PDF it attaches.
+  const amountDue = invoiceAmountDue({ invoice, contact, payments, changeOrders, invoices })
+  const result = await buildInvoicePdf({ invoice, contact, company, payments, changeOrders, insurance, invoices, amountDue })
   if (!result?.doc) return { ok: false, reason: 'error', message: 'PDF generator returned no document' }
 
   const blob = result.doc.output('blob')
@@ -243,7 +279,7 @@ export async function sendInvoiceEmail({ invoice, contact, company, userId, reci
       recipient_name: contact.name || null,
       storage_path: path,
       filename: result.filename,
-      amount_due: invoiceAmountDue({ invoice, contact, payments, changeOrders })
+      amount_due: amountDue
     })
   })
   const sendBody = await sendRes.json().catch(() => ({}))
@@ -260,11 +296,16 @@ export async function sendInvoiceEmail({ invoice, contact, company, userId, reci
   }
 
   // Don't downgrade a paid invoice just because the PDF was sent again.
+  // `invoice` is the row as it was when this send started, and the email
+  // can take seconds on a weak signal: only a row still in that status
+  // moves to sent, so a void or a payment recorded meanwhile stays
+  // (review of Phase 8, task 6).
   if (invoice.status !== 'paid') {
     await supabase
       .from('fh_invoices')
       .update({ status: 'sent', issued_at: invoice.issued_at || new Date().toISOString() })
       .eq('id', invoice.id)
+      .eq('status', invoice.status)
   }
   return { ok: true, filename: result.filename, recipient }
 }

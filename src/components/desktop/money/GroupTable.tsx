@@ -10,10 +10,16 @@
 // The Action buttons are the keyboard way in. On an overdue row the
 // customer name is a button too, because Remind is the only control the
 // column holds there.
+//
+// The Action column is a fixed 96 px, so Remind and Open never shrink to
+// "Re..." on a narrow window, and below 1100 px the Job column steps aside
+// and the job reads under the customer's name (PHASE8_PLAN.md Task 14).
 
 import type { MouseEvent } from 'react'
 import { Button, Chip, formatMoney } from '../../fh'
+import { cx } from '../../fh/cx.ts'
 import type { MoneyRow } from '../../../lib/moneyView.ts'
+import { useCompactMoneyTable } from './useCompactMoneyTable.ts'
 
 export type GroupTableProps = {
   id: string
@@ -36,6 +42,7 @@ function fromControl(e: MouseEvent): boolean {
 
 export default function GroupTable({ id, title, note, rows, onOpenInvoice, onOpenJob, onRemind }: GroupTableProps) {
   const headingId = `fhmd-group-${id}`
+  const compact = useCompactMoneyTable()
 
   return (
     <section className="fhmd-group" aria-labelledby={headingId}>
@@ -43,10 +50,10 @@ export default function GroupTable({ id, title, note, rows, onOpenInvoice, onOpe
         <h2 className="fhmd-group__title" id={headingId}>{title}</h2>
         <p className="fhmd-group__note">{note}</p>
       </div>
-      <table className="fhmd-table" aria-labelledby={headingId}>
+      <table className={cx('fhmd-table', compact && 'fhmd-table--compact')} aria-labelledby={headingId}>
         <colgroup>
           <col className="fhmd-col--customer" />
-          <col className="fhmd-col--job" />
+          {!compact && <col className="fhmd-col--job" />}
           <col className="fhmd-col--amount" />
           <col className="fhmd-col--status" />
           <col className="fhmd-col--action" />
@@ -54,7 +61,7 @@ export default function GroupTable({ id, title, note, rows, onOpenInvoice, onOpe
         <thead>
           <tr>
             <th scope="col">Customer</th>
-            <th scope="col">Job</th>
+            {!compact && <th scope="col">Job</th>}
             <th scope="col" className="fhmd-num">Amount</th>
             <th scope="col">Status</th>
             <th scope="col" className="fhmd-end">Action</th>
@@ -77,8 +84,9 @@ export default function GroupTable({ id, title, note, rows, onOpenInvoice, onOpe
                   ) : (
                     <span className="fhmd-name">{r.title}</span>
                   )}
+                  {compact && r.subline && <span className="fhmd-sub">{r.subline}</span>}
                 </td>
-                <td className="fhmd-cell--job">{r.subline}</td>
+                {!compact && <td className="fhmd-cell--job">{r.subline}</td>}
                 <td className="fhmd-num fhmd-cell--amount">{formatMoney(r.amount)}</td>
                 <td>
                   <div className="fhmd-status">

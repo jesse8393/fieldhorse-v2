@@ -16,7 +16,7 @@ afterAll(() => {
 // reads its pure helpers, so a stub client is enough here.
 vi.mock('./supabase.ts', () => ({ supabase: {} }))
 
-import { buildInvoiceList, buildMoneyView, type MoneyRow } from './moneyView.ts'
+import { buildInvoiceList, buildMoneyView, classifyInvoice, invoiceDueNow, type MoneyRow } from './moneyView.ts'
 import type { InvoicesBundle, JobRow } from './queries.ts'
 
 // Thursday, October 8, 2026, noon. The week runs Sunday Oct 4 to Saturday Oct 10.
@@ -493,5 +493,153 @@ describe('buildInvoiceList', () => {
       expect(row.note).not.toMatch(DASH)
       expect(row.chip?.label ?? '').not.toMatch(DASH)
     }
+  })
+})
+
+// What each invoice actually owes (Phase 8, task 5), with the plan's
+// numbers: a $10,000 job, invoice 1 for $5,000 overdue with a linked
+// $2,000 payment, and invoice 2 for $5,000 due Friday Oct 9.
+describe('what each invoice actually owes', () => {
+  const partial = () => bundle({
+    jobs: [job({ id: 'j1', amount: 10000 })],
+    invoices: [
+      invoice({ id: 'i2', title: 'Final', sequence_number: 2, amount: 5000, due_at: '2026-10-09' }),
+      invoice({ id: 'i1', title: 'Deposit', sequence_number: 1, amount: 5000, status: 'overdue', due_at: '2026-10-02' })
+    ],
+    payments: [payment({ id: 'p1', invoice_id: 'i1', amount: 2000, paid_on: '2026-10-03' })]
+  })
+
+  it('shows the overdue row at what is left after its linked payment', () => {
+    const view = build(partial())
+    expect(view.overdue.map((r) => [r.id, r.amount])).toEqual([['i1', 3000]])
+    expect(view.dueSoon.map((r) => [r.id, r.amount])).toEqual([['i2', 5000]])
+  })
+
+  it('adds the same amounts into Due this week', () => {
+    expect(build(partial()).dueThisWeek).toBe(8000)
+  })
+
+  it('prefills Mark paid with what is still owed', () => {
+    expect(invoiceDueNow(partial(), 'i1')).toBe(3000)
+    expect(invoiceDueNow(partial(), 'i2')).toBe(5000)
+  })
+
+  it('shows the same amount in the full invoice list', () => {
+    const rows = buildInvoiceList({ bundle: partial(), now: NOW })
+    expect(rows.find((r) => r.id === 'i1')?.amount).toBe(3000)
+  })
+
+  it('spreads an unlinked $4,000 payment over two $5,000 invoices, oldest due first', () => {
+    const view = build(bundle({
+      jobs: [job({ id: 'j1', amount: 10000 })],
+      invoices: [
+        invoice({ id: 'i1', sequence_number: 1, amount: 5000, due_at: '2026-10-05' }),
+        invoice({ id: 'i2', sequence_number: 2, amount: 5000, due_at: '2026-10-09' })
+      ],
+      payments: [payment({ id: 'p1', amount: 4000, paid_on: '2026-10-03' })]
+    }))
+    expect(view.overdue.map((r) => r.amount)).toEqual([1000])
+    expect(view.dueSoon.map((r) => r.amount)).toEqual([5000])
+    expect(view.dueThisWeek).toBe(6000)
+  })
+
+  it('never counts money that already paid a bill marked paid', () => {
+    const view = build(bundle({
+      jobs: [job({ id: 'j1', amount: 10000 })],
+      invoices: [invoice({ id: 'i2', sequence_number: 2, amount: 5000, due_at: '2026-10-05' })],
+      // The paid deposit sits outside the 500 row display list.
+      settledInvoices: [{ id: 'i1', contact_id: 'j1', amount: 5000, status: 'paid', due_at: '2026-09-01', sequence_number: 1, created_at: '2026-08-25T12:00:00Z' }],
+      payments: [payment({ id: 'p1', amount: 5000, paid_on: '2026-09-02' })]
+    }))
+    expect(view.overdue.map((r) => [r.id, r.amount])).toEqual([['i2', 5000]])
+  })
+
+  // Review of task 5: a job billed without a recorded contract amount has
+  // no balance to cap at, so its bill asks for its face less payments.
+  it('keeps a bill on a job with no contract amount', () => {
+    const view = build(bundle({
+      jobs: [job({ id: 'j1', amount: null })],
+      invoices: [invoice({ id: 'i1', sequence_number: 1, amount: 5000, status: 'overdue', due_at: '2026-10-02' })],
+      payments: [payment({ id: 'p1', invoice_id: 'i1', amount: 2000, paid_on: '2026-10-03' })]
+    }))
+    expect(view.overdue.map((r) => [r.id, r.amount])).toEqual([['i1', 3000]])
+    expect(view.dueThisWeek).toBe(3000)
+  })
+
+  // Review of task 5: a deposit logged against the job before the draws
+  // were made covers the deposit draft, so the progress draw asks for all
+  // of its $4,000, as the job page's Mark paid does.
+  it('lets a covered deposit draft keep the progress draw whole', () => {
+    const b = bundle({
+      jobs: [job({ id: 'j1', amount: 10000 })],
+      invoices: [
+        invoice({ id: 'd3', title: 'Final', sequence_number: 3, amount: 3000, status: 'draft', due_at: null }),
+        invoice({ id: 'd2', title: 'Progress', sequence_number: 2, amount: 4000, due_at: '2026-10-01' }),
+        invoice({ id: 'd1', title: 'Deposit', sequence_number: 1, amount: 3000, status: 'draft', due_at: null })
+      ],
+      payments: [payment({ id: 'p1', amount: 3000, paid_on: '2026-09-20' })]
+    })
+    expect(build(b).overdue.map((r) => [r.id, r.amount])).toEqual([['d2', 4000]])
+    expect(invoiceDueNow(b, 'd2')).toBe(4000)
+    expect(invoiceDueNow(b, 'd1')).toBe(0)
+  })
+
+  it('counts an old open invoice when 620 invoices outgrow the display list of 500', () => {
+    // 619 paid invoices and one old open one, newest first, as the bundle
+    // holds them. The display list keeps the 500 newest; the open one is
+    // the oldest of all, so only the uncapped open list carries it.
+    const paid = Array.from({ length: 619 }, (_, n) =>
+      invoice({ id: `paid-${n}`, status: 'paid', amount: 100, due_at: '2026-09-30', created_at: new Date(2026, 8, 30, 12, 0, 0, -n).toISOString() }))
+    const old = invoice({ id: 'old', title: 'Final', amount: 1240, due_at: '2025-01-15', created_at: new Date(2025, 0, 1).toISOString() })
+    const all = [...paid, old]
+    const view = build(bundle({
+      jobs: [job({ id: 'j1', amount: 500000 })],
+      invoices: all.slice(0, 500),
+      openInvoices: all.filter((i) => i.status === 'sent')
+    }))
+    expect(all).toHaveLength(620)
+    expect(view.overdue.map((r) => [r.id, r.amount])).toEqual([['old', 1240]])
+    expect(view.dueThisWeek).toBe(1240)
+  })
+})
+
+// The screen feeds a clock that moves while the app stays open (Phase 8,
+// task 6), so the view must read every week, day and month from `now`
+// alone. Payments on Monday Oct 5 and Saturday Oct 10, on another job so
+// they pay nothing off the bill, sit in the week of Sunday Oct 4 to
+// Saturday Oct 10.
+describe('the clock rolling over', () => {
+  const b = bundle({
+    jobs: [job({ id: 'j1' }), job({ id: 'j2', name: 'MMC Properties', job_title: 'Parking lot repour' })],
+    payments: [
+      payment({ id: 'p-mon', contact_id: 'j2', amount: 500, paid_on: '2026-10-05', created_at: new Date(2026, 9, 5, 15).toISOString() }),
+      payment({ id: 'p-sat', contact_id: 'j2', amount: 2000, paid_on: '2026-10-10', created_at: new Date(2026, 9, 10, 15).toISOString() })
+    ],
+    invoices: [invoice({ id: 'sun', amount: 1240, due_at: '2026-10-11' })]
+  })
+
+  it('counts last week\'s payments on Saturday night', () => {
+    const view = buildMoneyView({ bundle: b, quotes: [], now: new Date(2026, 9, 10, 23, 59) })
+    expect(view.collectedThisWeek).toBe(2500)
+    // A bill due Sunday is not due by this Saturday.
+    expect(view.dueThisWeek).toBe(0)
+    expect(view.dueSoon.map((r) => r.note)).toEqual(['Due Oct 11'])
+  })
+
+  it('gives $0.00 collected this week on Sunday at 8 am for last week\'s payments', () => {
+    const view = buildMoneyView({ bundle: b, quotes: [], now: new Date(2026, 9, 11, 8, 0) })
+    expect(view.collectedThisWeek).toBe(0)
+    expect(view.monthToDate).toBe(2500)
+    // The same bill is now due today, and due this week.
+    expect(view.dueThisWeek).toBe(1240)
+    expect(view.dueSoon.map((r) => r.note)).toEqual(['Due today'])
+  })
+})
+
+describe('classifyInvoice', () => {
+  it('calls an issued bill overdue only once its due day has ended', () => {
+    expect(classifyInvoice({ status: 'sent', due_at: '2026-10-08', amount: 900 }, 900, NOW).status).toBe('sent')
+    const late = classifyInvoice({ status: 'sent', due_at: '2026-10-07', amount: 900 }, 600, NOW)
+    expect(late).toMatchObject({ status: 'overdue', daysLate: 1, owed: 600 })
   })
 })

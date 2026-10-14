@@ -37,7 +37,7 @@ vi.mock('./supabase.ts', () => ({
   },
 }))
 
-const { fetchCoverPhotosByJob } = await import('./photos.ts')
+const { fetchCoverPhotos, fetchCoverPhotosByJob, freshCoverUrls } = await import('./photos.ts')
 
 beforeEach(() => {
   calls.length = 0
@@ -70,5 +70,28 @@ describe('fetchCoverPhotosByJob', () => {
     expect(calls).toContainEqual(['eq', 'fh_job_files.kind', 'photo'])
     expect(calls).toContainEqual(['limit', 1, { referencedTable: 'fh_job_files' }])
     expect(signed).toEqual([['u/job-1/new.jpg', 'u/job-3/new.jpg']])
+  })
+})
+
+// Phase 8, Task 15: Today's cover photos are saved in the offline cache
+// with the rest of the dashboard, so a cold open hours later used to hand
+// the card an expired link. The covers now carry when they were signed,
+// and only fresh ones reach the screen.
+describe('fetchCoverPhotos', () => {
+  it('records when the cover URLs were signed', async () => {
+    rows = [{ id: 'job-1', fh_job_files: [{ storage_path: 'u/job-1/new.jpg', uploaded_at: '2026-10-01T00:00:00Z' }] }]
+    expect(await fetchCoverPhotos(['job-1'], 5_000)).toEqual({ urls: { 'job-1': 'https://signed/u/job-1/new.jpg' }, signedAt: 5_000 })
+    expect(await fetchCoverPhotos([], 5_000)).toEqual({ urls: {}, signedAt: 5_000 })
+  })
+})
+
+describe('freshCoverUrls', () => {
+  it('hands out the covers only while their links are fresh', () => {
+    const covers = { urls: { 'job-1': 'https://signed/a.jpg' }, signedAt: 1_000 }
+    expect(freshCoverUrls(covers, 1_000 + 49 * 60_000)).toEqual({ 'job-1': 'https://signed/a.jpg' })
+    expect(freshCoverUrls(covers, 1_000 + 50 * 60_000)).toBeNull()
+    expect(freshCoverUrls(undefined, 1_000)).toBeNull()
+    // A copy saved before the signing time was kept: a bare map of links.
+    expect(freshCoverUrls({ 'job-1': 'https://signed/a.jpg' }, 1_000)).toBeNull()
   })
 })

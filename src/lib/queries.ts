@@ -12,7 +12,7 @@
 // Reuse target: these hooks are platform-agnostic (plain Supabase +
 // Query), so the future Expo app imports them verbatim.
 
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import {
   useQuery,
   useQueryClient,
@@ -23,6 +23,8 @@ import { supabase } from './supabase.ts'
 import { subMatchesKey } from './subIdentity.ts'
 import { loadPartnerDirectory } from './partners.ts'
 import { useOrgScope } from './orgScope.ts'
+import { activeCompanyFrom, onlyActiveCompany, type ActiveCompany } from './activeCompany.ts'
+import { OPEN_INVOICE_STATUSES } from './invoiceSettlement.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import type { Database } from './database.types.ts'
 
@@ -35,13 +37,14 @@ export type Payment = Database['public']['Tables']['fh_payments']['Row']
 // full width, fh_contacts carries big text fields (notes, scope,
 // proposal HTML) that the list never shows. completed_at and
 // quote_sent_at feed the phone Jobs rows ("Sent yesterday", the Done
-// group's last 30 days).
+// group's last 30 days). org_id tells the active company's jobs from a
+// partner's shared ones (lib/activeCompany.ts, useCompanyJobs below).
 export const JOB_LIST_COLUMNS =
-  'id, user_id, client_id, name, phone, email, address, stage, amount, job_title, job_type, referred_by, proposal_status, follow_up_on, completed_at, quote_sent_at, updated_at, created_at'
+  'id, user_id, org_id, client_id, name, phone, email, address, stage, amount, job_title, job_type, referred_by, proposal_status, follow_up_on, completed_at, quote_sent_at, updated_at, created_at'
 
 export type JobRow = Pick<
   Contact,
-  | 'id' | 'user_id' | 'client_id' | 'name' | 'phone' | 'email' | 'address'
+  | 'id' | 'user_id' | 'org_id' | 'client_id' | 'name' | 'phone' | 'email' | 'address'
   | 'stage' | 'amount' | 'job_title' | 'job_type' | 'referred_by'
   | 'proposal_status' | 'follow_up_on' | 'completed_at' | 'quote_sent_at'
   | 'updated_at' | 'created_at'
@@ -96,7 +99,7 @@ export function scoped<Q extends { eq(column: string, value: string): Q }>(
 // Lookups by id are chunked so a long id list never overflows the
 // request URL.
 const ID_CHUNK = 150
-function chunkIds(ids: string[]): string[][] {
+export function chunkIds(ids: string[]): string[][] {
   const out: string[][] = []
   for (let i = 0; i < ids.length; i += ID_CHUNK) out.push(ids.slice(i, i + ID_CHUNK))
   return out
@@ -150,6 +153,47 @@ export function useJobs() {
     enabled: !!user?.id,
     staleTime: 30_000
   })
+}
+
+// ---- Jobs of the active company ----
+// useJobs carries every company the person belongs to plus the jobs a
+// partner shared, which the Jobs list is meant to show. Screens that act on
+// a job (the Schedule tray writes visits, Money counts quotes waiting on
+// approval) read this instead: the same cached list, narrowed to the
+// active company (lib/activeCompany.ts). Until the company is known it
+// reads as loading, so a screen never shows an empty or unfiltered list.
+
+/** The company the screens act for, or null while it is not known. */
+export function useActiveCompany(): ActiveCompany | null {
+  const { user } = useAuth()
+  const scope = useOrgScope(user?.id)
+  const userId = user?.id
+  return useMemo(() => activeCompanyFrom(userId, scope), [userId, scope])
+}
+
+export type CompanyJobs = {
+  data: JobRow[] | undefined
+  isPending: boolean
+  isLoading: boolean
+  isError: boolean
+  error: Error | null
+  refetch: () => Promise<unknown>
+}
+
+export function useCompanyJobs(): CompanyJobs {
+  const jobs = useJobs()
+  const company = useActiveCompany()
+  const all = jobs.data
+  const data = useMemo(() => (all && company ? onlyActiveCompany(all, company) : undefined), [all, company])
+  const known = company !== null
+  return {
+    data,
+    isPending: jobs.isPending || !known,
+    isLoading: jobs.isLoading || (!known && !jobs.isError),
+    isError: jobs.isError,
+    error: jobs.error,
+    refetch: jobs.refetch
+  }
 }
 
 // Subscribe to Supabase Realtime for the user's fh_contacts and
@@ -363,26 +407,178 @@ export function useUpcomingEvents(userId: string | undefined) {
   })
 }
 
-// Invalidate both schedule queries (range + upcoming) after a mutation.
+// ---- Visits behind the phone Jobs list chips ----
+// The Jobs list only needs which job each visit is on and when it starts,
+// from 14 days back to 15 days ahead (jobsVisitWindow in lib/jobsList.ts).
+// Newest first, so if the server's row cap ever cuts the list short it
+// drops the oldest past visits, never a job's next one. The rows carry no
+// visit id, so the list has its own prefix beside the visit caches (a
+// patch by visit id never reaches it) and every schedule invalidation and
+// visit delete refetches it.
+
+export type JobVisit = { contact_id: string | null; start_at: string | null }
+
+export const jobVisitsKey = (
+  userId: string | undefined,
+  orgId: string | null | undefined,
+  startIso: string,
+  endIso: string
+) => ['scheduleJobVisits', userId ?? null, orgId ?? null, startIso, endIso] as const
+
+async function fetchJobVisits(userId: string, startIso: string, endIso: string, orgId?: string | null): Promise<JobVisit[]> {
+  const { data, error } = await scoped(supabase.from('fh_schedule').select('contact_id, start_at'), userId, orgId)
+    .gte('start_at', startIso)
+    .lt('start_at', endIso)
+    .not('contact_id', 'is', null)
+    .order('start_at', { ascending: false })
+  if (error) throw error
+  return (data ?? []) as JobVisit[]
+}
+
+/** Each visit's job and start in the window, newest first, for the active company. */
+export function useJobVisits(userId: string | undefined, startIso: string, endIso: string) {
+  const orgId = useOrgScope(userId)
+  return useQuery({
+    queryKey: jobVisitsKey(userId, orgId, startIso, endIso),
+    queryFn: () => fetchJobVisits(userId as string, startIso, endIso, orgId),
+    enabled: !!userId && orgId !== undefined,
+    // The window moves at midnight; keep yesterday's chips while it loads.
+    placeholderData: keepPreviousData
+  })
+}
+
+// ---- A job's linked client email (the Quote tab's send) ----
+// The job page reads its contact with select('*'), which carries no client.
+// The Quote tab finds the customer's email the way Money does, the job's
+// own and then its linked client's (lib/customerEmail.ts), so it reads the
+// client's email when the job has none of its own. RLS decides who may
+// read the client; a partner on a shared job gets nothing back.
+//
+// Always stale (staleTime 0): the address is edited on the client page,
+// and a proposal must go to the address as it is now, so every mount reads
+// it again, a reload included (the cache is saved for offline use). The
+// Quote tab waits for that read before it sends (see emailPending there).
+
+export const linkedClientEmailKey = (clientId: string | null | undefined) =>
+  ['linkedClientEmail', clientId ?? null] as const
+
+/** The email on the client `clientId`, or null. Pass enabled false when the job has its own. */
+export function useLinkedClientEmail(clientId: string | null | undefined, enabled = true) {
+  return useQuery({
+    queryKey: linkedClientEmailKey(clientId),
+    queryFn: async (): Promise<string | null> => {
+      const { data, error } = await supabase
+        .from('fh_clients')
+        .select('email')
+        .eq('id', clientId as string)
+        .maybeSingle()
+      if (error) throw error
+      return (data as { email?: string | null } | null)?.email ?? null
+    },
+    enabled: enabled && !!clientId,
+    staleTime: 0
+  })
+}
+
+// ---- Jobs with a visit from today on (the desktop Unscheduled tray) ----
+// Which jobs already have a date (decision D10), whatever week the board
+// shows. Only contact_id is read, for every visit from the start of today
+// with no end date, paged past the server's row cap, so a busy calendar
+// never drops a booked job back into the tray. The rows carry no visit
+// id, so the list has its own prefix beside the visit caches: a patch by
+// visit id never reaches it, and useInvalidateSchedule refreshes it with
+// them. The tray adds a job here optimistically while its drop saves
+// (see the updaters below).
+
+export type BookedVisit = { contact_id: string | null }
+
+export const bookedKey = (
+  userId: string | undefined,
+  orgId: string | null | undefined,
+  fromIso: string
+) => ['scheduleBooked', userId ?? null, orgId ?? null, fromIso] as const
+
+async function fetchBooked(userId: string, fromIso: string, orgId?: string | null): Promise<BookedVisit[]> {
+  return fetchAllRows<BookedVisit>((from, to) =>
+    scoped(supabase.from('fh_schedule').select('contact_id'), userId, orgId)
+      .gte('start_at', fromIso)
+      .not('contact_id', 'is', null)
+      // A stable order so the pages never overlap or skip.
+      .order('start_at', { ascending: true })
+      .order('id', { ascending: true })
+      .range(from, to)
+  )
+}
+
+/** The job of every visit from `fromIso` on, for the active company. */
+export function useBookedVisits(userId: string | undefined, fromIso: string) {
+  const orgId = useOrgScope(userId)
+  return useQuery({
+    queryKey: bookedKey(userId, orgId, fromIso),
+    queryFn: () => fetchBooked(userId as string, fromIso, orgId),
+    enabled: !!userId && orgId !== undefined,
+    // `fromIso` moves at midnight. Keep yesterday's list on screen while
+    // today's loads, so a board left open overnight never drops to a
+    // skeleton for a round trip.
+    placeholderData: keepPreviousData
+  })
+}
+
+// The booked list while a drop saves. Each updater takes the cached rows
+// and matches them by value, never by identity: the cache rebuilds equal
+// rows on every write (structural sharing), so a row kept by identity is
+// lost the moment a row ahead of it goes. A list that has not loaded yet
+// is left alone (an updater that returns undefined writes nothing), so it
+// never turns into a short list that reads as every other job being free.
+
+/** One more row for `jobId`, when its drop starts. */
+export const addBookedJob = (jobId: string) => (rows: BookedVisit[] | undefined) =>
+  rows && [...rows, { contact_id: jobId }]
+
+/** One row for `jobId` fewer, when its drop fails. A second row (a visit the server has) stays. */
+export const removeBookedJob = (jobId: string) => (rows: BookedVisit[] | undefined) => {
+  if (!rows) return rows
+  const at = rows.findIndex((row) => row.contact_id === jobId)
+  return at < 0 ? rows : [...rows.slice(0, at), ...rows.slice(at + 1)]
+}
+
+/** A row for `jobId` if none is there, after its write, in case a reload from before the write landed without it. */
+export const ensureBookedJob = (jobId: string) => (rows: BookedVisit[] | undefined) =>
+  rows && (rows.some((row) => row.contact_id === jobId) ? rows : [...rows, { contact_id: jobId }])
+
+// Invalidate every schedule query (range, upcoming, the booked list and
+// the Jobs list visits) after a mutation. A fetch already in flight is
+// dropped and started over, so what lands was asked for after the write.
 export function useInvalidateSchedule() {
   const client = useQueryClient()
   return () => {
     client.invalidateQueries({ queryKey: ['schedule'] })
     client.invalidateQueries({ queryKey: ['scheduleUpcoming'] })
+    client.invalidateQueries({ queryKey: ['scheduleBooked'] })
+    client.invalidateQueries({ queryKey: ['scheduleJobVisits'] })
   }
 }
 
 // Optimistically drop a deleted event from every cached schedule query
 // (range + upcoming) so it vanishes immediately, before the server
-// round-trip, replaces the old setEvents/setUpcoming filters.
+// round-trip, replaces the old setEvents/setUpcoming filters. A query that
+// has not loaded yet is left alone (an empty list would read as "nothing
+// scheduled" until its fetch lands). The booked list and the Jobs list
+// visits hold no visit ids, so they are refetched instead: the deleted
+// visit may have been its job's only one from today on, or the one its
+// chip read.
+export function dropScheduleEvent(client: QueryClient, evtId: string) {
+  const drop = (rows: ScheduleEvent[] | undefined) =>
+    rows?.filter((e) => e.id !== evtId)
+  client.setQueriesData({ queryKey: ['schedule'] }, drop)
+  client.setQueriesData({ queryKey: ['scheduleUpcoming'] }, drop)
+  client.invalidateQueries({ queryKey: ['scheduleBooked'] })
+  client.invalidateQueries({ queryKey: ['scheduleJobVisits'] })
+}
+
 export function useDropScheduleEvent() {
   const client = useQueryClient()
-  return (evtId: string) => {
-    const drop = (rows: ScheduleEvent[] | undefined) =>
-      (rows ?? []).filter((e) => e.id !== evtId)
-    client.setQueriesData({ queryKey: ['schedule'] }, drop)
-    client.setQueriesData({ queryKey: ['scheduleUpcoming'] }, drop)
-  }
+  return (evtId: string) => dropScheduleEvent(client, evtId)
 }
 
 // ---- Activity feed ----
@@ -476,18 +672,41 @@ export type InvoiceJob = Pick<
 
 export type InvoiceRecord = Database['public']['Tables']['fh_invoices']['Row']
 
+// The few columns the allocator (invoiceSettlement.ts) reads from an
+// invoice that is not an open bill: a draft, or a paid or void row.
+export const SETTLED_INVOICE_COLUMNS = 'id, contact_id, amount, status, due_at, sequence_number, created_at'
+
+export type SettledInvoice = Pick<
+  InvoiceRecord,
+  'id' | 'contact_id' | 'amount' | 'status' | 'due_at' | 'sequence_number' | 'created_at'
+>
+
 export type InvoicesBundle = {
   jobs: InvoiceJob[]
   payments: Payment[]
+  /** What the lists show: the 500 newest invoices of any status, plus every open one older than those. */
   invoices: InvoiceRecord[]
+  /**
+   * Every open invoice (sent, viewed, overdue), with no cap. Money's groups
+   * and totals read these. A bundle built by hand may leave it out; the
+   * open rows of `invoices` stand in.
+   */
+  openInvoices?: InvoiceRecord[]
+  /**
+   * Every invoice that is not an open bill (draft, paid, void), a few
+   * columns each, with no cap, so what an open invoice still owes never
+   * depends on the display cap: a deposit draft covered by money logged
+   * against the job, or a paid bill that money already took.
+   */
+  settledInvoices?: SettledInvoice[]
   changeOrders: Database['public']['Tables']['fh_change_orders']['Row'][]
 }
 
 export const invoicesKey = (userId: string | undefined, orgId?: string | null) =>
   ['invoices', userId, orgId ?? null] as const
 
-async function fetchInvoicesBundle(userId: string, orgId?: string | null): Promise<InvoicesBundle> {
-  const [jobs, payments, invoicesRes, changeOrders] = await Promise.all([
+export async function fetchInvoicesBundle(userId: string, orgId?: string | null): Promise<InvoicesBundle> {
+  const [jobs, payments, invoicesRes, openInvoices, settledInvoices, changeOrders] = await Promise.all([
     fetchAllRows<InvoiceJob>((from, to) =>
       scoped(supabase
         .from('fh_contacts')
@@ -506,14 +725,30 @@ async function fetchInvoicesBundle(userId: string, orgId?: string | null): Promi
         .order('id', { ascending: true })
         .range(from, to)
     ),
+    // The issued-invoice DISPLAY list: the 500 most recent cover the
+    // lists, so a huge invoice history no longer ships every row. Nothing
+    // is added up from it; the two uncapped reads below feed the totals.
     scoped(supabase.from('fh_invoices').select('*'), userId, orgId)
       .order('created_at', { ascending: false })
-      // Bound the issued-invoice DISPLAY list, the Invoices screen only
-      // renders these rows (invoiceRows), it does NOT compute A/R totals
-      // from them (totals derive from the uncapped jobs + payments +
-      // change orders sets above). So a huge invoice history no longer
-      // ships every row; the 500 most-recent cover the list.
       .limit(500),
+    // Every open invoice, uncapped: Money's groups, Due this week and
+    // the reminders read these, so an old unpaid bill past the newest 500
+    // still counts.
+    fetchAllRows<InvoiceRecord>((from, to) =>
+      scoped(supabase.from('fh_invoices').select('*'), userId, orgId)
+        .in('status', [...OPEN_INVOICE_STATUSES])
+        .order('id', { ascending: true })
+        .range(from, to)
+    ),
+    // Every draft, paid and void invoice, a few columns each, uncapped: the
+    // allocator needs them so money that already paid one bill (or covers
+    // an unsent deposit draft) is never counted against another.
+    fetchAllRows<SettledInvoice>((from, to) =>
+      scoped(supabase.from('fh_invoices').select(SETTLED_INVOICE_COLUMNS), userId, orgId)
+        .in('status', ['draft', 'paid', 'void'])
+        .order('id', { ascending: true })
+        .range(from, to)
+    ),
     // Approved change orders adjust each job's true contract, needed so
     // "Who owes you" / statements don't understate a job with signed COs.
     fetchAllRows<InvoicesBundle['changeOrders'][number]>((from, to) =>
@@ -524,10 +759,19 @@ async function fetchInvoicesBundle(userId: string, orgId?: string | null): Promi
     )
   ])
   if (invoicesRes.error) throw invoicesRes.error
+  const shown = (invoicesRes.data ?? []) as InvoiceRecord[]
+  // An open invoice older than the newest 500 joins the list after them,
+  // newest first, so its row can be opened, reminded and marked paid.
+  const shownIds = new Set(shown.map((inv) => inv.id))
+  const older = openInvoices
+    .filter((inv) => !shownIds.has(inv.id))
+    .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
   return {
     jobs,
     payments,
-    invoices: (invoicesRes.data ?? []) as InvoiceRecord[],
+    invoices: [...shown, ...older],
+    openInvoices,
+    settledInvoices,
     changeOrders
   }
 }

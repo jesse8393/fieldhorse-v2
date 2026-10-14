@@ -3,6 +3,7 @@
 // monogram, the desktop sidebar and the Day, Night and Auto modes.
 import { expect, test, type Page } from '@playwright/test'
 import { signIn as signInWith } from './helpers/signIn.ts'
+import { nothingRunsOffTheSide } from './helpers/overflow.ts'
 
 function signIn(context: Parameters<typeof signInWith>[0], mode: 'auto' | 'day' | 'night' = 'day') {
   return signInWith(context, { mode })
@@ -186,8 +187,7 @@ test.describe('component sheet', () => {
       for (const name of ['Day', 'Night']) {
         await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
       }
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
-      expect(overflow).toBeLessThanOrEqual(0)
+      await nothingRunsOffTheSide(page, `/design at ${width} px`)
       expect(errors).toEqual([])
       if (process.env.FH_VISUAL === '1') {
         await page.evaluate(() => document.fonts.ready)

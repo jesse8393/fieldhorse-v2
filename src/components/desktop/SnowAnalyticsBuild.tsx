@@ -3,6 +3,7 @@
 // Drop-in for SnowAnalytics at >=900px. Executive financial reporting,
 // not generic charts.
 
+import type { ReactNode } from 'react'
 import {
   Bell,
   Search,
@@ -12,7 +13,9 @@ import {
 } from 'lucide-react'
 import { countNoun, money } from '../../lib/format.ts'
 import MiniMetric from '../MiniMetric.tsx'
+import LoadingValue from '../LoadingValue.tsx'
 import TopbarWeather from './TopbarWeather.tsx'
+import PaletteKeyCap, { paletteShortcut } from './PaletteKeyCap.tsx'
 
 type StageRow = {
   id: string
@@ -57,6 +60,7 @@ type Stats = Record<string, any> & {
 }
 
 type Props = {
+  /** True until the first read is in: every number shows a skeleton, never $0 or 0%. */
   loading: boolean
   stats: Stats
   byStage: StageRow[]
@@ -114,6 +118,10 @@ export default function SnowAnalyticsBuild(props: Props) {
     ? revenueValue(lastCompleteMonth) - revenueValue(previousCompleteMonth)
     : 0
 
+  // While the numbers load, a skeleton stands in each value's place.
+  const pending = (label: string, width = 72) => <LoadingValue label={label} width={width} height={20} />
+  const railPending = <strong>{pending('Loading', 96)}</strong>
+
   return (
     <div className="fh-build-page" data-build-screen="SnowAnalyticsBuild">
       <header className="fh-build-topbar fh-build-topbar--no-cta">
@@ -122,15 +130,15 @@ export default function SnowAnalyticsBuild(props: Props) {
           className="fh-build-search"
           onClick={() => window.dispatchEvent(new CustomEvent('fh:open-palette'))}
           aria-label="Open command palette"
+          aria-keyshortcuts={paletteShortcut().combo}
         >
           <Search size={14} />
           <span>Search reports, KPIs...</span>
-          <kbd>⌘K</kbd>
+          <PaletteKeyCap />
         </button>
         <div className="fh-build-topbar__meta">
           <span>Year to date · {new Date().getFullYear()}</span>
-          <span className="fh-build-vline" />
-          <TopbarWeather />
+          <TopbarWeather lead />
         </div>
         <button className="fh-build-icon-btn" type="button" onClick={() => window.dispatchEvent(new CustomEvent('fh:navigate', { detail: { to: '/activity' } }))} aria-label="Open activity" title="Activity"><Bell size={16} /></button>
       </header>
@@ -144,18 +152,24 @@ export default function SnowAnalyticsBuild(props: Props) {
 
           <div className="fh-build-focus">
             <div className="fh-build-eyebrow">Top KPIs · YTD</div>
-            <p>
-              {money(stats.wonYTD || 0)} won · {pct(stats.closeRate || 0)} close rate ·
-              {' '}{pct(stats.avgMargin || 0)} margin
-            </p>
-            {stats.avgMarginNote && <p style={{ marginTop: 6 }}>{stats.avgMarginNote}</p>}
+            {loading ? (
+              <p><LoadingValue label="Loading your numbers" width={240} height={14} /></p>
+            ) : (
+              <>
+                <p>
+                  {money(stats.wonYTD || 0)} won · {pct(stats.closeRate || 0)} close rate ·
+                  {' '}{pct(stats.avgMargin || 0)} margin
+                </p>
+                {stats.avgMarginNote && <p style={{ marginTop: 6 }}>{stats.avgMarginNote}</p>}
+              </>
+            )}
           </div>
 
           <div className="fh-build-mini-grid">
-            <MiniMetric label="Pipeline" value={money(stats.pipeline || 0)} accent />
-            <MiniMetric label="Won YTD" value={money(stats.wonYTD || 0)} />
-            <MiniMetric label="Close rate" value={pct(stats.closeRate || 0)} />
-            <MiniMetric label="Avg margin" value={pct(stats.avgMargin || 0)} />
+            <MiniMetric label="Pipeline" value={loading ? pending('Loading the pipeline') : money(stats.pipeline || 0)} accent />
+            <MiniMetric label="Won YTD" value={loading ? pending('Loading won this year') : money(stats.wonYTD || 0)} />
+            <MiniMetric label="Close rate" value={loading ? pending('Loading the close rate') : pct(stats.closeRate || 0)} />
+            <MiniMetric label="Avg margin" value={loading ? pending('Loading the average margin') : pct(stats.avgMargin || 0)} />
           </div>
         </section>
 
@@ -166,18 +180,18 @@ export default function SnowAnalyticsBuild(props: Props) {
         <div className="fh-build-kpi-strip">
           <KpiCell
             label="Invoiced YTD"
-            value={stats.invoiced == null ? 'Not connected' : money(stats.invoiced)}
-            muted={stats.invoiced == null}
+            value={loading ? pending('Loading invoiced this year', 64) : stats.invoiced == null ? 'Not connected' : money(stats.invoiced)}
+            muted={!loading && stats.invoiced == null}
           />
           <KpiCell
             label="Collected YTD"
-            value={stats.collected == null ? 'Not connected' : money(stats.collected)}
-            muted={stats.collected == null}
+            value={loading ? pending('Loading collected this year', 64) : stats.collected == null ? 'Not connected' : money(stats.collected)}
+            muted={!loading && stats.collected == null}
           />
-          <KpiCell label="Active leads" value={String(stats.leads || 0)} />
-          <KpiCell label="Quotes out" value={String(stats.quotes || 0)} />
-          <KpiCell label="Miles YTD" value={Number(stats.milesYTD || 0).toLocaleString()} />
-          <KpiCell label="Mileage deduction" value={money(stats.mileageDeduction || 0)} />
+          <KpiCell label="Active leads" value={loading ? pending('Loading active leads', 40) : String(stats.leads || 0)} />
+          <KpiCell label="Quotes out" value={loading ? pending('Loading quotes out', 40) : String(stats.quotes || 0)} />
+          <KpiCell label="Miles YTD" value={loading ? pending('Loading miles this year', 48) : Number(stats.milesYTD || 0).toLocaleString()} />
+          <KpiCell label="Mileage deduction" value={loading ? pending('Loading the mileage deduction', 64) : money(stats.mileageDeduction || 0)} />
         </div>
 
         <section className="fh-build-content-grid fh-build-content-grid--analytics">
@@ -246,7 +260,7 @@ export default function SnowAnalyticsBuild(props: Props) {
 
             <section className="fh-build-card fh-build-table">
               <header className="fh-build-card-head">
-                <div className="fh-build-eyebrow">Top clients · {topClients.length}</div>
+                <div className="fh-build-eyebrow">{loading ? 'Top clients' : <>Top clients · {topClients.length}</>}</div>
               </header>
               <div className="fh-build-table__head is-topclients">
                 <span>#</span>
@@ -273,28 +287,36 @@ export default function SnowAnalyticsBuild(props: Props) {
           <aside className="fh-build-rail fh-build-rail--page">
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Largest stage</div>
-              <strong>{strongestStage ? (strongestStage.label || strongestStage.id) : '\u2003'}</strong>
-              <span>
-                {strongestStage
-                  ? `${money(strongestStage.value)} in ${strongestStage.count} ${countNoun(strongestStage.count, 'deal')}`
-                  : 'No data yet'}
-              </span>
-              {strongestStage && <div className="fh-build-spark is-gold" />}
+              {loading ? railPending : (
+                <>
+                  <strong>{strongestStage ? (strongestStage.label || strongestStage.id) : '\u2003'}</strong>
+                  <span>
+                    {strongestStage
+                      ? `${money(strongestStage.value)} in ${strongestStage.count} ${countNoun(strongestStage.count, 'deal')}`
+                      : 'No data yet'}
+                  </span>
+                  {strongestStage && <div className="fh-build-spark is-gold" />}
+                </>
+              )}
             </section>
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Smallest stage</div>
-              <strong>{weakestStage ? (weakestStage.label || weakestStage.id) : ' '}</strong>
-              <span>
-                {weakestStage
-                  ? `${money(weakestStage.value)} in ${weakestStage.count} ${countNoun(weakestStage.count, 'deal')}`
-                  : 'No data yet'}
-              </span>
+              {loading ? railPending : (
+                <>
+                  <strong>{weakestStage ? (weakestStage.label || weakestStage.id) : ' '}</strong>
+                  <span>
+                    {weakestStage
+                      ? `${money(weakestStage.value)} in ${weakestStage.count} ${countNoun(weakestStage.count, 'deal')}`
+                      : 'No data yet'}
+                  </span>
+                </>
+              )}
             </section>
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Cash risk</div>
-              {cashConnected ? (
+              {loading ? railPending : cashConnected ? (
                 <>
                   <strong style={{
                     color: collectionRate == null
@@ -316,22 +338,30 @@ export default function SnowAnalyticsBuild(props: Props) {
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Active leads</div>
-              <strong>{stats.leads || 0}</strong>
-              <span>currently in the pipeline</span>
+              {loading ? railPending : (
+                <>
+                  <strong>{stats.leads || 0}</strong>
+                  <span>currently in the pipeline</span>
+                </>
+              )}
             </section>
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Forecast note</div>
-              <strong>
-                {monthOverMonth > 0 ? 'Trending up' : monthOverMonth < 0 ? 'Trending down' : 'Flat'}
-              </strong>
-              <span>
-                {monthOverMonth !== 0 ? `${money(Math.abs(monthOverMonth))} vs prior full month` : 'Hold steady'}
-              </span>
-              <div className="fh-build-rail-card__spark">
-                <Target size={14} />
-                <span>{pct(stats.closeRate || 0)} close rate</span>
-              </div>
+              {loading ? railPending : (
+                <>
+                  <strong>
+                    {monthOverMonth > 0 ? 'Trending up' : monthOverMonth < 0 ? 'Trending down' : 'Flat'}
+                  </strong>
+                  <span>
+                    {monthOverMonth !== 0 ? `${money(Math.abs(monthOverMonth))} vs prior full month` : 'Hold steady'}
+                  </span>
+                  <div className="fh-build-rail-card__spark">
+                    <Target size={14} />
+                    <span>{pct(stats.closeRate || 0)} close rate</span>
+                  </div>
+                </>
+              )}
             </section>
           </aside>
         </section>
@@ -340,7 +370,7 @@ export default function SnowAnalyticsBuild(props: Props) {
   )
 }
 
-function KpiCell({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
+function KpiCell({ label, value, muted }: { label: string; value: ReactNode; muted?: boolean }) {
   return (
     <div className="fh-build-kpi-cell">
       <strong style={muted ? { color: 'var(--v3-text-faint)', fontSize: 14, fontWeight: 700, letterSpacing: 0 } : undefined}>

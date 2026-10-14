@@ -15,7 +15,7 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, authHeaders } from '../lib/supabase.ts'
 import { useInvoiceDetail, useInvalidateInvoiceDetail } from '../lib/queries.ts'
-import { fetchInvoicesForContact, createInvoice, sendInvoiceEmail } from '../lib/invoices.ts'
+import { fetchInvoicesForContact, createInvoice, invoiceAmountDue, sendInvoiceEmail } from '../lib/invoices.ts'
 import { pickBalanceInvoice } from '../lib/invoiceSettlement.ts'
 import { moneyExact } from '../lib/format.ts'
 import { parseDateOnly } from '../lib/dates.ts'
@@ -29,6 +29,7 @@ async function loadPdf(): Promise<any> {
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { mintPublicLink } from '../lib/publicLink.ts'
 import { hapticTap } from '../lib/haptics.ts'
+import { useMediaQuery } from '../lib/useMediaQuery.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { Eyebrow, StampNumber } from '../components/v3'
 // Lazy, only loads when an operator taps "Mark Paid" (avoids ~440KB
@@ -156,6 +157,16 @@ export default function InvoiceDetail() {
   // miss vs relying on the toast alone.
   const [sent, setSent] = useState(false)
   const [sharing, setSharing] = useState(false)
+  // Where the labelled row does not fit (below 600 px, so every phone),
+  // the three quiet actions are icon buttons that keep their names, so the
+  // row fits a 320 px phone and Collect Payment reads whole on one line
+  // (D48). Tablets and desktops keep the labels.
+  const quietIconsOnly = useMediaQuery('(max-width: 599px)')
+  // Each quiet action's name, shown as its text or, icon only, as its
+  // aria-label, so the two can never drift apart.
+  const emailLabel = sent ? 'Sent' : sending ? 'Sending…' : 'Email'
+  const shareLabel = sharing ? 'Minting…' : 'Share link'
+  const downloadLabel = generating ? 'Generating…' : 'Download'
 
   // Resolved client info, prefer the denormalized job-row fields, fall
   // back to fh_clients (the source of truth when edits happen on the
@@ -239,8 +250,12 @@ export default function InvoiceDetail() {
           amount: totals.amount
         }]
   ), [billingDraw, contact?.job_title, totals.amount])
+  // What this screen bills now: for an open draw, the allocator's figure
+  // (what Money, the reminder email and the job page name for it, with the
+  // job's other draws letting money logged against the job count); with no
+  // open draw, the whole balance.
   const amountDueNow = billingDraw
-    ? Math.min(totals.balance, Number(billingDraw.amount || 0))
+    ? invoiceAmountDue({ invoice: billingDraw, contact, payments, changeOrders, invoices: invoiceRows })
     : totals.balance
 
   async function handleGeneratePDF() {
@@ -270,6 +285,8 @@ export default function InvoiceDetail() {
         payments,
         contractTotal: Number(contact?.amount || 0),
         previouslyPaid: totals.paid,
+        // The hero names the same figure as amount_due below.
+        amountDue: billingDraw ? amountDueNow : null,
         insurance,
         changeOrders,
         invoices: invoiceRows,
@@ -358,6 +375,8 @@ export default function InvoiceDetail() {
       recipientEmail: resolved.email,
       payments,
       changeOrders,
+      // The job's invoices, so this asks for what Money asks for on it.
+      invoices: rows,
       insurance
     })
     if (res.ok) {
@@ -411,6 +430,8 @@ export default function InvoiceDetail() {
         payments,
         contractTotal: Number(contact?.amount || 0),
         previouslyPaid: totals.paid,
+        // The hero names the same figure as amount_due below.
+        amountDue: billingDraw ? amountDueNow : null,
         insurance,
         changeOrders,
         invoices: invoiceRows,
@@ -589,6 +610,7 @@ export default function InvoiceDetail() {
           changeOrders={changeOrders}
           invoices={invoiceRows}
           currentInvoice={billingDraw}
+          amountDue={billingDraw ? amountDueNow : null}
         />
       ) : null}
       {viewMode === 'document' ? null : (
@@ -868,10 +890,11 @@ export default function InvoiceDetail() {
             handleSendInvoice()
           }}
           disabled={sending}
+          aria-label={quietIconsOnly ? emailLabel : undefined}
+          title="Email the invoice"
           style={{
-            flex: 1,
+            ...(quietIconsOnly ? { flex: '0 0 48px', padding: 0 } : { flex: 1, padding: '12px 12px' }),
             minHeight: 48,
-            padding: '12px 12px',
             borderRadius: 10,
             background: sent
               ? 'linear-gradient(180deg, var(--v3-success-bright) 0%, var(--v3-success) 100%)'
@@ -892,18 +915,18 @@ export default function InvoiceDetail() {
             transition: 'background 200ms ease, border-color 200ms ease, color 200ms ease'
           }}
         >
-          {sent ? <CheckCircle2 size={14} aria-hidden="true" /> : <Send size={14} aria-hidden="true" />}
-          {sent ? 'Sent' : sending ? 'Sending…' : 'Email'}
+          {sent ? <CheckCircle2 size={quietIconsOnly ? 18 : 14} aria-hidden="true" /> : <Send size={quietIconsOnly ? 18 : 14} aria-hidden="true" />}
+          {!quietIconsOnly && emailLabel}
         </button>
         <button
           type="button"
           onClick={() => { hapticTap(); handleShare() }}
           disabled={sharing}
+          aria-label={quietIconsOnly ? shareLabel : undefined}
           title="Mint a public share link the customer can open in any browser"
           style={{
-            flex: 1,
+            ...(quietIconsOnly ? { flex: '0 0 48px', padding: 0 } : { flex: 1, padding: '12px 12px' }),
             minHeight: 48,
-            padding: '12px 12px',
             borderRadius: 10,
             background: 'var(--v3-surface-2)',
             border: '1px solid var(--v3-border-strong)',
@@ -916,17 +939,18 @@ export default function InvoiceDetail() {
             touchAction: 'manipulation'
           }}
         >
-          <LinkIcon size={14} aria-hidden="true" />
-          {sharing ? 'Minting…' : 'Share link'}
+          <LinkIcon size={quietIconsOnly ? 18 : 14} aria-hidden="true" />
+          {!quietIconsOnly && shareLabel}
         </button>
         <button
           type="button"
           onClick={() => { hapticTap(); handleGeneratePDF() }}
           disabled={generating}
+          aria-label={quietIconsOnly ? downloadLabel : undefined}
+          title="Download the invoice as a PDF"
           style={{
-            flex: 1,
+            ...(quietIconsOnly ? { flex: '0 0 48px', padding: 0 } : { flex: 1, padding: '12px 12px' }),
             minHeight: 48,
-            padding: '12px 12px',
             borderRadius: 10,
             background: 'var(--v3-surface-2)',
             border: '1px solid var(--v3-border-strong)',
@@ -939,8 +963,8 @@ export default function InvoiceDetail() {
             touchAction: 'manipulation'
           }}
         >
-          <FileDown size={14} aria-hidden="true" />
-          {generating ? 'Generating…' : 'Download'}
+          <FileDown size={quietIconsOnly ? 18 : 14} aria-hidden="true" />
+          {!quietIconsOnly && downloadLabel}
         </button>
         <button
           type="button"
@@ -1001,7 +1025,7 @@ export default function InvoiceDetail() {
    out of state and shapes them into the template's prop contract.
    No new queries; no schema changes.
    ───────────────────────────────────────────────────────── */
-function DocumentPreviewPane({ company, contact, resolved, payments, totals, status, item, insurance, changeOrders, invoices = [], currentInvoice = null }: any) {
+function DocumentPreviewPane({ company, contact, resolved, payments, totals, status, item, insurance, changeOrders, invoices = [], currentInvoice = null, amountDue = null }: any) {
   const docStatus = (() => {
     const tone = status?.tone
     if (tone === 'good')   return 'paid'
@@ -1015,8 +1039,10 @@ function DocumentPreviewPane({ company, contact, resolved, payments, totals, sta
   // the Draws tab sent the same customer a $5K draw.
   const drawIsOpen = currentInvoice
     && !['paid', 'void', 'draft'].includes(String(currentInvoice.status || '').toLowerCase())
+  // The screen hands in the allocator's figure for the open draw, so the
+  // preview reads the same amount as the PDF and the email.
   const thisInvoiceAmount = drawIsOpen
-    ? Math.min(totals.balance, Number(currentInvoice.amount || 0))
+    ? (amountDue ?? Math.min(totals.balance, Number(currentInvoice.amount || 0)))
     : totals.balance
 
   return (

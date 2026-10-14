@@ -11,10 +11,15 @@
 //   navigate  the same maps link the Today screen builds
 //
 // Keyboard: plain letters belong to the search field, so a shortcut is
-// Alt plus the letter (Option on a Mac). actionForShortcut() is the one
-// place that rule lives, and CommandPalette draws the key caps from it.
+// Alt plus the letter, or Control plus Option plus the letter on a Mac,
+// where Option alone types a character (Option N starts ñ, Option M is µ).
+// Control with Alt is never a shortcut elsewhere: on a Windows keyboard
+// that is AltGr, which types characters too (D19). actionForShortcut() is
+// the one place that rule lives, and CommandPalette draws the key caps
+// from shortcutModifier() and shortcutCombo().
 
 import { navigateHref } from './todayView.ts'
+import { isMacLike } from './shortcutKeys.ts'
 
 export type PaletteJob = {
   id: string
@@ -99,18 +104,29 @@ export type ShortcutKeys = {
 }
 
 /**
- * The action a key press runs, or null. Alt plus the letter and nothing
- * else: a plain letter must always reach the search field, and Ctrl or
- * Cmd with I, M or N already mean something to the browser. `code` is the
- * physical key, so it holds on a Mac where Option changes the character.
+ * The action a key press runs, or null. On a Mac, Control plus Option plus
+ * the letter; elsewhere Alt plus the letter, and nothing else in either
+ * case: a plain letter must always reach the search field, Option alone
+ * types accents on a Mac, Control with Alt is AltGr on Windows, and Ctrl
+ * or Cmd with I, M or N already mean something to the browser. `code` is
+ * the physical key, so it holds on a Mac where Option changes the
+ * character. With VoiceOver running, Control plus Option is VoiceOver's own
+ * key and those presses never reach the page (Control Option M opens its
+ * menu bar); its users reach the same actions as rows, with the arrows and
+ * Enter (decision D19).
  */
-export function actionForShortcut(actions: PaletteAction[], e: ShortcutKeys): PaletteAction | null {
-  if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return null
+export function actionForShortcut(actions: PaletteAction[], e: ShortcutKeys, env: PaletteEnv = {}): PaletteAction | null {
+  if (!e.altKey || e.metaKey || e.shiftKey) return null
+  if (e.ctrlKey !== isMacLike(env)) return null
   return actions.find((a) => a.key !== null && e.code === `Key${a.key}`) ?? null
 }
 
-/** The modifier as it is printed on the key cap: Option on a Mac, Alt elsewhere. */
+/** The modifier as it is printed on the key cap: Control and Option on a Mac, Alt elsewhere. */
 export function shortcutModifier(env: PaletteEnv = {}): string {
-  const mac = /Macintosh|iPad|iPhone|iPod/.test(env.userAgent ?? '')
-  return mac ? '⌥' : 'Alt'
+  return isMacLike(env) ? '⌃⌥' : 'Alt'
+}
+
+/** The aria-keyshortcuts value for an action's letter, such as "Control+Alt+N" on a Mac or "Alt+N". */
+export function shortcutCombo(key: string, env: PaletteEnv = {}): string {
+  return isMacLike(env) ? `Control+Alt+${key}` : `Alt+${key}`
 }

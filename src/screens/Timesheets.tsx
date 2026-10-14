@@ -16,6 +16,7 @@ import { useAuth } from '../contexts/AuthContext.tsx'
 import { toastSuccess, toastError, toastInfo } from '../lib/toast.ts'
 import MiniMetric from '../components/MiniMetric.tsx'
 import { Button } from '../ui/index.ts'
+import PaletteKeyCap, { paletteShortcut } from '../components/desktop/PaletteKeyCap.tsx'
 
 // HH:MM format, see comment in screens/Crew.tsx. Bebas Neue
 // (the display font on duration metrics) is uppercase-only, so
@@ -234,10 +235,11 @@ export default function Timesheets() {
           className="fh-build-search"
           onClick={() => window.dispatchEvent(new CustomEvent('fh:open-palette'))}
           aria-label="Open command palette"
+          aria-keyshortcuts={paletteShortcut().combo}
         >
           <Search size={14} />
           <span>Search jobs, clients, invoices, notes...</span>
-          <kbd>⌘K</kbd>
+          <PaletteKeyCap />
         </button>
         <div className="fh-build-topbar__meta">
           <span>{orgName || 'Your team'}</span>

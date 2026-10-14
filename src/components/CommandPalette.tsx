@@ -10,7 +10,8 @@
 // matcher is off.
 //
 // Keyboard rule for the job actions: plain letters always type into the
-// search field. A shortcut is Alt plus I, M or N (Option on a Mac), it
+// search field. A shortcut is Alt plus I, M or N, or Control plus Option
+// plus the letter on a Mac (Option alone types accents there, D19). It
 // fires only while this palette is open and a job, or one of its action
 // rows, is highlighted, and the key caps print the modifier. There is no
 // listener while the palette is closed, so typing "i" in any other text
@@ -53,6 +54,7 @@ import type { SearchResult, SearchResults } from '../lib/universalSearch.ts'
 import {
   actionForShortcut,
   paletteActions,
+  shortcutCombo,
   shortcutModifier,
 } from '../lib/paletteActions.ts'
 import type { PaletteAction, PaletteActionId, PaletteJob } from '../lib/paletteActions.ts'
@@ -306,7 +308,7 @@ export default function CommandPalette() {
 
   function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     if (e.nativeEvent.isComposing || !activeJob || !jobHighlighted) return
-    const hit = actionForShortcut(actions, e)
+    const hit = actionForShortcut(actions, e, env)
     if (!hit) return
     e.preventDefault()
     runAction(hit, activeJob)
@@ -425,7 +427,7 @@ export default function CommandPalette() {
                           icon={ICON_FOR_ACTION[action.id]}
                           title={action.label}
                           keys={action.key ? { modifier, key: action.key } : undefined}
-                          shortcut={action.key ? `Alt+${action.key}` : undefined}
+                          shortcut={action.key ? shortcutCombo(action.key, env) : undefined}
                           onSelect={() => runAction(action, activeJob)}
                         />
                       ))}

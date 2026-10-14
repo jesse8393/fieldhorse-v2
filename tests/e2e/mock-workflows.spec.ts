@@ -1,5 +1,6 @@
 import { expect, test, type BrowserContext, type Page, type TestInfo } from '@playwright/test'
 import { installMock, session } from '../../scripts/qa-mock.mjs'
+import { nothingRunsOffTheSide } from './helpers/overflow.ts'
 
 async function installSession(context: BrowserContext) {
   await installMock(context)
@@ -66,6 +67,24 @@ test('keeps the work lifecycle action ready', async ({ page }, testInfo) => {
 
 test('keeps money, schedule, settings, and missing routes usable', async ({ page }, testInfo) => {
   const expectNoPageErrors = failOnPageErrors(page)
+  // The default mock visit starts two hours after the mock loads, so after
+  // 10 pm Central it falls on tomorrow, outside the start_at range the
+  // phone's Day view asks for (the mock honors that range). Seed a visit
+  // that starts as the test starts and pin the page clock to that instant,
+  // so the page's today is the visit's day at any hour, even when the test
+  // crosses midnight before it opens Schedule.
+  const startsAt = Date.now()
+  await page.clock.setFixedTime(new Date(startsAt))
+  await installMock(page.context(), {
+    tables: {
+      fh_schedule: [{
+        id: 's1', user_id: session.user.id, contact_id: 'c-job1', title: 'Pour slab, crew A',
+        description: 'Bellevue site', start_at: new Date(startsAt).toISOString(),
+        end_at: new Date(startsAt + 4 * 3_600_000).toISOString(),
+        created_at: new Date(startsAt - 86_400_000).toISOString()
+      }]
+    }
+  })
 
   await openRoute(page, '/')
   await expect(page.locator('body')).toContainText(/pipeline|owner queue|today/i)
@@ -122,6 +141,20 @@ test('keeps the desktop schedule planning workflow complete', async ({ page }, t
   const expectNoPageErrors = failOnPageErrors(page)
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.setViewportSize({ width: 1440, height: 900 })
+  // The default mock visit starts two hours after the mock loads, so after
+  // 10 pm Central it lands on tomorrow and the Day view is empty. Pin the
+  // page clock to a Thursday morning and seed that day's visit, so the test
+  // never depends on the time it runs.
+  await page.clock.setFixedTime(new Date('2026-10-08T14:00:00.000Z'))
+  await installMock(page.context(), {
+    tables: {
+      fh_schedule: [{
+        id: 's1', user_id: session.user.id, contact_id: 'c-job1', title: 'Pour slab, crew A',
+        description: 'Bellevue site', start_at: '2026-10-08T15:00:00.000Z', end_at: '2026-10-08T19:00:00.000Z',
+        created_at: '2026-10-07T14:00:00.000Z'
+      }]
+    }
+  })
 
   await openRoute(page, '/schedule')
   await expect(page.locator('.fh-build-weekplan')).toBeVisible()
@@ -172,11 +205,10 @@ test('uses the full desktop workspace without changing the mobile screens', asyn
         return {
           contentWidth: inner?.getBoundingClientRect().width || 0,
           viewportWidth: window.innerWidth,
-          scrollWidth: document.documentElement.scrollWidth,
         }
       })
       expect(dimensions.contentWidth).toBeLessThanOrEqual(dimensions.viewportWidth)
-      expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.viewportWidth + 1)
+      await nothingRunsOffTheSide(page, route.path)
       await page.waitForTimeout(500)
       await capture(page, testInfo, `mobile-${route.name}`, true)
     }
@@ -199,16 +231,9 @@ test('uses the full desktop workspace without changing the mobile screens', asyn
     await openRoute(page, route.path)
     await expect(page.locator('.fh-app')).toHaveAttribute('data-layout', 'responsive')
     await expect(page.locator(route.ready)).toBeVisible()
-    const dimensions = await page.evaluate((selector) => {
-      const content = document.querySelector(selector)
-      return {
-        contentWidth: content?.getBoundingClientRect().width || 0,
-        viewportWidth: window.innerWidth,
-        scrollWidth: document.documentElement.scrollWidth,
-      }
-    }, route.ready)
-    expect(dimensions.contentWidth).toBeGreaterThan(route.minWidth)
-    expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.viewportWidth + 1)
+    const contentWidth = await page.evaluate((selector) => document.querySelector(selector)?.getBoundingClientRect().width || 0, route.ready)
+    expect(contentWidth).toBeGreaterThan(route.minWidth)
+    await nothingRunsOffTheSide(page, route.path)
 
     if (route.name === 'invoice-detail') {
       const alignment = await page.evaluate(() => {
@@ -264,7 +289,6 @@ test('uses the full desktop workspace without changing the mobile screens', asyn
       const screen = document.querySelector('.v3-screen--invoice-detail')?.getBoundingClientRect()
       const actionbar = document.querySelector('.fh-invoice-actionbar')?.getBoundingClientRect()
       return {
-        pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
         tableOverflow: tableElement ? tableElement.scrollWidth - tableElement.clientWidth : 0,
         invoiceCenterDelta: screen && actionbar
           ? Math.abs((screen.left + screen.width / 2) - (actionbar.left + actionbar.width / 2))
@@ -274,7 +298,7 @@ test('uses the full desktop workspace without changing the mobile screens', asyn
           : true,
       }
     }, route)
-    expect(geometry.pageOverflow).toBeLessThanOrEqual(1)
+    await nothingRunsOffTheSide(page, `${route.path} at 1024 px`)
     expect(geometry.tableOverflow).toBeLessThanOrEqual(1)
     expect(geometry.invoiceCenterDelta).toBeLessThanOrEqual(1)
     expect(geometry.invoiceContained).toBe(true)
@@ -298,11 +322,10 @@ test('keeps estimating and dispatch desktop-native while preserving their mobile
       await expect(page.locator('[data-build-screen]')).toHaveCount(0)
       const geometry = await page.evaluate(() => ({
         viewportWidth: window.innerWidth,
-        pageWidth: document.documentElement.scrollWidth,
         rootWidth: document.querySelector('.fh-app__main-inner')?.firstElementChild?.getBoundingClientRect().width || 0,
       }))
       expect(geometry.rootWidth).toBeLessThanOrEqual(geometry.viewportWidth)
-      expect(geometry.pageWidth).toBeLessThanOrEqual(geometry.viewportWidth + 1)
+      await nothingRunsOffTheSide(page, path)
       await page.waitForTimeout(500)
       await capture(page, testInfo, `mobile-${path.slice(1)}`, true)
     }
@@ -321,12 +344,11 @@ test('keeps estimating and dispatch desktop-native while preserving their mobile
     return {
       rootWidth: root?.width || 0,
       sideBySide: Boolean(scope && result && result.left >= scope.right),
-      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     }
   })
   expect(bidWide.rootWidth).toBeGreaterThan(1000)
   expect(bidWide.sideBySide).toBe(true)
-  expect(bidWide.overflow).toBeLessThanOrEqual(1)
+  await nothingRunsOffTheSide(page, '/bid at 1440 px')
   await capture(page, testInfo, 'desktop-bid-workspace', true)
 
   await openRoute(page, '/compose')
@@ -337,12 +359,11 @@ test('keeps estimating and dispatch desktop-native while preserving their mobile
     return {
       inputTop: input?.top || Number.POSITIVE_INFINITY,
       sideBySide: Boolean(input && output && output.left >= input.right),
-      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     }
   })
   expect(composeWide.inputTop).toBeLessThan(260)
   expect(composeWide.sideBySide).toBe(true)
-  expect(composeWide.overflow).toBeLessThanOrEqual(1)
+  await nothingRunsOffTheSide(page, '/compose at 1440 px')
   await capture(page, testInfo, 'desktop-compose-workspace', true)
 
   await page.setViewportSize({ width: 1024, height: 900 })
@@ -354,11 +375,10 @@ test('keeps estimating and dispatch desktop-native while preserving their mobile
     const result = document.querySelector('.fh-bid-workspace__result')?.getBoundingClientRect()
     return {
       stacked: Boolean(scope && result && result.top >= scope.bottom),
-      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     }
   })
   expect(bidCompact.stacked).toBe(true)
-  expect(bidCompact.overflow).toBeLessThanOrEqual(1)
+  await nothingRunsOffTheSide(page, '/bid at 1024 px')
 
   expectNoPageErrors()
 })

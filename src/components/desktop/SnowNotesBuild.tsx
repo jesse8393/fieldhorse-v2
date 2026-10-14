@@ -8,6 +8,7 @@
 //   Hero (title + Capture panel + KPIs)
 //   Two-column main: Capture+Reports feed (left) | Signal rail (right)
 
+import type { ReactNode } from 'react'
 import {
   Bell,
   ChevronRight,
@@ -21,8 +22,10 @@ import {
   Link as LinkIcon,
 } from 'lucide-react'
 import MiniMetric from '../MiniMetric.tsx'
+import LoadingValue from '../LoadingValue.tsx'
 import TopbarWeather from './TopbarWeather.tsx'
 import { countNoun } from '../../lib/format.ts'
+import PaletteKeyCap, { paletteShortcut } from './PaletteKeyCap.tsx'
 
 type Contact = { id: string; name?: string | null }
 type Note = {
@@ -48,7 +51,16 @@ function asParsed(value: unknown): ParsedNote | null {
 }
 
 type Props = {
+  /** True until the first read is in: the counts and the all clear lines show skeletons. */
   loading: boolean
+  /**
+   * The read failed with nothing to show: this error, with its Try again,
+   * stands where the reports go, and the counts and the rail wait. The
+   * capture panel stays, so a report can still be saved.
+   */
+  readError?: ReactNode
+  /** The Latest reports card, where focus waits while Try again reads again. */
+  reportsRef?: (el: HTMLElement | null) => void
   contacts: Contact[]
   recent: Note[]
   linkedGroups: { contactId: string; name: string; items: Note[] }[]
@@ -88,7 +100,7 @@ function relTime(iso: any) {
 
 export default function SnowNotesBuild(props: Props) {
   const {
-    loading, contacts, recent, actionItems, cockpitStats,
+    loading, readError = null, reportsRef, contacts, recent, actionItems, cockpitStats,
     draft, setDraft, contactId, setContactId,
     saving, parsing, parsed, parseError,
     voiceState, onStartVoice, onStopVoice, onParse, onSave,
@@ -96,7 +108,11 @@ export default function SnowNotesBuild(props: Props) {
   } = props
 
   const listening = !!(voiceState && (voiceState.listening || voiceState === 'listening'))
+  const failed = readError != null
   const unlinkedCount = recent.filter((n) => !n.contact_id).length
+  // While the reports load, a skeleton stands in each count's place.
+  const pending = (label: string, width = 48) => <LoadingValue label={label} width={width} height={20} />
+  const railPending = <strong>{pending('Loading', 56)}</strong>
 
   return (
     <div className="fh-build-page" data-build-screen="SnowNotesBuild">
@@ -106,15 +122,21 @@ export default function SnowNotesBuild(props: Props) {
           className="fh-build-search"
           onClick={() => window.dispatchEvent(new CustomEvent('fh:open-palette'))}
           aria-label="Open command palette"
+          aria-keyshortcuts={paletteShortcut().combo}
         >
           <Search size={14} />
           <span>Search jobs, clients, invoices, notes...</span>
-          <kbd>⌘K</kbd>
+          <PaletteKeyCap />
         </button>
         <div className="fh-build-topbar__meta">
-          <span>{cockpitStats.total.toLocaleString()} {countNoun(cockpitStats.total, 'report')} captured</span>
-          <span className="fh-build-vline" />
-          <TopbarWeather />
+          {!failed && (
+            <span>
+              {loading
+                ? <LoadingValue label="Loading your reports" width={112} height={12} />
+                : `${cockpitStats.total.toLocaleString()} ${countNoun(cockpitStats.total, 'report')} captured`}
+            </span>
+          )}
+          <TopbarWeather lead />
         </div>
         <button className="fh-build-icon-btn" type="button" onClick={() => window.dispatchEvent(new CustomEvent('fh:navigate', { detail: { to: '/activity' } }))} aria-label="Open activity" title="Activity"><Bell size={16} /></button>
       </header>
@@ -126,26 +148,37 @@ export default function SnowNotesBuild(props: Props) {
             <h1 className="fh-build-title">Field reports</h1>
           </div>
 
-          <div className="fh-build-focus">
-            <div className="fh-build-eyebrow">Today's pulse</div>
-            <p>
-              {cockpitStats.recent24} captured in 24h ·
-              {' '}{cockpitStats.parsedCount} parsed by AI
-            </p>
-            {cockpitStats.riskCount > 0 && (
-              <p style={{ color: 'var(--v3-primary-text)', marginTop: 6 }}>
-                <AlertTriangle size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
-                {cockpitStats.riskCount} open risk{cockpitStats.riskCount === 1 ? '' : 's'} flagged
-              </p>
-            )}
-          </div>
+          {/* After a failed read there is no pulse to give: it waits. */}
+          {!failed && (
+            <>
+              <div className="fh-build-focus">
+                <div className="fh-build-eyebrow">Today's pulse</div>
+                <p>
+                  {loading ? (
+                    <LoadingValue label="Loading today's pulse" width={200} height={14} />
+                  ) : (
+                    <>
+                      {cockpitStats.recent24} captured in 24h ·
+                      {' '}{cockpitStats.parsedCount} parsed by AI
+                    </>
+                  )}
+                </p>
+                {cockpitStats.riskCount > 0 && (
+                  <p style={{ color: 'var(--v3-primary-text)', marginTop: 6 }}>
+                    <AlertTriangle size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
+                    {cockpitStats.riskCount} open risk{cockpitStats.riskCount === 1 ? '' : 's'} flagged
+                  </p>
+                )}
+              </div>
 
-          <div className="fh-build-mini-grid">
-            <MiniMetric label="Reports today" value={String(cockpitStats.recent24)} accent />
-            <MiniMetric label="AI parsed" value={String(cockpitStats.parsedCount)} />
-            <MiniMetric label="Open risks" value={String(cockpitStats.riskCount)} tone={cockpitStats.riskCount > 0 ? 'warn' : undefined} />
-            <MiniMetric label="Missing job link" value={String(unlinkedCount)} tone={unlinkedCount > 0 ? 'warn' : undefined} />
-          </div>
+              <div className="fh-build-mini-grid">
+                <MiniMetric label="Reports today" value={loading ? pending('Loading reports today') : String(cockpitStats.recent24)} accent />
+                <MiniMetric label="AI parsed" value={loading ? pending('Loading AI parsed reports') : String(cockpitStats.parsedCount)} />
+                <MiniMetric label="Open risks" value={loading ? pending('Loading open risks') : String(cockpitStats.riskCount)} tone={cockpitStats.riskCount > 0 ? 'warn' : undefined} />
+                <MiniMetric label="Missing job link" value={loading ? pending('Loading missing job links') : String(unlinkedCount)} tone={unlinkedCount > 0 ? 'warn' : undefined} />
+              </div>
+            </>
+          )}
         </section>
 
         <section className="fh-build-content-grid fh-build-content-grid--notes">
@@ -229,20 +262,28 @@ export default function SnowNotesBuild(props: Props) {
             </section>
 
             {/* Recent reports */}
-            <section className="fh-build-card fh-build-table fh-build-notes-table">
+            <section
+              ref={reportsRef}
+              className="fh-build-card fh-build-table fh-build-notes-table"
+              aria-label="Latest reports"
+              tabIndex={-1}
+            >
               <header className="fh-build-card-head">
                 {/* Say what the list actually is, "22 reports captured"
                     above a 6-row list read as disagreeing numbers
                     (UI audit #11). */}
                 <div className="fh-build-eyebrow">
-                  Latest {recent.length} of {cockpitStats.total.toLocaleString()} {countNoun(cockpitStats.total, 'report')}
+                  {loading || failed
+                    ? 'Latest reports'
+                    : <>Latest {recent.length} of {cockpitStats.total.toLocaleString()} {countNoun(cockpitStats.total, 'report')}</>}
                 </div>
               </header>
 
+              {failed && readError}
               {loading && (
                 <div className="fh-build-table__empty">Loading reports…</div>
               )}
-              {!loading && recent.length === 0 && (
+              {!loading && !failed && recent.length === 0 && (
                 <div className="fh-build-table__empty">No reports yet, start one above.</div>
               )}
               {!loading && recent.slice(0, 25).map((n: any) => {
@@ -287,47 +328,66 @@ export default function SnowNotesBuild(props: Props) {
             </section>
           </div>
 
-          <aside className="fh-build-rail fh-build-rail--page">
-            <section className="fh-build-rail-card">
-              <div className="fh-build-eyebrow">Reports today</div>
-              <strong>{cockpitStats.recent24}</strong>
-              <span>captured in last 24h</span>
-            </section>
-
-            <section className="fh-build-rail-card">
-              <div className="fh-build-eyebrow">AI parsed</div>
-              <strong>{cockpitStats.parsedCount}</strong>
-              <span>structured by AI</span>
-            </section>
-
-            <section className="fh-build-rail-card">
-              <div className="fh-build-eyebrow">Open risks</div>
-              <strong style={{ color: cockpitStats.riskCount > 0 ? 'var(--v3-danger-text)' : undefined }}>
-                {cockpitStats.riskCount}
-              </strong>
-              <span>{cockpitStats.riskCount > 0 ? 'Needs triage' : 'All clear'}</span>
-              {cockpitStats.riskCount > 0 && <div className="fh-build-spark is-red" />}
-            </section>
-
-            <section className="fh-build-rail-card">
-              <div className="fh-build-eyebrow">Missing job links</div>
-              <strong style={{ color: unlinkedCount > 0 ? 'var(--v3-primary-text)' : undefined }}>{unlinkedCount}</strong>
-              <span>{unlinkedCount > 0 ? 'Tie reports to jobs' : 'All linked'}</span>
-            </section>
-
-            {actionItems.length > 0 && (
+          {/* The rail's counts and all clear lines wait for a read that works. */}
+          {!failed && (
+            <aside className="fh-build-rail fh-build-rail--page">
               <section className="fh-build-rail-card">
-                <div className="fh-build-eyebrow">Action items</div>
-                <ul className="fh-build-rail-list" style={{ marginTop: 10 }}>
-                  {actionItems.slice(0, 4).map((it, i) => (
-                    <li key={i} style={{ gridTemplateColumns: '1fr' }}>
-                      <span className="fh-build-rail-list__title" title={it.text}>{it.text}</span>
-                    </li>
-                  ))}
-                </ul>
+                <div className="fh-build-eyebrow">Reports today</div>
+                {loading ? railPending : (
+                  <>
+                    <strong>{cockpitStats.recent24}</strong>
+                    <span>captured in last 24h</span>
+                  </>
+                )}
               </section>
-            )}
-          </aside>
+
+              <section className="fh-build-rail-card">
+                <div className="fh-build-eyebrow">AI parsed</div>
+                {loading ? railPending : (
+                  <>
+                    <strong>{cockpitStats.parsedCount}</strong>
+                    <span>structured by AI</span>
+                  </>
+                )}
+              </section>
+
+              <section className="fh-build-rail-card">
+                <div className="fh-build-eyebrow">Open risks</div>
+                {loading ? railPending : (
+                  <>
+                    <strong style={{ color: cockpitStats.riskCount > 0 ? 'var(--v3-danger-text)' : undefined }}>
+                      {cockpitStats.riskCount}
+                    </strong>
+                    <span>{cockpitStats.riskCount > 0 ? 'Needs triage' : 'All clear'}</span>
+                    {cockpitStats.riskCount > 0 && <div className="fh-build-spark is-red" />}
+                  </>
+                )}
+              </section>
+
+              <section className="fh-build-rail-card">
+                <div className="fh-build-eyebrow">Missing job links</div>
+                {loading ? railPending : (
+                  <>
+                    <strong style={{ color: unlinkedCount > 0 ? 'var(--v3-primary-text)' : undefined }}>{unlinkedCount}</strong>
+                    <span>{unlinkedCount > 0 ? 'Tie reports to jobs' : 'All linked'}</span>
+                  </>
+                )}
+              </section>
+
+              {actionItems.length > 0 && (
+                <section className="fh-build-rail-card">
+                  <div className="fh-build-eyebrow">Action items</div>
+                  <ul className="fh-build-rail-list" style={{ marginTop: 10 }}>
+                    {actionItems.slice(0, 4).map((it, i) => (
+                      <li key={i} style={{ gridTemplateColumns: '1fr' }}>
+                        <span className="fh-build-rail-list__title" title={it.text}>{it.text}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+            </aside>
+          )}
         </section>
       </main>
     </div>

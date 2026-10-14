@@ -16,7 +16,7 @@ afterAll(() => {
 // reads its pure helpers, so a stub client is enough here.
 vi.mock('./supabase.ts', () => ({ supabase: {} }))
 
-import { buildJobsList, JOBS_TABS, type JobsGroup, type JobsListInput } from './jobsList.ts'
+import { buildJobsList, jobsVisitWindow, JOBS_TABS, type JobsGroup, type JobsListInput } from './jobsList.ts'
 import type { JobRow } from './queries.ts'
 
 const NOW = new Date(2026, 9, 10, 9, 0, 0)
@@ -33,6 +33,7 @@ const now = NOW.getTime()
 function row(partial: Partial<JobRow> & { id: string; stage: string }, i: number): JobRow {
   return {
     user_id: 'qa-user-1',
+    org_id: 'org-1',
     client_id: 'cl-1',
     name: null,
     phone: '555-0101',
@@ -250,5 +251,37 @@ describe('buildJobsList', () => {
     expect(byAmount.groups[0].rows.map((r) => r.id)).toEqual(['big', 'small'])
     const hidden = buildJobsList({ jobs, tab: 'jobs', showLost: false, showMoney: false, now: NOW, sort: 'amount' })
     expect(hidden.groups[0].rows.map((r) => r.id)).toEqual(['small', 'big'])
+  })
+
+  // Phase 8, Task 15: the All tab's number has to match the All list, which
+  // holds only the last 30 days of finished work.
+  it('counts on the All tab only the finished work the All list shows', () => {
+    const jobs = [
+      row({ id: 'lead', stage: 'lead', name: 'Lead' }, 0),
+      row({ id: 'recent', stage: 'closed', name: 'Recent', completed_at: iso(now - 5 * DAY) }, 0),
+      row({ id: 'old', stage: 'closed', name: 'Old', completed_at: iso(now - 90 * DAY), updated_at: iso(now - 90 * DAY) }, 0)
+    ]
+    const all = buildJobsList({ jobs, tab: 'all', showLost: false, showMoney: true, now: NOW })
+    expect(allRows(all.groups).map((r) => r.id)).toEqual(['lead', 'recent'])
+    expect(all.counts.all).toBe(2)
+    expect(all.counts.all).toBe(allRows(all.groups).length)
+    // The Done tab still counts, and lists, every finished job.
+    expect(all.counts.done).toBe(2)
+  })
+})
+
+// Phase 8, Task 15: the visits behind the Jobs chips ("On site", "Starts",
+// "Next visit") are read from 14 days back to 15 days ahead.
+describe('jobsVisitWindow', () => {
+  it('runs from local midnight 14 days back to local midnight 15 days ahead', () => {
+    expect(jobsVisitWindow('2026-10-10')).toEqual({
+      start: new Date(2026, 8, 26).toISOString(),
+      end: new Date(2026, 9, 25).toISOString()
+    })
+    // Across the end of daylight saving time (November 1) the bounds stay on midnight.
+    expect(jobsVisitWindow('2026-11-05')).toEqual({
+      start: new Date(2026, 9, 22).toISOString(),
+      end: new Date(2026, 10, 20).toISOString()
+    })
   })
 })

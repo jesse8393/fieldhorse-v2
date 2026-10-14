@@ -77,6 +77,17 @@ export async function markLost(contact: Contact) {
   return res
 }
 
+/**
+ * What Reopen asks first (Phase 8, Task 15), the way Mark lost does: one
+ * tap on a closed or lost job used to move it straight back. A closed job
+ * goes back to Jobs, a lost deal back to Leads. Pass it to useConfirm().
+ */
+export function reopenQuestion(contact: Pick<Contact, 'stage'>) {
+  return contact.stage === 'closed'
+    ? { title: 'Reopen this job?', body: 'It moves back to Jobs.', confirmLabel: 'Reopen' }
+    : { title: 'Reopen this deal?', body: 'It moves back to Leads.', confirmLabel: 'Reopen' }
+}
+
 export async function reopen(contact: Contact) {
   // closed → job (billing adjustments / extra payments happen on the
   // job itself now that invoicing isn't a stage). lost → lead (they're

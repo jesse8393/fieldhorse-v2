@@ -10,7 +10,8 @@ import { Toaster as SonnerToaster } from 'sonner'
  * text, in both themes, so Sonner runs in its dark theme for its own
  * description, action and close colors. Sonner announces toasts in a
  * polite live region. Phone: full width above the dock. Desktop: bottom
- * right, left of the capture button column.
+ * right, left of the corner plus button column (Jobs keeps its New deal
+ * button there).
  */
 export default function AppToaster() {
   return (

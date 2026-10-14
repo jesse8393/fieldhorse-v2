@@ -1,14 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const inserted: { user_id: string; text: string }[] = []
+type NoteRow = { user_id: string; contact_id: string | null; text: string; category: string }
+const inserted: NoteRow[] = []
 const failTexts = new Set<string>()
+// Jobs the database no longer has: a note filed on one breaks the foreign key.
+const goneJobs = new Set<string>()
 let sessionUser: string | null = 'user-a'
 
 vi.mock('./supabase.ts', () => ({
   supabase: {
     from: () => ({
-      insert: async (row: { user_id: string; text: string }) => {
+      insert: async (row: NoteRow) => {
         if ([...failTexts].some((t) => row.text.startsWith(t))) return { error: { message: 'rejected' } }
+        if (row.contact_id && goneJobs.has(row.contact_id)) {
+          return { error: { code: '23503', message: 'insert or update on table "fh_notes" violates foreign key constraint' } }
+        }
         inserted.push(row)
         return { error: null }
       },
@@ -28,7 +34,7 @@ vi.stubGlobal('localStorage', {
 
 const capture = await import('./captureOutbox.ts')
 
-function queued(): { text: string; user_id?: string }[] {
+function queued(): { text: string; user_id?: string; job_id?: string }[] {
   return JSON.parse(storage.get('fh:capture-outbox') || '[]')
 }
 
@@ -36,6 +42,7 @@ beforeEach(() => {
   storage.clear()
   inserted.length = 0
   failTexts.clear()
+  goneJobs.clear()
   sessionUser = 'user-a'
 })
 
@@ -84,6 +91,47 @@ describe('flushOutbox', () => {
     failTexts.add('bounces')
     expect(await capture.flushOutbox('user-a')).toBe(1)
     expect(queued()).toMatchObject([{ text: 'bounces' }])
+  })
+})
+
+describe('a capture taken on a job', () => {
+  it('keeps the job on the queued capture and files the note on that job', async () => {
+    expect(capture.pushOutbox('Rebar is four sticks short', 'user-a', 'c-job1')).toBe(true)
+    expect(queued()).toMatchObject([{ text: 'Rebar is four sticks short', user_id: 'user-a', job_id: 'c-job1' }])
+
+    expect(await capture.flushOutbox('user-a')).toBe(1)
+    expect(inserted).toHaveLength(1)
+    expect(inserted[0]).toMatchObject({ user_id: 'user-a', contact_id: 'c-job1', category: 'note' })
+    expect(inserted[0].text.startsWith('Rebar is four sticks short (captured offline')).toBe(true)
+    expect(queued()).toEqual([])
+  })
+
+  it('lands captures queued before the job was kept, with no job', async () => {
+    const at = new Date().toISOString()
+    storage.set('fh:capture-outbox', JSON.stringify([
+      { text: 'tagged, no job', captured_at: at, user_id: 'user-a' },
+      { text: 'untagged, no job', captured_at: at },
+    ]))
+    expect(await capture.flushOutbox('user-a')).toBe(2)
+    expect(inserted.map((r) => [r.text.split(' (')[0], r.contact_id])).toEqual([
+      ['tagged, no job', null],
+      ['untagged, no job', null],
+    ])
+  })
+
+  it('still lands the words when the job is gone, as a note on no job', async () => {
+    capture.pushOutbox('Pump truck at seven', 'user-a', 'c-deleted')
+    goneJobs.add('c-deleted')
+    expect(await capture.flushOutbox('user-a')).toBe(1)
+    expect(inserted).toHaveLength(1)
+    expect(inserted[0]).toMatchObject({ contact_id: null })
+    expect(inserted[0].text.startsWith('Pump truck at seven')).toBe(true)
+    expect(queued()).toEqual([])
+  })
+
+  it('a capture with no job queues as before', () => {
+    expect(capture.pushOutbox('measure the deck', 'user-a', null)).toBe(true)
+    expect(queued()[0]).not.toHaveProperty('job_id')
   })
 })
 

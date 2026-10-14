@@ -1,8 +1,8 @@
 // src/components/CaptureSheet.tsx
 //
 // Universal Capture, the one gesture that replaces navigating the app
-// to do data entry. Opened from anywhere (the dock coin, the desktop
-// button, Cmd or Ctrl+J, the command palette) via the `fh:open-capture`
+// to do data entry. Opened from anywhere (the dock coin, the sidebar's
+// Capture row, Cmd or Ctrl+J, the command palette) via the `fh:open-capture`
 // window event; openCapture({ jobId }) in lib/captureAttach.ts opens it
 // attached to the job on screen. The contractor says it, types it, or
 // snaps a receipt; Claude routes it into the right action (note, task,
@@ -17,7 +17,11 @@
 //
 // Failure philosophy: capture must never lose words. AI down, offer
 // "save as note". No signal, queue in the offline outbox and sync as a
-// note when the connection returns.
+// note (on the job the sheet was opened on) when the connection returns.
+//
+// The sheet never navigates after Save. It refreshes what the capture
+// changed instead (refreshAfterCapture), so a note taken on a job page
+// shows on that job's Spine at once.
 //
 // Layout (SPEC.md 9.5, base/capture.jpg): the fh Sheet titled Capture
 // with Done; a voice panel on the tray (microphone, text, File it, then
@@ -26,6 +30,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import type { LucideIcon } from 'lucide-react'
 import {
   Camera, ChevronRight, Clock, FileText, HandCoins, Keyboard, Mic,
@@ -50,7 +55,7 @@ import {
   type CaptureIntent
 } from '../lib/captureIntelligence.ts'
 import { seedJob, withAttachedJob, type OpenCaptureDetail } from '../lib/captureAttach.ts'
-import { commitCapture, type CaptureContact } from '../lib/captureActions.ts'
+import { commitCapture, refreshAfterCapture, type CaptureContact } from '../lib/captureActions.ts'
 import { pushOutbox, flushOutbox, outboxCount } from '../lib/captureOutbox.ts'
 import { compressImageToDataUrl, parseExpenseFromImage } from '../lib/docIntelligence.ts'
 import { speechErrorFeedback } from '../lib/speech.ts'
@@ -65,6 +70,7 @@ const ROSTER_COLUMNS = 'id,user_id,name,job_title,stage,amount'
 export default function CaptureSheet() {
   const { user } = useAuth()
   const { canSee } = useNavAccess()
+  const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
   const [phase, setPhase] = useState<Phase>('input')
   const [text, setText] = useState('')
@@ -116,8 +122,13 @@ export default function CaptureSheet() {
   const flush = useCallback(async () => {
     if (!user?.id || !navigator.onLine || outboxCount() === 0) return
     const n = await flushOutbox(user.id)
-    if (n > 0) toastSuccess(`Synced ${n} offline capture${n === 1 ? '' : 's'}`, 'Saved to Notes')
-  }, [user?.id])
+    if (n > 0) {
+      // The notes landed on the jobs they were taken on; a job page on
+      // screen reads them now.
+      void queryClient.invalidateQueries({ queryKey: ['jobDetail'] })
+      toastSuccess(`Synced ${n} offline capture${n === 1 ? '' : 's'}`, 'Saved to Notes')
+    }
+  }, [user?.id, queryClient])
 
   useEffect(() => {
     flush()
@@ -297,8 +308,9 @@ export default function CaptureSheet() {
 
     if (!navigator.onLine) {
       // The queue refuses new captures when full; keep the words in the
-      // sheet rather than claiming they were saved.
-      if (!pushOutbox(input, user.id)) {
+      // sheet rather than claiming they were saved. The job comes from
+      // the open event: with no signal its row never loads.
+      if (!pushOutbox(input, user.id, attachedJobId)) {
         setText(input)
         hapticError()
         toastError("Couldn't save offline", 'Offline storage is full. Reconnect to sync, then try again.')
@@ -338,6 +350,7 @@ export default function CaptureSheet() {
     setPhase('saving')
     try {
       const result = await commitCapture({ intent: it, userId: user.id, contacts: roster })
+      void refreshAfterCapture(queryClient, user.id, it.job_id ?? null)
       hapticSuccess()
       toastSuccess(result.toast, it.summary)
       finish()

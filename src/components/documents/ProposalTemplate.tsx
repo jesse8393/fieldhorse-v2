@@ -27,12 +27,18 @@ import { DOC_COLORS, DOC_FONTS, resolveBrandGold } from './tokens.ts'
 import { money, longDate } from './format.ts'
 import { proposalNumber } from './numbers.ts'
 import { groupPhotosByTag } from './photoGroups.ts'
-import { SlateProposal, MintProposal, EditorialProposal } from './proposalThemes.tsx'
+import { SlateProposal, MintProposal, EditorialProposal, FieldhorseProposal } from './proposalThemes.tsx'
+import { quoteMoney } from '../../lib/quoteMoney.ts'
 
+// 'fieldhorse' is the phone first customer portal (spec 9.9). It is a
+// choice in Settings, never the default: a company with no estimate_template
+// still resolves to 'classic' below, so no live customer page changes until
+// its owner picks it (decision D13).
 const TEMPLATE_COMPONENTS: Record<string, (props: { view: any }) => any> = {
   slate: SlateProposal,
   mint: MintProposal,
-  editorial: EditorialProposal
+  editorial: EditorialProposal,
+  fieldhorse: FieldhorseProposal
 }
 
 const DEFAULT_PAYMENT_COPY = '50% deposit due upon approval · 40% due at material delivery or midpoint · 10% due upon substantial completion.'
@@ -55,7 +61,9 @@ export default function ProposalTemplate({
   meta = {},
   status = 'draft',
   showInternalNotes = false,
-  photos = []
+  photos = [],
+  payments = [],           // the job's payments, which the 'fieldhorse' theme reads as the customer page does
+  portal = undefined       // the live customer link's extras, read by the 'fieldhorse' theme only
 }: any) {
   const issuedAt = meta.issuedAt || new Date()
   const number = meta.number || proposalNumber(company?.name, contact?.id, issuedAt)
@@ -76,13 +84,25 @@ export default function ProposalTemplate({
   const projectTitle = (project?.title || project?.name || contact?.job_title || '').trim()
 
   const coAdjustment = (changeOrders || [])
-    .filter((co: any) => co?.status === 'approved')
+    .filter((co: any) => String(co?.status || '').toLowerCase() === 'approved')
     .reduce((s: any, co: any) => s + Number(co.amount || 0), 0)
+
+  // The quote's total is the one rule the Quote tab capsule and the
+  // customer page use too (lib/quoteMoney.ts, decision D31): base lines plus
+  // approved change orders, or the contact amount when no line is priced.
+  const quote = quoteMoney({
+    items: [
+      ...groups.flatMap((g: any) => g.items),
+      ...upgradeGroupsFlat.map((it: any) => ({ ...it, is_optional: true }))
+    ],
+    changeOrders,
+    contactAmount: contact?.amount
+  })
 
   const subtotal = Math.max(0, Number(pricing.baseTotal || 0))
   const discount = Math.max(0, Number(pricing.discount || 0))
   const tax = (subtotal - discount) * Number(pricing.taxRate || 0)
-  const grandTotal = Math.max(0, subtotal - discount + tax + coAdjustment)
+  const grandTotal = Math.max(0, quote.total - discount + tax)
   const itemCount = groups.reduce((s: number, g: any) => s + g.items.length, 0)
 
   const statusChip = statusToChip(status)
@@ -121,7 +141,9 @@ export default function ProposalTemplate({
       approval,
       photos,
       insurance,
-      changeOrders
+      changeOrders,
+      payments,
+      portal
     }
     return <ThemeComponent view={view} />
   }

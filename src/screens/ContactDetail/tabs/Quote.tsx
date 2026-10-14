@@ -11,17 +11,19 @@ async function loadPdf(): Promise<any> {
 import { toastError, toastSuccess } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { dateInputToTimestamp, timestampToDateInput } from '../../../lib/dueDate.ts'
-import QuoteItemsSection from '../sections/QuoteItems.tsx'
+import QuoteItemsSection, { type QuoteLinesState } from '../sections/QuoteItems.tsx'
 import QuoteTermsSection from '../sections/QuoteTerms.tsx'
 import ChangeOrdersSection from '../sections/ChangeOrdersSection.tsx'
 import { useConfirm } from '../../../components/ConfirmSheet.tsx'
 import { proposalNumber } from '../../../components/documents/numbers.ts'
-import { DocumentPreviewPane, loadProjectPhotosForPdf } from '../sections/DocumentPreviewPane.tsx'
+import { DocumentPreviewPane, loadPreviewPhotos, loadProjectPhotosForPdf } from '../sections/DocumentPreviewPane.tsx'
 import { deriveStatus, shortDate } from '../lib/quoteStatus.ts'
 import { mintPublicLink } from '../../../lib/publicLink.ts'
 import { Eyebrow } from '../../../components/v3'
 import { quoteFollowUpDate } from '../../../lib/quoteFollowUp.ts'
 import { useIsDesktop } from '../../../lib/useMediaQuery.ts'
+import { useLinkedClientEmail } from '../../../lib/queries.ts'
+import { customerEmail } from '../../../lib/customerEmail.ts'
 import QuotePhone from '../phone/QuotePhone.tsx'
 
 // An iPhone running the app from the home screen. Safari's share sheet is
@@ -92,20 +94,36 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
   // tenant boundary, never by the viewer, so a teammate sees the lines
   // the quote's author wrote.
   const [baseCount, setBaseCount] = useState(0)
+  // The job whose base lines baseCount counts. Until the count is read for
+  // this job (the first read is out, or failed) it says nothing: never
+  // that there are no lines.
+  const [countedFor, setCountedFor] = useState<string | null>(null)
+  // The count could not be read. Send and Approve wait, and say the lines
+  // could not be loaded, never that there are none; a count read before
+  // stays. The next read of the lines that works reads it again.
+  const [baseCountFailed, setBaseCountFailed] = useState(false)
+  const [countKey, setCountKey] = useState(0)
   useEffect(() => {
     let alive = true
-    if (!contact?.id || !userId) { setBaseCount(0); return }
+    if (!contact?.id || !userId) { setBaseCount(0); setBaseCountFailed(false); setCountedFor(null); return }
+    const jobId = contact.id
     ;(async () => {
-      const { count } = await supabase
+      const { count, error } = await supabase
         .from('fh_quote_items')
         .select('id', { count: 'exact', head: true })
-        .eq('contact_id', contact.id)
+        .eq('contact_id', jobId)
         .eq('is_optional', false)
         .eq('is_excluded', false)
-      if (alive) setBaseCount(count || 0)
+      if (!alive) return
+      if (error) { setBaseCountFailed(true); return }
+      setBaseCount(count || 0)
+      setCountedFor(jobId)
+      setBaseCountFailed(false)
     })()
     return () => { alive = false }
-  }, [contact?.id, contact?.updated_at, userId])
+  }, [contact?.id, contact?.updated_at, userId, countKey])
+  const baseCountKnown = !!contact?.id && countedFor === contact.id
+  const recountLines = baseCountFailed ? () => setCountKey((k) => k + 1) : undefined
 
   // Phase 2, opt-in Document preview using the new ProposalTemplate.
   // 'builder' = existing CRUD editor (default, unchanged UX).
@@ -118,43 +136,120 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
   const [docItems, setDocItems] = useState<any[]>([])
   const [docPhotos, setDocPhotos] = useState<any[]>([])
   const [docItemsLoading, setDocItemsLoading] = useState(false)
+  // The Document view's first read of the lines failed: the pane says so,
+  // with Try again, and never draws a proposal with no lines.
+  const [docItemsFailed, setDocItemsFailed] = useState(false)
+  const [docKey, setDocKey] = useState(0)
+  // The job whose letter is on screen, from a read since the Document view
+  // opened. Its rereads keep the letter: no wait in its place, and a reread
+  // that fails says so in a toast instead of taking the letter away.
+  const docShownFor = useRef<string | null>(null)
   useEffect(() => {
-    if (docMode !== 'document' || !contact?.id || !userId) return
+    if (docMode !== 'document' || !contact?.id || !userId) {
+      docShownFor.current = null
+      return
+    }
     let alive = true
-    setDocItemsLoading(true)
+    const jobId = contact.id
+    const reread = docShownFor.current === jobId
+    if (!reread) setDocItemsLoading(true)
+    setDocItemsFailed(false)
     ;(async () => {
-      const [{ data: items }, photos] = await Promise.all([
+      const [{ data: items, error }, photos] = await Promise.all([
         supabase
           .from('fh_quote_items')
           .select('*')
-          .eq('contact_id', contact.id)
+          .eq('contact_id', jobId)
           .order('sort_order', { ascending: true }),
-        loadProjectPhotosForPdf(contact.id, userId).catch(() => [])
+        loadPreviewPhotos(jobId, userId).catch(() => [])
       ])
-      if (alive) {
-        setDocItems(items || [])
-        setDocPhotos(photos || [])
+      if (!alive) return
+      if (error) {
+        if (reread) {
+          toastError("Couldn't refresh the lines", 'The preview may be out of date. Check your connection and try again.')
+        } else {
+          setDocItemsFailed(true)
+        }
         setDocItemsLoading(false)
+        return
       }
+      setDocItems(items || [])
+      setDocPhotos(photos || [])
+      docShownFor.current = jobId
+      setDocItemsLoading(false)
     })()
     return () => { alive = false }
     // contact.updated_at flips after every CRUD via the trigger from
     // 011_quote_items so the preview re-fetches without an extra sub.
-  }, [docMode, contact?.id, contact?.updated_at, userId])
+  }, [docMode, contact?.id, contact?.updated_at, userId, docKey])
+
+  // What the line editor on screen knows (useQuoteItems): the desktop
+  // builder or the phone editor, null while neither is mounted (the
+  // desktop Document view).
+  const [editorLines, setEditorLines] = useState<QuoteLinesState | null>(null)
+  // The editor's first read of the lines failed, or the Document view's
+  // read did: the lines on screen are unknown, so Send and Approve wait
+  // with "We couldn't load the lines.", whatever the separate count read
+  // says. Nothing goes out that the operator cannot see.
+  const linesUnknown = (!!editorLines && editorLines.failed && !editorLines.loaded)
+    || (docMode === 'document' && docItemsFailed)
+  // The count read failed, or is not in yet, but the editor has the lines:
+  // count those, so Send and Approve follow the lines on screen instead of
+  // waiting on a count that may not be read again until the next edit.
+  const editorCount = (baseCountFailed || !baseCountKnown) && editorLines?.loaded ? editorLines.baseCount : null
+  const knownBaseCount = editorCount ?? (baseCountKnown ? baseCount : 0)
+  const countFailed = linesUnknown || (baseCountFailed && editorCount === null)
+  // Nothing has counted the lines yet: the first count read is out and the
+  // editor has no read either. Send waits without saying to add a line.
+  const countPending = !baseCountKnown && !baseCountFailed && editorCount === null
 
   const [busy, setBusy] = useState<any>(null) // 'preview' | 'download' | 'send' | null
-  const disabled = baseCount === 0 || busy !== null
+  const disabled = knownBaseCount === 0 || linesUnknown || busy !== null
   // Phase 1 send requires a recipient, the proposal email is attached to
   // the client's email address. Preview and Download don't require this.
-  const hasClientEmail = Boolean((contact?.email || '').trim())
-  const sendDisabled = disabled || !hasClientEmail
-  const sendDisabledReason = baseCount === 0
-    ? (pastQuote
-        ? "This job is past the quote phase. There's nothing to send unless you rebuild the proposal."
-        : 'Add at least one base line item to enable Send.')
-    : !hasClientEmail
-      ? "Add a client email first so we know where to send."
-      : null
+  // The address is found the way Money finds it: the job's own email, then
+  // the linked client's (lib/customerEmail.ts). The job page's contact
+  // carries no client, so the client's email is read when the job has none.
+  const ownEmail = String(contact?.email || '').trim()
+  const readsLinkedEmail = !ownEmail && !!contact?.client_id
+  const linkedEmail = useLinkedClientEmail(contact?.client_id, !ownEmail)
+  const recipientEmail = customerEmail({ email: ownEmail, fh_clients: { email: linkedEmail.data ?? null } })
+  // Still reading the linked client: say nothing about the email yet. The
+  // tab reads it again each time it opens, and a copy from before (an
+  // earlier visit, or the one saved for offline use) is not sent to: the
+  // address may have changed on the client page since. Offline, when that
+  // read cannot go out, the saved copy stands. Trying again after a failed
+  // read counts as reading.
+  const emailPending = readsLinkedEmail && (
+    linkedEmail.isPending
+    || (linkedEmail.isFetching && (!linkedEmail.isFetchedAfterMount || linkedEmail.isError))
+  )
+  // The read failed, its retry too: whether the client has an email is
+  // unknown, not no. Nothing claims there is none, Send waits instead of
+  // falling back to a share link, and the phone offers Try again.
+  const emailFailed = readsLinkedEmail && !emailPending && linkedEmail.isError
+  // Reading again after a failure: the phone keeps its line and shows Try
+  // again as busy, so the button does not vanish from under a finger or
+  // the keyboard focus, and the line does not flicker if it fails again.
+  const emailRetrying = readsLinkedEmail && linkedEmail.isError && linkedEmail.isFetching
+  const emailUnknown = emailPending || emailFailed
+  const hasClientEmail = recipientEmail !== ''
+  const sendDisabled = disabled || emailUnknown || !hasClientEmail
+  const sendDisabledReason = linesUnknown || knownBaseCount === 0
+    ? (countFailed
+        ? "We couldn't load the lines."
+        : countPending
+          ? null
+          : pastQuote
+            ? "This job is past the quote phase. There's nothing to send unless you rebuild the proposal."
+            : 'Add at least one base line item to enable Send.')
+    : emailPending
+      ? null
+      : emailFailed
+        ? "Couldn't check the client email. Reload the page to try again."
+        : !hasClientEmail
+          ? "Add a client email first so we know where to send."
+          : null
 
   // Mirror of QuoteTermsSection's local state. The terms editor pushes
   // its current values here on every change; buildPdf reads from this
@@ -252,7 +347,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
         name: contact.name,
         address: contact.address,
         phone: contact.phone,
-        email: contact.email,
+        email: recipientEmail || null,
         job_title: contact.job_title
       },
       items: items as any,
@@ -350,7 +445,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
       if (delErr) throw delErr
       // Lines exist but none were removed (refused by the database): stop
       // here rather than wipe the terms of a quote whose lines remain.
-      if (baseCount > 0 && (!deleted || deleted.length === 0)) {
+      if (knownBaseCount > 0 && (!deleted || deleted.length === 0)) {
         throw new Error("The line items couldn't be removed, so nothing was changed.")
       }
 
@@ -434,7 +529,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
   }
 
   async function handleSend() {
-    if (disabled) return
+    if (disabled || emailUnknown) return
     // Phase 1 send-by-email, require a client email. The Send button is
     // already disabled in this state, so this is a belt-and-suspenders
     // guard for the desktop WorkspaceHead path which doesn't see the
@@ -486,7 +581,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
         body: JSON.stringify({
           contact_id: contact.id,
           sender_user_id: userId,
-          recipient_email: contact.email,
+          recipient_email: recipientEmail,
           recipient_name: contact.name || null,
           storage_path: path,
           filename: result.filename,
@@ -514,7 +609,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
       if (fetchAll) await fetchAll()
 
       toastSuccess(
-        `Proposal sent to ${contact.email}`,
+        `Proposal sent to ${recipientEmail}`,
         result.filename
       )
     } catch (e: any) {
@@ -529,7 +624,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
   // function degrades gracefully (503 esign_not_configured) until the
   // DOCUSIGN_* env vars are set in Netlify.
   async function handleEsign() {
-    if (disabled) return
+    if (disabled || emailUnknown) return
     if (!hasClientEmail) {
       toastError('Add a client email first', 'DocuSign sends the signing request to the client email.')
       return
@@ -559,7 +654,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
         body: JSON.stringify({
           contact_id: contact.id,
           sender_user_id: userId,
-          recipient_email: contact.email,
+          recipient_email: recipientEmail,
           recipient_name: contact.name || null,
           storage_path: path
         })
@@ -573,7 +668,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
         throw new Error(data?.detail || data?.error || 'DocuSign send failed.')
       }
       if (fetchAll) await fetchAll()
-      toastSuccess(`Sent to ${contact.email} for signature`, 'DocuSign will email the signing request.')
+      toastSuccess(`Sent to ${recipientEmail} for signature`, 'DocuSign will email the signing request.')
     } catch (e: any) {
       toastError("Couldn't send for electronic signature", e?.message || 'Try again')
     } finally {
@@ -592,7 +687,10 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
         status={status}
         pastQuote={pastQuote}
         busy={busy}
-        hasClientEmail={hasClientEmail}
+        customerEmail={emailUnknown ? null : recipientEmail}
+        emailFailed={emailFailed || emailRetrying}
+        emailRetrying={emailRetrying}
+        onRetryEmail={() => { void linkedEmail.refetch() }}
         clearing={clearing}
         patch={patch}
         onContactRefresh={fetchAll}
@@ -603,6 +701,8 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
         onEsign={handleEsign}
         onOpenApprove={onOpenApprove}
         onClearDraft={handleClearDraft}
+        onLinesLoaded={recountLines}
+        onLinesState={setEditorLines}
       />
     )
   }
@@ -626,7 +726,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
         contact={contact}
         companyName={company?.name}
         status={status}
-        baseCount={baseCount}
+        baseCount={knownBaseCount}
         busy={busy}
         disabled={disabled}
         sendDisabled={sendDisabled}
@@ -662,6 +762,8 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
             items={docItems}
             photos={docPhotos}
             loading={docItemsLoading}
+            failed={docItemsFailed}
+            onRetry={() => setDocKey((k) => k + 1)}
             insurance={insurance}
             changeOrders={changeOrders}
           />
@@ -671,6 +773,8 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
               jobId={contact?.id}
               userId={userId}
               onContactRefresh={fetchAll}
+              onLinesLoaded={recountLines}
+              onLinesState={setEditorLines}
             />
 
             <QuoteTermsSection
@@ -697,7 +801,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
         <ContextCard contact={contact} status={status} />
 
         <ActionBar
-          baseCount={baseCount}
+          baseCount={knownBaseCount}
           busy={busy}
           disabled={disabled}
           sendDisabled={sendDisabled}
@@ -712,7 +816,8 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
         {(pastQuote || ['approved', 'changes_requested'].includes(contact?.proposal_status)) && (
           <ApproveBand
             contact={contact}
-            baseCount={baseCount}
+            baseCount={linesUnknown ? 0 : knownBaseCount}
+            countFailed={countFailed}
             busy={busy}
             pastQuote={pastQuote}
             onOpenApprove={onOpenApprove}
@@ -721,7 +826,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
 
         <ClearDraftBand
           contact={contact}
-          baseCount={baseCount}
+          baseCount={knownBaseCount}
           clearing={clearing}
           onClearDraft={handleClearDraft}
         />
@@ -1010,7 +1115,7 @@ function ContextCard({ contact, status }: any) {
    small "Approve a new version" link so re-approval requires an
    intentional tap (no accidental double-approval). Phase 4C-2.
    ============================================================ */
-function ApproveBand({ contact, baseCount, busy, pastQuote = false, onOpenApprove }: any) {
+function ApproveBand({ contact, baseCount, countFailed = false, busy, pastQuote = false, onOpenApprove }: any) {
   const status = (contact?.proposal_status || 'draft').toLowerCase()
   const changesRequested = status === 'changes_requested'
   const explicitlyApproved = status === 'approved'
@@ -1108,7 +1213,7 @@ function ApproveBand({ contact, baseCount, busy, pastQuote = false, onOpenApprov
   }
 
   const helper = baseCount === 0
-    ? 'Add at least one base line item to enable approval.'
+    ? (countFailed ? "We couldn't load the lines." : 'Add at least one base line item to enable approval.')
     : 'Saves a permanent record of the customer approved quote. Different from sending the PDF, use this when the customer says yes.'
 
   return (

@@ -117,7 +117,7 @@
 }
 
 .fhtd .fht-card__frame {
-  aspect-ratio: 21 / 8;
+  padding: 12px 20px;
 }
 
 /* ---- Lists on plaster, as on the phone ---- */

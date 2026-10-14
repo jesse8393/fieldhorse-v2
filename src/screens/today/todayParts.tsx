@@ -185,7 +185,9 @@ export function StageLine({ view, loading, hasLocation, forecast, forecastError,
 export function NextStopCard({ next, maps, ratio }: { next: TodayNextStop; maps: (address: string) => string; ratio?: string }) {
   const time = stopTime(next.startAt)
   const shared = {
-    eyebrow: time ? `Next stop, ${time.time} ${time.suffix}` : 'Next stop',
+    // A no break space keeps "7:30 am" together where the photo's text
+    // column is narrow, instead of "Next stop, 7:30" over "am".
+    eyebrow: time ? `Next stop, ${time.time}\u00a0${time.suffix}` : 'Next stop',
     title: (
       <Link className="fht-next__link" to={`/jobs/${next.jobId}`}>
         {next.title}
@@ -241,6 +243,25 @@ export function AnswerList({ answers, now, actionPath }: { answers: HomeNextActi
         )
       })}
     </ul>
+  )
+}
+
+/**
+ * See all and Show fewer under the answers. While See all is open and more
+ * wait than the dashboard keeps, a quiet line says how many it lists.
+ */
+export function AnswersMore({ view, showAll }: { view: TodayView; showAll: boolean }) {
+  if (view.answersTotal <= 3) return null
+  const listed = view.seeAll.length
+  return (
+    <div className="fht-more">
+      <Button variant="quiet" size="mini" to={{ search: showAll ? '' : '?answers=all' }} replace>
+        {showAll ? 'Show fewer' : 'See all'}
+      </Button>
+      {showAll && listed < view.answersTotal && (
+        <p className="fht-more__note">{`Showing ${listed} of ${view.answersTotal}, most urgent first.`}</p>
+      )}
+    </div>
   )
 }
 
