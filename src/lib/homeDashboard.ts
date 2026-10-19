@@ -519,11 +519,11 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
     // Noon on the due day, as follow_up_on above, so the day and the days
     // late read the same on Today as on Money.
     const due = new Date(standing.dueDay.getFullYear(), standing.dueDay.getMonth(), standing.dueDay.getDate(), 12)
-    const contact = contactsById.get(invoice.contact_id)
+    const contact = invoice.contact_id ? contactsById.get(invoice.contact_id) : undefined
     actions.push({
       id: `inv-overdue-${invoice.id}`,
       kind: 'inv-overdue',
-      contactId: invoice.contact_id,
+      contactId: invoice.contact_id ?? '',
       verb: 'Nudge',
       contactName: contactName(contact),
       contactAmount: standing.owed,

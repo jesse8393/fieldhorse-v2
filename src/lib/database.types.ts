@@ -1371,6 +1371,7 @@ export type Database = {
       }
       fh_esign_envelopes: {
         Row: {
+          quote_id: string | null
           completed_at: string | null
           contact_id: string
           created_at: string
@@ -1387,6 +1388,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          quote_id?: string | null
           completed_at?: string | null
           contact_id: string
           created_at?: string
@@ -1403,6 +1405,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          quote_id?: string | null
           completed_at?: string | null
           contact_id?: string
           created_at?: string
@@ -1419,6 +1422,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "fh_esign_envelopes_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "fh_quotes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "fh_esign_envelopes_contact_id_fkey"
             columns: ["contact_id"]
@@ -2212,8 +2222,9 @@ export type Database = {
       }
       fh_invoices: {
         Row: {
+          client_id: string | null
           amount: number
-          contact_id: string
+          contact_id: string | null
           created_at: string
           description: string | null
           due_at: string | null
@@ -2228,8 +2239,9 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          client_id?: string | null
           amount?: number
-          contact_id: string
+          contact_id: string | null
           created_at?: string
           description?: string | null
           due_at?: string | null
@@ -2244,8 +2256,9 @@ export type Database = {
           user_id: string
         }
         Update: {
+          client_id?: string | null
           amount?: number
-          contact_id?: string
+          contact_id?: string | null
           created_at?: string
           description?: string | null
           due_at?: string | null
@@ -2260,6 +2273,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "fh_invoices_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "fh_clients"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "fh_invoices_contact_id_fkey"
             columns: ["contact_id"]
@@ -2552,6 +2572,92 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fh_leads: {
+        Row: {
+          client_id: string
+          created_at: string
+          follow_up_on: string | null
+          id: string
+          job_type: string | null
+          last_contact: string | null
+          notes: string | null
+          org_id: string | null
+          origin_contact_id: string | null
+          quote_id: string | null
+          referred_by: string | null
+          source: string | null
+          status: string
+          title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          follow_up_on?: string | null
+          id?: string
+          job_type?: string | null
+          last_contact?: string | null
+          notes?: string | null
+          org_id?: string | null
+          origin_contact_id?: string | null
+          quote_id?: string | null
+          referred_by?: string | null
+          source?: string | null
+          status?: string
+          title?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          follow_up_on?: string | null
+          id?: string
+          job_type?: string | null
+          last_contact?: string | null
+          notes?: string | null
+          org_id?: string | null
+          origin_contact_id?: string | null
+          quote_id?: string | null
+          referred_by?: string | null
+          source?: string | null
+          status?: string
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fh_leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "fh_clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fh_leads_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fh_leads_origin_contact_id_fkey"
+            columns: ["origin_contact_id"]
+            isOneToOne: false
+            referencedRelation: "fh_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fh_leads_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "fh_quotes"
             referencedColumns: ["id"]
           },
         ]
@@ -2930,6 +3036,8 @@ export type Database = {
       }
       fh_notes: {
         Row: {
+          lead_id: string | null
+          quote_id: string | null
           action: string | null
           audio_url: string | null
           category: string | null
@@ -2944,6 +3052,8 @@ export type Database = {
           when_text: string | null
         }
         Insert: {
+          lead_id?: string | null
+          quote_id?: string | null
           action?: string | null
           audio_url?: string | null
           category?: string | null
@@ -2958,6 +3068,8 @@ export type Database = {
           when_text?: string | null
         }
         Update: {
+          lead_id?: string | null
+          quote_id?: string | null
           action?: string | null
           audio_url?: string | null
           category?: string | null
@@ -2972,6 +3084,20 @@ export type Database = {
           when_text?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fh_notes_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "fh_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fh_notes_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "fh_quotes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "fh_notes_contact_id_fkey"
             columns: ["contact_id"]
@@ -3501,6 +3627,7 @@ export type Database = {
       }
       fh_public_links: {
         Row: {
+          quote_id: string | null
           change_order_id: string | null
           client_id: string | null
           contact_id: string | null
@@ -3517,6 +3644,7 @@ export type Database = {
           view_count: number
         }
         Insert: {
+          quote_id?: string | null
           change_order_id?: string | null
           client_id?: string | null
           contact_id?: string | null
@@ -3533,6 +3661,7 @@ export type Database = {
           view_count?: number
         }
         Update: {
+          quote_id?: string | null
           change_order_id?: string | null
           client_id?: string | null
           contact_id?: string | null
@@ -3549,6 +3678,13 @@ export type Database = {
           view_count?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "fh_public_links_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "fh_quotes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "fh_public_links_change_order_id_fkey"
             columns: ["change_order_id"]
@@ -3614,8 +3750,9 @@ export type Database = {
       }
       fh_quote_items: {
         Row: {
+          quote_id: string | null
           amount: number
-          contact_id: string
+          contact_id: string | null
           created_at: string
           description: string
           id: string
@@ -3632,8 +3769,9 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          quote_id?: string | null
           amount?: number
-          contact_id: string
+          contact_id: string | null
           created_at?: string
           description: string
           id?: string
@@ -3650,8 +3788,9 @@ export type Database = {
           user_id: string
         }
         Update: {
+          quote_id?: string | null
           amount?: number
-          contact_id?: string
+          contact_id?: string | null
           created_at?: string
           description?: string
           id?: string
@@ -3668,6 +3807,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "fh_quote_items_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "fh_quotes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "fh_quote_items_contact_id_fkey"
             columns: ["contact_id"]
@@ -3686,6 +3832,7 @@ export type Database = {
       }
       fh_quote_versions: {
         Row: {
+          quote_id: string | null
           approval_method: string
           approval_note: string | null
           approval_token: string | null
@@ -3714,6 +3861,7 @@ export type Database = {
           version_number: number
         }
         Insert: {
+          quote_id?: string | null
           approval_method: string
           approval_note?: string | null
           approval_token?: string | null
@@ -3742,6 +3890,7 @@ export type Database = {
           version_number: number
         }
         Update: {
+          quote_id?: string | null
           approval_method?: string
           approval_note?: string | null
           approval_token?: string | null
@@ -3770,6 +3919,13 @@ export type Database = {
           version_number?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "fh_quote_versions_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "fh_quotes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "fh_quote_versions_contact_id_fkey"
             columns: ["contact_id"]
@@ -3803,6 +3959,121 @@ export type Database = {
             columns: ["superseded_by"]
             isOneToOne: false
             referencedRelation: "fh_quote_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fh_quotes: {
+        Row: {
+          amount: number
+          approved_version_id: string | null
+          change_request_note: string | null
+          change_requested_at: string | null
+          client_id: string
+          created_at: string
+          exclusions_text: string | null
+          expires_at: string | null
+          id: string
+          job_id: string | null
+          job_type: string | null
+          lead_id: string | null
+          org_id: string | null
+          origin_contact_id: string | null
+          scope_text: string | null
+          sent_at: string | null
+          status: string
+          terms_text: string | null
+          title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          approved_version_id?: string | null
+          change_request_note?: string | null
+          change_requested_at?: string | null
+          client_id: string
+          created_at?: string
+          exclusions_text?: string | null
+          expires_at?: string | null
+          id?: string
+          job_id?: string | null
+          job_type?: string | null
+          lead_id?: string | null
+          org_id?: string | null
+          origin_contact_id?: string | null
+          scope_text?: string | null
+          sent_at?: string | null
+          status?: string
+          terms_text?: string | null
+          title?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          approved_version_id?: string | null
+          change_request_note?: string | null
+          change_requested_at?: string | null
+          client_id?: string
+          created_at?: string
+          exclusions_text?: string | null
+          expires_at?: string | null
+          id?: string
+          job_id?: string | null
+          job_type?: string | null
+          lead_id?: string | null
+          org_id?: string | null
+          origin_contact_id?: string | null
+          scope_text?: string | null
+          sent_at?: string | null
+          status?: string
+          terms_text?: string | null
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fh_quotes_approved_version_id_fkey"
+            columns: ["approved_version_id"]
+            isOneToOne: false
+            referencedRelation: "fh_quote_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fh_quotes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "fh_clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fh_quotes_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "fh_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fh_quotes_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "fh_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fh_quotes_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fh_quotes_origin_contact_id_fkey"
+            columns: ["origin_contact_id"]
+            isOneToOne: false
+            referencedRelation: "fh_contacts"
             referencedColumns: ["id"]
           },
         ]
@@ -4058,6 +4329,8 @@ export type Database = {
       }
       fh_schedule: {
         Row: {
+          lead_id: string | null
+          quote_id: string | null
           assigned_to: string | null
           contact_id: string | null
           created_at: string | null
@@ -4072,6 +4345,8 @@ export type Database = {
           weather_locked: boolean | null
         }
         Insert: {
+          lead_id?: string | null
+          quote_id?: string | null
           assigned_to?: string | null
           contact_id?: string | null
           created_at?: string | null
@@ -4086,6 +4361,8 @@ export type Database = {
           weather_locked?: boolean | null
         }
         Update: {
+          lead_id?: string | null
+          quote_id?: string | null
           assigned_to?: string | null
           contact_id?: string | null
           created_at?: string | null
@@ -4100,6 +4377,20 @@ export type Database = {
           weather_locked?: boolean | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fh_schedule_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "fh_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fh_schedule_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "fh_quotes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "fh_schedule_contact_id_fkey"
             columns: ["contact_id"]

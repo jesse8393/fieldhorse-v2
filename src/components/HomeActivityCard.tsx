@@ -147,8 +147,8 @@ export default function HomeActivityCard() {
         out.push({
           id: `inv:${inv.id}`,
           when: new Date(inv.issued_at || inv.created_at),
-          contactId: inv.contact_id,
-          contact: byId.get(inv.contact_id),
+          contactId: inv.contact_id ?? '',
+          contact: inv.contact_id ? byId.get(inv.contact_id) : undefined,
           icon: Receipt,
           tone: inv.status === 'paid' ? 'green' : 'gold',
           title: `Draw #${inv.sequence_number}${inv.status === 'paid' ? ' paid' : ''}`

@@ -154,8 +154,8 @@ export default function Activity() {
         out.push({
           id: `inv:${inv.id}`,
           when: new Date(inv.issued_at || inv.created_at),
-          contact: contactById.get(inv.contact_id),
-          contactId: inv.contact_id,
+          contact: inv.contact_id ? contactById.get(inv.contact_id) : undefined,
+          contactId: inv.contact_id ?? '',
           kind: 'invoice',
           icon: Receipt,
           tone: inv.status === 'paid' ? 'green' : 'gold',

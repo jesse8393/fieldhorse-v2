@@ -244,7 +244,7 @@ type Classified = {
 
 function classify(inv: Invoice, ctx: Context): Classified {
   const { status, issued, dueDay, until, daysLate: late, owed } = classifyInvoice(inv, ctx.owed.get(inv.id), ctx.now)
-  const job = ctx.jobs.get(inv.contact_id)
+  const job = inv.contact_id ? ctx.jobs.get(inv.contact_id) : undefined
 
   let chip: MoneyChip | null
   let note = ''
