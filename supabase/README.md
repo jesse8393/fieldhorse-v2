@@ -29,6 +29,8 @@ fh_workflow_versions, fh_workflows, profiles.
 
 A fresh database built from this folder alone will not match production.
 
+**Follow up engine.** Since October 19 the body of `fh_run_follow_up_engine` lives in `migrations/091_follow_up_engine_per_client.sql` and `tests/follow_up_engine.test.sql` checks it. The tables it writes (`fh_follow_ups`, `fh_follow_up_settings`) still have no creating migration here.
+
 **Scheduled jobs.** Five pg_cron jobs run in production and none is defined
 here:
 

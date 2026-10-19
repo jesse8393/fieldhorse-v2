@@ -10,7 +10,7 @@ Plan: `PHASE9_PLAN.md`. Branch `redesign/phase-9` from `main` (`0c7d8e8`). Pull 
 
 ### Failing before Phase 9
 
-Filled in by the baseline run.
+Nothing. Main at `0c7d8e8` is the Phase 8 head, which passed CI (check and the full e2e job) on October 14, so that run is the baseline.
 
 ### Phase 9 tasks
 
@@ -18,7 +18,7 @@ Filled in by the baseline run.
 |---|---|---|---|
 | 1 The invoice description reaches the PDF and the email | todo | | |
 | 2 Notifications become a screen with Done and Dismiss | todo | | |
-| 3 Reminders stop for lost deals and run per client | todo | | |
+| 3 Reminders stop for lost deals and run per client | done | this commit | Migration 091 applied on October 19 after a rolled back dry run passed all four checks. 17 queued duplicates closed, 45 remain, one per client and kind. The 27 unread reminders that stay belong to demo contacts with no client, which Task 6 gives one |
 | 4 New tables for leads and quotes | todo | | |
 | 5 Pure converters and the data layer | todo | | |
 | 6 The migration that moves leads and quotes | todo | | |

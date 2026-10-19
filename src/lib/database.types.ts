@@ -1787,6 +1787,7 @@ export type Database = {
         Row: {
           anchor_on: string | null
           channel: string
+          client_id: string | null
           completed_at: string | null
           completed_by: string | null
           contact_id: string
@@ -1805,6 +1806,7 @@ export type Database = {
         Insert: {
           anchor_on?: string | null
           channel: string
+          client_id?: string | null
           completed_at?: string | null
           completed_by?: string | null
           contact_id: string
@@ -1823,6 +1825,7 @@ export type Database = {
         Update: {
           anchor_on?: string | null
           channel?: string
+          client_id?: string | null
           completed_at?: string | null
           completed_by?: string | null
           contact_id?: string
@@ -1839,6 +1842,13 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fh_follow_ups_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "fh_clients"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "fh_follow_ups_contact_id_fkey"
             columns: ["contact_id"]
