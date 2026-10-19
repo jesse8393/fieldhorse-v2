@@ -5395,6 +5395,10 @@ export type Database = {
         Returns: undefined
       }
       fh_daily_sweep: { Args: never; Returns: Json }
+      fh_follow_up_set_status: {
+        Args: { p_notification_id: string; p_status: string }
+        Returns: undefined
+      }
       fh_dispatch_events: { Args: { p_limit?: number }; Returns: number }
       fh_emit_event: {
         Args: {

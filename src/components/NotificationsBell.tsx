@@ -1,62 +1,29 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import Icon from './fh/Icon.tsx'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, Check, Inbox, Users, ClipboardCheck, DollarSign, Calendar, MessageSquare, Eye, ShieldCheck, FileEdit, PenLine } from 'lucide-react'
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
-import { Eyebrow } from './v3'
+import { Bell } from 'lucide-react'
+import Icon from './fh/Icon.tsx'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { supabase } from '../lib/supabase.ts'
-import { fetchInbox, markRead, markAllRead, fmtAge } from '../lib/notifications.ts'
-import { countNoun } from '../lib/format.ts'
+import { unreadCount } from '../lib/notifications.ts'
 import { hapticTap } from '../lib/haptics.ts'
 
-// Map notification kind → icon + accent color. Add cases as new kinds
-// are introduced on the server; default falls back to Inbox + steel.
-const KIND_META: Record<string, any> = {
-  partner_accepted:   { Icon: Users,           color: 'var(--ink-strong)' },
-  inspection_logged:  { Icon: ClipboardCheck,  color: 'var(--signal-green)' },
-  payment_received:   { Icon: DollarSign,      color: 'var(--signal-green)' },
-  schedule_change:    { Icon: Calendar,        color: 'var(--ink-strong)' },
-  sub_responded:      { Icon: MessageSquare,   color: 'var(--ink-strong)' },
-  public_link_viewed: { Icon: Eye,             color: 'var(--ink-strong)' },
-  quote_approved:     { Icon: ShieldCheck,     color: 'var(--signal-green)' },
-  quote_changes_requested: { Icon: PenLine,    color: 'var(--alert-red)' },
-  change_order_added: { Icon: FileEdit,        color: 'var(--ink-strong)' }
-}
-function metaFor(kind: any) {
-  return KIND_META[kind] || { Icon: Inbox, color: 'var(--ink-muted)' }
-}
-
+// The bell in the shared header (decision D64). It shows how many
+// notifications are unread and opens the /notifications screen; the list
+// itself lives there, never in a sheet (decision D57). The count follows
+// the inbox in real time, as it always has.
 export default function NotificationsBell() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const [open, setOpen] = useState(false)
-  const [rows, setRows] = useState<any[]>([])
-  const [loading, setLoading] = useState(false)
+  const [unread, setUnread] = useState(0)
 
-  // Single source of truth: badge count derives from rows so the
-  // bell badge can't say "1" while the drawer says "All caught up."
-  // Audit caught the divergence, used to be two parallel state vars.
-  const unread = useMemo(() => rows.filter((r) => !r.read_at).length, [rows])
-
-  // Pull inbox on mount + whenever auth user changes. Realtime
-  // channel below keeps rows fresh on every insert/update without polling.
   const refresh = useCallback(async () => {
-    if (!user) { setRows([]); return }
-    try {
-      const list = await fetchInbox(40, user.id)
-      setRows(list)
-    } catch {
-      // RLS denial / table missing → silently zero out so the bell never
-      // throws. Migration 008 may not have been applied yet.
-      setRows([])
-    }
+    if (!user) { setUnread(0); return }
+    // unreadCount answers 0 when the read fails, so the bell never throws.
+    setUnread(await unreadCount(user.id))
   }, [user])
 
   useEffect(() => { refresh() }, [refresh])
 
-  // Realtime, any change to the recipient's inbox refreshes both the
-  // count badge and (if open) the drawer list.
   useEffect(() => {
     if (!user) return
     const channel = supabase
@@ -70,195 +37,19 @@ export default function NotificationsBell() {
     return () => { supabase.removeChannel(channel) }
   }, [user, refresh])
 
-  // Reload list when the drawer opens so the user sees the freshest
-  // version even if realtime missed an update.
-  useEffect(() => {
-    if (!open || !user) return
-    setLoading(true)
-    refresh().finally(() => setLoading(false))
-  }, [open, user, refresh])
-
-  async function handleTap(row: any) {
-    hapticTap()
-    if (!row.read_at && user) {
-      // Optimistic update, badge falls automatically since it's
-      // derived from rows.
-      setRows((prev) => prev.map((r) => r.id === row.id ? { ...r, read_at: new Date().toISOString() } : r))
-      await markRead(row.id, user.id)
-    }
-    if (row.link) {
-      // Route through handleOpenChange so the rest of the list is
-      // marked seen too, leaving via one item shouldn't keep the
-      // other five badged.
-      handleOpenChange(false)
-      navigate(row.link)
-    }
-  }
-
-  async function handleMarkAll() {
-    hapticTap()
-    if (!user) return
-    setRows((prev) => prev.map((r) => r.read_at ? r : { ...r, read_at: new Date().toISOString() }))
-    await markAllRead(user.id)
-  }
-
-  // Opening the inbox counts as seeing it, standard inbox semantics.
-  // While the drawer is up the unread styling still shows what's new,
-  // but closing it marks everything read so the badge and "N new"
-  // header stop nagging about weeks-old items nobody taps one by one.
-  function handleOpenChange(next: boolean) {
-    if (!next && user && rows.some((r) => !r.read_at)) {
-      setRows((prev) => prev.map((r) => r.read_at ? r : { ...r, read_at: new Date().toISOString() }))
-      markAllRead(user.id)
-    }
-    setOpen(next)
-  }
-
   return (
-    <>
-      <button
-        type="button"
-        aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
-        onClick={() => { hapticTap(); setOpen(true) }}
-        className="fhs-icon-btn"
-      >
-        <Icon icon={Bell} size={22} />
-        {unread > 0 && (
-          <span aria-hidden="true" className="fhs-icon-btn__badge">
-            {unread > 9 ? '9+' : unread}
-          </span>
-        )}
-      </button>
-
-      <Drawer open={open} onOpenChange={handleOpenChange}>
-        <DrawerContent
-          className="ui:max-w-full ui:overflow-x-hidden"
-          style={{ maxWidth: '100%', overflowX: 'hidden' }}
-        >
-          <DrawerHeader className="ui:text-left" style={{ maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-              <div>
-                <Eyebrow as="div">
-                  <Inbox size={12} />
-                  Inbox
-                </Eyebrow>
-                <DrawerTitle asChild>
-                  <h2
-                    className="fh-font-serif"
-                    style={{ margin: '6px 0 0', fontSize: 24, lineHeight: 1.1, letterSpacing: 0, fontWeight: 400, fontStyle: 'normal', color: 'var(--ink-strong)' }}
-                  >
-                    {unread > 0 ? <>{unread} new <em style={{ fontStyle: 'normal', fontWeight: 600 }}>{countNoun(unread, 'notification')}.</em></> : <>All <em style={{ fontStyle: 'normal', fontWeight: 600 }}>caught up.</em></>}
-                  </h2>
-                </DrawerTitle>
-              </div>
-              {unread > 0 && (
-                <button
-                  type="button"
-                  onClick={handleMarkAll}
-                  style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
-                >
-                  <Check size={12} />
-                  Mark all read
-                </button>
-              )}
-            </div>
-            <DrawerDescription
-              style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}
-            >
-              {rows.length === 0 && !loading ? 'You\'ll see partner replies, inspections, payments, and schedule changes here.' : 'Tap any item to open the related job.'}
-            </DrawerDescription>
-          </DrawerHeader>
-
-          <div style={{ padding: '8px 24px 24px', maxHeight: '60dvh', overflowY: 'auto' }}>
-            {loading && rows.length === 0 && (
-              <div style={{ padding: '24px 0', textAlign: 'center', fontSize: 12, color: 'var(--ink-muted)' }}>Loading…</div>
-            )}
-            {!loading && rows.length === 0 && (
-              <div style={{ padding: '32px 16px', borderRadius: 10, background: 'var(--surface-2)', border: '1px dashed var(--rule)', textAlign: 'center', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-strong)', marginBottom: 4 }}>No notifications yet.</div>
-                <div style={{ fontSize: 12 }}>Quiet inbox. Check back after partners or subs respond.</div>
-              </div>
-            )}
-
-            {rows.length > 0 && (
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {rows.map((r) => {
-                  const meta = metaFor(r.kind)
-                  const I = meta.Icon
-                  const isUnread = !r.read_at
-                  return (
-                    <li key={r.id}>
-                      <button
-                        type="button"
-                        onClick={() => handleTap(r)}
-                        style={{
-                          width: '100%',
-                          textAlign: 'left',
-                          display: 'flex',
-                          alignItems: 'flex-start',
-                          gap: 12,
-                          padding: '12px 12px 12px 16px',
-                          borderRadius: 10,
-                          // User feedback: gold-tinted unread rows read as
-                          // yellow noise on the inbox. The colored left
-                          // stripe + bold title already signal "unread"
-                          // adequately. Now uses a neutral lift instead
-                          // of gold gradient.
-                          background: isUnread
-                            ? 'linear-gradient(180deg, var(--v3-glass-tint), var(--v3-glass-tint))'
-                            : 'var(--surface-2)',
-                          border: isUnread ? '1px solid var(--v3-border-mid)' : '1px solid var(--rule)',
-                          cursor: 'pointer',
-                          color: 'var(--ink-strong)',
-                          position: 'relative',
-                          overflow: 'hidden'
-                        }}
-                      >
-                        {isUnread && (
-                          <span
-                            aria-hidden="true"
-                            style={{
-                              position: 'absolute',
-                              left: 0,
-                              top: 10,
-                              bottom: 10,
-                              width: 3,
-                              borderRadius: '0 3px 3px 0',
-                              background: meta.color,
-                              // meta.color is a var() ref, hex-alpha
-                              // concatenation ('…99') is invalid CSS and
-                              // silently drops. color-mix keeps the glow.
-                              boxShadow: `0 0 8px color-mix(in srgb, ${meta.color} 60%, transparent)`
-                            }}
-                          />
-                        )}
-                        <span aria-hidden="true" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 10, display: 'grid', placeItems: 'center', background: `color-mix(in srgb, ${meta.color} 13%, transparent)`, border: `1px solid color-mix(in srgb, ${meta.color} 27%, transparent)`, color: meta.color }}>
-                          <I size={14} />
-                        </span>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
-                            <span style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: isUnread ? 700 : 600, color: 'var(--ink-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {r.title}
-                            </span>
-                            <span style={{ flexShrink: 0, fontSize: 12, color: 'var(--ink-faint)', fontFamily: 'var(--font-body)' }}>
-                              {fmtAge(r.created_at)}
-                            </span>
-                          </div>
-                          {r.body && (
-                            <div style={{ marginTop: 2, fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {r.body}
-                            </div>
-                          )}
-                        </div>
-                      </button>
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-          </div>
-        </DrawerContent>
-      </Drawer>
-    </>
+    <button
+      type="button"
+      aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
+      onClick={() => { hapticTap(); navigate('/notifications') }}
+      className="fhs-icon-btn"
+    >
+      <Icon icon={Bell} size={22} />
+      {unread > 0 && (
+        <span aria-hidden="true" className="fhs-icon-btn__badge">
+          {unread > 9 ? '9+' : unread}
+        </span>
+      )}
+    </button>
   )
 }

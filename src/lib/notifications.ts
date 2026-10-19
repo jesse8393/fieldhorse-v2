@@ -71,3 +71,27 @@ export function fmtAge(iso: string | null | undefined) {
   if (d < 7) return `${d}d`
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
+
+// A reminder (kind follow_up_due or review_ask_due) can be marked Done or
+// Dismissed from the notifications screen (decision D63). The RPC
+// fh_follow_up_set_status (migration 090) closes the fh_follow_ups row that
+// the notification stands for and marks the notification read. The app says
+// 'dismissed'; the database stores that as 'skipped', the status its check
+// constraint allows.
+export type FollowUpStatus = 'done' | 'dismissed'
+
+export async function setFollowUpStatus(notificationId: string, status: FollowUpStatus) {
+  const { error } = await supabase.rpc('fh_follow_up_set_status', {
+    p_notification_id: notificationId,
+    p_status: status
+  })
+  if (error) throw error
+}
+
+export function completeFollowUp(notificationId: string) {
+  return setFollowUpStatus(notificationId, 'done')
+}
+
+export function dismissFollowUp(notificationId: string) {
+  return setFollowUpStatus(notificationId, 'dismissed')
+}

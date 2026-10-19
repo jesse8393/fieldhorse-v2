@@ -52,6 +52,7 @@ const Invoices       = lazy(() => import('./screens/Invoices.tsx'))
 const Landing        = lazy(() => import('./screens/Landing.tsx'))
 const InvoiceDetail  = lazy(() => import('./screens/InvoiceDetail.tsx'))
 const Inbox          = lazy(() => import('./screens/inbox/Inbox.tsx'))
+const Notifications  = lazy(() => import('./screens/Notifications.tsx'))
 // The redesign component sheet, in development builds only: the
 // condition is a build time constant, so production drops the chunk.
 const DesignSheet    = import.meta.env.DEV ? lazy(() => import('./screens/DesignSheet.tsx')) : null
@@ -245,6 +246,8 @@ export default function App() {
               on; the screen explains itself when it is off (decision D9). */}
           <Route path="/inbox" element={<Inbox />} />
           <Route path="/inbox/:conversationId" element={<Inbox />} />
+          {/* The bell's list is a screen, not a sheet (decision D64). */}
+          <Route path="/notifications" element={<Notifications />} />
           {/* Alias routes, these URLs exist in muscle memory / older
               links but the screens live elsewhere. Explicit redirects
               beat the silent catch-all bounce to Home. (/leads is a
