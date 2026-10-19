@@ -15,7 +15,7 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, authHeaders } from '../lib/supabase.ts'
 import { useInvoiceDetail, useInvalidateInvoiceDetail } from '../lib/queries.ts'
-import { fetchInvoicesForContact, createInvoice, invoiceAmountDue, sendInvoiceEmail } from '../lib/invoices.ts'
+import { fetchInvoicesForContact, createInvoice, invoiceAmountDue, invoiceDescription, sendInvoiceEmail } from '../lib/invoices.ts'
 import { pickBalanceInvoice } from '../lib/invoiceSettlement.ts'
 import { moneyExact } from '../lib/format.ts'
 import { parseDateOnly } from '../lib/dates.ts'
@@ -140,6 +140,16 @@ export default function InvoiceDetail() {
     const s = String(r?.status || '').toLowerCase()
     return s !== 'void' && s !== 'paid' && s !== 'draft'
   }) || null, [invoiceRows])
+  // What the Service block and the PDF Description column say: the open
+  // draw's own description when there is one, else the newest live
+  // invoice row's, else the job title (D62). Screen and PDF share this.
+  const serviceDescription = useMemo(() => {
+    const newest = (invoiceRows || [])
+      .filter((r: any) => String(r?.status || '').toLowerCase() !== 'void')
+      .slice()
+      .sort((a: any, b: any) => (Number(b?.sequence_number) || 0) - (Number(a?.sequence_number) || 0))[0] || null
+    return invoiceDescription(billingDraw || newest, contact)
+  }, [billingDraw, invoiceRows, contact])
   const [paying, setPaying] = useState(false)
   const [generating, setGenerating] = useState(false)
   // 'detail' = existing list-style breakdown (default, original UX).
@@ -238,18 +248,18 @@ export default function InvoiceDetail() {
     billingDraw
       ? [{
           description: billingDraw.title?.trim() || `Invoice #${billingDraw.sequence_number}`,
-          notes: contact?.job_title || 'Construction services',
+          notes: serviceDescription,
           qty: 1,
           rate: Number(billingDraw.amount || 0),
           amount: Number(billingDraw.amount || 0)
         }]
       : [{
-          description: contact?.job_title || 'Construction services per agreement',
+          description: serviceDescription,
           qty: 1,
           rate: totals.amount,
           amount: totals.amount
         }]
-  ), [billingDraw, contact?.job_title, totals.amount])
+  ), [billingDraw, serviceDescription, totals.amount])
   // What this screen bills now: for an open draw, the allocator's figure
   // (what Money, the reminder email and the job page name for it, with the
   // job's other draws letting money logged against the job count); with no
@@ -733,7 +743,7 @@ export default function InvoiceDetail() {
               color: 'var(--v3-text)', lineHeight: 1.35,
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
             }}>
-              {contact.job_title || 'Construction services per agreement'}
+              {serviceDescription}
             </div>
             {resolved.address && (
               <div style={{

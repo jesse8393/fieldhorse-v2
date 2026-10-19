@@ -1,6 +1,7 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { installMock, session } from '../../scripts/qa-mock.mjs'
 import { nothingRunsOffTheSide } from './helpers/overflow.ts'
+import { signIn } from './helpers/signIn.ts'
 
 // The invoice's action row: Email, Share link, Download and the gold
 // Collect Payment. Below 600 px (every phone) the three quiet actions are
@@ -125,4 +126,32 @@ test('a desktop keeps the invoice action labels', async ({ page }, testInfo) => 
     await expect(bar.getByRole('button', { name: label, exact: true })).toContainText(label, { useInnerText: true })
   }
   await nothingRunsOffTheSide(page, '/invoices/c-job2 on a desktop')
+})
+
+// The invoice has a description of its own (D62). The Service block prints
+// it, not the job title, so the screen and the PDF Description column agree.
+function shedJob() {
+  return {
+    id: 'c-job1', stage: 'job', name: 'Plumbing Bellevue', job_title: 'Slab + trench', amount: 33100,
+    user_id: 'qa-user-1', client_id: null, phone: '555-0101', email: 'x@y.com', address: '412 Burkitt Station Rd',
+    created_at: '2026-09-20T15:00:00.000Z', updated_at: '2026-10-09T15:00:00.000Z', completed_at: null,
+    proposal_status: null, milestones: [], follow_up_on: null, notes: null, scope_text: null
+  }
+}
+
+function shedDeposit() {
+  return {
+    id: 'inv-1', contact_id: 'c-job1', user_id: 'qa-user-1', sequence_number: 1, title: 'Deposit', amount: 3000,
+    status: 'sent', issued_at: '2026-10-10T15:00:00.000Z', due_at: '2026-10-24T15:00:00.000Z', notes: null,
+    description: 'Deposit for the shed slab', created_at: '2026-10-10T15:00:00.000Z', updated_at: '2026-10-10T15:00:00.000Z'
+  }
+}
+
+test("an invoice's description prints in the Service block, not the job title", async ({ page, context }) => {
+  await signIn(context, { tables: { fh_contacts: [shedJob()], fh_invoices: [shedDeposit()], fh_payments: [] } })
+  await page.goto('/invoices/c-job1', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+  const service = page.locator('.fh-invoice-detail__service')
+  await expect(service).toBeVisible()
+  await expect(service.getByText('Deposit for the shed slab')).toBeVisible()
+  await expect(service.getByText('Slab + trench')).toHaveCount(0)
 })

@@ -16,7 +16,7 @@ Nothing. Main at `0c7d8e8` is the Phase 8 head, which passed CI (check and the f
 
 | Task | Status | Commit | Notes |
 |---|---|---|---|
-| 1 The invoice description reaches the PDF and the email | todo | | |
+| 1 The invoice description reaches the PDF and the email | done | this commit | `invoiceDescription` in `src/lib/invoices.ts` feeds the PDF Description column, the per draw PDF, the invoice screen's Service block and the draws editor's new Description field, so the invoice's own words print instead of the job title. |
 | 2 Notifications become a screen with Done and Dismiss | todo | | |
 | 3 Reminders stop for lost deals and run per client | done | this commit | Migration 091 applied on October 19 after a rolled back dry run passed all four checks. 17 queued duplicates closed, 45 remain, one per client and kind. The 27 unread reminders that stay belong to demo contacts with no client, which Task 6 gives one |
 | 4 New tables for leads and quotes | todo | | |

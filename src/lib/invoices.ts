@@ -152,6 +152,19 @@ export async function setInvoiceStatus(invoice: Pick<InvoiceRow, 'id'>, status: 
 // bill sits in the whole job. The hero prints what the invoice still owes
 // (invoiceAmountDue, or `amountDue` when the caller already worked it out),
 // so the PDF and the email it travels with name one figure.
+/**
+ * What an invoice is for, in the customer's words: the invoice's own
+ * description, else the job title, else a generic line. Every PDF, email
+ * and screen path that prints the Description column goes through this so
+ * they never disagree (D62).
+ */
+export function invoiceDescription(
+  invoice: { description?: string | null } | null | undefined,
+  contact: { job_title?: string | null } | null | undefined
+): string {
+  return invoice?.description?.trim() || contact?.job_title?.trim() || 'Construction services'
+}
+
 export async function buildInvoicePdf({ invoice, contact, company, payments = [], changeOrders = [], insurance = null, invoices = null, amountDue = null }: {
   invoice: InvoiceRow
   contact: any
@@ -176,12 +189,9 @@ export async function buildInvoicePdf({ invoice, contact, company, payments = []
     : Number(contact?.amount || 0)
   const due = amountDue ?? invoiceAmountDue({ invoice, contact, payments, changeOrders, invoices })
   const title = invoice.title?.trim() || `Invoice #${invoice.sequence_number}`
-  // Customer facing "what is this for". Falls back to the job title.
-  // No address here, the recipient block already prints it, and in
-  // the table it just wraps into noise.
-  const description = (invoice as any).description?.trim()
-    || contact.job_title
-    || 'Construction services'
+  // Customer facing "what is this for". No address here, the recipient
+  // block already prints it, and in the table it just wraps into noise.
+  const description = invoiceDescription(invoice, contact)
   const { generateInvoice } = await loadPdf()
   return generateInvoice({
     company,

@@ -35,7 +35,7 @@ import { money } from '../../../components/documents/format.ts'
 import { useConfirm } from '../../../components/ConfirmSheet.tsx'
 import { Eyebrow } from '../../../components/v3'
 import { countNoun } from '../../../lib/format.ts'
-import { invoiceAmountDue } from '../../../lib/invoices.ts'
+import { invoiceAmountDue, invoiceDescription } from '../../../lib/invoices.ts'
 import { invoicesPaidInFull } from '../../../lib/invoiceSettlement.ts'
 import { splitByPercents } from '../../../lib/paymentSchedule.ts'
 import { useMembership } from '../../../contexts/MembershipContext.tsx'
@@ -144,7 +144,8 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
         status: payload.status || 'draft',
         issued_at: payload.issued_at || null,
         due_at: payload.due_at || null,
-        notes: payload.notes?.trim() || null
+        notes: payload.notes?.trim() || null,
+        description: payload.description?.trim() || null
       }
       let res
       if (payload.id) {
@@ -354,6 +355,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       lineItems: [
         {
           description: drawTitle,
+          notes: invoiceDescription(draw, contact),
           qty: 1,
           rate: draw.amount,
           amount: draw.amount
@@ -831,7 +833,8 @@ function Editor({ initial, isNew, unbilled, onSave, onCancel }: any) {
     status: initial.status || 'draft',
     issued_at: initial.issued_at || null,
     due_at: initial.due_at || null,
-    notes: initial.notes || ''
+    notes: initial.notes || '',
+    description: initial.description || ''
   })
   const [saving, setSaving] = useState(false)
 
@@ -902,6 +905,16 @@ function Editor({ initial, isNew, unbilled, onSave, onCancel }: any) {
           />
         </label>
       </div>
+      <label style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 10 }}>
+        <span style={labelStyle}>Description, shows on the invoice</span>
+        <input
+          type="text"
+          value={form.description}
+          onChange={(e) => set('description', e.target.value)}
+          placeholder="Deposit for the shed slab"
+          style={inputStyle}
+        />
+      </label>
       <label style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 10 }}>
         <span style={labelStyle}>Notes (optional)</span>
         <textarea

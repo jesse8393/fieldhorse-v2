@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildInvoicePdf, contractTotals, invoiceAmountDue, suggestNextInvoice } from './invoices.ts'
+import { buildInvoicePdf, contractTotals, invoiceAmountDue, invoiceDescription, suggestNextInvoice } from './invoices.ts'
 
 describe('contractTotals', () => {
   it('folds approved change orders into the contract', () => {
@@ -208,5 +208,18 @@ describe('buildInvoicePdf', () => {
     const text = pdfText(result.doc)
     expect(text).not.toContain('Paid in full')
     expect(text).toContain('$3,000.00')
+  })
+})
+
+describe('invoiceDescription', () => {
+  it("prefers the invoice's own description over the job title", () => {
+    expect(invoiceDescription({ description: '  Deposit for the shed slab ' } as any, { job_title: 'Slab + trench' } as any))
+      .toBe('Deposit for the shed slab')
+  })
+
+  it('falls back to the job title then to Construction services', () => {
+    expect(invoiceDescription({ description: '   ' } as any, { job_title: ' Slab + trench ' } as any)).toBe('Slab + trench')
+    expect(invoiceDescription({ description: null } as any, { job_title: '' } as any)).toBe('Construction services')
+    expect(invoiceDescription({} as any, null)).toBe('Construction services')
   })
 })
