@@ -4,6 +4,40 @@ Run rules and plans: `PHASE2_PLAN.md` to `PHASE7_PLAN.md` in this folder, decisi
 
 **If this run is picked up by a new session:** read this file first and continue from the first task that is not `done`.
 
+## Phase 9, separate records and no pop ups
+
+Plan: `PHASE9_PLAN.md`. Branch `redesign/phase-9` from `main` (`0c7d8e8`). Pull request #227 (draft) against `main`. Decisions D53 to D65.
+
+### Failing before Phase 9
+
+Filled in by the baseline run.
+
+### Phase 9 tasks
+
+| Task | Status | Commit | Notes |
+|---|---|---|---|
+| 1 The invoice description reaches the PDF and the email | todo | | |
+| 2 Notifications become a screen with Done and Dismiss | todo | | |
+| 3 Reminders stop for lost deals and run per client | todo | | |
+| 4 New tables for leads and quotes | todo | | |
+| 5 Pure converters and the data layer | todo | | |
+| 6 The migration that moves leads and quotes | todo | | |
+| 7 Old links keep working | todo | | |
+| 8 The New screen and the create screens | todo | | |
+| 9 The lead screen | todo | | |
+| 10 The quote screen | todo | | |
+| 11 The customer link, send and approve read the quote | todo | | |
+| 12 The invoice screen and Money | todo | | |
+| 13 The job screen loses its sheets and gains Invoice this | todo | | |
+| 14 Capture, Customers and the rest become screens | todo | | |
+| 15 Today, Reports, Clients and the Inbox | todo | | |
+| 16 Importer, webhooks, captures and the engine write the new records | todo | | |
+| 17 Cut over, screenshots, summary | todo | | |
+
+### Phase 9 notes
+
+* October 19: the four code reads and the production queries behind the plan are summarised in the plan's Research notes. The repeated reminders in the notifications list come from one customer having several deal rows, not from the engine repeating itself; none were sent.
+
 ## Phase 8 summary
 
 Hi Jesse. Phase 8 fixed what the October 10 audit found, and then some. All seventeen tasks in the plan are done and pushed; Task 18 was skipped because its approval line reads no. After Task 17, the final screenshots and a careful sweep of the app turned up more places where a screen said something untrue, so three follow ups fixed those too. Nothing was merged or deployed, no migration was written, and no file under `supabase/` or `netlify/functions/` changed. #223 (Task 1) and #224 (Tasks 2, 3 and 7) are already merged into `redesign/phase-7`; #225 carries the rest.
