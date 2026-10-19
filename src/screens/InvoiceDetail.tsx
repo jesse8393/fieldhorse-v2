@@ -141,15 +141,11 @@ export default function InvoiceDetail() {
     return s !== 'void' && s !== 'paid' && s !== 'draft'
   }) || null, [invoiceRows])
   // What the Service block and the PDF Description column say: the open
-  // draw's own description when there is one, else the newest live
-  // invoice row's, else the job title (D62). Screen and PDF share this.
-  const serviceDescription = useMemo(() => {
-    const newest = (invoiceRows || [])
-      .filter((r: any) => String(r?.status || '').toLowerCase() !== 'void')
-      .slice()
-      .sort((a: any, b: any) => (Number(b?.sequence_number) || 0) - (Number(a?.sequence_number) || 0))[0] || null
-    return invoiceDescription(billingDraw || newest, contact)
-  }, [billingDraw, invoiceRows, contact])
+  // draw's own description when there is one, else the job title (D62).
+  // With no open draw the screen bills the whole balance, so no other
+  // row's words belong here (a paid deposit's description on a final
+  // balance would mislead). Screen and PDF share this.
+  const serviceDescription = useMemo(() => invoiceDescription(billingDraw, contact), [billingDraw, contact])
   const [paying, setPaying] = useState(false)
   const [generating, setGenerating] = useState(false)
   // 'detail' = existing list-style breakdown (default, original UX).

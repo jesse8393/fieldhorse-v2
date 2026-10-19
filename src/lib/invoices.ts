@@ -289,7 +289,9 @@ export async function sendInvoiceEmail({ invoice, contact, company, userId, reci
       recipient_name: contact.name || null,
       storage_path: path,
       filename: result.filename,
-      amount_due: amountDue
+      amount_due: amountDue,
+      // What the email says the invoice is for, the same words as the PDF.
+      description: invoiceDescription(invoice, contact)
     })
   })
   const sendBody = await sendRes.json().catch(() => ({}))

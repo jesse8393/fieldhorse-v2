@@ -541,7 +541,10 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
             status: 'draft',
             issued_at: null,
             due_at: null,
-            notes: ''
+            notes: '',
+            // Prefilled with the job title (D62) so the stored column is
+            // filled; Jesse can change it before saving.
+            description: contact?.job_title || ''
           }}
           onSave={async (payload: any) => { const ok = await handleSave(payload); if (ok) setCreating(false) }}
           onCancel={() => setCreating(false)}

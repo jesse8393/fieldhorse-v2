@@ -139,10 +139,10 @@ function shedJob() {
   }
 }
 
-function shedDeposit() {
+function shedDeposit(status = 'sent') {
   return {
     id: 'inv-1', contact_id: 'c-job1', user_id: 'qa-user-1', sequence_number: 1, title: 'Deposit', amount: 3000,
-    status: 'sent', issued_at: '2026-10-10T15:00:00.000Z', due_at: '2026-10-24T15:00:00.000Z', notes: null,
+    status, issued_at: '2026-10-10T15:00:00.000Z', due_at: '2026-10-24T15:00:00.000Z', notes: null,
     description: 'Deposit for the shed slab', created_at: '2026-10-10T15:00:00.000Z', updated_at: '2026-10-10T15:00:00.000Z'
   }
 }
@@ -154,4 +154,15 @@ test("an invoice's description prints in the Service block, not the job title", 
   await expect(service).toBeVisible()
   await expect(service.getByText('Deposit for the shed slab')).toBeVisible()
   await expect(service.getByText('Slab + trench')).toHaveCount(0)
+})
+
+// With no open draw the screen bills the whole balance, so a paid deposit's
+// description must not stand in for it: the job title prints instead.
+test('with no open draw the Service block shows the job title, not a paid draw\'s description', async ({ page, context }) => {
+  await signIn(context, { tables: { fh_contacts: [shedJob()], fh_invoices: [shedDeposit('paid')], fh_payments: [] } })
+  await page.goto('/invoices/c-job1', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+  const service = page.locator('.fh-invoice-detail__service')
+  await expect(service).toBeVisible()
+  await expect(service.getByText('Slab + trench')).toBeVisible()
+  await expect(service.getByText('Deposit for the shed slab')).toHaveCount(0)
 })

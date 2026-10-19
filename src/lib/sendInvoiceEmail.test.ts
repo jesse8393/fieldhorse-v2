@@ -125,3 +125,14 @@ describe('sendInvoiceEmail marks the invoice sent', () => {
     expect(row.status).toBe('paid')
   })
 })
+
+describe('sendInvoiceEmail tells the email what the invoice is for', () => {
+  it("posts the invoice's own description, else the job title", async () => {
+    stored = [{ ...invoiceRow('draft', null) }]
+    const posted = () => JSON.parse(String((vi.mocked(fetch).mock.calls.at(-1) as any)[1].body))
+    await sendInvoiceEmail({ invoice: { ...invoiceRow('draft', null), description: ' Deposit for the shed slab ' }, contact, company, userId: 'u-1', recipientEmail: 'rosa@example.com' })
+    expect(posted().description).toBe('Deposit for the shed slab')
+    await sendInvoiceEmail({ invoice: invoiceRow('draft', null), contact, company, userId: 'u-1', recipientEmail: 'rosa@example.com' })
+    expect(posted().description).toBe('Concrete steps')
+  })
+})

@@ -87,7 +87,8 @@ export default async (request) => {
     storage_path,
     filename,
     sender_message,
-    amount_due
+    amount_due,
+    description
   } = body || {}
 
   if (!contact_id || !sender_user_id || !recipient_email || !storage_path) {
@@ -178,7 +179,9 @@ export default async (request) => {
   // empty (incomplete profile).
   const fromName = companyName || SEND_EMAIL_FROM_NAME
   const fromHeader = formatFromHeader(fromName, SEND_EMAIL_FROM)
-  const jobTitle = contact.job_title || 'your project'
+  // What the invoice is for: the invoice's own description when the client
+  // sent one (the same words its PDF prints), else the job title as before.
+  const jobTitle = textField(description).slice(0, 200) || contact.job_title || 'your project'
   const amountLabel = formatMoneyLabel(amount_due ?? contact.amount)
   const subject = `Invoice for ${jobTitle}${amountLabel ? ` (${amountLabel})` : ''}`
   // Optional fields read through textField so a non string value from a
