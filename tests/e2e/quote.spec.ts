@@ -167,13 +167,17 @@ test.describe('the quote screen', () => {
     test.skip(!testInfo.project.name.startsWith('mobile'), 'Phone layout')
     await signIn(context, { tables: { fh_quote_items: ITEMS } })
     await openQuote(page)
-    await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }))
-    await page.waitForTimeout(150)
+    // The lines land after the quote; scroll once they are on the page, and
+    // read the geometry until the scroll has settled.
+    await expect(lines(page).getByText('Excavate and grade')).toBeVisible()
     const dock = page.getByRole('navigation', { name: 'Primary' })
     await expect(dock).toBeVisible()
-    const dockTop = await dock.evaluate((el) => el.getBoundingClientRect().top)
-    const contentBottom = await page.locator('.fhqt-page').evaluate((el) => el.getBoundingClientRect().bottom)
-    expect(contentBottom).toBeLessThanOrEqual(dockTop)
+    await expect.poll(async () => {
+      await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }))
+      const dockTop = await dock.evaluate((el) => el.getBoundingClientRect().top)
+      const contentBottom = await page.locator('.fhqt-page').evaluate((el) => el.getBoundingClientRect().bottom)
+      return contentBottom - dockTop
+    }).toBeLessThanOrEqual(0)
   })
 
   test('preview never sends', async ({ context, page }) => {

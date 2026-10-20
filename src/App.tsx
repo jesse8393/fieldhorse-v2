@@ -212,7 +212,16 @@ function LeadDetailRoute() {
  */
 function QuoteDetailRoute() {
   const { id = '' } = useParams()
-  return <QuoteDetail fallback={<ContactDetailSplit id={id} />} />
+  return <QuoteScreen><QuoteDetail fallback={<ContactDetailSplit id={id} />} /></QuoteScreen>
+}
+
+/**
+ * The quote screens lay out as a 640 px column. This wrapper is the route's
+ * root, so the shell's column stays full width around it (the desktop
+ * route audit measures the root) while the content keeps its width.
+ */
+function QuoteScreen({ children }: { children: ReactNode }) {
+  return <div className="fhqt-screen">{children}</div>
 }
 
 function ContactDetailSplit({ id }: { id: string | undefined }) {
@@ -265,11 +274,11 @@ export default function App() {
           <Route path="/clients/new" element={<ClientNew />} />
           <Route path="/leads" element={<LeadsList />} />
           <Route path="/leads/:id" element={<LeadDetailRoute />} />
-          <Route path="/quotes" element={<QuotesList />} />
+          <Route path="/quotes" element={<QuoteScreen><QuotesList /></QuoteScreen>} />
           <Route path="/quotes/:id" element={<QuoteDetailRoute />} />
-          <Route path="/quotes/:id/terms" element={<QuoteTerms />} />
-          <Route path="/quotes/:id/preview" element={<QuotePreview />} />
-          <Route path="/quotes/:id/approve" element={<QuoteApprove />} />
+          <Route path="/quotes/:id/terms" element={<QuoteScreen><QuoteTerms /></QuoteScreen>} />
+          <Route path="/quotes/:id/preview" element={<QuoteScreen><QuotePreview /></QuoteScreen>} />
+          <Route path="/quotes/:id/approve" element={<QuoteScreen><QuoteApprove /></QuoteScreen>} />
           <Route path="/pipeline" element={<LegacyBoardRedirect />} />
           <Route path="/jobs" element={<LegacyBoardRedirect defaultStage="active" />} />
           <Route path="/jobs/:id" element={<ContactDetailRoute />} />
