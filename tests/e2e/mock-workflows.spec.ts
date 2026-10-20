@@ -385,7 +385,6 @@ test('keeps estimating and dispatch desktop-native while preserving their mobile
 })
 
 test('keeps customer quote change requests in the workflow', async ({ page }, testInfo) => {
-  test.fixme(true, 'The mock quote c-change now lives in fh_quotes as q-change; Task 10 builds the quote screen that reads it')
   const expectNoPageErrors = failOnPageErrors(page)
   let submitted: any = null
 
@@ -472,18 +471,16 @@ test('keeps customer quote change requests in the workflow', async ({ page }, te
   await expect(page.getByRole('button', { name: 'Request changes' })).toHaveCount(0)
   await capture(page, testInfo, 'quote-change-requested-customer', true)
 
-  await openRoute(page, '/quotes/c-change?tab=quote')
-  if (testInfo.project.name.startsWith('mobile')) {
-    // The phone's Quote tab is the editor itself (tests/e2e/quote.spec.ts):
-    // the request sits in a panel at the top and the capsule carries the
-    // send. "Review changes" stays the stage action on the other tabs.
-    await expect(page.getByRole('region', { name: 'Customer requested changes' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Send for approval' })).toBeVisible()
-  } else {
-    await expect(page.getByRole('button', { name: 'Review changes' }).first()).toBeVisible()
-  }
+  // The quote is its own screen on every device (Phase 9, D53, D57,
+  // tests/e2e/quote.spec.ts): the request sits in a panel at the top and
+  // Send for approval waits under the total.
+  await openRoute(page, '/quotes/q-change')
+  await expect(page.locator('.fhqt-page')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('region', { name: 'Customer requested changes' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Send for approval' })).toBeVisible()
   await expect(page.getByText('Please separate the cabinet allowance.', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: /approve quote/i })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: /approve quote/i })).toHaveCount(0)
   await capture(page, testInfo, 'quote-change-requested-operator', true)
 
   expectNoPageErrors()

@@ -103,7 +103,6 @@ test.describe('job page on a phone', () => {
   })
 
   test('every section stays one tap away', async ({ context, page }) => {
-    test.fixme(true, 'The mock quote c-quote now lives in fh_quotes as q-quote; Task 10 builds the quote screen whose Quote tab this opens')
     await signIn(context)
     await open(page, '/jobs/c-job1')
     const tabs = page.getByRole('tablist', { name: 'Job sections' })
@@ -114,9 +113,11 @@ test.describe('job page on a phone', () => {
     await expect(tabs.getByRole('tab', { name: 'Financials', exact: true })).toHaveAttribute('aria-selected', 'true')
     await expect(page).toHaveURL(/tab=financials/)
 
-    // The quote stage keeps its Quote tab.
-    await open(page, '/quotes/c-quote?tab=overview')
-    await expect(page.getByRole('tablist', { name: 'Job sections' }).getByRole('tab', { name: 'Quote', exact: true })).toHaveCount(1)
+    // A quote is its own screen (Phase 9, D53): its lines are one tap away too.
+    await page.goto('/quotes/q-quote', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    await expect(page.locator('.fhqt-page')).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByRole('heading', { level: 1, name: 'Parking lot repour' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Add a line' })).toBeVisible()
   })
 
   test('the tab row fades at the right while it overflows, and not once scrolled to the end', async ({ context, page }) => {
@@ -513,7 +514,6 @@ test.describe('job page on a desktop, redesigned', () => {
   })
 
   test('the Spine is the first tab and every section stays one click away', async ({ context, page }) => {
-    test.fixme(true, 'The mock quote c-quote now lives in fh_quotes as q-quote; Task 10 builds the quote screen whose Quote tab this opens')
     await signIn(context)
     await openDesktop(page, '/jobs/c-job1')
     const tabs = page.getByRole('tablist', { name: 'Job sections' })
@@ -526,9 +526,12 @@ test.describe('job page on a desktop, redesigned', () => {
     await expect(tabs.getByRole('tab', { name: 'Financials', exact: true })).toHaveAttribute('aria-selected', 'true')
     await expect(page).toHaveURL(/tab=financials/)
 
-    // The quote stage keeps its Quote tab, and it opens first.
-    await openDesktop(page, '/quotes/c-quote')
-    await expect(page.getByRole('tablist', { name: 'Job sections' }).getByRole('tab', { name: 'Quote', exact: true })).toHaveAttribute('aria-selected', 'true')
+    // A quote is its own screen (Phase 9, D53), the same one as on a phone,
+    // and its lines open first.
+    await page.goto('/quotes/q-quote', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    await expect(page.locator('.fhqt-page')).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByRole('heading', { level: 1, name: 'Parking lot repour' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Add a line' })).toBeVisible()
   })
 
   test('deep links and the action cue keep working', async ({ context, page }) => {

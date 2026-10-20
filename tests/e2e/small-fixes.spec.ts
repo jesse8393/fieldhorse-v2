@@ -126,14 +126,15 @@ async function openDesktopJob(page: Page, path: string) {
   await expect(page.locator('[data-build-screen="SnowJobDetailBuild"]')).toBeVisible({ timeout: 30_000 })
 }
 
+// The quote screen (Phase 9, Task 10): the mock's quote q-quote on fh_quotes.
 async function openQuote(page: Page) {
-  await page.goto('/quotes/c-quote?tab=quote', { waitUntil: 'domcontentloaded', timeout: 60_000 })
-  await expect(page.locator('.fhq-page')).toBeVisible({ timeout: 30_000 })
+  await page.goto('/quotes/q-quote', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.locator('.fhqt-page')).toBeVisible({ timeout: 30_000 })
 }
 
 function quoteItem(id: string, description: string, over: Record<string, unknown> = {}) {
   return {
-    id, user_id: 'qa-user-1', contact_id: 'c-quote', section: null, description, qty: 1, unit: null, rate: 0, amount: 0,
+    id, user_id: 'qa-user-1', quote_id: 'q-quote', contact_id: null, section: null, description, qty: 1, unit: null, rate: 0, amount: 0,
     notes: null, is_optional: false, is_excluded: false, sort_order: 0, created_at: iso(NOW - DAY), updated_at: iso(NOW - DAY), ...over
   }
 }
@@ -145,8 +146,9 @@ const QUOTE_ITEMS = [
   quoteItem('qi3', 'Stamped ashlar, charcoal release', { qty: 1, rate: 4950, amount: 4950, is_optional: true, sort_order: 2 })
 ]
 
-// The rows of the Share or download sheet.
+// The rows of the quote screen's Share or download list.
 const SHARE_ROWS = ['Open the PDF', 'Download the PDF', 'Copy a share link', 'Send for electronic signature']
+const shareRows = (page: Page) => page.getByRole('list', { name: 'Share or download' })
 
 /** Holds every save to the quote lines until release(), recording each body. */
 async function holdQuoteItemPatches(context: BrowserContext) {
@@ -171,14 +173,16 @@ async function failEmailReads(context: BrowserContext, failing: () => boolean) {
   })
 }
 
-// The mock's MMC Properties quote, without the mock's own client copy on the
-// row, so only a real read of the linked client can find the client's email.
-function quoteContact(over: Record<string, unknown> = {}) {
+// The mock's MMC Properties quote on fh_quotes, written out so a test can
+// change one field. The quote screen reads the client's email from
+// fh_clients itself, fresh, so the copy on the row is never what it sends to.
+function quoteRow(over: Record<string, unknown> = {}) {
   return {
-    id: 'c-quote', stage: 'quote', name: 'MMC Properties', job_title: 'Parking lot repour', amount: 3150, proposal_status: 'sent',
-    quote_sent_at: iso(NOW - DAY), follow_up_on: null, user_id: 'qa-user-1', client_id: 'cl-1', phone: '555-0101', email: 'x@y.com',
-    address: '412 Burkitt Station Rd', notes: null, scope_text: null, terms_text: null, milestones: [], created_at: iso(NOW - 28 * DAY),
-    updated_at: iso(NOW - DAY), completed_at: null, invoice_no: null, ...over
+    id: 'q-quote', user_id: 'qa-user-1', client_id: 'cl-1', origin_contact_id: 'c-quote', lead_id: null, job_id: null,
+    title: 'Parking lot repour', amount: 3150, status: 'sent', sent_at: iso(NOW - DAY), expires_at: null,
+    scope_text: null, terms_text: null, exclusions_text: null, job_type: null, change_request_note: null,
+    change_requested_at: null, approved_version_id: null, created_at: iso(NOW - 28 * DAY), updated_at: iso(NOW - DAY),
+    fh_clients: { id: 'cl-1', name: 'Jeff Roy', phone: '555-0101', email: 'jeff@roy.com' }, ...over
   }
 }
 
@@ -438,25 +442,25 @@ test.describe('Leaving a page while it asks', () => {
     await expectJobsTakeTaps(page)
   })
 
-  test('so does a sheet\'s discard question', async ({ context, page }) => {
-    test.fixme(true, 'The mock quote c-quote now lives in fh_quotes as q-quote; Task 10 builds the quote screen that reads it')
+  // A line being typed on the quote screen is edited in place (Phase 9,
+  // D57): no sheet, so no discard question, and going back writes nothing.
+  test('so does a line being typed on the quote', async ({ context, page }) => {
     await stubSends(context)
     await signIn(context, { tables: { fh_quote_items: QUOTE_ITEMS } })
     const writes = watchWrites(page)
     await openJobs(page)
-    await goInApp(page, '/quotes/c-quote?tab=quote')
-    await expect(page.locator('.fhq-page')).toBeVisible({ timeout: 30_000 })
+    await goInApp(page, '/quotes/q-quote')
+    await expect(page.locator('.fhqt-page')).toBeVisible({ timeout: 30_000 })
     await page.getByRole('button', { name: 'Add a line', exact: true }).click()
-    const sheet = page.getByRole('dialog', { name: 'Add a line' })
-    await expect(sheet).toBeVisible()
-    await sheet.getByLabel('Description').fill('Saw cut the joints')
-    await page.keyboard.press('Escape')
-    const question = page.getByRole('alertdialog', { name: 'Discard your changes?' })
-    await expect(question).toBeVisible()
+    const editor = page.getByRole('form', { name: 'Add a line' })
+    await expect(editor).toBeVisible()
+    await editor.getByLabel('Description').fill('Saw cut the joints')
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(page.getByRole('alertdialog')).toHaveCount(0)
 
     await page.goBack()
     await expect(page.getByRole('heading', { level: 1, name: 'Jobs' })).toBeVisible({ timeout: 30_000 })
-    await expect(question).toBeHidden()
+    await expect(editor).toBeHidden()
     await page.waitForTimeout(400)
     expect(writes).toEqual([])
     await expectJobsTakeTaps(page)
@@ -818,54 +822,45 @@ test.describe('Key caps follow the keyboard', () => {
   })
 })
 
-test.describe('The Quote tab on a phone', () => {
-  test.beforeEach(async ({ context }, testInfo) => {
-    test.skip(!isPhone(testInfo.project.name), 'Phone Quote tab')
+// The quote screen (Phase 9, Task 10) is the same on a phone and a desktop.
+test.describe('The quote screen', () => {
+  test.beforeEach(async ({ context }) => {
     await stubSends(context)
   })
 
   test('a quote with no lines cannot open a PDF or copy a link', async ({ context, page }) => {
-    test.fixme(true, 'The mock quote c-quote now lives in fh_quotes as q-quote; Task 10 builds the quote screen that reads it')
     await signIn(context, { tables: { fh_quote_items: [] } })
     await openQuote(page)
     await expect(page.getByText('No lines yet.')).toBeVisible()
-    await page.getByRole('button', { name: /^Share or download/ }).click()
-    const sheet = page.getByRole('dialog', { name: 'Share or download' })
-    await expect(sheet).toBeVisible()
     for (const name of ['Open the PDF', 'Download the PDF', 'Copy a share link']) {
-      const row = sheet.getByRole('button', { name: new RegExp(`^${name}`) })
+      const row = shareRows(page).getByRole('button', { name: new RegExp(`^${name}`) })
       await expect(row).toBeDisabled()
       await expect(row).toContainText('Add at least one line')
     }
   })
 
   test('finds the customer email on the linked client, as Money does', async ({ context, page }) => {
-    await signIn(context, { tables: { fh_contacts: [quoteContact({ email: null })], fh_quote_items: QUOTE_ITEMS } })
+    await signIn(context, { tables: { fh_quote_items: QUOTE_ITEMS } })
     const sends = await recordSends(context)
     await openQuote(page)
     await expect(page.getByText('Excavate and grade')).toBeVisible()
     await expect(page.getByText(/No email on file/)).toHaveCount(0)
-    await expect(page.locator('.fhj-capsule').getByText('Copies a link')).toHaveCount(0)
-    await page.getByRole('button', { name: /^Share or download/ }).click()
-    const sheet = page.getByRole('dialog', { name: 'Share or download' })
-    await expect(sheet.getByRole('button', { name: /^Send for electronic signature/ })).toContainText('jeff@roy.com')
-    await page.keyboard.press('Escape')
-    await expect(sheet).toBeHidden()
+    await expect(page.locator('.fhqt-total').getByText('Copies a link')).toHaveCount(0)
+    await expect(shareRows(page).getByRole('button', { name: /^Send for electronic signature/ })).toContainText('jeff@roy.com')
 
-    // The proposal goes to the client's address, not to the job's empty one.
-    await page.locator('.fhj-capsule').getByRole('button', { name: 'Send for approval' }).click()
+    // The proposal goes to the client's address, and names the quote.
+    await page.locator('.fhqt-total').getByRole('button', { name: 'Send for approval' }).click()
     await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(1)
     expect(sends[0].url).toContain('/api/send-quote')
-    expect(JSON.parse(sends[0].body)).toMatchObject({ contact_id: 'c-quote', recipient_email: 'jeff@roy.com' })
+    expect(JSON.parse(sends[0].body)).toMatchObject({ quote_id: 'q-quote', recipient_email: 'jeff@roy.com' })
   })
 
   // The client's email can change on the client page while the job page is
   // closed. Coming back reads it again, so a send never goes by the copy
   // read a minute ago (or saved for offline use before a reload).
-  test('reads the linked client email again when the tab opens again', async ({ context, page }) => {
+  test('reads the linked client email again when the quote opens again', async ({ context, page }) => {
     await signIn(context, {
       tables: {
-        fh_contacts: [quoteContact({ email: null })],
         fh_clients: [{ id: 'cl-1', user_id: 'qa-user-1', name: 'Jeff Roy', phone: '555-0101', email: null }],
         fh_quote_items: QUOTE_ITEMS
       }
@@ -878,50 +873,45 @@ test.describe('The Quote tab on a phone', () => {
 
     // The office adds the client's email elsewhere, then opens the quote again.
     clientEmail = 'jeff@roy.com'
-    await goInApp(page, '/work')
-    await expect(page.getByRole('heading', { level: 1, name: 'Jobs' })).toBeVisible({ timeout: 30_000 })
-    await goInApp(page, '/quotes/c-quote?tab=quote')
-    await expect(page.locator('.fhq-page')).toBeVisible({ timeout: 30_000 })
-    const send = page.locator('.fhj-capsule').getByRole('button', { name: 'Send for approval' })
+    await goInApp(page, '/quotes')
+    await expect(page.getByRole('heading', { level: 1, name: 'Quotes' })).toBeVisible({ timeout: 30_000 })
+    await goInApp(page, '/quotes/q-quote')
+    await expect(page.locator('.fhqt-page')).toBeVisible({ timeout: 30_000 })
+    const send = page.locator('.fhqt-total').getByRole('button', { name: 'Send for approval' })
     await expect(send).toBeEnabled()
     await expect(page.getByText(/No email on file/)).toHaveCount(0)
-    await expect(page.locator('.fhj-capsule').getByText('Copies a link')).toHaveCount(0)
+    await expect(page.locator('.fhqt-total').getByText('Copies a link')).toHaveCount(0)
   })
 
-  test('says so when neither the job nor its client has an email', async ({ context, page }) => {
+  test('says so when the client has no email', async ({ context, page }) => {
     await signIn(context, {
       tables: {
-        fh_contacts: [quoteContact({ email: null })],
         fh_clients: [{ id: 'cl-1', user_id: 'qa-user-1', name: 'Jeff Roy', phone: '555-0101', email: null }],
         fh_quote_items: QUOTE_ITEMS
       }
     })
     await openQuote(page)
-    await expect(page.getByText('No email on file for MMC Properties.', { exact: false })).toBeVisible()
+    await expect(page.getByText('No email on file for Jeff.', { exact: false })).toBeVisible()
   })
 
   // A read that fails says nothing about whether there is an email. It used
   // to read as "no email", and Send for approval then copied a share link
   // and marked the quote sent instead of emailing a client who has one.
   test('a failed read of the client email says it could not check, and Send waits for a read that works', async ({ context, page }) => {
-    await signIn(context, { tables: { fh_contacts: [quoteContact({ email: null })], fh_quote_items: QUOTE_ITEMS } })
+    await signIn(context, { tables: { fh_quote_items: QUOTE_ITEMS } })
     const sends = await recordSends(context)
-    const contactPatches = watchPatches(page, 'fh_contacts')
+    const quotePatches = watchPatches(page, 'fh_quotes')
     let failing = true
     await failEmailReads(context, () => failing)
     await openQuote(page)
     await expect(page.getByText('Excavate and grade')).toBeVisible()
-    const send = page.locator('.fhj-capsule').getByRole('button', { name: 'Send for approval' })
-    await expect(page.getByText("Couldn't check the email for MMC Properties.", { exact: false })).toBeVisible({ timeout: 15_000 })
+    const send = page.locator('.fhqt-total').getByRole('button', { name: 'Send for approval' })
+    await expect(page.getByText("Couldn't check the email for Jeff.", { exact: false })).toBeVisible({ timeout: 15_000 })
     await expect(page.getByText(/No email on file/)).toHaveCount(0)
-    await expect(page.locator('.fhj-capsule').getByText('Copies a link')).toHaveCount(0)
+    await expect(page.locator('.fhqt-total').getByText('Copies a link')).toHaveCount(0)
     await expect(send).toBeDisabled()
-    await page.getByRole('button', { name: /^Share or download/ }).click()
-    const sheet = page.getByRole('dialog', { name: 'Share or download' })
-    await expect(sheet.getByRole('button', { name: /^Send for electronic signature/ })).toBeDisabled()
-    await expect(sheet.getByText('Add a customer email first.')).toHaveCount(0)
-    await page.keyboard.press('Escape')
-    await expect(sheet).toBeHidden()
+    await expect(shareRows(page).getByRole('button', { name: /^Send for electronic signature/ })).toBeDisabled()
+    await expect(shareRows(page).getByText('Add a customer email first.')).toHaveCount(0)
 
     // Try again reads it, and this time the read works.
     failing = false
@@ -933,13 +923,14 @@ test.describe('The Quote tab on a phone', () => {
     expect(sends[0].url).toContain('/api/send-quote')
     expect(JSON.parse(sends[0].body)).toMatchObject({ recipient_email: 'jeff@roy.com' })
     // No share link marked the quote sent along the way.
-    expect(contactPatches.filter((body) => body.includes('proposal_status'))).toEqual([])
+    expect(quotePatches.filter((body) => body.includes('"status"'))).toEqual([])
   })
 
-  // The approval form and the approved copy take the customer's email the
-  // way the Quote tab sends: the job's own, then the linked client's.
+  // The approval screen and the approved copy take the customer's email the
+  // way the quote sends: the client's, read fresh. The approval names the
+  // quote (fn_approve_quote_version takes p_quote_id, Task 11).
   test('Approve quote starts from the client email too, and keeps it on the approved copy', async ({ context, page }) => {
-    await signIn(context, { tables: { fh_contacts: [quoteContact({ email: null })], fh_quote_items: QUOTE_ITEMS } })
+    await signIn(context, { tables: { fh_quote_items: QUOTE_ITEMS } })
     const approvals: Record<string, any>[] = []
     page.on('request', (req) => {
       if (req.method() === 'POST' && new URL(req.url()).pathname.endsWith('/rpc/fn_approve_quote_version')) {
@@ -948,18 +939,20 @@ test.describe('The Quote tab on a phone', () => {
     })
     await openQuote(page)
     await expect(page.getByText('Excavate and grade')).toBeVisible()
-    await page.getByRole('button', { name: /^Approve quote/ }).click()
-    const sheet = page.getByRole('dialog', { name: 'Lock the approved quote.' })
-    await expect(sheet).toBeVisible()
-    await expect(sheet.getByLabel('Email (optional)')).toHaveValue('jeff@roy.com')
-    await sheet.getByRole('button', { name: 'Approve quote' }).click()
+    await page.getByRole('link', { name: /^Approve quote/ }).click()
+    await expect(page).toHaveURL(/\/quotes\/q-quote\/approve$/)
+    await expect(page.getByRole('heading', { name: 'Lock the approved quote.' })).toBeVisible()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(page.getByLabel('Email (optional)')).toHaveValue('jeff@roy.com')
+    await expect(page.getByText(/^2 base, 1 optional/)).toBeVisible()
+    await page.getByRole('button', { name: 'Approve quote' }).click()
     await expect.poll(() => approvals.length).toBe(1)
+    expect(approvals[0].p_quote_id).toBe('q-quote')
     expect(approvals[0].p_approved_by_email).toBe('jeff@roy.com')
     expect(approvals[0].p_snapshot?.contact?.email).toBe('jeff@roy.com')
   })
 
   test('the optional switch and Send for approval wait while a switch saves', async ({ context, page }) => {
-    test.fixme(true, 'The mock quote c-quote now lives in fh_quotes as q-quote; Task 10 builds the quote screen that reads it')
     await signIn(context, { tables: { fh_quote_items: QUOTE_ITEMS } })
     let release: () => void = () => {}
     const held = new Promise<void>((resolve) => { release = resolve })
@@ -973,7 +966,7 @@ test.describe('The Quote tab on a phone', () => {
     })
     await openQuote(page)
     const toggle = page.getByRole('switch', { name: 'Include Stamped ashlar, charcoal release in the total' })
-    const send = page.locator('.fhj-capsule').getByRole('button', { name: 'Send for approval' })
+    const send = page.locator('.fhqt-total').getByRole('button', { name: 'Send for approval' })
     await expect(toggle).toBeEnabled()
     await expect(send).toBeEnabled()
 
@@ -993,27 +986,28 @@ test.describe('The Quote tab on a phone', () => {
 
   // An approved quote's new version is a snapshot of the lines, so it waits
   // too: taken during the save, it froze the lines from before the switch.
+  // The row leads to the approval screen while it can, and waits as a
+  // disabled row while it cannot.
   test('Approve a new version waits while a switch saves', async ({ context, page }) => {
-    await signIn(context, { tables: { fh_contacts: [quoteContact({ proposal_status: 'approved' })], fh_quote_items: QUOTE_ITEMS } })
+    await signIn(context, { tables: { fh_quotes: [quoteRow({ status: 'approved' })], fh_quote_items: QUOTE_ITEMS } })
     const save = await holdQuoteItemPatches(context)
     await openQuote(page)
     const toggle = page.getByRole('switch', { name: 'Include Stamped ashlar, charcoal release in the total' })
-    const approveAgain = page.getByRole('button', { name: /^Approve a new version/ })
-    await expect(approveAgain).toBeEnabled()
+    await expect(page.getByRole('link', { name: /^Approve a new version/ })).toBeVisible()
 
     await toggle.click()
     await expect.poll(() => save.patches.length).toBe(1)
-    await expect(approveAgain).toBeDisabled()
+    await expect(page.getByRole('button', { name: /^Approve a new version/ })).toBeDisabled()
+    await expect(page.getByRole('link', { name: /^Approve a new version/ })).toHaveCount(0)
 
     save.release()
-    await expect(approveAgain).toBeEnabled()
+    await expect(page.getByRole('link', { name: /^Approve a new version/ })).toBeVisible()
   })
 
   // A disabled control that has focus drops it to the page: the switch
   // waits with aria-disabled instead, so a keyboard or switch access user
   // stays on it through the save.
   test('the optional switch keeps keyboard focus while it saves', async ({ context, page }) => {
-    test.fixme(true, 'The mock quote c-quote now lives in fh_quotes as q-quote; Task 10 builds the quote screen that reads it')
     await signIn(context, { tables: { fh_quote_items: QUOTE_ITEMS } })
     const save = await holdQuoteItemPatches(context)
     await openQuote(page)
@@ -1038,26 +1032,22 @@ test.describe('The Quote tab on a phone', () => {
   })
 
   test('Share or download waits while a switch saves', async ({ context, page }) => {
-    test.fixme(true, 'The mock quote c-quote now lives in fh_quotes as q-quote; Task 10 builds the quote screen that reads it')
     await signIn(context, { tables: { fh_quote_items: QUOTE_ITEMS } })
     const save = await holdQuoteItemPatches(context)
     await openQuote(page)
     await page.getByRole('switch', { name: 'Include Stamped ashlar, charcoal release in the total' }).click()
     await expect.poll(() => save.patches.length).toBe(1)
 
-    await page.getByRole('button', { name: /^Share or download/ }).click()
-    const sheet = page.getByRole('dialog', { name: 'Share or download' })
-    await expect(sheet).toBeVisible()
     // The PDF is built from the saved lines, so nothing goes out with the
     // total that is still saving.
-    for (const name of SHARE_ROWS) await expect(sheet.getByRole('button', { name: new RegExp(`^${name}`) })).toBeDisabled()
+    for (const name of SHARE_ROWS) await expect(shareRows(page).getByRole('button', { name: new RegExp(`^${name}`) })).toBeDisabled()
 
     save.release()
-    for (const name of SHARE_ROWS) await expect(sheet.getByRole('button', { name: new RegExp(`^${name}`) })).toBeEnabled()
+    for (const name of SHARE_ROWS) await expect(shareRows(page).getByRole('button', { name: new RegExp(`^${name}`) })).toBeEnabled()
   })
 
   test('Share or download waits while the lines and the email load, and says nothing wrong', async ({ context, page }) => {
-    await signIn(context, { tables: { fh_contacts: [quoteContact({ email: null })], fh_quote_items: QUOTE_ITEMS } })
+    await signIn(context, { tables: { fh_quote_items: QUOTE_ITEMS } })
     let release: () => void = () => {}
     const held = new Promise<void>((resolve) => { release = resolve })
     // Hold the line read and the linked client's email read.
@@ -1067,41 +1057,30 @@ test.describe('The Quote tab on a phone', () => {
       return route.fallback()
     })
     await openQuote(page)
-    await expect(page.locator('.fhq-loading')).toBeVisible()
+    await expect(page.locator('.fhqt-loading')).toBeVisible()
     // Approve quote waits too, without claiming there is no line.
     const approve = page.getByRole('button', { name: /^Approve quote/ })
     await expect(approve).toBeDisabled()
     await expect(approve).toContainText('Record that the customer said yes.')
 
-    await page.getByRole('button', { name: /^Share or download/ }).click()
-    const sheet = page.getByRole('dialog', { name: 'Share or download' })
-    await expect(sheet).toBeVisible()
-    for (const name of SHARE_ROWS) await expect(sheet.getByRole('button', { name: new RegExp(`^${name}`) })).toBeDisabled()
+    for (const name of SHARE_ROWS) await expect(shareRows(page).getByRole('button', { name: new RegExp(`^${name}`) })).toBeDisabled()
     // Neither line is known yet, so neither is said.
-    await expect(sheet.getByText('Add at least one line')).toHaveCount(0)
-    await expect(sheet.getByText('Add a customer email first.')).toHaveCount(0)
+    await expect(shareRows(page).getByText('Add at least one line')).toHaveCount(0)
+    await expect(shareRows(page).getByText('Add a customer email first.')).toHaveCount(0)
 
     release()
-    for (const name of SHARE_ROWS) await expect(sheet.getByRole('button', { name: new RegExp(`^${name}`) })).toBeEnabled()
-    await expect(sheet.getByRole('button', { name: /^Send for electronic signature/ })).toContainText('jeff@roy.com')
-  })
-})
-
-test.describe('The Quote tab on a desktop', () => {
-  test.beforeEach(async ({ context }, testInfo) => {
-    test.skip(isPhone(testInfo.project.name), 'Desktop Quote tab')
-    await stubSends(context)
+    for (const name of SHARE_ROWS) await expect(shareRows(page).getByRole('button', { name: new RegExp(`^${name}`) })).toBeEnabled()
+    await expect(shareRows(page).getByRole('button', { name: /^Send for electronic signature/ })).toContainText('jeff@roy.com')
   })
 
   test('a failed read of the client email does not say there is none', async ({ context, page }) => {
-    await signIn(context, { tables: { fh_contacts: [quoteContact({ email: null })], fh_quote_items: QUOTE_ITEMS } })
+    await signIn(context, { tables: { fh_quote_items: QUOTE_ITEMS } })
     await failEmailReads(context, () => true)
-    await page.goto('/quotes/c-quote?tab=quote', { waitUntil: 'domcontentloaded', timeout: 60_000 })
-    await expect(page.locator('.fh-quote-workspace')).toBeVisible({ timeout: 30_000 })
-    await expect(page.getByText("Couldn't check the client email.", { exact: false })).toBeVisible({ timeout: 15_000 })
-    await expect(page.getByText('Add a client email first', { exact: false })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: 'Send to client' })).toBeDisabled()
-    await expect(page.getByRole('button', { name: 'Send Proposal' })).toBeDisabled()
+    await openQuote(page)
+    await expect(page.getByText("Couldn't check the email for Jeff.", { exact: false })).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText('Add a customer email first', { exact: false })).toHaveCount(0)
+    await expect(page.getByText(/No email on file/)).toHaveCount(0)
+    await expect(page.locator('.fhqt-total').getByRole('button', { name: 'Send for approval' })).toBeDisabled()
   })
 })
 
@@ -1148,18 +1127,20 @@ test.describe('Focus after a sheet closes', () => {
     await expect(filter).toBeFocused()
   })
 
-  test('the same holds for a row that opens a sheet', async ({ context, page }) => {
-    test.fixme(true, 'The mock quote c-quote now lives in fh_quotes as q-quote; Task 10 builds the quote screen that reads it')
+  // The quote's line editor opens in place (Phase 9, D57): Escape closes it
+  // and focus comes back to the button that opened it, the same way.
+  test('the same holds for a row that opens the line editor in place', async ({ context, page }) => {
     await stubSends(context)
     await signIn(context, { tables: { fh_quote_items: QUOTE_ITEMS } })
     await openQuote(page)
-    const row = page.getByRole('button', { name: /^Share or download/ })
-    await row.focus()
+    const add = page.getByRole('button', { name: 'Add a line', exact: true })
+    await add.focus()
     await page.keyboard.press('Enter')
-    const sheet = page.getByRole('dialog', { name: 'Share or download' })
-    await expect(sheet).toBeVisible()
+    const editor = page.getByRole('form', { name: 'Add a line' })
+    await expect(editor).toBeVisible()
+    await expect(editor.getByLabel('Description')).toBeFocused()
     await page.keyboard.press('Escape')
-    await expect(sheet).toBeHidden()
-    await expect(row).toBeFocused()
+    await expect(editor).toBeHidden()
+    await expect(add).toBeFocused()
   })
 })

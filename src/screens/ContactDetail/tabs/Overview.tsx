@@ -5,9 +5,7 @@ import { motion } from 'framer-motion'
 import { Plus, Pencil, X as XIcon, ShieldCheck, Receipt, RotateCcw, ChevronDown } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
 import { toYmd } from '../../../lib/dates.ts'
-import {
-  startQuote, approveQuote, markComplete, reopen, reopenQuestion
-} from '../../../lib/pipeline.ts'
+import { markComplete, reopen, reopenQuestion } from '../../../lib/pipeline.ts'
 import { useConfirm } from '../../../components/ConfirmSheet.tsx'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
 import { hapticTap, hapticStageChange } from '../../../lib/haptics.ts'
@@ -198,9 +196,6 @@ export default function OverviewTab({
             const res: any = await fn(contact)
             if (res?.error) throw res.error
             await fetchAll()
-            if (nextAction.pipelineFn === 'startQuote') {
-              onOpenQuote?.()
-            }
           } else if (nextAction.pipelineFn === 'logPayment') {
             // Log payment opens the modal in the parent, stays in flight as
             // the operator inputs amount/date/method.
@@ -485,9 +480,10 @@ export default function OverviewTab({
 
 /* ----------- helpers ----------- */
 
+// Phase 9 (D54): startQuote and approveQuote are gone. A lead's quote is
+// made with Quote this and a quote's approval is its own screen, so the
+// stage card only completes or reopens a job here.
 const STAGE_FN_MAP: Record<string, any> = {
-  startQuote,
-  approveQuote,
   markComplete,
   reopen
 }

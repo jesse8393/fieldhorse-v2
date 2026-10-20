@@ -44,7 +44,7 @@ const Calendar = lazy(() => import('@/components/ui/calendar').then((m) => ({ de
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { supabase } from '../lib/supabase.ts'
-import { markWon, markLost, reopen, reopenQuestion } from '../lib/pipeline.ts'
+import { markLost, reopen, reopenQuestion } from '../lib/pipeline.ts'
 import { useConfirm } from '../components/ConfirmSheet.tsx'
 import { detailRoute, LIST_STAGE_META as STAGE_META } from '../lib/stages.ts'
 import { moneyK as money } from '../lib/format.ts'
@@ -343,14 +343,14 @@ export default function Work() {
   // mounted cards.
   const handleOpen = useCallback((c: JobRow) => navigate(detailRoute(c)), [navigate])
   const handleHover = useCallback((c: JobRow) => { if (canHover) prefetchJobDetail(queryClient, c.id, user?.id) }, [queryClient, user?.id])
+  // Won is no longer a stage move (Phase 9, D54, D61): the quote screen's
+  // Make this a job makes the job, so Won opens the record.
   const handleWon = useCallback((c: JobRow) => {
     if (c.proposal_status === 'changes_requested') {
-      toastError('Review changes first', 'Send the revised quote before marking it won.')
-      navigate(`/quotes/${c.id}?tab=quote`)
-      return
+      toastError('Review changes first', 'Send the revised quote before making it a job.')
     }
-    run(c, markWon, null, "Couldn't mark won", () => navigate(`/jobs/${c.id}`))
-  }, [run, navigate])
+    navigate(detailRoute(c))
+  }, [navigate])
   const handleLost = useCallback((c: JobRow) => run(c, markLost, { stage: 'lost' } as Partial<JobRow>, "Couldn't mark lost"), [run])
   // Reopen asks first, like Mark lost on the job page: one tap used to move
   // a closed or lost deal straight back (Phase 8, Task 15).

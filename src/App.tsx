@@ -6,7 +6,6 @@ import { useProfile } from './contexts/ProfileContext.tsx'
 import { useMediaQuery } from './lib/useMediaQuery.ts'
 import { lazyWithRetry as lazy } from './lib/lazyWithRetry.ts'
 import AppShell from './components/AppShell.tsx'
-import { NewRecordRoute } from './components/MovedRecordRedirect.tsx'
 
 // Eager, must be in main bundle
 //   Login: gates everything; can't lazy-load the login screen
@@ -63,6 +62,13 @@ const QuoteNew       = lazy(() => import('./screens/quotes/QuoteNew.tsx'))
 const JobNew         = lazy(() => import('./screens/jobs/JobNew.tsx'))
 const InvoiceNew     = lazy(() => import('./screens/invoices/InvoiceNew.tsx'))
 const ClientNew      = lazy(() => import('./screens/clients/ClientNew.tsx'))
+// Quotes are records of their own (Phase 9, D53, D65): a list, the quote
+// and its three screens for terms, the preview and approval.
+const QuotesList     = lazy(() => import('./screens/quotes/QuotesList.tsx'))
+const QuoteDetail    = lazy(() => import('./screens/quotes/QuoteDetail.tsx'))
+const QuoteTerms     = lazy(() => import('./screens/quotes/QuoteTerms.tsx'))
+const QuotePreview   = lazy(() => import('./screens/quotes/QuotePreview.tsx'))
+const QuoteApprove   = lazy(() => import('./screens/quotes/QuoteApprove.tsx'))
 // The redesign component sheet, in development builds only: the
 // condition is a build time constant, so production drops the chunk.
 const DesignSheet    = import.meta.env.DEV ? lazy(() => import('./screens/DesignSheet.tsx')) : null
@@ -187,20 +193,26 @@ function ContactDetailRoute() {
 }
 
 /**
- * /leads/:id and /quotes/:id (SPEC D55, D56). Leads and quotes live in
- * their own tables now, so the id is first read there. An old fh_contacts
- * id the migration moved is sent on to the new record; any other contact
- * id still opens the old detail screen.
+ * /leads/:id (SPEC D55, D56). Leads live in their own table now, so the id
+ * is first read there. An old fh_contacts id the migration moved is sent
+ * on to the new record; any other contact id still opens the old detail
+ * screen.
  */
-function NewRecordDetailRoute({ kind }: { kind: 'lead' | 'quote' }) {
-  const { id = '' } = useParams()
-  return <NewRecordRoute kind={kind} id={id} fallback={<ContactDetailSplit id={id} />} />
-}
 
 /** /leads/:id: the lead screen, or the old detail screen for any other id. */
 function LeadDetailRoute() {
   const { id = '' } = useParams()
   return <LeadDetail id={id} fallback={<ContactDetailSplit id={id} />} />
+}
+
+/**
+ * /quotes/:id is the quote screen (Phase 9, Task 10). When no fh_quotes
+ * row has the id, the old detail screen takes it: a moved row is sent on
+ * to its new quote, a live contact still opens.
+ */
+function QuoteDetailRoute() {
+  const { id = '' } = useParams()
+  return <QuoteDetail fallback={<ContactDetailSplit id={id} />} />
 }
 
 function ContactDetailSplit({ id }: { id: string | undefined }) {
@@ -253,8 +265,11 @@ export default function App() {
           <Route path="/clients/new" element={<ClientNew />} />
           <Route path="/leads" element={<LeadsList />} />
           <Route path="/leads/:id" element={<LeadDetailRoute />} />
-          <Route path="/quotes" element={<LegacyBoardRedirect defaultStage="quotes" />} />
-          <Route path="/quotes/:id" element={<NewRecordDetailRoute kind="quote" />} />
+          <Route path="/quotes" element={<QuotesList />} />
+          <Route path="/quotes/:id" element={<QuoteDetailRoute />} />
+          <Route path="/quotes/:id/terms" element={<QuoteTerms />} />
+          <Route path="/quotes/:id/preview" element={<QuotePreview />} />
+          <Route path="/quotes/:id/approve" element={<QuoteApprove />} />
           <Route path="/pipeline" element={<LegacyBoardRedirect />} />
           <Route path="/jobs" element={<LegacyBoardRedirect defaultStage="active" />} />
           <Route path="/jobs/:id" element={<ContactDetailRoute />} />

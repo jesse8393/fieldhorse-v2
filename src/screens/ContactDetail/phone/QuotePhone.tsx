@@ -1,39 +1,29 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronRight, Plus, Receipt } from 'lucide-react'
-import { Button, Chip, EmptyState, Icon, Row, SkeletonRows } from '../../../components/fh'
-import DataErrorState from '../../../components/DataErrorState.tsx'
-import { keepFocusOnRetry } from '../../../lib/retryFocus.ts'
-import { formatMoney } from '../../../components/fh/money.ts'
-import { Switch } from '@/components/ui/switch'
+import { ChevronRight } from 'lucide-react'
+import { Button, Chip, Icon, Row } from '../../../components/fh'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { buildQuoteView, previewAsLabel, previewAsName, quoteCapsule } from '../../../lib/quoteView.ts'
-import { useItemSuggestions, useQuoteItems, type QuoteLinesState } from '../sections/QuoteItems.tsx'
+import { useQuoteItems, type QuoteLinesState } from '../sections/QuoteItems.tsx'
+import QuoteTermsSection from '../sections/QuoteTerms.tsx'
+import { DocumentPreviewPane, loadPreviewPhotos } from '../sections/DocumentPreviewPane.tsx'
 import { shortDate, statusChip } from '../lib/quoteStatus.ts'
+import QuoteLines, { type QuoteLinesChange } from '../../quotes/QuoteLines.tsx'
 import JobActionCapsule from './JobActionCapsule.tsx'
-import QuotePreviewSheet from './QuotePreviewSheet.tsx'
-import { QuoteLineSheet, QuoteMoreSheet, QuoteTermsSheet } from './QuoteSheets.tsx'
 import './quote-phone.css'
 
-// The Quote tab on a phone (spec 9.6, decision D8, render glamor/g-quote.jpg).
+// The Quote tab on a phone (spec 9.6, decision D8), for a contact row that
+// still carries its quote. Since Phase 9 a quote is a record of its own
+// (src/screens/quotes, decision D53), so this tab only shows for a row the
+// migration never moved; Task 13 takes it off the job page.
 //
-// Status chip and the line under it, then the lines as hairline rows (tap
-// one to edit it in a sheet), "Add a line", the optional items in a paper
-// panel with a switch each, and the rows that keep the rest reachable:
-// scope and terms, approving by hand, sharing and downloading. The onyx
-// capsule at the bottom carries the total, the deposit and the one gold
-// "Send for approval".
+// Nothing here opens a sheet (D57). The lines are edited in place through
+// the quote screen's QuoteLines; Scope and terms opens the terms section
+// in place; Preview as draws the proposal in place; the share and download
+// rows sit on the page. The onyx capsule at the bottom carries the total,
+// the deposit and the one gold "Send for approval".
 //
 // The money comes from lib/quoteView.ts, which reads lib/quoteMoney.ts, the
-// one rule the preview and the customer page use too (D31): the total is
-// the base lines plus approved change orders (the contact's own amount
-// until a line is priced, so the capsule never flashes $0.00 while the
-// lines load), and the deposit is what the payment terms name. There is
-// no overhead line. Lines save through the same
-// useQuoteItems writes the desktop builder uses. "Preview as" draws the
-// proposal in the app and never mints a link or calls a send route.
-//
-// There is no AI draft note: nothing on the quote says it was drafted by
-// the model, so the screen never claims it was.
+// one rule the preview and the customer page use too (D31).
 
 export type QuotePhoneProps = {
   contact: any
@@ -77,11 +67,10 @@ export type QuotePhoneProps = {
   onLinesState?: (state: QuoteLinesState | null) => void
 }
 
-type LineSheetState = { key: number; id: string | null }
-
 // What Approve, Send and the share rows say when the lines could not be
 // read: never that there are none.
 const LINES_FAILED = "We couldn't load the lines."
+const NEEDS_A_LINE = 'Add at least one line.'
 
 export default function QuotePhone({
   contact,
@@ -90,7 +79,7 @@ export default function QuotePhone({
   insurance = null,
   changeOrders = [],
   status,
-  pastQuote,
+  pastQuote: _pastQuote,
   busy,
   customerEmail,
   emailFailed = false,
@@ -109,135 +98,55 @@ export default function QuotePhone({
   onLinesLoaded,
   onLinesState
 }: QuotePhoneProps) {
-  const { rows, loading, loaded, failed, fetchRows, addItem, updateItem, removeItem, reorderItem } = useQuoteItems({
+  const items = useQuoteItems({
     jobId: contact?.id,
     userId,
     onContactRefresh,
     onLoaded: onLinesLoaded,
     onState: onLinesState
   })
+  const { rows, loading, loaded, failed, fetchRows } = items
   // No read of the lines has worked yet and the last one failed: the lines
   // are unknown, so nothing may say there are none.
   const linesFailed = !loading && failed && !loaded
   // The page's heading, where focus waits while Try again reads the lines again.
   const titleRef = useRef<HTMLHeadingElement>(null)
-  const suggestions = useItemSuggestions(userId)
 
-  // Optional switches flip here at once (is_optional by line id), then save
-  // through updateItem. An entry leaves when the saved row catches up, or
-  // when the save fails. `toggled` remembers the lines a switch moved, so
-  // they stay in the optional panel (and can flip back) for this visit.
-  const [optimistic, setOptimistic] = useState<Record<string, boolean>>({})
-  const [toggled, setToggled] = useState<Set<string>>(() => new Set())
-  useEffect(() => {
-    setOptimistic((prev) => {
-      let next = prev
-      for (const id of Object.keys(prev)) {
-        const saved = rows.find((r) => r.id === id)
-        if (!saved || Boolean(saved.is_optional) === prev[id]) {
-          if (next === prev) next = { ...prev }
-          delete next[id]
-        }
-      }
-      return next
-    })
-  }, [rows])
-
-  const effective = useMemo(
-    () => rows.map((r) => (r.id in optimistic ? { ...r, is_optional: optimistic[r.id] } : r)),
-    [rows, optimistic]
-  )
+  const [lines, setLines] = useState<QuoteLinesChange>({ effective: [], switchSaving: false })
+  const switchSaving = lines.switchSaving
   const contactAmount = contact?.amount
   const termsText = contact?.terms_text
   const moneyTerms = useMemo(() => ({ changeOrders, contactAmount, termsText }), [changeOrders, contactAmount, termsText])
-  const live = useMemo(() => buildQuoteView(effective, moneyTerms), [effective, moneyTerms])
+  const live = useMemo(() => buildQuoteView(lines.effective, moneyTerms), [lines.effective, moneyTerms])
   // While the lines load no line is priced, so the contact's own amount
   // stands in and the capsule does not flash $0.00.
   const loadingMoney = useMemo(() => buildQuoteView([], moneyTerms).money, [moneyTerms])
   const capsule = quoteCapsule(loading ? loadingMoney : live.money)
 
-  const byId = useMemo(
-    () => new Map([...live.lines, ...live.optional, ...live.excluded].map((l) => [l.id, l])),
-    [live]
-  )
-  const pending = (id: string) => Boolean(rows.find((r) => r.id === id)?._pending)
-  const lines = live.lines.filter((l) => !toggled.has(l.id))
-  const optionalRows = effective.filter((r) => !r.is_excluded && (r.is_optional || toggled.has(r.id)))
   const who = previewAsName(contact?.name)
   const approved = status.label === 'Approved'
   const changesRequested = status.label === 'Changes requested'
   const deletable = !approved && !(status.label === 'Draft' && rows.length === 0)
 
-  // Switch saves in flight, by line id (Phase 8, Task 15). While one is
-  // out, its switch, Send for approval, Approve quote and every Share or
-  // download row wait: a quick second tap cannot race the first save, and
-  // the quote never goes out, or gets approved, with a total that is still
-  // saving (the PDF is built from the saved lines). The switch waits with
-  // aria-disabled, not disabled: a disabled control that has focus drops
-  // it to the page, so a keyboard or switch access user would lose their
-  // place on every toggle. The ref turns away the taps meanwhile.
-  const switchSavesRef = useRef<Set<string>>(new Set())
-  const [switchSaves, setSwitchSaves] = useState<ReadonlySet<string>>(() => new Set())
-  const switchSaving = switchSaves.size > 0
-
-  function toggleOptional(id: string, include: boolean) {
-    if (switchSavesRef.current.has(id)) return
-    switchSavesRef.current.add(id)
-    setSwitchSaves(new Set(switchSavesRef.current))
-    hapticTap()
-    setToggled((s) => new Set(s).add(id))
-    setOptimistic((o) => ({ ...o, [id]: !include }))
-    void updateItem(id, { is_optional: !include })
-      .then((ok) => {
-        if (ok) return
-        setOptimistic((o) => {
-          const { [id]: _gone, ...rest } = o
-          return rest
-        })
-      })
-      .finally(() => {
-        switchSavesRef.current.delete(id)
-        setSwitchSaves(new Set(switchSavesRef.current))
-      })
-  }
-
-  // Sheets. The line sheet and the terms sheet remount on every opening
-  // (a new key), so each starts from what is saved.
-  const [lineSheet, setLineSheet] = useState<LineSheetState | null>(null)
-  const [lineOpen, setLineOpen] = useState(false)
-  const [termsKey, setTermsKey] = useState(0)
+  // Scope and terms and the preview open in place, under their rows.
   const [termsOpen, setTermsOpen] = useState(false)
-  const [moreOpen, setMoreOpen] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
-  const sheetKey = useRef(0)
-  const lastSection = useRef('')
-
-  function openLine(id: string | null) {
-    hapticTap()
-    sheetKey.current += 1
-    setLineSheet({ key: sheetKey.current, id })
-    setLineOpen(true)
-  }
-  const editRow = lineSheet?.id ? effective.find((r) => r.id === lineSheet.id) ?? null : null
-  const editIndex = editRow ? rows.findIndex((r) => r.id === editRow.id) : -1
-  const editPending = editRow ? pending(editRow.id) : false
-
-  async function saveLine(values: any) {
-    if (!lineSheet) return false
-    if (!lineSheet.id) {
-      lastSection.current = values.section || ''
-      void addItem(values)
-      return true
-    }
-    const id = lineSheet.id
-    const ok = await updateItem(id, values)
-    if (ok) {
-      // The sheet's mode picker decides now; drop any switch memory.
-      setToggled((s) => { const next = new Set(s); next.delete(id); return next })
-      setOptimistic((o) => { const { [id]: _gone, ...rest } = o; return rest })
-    }
-    return ok
-  }
+  const [photos, setPhotos] = useState<any[]>([])
+  const [photosLoading, setPhotosLoading] = useState(false)
+  const jobId = contact?.id
+  useEffect(() => {
+    if (!previewOpen || !jobId || !userId) return
+    let alive = true
+    setPhotosLoading(true)
+    loadPreviewPhotos(jobId, userId)
+      .catch(() => [])
+      .then((list) => {
+        if (!alive) return
+        setPhotos(list || [])
+        setPhotosLoading(false)
+      })
+    return () => { alive = false }
+  }, [previewOpen, jobId, userId])
 
   // The send button: the email path with an address, the link path
   // without. While the linked client's email is still being read, the
@@ -247,7 +156,8 @@ export default function QuotePhone({
   const emailKnown = customerEmail !== null
   const hasClientEmail = !!customerEmail
   const sendLabel = approved ? 'Send again' : 'Send for approval'
-  const sendHint = !loading && !live.canSend
+  const needsLines = !loading && !live.canSend
+  const sendHint = needsLines
     ? (linesFailed ? LINES_FAILED : 'Add at least one line')
     : emailFailed
       ? "Couldn't check the email"
@@ -260,6 +170,17 @@ export default function QuotePhone({
     contact?.quote_expires_at && `Expires ${shortDate(contact.quote_expires_at)}`
   ].filter(Boolean) as string[]
   const chevron = <Icon icon={ChevronRight} size={18} className="fhq-chevron" />
+  const waiting = loading || busy !== null || switchSaving
+  const linesLine = linesFailed ? LINES_FAILED : NEEDS_A_LINE
+  const esignLine = needsLines
+    ? linesLine
+    : customerEmail
+      ? `DocuSign emails a signing request to ${customerEmail}.`
+      : emailFailed
+        ? "Couldn't check the customer email."
+        : customerEmail === ''
+          ? 'Add a customer email first.'
+          : 'DocuSign emails the customer a signing request.'
 
   return (
     <div className="fhq-page">
@@ -271,7 +192,8 @@ export default function QuotePhone({
             variant="quiet"
             size="mini"
             className="fhq-head__preview"
-            onClick={() => { hapticTap(); setPreviewOpen(true) }}
+            aria-expanded={previewOpen}
+            onClick={() => { hapticTap(); setPreviewOpen((v) => !v) }}
           >
             {previewAsLabel(contact?.name)}
           </Button>
@@ -300,6 +222,24 @@ export default function QuotePhone({
         )}
       </header>
 
+      {previewOpen && (
+        <section className="fhq-preview" aria-label="Proposal preview, in place">
+          <p className="fhq-head__sub">This is what {who} sees. Nothing is sent.</p>
+          <DocumentPreviewPane
+            bare
+            company={company}
+            contact={contact}
+            items={lines.effective}
+            photos={photos}
+            loading={photosLoading || loading}
+            failed={linesFailed}
+            onRetry={() => { void fetchRows() }}
+            insurance={insurance}
+            changeOrders={changeOrders}
+          />
+        </section>
+      )}
+
       {changesRequested && (
         <section className="fhq-panel" aria-labelledby="fhq-changes-title">
           <h3 className="fhq-panel__title" id="fhq-changes-title">Customer requested changes</h3>
@@ -312,94 +252,7 @@ export default function QuotePhone({
         </section>
       )}
 
-      {loading ? (
-        <div className="fhq-loading"><SkeletonRows rows={4} label="Loading the quote lines" /></div>
-      ) : linesFailed ? (
-        <div className="fhq-loading">
-          <DataErrorState
-            title="Couldn't load the lines"
-            message="Check your connection and try again."
-            actionLabel="Try again"
-            onRetry={() => {
-              keepFocusOnRetry(titleRef.current)
-              void fetchRows()
-            }}
-          />
-        </div>
-      ) : lines.length === 0 ? (
-        <EmptyState
-          icon={Receipt}
-          title="No lines yet."
-          action={<Button variant="secondary" icon={Plus} onClick={() => openLine(null)}>Add a line</Button>}
-        />
-      ) : (
-        <>
-          <ul className="fhq-lines" aria-label="Line items">
-            {lines.map((line) => (
-              <Row
-                key={line.id}
-                as="li"
-                title={line.title}
-                subline={line.detail || undefined}
-                money={line.amount}
-                next={pending(line.id) ? 'Saving' : undefined}
-                disabled={pending(line.id)}
-                onClick={() => openLine(line.id)}
-              />
-            ))}
-          </ul>
-          <Button variant="quiet" icon={Plus} className="fhq-add" onClick={() => openLine(null)}>Add a line</Button>
-        </>
-      )}
-
-      {optionalRows.length > 0 && (
-        <section className="fhq-optional" aria-labelledby="fhq-optional-title">
-          <h3 className="fhq-optional__title" id="fhq-optional-title">Optional for {who}</h3>
-          <ul className="fhq-optional__list">
-            {optionalRows.map((r) => {
-              const line = byId.get(r.id)
-              if (!line) return null
-              const included = !r.is_optional
-              const showDetail = line.detail && line.detail !== formatMoney(line.amount)
-              return (
-                <li className="fhq-opt" key={r.id}>
-                  <button type="button" className="fhq-opt__main" onClick={() => openLine(r.id)} disabled={pending(r.id)}>
-                    <span className="fhq-opt__title">{line.title}</span>
-                    {showDetail && <span className="fhq-opt__sub">{line.detail}</span>}
-                    <span className="fhq-opt__sub">Adds {formatMoney(line.amount)}</span>
-                  </button>
-                  <Switch
-                    className="fhq-switch"
-                    checked={included}
-                    disabled={pending(r.id)}
-                    aria-disabled={switchSaves.has(r.id) || undefined}
-                    aria-label={`Include ${line.title} in the total`}
-                    onCheckedChange={(on: boolean) => toggleOptional(r.id, on)}
-                  />
-                </li>
-              )
-            })}
-          </ul>
-        </section>
-      )}
-
-      {live.excluded.length > 0 && (
-        <section className="fhq-excluded" aria-labelledby="fhq-excluded-title">
-          <h3 className="fhq-excluded__title" id="fhq-excluded-title">Not included</h3>
-          <ul className="fhq-lines" aria-label="Lines that are not included">
-            {live.excluded.map((line) => (
-              <Row
-                key={line.id}
-                as="li"
-                title={line.title}
-                subline={line.detail || undefined}
-                money={line.amount}
-                onClick={() => openLine(line.id)}
-              />
-            ))}
-          </ul>
-        </section>
-      )}
+      <QuoteLines items={items} userId={userId} who={who} money={moneyTerms} focusRef={titleRef} onChange={setLines} />
 
       {approved && (
         <section className="fhq-panel" aria-labelledby="fhq-approved-title">
@@ -418,7 +271,7 @@ export default function QuotePhone({
           title="Scope and terms"
           subline={terms.length > 0 ? terms.join(', ') : 'Not added yet'}
           next={chevron}
-          onClick={() => { hapticTap(); setTermsKey((k) => k + 1); setTermsOpen(true) }}
+          onClick={() => { hapticTap(); setTermsOpen((v) => !v) }}
         />
         {approved ? (
           <Row
@@ -428,7 +281,7 @@ export default function QuotePhone({
             next={chevron}
             // A snapshot of the lines, so it waits for a switch that is
             // still saving, the same as Approve quote and Send.
-            disabled={loading || busy !== null || switchSaving}
+            disabled={waiting}
             onClick={() => { hapticTap(); onOpenApprove() }}
           />
         ) : !changesRequested && (
@@ -437,18 +290,55 @@ export default function QuotePhone({
             title="Approve quote"
             subline={loading || live.canSend ? 'Record that the customer said yes.' : linesFailed ? LINES_FAILED : 'Add at least one line first.'}
             next={chevron}
-            disabled={loading || !live.canSend || busy !== null || switchSaving}
+            disabled={waiting || !live.canSend}
             onClick={() => { hapticTap(); onOpenApprove() }}
           />
         )}
-        <Row
-          as="li"
-          title="Share or download"
-          subline="PDF, share link, electronic signature"
-          next={chevron}
-          onClick={() => { hapticTap(); setMoreOpen(true) }}
-        />
       </ul>
+
+      {termsOpen && (
+        <div className="fhq-terms">
+          <QuoteTermsSection contact={contact} patch={patch} />
+        </div>
+      )}
+
+      <section className="fhq-share" aria-labelledby="fhq-share-title">
+        <h3 className="fhq-share__title" id="fhq-share-title">Share or download</h3>
+        <ul className="fhq-rows fhq-more-list" aria-label="Share or download">
+          <Row
+            as="li"
+            title="Open the PDF"
+            subline={needsLines ? linesLine : 'Builds the proposal and opens it in a new tab.'}
+            next={chevron}
+            disabled={waiting || needsLines}
+            onClick={onOpenPdf}
+          />
+          <Row
+            as="li"
+            title="Download the PDF"
+            subline={needsLines ? linesLine : 'Saves a copy to this phone.'}
+            next={chevron}
+            disabled={waiting || needsLines}
+            onClick={onDownload}
+          />
+          <Row
+            as="li"
+            title="Copy a share link"
+            subline={needsLines ? linesLine : 'Makes a link the customer can open, and marks the quote as sent.'}
+            next={chevron}
+            disabled={waiting || needsLines}
+            onClick={onShare}
+          />
+          <Row
+            as="li"
+            title="Send for electronic signature"
+            subline={esignLine}
+            next={chevron}
+            disabled={waiting || needsLines || !customerEmail}
+            onClick={onEsign}
+          />
+        </ul>
+      </section>
 
       {deletable ? (
         <div className="fhq-danger">
@@ -469,54 +359,6 @@ export default function QuotePhone({
           hint: sendHint
         }}
       />
-
-      {lineSheet && (
-        <QuoteLineSheet
-          key={lineSheet.key}
-          open={lineOpen}
-          onOpenChange={setLineOpen}
-          row={editRow}
-          defaultSection={lastSection.current}
-          suggestions={suggestions}
-          onSave={saveLine}
-          onDelete={editRow ? () => { setLineOpen(false); void removeItem(editRow.id) } : undefined}
-          onMove={editRow ? (direction) => { void reorderItem(editRow.id, direction) } : undefined}
-          canMoveUp={editIndex > 0 && !editPending}
-          canMoveDown={editIndex >= 0 && editIndex < rows.length - 1 && !editPending}
-        />
-      )}
-      {termsKey > 0 && (
-        <QuoteTermsSheet key={termsKey} open={termsOpen} onOpenChange={setTermsOpen} contact={contact} patch={patch} />
-      )}
-      <QuoteMoreSheet
-        open={moreOpen}
-        onOpenChange={setMoreOpen}
-        email={customerEmail}
-        emailFailed={emailFailed}
-        loading={loading}
-        needsLines={!loading && !live.canSend}
-        linesFailed={linesFailed}
-        busy={busy !== null || switchSaving}
-        onOpenPdf={onOpenPdf}
-        onDownload={onDownload}
-        onShare={onShare}
-        onEsign={onEsign}
-      />
-      <QuotePreviewSheet
-        open={previewOpen}
-        onOpenChange={setPreviewOpen}
-        who={who}
-        company={company}
-        contact={contact}
-        items={effective}
-        linesLoading={loading}
-        linesFailed={linesFailed}
-        onRetryLines={() => { void fetchRows() }}
-        userId={userId}
-        insurance={insurance}
-        changeOrders={changeOrders}
-      />
     </div>
   )
 }
-

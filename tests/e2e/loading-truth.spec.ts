@@ -6,7 +6,6 @@
 // read fails; then the read goes through, to check the loaded screen still
 // reads as it did before.
 import { expect, test, type BrowserContext, type Locator, type Page } from '@playwright/test'
-import { restResponse } from '../../scripts/qa-mock.mjs'
 import { signIn } from './helpers/signIn.ts'
 
 const isPhone = (project: string) => project.startsWith('mobile')
@@ -1115,15 +1114,15 @@ test.describe('Field reports', () => {
 
 // ---- 8: quote lines ----------------------------------------------------------
 
+// The quote screen (Phase 9, Task 10, tests/e2e/quote.spec.ts): the same
+// column on a phone and a desktop, its lines edited in place, the preview
+// and the approval screens of their own.
 test.describe('Quote lines', () => {
-  test.beforeEach(() => {
-    test.fixme(true, 'The mock quote c-quote now lives in fh_quotes as q-quote; Task 10 builds the quote screen that reads it')
-  })
   const NOW = Date.now()
   const iso = (ms: number) => new Date(ms).toISOString()
   function item(id: string, description: string, over: Record<string, unknown> = {}) {
     return {
-      id, user_id: 'qa-user-1', contact_id: 'c-quote', section: null, description,
+      id, user_id: 'qa-user-1', quote_id: 'q-quote', contact_id: null, section: null, description,
       qty: 1, unit: null, rate: 0, amount: 0, notes: null, is_optional: false, is_excluded: false,
       sort_order: 0, created_at: iso(NOW - 86400000), updated_at: iso(NOW - 86400000), ...over
     }
@@ -1134,6 +1133,7 @@ test.describe('Quote lines', () => {
     item('qi3', 'Stamped ashlar, charcoal release', { rate: 4950, amount: 4950, is_optional: true, sort_order: 2 })
   ]
   const COULD_NOT = "We couldn't load the lines."
+  const QUOTE = '/quotes/q-quote'
 
   // Nothing may send: every send route answers here and is counted.
   async function noSends(context: BrowserContext) {
@@ -1145,139 +1145,112 @@ test.describe('Quote lines', () => {
     return sends
   }
 
-  test('while the lines load nothing says there are none, and Approve, Send and the previews wait', async ({ context, page }, testInfo) => {
+  const screen = (page: Page) => page.locator('.fhqt-page')
+  const lines = (page: Page) => page.getByRole('list', { name: 'Line items' })
+  const total = (page: Page) => page.locator('.fhqt-total')
+  const send = (page: Page) => total(page).getByRole('button', { name: 'Send for approval' })
+  // Approve quote is a link while it can be taken, a disabled row while it waits.
+  const approveLink = (page: Page) => page.getByRole('link', { name: /^Approve quote/ })
+  const approveWaiting = (page: Page) => page.getByRole('button', { name: /^Approve quote/ })
+  const preview = (page: Page) => page.getByRole('group', { name: 'Proposal preview' })
+  // The base lines, top to bottom, by their descriptions.
+  async function lineOrder(page: Page) {
+    const texts = await lines(page).locator('> li').allInnerTexts()
+    return ['Excavate and grade', 'Pump truck']
+      .map((name) => ({ name, at: texts.findIndex((text) => text.includes(name)) }))
+      .filter((line) => line.at >= 0)
+      .sort((a, b) => a.at - b.at)
+      .map((line) => line.name)
+  }
+
+  test('while the lines load nothing says there are none, and Approve, Send and the preview wait', async ({ context, page }) => {
     await signIn(context, { tables: { fh_quote_items: ITEMS } })
     const sends = await noSends(context)
-    // Every read of the lines waits: the editor's list and the base line count.
+    // Every read of the lines waits.
     const read = await hold(context, 'fh_quote_items')
-    if (isPhone(testInfo.project.name)) {
-      await open(page, '/quotes/c-quote?tab=quote', '.fhq-page')
-      await expect.poll(() => read.held.length).toBeGreaterThan(0)
-      const capsule = page.locator('.fhj-capsule')
-      const approve = page.getByRole('button', { name: /^Approve quote/ })
-      await holds(async () => {
-        await expect(page.locator('.fhq-page').getByRole('status').filter({ hasText: 'Loading the quote lines' })).toBeVisible()
-        await expect(page.getByText('No lines yet.', { exact: true })).toHaveCount(0)
-        await expect(page.getByText(/Add at least one line/)).toHaveCount(0)
-        await expect(page.getByText(COULD_NOT)).toHaveCount(0)
-        await expect(approve).toBeDisabled()
-        await expect(capsule.getByRole('button', { name: 'Send for approval' })).toBeDisabled()
-      })
-      // Preview as waits for the lines too, and draws no proposal without them.
-      await page.getByRole('button', { name: 'Preview as MMC Properties' }).click()
-      const sheet = page.getByRole('dialog', { name: 'Proposal preview' })
-      await holds(async () => {
-        await expect(sheet.getByText('Loading preview…')).toBeVisible()
-        await expect(sheet.getByText('$0.00')).toHaveCount(0)
-        await expect(sheet.getByRole('alert')).toHaveCount(0)
-      })
-      read.release()
-      await expect(sheet.getByText('Excavate and grade').first()).toBeVisible()
-      await page.keyboard.press('Escape')
-      await expect(sheet).toHaveCount(0)
-      await expect(page.getByRole('list', { name: 'Line items' }).getByText('Excavate and grade')).toBeVisible()
-      await expect(capsule.getByRole('button', { name: 'Send for approval' })).toBeEnabled()
-      await expect(approve).toBeEnabled()
-    } else {
-      await open(page, '/quotes/c-quote?tab=quote', '.fh-quote-workspace')
-      await expect.poll(() => read.held.length).toBeGreaterThan(0)
-      const send = page.getByRole('button', { name: 'Send to client' })
-      const add = workspace(page).getByRole('button', { name: 'Add line item', exact: true })
-      await workspace(page).getByPlaceholder("What's this line for?").fill('Saw cut joints')
-      await holds(async () => {
-        await expect(workspace(page).getByRole('status').first()).toBeVisible()
-        await expect(workspace(page).getByText(/No line items yet/)).toHaveCount(0)
-        await expect(page.getByText(/Add at least one base line item/)).toHaveCount(0)
-        await expect(page.getByText(COULD_NOT)).toHaveCount(0)
-        await expect(send).toBeDisabled()
-        await expect(add).toBeDisabled()
-      })
-      // The Document view waits as well.
-      await page.getByRole('tab', { name: 'Document' }).click()
-      await holds(async () => {
-        await expect(workspace(page).getByText('Loading preview…')).toBeVisible()
-        await expect(workspace(page).getByRole('alert')).toHaveCount(0)
-        await expect(page.getByText(/Add at least one base line item/)).toHaveCount(0)
-      })
-      read.release()
-      await expect(workspace(page).getByText('Excavate and grade').first()).toBeVisible()
-      await expect(send).toBeEnabled()
-    }
-    expect(sends).toEqual([])
-  })
-
-  test('a failed first read shows the error with Try again, and Approve and Send wait', async ({ context, page }, testInfo) => {
-    await signIn(context, { tables: { fh_quote_items: ITEMS } })
-    const sends = await noSends(context)
-    const failing = await fail(context, 'fh_quote_items')
-    if (isPhone(testInfo.project.name)) {
-      await open(page, '/quotes/c-quote?tab=quote', '.fhq-page')
-      const error = page.locator('.fhq-page').getByRole('alert').filter({ hasText: "Couldn't load the lines" })
-      await expect(error).toBeVisible({ timeout: 15_000 })
+    await open(page, QUOTE, '.fhqt-page')
+    await expect.poll(() => read.held.length).toBeGreaterThan(0)
+    await holds(async () => {
+      await expect(screen(page).getByRole('status').filter({ hasText: 'Loading the quote lines' })).toBeVisible()
       await expect(page.getByText('No lines yet.', { exact: true })).toHaveCount(0)
-      const approve = page.getByRole('button', { name: /^Approve quote/ })
-      await expect(approve).toBeDisabled()
-      await expect(approve).toContainText(COULD_NOT)
-      const capsule = page.locator('.fhj-capsule')
-      await expect(capsule.getByRole('button', { name: 'Send for approval' })).toBeDisabled()
-      await expect(capsule.getByText(COULD_NOT, { exact: true })).toBeVisible()
       await expect(page.getByText(/Add at least one line/)).toHaveCount(0)
-      failing.on = false
-      await retryFromKeyboard(page, error.getByRole('button', { name: 'Try again' }))
-      await expect(page.getByRole('list', { name: 'Line items' }).getByText('Excavate and grade')).toBeVisible()
-      await expect(capsule.getByRole('button', { name: 'Send for approval' })).toBeEnabled()
-      await expect(page.getByRole('button', { name: /^Approve quote/ })).toBeEnabled()
       await expect(page.getByText(COULD_NOT)).toHaveCount(0)
-      await expect(page.locator('.fhq-page').getByRole('heading', { name: 'Quote', exact: true })).toBeFocused()
-    } else {
-      await open(page, '/quotes/c-quote?tab=quote', '.fh-quote-workspace')
-      const error = page.locator('.fh-quote-workspace').getByRole('alert').filter({ hasText: "Couldn't load the lines" })
-      await expect(error).toBeVisible({ timeout: 15_000 })
-      await expect(page.getByText(/No line items yet/)).toHaveCount(0)
-      await expect(page.getByRole('button', { name: 'Send to client' })).toBeDisabled()
-      await expect(page.getByText(COULD_NOT, { exact: true }).first()).toBeVisible()
-      await expect(page.getByText(/Add at least one base line item/)).toHaveCount(0)
-      failing.on = false
-      await retryFromKeyboard(page, error.getByRole('button', { name: 'Try again' }))
-      await expect(page.locator('.fh-quote-workspace').getByText('Excavate and grade')).toBeVisible()
-      await expect(error).toHaveCount(0)
-      await expect(page.locator('.fh-quote-workspace').getByRole('heading', { name: 'Line items', exact: true })).toBeFocused()
-    }
+      await expect(approveWaiting(page)).toBeDisabled()
+      await expect(approveLink(page)).toHaveCount(0)
+      await expect(send(page)).toBeDisabled()
+    })
+    // The preview waits for the lines too, and draws no proposal without them.
+    await page.getByRole('link', { name: /^Preview as/ }).click()
+    await expect(page).toHaveURL(/\/quotes\/q-quote\/preview$/)
+    await holds(async () => {
+      await expect(preview(page).getByText('Loading preview…')).toBeVisible()
+      await expect(preview(page).getByText('$0.00')).toHaveCount(0)
+      await expect(preview(page).getByRole('alert')).toHaveCount(0)
+    })
+    read.release()
+    await expect(preview(page).getByText('Excavate and grade').first()).toBeVisible()
+    await page.getByRole('button', { name: 'Back' }).click()
+    await expect(page).toHaveURL(/\/quotes\/q-quote$/)
+    await expect(lines(page).getByText('Excavate and grade')).toBeVisible()
+    await expect(send(page)).toBeEnabled()
+    await expect(approveLink(page)).toBeVisible()
     expect(sends).toEqual([])
   })
 
-  // On a desktop the gold Approve quote opens the approval sheet, which
-  // reads the lines again for its snapshot.
-  test('the approve sheet says a failed line read, with Try again, and approving waits', async ({ context, page }, testInfo) => {
-    test.skip(isPhone(testInfo.project.name), 'The desktop gold action')
+  test('a failed first read shows the error with Try again, and Approve and Send wait', async ({ context, page }) => {
     await signIn(context, { tables: { fh_quote_items: ITEMS } })
     const sends = await noSends(context)
-    await open(page, '/quotes/c-quote?tab=quote', '.fh-quote-workspace')
-    await expect(page.locator('.fh-quote-workspace').getByText('Excavate and grade')).toBeVisible()
+    const failing = await fail(context, 'fh_quote_items')
+    await open(page, QUOTE, '.fhqt-page')
+    const error = screen(page).getByRole('alert').filter({ hasText: "Couldn't load the lines" })
+    await expect(error).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText('No lines yet.', { exact: true })).toHaveCount(0)
+    await expect(approveWaiting(page)).toBeDisabled()
+    await expect(approveWaiting(page)).toContainText(COULD_NOT)
+    await expect(send(page)).toBeDisabled()
+    await expect(total(page).getByText(COULD_NOT, { exact: true })).toBeVisible()
+    await expect(page.getByText(/Add at least one line/)).toHaveCount(0)
+    failing.on = false
+    await retryFromKeyboard(page, error.getByRole('button', { name: 'Try again' }))
+    await expect(lines(page).getByText('Excavate and grade')).toBeVisible()
+    await expect(send(page)).toBeEnabled()
+    await expect(approveLink(page)).toBeVisible()
+    await expect(page.getByText(COULD_NOT)).toHaveCount(0)
+    await expect(screen(page).getByRole('heading', { level: 1 })).toBeFocused()
+    expect(sends).toEqual([])
+  })
+
+  // Approve quote opens the approval screen, which reads the lines again
+  // for its snapshot.
+  test('the approval screen says a failed line read, with Try again, and approving waits', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS } })
+    const sends = await noSends(context)
+    await open(page, QUOTE, '.fhqt-page')
+    await expect(lines(page).getByText('Excavate and grade')).toBeVisible()
 
     const failing = await fail(context, 'fh_quote_items')
-    await page.getByRole('button', { name: 'Approve quote', exact: true }).first().click()
-    const sheet = page.getByRole('dialog', { name: 'Lock the approved quote.' })
-    const error = sheet.getByRole('alert').filter({ hasText: COULD_NOT })
+    await approveLink(page).click()
+    await expect(page).toHaveURL(/\/quotes\/q-quote\/approve$/)
+    await expect(page.getByRole('heading', { name: 'Lock the approved quote.' })).toBeVisible()
+    const error = screen(page).getByRole('alert').filter({ hasText: COULD_NOT })
     await expect(error).toBeVisible({ timeout: 15_000 })
-    await expect(sheet.getByText(/Add at least one base line item/)).toHaveCount(0)
-    await expect(sheet.getByText(/0 base/)).toHaveCount(0)
-    await expect(sheet.getByText('$0', { exact: true })).toHaveCount(0)
-    const approve = sheet.getByRole('button', { name: 'Approve quote', exact: true })
+    await expect(screen(page).getByText(/Add at least one line/)).toHaveCount(0)
+    await expect(screen(page).getByText(/0 base/)).toHaveCount(0)
+    await expect(screen(page).getByText('$0.00', { exact: true })).toHaveCount(0)
+    const approve = page.getByRole('button', { name: 'Approve quote', exact: true })
     await expect(approve).toBeDisabled()
 
     failing.on = false
     await retryFromKeyboard(page, error.getByRole('button', { name: 'Try again' }))
-    await expect(sheet.getByText(/^2 base · 1 optional/)).toBeVisible()
-    await expect(sheet.getByText('$3,150', { exact: true })).toBeVisible()
+    await expect(screen(page).getByText(/^2 base, 1 optional/)).toBeVisible()
+    await expect(screen(page).getByText('$3,150.00', { exact: true })).toBeVisible()
     await expect(approve).toBeEnabled()
-    await expect(sheet.getByRole('alert')).toHaveCount(0)
-    await expect(sheet.getByRole('heading', { name: 'Lock the approved quote.' })).toBeFocused()
+    await expect(screen(page).getByRole('alert')).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: 'Lock the approved quote.' })).toBeFocused()
     expect(sends).toEqual([])
   })
 
-  test('a failed reread after an edit keeps the lines and their order, and says so', async ({ context, page }, testInfo) => {
-    test.skip(!isPhone(testInfo.project.name), 'The phone line sheet')
+  test('a failed reread after an edit keeps the lines and their order, and says so', async ({ context, page }) => {
     await signIn(context, { tables: { fh_quote_items: ITEMS } })
     await noSends(context)
     // A new line comes back as the row that was sent, with an id.
@@ -1291,36 +1264,34 @@ test.describe('Quote lines', () => {
     })
     const failing = await fail(context, 'fh_quote_items', (_url, method) => method === 'GET')
     failing.on = false
-    await open(page, '/quotes/c-quote?tab=quote', '.fhq-page')
-    const lines = page.getByRole('list', { name: 'Line items' })
-    await expect(lines.getByText('Excavate and grade')).toBeVisible()
+    await open(page, QUOTE, '.fhqt-page')
+    await expect(lines(page).getByText('Excavate and grade')).toBeVisible()
 
     // The connection drops; an edit saves, and the reread after it fails.
     failing.on = true
-    await lines.getByRole('button', { name: /Pump truck/ }).click()
-    const sheet = page.getByRole('dialog', { name: 'Edit line' })
-    await sheet.getByLabel('Notes').fill('Half day minimum')
-    await sheet.getByRole('button', { name: 'Save changes' }).click()
+    await lines(page).getByRole('button', { name: /Pump truck/ }).click()
+    const editor = page.getByRole('form', { name: 'Edit line' })
+    await editor.getByLabel('Notes').fill('Half day minimum')
+    await editor.getByRole('button', { name: 'Save changes' }).click()
     await expect(page.getByText("Couldn't refresh the lines")).toBeVisible({ timeout: 15_000 })
-    await expect(lines.getByText('Excavate and grade')).toBeVisible()
-    await expect(lines.getByText('Pump truck')).toBeVisible()
+    await expect(lines(page).getByText('Excavate and grade')).toBeVisible()
+    await expect(lines(page).getByText('Pump truck')).toBeVisible()
     await expect(page.getByText('No lines yet.', { exact: true })).toHaveCount(0)
 
     // The next line still goes after the last one.
     await page.getByRole('button', { name: 'Add a line', exact: true }).click()
-    const addSheet = page.getByRole('dialog', { name: 'Add a line' })
-    await addSheet.getByLabel('Description').fill('Saw cut joints')
-    await addSheet.getByLabel('Rate').fill('100')
-    await addSheet.getByRole('button', { name: 'Add line', exact: true }).click()
+    const adding = page.getByRole('form', { name: 'Add a line' })
+    await adding.getByLabel('Description').fill('Saw cut joints')
+    await adding.getByLabel('Rate').fill('100')
+    await adding.getByRole('button', { name: 'Add line', exact: true }).click()
     await expect.poll(() => added.length).toBe(1)
-    expect(added[0]).toMatchObject({ description: 'Saw cut joints', sort_order: 3 })
+    expect(added[0]).toMatchObject({ description: 'Saw cut joints', sort_order: 3, quote_id: 'q-quote' })
   })
 
   // Rereads that overlap land in any order; only the latest one decides.
   // Two optional switches flip one after the other: the first one's reread
   // is slow and fails after the second one's has worked.
-  test('an older reread that fails after a newer one worked does not say the lines could not refresh', async ({ context, page }, testInfo) => {
-    test.skip(!isPhone(testInfo.project.name), 'The phone optional switches')
+  test('an older reread that fails after a newer one worked does not say the lines could not refresh', async ({ context, page }) => {
     const WITH_SEALER = [...ITEMS, item('qi4', 'Sealer, two coats', { rate: 600, amount: 600, is_optional: true, sort_order: 3 })]
     await signIn(context, { tables: { fh_quote_items: WITH_SEALER } })
     const sends = await noSends(context)
@@ -1329,7 +1300,7 @@ test.describe('Quote lines', () => {
     const reads = { holdNext: false, held: 0, newer: 0, staleAnswered: false }
     // The editor's reads of this quote's lines, not the line suggestions.
     const linesRead: Matcher = (url, method) =>
-      method === 'GET' && url.searchParams.get('select') === '*' && url.searchParams.get('contact_id') === 'eq.c-quote'
+      method === 'GET' && url.searchParams.get('select') === '*' && url.searchParams.get('quote_id') === 'eq.q-quote'
     await context.route((url) => url.pathname === '/rest/v1/fh_quote_items', async (route) => {
       if (!linesRead(new URL(route.request().url()), route.request().method())) return route.fallback()
       if (reads.holdNext) {
@@ -1343,9 +1314,8 @@ test.describe('Quote lines', () => {
       if (reads.held > 0) reads.newer += 1
       return route.fallback()
     })
-    await open(page, '/quotes/c-quote?tab=quote', '.fhq-page')
-    const lines = page.getByRole('list', { name: 'Line items' })
-    await expect(lines.getByText('Excavate and grade')).toBeVisible()
+    await open(page, QUOTE, '.fhqt-page')
+    await expect(lines(page).getByText('Excavate and grade')).toBeVisible()
     const ashlar = page.getByRole('switch', { name: 'Include Stamped ashlar, charcoal release in the total' })
     const sealer = page.getByRole('switch', { name: 'Include Sealer, two coats in the total' })
 
@@ -1362,8 +1332,8 @@ test.describe('Quote lines', () => {
     release()
     await expect.poll(() => reads.staleAnswered).toBe(true)
     await neverShows(page.getByText("Couldn't refresh the lines"))
-    await expect(lines.getByText('Excavate and grade')).toBeVisible()
-    await expect(lines.getByText('Pump truck')).toBeVisible()
+    await expect(lines(page).getByText('Excavate and grade')).toBeVisible()
+    await expect(lines(page).getByText('Pump truck')).toBeVisible()
     expect(sends).toEqual([])
   })
 
@@ -1391,271 +1361,182 @@ test.describe('Quote lines', () => {
     return failing
   }
 
-  const workspace = (page: Page) => page.locator('.fh-quote-workspace')
-  // The builder's lines, top to bottom, by their descriptions.
-  async function builderOrder(page: Page) {
-    const texts = await workspace(page).locator('ul > li').allInnerTexts()
-    return ['Excavate and grade', 'Pump truck', 'Stamped ashlar, charcoal release']
-      .map((name) => ({ name, at: texts.findIndex((text) => text.includes(name)) }))
-      .filter((line) => line.at >= 0)
-      .sort((a, b) => a.at - b.at)
-      .map((line) => line.name)
-  }
-
-  test('on a desktop a failed first read keeps the add card off, so no line goes in at sort order 0', async ({ context, page }, testInfo) => {
-    test.skip(isPhone(testInfo.project.name), 'The desktop builder')
+  test('a failed first read offers no Add a line, so no line goes in at sort order 0', async ({ context, page }) => {
     await signIn(context, { tables: { fh_quote_items: ITEMS } })
     const sends = await noSends(context)
     const added = await recordAdds(context)
     const failing = await fail(context, 'fh_quote_items')
-    await open(page, '/quotes/c-quote?tab=quote', '.fh-quote-workspace')
-    const error = workspace(page).getByRole('alert').filter({ hasText: "Couldn't load the lines" })
+    await open(page, QUOTE, '.fhqt-page')
+    const error = screen(page).getByRole('alert').filter({ hasText: "Couldn't load the lines" })
     await expect(error).toBeVisible({ timeout: 15_000 })
 
-    const description = workspace(page).getByPlaceholder("What's this line for?")
-    const add = workspace(page).getByRole('button', { name: 'Add line item', exact: true })
-    await description.fill('Saw cut joints')
+    // The lines are unknown, so nothing offers to add one in front of them.
     await holds(async () => {
-      await expect(add).toBeDisabled()
+      await expect(page.getByRole('button', { name: 'Add a line', exact: true })).toHaveCount(0)
+      await expect(page.getByRole('form', { name: 'Add a line' })).toHaveCount(0)
       await expect(error).toBeVisible()
     })
-    await description.press('Enter')
-    // The add card ignores Enter while the lines are unknown, so no toast
-    // answers it; give a stray write a moment to show, then check none went.
     await page.waitForTimeout(500)
     expect(added).toEqual([])
-    await expect(error).toBeVisible()
-    await expect(workspace(page).getByText('Saw cut joints', { exact: true })).toHaveCount(0)
 
     // Once a read works the lines show, and the new line goes after the last one.
     failing.on = false
     await error.getByRole('button', { name: 'Try again' }).click()
-    await expect(workspace(page).getByText('Excavate and grade')).toBeVisible()
-    await expect(add).toBeEnabled()
-    await add.click()
+    await expect(lines(page).getByText('Excavate and grade')).toBeVisible()
+    await page.getByRole('button', { name: 'Add a line', exact: true }).click()
+    const editor = page.getByRole('form', { name: 'Add a line' })
+    await editor.getByLabel('Description').fill('Saw cut joints')
+    await editor.getByRole('button', { name: 'Add line', exact: true }).click()
     await expect.poll(() => added.length).toBe(1)
     expect(added[0]).toMatchObject({ description: 'Saw cut joints', sort_order: 3 })
     expect(sends).toEqual([])
   })
 
-  test('on a desktop Send waits when the lines read fails, even when the count read works', async ({ context, page }, testInfo) => {
-    test.skip(isPhone(testInfo.project.name), 'The desktop rail')
+  test('Send waits when the lines read fails, even when a count read works', async ({ context, page }) => {
     await signIn(context, { tables: { fh_quote_items: ITEMS } })
     const sends = await noSends(context)
-    // The list read fails; the base line count (a HEAD read) still answers 2.
+    // The list read fails; a base line count (a HEAD read) would still answer 2.
     const failing = await fail(context, 'fh_quote_items', (_url, method) => method === 'GET')
-    await open(page, '/quotes/c-quote?tab=quote', '.fh-quote-workspace')
-    const error = workspace(page).getByRole('alert').filter({ hasText: "Couldn't load the lines" })
+    await open(page, QUOTE, '.fhqt-page')
+    const error = screen(page).getByRole('alert').filter({ hasText: "Couldn't load the lines" })
     await expect(error).toBeVisible({ timeout: 15_000 })
-    const send = page.getByRole('button', { name: 'Send to client' })
     await holds(async () => {
-      await expect(send).toBeDisabled()
+      await expect(send(page)).toBeDisabled()
       await expect(page.getByText(COULD_NOT, { exact: true }).first()).toBeVisible()
     })
     failing.on = false
     await error.getByRole('button', { name: 'Try again' }).click()
-    await expect(workspace(page).getByText('Excavate and grade')).toBeVisible()
-    await expect(send).toBeEnabled()
+    await expect(lines(page).getByText('Excavate and grade')).toBeVisible()
+    await expect(send(page)).toBeEnabled()
     await expect(page.getByText(COULD_NOT)).toHaveCount(0)
     expect(sends).toEqual([])
   })
 
-  test('on a desktop a count read that fails after the lines landed leaves Send to the lines on screen', async ({ context, page }, testInfo) => {
-    test.skip(isPhone(testInfo.project.name), 'The desktop rail')
+  test('a count read that fails after the lines landed leaves Send to the lines on screen', async ({ context, page }) => {
     await signIn(context, { tables: { fh_quote_items: ITEMS } })
     const sends = await noSends(context)
     // Every base line count read fails, two seconds late: after the lines are in.
-    const counts = { failed: 0 }
     await context.route((url) => url.pathname === '/rest/v1/fh_quote_items', async (route) => {
       if (route.request().method() !== 'HEAD') return route.fallback()
       await new Promise((resolve) => setTimeout(resolve, 2000))
-      counts.failed += 1
       return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'Server error' }) })
     })
-    await open(page, '/quotes/c-quote?tab=quote', '.fh-quote-workspace')
-    await expect(workspace(page).getByText('Excavate and grade')).toBeVisible()
-    await expect.poll(() => counts.failed, { timeout: 15_000 }).toBeGreaterThan(0)
-    const send = page.getByRole('button', { name: 'Send to client' })
+    await open(page, QUOTE, '.fhqt-page')
+    await expect(lines(page).getByText('Excavate and grade')).toBeVisible()
+    await page.waitForTimeout(2500)
     await holds(async () => {
-      await expect(workspace(page).getByText('Pump truck')).toBeVisible()
-      await expect(send).toBeEnabled()
+      await expect(lines(page).getByText('Pump truck')).toBeVisible()
+      await expect(send(page)).toBeEnabled()
       await expect(page.getByText(COULD_NOT)).toHaveCount(0)
     })
     expect(sends).toEqual([])
   })
 
-  test('on a desktop the Document view says a failed line read, with Try again, never an empty proposal', async ({ context, page }, testInfo) => {
-    test.skip(isPhone(testInfo.project.name), 'The desktop Document view')
+  test('the preview says a failed line read, with Try again, never a proposal with no lines, and Send waits meanwhile', async ({ context, page }) => {
     await signIn(context, { tables: { fh_quote_items: ITEMS } })
     const sends = await noSends(context)
     const failing = await fail(context, 'fh_quote_items')
-    await open(page, '/quotes/c-quote?tab=quote', '.fh-quote-workspace')
-    await expect(workspace(page).getByRole('alert').filter({ hasText: "Couldn't load the lines" })).toBeVisible({ timeout: 15_000 })
-    await page.getByRole('tab', { name: 'Document' }).click()
-    const error = workspace(page).getByRole('alert').filter({ hasText: "Couldn't load the lines" })
+    await open(page, QUOTE, '.fhqt-page')
+    await expect(screen(page).getByRole('alert').filter({ hasText: "Couldn't load the lines" })).toBeVisible({ timeout: 15_000 })
+    await expect(send(page)).toBeDisabled()
+    await page.getByRole('link', { name: /^Preview as/ }).click()
+    await expect(page).toHaveURL(/\/quotes\/q-quote\/preview$/)
+    const error = preview(page).getByRole('alert').filter({ hasText: "Couldn't load the lines" })
     await expect(error).toBeVisible({ timeout: 15_000 })
-    await expect(workspace(page).getByText('Loading preview…')).toHaveCount(0)
+    await expect(preview(page).getByText('Loading preview…')).toHaveCount(0)
+    await expect(preview(page).getByText('$0.00')).toHaveCount(0)
     failing.on = false
     await retryFromKeyboard(page, error.getByRole('button', { name: 'Try again' }))
-    await expect(workspace(page).getByText('Excavate and grade').first()).toBeVisible()
-    await expect(workspace(page).getByRole('alert')).toHaveCount(0)
-    await expect(workspace(page).getByRole('group', { name: 'Proposal preview' })).toBeFocused()
+    await expect(preview(page).getByText('Excavate and grade').first()).toBeVisible()
+    await expect(preview(page).getByRole('alert')).toHaveCount(0)
+    await expect(preview(page)).toBeFocused()
+    // Back on the quote, the lines read works and Send is on.
+    await page.getByRole('button', { name: 'Back' }).click()
+    await expect(lines(page).getByText('Excavate and grade')).toBeVisible()
+    await expect(send(page)).toBeEnabled()
     expect(sends).toEqual([])
   })
 
-  test('on a desktop the Document view keeps Send waiting while its lines cannot be read', async ({ context, page }, testInfo) => {
-    test.skip(isPhone(testInfo.project.name), 'The desktop Document view')
+  // After a save the lines are read again, quietly: the ones on screen stay,
+  // with no skeleton in their place, and a reread that fails says so in a
+  // toast instead of taking them away.
+  test('a reread after a save keeps the lines on screen', async ({ context, page }) => {
     await signIn(context, { tables: { fh_quote_items: ITEMS } })
     const sends = await noSends(context)
-    // The list reads fail; the base line count (a HEAD read) still answers 2.
-    const failing = await fail(context, 'fh_quote_items', (_url, method) => method === 'GET')
-    await open(page, '/quotes/c-quote?tab=quote', '.fh-quote-workspace')
-    await expect(workspace(page).getByRole('alert').filter({ hasText: "Couldn't load the lines" })).toBeVisible({ timeout: 15_000 })
-    await page.getByRole('tab', { name: 'Document' }).click()
-    const error = workspace(page).getByRole('alert').filter({ hasText: "Couldn't load the lines" })
-    await expect(error).toBeVisible({ timeout: 15_000 })
-    const send = page.getByRole('button', { name: 'Send to client' })
-    await holds(async () => {
-      await expect(send).toBeDisabled()
-      await expect(page.getByText(COULD_NOT, { exact: true }).first()).toBeVisible()
-    })
-    failing.on = false
-    await error.getByRole('button', { name: 'Try again' }).click()
-    await expect(workspace(page).getByText('Excavate and grade').first()).toBeVisible()
-    await expect(send).toBeEnabled()
-    expect(sends).toEqual([])
-  })
-
-  test('on a phone Preview as says a failed line read, with Try again, never a proposal with no lines', async ({ context, page }, testInfo) => {
-    test.skip(!isPhone(testInfo.project.name), 'The phone preview sheet')
-    await signIn(context, { tables: { fh_quote_items: ITEMS } })
-    const sends = await noSends(context)
-    const failing = await fail(context, 'fh_quote_items')
-    await open(page, '/quotes/c-quote?tab=quote', '.fhq-page')
-    await expect(page.locator('.fhq-page').getByRole('alert').filter({ hasText: "Couldn't load the lines" })).toBeVisible({ timeout: 15_000 })
-    await page.getByRole('button', { name: 'Preview as MMC Properties' }).click()
-    const sheet = page.getByRole('dialog', { name: 'Proposal preview' })
-    const error = sheet.getByRole('alert').filter({ hasText: "Couldn't load the lines" })
-    await expect(error).toBeVisible({ timeout: 15_000 })
-    await expect(sheet.getByText('$0.00')).toHaveCount(0)
-    failing.on = false
-    await retryFromKeyboard(page, error.getByRole('button', { name: 'Try again' }))
-    await expect(sheet.getByText('Excavate and grade').first()).toBeVisible()
-    await expect(sheet.getByRole('alert')).toHaveCount(0)
-    await expect(sheet.getByRole('group', { name: 'Proposal preview' })).toBeFocused()
-    expect(sends).toEqual([])
-  })
-
-  // The job's contact as the mock serves it, with updated_at moved on once
-  // `bump.at` is set: what the database trigger does after any write to the
-  // job or its lines, and what makes the Document view read the lines again.
-  async function bumpContact(context: BrowserContext) {
-    const bump: { at: string | null } = { at: null }
-    await context.route((url) => url.pathname === '/rest/v1/fh_contacts', (route) => {
-      const request = route.request()
-      if (!bump.at || request.method() !== 'GET') return route.fallback()
-      const answer = restResponse(request.url(), { method: 'GET', headers: request.headers() })
-      const touch = (row: any) => (row && row.id === 'c-quote' ? { ...row, updated_at: bump.at } : row)
-      const parsed = answer.body ? JSON.parse(answer.body) : null
-      const body = Array.isArray(parsed) ? parsed.map(touch) : touch(parsed)
-      return route.fulfill({ status: answer.status, headers: { ...answer.headers, 'content-type': 'application/json' }, body: JSON.stringify(body) })
-    })
-    return bump
-  }
-
-  // A minute later the app comes back into view: the cached job is stale,
-  // so it reads again, and its contact has moved on. The browser's own
-  // visibilitychange bubbles up to the window, where the query client hears it.
-  async function comeBackLater(page: Page, bump: { at: string | null }) {
-    const later = new Date(Date.now() + 60_000)
-    bump.at = later.toISOString()
-    await page.clock.setFixedTime(later)
-    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange', { bubbles: true })))
-  }
-
-  async function openDocument(page: Page) {
-    await open(page, '/quotes/c-quote?tab=quote', '.fh-quote-workspace')
-    await expect(workspace(page).getByText('Excavate and grade')).toBeVisible()
-    await page.getByRole('tab', { name: 'Document' }).click()
-    await expect(workspace(page).getByText('Excavate and grade').first()).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Send to client' })).toBeEnabled()
-  }
-
-  test('on a desktop the Document view keeps the letter on screen while it reads the lines again', async ({ context, page }, testInfo) => {
-    test.skip(isPhone(testInfo.project.name), 'The desktop Document view')
-    await signIn(context, { tables: { fh_quote_items: ITEMS } })
-    const sends = await noSends(context)
-    const bump = await bumpContact(context)
-    await openDocument(page)
+    const reads = await fail(context, 'fh_quote_items', (_url, method) => method === 'GET')
+    reads.on = false
+    await open(page, QUOTE, '.fhqt-page')
+    await expect(lines(page).getByText('Excavate and grade')).toBeVisible()
     const reread = await hold(context, 'fh_quote_items', (_url, method) => method === 'GET')
-    await comeBackLater(page, bump)
+    await page.getByRole('switch', { name: 'Include Stamped ashlar, charcoal release in the total' }).click()
     await expect.poll(() => reread.held.length, { timeout: 15_000 }).toBeGreaterThan(0)
     await holds(async () => {
-      await expect(workspace(page).getByText('Excavate and grade').first()).toBeVisible()
-      await expect(workspace(page).getByText('Loading preview…')).toHaveCount(0)
-      await expect(page.getByRole('button', { name: 'Send to client' })).toBeEnabled()
+      await expect(lines(page).getByText('Excavate and grade')).toBeVisible()
+      await expect(screen(page).getByRole('status').filter({ hasText: 'Loading the quote lines' })).toHaveCount(0)
     })
     reread.release()
-    await expect(workspace(page).getByText('Excavate and grade').first()).toBeVisible()
-    await expect(workspace(page).getByText('Loading preview…')).toHaveCount(0)
+    await expect(lines(page).getByText('Excavate and grade')).toBeVisible()
+    await expect(send(page)).toBeEnabled()
     expect(sends).toEqual([])
   })
 
-  test('on a desktop a failed reread in the Document view keeps the letter, says so, and leaves Send on', async ({ context, page }, testInfo) => {
-    test.skip(isPhone(testInfo.project.name), 'The desktop Document view')
+  test('a failed reread after a save keeps the lines, says so, and leaves Send on', async ({ context, page }) => {
     await signIn(context, { tables: { fh_quote_items: ITEMS } })
     const sends = await noSends(context)
-    const bump = await bumpContact(context)
-    await openDocument(page)
     const failing = await fail(context, 'fh_quote_items', (_url, method) => method === 'GET')
-    await comeBackLater(page, bump)
+    failing.on = false
+    await open(page, QUOTE, '.fhqt-page')
+    await expect(lines(page).getByText('Excavate and grade')).toBeVisible()
+    failing.on = true
+    await page.getByRole('switch', { name: 'Include Stamped ashlar, charcoal release in the total' }).click()
     await expect(page.getByText("Couldn't refresh the lines")).toBeVisible({ timeout: 15_000 })
     expect(failing.count).toBeGreaterThan(0)
     await holds(async () => {
-      await expect(workspace(page).getByText('Excavate and grade').first()).toBeVisible()
-      await expect(workspace(page).getByRole('alert').filter({ hasText: "Couldn't load the lines" })).toHaveCount(0)
+      await expect(lines(page).getByText('Excavate and grade')).toBeVisible()
+      await expect(screen(page).getByRole('alert').filter({ hasText: "Couldn't load the lines" })).toHaveCount(0)
       await expect(page.getByText(COULD_NOT)).toHaveCount(0)
-      await expect(page.getByRole('button', { name: 'Send to client' })).toBeEnabled()
+      await expect(send(page)).toBeEnabled()
     })
     expect(sends).toEqual([])
   })
 
-  test('a failed delete whose reread fails too puts the line back where it was', async ({ context, page }, testInfo) => {
-    test.skip(isPhone(testInfo.project.name), 'The desktop builder rows')
+  test('a failed delete whose reread fails too puts the line back where it was', async ({ context, page }) => {
     await signIn(context, { tables: { fh_quote_items: ITEMS } })
     await noSends(context)
     const reads = await fail(context, 'fh_quote_items', (_url, method) => method === 'GET')
     reads.on = false
     const deletes = await failWrites(context, 'DELETE')
-    await open(page, '/quotes/c-quote?tab=quote', '.fh-quote-workspace')
-    await expect(workspace(page).getByText('Pump truck')).toBeVisible()
+    await open(page, QUOTE, '.fhqt-page')
+    await expect(lines(page).getByText('Pump truck')).toBeVisible()
     reads.on = true
-    const row = workspace(page).locator('ul > li').filter({ hasText: 'Pump truck' })
-    await row.getByRole('button', { name: 'Delete line item' }).click()
+    await lines(page).getByRole('button', { name: /Pump truck/ }).click()
+    await page.getByRole('form', { name: 'Edit line' }).getByRole('button', { name: 'Delete line' }).click()
     await expect(page.getByText("Couldn't delete item")).toBeVisible({ timeout: 15_000 })
     await expect.poll(() => deletes.count).toBeGreaterThan(0)
     await holds(async () => {
-      await expect(workspace(page).getByText('Pump truck')).toBeVisible()
-      expect(await builderOrder(page)).toEqual(['Excavate and grade', 'Pump truck', 'Stamped ashlar, charcoal release'])
+      await expect(lines(page).getByText('Pump truck')).toBeVisible()
+      expect(await lineOrder(page)).toEqual(['Excavate and grade', 'Pump truck'])
+      await expect(page.locator('.fhqt-optional').getByText('Stamped ashlar, charcoal release')).toBeVisible()
     })
   })
 
-  test('a failed move whose reread fails too puts the lines back in their order', async ({ context, page }, testInfo) => {
-    test.skip(isPhone(testInfo.project.name), 'The desktop builder rows')
+  test('a failed move whose reread fails too puts the lines back in their order', async ({ context, page }) => {
     await signIn(context, { tables: { fh_quote_items: ITEMS } })
     await noSends(context)
     const reads = await fail(context, 'fh_quote_items', (_url, method) => method === 'GET')
     reads.on = false
     const moves = await failWrites(context, 'PATCH')
-    await open(page, '/quotes/c-quote?tab=quote', '.fh-quote-workspace')
-    await expect(workspace(page).getByText('Pump truck')).toBeVisible()
+    await open(page, QUOTE, '.fhqt-page')
+    await expect(lines(page).getByText('Pump truck')).toBeVisible()
     reads.on = true
-    const row = workspace(page).locator('ul > li').filter({ hasText: 'Excavate and grade' })
-    await row.getByRole('button', { name: 'Move down' }).click()
+    await lines(page).getByRole('button', { name: /Excavate and grade/ }).click()
+    const editor = page.getByRole('form', { name: 'Edit line' })
+    await editor.getByRole('button', { name: 'Move down' }).click()
     await expect(page.getByText("Couldn't reorder")).toBeVisible({ timeout: 15_000 })
     await expect.poll(() => moves.count).toBeGreaterThan(0)
+    await editor.getByRole('button', { name: 'Cancel' }).click()
     await holds(async () => {
-      expect(await builderOrder(page)).toEqual(['Excavate and grade', 'Pump truck', 'Stamped ashlar, charcoal release'])
+      expect(await lineOrder(page)).toEqual(['Excavate and grade', 'Pump truck'])
     })
   })
 })

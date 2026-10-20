@@ -3,9 +3,6 @@
 
 import {
   transitionStage,
-  startQuote as baseStartQuote,
-  approveQuote as baseApproveQuote,
-  markWon as baseMarkWon,
   completeJob as baseCompleteJob,
   markLost as baseMarkLost,
   logPayment as baseLogPayment,
@@ -31,36 +28,9 @@ function notify(stageId: string, verb = 'Moved to') {
   toast(`${verb} ${s.label}`, { accent: stageId })
 }
 
-export async function startQuote(contact: Contact) {
-  const res = await baseStartQuote(contact)
-  if (!res.error) notify('quote')
-  return res
-}
-
-export async function approveQuote(contact: Contact) {
-  const res = await baseApproveQuote(contact)
-  if (!res.error) {
-    hapticMedium()
-    const scheduleFailed = 'scheduleError' in res && !!res.scheduleError
-    if (scheduleFailed) {
-      toast('Moved to Job. Schedule manually.', { accent: 'job', heavy: true })
-      return res
-    }
-    toast('Moved to Job · Scheduled for tomorrow 9am', { accent: 'job', heavy: true })
-  }
-  return res
-}
-
-// One-tap "Won" from the Leads board, moves to Job with no auto-kickoff
-// event (approveQuote is the formal quote-approval path that schedules).
-export async function markWon(contact: Contact) {
-  const res = await baseMarkWon(contact)
-  if (!res.error) {
-    hapticMedium()
-    toast('Marked won · moved to Job', { accent: 'job', heavy: true })
-  }
-  return res
-}
+// Phase 9 (D54, D61): startQuote, approveQuote and markWon are gone. A
+// quote comes from Quote this on a lead and a job from Make this a job on
+// a quote (lib/quotes.ts), each on a tap.
 
 export async function markComplete(contact: Contact) {
   const res = await baseCompleteJob(contact)

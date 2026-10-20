@@ -446,15 +446,17 @@ test('the page reads the quote record: its status and its id drive the headline 
 })
 
 // "Preview as" says it is what the customer sees, and draws this page from
-// the job (the Fieldhorse theme, D22). The customer page reads the job's
-// payments, so the preview reads them too: an approved quote with its
-// deposit in shows the same steps and the same capsule in both.
+// the quote (the Fieldhorse theme, D22). The customer page reads the
+// quote's payments, so the preview reads them too: an approved quote with
+// its deposit in shows the same steps and the same capsule in both. Since
+// Phase 9 the quote is its own record (fh_quotes, D53) and the preview is
+// the screen /quotes/:id/preview (D57).
 
 // An approved $3,150.00 quote with half of it, the deposit the default
 // terms name, paid, for the signed in "Preview as" tests below.
 function previewTables() {
   const line = (id: string, description: string, amount: number, sort_order: number) => ({
-    id, user_id: 'qa-user-1', contact_id: 'c-quote', section: null, description, qty: 1, unit: null,
+    id, user_id: 'qa-user-1', quote_id: 'q-quote', contact_id: null, section: null, description, qty: 1, unit: null,
     rate: amount, amount, notes: null, is_optional: false, is_excluded: false, sort_order
   })
   return {
@@ -463,18 +465,18 @@ function previewTables() {
       onboarded_at: '2026-07-10T14:00:00.000Z', logo_url: null, company_email: 'office@parker.co',
       brand_accent_hex: null, estimate_template: 'fieldhorse', preferences: {}
     }],
-    fh_contacts: [{
-      id: 'c-quote', stage: 'quote', name: 'MMC Properties', job_title: 'Parking lot repour', amount: 3150,
-      proposal_status: 'approved', quote_sent_at: '2026-10-02T12:00:00.000Z', user_id: 'qa-user-1',
-      client_id: 'cl-1', phone: '555-0101', email: 'x@y.com', address: '412 Burkitt Station Rd',
-      notes: null, scope_text: null, terms_text: null, milestones: [], follow_up_on: null,
+    fh_quotes: [{
+      id: 'q-quote', user_id: 'qa-user-1', client_id: 'cl-1', origin_contact_id: 'c-quote', lead_id: null, job_id: null,
+      title: 'Parking lot repour', amount: 3150, status: 'approved', sent_at: '2026-10-02T12:00:00.000Z', expires_at: null,
+      scope_text: null, terms_text: null, exclusions_text: null, job_type: null, change_request_note: null,
+      change_requested_at: null, approved_version_id: null,
       created_at: '2026-10-01T12:00:00.000Z', updated_at: '2026-10-09T12:00:00.000Z',
-      completed_at: null, invoice_no: null, client_name: 'Jeff Roy',
-      fh_clients: { id: 'cl-1', name: 'Jeff Roy', phone: '555-0101', email: 'jeff@roy.com' }
+      fh_clients: { id: 'cl-1', name: 'MMC Properties', phone: '555-0101', email: 'jeff@roy.com', address: '412 Burkitt Station Rd' }
     }],
     fh_quote_items: [line('qi1', 'Excavate and grade', 2200, 0), line('qi2', 'Pump truck', 950, 1)],
-    // Half of the $3,150.00 total, the deposit the default terms name.
-    fh_payments: [{ id: 'pd1', user_id: 'qa-user-1', contact_id: 'c-quote', amount: 1575, kind: 'deposit', method: 'check', reference: '2210', paid_on: '2026-10-09', created_at: '2026-10-09T15:00:00.000Z' }]
+    // Half of the $3,150.00 total, the deposit the default terms name. The
+    // preview reads the quote's payments by its id until Task 11 moves them.
+    fh_payments: [{ id: 'pd1', user_id: 'qa-user-1', contact_id: 'q-quote', amount: 1575, kind: 'deposit', method: 'check', reference: '2210', paid_on: '2026-10-09', created_at: '2026-10-09T15:00:00.000Z' }]
   }
 }
 
@@ -489,10 +491,11 @@ async function spyOnSends(context: BrowserContext) {
 }
 
 async function openPreviewAs(page: Page) {
-  await page.goto('/quotes/c-quote?tab=quote', { waitUntil: 'domcontentloaded', timeout: 60_000 })
-  await expect(page.locator('.fhq-page')).toBeVisible({ timeout: 30_000 })
-  await page.getByRole('button', { name: 'Preview as MMC Properties' }).click()
-  return page.getByRole('dialog', { name: 'Proposal preview' })
+  await page.goto('/quotes/q-quote', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.locator('.fhqt-page')).toBeVisible({ timeout: 30_000 })
+  await page.getByRole('link', { name: 'Preview as MMC Properties' }).click()
+  await expect(page).toHaveURL(/\/quotes\/q-quote\/preview$/)
+  return page.getByRole('group', { name: 'Proposal preview' })
 }
 
 // What the preview shows once it has read the payments: the deposit is in.
@@ -518,8 +521,7 @@ async function expectNothingUnpaid(preview: Locator) {
   await expect(preview.getByText(/to reserve your start date|You pay the deposit\.|Pay deposit/)).toHaveCount(0)
 }
 
-test('the in app preview shows an approved quote with its deposit in as the customer page does', async ({ context, page }, testInfo) => {
-  test.skip(!testInfo.project.name.startsWith('mobile'), 'Preview as is on the phone quote page; the desktop Document view draws the same preview pane')
+test('the in app preview shows an approved quote with its deposit in as the customer page does', async ({ context, page }) => {
   const sends = await spyOnSends(context)
   await signIn(context, { tables: previewTables() })
   const preview = await openPreviewAs(page)
@@ -532,8 +534,7 @@ test('the in app preview shows an approved quote with its deposit in as the cust
 // the deposit." and no Deposit received chip (Phase 8 follow up B, second
 // review). It waits for the read as it waits for the photos, and a read
 // that fails says so, with Try again, and draws no quote.
-test('the in app preview waits for the payments, and says so when it cannot read them instead of showing nothing paid', async ({ context, page }, testInfo) => {
-  test.skip(!testInfo.project.name.startsWith('mobile'), 'Preview as is on the phone quote page; the desktop Document view draws the same preview pane')
+test('the in app preview waits for the payments, and says so when it cannot read them instead of showing nothing paid', async ({ context, page }) => {
   const sends = await spyOnSends(context)
   await signIn(context, { tables: previewTables() })
   // The preview's read of the job's payments: held until released, refused,

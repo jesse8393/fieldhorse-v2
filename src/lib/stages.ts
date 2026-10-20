@@ -90,51 +90,9 @@ export async function transitionStage(contact: Contact, nextStage: StageId) {
   return { data, error }
 }
 
-export async function startQuote(contact: Contact) {
-  return transitionStage(contact, 'quote')
-}
-
-// Direct "Won" from the Leads board: move a lead/quote to Job WITHOUT
-// auto-creating a kickoff schedule event. approveQuote (below) is the
-// formal quote-approval path that also drops a kickoff; a one tap Won on
-// a raw lead shouldn't silently schedule a job for tomorrow 9am.
-export async function markWon(contact: Contact) {
-  return transitionStage(contact, 'job')
-}
-
-export async function approveQuote(contact: Contact) {
-  const { data, error } = await transitionStage(contact, 'job')
-  if (error) return { data, error, scheduleError: null }
-
-  // Default the kickoff to tomorrow 9am–5pm local. Operator can edit later.
-  const start = new Date()
-  start.setDate(start.getDate() + 1)
-  start.setHours(9, 0, 0, 0)
-  const end = new Date(start)
-  end.setHours(17, 0, 0, 0)
-
-  const title = contact.job_title || contact.name || 'New job'
-  const description = `Approved quote for ${contact.name || 'job'}${contact.address ? ` at ${contact.address}` : ''}`
-
-  const { error: schedErr } = await supabase.from('fh_schedule').insert({
-    user_id: contact.user_id,
-    contact_id: contact.id,
-    title,
-    description,
-    start_at: start.toISOString(),
-    end_at: end.toISOString()
-  })
-  // Secondary failure: the stage transition succeeded but the kickoff
-  // event didn't land. Log loudly (so it surfaces in monitoring) and
-  // surface `scheduleError` to callers who want to flag the partial
-  // success. The primary `error` stays null so the success toast keeps
-  // firing, the operator is now on the Job stage either way.
-  if (schedErr) {
-    console.error('[fieldhorse] approveQuote schedule insert failed', schedErr)
-  }
-
-  return { data, error: null, scheduleError: schedErr ?? null }
-}
+// Phase 9 (D54, D61): nothing moves a record along on its own. A quote is
+// made from a lead with Quote this, and a job from a quote with Make this a
+// job (lib/quotes.ts). startQuote, markWon and approveQuote are gone.
 
 // Work wrapped. Stays a 'job' (no more invoice stage), completed_at
 // flags "done, awaiting payment" so the money screens can chase the

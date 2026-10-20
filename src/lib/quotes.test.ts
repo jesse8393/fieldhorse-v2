@@ -171,4 +171,46 @@ describe('makeJobFromQuote', () => {
     expect(callsOf(3, 'insert')[0][1]).toMatchObject({ amount: 0 })
     expect(callsOf(4, 'from')[0][1]).toBe('fh_quotes')
   })
+
+  // Task 10, Make this a job (D61): the job is a copy of the quote's words
+  // and base price, and the quote points at it. The quote's status is left
+  // alone, so an approved quote stays approved and a draft stays a draft.
+  it('makeJobFromQuote copies scope, amount and terms and sets job_id', async () => {
+    responses.push({ data: quote, error: null })
+    responses.push({ data: [item({ id: 'a', amount: 1200.25 }), item({ id: 'b', amount: 300 }), item({ id: 'c', amount: 99, is_excluded: true })], error: null })
+    responses.push({ data: client, error: null })
+    responses.push({ data: { id: 'job-9' }, error: null })
+    responses.push({ data: null, error: null })
+    responses.push({ data: null, error: null })
+
+    await expect(makeJobFromQuote('quote-1')).resolves.toEqual({ jobId: 'job-9' })
+
+    const job = callsOf(3, 'insert')[0][1] as Record<string, unknown>
+    expect(job).toMatchObject({
+      stage: 'job',
+      scope_text: 'Tear out and rebuild',
+      terms_text: 'Half up front',
+      exclusions_text: 'No permits',
+      amount: 1500.25,
+    })
+    expect(job).not.toHaveProperty('status')
+
+    expect(callsOf(5, 'from')[0][1]).toBe('fh_quotes')
+    expect(callsOf(5, 'update')[0][1]).toEqual({ job_id: 'job-9' })
+    // Only the pointer is written: nothing touches the quote's status.
+    expect(callsOf(5, 'update')[0][1]).not.toHaveProperty('status')
+  })
+
+  it('a quote with no lines makes a job with no amount', async () => {
+    responses.push({ data: { ...quote, amount: 0 }, error: null })
+    responses.push({ data: [], error: null })
+    responses.push({ data: client, error: null })
+    responses.push({ data: { id: 'job-0' }, error: null })
+    responses.push({ data: null, error: null })
+
+    await expect(makeJobFromQuote('quote-1')).resolves.toEqual({ jobId: 'job-0' })
+    expect(callsOf(3, 'insert')[0][1]).toMatchObject({ amount: 0, stage: 'job' })
+    // No lines, so no copy of them is attempted.
+    expect(builders).toHaveLength(5)
+  })
 })

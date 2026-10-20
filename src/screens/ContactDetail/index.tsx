@@ -6,7 +6,9 @@ import { XCircle, ArrowRight } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useMembership } from '../../contexts/MembershipContext.tsx'
 import { supabase } from '../../lib/supabase.ts'
-import { markLost, startQuote, reopen, reopenQuestion } from '../../lib/pipeline.ts'
+import { markLost, reopen, reopenQuestion } from '../../lib/pipeline.ts'
+import { findMovedRecord } from '../../lib/movedRecord.ts'
+import { recordRoute } from '../../lib/records.ts'
 import { stageColor, margin, isMovedStage } from '../../lib/stages.ts'
 import { MovedRecordRedirect } from '../../components/MovedRecordRedirect.tsx'
 import { toastSuccess, toastError } from '../../lib/toast.ts'
@@ -31,7 +33,7 @@ import { computeJobHealth } from './lib/jobHealth.ts'
 import { tabsForStage, resolveTabForStage } from './lib/stageWorkspace.ts'
 import { tabsForRole, pickVisibleTab } from './lib/jobAccess.ts'
 import OverviewTab from './tabs/Overview.tsx'
-// Lazy, non-default tabs + sections + ApproveQuoteSheet only render
+// Lazy, non-default tabs + sections only render
 // when the operator picks them. Saves ~290KB of code from the initial
 // ContactDetail route chunk. Overview stays eager because it's the
 // default tab (and would otherwise flash a suspense fallback on every
@@ -44,7 +46,6 @@ const DailyLogsSection = lazy(() => import('./sections/DailyLogs.tsx'))
 const SelectionsSection = lazy(() => import('./sections/Selections.tsx'))
 const MaterialsSection = lazy(() => import('./sections/Materials.tsx'))
 const ChangeOrdersSection = lazy(() => import('./sections/ChangeOrdersSection.tsx'))
-const ApproveQuoteSheet = lazy(() => import('./sections/ApproveQuoteSheet.tsx'))
 const SnowJobDetailBuild = lazy(() => import('../../components/desktop/SnowJobDetailBuild.tsx'))
 import { useIsDesktop } from '../../lib/useMediaQuery.ts'
 import { useHideDock } from '../../lib/dockVisibility.ts'
@@ -341,10 +342,18 @@ export default function ContactDetail() {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteErr, setDeleteErr] = useState('')
-  // Approve Quote sheet, lifted to root so the Overview NextAction CTA
-  // and the Quote tab ApproveBand both open the same sheet without
-  // duplicating state. Phase 4C-2.
-  const [approveOpen, setApproveOpen] = useState(false)
+  // Approving a quote is a screen of its own, /quotes/:id/approve (Phase 9,
+  // Task 10, D57). A contact row at the quote stage was moved to fh_quotes
+  // by the migration, so the approval goes to the quote that replaced it.
+  async function openApprove() {
+    if (!contact) return
+    const moved = await findMovedRecord(contact.id)
+    if (moved?.kind === 'quote') {
+      navigate(`${recordRoute('quote', moved.id)}/approve`)
+      return
+    }
+    toastError('This quote has no record of its own yet', 'Open it from the Quotes list to approve it.')
+  }
   const [completeOpen, setCompleteOpen] = useState(false)
   // Send-invoice sheet (pipeline v2), the job screen's one tap billing
   // action. Opened by the stage CTA, Overview quick action, and the
@@ -503,20 +512,8 @@ export default function ContactDetail() {
   // Per-stage primary action, gives the mobile deal screen the same
   // "what do I do next at this stage" CTA the desktop shell already has
   // (DesktopJobDetail's nextActionFor). Closed/lost are terminal → null.
-  // "Build quote" on a lead also transitions the stage to 'quote' so the
-  // deal actually advances, otherwise clicking it just jumps tabs and
-  // the lead never leaves the lead stage.
-  async function onBuildQuote() {
-    if (!contact) return
-    const res: any = await startQuote(contact)
-    if (res?.error) {
-      toastError("Couldn't start quote", res.error.message || 'Try again')
-      return
-    }
-    await fetchAll()
-    setTab('quote')
-  }
-
+  // A contact still at the lead stage was never moved (Phase 9, D55): its
+  // quote is made from the Quotes list, so it gets no stage action here.
   // Reopen asks first, like Mark lost below (Phase 8, Task 15).
   async function onReopen() {
     if (!contact) return
@@ -560,11 +557,11 @@ export default function ContactDetail() {
   // of these is a pipeline or billing move, so field roles get none.
   const stageCta: { label: string; onClick: () => void } | null =
     !canMoveMoney ? null
-    : contact.stage === 'lead'    ? { label: 'Convert to quote', onClick: onBuildQuote }
+    : contact.stage === 'lead'    ? null
     : contact.stage === 'quote'
       ? contact.proposal_status === 'changes_requested'
         ? { label: 'Review changes', onClick: () => setTab('quote') }
-        : { label: 'Approve quote', onClick: () => setApproveOpen(true) }
+        : { label: 'Approve quote', onClick: () => { void openApprove() } }
     : contact.stage === 'job' || contact.stage === 'invoice'
       ? (Number(balance || 0) > 0
           ? { label: 'Send invoice',   onClick: () => setInvoiceOpen(true) }
@@ -637,7 +634,7 @@ export default function ContactDetail() {
           onOpenAddEvent={() => setEventOpen(true)}
           onOpenLogPayment={() => setPayModalOpen(true)}
           onOpenInvitePartner={() => setInviteOpen(true)}
-          onOpenApproveQuote={() => setApproveOpen(true)}
+          onOpenApproveQuote={() => { void openApprove() }}
           onOpenMarkComplete={() => setCompleteOpen(true)}
           onOpenSendInvoice={() => setInvoiceOpen(true)}
           onOpenQuote={() => setTab('quote')}
@@ -653,7 +650,7 @@ export default function ContactDetail() {
             userId={user?.id}
             fetchAll={fetchAll}
             patch={patch}
-            onOpenApprove={() => setApproveOpen(true)}
+            onOpenApprove={() => { void openApprove() }}
             insurance={insurance}
             changeOrders={changeOrders}
           />
@@ -968,15 +965,6 @@ export default function ContactDetail() {
             />
           </Suspense>
 
-          <Suspense fallback={null}>
-            <ApproveQuoteSheet
-              open={approveOpen}
-              contact={contact}
-              userId={user?.id}
-              onClose={() => setApproveOpen(false)}
-              onApproved={fetchAll}
-            />
-          </Suspense>
         </>
       )}
 
