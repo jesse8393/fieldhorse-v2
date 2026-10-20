@@ -86,7 +86,8 @@ test.describe('phone shell', () => {
   test('last item clears the dock', async ({ page }) => {
     for (const path of ['/invoices', '/clients']) {
       await open(page, path)
-      await expect(page.locator('main').getByRole('button').first()).toBeVisible()
+      // Money's rows are links now (Phase 9, D62), Customers still has buttons.
+      await expect(page.locator('main').locator('a, button').first()).toBeVisible()
       // Scroll to the very bottom; long lists render more rows as they
       // near the end, so repeat until the page stops growing.
       let height = 0

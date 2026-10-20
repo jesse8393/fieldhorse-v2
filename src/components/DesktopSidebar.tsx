@@ -156,46 +156,48 @@ export default function DesktopSidebar() {
         </div>
       </div>
 
-      <button
-        type="button"
-        className="fhs-side__search"
-        onClick={openPalette}
-        aria-label={`Search everything (${searchKeys.spoken})`}
-        aria-keyshortcuts={searchKeys.combo}
-      >
-        <Icon icon={Search} size={18} />
-        <span>Search</span>
-        <KeyCap aria-hidden="true">{searchKeys.keys}</KeyCap>
-      </button>
-
-      {/* Universal Capture, the same path the dock coin takes, and New,
-          side by side so the two together take one row (the nav below must
-          fit a 900 px tall window without scrolling). */}
-      <div className="fhs-side__quick">
-        <button
-          type="button"
-          className="fhs-side__link fhs-side__capture"
-          onClick={() => openCapture()}
-          aria-label={`Capture (${captureKeys.spoken})`}
-          aria-keyshortcuts={captureKeys.combo}
-        >
-          <Icon icon={Mic} size={18} />
-          <span className="fhs-side__capture-label">Capture</span>
-          <KeyCap aria-hidden="true">{captureKeys.keys}</KeyCap>
-        </button>
-
+      {/* New and Search share one row, so the nav below still fits a 900 px
+          window (SPEC D58). New is a square; the Search cap keeps the row's
+          right edge. */}
+      <div className="fhs-side__toprow">
         <Link
           to="/new"
-          className="fhs-side__link fhs-side__capture"
+          className="fhs-side__new"
           aria-label={`New (${newKeys.spoken})`}
           aria-keyshortcuts={newKeys.combo}
+          title={`New (${newKeys.keys})`}
           onMouseEnter={() => prefetchRoute('/new')}
         >
           <Icon icon={Plus} size={18} />
-          <span className="fhs-side__capture-label">New</span>
-          <KeyCap aria-hidden="true">{newKeys.keys}</KeyCap>
         </Link>
+        <button
+          type="button"
+          className="fhs-side__search"
+          onClick={openPalette}
+          aria-label={`Search everything (${searchKeys.spoken})`}
+          aria-keyshortcuts={searchKeys.combo}
+        >
+          <Icon icon={Search} size={18} />
+          <span>Search</span>
+          <KeyCap aria-hidden="true">{searchKeys.keys}</KeyCap>
+        </button>
       </div>
+
+      {/* Universal Capture, the same path the dock coin takes. CaptureSheet
+          also answers Cmd or Ctrl J and the palette's Capture anything. Its
+          key cap lines up under the Search cap, so New sits on the Search
+          row (above) rather than beside Capture. */}
+      <button
+        type="button"
+        className="fhs-side__link fhs-side__capture"
+        onClick={() => openCapture()}
+        aria-label={`Capture (${captureKeys.spoken})`}
+        aria-keyshortcuts={captureKeys.combo}
+      >
+        <Icon icon={Mic} size={18} />
+        <span className="fhs-side__capture-label">Capture</span>
+        <KeyCap aria-hidden="true">{captureKeys.keys}</KeyCap>
+      </button>
 
       <nav className="fhs-side__nav" aria-label="Primary">
         <ul className="fhs-side__list">
