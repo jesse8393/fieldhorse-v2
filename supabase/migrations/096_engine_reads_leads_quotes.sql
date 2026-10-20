@@ -47,7 +47,7 @@ end $$;
 -- record no screen shows any more. Close them (skipped, the table's word for
 -- dismissed) and mark their notifications read; the engine below queues
 -- fresh ones on the lead or quote that replaced the row. Production had 36.
-create temp table t_closed on commit drop as
+create temp table t_closed as
   select f.id, f.contact_id, f.headline
     from public.fh_follow_ups f
     join public.fh_contacts c on c.id = f.contact_id
