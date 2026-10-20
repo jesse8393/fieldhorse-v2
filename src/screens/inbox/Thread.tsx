@@ -49,7 +49,7 @@ import {
   groupByDay,
   replyChannel,
   replySubject,
-  stageChip,
+  recordChip,
   threadItems,
   timeLabel,
   useInboxActions,
@@ -260,7 +260,7 @@ export default function Thread({ conversationId, row: listRow, embedded = false 
   const shownRow = row ?? conversation ?? undefined
   const name = shownRow?.client_name?.trim() || shownRow?.company_name?.trim() || 'Conversation'
   const job = useMemo(() => (outside ? null : jobFor(row, jobs.data)), [outside, row, jobs.data])
-  const stage = outside ? null : stageChip(row?.latest_stage)
+  const stage = outside ? null : recordChip(row)
 
   const days = useMemo(() => groupByDay(threadItems(messages, runs)), [messages, runs])
   const itemCount = days.reduce((n, d) => n + d.items.length, 0)

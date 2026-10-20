@@ -19,6 +19,7 @@ import { useClientDetail, useInvalidateClientDetail, useInvalidateClients } from
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { toastError, toastInfo } from '../lib/toast.ts'
 import { stageColor, stageLabel } from '../lib/stages.ts'
+import { recordRoute, type RecordKind } from '../lib/records.ts'
 import { useSecondTap } from '../lib/secondTap.ts'
 import { gatherStatement } from '../lib/statement.ts'
 import { rollupJobs } from '../lib/rollups.ts'
@@ -61,11 +62,16 @@ export default function ClientDetail() {
   const invalidateClients = useInvalidateClients()
   const client = bundle?.client ?? null
   const jobs = bundle?.jobs ?? []
+  const leads = bundle?.leads ?? []
+  const quotes = bundle?.quotes ?? []
+  const invoices = bundle?.invoices ?? []
   const notes = bundle?.notes ?? []
   const files = bundle?.files ?? []
   const payments = bundle?.payments ?? []
   const changeOrders = bundle?.changeOrders ?? []
   const [tab, setTab] = useState('overview')
+  // Every row on the Projects tab opens its own record (D53).
+  const openRecord = (kind: RecordKind, recordId: string) => navigate(recordRoute(kind, recordId))
   const [isEditing, setIsEditing] = useState(false)
   // Deleting the client takes a second tap on the same button (D57).
   const deleteTap = useSecondTap()
@@ -197,7 +203,7 @@ export default function ClientDetail() {
         <ClientTimeline jobs={jobs} payments={payments} notes={notes} files={files} onOpen={(jobId: any) => jobId && navigate(`/jobs/${jobId}`)} />
       )}
       {tab === 'projects' && (
-        <ProjectsList jobs={jobs} payments={payments} changeOrders={changeOrders} onOpen={(jobId: any) => navigate(`/jobs/${jobId}`)} />
+        <ProjectsList jobs={jobs} leads={leads} quotes={quotes} invoices={invoices} payments={payments} changeOrders={changeOrders} onOpen={openRecord} />
       )}
       {tab === 'files' && <FilesList rows={files} />}
       {tab === 'notes' && <NotesList notes={notes} />}
@@ -460,7 +466,7 @@ export default function ClientDetail() {
           <ClientTimeline jobs={jobs} payments={payments} notes={notes} files={files} onOpen={(jobId: any) => jobId && navigate(`/jobs/${jobId}`)} />
         )}
         {tab === 'projects' && (
-          <ProjectsList jobs={jobs} payments={payments} changeOrders={changeOrders} onOpen={(jobId: any) => navigate(`/jobs/${jobId}`)} />
+          <ProjectsList jobs={jobs} leads={leads} quotes={quotes} invoices={invoices} payments={payments} changeOrders={changeOrders} onOpen={openRecord} />
         )}
         {tab === 'files' && <FilesList rows={files} />}
         {tab === 'notes' && <NotesList notes={notes} />}
@@ -1017,13 +1023,6 @@ function PipelineDistribution({ jobs, payments = [], onJump }: any) {
    chips + per-row paid/balance bar + relative-time stamp.
    ============================================================ */
 
-const PROJECT_FILTERS = [
-  { id: 'all',    label: 'All' },
-  { id: 'active', label: 'Active', match: (j: any) => ['lead', 'quote', 'job', 'invoice'].includes(j.stage as string) },
-  { id: 'won',    label: 'Complete', match: (j: any) => j.stage === 'closed' },
-  { id: 'lost',   label: 'Lost',   match: (j: any) => j.stage === 'lost' }
-]
-
 function relTime(input: any) {
   if (!input) return ''
   const d = input instanceof Date ? input : new Date(input)
@@ -1129,9 +1128,117 @@ function timelineDate(iso: string) {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...(sameYear ? {} : { year: 'numeric' }) })
 }
 
-function ProjectsList({ jobs, payments = [], changeOrders = [], onOpen }: any) {
-  const [filter, setFilter] = useState('all')
+const RECORD_ROW_STYLE = {
+  width: '100%',
+  position: 'relative',
+  display: 'flex', flexDirection: 'column', gap: 12,
+  padding: '12px 12px 12px 24px',
+  borderRadius: 10,
+  background: 'var(--v3-bg)',
+  border: '1px solid var(--v3-border-strong)',
+  boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 1px 2px rgba(20, 20, 20, 0.22)',
+  textAlign: 'left',
+  cursor: 'pointer',
+  color: 'var(--v3-text)',
+  overflow: 'hidden',
+  WebkitTapHighlightColor: 'transparent'
+} as const
 
+const TITLE_STYLE = {
+  fontFamily: 'var(--font-body)',
+  fontSize: 14, fontWeight: 700,
+  letterSpacing: 0,
+  color: 'var(--v3-text)',
+  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+} as const
+
+const DETAIL_STYLE = {
+  marginTop: 3,
+  fontFamily: 'var(--font-body)',
+  fontSize: 12,
+  color: 'var(--v3-text-muted)',
+  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+} as const
+
+const AMOUNT_STYLE = {
+  fontFamily: 'var(--font-display)',
+  fontSize: 16,
+  color: 'var(--v3-primary-text)',
+  letterSpacing: 0,
+  fontVariantNumeric: 'tabular-nums',
+  lineHeight: 1
+} as const
+
+/** The status of a lead, quote or invoice in a word. */
+function statusWord(status: string | null | undefined) {
+  const s = String(status || '').replace(/_/g, ' ').trim()
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''
+}
+
+function RecordGroup({ heading, count, children }: { heading: string; count: number; children: any }) {
+  const id = `fh-client-projects-${heading.toLowerCase()}`
+  return (
+    <section aria-labelledby={id} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <h3 id={id} style={{ margin: 0, display: 'flex', alignItems: 'baseline', gap: 8, fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, color: 'var(--v3-text)', letterSpacing: 0 }}>
+        {heading}
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--v3-text-muted)', fontVariantNumeric: 'tabular-nums' }}>{count}</span>
+      </h3>
+      {count === 0
+        ? <div style={{ fontSize: 12, color: 'var(--v3-text-muted)' }}>None yet.</div>
+        : <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>{children}</ul>}
+    </section>
+  )
+}
+
+/** One row of a group: a rail in the record's colour, a title, a detail line, a figure and a word. */
+function RecordRow({ color, title, detail, figure, word, stamp, onOpen }: any) {
+  return (
+    <li>
+      <motion.button
+        type="button"
+        whileTap={{ scale: 0.99 }}
+        whileHover={{ y: -2, backgroundColor: 'var(--v3-surface-3)' }}
+        transition={{ type: 'spring', stiffness: 620, damping: 28 }}
+        onClick={() => { hapticTap(); onOpen() }}
+        style={RECORD_ROW_STYLE}
+      >
+        <span aria-hidden="true" style={{
+          position: 'absolute',
+          left: 0, top: 12, bottom: 12,
+          width: 3,
+          borderRadius: '0 3px 3px 0',
+          background: color,
+          boxShadow: `0 0 12px ${color}66`
+        }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={TITLE_STYLE}>{title}</div>
+            <div style={DETAIL_STYLE}>{detail || '\u2003'}</div>
+          </div>
+          <div style={{ flexShrink: 0, textAlign: 'right' }}>
+            {figure != null && <div style={AMOUNT_STYLE}>{figure}</div>}
+            {word && (
+              <Eyebrow as="div" style={{ marginTop: figure != null ? 4 : 0, color }}>
+                {word}
+              </Eyebrow>
+            )}
+          </div>
+        </div>
+        {stamp && (
+          <Eyebrow as="div" style={{ color: 'var(--v3-text-faint, var(--v3-text-muted))', fontVariantNumeric: 'tabular-nums' }}>
+            {updatedLabel(stamp)}
+          </Eyebrow>
+        )}
+      </motion.button>
+    </li>
+  )
+}
+
+/* ============================================================
+   ProjectsList: the client's four kinds of record (D53), Leads,
+   Quotes, Jobs and Invoices, each row opening its own screen.
+   ============================================================ */
+function ProjectsList({ jobs, leads = [], quotes = [], invoices = [], payments = [], changeOrders = [], onOpen }: any) {
   const paidByJob = useMemo(() => {
     const m = new Map()
     for (const p of payments || []) {
@@ -1153,192 +1260,146 @@ function ProjectsList({ jobs, payments = [], changeOrders = [], onOpen }: any) {
     return m
   }, [changeOrders])
 
-  const filtered = useMemo(() => {
-    if (filter === 'all') return jobs
-    const cfg = PROJECT_FILTERS.find((f) => f.id === filter)
-    return cfg ? jobs.filter(cfg.match) : jobs
-  }, [jobs, filter])
-
-  if (jobs.length === 0) {
-    return <EmptyCard label="No projects linked to this client yet." />
+  if (jobs.length === 0 && leads.length === 0 && quotes.length === 0 && invoices.length === 0) {
+    return <EmptyCard label="No records linked to this client yet." />
   }
 
   return (
-    <div style={{ padding: '12px 0 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div style={{ padding: '12px 0 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <RecordGroup heading="Leads" count={leads.length}>
+        {leads.map((l: any) => (
+          <RecordRow
+            key={l.id}
+            color={stageColor('lead')}
+            title={l.title || 'Untitled lead'}
+            detail={[l.job_type, l.follow_up_on ? `Follow up ${new Date(`${l.follow_up_on}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : null].filter(Boolean).join(' · ')}
+            word={statusWord(l.status)}
+            stamp={relTime(l.updated_at)}
+            onOpen={() => onOpen('lead', l.id)}
+          />
+        ))}
+      </RecordGroup>
 
-      {/* Filter chips, dispatch-state pill pattern */}
-      <div role="tablist" aria-label="Project filter" style={{
-        display: 'flex', gap: 8, padding: 4,
-        borderRadius: 10,
-        background: 'var(--v3-surface)',
-        border: '1px solid var(--v3-border)',
-        boxShadow: 'inset 0 1px 0 var(--v3-glass-tint)'
-      }}>
-        {PROJECT_FILTERS.map((f) => {
-          const active = filter === f.id
-          const count = f.id === 'all' ? jobs.length : jobs.filter(f.match).length
+      <RecordGroup heading="Quotes" count={quotes.length}>
+        {quotes.map((q: any) => (
+          <RecordRow
+            key={q.id}
+            color={stageColor('quote')}
+            title={q.title || 'Untitled quote'}
+            detail={q.job_id ? 'Made into a job' : q.sent_at ? `Sent ${new Date(q.sent_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : null}
+            figure={money(q.amount)}
+            word={statusWord(q.status)}
+            stamp={relTime(q.updated_at)}
+            onOpen={() => onOpen('quote', q.id)}
+          />
+        ))}
+      </RecordGroup>
+
+      <RecordGroup heading="Jobs" count={jobs.length}>
+        {jobs.map((j: any) => {
+          const c = stageColor(j.stage)
+          const contract = Number(j.amount || 0) + (coByJob.get(j.id) || 0)
+          const paid = paidByJob.get(j.id) || 0
+          const billable = j.stage === 'job' || j.stage === 'invoice' || j.stage === 'closed'
+          // Under 50 cents is rounding dust, as in rollups.ts.
+          const balance = Math.max(0, contract - paid)
+          const due = balance > 0.5
+          const pct = contract > 0 ? Math.min(100, Math.round((paid / contract) * 100)) : 0
+          const stamp = relTime(j.updated_at)
           return (
-            <button
-              key={f.id}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => { hapticTap(); setFilter(f.id) }}
-              style={{
-                flex: 1,
-                padding: '8px 12px',
-                borderRadius: 10,
-                border: 'none',
-                background: active ? 'var(--v3-primary)' : 'transparent',
-                color: active ? 'var(--v3-on-primary)' : 'var(--v3-text-muted)',
-                fontFamily: 'var(--font-body)',
-                fontSize: 12, fontWeight: 700,
-                letterSpacing: 0,
-                fontVariantNumeric: 'tabular-nums',
-                cursor: 'pointer',
-                WebkitTapHighlightColor: 'transparent',
-                transition: 'background 0.15s, color 0.15s'
-              }}
-            >
-              {f.label} <span style={{ opacity: 0.65, fontWeight: 600 }}>{count}</span>
-            </button>
-          )
-        })}
-      </div>
+            <li key={j.id}>
+              <motion.button
+                type="button"
+                whileTap={{ scale: 0.99 }}
+                whileHover={{ y: -2, backgroundColor: 'var(--v3-surface-3)' }}
+                transition={{ type: 'spring', stiffness: 620, damping: 28 }}
+                onClick={() => { hapticTap(); onOpen('job', j.id) }}
+                style={RECORD_ROW_STYLE}
+              >
+                <span aria-hidden="true" style={{
+                  position: 'absolute',
+                  left: 0, top: 12, bottom: 12,
+                  width: 3,
+                  borderRadius: '0 3px 3px 0',
+                  background: c,
+                  boxShadow: `0 0 12px ${c}66`
+                }} />
 
-      {filtered.length === 0 ? (
-        <EmptyCard label="No projects in this filter." />
-      ) : (
-        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {filtered.map((j: any) => {
-            const c = stageColor(j.stage)
-            const contract = Number(j.amount || 0) + (coByJob.get(j.id) || 0)
-            const paid = paidByJob.get(j.id) || 0
-            const billable = j.stage === 'job' || j.stage === 'invoice' || j.stage === 'closed'
-            // Under 50 cents is rounding dust, as in rollups.ts.
-            const balance = Math.max(0, contract - paid)
-            const due = balance > 0.5
-            const pct = contract > 0 ? Math.min(100, Math.round((paid / contract) * 100)) : 0
-            const stamp = relTime(j.updated_at)
-            return (
-              <li key={j.id}>
-                <motion.button
-                  type="button"
-                  whileTap={{ scale: 0.99 }}
-                  whileHover={{ y: -2, backgroundColor: 'var(--v3-surface-3)' }}
-                  transition={{ type: 'spring', stiffness: 620, damping: 28 }}
-                  onClick={() => { hapticTap(); onOpen(j.id) }}
-                  style={{
-                    width: '100%',
-                    position: 'relative',
-                    display: 'flex', flexDirection: 'column', gap: 12,
-                    padding: '12px 12px 12px 24px',
-                    borderRadius: 10,
-                    background: 'var(--v3-bg)',
-                    border: '1px solid var(--v3-border-strong)',
-                    boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 1px 2px rgba(20, 20, 20, 0.22)',
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    color: 'var(--v3-text)',
-                    overflow: 'hidden',
-                    WebkitTapHighlightColor: 'transparent'
-                  }}
-                >
-                  <span aria-hidden="true" style={{
-                    position: 'absolute',
-                    left: 0, top: 12, bottom: 12,
-                    width: 3,
-                    borderRadius: '0 3px 3px 0',
-                    background: c,
-                    boxShadow: `0 0 12px ${c}66`
-                  }} />
+                {/* Row 1, title + amount */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={TITLE_STYLE}>{j.name || 'Untitled'}</div>
+                    <div style={DETAIL_STYLE}>{j.job_title || j.job_type || '\u2003'}</div>
+                  </div>
+                  <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                    <div style={AMOUNT_STYLE}>{money(contract)}</div>
+                    <Eyebrow as="div" style={{ marginTop: 4, color: c }}>
+                      {stageLabel(String(j.stage || ''))}
+                    </Eyebrow>
+                  </div>
+                </div>
 
-                  {/* Row 1, title + amount */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
+                {/* Row 2, paid bar (only when there's money to track) */}
+                {contract > 0 && billable && (
+                  <div>
+                    <div style={{
+                      height: 4, borderRadius: 10,
+                      background: 'var(--v3-glass-tint-2)',
+                      overflow: 'hidden'
+                    }}>
                       <div style={{
-                        fontFamily: 'var(--font-body)',
-                        fontSize: 14, fontWeight: 700,
-                        letterSpacing: 0,
-                        color: 'var(--v3-text)',
-                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-                      }}>
-                        {j.name || 'Untitled'}
-                      </div>
-                      <div style={{
-                        marginTop: 3,
-                        fontFamily: 'var(--font-body)',
-                        fontSize: 12,
-                        color: 'var(--v3-text-muted)',
-                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-                      }}>
-                        {j.job_title || j.job_type || '\u2003'}
-                      </div>
+                        width: `${pct}%`,
+                        height: '100%',
+                        background: pct >= 100 ? 'var(--v3-success-bright, #2D7A4F)' : c,
+                        borderRadius: 10
+                      }} />
                     </div>
-                    <div style={{ flexShrink: 0, textAlign: 'right' }}>
-                      <div style={{
-                        fontFamily: 'var(--font-display)',
-                        fontSize: 16,
-                        color: 'var(--v3-primary-text)',
-                        letterSpacing: 0,
-                        fontVariantNumeric: 'tabular-nums',
-                        lineHeight: 1
-                      }}>
-                        {money(contract)}
-                      </div>
-                      <Eyebrow as="div" style={{ marginTop: 4, color: c }}>
-                        {stageLabel(String(j.stage || ''))}
-                      </Eyebrow>
+                    <div style={{
+                      marginTop: 6,
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      gap: 8,
+                      fontFamily: 'var(--font-body)',
+                      fontSize: 12, fontWeight: 600,
+                      letterSpacing: 0,
+                      color: 'var(--v3-text-muted)',
+                      fontVariantNumeric: 'tabular-nums'
+                    }}>
+                      <span>
+                        {money(paid)} paid{paid > 0 ? ` · ${pct}%` : ''}
+                      </span>
+                      <span style={{ color: due ? 'var(--v3-danger-text)' : 'var(--v3-success-text)' }}>
+                        {due ? `${money(balance)} due` : 'Paid in full'}
+                      </span>
                     </div>
                   </div>
+                )}
 
-                  {/* Row 2, paid bar (only when there's money to track) */}
-                  {contract > 0 && billable && (
-                    <div>
-                      <div style={{
-                        height: 4, borderRadius: 10,
-                        background: 'var(--v3-glass-tint-2)',
-                        overflow: 'hidden'
-                      }}>
-                        <div style={{
-                          width: `${pct}%`,
-                          height: '100%',
-                          background: pct >= 100 ? 'var(--v3-success-bright, #2D7A4F)' : c,
-                          borderRadius: 10
-                        }} />
-                      </div>
-                      <div style={{
-                        marginTop: 6,
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        gap: 8,
-                        fontFamily: 'var(--font-body)',
-                        fontSize: 12, fontWeight: 600,
-                        letterSpacing: 0,
-                        color: 'var(--v3-text-muted)',
-                        fontVariantNumeric: 'tabular-nums'
-                      }}>
-                        <span>
-                          {money(paid)} paid{paid > 0 ? ` · ${pct}%` : ''}
-                        </span>
-                        <span style={{ color: due ? 'var(--v3-danger-text)' : 'var(--v3-success-text)' }}>
-                          {due ? `${money(balance)} due` : 'Paid in full'}
-                        </span>
-                      </div>
-                    </div>
-                  )}
+                {/* Row 3, last-touch stamp */}
+                {stamp && (
+                  <Eyebrow as="div" style={{ color: 'var(--v3-text-faint, var(--v3-text-muted))', fontVariantNumeric: 'tabular-nums' }}>
+                    {updatedLabel(stamp)}
+                  </Eyebrow>
+                )}
+              </motion.button>
+            </li>
+          )
+        })}
+      </RecordGroup>
 
-                  {/* Row 3, last-touch stamp */}
-                  {stamp && (
-                    <Eyebrow as="div" style={{ color: 'var(--v3-text-faint, var(--v3-text-muted))', fontVariantNumeric: 'tabular-nums' }}>
-                      {updatedLabel(stamp)}
-                    </Eyebrow>
-                  )}
-                </motion.button>
-              </li>
-            )
-          })}
-        </ul>
-      )}
+      <RecordGroup heading="Invoices" count={invoices.length}>
+        {invoices.map((inv: any) => (
+          <RecordRow
+            key={inv.id}
+            color={stageColor('invoice')}
+            title={inv.title || `Invoice ${inv.sequence_number || ''}`.trim()}
+            detail={inv.due_at ? `Due ${new Date(inv.due_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : null}
+            figure={money(inv.amount)}
+            word={statusWord(inv.status)}
+            stamp={relTime(inv.updated_at || inv.created_at)}
+            onOpen={() => onOpen('invoice', inv.id)}
+          />
+        ))}
+      </RecordGroup>
     </div>
   )
 }

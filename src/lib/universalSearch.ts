@@ -1,8 +1,11 @@
 // Universal search, Phase 19 / Audit Move #8.
 //
-// One query → results grouped across the 5 main entities:
-//   jobs (fh_contacts), clients (fh_clients), notes (fh_notes),
+// One query → results grouped across the main entities:
+//   leads (fh_leads), quotes (fh_quotes), jobs (fh_contacts),
+//   invoices (fh_invoices), clients (fh_clients), notes (fh_notes),
 //   events (fh_schedule), files (fh_job_files).
+// Leads, quotes, jobs and invoices are the four records of Phase 9 (D53);
+// a lead, a quote or an invoice is found by its title or its client's name.
 //
 // All queries run in parallel; each is RLS-scoped (the supabase client
 // uses the caller's JWT, so user_id filtering happens automatically via
@@ -11,8 +14,8 @@
 // Every result row has a uniform shape so CommandPalette can render
 // + navigate without per-type branching:
 //   { id, kind, title, sub, to }
-//     kind: 'job' | 'client' | 'note' | 'event' | 'file'
-//     to:   internal route e.g. '/jobs/<id>'
+//     kind: 'lead' | 'quote' | 'job' | 'invoice' | 'client' | 'note' | 'event' | 'file'
+//     to:   internal route e.g. '/jobs/<id>' (lib/records.ts recordRoute)
 //
 // Pagination: 6 rows per kind. Universal search is for jumping to a
 // known item, not for browsing, go to the dedicated screen for that.
@@ -21,11 +24,12 @@ import { supabase } from './supabase.ts'
 import { detailRoute, MOVED_STAGE_FILTER, stageLabel } from './stages.ts'
 import { escapeLikeText, ilikeAnyOf } from './searchFilter.ts'
 import { lastKnownOrg } from './orgScope.ts'
+import { recordRoute } from './records.ts'
 import type { PaletteJob } from './paletteActions.ts'
 
 const PER_KIND = 6
 
-export type SearchKind = 'job' | 'client' | 'note' | 'event' | 'file'
+export type SearchKind = 'lead' | 'quote' | 'job' | 'invoice' | 'client' | 'note' | 'event' | 'file'
 
 export type SearchResult = {
   id: string
@@ -38,7 +42,10 @@ export type SearchResult = {
 }
 
 export type SearchResults = {
+  leads: SearchResult[]
+  quotes: SearchResult[]
   jobs: SearchResult[]
+  invoices: SearchResult[]
   clients: SearchResult[]
   notes: SearchResult[]
   events: SearchResult[]
@@ -49,6 +56,34 @@ export type SearchResults = {
 function fmtDateShort(iso: string | null | undefined) {
   if (!iso) return ''
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+function fmtMoney(amount: unknown) {
+  const n = Number(amount || 0)
+  return n ? `$${Math.round(n).toLocaleString()}` : null
+}
+
+/** 'changes_requested' as 'Changes requested'. */
+function statusWord(status: unknown) {
+  const s = String(status || '').replace(/_/g, ' ').trim()
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : null
+}
+
+const NO_RESULTS: SearchResults = { leads: [], quotes: [], jobs: [], invoices: [], clients: [], notes: [], events: [], files: [], total: 0 }
+
+// Rows from a pair of reads (by title, by client name) as one list, in
+// the order they came, each row once.
+function mergeRows(a: unknown, b: unknown): any[] {
+  const rows: any[] = []
+  const seen = new Set<string>()
+  for (const list of [a, b]) {
+    for (const row of Array.isArray(list) ? list : []) {
+      if (!row?.id || seen.has(row.id)) continue
+      seen.add(row.id)
+      rows.push(row)
+    }
+  }
+  return rows.slice(0, PER_KIND)
 }
 
 function fmtDateTime(iso: string | null | undefined) {
@@ -66,7 +101,7 @@ export async function universalSearch(
   orgId?: string | null,
 ): Promise<SearchResults> {
   const q = String(query || '').trim()
-  if (!q || !userId) return { jobs: [], clients: [], notes: [], events: [], files: [], total: 0 }
+  if (!q || !userId) return NO_RESULTS
 
   // Search the active company's book, like every list screen does
   // (lib/orgScope.ts), so teammates' jobs, clients, events and files show
@@ -81,11 +116,32 @@ export async function universalSearch(
   // or() syntax, so "Smith, John" or "(615) 555-0101" broke them).
   const like = `%${escapeLikeText(q)}%`
 
+  // A lead, a quote or an invoice by its own title, and again by its
+  // client's name through the embedded client (an inner join, so only the
+  // matching clients' rows come back). PostgREST takes an embedded column
+  // in its own filter, not inside or(), hence two reads per table.
+  const byTitle = (table: 'fh_leads' | 'fh_quotes' | 'fh_invoices', columns: string) =>
+    scoped(supabase.from(table).select(`${columns}, fh_clients(name)`))
+      .ilike('title', like)
+      .order('updated_at', { ascending: false })
+      .limit(PER_KIND)
+  const byClient = (table: 'fh_leads' | 'fh_quotes' | 'fh_invoices', columns: string) =>
+    scoped(supabase.from(table).select(`${columns}, fh_clients!inner(name)`))
+      .ilike('fh_clients.name', like)
+      .order('updated_at', { ascending: false })
+      .limit(PER_KIND)
+  const LEAD_COLUMNS = 'id, title, status, job_type, follow_up_on, client_id'
+  const QUOTE_COLUMNS = 'id, title, status, amount, client_id'
+  const INVOICE_COLUMNS = 'id, title, status, amount, sequence_number, client_id'
+
   // Parallel, independent queries, no transactional concern.
   // Each .or() searches the most useful columns for that table.
   // Every query carries an explicit company (or owner) filter as defense
   // in depth alongside RLS.
-  const [jobsRes, clientsRes, notesRes, eventsRes, filesRes] = await Promise.all([
+  const [
+    jobsRes, clientsRes, notesRes, eventsRes, filesRes,
+    leadsByTitle, leadsByClient, quotesByTitle, quotesByClient, invoicesByTitle, invoicesByClient
+  ] = await Promise.all([
     scoped(supabase
       .from('fh_contacts')
       .select('id, name, job_title, job_type, stage, amount, phone, address'))
@@ -121,13 +177,23 @@ export async function universalSearch(
       .select('id, filename, kind, job_id, fh_contacts(name)'))
       .ilike('filename', like)
       .order('uploaded_at', { ascending: false })
-      .limit(PER_KIND)
+      .limit(PER_KIND),
+
+    byTitle('fh_leads', LEAD_COLUMNS),
+    byClient('fh_leads', LEAD_COLUMNS),
+    byTitle('fh_quotes', QUOTE_COLUMNS),
+    byClient('fh_quotes', QUOTE_COLUMNS),
+    byTitle('fh_invoices', INVOICE_COLUMNS),
+    byClient('fh_invoices', INVOICE_COLUMNS)
   ])
 
   // A failed group used to come back as an empty list, so a broken query
   // read as "Nothing matched". Fail the whole search instead and let the
   // palette show its error state.
-  const failed = [jobsRes, clientsRes, notesRes, eventsRes, filesRes].find((r) => r.error)
+  const failed = [
+    jobsRes, clientsRes, notesRes, eventsRes, filesRes,
+    leadsByTitle, leadsByClient, quotesByTitle, quotesByClient, invoicesByTitle, invoicesByClient
+  ].find((r) => r.error)
   if (failed?.error) {
     console.warn('[fieldhorse] universal search failed', failed.error)
     throw new Error("Search isn't working right now. Check your connection and try again.")
@@ -137,6 +203,28 @@ export async function universalSearch(
   // these are display mappers, so we read the rows loosely.
   const asRows = (d: unknown): any[] => (Array.isArray(d) ? d : [])
 
+  // A lead or a quote is called by its client, as its own screen is.
+  const leads: SearchResult[] = mergeRows(leadsByTitle.data, leadsByClient.data).map((l) => ({
+    id: `lead:${l.id}`,
+    kind: 'lead',
+    title: l.fh_clients?.name || l.title || 'Unnamed lead',
+    sub: [l.fh_clients?.name ? l.title : null, 'Lead', statusWord(l.status), l.job_type].filter(Boolean).join(' · '),
+    to: recordRoute('lead', String(l.id))
+  }))
+  const quotes: SearchResult[] = mergeRows(quotesByTitle.data, quotesByClient.data).map((qt) => ({
+    id: `quote:${qt.id}`,
+    kind: 'quote',
+    title: qt.fh_clients?.name || qt.title || 'Untitled quote',
+    sub: [qt.fh_clients?.name ? qt.title : null, 'Quote', statusWord(qt.status), fmtMoney(qt.amount)].filter(Boolean).join(' · '),
+    to: recordRoute('quote', String(qt.id))
+  }))
+  const invoices: SearchResult[] = mergeRows(invoicesByTitle.data, invoicesByClient.data).map((inv) => ({
+    id: `invoice:${inv.id}`,
+    kind: 'invoice',
+    title: inv.title || (inv.sequence_number ? `Invoice ${inv.sequence_number}` : 'Invoice'),
+    sub: [inv.fh_clients?.name, statusWord(inv.status), fmtMoney(inv.amount)].filter(Boolean).join(' · '),
+    to: recordRoute('invoice', String(inv.id))
+  }))
   const jobs: SearchResult[] = asRows(jobsRes.data).map((j) => ({
     id: `job:${j.id}`,
     kind: 'job',
@@ -185,6 +273,6 @@ export async function universalSearch(
     to: f.job_id ? `/jobs/${f.job_id}` : '/jobs'
   }))
 
-  const total = jobs.length + clients.length + notes.length + events.length + files.length
-  return { jobs, clients, notes, events, files, total }
+  const total = leads.length + quotes.length + jobs.length + invoices.length + clients.length + notes.length + events.length + files.length
+  return { leads, quotes, jobs, invoices, clients, notes, events, files, total }
 }

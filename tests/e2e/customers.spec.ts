@@ -113,6 +113,39 @@ test.describe('the customer page', () => {
     await expect(page.getByRole('dialog')).toHaveCount(0)
   })
 
+  // Phase 9, Task 15 (D53): a client's records are four kinds, each with
+  // its own screen. The mock client has two leads, two quotes, four jobs
+  // and two invoices.
+  test("a client's Projects tab groups its four kinds", async ({ context, page }) => {
+    await signIn(context)
+    await open(page, '/clients/cl-1')
+    // The phone draws the tabs as tabs, the desktop build as plain buttons.
+    const projectsTab = page.getByRole('tab', { name: 'Projects' }).or(page.getByRole('button', { name: 'Projects', exact: true }))
+    await projectsTab.click()
+
+    for (const [heading, count] of [['Leads', 2], ['Quotes', 2], ['Jobs', 4], ['Invoices', 2]] as const) {
+      const group = page.getByRole('region', { name: new RegExp(`^${heading}`) })
+      await expect(group.getByRole('heading', { level: 3 })).toContainText(heading)
+      await expect(group.getByRole('listitem')).toHaveCount(count)
+    }
+    const leads = page.getByRole('region', { name: /^Leads/ })
+    await expect(leads.getByRole('button', { name: /Vintage Burkitt Station Drainage/ })).toBeVisible()
+    await expect(page.getByRole('region', { name: /^Quotes/ }).getByRole('button', { name: /Parking lot repour/ })).toContainText('Sent')
+    await expect(page.getByRole('region', { name: /^Invoices/ }).getByRole('button', { name: /Progress draw 1/ })).toBeVisible()
+
+    // Each row opens its own record.
+    await leads.getByRole('button', { name: /Vintage Burkitt Station Drainage/ }).click()
+    await expect(page).toHaveURL(/\/leads\/l-lead1$/)
+    await page.goBack()
+    await projectsTab.click()
+    await page.getByRole('region', { name: /^Quotes/ }).getByRole('button', { name: /Parking lot repour/ }).click()
+    await expect(page).toHaveURL(/\/quotes\/q-quote$/)
+    await page.goBack()
+    await projectsTab.click()
+    await page.getByRole('region', { name: /^Invoices/ }).getByRole('button', { name: /Progress draw 1/ }).click()
+    await expect(page).toHaveURL(/\/invoices\/inv1$/)
+  })
+
   test('deleting a customer takes a second tap on the same button', async ({ context, page }) => {
     await signIn(context)
     const writes = watchWrites(page)

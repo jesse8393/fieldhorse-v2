@@ -7,6 +7,7 @@ import { chunkIds, fetchAllRows } from './queries.ts'
 import { useOrgScope } from './orgScope.ts'
 import { OPEN_INVOICE_STATUSES, amountsDueByInvoice, knownContractTotal } from './invoiceSettlement.ts'
 import { classifyInvoice } from './moneyView.ts'
+import type { RecordKind } from './records.ts'
 import type { Database } from './database.types.ts'
 
 // Local-calendar year month day (NOT UTC) so evening follow-ups don't read
@@ -23,6 +24,25 @@ type ContactRow = Pick<
   Database['public']['Tables']['fh_contacts']['Row'],
   'quote_change_request_note' | 'quote_change_requested_at' | 'address' | 'job_title'
 >>
+
+type ClientName = { name: string | null } | null
+
+// Phase 9 (D53, D55): leads and quotes are their own records, each
+// pointing at a client, whose name is what Today calls them.
+type LeadSourceRow = Pick<
+  Database['public']['Tables']['fh_leads']['Row'],
+  'id' | 'client_id' | 'title' | 'status' | 'follow_up_on' | 'last_contact' | 'created_at' | 'updated_at'
+> & { fh_clients: ClientName }
+
+type QuoteSourceRow = Pick<
+  Database['public']['Tables']['fh_quotes']['Row'],
+  'id' | 'client_id' | 'title' | 'status' | 'amount' | 'job_id' | 'sent_at' | 'change_request_note' | 'change_requested_at' | 'created_at' | 'updated_at'
+> & { fh_clients: ClientName }
+
+// A quote still in play: not decided against, and not yet made a job.
+const OPEN_QUOTE_STATUSES = ['draft', 'sent', 'viewed', 'changes_requested', 'approved']
+// A quote waiting on the customer.
+const QUOTE_OUT_STATUSES = ['sent', 'viewed']
 
 type ScheduleRow = Pick<
   Database['public']['Tables']['fh_schedule']['Row'],
@@ -43,11 +63,6 @@ type PaymentRow = Pick<
 type ApprovedCoRow = Pick<
   Database['public']['Tables']['fh_change_orders']['Row'],
   'contact_id' | 'amount' | 'status'
->
-
-type PublicLinkRow = Pick<
-  Database['public']['Tables']['fh_public_links']['Row'],
-  'contact_id' | 'last_viewed_at'
 >
 
 type ChangeOrderRow = Pick<
@@ -82,6 +97,11 @@ export type HomeNextAction = {
     | 'quote-changes'
     | 'co-unsigned'
     | 'inv-overdue'
+  /** Which record the row opens (D53): a lead, a quote or a job. */
+  recordKind: Extract<RecordKind, 'lead' | 'quote' | 'job'>
+  /** That record's id. */
+  recordId: string
+  /** The job's id, or '' when the row is about a lead or a quote. */
   contactId: string
   verb: string
   contactName: string
@@ -136,8 +156,10 @@ export type HomeStageBreakdown = {
   lead: number
 }
 
+// Four counts (Task 15): open leads, open quotes, jobs under way and the
+// invoices still owed, with the money each stands for (leads carry none).
 export type HomeStageRail = {
-  key: 'lead' | 'quote' | 'job' | 'closed' | 'lost'
+  key: 'lead' | 'quote' | 'job' | 'invoice'
   count: number
   total: number
 }
@@ -183,7 +205,10 @@ export type HomeDashboardSource = {
   todaySchedules: ScheduleWithContact[]
   tomorrowSchedules: ScheduleWithContact[]
   photoUrlByJob: Record<string, string>
-  proposalViews: PublicLinkRow[]
+  /** Every lead of the scope; only open ones ask for anything. */
+  leads: LeadSourceRow[]
+  /** Every quote of the scope. */
+  quotes: QuoteSourceRow[]
   sentChangeOrders: ChangeOrderRow[]
   openInvoices: InvoiceRow[]
   /**
@@ -230,6 +255,19 @@ function contactName(contact: ContactRow | undefined, fallback = 'Job') {
   return contact?.name || fallback
 }
 
+function clientName(row: { fh_clients: ClientName; title: string | null }, fallback: string) {
+  return row.fh_clients?.name?.trim() || row.title?.trim() || fallback
+}
+
+function latestMs(...isos: (string | null | undefined)[]): number {
+  let latest = 0
+  for (const iso of isos) {
+    const ms = iso ? Date.parse(iso) : Number.NaN
+    if (!Number.isNaN(ms) && ms > latest) latest = ms
+  }
+  return latest
+}
+
 // Today counts every next action but keeps only this many, most urgent
 // first, for its See all list.
 export const NEXT_ACTIONS_KEPT = 20
@@ -247,27 +285,33 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
   }
   const contacts = Array.from(contactsById.values())
 
-  const totalPipeline = contacts
-    .filter((contact) => ACTIVE_STAGES.includes(contact.stage || ''))
-    .reduce((sum, contact) => sum + Number(contact.amount || 0), 0)
+  const openLeads = (source.leads ?? []).filter((lead) => lead.status === 'open')
+  // Open quotes, less the ones already made into a job: the job carries
+  // that money now.
+  const openQuotes = (source.quotes ?? []).filter((quote) => OPEN_QUOTE_STATUSES.includes(quote.status) && !quote.job_id)
 
-  const prevPipeline = contacts
-    .filter((contact) => {
-      if (!ACTIVE_STAGES.includes(contact.stage || '')) return false
-      return new Date(contact.created_at || now).getTime() < sevenDaysAgo.getTime()
-    })
-    .reduce((sum, contact) => sum + Number(contact.amount || 0), 0)
+  // The pipeline: the jobs under way and the quotes still open.
+  const activeJobs = contacts.filter((contact) => ACTIVE_STAGES.includes(contact.stage || ''))
+  const totalPipeline = activeJobs.reduce((sum, contact) => sum + Number(contact.amount || 0), 0)
+    + openQuotes.reduce((sum, quote) => sum + Number(quote.amount || 0), 0)
 
-  const risky = contacts.filter((contact) => {
-    if (contact.stage !== 'lead' && contact.stage !== 'quote') return false
-    if (
-      contact.stage === 'quote'
-      && ['approved', 'changes_requested', 'rejected', 'expired'].includes(contact.proposal_status || '')
-    ) return false
-    const last = new Date(contact.updated_at || contact.created_at || 0)
-    return last < sevenDaysAgo
+  const olderThanWeek = (iso: string | null | undefined) => new Date(iso || now).getTime() < sevenDaysAgo.getTime()
+  const prevPipeline = activeJobs
+    .filter((contact) => olderThanWeek(contact.created_at))
+    .reduce((sum, contact) => sum + Number(contact.amount || 0), 0)
+    + openQuotes
+      .filter((quote) => olderThanWeek(quote.created_at))
+      .reduce((sum, quote) => sum + Number(quote.amount || 0), 0)
+
+  // Quotes out with the customer and quiet for a week: nothing sent or
+  // changed since. A quote with changes requested has its own row below.
+  const quietQuotes = openQuotes.filter((quote) => {
+    if (!QUOTE_OUT_STATUSES.includes(quote.status)) return false
+    const last = latestMs(quote.sent_at, quote.updated_at, quote.created_at)
+    return last < sevenDaysAgo.getTime()
   })
-  const riskValue = risky.reduce((sum, contact) => sum + Number(contact.amount || 0), 0)
+  const changedQuotes = openQuotes.filter((quote) => quote.status === 'changes_requested')
+  const riskValue = [...quietQuotes, ...changedQuotes].reduce((sum, quote) => sum + Number(quote.amount || 0), 0)
 
   const overdueContactIds = new Set(source.overdueSchedules.map((row) => row.contact_id).filter(Boolean) as string[])
   const behind = contacts.filter((contact) => contact.stage === 'job' && overdueContactIds.has(contact.id))
@@ -303,36 +347,30 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
   }, 0)
 
   const actions: HomeNextAction[] = []
-  const removeGenericFollowUps = (contactId: string) => {
-    for (let index = actions.length - 1; index >= 0; index -= 1) {
-      const action = actions[index]
-      if (
-        action.contactId === contactId
-        && ['followup', 'followup-due', 'viewed-quiet'].includes(action.kind)
-      ) actions.splice(index, 1)
-    }
-  }
 
-  for (const contact of risky) {
-    const lastTouchMs = new Date(contact.updated_at || contact.created_at || 0).getTime()
+  for (const quote of quietQuotes) {
+    const lastTouchMs = latestMs(quote.sent_at, quote.updated_at, quote.created_at)
     const daysWaiting = daysBetween(now, lastTouchMs)
     const dayWord = daysWaiting === 1 ? 'day' : 'days'
+    const name = clientName(quote, 'Customer')
     actions.push({
-      id: `followup-${contact.id}`,
+      id: `followup-${quote.id}`,
       kind: 'followup',
-      contactId: contact.id,
+      recordKind: 'quote',
+      recordId: quote.id,
+      contactId: '',
       verb: 'Follow up',
-      contactName: contact.name || 'Unnamed lead',
-      contactAmount: Number(contact.amount || 0),
+      contactName: name,
+      contactAmount: Number(quote.amount || 0),
       dueIso: new Date(lastTouchMs).toISOString(),
       dueKind: 'waited',
-      title: `Follow up with ${contact.name || 'lead'}`,
-      detail: `${contact.stage === 'lead' ? 'Lead' : 'Quote'} waiting ${daysWaiting} ${dayWord}`,
+      title: `Follow up with ${name}`,
+      detail: `Quote waiting ${daysWaiting} ${dayWord}`,
       urgencyLabel: 'Follow up',
       urgencyTone: daysWaiting >= 14 ? 'danger' : 'warn',
       urgency: lastTouchMs,
-      tab: contact.stage === 'quote' ? 'quote' : 'overview',
-      intent: contact.stage === 'quote' ? 'quote_followup' : 'follow_up',
+      tab: 'quote',
+      intent: 'quote_followup',
     })
   }
 
@@ -340,6 +378,8 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
     actions.push({
       id: `reschedule-${contact.id}`,
       kind: 'reschedule',
+      recordKind: 'job',
+      recordId: contact.id,
       contactId: contact.id,
       verb: 'Reschedule',
       contactName: contact.name || 'Unnamed job',
@@ -368,6 +408,8 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
     actions.push({
       id: `invoice-${contact.id}`,
       kind: 'invoice',
+      recordKind: 'job',
+      recordId: contact.id,
       contactId: contact.id,
       verb: 'Chase invoice',
       contactName: contact.name || 'Unnamed job',
@@ -386,86 +428,54 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
     })
   }
 
+  // A lead is due by the day its follow up was set for (D60). The most
+  // overdue is the most urgent; a due today row sits behind one a week late.
   const todayYmdStr = localYmd(now)
-  for (const contact of contacts) {
-    if (!contact.follow_up_on || contact.follow_up_on > todayYmdStr) continue
-    if (!['lead', 'quote'].includes(contact.stage || '')) continue
-    removeGenericFollowUps(contact.id)
-    const due = new Date(`${contact.follow_up_on}T12:00:00`)
+  const dueLeads = openLeads.filter((lead) => !!lead.follow_up_on && lead.follow_up_on <= todayYmdStr)
+  for (const lead of dueLeads) {
+    const due = new Date(`${lead.follow_up_on}T12:00:00`)
     const overdueDays = Math.max(0, Math.round((now.getTime() - due.getTime()) / 86400000))
+    const name = clientName(lead, 'Unnamed lead')
     actions.push({
-      id: `followup-due-${contact.id}`,
+      id: `followup-due-${lead.id}`,
       kind: 'followup-due',
-      contactId: contact.id,
+      recordKind: 'lead',
+      recordId: lead.id,
+      contactId: '',
       verb: 'Call',
-      contactName: contact.name || 'Unnamed lead',
-      contactAmount: Number(contact.amount || 0),
+      contactName: name,
+      contactAmount: 0,
       dueIso: due.toISOString(),
       dueKind: 'overdue',
-      title: `Call ${contact.name || 'lead'}`,
+      title: `Call ${name}`,
       detail: overdueDays === 0 ? 'Follow up due today' : `Follow up ${overdueDays}d overdue`,
       urgencyLabel: overdueDays === 0 ? 'Due today' : 'Overdue',
       urgencyTone: overdueDays >= 2 ? 'danger' : 'warn',
-      urgency: 1 + Math.max(0, 5 - overdueDays),
-      tab: contact.stage === 'quote' ? 'quote' : 'overview',
-      intent: contact.stage === 'quote' ? 'quote_followup' : 'follow_up',
+      urgency: 1 + 5 / (1 + overdueDays),
+      intent: 'follow_up',
     })
   }
 
-  const latestViewByContact = new Map<string, number>()
-  for (const view of source.proposalViews) {
-    if (!view.contact_id || !view.last_viewed_at) continue
-    const viewedAt = new Date(view.last_viewed_at).getTime()
-    if (Number.isNaN(viewedAt)) continue
-    const prev = latestViewByContact.get(view.contact_id) || 0
-    if (viewedAt > prev) latestViewByContact.set(view.contact_id, viewedAt)
-  }
-  for (const contact of contacts) {
-    if (contact.stage !== 'quote' || contact.proposal_status !== 'changes_requested') continue
-    removeGenericFollowUps(contact.id)
-    const requestedAt = contact.quote_change_requested_at || contact.updated_at || contact.created_at
+  for (const quote of changedQuotes) {
+    const requestedAt = quote.change_requested_at || quote.updated_at || quote.created_at
     actions.push({
-      id: `quote-changes-${contact.id}`,
+      id: `quote-changes-${quote.id}`,
       kind: 'quote-changes',
-      contactId: contact.id,
+      recordKind: 'quote',
+      recordId: quote.id,
+      contactId: '',
       verb: 'Review',
-      contactName: contact.name || 'Customer',
-      contactAmount: Number(contact.amount || 0),
+      contactName: clientName(quote, 'Customer'),
+      contactAmount: Number(quote.amount || 0),
       dueIso: requestedAt || now.toISOString(),
       dueKind: 'overdue',
       title: 'Customer requested quote changes',
-      detail: contact.quote_change_request_note || 'Open the quote and review the requested revision.',
+      detail: quote.change_request_note || 'Open the quote and review the requested revision.',
       urgencyLabel: 'Needs revision',
       urgencyTone: 'danger',
       urgency: 0.5,
       tab: 'quote',
       intent: 'review_quote_changes',
-    })
-  }
-  for (const contact of contacts) {
-    if (contact.stage !== 'quote') continue
-    if (!['sent', 'viewed'].includes((contact.proposal_status || '').toLowerCase())) continue
-    const viewedAt = latestViewByContact.get(contact.id)
-    if (!viewedAt) continue
-    const hoursSince = (now.getTime() - viewedAt) / 3600000
-    if (hoursSince < 48) continue
-    if (actions.some((action) => action.contactId === contact.id)) continue
-    actions.push({
-      id: `viewed-quiet-${contact.id}`,
-      kind: 'viewed-quiet',
-      contactId: contact.id,
-      verb: 'Follow up',
-      contactName: contact.name || 'Unnamed lead',
-      contactAmount: Number(contact.amount || 0),
-      dueIso: new Date(viewedAt).toISOString(),
-      dueKind: 'waited',
-      title: 'They read your quote - follow up',
-      detail: `${contact.name || 'Customer'} viewed it ${Math.round(hoursSince / 24)}d ago, no answer`,
-      urgencyLabel: 'Engaged',
-      urgencyTone: 'warn',
-      urgency: 10 + hoursSince / 24,
-      tab: 'quote',
-      intent: 'quote_followup',
     })
   }
 
@@ -477,6 +487,8 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
     actions.push({
       id: `co-unsigned-${changeOrder.id}`,
       kind: 'co-unsigned',
+      recordKind: 'job',
+      recordId: changeOrder.contact_id,
       contactId: changeOrder.contact_id,
       verb: 'Re-send',
       contactName: contactName(contact),
@@ -523,6 +535,8 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
     actions.push({
       id: `inv-overdue-${invoice.id}`,
       kind: 'inv-overdue',
+      recordKind: 'job',
+      recordId: invoice.contact_id ?? '',
       contactId: invoice.contact_id ?? '',
       verb: 'Nudge',
       contactName: contactName(contact),
@@ -541,31 +555,26 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
 
   actions.sort((a, b) => a.urgency - b.urgency)
 
+  const jobsUnderWay = contacts.filter((contact) => contact.stage === 'job' || contact.stage === 'invoice')
   const stageBreakdown = {
     won: contacts.filter((contact) => contact.stage === 'closed').length,
-    active: contacts.filter((contact) => contact.stage === 'job' || contact.stage === 'invoice').length,
-    lead: contacts.filter((contact) => contact.stage === 'lead' || contact.stage === 'quote').length,
+    active: jobsUnderWay.length,
+    lead: openLeads.length + openQuotes.length,
   }
 
-  const stageRail = (['lead', 'quote', 'job', 'closed', 'lost'] as const).map((stage) => {
-    const rows = contacts.filter((contact) => contact.stage === stage)
-    return {
-      key: stage,
-      count: rows.length,
-      total: rows.reduce((sum, contact) => sum + Number(contact.amount || 0), 0),
-    }
-  })
+  // Invoices still owed, by Money's allocator, as the overdue rows above.
+  const invoicesDue = source.openInvoices
+    .map((invoice) => owedByInvoice.get(invoice.id) ?? Number(invoice.amount || 0))
+    .filter((owed) => owed > 0.005)
+  const stageRail: HomeStageRail[] = [
+    { key: 'lead', count: openLeads.length, total: 0 },
+    { key: 'quote', count: openQuotes.length, total: openQuotes.reduce((sum, quote) => sum + Number(quote.amount || 0), 0) },
+    { key: 'job', count: jobsUnderWay.length, total: jobsUnderWay.reduce((sum, contact) => sum + Number(contact.amount || 0), 0) },
+    { key: 'invoice', count: invoicesDue.length, total: invoicesDue.reduce((sum, owed) => sum + owed, 0) },
+  ]
 
-  const quotesAttention = contacts.filter((contact) => {
-    if (contact.stage !== 'quote') return false
-    if (contact.proposal_status === 'changes_requested') return true
-    return new Date(contact.updated_at || contact.created_at || 0) < sevenDaysAgo
-  }).length
-
-  const followUps = contacts.filter((contact) => {
-    if (contact.stage !== 'lead') return false
-    return new Date(contact.updated_at || contact.created_at || 0) < sevenDaysAgo
-  }).length
+  const quotesAttention = quietQuotes.length + changedQuotes.length
+  const followUps = dueLeads.length
 
   // The job comes embedded with each visit. A visit read without the
   // embed falls back to the job's own contact row.
@@ -644,7 +653,7 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
     pipeline: totalPipeline,
     pipelinePrev: prevPipeline,
     dealsAtRisk: {
-      count: risky.length,
+      count: followUps + quotesAttention,
       value: riskValue,
       followUps,
       quotesAttention,
@@ -684,6 +693,11 @@ const CONTACT_COLUMNS =
   'id, name, amount, stage, updated_at, created_at, completed_at, follow_up_on, proposal_status, quote_change_request_note, quote_change_requested_at, address, job_title'
 
 const INVOICE_COLUMNS = 'id, contact_id, title, amount, due_at, status, sequence_number, created_at'
+
+const LEAD_COLUMNS = 'id, client_id, title, status, follow_up_on, last_contact, created_at, updated_at, fh_clients(name)'
+
+const QUOTE_COLUMNS =
+  'id, client_id, title, status, amount, job_id, sent_at, change_request_note, change_requested_at, created_at, updated_at, fh_clients(name)'
 
 // Visits with the job they belong to, for Today's next stop and day list.
 const SCHEDULE_COLUMNS = 'id, contact_id, start_at, end_at, title, fh_contacts(name, stage, address, job_title)'
@@ -771,13 +785,20 @@ export async function fetchHomeDashboard(
   const todayScheduleQuery = scheduleForDay(todayStart, todayEnd)
   const tomorrowScheduleQuery = scheduleForDay(todayEnd, tomorrowEnd)
 
-  const proposalViewsPromise = fetchAllLabelled<PublicLinkRow>('proposal views', (from, to) =>
+  // Leads and quotes, each with its client's name (D53, D55).
+  const leadsPromise = fetchAllLabelled<LeadSourceRow>('leads', (from, to) =>
     (orgId
-      ? supabase.from('fh_public_links').select('contact_id, last_viewed_at').eq('org_id', orgId)
-      : supabase.from('fh_public_links').select('contact_id, last_viewed_at').eq('user_id', userId)
+      ? supabase.from('fh_leads').select(LEAD_COLUMNS).eq('org_id', orgId)
+      : supabase.from('fh_leads').select(LEAD_COLUMNS).eq('user_id', userId)
     )
-      .eq('kind', 'proposal')
-      .not('last_viewed_at', 'is', null)
+      .order('id', { ascending: true })
+      .range(from, to)
+  )
+  const quotesPromise = fetchAllLabelled<QuoteSourceRow>('quotes', (from, to) =>
+    (orgId
+      ? supabase.from('fh_quotes').select(QUOTE_COLUMNS).eq('org_id', orgId)
+      : supabase.from('fh_quotes').select(QUOTE_COLUMNS).eq('user_id', userId)
+    )
       .order('id', { ascending: true })
       .range(from, to)
   )
@@ -818,23 +839,25 @@ export async function fetchHomeDashboard(
     overdueSchedRes,
     payments,
     todaySchedRes,
-    proposalViews,
+    leads,
     sentChangeOrders,
     openInvoices,
     approvedChangeOrders,
     tomorrowSchedRes,
     settledInvoices,
+    quotes,
   ] = await Promise.all([
     contactsPromise,
     overdueScheduleQuery,
     paymentsPromise,
     todayScheduleQuery,
-    proposalViewsPromise,
+    leadsPromise,
     sentChangeOrdersPromise,
     openInvoicesPromise,
     approvedCoPromise,
     tomorrowScheduleQuery,
     settledInvoicesPromise,
+    quotesPromise,
   ])
 
   assertOk('overdue schedule', overdueSchedRes)
@@ -849,7 +872,8 @@ export async function fetchHomeDashboard(
     todaySchedules: (todaySchedRes.data ?? []) as unknown as ScheduleWithContact[],
     tomorrowSchedules: (tomorrowSchedRes.data ?? []) as unknown as ScheduleWithContact[],
     photoUrlByJob: {},
-    proposalViews,
+    leads,
+    quotes,
     sentChangeOrders,
     openInvoices,
     settledInvoices,
@@ -905,7 +929,7 @@ export function useHomeDashboardRealtime(userId: string | undefined, _orgId?: st
     // then torn down and reopened org scoped once membership resolves.
     if (!userId || orgId === undefined) return
 
-    // Coalesce bursts. The dashboard listens to 7 tables; a single busy
+    // Coalesce bursts. The dashboard listens to 8 tables; a single busy
     // moment (log a payment → contact, payment, invoice, schedule all fire)
     // would otherwise trigger several full 8-query refetches back-to-back.
     // A trailing debounce collapses the burst into one refetch.
@@ -931,7 +955,8 @@ export function useHomeDashboardRealtime(userId: string | undefined, _orgId?: st
       .on('postgres_changes', { event: '*', schema: 'public', table: 'fh_contacts', filter: scopeFilter }, invalidate)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'fh_schedule', filter: scopeFilter }, invalidate)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'fh_payments', filter: scopeFilter }, invalidate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'fh_public_links', filter: scopeFilter }, invalidate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fh_leads', filter: scopeFilter }, invalidate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fh_quotes', filter: scopeFilter }, invalidate)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'fh_change_orders', filter: scopeFilter }, invalidate)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'fh_invoices', filter: scopeFilter }, invalidate)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'fh_job_files', filter: scopeFilter }, invalidateCovers)

@@ -688,7 +688,8 @@ test.describe('Crew home', () => {
 
 test.describe('Reports', () => {
   // The mock's active job stages add up to $45,900. Its leads and quotes
-  // live in fh_leads and fh_quotes, which Reports reads from Task 15 on.
+  // live in fh_leads and fh_quotes (Task 15), which feed the funnel and the
+  // lead and quote counts, not the pipeline money.
   const PIPELINE = '$46K'
 
   test('while the numbers load nothing reads as zero, empty or not connected', async ({ context, page }, testInfo) => {

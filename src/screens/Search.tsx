@@ -13,7 +13,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
-import { Briefcase, Calendar, ChevronLeft, ChevronRight, FileText, Paperclip, Users } from 'lucide-react'
+import { Briefcase, Calendar, ChevronLeft, ChevronRight, FileText, Paperclip, Receipt, Target, Users } from 'lucide-react'
 import { universalSearch } from '../lib/universalSearch.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import Field from '../components/fh/Field.tsx'
@@ -26,16 +26,20 @@ import './search.css'
 const DEBOUNCE_MS = 200
 
 const KIND_META: Record<string, { icon: LucideIcon; heading: string }> = {
+  lead: { icon: Target, heading: 'Leads' },
+  quote: { icon: FileText, heading: 'Quotes' },
   job: { icon: Briefcase, heading: 'Jobs' },
+  invoice: { icon: Receipt, heading: 'Invoices' },
   client: { icon: Users, heading: 'Clients' },
   note: { icon: FileText, heading: 'Notes' },
   event: { icon: Calendar, heading: 'Schedule' },
   file: { icon: Paperclip, heading: 'Files' }
 }
 
-const GROUP_ORDER = ['jobs', 'clients', 'notes', 'events', 'files']
+// The four records first (D53), then the rest.
+const GROUP_ORDER = ['leads', 'quotes', 'jobs', 'invoices', 'clients', 'notes', 'events', 'files']
 const GROUP_TO_KIND: Record<string, string> = {
-  jobs: 'job', clients: 'client', notes: 'note', events: 'event', files: 'file'
+  leads: 'lead', quotes: 'quote', jobs: 'job', invoices: 'invoice', clients: 'client', notes: 'note', events: 'event', files: 'file'
 }
 
 type Result = { id: string; kind: string; title: string; sub?: string | null; to: string }

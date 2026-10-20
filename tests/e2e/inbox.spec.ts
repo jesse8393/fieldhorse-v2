@@ -38,22 +38,22 @@ const INBOX = [
   conversation({
     conversation_id: 'conv-priya', client_id: 'cl-priya', client_name: 'Priya Rangarajan',
     last_preview: 'Can we push to 11:30? Daycare pickup ran long.', last_message_at: '2026-10-10T13:14:00Z',
-    unread_count: 1, pending_drafts: 1, latest_stage: 'quote'
+    unread_count: 1, pending_drafts: 1, latest_record: 'quote', latest_record_id: 'q-priya', latest_stage: 'job'
   }),
   conversation({
     conversation_id: 'conv-marcus', client_id: 'cl-marcus', client_name: 'Marcus Bell',
     last_preview: 'Thanks, the crew did great work.', last_message_at: '2026-10-09T21:30:00Z',
-    latest_stage: 'job', last_channel: 'email', email: 'marcus@example.com'
+    latest_record: 'job', latest_record_id: 'c-marcus', latest_stage: 'job', last_channel: 'email', email: 'marcus@example.com'
   }),
   conversation({
     conversation_id: 'conv-tessa', client_id: 'cl-tessa', client_name: 'Tessa Holloway',
     last_preview: 'We can start Monday if the weather holds.', last_message_at: '2026-10-07T15:00:00Z',
-    held_messages: 1, latest_stage: 'lead'
+    held_messages: 1, latest_record: 'lead', latest_record_id: 'l-tessa', latest_stage: null
   }),
   conversation({
     conversation_id: 'conv-gus', client_id: 'cl-gus', client_name: 'Gus Okafor',
     last_preview: 'Still thinking about the retaining wall.', last_message_at: '2026-09-20T15:00:00Z',
-    latest_stage: 'closed'
+    latest_record: 'job', latest_record_id: 'c-gus', latest_stage: 'closed'
   })
 ]
 

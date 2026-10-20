@@ -20,7 +20,11 @@
 
 import { navigateHref } from './todayView.ts'
 import { isMacLike } from './shortcutKeys.ts'
+import { recordRoute } from './records.ts'
 
+// The palette's actions belong to a job (fh_contacts). A lead, a quote or
+// an invoice found by the search opens its own screen (D53) and has no
+// action rows here.
 export type PaletteJob = {
   id: string
   name: string
@@ -70,7 +74,7 @@ export function paletteActions(
       id: 'invoice',
       label: `Create invoice for ${title}`,
       key: 'I',
-      to: `/jobs/${job.id}?action=send_invoice`
+      to: `${recordRoute('job', job.id)}?action=send_invoice`
     })
   }
 
@@ -78,7 +82,7 @@ export function paletteActions(
     id: 'message',
     label: `Message ${name}`,
     key: 'M',
-    to: phone ? `sms:${phone}` : `/jobs/${job.id}`
+    to: phone ? `sms:${phone}` : recordRoute('job', job.id)
   })
 
   actions.push({ id: 'note', label: `Add a note to ${title}`, key: 'N', event: CAPTURE_EVENT })

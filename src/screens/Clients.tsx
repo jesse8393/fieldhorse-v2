@@ -56,6 +56,8 @@ export default function Clients() {
   // Single source of truth shared with Client detail (rollups.ts).
   // Both come from the same Query bundle as the client roster.
   const jobs = bundle?.jobs ?? []
+  const leads = bundle?.leads ?? []
+  const quotes = bundle?.quotes ?? []
   const payments = bundle?.payments ?? []
   const changeOrders = bundle?.changeOrders ?? []
 
@@ -65,7 +67,19 @@ export default function Clients() {
 
   // Map<client_id, { lifetime, outstanding, activeCount, ... }>, built
   // once per (jobs|payments) change. Per-row lookup is O(1).
-  const rollupMap = useMemo(() => rollupByClient(jobs, payments, changeOrders), [jobs, payments, changeOrders])
+  // Leads and quotes are their own records (D53): an open lead or an open
+  // quote that has not become a job keeps the client active too.
+  const rollupMap = useMemo(() => {
+    const map = rollupByClient(jobs, payments, changeOrders)
+    const bump = (clientId: string | null | undefined) => {
+      if (!clientId) return
+      const r = map.get(clientId) || { lifetime: 0, outstanding: 0, activeCount: 0, wonCount: 0, paidTotal: 0 }
+      map.set(clientId, { ...r, activeCount: r.activeCount + 1 })
+    }
+    for (const l of leads) if (l.status === 'open') bump(l.client_id)
+    for (const q of quotes) if (['draft', 'sent', 'viewed', 'changes_requested', 'approved'].includes(q.status) && !q.job_id) bump(q.client_id)
+    return map
+  }, [jobs, leads, quotes, payments, changeOrders])
 
   // Duplicate detection, runs every time the client roster changes.
   // Match policy lives in lib/clientMerge.ts (phone or email normalized).

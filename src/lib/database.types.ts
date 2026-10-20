@@ -5502,6 +5502,8 @@ export type Database = {
           last_message_at: string | null
           last_outbound_at: string | null
           last_preview: string | null
+          latest_record: string | null
+          latest_record_id: string | null
           latest_stage: string | null
           org_id: string | null
           pending_drafts: number | null

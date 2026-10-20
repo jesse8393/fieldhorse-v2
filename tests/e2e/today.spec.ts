@@ -39,22 +39,26 @@ const EIGHT_VISITS = [
   { id: 'e9', contact_id: 'c-job1', title: 'Final slab inspection', start_at: '2026-10-09T14:00:00Z', end_at: '2026-10-09T15:00:00Z' }
 ].map((row) => ({ user_id: 'qa-user-1', description: null, created_at: '2026-10-01T12:00:00Z', ...row }))
 
-// Twenty five leads gone quiet for ten days or more, each a follow up to
-// answer: more than the 20 that See all lists.
+// Twenty five leads (fh_leads rows, D55) whose follow up fell due ten days
+// ago or more, each a call to make: more than the 20 that See all lists.
+// The last one is the most overdue, so it is listed first.
 const QUIET_LEADS = Array.from({ length: 25 }, (_, i) => ({
   id: `q-${i + 1}`,
   user_id: 'qa-user-1',
-  stage: 'lead',
-  name: `Quiet lead ${i + 1}`,
-  amount: 1000 + i * 100,
-  address: null,
-  job_title: 'Driveway',
+  client_id: `cl-quiet-${i + 1}`,
+  title: 'Driveway',
+  status: 'open',
+  job_type: 'Concrete',
+  notes: null,
+  last_contact: null,
+  quote_id: null,
+  follow_up_on: new Date(Date.parse('2026-09-28T15:00:00Z') - i * 86_400_000).toISOString().slice(0, 10),
   created_at: '2026-08-01T12:00:00Z',
   updated_at: new Date(Date.parse('2026-09-28T15:00:00Z') - i * 86_400_000).toISOString(),
-  proposal_status: null,
-  follow_up_on: null,
-  completed_at: null
+  fh_clients: { id: `cl-quiet-${i + 1}`, name: `Quiet lead ${i + 1}` }
 }))
+// Only those leads wait for an answer: no quotes, and no jobs owed money.
+const ONLY_QUIET_LEADS = { fh_leads: QUIET_LEADS, fh_quotes: [], fh_contacts: [] }
 
 // Last night at 9:00 pm Central, and 6:30 the next morning. Last night's
 // bundle read Friday's two visits as tomorrow.
@@ -222,7 +226,6 @@ test.describe('today on a phone', () => {
   test.skip(({ isMobile }) => !isMobile, 'Phone layout')
 
   test('today shows the headline and the next stop', async ({ context, page }) => {
-    test.fixme(true, 'Needs an answer still reads lead and quote follow ups from fh_contacts, which the mock moved out; Task 15 reads fh_leads and fh_quotes')
     await setUp(context, page, { at: MORNING })
     const headline = page.getByRole('heading', { level: 1 })
     await expect(headline).toHaveText(/stops?\.|Clear day\./)
@@ -310,7 +313,7 @@ test.describe('today on a phone', () => {
   })
 
   test('every thing waiting counts in the evening, and See all lists the 20 most urgent', async ({ context, page }) => {
-    await setUp(context, page, { at: EVENING, tables: { fh_contacts: QUIET_LEADS } })
+    await setUp(context, page, { at: EVENING, tables: ONLY_QUIET_LEADS })
     await seeAllAnswers(page)
   })
 
@@ -338,7 +341,6 @@ test.describe('today on a desktop', () => {
   test.skip(({ isMobile }) => isMobile, 'Desktop layout')
 
   test('shows the stage, the next stop, what needs an answer and the day', async ({ context, page }) => {
-    test.fixme(true, 'Needs an answer still reads lead and quote follow ups from fh_contacts, which the mock moved out; Task 15 reads fh_leads and fh_quotes')
     await setUp(context, page, { at: MORNING })
     const headline = page.getByRole('heading', { level: 1 })
     await expect(headline).toHaveText('Three stops. First pour at 7:30.')
@@ -398,7 +400,7 @@ test.describe('today on a desktop', () => {
   })
 
   test('every thing waiting counts in the evening, and See all lists the 20 most urgent', async ({ context, page }) => {
-    await setUp(context, page, { at: EVENING, tables: { fh_contacts: QUIET_LEADS } })
+    await setUp(context, page, { at: EVENING, tables: ONLY_QUIET_LEADS })
     await seeAllAnswers(page)
   })
 

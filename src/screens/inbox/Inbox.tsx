@@ -24,7 +24,7 @@ import { useIsDesktop } from '../../lib/useMediaQuery.ts'
 import { hapticTap } from '../../lib/haptics.ts'
 import {
   listTimeLabel,
-  stageChip,
+  recordChip,
   useEngineEnabled,
   useInbox,
   type InboxRow
@@ -66,7 +66,7 @@ function InboxList({ rows, loading, error, onRetry, selectedId }: ListProps) {
             const unread = (row.unread_count ?? 0) > 0
             const drafts = (row.pending_drafts ?? 0) > 0
             const held = (row.held_messages ?? 0) > 0
-            const stage = stageChip(row.latest_stage)
+            const stage = recordChip(row)
             const selected = id !== '' && id === selectedId
             return (
               <Row

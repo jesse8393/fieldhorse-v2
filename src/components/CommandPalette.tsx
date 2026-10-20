@@ -115,7 +115,10 @@ const SYSTEM_ITEMS: NavEntry[] = [
 ]
 
 const ICON_FOR_KIND: Record<string, LucideIcon> = {
+  lead: Target,
+  quote: FileText,
   job: HardHat,
+  invoice: Receipt,
   client: Users,
   note: NotepadText,
   event: Calendar,
@@ -130,7 +133,7 @@ const ICON_FOR_ACTION: Record<PaletteActionId, LucideIcon> = {
   navigate: MapPin,
 }
 
-const EMPTY_RESULTS: SearchResults = { jobs: [], clients: [], notes: [], events: [], files: [], total: 0 }
+const EMPTY_RESULTS: SearchResults = { leads: [], quotes: [], jobs: [], invoices: [], clients: [], notes: [], events: [], files: [], total: 0 }
 
 // Row values. cmdk tracks the highlighted row by value, so these say what
 // a highlight means: a job row, or an action row of a job.
@@ -432,6 +435,9 @@ export default function CommandPalette() {
                       ))}
                     </Command.Group>
                   )}
+                  {renderEntityGroup('Leads', results.leads)}
+                  {renderEntityGroup('Quotes', results.quotes)}
+                  {renderEntityGroup('Invoices', results.invoices)}
                   {renderEntityGroup('Customers', results.clients)}
                   {renderEntityGroup('Documents', results.files)}
                   {renderEntityGroup('Notes', results.notes)}

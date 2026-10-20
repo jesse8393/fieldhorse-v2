@@ -10,6 +10,7 @@ import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { useHomeDashboard, useHomeDashboardRealtime } from '../lib/homeDashboard.ts'
 import type { HomeNextAction } from '../lib/homeDashboard.ts'
 import { lazyWithRetry } from '../lib/lazyWithRetry.ts'
+import { recordRoute } from '../lib/records.ts'
 import TodayPhone from './today/TodayPhone.tsx'
 // Lazy, desktop-only variant. Home itself is an eager route (loaded
 // with the main bundle) so any static import here ships SnowHome to
@@ -147,7 +148,10 @@ function jobActionPath(contactId: any, tab?: any, intent?: any) {
   return `/jobs/${contactId}${query ? `?${query}` : ''}`
 }
 
+// A lead or a quote opens its own screen (D53); a job row keeps the tab
+// and the action it asks for.
 function nextActionPath(action: HomeNextAction) {
+  if (action?.recordKind === 'lead' || action?.recordKind === 'quote') return recordRoute(action.recordKind, action.recordId)
   if (!action?.contactId) return '/jobs'
   return jobActionPath(action.contactId, action.tab, action.intent)
 }

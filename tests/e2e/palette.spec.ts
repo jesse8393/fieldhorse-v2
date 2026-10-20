@@ -75,6 +75,33 @@ test.describe('command palette', () => {
     await expect(palette.getByText('to close.')).toBeVisible()
   })
 
+  // Phase 9, Task 15: leads, quotes and invoices are records of their own
+  // (D53) and the search finds a lead by the name of its client.
+  test('search finds a lead by name', async ({ context, page }) => {
+    const LEAD = {
+      id: 'l-justin', user_id: 'qa-user-1', client_id: 'cl-justin', title: 'Vintage Burkitt Station Drainage',
+      status: 'open', job_type: 'Drainage', follow_up_on: null, notes: null, last_contact: null, quote_id: null,
+      created_at: '2026-10-01T12:00:00Z', updated_at: '2026-10-09T12:00:00Z',
+      fh_clients: { id: 'cl-justin', name: 'Justin Bryan' }
+    }
+    // The mock does not filter by text, so only the lead is seeded: a job
+    // would bring its Actions group along.
+    await signIn(context, { tables: { fh_contacts: [], fh_clients: [CLIENT], fh_leads: [LEAD], fh_quotes: [], fh_invoices: [] } })
+    await open(page)
+    const palette = await openPalette(page)
+    await palette.getByRole('combobox').fill('Justin')
+
+    const leads = palette.getByRole('group', { name: 'Leads' })
+    await expect(leads).toBeVisible()
+    const row = leads.getByRole('option', { name: /Justin Bryan.*Vintage Burkitt Station Drainage.*Lead/ })
+    await expect(row).toBeVisible()
+    // A lead has no job actions.
+    await expect(palette.getByRole('group', { name: 'Actions' })).toHaveCount(0)
+    await row.click()
+    await expect(palette).toBeHidden()
+    await expect(page).toHaveURL(/\/leads\/l-justin$/)
+  })
+
   test('Documents appears only when files match', async ({ context, page }) => {
     await signIn(context, { tables: { fh_contacts: [JOB], fh_clients: [CLIENT], fh_job_files: [FILE] } })
     await open(page)
@@ -146,7 +173,10 @@ test.describe('command palette', () => {
   })
 
   test('a shortcut needs a job or one of its actions highlighted', async ({ context, page }) => {
-    await signIn(context, { tables: { fh_contacts: [JOB], fh_clients: [CLIENT] } })
+    // Only the job and its customer, so the arrow count below holds: the
+    // mock does not filter by text, and the default leads, quotes and
+    // invoices would add rows of their own (Task 15).
+    await signIn(context, { tables: { fh_contacts: [JOB], fh_clients: [CLIENT], fh_leads: [], fh_quotes: [], fh_invoices: [] } })
     await open(page)
     const before = page.url()
     const palette = await openPalette(page)

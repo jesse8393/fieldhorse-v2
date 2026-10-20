@@ -27,6 +27,7 @@ import {
   onceAtATime,
   replyChannel,
   replySubject,
+  recordChip,
   stageChip,
   threadItems,
   timeLabel,
@@ -342,14 +343,31 @@ describe('day and time labels (Central time)', () => {
 })
 
 describe('stageChip', () => {
-  it('words every stage and keeps the job and quote tones apart', () => {
-    expect(stageChip('lead')).toEqual({ label: 'Lead', tone: 'neutral' })
-    expect(stageChip('quote')).toEqual({ label: 'Quote', tone: 'info' })
+  it('words a job stage and nothing else', () => {
     expect(stageChip('job')).toEqual({ label: 'Job', tone: 'success' })
     expect(stageChip('invoice')).toEqual({ label: 'Job', tone: 'success' })
     expect(stageChip('closed')).toEqual({ label: 'Closed', tone: 'neutral' })
+    // Leads and quotes are their own records now (D55); the stage column
+    // only ever holds a job stage, and a legacy value shows nothing.
+    expect(stageChip('lead')).toBeNull()
+    expect(stageChip('quote')).toBeNull()
     expect(stageChip(null)).toBeNull()
     expect(stageChip('')).toBeNull()
+  })
+})
+
+describe('recordChip', () => {
+  it('names the newest record and keeps the job and quote tones apart', () => {
+    expect(recordChip({ latest_record: 'lead', latest_stage: null })).toEqual({ label: 'Lead', tone: 'neutral' })
+    expect(recordChip({ latest_record: 'quote', latest_stage: 'closed' })).toEqual({ label: 'Quote', tone: 'info' })
+    expect(recordChip({ latest_record: 'invoice', latest_stage: 'job' })).toEqual({ label: 'Invoice', tone: 'info' })
+    expect(recordChip({ latest_record: 'job', latest_stage: 'job' })).toEqual({ label: 'Job', tone: 'success' })
+    expect(recordChip({ latest_record: 'job', latest_stage: 'closed' })).toEqual({ label: 'Closed', tone: 'neutral' })
+  })
+  it('falls back to the stage for a row from the older view', () => {
+    expect(recordChip({ latest_stage: 'job' })).toEqual({ label: 'Job', tone: 'success' })
+    expect(recordChip({ latest_stage: 'quote' })).toBeNull()
+    expect(recordChip(null)).toBeNull()
   })
 })
 
