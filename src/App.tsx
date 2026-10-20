@@ -187,11 +187,10 @@ function AppLoading({ label }: { label: string }) {
  * state because React kept the instance alive across param changes.
  */
 /**
- * LegacyBoardRedirect, /leads, /quotes, /jobs, /pipeline collapsed
- * into the single /work screen (IA round 2: "jobs leads quotes
- * invoices… it all sucks and is too complicated"). Old links, nav
- * habits, and deep links keep working: the stage/view intent maps to
- * the matching Work chip and every other query param rides along.
+ * LegacyBoardRedirect: /work and /pipeline land on /jobs, the Jobs list
+ * (Phase 9, D65). Old links, nav habits and deep links keep working: the
+ * stage/view intent maps to the matching Jobs tab and every other query
+ * param rides along.
  */
 function LegacyBoardRedirect({ defaultStage }: { defaultStage?: string }) {
   const [params] = useSearchParams()
@@ -208,7 +207,7 @@ function LegacyBoardRedirect({ defaultStage }: { defaultStage?: string }) {
   if (mapped) sp.set('stage', mapped)
   else sp.delete('stage')
   const search = sp.toString()
-  return <Navigate to={{ pathname: '/work', search: search ? `?${search}` : '' }} replace />
+  return <Navigate to={{ pathname: '/jobs', search: search ? `?${search}` : '' }} replace />
 }
 
 function ContactDetailRoute() {
@@ -288,7 +287,7 @@ export default function App() {
         />
         <Route element={<Gated><AppShell /></Gated>}>
           <Route path="/" element={<Home />} />
-          <Route path="/work" element={<Work />} />
+          <Route path="/work" element={<LegacyBoardRedirect />} />
           {/* The New screen and the create screens (SPEC D58, D59). */}
           <Route path="/new" element={<New />} />
           <Route path="/leads/new" element={<LeadNew />} />
@@ -304,7 +303,7 @@ export default function App() {
           <Route path="/quotes/:id/preview" element={<QuoteScreen><QuotePreview /></QuoteScreen>} />
           <Route path="/quotes/:id/approve" element={<QuoteScreen><QuoteApprove /></QuoteScreen>} />
           <Route path="/pipeline" element={<LegacyBoardRedirect />} />
-          <Route path="/jobs" element={<LegacyBoardRedirect defaultStage="active" />} />
+          <Route path="/jobs" element={<Work />} />
           <Route path="/jobs/:id" element={<ContactDetailRoute />} />
           <Route path="/jobs/:id/payment" element={<JobPayment />} />
           <Route path="/jobs/:id/partner" element={<JobPartner />} />

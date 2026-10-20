@@ -43,7 +43,7 @@ export function isActive(item: NavItem, pathname: string) {
 }
 
 export const TODAY: NavItem = { to: '/', label: 'Today', icon: Sun, match: (p) => p === '/' }
-export const JOBS: NavItem = { to: '/work', label: 'Jobs', icon: HardHat, match: jobsMatch }
+export const JOBS: NavItem = { to: '/jobs', label: 'Jobs', icon: HardHat, match: jobsMatch }
 export const MONEY: NavItem = { to: '/invoices', label: 'Money', icon: Banknote, match: under('/invoices') }
 export const SCHEDULE: NavItem = { to: '/schedule', label: 'Schedule', icon: CalendarDays, match: under('/schedule') }
 export const CUSTOMERS: NavItem = { to: '/clients', label: 'Customers', icon: Users, match: under('/clients') }

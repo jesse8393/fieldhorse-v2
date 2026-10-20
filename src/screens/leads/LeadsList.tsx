@@ -35,7 +35,7 @@ export default function LeadsList() {
     hapticTap()
     const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0
     if (idx > 0) navigate(-1)
-    else navigate('/work')
+    else navigate('/jobs')
   }
 
   let body

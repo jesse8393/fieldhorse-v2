@@ -126,7 +126,7 @@ export default function SnowPartnersBuild({
           <div className="fh-build-focus">
             <div className="fh-build-eyebrow">Access coverage</div>
             <p><strong>{counts.accepted}</strong> accepted {counts.accepted === 1 ? 'partner' : 'partners'} across <strong>{summary.activeJobs}</strong> active job {summary.activeJobs === 1 ? 'share' : 'shares'}.</p>
-            <Link className="fh-build-inline-link" to="/work">Open jobs <ChevronRight size={12} /></Link>
+            <Link className="fh-build-inline-link" to="/jobs">Open jobs <ChevronRight size={12} /></Link>
           </div>
 
           <div className="fh-build-mini-grid">
@@ -175,7 +175,7 @@ export default function SnowPartnersBuild({
                 <Users size={22} aria-hidden="true" />
                 <strong>No partners yet</strong>
                 <span>Open a job to invite a foreman, subcontractor, or estimator.</span>
-                <Link className="fh-build-secondary-btn" to="/work">Open jobs</Link>
+                <Link className="fh-build-secondary-btn" to="/jobs">Open jobs</Link>
               </div>
             )}
 

@@ -157,6 +157,48 @@ const SHOTS: Shot[] = [
       await expect(page.locator('.fhinv-hero')).toBeVisible({ timeout: 30_000 })
     }
   },
+  // Phase 9 screens (Task 17): the New menu, a lead, a quote, the
+  // notifications screen and Capture as a route of its own.
+  {
+    route: '/new',
+    name: 'new',
+    ready: async (page) => {
+      await appReady(page)
+      await expect(page.getByRole('heading', { level: 1, name: 'New' })).toBeVisible({ timeout: 30_000 })
+    }
+  },
+  {
+    route: '/leads/l-lead1',
+    name: 'lead-l-lead1',
+    ready: async (page) => {
+      await appReady(page)
+      await expect(page.getByRole('link', { name: 'Quote this' })).toBeVisible({ timeout: 30_000 })
+    }
+  },
+  {
+    route: '/quotes/q-quote',
+    name: 'quote-q-quote',
+    ready: async (page) => {
+      await appReady(page)
+      await expect(page.getByRole('button', { name: 'Make this a job' })).toBeVisible({ timeout: 30_000 })
+    }
+  },
+  {
+    route: '/notifications',
+    name: 'notifications',
+    ready: async (page) => {
+      await appReady(page)
+      await expect(page.getByRole('heading', { level: 1, name: 'Notifications' })).toBeVisible({ timeout: 30_000 })
+    }
+  },
+  {
+    route: '/capture',
+    name: 'capture',
+    ready: async (page) => {
+      await appReady(page)
+      await expect(page.getByRole('list', { name: 'Or start with' })).toBeVisible({ timeout: 30_000 })
+    }
+  },
   {
     route: '/inbox',
     name: 'inbox',

@@ -63,7 +63,7 @@ export function NewRecordRoute({ kind, id, fallback }: { kind: MovedRecord['kind
   const goBack = () => {
     const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0
     if (idx > 0) navigate(-1)
-    else navigate('/work')
+    else navigate('/jobs')
   }
   return (
     <div style={{ padding: '12px 16px 24px', minHeight: '100%', background: 'var(--v3-bg)' }}>

@@ -80,7 +80,7 @@ const QUICK_ACTIONS: NavEntry[] = [
   { id: 'newLead', label: 'New lead', hint: 'Someone who called', icon: Plus, to: '/leads/new' },
   { id: 'newQuote', label: 'New quote', hint: 'Scope and a price to send', icon: FileText, to: '/quotes/new' },
   { id: 'newJob', label: 'New job', hint: 'Work that is on', icon: Briefcase, to: '/jobs/new' },
-  { id: 'followups', label: 'Work follow ups', hint: 'Deals due for a touch, up top', icon: Target, to: '/work?stage=leads' },
+  { id: 'followups', label: 'Work follow ups', hint: 'Deals due for a touch, up top', icon: Target, to: '/leads' },
   { id: 'collect', label: 'Collect money', hint: 'Invoices and balances', icon: Receipt, to: '/invoices' },
   { id: 'compose', label: 'Draft message', hint: 'AI compose for customers', icon: MessageSquare, to: '/compose' },
 ]
@@ -94,7 +94,7 @@ function homeHint() {
 
 const NAV_ITEMS: NavEntry[] = [
   { id: 'home', label: 'Command Center', hint: homeHint(), icon: Home, to: '/' },
-  { id: 'work', label: 'Work & Deals', hint: 'Every deal, lead to done, one list', icon: Briefcase, to: '/work' },
+  { id: 'work', label: 'Work & Deals', hint: 'Every deal, lead to done, one list', icon: Briefcase, to: '/jobs' },
   { id: 'clients', label: 'Clients', hint: 'Customer profiles', icon: Users, to: '/clients' },
   { id: 'schedule', label: 'Schedule', hint: 'Day, week, and month planning', icon: Calendar, to: '/schedule' },
 ]

@@ -30,7 +30,7 @@ test.describe('phone shell', () => {
     await expect(dock.getByRole('link', { name: 'Today' })).toHaveAttribute('aria-current', 'page')
 
     await dock.getByRole('link', { name: 'Jobs' }).click()
-    await expect(page).toHaveURL(/\/work/)
+    await expect(page).toHaveURL(/\/jobs$/)
     await expect(dock.getByRole('link', { name: 'Jobs' })).toHaveAttribute('aria-current', 'page')
 
     await dock.getByRole('button', { name: /Capture/ }).click()
@@ -38,7 +38,7 @@ test.describe('phone shell', () => {
   })
 
   test('the header monogram opens the workspace screen from any screen', async ({ page }) => {
-    for (const path of ['/', '/work', '/invoices', '/schedule']) {
+    for (const path of ['/', '/jobs', '/invoices', '/schedule']) {
       await open(page, path)
       await page.getByRole('button', { name: 'Open workspace menu' }).click()
       // A screen, not a sheet (D57).

@@ -77,3 +77,56 @@ test('moved rows never show on Jobs, Today or Money', async ({ context, page, is
   await expect(page.getByRole('heading', { level: 1, name: 'Money' })).toBeVisible({ timeout: 30_000 })
   await expect(page.getByText(/Moved Ghost/)).toHaveCount(0)
 })
+
+// The cut over (PHASE9_PLAN Task 17, SPEC D65): /jobs is the Jobs list,
+// /work and /pipeline land on it, and Leads, Quotes and Money are lists of
+// their own records.
+test('/work lands on /jobs and keeps its stage', async ({ context, page, isMobile }) => {
+  await signIn(context, { tables: TABLES })
+  await open(page, '/work')
+  await expect(page).toHaveURL(/\/jobs$/, { timeout: 30_000 })
+  await expect(page.getByRole('heading', { level: 1, name: isMobile ? 'Jobs' : /Work/ })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText('Plumbing Bellevue').first()).toBeVisible()
+
+  await open(page, '/work?stage=lost&q=mill')
+  await expect(page).toHaveURL(/\/jobs\?stage=lost&q=mill$/, { timeout: 30_000 })
+  await open(page, '/pipeline')
+  await expect(page).toHaveURL(/\/jobs$/, { timeout: 30_000 })
+})
+
+test('/jobs, /leads, /quotes and /invoices are their own lists', async ({ context, page, isMobile }) => {
+  await signIn(context, { tables: TABLES })
+  await open(page, '/jobs')
+  await expect(page).toHaveURL(/\/jobs$/, { timeout: 30_000 })
+  await expect(page.getByRole('heading', { level: 1, name: isMobile ? 'Jobs' : /Work/ })).toBeVisible({ timeout: 30_000 })
+
+  await open(page, '/leads')
+  await expect(page).toHaveURL(/\/leads$/, { timeout: 30_000 })
+  await expect(page.getByRole('heading', { level: 1, name: 'Leads' })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText('Ghost drainage').first()).toBeVisible()
+
+  await open(page, '/quotes')
+  await expect(page).toHaveURL(/\/quotes$/, { timeout: 30_000 })
+  await expect(page.getByRole('heading', { level: 1, name: 'Quotes' })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText('Ghost repour').first()).toBeVisible()
+
+  await open(page, '/invoices')
+  await expect(page).toHaveURL(/\/invoices$/, { timeout: 30_000 })
+  await expect(page.getByRole('heading', { level: 1, name: 'Money' })).toBeVisible({ timeout: 30_000 })
+})
+
+test('the phone dock keeps Today, Jobs, Capture, Money, Schedule and Jobs goes to /jobs', async ({ context, page, isMobile }) => {
+  test.skip(!isMobile, 'The dock is the phone shell')
+  await signIn(context, { tables: TABLES })
+  await open(page, '/')
+  const dock = page.getByRole('navigation', { name: 'Primary' })
+  await expect(dock).toBeVisible({ timeout: 30_000 })
+  for (const label of ['Today', 'Jobs', 'Money', 'Schedule']) {
+    await expect(dock.getByRole('link', { name: label })).toBeVisible()
+  }
+  await expect(dock.getByRole('button', { name: /Capture/ })).toBeVisible()
+  await expect(dock.getByRole('link', { name: 'Jobs' })).toHaveAttribute('href', '/jobs')
+  await dock.getByRole('link', { name: 'Jobs' }).click()
+  await expect(page).toHaveURL(/\/jobs$/)
+  await expect(dock.getByRole('link', { name: 'Jobs' })).toHaveAttribute('aria-current', 'page')
+})

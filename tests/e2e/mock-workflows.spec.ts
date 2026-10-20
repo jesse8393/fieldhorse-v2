@@ -34,34 +34,42 @@ test.beforeEach(async ({ context }) => {
 })
 
 test('keeps the work lifecycle action ready', async ({ page }, testInfo) => {
-  test.fixme(true, 'The mock leads and quotes live in fh_leads and fh_quotes now; Tasks 9 and 10 build the screens this walks through')
+  // Leads, quotes and jobs are separate records (SPEC D53 to D65): the
+  // lifecycle runs lead, quote, job, invoice, and each screen keeps its
+  // next action one tap away.
   const expectNoPageErrors = failOnPageErrors(page)
 
-  await openRoute(page, '/work')
-  // Phones get the redesigned Jobs list (spec 9.3); desktop keeps the deal board.
+  await openRoute(page, '/jobs')
+  // Phones get the Jobs list (spec 9.3); desktop keeps the deal board.
   const workHeading = testInfo.project.name.startsWith('mobile') ? /^jobs$/i : /work & deals/i
   await expect(page.getByRole('heading', { level: 1, name: workHeading })).toBeVisible()
-  await expect(page.getByText('Justin Bryan', { exact: true })).toBeVisible()
-  await expect(page.getByText('MMC Properties', { exact: true })).toBeVisible()
   await expect(page.getByText('Plumbing Bellevue', { exact: true })).toBeVisible()
   await capture(page, testInfo, 'work')
 
-  await openRoute(page, '/leads/c-lead1')
-  await expect(page.getByRole('button', { name: /convert to quote/i })).toBeVisible()
+  await openRoute(page, '/leads')
+  await expect(page.getByRole('heading', { level: 1, name: 'Leads' })).toBeVisible()
+  await expect(page.getByText('Vintage Burkitt Station Drainage', { exact: true }).first()).toBeVisible()
+  await openRoute(page, '/quotes')
+  await expect(page.getByRole('heading', { level: 1, name: 'Quotes' })).toBeVisible()
+  await expect(page.getByText('Parking lot repour', { exact: true }).first()).toBeVisible()
+
+  await openRoute(page, '/leads/l-lead1')
+  await expect(page.getByRole('link', { name: 'Schedule estimate' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Quote this' })).toBeVisible()
   await capture(page, testInfo, 'lead')
 
-  await openRoute(page, '/quotes/c-quote?tab=quote')
-  await expect(page.getByRole('button', { name: /approve quote/i })).toBeVisible()
-  await expect(page.getByText(/follow up [a-z]{3} \d{1,2}/i).first()).toBeVisible()
+  await openRoute(page, '/quotes/q-quote')
+  await expect(page.getByRole('button', { name: 'Make this a job' })).toBeVisible()
   await capture(page, testInfo, 'quote')
 
   await openRoute(page, '/jobs/c-job1')
-  const sendInvoice = page.getByRole('button', { name: /send invoice/i }).first()
-  await expect(sendInvoice).toBeVisible()
+  const invoiceThis = page.getByRole('button', { name: 'Invoice this' }).first()
+  await expect(invoiceThis).toBeVisible()
   await capture(page, testInfo, 'job')
-  await sendInvoice.click()
-  await expect(page.getByText(/create invoice|send invoice/i).last()).toBeVisible()
-  await capture(page, testInfo, 'send-invoice')
+  await invoiceThis.click()
+  await expect(page).toHaveURL(/\/invoices\/new\?job=c-job1$/)
+  await expect(page.getByRole('heading', { level: 1, name: 'New invoice' })).toBeVisible()
+  await capture(page, testInfo, 'new-invoice')
 
   expectNoPageErrors()
 })
