@@ -511,6 +511,13 @@
 }
 .fhs-side__search span { flex: 1; }
 .fhs-side__search:hover { color: var(--fh-linen); border-color: var(--fh-edge); }
+.fhs-side__quick {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.fhs-side__quick .fhs-side__link { padding: 0 8px; gap: 8px; min-width: 0; }
+.fhs-side__quick .fhs-side__capture-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fhs-side__nav {
   flex: 1;
   min-height: 0;

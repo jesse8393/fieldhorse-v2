@@ -7,7 +7,7 @@ const routes = [
   { name: 'work', path: '/work', ready: '.v3-screen--work' },
   // Leads and quotes live in fh_leads and fh_quotes. Until Tasks 9 and 10
   // build their screens, the route shows the record's title.
-  { name: 'lead-detail', path: '/leads/l-lead1', ready: 'h1:has-text("Vintage Burkitt Station Drainage")' },
+  { name: 'lead-detail', path: '/leads/l-lead1', ready: 'h1.fhl-title:has-text("Jeff Roy")' },
   { name: 'quote-detail', path: '/quotes/q-quote', ready: 'h1:has-text("Parking lot repour")' },
   { name: 'job-detail', path: '/jobs/c-job1', ready: '[data-build-screen="SnowJobDetailBuild"]' },
   { name: 'clients', path: '/clients', ready: '[data-build-screen="SnowClientsBuild"]' },

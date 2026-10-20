@@ -168,31 +168,34 @@ export default function DesktopSidebar() {
         <KeyCap aria-hidden="true">{searchKeys.keys}</KeyCap>
       </button>
 
-      {/* Universal Capture, the same path the dock coin takes. CaptureSheet
-          also answers Cmd or Ctrl J and the palette's Capture anything. */}
-      <button
-        type="button"
-        className="fhs-side__link fhs-side__capture"
-        onClick={() => openCapture()}
-        aria-label={`Capture (${captureKeys.spoken})`}
-        aria-keyshortcuts={captureKeys.combo}
-      >
-        <Icon icon={Mic} size={18} />
-        <span className="fhs-side__capture-label">Capture</span>
-        <KeyCap aria-hidden="true">{captureKeys.keys}</KeyCap>
-      </button>
+      {/* Universal Capture, the same path the dock coin takes, and New,
+          side by side so the two together take one row (the nav below must
+          fit a 900 px tall window without scrolling). */}
+      <div className="fhs-side__quick">
+        <button
+          type="button"
+          className="fhs-side__link fhs-side__capture"
+          onClick={() => openCapture()}
+          aria-label={`Capture (${captureKeys.spoken})`}
+          aria-keyshortcuts={captureKeys.combo}
+        >
+          <Icon icon={Mic} size={18} />
+          <span className="fhs-side__capture-label">Capture</span>
+          <KeyCap aria-hidden="true">{captureKeys.keys}</KeyCap>
+        </button>
 
-      <Link
-        to="/new"
-        className="fhs-side__link fhs-side__capture"
-        aria-label={`New (${newKeys.spoken})`}
-        aria-keyshortcuts={newKeys.combo}
-        onMouseEnter={() => prefetchRoute('/new')}
-      >
-        <Icon icon={Plus} size={18} />
-        <span className="fhs-side__capture-label">New</span>
-        <KeyCap aria-hidden="true">{newKeys.keys}</KeyCap>
-      </Link>
+        <Link
+          to="/new"
+          className="fhs-side__link fhs-side__capture"
+          aria-label={`New (${newKeys.spoken})`}
+          aria-keyshortcuts={newKeys.combo}
+          onMouseEnter={() => prefetchRoute('/new')}
+        >
+          <Icon icon={Plus} size={18} />
+          <span className="fhs-side__capture-label">New</span>
+          <KeyCap aria-hidden="true">{newKeys.keys}</KeyCap>
+        </Link>
+      </div>
 
       <nav className="fhs-side__nav" aria-label="Primary">
         <ul className="fhs-side__list">

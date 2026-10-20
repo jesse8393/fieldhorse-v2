@@ -638,7 +638,11 @@ test.describe('The Jobs list visits', () => {
       const n = new Date()
       return new Date(n.getFullYear(), n.getMonth(), n.getDate() - 14).toISOString()
     })
+    // The Leads tab reads visits booked on leads too (lead_id, from today);
+    // this test pins the job visits read, so pick the reads that name the job.
     const visits = reads.filter((u) => u.searchParams.getAll('start_at').some((v) => v.startsWith('gte.')))
+      .filter((u) => (u.searchParams.get('select') || '').includes('contact_id'))
+    expect(visits.length).toBeGreaterThan(0)
     for (const url of visits) {
       expect(url.searchParams.get('select')).toBe('contact_id,start_at')
       expect(url.searchParams.getAll('start_at')).toContain(`gte.${from}`)
