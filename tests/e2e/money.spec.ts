@@ -1,9 +1,10 @@
 // The Money screen on a phone (docs/design/2026-10-redesign/SPEC.md,
-// section 9.7, decision D6): the vault card, the four groups, a Remind
-// button that sends only when it is tapped, the invoice actions in a sheet,
-// and everything the old screen offered still one tap away. The second
-// describe at the bottom covers the same screen at 900 px and wider: the
-// vault card and the four groups as tables.
+// section 9.7, decisions D6, D57 and D62): the vault card, the four groups,
+// a Remind button that opens the remind screen and sends only when Send
+// reminder is tapped there, an invoice row that opens the invoice's own
+// screen (no sheet anywhere), and everything the old screen offered still
+// one tap away. The second describe at the bottom covers the same screen at
+// 900 px and wider: the vault card and the four groups as tables.
 import { expect, test, type BrowserContext, type Locator, type Page } from '@playwright/test'
 import { signIn, type SignInOptions } from './helpers/signIn.ts'
 
@@ -37,9 +38,11 @@ function contact(partial: Record<string, unknown>) {
   }
 }
 
+// Every invoice points at its client (D62); most here bill a job too.
 function invoice(partial: Record<string, unknown>) {
   return {
     user_id: 'qa-user-1',
+    client_id: 'cl-1',
     description: null,
     notes: null,
     status: 'sent',
@@ -47,6 +50,7 @@ function invoice(partial: Record<string, unknown>) {
     issued_at: '2026-09-28T12:00:00Z',
     created_at: '2026-09-28T12:00:00Z',
     updated_at: '2026-09-28T12:00:00Z',
+    fh_clients: CLIENT,
     ...partial
   }
 }
@@ -110,7 +114,7 @@ const NO_EMAIL_TABLES = {
       fh_clients: { ...CLIENT, email: '' }
     })
   ],
-  fh_invoices: [invoice({ id: 'i-priya', contact_id: 'c-priya', title: 'Final', amount: 900, due_at: '2026-10-05' })],
+  fh_invoices: [invoice({ id: 'i-priya', contact_id: 'c-priya', title: 'Final', amount: 900, due_at: '2026-10-05', fh_clients: { ...CLIENT, email: '' } })],
   fh_payments: []
 }
 
@@ -128,6 +132,21 @@ const PARTIAL_TABLES = {
   fh_payments: [
     payment({ id: 'p-sam', contact_id: 'c-sam', invoice_id: 'i-sam-1', amount: 2000, paid_on: '2026-10-03', created_at: '2026-10-03T15:00:00Z' })
   ]
+}
+
+// One open invoice, inv-1, due next week: the row the Task 12 test opens.
+const ONE_INVOICE_TABLES = {
+  fh_contacts: [CONTACTS[2]],
+  fh_invoices: [invoice({ id: 'inv-1', contact_id: 'c-gail', title: 'Balance', amount: 2960, due_at: '2026-10-15' })],
+  fh_payments: []
+}
+
+// An invoice with no job (D62): Jeff Roy owes $1,200 for a gravel delivery
+// against no job at all, $200 of it paid.
+const NO_JOB_TABLES = {
+  fh_contacts: [CONTACTS[3]],
+  fh_invoices: [invoice({ id: 'i-solo', contact_id: null, title: 'Gravel delivery', amount: 1200, due_at: '2026-10-01', description: 'Two loads of crusher run' })],
+  fh_payments: [payment({ id: 'p-solo', contact_id: null, invoice_id: 'i-solo', amount: 200, paid_on: '2026-10-03', created_at: '2026-10-03T15:00:00Z' })]
 }
 
 // 620 invoices: 619 paid in the last weeks and, oldest of all, an open
@@ -172,22 +191,31 @@ const TWO_OVERDUE_TABLES = {
 
 type HeldSend = { contact: string; release: () => void }
 
-// Waits until the sheet holding this element has finished sliding in, so
-// the element sits where a tap at its spot will find it. A tap aimed while
-// the sheet still rises lands on whatever slides into that spot next.
-async function sheetAtRest(inside: Locator) {
-  await inside.evaluate(async (node) => {
-    const sheetNode = node.closest('[role="dialog"]')
-    await Promise.all((sheetNode?.getAnimations() ?? []).map((animation) => animation.finished))
-  })
+// The screens an invoice's actions live on (D57).
+const remindHeading = (page: Page) => page.getByRole('heading', { level: 1, name: 'Send a reminder' })
+const sendReminderButton = (page: Page) => page.getByRole('button', { name: 'Send reminder' })
+const moneyHeading = (page: Page) => page.getByRole('heading', { level: 1, name: 'Money' })
+const remindLink = (page: Page, who: string) => page.getByRole('link', { name: `Remind ${who}` })
+const backButton = (page: Page) => page.getByRole('button', { name: 'Back', exact: true })
+
+// Opens the remind screen for a customer from Money and waits for it.
+async function openRemind(page: Page, who: string, invoiceId: string) {
+  await remindLink(page, who).click()
+  await expect(page).toHaveURL(new RegExp(`/invoices/${invoiceId}/remind$`))
+  await expect(remindHeading(page)).toBeVisible()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+}
+
+// Back from a screen under Money lands on Money again.
+async function backToMoney(page: Page) {
+  await backButton(page).click()
+  await expect(moneyHeading(page)).toBeVisible({ timeout: 15_000 })
 }
 
 // Taps a button that shows it is busy. A plain click would wait for it to
-// be ready, so the tap is forced, once the sheet has slid all the way in
-// and the button sits where a finger would find it.
+// be ready, so the tap is forced.
 async function tapBusy(button: Locator) {
   await expect(button).toBeInViewport({ ratio: 1 })
-  await sheetAtRest(button)
   await button.click({ force: true })
 }
 
@@ -211,11 +239,9 @@ async function routeHeldSends(context: BrowserContext): Promise<HeldSend[]> {
 // finishing cannot re enable Lorraine's, and a tap on a button that is
 // busy sends nothing.
 async function remindTwoQuickly(page: Page, sends: HeldSend[]) {
-  const sheet = page.getByRole('dialog', { name: 'Send a reminder' })
-  const send = sheet.getByRole('button', { name: 'Send reminder' })
+  const send = sendReminderButton(page)
 
-  await page.getByRole('button', { name: 'Remind Rosa Delgado' }).click()
-  await expect(sheet).toBeVisible()
+  await openRemind(page, 'Rosa Delgado', 'i-rosa')
   await send.click()
   await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(1)
   // A second tap on the same invoice does nothing.
@@ -224,53 +250,44 @@ async function remindTwoQuickly(page: Page, sends: HeldSend[]) {
   await page.waitForTimeout(600)
   expect(sends).toHaveLength(1)
 
-  // Close the sheet while Rosa's is in flight and remind Lorraine.
-  await page.keyboard.press('Escape')
-  await expect(sheet).toBeHidden()
-  await page.getByRole('button', { name: 'Remind Lorraine Beasley' }).click()
-  await expect(sheet).toBeVisible()
-  await expect(sheet.getByText('$4,850.00', { exact: true })).toBeVisible()
+  // Leave the screen while Rosa's is in flight and remind Lorraine.
+  await backToMoney(page)
+  await openRemind(page, 'Lorraine Beasley', 'i-lorraine')
+  await expect(page.getByText('$4,850.00', { exact: true })).toBeVisible()
   await send.click()
   await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(2)
   expect(sends.map((s) => s.contact)).toEqual(['c-rosa', 'c-lorraine'])
 
   // Lorraine's going out did not free Rosa's: back on Rosa, her button is
   // still busy and a tap sends nothing.
-  await page.keyboard.press('Escape')
-  await expect(sheet).toBeHidden()
-  await page.getByRole('button', { name: 'Remind Rosa Delgado' }).click()
-  await expect(sheet).toBeVisible()
-  await expect(sheet.getByText('$1,240.00', { exact: true })).toBeVisible()
+  await backToMoney(page)
+  await openRemind(page, 'Rosa Delgado', 'i-rosa')
+  await expect(page.getByText('$1,240.00', { exact: true })).toBeVisible()
   await expect(send).toHaveAttribute('aria-busy', 'true')
   await tapBusy(send)
   await page.waitForTimeout(600)
   expect(sends).toHaveLength(2)
 
   // Back on Lorraine, still busy.
-  await page.keyboard.press('Escape')
-  await expect(sheet).toBeHidden()
-  await page.getByRole('button', { name: 'Remind Lorraine Beasley' }).click()
-  await expect(sheet).toBeVisible()
-  await expect(sheet.getByText('$4,850.00', { exact: true })).toBeVisible()
+  await backToMoney(page)
+  await openRemind(page, 'Lorraine Beasley', 'i-lorraine')
+  await expect(page.getByText('$4,850.00', { exact: true })).toBeVisible()
   await expect(send).toHaveAttribute('aria-busy', 'true')
 
-  // Rosa's goes through. Lorraine's sheet stays open and her button stays
-  // busy. A sheet sliding away still counts as visible, so the check waits
-  // until one that had started to close would be gone, then asks for an
-  // open sheet.
+  // Rosa's goes through. Lorraine's screen stays and her button stays busy.
   sends[0].release()
   await expect(page.getByText('Reminder sent to rosa@example.com', { exact: false }).first()).toBeVisible({ timeout: 15_000 })
   await page.waitForTimeout(800)
-  await expect(sheet).toHaveAttribute('data-state', 'open', { timeout: 1_000 })
+  await expect(page).toHaveURL(/\/invoices\/i-lorraine\/remind$/)
   await expect(send).toHaveAttribute('aria-busy', 'true')
   await tapBusy(send)
   await page.waitForTimeout(800)
   expect(sends).toHaveLength(2)
-  await expect(sheet).toHaveAttribute('data-state', 'open', { timeout: 1_000 })
+  await expect(page).toHaveURL(/\/invoices\/i-lorraine\/remind$/)
 
-  // Then Lorraine's.
+  // Then Lorraine's: her screen leaves once the email is out.
   sends[1].release()
-  await expect(sheet).toBeHidden({ timeout: 15_000 })
+  await expect(moneyHeading(page)).toBeVisible({ timeout: 15_000 })
   await expect(page.getByText('Reminder sent to x@y.com', { exact: false }).first()).toBeVisible()
   await page.waitForTimeout(800)
   expect(sends).toHaveLength(2)
@@ -349,11 +366,9 @@ async function expectMonthRollover(page: Page) {
 // button as busy, so the second tap reaches the send handler itself and
 // only its own in flight guard can stop it.
 async function doubleTapSendsOnce(page: Page, sends: HeldSend[]) {
-  const sheet = page.getByRole('dialog', { name: 'Send a reminder' })
-  const send = sheet.getByRole('button', { name: 'Send reminder' })
+  const send = sendReminderButton(page)
 
-  await page.getByRole('button', { name: 'Remind Rosa Delgado' }).click()
-  await expect(sheet).toBeVisible()
+  await openRemind(page, 'Rosa Delgado', 'i-rosa')
   await expect(send).toBeEnabled()
   await expect(send).not.toHaveAttribute('aria-busy', 'true')
   const busyAtSecondTap = await send.evaluate((button) => {
@@ -371,7 +386,7 @@ async function doubleTapSendsOnce(page: Page, sends: HeldSend[]) {
   expect(sends).toHaveLength(1)
 
   sends[0].release()
-  await expect(sheet).toBeHidden({ timeout: 15_000 })
+  await expect(moneyHeading(page)).toBeVisible({ timeout: 15_000 })
   await expect(page.getByText('Reminder sent to rosa@example.com', { exact: false }).first()).toBeVisible()
   await page.waitForTimeout(800)
   expect(sends).toHaveLength(1)
@@ -387,46 +402,52 @@ async function leaveMoneyAndComeBack(page: Page, phone: boolean) {
     : page.getByRole('complementary', { name: 'Primary navigation' }).getByRole('button', { name: label, exact: true })
   await go('Today').click()
   await expect(page).not.toHaveURL(/\/invoices/)
-  await expect(page.getByRole('heading', { level: 1, name: 'Money' })).toHaveCount(0)
+  await expect(moneyHeading(page)).toHaveCount(0)
   await go('Money').click()
   await expect(page).toHaveURL(/\/invoices/)
-  await expect(page.getByRole('heading', { level: 1, name: 'Money' })).toBeVisible({ timeout: 30_000 })
+  await expect(moneyHeading(page)).toBeVisible({ timeout: 30_000 })
   expect(await page.evaluate(() => (window as unknown as { fhSameDocument?: boolean }).fhSameDocument)).toBe(true)
 }
 
-// Remind Rosa, leave Money while her reminder is still going out, and come
-// back. The new screen still shows her Resend and Send reminder busy, a
-// tap on either sends nothing, and the Remind sheet closes once the first
-// reminder is out: one email in all.
-async function remindLeaveAndComeBack(page: Page, sends: HeldSend[], phone: boolean) {
-  const sheet = page.getByRole('dialog', { name: 'Send a reminder' })
-  const send = sheet.getByRole('button', { name: 'Send reminder' })
+// Opens an invoice's screen from its row in a Money group: the row is a
+// link on a phone and a table row on a desktop.
+async function openInvoiceRow(page: Page, group: string, who: RegExp, invoiceId: string) {
+  const region = page.getByRole('region', { name: group, exact: true })
+  await expect(region).toBeVisible({ timeout: 15_000 })
+  const row = region.getByRole('row', { name: who })
+  if (await row.count()) await row.first().click()
+  else await region.getByRole('link', { name: who }).first().click()
+  await expect(page).toHaveURL(new RegExp(`/invoices/${invoiceId}$`))
+  await expect(page.locator('.fhinv-actions')).toBeVisible()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+}
 
-  await page.getByRole('button', { name: 'Remind Rosa Delgado' }).click()
-  await expect(sheet).toBeVisible()
+// Remind Rosa, leave Money while her reminder is still going out, and come
+// back. The invoice screen still shows her Resend busy and the remind screen
+// its Send reminder busy, a tap on either sends nothing, and the remind
+// screen leaves once the first reminder is out: one email in all.
+async function remindLeaveAndComeBack(page: Page, sends: HeldSend[], phone: boolean) {
+  const send = sendReminderButton(page)
+
+  await openRemind(page, 'Rosa Delgado', 'i-rosa')
   await send.click()
   await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(1)
-  await page.keyboard.press('Escape')
-  await expect(sheet).toBeHidden()
+  await backToMoney(page)
 
   await leaveMoneyAndComeBack(page, phone)
 
-  // Her invoice's actions: Resend is busy and a tap sends nothing.
-  await page.getByRole('region', { name: 'Overdue', exact: true }).getByRole('button', { name: /^Rosa Delgado/ }).click()
-  const actions = page.getByRole('dialog', { name: 'Final' })
-  await expect(actions).toBeVisible()
-  const resend = actions.getByRole('button', { name: 'Resend', exact: true })
+  // Her invoice's screen: Resend is busy and a tap sends nothing.
+  await openInvoiceRow(page, 'Overdue', /^Rosa Delgado/, 'i-rosa')
+  const resend = page.getByRole('button', { name: 'Resend', exact: true })
   await expect(resend).toHaveAttribute('aria-busy', 'true')
   await tapBusy(resend)
   await page.waitForTimeout(600)
   expect(sends).toHaveLength(1)
-  await page.keyboard.press('Escape')
-  await expect(actions).toBeHidden()
+  await backToMoney(page)
 
-  // The Remind sheet too.
-  await page.getByRole('button', { name: 'Remind Rosa Delgado' }).click()
-  await expect(sheet).toBeVisible()
-  await expect(sheet.getByText('$1,240.00', { exact: true })).toBeVisible()
+  // The remind screen too.
+  await openRemind(page, 'Rosa Delgado', 'i-rosa')
+  await expect(page.getByText('$1,240.00', { exact: true })).toBeVisible()
   await expect(send).toHaveAttribute('aria-busy', 'true')
   await tapBusy(send)
   await page.waitForTimeout(800)
@@ -434,13 +455,12 @@ async function remindLeaveAndComeBack(page: Page, sends: HeldSend[], phone: bool
 
   sends[0].release()
   await expect(page.getByText('Reminder sent to rosa@example.com', { exact: false }).first()).toBeVisible({ timeout: 15_000 })
-  await expect(sheet).toBeHidden({ timeout: 15_000 })
+  await expect(moneyHeading(page)).toBeVisible({ timeout: 15_000 })
   await page.waitForTimeout(800)
   expect(sends).toHaveLength(1)
 
   // Once it is out, a new reminder is a new tap away.
-  await page.getByRole('button', { name: 'Remind Rosa Delgado' }).click()
-  await expect(sheet).toBeVisible()
+  await openRemind(page, 'Rosa Delgado', 'i-rosa')
   await expect(send).toBeEnabled()
   await expect(send).not.toHaveAttribute('aria-busy', 'true')
 }
@@ -468,235 +488,208 @@ async function routeFirstSendsHeld(context: BrowserContext): Promise<HeldSend[]>
 }
 
 // What reached the send button: real taps while the email was still going
-// out, and the two clicks made at the moments the email landed.
-type Landing = { busyTaps: number; freed: number; closing: number }
+// out, and the click made at the moment the button was freed.
+type Landing = { busyTaps: number; freed: number }
 
 // Lets the held email go and keeps tapping its busy button with real input,
 // a finger on a phone and the mouse on a desktop, at the spot where the
-// button sits, while the email lands and the sheet slides away, until that
-// sheet has left the page. Two moments follow the landing in which the
-// button no longer looks busy: it frees a beat before the sheet starts to
-// close, and a closing sheet still takes taps. A tap in either used to send
-// the email a second time (review of Phase 8, task 6). Real taps reach
-// those moments only some of the time, so the page also clicks the button
-// once at the instant each begins, the way a tap landing then would, which
-// makes every run cover both. A tap goes out only while the spot is on the
-// button or on bare sheet around it, never on another control of the sheet
-// (PDF would close it) or on the page underneath.
-async function tapThroughTheLanding(page: Page, phone: boolean, sheet: Locator, button: Locator, held: HeldSend): Promise<Landing> {
+// button sits, while the email lands and the screen leaves (the remind
+// screen) or the button frees (the invoice screen). The moment the button
+// no longer looks busy, the page also clicks it once, the way a tap landing
+// then would, so every run covers that instant. A tap that lands then must
+// send nothing (review of Phase 8, task 6).
+async function tapThroughTheLanding(page: Page, phone: boolean, button: Locator, held: HeldSend, leaves: boolean): Promise<Landing> {
   await expect(button).toBeInViewport({ ratio: 1 })
   await expect(button).toHaveAttribute('aria-busy', 'true')
-  await sheetAtRest(sheet)
   const box = await button.boundingBox()
   if (!box) throw new Error('The button has no box')
   const x = box.x + box.width / 2
   const y = box.y + box.height / 2
-  await sheet.evaluate((node) => node.setAttribute('data-test-sheet', ''))
   await button.evaluate((node) => node.setAttribute('data-test-button', ''))
   await page.evaluate(() => {
     const w = window as unknown as { fhLanding?: Landing }
-    const sheetNode = document.querySelector('[data-test-sheet]')
     const buttonNode = document.querySelector<HTMLElement>('[data-test-button]')
-    if (!sheetNode || !buttonNode) throw new Error('The sheet and its button are not marked')
-    const landing: Landing = { busyTaps: 0, freed: 0, closing: 0 }
+    if (!buttonNode) throw new Error('The button is not marked')
+    const landing: Landing = { busyTaps: 0, freed: 0 }
     w.fhLanding = landing
     buttonNode.addEventListener('click', (event) => {
       if (event.isTrusted && buttonNode.getAttribute('aria-busy') === 'true') landing.busyTaps++
     }, true)
-    // The instant the button frees, with the sheet still open, and the
-    // instant the sheet starts to close: one click each.
+    // The instant the button frees: one click.
     new MutationObserver(() => {
-      if (!landing.freed && buttonNode.getAttribute('aria-busy') !== 'true') {
+      if (!landing.freed && buttonNode.isConnected && buttonNode.getAttribute('aria-busy') !== 'true') {
         landing.freed++
         buttonNode.click()
       }
-      if (!landing.closing && sheetNode.getAttribute('data-state') === 'closed') {
-        landing.closing++
-        buttonNode.click()
-      }
-    }).observe(sheetNode, { attributes: true, attributeFilter: ['aria-busy', 'data-state'], subtree: true })
+    }).observe(buttonNode, { attributes: true, attributeFilter: ['aria-busy'] })
   })
-  // What the spot hits: the button, bare sheet, another control of the
-  // sheet, nothing of the sheet, the sheet sliding away, or the sheet is
-  // gone. No tap goes in while the sheet slides away: the observer above
-  // already clicks the button the instant it starts to close, and a tap
-  // aimed at the moving sheet could land on the dock behind it once the
-  // sheet has moved on (it opened Capture over Money in CI).
+  // What the spot hits: the busy button, the freed button, or something else.
   const spot = () => page.evaluate(([px, py]) => {
-    const sheetNode = document.querySelector('[data-test-sheet]')
-    if (!sheetNode) return 'gone'
-    if (sheetNode.getAttribute('data-state') === 'closed') return 'closing'
+    const buttonNode = document.querySelector('[data-test-button]')
+    if (!buttonNode) return 'gone'
     const hit = document.elementFromPoint(px, py)
-    if (!hit || !sheetNode.contains(hit)) return 'off'
-    if (hit.closest('[data-test-button]')) return 'button'
-    return hit.closest('button, a, input, textarea, select') ? 'control' : 'sheet'
+    if (!hit || !buttonNode.contains(hit)) return 'off'
+    return buttonNode.getAttribute('aria-busy') === 'true' ? 'busy' : 'free'
   }, [x, y])
   const tap = () => (phone ? page.touchscreen.tap(x, y) : page.mouse.click(x, y))
 
   // A few taps while the email is still going out, then on through its landing.
   for (let n = 0; n < 3; n++) {
-    expect(await spot()).toBe('button')
+    expect(await spot()).toBe('busy')
     await tap()
   }
   held.release()
   const until = Date.now() + 15_000
   let where = await spot()
-  while (where !== 'gone' && Date.now() < until) {
-    if (where === 'button' || where === 'sheet') await tap()
+  while (where === 'busy' && Date.now() < until) {
+    await tap()
     where = await spot()
   }
-  expect(where).toBe('gone')
+  // Keep tapping the freed spot for a beat: a tap on a screen that is
+  // leaving, or on a button just freed, sends nothing.
+  for (let n = 0; n < 3; n++) {
+    const now = await spot()
+    if (now === 'busy' || (leaves && now === 'free')) await tap()
+    else if (now === 'free') {
+      // On a screen that stays, one tap the instant the button frees.
+      if (n === 0) await tap()
+      break
+    }
+  }
+  if (leaves) {
+    await expect(page.locator('[data-test-button]')).toHaveCount(0, { timeout: 15_000 })
+  } else {
+    await expect(button).not.toHaveAttribute('aria-busy', 'true', { timeout: 15_000 })
+  }
   const landing = await page.evaluate(() => (window as unknown as { fhLanding: Landing }).fhLanding)
   expect(landing.busyTaps).toBeGreaterThan(0)
-  expect(landing.freed).toBe(1)
-  expect(landing.closing).toBe(1)
   return landing
 }
 
 // Send reminder, tapped again and again while Rosa's reminder goes out and
 // lands: one email.
 async function remindTapsThroughTheLanding(page: Page, phone: boolean, sends: HeldSend[]) {
-  const sheet = page.getByRole('dialog', { name: 'Send a reminder' })
-  const send = sheet.getByRole('button', { name: 'Send reminder' })
-
-  await page.getByRole('button', { name: 'Remind Rosa Delgado' }).click()
-  await expect(sheet).toBeVisible()
+  const send = sendReminderButton(page)
+  await openRemind(page, 'Rosa Delgado', 'i-rosa')
   await expect(send).toBeInViewport({ ratio: 1 })
   await send.click()
   await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(1)
-  await tapThroughTheLanding(page, phone, sheet, send, sends[0])
+  await tapThroughTheLanding(page, phone, send, sends[0], true)
   await expect(page.getByText('Reminder sent to rosa@example.com', { exact: false }).first()).toBeVisible({ timeout: 15_000 })
   await page.waitForTimeout(1_000)
   expect(sends.map((s) => s.contact)).toEqual(['c-rosa'])
 }
 
 // Resend, tapped again and again while Rosa's invoice goes out and lands:
-// one email.
+// one email. The invoice screen stays; its button simply frees.
 async function resendTapsThroughTheLanding(page: Page, phone: boolean, sends: HeldSend[]) {
-  const actions = page.getByRole('dialog', { name: 'Final' })
-  const resend = actions.getByRole('button', { name: 'Resend', exact: true })
-
-  await page.getByRole('region', { name: 'Overdue', exact: true }).getByRole('button', { name: /^Rosa Delgado/ }).click()
-  await expect(actions).toBeVisible()
+  await openInvoiceRow(page, 'Overdue', /^Rosa Delgado/, 'i-rosa')
+  const resend = page.getByRole('button', { name: 'Resend', exact: true })
   await expect(resend).toBeInViewport({ ratio: 1 })
   await resend.click()
   await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(1)
-  await tapThroughTheLanding(page, phone, actions, resend, sends[0])
+  await tapThroughTheLanding(page, phone, resend, sends[0], false)
   await expect(page.getByText('Invoice sent to rosa@example.com', { exact: false }).first()).toBeVisible({ timeout: 15_000 })
   await page.waitForTimeout(1_000)
+  // Taps that landed as the button freed sent nothing more; a tap now would
+  // be a new, deliberate send.
   expect(sends.map((s) => s.contact)).toEqual(['c-rosa'])
 }
 
-// Any email of an invoice going out keeps both of its sheets busy, and when
-// it lands, a sheet still showing that invoice closes instead of turning
-// live under a finger that is still tapping. First Rosa's Remind sheet,
-// opened while her Resend goes out, then Lorraine's actions, opened while
-// her reminder goes out. One email each.
-async function otherSheetClosesWhenTheEmailLands(page: Page, phone: boolean, sends: HeldSend[]) {
-  const overdue = page.getByRole('region', { name: 'Overdue', exact: true })
-  const remind = page.getByRole('dialog', { name: 'Send a reminder' })
-  const sendReminder = remind.getByRole('button', { name: 'Send reminder' })
+// Any email of an invoice going out keeps both of its screens busy, and
+// when it lands, a remind screen still showing that invoice leaves instead
+// of turning live under a finger that is still tapping. First Rosa's remind
+// screen, opened while her Resend goes out, then Lorraine's invoice screen,
+// opened while her reminder goes out. One email each.
+async function otherScreenSettlesWhenTheEmailLands(page: Page, phone: boolean, sends: HeldSend[]) {
+  const sendReminder = sendReminderButton(page)
 
-  await overdue.getByRole('button', { name: /^Rosa Delgado/ }).click()
-  const rosa = page.getByRole('dialog', { name: 'Final' })
-  await expect(rosa).toBeVisible()
-  const resend = rosa.getByRole('button', { name: 'Resend', exact: true })
+  await openInvoiceRow(page, 'Overdue', /^Rosa Delgado/, 'i-rosa')
+  const resend = page.getByRole('button', { name: 'Resend', exact: true })
   await expect(resend).toBeInViewport({ ratio: 1 })
   await resend.click()
   await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(1)
-  await page.keyboard.press('Escape')
-  await expect(rosa).toBeHidden()
-  await page.getByRole('button', { name: 'Remind Rosa Delgado' }).click()
-  await expect(remind).toBeVisible()
-  await expect(remind.getByText('$1,240.00', { exact: true })).toBeVisible()
-  await tapThroughTheLanding(page, phone, remind, sendReminder, sends[0])
+  await backToMoney(page)
+  await openRemind(page, 'Rosa Delgado', 'i-rosa')
+  await expect(page.getByText('$1,240.00', { exact: true })).toBeVisible()
+  await tapThroughTheLanding(page, phone, sendReminder, sends[0], true)
   await expect(page.getByText('Invoice sent to rosa@example.com', { exact: false }).first()).toBeVisible({ timeout: 15_000 })
+  await expect(moneyHeading(page)).toBeVisible({ timeout: 15_000 })
   await page.waitForTimeout(1_000)
   expect(sends.map((s) => s.contact)).toEqual(['c-rosa'])
 
-  await page.getByRole('button', { name: 'Remind Lorraine Beasley' }).click()
-  await expect(remind).toBeVisible()
-  await expect(remind.getByText('$4,850.00', { exact: true })).toBeVisible()
+  await openRemind(page, 'Lorraine Beasley', 'i-lorraine')
+  await expect(page.getByText('$4,850.00', { exact: true })).toBeVisible()
   await expect(sendReminder).toBeInViewport({ ratio: 1 })
   await sendReminder.click()
   await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(2)
-  await page.keyboard.press('Escape')
-  await expect(remind).toBeHidden()
-  await overdue.getByRole('button', { name: /^Lorraine Beasley/ }).click()
-  const lorraine = page.getByRole('dialog', { name: 'Final balance' })
-  await expect(lorraine).toBeVisible()
-  await tapThroughTheLanding(page, phone, lorraine, lorraine.getByRole('button', { name: 'Resend', exact: true }), sends[1])
+  await backToMoney(page)
+  await openInvoiceRow(page, 'Overdue', /^Lorraine Beasley/, 'i-lorraine')
+  const lorraineResend = page.getByRole('button', { name: 'Resend', exact: true })
+  await tapThroughTheLanding(page, phone, lorraineResend, sends[1], false)
   await expect(page.getByText('Reminder sent to x@y.com', { exact: false }).first()).toBeVisible({ timeout: 15_000 })
   await page.waitForTimeout(1_000)
   expect(sends.map((s) => s.contact)).toEqual(['c-rosa', 'c-lorraine'])
 }
 
-// Mark paid and Void wait while the invoice's email is going out: the email
-// landing marks the invoice sent, so a payment or a void recorded meanwhile
-// would read as sent again (review of Phase 8, task 6). Once it is out,
-// both work again. Every send here is held until the test lets it go.
+// Collect payment and Void wait while the invoice's email is going out: the
+// email landing marks the invoice sent, so a payment or a void recorded
+// meanwhile would read as sent again (review of Phase 8, task 6). Once it
+// is out, both work again. Every send here is held until the test lets it go.
 async function payAndVoidWaitForTheEmail(page: Page, sends: HeldSend[]) {
-  const overdue = page.getByRole('region', { name: 'Overdue', exact: true })
-  const remind = page.getByRole('dialog', { name: 'Send a reminder' })
-  const actions = page.getByRole('dialog', { name: 'Final' })
-  const resend = actions.getByRole('button', { name: 'Resend', exact: true })
-  const markPaid = actions.getByRole('button', { name: 'Mark paid', exact: true })
-  const voidIt = actions.getByRole('button', { name: 'Void', exact: true })
-  const why = 'Mark paid and Void are paused while the email goes out.'
+  const why = 'Collect payment and Void are paused while the email goes out.'
 
-  // Rosa's reminder goes out, and her invoice's actions open meanwhile.
-  await page.getByRole('button', { name: 'Remind Rosa Delgado' }).click()
-  await expect(remind).toBeVisible()
-  await remind.getByRole('button', { name: 'Send reminder' }).click()
+  // Rosa's reminder goes out, and her invoice's screen opens meanwhile.
+  await openRemind(page, 'Rosa Delgado', 'i-rosa')
+  await sendReminderButton(page).click()
   await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(1)
-  await page.keyboard.press('Escape')
-  await expect(remind).toBeHidden()
-  await overdue.getByRole('button', { name: /^Rosa Delgado/ }).click()
-  await expect(actions).toBeVisible()
+  await backToMoney(page)
+  await openInvoiceRow(page, 'Overdue', /^Rosa Delgado/, 'i-rosa')
+  const actions = page.locator('.fhinv-actions')
+  const resend = actions.getByRole('button', { name: 'Resend', exact: true })
+  const collect = actions.getByRole('link', { name: 'Collect payment', exact: true })
+  const voidIt = actions.getByRole('button', { name: 'Void', exact: true })
   await expect(resend).toHaveAttribute('aria-busy', 'true')
-  await expect(markPaid).toBeDisabled()
+  await expect(collect).toHaveAttribute('aria-disabled', 'true')
   await expect(voidIt).toBeDisabled()
-  // A line says why, and both buttons point to it.
+  // A line says why, and both point to it.
   await expect(actions.getByText(why, { exact: true })).toBeVisible()
-  await expect(markPaid).toHaveAccessibleDescription(why)
+  await expect(collect).toHaveAccessibleDescription(why)
   await expect(voidIt).toHaveAccessibleDescription(why)
   // The PDF and the job stay one tap away.
   await expect(actions.getByRole('button', { name: 'PDF', exact: true })).toBeEnabled()
   await expect(actions.getByRole('link', { name: 'Open job' })).toBeVisible()
   // A tap on either does nothing.
-  await sheetAtRest(actions)
-  await markPaid.click({ force: true })
+  await collect.click({ force: true })
   await voidIt.click({ force: true })
   await page.waitForTimeout(600)
-  await expect(page.getByText('Log what was paid.')).toHaveCount(0)
-  await expect(page.getByText('Void final?', { exact: false })).toHaveCount(0)
-  await expect(actions).toBeVisible()
+  await expect(page).toHaveURL(/\/invoices\/i-rosa$/)
+  await expect(actions.getByRole('button', { name: 'Tap again to void' })).toHaveCount(0)
 
-  // The reminder lands and the sheet closes. Opened again, all of it works.
+  // The reminder lands. The screen stays, and all of it works again.
   sends[0].release()
   await expect(page.getByText('Reminder sent to rosa@example.com', { exact: false }).first()).toBeVisible({ timeout: 15_000 })
-  await expect(actions).toBeHidden()
-  await overdue.getByRole('button', { name: /^Rosa Delgado/ }).click()
-  await expect(actions).toBeVisible()
-  await expect(markPaid).toBeEnabled()
+  await expect(resend).not.toHaveAttribute('aria-busy', 'true')
+  await expect(collect).not.toHaveAttribute('aria-disabled', 'true')
   await expect(voidIt).toBeEnabled()
   await expect(actions.getByText(why, { exact: true })).toHaveCount(0)
 
-  // The same while its own Resend goes out.
+  // The same while its own Resend goes out. A tap in the beat after an
+  // email lands is taken as aimed at the busy button, so this one waits.
+  await page.waitForTimeout(1_000)
   await expect(resend).toBeInViewport({ ratio: 1 })
   await resend.click()
   await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(2)
   await expect(resend).toHaveAttribute('aria-busy', 'true')
-  await expect(markPaid).toBeDisabled()
+  await expect(collect).toHaveAttribute('aria-disabled', 'true')
   await expect(voidIt).toBeDisabled()
   sends[1].release()
-  await expect(actions).toBeHidden({ timeout: 15_000 })
+  await expect(resend).not.toHaveAttribute('aria-busy', 'true', { timeout: 15_000 })
 
-  // Void asks first, as before.
-  await overdue.getByRole('button', { name: /^Rosa Delgado/ }).click()
-  await expect(actions).toBeVisible()
+  // Void asks with a second tap, as before, and no sheet.
   await voidIt.click()
-  await expect(page.getByText('Void final?', { exact: false })).toBeVisible({ timeout: 15_000 })
+  await expect(actions.getByRole('button', { name: 'Tap again to void' })).toBeVisible()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
   expect(sends).toHaveLength(2)
 }
 
@@ -745,6 +738,24 @@ async function expectPanelsWaitForTheCompany(context: BrowserContext, page: Page
   await expect(page.getByText('Loading money', { exact: true })).toHaveCount(0)
 }
 
+// An invoice with no job (D62) on Money and on its screen: the client names
+// the row, what it owes is its amount less its payments, and its PDF has no
+// Contract position block.
+async function expectInvoiceWithoutAJob(page: Page) {
+  const overdue = page.getByRole('region', { name: 'Overdue', exact: true })
+  await expect(overdue.getByText('Jeff Roy', { exact: true })).toBeVisible()
+  await expect(overdue.getByText('$1,000.00', { exact: true })).toBeVisible()
+  await openInvoiceRow(page, 'Overdue', /^Jeff Roy/, 'i-solo')
+  await expect(page.getByRole('heading', { level: 1, name: 'Gravel delivery' })).toBeVisible()
+  await expect(page.locator('.fhinv-hero').getByText('$1,000.00', { exact: true })).toBeVisible()
+  await expect(page.locator('.fhinv-hero').getByText('$1,200.00 invoiced, $200.00 paid on it', { exact: true })).toBeVisible()
+  await expect(page.locator('.fhinv-actions').getByRole('link', { name: 'Open client' })).toHaveAttribute('href', '/clients/cl-1')
+  await expect(page.locator('.fhinv-actions').getByRole('link', { name: 'Open job' })).toHaveCount(0)
+  await page.locator('.fhinv-actions').getByRole('link', { name: 'Collect payment' }).click()
+  await expect(page).toHaveURL(/\/invoices\/i-solo\/payment$/)
+  await expect(page.locator('#fhinv-pay-amount')).toHaveValue('1000')
+}
+
 test.describe('money on a phone', () => {
   test.skip(({ isMobile }) => !isMobile, 'Phone Money screen')
 
@@ -773,6 +784,8 @@ test.describe('money on a phone', () => {
     await expect(overdue.getByText('$1,240.00', { exact: true })).toBeVisible()
     await expect(overdue.getByText('6 days overdue', { exact: true })).toBeVisible()
     await expect(overdue.getByText('1 invoice', { exact: true })).toBeVisible()
+    // Remind is a link to the remind screen.
+    await expect(remindLink(page, 'Rosa Delgado')).toHaveAttribute('href', '/invoices/i-rosa/remind')
     // Due soon: today and next Thursday. The one due in three weeks is not here.
     const soon = page.getByRole('region', { name: 'Due soon' })
     await expect(soon.getByText('Due today', { exact: true })).toBeVisible()
@@ -791,6 +804,7 @@ test.describe('money on a phone', () => {
     await expect(paid.getByText('$6,187.50', { exact: true })).toBeVisible()
     // Nothing gold here: the Money screen has no primary button of its own.
     await expect(page.locator('.fhc-btn--primary')).toHaveCount(0)
+    await expect(page.getByRole('dialog')).toHaveCount(0)
   })
 
   test('groups without rows stay out', async ({ context, page }) => {
@@ -803,14 +817,13 @@ test.describe('money on a phone', () => {
 
   test('remind needs an email', async ({ context, page }) => {
     await openMoney(context, page, { tables: NO_EMAIL_TABLES })
-    await page.getByRole('button', { name: 'Remind Priya Shah' }).click()
-    const sheet = page.getByRole('dialog', { name: 'Send a reminder' })
-    await expect(sheet).toBeVisible()
-    await expect(sheet.getByText('Add an email to send reminders.', { exact: true })).toBeVisible()
-    await expect(sheet.getByRole('button', { name: 'Send reminder' })).toBeDisabled()
+    await openRemind(page, 'Priya Shah', 'i-priya')
+    await expect(page.getByText('Add an email to send reminders.', { exact: true })).toBeVisible()
+    await expect(sendReminderButton(page)).toBeDisabled()
+    await expect(page.getByRole('link', { name: 'Open job' })).toHaveAttribute('href', '/jobs/c-priya?tab=financials')
   })
 
-  test('remind sends only on tap', async ({ context, page }) => {
+  test('Remind is a screen and sends only on tap', async ({ context, page }) => {
     // sendInvoiceEmail builds the PDF, uploads it to storage, posts to
     // /api/send-invoice, then marks the invoice sent. Mock each of them and
     // count what reaches the send endpoint. Routes are added after sign in:
@@ -833,23 +846,25 @@ test.describe('money on a phone', () => {
       return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' })
     })
 
-    await page.getByRole('button', { name: 'Remind Rosa Delgado' }).click()
-    const sheet = page.getByRole('dialog', { name: 'Send a reminder' })
-    await expect(sheet).toBeVisible()
-    await expect(sheet.getByText('rosa@example.com', { exact: true })).toBeVisible()
-    await expect(sheet.getByText('$1,240.00', { exact: true })).toBeVisible()
-    // Opening the sheet sends nothing.
+    await openRemind(page, 'Rosa Delgado', 'i-rosa')
+    await expect(page.getByText('rosa@example.com', { exact: true })).toBeVisible()
+    await expect(page.getByText('$1,240.00', { exact: true })).toBeVisible()
+    // Opening the screen sends nothing.
     await page.waitForTimeout(800)
     expect(sends).toHaveLength(0)
     expect(uploads).toHaveLength(0)
+    // The one gold button on the screen.
+    await expect(page.locator('.fhc-btn--primary')).toHaveCount(1)
 
-    await sheet.getByRole('button', { name: 'Send reminder' }).click()
+    await sendReminderButton(page).click()
     await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(1)
     const body = JSON.parse(sends[0])
     expect(body.recipient_email).toBe('rosa@example.com')
     expect(body.contact_id).toBe('c-rosa')
+    expect(body.invoice_id).toBe('i-rosa')
     expect(body.amount_due).toBe(1240)
-    await expect(sheet).toBeHidden({ timeout: 15_000 })
+    // Once the email is out the screen leaves, back to Money.
+    await expect(moneyHeading(page)).toBeVisible({ timeout: 15_000 })
     await expect(page.getByText('Reminder sent to rosa@example.com', { exact: false }).first()).toBeVisible()
     // Exactly one send, nothing else.
     await page.waitForTimeout(800)
@@ -870,22 +885,21 @@ test.describe('money on a phone', () => {
     await expect(overdue.getByText('6 days overdue', { exact: true })).toBeVisible()
     await expect(page.getByRole('region', { name: 'Due soon' }).getByText('$5,000.00', { exact: true })).toBeVisible()
 
-    // The reminder asks for the same $3,000.00, in the sheet and the email.
-    await page.getByRole('button', { name: 'Remind Sam Whitfield' }).click()
-    const sheet = page.getByRole('dialog', { name: 'Send a reminder' })
-    await expect(sheet.getByText('$3,000.00', { exact: true })).toBeVisible()
-    await sheet.getByRole('button', { name: 'Send reminder' }).click()
+    // The reminder asks for the same $3,000.00, on the screen and in the email.
+    await openRemind(page, 'Sam Whitfield', 'i-sam-1')
+    await expect(page.getByText('$3,000.00', { exact: true })).toBeVisible()
+    await sendReminderButton(page).click()
     await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(1)
     expect(JSON.parse(sends[0]).amount_due).toBe(3000)
-    await expect(sheet).toBeHidden({ timeout: 15_000 })
+    await expect(moneyHeading(page)).toBeVisible({ timeout: 15_000 })
 
-    // Mark paid prefills $3,000.
-    await overdue.getByRole('button', { name: /^Sam Whitfield/ }).click()
-    const actions = page.getByRole('dialog', { name: 'Deposit' })
-    await expect(actions.getByText('$3,000.00', { exact: true })).toBeVisible()
-    await actions.getByRole('button', { name: 'Mark paid', exact: true }).click()
-    await expect(page.getByText('Log what was paid.')).toBeVisible({ timeout: 15_000 })
-    await expect(page.locator('#v3-pay-amount')).toHaveValue('3000')
+    // The invoice screen shows $3,000.00, and Collect payment prefills it.
+    await openInvoiceRow(page, 'Overdue', /^Sam Whitfield/, 'i-sam-1')
+    await expect(page.locator('.fhinv-hero').getByText('$3,000.00', { exact: true })).toBeVisible()
+    await page.locator('.fhinv-actions').getByRole('link', { name: 'Collect payment' }).click()
+    await expect(page).toHaveURL(/\/invoices\/i-sam-1\/payment$/)
+    await expect(page.getByRole('heading', { level: 1, name: 'Collect payment' })).toBeVisible()
+    await expect(page.locator('#fhinv-pay-amount')).toHaveValue('3000')
   })
 
   test('an old open invoice still counts when 620 invoices outgrow the list', async ({ context, page }) => {
@@ -900,50 +914,78 @@ test.describe('money on a phone', () => {
     await signIn(context, { role: 'crew', tables: TABLES })
     await page.goto('/invoices', { waitUntil: 'domcontentloaded', timeout: 60_000 })
     await page.waitForURL((url) => !url.pathname.startsWith('/invoices'), { timeout: 30_000 })
-    await expect(page.getByRole('heading', { level: 1, name: 'Money' })).toHaveCount(0)
+    await expect(moneyHeading(page)).toHaveCount(0)
   })
 
   test('empty money', async ({ context, page }) => {
     await openMoney(context, page, { tables: { fh_invoices: [], fh_payments: [] } })
     await expect(page.locator('.fhc-vault').getByText('$0.00').first()).toBeVisible()
     await expect(page.getByText('No open invoices', { exact: true })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Create an invoice' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Create an invoice' })).toBeVisible()
     await expect(page.getByRole('heading', { level: 2, name: 'Overdue', exact: true })).toHaveCount(0)
     await expect(page.getByRole('heading', { level: 2, name: 'Due soon', exact: true })).toHaveCount(0)
   })
 
-  test('create an invoice starts from a job', async ({ context, page }) => {
+  test('a new invoice starts on its own screen, not a picker', async ({ context, page }) => {
     await openMoney(context, page, { tables: { fh_invoices: [], fh_payments: [] } })
-    await page.getByRole('button', { name: 'Create an invoice' }).click()
-    const picker = page.getByRole('dialog', { name: 'Which job is it for?' })
-    await expect(picker).toBeVisible()
-    await expect(picker.getByText('Rosa Delgado', { exact: true })).toBeVisible()
-    // Quotes and finished jobs are not offered.
-    await expect(picker.getByText('Marco Castellanos', { exact: true })).toHaveCount(0)
-    await picker.getByRole('button', { name: /Rosa Delgado/ }).click()
-    // The existing send invoice sheet opens for that job.
-    const bill = page.getByRole('dialog', { name: 'Bill this job.' })
-    await expect(bill).toBeVisible({ timeout: 15_000 })
-    await expect(bill.getByText('Rosa Delgado', { exact: true })).toBeVisible()
-    await expect(picker).toBeHidden()
+    // The create screen (/invoices/new, Task 8) asks for the client and an
+    // optional job itself; Money only links there.
+    await expect(page.getByRole('link', { name: 'Create an invoice' })).toHaveAttribute('href', '/invoices/new')
+    await expect(page.getByRole('dialog')).toHaveCount(0)
   })
 
-  test('an invoice row opens its actions', async ({ context, page }) => {
-    await openMoney(context, page)
-    await page.getByRole('region', { name: 'Due soon' }).getByRole('button', { name: /Gail Abernathy/ }).click()
-    const sheet = page.getByRole('dialog', { name: 'Balance' })
-    await expect(sheet).toBeVisible()
-    for (const name of ['Resend', 'PDF', 'Mark paid', 'Void']) {
-      await expect(sheet.getByRole('button', { name, exact: true })).toBeVisible()
+  test('an invoice row opens the invoice screen', async ({ context, page }) => {
+    await openMoney(context, page, { tables: ONE_INVOICE_TABLES })
+    await page.getByRole('region', { name: 'Due soon' }).getByRole('link', { name: /Gail Abernathy/ }).click()
+    await expect(page).toHaveURL(/\/invoices\/inv-1$/)
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(page.getByRole('heading', { level: 1, name: 'Balance' })).toBeVisible()
+    const actions = page.locator('.fhinv-actions')
+    for (const name of ['Resend', 'PDF', 'Share link', 'Void']) {
+      await expect(actions.getByRole('button', { name, exact: true })).toBeVisible()
     }
-    await expect(sheet.getByRole('link', { name: 'Open job' })).toHaveAttribute('href', '/jobs/c-gail?tab=financials')
-    // Mark paid hands over to the payment sheet.
-    await sheet.getByRole('button', { name: 'Mark paid', exact: true }).click()
-    await expect(page.getByText('Log what was paid.')).toBeVisible({ timeout: 15_000 })
-    await expect(sheet).toBeHidden()
+    await expect(actions.getByRole('link', { name: 'Collect payment' })).toHaveAttribute('href', '/invoices/inv-1/payment')
+    await expect(actions.getByRole('link', { name: 'Open job' })).toHaveAttribute('href', '/jobs/c-gail?tab=financials')
+    // Back returns to Money.
+    await backToMoney(page)
   })
 
-  test('resend sends once and closes', async ({ context, page }) => {
+  test('Collect payment is a screen', async ({ context, page }) => {
+    await openMoney(context, page, { tables: ONE_INVOICE_TABLES })
+    await openInvoiceRow(page, 'Due soon', /Gail Abernathy/, 'inv-1')
+    await page.locator('.fhinv-actions').getByRole('link', { name: 'Collect payment' }).click()
+    await expect(page).toHaveURL(/\/invoices\/inv-1\/payment$/)
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(page.getByRole('heading', { level: 1, name: 'Collect payment' })).toBeVisible()
+    await expect(page.locator('#fhinv-pay-amount')).toHaveValue('2960')
+    await expect(page.getByRole('radio', { name: 'Check' })).toHaveAttribute('aria-checked', 'true')
+    // The one gold button records it.
+    await expect(page.locator('.fhc-btn--primary')).toHaveCount(1)
+    await expect(page.getByRole('button', { name: 'Record $2,960.00' })).toBeEnabled()
+    // Back returns to the invoice.
+    await backButton(page).click()
+    await expect(page).toHaveURL(/\/invoices\/inv-1$/)
+  })
+
+  test('Remind is a screen', async ({ context, page }) => {
+    await openMoney(context, page, { tables: TWO_OVERDUE_TABLES })
+    await openRemind(page, 'Rosa Delgado', 'i-rosa')
+    await expect(page.getByText('rosa@example.com', { exact: true })).toBeVisible()
+    await expect(page.getByText('Concrete steps, Final', { exact: true })).toBeVisible()
+    await expect(page.getByText('$1,240.00', { exact: true })).toBeVisible()
+    await expect(sendReminderButton(page)).toBeEnabled()
+    // The invoice screen links here too.
+    await backToMoney(page)
+    await openInvoiceRow(page, 'Overdue', /^Rosa Delgado/, 'i-rosa')
+    await expect(page.locator('.fhinv-actions').getByRole('link', { name: 'Remind' })).toHaveAttribute('href', '/invoices/i-rosa/remind')
+  })
+
+  test('an invoice with no job stands on its own', async ({ context, page }) => {
+    await openMoney(context, page, { tables: NO_JOB_TABLES })
+    await expectInvoiceWithoutAJob(page)
+  })
+
+  test('resend sends once from the invoice screen', async ({ context, page }) => {
     await openMoney(context, page)
     const sends: string[] = []
     await context.route('**/storage/v1/object/**', (route) =>
@@ -953,24 +995,29 @@ test.describe('money on a phone', () => {
       sends.push(route.request().postData() || '')
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) })
     })
-    await page.getByRole('region', { name: 'Due soon' }).getByRole('button', { name: /Gail Abernathy/ }).click()
-    const sheet = page.getByRole('dialog', { name: 'Balance' })
-    await expect(sheet).toBeVisible()
+    await openInvoiceRow(page, 'Due soon', /Gail Abernathy/, 'i-gail')
     await page.waitForTimeout(800)
     expect(sends).toHaveLength(0)
-    await sheet.getByRole('button', { name: 'Resend', exact: true }).click()
+    const resend = page.locator('.fhinv-actions').getByRole('button', { name: 'Resend', exact: true })
+    await resend.click()
     await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(1)
-    await expect(sheet).toBeHidden({ timeout: 15_000 })
-    await expect(page.getByText('Invoice sent to', { exact: false }).first()).toBeVisible()
+    await expect(page.getByText('Invoice sent to', { exact: false }).first()).toBeVisible({ timeout: 15_000 })
+    await expect(resend).not.toHaveAttribute('aria-busy', 'true')
     expect(JSON.parse(sends[0]).recipient_email).toBe('x@y.com')
+    await page.waitForTimeout(800)
+    expect(sends).toHaveLength(1)
   })
 
-  test('void asks first', async ({ context, page }) => {
+  test('void asks with a second tap, not a sheet', async ({ context, page }) => {
     await openMoney(context, page)
-    await page.getByRole('region', { name: 'Due soon' }).getByRole('button', { name: /Gail Abernathy/ }).click()
-    await page.getByRole('dialog', { name: 'Balance' }).getByRole('button', { name: 'Void', exact: true }).click()
-    await expect(page.getByText('Void balance?', { exact: false })).toBeVisible({ timeout: 15_000 })
-    await expect(page.getByRole('button', { name: 'Void invoice' })).toBeVisible()
+    await openInvoiceRow(page, 'Due soon', /Gail Abernathy/, 'i-gail')
+    const voidIt = page.locator('.fhinv-actions').getByRole('button', { name: 'Void', exact: true })
+    await voidIt.click()
+    await expect(page.locator('.fhinv-actions').getByRole('button', { name: 'Tap again to void' })).toBeVisible()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    // The arming wears off after 4 seconds.
+    await page.waitForTimeout(4_300)
+    await expect(voidIt).toBeVisible()
   })
 
   test('quotes and paid rows open the job', async ({ context, page }) => {
@@ -987,29 +1034,32 @@ test.describe('money on a phone', () => {
     await expect(page).toHaveURL(/panel=statements/)
     await expect(page.getByRole('heading', { level: 1, name: 'Who owes you' })).toBeVisible()
     await page.getByRole('button', { name: /^Statement for/ }).first().click()
-    // The existing statement sheet opens for that customer.
+    // The existing statement sheet opens for that customer (Task 14 moves it).
     await expect(page.getByRole('dialog', { name: /^Statement for/ })).toBeVisible({ timeout: 15_000 })
     await page.keyboard.press('Escape')
     await expect(page.getByRole('dialog', { name: /^Statement for/ })).toBeHidden()
     await page.getByRole('button', { name: 'Back to Money' }).click()
-    await expect(page.getByRole('heading', { level: 1, name: 'Money' })).toBeVisible()
+    await expect(moneyHeading(page)).toBeVisible()
 
     // All invoices: the draft and the one due in three weeks are here, and
-    // the filter keeps the old Outstanding and All choice.
+    // the filter keeps the old Outstanding and All choice. A row opens the
+    // invoice's screen.
     await page.getByRole('link', { name: /^All invoices/ }).click()
     await expect(page.getByRole('heading', { level: 1, name: 'All invoices' })).toBeVisible()
     await expect(page.getByText('Draft', { exact: true })).toBeVisible()
     await expect(page.getByText('Due Oct 29', { exact: true })).toBeVisible()
-    await page.getByRole('button', { name: /Gail Abernathy.*progress draw 2/i }).click()
-    await expect(page.getByRole('dialog', { name: 'Progress draw 2' })).toBeVisible()
-    await page.getByRole('dialog', { name: 'Progress draw 2' }).getByRole('button', { name: 'Close' }).click()
+    await page.getByRole('link', { name: /Gail Abernathy.*progress draw 2/i }).click()
+    await expect(page).toHaveURL(/\/invoices\/i-later$/)
+    await expect(page.getByRole('heading', { level: 1, name: 'Progress draw 2' })).toBeVisible()
+    await backButton(page).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'All invoices' })).toBeVisible()
     await page.getByRole('radio', { name: 'All', exact: true }).click({ force: true })
     await expect(page).toHaveURL(/view=all/)
     await expect(page.getByRole('radio', { name: 'All', exact: true })).toBeChecked()
     // All adds the paid and void invoices the Outstanding view leaves out.
     await page.getByRole('button', { name: 'Back to Money' }).click()
 
-    // Job balances: the aging summary and a link to each job's invoice page.
+    // Job balances: the aging summary and a link to each job's money tab.
     await page.getByRole('link', { name: /^Job balances/ }).click()
     await expect(page.getByRole('heading', { level: 1, name: 'Job balances' })).toBeVisible()
     const aging = page.getByRole('region', { name: 'Outstanding by age' })
@@ -1017,7 +1067,7 @@ test.describe('money on a phone', () => {
       await expect(aging.getByText(label, { exact: true })).toBeVisible()
     }
     await expect(aging.getByText('Total outstanding', { exact: true })).toBeVisible()
-    await expect(page.getByRole('link', { name: /Rosa Delgado/ })).toHaveAttribute('href', '/invoices/c-rosa')
+    await expect(page.getByRole('link', { name: /Rosa Delgado/ })).toHaveAttribute('href', '/jobs/c-rosa?tab=financials')
   })
 
   test('remind A then B quickly sends exactly one request each', async ({ context, page }) => {
@@ -1064,13 +1114,13 @@ test.describe('money on a phone', () => {
     await resendTapsThroughTheLanding(page, true, sends)
   })
 
-  test('a sheet opened while another email of its invoice goes out closes when it lands', async ({ context, page }) => {
+  test('a screen opened while another email of its invoice goes out settles when it lands', async ({ context, page }) => {
     await openMoney(context, page, { tables: TWO_OVERDUE_TABLES })
     const sends = await routeFirstSendsHeld(context)
-    await otherSheetClosesWhenTheEmailLands(page, true, sends)
+    await otherScreenSettlesWhenTheEmailLands(page, true, sends)
   })
 
-  test('mark paid and void wait while the invoice email goes out', async ({ context, page }) => {
+  test('collect payment and void wait while the invoice email goes out', async ({ context, page }) => {
     await openMoney(context, page, { tables: TWO_OVERDUE_TABLES })
     const sends = await routeHeldSends(context)
     await payAndVoidWaitForTheEmail(page, sends)
@@ -1078,7 +1128,7 @@ test.describe('money on a phone', () => {
 })
 
 // The desktop Money screen (Phase 4, task 4.6): the same numbers and
-// the same sheets as the phone, laid out as a vault card and four tables
+// the same screens as the phone, laid out as a vault card and four tables
 // with the columns Customer, Job, Amount, Status and Action.
 test.describe('money on a desktop', () => {
   test.skip(({ isMobile }) => isMobile, 'Desktop Money screen')
@@ -1099,6 +1149,8 @@ test.describe('money on a desktop', () => {
     await expect(vault.getByText('Margin', { exact: true })).toBeVisible()
     await expect(vault.getByText('27.5%', { exact: true })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Reports' })).toHaveAttribute('href', '/analytics')
+    // New invoice is a link to the create screen (Task 8).
+    await expect(page.getByRole('link', { name: 'New invoice', exact: true })).toHaveAttribute('href', '/invoices/new')
 
     // Four groups, each a table with the same five column heads.
     for (const title of ['Overdue', 'Due soon', 'Waiting on approval', 'Paid']) {
@@ -1119,7 +1171,7 @@ test.describe('money on a desktop', () => {
     await expect(rosa.getByText('Concrete steps, final', { exact: true })).toBeVisible()
     await expect(rosa.getByText('$1,240.00', { exact: true })).toBeVisible()
     await expect(rosa.getByText('6 days overdue', { exact: true })).toBeVisible()
-    await expect(rosa.getByRole('button', { name: 'Remind Rosa Delgado' })).toBeVisible()
+    await expect(rosa.getByRole('link', { name: 'Remind Rosa Delgado' })).toHaveAttribute('href', '/invoices/i-rosa/remind')
     await expect(overdue.getByText('1 invoice', { exact: true })).toBeVisible()
 
     // Due soon: today and next Thursday, each with Open and no Remind.
@@ -1127,8 +1179,8 @@ test.describe('money on a desktop', () => {
     await expect(soon.getByText('Due today', { exact: true })).toBeVisible()
     await expect(soon.getByText('Due Oct 15', { exact: true })).toBeVisible()
     await expect(soon.getByText('2 invoices', { exact: true })).toBeVisible()
-    await expect(soon.getByRole('button', { name: /^Open Lorraine Beasley/ })).toBeVisible()
-    await expect(soon.getByRole('button', { name: /^Remind/ })).toHaveCount(0)
+    await expect(soon.getByRole('link', { name: /^Open Lorraine Beasley/ })).toHaveAttribute('href', '/invoices/i-lorraine')
+    await expect(soon.getByRole('link', { name: /^Remind/ })).toHaveCount(0)
 
     // Waiting on approval: the sent quote, with its total.
     const waiting = page.getByRole('region', { name: 'Waiting on approval', exact: true })
@@ -1143,12 +1195,12 @@ test.describe('money on a desktop', () => {
     await expect(paid.getByText('Garage slab, deposit', { exact: true })).toBeVisible()
     await expect(paid.getByText('$6,187.50', { exact: true })).toBeVisible()
 
-    // Nothing gold on the page: the only brushed gold button is inside the
-    // Remind sheet.
+    // Nothing gold on the page, and no sheet anywhere.
     await expect(page.locator('.fhc-btn--primary')).toHaveCount(0)
+    await expect(page.getByRole('dialog')).toHaveCount(0)
   })
 
-  test('desktop remind sends only on tap', async ({ context, page }) => {
+  test('desktop remind is a screen and sends only on tap', async ({ context, page }) => {
     await openMoney(context, page)
     const sends: string[] = []
     const uploads: string[] = []
@@ -1166,23 +1218,21 @@ test.describe('money on a desktop', () => {
       return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' })
     })
 
-    await page.getByRole('button', { name: 'Remind Rosa Delgado' }).click()
-    const sheet = page.getByRole('dialog', { name: 'Send a reminder' })
-    await expect(sheet).toBeVisible()
-    await expect(sheet.getByText('rosa@example.com', { exact: true })).toBeVisible()
-    await expect(sheet.getByText('$1,240.00', { exact: true })).toBeVisible()
-    // Opening the sheet sends nothing.
+    await openRemind(page, 'Rosa Delgado', 'i-rosa')
+    await expect(page.getByText('rosa@example.com', { exact: true })).toBeVisible()
+    await expect(page.getByText('$1,240.00', { exact: true })).toBeVisible()
+    // Opening the screen sends nothing.
     await page.waitForTimeout(800)
     expect(sends).toHaveLength(0)
     expect(uploads).toHaveLength(0)
 
-    await sheet.getByRole('button', { name: 'Send reminder' }).click()
+    await sendReminderButton(page).click()
     await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(1)
     const body = JSON.parse(sends[0])
     expect(body.recipient_email).toBe('rosa@example.com')
     expect(body.contact_id).toBe('c-rosa')
     expect(body.amount_due).toBe(1240)
-    await expect(sheet).toBeHidden({ timeout: 15_000 })
+    await expect(moneyHeading(page)).toBeVisible({ timeout: 15_000 })
     await expect(page.getByText('Reminder sent to rosa@example.com', { exact: false }).first()).toBeVisible()
     await page.waitForTimeout(800)
     expect(sends).toHaveLength(1)
@@ -1201,20 +1251,20 @@ test.describe('money on a desktop', () => {
     await expect(row.getByText('6 days overdue', { exact: true })).toBeVisible()
     await expect(page.getByRole('region', { name: 'Due soon', exact: true }).getByText('$5,000.00', { exact: true })).toBeVisible()
 
-    await row.getByRole('button', { name: 'Remind Sam Whitfield' }).click()
-    const sheet = page.getByRole('dialog', { name: 'Send a reminder' })
-    await expect(sheet.getByText('$3,000.00', { exact: true })).toBeVisible()
-    await sheet.getByRole('button', { name: 'Send reminder' }).click()
+    await row.getByRole('link', { name: 'Remind Sam Whitfield' }).click()
+    await expect(remindHeading(page)).toBeVisible()
+    await expect(page.getByText('$3,000.00', { exact: true })).toBeVisible()
+    await sendReminderButton(page).click()
     await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(1)
     expect(JSON.parse(sends[0]).amount_due).toBe(3000)
-    await expect(sheet).toBeHidden({ timeout: 15_000 })
+    await expect(moneyHeading(page)).toBeVisible({ timeout: 15_000 })
 
     await overdue.getByRole('button', { name: 'Sam Whitfield', exact: true }).click()
-    const actions = page.getByRole('dialog', { name: 'Deposit' })
-    await expect(actions.getByText('$3,000.00', { exact: true })).toBeVisible()
-    await actions.getByRole('button', { name: 'Mark paid', exact: true }).click()
-    await expect(page.getByText('Log what was paid.')).toBeVisible({ timeout: 15_000 })
-    await expect(page.locator('#v3-pay-amount')).toHaveValue('3000')
+    await expect(page).toHaveURL(/\/invoices\/i-sam-1$/)
+    await expect(page.locator('.fhinv-hero').getByText('$3,000.00', { exact: true })).toBeVisible()
+    await page.locator('.fhinv-actions').getByRole('link', { name: 'Collect payment' }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Collect payment' })).toBeVisible({ timeout: 15_000 })
+    await expect(page.locator('#fhinv-pay-amount')).toHaveValue('3000')
   })
 
   test('desktop old open invoice still counts when 620 invoices outgrow the list', async ({ context, page }) => {
@@ -1226,50 +1276,55 @@ test.describe('money on a desktop', () => {
 
   test('desktop remind needs an email', async ({ context, page }) => {
     await openMoney(context, page, { tables: NO_EMAIL_TABLES })
-    await page.getByRole('button', { name: 'Remind Priya Shah' }).click()
-    const sheet = page.getByRole('dialog', { name: 'Send a reminder' })
-    await expect(sheet.getByText('Add an email to send reminders.', { exact: true })).toBeVisible()
-    await expect(sheet.getByRole('button', { name: 'Send reminder' })).toBeDisabled()
+    await openRemind(page, 'Priya Shah', 'i-priya')
+    await expect(page.getByText('Add an email to send reminders.', { exact: true })).toBeVisible()
+    await expect(sendReminderButton(page)).toBeDisabled()
   })
 
-  test('a row and its Open button open the invoice actions', async ({ context, page }) => {
+  test('a row and its Open button open the invoice screen', async ({ context, page }) => {
     await openMoney(context, page)
     const soon = page.getByRole('region', { name: 'Due soon', exact: true })
 
     // A click anywhere on the row.
     await soon.getByText('Roof repair, balance', { exact: true }).click()
-    let sheet = page.getByRole('dialog', { name: 'Balance' })
-    await expect(sheet).toBeVisible()
-    for (const name of ['Resend', 'PDF', 'Mark paid', 'Void']) {
-      await expect(sheet.getByRole('button', { name, exact: true })).toBeVisible()
+    await expect(page).toHaveURL(/\/invoices\/i-gail$/)
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    const actions = page.locator('.fhinv-actions')
+    for (const name of ['Resend', 'PDF', 'Share link', 'Void']) {
+      await expect(actions.getByRole('button', { name, exact: true })).toBeVisible()
     }
-    await expect(sheet.getByRole('link', { name: 'Open job' })).toHaveAttribute('href', '/jobs/c-gail?tab=financials')
-    await page.keyboard.press('Escape')
-    await expect(sheet).toBeHidden()
+    await expect(actions.getByRole('link', { name: 'Open job' })).toHaveAttribute('href', '/jobs/c-gail?tab=financials')
+    await backToMoney(page)
 
-    // The Open button in the Action column does the same.
-    await soon.getByRole('button', { name: /^Open Gail Abernathy/ }).click()
-    sheet = page.getByRole('dialog', { name: 'Balance' })
-    await expect(sheet).toBeVisible()
-    // Mark paid hands over to the existing payment sheet.
-    await sheet.getByRole('button', { name: 'Mark paid', exact: true }).click()
-    await expect(page.getByText('Log what was paid.')).toBeVisible({ timeout: 15_000 })
-    await expect(sheet).toBeHidden()
+    // The Open link in the Action column does the same.
+    await soon.getByRole('link', { name: /^Open Gail Abernathy/ }).click()
+    await expect(page).toHaveURL(/\/invoices\/i-gail$/)
+    // Collect payment hands over to its screen.
+    await actions.getByRole('link', { name: 'Collect payment' }).click()
+    await expect(page).toHaveURL(/\/invoices\/i-gail\/payment$/)
+    await expect(page.getByRole('heading', { level: 1, name: 'Collect payment' })).toBeVisible({ timeout: 15_000 })
   })
 
-  test('an overdue row opens its actions from the keyboard', async ({ context, page }) => {
+  test('an overdue row opens the invoice screen from the keyboard', async ({ context, page }) => {
     await openMoney(context, page)
     const overdue = page.getByRole('region', { name: 'Overdue', exact: true })
     await overdue.getByRole('button', { name: 'Rosa Delgado', exact: true }).press('Enter')
-    await expect(page.getByRole('dialog', { name: 'Final' })).toBeVisible()
+    await expect(page).toHaveURL(/\/invoices\/i-rosa$/)
+    await expect(page.getByRole('heading', { level: 1, name: 'Final' })).toBeVisible()
   })
 
-  test('void asks first', async ({ context, page }) => {
+  test('desktop void asks with a second tap', async ({ context, page }) => {
     await openMoney(context, page)
-    await page.getByRole('region', { name: 'Due soon', exact: true }).getByRole('button', { name: /^Open Gail Abernathy/ }).click()
-    await page.getByRole('dialog', { name: 'Balance' }).getByRole('button', { name: 'Void', exact: true }).click()
-    await expect(page.getByText('Void balance?', { exact: false })).toBeVisible({ timeout: 15_000 })
-    await expect(page.getByRole('button', { name: 'Void invoice' })).toBeVisible()
+    await page.getByRole('region', { name: 'Due soon', exact: true }).getByRole('link', { name: /^Open Gail Abernathy/ }).click()
+    await expect(page).toHaveURL(/\/invoices\/i-gail$/)
+    await page.locator('.fhinv-actions').getByRole('button', { name: 'Void', exact: true }).click()
+    await expect(page.locator('.fhinv-actions').getByRole('button', { name: 'Tap again to void' })).toBeVisible()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+  })
+
+  test('desktop invoice with no job stands on its own', async ({ context, page }) => {
+    await openMoney(context, page, { tables: NO_JOB_TABLES })
+    await expectInvoiceWithoutAJob(page)
   })
 
   test('quote and paid rows open the job', async ({ context, page }) => {
@@ -1289,23 +1344,17 @@ test.describe('money on a desktop', () => {
     await expect(page.getByText('No open invoices', { exact: true })).toBeVisible()
     await expect(page.getByRole('heading', { level: 2, name: 'Overdue', exact: true })).toHaveCount(0)
     await expect(page.getByRole('heading', { level: 2, name: 'Due soon', exact: true })).toHaveCount(0)
-    // An invoice starts from a job, from the empty state or the toolbar.
-    await page.getByRole('button', { name: 'Create an invoice' }).click()
-    const picker = page.getByRole('dialog', { name: 'Which job is it for?' })
-    await expect(picker).toBeVisible()
-    await expect(picker.getByText('Rosa Delgado', { exact: true })).toBeVisible()
-    await expect(picker.getByText('Marco Castellanos', { exact: true })).toHaveCount(0)
-    await page.keyboard.press('Escape')
-    await expect(picker).toBeHidden()
-    await page.getByRole('button', { name: 'New invoice', exact: true }).click()
-    await expect(page.getByRole('dialog', { name: 'Which job is it for?' })).toBeVisible()
+    // An invoice starts on its own screen, from the empty state or the toolbar.
+    await expect(page.getByRole('link', { name: 'Create an invoice' })).toHaveAttribute('href', '/invoices/new')
+    await expect(page.getByRole('link', { name: 'New invoice', exact: true })).toHaveAttribute('href', '/invoices/new')
+    await expect(page.getByRole('dialog')).toHaveCount(0)
   })
 
   test('crew cannot open money', async ({ context, page }) => {
     await signIn(context, { role: 'crew', tables: TABLES })
     await page.goto('/invoices', { waitUntil: 'domcontentloaded', timeout: 60_000 })
     await page.waitForURL((url) => !url.pathname.startsWith('/invoices'), { timeout: 30_000 })
-    await expect(page.getByRole('heading', { level: 1, name: 'Money' })).toHaveCount(0)
+    await expect(moneyHeading(page)).toHaveCount(0)
   })
 
   test('statements, all invoices and job balances stay reachable', async ({ context, page }) => {
@@ -1323,17 +1372,19 @@ test.describe('money on a desktop', () => {
     await page.keyboard.press('Escape')
     await expect(page.getByRole('dialog', { name: /^Statement for/ })).toBeHidden()
     await page.getByRole('button', { name: 'Back to Money' }).click()
-    await expect(page.getByRole('heading', { level: 1, name: 'Money' })).toBeVisible()
+    await expect(moneyHeading(page)).toBeVisible()
 
     // All invoices: drafts and invoices due later are here, with the old
-    // Outstanding and All choice.
+    // Outstanding and All choice. Open goes to the invoice's screen.
     await page.getByRole('link', { name: /^All invoices/ }).click()
     await expect(page.getByRole('heading', { level: 1, name: 'All invoices' })).toBeVisible()
     await expect(page.getByText('Draft', { exact: true })).toBeVisible()
     await expect(page.getByText('Due Oct 29', { exact: true })).toBeVisible()
-    await page.getByRole('row', { name: /Gail Abernathy.*progress draw 2/i }).getByRole('button', { name: /^Open/ }).click()
-    await expect(page.getByRole('dialog', { name: 'Progress draw 2' })).toBeVisible()
-    await page.keyboard.press('Escape')
+    await page.getByRole('row', { name: /Gail Abernathy.*progress draw 2/i }).getByRole('link', { name: /^Open/ }).click()
+    await expect(page).toHaveURL(/\/invoices\/i-later$/)
+    await expect(page.getByRole('heading', { level: 1, name: 'Progress draw 2' })).toBeVisible()
+    await backButton(page).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'All invoices' })).toBeVisible()
     await page.getByRole('radio', { name: 'All', exact: true }).click({ force: true })
     await expect(page).toHaveURL(/view=all/)
     await expect(page.getByRole('radio', { name: 'All', exact: true })).toBeChecked()
@@ -1348,7 +1399,7 @@ test.describe('money on a desktop', () => {
       await expect(aging.getByText(label, { exact: true })).toBeVisible()
     }
     await expect(aging.getByText('Total outstanding', { exact: true })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Rosa Delgado', exact: true })).toHaveAttribute('href', '/invoices/c-rosa')
+    await expect(page.getByRole('link', { name: 'Rosa Delgado', exact: true })).toHaveAttribute('href', '/jobs/c-rosa?tab=financials')
     await page.getByRole('button', { name: 'Sort by Balance' }).click()
     await page.getByRole('button', { name: 'Log payment for Rosa Delgado' }).click()
     await expect(page.getByText('Log what was paid.')).toBeVisible({ timeout: 15_000 })
@@ -1410,42 +1461,32 @@ test.describe('money on a desktop', () => {
     await resendTapsThroughTheLanding(page, false, sends)
   })
 
-  test('desktop sheet opened while another email of its invoice goes out closes when it lands', async ({ context, page }) => {
+  test('desktop screen opened while another email of its invoice goes out settles when it lands', async ({ context, page }) => {
     await openMoney(context, page, { tables: TWO_OVERDUE_TABLES })
     const sends = await routeFirstSendsHeld(context)
-    await otherSheetClosesWhenTheEmailLands(page, false, sends)
+    await otherScreenSettlesWhenTheEmailLands(page, false, sends)
   })
 
-  test('desktop mark paid and void wait while the invoice email goes out', async ({ context, page }) => {
+  test('desktop collect payment and void wait while the invoice email goes out', async ({ context, page }) => {
     await openMoney(context, page, { tables: TWO_OVERDUE_TABLES })
     const sends = await routeHeldSends(context)
     await payAndVoidWaitForTheEmail(page, sends)
   })
 
-  test('desktop new invoice while money loads waits for the jobs', async ({ context, page }) => {
+  test('desktop new invoice is a link while money loads', async ({ context, page }) => {
     await signIn(context, { tables: TABLES })
     const release = await holdRequests(context, '**/rest/v1/fh_invoices**')
     await page.clock.setFixedTime(MORNING)
     await page.goto('/invoices', { waitUntil: 'domcontentloaded', timeout: 60_000 })
-    await expect(page.getByRole('heading', { level: 1, name: 'Money' })).toBeVisible({ timeout: 30_000 })
+    await expect(moneyHeading(page)).toBeVisible({ timeout: 30_000 })
     await expect(page.getByText('Loading money', { exact: true })).toBeAttached()
 
-    // The toolbar button works at once, and the picker waits for the jobs
-    // instead of saying there are none.
-    await page.getByRole('button', { name: 'New invoice' }).click()
-    const picker = page.getByRole('dialog', { name: 'Which job is it for?' })
-    await expect(picker).toBeVisible()
-    await expect(picker.getByText('No jobs to invoice yet.', { exact: true })).toHaveCount(0)
-    await expect(picker.getByRole('link', { name: 'Open jobs' })).toHaveCount(0)
-    await expect(picker.getByText('Loading jobs', { exact: true })).toBeAttached()
-
+    // The toolbar link works at once: the create screen asks for the client
+    // and the job itself, so nothing here waits for the jobs.
+    await expect(page.getByRole('link', { name: 'New invoice', exact: true })).toHaveAttribute('href', '/invoices/new')
+    await expect(page.getByRole('dialog')).toHaveCount(0)
     release()
-    await expect(picker.getByText('Rosa Delgado', { exact: true })).toBeVisible({ timeout: 15_000 })
-    for (const name of ['Lorraine Beasley', 'Gail Abernathy']) {
-      await expect(picker.getByText(name, { exact: true })).toBeVisible()
-    }
-    await expect(picker.getByText('Loading jobs', { exact: true })).toHaveCount(0)
-    await expect(picker.getByText('No jobs to invoice yet.', { exact: true })).toHaveCount(0)
+    await expect(page.getByRole('region', { name: 'Overdue', exact: true })).toBeVisible({ timeout: 15_000 })
   })
 
   test('desktop money shows skeletons, never $0.00, while it loads', async ({ context, page }) => {
@@ -1460,7 +1501,7 @@ test.describe('money on a desktop', () => {
     })
     await page.clock.setFixedTime(MORNING)
     await page.goto('/invoices', { waitUntil: 'domcontentloaded', timeout: 60_000 })
-    await expect(page.getByRole('heading', { level: 1, name: 'Money' })).toBeVisible({ timeout: 30_000 })
+    await expect(moneyHeading(page)).toBeVisible({ timeout: 30_000 })
     await expect(page.getByText('Loading money', { exact: true })).toBeAttached()
     expect(await page.locator('.fhc-skel').count()).toBeGreaterThan(3)
     // No number and no count stands in for data that has not arrived.

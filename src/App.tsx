@@ -50,7 +50,13 @@ const Partners       = lazy(() => import('./screens/Partners.tsx'))
 const SubDetail      = lazy(() => import('./screens/SubDetail.tsx'))
 const Invoices       = lazy(() => import('./screens/Invoices.tsx'))
 const Landing        = lazy(() => import('./screens/Landing.tsx'))
-const InvoiceDetail  = lazy(() => import('./screens/InvoiceDetail.tsx'))
+// The invoice screens (Phase 9, D57, D62): /invoices/:id is an fh_invoices
+// row; its payment, edit and remind flows are routes of their own. A job's
+// money lives at /jobs/:id?tab=financials (JobMoney).
+const InvoiceDetail  = lazy(() => import('./screens/invoices/InvoiceDetail.tsx'))
+const InvoicePayment = lazy(() => import('./screens/invoices/InvoicePayment.tsx'))
+const InvoiceEdit    = lazy(() => import('./screens/invoices/InvoiceEdit.tsx'))
+const InvoiceRemind  = lazy(() => import('./screens/invoices/InvoiceRemind.tsx'))
 const Inbox          = lazy(() => import('./screens/inbox/Inbox.tsx'))
 const Notifications  = lazy(() => import('./screens/Notifications.tsx'))
 // Leads have their own list and screen (PHASE9_PLAN Task 9, decision D65).
@@ -303,6 +309,9 @@ export default function App() {
           <Route path="/sub-portal" element={<SubPortal />} />
           <Route path="/invoices" element={<Invoices />} />
           <Route path="/invoices/:id" element={<InvoiceDetail />} />
+          <Route path="/invoices/:id/payment" element={<InvoicePayment />} />
+          <Route path="/invoices/:id/edit" element={<InvoiceEdit />} />
+          <Route path="/invoices/:id/remind" element={<InvoiceRemind />} />
           {/* The Inbox exists only while the company's messaging engine is
               on; the screen explains itself when it is off (decision D9). */}
           <Route path="/inbox" element={<Inbox />} />

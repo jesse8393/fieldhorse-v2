@@ -25,7 +25,6 @@ import { useConfirm } from '../../components/ConfirmSheet.tsx'
 // Record Payment respectively).
 const MarkCompleteSheet = lazy(() => import('../../components/MarkCompleteSheet.tsx'))
 const V3PaymentSheet = lazy(() => import('../../components/V3PaymentSheet.tsx'))
-const SendInvoiceSheet = lazy(() => import('../../components/SendInvoiceSheet.tsx'))
 import { Eyebrow } from '../../components/v3'
 import { tabPanelProps } from '../../lib/tabs.ts'
 import { useJobData } from './hooks/useJobData.ts'
@@ -355,10 +354,10 @@ export default function ContactDetail() {
     toastError('This quote has no record of its own yet', 'Open it from the Quotes list to approve it.')
   }
   const [completeOpen, setCompleteOpen] = useState(false)
-  // Send-invoice sheet (pipeline v2), the job screen's one tap billing
-  // action. Opened by the stage CTA, Overview quick action, and the
-  // next-action resolver's 'sendInvoice' suggestion.
-  const [invoiceOpen, setInvoiceOpen] = useState(false)
+  // Invoice this (D61): the job's one tap billing action opens the new
+  // invoice screen with this job filled in. The stage CTA, the Overview
+  // quick action and the next action resolver's 'sendInvoice' all use it.
+  const openNewInvoice = () => navigate(`/invoices/new?job=${id}`)
   // Edit mode is a flag the Overview tab + section editors read.
   // Header EDIT button toggles + jumps to overview if currently on another tab.
   const [isEditing, setIsEditing] = useState(false)
@@ -402,7 +401,7 @@ export default function ContactDetail() {
       return
     }
     if (actionIntent === 'send_invoice' || actionIntent === 'nudge_invoice') {
-      setInvoiceOpen(true)
+      openNewInvoice()
     }
   }
 
@@ -564,7 +563,7 @@ export default function ContactDetail() {
         : { label: 'Approve quote', onClick: () => { void openApprove() } }
     : contact.stage === 'job' || contact.stage === 'invoice'
       ? (Number(balance || 0) > 0
-          ? { label: 'Send invoice',   onClick: () => setInvoiceOpen(true) }
+          ? { label: 'Invoice this',   onClick: openNewInvoice }
           : { label: 'Mark complete',  onClick: () => setCompleteOpen(true) })
     : contact.stage === 'closed'  ? { label: 'Reopen',         onClick: onReopen }
     : contact.stage === 'lost'    ? { label: 'Reopen',         onClick: onReopen }
@@ -636,7 +635,7 @@ export default function ContactDetail() {
           onOpenInvitePartner={() => setInviteOpen(true)}
           onOpenApproveQuote={() => { void openApprove() }}
           onOpenMarkComplete={() => setCompleteOpen(true)}
-          onOpenSendInvoice={() => setInvoiceOpen(true)}
+          onOpenSendInvoice={openNewInvoice}
           onOpenQuote={() => setTab('quote')}
           spineFirst
           inspections={inspections}
@@ -951,20 +950,6 @@ export default function ContactDetail() {
               onSaved={fetchAll}
             />
           </Suspense>
-
-          <Suspense fallback={null}>
-            <SendInvoiceSheet
-              open={invoiceOpen}
-              userId={user?.id}
-              contact={contact}
-              payments={payments}
-              changeOrders={changeOrders}
-              insurance={insurance}
-              onClose={() => setInvoiceOpen(false)}
-              onDone={fetchAll}
-            />
-          </Suspense>
-
         </>
       )}
 

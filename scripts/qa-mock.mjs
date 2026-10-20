@@ -72,9 +72,10 @@ const payments = [
 // bill. Without the paid deposit, Money (Phase 8, task 5) reads money
 // logged against a job as paying its oldest open bill, as logPayment would
 // have marked the draw paid.
+// Every invoice points at its client (D62); these two also bill a job.
 const invoices = [
-  { id: 'inv0', user_id: USER.id, contact_id: 'c-job2', title: 'Deposit', amount: 6400, status: 'paid', sequence_number: 1, issued_at: iso(now - 14 * day), due_at: iso(now - 7 * day), created_at: iso(now - 14 * day) },
-  { id: 'inv1', user_id: USER.id, contact_id: 'c-job2', title: 'Progress draw 1', amount: 6400, status: 'sent', sequence_number: 2, issued_at: iso(now - 8 * day), due_at: iso(now + 6 * day), created_at: iso(now - 8 * day) }
+  { id: 'inv0', user_id: USER.id, client_id: 'cl-1', contact_id: 'c-job2', title: 'Deposit', amount: 6400, status: 'paid', sequence_number: 1, issued_at: iso(now - 14 * day), due_at: iso(now - 7 * day), created_at: iso(now - 14 * day), description: null, notes: null, fh_clients: CLIENT },
+  { id: 'inv1', user_id: USER.id, client_id: 'cl-1', contact_id: 'c-job2', title: 'Progress draw 1', amount: 6400, status: 'sent', sequence_number: 2, issued_at: iso(now - 8 * day), due_at: iso(now + 6 * day), created_at: iso(now - 8 * day), description: null, notes: null, fh_clients: CLIENT }
 ]
 const schedule = [
   { id: 's1', user_id: USER.id, contact_id: 'c-job1', title: 'Pour slab — crew A', description: 'Bellevue site', start_at: iso(now + 2 * 3600e3), end_at: iso(now + 6 * 3600e3), created_at: iso(now - day) }

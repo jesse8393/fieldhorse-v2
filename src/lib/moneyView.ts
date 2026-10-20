@@ -38,7 +38,7 @@ export type MoneyRow = {
   chip: MoneyChip | null
   /** Where the row goes when it has no invoice to act on. */
   to: string
-  /** The fh_invoices row a tap opens actions for; null for quotes and payments. */
+  /** The fh_invoices row a tap opens (its screen at /invoices/:id); null for quotes and payments. */
   invoiceId: string | null
   /** The invoice's job or client has an email, so a reminder can go out. */
   canRemind: boolean
@@ -117,12 +117,20 @@ function lowerFirst(text: string): string {
   return /^[A-Z][a-z]/.test(text) ? text[0].toLowerCase() + text.slice(1) : text
 }
 
-function customerName(job: { name?: string | null; fh_clients?: { name?: string | null } | null } | null | undefined): string {
-  return (job?.name || job?.fh_clients?.name || '').trim() || 'Customer'
+type Customer = { name?: string | null; email?: string | null } | null | undefined
+
+function customerName(
+  job: { name?: string | null; fh_clients?: { name?: string | null } | null } | null | undefined,
+  client?: Customer
+): string {
+  return (job?.name || job?.fh_clients?.name || client?.name || '').trim() || 'Customer'
 }
 
-function hasEmail(job: { email?: string | null; fh_clients?: { email?: string | null } | null } | null | undefined): boolean {
-  return (job?.email || job?.fh_clients?.email || '').trim().length > 0
+function hasEmail(
+  job: { email?: string | null; fh_clients?: { email?: string | null } | null } | null | undefined,
+  client?: Customer
+): boolean {
+  return (job?.email || job?.fh_clients?.email || client?.email || '').trim().length > 0
 }
 
 function titleOf(inv: Invoice): string {
@@ -268,17 +276,20 @@ function classify(inv: Invoice, ctx: Context): Classified {
       note = dueDay ? `Due ${shortDate(dueDay, ctx.now)}` : ''
   }
 
+  // An invoice with no job bills its client directly (D62): the client
+  // names the row, and the row goes to the invoice's own screen.
+  const client = inv.fh_clients
   const title = titleOf(inv)
   const row: MoneyInvoiceRow = {
     id: inv.id,
-    title: customerName(job),
+    title: customerName(job, client),
     subline: job?.job_title ? `${job.job_title}, ${lowerFirst(title)}` : title,
     amount: owed,
     note,
     chip,
-    to: job ? detailRoute(job, { financials: true }) : `/jobs/${inv.contact_id}?tab=financials`,
+    to: job ? detailRoute(job, { financials: true }) : inv.contact_id ? `/jobs/${inv.contact_id}?tab=financials` : `/invoices/${inv.id}`,
     invoiceId: inv.id,
-    canRemind: issued && hasEmail(job),
+    canRemind: issued && hasEmail(job, client),
     status
   }
   return { row, owed, dueDay, until, issued }
@@ -431,6 +442,10 @@ export function invoiceDueNow(bundle: InvoicesBundle, invoiceId: string): number
   if (!invoice) return 0
   const jobId = invoice.contact_id ?? null
   const job = jobId ? bundle.jobs.find((j) => j.id === jobId) : undefined
+  // No job at all: the invoice settles against its own payments (D62).
+  if (!jobId) {
+    return invoiceAmountDue({ invoice, contact: null, payments: bundle.payments.filter((p) => p.invoice_id === invoice.id) })
+  }
   if (!job) return Math.max(0, Number(invoice.amount) || 0)
   return invoiceAmountDue({
     invoice,

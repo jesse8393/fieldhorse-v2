@@ -1718,7 +1718,7 @@ a {
    ========================================================================= */
 @media (min-width: 900px) {
   .fh-app--layout-responsive
-    .v3-screen:not(.v3-screen--home):not(.v3-screen--jobs):not(.v3-screen--clients):not(.v3-screen--schedule):not(.v3-screen--compose):not(.v3-screen--job-detail):not(.v3-screen--invoice-detail) {
+    .v3-screen:not(.v3-screen--home):not(.v3-screen--jobs):not(.v3-screen--clients):not(.v3-screen--schedule):not(.v3-screen--compose):not(.v3-screen--job-detail):not(.fhinv) {
     width: 100%;
     max-width: 960px;
     margin-left: auto;
@@ -2188,15 +2188,6 @@ a {
 }
 .fh-fab:active { transform: scale(0.94); }
 
-/* Fixed invoice actions share the same 44px control geometry on mobile
-   and desktop. Without border-box their vertical padding made the row
-   taller than its declared minimum and buried content beneath it. */
-.fh-invoice-actionbar > button {
-  box-sizing: border-box;
-  min-height: 44px !important;
-  height: 44px;
-}
-
 /* Desktop: the one "+" FAB a screen keeps at >=900px (Jobs) sits in the
    canonical corner. Universal Capture no longer floats here: the sidebar
    carries a Capture row under Search (Task 13, D33), and the phone's
@@ -2242,108 +2233,6 @@ a {
     width: 100%;
     max-width: 880px;
     margin-inline: auto;
-  }
-}
-
-/* Invoice detail desktop workspace. */
-@media (min-width: 900px) {
-  .fh-app--layout-responsive .v3-screen--invoice-detail {
-    width: min(100%, 1280px);
-    max-width: 1280px;
-    margin-inline: auto;
-    padding: 24px 24px calc(var(--space-7) + var(--space-7) + var(--space-4)) !important;
-    display: grid;
-    grid-template-columns: minmax(0, 1.2fr) minmax(360px, .8fr);
-    grid-template-rows: auto auto auto 1fr;
-    gap: 16px;
-    align-content: start;
-  }
-
-  .fh-invoice-detail-state {
-    width: min(100%, 1280px);
-    margin-inline: auto;
-  }
-
-  .fh-invoice-detail__header {
-    grid-column: 1 / -1;
-    min-height: 56px;
-    padding: 8px 12px !important;
-    border: 1px solid var(--v3-border-mid);
-    border-radius: 10px;
-    background: var(--v3-surface-glass);
-  }
-
-  .fh-invoice-detail__hero {
-    grid-column: 1;
-    grid-row: 2;
-    padding: 0 !important;
-  }
-
-  .fh-invoice-detail__hero > div {
-    min-height: 248px;
-    padding: 24px !important;
-    justify-content: space-between;
-  }
-
-  .fh-invoice-detail__service {
-    grid-column: 1;
-    grid-row: 3;
-    padding: 0 !important;
-  }
-
-  .fh-invoice-detail__payments {
-    grid-column: 2;
-    grid-row: 2 / span 3;
-    min-width: 0;
-    align-self: start;
-    padding: 16px !important;
-    border: 1px solid var(--v3-border-mid);
-    border-radius: 10px;
-    background: var(--v3-surface-glass);
-  }
-
-  .fh-invoice-detail__job {
-    grid-column: 1;
-    grid-row: 4;
-    padding: 0 !important;
-  }
-
-  .fh-invoice-document-pane {
-    grid-column: 1 / -1;
-    width: min(100%, 960px);
-    margin-inline: auto;
-  }
-
-  .fh-invoice-actionbar {
-    width: min(1280px, calc(100% - 320px));
-    left: calc(50% + 128px) !important;
-    right: auto !important;
-    bottom: 16px !important;
-    transform: translateX(-50%);
-    padding: 12px !important;
-    border: 1px solid var(--v3-border-mid);
-    border-radius: 10px;
-    background: var(--v3-surface-glass) !important;
-    box-shadow: 0 16px 42px rgba(20, 20, 20, 0.40);
-    backdrop-filter: blur(20px);
-  }
-
-  .fh-invoice-actionbar > button {
-    min-height: 44px !important;
-    height: 44px;
-  }
-}
-
-@media (min-width: 900px) and (max-width: 1120px) {
-  .fh-app--layout-responsive .v3-screen--invoice-detail {
-    grid-template-columns: 1fr;
-  }
-  .fh-invoice-detail__hero,
-  .fh-invoice-detail__service,
-  .fh-invoice-detail__payments,
-  .fh-invoice-detail__job {
-    grid-column: 1;
-    grid-row: auto;
   }
 }
 

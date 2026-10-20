@@ -20,6 +20,7 @@
 
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
+import { Link } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { Plus, FileEdit, Send, Download, Check, X, Trash2, FileText } from 'lucide-react'
 import { supabase, authHeaders } from '../../../lib/supabase.ts'
@@ -770,12 +771,25 @@ function Row({ draw, busy, readOnly, onEdit, onDownload, onSend, onMarkPaid, onV
           {draw.due_at && <span>Due {shortDate(draw.due_at)}</span>}
           {draw.notes && <span style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>· {draw.notes}</span>}
         </div>
-        <div style={{ marginTop: 6, display: 'flex', gap: 8 }}>
+        <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           {isPaid && <Tag tone="green">Paid</Tag>}
           {isVoid && <Tag tone="muted">Void</Tag>}
           {isOverdue && <Tag tone="red">Overdue</Tag>}
           {!isPaid && !isVoid && !isOverdue && draw.status === 'draft' && <Tag tone="muted">Draft</Tag>}
           {!isPaid && !isVoid && !isOverdue && draw.status === 'sent'  && <Tag tone="gold">Sent</Tag>}
+          {/* Each draw is an invoice of its own with a screen at /invoices/:id (D62). */}
+          <Link
+            to={`/invoices/${draw.id}`}
+            aria-label={`Open invoice ${draw.title || draw.sequence_number}`}
+            style={{
+              display: 'inline-flex', alignItems: 'center', minHeight: 24, padding: '0 8px',
+              borderRadius: 10, border: '1px solid var(--v3-border)',
+              fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
+              color: 'var(--v3-text)', textDecoration: 'none'
+            }}
+          >
+            Open
+          </Link>
         </div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>

@@ -3,22 +3,20 @@
 // cards: a condensed "Money" title with a Reports link, a vault card with
 // what came in this week, then hairline groups on plaster: Overdue (each
 // with a mini Remind), Due soon, Waiting on approval and Paid. A tap on an
-// invoice row opens its actions in a sheet. There is no gold action here;
-// the one brushed gold button is "Send reminder" inside the Remind sheet.
+// invoice row opens the invoice's own screen, /invoices/:id, where Send,
+// PDF, Collect payment and Void live; Remind opens /invoices/:id/remind
+// (Phase 9, decisions D57 and D62). There is no gold action here and no
+// sheet: every action is a screen.
 //
 // Everything the old phone view offered stays one tap away. The links at
 // the bottom open Who owes you (statements), All invoices (drafts, due
 // later, paid and void, with the Outstanding and All choice) and Job
-// balances (the aging summary and each job's balance). Per job Email,
-// Download and Mark paid live on the job's invoice page, /invoices/:id,
-// which Job balances links to.
+// balances (the aging summary and each job's balance, each opening the
+// job's money tab). A new invoice starts at /invoices/new.
 //
 // The numbers come from buildMoneyView (lib/moneyView.ts), read against
 // the clock Invoices.tsx passes down (`now`, from useNow), so the week,
 // "Due today" and the month label roll over while the screen stays open.
-// The handlers that send, download, void and record payments are
-// Invoices.tsx's own and arrive as props, so the phone and the desktop
-// table share one code path.
 
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
@@ -37,7 +35,6 @@ import {
   StatementsPanel
 } from './MoneyPanels.tsx'
 import { useMoneyPanel } from './useMoneyPanel.ts'
-import { useMoneySheets } from './useMoneySheets.tsx'
 import type { MoneyScreenProps } from './types.ts'
 import './money.css'
 
@@ -52,11 +49,11 @@ type GroupProps = {
   title: string
   note: string
   rows: MoneyRow[]
-  onOpenInvoice: (invoiceId: string) => void
-  onRemind?: (row: MoneyRow) => void
+  /** The Overdue group: each row carries Remind, which opens the remind screen. */
+  remind?: boolean
 }
 
-function Group({ id, title, note, rows, onOpenInvoice, onRemind }: GroupProps) {
+function Group({ id, title, note, rows, remind = false }: GroupProps) {
   const headingId = `fhm-group-${id}`
   return (
     <section className="fhm-group" aria-labelledby={headingId}>
@@ -71,22 +68,24 @@ function Group({ id, title, note, rows, onOpenInvoice, onRemind }: GroupProps) {
           const end = r.chip
             ? <Chip label={r.chip.label} tone={r.chip.tone} />
             : r.note ? <span className="fhc-row__next">{r.note}</span> : null
-          const action = onRemind ? (
+          const invoiceId = r.invoiceId
+          const action = remind && invoiceId ? (
             <Button
               variant="secondary"
               size="mini"
               aria-label={`Remind ${r.title}`}
-              onClick={() => { hapticTap(); onRemind(r) }}
+              to={`/invoices/${invoiceId}/remind`}
+              onClick={() => hapticTap()}
             >
               Remind
             </Button>
           ) : undefined
-          const invoiceId = r.invoiceId
           return invoiceId ? (
             <Row
               key={r.id}
               as="li"
-              onClick={() => { hapticTap(); onOpenInvoice(invoiceId) }}
+              to={`/invoices/${invoiceId}`}
+              onClick={() => hapticTap()}
               title={r.title}
               subline={r.subline || undefined}
               money={r.amount}
@@ -113,7 +112,6 @@ function Group({ id, title, note, rows, onOpenInvoice, onRemind }: GroupProps) {
 export default function MoneyPhone({
   bundle,
   loading,
-  invoiceRows,
   jobBalances,
   totals,
   clientAR,
@@ -121,13 +119,7 @@ export default function MoneyPhone({
   filter,
   onFilterChange,
   now,
-  sendingIds,
-  onSendInvoice,
-  onDownloadInvoice,
-  onPayInvoice,
-  onVoidInvoice,
-  onStatement,
-  onRefresh
+  onStatement
 }: MoneyPhoneProps) {
   const { profile } = useProfile()
   const jobsQuery = useCompanyJobs()
@@ -143,18 +135,6 @@ export default function MoneyPhone({
     () => invoiceList.filter((r) => r.status === 'draft' || r.status === 'sent' || r.status === 'overdue').length,
     [invoiceList]
   )
-
-  const { openActions, openRemind, openPicker, sheets } = useMoneySheets({
-    bundle,
-    invoiceRows,
-    invoiceList,
-    sendingIds,
-    onSendInvoice,
-    onDownloadInvoice,
-    onPayInvoice,
-    onVoidInvoice,
-    onRefresh
-  })
 
   if (panel) {
     return (
@@ -175,7 +155,6 @@ export default function MoneyPhone({
                   rows={invoiceList}
                   filter={filter}
                   onFilterChange={onFilterChange}
-                  onOpenInvoice={openActions}
                 />
               )}
               {panel === 'balances' && (
@@ -190,7 +169,6 @@ export default function MoneyPhone({
             </>
           )}
         </PanelShell>
-        {sheets}
       </>
     )
   }
@@ -234,8 +212,7 @@ export default function MoneyPhone({
               title="Overdue"
               note={countLine(view.overdue.length)}
               rows={view.overdue}
-              onOpenInvoice={openActions}
-              onRemind={openRemind}
+              remind
             />
           )}
           {view.dueSoon.length > 0 && (
@@ -244,7 +221,6 @@ export default function MoneyPhone({
               title="Due soon"
               note={countLine(view.dueSoon.length)}
               rows={view.dueSoon}
-              onOpenInvoice={openActions}
             />
           )}
           {!hasDue && openInvoiceCount === 0 && (
@@ -253,7 +229,7 @@ export default function MoneyPhone({
                 icon={Receipt}
                 title="No open invoices"
                 action={
-                  <Button variant="secondary" size="md" onClick={() => { hapticTap(); openPicker() }}>
+                  <Button variant="secondary" size="md" to="/invoices/new" onClick={() => hapticTap()}>
                     Create an invoice
                   </Button>
                 }
@@ -269,11 +245,10 @@ export default function MoneyPhone({
               title="Waiting on approval"
               note={formatMoney(view.waiting.reduce((sum, r) => sum + r.amount, 0))}
               rows={view.waiting}
-              onOpenInvoice={openActions}
             />
           )}
           {view.paid.length > 0 && (
-            <Group id="paid" title="Paid" note="Last 10 days" rows={view.paid} onOpenInvoice={openActions} />
+            <Group id="paid" title="Paid" note="Last 10 days" rows={view.paid} />
           )}
 
           <nav className="fhm-more" aria-label="More on money">
@@ -297,8 +272,6 @@ export default function MoneyPhone({
           </nav>
         </>
       )}
-
-      {sheets}
     </div>
   )
 }

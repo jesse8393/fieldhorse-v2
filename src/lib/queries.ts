@@ -658,6 +658,10 @@ export function useActivityFeed(userId: string | undefined, pageSize = 60) {
 // first-class fh_invoices rows so the screen can list real issued
 // invoices, not just per-job balances. Bundled so the screen keeps a
 // single loading flag, matching its prior behavior.
+//
+// Invoices are read by the company (org_id, through `scoped`) and join
+// their client; a job is looked up only for an invoice whose contact_id is
+// set, since an invoice can bill a client with no job at all (D62).
 
 // Projected, the AR screen renders identity/billing fields only; the
 // wide text columns on fh_contacts (scope, notes, proposal bodies) never
@@ -675,7 +679,15 @@ export type InvoiceJob = Pick<
   fh_clients: Pick<Client, 'name' | 'email' | 'phone' | 'address'> | null
 }
 
-export type InvoiceRecord = Database['public']['Tables']['fh_invoices']['Row']
+// The client an invoice bills (D62), joined on fh_invoices.client_id. An
+// invoice with no job reads its customer from here; one with a job reads
+// the job first and falls back to this.
+export const INVOICE_CLIENT_COLUMNS = 'name, email, phone, address, company_name'
+export type InvoiceClient = Pick<Client, 'name' | 'email' | 'phone' | 'address' | 'company_name'>
+
+export type InvoiceRecord = Database['public']['Tables']['fh_invoices']['Row'] & {
+  fh_clients?: InvoiceClient | null
+}
 
 // The few columns the allocator (invoiceSettlement.ts) reads from an
 // invoice that is not an open bill: a draft, or a paid or void row.
@@ -733,14 +745,14 @@ export async function fetchInvoicesBundle(userId: string, orgId?: string | null)
     // The issued-invoice DISPLAY list: the 500 most recent cover the
     // lists, so a huge invoice history no longer ships every row. Nothing
     // is added up from it; the two uncapped reads below feed the totals.
-    scoped(supabase.from('fh_invoices').select('*'), userId, orgId)
+    scoped(supabase.from('fh_invoices').select(`*, fh_clients(${INVOICE_CLIENT_COLUMNS})`), userId, orgId)
       .order('created_at', { ascending: false })
       .limit(500),
     // Every open invoice, uncapped: Money's groups, Due this week and
     // the reminders read these, so an old unpaid bill past the newest 500
     // still counts.
     fetchAllRows<InvoiceRecord>((from, to) =>
-      scoped(supabase.from('fh_invoices').select('*'), userId, orgId)
+      scoped(supabase.from('fh_invoices').select(`*, fh_clients(${INVOICE_CLIENT_COLUMNS})`), userId, orgId)
         .in('status', [...OPEN_INVOICE_STATUSES])
         .order('id', { ascending: true })
         .range(from, to)
@@ -793,6 +805,93 @@ export function useInvoicesBundle(userId: string | undefined) {
 export function useInvalidateInvoices() {
   const client = useQueryClient()
   return () => client.invalidateQueries({ queryKey: ['invoices'] })
+}
+
+// ---- One invoice (D62) ----
+// Everything the invoice screens (/invoices/:id and its payment, edit and
+// remind screens) need: the fh_invoices row with its client, and, only when
+// the invoice points at a job, that job with its client, the job's
+// payments, approved change orders, insurance claim and other invoices, so
+// what the invoice owes is worked out the way Money works it out. An
+// invoice with no job carries just the payments linked to it.
+
+export type InvoiceRecordBundle = {
+  invoice: InvoiceRecord
+  client: (InvoiceClient & { id: string }) | null
+  job: InvoiceJob | null
+  payments: Payment[]
+  changeOrders: Database['public']['Tables']['fh_change_orders']['Row'][]
+  insurance: Database['public']['Tables']['fh_insurance_claims']['Row'] | null
+  /** Every invoice on the job, this one included; just this one without a job. */
+  jobInvoices: InvoiceRecord[]
+}
+
+export const invoiceRecordKey = (id: string | undefined) => ['invoiceRecord', id ?? null] as const
+
+export async function fetchInvoiceRecord(id: string): Promise<InvoiceRecordBundle> {
+  const { data: invoiceRow, error } = await supabase
+    .from('fh_invoices')
+    .select(`*, fh_clients(id, ${INVOICE_CLIENT_COLUMNS})`)
+    .eq('id', id)
+    .maybeSingle()
+  if (error) throw error
+  if (!invoiceRow) throw new Error('Invoice not found')
+  const invoice = invoiceRow as InvoiceRecord & { fh_clients?: (InvoiceClient & { id: string }) | null }
+  const client = invoice.fh_clients ?? null
+  const jobId = invoice.contact_id
+
+  if (!jobId) {
+    const { data: paymentRows, error: payErr } = await supabase
+      .from('fh_payments')
+      .select('*')
+      .eq('invoice_id', id)
+      .order('paid_on', { ascending: false })
+    if (payErr) throw payErr
+    return {
+      invoice, client, job: null,
+      payments: (paymentRows ?? []) as Payment[],
+      changeOrders: [], insurance: null, jobInvoices: [invoice]
+    }
+  }
+
+  const [jobRes, payRes, coRes, insRes, invRes] = await Promise.all([
+    supabase.from('fh_contacts').select(`${INVOICE_JOB_COLUMNS}, fh_clients(name, email, phone, address)`).eq('id', jobId).maybeSingle(),
+    supabase.from('fh_payments').select('*').eq('contact_id', jobId).order('paid_on', { ascending: false }),
+    supabase.from('fh_change_orders').select('*').eq('contact_id', jobId).eq('status', 'approved').order('sequence_number', { ascending: true }),
+    supabase.from('fh_insurance_claims').select('*').eq('contact_id', jobId).maybeSingle(),
+    supabase.from('fh_invoices').select('*').eq('contact_id', jobId).order('sequence_number', { ascending: true })
+  ])
+  if (jobRes.error) throw jobRes.error
+  if (payRes.error) throw payRes.error
+  if (coRes.error) throw coRes.error
+  if (insRes.error) throw insRes.error
+  if (invRes.error) throw invRes.error
+  const jobInvoices = (invRes.data ?? []) as InvoiceRecord[]
+  return {
+    invoice,
+    client,
+    job: (jobRes.data ?? null) as InvoiceJob | null,
+    payments: (payRes.data ?? []) as Payment[],
+    changeOrders: (coRes.data ?? []) as InvoiceRecordBundle['changeOrders'],
+    insurance: (insRes.data ?? null) as InvoiceRecordBundle['insurance'],
+    jobInvoices: jobInvoices.some((inv) => inv.id === invoice.id) ? jobInvoices : [...jobInvoices, invoice]
+  }
+}
+
+export function useInvoiceRecord(id: string | undefined, userId: string | undefined) {
+  return useQuery({
+    queryKey: invoiceRecordKey(id),
+    queryFn: () => fetchInvoiceRecord(id as string),
+    enabled: !!id && !!userId
+  })
+}
+
+export function useInvalidateInvoiceRecord() {
+  const client = useQueryClient()
+  return (id: string | undefined) => {
+    client.invalidateQueries({ queryKey: invoiceRecordKey(id) })
+    client.invalidateQueries({ queryKey: ['invoices'] })
+  }
 }
 
 // ---- Subs ----

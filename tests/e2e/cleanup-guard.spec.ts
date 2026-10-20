@@ -150,11 +150,11 @@ async function appReady(page: Page) {
 const SHOTS: Shot[] = [
   ...ROUTES.map((route) => ({ route, name: route === '/' ? 'today' : route.slice(1).replaceAll('/', '-'), ready: appReady })),
   {
-    route: '/invoices/c-job2',
-    name: 'invoice-c-job2',
+    route: '/invoices/inv1',
+    name: 'invoice-inv1',
     ready: async (page) => {
       await appReady(page)
-      await expect(page.locator('.fh-invoice-detail__hero')).toBeVisible({ timeout: 30_000 })
+      await expect(page.locator('.fhinv-hero')).toBeVisible({ timeout: 30_000 })
     }
   },
   {

@@ -223,7 +223,7 @@ test('uses the full desktop workspace without changing the mobile screens', asyn
     { path: '/activity', name: 'activity', ready: '[data-build-screen="SnowActivityBuild"]', minWidth: 1000 },
     { path: '/import', name: 'import', ready: '[data-build-screen="Importer"]', minWidth: 1000 },
     { path: '/partners', name: 'partners', ready: '[data-build-screen="SnowPartnersBuild"]', minWidth: 1000 },
-    { path: '/invoices/c-job2', name: 'invoice-detail', ready: '.v3-screen--invoice-detail', minWidth: 900 },
+    { path: '/invoices/inv1', name: 'invoice-detail', ready: '.fhinv', minWidth: 900 },
     { path: '/subs/qa-missing', name: 'sub-detail', ready: '[data-build-screen="SubDetailState"]', minWidth: 1000 },
     { path: '/sub-portal', name: 'sub-portal', ready: '[data-build-screen="SubPortal"]', minWidth: 1000 },
   ]
@@ -238,8 +238,8 @@ test('uses the full desktop workspace without changing the mobile screens', asyn
 
     if (route.name === 'invoice-detail') {
       const alignment = await page.evaluate(() => {
-        const screen = document.querySelector('.v3-screen--invoice-detail')?.getBoundingClientRect()
-        const actionbar = document.querySelector('.fh-invoice-actionbar')?.getBoundingClientRect()
+        const screen = document.querySelector('.fhinv')?.getBoundingClientRect()
+        const actionbar = document.querySelector('.fhinv-actions')?.getBoundingClientRect()
         return {
           centerDelta: screen && actionbar
             ? Math.abs((screen.left + screen.width / 2) - (actionbar.left + actionbar.width / 2))
@@ -279,7 +279,7 @@ test('uses the full desktop workspace without changing the mobile screens', asyn
   const compactDesktopRoutes = [
     { path: '/activity', ready: '[data-build-screen="SnowActivityBuild"]', table: '.fh-activity-table__head' },
     { path: '/partners', ready: '[data-build-screen="SnowPartnersBuild"]', table: '.fh-partners-table__head' },
-    { path: '/invoices/c-job2', ready: '.v3-screen--invoice-detail', table: null },
+    { path: '/invoices/inv1', ready: '.fhinv', table: null },
   ]
 
   for (const route of compactDesktopRoutes) {
@@ -287,8 +287,8 @@ test('uses the full desktop workspace without changing the mobile screens', asyn
     await expect(page.locator(route.ready)).toBeVisible()
     const geometry = await page.evaluate(({ table }) => {
       const tableElement = table ? document.querySelector(table) : null
-      const screen = document.querySelector('.v3-screen--invoice-detail')?.getBoundingClientRect()
-      const actionbar = document.querySelector('.fh-invoice-actionbar')?.getBoundingClientRect()
+      const screen = document.querySelector('.fhinv')?.getBoundingClientRect()
+      const actionbar = document.querySelector('.fhinv-actions')?.getBoundingClientRect()
       return {
         tableOverflow: tableElement ? tableElement.scrollWidth - tableElement.clientWidth : 0,
         invoiceCenterDelta: screen && actionbar

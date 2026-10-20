@@ -1,9 +1,10 @@
 /*
  * Money on a phone (spec 9.7, render glamor/g-money.jpg). Class prefix
  * fhm-. Reads only --fh- tokens, so Day and Night follow on their own.
- * Rows, chips, buttons, the vault card and sheets come from the fh
- * components; this file lays out the title, the groups, the quiet links at
- * the bottom, the sub pages and what sits inside the sheets.
+ * Rows, chips, buttons and the vault card come from the fh components;
+ * this file lays out the title, the groups, the quiet links at the bottom
+ * and the sub pages. An invoice row opens the invoice's own screen,
+ * /invoices/:id (Phase 9, D57, D62).
  */
 
 .fhm {
@@ -355,137 +356,6 @@
   font-family: var(--fh-font-body);
   font-size: 14px;
   line-height: 18px;
-  font-weight: 500;
-  color: var(--fh-ink-2);
-}
-
-/* ---- Invoice actions sheet ---- */
-.fhm-inv {
-  display: grid;
-  gap: 20px;
-}
-
-.fhm-inv__summary {
-  display: grid;
-  gap: 4px;
-}
-
-.fhm-inv__who {
-  margin: 0;
-  font-family: var(--fh-font-body);
-  font-size: 17px;
-  line-height: 22px;
-  font-weight: 600;
-  color: var(--fh-ink);
-}
-
-.fhm-inv__sub {
-  margin: 0;
-  font-family: var(--fh-font-body);
-  font-size: 15px;
-  line-height: 20px;
-  color: var(--fh-ink-2);
-}
-
-.fhm-inv__amount {
-  margin: 8px 0 0;
-  font-family: var(--fh-font-display);
-  font-size: 34px;
-  line-height: 36px;
-  font-weight: 600;
-  letter-spacing: 0;
-  font-variant-numeric: tabular-nums;
-  color: var(--fh-ink);
-}
-
-.fhm-inv__status {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 4px;
-}
-
-.fhm-inv__dates {
-  font-family: var(--fh-font-body);
-  font-size: 14px;
-  line-height: 18px;
-  font-weight: 500;
-  color: var(--fh-ink-2);
-}
-
-.fhm-inv__actions {
-  display: grid;
-  gap: 8px;
-}
-
-/* Void sits apart from the other actions. */
-.fhm-inv__actions .fhc-btn--destructive {
-  margin-top: 8px;
-}
-
-/* ---- Remind sheet ---- */
-.fhm-remind {
-  display: grid;
-  gap: 16px;
-}
-
-.fhm-remind__facts {
-  display: grid;
-  gap: 12px;
-  margin: 0;
-}
-
-.fhm-remind__fact {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-
-.fhm-remind__fact dt {
-  font-family: var(--fh-font-body);
-  font-size: 13px;
-  line-height: 16px;
-  font-weight: 500;
-  color: var(--fh-ink-3);
-}
-
-.fhm-remind__fact dd {
-  display: grid;
-  gap: 4px;
-  margin: 0;
-  min-width: 0;
-  font-family: var(--fh-font-body);
-  font-size: 17px;
-  line-height: 22px;
-  font-weight: 600;
-  color: var(--fh-ink);
-  overflow-wrap: anywhere;
-}
-
-.fhm-remind__sub {
-  font-size: 15px;
-  line-height: 20px;
-  font-weight: 400;
-  color: var(--fh-ink-2);
-}
-
-.fhm-remind__amount {
-  font-variant-numeric: tabular-nums;
-}
-
-.fhm-remind__help {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.fhm-helper {
-  margin: 0;
-  font-family: var(--fh-font-body);
-  font-size: 15px;
-  line-height: 20px;
   font-weight: 500;
   color: var(--fh-ink-2);
 }

@@ -1,56 +1,55 @@
-import { lazy, Suspense, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import {
-  ChevronLeft,
-  Receipt,
   FileDown,
   DollarSign,
-  ExternalLink,
   Clock,
   CheckCircle2,
   Send,
+  Trash2,
   Link as LinkIcon
 } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { supabase, authHeaders } from '../lib/supabase.ts'
-import { useInvoiceDetail, useInvalidateInvoiceDetail } from '../lib/queries.ts'
-import { fetchInvoicesForContact, createInvoice, invoiceAmountDue, invoiceDescription, sendInvoiceEmail } from '../lib/invoices.ts'
-import { pickBalanceInvoice } from '../lib/invoiceSettlement.ts'
-import { moneyExact } from '../lib/format.ts'
-import { parseDateOnly } from '../lib/dates.ts'
-import { useAuth } from '../contexts/AuthContext.tsx'
-import { useProfile } from '../contexts/ProfileContext.tsx'
+import { supabase, authHeaders } from '../../lib/supabase.ts'
+import { useInvoiceDetail, useInvalidateInvoiceDetail } from '../../lib/queries.ts'
+import { fetchInvoicesForContact, createInvoice, invoiceAmountDue, invoiceDescription, sendInvoiceEmail } from '../../lib/invoices.ts'
+import { pickBalanceInvoice } from '../../lib/invoiceSettlement.ts'
+import { moneyExact } from '../../lib/format.ts'
+import { parseDateOnly } from '../../lib/dates.ts'
+import { useAuth } from '../../contexts/AuthContext.tsx'
+import { useProfile } from '../../contexts/ProfileContext.tsx'
 // Lazy, pdf.js + transitive jspdf + autoTable deps are ~430KB. Only
 // loads on the first PDF action (Generate, Share, Email Invoice).
 async function loadPdf(): Promise<any> {
-  return import('../lib/pdf.js')
+  return import('../../lib/pdf.js')
 }
-import { toastSuccess, toastError } from '../lib/toast.ts'
-import { mintPublicLink } from '../lib/publicLink.ts'
-import { hapticTap } from '../lib/haptics.ts'
-import { useMediaQuery } from '../lib/useMediaQuery.ts'
-import { useFhMotion } from '../lib/motion.ts'
-import { Eyebrow, StampNumber } from '../components/v3'
-// Lazy, only loads when an operator taps "Mark Paid" (avoids ~440KB
-// in the InvoiceDetail route chunk).
-const V3PaymentSheet = lazy(() => import('../components/V3PaymentSheet.tsx'))
-import { InvoiceTemplate } from '../components/documents'
+import { toastSuccess, toastError } from '../../lib/toast.ts'
+import { mintPublicLink } from '../../lib/publicLink.ts'
+import { hapticTap } from '../../lib/haptics.ts'
+import { useMediaQuery } from '../../lib/useMediaQuery.ts'
+import { useFhMotion } from '../../lib/motion.ts'
+import { Eyebrow, StampNumber } from '../../components/v3'
+import { InvoiceTemplate } from '../../components/documents'
 
 /**
- * InvoiceDetail, read-only mobile invoice surface at /invoices/:id.
+ * JobMoney, a job's money, reached at /jobs/:id?tab=financials only (the
+ * Financials tab's Invoice sub tab). It was the old /invoices/:id screen,
+ * which took a job id; /invoices/:id now means an fh_invoices row (Phase 9,
+ * decision D62), so this view lives inside the job page.
  *
- * No new schema. Reads fh_contacts + fh_payments and surfaces:
+ * Reads fh_contacts + fh_payments and surfaces:
  *   - status (Outstanding / Overdue / Paid / Closed) computed from
  *     balance + age, not from a stored column
  *   - client + total + balance + service title
- *   - payment history (reverse chronological)
- *   - primary actions: Collect Payment / Generate PDF / Open Job
- *
- * Line item CRUD is intentionally out of scope (would need
- * fh_invoice_items). When the operator wants to edit the scope, they
- * use the Quote tab on Job Detail where line items already live.
+ *   - payment history (reverse chronological), each deletable with a
+ *     second tap (D57)
+ *   - actions: Email, Share link, Download and the gold Collect payment,
+ *     which opens the open draw's payment screen (/invoices/:id/payment)
+ *     or, with no open draw, the job's payment recorder
  */
+
+const DELETE_ARMED_MS = 4000
 
 const AGING_BUCKETS = [
   { id: '0-30',  label: 'Current',  max: 30,        color: 'var(--v3-text-muted)',     accent: 'var(--v3-border-strong)' },
@@ -88,8 +87,16 @@ function methodLabel(m: any) {
   return lower.charAt(0).toUpperCase() + lower.slice(1)
 }
 
-export default function InvoiceDetail() {
-  const { id } = useParams()
+export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
+  /** The job (fh_contacts id). Falls back to the route's :id. */
+  id?: string
+  /** Records a payment against the job when no open draw is billing it. */
+  onOpenLogPayment?: () => void
+  /** The job page reloads its own money after a change here. */
+  onChanged?: () => void
+} = {}) {
+  const params = useParams()
+  const id = idProp ?? params.id
   const navigate = useNavigate()
   const { user } = useAuth()
   const { profile } = useProfile()
@@ -107,6 +114,7 @@ export default function InvoiceDetail() {
   const refresh = () => {
     invalidateInvoiceDetail(id)
     queryClient.invalidateQueries({ queryKey: ['invoiceDraws', id] })
+    onChanged?.()
   }
   const contact = bundle?.contact ?? null
   const payments = bundle?.payments ?? []
@@ -146,8 +154,13 @@ export default function InvoiceDetail() {
   // row's words belong here (a paid deposit's description on a final
   // balance would mislead). Screen and PDF share this.
   const serviceDescription = useMemo(() => invoiceDescription(billingDraw, contact), [billingDraw, contact])
-  const [paying, setPaying] = useState(false)
   const [generating, setGenerating] = useState(false)
+  // A payment row deletes with a second tap on its own button within 4
+  // seconds (D57): which row is armed, and which is being deleted.
+  const [deleteArmed, setDeleteArmed] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const deleteTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => { if (deleteTimer.current) clearTimeout(deleteTimer.current) }, [])
   // 'detail' = existing list-style breakdown (default, original UX).
   // 'document' = new InvoiceTemplate preview (Phase 2, opt-in so the
   // toggle is reversible and the existing flow stays untouched until
@@ -363,6 +376,7 @@ export default function InvoiceDetail() {
     } else {
       const { data: created, error: createErr } = await createInvoice({
         contact,
+        clientId: contact.client_id,
         userId: user!.id,
         title: 'Balance due',
         amount: plan.amount,
@@ -513,6 +527,44 @@ export default function InvoiceDetail() {
     }
   }
 
+  // Collect payment pays the bill this screen shows: the open draw's own
+  // payment screen (prefilled with what is due on it), else the job's
+  // payment recorder for the whole balance.
+  function handleCollect() {
+    hapticTap()
+    if (billingDraw) {
+      navigate(`/invoices/${billingDraw.id}/payment`)
+      return
+    }
+    onOpenLogPayment?.()
+  }
+
+  async function handleDeletePayment(paymentId: string, paymentAmount: number) {
+    if (!user?.id || deletingId) return
+    hapticTap()
+    if (deleteArmed !== paymentId) {
+      if (deleteTimer.current) clearTimeout(deleteTimer.current)
+      setDeleteArmed(paymentId)
+      deleteTimer.current = setTimeout(() => setDeleteArmed(null), DELETE_ARMED_MS)
+      return
+    }
+    if (deleteTimer.current) clearTimeout(deleteTimer.current)
+    setDeleteArmed(null)
+    setDeletingId(paymentId)
+    const { error: delErr } = await supabase
+      .from('fh_payments')
+      .delete()
+      .eq('id', paymentId)
+      .eq('user_id', user.id)
+    setDeletingId(null)
+    if (delErr) {
+      toastError("Couldn't delete payment", delErr.message)
+      return
+    }
+    toastSuccess('Payment deleted', `${moneyExact(paymentAmount)} removed`)
+    refresh()
+  }
+
   const { stagger, item } = useFhMotion()
 
   if (loading) {
@@ -528,26 +580,11 @@ export default function InvoiceDetail() {
   if (error) {
     return (
       <div className="fh-invoice-detail-state" style={{ padding: '24px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <button
-          type="button"
-          onClick={() => { hapticTap(); navigate('/invoices') }}
-          style={{
-            alignSelf: 'flex-start',
-            display: 'inline-flex', alignItems: 'center', gap: 8,
-            padding: '8px 12px 8px 8px', borderRadius: 10,
-            background: 'transparent', border: '1px solid var(--v3-border)',
-            color: 'var(--v3-text)', cursor: 'pointer',
-            fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600
-          }}
-        >
-          <ChevronLeft size={16} aria-hidden="true" />
-          Money Owed
-        </button>
         <div className="v3-empty">
           <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
             {error}
           </div>
-          <div style={{ fontSize: 12 }}>The invoice may have been removed.</div>
+          <div style={{ fontSize: 12 }}>The job may have been removed.</div>
         </div>
       </div>
     )
@@ -557,49 +594,16 @@ export default function InvoiceDetail() {
 
   return (
     <motion.div
-      className="v3-screen v3-screen--invoice-detail"
+      className="fh-job-money"
       variants={stagger}
       initial="hidden"
       animate="show"
-      // Reserve the action row in addition to the shell-owned dock space.
-      style={{
-        paddingBottom: 'calc(44px + var(--space-5) + var(--space-4))',
-        position: 'relative',
-        background: 'var(--v3-bg)'
-      }}
+      style={{ position: 'relative' }}
     >
-      {/* HEADER STRIP, Back chevron + title eyebrow.
-          Premium black-glass; no fog backdrop on the strip itself so
-          the screen feels solid, not overlaid. */}
-      <motion.div className="fh-invoice-detail__header" variants={item} style={{ padding: '8px 16px 4px', display: 'flex', alignItems: 'center', gap: 8 }}>
-        <button
-          type="button"
-          onClick={() => { hapticTap(); navigate('/invoices') }}
-          aria-label="Back to Money Owed"
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            minHeight: 40, padding: '0 12px 0 8px',
-            borderRadius: 10,
-            background: 'transparent', border: '1px solid transparent',
-            color: 'var(--v3-text)',
-            fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600,
-            cursor: 'pointer', WebkitTapHighlightColor: 'transparent'
-          }}
-        >
-          <ChevronLeft size={18} aria-hidden="true" />
-          Back
-        </button>
-        <span style={{ flex: 1, textAlign: 'center', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          <Eyebrow tone="gold">
-            <Receipt size={11} aria-hidden="true" />
-            Invoice
-          </Eyebrow>
-        </span>
-        {/* View toggle, Detail (default, original UX) vs Document
-            (new InvoiceTemplate preview). Reversible; lives in the
-            header so the operator can flip without scrolling. Sized
-            to match the back-chevron button so the eyebrow stays
-            visually centered. */}
+      {/* View toggle, Detail (default) vs Document (the InvoiceTemplate
+          preview). Reversible; sits at the top so the operator can flip
+          without scrolling. */}
+      <motion.div className="fh-invoice-detail__header" variants={item} style={{ padding: '8px 16px 4px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
         <ViewModeToggle value={viewMode} onChange={setViewMode} />
       </motion.div>
 
@@ -768,7 +772,7 @@ export default function InvoiceDetail() {
           fontFamily: 'var(--font-body)', fontSize: 12,
           color: 'var(--v3-text-muted)', lineHeight: 1.4
         }}>
-          Edit line items on the Quote tab of the linked job.
+          The amount is the job's contract. Each draw has its own invoice screen under Draws.
         </div>
       </motion.div>
 
@@ -782,7 +786,7 @@ export default function InvoiceDetail() {
               <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
                 No payments recorded yet.
               </div>
-              <div style={{ fontSize: 12 }}>Tap Collect Payment to log cash, check, or other.</div>
+              <div style={{ fontSize: 12 }}>Tap Collect payment to log cash, a check or a transfer.</div>
             </div>
           ) : (
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -830,6 +834,27 @@ export default function InvoiceDetail() {
                   }}>
                     {fmtMoney(p.amount)}
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => void handleDeletePayment(p.id, Number(p.amount || 0))}
+                    disabled={deletingId === p.id}
+                    aria-label={deleteArmed === p.id ? `Tap again to delete the ${fmtMoney(p.amount)} payment` : `Delete the ${fmtMoney(p.amount)} payment`}
+                    style={{
+                      flexShrink: 0,
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                      minHeight: 44, minWidth: 44, padding: deleteArmed === p.id ? '0 12px' : 0,
+                      borderRadius: 10,
+                      border: deleteArmed === p.id ? '1px solid var(--v3-danger-text)' : '1px solid var(--v3-border)',
+                      background: 'transparent',
+                      color: 'var(--v3-danger-text)',
+                      fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
+                      cursor: deletingId === p.id ? 'wait' : 'pointer',
+                      WebkitTapHighlightColor: 'transparent'
+                    }}
+                  >
+                    <Trash2 size={14} aria-hidden="true" />
+                    {deleteArmed === p.id && 'Tap again'}
+                  </button>
                 </li>
               ))}
             </ul>
@@ -837,47 +862,16 @@ export default function InvoiceDetail() {
         </div>
       </motion.div>
 
-      {/* JOB LINK */}
-      <motion.div className="fh-invoice-detail__job" variants={item} style={{ padding: '0 16px 24px' }}>
-        <button
-          type="button"
-          onClick={() => { hapticTap(); navigate(`/jobs/${contact.id}`) }}
-          style={{
-            width: '100%',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            gap: 12, padding: '12px 12px',
-            borderRadius: 10,
-            background: 'var(--v3-surface)', border: '1px solid var(--v3-border)',
-            color: 'var(--v3-text)', cursor: 'pointer',
-            fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600,
-            WebkitTapHighlightColor: 'transparent'
-          }}
-        >
-          <span>Open job, notes, schedule, files, line items</span>
-          <ExternalLink size={14} aria-hidden="true" color="var(--v3-text-muted)" />
-        </button>
-      </motion.div>
       </>
       )}
 
-      {/* STICKY ACTION BAR, Send + Generate PDF + Collect Payment.
-          Three-button row: Send (email the invoice), PDF (local download),
-          Collect (log a payment). Send is new (5/17 invoice-send port);
-          Generate PDF + Collect Payment behavior unchanged. Sits above
-          the BottomNav (position: fixed; bottom: 0 with safe-area).
-          Padding-bottom raises us above the dock; gradient softens the
-          transition into the page. */}
+      {/* ACTION ROW, Email, Share link, Download and the gold Collect
+          payment, in the flow of the Financials tab. */}
       <div
-        className="fh-invoice-actionbar"
+        className="fh-job-money__actions"
         style={{
-          position: 'fixed',
-          left: 0, right: 0,
-          bottom: 'calc(var(--fh-mobile-dock-height) + 16px)',
-          padding: '12px 16px',
-          background: 'linear-gradient(180deg, transparent, color-mix(in srgb, var(--v3-bg) 92%, transparent) 32%, var(--v3-bg) 64%)',
-          zIndex: 30,
-          display: 'flex', gap: 8,
-          pointerEvents: 'none'
+          padding: '12px 16px 24px',
+          display: 'flex', gap: 8
         }}
       >
         <button
@@ -915,7 +909,6 @@ export default function InvoiceDetail() {
             cursor: sending ? 'wait' : 'pointer',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             WebkitTapHighlightColor: 'transparent',
-            pointerEvents: 'auto',
             touchAction: 'manipulation',
             opacity: 1,
             transition: 'background 200ms ease, border-color 200ms ease, color 200ms ease'
@@ -941,7 +934,6 @@ export default function InvoiceDetail() {
             cursor: sharing ? 'wait' : 'pointer',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             WebkitTapHighlightColor: 'transparent',
-            pointerEvents: 'auto',
             touchAction: 'manipulation'
           }}
         >
@@ -965,7 +957,6 @@ export default function InvoiceDetail() {
             cursor: generating ? 'wait' : 'pointer',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             WebkitTapHighlightColor: 'transparent',
-            pointerEvents: 'auto',
             touchAction: 'manipulation'
           }}
         >
@@ -974,7 +965,7 @@ export default function InvoiceDetail() {
         </button>
         <button
           type="button"
-          onClick={() => { hapticTap(); setPaying(true) }}
+          onClick={handleCollect}
           disabled={totals.isPaid && totals.balance < 0.5}
           style={{
             flex: 2,
@@ -994,31 +985,13 @@ export default function InvoiceDetail() {
               : '0 0 0 3px rgba(201, 150, 58, 0.10), 0 4px 12px rgba(201, 150, 58, 0.18), 0 1px 0 var(--v3-border-strong) inset',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             WebkitTapHighlightColor: 'transparent',
-            pointerEvents: 'auto',
             touchAction: 'manipulation'
           }}
         >
           <DollarSign size={15} aria-hidden="true" />
-          {totals.isPaid && totals.balance < 0.5 ? 'Paid in full' : 'Collect Payment'}
+          {totals.isPaid && totals.balance < 0.5 ? 'Paid in full' : 'Collect payment'}
         </button>
       </div>
-
-      <AnimatePresence>
-        {paying && (
-          <Suspense fallback={null}>
-            {/* Collecting here pays the bill this screen shows: the
-                payment links to the open draw (prefilled with what is due
-                on it, never more than the balance) so that draw settles. */}
-            <V3PaymentSheet
-              contact={contact}
-              balance={totals.balance}
-              invoice={billingDraw ? { ...billingDraw, amount: amountDueNow } : null}
-              onClose={() => setPaying(false)}
-              onLogged={() => { setPaying(false); refresh() }}
-            />
-          </Suspense>
-        )}
-      </AnimatePresence>
     </motion.div>
   )
 }

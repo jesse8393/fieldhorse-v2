@@ -28,8 +28,9 @@ export type PublicLinkKind = 'proposal' | 'invoice' | 'change_order' | 'statemen
  * (quoteId, fh_quotes) or, for a job's proposal, at the job (contactId).
  * Invoice and change_order links hang off a single job (contactId). A
  * statement link is client-scoped (clientId, no contactId) and rolls up
- * every open job for that client. Returns the full row including the
- * token + the public URL to share.
+ * every open job for that client, and so is an invoice link for an
+ * invoice with no job (D62): it shows the client's job less invoices.
+ * Returns the full row including the token + the public URL to share.
  */
 export async function mintPublicLink({ contactId = null, quoteId = null, clientId = null, userId, kind, expiresAt = null, changeOrderId = null }: {
   contactId?: string | null
@@ -46,6 +47,8 @@ export async function mintPublicLink({ contactId = null, quoteId = null, clientI
     if (!clientId) throw new Error('clientId required for statement links')
   } else if (kind === 'proposal') {
     if (!quoteId && !contactId) throw new Error('quoteId or contactId required')
+  } else if (kind === 'invoice') {
+    if (!contactId && !clientId) throw new Error('contactId or clientId required for invoice links')
   } else if (!contactId) {
     throw new Error('contactId required')
   }
@@ -57,7 +60,7 @@ export async function mintPublicLink({ contactId = null, quoteId = null, clientI
       user_id: userId,
       contact_id: kind === 'statement' || quoteId ? null : contactId,
       quote_id: kind === 'proposal' ? quoteId : null,
-      client_id: kind === 'statement' ? clientId : null,
+      client_id: kind === 'statement' || (kind === 'invoice' && !contactId) ? clientId : null,
       kind,
       token,
       expires_at: expiresAt ? expiresAt.toISOString() : null,

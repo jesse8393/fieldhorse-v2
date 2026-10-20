@@ -3,13 +3,16 @@ import { SegmentedTabs } from '../../../components/v3'
 import { tabPanelProps } from '../../../lib/tabs.ts'
 import SubsSection from '../sections/Subs.tsx'
 import ExpensesSection from '../sections/Expenses.tsx'
-import InvoiceSection from '../sections/Invoice.tsx'
+import JobMoney from '../../jobs/JobMoney.tsx'
 import InvoiceDrawsSection from '../sections/InvoiceDrawsSection.tsx'
 
 /**
  * FINANCIALS tab, sub-tab router for cost + revenue surfaces.
  *
- * Sub-tabs: Subs · Expenses · Invoice
+ * Sub-tabs: Subs, Expenses, Invoice (the job's money: balance, payments,
+ * email, share, download, collect; JobMoney, reached here only since
+ * /invoices/:id means an invoice row, D62) and Draws (each linking to its
+ * own invoice screen).
  *
  * Default sub is 'invoice' if there's a balance due (most-actionable signal),
  * otherwise 'subs' (most-frequently-managed).
@@ -30,7 +33,6 @@ export default function FinancialsTab({
   subs,
   expenses,
   payments,
-  paid,
   balance,
   userId,
   fetchAll,
@@ -84,16 +86,7 @@ export default function FinancialsTab({
           <ExpensesSection contact={contact} expenses={expenses} userId={userId} fetchAll={fetchAll} />
         )}
         {sub === 'invoice' && (
-          <InvoiceSection
-            contact={contact}
-            payments={payments}
-            changeOrders={changeOrders}
-            paid={paid}
-            balance={balance}
-            onOpenLogPayment={onOpenLogPayment}
-            userId={userId}
-            fetchAll={fetchAll}
-          />
+          <JobMoney id={contact.id} onOpenLogPayment={onOpenLogPayment} onChanged={fetchAll} />
         )}
         {sub === 'draws' && (
           <InvoiceDrawsSection

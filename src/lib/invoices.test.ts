@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildInvoicePdf, contractTotals, invoiceAmountDue, invoiceDescription, suggestNextInvoice } from './invoices.ts'
+import { buildInvoicePdf, contractTotals, invoiceAmountDue, invoiceDescription, invoicePdfInput, suggestNextInvoice } from './invoices.ts'
 
 describe('contractTotals', () => {
   it('folds approved change orders into the contract', () => {
@@ -221,5 +221,45 @@ describe('invoiceDescription', () => {
     expect(invoiceDescription({ description: '   ' } as any, { job_title: ' Slab + trench ' } as any)).toBe('Slab + trench')
     expect(invoiceDescription({ description: null } as any, { job_title: '' } as any)).toBe('Construction services')
     expect(invoiceDescription({} as any, null)).toBe('Construction services')
+  })
+})
+
+// Phase 9, Task 12 (D62): an invoice with no job bills the client directly.
+// Its contract is its own amount, so what it owes is its amount less its
+// payments, and its PDF has no Contract position block to reconcile against.
+describe('an invoice with no job', () => {
+  const company = { name: 'Parker Construction Co.', address: '100 Main St', phone: '', email: 'admin@example.com' }
+  const client = { id: 'cl-1', name: 'Rosa Delgado', email: 'rosa@example.com', phone: '555-0101', address: '412 Burkitt Station Rd' }
+  const invoice = {
+    id: 'inv-solo', contact_id: null, client_id: 'cl-1', title: 'Gravel delivery', amount: 1200, status: 'sent',
+    sequence_number: 1, due_at: '2026-10-20', issued_at: '2026-10-06T12:00:00Z', notes: null, description: 'Two loads of crusher run'
+  } as any
+
+  it('settles against itself', async () => {
+    expect(invoiceAmountDue({ invoice, contact: null, payments: [{ amount: 200 }] })).toBe(1000)
+    expect(invoiceAmountDue({ invoice, contact: null, payments: [{ amount: 200, invoice_id: 'inv-solo' }] })).toBe(1000)
+    expect(invoiceAmountDue({ invoice, contact: null, payments: [{ amount: 1200 }] })).toBe(0)
+    expect(invoiceAmountDue({ invoice, contact: null })).toBe(1200)
+
+    const input = invoicePdfInput({ invoice, contact: null, client, company, payments: [{ amount: 200 }] })
+    expect(input.showContractPosition).toBe(false)
+    expect(input.contractTotal).toBeNull()
+    expect(input.amountDue).toBe(1000)
+    expect(input.contact.name).toBe('Rosa Delgado')
+    expect(input.lineItems[0].notes).toBe('Two loads of crusher run')
+
+    const result = await buildInvoicePdf({ invoice, contact: null, client, company, payments: [{ amount: 200 }] })
+    const text = pdfText(result.doc)
+    expect(text).toContain('$1,000.00')
+    expect(text).toContain('Rosa Delgado')
+    expect(text).not.toContain('Contract position')
+    expect(text).not.toContain('Original contract')
+  })
+
+  it('keeps the Contract position block when there is a job', () => {
+    const contact = { id: 'c-1', name: 'Rosa Delgado', amount: 10000, job_title: 'Patio pour' }
+    const input = invoicePdfInput({ invoice: { ...invoice, contact_id: 'c-1' }, contact, company })
+    expect(input.showContractPosition).toBe(true)
+    expect(input.contractTotal).toBe(10000)
   })
 })

@@ -30,7 +30,7 @@ const routes = [
   { name: 'tasks', path: '/tasks', ready: '[data-build-screen="Tasks"]' },
   { name: 'sub-portal', path: '/sub-portal', ready: '[data-build-screen="SubPortal"]' },
   { name: 'invoices', path: '/invoices', ready: '[data-build-screen="SnowInvoicesBuild"]' },
-  { name: 'invoice-detail', path: '/invoices/c-job2', ready: '.fh-invoice-detail__hero' },
+  { name: 'invoice-detail', path: '/invoices/inv1', ready: '.fhinv-hero' },
 ] as const
 
 async function installSession(context: BrowserContext) {

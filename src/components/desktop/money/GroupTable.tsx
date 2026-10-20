@@ -4,9 +4,10 @@
 // (lib/moneyView.ts), so the numbers cannot differ.
 //
 // A click anywhere on a row does what the row's Open button does: an
-// invoice opens its actions sheet, a quote or a payment opens its job.
-// Overdue rows carry Remind in the Action column (decision D6); it opens
-// the Remind sheet and sends nothing until Send reminder is pressed there.
+// invoice opens its screen (/invoices/:id, D62), a quote or a payment opens
+// its job. Overdue rows carry Remind in the Action column (decision D6); it
+// opens the remind screen (/invoices/:id/remind) and sends nothing until
+// Send reminder is pressed there.
 // The Action buttons are the keyboard way in. On an overdue row the
 // customer name is a button too, because Remind is the only control the
 // column holds there.
@@ -27,12 +28,12 @@ export type GroupTableProps = {
   /** The gray line beside the title: a count, a total, "Last 10 days". */
   note: string
   rows: MoneyRow[]
-  /** An invoice row opens the invoice's actions. */
+  /** An invoice row opens the invoice's screen. */
   onOpenInvoice: (invoiceId: string) => void
   /** A quote or payment row opens its job. */
   onOpenJob: (to: string) => void
-  /** Present on the Overdue group only. */
-  onRemind?: (row: MoneyRow) => void
+  /** Present on the Overdue group only: the rows carry Remind. */
+  remind?: boolean
 }
 
 // Clicks on the row's own controls do their own thing.
@@ -40,7 +41,7 @@ function fromControl(e: MouseEvent): boolean {
   return (e.target as HTMLElement).closest('button, a') !== null
 }
 
-export default function GroupTable({ id, title, note, rows, onOpenInvoice, onOpenJob, onRemind }: GroupTableProps) {
+export default function GroupTable({ id, title, note, rows, onOpenInvoice, onOpenJob, remind = false }: GroupTableProps) {
   const headingId = `fhmd-group-${id}`
   const compact = useCompactMoneyTable()
 
@@ -79,7 +80,7 @@ export default function GroupTable({ id, title, note, rows, onOpenInvoice, onOpe
                 onClick={(e) => { if (!fromControl(e)) open() }}
               >
                 <td className="fhmd-cell--customer">
-                  {onRemind && invoiceId ? (
+                  {remind && invoiceId ? (
                     <button type="button" className="fhmd-name" onClick={open}>{r.title}</button>
                   ) : (
                     <span className="fhmd-name">{r.title}</span>
@@ -95,17 +96,17 @@ export default function GroupTable({ id, title, note, rows, onOpenInvoice, onOpe
                   </div>
                 </td>
                 <td className="fhmd-end">
-                  {onRemind && invoiceId ? (
+                  {remind && invoiceId ? (
                     <Button
                       variant="secondary"
                       size="mini"
                       aria-label={`Remind ${r.title}`}
-                      onClick={() => onRemind(r)}
+                      to={`/invoices/${invoiceId}/remind`}
                     >
                       Remind
                     </Button>
                   ) : invoiceId ? (
-                    <Button variant="quiet" size="mini" aria-label={`Open ${label}`} onClick={open}>Open</Button>
+                    <Button variant="quiet" size="mini" aria-label={`Open ${label}`} to={`/invoices/${invoiceId}`}>Open</Button>
                   ) : (
                     <Button variant="quiet" size="mini" to={r.to} aria-label={`Open ${label}`}>Open</Button>
                   )}

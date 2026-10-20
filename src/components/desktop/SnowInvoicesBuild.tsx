@@ -1,29 +1,26 @@
 // SnowInvoicesBuild, desktop /invoices (spec 9.7, plan task 4.6).
 //
-// The entry for Money at 900 px and wider. Same numbers and same sheets as
+// The entry for Money at 900 px and wider. Same numbers and same rows as
 // the phone (screens/money/): a vault card with what came in this week,
 // then the four groups as tables, Overdue (each with Remind), Due soon,
 // Waiting on approval and Paid, with the columns Customer, Job, Amount,
-// Status and Action. A click on a row opens the invoice's actions or the
-// job, as on the phone.
+// Status and Action. A click on an invoice row opens the invoice's screen,
+// /invoices/:id, where Send, PDF, Collect payment and Void live; Remind
+// opens /invoices/:id/remind; a quote or payment row opens its job (D57,
+// D62). New invoice opens /invoices/new.
 //
 // The old desktop page kept its aging summary, the Outstanding and All
 // filter, who owes you with statements, per job balances with Log payment,
-// sort, filter and Export CSV, and a send, PDF, mark paid and void button
-// on every invoice. They stay: the aging summary sits beside the vault
-// card, and the three lists open as pages at ?panel= (decision D16), as
-// tables here. Per invoice Send, PDF, Mark paid and Void are in the invoice
-// sheet. There is no gold action on the page; the one brushed gold button
-// is "Send reminder" inside the Remind sheet, as on the phone.
+// sort, filter and Export CSV. They stay: the aging summary sits beside the
+// vault card, and the three lists open as pages at ?panel= (decision D16),
+// as tables here. There is no gold action on the page.
 //
 // The numbers come from buildMoneyView (lib/moneyView.ts), read against
 // the clock Invoices.tsx passes down (`now`, from useNow), so the week,
 // "Due today" and the month label roll over while the page stays open.
 // Until the bundle arrives, the vault card, the aging summary, the link
 // strip and the groups are all skeletons, and so is a page opened by its
-// ?panel= link: no $0.00 stands in for money that has not loaded. The
-// handlers that send, download, void and record payments are
-// Invoices.tsx's own.
+// ?panel= link: no $0.00 stands in for money that has not loaded.
 
 import { useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
@@ -36,7 +33,6 @@ import { useCompanyJobs } from '../../lib/queries.ts'
 import { buildInvoiceList, buildMoneyView } from '../../lib/moneyView.ts'
 import { PANEL_TITLES, plural } from '../../screens/money/MoneyPanels.tsx'
 import { useMoneyPanel } from '../../screens/money/useMoneyPanel.ts'
-import { useMoneySheets } from '../../screens/money/useMoneySheets.tsx'
 import type { JobBalanceRow, MoneyScreenProps } from '../../screens/money/types.ts'
 import GroupTable from './money/GroupTable.tsx'
 import { AgingSummary, BalancesTable, InvoicesTable, StatementsTable } from './money/DeskPanels.tsx'
@@ -51,7 +47,6 @@ export type SnowInvoicesBuildProps = MoneyScreenProps & {
 export default function SnowInvoicesBuild({
   bundle,
   loading,
-  invoiceRows,
   jobBalances,
   totals,
   clientAR,
@@ -59,13 +54,7 @@ export default function SnowInvoicesBuild({
   filter,
   onFilterChange,
   now,
-  sendingIds,
-  onSendInvoice,
-  onDownloadInvoice,
-  onPayInvoice,
-  onVoidInvoice,
   onStatement,
-  onRefresh,
   onPayRow
 }: SnowInvoicesBuildProps) {
   const { profile } = useProfile()
@@ -84,18 +73,7 @@ export default function SnowInvoicesBuild({
     [invoiceList]
   )
 
-  const { openActions, openRemind, openPicker, sheets } = useMoneySheets({
-    bundle,
-    invoiceRows,
-    invoiceList,
-    sendingIds,
-    onSendInvoice,
-    onDownloadInvoice,
-    onPayInvoice,
-    onVoidInvoice,
-    onRefresh
-  })
-
+  const openInvoice = (invoiceId: string) => navigate(`/invoices/${invoiceId}`)
   const openJob = (to: string) => navigate(to)
   const month = now.toLocaleDateString('en-US', { month: 'long' })
   const hasDue = view ? view.overdue.length + view.dueSoon.length > 0 : false
@@ -123,7 +101,7 @@ export default function SnowInvoicesBuild({
             <>
               {panel === 'statements' && <StatementsTable groups={clientAR} onStatement={onStatement} />}
               {panel === 'invoices' && (
-                <InvoicesTable rows={invoiceList} filter={filter} onFilterChange={onFilterChange} onOpenInvoice={openActions} />
+                <InvoicesTable rows={invoiceList} filter={filter} onFilterChange={onFilterChange} onOpenInvoice={openInvoice} />
               )}
               {panel === 'balances' && (
                 <BalancesTable
@@ -139,7 +117,6 @@ export default function SnowInvoicesBuild({
             </>
           )}
         </main>
-        {sheets}
       </div>
     )
   }
@@ -150,7 +127,7 @@ export default function SnowInvoicesBuild({
         <h1 className="fhmd-title" ref={titleRef} tabIndex={-1}>Money</h1>
         <div className="fhmd-toolbar__actions">
           <Button variant="quiet" size="md" to="/analytics">Reports</Button>
-          <Button variant="secondary" size="md" icon={Plus} onClick={openPicker}>New invoice</Button>
+          <Button variant="secondary" size="md" icon={Plus} to="/invoices/new">New invoice</Button>
         </div>
       </header>
 
@@ -222,9 +199,9 @@ export default function SnowInvoicesBuild({
                 title="Overdue"
                 note={countLine(view.overdue.length)}
                 rows={view.overdue}
-                onOpenInvoice={openActions}
+                onOpenInvoice={openInvoice}
                 onOpenJob={openJob}
-                onRemind={openRemind}
+                remind
               />
             )}
             {view.dueSoon.length > 0 && (
@@ -233,7 +210,7 @@ export default function SnowInvoicesBuild({
                 title="Due soon"
                 note={countLine(view.dueSoon.length)}
                 rows={view.dueSoon}
-                onOpenInvoice={openActions}
+                onOpenInvoice={openInvoice}
                 onOpenJob={openJob}
               />
             )}
@@ -242,7 +219,7 @@ export default function SnowInvoicesBuild({
                 <EmptyState
                   icon={Receipt}
                   title="No open invoices"
-                  action={<Button variant="secondary" size="md" onClick={openPicker}>Create an invoice</Button>}
+                  action={<Button variant="secondary" size="md" to="/invoices/new">Create an invoice</Button>}
                 />
               </div>
             )}
@@ -255,7 +232,7 @@ export default function SnowInvoicesBuild({
                 title="Waiting on approval"
                 note={formatMoney(view.waiting.reduce((sum, r) => sum + r.amount, 0))}
                 rows={view.waiting}
-                onOpenInvoice={openActions}
+                onOpenInvoice={openInvoice}
                 onOpenJob={openJob}
               />
             )}
@@ -265,14 +242,13 @@ export default function SnowInvoicesBuild({
                 title="Paid"
                 note="Last 10 days"
                 rows={view.paid}
-                onOpenInvoice={openActions}
+                onOpenInvoice={openInvoice}
                 onOpenJob={openJob}
               />
             )}
           </>
         )}
       </main>
-      {sheets}
     </div>
   )
 }

@@ -210,12 +210,15 @@ test('shows the mobile Settings save action only after a change', async ({ page 
   }
 })
 
+// The invoice screen's actions sit in the flow (Phase 9, D57): nothing on
+// the screen hides behind the dock on a phone or the sidebar on a desktop
+// once it is scrolled to the end.
 test('keeps invoice actions clear of mobile and desktop navigation', async ({ page }, testInfo) => {
   await page.setViewportSize(testInfo.project.name.startsWith('mobile')
     ? { width: 390, height: 844 }
     : { width: 1440, height: 900 })
-  await openRoute(page, '/invoices/c-job2')
-  const actionBar = page.locator('.fh-invoice-actionbar')
+  await openRoute(page, '/invoices/inv1')
+  const actionBar = page.locator('.fhinv-actions')
   await expect(actionBar).toBeVisible()
   await page.evaluate(() => window.scrollTo({
     top: document.documentElement.scrollHeight - window.innerHeight,
@@ -223,26 +226,23 @@ test('keeps invoice actions clear of mobile and desktop navigation', async ({ pa
   }))
 
   const geometry = await page.evaluate(() => {
-    const bar = document.querySelector<HTMLElement>('.fh-invoice-actionbar')!.getBoundingClientRect()
-    const screen = document.querySelector<HTMLElement>('.v3-screen--invoice-detail')!
+    const bar = document.querySelector<HTMLElement>('.fhinv-actions')!.getBoundingClientRect()
+    const screen = document.querySelector<HTMLElement>('.fhinv')!
     const flowBottom = Array.from(screen.children)
-      .filter((element) => !element.classList.contains('fh-invoice-actionbar'))
       .map((element) => (element as HTMLElement).getBoundingClientRect().bottom)
       .reduce((max, bottom) => Math.max(max, bottom), Number.NEGATIVE_INFINITY)
     const nav = document.querySelector<HTMLElement>('.fhs-dock__coin')?.getBoundingClientRect()
     return {
-      barTop: Math.round(bar.top),
-      barBottom: Math.round(bar.bottom),
       barLeft: Math.round(bar.left),
       flowBottom: Math.round(flowBottom),
       navTop: nav ? Math.round(nav.top) : null
     }
   })
 
-  expect(geometry.barTop - geometry.flowBottom).toBeGreaterThanOrEqual(15)
   if (testInfo.project.name.startsWith('mobile')) {
-    // navTop is the Capture coin's top, the highest point of the dock.
-    expect((geometry.navTop || 0) - geometry.barBottom).toBeGreaterThanOrEqual(8)
+    // navTop is the Capture coin's top, the highest point of the dock: the
+    // last thing on the screen ends above it.
+    expect((geometry.navTop || 0) - geometry.flowBottom).toBeGreaterThanOrEqual(8)
   } else {
     expect(geometry.barLeft).toBeGreaterThanOrEqual(232)
   }

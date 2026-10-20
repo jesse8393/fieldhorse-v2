@@ -1,9 +1,8 @@
-// First-class invoices (pipeline v2). One fh_invoices row per invoice,
-// N per job, deposit, progress draws, final balance. This module is
-// the single home for create / PDF / send / settle so the job screen,
-// the Financials tab, and the Invoices screen all drive the same
-// plumbing. Extracted from InvoiceDrawsSection (which now consumes it)
-// so "send an invoice" is callable from anywhere with one function.
+// First-class invoices (pipeline v2, D62). One fh_invoices row per invoice:
+// a job's deposit, progress draws and final balance, or a bill that stands
+// on its own against a client with no job. This module is the single home
+// for create / PDF / send / settle so the invoice screen, the job's money
+// tab and Money all drive the same plumbing.
 
 import { supabase, authHeaders } from './supabase.ts'
 import { allocateInvoiceDue, knownContractTotal, type DueInvoice } from './invoiceSettlement.ts'
@@ -78,6 +77,7 @@ export function contractTotals({ contact, payments = [], changeOrders = [], invo
 // contract amount (knownContractTotal null) has no balance to cap at.
 export function invoiceAmountDue({ invoice, contact, payments = [], changeOrders = [], invoices = null }: {
   invoice: (Omit<DueInvoice, 'id'> & { id?: string | null }) | null | undefined
+  /** The job the invoice bills, or null for an invoice that bills the client directly (D62). */
   contact: Partial<Contact> | null | undefined
   payments?: { amount?: number | string | null; invoice_id?: string | null }[]
   changeOrders?: { amount?: number | string | null; status?: string | null }[]
@@ -86,9 +86,15 @@ export function invoiceAmountDue({ invoice, contact, payments = [], changeOrders
 }) {
   const amount = Number(invoice?.amount || 0)
   if (!Number.isFinite(amount) || amount <= 0) return 0
-  const contractTotal = knownContractTotal({ amount: contact?.amount, changeOrders })
   const id = invoice?.id || 'this-invoice'
   const self: DueInvoice = { ...invoice, id, status: 'sent' }
+  // An invoice with no job is a contract of its own amount: every payment
+  // handed in is its own, so what it owes is its amount less those payments.
+  if (!contact) {
+    const due = allocateInvoiceDue({ invoices: [self], payments, contractTotal: amount, applyUnlinked: true })
+    return Math.round((due.get(id) ?? 0) * 100) / 100
+  }
+  const contractTotal = knownContractTotal({ amount: contact?.amount, changeOrders })
   const others = (invoices || []).filter((inv) => inv?.id !== id)
   const due = allocateInvoiceDue({
     invoices: [...others, self],
@@ -108,10 +114,14 @@ export async function fetchInvoicesForContact(contactId: string) {
   return { data: (data || []) as InvoiceRow[], error }
 }
 
-// An invoice bills a job (contact) or, with no job, the client directly
-// through client_id (D62). Pass clientId with or without a job.
-export async function createInvoice({ contact, clientId = null, userId, title, amount, status = 'draft', due_at = null, notes = null, description = null }: {
-  contact: Pick<Contact, 'id'> | null
+// An invoice bills a job (contact or contactId) or, with no job, the client
+// directly through client_id (D62). Pass clientId with or without a job.
+export async function createInvoice({ contact = null, contactId = null, clientId = null, userId, title, amount, status = 'draft', due_at = null, notes = null, description = null }: {
+  /** The job it bills, when there is one (D54); null for an invoice against the client alone. */
+  contact?: Pick<Contact, 'id'> | null
+  /** The job's id, for callers that have no row. */
+  contactId?: string | null
+  /** The client the invoice bills (D62). An invoice always has one. */
   clientId?: string | null
   userId: string
   title: string
@@ -124,8 +134,8 @@ export async function createInvoice({ contact, clientId = null, userId, title, a
   const { data, error } = await supabase
     .from('fh_invoices')
     .insert({
-      contact_id: contact?.id ?? null,
-      client_id: clientId,
+      client_id: clientId || null,
+      contact_id: contact?.id || contactId || null,
       user_id: userId,
       sequence_number: 0, // BEFORE INSERT trigger assigns the next number
       title: title?.trim() || 'Invoice',
@@ -140,6 +150,75 @@ export async function createInvoice({ contact, clientId = null, userId, title, a
   return { data: data as InvoiceRow | null, error }
 }
 
+/**
+ * Who an invoice bills, for the PDF, the email and the screens: the job's
+ * own details first (the job row carries the customer as it was at the
+ * time), then the client it or the invoice points at.
+ */
+export type BillTo = {
+  id: string | null
+  name: string
+  email: string
+  phone: string
+  address: string
+  job_title: string | null
+}
+
+export function billTo(
+  job: { id?: string | null; name?: string | null; email?: string | null; phone?: string | null; address?: string | null; job_title?: string | null; fh_clients?: { name?: string | null; email?: string | null; phone?: string | null; address?: string | null } | null } | null | undefined,
+  client: { id?: string | null; name?: string | null; email?: string | null; phone?: string | null; address?: string | null } | null | undefined
+): BillTo {
+  const cli = job?.fh_clients || client || {}
+  const pick = (a: unknown, b: unknown) => (typeof a === 'string' && a.trim()) || (typeof b === 'string' && b.trim()) || ''
+  return {
+    id: job?.id || client?.id || null,
+    name: pick(job?.name, cli.name) || pick(client?.name, ''),
+    email: pick(job?.email, cli.email) || pick(client?.email, ''),
+    phone: pick(job?.phone, cli.phone) || pick(client?.phone, ''),
+    address: pick(job?.address, cli.address) || pick(client?.address, ''),
+    job_title: job?.job_title?.trim() || null
+  }
+}
+
+/**
+ * Records a payment against an invoice that bills the client directly (no
+ * job, D62): an fh_payments row linked to the invoice with no contact, and
+ * the invoice flips to paid once its payments cover it. A job's invoice is
+ * paid through logPayment (lib/pipeline.ts), which settles the job too.
+ */
+export async function logInvoicePayment(invoice: Pick<InvoiceRow, 'id' | 'user_id' | 'amount' | 'status'>, input: {
+  id?: string | null
+  amount: number
+  method?: string | null
+  kind?: string | null
+  reference?: string | null
+  paid_on?: string | null
+  /** Payments already linked to the invoice, so the paid flip counts them. */
+  priorPayments?: { amount?: number | string | null }[]
+}) {
+  const amount = Number(input.amount) || 0
+  const kind = ['deposit', 'progress', 'final', 'retainage', 'other'].includes(input.kind ?? '') ? (input.kind as string) : 'other'
+  const payload: Record<string, unknown> = {
+    ...(input.id ? { id: input.id } : {}),
+    user_id: invoice.user_id,
+    contact_id: null,
+    invoice_id: invoice.id,
+    amount,
+    method: input.method || 'check',
+    kind,
+    reference: input.reference || null,
+    paid_on: input.paid_on || new Date().toISOString().slice(0, 10)
+  }
+  const { error } = await supabase.from('fh_payments').upsert(payload as any, { onConflict: 'id', ignoreDuplicates: true })
+  if (error) return { error, paid: false }
+  const prior = (input.priorPayments || []).reduce((s, p) => s + Number(p.amount || 0), 0)
+  const paid = prior + amount >= Number(invoice.amount || 0) - 0.005
+  if (paid && invoice.status !== 'paid' && invoice.status !== 'void') {
+    await supabase.from('fh_invoices').update({ status: 'paid' }).eq('id', invoice.id)
+  }
+  return { error: null, paid }
+}
+
 export async function setInvoiceStatus(invoice: Pick<InvoiceRow, 'id'>, status: InvoiceStatus, extra: Partial<InvoiceRow> = {}) {
   const { data, error } = await supabase
     .from('fh_invoices')
@@ -150,12 +229,6 @@ export async function setInvoiceStatus(invoice: Pick<InvoiceRow, 'id'>, status: 
   return { data: data as InvoiceRow | null, error }
 }
 
-// Build the per-invoice PDF. The invoice's amount is "this invoice";
-// the balance-summary block on the PDF reconciles it against the
-// contract total + payments so the customer always sees where this
-// bill sits in the whole job. The hero prints what the invoice still owes
-// (invoiceAmountDue, or `amountDue` when the caller already worked it out),
-// so the PDF and the email it travels with name one figure.
 /**
  * What an invoice is for, in the customer's words: the invoice's own
  * description, else the job title, else a generic line. Every PDF, email
@@ -169,9 +242,12 @@ export function invoiceDescription(
   return invoice?.description?.trim() || contact?.job_title?.trim() || 'Construction services'
 }
 
-export async function buildInvoicePdf({ invoice, contact, company, payments = [], changeOrders = [], insurance = null, invoices = null, amountDue = null }: {
+export type InvoicePdfArgs = {
   invoice: InvoiceRow
+  /** The job the invoice bills, or null when it bills the client directly (D62). */
   contact: any
+  /** The client, read when there is no job (or the job has no customer details). */
+  client?: any
   company: any
   payments?: any[]
   changeOrders?: any[]
@@ -180,32 +256,43 @@ export async function buildInvoicePdf({ invoice, contact, company, payments = []
   invoices?: DueInvoice[] | null
   /** What this invoice still owes, when the caller has it; else it is worked out here. */
   amountDue?: number | null
-}) {
+}
+
+/**
+ * What generateInvoice (lib/pdf.js) is handed for one invoice, as plain
+ * data, so the figures the PDF prints can be checked without drawing it.
+ * With a job, the balance summary reconciles this bill against the
+ * contract and the job's payments. Without one, the invoice is the whole
+ * contract: the PDF skips the Contract position block and the hero asks
+ * for the invoice less its payments.
+ */
+export function invoicePdfInput({ invoice, contact, client = null, company, payments = [], changeOrders = [], insurance = null, invoices = null, amountDue = null }: InvoicePdfArgs) {
+  const job = contact || null
+  const recipient = billTo(job, client)
   // generateInvoice folds approved COs into the balance summary itself
   // (it receives `changeOrders`), so pass the RAW contract amount here :
   // passing the CO-inclusive contractTotals().contractTotal double-counts.
   // A job with no recorded contract (and no approved change order) passes
   // null, and the PDF then reconciles against this invoice instead of
   // calling a $0 contract paid in full.
-  const { paid } = contractTotals({ contact, payments, changeOrders })
-  const contractTotal = knownContractTotal({ amount: contact?.amount, changeOrders }) == null
+  const { paid } = contractTotals({ contact: job, payments, changeOrders })
+  const contractTotal = !job || knownContractTotal({ amount: job?.amount, changeOrders }) == null
     ? null
-    : Number(contact?.amount || 0)
-  const due = amountDue ?? invoiceAmountDue({ invoice, contact, payments, changeOrders, invoices })
+    : Number(job?.amount || 0)
+  const due = amountDue ?? invoiceAmountDue({ invoice, contact: job, payments, changeOrders, invoices })
   const title = invoice.title?.trim() || `Invoice #${invoice.sequence_number}`
   // Customer facing "what is this for". No address here, the recipient
   // block already prints it, and in the table it just wraps into noise.
-  const description = invoiceDescription(invoice, contact)
-  const { generateInvoice } = await loadPdf()
-  return generateInvoice({
+  const description = invoiceDescription(invoice, job)
+  return {
     company,
     contact: {
-      id: contact.id,
-      name: contact.name || 'Client',
-      address: contact.address,
-      phone: contact.phone,
-      email: contact.email,
-      job_title: `${title}, ${contact.job_title || 'Construction services'}`
+      id: recipient.id,
+      name: recipient.name || 'Client',
+      address: recipient.address,
+      phone: recipient.phone,
+      email: recipient.email,
+      job_title: `${title}, ${recipient.job_title || 'Construction services'}`
     },
     // pdf.js maps line item `description` → the narrow bold
     // Product/Service column and `notes` → the wide Description column.
@@ -224,11 +311,24 @@ export async function buildInvoicePdf({ invoice, contact, company, payments = []
     currentInvoice: invoice,
     payments,
     contractTotal,
-    previouslyPaid: paid,
+    previouslyPaid: job ? paid : null,
     amountDue: due,
     insurance,
-    changeOrders
-  } as any)
+    changeOrders: job ? changeOrders : [],
+    showContractPosition: !!job
+  }
+}
+
+// Build the per-invoice PDF. The invoice's amount is "this invoice";
+// the balance-summary block on the PDF reconciles it against the
+// contract total + payments so the customer always sees where this
+// bill sits in the whole job. The hero prints what the invoice still owes
+// (invoiceAmountDue, or `amountDue` when the caller already worked it out),
+// so the PDF and the email it travels with name one figure.
+export async function buildInvoicePdf(args: InvoicePdfArgs) {
+  const input = invoicePdfInput(args)
+  const { generateInvoice } = await loadPdf()
+  return generateInvoice(input as any)
 }
 
 export type SendInvoiceResult =
@@ -239,9 +339,12 @@ export type SendInvoiceResult =
 // (server pulls it with service role) → POST /api/send-invoice → flip
 // the row to 'sent'. On a missing Resend config the PDF downloads
 // locally so the operator can email it by hand.
-export async function sendInvoiceEmail({ invoice, contact, company, userId, recipientEmail, payments = [], changeOrders = [], invoices = null, insurance = null }: {
+export async function sendInvoiceEmail({ invoice, contact, client = null, company, userId, recipientEmail, payments = [], changeOrders = [], invoices = null, insurance = null }: {
   invoice: InvoiceRow
+  /** The job the invoice bills, or null when it bills the client directly (D62). */
   contact: any
+  /** The client, for the recipient when there is no job. */
+  client?: any
   company: any
   userId: string
   recipientEmail?: string | null
@@ -251,51 +354,59 @@ export async function sendInvoiceEmail({ invoice, contact, company, userId, reci
   invoices?: DueInvoice[] | null
   insurance?: any
 }): Promise<SendInvoiceResult> {
-  const recipient = (recipientEmail || contact?.email || contact?.fh_clients?.email || '').trim()
+  const job = contact || null
+  const to = billTo(job, client)
+  const recipient = (recipientEmail || to.email || '').trim()
   if (!recipient) return { ok: false, reason: 'no_email' }
 
   // One figure for the email and the PDF it attaches.
-  const amountDue = invoiceAmountDue({ invoice, contact, payments, changeOrders, invoices })
-  const result = await buildInvoicePdf({ invoice, contact, company, payments, changeOrders, insurance, invoices, amountDue })
+  const amountDue = invoiceAmountDue({ invoice, contact: job, payments, changeOrders, invoices })
+  const result = await buildInvoicePdf({ invoice, contact: job, client, company, payments, changeOrders, insurance, invoices, amountDue })
   if (!result?.doc) return { ok: false, reason: 'error', message: 'PDF generator returned no document' }
 
   const blob = result.doc.output('blob')
   const rowId = crypto.randomUUID()
-  const path = `${userId}/${contact.id}/${rowId}.pdf`
+  // Under the sender's own folder either way (the server checks that); a
+  // job's PDF sits with the job's files, a client's under its invoice.
+  const path = job ? `${userId}/${job.id}/${rowId}.pdf` : `${userId}/invoices/${invoice.id}/${rowId}.pdf`
   const { error: upErr } = await supabase.storage
     .from('job-files')
     .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
   if (upErr) return { ok: false, reason: 'error', message: `Couldn't save the invoice PDF: ${upErr.message}` }
 
-  // Audit row, best-effort, never blocks the send.
-  try {
-    await supabase.from('fh_job_files').insert({
-      id: rowId,
-      user_id: userId,
-      job_id: contact.id,
-      filename: result.filename,
-      storage_path: path,
-      mime_type: 'application/pdf',
-      size_bytes: blob.size || 0,
-      kind: 'file'
-    })
-  } catch (e) {
-    console.warn('[invoices] fh_job_files row insert failed', e)
+  // Audit row on the job, best-effort, never blocks the send.
+  if (job) {
+    try {
+      await supabase.from('fh_job_files').insert({
+        id: rowId,
+        user_id: userId,
+        job_id: job.id,
+        filename: result.filename,
+        storage_path: path,
+        mime_type: 'application/pdf',
+        size_bytes: blob.size || 0,
+        kind: 'file'
+      })
+    } catch (e) {
+      console.warn('[invoices] fh_job_files row insert failed', e)
+    }
   }
 
   const sendRes = await fetch('/api/send-invoice', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     body: JSON.stringify({
-      contact_id: contact.id,
+      contact_id: job?.id || null,
+      invoice_id: invoice.id,
+      client_id: invoice.client_id || client?.id || null,
       sender_user_id: userId,
       recipient_email: recipient,
-      recipient_name: contact.name || null,
+      recipient_name: to.name || null,
       storage_path: path,
       filename: result.filename,
       amount_due: amountDue,
       // What the email says the invoice is for, the same words as the PDF.
-      description: invoiceDescription(invoice, contact)
+      description: invoiceDescription(invoice, job)
     })
   })
   const sendBody = await sendRes.json().catch(() => ({}))
@@ -326,7 +437,7 @@ export async function sendInvoiceEmail({ invoice, contact, company, userId, reci
   return { ok: true, filename: result.filename, recipient }
 }
 
-// Suggested next invoice for a job, drives the SendInvoiceSheet
+// Suggested next invoice for a job, drives the new invoice screen's
 // prefill. Final balance when the work's complete or everything else
 // is billed; otherwise a progress draw of the unbilled remainder.
 export function suggestNextInvoice({ contact, payments = [], changeOrders = [], invoices = [] }: {

@@ -77,7 +77,10 @@ const PUBLIC_CHANGE_ORDER_COLUMNS = 'id, contact_id, sequence_number, title, des
 // Human label + in-app deep link for a "customer viewed" notification.
 export function viewedLabelFor(link) {
   if (link.kind === 'invoice') {
-    return { kindLabel: 'invoice', detailLink: `/jobs/${link.contact_id}?tab=financials` }
+    // A job's invoices live on its money tab; a client's (no job, D62) on
+    // the client.
+    const detailLink = link.contact_id ? `/jobs/${link.contact_id}?tab=financials` : `/clients/${link.client_id}`
+    return { kindLabel: 'invoice', detailLink }
   }
   if (link.kind === 'change_order') {
     return { kindLabel: 'change order', detailLink: `/jobs/${link.contact_id}?tab=quote` }
@@ -162,6 +165,12 @@ export default async function handler(req) {
   // quote first; contact_id links keep the job path below.
   if (link.quote_id) {
     return handleQuote(supabase, req, link)
+  }
+  // An invoice that bills a client with no job (D62) is client-scoped too:
+  // the client stands in for the job, and its invoices are the ones with
+  // no contact_id.
+  if (link.kind === 'invoice' && !link.contact_id && link.client_id) {
+    return handleClientInvoice(supabase, req, link)
   }
 
   // 2. Load the contact + related data in parallel. Branding comes from the
@@ -338,6 +347,64 @@ export default async function handler(req) {
     insurance: insurance || null,
     invoices: invoices || [],
     photos
+  })
+}
+
+// An invoice link for a client with no job (D62). The client is the
+// recipient; the invoices are the client's job less bills, projected to the
+// customer visible columns and statuses; payments are the ones linked to
+// those invoices. The page then renders the oldest open one as "this
+// invoice" with no contract to reconcile against.
+async function handleClientInvoice(supabase, req, link) {
+  const brandUserId = await brandingUserIdFor(supabase, link)
+  const [{ data: client }, { data: profile }, { data: invoices }] = await Promise.all([
+    supabase.from('fh_clients').select('*').eq('id', link.client_id).match(linkScope(link)).maybeSingle(),
+    supabase.from('profiles').select('*').eq('user_id', brandUserId).maybeSingle(),
+    supabase
+      .from('fh_invoices')
+      .select('id, contact_id, client_id, sequence_number, title, amount, status, issued_at, due_at, description')
+      .eq('client_id', link.client_id)
+      .is('contact_id', null)
+      .in('status', ['sent', 'paid', 'overdue'])
+      .order('sequence_number', { ascending: true })
+  ])
+  if (!client) {
+    return json({ error: 'gone', message: 'This document is no longer available.' }, 404)
+  }
+  const invoiceIds = (invoices || []).map((inv) => inv.id)
+  const { data: payments } = invoiceIds.length > 0
+    ? await supabase.from('fh_payments').select(PUBLIC_PAYMENT_COLUMNS).in('invoice_id', invoiceIds).order('paid_on', { ascending: false })
+    : { data: [] }
+  const openOnes = (invoices || []).filter((inv) => inv.status !== 'paid')
+  const amount = (openOnes.length > 0 ? openOnes : invoices || []).reduce((s, inv) => s + Number(inv.amount || 0), 0)
+  const contact = {
+    id: client.id,
+    name: client.name,
+    address: client.address,
+    phone: client.phone,
+    email: client.email,
+    job_title: null,
+    job_type: null,
+    stage: null,
+    created_at: client.created_at,
+    amount
+  }
+  const settled = await Promise.allSettled([recordPublicLinkView(supabase, req, link, contact)])
+  for (const result of settled) {
+    if (result.status === 'rejected') console.warn('[public-link] side effect failed', result.reason)
+  }
+  return json({
+    ok: true,
+    kind: 'invoice',
+    change_order_id: null,
+    contact,
+    company: buildCompany(profile),
+    items: [],
+    payments: payments || [],
+    changeOrders: [],
+    insurance: null,
+    invoices: invoices || [],
+    photos: []
   })
 }
 
