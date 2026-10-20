@@ -27,11 +27,15 @@ const now = readQaNow(process.env.QA_NOW)
 const day = 86400000
 const iso = (d) => new Date(d).toISOString()
 const CLIENT = { id: 'cl-1', name: 'Jeff Roy', phone: '555-0101', email: 'jeff@roy.com' }
+// Leads and quotes live in fh_leads and fh_quotes (SPEC D55). The four
+// contact rows the migration moved stay here with stage moved_lead or
+// moved_quote, as production has them, so an old /leads/c-lead1 link can
+// follow origin_contact_id to its new row. No screen may show them.
 const contacts = [
-  { id: 'c-lead1', stage: 'lead',    name: 'Justin Bryan',     job_title: 'Vintage Burkitt Station Drainage', amount: 24400, follow_up_on: iso(now - 10 * day).slice(0, 10), referred_by: 'Google', job_type: 'Drainage' },
-  { id: 'c-lead2', stage: 'lead',    name: 'Lily Grace North', job_title: 'Retaining wall + pad', amount: 18750, referred_by: 'Referral', job_type: 'Concrete' },
-  { id: 'c-quote', stage: 'quote',   name: 'MMC Properties',   job_title: 'Parking lot repour', amount: 46200, proposal_status: 'sent', quote_sent_at: iso(now - day), follow_up_on: iso(now + 2 * day).slice(0, 10) },
-  { id: 'c-change', stage: 'quote',  name: 'Taylor Reed',      job_title: 'Kitchen renovation', amount: 18400, proposal_status: 'changes_requested', quote_change_request_note: 'Please separate the cabinet allowance.', quote_change_requested_at: iso(now - 2 * 3600e3) },
+  { id: 'c-lead1', stage: 'moved_lead',  name: 'Justin Bryan',     job_title: 'Vintage Burkitt Station Drainage', amount: 24400, follow_up_on: iso(now - 10 * day).slice(0, 10), referred_by: 'Google', job_type: 'Drainage' },
+  { id: 'c-lead2', stage: 'moved_lead',  name: 'Lily Grace North', job_title: 'Retaining wall + pad', amount: 18750, referred_by: 'Referral', job_type: 'Concrete' },
+  { id: 'c-quote', stage: 'moved_quote', name: 'MMC Properties',   job_title: 'Parking lot repour', amount: 46200, proposal_status: 'sent', quote_sent_at: iso(now - day), follow_up_on: iso(now + 2 * day).slice(0, 10) },
+  { id: 'c-change', stage: 'moved_quote', name: 'Taylor Reed',     job_title: 'Kitchen renovation', amount: 18400, proposal_status: 'changes_requested', quote_change_request_note: 'Please separate the cabinet allowance.', quote_change_requested_at: iso(now - 2 * 3600e3) },
   { id: 'c-job1',  stage: 'job',     name: 'Plumbing Bellevue', job_title: 'Slab + trench', amount: 33100 },
   { id: 'c-job2',  stage: 'invoice', name: 'Harold Wickham',   job_title: 'Driveway replacement', amount: 12800 },
   { id: 'c-done',  stage: 'closed',  name: 'Danielle Ortiz',   job_title: 'Patio + walkway', amount: 9600, completed_at: iso(now - 20 * day) },
@@ -42,6 +46,23 @@ const contacts = [
   created_at: iso(now - (30 - i) * day), updated_at: iso(now - i * day),
   proposal_status: null, follow_up_on: null, completed_at: null, invoice_no: null,
   client_name: CLIENT.name, fh_clients: CLIENT, ...c
+}))
+
+const leads = [
+  { id: 'l-lead1', origin_contact_id: 'c-lead1', title: 'Vintage Burkitt Station Drainage', job_type: 'Drainage', referred_by: 'Google', source: 'Google', follow_up_on: iso(now - 10 * day).slice(0, 10), created_at: iso(now - 30 * day), updated_at: iso(now) },
+  { id: 'l-lead2', origin_contact_id: 'c-lead2', title: 'Retaining wall + pad', job_type: 'Concrete', referred_by: 'Referral', source: 'Referral', created_at: iso(now - 29 * day), updated_at: iso(now - day) }
+].map((l) => ({
+  user_id: USER.id, client_id: 'cl-1', status: 'open', notes: null, last_contact: null, quote_id: null, follow_up_on: null,
+  fh_clients: CLIENT, ...l
+}))
+
+const quotes = [
+  { id: 'q-quote', origin_contact_id: 'c-quote', title: 'Parking lot repour', amount: 46200, status: 'sent', sent_at: iso(now - day), created_at: iso(now - 28 * day), updated_at: iso(now - 2 * day) },
+  { id: 'q-change', origin_contact_id: 'c-change', title: 'Kitchen renovation', amount: 18400, status: 'changes_requested', change_request_note: 'Please separate the cabinet allowance.', change_requested_at: iso(now - 2 * 3600e3), created_at: iso(now - 27 * day), updated_at: iso(now - 3 * day) }
+].map((q) => ({
+  user_id: USER.id, client_id: 'cl-1', scope_text: null, terms_text: null, exclusions_text: null, job_type: null,
+  sent_at: null, expires_at: null, change_request_note: null, change_requested_at: null,
+  approved_version_id: null, lead_id: null, job_id: null, fh_clients: CLIENT, ...q
 }))
 
 const payments = [
@@ -69,6 +90,8 @@ const TABLES = {
   org_members: [{ id: 'm1', org_id: 'org-1', user_id: USER.id, role: process.env.QA_ROLE || 'owner', revoked_at: null, joined_at: iso(now - 90 * day), default_hourly_rate: null, status: 'active' }],
   organizations: [{ id: 'org-1', name: 'Parker Construction', created_at: iso(now - 90 * day) }],
   fh_contacts: contacts,
+  fh_leads: leads,
+  fh_quotes: quotes,
   fh_clients: [{ ...CLIENT, user_id: USER.id, company_name: null, address: '412 Burkitt Station Rd', created_at: iso(now - 60 * day) }],
   fh_payments: payments,
   fh_invoices: invoices,
@@ -115,7 +138,9 @@ for (const rows of Object.values(TABLES)) {
 // The mock does not know column types, so text that looks like a number
 // compares as a number: a zip of '01234' equals eq.1234 here, where a text
 // column in Postgres would not.
-// Everything else is ignored, as the mock always has: not. prefixes, or= and
+//   col=not.<op>.<value>                       the negation of any of those
+//                                               (a null row value never matches)
+// Everything else is ignored, as the mock always has: or= and
 // and=, like, ilike, cs, ov, fts and the other operators, filters on embedded
 // columns (a dot in the name, such as fh_contacts.stage) and ordering,
 // limits or offsets on embedded tables.
@@ -235,6 +260,13 @@ function rowTest(column, raw) {
   if (dot < 0) return null
   const op = raw.slice(0, dot)
   const value = raw.slice(dot + 1)
+  // not.<op>.<value> is the negation of the test, with the SQL rule that a
+  // null never matches either way.
+  if (op === 'not') {
+    const inner = rowTest(column, value)
+    if (!inner) return null
+    return (row) => (row[column] ?? null) !== null && !inner(row)
+  }
   const cell = (row) => row[column] ?? null
   // Compares the row's value with a filter value; null when the row has none.
   const against = (row, filterValue) => {

@@ -5,8 +5,10 @@ import { nothingRunsOffTheSide } from './helpers/overflow.ts'
 const routes = [
   { name: 'home', path: '/', ready: '[data-build-screen="SnowHomeBuild"]' },
   { name: 'work', path: '/work', ready: '.v3-screen--work' },
-  { name: 'lead-detail', path: '/leads/c-lead1', ready: '[data-build-screen="SnowJobDetailBuild"]' },
-  { name: 'quote-detail', path: '/quotes/c-quote?tab=quote', ready: '[data-build-screen="SnowJobDetailBuild"]' },
+  // Leads and quotes live in fh_leads and fh_quotes. Until Tasks 9 and 10
+  // build their screens, the route shows the record's title.
+  { name: 'lead-detail', path: '/leads/l-lead1', ready: 'h1:has-text("Vintage Burkitt Station Drainage")' },
+  { name: 'quote-detail', path: '/quotes/q-quote', ready: 'h1:has-text("Parking lot repour")' },
   { name: 'job-detail', path: '/jobs/c-job1', ready: '[data-build-screen="SnowJobDetailBuild"]' },
   { name: 'clients', path: '/clients', ready: '[data-build-screen="SnowClientsBuild"]' },
   { name: 'client-detail', path: '/clients/cl-1', ready: '[data-build-screen="SnowClientDetailBuild"]' },

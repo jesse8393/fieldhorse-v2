@@ -31,7 +31,7 @@ test.describe('jobs on a phone', () => {
   test('lost behind the filter', async ({ context, page }) => {
     await signIn(context)
     await openJobs(page)
-    await expect(page.getByText('Justin Bryan', { exact: true })).toBeVisible()
+    await expect(page.getByText('Plumbing Bellevue', { exact: true })).toBeVisible()
     await expect(page.getByText('Old Mill HOA', { exact: true })).toHaveCount(0)
 
     await page.getByRole('button', { name: 'Filter and sort' }).click()

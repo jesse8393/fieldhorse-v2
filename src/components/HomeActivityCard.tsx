@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Activity as ActivityIcon, DollarSign, FileEdit, Check, Briefcase, Receipt, ArrowRight } from 'lucide-react'
 import { supabase } from '../lib/supabase.ts'
+import { MOVED_STAGE_FILTER } from '../lib/stages.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { Eyebrow } from './v3'
 
@@ -89,6 +90,7 @@ export default function HomeActivityCard() {
         supabase.from('fh_contacts')
           .select('id, name, job_title')
           .eq('user_id', user.id)
+          .not('stage', 'in', MOVED_STAGE_FILTER)
           .order('updated_at', { ascending: false })
           .limit(PER_SOURCE * 2)
       ])

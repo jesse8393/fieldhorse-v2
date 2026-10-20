@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { Car, Save as SaveIcon, X } from 'lucide-react'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 import { supabase } from '../lib/supabase.ts'
+import { MOVED_STAGE_FILTER } from '../lib/stages.ts'
 import { toastError } from '../lib/toast.ts'
 import { Eyebrow } from './v3'
 
@@ -24,6 +25,7 @@ export default function LogMilesSheet({ open, userId, onOpenChange, onSaved }: a
       .from('fh_contacts')
       .select('id, name')
       .eq('user_id', userId)
+      .not('stage', 'in', MOVED_STAGE_FILTER)
       .order('name', { ascending: true })
       .then(({ data }: any) => setContacts(data || []))
   }, [userId, open])

@@ -46,7 +46,43 @@ const fake = vi.hoisted(() => {
 
 vi.mock('./supabase.ts', () => ({ supabase: fake.supabase }))
 
-const { margin, marginTier, logPayment } = await import('./stages.ts')
+const { margin, marginTier, logPayment, HIDDEN_STAGES, isMovedStage, STAGES, STAGE_MAP, LIST_STAGE_META, detailRoute } = await import('./stages.ts')
+
+// SPEC D55 and D56: fh_contacts keeps job, closed and lost as the stages a
+// person can pick. Rows copied into fh_leads and fh_quotes are marked
+// moved_lead or moved_quote and never show anywhere.
+describe('hidden stages', () => {
+  it('names the two moved markers', () => {
+    expect(HIDDEN_STAGES).toEqual(['moved_lead', 'moved_quote'])
+  })
+
+  it('isMovedStage is true only for the two markers', () => {
+    expect(isMovedStage('moved_lead')).toBe(true)
+    expect(isMovedStage('moved_quote')).toBe(true)
+    for (const s of ['lead', 'quote', 'job', 'invoice', 'closed', 'lost', '', null, undefined]) {
+      expect(isMovedStage(s)).toBe(false)
+    }
+  })
+
+  it('offers only job, closed and lost as stage choices', () => {
+    expect(STAGES.map((s) => s.id)).toEqual(['job', 'closed', 'lost'])
+  })
+
+  it('never labels a moved row', () => {
+    expect(STAGE_MAP.moved_lead).toBeUndefined()
+    expect(STAGE_MAP.moved_quote).toBeUndefined()
+    expect(LIST_STAGE_META.moved_lead).toBeUndefined()
+    expect(LIST_STAGE_META.moved_quote).toBeUndefined()
+  })
+
+  it('routes a lost contact to the job screen, since lost leads moved out', () => {
+    expect(detailRoute({ id: 'a', stage: 'job' })).toBe('/jobs/a')
+    expect(detailRoute({ id: 'a', stage: 'lost' })).toBe('/jobs/a')
+    expect(detailRoute({ id: 'a', stage: 'invoice' })).toBe('/jobs/a')
+    expect(detailRoute({ id: 'a', stage: 'moved_lead' })).toBe('/jobs/a')
+    expect(detailRoute({ id: 'a', stage: 'closed' }, { financials: true })).toBe('/jobs/a?tab=financials')
+  })
+})
 
 describe('margin', () => {
   it('is 0 when there is no contract amount', () => {

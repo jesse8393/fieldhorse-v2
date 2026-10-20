@@ -30,7 +30,7 @@ test('the mock honors in and limit on REST reads', async ({ page }) => {
 })
 
 test('the mock sends the filtered count to the page', async ({ page }) => {
-  const counted = await rest(page, 'fh_contacts?select=id&stage=in.(lead,quote)', { method: 'HEAD', headers: { Prefer: 'count=exact' } })
+  const counted = await rest(page, 'fh_contacts?select=id&stage=in.(moved_lead,moved_quote)', { method: 'HEAD', headers: { Prefer: 'count=exact' } })
   expect(counted.status).toBe(200)
   expect(counted.range).toBe('0-3/4')
 })

@@ -17,6 +17,7 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } f
 import { Calendar as CalendarIcon, Check, X } from 'lucide-react'
 import { hapticTap } from '../lib/haptics.ts'
 import { supabase } from '../lib/supabase.ts'
+import { MOVED_STAGE_FILTER } from '../lib/stages.ts'
 import { useOrgScope } from '../lib/orgScope.ts'
 import { createScheduleEvents } from '../lib/scheduleWrite.ts'
 import { toastError } from '../lib/toast.ts'
@@ -55,6 +56,7 @@ export default function AddEventSheet({ open, userId, onClose, onSaved, defaultC
       .select('id, name, job_title, address, stage')
     ;(orgScope ? base.eq('org_id', orgScope) : base.eq('user_id', userId))
       .neq('stage', 'lost')
+      .not('stage', 'in', MOVED_STAGE_FILTER)
       .order('updated_at', { ascending: false })
       .then(({ data }: any) => setContacts(data || []))
   }, [userId, orgScope])

@@ -18,7 +18,7 @@
 // known item, not for browsing, go to the dedicated screen for that.
 
 import { supabase } from './supabase.ts'
-import { detailRoute, stageLabel } from './stages.ts'
+import { detailRoute, MOVED_STAGE_FILTER, stageLabel } from './stages.ts'
 import { escapeLikeText, ilikeAnyOf } from './searchFilter.ts'
 import { lastKnownOrg } from './orgScope.ts'
 import type { PaletteJob } from './paletteActions.ts'
@@ -89,6 +89,7 @@ export async function universalSearch(
     scoped(supabase
       .from('fh_contacts')
       .select('id, name, job_title, job_type, stage, amount, phone, address'))
+      .not('stage', 'in', MOVED_STAGE_FILTER)
       .or(ilikeAnyOf(['name', 'job_title', 'job_type', 'phone', 'email', 'address'], q))
       .order('updated_at', { ascending: false })
       .limit(PER_KIND),

@@ -7,7 +7,8 @@ import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useMembership } from '../../contexts/MembershipContext.tsx'
 import { supabase } from '../../lib/supabase.ts'
 import { markLost, startQuote, reopen, reopenQuestion } from '../../lib/pipeline.ts'
-import { stageColor, margin } from '../../lib/stages.ts'
+import { stageColor, margin, isMovedStage } from '../../lib/stages.ts'
+import { MovedRecordRedirect } from '../../components/MovedRecordRedirect.tsx'
 import { toastSuccess, toastError } from '../../lib/toast.ts'
 import { hapticTap, hapticError } from '../../lib/haptics.ts'
 import { SkeletonBlock as SkeletonBlock_, SkeletonList as SkeletonList_ } from '../../components/Skeleton.tsx'
@@ -446,11 +447,17 @@ export default function ContactDetail() {
     )
   }
 
+  // The migration moved this row into fh_leads or fh_quotes (SPEC D56):
+  // an old link lands on the new record. A row that is gone gets the same
+  // lookup, in case the marked rows were cleaned up. The not found view
+  // below is the fallback when nothing points back at the id.
+  const lookForMoved = id && !isError && (!contact || isMovedStage(contact.stage))
+
   // Not found, or could not load. A failed fetch (offline, 5xx, expired
   // session) is not proof the job is gone, so it gets a retry instead of
   // "not found".
-  if (!contact) {
-    return (
+  if (!contact || lookForMoved) {
+    const notFound = (
       <div style={{ padding: '32px 24px', minHeight: '100%', background: 'var(--v3-bg)', textAlign: 'center' }}>
         <button
           type="button"
@@ -475,6 +482,8 @@ export default function ContactDetail() {
         )}
       </div>
     )
+    if (lookForMoved) return <MovedRecordRedirect id={id} fallback={notFound} />
+    return notFound
   }
 
   // Phase 8, desktop dispatch. At >=900px every tab (including Quote)

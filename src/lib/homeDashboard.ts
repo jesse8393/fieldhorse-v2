@@ -1,7 +1,7 @@
 import { useCallback, useEffect } from 'react'
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from './supabase.ts'
-import { ACTIVE_STAGES } from './stages.ts'
+import { ACTIVE_STAGES, MOVED_STAGE_FILTER } from './stages.ts'
 import { fetchCoverPhotos, freshCoverUrls } from './photos.ts'
 import { chunkIds, fetchAllRows } from './queries.ts'
 import { useOrgScope } from './orgScope.ts'
@@ -743,6 +743,7 @@ export async function fetchHomeDashboard(
       ? supabase.from('fh_contacts').select(CONTACT_COLUMNS).eq('org_id', orgId)
       : supabase.from('fh_contacts').select(CONTACT_COLUMNS).eq('user_id', userId)
     )
+      .not('stage', 'in', MOVED_STAGE_FILTER)
       .order('id', { ascending: true })
       .range(from, to)
   )

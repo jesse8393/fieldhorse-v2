@@ -6,6 +6,7 @@ import { useProfile } from './contexts/ProfileContext.tsx'
 import { useMediaQuery } from './lib/useMediaQuery.ts'
 import { lazyWithRetry as lazy } from './lib/lazyWithRetry.ts'
 import AppShell from './components/AppShell.tsx'
+import { NewRecordRoute } from './components/MovedRecordRedirect.tsx'
 
 // Eager, must be in main bundle
 //   Login: gates everything; can't lazy-load the login screen
@@ -174,6 +175,21 @@ function LegacyBoardRedirect({ defaultStage }: { defaultStage?: string }) {
 
 function ContactDetailRoute() {
   const { id } = useParams()
+  return <ContactDetailSplit id={id} />
+}
+
+/**
+ * /leads/:id and /quotes/:id (SPEC D55, D56). Leads and quotes live in
+ * their own tables now, so the id is first read there. An old fh_contacts
+ * id the migration moved is sent on to the new record; any other contact
+ * id still opens the old detail screen.
+ */
+function NewRecordDetailRoute({ kind }: { kind: 'lead' | 'quote' }) {
+  const { id = '' } = useParams()
+  return <NewRecordRoute kind={kind} id={id} fallback={<ContactDetailSplit id={id} />} />
+}
+
+function ContactDetailSplit({ id }: { id: string | undefined }) {
   const isWide = useMediaQuery('(min-width: 1680px)')
   return (
     <div className="fh-detail-split">
@@ -215,9 +231,9 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/work" element={<Work />} />
           <Route path="/leads" element={<LegacyBoardRedirect defaultStage="leads" />} />
-          <Route path="/leads/:id" element={<ContactDetailRoute />} />
+          <Route path="/leads/:id" element={<NewRecordDetailRoute kind="lead" />} />
           <Route path="/quotes" element={<LegacyBoardRedirect defaultStage="quotes" />} />
-          <Route path="/quotes/:id" element={<ContactDetailRoute />} />
+          <Route path="/quotes/:id" element={<NewRecordDetailRoute kind="quote" />} />
           <Route path="/pipeline" element={<LegacyBoardRedirect />} />
           <Route path="/jobs" element={<LegacyBoardRedirect defaultStage="active" />} />
           <Route path="/jobs/:id" element={<ContactDetailRoute />} />

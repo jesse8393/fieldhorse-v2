@@ -20,6 +20,7 @@ import {
   type QueryClient
 } from '@tanstack/react-query'
 import { supabase } from './supabase.ts'
+import { MOVED_STAGE_FILTER } from './stages.ts'
 import { subMatchesKey } from './subIdentity.ts'
 import { loadPartnerDirectory } from './partners.ts'
 import { useOrgScope } from './orgScope.ts'
@@ -127,6 +128,7 @@ async function fetchJobs(): Promise<JobRow[]> {
   const { data, error } = await supabase
     .from('fh_contacts')
     .select(`${JOB_LIST_COLUMNS}, fh_clients(name, phone, email)`)
+    .not('stage', 'in', MOVED_STAGE_FILTER)
     .order('updated_at', { ascending: false })
     // Sanity ceiling: 2000 most-recently-touched deals is far beyond what
     // the list UX can present; without it one giant book turns every
@@ -256,6 +258,7 @@ export function useJobSearch(term: string) {
       const { data, error } = await supabase
         .from('fh_contacts')
         .select(`${JOB_LIST_COLUMNS}, fh_clients(name, phone, email)`)
+        .not('stage', 'in', MOVED_STAGE_FILTER)
         .or(orExpr)
         .order('updated_at', { ascending: false })
         .limit(100)
@@ -303,6 +306,7 @@ async function fetchClientsBundle(userId: string, orgId?: string | null): Promis
     ),
     fetchAllRows<ClientsBundle['jobs'][number]>((from, to) =>
       scoped(supabase.from('fh_contacts').select('id, client_id, amount, stage'), userId, orgId)
+        .not('stage', 'in', MOVED_STAGE_FILTER)
         .order('id', { ascending: true })
         .range(from, to)
     ),
@@ -618,6 +622,7 @@ async function fetchActivity(userId: string, pageSize: number, orgId?: string | 
       .order('created_at', { ascending: false }).limit(pageSize),
     scoped(supabase.from('fh_contacts')
       .select('id, name, job_title, stage'), userId, orgId)
+      .not('stage', 'in', MOVED_STAGE_FILTER)
       .order('updated_at', { ascending: false }).limit(pageSize * 2)
   ])
   for (const result of [transitions, payments, changeOrders, invoices, contacts]) {
@@ -882,6 +887,7 @@ export const noteContactsKey = (userId: string | undefined, orgId?: string | nul
 async function fetchNoteContacts(userId: string, orgId?: string | null): Promise<NoteContact[]> {
   const rows = await fetchAllRows<NoteContact & { updated_at: string | null }>((from, to) =>
     scoped(supabase.from('fh_contacts').select('id, name, updated_at'), userId, orgId)
+      .not('stage', 'in', MOVED_STAGE_FILTER)
       .order('id', { ascending: true })
       .range(from, to)
   )
@@ -980,6 +986,7 @@ async function fetchClientDetail(id: string, userId: string, orgId?: string | nu
     .from('fh_contacts')
     .select('id, name, stage, job_title, job_type, amount, updated_at, created_at'), userId, orgId)
     .eq('client_id', client.id)
+    .not('stage', 'in', MOVED_STAGE_FILTER)
     .order('updated_at', { ascending: false })
   if (jobsErr) throw jobsErr
 
@@ -1077,6 +1084,7 @@ async function fetchAnalyticsBundle(userId: string, orgId?: string | null): Prom
       scoped(supabase
         .from('fh_contacts')
         .select('id, user_id, client_id, name, stage, amount, cost, created_at, completed_at, updated_at, follow_up_on, proposal_status, job_type, quote_sent_at'), userId, orgId)
+        .not('stage', 'in', MOVED_STAGE_FILTER)
         .order('id', { ascending: true })
         .range(from, to)
     ),
