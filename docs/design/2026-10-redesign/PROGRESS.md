@@ -31,7 +31,7 @@ Nothing. Main at `0c7d8e8` is the Phase 8 head, which passed CI (check and the f
 | 13 The job screen loses its sheets and gains Invoice this | done | this commit | Payment, event, partner, complete, follow up and More are screens under `/jobs/:id/...`; `/schedule/new` and `/schedule/:id/edit` replace the event sheet and link a job, lead or quote; Delete and Reopen confirm with a second tap; the job's Quote tab is gone; the stage button reads Invoice this while a balance is owed. The Schedule marks a lead's estimate with a Lead chip |
 | 14 Capture, Customers and the rest become screens | todo | | |
 | 15 Today, Reports, Clients and the Inbox | todo | | |
-| 16 Importer, webhooks, captures and the engine write the new records | todo | | |
+| 16 Importer, webhooks, captures and the engine write the new records | done | this commit | Importer rows, webhook leads and captured leads become a client plus an `fh_leads` row; the reminder engine scores open leads and sent, viewed or changes requested quotes with `/leads/:id` and `/quotes/:id` links, and Done or Dismiss matches them. Migration 096 applied on October 20: 36 queued reminders on moved contacts closed; the dry run queued 68 fresh ones (59 leads, 9 quotes), which the daily cron will queue for real on its next run |
 | 17 Cut over, screenshots, summary | todo | | |
 
 ### Phase 9 notes

@@ -43,6 +43,22 @@ begin
   execute 'alter table public.fh_follow_ups alter column contact_id ' || 'dr' || 'op not null';
 end $$;
 
+-- Reminders still queued on a contact row the migration moved point at a
+-- record no screen shows any more. Close them (skipped, the table's word for
+-- dismissed) and mark their notifications read; the engine below queues
+-- fresh ones on the lead or quote that replaced the row. Production had 36.
+create temp table t_closed on commit drop as
+  select f.id, f.contact_id, f.headline
+    from public.fh_follow_ups f
+    join public.fh_contacts c on c.id = f.contact_id
+   where f.status = 'queued' and c.stage in ('moved_lead', 'moved_quote');
+update public.fh_follow_ups f set status = 'skipped', completed_at = now()
+  from t_closed t where f.id = t.id;
+update public.fh_notifications n set read_at = coalesce(n.read_at, now())
+  from t_closed t
+ where n.title = t.headline and n.link = '/jobs/' || t.contact_id::text
+   and n.kind in ('follow_up_due', 'review_ask_due');
+
 create or replace function public.fh_run_follow_up_engine(p_org_id uuid default null::uuid)
 returns jsonb
 language plpgsql
@@ -314,3 +330,11 @@ $$;
 
 revoke all on function public.fh_follow_up_set_status(uuid, text) from public, anon;
 grant execute on function public.fh_follow_up_set_status(uuid, text) to authenticated;
+
+-- Applied to production on October 20 as 096a (columns and indexes through
+-- apply_migration) and 096b (both functions and the cleanup in one
+-- execute_sql transaction) after a rolled back dry run with
+-- supabase/tests/follow_up_engine.test.sql passed every check: 36 queued
+-- reminders on moved contacts closed, the dry run queued 68 fresh ones (59
+-- on leads, 9 on quotes), a second run added nothing. The real run leaves the
+-- engine to its daily cron, so those reminders arrive on the next run.
