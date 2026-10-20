@@ -1800,7 +1800,7 @@ export type Database = {
           client_id: string | null
           completed_at: string | null
           completed_by: string | null
-          contact_id: string
+          contact_id: string | null
           created_at: string
           days_quiet: number | null
           draft_body: string | null
@@ -1808,7 +1808,9 @@ export type Database = {
           headline: string
           id: string
           kind: string
+          lead_id: string | null
           org_id: string
+          quote_id: string | null
           stage_at_queue: string | null
           status: string
           user_id: string | null
@@ -1819,7 +1821,7 @@ export type Database = {
           client_id?: string | null
           completed_at?: string | null
           completed_by?: string | null
-          contact_id: string
+          contact_id?: string | null
           created_at?: string
           days_quiet?: number | null
           draft_body?: string | null
@@ -1827,7 +1829,9 @@ export type Database = {
           headline: string
           id?: string
           kind: string
+          lead_id?: string | null
           org_id: string
+          quote_id?: string | null
           stage_at_queue?: string | null
           status?: string
           user_id?: string | null
@@ -1838,7 +1842,7 @@ export type Database = {
           client_id?: string | null
           completed_at?: string | null
           completed_by?: string | null
-          contact_id?: string
+          contact_id?: string | null
           created_at?: string
           days_quiet?: number | null
           draft_body?: string | null
@@ -1846,7 +1850,9 @@ export type Database = {
           headline?: string
           id?: string
           kind?: string
+          lead_id?: string | null
           org_id?: string
+          quote_id?: string | null
           stage_at_queue?: string | null
           status?: string
           user_id?: string | null
@@ -1867,10 +1873,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "fh_follow_ups_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "fh_leads"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "fh_follow_ups_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fh_follow_ups_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "fh_quotes"
             referencedColumns: ["id"]
           },
         ]

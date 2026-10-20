@@ -1,7 +1,8 @@
 // Netlify Function — inbound lead webhook.
 // External tools (GoHighLevel, Zapier, Make, Facebook Lead Ads) POST JSON here.
-// We validate the ?key= against fh_profiles.webhook_key, then insert a row
-// into fh_contacts with stage='lead'.
+// We validate the ?key= against profiles.webhook_key, resolve the client
+// (fh_resolve_client matches by phone or email inside the company, else
+// makes one) and insert a row into fh_leads pointing at it (SPEC D53).
 //
 // ENV required:
 //   SUPABASE_URL       (e.g. https://pnmhblvslftdzfcdezbw.supabase.co)
@@ -112,25 +113,34 @@ export default async (request) => {
     }
   }
 
-  // Sanitize and shape the contact row
-  const row = {
-    user_id: userId,
-    org_id: orgId,
+  // Sanitize and shape the two rows: who (the client) and what (the lead).
+  const person = {
     name: String(payload.name).trim().slice(0, 200),
     phone: payload.phone ? String(payload.phone).trim().slice(0, 40) : null,
     email: payload.email ? String(payload.email).trim().slice(0, 200) : null,
-    address: payload.address ? String(payload.address).trim().slice(0, 400) : null,
-    job_title: payload.job_title ? String(payload.job_title).trim().slice(0, 240) : null,
+    address: payload.address ? String(payload.address).trim().slice(0, 400) : null
+  }
+  const source = payload.source ? String(payload.source).slice(0, 80) : 'webhook'
+  const amount = Number.isFinite(Number(payload.amount)) ? Math.max(0, Number(payload.amount)) : 0
+  const lead = {
+    user_id: userId,
+    org_id: orgId,
+    title: payload.job_title ? String(payload.job_title).trim().slice(0, 240) : null,
     job_type: payload.job_type ? String(payload.job_type).trim().slice(0, 120) : null,
-    amount: Number.isFinite(Number(payload.amount)) ? Math.max(0, Number(payload.amount)) : 0,
-    notes: payload.notes ? String(payload.notes).slice(0, 2000) : null,
-    stage: 'lead',
-    source: payload.source ? String(payload.source).slice(0, 80) : 'webhook'
+    // fh_leads has no amount column; a figure the source sent stays in the notes.
+    notes: leadNotes(payload.notes, amount),
+    source,
+    status: 'open'
+  }
+
+  const clientId = await resolveClient(supabase, { userId, orgId, person, source })
+  if (!clientId) {
+    return json({ error: 'client_failed', detail: 'Could not save the customer. Try again shortly.' }, 500)
   }
 
   const { data: inserted, error: insertErr } = await supabase
-    .from('fh_contacts')
-    .insert(row)
+    .from('fh_leads')
+    .insert({ ...lead, client_id: clientId })
     .select('id')
   if (insertErr) {
     console.error('[webhook-lead] insert failed', insertErr)
@@ -139,27 +149,81 @@ export default async (request) => {
   const newId = inserted[0]?.id
 
   // Bell + lock screen: a new lead is the most time-sensitive event in
-  // the app — speed-to-call decides whether it converts. Best effort.
+  // the app, speed to call decides whether it converts. Best effort.
+  const body = [lead.title, person.phone].filter(Boolean).join(' · ') || 'Tap to view'
   try {
     await supabase.from('fh_notifications').insert({
       user_id: userId,
       org_id: orgId,
       kind: 'new_lead',
-      title: `New lead · ${row.name}`,
-      body: [row.job_title, row.phone].filter(Boolean).join(' · ') || 'Tap to view',
+      title: `New lead · ${person.name}`,
+      body,
       link: newId ? `/leads/${newId}` : '/leads'
     })
     await sendPushToUser(supabase, userId, {
-      title: `New lead · ${row.name}`,
-      body: [row.job_title, row.phone].filter(Boolean).join(' · ') || 'Tap to view',
+      title: `New lead · ${person.name}`,
+      body,
       link: newId ? `/leads/${newId}` : '/leads',
-      tag: `new-lead-${newId || row.name}`
+      tag: `new-lead-${newId || person.name}`
     })
   } catch (e) {
     console.warn('[webhook-lead] notify failed', e)
   }
 
-  return json({ ok: true, id: newId, stage: 'lead' }, 200)
+  // `stage: 'lead'` stays for integrations that read it; the row is a lead.
+  return json({ ok: true, id: newId, client_id: clientId, record: 'lead', stage: 'lead' }, 200)
+}
+
+export function leadNotes(notes, amount) {
+  const parts = []
+  if (notes) parts.push(String(notes).slice(0, 2000))
+  if (amount > 0) parts.push(`Estimated amount $${amount.toLocaleString('en-US', { maximumFractionDigits: 2 })}`)
+  return parts.length ? parts.join('\n') : null
+}
+
+// The client the lead belongs to. Inside an organization fh_resolve_client
+// matches by phone, then email, then makes one, the same path the inbound
+// text and email functions take. A profile with no organization writes
+// fh_clients directly, matching the user's own rows by phone or email.
+async function resolveClient(supabase, { userId, orgId, person, source }) {
+  if (orgId) {
+    const { data, error } = await supabase.rpc('fh_resolve_client', {
+      p_org_id: orgId,
+      p_phone: person.phone,
+      p_email: person.email,
+      p_name: person.name,
+      p_address: person.address,
+      p_source: source
+    })
+    if (error) {
+      console.error('[webhook-lead] fh_resolve_client failed', error)
+      return null
+    }
+    const row = Array.isArray(data) ? data[0] : data
+    if (row?.client_id) return row.client_id
+    return null
+  }
+  const mine = () => supabase.from('fh_clients').select('id, phone, email').eq('user_id', userId)
+  const digits = (s) => String(s || '').replace(/\D/g, '')
+  if (person.phone && digits(person.phone).length >= 7) {
+    const { data } = await mine().order('created_at', { ascending: false }).limit(200)
+    const hit = (data || []).find((c) => digits(c.phone) === digits(person.phone))
+    if (hit) return hit.id
+  }
+  if (person.email) {
+    const { data } = await mine().ilike('email', person.email).limit(1)
+    if (data?.[0]?.id) return data[0].id
+  }
+  const { data: created, error } = await supabase
+    .from('fh_clients')
+    .insert({ user_id: userId, name: person.name, phone: person.phone, email: person.email, address: person.address })
+    .select('id')
+    .single()
+  if (error) {
+    console.error('[webhook-lead] client insert failed', error)
+    return null
+  }
+  return created?.id || null
 }
 
 async function checkWebhookRateLimit(supabase, { userId, orgId, key }) {

@@ -29,7 +29,7 @@ fh_workflow_versions, fh_workflows, profiles.
 
 A fresh database built from this folder alone will not match production.
 
-**Follow up engine.** Since October 19 the body of `fh_run_follow_up_engine` lives in `migrations/091_follow_up_engine_per_client.sql` and `tests/follow_up_engine.test.sql` checks it. The tables it writes (`fh_follow_ups`, `fh_follow_up_settings`) still have no creating migration here.
+**Follow up engine.** Since October 19 the body of `fh_run_follow_up_engine` lives in this folder and `tests/follow_up_engine.test.sql` checks it. `091_follow_up_engine_per_client.sql` made reminders per client; `096_engine_reads_leads_quotes.sql` is the current body: the pipeline block scores `fh_leads` rows with status open and `fh_quotes` rows with status sent, viewed or changes_requested, writes `lead_id` or `quote_id` on `fh_follow_ups` (both new, nullable; `contact_id` is nullable since 096) and links each notification to `/leads/:id` or `/quotes/:id`. The review ask block still reads completed jobs on `fh_contacts`. `fh_follow_up_set_status` (090, replaced in 096) closes a reminder by the job, lead or quote id at the end of the notification link. The tables it writes (`fh_follow_ups`, `fh_follow_up_settings`) still have no creating migration here.
 
 **Scheduled jobs.** Five pg_cron jobs run in production and none is defined
 here:

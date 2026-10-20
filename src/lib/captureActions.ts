@@ -9,9 +9,12 @@ import type { QueryClient, QueryKey } from '@tanstack/react-query'
 import { supabase } from './supabase.ts'
 import { resilientInsert } from './outbox.ts'
 import { findOrCreateClient } from './clients.ts'
+import { createLead } from './leads.ts'
 import { lastKnownOrg } from './orgScope.ts'
 import { logPayment, recalcCost } from './stages.ts'
 import type { CaptureIntent } from './captureIntelligence.ts'
+
+const formatMoney = (n: number) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 2 })
 
 // The slice of fh_contacts the capture flow loads for matching +
 // payment logging. logPayment() needs user_id/amount/stage off the row.
@@ -124,39 +127,30 @@ export async function commitCapture({ intent, userId, contacts }: {
 
     case 'lead': {
       const name = intent.name || intent.title || 'New lead'
-      // Link (or create) the client so a captured lead isn't an orphan
-      //, matches what the lead screen does. Skipped when offline (the
-      // lookups need the network); the lead still saves via the outbox.
-      let clientId: string | null = null
-      if (typeof navigator === 'undefined' || navigator.onLine !== false) {
-        // Dedupe against the whole company's clients, not only the ones
-        // this user created.
-        clientId = await findOrCreateClient(userId, {
-          name,
-          phone: intent.phone,
-          email: intent.email,
-          address: intent.address
-        }, lastKnownOrg(userId) ?? null)
-      }
-      // resilientInsert mints the id client-side, so the success link
-      // works even when the row is still queued for sync.
-      const { queued, error, id } = await resilientInsert('fh_contacts', {
-        user_id: userId,
+      const orgId = lastKnownOrg(userId) ?? null
+      // A lead is a row on fh_leads pointing at a client (D53), so the
+      // client comes first through the same helper the lead screen uses,
+      // matched on phone, then email, then name across the company.
+      const clientId = await findOrCreateClient(userId, {
         name,
-        phone: intent.phone || null,
-        email: intent.email || null,
-        address: intent.address || null,
-        job_title: intent.title || null,
-        amount: intent.amount || null,
-        follow_up_on: intent.follow_up_on || null,
-        client_id: clientId,
-        stage: 'lead'
+        phone: intent.phone,
+        email: intent.email,
+        address: intent.address
+      }, orgId)
+      if (!clientId) throw new Error('Could not save the client for this lead. Check the connection and try again.')
+      // fh_leads has no amount column; a number the operator spoke is
+      // kept in the notes so it is not lost.
+      const notes = intent.amount ? `Estimated amount ${formatMoney(intent.amount)}` : null
+      const lead = await createLead({
+        userId,
+        orgId,
+        clientId,
+        title: intent.title,
+        notes,
+        source: 'capture',
+        followUpOn: intent.follow_up_on
       })
-      if (error) throw error
-      return {
-        link: queued ? '/leads' : `/leads/${id}`,
-        toast: queued ? 'Lead saved, will sync' : 'Lead created'
-      }
+      return { link: `/leads/${lead.id}`, toast: 'Lead created' }
     }
   }
 }

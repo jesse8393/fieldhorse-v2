@@ -553,8 +553,10 @@ export function useDeleteFile() {
 }
 
 // ---- Create lead ----
-// Insert a new fh_contacts row at a chosen stage, then invalidate the
-// jobs list. Mirrors the web NewLeadSheet's minimal create path.
+// A lead is an fh_leads row pointing at an fh_clients row (SPEC D53). The
+// client is matched among the user's own clients by phone, then email,
+// or inserted; the lead carries the title, type and notes. The stage
+// update above stays for jobs, which live on fh_contacts.
 export type NewLeadInput = {
   userId: string
   name: string
@@ -564,28 +566,59 @@ export type NewLeadInput = {
   jobTitle?: string
   jobType?: string
   amount?: number
-  stage?: string
   notes?: string
   referredBy?: string
+  // Accepted and ignored: a new lead is always open. Stages belong to jobs.
+  stage?: string
+}
+
+const digitsOf = (s?: string | null) => String(s || '').replace(/\D/g, '')
+
+async function findOrCreateMobileClient(input: NewLeadInput): Promise<{ id?: string; error: any }> {
+  const phone = digitsOf(input.phone)
+  const email = (input.email || '').trim().toLowerCase()
+  if (phone.length >= 7 || email) {
+    const { data, error } = await supabase.from('fh_clients')
+      .select('id, phone, email')
+      .eq('user_id', input.userId)
+      .order('created_at', { ascending: false })
+      .limit(200)
+    if (error) return { error }
+    const hit = (data || []).find((c: any) =>
+      (phone.length >= 7 && digitsOf(c.phone) === phone) ||
+      (email && String(c.email || '').trim().toLowerCase() === email))
+    if (hit) return { id: hit.id, error: null }
+  }
+  const { data, error } = await supabase.from('fh_clients').insert({
+    user_id: input.userId,
+    name: input.name,
+    phone: input.phone || null,
+    email: input.email || null,
+    address: input.address || null
+  } as any).select('id').single()
+  return { id: (data as any)?.id as string | undefined, error }
 }
 
 export function useCreateLead() {
   const client = useQueryClient()
   return async (input: NewLeadInput) => {
-    const { data, error } = await supabase.from('fh_contacts').insert({
+    const who = await findOrCreateMobileClient(input)
+    if (who.error || !who.id) return { id: undefined as string | undefined, error: who.error || new Error('Could not save the client') }
+    const notes = [input.notes || null, input.amount ? `Estimated amount $${input.amount}` : null].filter(Boolean).join('\n') || null
+    const { data, error } = await supabase.from('fh_leads').insert({
       user_id: input.userId,
-      name: input.name,
-      phone: input.phone || null,
-      email: input.email || null,
-      address: input.address || null,
-      job_title: input.jobTitle || null,
+      client_id: who.id,
+      title: input.jobTitle || null,
       job_type: input.jobType || null,
-      amount: input.amount ?? null,
-      stage: input.stage || 'lead',
-      notes: input.notes || null,
-      referred_by: input.referredBy || null
+      notes,
+      referred_by: input.referredBy || null,
+      source: 'mobile',
+      status: 'open'
     } as any).select('id').single()
-    if (!error) client.invalidateQueries({ queryKey: queryKeys.jobs })
+    if (!error) {
+      client.invalidateQueries({ queryKey: queryKeys.jobs })
+      client.invalidateQueries({ queryKey: queryKeys.clients })
+    }
     return { id: (data as any)?.id as string | undefined, error }
   }
 }
