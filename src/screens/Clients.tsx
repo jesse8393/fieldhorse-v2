@@ -12,7 +12,6 @@ import { useAuth } from '../contexts/AuthContext.tsx'
 import { useClientsBundle, useInvalidateClients } from '../lib/queries.ts'
 import { rollupByClient } from '../lib/rollups.ts'
 import { findDuplicateClusters, loadNotDuplicates, rememberNotDuplicates } from '../lib/clientMerge.ts'
-import NewClientSheet from '../components/NewClientSheet.tsx'
 // Lazy, sheet only mounts when the operator opens the merge flow.
 const MergeDuplicatesSheet = lazy(() => import('../components/MergeDuplicatesSheet.tsx'))
 import { FilterPill, Eyebrow, StampNumber, ScreenCloser } from '../components/v3'
@@ -49,7 +48,8 @@ export default function Clients() {
     else sp.set('filter', next)
     setSearchParams(sp, { replace: true })
   }
-  const [addOpen, setAddOpen] = useState(false)
+  // New customer is a full screen (SPEC D57); nothing opens over the list.
+  const openNew = () => navigate('/clients/new')
   const [mergeOpen, setMergeOpen] = useState(false)
 
   // Rollups computed live from jobs + payments instead of trusting the
@@ -212,22 +212,10 @@ export default function Clients() {
             duplicateClusters={duplicateClusters}
             duplicateCount={duplicateCount}
             onOpenClient={(id: any) => navigate(`/clients/${id}`)}
-            onNewClient={() => setAddOpen(true)}
+            onNewClient={() => openNew()}
             onReviewDuplicates={() => setMergeOpen(true)}
           />
         </Suspense>
-        <NewClientSheet
-          open={addOpen}
-          userId={user?.id}
-          onClose={() => setAddOpen(false)}
-          onSaved={(client: any) => {
-            setAddOpen(false)
-            // Refresh the cached list either way, so the new client is
-            // there when the operator comes back from its detail page.
-            load()
-            if (client?.id) navigate(`/clients/${client.id}`)
-          }}
-        />
         <Suspense fallback={null}>
           <MergeDuplicatesSheet
             open={mergeOpen}
@@ -261,7 +249,7 @@ export default function Clients() {
             </div>
             {/* The add action sits in the header on a phone; the dock coin
                 is the only floating gold action (spec 8.1). */}
-            <Button variant="secondary" size="mini" icon={Plus} onClick={() => { hapticMedium(); setAddOpen(true) }}>
+            <Button variant="secondary" size="mini" icon={Plus} onClick={() => { hapticMedium(); openNew() }}>
               New customer
             </Button>
           </div>
@@ -422,7 +410,7 @@ export default function Clients() {
                 A client is the person you work for. Bills get sent to them, jobs roll up to them.
               </p>
             </div>
-            <button type="button" onClick={() => setAddOpen(true)} style={{
+            <button type="button" onClick={() => openNew()} style={{
               background: 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
               color: 'var(--v3-on-primary)',
               border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
@@ -534,21 +522,9 @@ export default function Clients() {
         variant="cta"
         caption={loading ? undefined : `${rows.length} ${rows.length === 1 ? 'account' : 'accounts'} on file.`}
         ctaLabel="Add another client"
-        onCta={() => setAddOpen(true)}
+        onCta={() => openNew()}
       />
 
-      <NewClientSheet
-        open={addOpen}
-        userId={user?.id}
-        onClose={() => setAddOpen(false)}
-        onSaved={(client: any) => {
-          setAddOpen(false)
-          // Refresh the cached list either way, so the new client is
-          // there when the operator comes back from its detail page.
-          load()
-          if (client?.id) navigate(`/clients/${client.id}`)
-        }}
-      />
       <Suspense fallback={null}>
         <MergeDuplicatesSheet
           open={mergeOpen}

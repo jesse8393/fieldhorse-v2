@@ -57,8 +57,6 @@ import { canHover } from '../lib/hover.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { useJobs, useJobsRealtime, useJobSearch, jobsKey, type JobRow } from '../lib/queries.ts'
 
-const NewLeadSheet = lazy(() => import('../components/NewLeadSheet.tsx'))
-
 type ChipId = 'all' | 'leads' | 'quotes' | 'active' | 'done' | 'lost'
 
 const CHIPS: { id: ChipId; label: string; match: (c: JobRow) => boolean }[] = [
@@ -154,34 +152,21 @@ export default function Work() {
     return () => clearTimeout(t)
   }, [search])
   const { data: serverHits = [], isError: searchDegraded } = useJobSearch(debouncedSearch)
-  const [addOpen, setAddOpen] = useState(false)
-  const [addStage, setAddStage] = useState<'lead' | 'quote' | 'job'>('lead')
-  const [justAddedId, setJustAddedId] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const loadError = isError
     ? error instanceof Error ? error.message : 'The work list failed to load.'
     : ''
 
-  // Deep links: ?stage=<chip> selects a chip; ?new=1 opens the create
-  // sheet (optionally ?asStage=job from Home's "New Job" tile).
-  // ?stage stays IN the URL so the active filter survives refresh and
-  // is shareable/bookmarkable (UI audit #30), only the one-shot
-  // new/asStage params are consumed.
+  // Deep links: ?stage=<chip> selects a chip. It stays IN the URL so the
+  // active filter survives refresh and is shareable/bookmarkable (UI
+  // audit #30). Creating a record is its own screen (/leads/new and the
+  // others, SPEC D57), so nothing opens from here.
   useEffect(() => {
     const requested = searchParams.get('stage')
-    const wantsNew = searchParams.get('new') === '1'
-    const asStage = searchParams.get('asStage')
     const requestedChip = chipFromStage(requested)
     if (requestedChip) setChip(requestedChip)
     if (!requested) setChip('all')
-    if (wantsNew) {
-      setAddStage(asStage === 'job' ? 'job' : asStage === 'quote' ? 'quote' : 'lead')
-      setAddOpen(true)
-      const sp = new URLSearchParams(searchParams)
-      sp.delete('new'); sp.delete('asStage')
-      setSearchParams(sp, { replace: true })
-    }
-  }, [searchParams, setSearchParams])
+  }, [searchParams])
 
   // Chip clicks write the URL; the effect above syncs state from it.
   const selectChip = (id: ChipId) => {
@@ -377,32 +362,8 @@ export default function Work() {
 
   const { stagger, item } = useFhMotion()
 
-  const openNewLead = () => { setAddStage('lead'); setAddOpen(true) }
-
-  // ONE way in. Everything starts as a deal; Home's "New Job" tile
-  // deep links with ?asStage=job for work that skips selling.
-  const newLeadSheet = (
-    <Suspense fallback={null}>
-      <NewLeadSheet
-        open={addOpen}
-        userId={user?.id}
-        initialStage={addStage}
-        lockStage={addStage === 'lead'}
-        onClose={() => setAddOpen(false)}
-        onCreated={async (created: any) => {
-          setAddOpen(false)
-          if (created?.id && created.stage === 'quote') {
-            navigate(`/quotes/${created.id}?tab=quote`)
-            return
-          }
-          if (created?.id) setJustAddedId(created.id)
-          await refresh()
-          setTimeout(() => setJustAddedId(null), 1200)
-          toastSuccess('Added', created?.name ? `${created.name} is on the board` : 'On the board')
-        }}
-      />
-    </Suspense>
-  )
+  // New lead is a full screen (SPEC D57, D58).
+  const openNewLead = () => navigate('/leads/new')
 
   // Phone (below 900 px): the redesigned Jobs list (spec 9.3). The deal
   // cards, the stats line and their per row menus stay on desktop until
@@ -425,7 +386,6 @@ export default function Work() {
           // same roles that see no Leads or Quotes tab).
           onNewLead={isMoneyRole ? openNewLead : undefined}
         />
-        {newLeadSheet}
       </>
     )
   }
@@ -569,7 +529,7 @@ export default function Work() {
             {effectiveChip === 'all' && !search && (
               <button
                 type="button"
-                onClick={() => setAddOpen(true)}
+                onClick={openNewLead}
                 style={{
                   background: 'none', border: 'none', padding: 0,
                   color: 'var(--v3-primary-text)', fontWeight: 700, fontSize: 12, cursor: 'pointer'
@@ -589,7 +549,6 @@ export default function Work() {
               <DealCard
                 key={c.id}
                 contact={c}
-                isNew={c.id === justAddedId}
                 busy={busyId === c.id}
                 canSell={isMoneyRole}
                 onOpen={handleOpen}
@@ -604,8 +563,6 @@ export default function Work() {
           {hasMore && <div ref={sentinelRef} aria-hidden="true" style={{ height: 1 }} />}
         </motion.div>
       )}
-
-      {newLeadSheet}
 
       <FloatingActionButton
         onClick={openNewLead}
@@ -628,7 +585,7 @@ export default function Work() {
    ============================================================ */
 type DealCardProps = {
   contact: JobRow
-  isNew: boolean
+  isNew?: boolean
   busy: boolean
   // Whether this role may move the deal through the pipeline (Mark
   // won/lost). Field roles get follow-up actions but no stage moves.
@@ -648,7 +605,7 @@ type DealCardProps = {
 // search keystroke because the parent passed fresh inline-arrow callbacks
 // each render. With stable handlers (above) + memo, only cards whose own
 // props (contact ref / isNew / busy / canSell) actually change re-render.
-const DealCard = memo(function DealCard({ contact: c, isNew, busy, canSell: mayMoveStage, onOpen, onHover, onWon, onLost, onReopen, onFollowUp }: DealCardProps) {
+const DealCard = memo(function DealCard({ contact: c, isNew = false, busy, canSell: mayMoveStage, onOpen, onHover, onWon, onLost, onReopen, onFollowUp }: DealCardProps) {
   // Calendar popover for "Pick a date…", anchored to the ⋯ button so
   // it opens exactly where the menu just closed.
   const [dateOpen, setDateOpen] = useState(false)

@@ -18,7 +18,7 @@ const clean = (s: string | null | undefined) => {
 
 export async function createLead(input: {
   userId: string
-  orgId: string
+  orgId: string | null
   clientId: string
   title?: string | null
   notes?: string | null
@@ -29,7 +29,7 @@ export async function createLead(input: {
 }): Promise<LeadRow> {
   const row: LeadInsert = {
     user_id: input.userId,
-    org_id: input.orgId,
+    org_id: input.orgId ?? null,
     client_id: input.clientId,
     title: clean(input.title),
     notes: clean(input.notes),

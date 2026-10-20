@@ -628,7 +628,7 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId, canEditAmount = fa
 
   // Called when the operator picks (or clears) a client via the
   // ClientPicker below. Auto-hydrates empty form fields with the
-  // picked client's values, same merge policy as NewLeadSheet's
+  // picked client's values, same merge policy as the lead screen's
   // handleClientChange. User-typed values are never clobbered.
   function handleClientLink(picked: any) {
     if (!picked) {
@@ -697,7 +697,7 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId, canEditAmount = fa
       </div>
 
       {/* LINKED CLIENT, controlled ClientPicker. Picks auto-hydrate
-          empty fields on the form (same merge policy as NewLeadSheet)
+          empty fields on the form (same merge policy as the lead screen)
           and commit the new client_id alongside the regular field
           diff. Clearing the picker queues an unlink. */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

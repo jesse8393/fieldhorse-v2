@@ -1,4 +1,5 @@
-import { Search } from 'lucide-react'
+import { Plus, Search } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { useProfile } from '../contexts/ProfileContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { headerName } from '../lib/headerName.ts'
@@ -26,8 +27,8 @@ function openSearch() {
  * a trailing "Company" or "LLC". Long names wrap to two lines at 15 px
  * before anything is cut off.
  *
- * Desktop: the sidebar carries identity and navigation, so only search
- * and the bell show, at the right.
+ * Desktop: the sidebar carries identity and navigation, so only New,
+ * search and the bell show, at the right.
  */
 export default function AppHeader() {
   const { profile } = useProfile()
@@ -50,6 +51,11 @@ export default function AppHeader() {
       </button>
       <span className={`fhs-header__company${long ? ' fhs-header__company--long' : ''}`}>{company}</span>
       <div className="fhs-header__actions">
+        {/* One New button (D58): the full screen with Lead, Quote, Job,
+            Invoice and Client. The long press menu on the dock coin is gone. */}
+        <Link to="/new" className="fhs-icon-btn" aria-label="New" title="New">
+          <Icon icon={Plus} size={22} />
+        </Link>
         <button type="button" className="fhs-icon-btn" aria-label="Search everything" onClick={openSearch}>
           <Icon icon={Search} size={22} />
         </button>

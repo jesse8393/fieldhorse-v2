@@ -2,7 +2,7 @@
 //
 // v3 rebuild, same partner-invite flow, but rebuilt around the
 // cockpit / serif-headline / commit-button pattern shared with
-// NewClientSheet, NewLeadSheet, MergeDuplicatesSheet so it stops
+// MergeDuplicatesSheet so it stops
 // looking like a leftover from an earlier design pass.
 //
 // New surface (vs. the old version):

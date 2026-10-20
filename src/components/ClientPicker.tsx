@@ -29,7 +29,7 @@ type ServerSearch = { term: string; rows: any[]; failed: boolean }
 /**
  * ClientPicker, inline autocomplete + inline-create, built on the
  * existing Supabase fh_clients table. Designed to drop into any sheet
- * next to a contact form (NewLeadSheet, ContactDetail edit mode, etc).
+ * next to a contact form (ContactDetail edit mode, etc).
  *
  * Controlled API:
  *   value:        { id, name } | null   , currently selected client

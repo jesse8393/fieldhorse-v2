@@ -24,7 +24,7 @@ const clean = (s: string | null | undefined) => {
 
 export async function createQuote(input: {
   userId: string
-  orgId: string
+  orgId: string | null
   clientId: string
   leadId?: string | null
   title?: string | null
@@ -34,7 +34,7 @@ export async function createQuote(input: {
 }): Promise<QuoteRow> {
   const row: QuoteInsert = {
     user_id: input.userId,
-    org_id: input.orgId,
+    org_id: input.orgId ?? null,
     client_id: input.clientId,
     lead_id: input.leadId || null,
     title: clean(input.title),

@@ -648,9 +648,9 @@ test.describe('views', () => {
     await expect(page.getByText('Oct 4 to 10, 2026', { exact: true })).toBeVisible()
   })
 
-  test('New job goes to the job sheet in Jobs', async ({ context, page }) => {
+  test('New job opens the new job screen', async ({ context, page }) => {
     await setUp(context, page)
     await page.getByRole('button', { name: 'New job', exact: true }).click()
-    await expect(page).toHaveURL(/\/work/)
+    await expect(page).toHaveURL(/\/jobs\/new$/)
   })
 })

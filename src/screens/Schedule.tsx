@@ -318,7 +318,7 @@ export default function Schedule() {
             setView={setView}
             weather={hasCoords && !weatherFailed ? weather : undefined}
             onAddEvent={() => { setAddPreset(null); setAddOpen(true) }}
-            onNewJob={() => navigate('/work?new=1&asStage=job')}
+            onNewJob={() => navigate('/jobs/new')}
             onScheduleJob={(job) => {
               setAddPreset({ contactId: job.id, title: jobLabel(job) })
               setAddOpen(true)

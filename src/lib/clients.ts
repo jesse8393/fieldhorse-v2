@@ -2,7 +2,7 @@
 //
 // Find-or-create an fh_clients row for a lead/job, matching on
 // phone → email → name (most-recent) before inserting. Shared by
-// NewLeadSheet and Universal Capture so every path that creates a lead
+// the create screens and Universal Capture so every path that creates a lead
 // links a client, otherwise voice/scan leads were orphans with no
 // client record (invisible on /clients, and no client email to invoice
 // against later).

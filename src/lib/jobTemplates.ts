@@ -1,7 +1,7 @@
 // Job templates, Phase 19 / Audit Move #5.
 //
 // A template is a named milestone playbook for a common trade pattern.
-// Pick one in NewLeadSheet and the app pre-creates the task list for
+// Pick one when creating a job and the app pre-creates the task list for
 // the new job so the contractor isn't staring at an empty checklist.
 //
 // Scope for v1:

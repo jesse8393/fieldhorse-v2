@@ -1,0 +1,191 @@
+// ClientField (PHASE9_PLAN Task 8, SPEC D58, D59): one field on every
+// create screen. Type a name, see the clients that match under the field,
+// tap one to pick it, or keep typing and the screen saves the typed name
+// as a new client when it saves. Nothing opens over the page: the matches
+// are a list under the input and go away once a client is picked or the
+// field is empty.
+//
+// The company's clients are read once (the newest active first) and
+// matched here, so the list answers every keystroke without a request.
+
+import { useEffect, useId, useMemo, useState } from 'react'
+import { Field } from './fh'
+import { supabase } from '../lib/supabase.ts'
+import { useOrgScope } from '../lib/orgScope.ts'
+import { findOrCreateClient } from '../lib/clients.ts'
+
+export type ClientPick = {
+  id: string
+  name: string
+  company_name?: string | null
+  phone?: string | null
+  email?: string | null
+  address?: string | null
+}
+
+export type ClientFieldValue = {
+  /** What is typed. The new client's name when nothing is picked. */
+  text: string
+  /** The picked client, or null while the name is new or still being typed. */
+  picked: ClientPick | null
+}
+
+const COLUMNS = 'id, name, company_name, phone, email, address'
+const LIMIT = 200
+const SHOWN = 6
+
+function clientRows(userId: string, orgScope: string | null) {
+  const q = supabase.from('fh_clients').select(COLUMNS)
+  return orgScope ? q.eq('org_id', orgScope) : q.eq('user_id', userId)
+}
+
+function norm(s: string | null | undefined) {
+  return (s || '').trim().toLowerCase()
+}
+
+/** The clients whose name, company, phone or email contain the typed text. */
+export function matchClients(rows: ClientPick[], typed: string, limit = SHOWN): ClientPick[] {
+  const t = norm(typed)
+  if (!t) return []
+  const starts: ClientPick[] = []
+  const contains: ClientPick[] = []
+  for (const r of rows) {
+    const name = norm(r.name)
+    if (name.startsWith(t)) starts.push(r)
+    else if (name.includes(t) || norm(r.company_name).includes(t) || norm(r.email).includes(t) || norm(r.phone).includes(t)) contains.push(r)
+  }
+  return [...starts, ...contains].slice(0, limit)
+}
+
+/** True when the typed text is the exact name of one of the rows. */
+export function exactClient(rows: ClientPick[], typed: string): ClientPick | null {
+  const t = norm(typed)
+  if (!t) return null
+  return rows.find((r) => norm(r.name) === t) ?? null
+}
+
+/**
+ * The client a create screen saves against: the picked client, else the
+ * client whose name, phone or email already matches what was typed, else a
+ * new fh_clients row from the typed name (D59). Null when there is no name.
+ */
+export async function resolveClientId(
+  value: ClientFieldValue,
+  ids: { userId: string; orgId: string | null },
+  extra: { phone?: string | null; email?: string | null; address?: string | null; company?: string | null } = {}
+): Promise<ClientPick | null> {
+  if (value.picked) return value.picked
+  const name = value.text.trim()
+  if (!name) return null
+  const id = await findOrCreateClient(ids.userId, {
+    name,
+    phone: extra.phone?.trim() || null,
+    email: extra.email?.trim() || null,
+    address: extra.address?.trim() || null,
+    company: extra.company?.trim() || null
+  }, ids.orgId)
+  if (!id) throw new Error('Could not save the client. Check your connection and try again.')
+  return {
+    id,
+    name,
+    phone: extra.phone?.trim() || null,
+    email: extra.email?.trim() || null,
+    address: extra.address?.trim() || null,
+    company_name: extra.company?.trim() || null
+  }
+}
+
+/** Reads one client by id, for a screen opened with ?client=. */
+export async function fetchClientPick(id: string): Promise<ClientPick | null> {
+  const { data, error } = await supabase.from('fh_clients').select(COLUMNS).eq('id', id).maybeSingle()
+  if (error || !data) return null
+  return data as ClientPick
+}
+
+type Props = {
+  userId: string | undefined
+  value: ClientFieldValue
+  onChange: (next: ClientFieldValue) => void
+  /** The label above the field: "Client" on most screens, "Name" on a lead. */
+  label?: string
+  placeholder?: string
+  error?: string
+  autoFocus?: boolean
+  /** Called with the picked client, so a screen can fill its own fields from it. */
+  onPick?: (client: ClientPick) => void
+}
+
+export default function ClientField({ userId, value, onChange, label = 'Client', placeholder = 'Type a name', error, autoFocus, onPick }: Props) {
+  const orgScope = useOrgScope(userId)
+  const [rows, setRows] = useState<ClientPick[]>([])
+  const listId = useId()
+
+  useEffect(() => {
+    if (!userId || orgScope === undefined) return
+    let alive = true
+    clientRows(userId, orgScope)
+      .order('last_activity_at', { ascending: false, nullsFirst: false })
+      .limit(LIMIT)
+      .then(({ data }) => { if (alive) setRows((data || []) as ClientPick[]) })
+    return () => { alive = false }
+  }, [userId, orgScope])
+
+  const typed = value.text
+  const matches = useMemo(() => (value.picked ? [] : matchClients(rows, typed)), [rows, typed, value.picked])
+  const exact = useMemo(() => (value.picked ? null : exactClient(rows, typed)), [rows, typed, value.picked])
+  const isNew = !value.picked && typed.trim() !== '' && !exact
+  const showList = matches.length > 0
+
+  function pick(c: ClientPick) {
+    onChange({ text: c.name, picked: c })
+    onPick?.(c)
+  }
+
+  // Typing again after a pick clears it, so "Saves to" is the one sign
+  // of a picked client and the field stays one control.
+  const helper = value.picked
+    ? `Saves to ${value.picked.name}.`
+    : isNew && !showList
+      ? `Saves ${typed.trim()} as a new client.`
+      : isNew && showList
+        ? `Pick one below, or keep ${typed.trim()} as a new client.`
+        : undefined
+
+  return (
+    <div className="fhnew-client">
+      <Field
+        label={label}
+        value={typed}
+        placeholder={placeholder}
+        autoComplete="off"
+        autoCapitalize="words"
+        autoFocus={autoFocus}
+        error={error}
+        helper={helper}
+        role="combobox"
+        aria-expanded={showList}
+        aria-controls={showList ? listId : undefined}
+        aria-autocomplete="list"
+        onChange={(e) => onChange({ text: e.target.value, picked: null })}
+        onKeyDown={(e) => {
+          // Enter on an exact name picks it, so the keyboard never needs a tap.
+          if (e.key === 'Enter' && exact) { e.preventDefault(); pick(exact) }
+        }}
+      />
+      {showList && (
+        <ul id={listId} className="fhnew-client__list" role="listbox" aria-label="Matching clients">
+          {matches.map((c) => (
+            <li key={c.id} className="fhnew-client__item">
+              <button type="button" role="option" aria-selected={false} className="fhnew-client__pick" onClick={() => pick(c)}>
+                <span className="fhnew-client__name">{c.name}</span>
+                {(c.company_name || c.phone) && (
+                  <span className="fhnew-client__sub">{c.company_name || c.phone}</span>
+                )}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}

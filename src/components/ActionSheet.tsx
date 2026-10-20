@@ -244,7 +244,7 @@ export default function ActionSheet({
 export function SheetField({ label, code, children }: any) {
   // Wrapper is a <div>, not a <label>. iOS Safari redirects taps inside a
   // <label> to the first form control, which silently swallows clicks on
-  // nested buttons (e.g. ClientPicker rows in NewLeadSheet). The label is
+  // nested buttons (e.g. ClientPicker rows in a form). The label is
   // tied to the control with aria-labelledby instead, so screen readers
   // announce "Vendor, text field" rather than a bare "text field". A lone
   // child element gets the reference; anything else is wrapped in a

@@ -2,7 +2,7 @@
 //
 // Schedule a job event (kickoff, inspection, walkthrough, recurring
 // crew day). Was on the legacy ActionSheet chrome, now uses the v3
-// Drawer pattern shared with NewClientSheet / MarkCompleteSheet so the
+// Drawer pattern shared with MarkCompleteSheet so the
 // schedule entry experience matches the rest of the system.
 //
 // Business logic untouched: same fh_schedule insert (now through the

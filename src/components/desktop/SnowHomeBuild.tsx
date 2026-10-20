@@ -132,8 +132,8 @@ export default function SnowHomeBuild({
         <p className="fht-date">{evening ? eveningDate(now) : longDate(now)}</p>
         <div className="fhtd-stage__tools">
           <SyncPill />
-          <Button variant="secondary" size="mini" icon={Plus} to="/work?new=1">New lead</Button>
-          <Button variant="secondary" size="mini" icon={Plus} to="/work?new=1&asStage=job">New job</Button>
+          <Button variant="secondary" size="mini" icon={Plus} to="/leads/new">New lead</Button>
+          <Button variant="secondary" size="mini" icon={Plus} to="/jobs/new">New job</Button>
         </div>
       </div>
       <StageHero view={view} loading={loading} />

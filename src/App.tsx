@@ -57,6 +57,12 @@ const Notifications  = lazy(() => import('./screens/Notifications.tsx'))
 // Leads have their own list and screen (PHASE9_PLAN Task 9, decision D65).
 const LeadsList      = lazy(() => import('./screens/leads/LeadsList.tsx'))
 const LeadDetail     = lazy(() => import('./screens/leads/LeadDetail.tsx'))
+const New            = lazy(() => import('./screens/New.tsx'))
+const LeadNew        = lazy(() => import('./screens/leads/LeadNew.tsx'))
+const QuoteNew       = lazy(() => import('./screens/quotes/QuoteNew.tsx'))
+const JobNew         = lazy(() => import('./screens/jobs/JobNew.tsx'))
+const InvoiceNew     = lazy(() => import('./screens/invoices/InvoiceNew.tsx'))
+const ClientNew      = lazy(() => import('./screens/clients/ClientNew.tsx'))
 // The redesign component sheet, in development builds only: the
 // condition is a build time constant, so production drops the chunk.
 const DesignSheet    = import.meta.env.DEV ? lazy(() => import('./screens/DesignSheet.tsx')) : null
@@ -155,8 +161,7 @@ function AppLoading({ label }: { label: string }) {
  * into the single /work screen (IA round 2: "jobs leads quotes
  * invoices… it all sucks and is too complicated"). Old links, nav
  * habits, and deep links keep working: the stage/view intent maps to
- * the matching Work chip and every other query param rides along
- * (?new=1, ?asStage=job from Home's New Job tile, etc).
+ * the matching Work chip and every other query param rides along.
  */
 function LegacyBoardRedirect({ defaultStage }: { defaultStage?: string }) {
   const [params] = useSearchParams()
@@ -239,6 +244,13 @@ export default function App() {
         <Route element={<Gated><AppShell /></Gated>}>
           <Route path="/" element={<Home />} />
           <Route path="/work" element={<Work />} />
+          {/* The New screen and the create screens (SPEC D58, D59). */}
+          <Route path="/new" element={<New />} />
+          <Route path="/leads/new" element={<LeadNew />} />
+          <Route path="/quotes/new" element={<QuoteNew />} />
+          <Route path="/jobs/new" element={<JobNew />} />
+          <Route path="/invoices/new" element={<InvoiceNew />} />
+          <Route path="/clients/new" element={<ClientNew />} />
           <Route path="/leads" element={<LeadsList />} />
           <Route path="/leads/:id" element={<LeadDetailRoute />} />
           <Route path="/quotes" element={<LegacyBoardRedirect defaultStage="quotes" />} />

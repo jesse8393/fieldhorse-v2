@@ -146,7 +146,7 @@ export async function compressImageToBlob(file: File | null | undefined, maxByte
 }
 
 // Read a clipboard event for an image and return a File. Returns null
-// if the paste didn't contain an image. Used by NewLeadSheet's paste
+// if the paste didn't contain an image. Used by the lead form's paste
 // handler so the user can screenshot an email and Cmd-V into the form.
 export function imageFromClipboardEvent(e: ClipboardEvent): File | null {
   const items = e.clipboardData?.items || []

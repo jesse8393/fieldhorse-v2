@@ -108,8 +108,11 @@ export async function fetchInvoicesForContact(contactId: string) {
   return { data: (data || []) as InvoiceRow[], error }
 }
 
-export async function createInvoice({ contact, userId, title, amount, status = 'draft', due_at = null, notes = null, description = null }: {
-  contact: Pick<Contact, 'id'>
+// An invoice bills a job (contact) or, with no job, the client directly
+// through client_id (D62). Pass clientId with or without a job.
+export async function createInvoice({ contact, clientId = null, userId, title, amount, status = 'draft', due_at = null, notes = null, description = null }: {
+  contact: Pick<Contact, 'id'> | null
+  clientId?: string | null
   userId: string
   title: string
   amount: number
@@ -121,7 +124,8 @@ export async function createInvoice({ contact, userId, title, amount, status = '
   const { data, error } = await supabase
     .from('fh_invoices')
     .insert({
-      contact_id: contact.id,
+      contact_id: contact?.id ?? null,
+      client_id: clientId,
       user_id: userId,
       sequence_number: 0, // BEFORE INSERT trigger assigns the next number
       title: title?.trim() || 'Invoice',

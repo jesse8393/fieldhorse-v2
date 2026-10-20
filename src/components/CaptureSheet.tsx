@@ -759,8 +759,8 @@ function startRows({ job, canSee, onExpense }: {
     // needs one.
     job ? { key: 'photo', icon: Camera, title: 'Photo', hint: 'Opens this job’s photos.', to: `/jobs/${job.id}?tab=files` } : false,
     { key: 'note', icon: NotepadText, title: 'Note', hint: 'Type or talk.', to: '/notes' },
-    canSee('/leads') && { key: 'lead', icon: Users, title: 'Lead', hint: 'New customer or request.', to: '/work?new=1' },
-    canSee('/quotes') && { key: 'quote', icon: FileText, title: 'Quote', hint: 'From your rate card.', to: '/work?new=1&asStage=quote' },
+    canSee('/leads') && { key: 'lead', icon: Users, title: 'Lead', hint: 'New customer or request.', to: '/leads/new' },
+    canSee('/quotes') && { key: 'quote', icon: FileText, title: 'Quote', hint: 'From your rate card.', to: '/quotes/new' },
     // Invoices are sent from a job in progress (SendInvoiceSheet).
     job && isWorkStage(job.stage) && canSee('/invoices')
       ? { key: 'invoice', icon: HandCoins, title: 'Invoice', hint: 'Bill this job.', to: `/jobs/${job.id}?action=send_invoice` }

@@ -451,8 +451,8 @@ test.describe('today on a desktop', () => {
   test('the quick actions stay reachable and the page has no brushed gold action on a full day', async ({ context, page }) => {
     await setUp(context, page, { at: MORNING })
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(/stops?\./)
-    await expect(page.getByRole('link', { name: 'New lead' })).toHaveAttribute('href', '/work?new=1')
-    await expect(page.getByRole('link', { name: 'New job' })).toHaveAttribute('href', '/work?new=1&asStage=job')
+    await expect(page.getByRole('link', { name: 'New lead' })).toHaveAttribute('href', '/leads/new')
+    await expect(page.getByRole('link', { name: 'New job' })).toHaveAttribute('href', '/jobs/new')
     await expect(page.locator('main .fhc-btn--primary')).toHaveCount(0)
   })
 

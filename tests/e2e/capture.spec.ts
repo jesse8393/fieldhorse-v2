@@ -116,8 +116,8 @@ test.describe('capture sheet', () => {
     await expect(starts).toBeVisible()
     await expect(starts.getByRole('listitem')).toHaveCount(5)
     await expect(starts.getByRole('link', { name: /^Note/ })).toHaveAttribute('href', '/notes')
-    await expect(starts.getByRole('link', { name: /^Lead/ })).toHaveAttribute('href', '/work?new=1')
-    await expect(starts.getByRole('link', { name: /^Quote/ })).toHaveAttribute('href', '/work?new=1&asStage=quote')
+    await expect(starts.getByRole('link', { name: /^Lead/ })).toHaveAttribute('href', '/leads/new')
+    await expect(starts.getByRole('link', { name: /^Quote/ })).toHaveAttribute('href', '/quotes/new')
     await expect(starts.getByRole('button', { name: /^Expense/ })).toBeVisible()
     await expect(starts.getByRole('link', { name: /^Time/ })).toHaveAttribute('href', '/crew')
     // Photos and invoices always belong to a job, so they wait for one.
@@ -125,7 +125,7 @@ test.describe('capture sheet', () => {
     await expect(starts.getByRole('link', { name: /^Invoice/ })).toHaveCount(0)
 
     await starts.getByRole('link', { name: /^Lead/ }).click()
-    await expect(page).toHaveURL(/\/work/)
+    await expect(page).toHaveURL(/\/leads\/new$/)
     await expect(sheet).toBeHidden()
   })
 

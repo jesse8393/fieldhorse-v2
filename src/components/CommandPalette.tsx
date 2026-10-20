@@ -73,14 +73,13 @@ type NavEntry = {
   event?: string
 }
 
-// Target /work directly (the collapsed deal list) rather than the legacy
-// board paths, so these don't round-trip through LegacyBoardRedirect and
-// its stage-synonym table. asStage seeds the New-deal sheet's stage.
+// The three New items open the create screens (SPEC D58): a lead, a
+// quote or a job starts on its own, with no chooser first.
 const QUICK_ACTIONS: NavEntry[] = [
   { id: 'capture', label: 'Capture anything', hint: 'Voice, text, receipt, or photo', icon: Mic, event: 'fh:open-capture' },
-  { id: 'newLead', label: 'New lead', hint: 'Add an opportunity', icon: Plus, to: '/work?new=1' },
-  { id: 'newQuote', label: 'New quote', hint: 'Start a proposal with scope', icon: FileText, to: '/work?new=1&asStage=quote' },
-  { id: 'newJob', label: 'New job', hint: 'Create active work', icon: Briefcase, to: '/work?new=1&asStage=job' },
+  { id: 'newLead', label: 'New lead', hint: 'Someone who called', icon: Plus, to: '/leads/new' },
+  { id: 'newQuote', label: 'New quote', hint: 'Scope and a price to send', icon: FileText, to: '/quotes/new' },
+  { id: 'newJob', label: 'New job', hint: 'Work that is on', icon: Briefcase, to: '/jobs/new' },
   { id: 'followups', label: 'Work follow ups', hint: 'Deals due for a touch, up top', icon: Target, to: '/work?stage=leads' },
   { id: 'collect', label: 'Collect money', hint: 'Invoices and balances', icon: Receipt, to: '/invoices' },
   { id: 'compose', label: 'Draft message', hint: 'AI compose for customers', icon: MessageSquare, to: '/compose' },

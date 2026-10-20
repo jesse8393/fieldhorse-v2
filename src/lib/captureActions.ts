@@ -125,7 +125,7 @@ export async function commitCapture({ intent, userId, contacts }: {
     case 'lead': {
       const name = intent.name || intent.title || 'New lead'
       // Link (or create) the client so a captured lead isn't an orphan
-      //, matches what NewLeadSheet does. Skipped when offline (the
+      //, matches what the lead screen does. Skipped when offline (the
       // lookups need the network); the lead still saves via the outbox.
       let clientId: string | null = null
       if (typeof navigator === 'undefined' || navigator.onLine !== false) {

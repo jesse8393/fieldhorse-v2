@@ -7,11 +7,10 @@ import {
   ChevronLeft, Pencil, X as XIcon, Save as SaveIcon,
   Briefcase, Paperclip, Image as ImageIcon, Download,
   Phone, Mail, MapPin, Trash2, MessageSquare, Users,
-  Plus, FileText, Receipt, DollarSign, Clock
+  Plus, Receipt, DollarSign, Clock
 } from 'lucide-react'
 import { hapticTap, hapticMedium, hapticError } from '../lib/haptics.ts'
 import ActionSheet from '../components/ActionSheet.tsx'
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 import { SkeletonList } from '../components/Skeleton.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
 import { SegmentedTabs, Eyebrow, StampNumber } from '../components/v3'
@@ -72,9 +71,6 @@ export default function ClientDetail() {
   // Destructive-confirm sheet state for delete client.
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  // "New" chooser sheet, spin up a quote / job / invoice under this client.
-  const [newOpen, setNewOpen] = useState(false)
-  const [creating, setCreating] = useState(false)
   // Statement sheet, roll all open invoices into one document.
   const [statementOpen, setStatementOpen] = useState(false)
 
@@ -139,38 +135,12 @@ export default function ClientDetail() {
     setIsEditing(false)
   }
 
-  // Create a new deal under this client at the chosen kind, prefilled
-  // with the client's contact info, then jump straight into it. A quote
-  // lands on the Quote builder; an "invoice" (materials/quick job, no
-  // quote needed) is a job in v2, it lands on Financials where the
-  // Send Invoice flow lives; a job lands on Overview.
-  async function createDealForClient(stage: 'quote' | 'job' | 'invoice') {
-    if (!client?.id || !user?.id || creating) return
-    setCreating(true)
-    const payload = {
-      user_id: user.id,
-      name: client.name || 'New ' + (stage === 'invoice' ? 'invoice' : stage),
-      phone: client.phone || null,
-      email: client.email || null,
-      address: client.address || null,
-      amount: 0,
-      // 'invoice' isn't a stage anymore (pipeline v2), a quick
-      // standalone invoice is a job you bill immediately.
-      stage: stage === 'invoice' ? 'job' : stage,
-      client_id: client.id
-    }
-    const { data, error } = await supabase.from('fh_contacts').insert(payload).select().single()
-    if (error) {
-      setCreating(false)
-      toastError("Couldn't create", error.message)
-      return
-    }
-    hapticMedium()
-    await fetchClient()
-    setCreating(false)
-    setNewOpen(false)
-    const dest = stage === 'invoice' ? '?tab=financials' : ''
-    navigate(stage === 'quote' ? `/quotes/${data.id}?tab=quote` : `/jobs/${data.id}${dest}`)
+  // New for this client (SPEC D58): the New screen, with this client
+  // carried to every create screen, so no chooser opens here.
+  function openNew() {
+    if (!client?.id) return
+    hapticTap()
+    navigate(`/new?client=${encodeURIComponent(client.id)}`)
   }
 
   // Rules-of-hooks: useIsDesktop must run before any conditional
@@ -236,11 +206,11 @@ export default function ClientDetail() {
     </>
   )
 
-  // Shared overlays (delete confirm, new-deal chooser, statement sheet).
+  // Shared overlays (delete confirm, statement sheet).
   // Mounted in BOTH the desktop and mobile branches, they're portaled,
   // so they render correctly wherever they sit in the tree. Previously
-  // these lived only in the mobile JSX, so on desktop the Delete / New
-  // deal / Statement buttons set state but nothing ever appeared.
+  // these lived only in the mobile JSX, so on desktop the Delete and
+  // Statement buttons set state but nothing ever appeared.
   const sheets = (
     <>
       <ActionSheet
@@ -262,19 +232,6 @@ export default function ClientDetail() {
         </p>
       </ActionSheet>
 
-      <Drawer open={newOpen} onOpenChange={(o: any) => { if (!o && !creating) setNewOpen(false) }}>
-        <DrawerContent>
-          <DrawerHeader>
-            <DrawerTitle>New for {client.name}</DrawerTitle>
-            <DrawerDescription>Start a quote, a quick job, or a standalone invoice, all linked to this client.</DrawerDescription>
-          </DrawerHeader>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 16px max(16px, env(safe-area-inset-bottom))' }}>
-            <NewDealOption icon={FileText} label="New quote" sub="Build an estimate to send" onClick={() => createDealForClient('quote')} disabled={creating} />
-            <NewDealOption icon={Briefcase} label="New job" sub="Quick job, skip the quote" onClick={() => createDealForClient('job')} disabled={creating} />
-            <NewDealOption icon={Receipt} label="New invoice" sub="Materials or misc, no quote needed" onClick={() => createDealForClient('invoice')} disabled={creating} />
-          </div>
-        </DrawerContent>
-      </Drawer>
 
       <StatementSheet
         open={statementOpen}
@@ -304,7 +261,7 @@ export default function ClientDetail() {
           onBack={() => navigate('/clients')}
           onEdit={() => setIsEditing(!isEditing)}
           onDelete={() => setDeleteOpen(true)}
-          onNewDeal={() => setNewOpen(true)}
+          onNewDeal={openNew}
           onStatement={statementSummary.totalDue > 0 ? () => setStatementOpen(true) : undefined}
           isEditing={isEditing}
         >
@@ -466,7 +423,7 @@ export default function ClientDetail() {
         <motion.button
           type="button"
           whileTap={{ scale: 0.99 }}
-          onClick={() => { hapticTap(); setNewOpen(true) }}
+          onClick={openNew}
           style={{
             width: '100%',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
@@ -533,59 +490,6 @@ export default function ClientDetail() {
 
       {sheets}
     </motion.div>
-  )
-}
-
-/* ============================================================
-   NewDealOption, one row in the "New for {client}" chooser sheet
-   ============================================================ */
-
-function NewDealOption({ icon: Icon, label, sub, onClick, disabled }: any) {
-  return (
-    <motion.button
-      type="button"
-      whileTap={disabled ? undefined : { scale: 0.99 }}
-      onClick={() => { if (!disabled) { hapticTap(); onClick?.() } }}
-      disabled={disabled}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 12,
-        width: '100%', textAlign: 'left',
-        padding: '12px 16px', borderRadius: 10,
-        background: 'var(--v3-surface-2)',
-        border: '1px solid var(--v3-border-strong)',
-        color: 'var(--v3-text)',
-        cursor: disabled ? 'wait' : 'pointer',
-        opacity: disabled ? 0.6 : 1,
-        WebkitTapHighlightColor: 'transparent'
-      }}
-    >
-      <span aria-hidden="true" style={{
-        flexShrink: 0,
-        width: 40, height: 40, borderRadius: 10,
-        background: 'var(--v3-primary-soft)',
-        border: '1px solid color-mix(in srgb, var(--v3-primary) 28%, transparent)',
-        color: 'var(--v3-primary-text)',
-        display: 'grid', placeItems: 'center'
-      }}>
-        <Icon size={18} />
-      </span>
-      <span style={{ minWidth: 0, flex: 1 }}>
-        <span style={{
-          display: 'block',
-          fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
-          color: 'var(--v3-text)', lineHeight: 1.2
-        }}>
-          {label}
-        </span>
-        <span style={{
-          display: 'block', marginTop: 2,
-          fontFamily: 'var(--font-body)', fontSize: 12,
-          color: 'var(--v3-text-muted)', lineHeight: 1.3
-        }}>
-          {sub}
-        </span>
-      </span>
-    </motion.button>
   )
 }
 
