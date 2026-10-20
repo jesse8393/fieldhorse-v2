@@ -88,3 +88,8 @@ left join lateral (
   order by r.updated_at desc nulls last
   limit 1
 ) newest on true;
+
+-- Applied to production on October 20 through apply_migration; the view
+-- body above was read from the live definition first, so every existing
+-- column keeps its place and only latest_record and latest_record_id are
+-- appended.
