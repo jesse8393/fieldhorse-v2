@@ -1,16 +1,10 @@
-import { lazy, Suspense, useMemo, useState } from 'react'
-import { AnimatePresence } from 'framer-motion'
+import { lazy, Suspense, useMemo } from 'react'
 import { useInvoicesBundle, useInvalidateInvoices } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
-// V3PaymentSheet is lazy, only loads when an operator taps Log payment on
-// a job balance (the desktop table). Task 13 replaces it with the job's
-// payment screen.
-const V3PaymentSheet = lazy(() => import('../components/V3PaymentSheet.tsx'))
-import StatementSheet from '../components/StatementSheet.tsx'
 import { approvedCoByContact } from '../lib/statement.ts'
 import { parseDateOnly } from '../lib/dates.ts'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { useNow } from '../lib/useNow.ts'
 const SnowInvoices = lazy(() => import('../components/desktop/SnowInvoicesBuild.tsx'))
@@ -81,9 +75,11 @@ export default function Invoices() {
     else sp.set('view', next)
     setSearchParams(sp, { replace: true })
   }
-  // Job balance whose Log payment sheet is open (the desktop table). null =
-  // closed. Stores the row so the sheet can prefill the balance.
-  const [payingRow, setPayingRow] = useState<any>(null)
+  // Log payment on a job balance (the desktop table) is the job's payment
+  // screen, and a customer's statement its own screen (D57).
+  const navigate = useNavigate()
+  const openPayment = (r: { job: { id: string } }) => navigate(`/jobs/${r.job.id}/payment`)
+  const openStatement = (g: { clientId: string }) => navigate(`/clients/${g.clientId}/statement`)
 
   // Receivable-age anchor per job: the earliest OPEN (issued but not
   // paid/void/draft) invoice's due date, else its issue date. A/R aging
@@ -147,7 +143,7 @@ export default function Invoices() {
   // BY-CLIENT A/R rollup, group every outstanding job balance under
   // its linked client so "who owes me, and how overdue" reads at a
   // glance. Each group carries the client's jobs + the worst aging
-  // bucket among them, and feeds the shared StatementSheet directly.
+  // bucket among them, and names the customer whose statement screen opens.
   const clientAR = useMemo(() => {
     const groups = new Map<string, any>()
     for (const r of rows) {
@@ -180,8 +176,6 @@ export default function Invoices() {
     }
     return Array.from(groups.values()).sort((a, b) => b.total - a.total)
   }, [rows])
-
-  const [statementClient, setStatementClient] = useState<any>(null)
 
   const totals = useMemo(() => {
     const out: Record<string, number> = { '0-30': 0, '31-60': 0, '60+': 0, total: 0, count: 0 }
@@ -251,39 +245,16 @@ export default function Invoices() {
             filter={filter as MoneyFilter}
             onFilterChange={(f) => setFilter(f)}
             now={now}
-            onStatement={(g) => setStatementClient(g)}
-            onPayRow={(r) => setPayingRow(r)}
+            onStatement={openStatement}
+            onPayRow={openPayment}
           />
         </Suspense>
-        <AnimatePresence>
-          {payingRow && (
-            <Suspense fallback={null}>
-              <V3PaymentSheet
-                contact={payingRow.job}
-                balance={payingRow.balance}
-                invoice={payingRow.invoice || null}
-                onClose={() => setPayingRow(null)}
-                onLogged={() => { setPayingRow(null); refresh() }}
-              />
-            </Suspense>
-          )}
-        </AnimatePresence>
-        <StatementSheet
-          open={!!statementClient}
-          onClose={() => setStatementClient(null)}
-          client={statementClient?.client || null}
-          jobs={statementClient?.jobs || []}
-          payments={payments}
-          changeOrders={changeOrders}
-          userId={user?.id}
-        />
       </>
     )
   }
 
   // Phone: the Money screen. It takes the same rows and handlers the
-  // desktop table gets; the payment and statement sheets below are the
-  // existing ones, opened from its invoice actions and its Who owes you list.
+  // desktop table gets; a statement opens as the customer's statement screen.
   return (
     <>
       <MoneyPhone
@@ -296,29 +267,7 @@ export default function Invoices() {
         filter={filter as MoneyFilter}
         onFilterChange={(f) => setFilter(f)}
         now={now}
-        onStatement={(g) => setStatementClient(g)}
-      />
-      <AnimatePresence>
-        {payingRow && (
-          <Suspense fallback={null}>
-            <V3PaymentSheet
-              contact={payingRow.job}
-              balance={payingRow.balance}
-              invoice={payingRow.invoice || null}
-              onClose={() => setPayingRow(null)}
-              onLogged={() => { setPayingRow(null); refresh() }}
-            />
-          </Suspense>
-        )}
-      </AnimatePresence>
-      <StatementSheet
-        open={!!statementClient}
-        onClose={() => setStatementClient(null)}
-        client={statementClient?.client || null}
-        jobs={statementClient?.jobs || []}
-        payments={payments}
-        changeOrders={changeOrders}
-        userId={user?.id}
+        onStatement={openStatement}
       />
     </>
   )

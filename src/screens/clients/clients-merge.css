@@ -1,0 +1,202 @@
+/*
+ * The merge duplicates screen, /clients/merge (Phase 9, Task 14, D57):
+ * Back and the title, then one card per cluster with the record to keep
+ * marked, a box per duplicate and the merge button, which takes a second
+ * tap. Reads only --fh- tokens.
+ */
+
+.fhcm {
+  padding-bottom: 24px;
+}
+
+.fhcm-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 8px 8px;
+}
+
+.fhcm-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-family: var(--fh-font-display);
+  font-size: 30px;
+  line-height: 36px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--fh-ink);
+}
+
+.fhcm-title:focus {
+  outline: none;
+}
+
+.fhcm-lede {
+  margin: 0;
+  padding: 0 var(--fh-gutter) 8px;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--fh-ink-2);
+}
+
+.fhcm-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px var(--fh-gutter) 0;
+}
+
+.fhcm-empty {
+  margin: 0;
+  padding: 24px 0;
+  text-align: center;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--fh-ink-2);
+}
+
+.fhcm-cluster {
+  border: 1px solid var(--fh-edge);
+  border-radius: 14px;
+  background: var(--fh-paper);
+  overflow: hidden;
+}
+
+.fhcm-cluster__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border-bottom: 1px solid var(--fh-hairline);
+  background: var(--fh-tray);
+  font: 600 13px/16px var(--fh-font-body);
+  color: var(--fh-ink-2);
+}
+
+.fhcm-members {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.fhcm-member {
+  display: flex;
+  align-items: stretch;
+  border-top: 1px solid var(--fh-hairline);
+}
+
+.fhcm-member:first-child {
+  border-top: 0;
+}
+
+.fhcm-member.is-kept {
+  background: var(--fh-gold-lo);
+}
+
+.fhcm-member__pick {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 0;
+  background: transparent;
+  color: var(--fh-ink);
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.fhcm-member.is-skipped .fhcm-member__pick {
+  opacity: 0.55;
+}
+
+.fhcm-member__mark {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 2px solid var(--fh-edge-strong);
+  display: grid;
+  place-items: center;
+  color: var(--fh-on-gold);
+}
+
+.fhcm-member.is-kept .fhcm-member__mark {
+  border-color: var(--fh-gold-ink);
+  background: var(--fh-gold-ink);
+}
+
+.fhcm-member__text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fhcm-member__name {
+  font: 600 15px/20px var(--fh-font-body);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fhcm-member__tag {
+  margin-left: 8px;
+  font: 600 12px/16px var(--fh-font-body);
+  color: var(--fh-gold-ink);
+}
+
+.fhcm-member__meta {
+  font: 400 13px/16px var(--fh-font-body);
+  color: var(--fh-ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fhcm-member__date {
+  font: 500 12px/16px var(--fh-font-body);
+  color: var(--fh-ink-3);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.fhcm-member__box {
+  flex: none;
+  width: 48px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.fhcm-cluster__foot {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border-top: 1px solid var(--fh-hairline);
+  background: var(--fh-tray);
+}
+
+.fhcm-cluster__note {
+  font: 400 13px/18px var(--fh-font-body);
+  color: var(--fh-ink-2);
+}
+
+@media (min-width: 900px) {
+  .fhcm-head {
+    padding: 12px var(--fh-gutter-desktop) 8px 20px;
+  }
+
+  .fhcm-lede,
+  .fhcm-body {
+    padding-left: var(--fh-gutter-desktop);
+    padding-right: var(--fh-gutter-desktop);
+  }
+}

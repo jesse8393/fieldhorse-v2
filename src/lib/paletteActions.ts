@@ -4,7 +4,7 @@
 // rows of its Actions group. Where each row goes uses things the app
 // already has:
 //
-//   invoice   the send invoice cue on the job page (opens SendInvoiceSheet)
+//   invoice   the send invoice cue on the job page (opens the invoice screen)
 //   message   the native text handoff (sms:) every other screen uses, or the
 //             job page when there is no number to text
 //   note      Universal Capture attached to the job (openCapture({ jobId }))

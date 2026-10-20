@@ -1,8 +1,9 @@
 // Phase 8, Task 15: small behavior fixes (PHASE8_PLAN.md). One describe per
 // fix, each with the smallest check that shows the old behavior was wrong:
 // Reopen asks first (deal card, job page, next action card and closeout
-// record, with the question holding focus), a question over a sheet that
-// goes with the sheet when the back button leaves the page (and leaves the
+// record) with a second tap on the same button (Phase 9, D57; the armed
+// button takes focus so the keyboard answers it), a second tap that goes
+// with its screen when the back button leaves the page (and leaves the
 // next screen taking taps), field roles get no New lead, the job header and
 // the desktop facts panel pick the maps app by device, the Spine shows
 // every note and hides a broken thumbnail, the Jobs list reads a narrow
@@ -52,11 +53,6 @@ function watchWrites(page: Page): string[] {
     writes.push(`${req.method()} ${url.pathname.split('/rest/v1/')[1]} ${req.postData() || ''}`.trim())
   })
   return writes
-}
-
-/** Whether keyboard focus is inside the open question (the ConfirmSheet). */
-function focusInQuestion(page: Page): Promise<boolean> {
-  return page.evaluate(() => !!document.activeElement?.closest('[role="alertdialog"]'))
 }
 
 /** A route change inside the app, the way a link does it: the query cache stays. */
@@ -199,7 +195,7 @@ const NO_LOCATION_PROFILE = [{
 }]
 
 test.describe('Reopen asks first, like Mark lost', () => {
-  test('the deal card asks, and Cancel writes nothing', async ({ context, page }, testInfo) => {
+  test('the deal card asks with a second tap, and leaving it alone writes nothing', async ({ context, page }, testInfo) => {
     test.skip(isPhone(testInfo.project.name), 'Desktop deal cards')
     await signIn(context)
     const patches = watchPatches(page, 'fh_contacts')
@@ -207,19 +203,23 @@ test.describe('Reopen asks first, like Mark lost', () => {
     const card = page.locator('.fh-deal-card', { hasText: 'Old Mill HOA' })
     await expect(card).toBeVisible({ timeout: 30_000 })
 
+    // Reopen in the menu arms a Tap again button on the card; no dialog.
     await card.getByRole('button', { name: 'Deal actions' }).click()
     await page.getByRole('menuitem', { name: 'Reopen' }).click()
-    const question = page.getByRole('alertdialog', { name: 'Reopen this deal?' })
-    await expect(question).toBeVisible()
-    await expect(question).toContainText('It moves back to Leads.')
-    await question.getByRole('button', { name: 'Cancel' }).click()
-    await expect(question).toBeHidden()
+    const again = card.getByRole('button', { name: 'Tap again to reopen' })
+    await expect(again).toBeVisible()
+    await expect(card).toContainText('It moves back to Leads.')
+    await expect(page.getByRole('alertdialog')).toHaveCount(0)
     await page.waitForTimeout(300)
+    expect(patches).toEqual([])
+
+    // Left alone, the button goes back to resting and nothing is written.
+    await expect(again).toBeHidden({ timeout: 6000 })
     expect(patches).toEqual([])
 
     await card.getByRole('button', { name: 'Deal actions' }).click()
     await page.getByRole('menuitem', { name: 'Reopen' }).click()
-    await page.getByRole('alertdialog', { name: 'Reopen this deal?' }).getByRole('button', { name: 'Reopen' }).click()
+    await card.getByRole('button', { name: 'Tap again to reopen' }).click()
     await expect.poll(() => patches.length).toBe(1)
     expect(JSON.parse(patches[0])).toEqual({ stage: 'lead' })
   })
@@ -232,16 +232,20 @@ test.describe('Reopen asks first, like Mark lost', () => {
     const reopen = page.locator('.fhj-capsule .fhc-btn--primary')
     await expect(reopen).toHaveText('Reopen')
 
+    // The first tap arms the button and says where the deal goes.
     await reopen.click()
-    const question = page.getByRole('alertdialog', { name: 'Reopen this deal?' })
-    await expect(question).toBeVisible()
-    await question.getByRole('button', { name: 'Cancel' }).click()
-    await expect(question).toBeHidden()
+    await expect(reopen).toHaveText('Tap again to reopen')
+    await expect(page.getByRole('alertdialog')).toHaveCount(0)
+    await expect(page.locator('.fhj-capsule')).toContainText('It moves back to Leads.')
     await page.waitForTimeout(300)
     expect(patches).toEqual([])
 
+    // Left alone, it goes back to resting and nothing is written.
+    await expect(reopen).toHaveText('Reopen', { timeout: 6000 })
+    expect(patches).toEqual([])
+
     await reopen.click()
-    await page.getByRole('alertdialog', { name: 'Reopen this deal?' }).getByRole('button', { name: 'Reopen' }).click()
+    await reopen.click()
     await expect.poll(() => patches.length).toBe(1)
     expect(JSON.parse(patches[0])).toEqual({ stage: 'lead' })
   })
@@ -251,19 +255,20 @@ test.describe('Reopen asks first, like Mark lost', () => {
     await signIn(context)
     const patches = watchPatches(page, 'fh_contacts')
     await openJob(page, '/jobs/c-done')
-    await page.locator('.fhj-capsule .fhc-btn--primary').click()
-    const question = page.getByRole('alertdialog', { name: 'Reopen this job?' })
-    await expect(question).toContainText('It moves back to Jobs.')
-    await question.getByRole('button', { name: 'Reopen' }).click()
+    const reopen = page.locator('.fhj-capsule .fhc-btn--primary')
+    await reopen.click()
+    await expect(reopen).toHaveText('Tap again to reopen')
+    await expect(page.locator('.fhj-capsule')).toContainText('It moves back to Jobs.')
+    await reopen.click()
     await expect.poll(() => patches.length).toBe(1)
     expect(JSON.parse(patches[0])).toEqual({ stage: 'job' })
   })
 
-  // The question opens from the deal card's menu. It has to hold focus once
-  // the menu has gone: the menu used to hand focus back to its button behind
-  // the question, so a screen reader never read it, Tab walked the page and
-  // Enter opened the menu again over it.
-  test('from the keyboard, the deal card question takes focus and gives it back', async ({ context, page }, testInfo) => {
+  // The armed button appears from the deal card's menu. It has to take
+  // focus once the menu has gone: the menu hands focus back to its ⋯
+  // button, so without this a screen reader never hears the question and
+  // Enter opens the menu again.
+  test('from the keyboard, the deal card Tap again button takes focus and Enter answers it', async ({ context, page }, testInfo) => {
     test.skip(isPhone(testInfo.project.name), 'Desktop deal cards')
     await signIn(context)
     const patches = watchPatches(page, 'fh_contacts')
@@ -278,26 +283,23 @@ test.describe('Reopen asks first, like Mark lost', () => {
     await expect(item).toBeVisible()
     await item.focus()
     await page.keyboard.press('Enter')
-    const question = page.getByRole('alertdialog', { name: 'Reopen this deal?' })
-    await expect(question).toBeVisible()
-    // Once the menu has gone and handed focus back, focus is in the question.
+    const again = card.getByRole('button', { name: 'Tap again to reopen' })
+    await expect(again).toBeVisible()
+    await expect(page.getByRole('alertdialog')).toHaveCount(0)
+    // Once the menu has gone and handed focus back, focus is on the armed button.
     await expect(page.locator('[data-slot="dropdown-menu-content"]')).toHaveCount(0)
-    await page.waitForTimeout(300)
-    expect(await focusInQuestion(page)).toBe(true)
-    // Tab keeps it there.
-    await page.keyboard.press('Tab')
-    expect(await focusInQuestion(page)).toBe(true)
-    await page.keyboard.press('Tab')
-    expect(await focusInQuestion(page)).toBe(true)
-
-    await page.keyboard.press('Escape')
-    await expect(question).toBeHidden()
-    await expect(trigger).toBeFocused()
+    await expect(again).toBeFocused()
     await page.waitForTimeout(300)
     expect(patches).toEqual([])
+
+    // Enter presses the armed button: the deal moves, no menu opens.
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('menu')).toHaveCount(0)
+    await expect.poll(() => patches.length).toBe(1)
+    expect(JSON.parse(patches[0])).toEqual({ stage: 'lead' })
   })
 
-  test('by mouse, Enter then answers the question, not the menu behind it', async ({ context, page }, testInfo) => {
+  test('by mouse, Enter then answers the Tap again button, not the menu behind it', async ({ context, page }, testInfo) => {
     test.skip(isPhone(testInfo.project.name), 'Desktop deal cards')
     await signIn(context)
     const patches = watchPatches(page, 'fh_contacts')
@@ -308,18 +310,17 @@ test.describe('Reopen asks first, like Mark lost', () => {
 
     await trigger.click()
     await page.getByRole('menuitem', { name: 'Reopen' }).click()
-    const question = page.getByRole('alertdialog', { name: 'Reopen this deal?' })
-    await expect(question).toBeVisible()
+    const again = card.getByRole('button', { name: 'Tap again to reopen' })
+    await expect(again).toBeVisible()
     await expect(page.locator('[data-slot="dropdown-menu-content"]')).toHaveCount(0)
-    await page.waitForTimeout(300)
-    expect(await focusInQuestion(page)).toBe(true)
-    // Enter presses the focused Cancel: the question closes, no menu opens.
-    await page.keyboard.press('Enter')
-    await expect(question).toBeHidden()
-    await expect(page.getByRole('menu')).toHaveCount(0)
-    await expect(trigger).toBeFocused()
+    await expect(again).toBeFocused()
     await page.waitForTimeout(300)
     expect(patches).toEqual([])
+    // Enter presses the focused armed button; no menu opens.
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('menu')).toHaveCount(0)
+    await expect.poll(() => patches.length).toBe(1)
+    expect(JSON.parse(patches[0])).toEqual({ stage: 'lead' })
   })
 
   // The closeout record's own Reopen deletes the record (sign off, warranty,
@@ -366,16 +367,15 @@ test.describe('Reopen asks first, like Mark lost', () => {
     const reopen = page.locator('#fhj-more-body').getByRole('button', { name: 'Reopen', exact: true })
     await expect(reopen).toBeVisible()
 
+    // The first tap arms the card's button; nothing is written.
     await reopen.click()
-    const question = page.getByRole('alertdialog', { name: 'Reopen this deal?' })
-    await expect(question).toBeVisible()
-    await question.getByRole('button', { name: 'Cancel' }).click()
-    await expect(question).toBeHidden()
+    const again = page.locator('#fhj-more-body').getByRole('button', { name: 'Tap again to reopen' })
+    await expect(again).toBeVisible()
+    await expect(page.getByRole('alertdialog')).toHaveCount(0)
     await page.waitForTimeout(300)
     expect(patches).toEqual([])
 
-    await reopen.click()
-    await page.getByRole('alertdialog', { name: 'Reopen this deal?' }).getByRole('button', { name: 'Reopen' }).click()
+    await again.click()
     await expect.poll(() => patches.length).toBe(1)
     expect(JSON.parse(patches[0])).toEqual({ stage: 'lead' })
   })
@@ -457,24 +457,23 @@ test.describe('Leaving a page while it asks', () => {
     await expectJobsTakeTaps(page)
   })
 
-  // A question the page itself asks (Reopen and Mark lost on the job page,
-  // the next action card, the deal card) is drawn at the app root too, so
-  // it stayed over the next screen, and a yes there moved the stage of a
-  // job that was no longer shown. Any question closes, unanswered, when
-  // the page changes.
-  test('a page question closes when the page changes, and its yes can no longer write', async ({ context, page }) => {
+  // An armed button (Reopen on the job page, the next action card, the deal
+  // card) belongs to its screen, so it goes with the screen when the page
+  // changes and its second tap can no longer move a job that is not shown.
+  test('an armed button goes with its page, and its second tap can no longer write', async ({ context, page }) => {
     await signIn(context)
     const writes = watchWrites(page)
     await openJobs(page)
     await goInApp(page, '/jobs/c-lost')
     await expect(page.locator('.fhj-page')).toBeVisible({ timeout: 30_000 })
     await page.locator('.fhj-capsule .fhc-btn--primary').click()
-    const question = page.getByRole('alertdialog', { name: 'Reopen this deal?' })
-    await expect(question).toBeVisible()
+    const again = page.getByRole('button', { name: 'Tap again to reopen' })
+    await expect(again).toBeVisible()
+    await expect(page.getByRole('alertdialog')).toHaveCount(0)
 
     await page.goBack()
     await expect(page.getByRole('heading', { level: 1, name: 'Jobs' })).toBeVisible({ timeout: 30_000 })
-    await expect(question).toBeHidden()
+    await expect(again).toBeHidden()
     await expect(page.getByRole('button', { name: 'Reopen', exact: true })).toHaveCount(0)
     await page.waitForTimeout(400)
     expect(writes).toEqual([])
@@ -775,7 +774,7 @@ test.describe('Key caps follow the keyboard', () => {
     await page.keyboard.press('Control+Alt+KeyN')
     await page.waitForTimeout(300)
     await expect(palette).toBeVisible()
-    await expect(page.getByRole('dialog', { name: 'Capture' })).toHaveCount(0)
+    await expect(page).not.toHaveURL(/\/capture/)
   })
 
   test.describe('on a Mac', () => {
@@ -802,13 +801,13 @@ test.describe('Key caps follow the keyboard', () => {
       await page.keyboard.press('Alt+KeyN')
       await page.waitForTimeout(300)
       await expect(palette).toBeVisible()
-      await expect(page.getByRole('dialog', { name: 'Capture' })).toHaveCount(0)
+      await expect(page).not.toHaveURL(/\/capture/)
 
       await page.keyboard.press('Control+Alt+KeyN')
       await expect(palette).toBeHidden()
-      const sheet = page.getByRole('dialog', { name: 'Capture' })
-      await expect(sheet).toBeVisible()
-      await expect(sheet.getByText('Attached to Slab + trench.')).toBeVisible()
+      // Capture is a screen (D57), opened on the job.
+      await expect(page).toHaveURL(/\/capture\?job=c-job1$/)
+      await expect(page.getByText('Attached to Slab + trench.')).toBeVisible()
     })
   })
 })
@@ -1097,25 +1096,27 @@ test.describe('Reset password', () => {
   })
 })
 
-test.describe('Focus after a sheet closes', () => {
+test.describe('Focus stays where the keyboard put it', () => {
   test.beforeEach(async ({ page: _page }, testInfo) => {
-    test.skip(!isPhone(testInfo.project.name), 'Phone sheets')
+    test.skip(!isPhone(testInfo.project.name), 'Phone screens')
   })
 
-  test('Escape puts focus back on the button that opened the sheet', async ({ context, page }) => {
+  // The Jobs filter is a chip in the header (Phase 9, D57): Enter toggles
+  // it in place and focus never leaves the chip, so there is no sheet to
+  // come back from.
+  test('Enter toggles the lost jobs chip and keeps focus on it', async ({ context, page }) => {
     await signIn(context)
     await openJobs(page)
-    const filter = page.getByRole('button', { name: 'Filter and sort' })
-    await filter.focus()
+    const lost = page.getByRole('group', { name: 'Filter and sort' }).getByRole('switch', { name: 'Show lost jobs' })
+    await expect(lost).toHaveAttribute('aria-checked', 'false')
+    await lost.focus()
     await page.keyboard.press('Enter')
-    const sheet = page.getByRole('dialog', { name: 'Filter and sort' })
-    await expect(sheet).toBeVisible()
-    // Focus is in the sheet now (the page behind it is hidden from the
-    // accessibility tree, so the button cannot be asked about directly).
-    await expect.poll(() => page.evaluate(() => !!document.activeElement?.closest('[role="dialog"]'))).toBe(true)
-    await page.keyboard.press('Escape')
-    await expect(sheet).toBeHidden()
-    await expect(filter).toBeFocused()
+    await expect(lost).toHaveAttribute('aria-checked', 'true')
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(lost).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(lost).toHaveAttribute('aria-checked', 'false')
+    await expect(lost).toBeFocused()
   })
 
   // The quote's line editor opens in place (Phase 9, D57): Escape closes it

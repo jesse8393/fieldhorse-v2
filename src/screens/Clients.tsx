@@ -11,9 +11,7 @@ import { useFhMotion } from '../lib/motion.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useClientsBundle, useInvalidateClients } from '../lib/queries.ts'
 import { rollupByClient } from '../lib/rollups.ts'
-import { findDuplicateClusters, loadNotDuplicates, rememberNotDuplicates } from '../lib/clientMerge.ts'
-// Lazy, sheet only mounts when the operator opens the merge flow.
-const MergeDuplicatesSheet = lazy(() => import('../components/MergeDuplicatesSheet.tsx'))
+import { findDuplicateClusters, loadNotDuplicates } from '../lib/clientMerge.ts'
 import { FilterPill, Eyebrow, StampNumber, ScreenCloser } from '../components/v3'
 import { Button } from '../components/fh'
 const SnowClients = lazy(() => import('../components/desktop/SnowClientsBuild.tsx'))
@@ -50,7 +48,8 @@ export default function Clients() {
   }
   // New customer is a full screen (SPEC D57); nothing opens over the list.
   const openNew = () => navigate('/clients/new')
-  const [mergeOpen, setMergeOpen] = useState(false)
+  // Reviewing duplicates is the screen /clients/merge (D57).
+  const openMerge = () => navigate('/clients/merge')
 
   // Rollups computed live from jobs + payments instead of trusting the
   // stale fh_clients.total_lifetime_value / active_jobs_count columns.
@@ -70,12 +69,9 @@ export default function Clients() {
 
   // Duplicate detection, runs every time the client roster changes.
   // Match policy lives in lib/clientMerge.ts (phone or email normalized).
-  // Pairs the operator marked as different clients in the merge sheet
+  // Pairs the operator marked as different clients on the merge screen
   // stop being flagged (remembered on this device).
-  const [notDuplicates, setNotDuplicates] = useState<ReadonlySet<string>>(() => loadNotDuplicates(user?.id))
-  const markDistinct = (pairs: Array<[string, string]>) => {
-    setNotDuplicates(rememberNotDuplicates(user?.id, notDuplicates, pairs))
-  }
+  const notDuplicates = useMemo(() => loadNotDuplicates(user?.id), [user?.id])
   const duplicateClusters = useMemo(() => findDuplicateClusters(rows, notDuplicates), [rows, notDuplicates])
   const duplicateCount = useMemo(
     () => duplicateClusters.reduce((s, c) => s + c.members.length, 0),
@@ -213,17 +209,7 @@ export default function Clients() {
             duplicateCount={duplicateCount}
             onOpenClient={(id: any) => navigate(`/clients/${id}`)}
             onNewClient={() => openNew()}
-            onReviewDuplicates={() => setMergeOpen(true)}
-          />
-        </Suspense>
-        <Suspense fallback={null}>
-          <MergeDuplicatesSheet
-            open={mergeOpen}
-            userId={user?.id}
-            clusters={duplicateClusters}
-            onClose={() => setMergeOpen(false)}
-            onMerged={load}
-            onMarkedDistinct={markDistinct}
+            onReviewDuplicates={openMerge}
           />
         </Suspense>
       </>
@@ -319,12 +305,12 @@ export default function Clients() {
       </motion.div>
 
       {/* DUPLICATES BANNER, only when clusters detected. Tapping opens
-          the merge sheet. */}
+          the merge screen. */}
       {!loading && duplicateClusters.length > 0 && (
         <motion.div variants={item} style={{ padding: '0 24px 12px' }}>
           <button
             type="button"
-            onClick={() => { hapticMedium(); setMergeOpen(true) }}
+            onClick={() => { hapticMedium(); openMerge() }}
             style={{
               width: '100%',
               display: 'flex', alignItems: 'center', gap: 12,
@@ -524,17 +510,6 @@ export default function Clients() {
         ctaLabel="Add another client"
         onCta={() => openNew()}
       />
-
-      <Suspense fallback={null}>
-        <MergeDuplicatesSheet
-          open={mergeOpen}
-          userId={user?.id}
-          clusters={duplicateClusters}
-          onClose={() => setMergeOpen(false)}
-          onMerged={load}
-          onMarkedDistinct={markDistinct}
-        />
-      </Suspense>
     </motion.div>
   )
 }

@@ -1,17 +1,16 @@
 import { lazy, Suspense, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { TrendingUp, BarChart3, DollarSign, Target, Car, Plus } from 'lucide-react'
 import { SkeletonStat } from '../components/Skeleton.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
 import { parseDateOnly } from '../lib/dates.ts'
 import CountUp from '../components/fx/CountUp.tsx'
-import LogMilesSheet from '../components/LogMilesSheet.tsx'
 import { useAnalyticsBundle, useInvalidateAnalytics } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { STAGES, ACTIVE_STAGES } from '../lib/stages.ts'
 import { wonYTD as wonYTDFn, profitYTD as profitYTDFn, closeRate as closeRateFn, avgMargin as avgMarginFn, computeFunnel } from '../lib/rollups.ts'
-import { toastSuccess } from '../lib/toast.ts'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
@@ -41,6 +40,7 @@ export default function Analytics() {
   // and that wait is loading too, never "Not enough data yet." or $0.
   const { data: bundle, isPending: loading, isError, refetch } = useAnalyticsBundle(user?.id)
   const load = useInvalidateAnalytics()
+  const navigate = useNavigate()
   const contacts = bundle?.contacts ?? []
   const mileage = bundle?.mileage ?? []
   const payments = bundle?.payments ?? []
@@ -48,7 +48,6 @@ export default function Analytics() {
   const changeOrders = bundle?.changeOrders ?? []
   const clients = bundle?.clients ?? []
   const stageTransitions = bundle?.stageTransitions ?? []
-  const [logOpen, setLogOpen] = useState(false)
 
   // 12-week pipeline trend, bucket contacts by created_at week,
   // sum amount of rows still in active stages. Each bucket is Sunday-anchored.
@@ -615,7 +614,7 @@ export default function Analytics() {
                 <motion.button
                   type="button"
                   whileTap={{ scale: 0.97 }}
-                  onClick={() => setLogOpen(true)}
+                  onClick={() => navigate('/miles/new')}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -780,12 +779,6 @@ export default function Analytics() {
         </>
       )}
 
-      <LogMilesSheet
-        open={logOpen}
-        userId={user?.id}
-        onOpenChange={setLogOpen}
-        onSaved={() => { setLogOpen(false); load(); toastSuccess('Miles logged', 'Deduction updated') }}
-      />
     </motion.div>
   )
 }

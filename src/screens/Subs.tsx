@@ -17,9 +17,6 @@ import SectionHeader from '../components/v3/SectionHeader.tsx'
 import { FilterPill, Eyebrow, StampNumber } from '../components/v3'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { useMembership } from '../contexts/MembershipContext.tsx'
-import {
-  Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription
-} from '@/components/ui/drawer'
 
 // Subs directory, v3 rebuild. Aggregates fh_subs rows by (name + phone)
 // so the same sub appearing on 5 jobs shows as ONE entry with 5-job
@@ -73,7 +70,6 @@ export default function Subs() {
   const rows = bundle?.subs ?? []
   const [q, setQ] = useState('')
   const [tradeFilter, setTradeFilter] = useState('')
-  const [addOpen, setAddOpen] = useState(false)
 
   const contacts = useMemo(() => {
     const map: Record<string, any> = {}
@@ -196,20 +192,10 @@ export default function Subs() {
             setTradeFilter={setTradeFilter}
             allTrades={allTrades as string[]}
             screenStats={screenStats}
-            onAddSub={() => setAddOpen(true)}
+            onAddSub={() => navigate('/subs/new')}
             onOpenSub={(key) => navigate(`/subs/${encodeURIComponent(key)}`)}
           />
         </Suspense>
-        <AddSubDrawer
-          open={addOpen}
-          userId={user?.id}
-          orgId={scopeOrgId ?? null}
-          onClose={() => setAddOpen(false)}
-          onCreated={async () => {
-            setAddOpen(false)
-            await load()
-          }}
-        />
       </>
     )
   }
@@ -248,7 +234,7 @@ export default function Subs() {
               <motion.button
                 type="button"
                 whileTap={{ scale: 0.96 }}
-                onClick={() => { hapticTap(); setAddOpen(true) }}
+                onClick={() => { hapticTap(); navigate('/subs/new') }}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -405,17 +391,6 @@ export default function Subs() {
         )}
       </motion.div>
 
-      {/* Add Sub drawer, schema-honest fields only */}
-      <AddSubDrawer
-        open={addOpen}
-        userId={user?.id}
-        orgId={scopeOrgId ?? null}
-        onClose={() => setAddOpen(false)}
-        onCreated={async () => {
-          setAddOpen(false)
-          await load()
-        }}
-      />
     </motion.div>
   )
 }
@@ -707,187 +682,6 @@ function SubCard({ g, contacts, isTop }: any) {
         )}
       </motion.article>
     </li>
-  )
-}
-
-/* ============================================================
-   AddSubDrawer, directory-level vendor creation. Inserts into
-   fh_subs with contact_id=null so the new sub appears in the
-   directory roll-up immediately and can be linked to a job
-   later via the per-job SubsSection.
-
-   Schema-honest fields only (fh_subs columns: name, trade,
-   phone). Rate stays at the schema default 0; status stays at
-   the schema default 'scheduled'. Both are meaningless without
-   a job, so they're not surfaced here.
-   ============================================================ */
-function AddSubDrawer({ open, userId, orgId, onClose, onCreated }: any) {
-  const [form, setForm] = useState({ name: '', trade: '', phone: '' })
-  const [saving, setSaving] = useState(false)
-
-  // Reset whenever the drawer closes so a re-open starts fresh.
-  useEffect(() => {
-    if (!open) setForm({ name: '', trade: '', phone: '' })
-  }, [open])
-
-  async function save(e: any) {
-    e?.preventDefault?.()
-    if (saving) return
-    const name = form.name.trim()
-    if (!name) return
-    setSaving(true)
-    const { error } = await supabase.from('fh_subs').insert({
-      user_id: userId,
-      org_id: orgId ?? null,
-      contact_id: null,
-      name,
-      trade: form.trade.trim() || null,
-      phone: form.phone.trim() || null
-    })
-    if (error) {
-      toastError("Couldn't add sub", error.message)
-      setSaving(false)
-      return
-    }
-    hapticSuccess()
-    toastSuccess('Sub added', name)
-    setSaving(false)
-    onCreated?.()
-  }
-
-  const fieldStyle: import('react').CSSProperties = {
-    width: '100%', boxSizing: 'border-box',
-    padding: '12px 12px', borderRadius: 10,
-    background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)',
-    color: 'var(--v3-text)', fontFamily: 'var(--font-body)',
-    fontSize: 14, outline: 'none'
-  }
-  const labelStyle: import('react').CSSProperties = {
-    fontFamily: 'var(--font-body)',
-    fontSize: 12, fontWeight: 700,
-    letterSpacing: 0,
-    color: 'var(--v3-text-muted)'
-  }
-
-  return (
-    <Drawer open={open} onOpenChange={(v: any) => { if (!v) onClose?.() }}>
-      <DrawerContent>
-        <DrawerHeader>
-          <Eyebrow tone="gold">
-            <Hammer size={11} aria-hidden="true" />
-            New sub
-          </Eyebrow>
-          <DrawerTitle asChild>
-            <h2 style={{
-              margin: '6px 0 0',
-              fontFamily: 'var(--font-body)',
-              fontSize: 24,
-              lineHeight: 1.1,
-              letterSpacing: 0,
-              fontWeight: 700,
-              color: 'var(--v3-text)'
-            }}>
-              Add to the trade directory
-            </h2>
-          </DrawerTitle>
-          <DrawerDescription style={{
-            margin: '6px 0 0',
-            fontFamily: 'var(--font-body)',
-            fontSize: 12, color: 'var(--v3-text-muted)', lineHeight: 1.5
-          }}>
-            Name is enough to start. Trade and phone help when you assign them to a job later.
-          </DrawerDescription>
-        </DrawerHeader>
-
-        <form
-          onSubmit={save}
-          className="fh-vaul-form"
-          style={{
-            padding: '4px 24px 24px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 12,
-            // Keyboard-safe scrollable body (mirrors LogMilesSheet). The
-            // fh-vaul-form class adds safe-area-inset-bottom padding via
-            // mobile-keyboard-fix.css so Cancel / Add Sub stay reachable
-            // above the iOS keyboard accessory bar.
-            maxHeight: 'calc(92dvh - 96px)',
-            overflowY: 'auto',
-            overscrollBehavior: 'contain'
-          }}
-        >
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <span style={labelStyle}>Name</span>
-            <input
-              autoFocus
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="Crew lead or company"
-              style={fieldStyle}
-              required
-            />
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <span style={labelStyle}>Trade</span>
-            <input
-              value={form.trade}
-              onChange={(e) => setForm({ ...form, trade: e.target.value })}
-              placeholder="Framer, electrician, roofer…"
-              style={fieldStyle}
-            />
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <span style={labelStyle}>Phone</span>
-            <input
-              type="tel"
-              inputMode="tel"
-              value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              placeholder="(615) 555-0000"
-              style={fieldStyle}
-            />
-          </label>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: 12, marginTop: 4 }}>
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={saving}
-              style={{
-                padding: '12px 12px', borderRadius: 10,
-                background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)',
-                color: 'var(--v3-text)', fontFamily: 'var(--font-body)',
-                fontSize: 14, fontWeight: 700, cursor: 'pointer'
-              }}
-            >
-              Cancel
-            </button>
-            <motion.button
-              type="submit"
-              whileTap={{ scale: 0.98 }}
-              disabled={saving || !form.name.trim()}
-              // Always render the gold primary treatment so the CTA reads
-              // as "the action", not as "an empty chip". Disabled state
-              // is conveyed via opacity (canonical TodosSection Add
-              // pattern), which keeps text legible against the gold.
-              style={{
-                padding: '12px 12px', borderRadius: 10,
-                border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
-                background: 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
-                color: 'var(--v3-on-primary)',
-                fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
-                letterSpacing: 0,
-                cursor: !form.name.trim() || saving ? 'default' : 'pointer',
-                opacity: !form.name.trim() || saving ? 0.5 : 1,
-                boxShadow: '0 0 0 2px rgba(201, 150, 58, 0.14), 0 4px 12px rgba(201, 150, 58, 0.28)'
-              }}
-            >
-              {saving ? 'Saving…' : 'Add sub'}
-            </motion.button>
-          </div>
-        </form>
-      </DrawerContent>
-    </Drawer>
   )
 }
 

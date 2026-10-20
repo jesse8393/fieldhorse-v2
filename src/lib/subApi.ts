@@ -160,3 +160,20 @@ export async function subDocSignedUrl(storagePath: string, ttlSec = 600): Promis
   if (error || !data?.signedUrl) return null
   return data.signedUrl
 }
+
+// Merge fields across multiple matched profiles. When a sub works for
+// several GCs there is one combined view of the editable fields, preferring
+// the most recently updated non null value per field (profiles arrive
+// sorted by updated_at desc).
+export function mergedProfile(profiles: SubProfile[]): SubProfile | null {
+  if (profiles.length === 0) return null
+  const out: Record<string, unknown> = { ...profiles[0] }
+  for (let i = 1; i < profiles.length; i++) {
+    for (const k of Object.keys(profiles[i] || {})) {
+      if (out[k] == null && (profiles[i] as Record<string, unknown>)[k] != null) {
+        out[k] = (profiles[i] as Record<string, unknown>)[k]
+      }
+    }
+  }
+  return out as SubProfile
+}

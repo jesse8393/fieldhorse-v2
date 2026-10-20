@@ -20,7 +20,7 @@ import { useEffect, useState } from 'react'
 import { Shield, Save as SaveIcon, X, Trash2 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
-import { useConfirm } from '../../../components/ConfirmSheet.tsx'
+import { useSecondTap } from '../../../lib/secondTap.ts'
 import { useMembership } from '../../../contexts/MembershipContext.tsx'
 import { canEditJobMoney } from '../lib/jobAccess.ts'
 
@@ -51,7 +51,8 @@ function hydrate(insurance: any) {
 }
 
 export default function InsuranceSection({ contact, userId, insurance, onChange }: any) {
-  const confirm = useConfirm()
+  // Removing the claim takes a second tap on the same button (D57).
+  const removeTap = useSecondTap()
   // Any owner, admin or manager of the job's company may edit, not only
   // the teammate who created the job (see lib/jobAccess.ts).
   const { orgId: viewerOrgId, canCreateFinancialDocs } = useMembership()
@@ -144,7 +145,6 @@ export default function InsuranceSection({ contact, userId, insurance, onChange 
 
   async function handleDelete() {
     if (!insurance?.id) return
-    if (!(await confirm({ title: 'Remove insurance claim from this job?', body: 'This cannot be undone.', destructive: true, confirmLabel: 'Remove' }))) return
     setDeleting(true)
     try {
       const { error } = await supabase
@@ -173,8 +173,15 @@ export default function InsuranceSection({ contact, userId, insurance, onChange 
             <button type="button" onClick={() => setEditing(true)} style={ghostBtnStyle()}>
               Edit
             </button>
-            <button type="button" onClick={handleDelete} disabled={deleting} style={dangerGhostBtnStyle()} aria-label="Remove insurance claim">
-              <Trash2 size={13} aria-hidden="true" />
+            <button
+              type="button"
+              onClick={() => { if (!deleting) removeTap.tap(() => { void handleDelete() }) }}
+              disabled={deleting}
+              style={dangerGhostBtnStyle()}
+              aria-label={removeTap.armed ? 'Tap again to remove' : 'Remove insurance claim'}
+              title={removeTap.armed ? 'Tap again to remove the claim from this job. This cannot be undone.' : 'Remove insurance claim'}
+            >
+              {removeTap.armed ? 'Tap again to remove' : <Trash2 size={13} aria-hidden="true" />}
             </button>
           </div>
         </div>

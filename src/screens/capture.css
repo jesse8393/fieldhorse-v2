@@ -1,16 +1,72 @@
 /*
- * Universal Capture sheet (SPEC.md 9.5, base/capture.jpg). The sheet
- * itself is the fh Sheet; these rules lay out what sits inside it and
- * read only --fh- tokens, so Day and Night follow the theme.
+ * The Capture screen, /capture (SPEC.md 9.5, base/capture.jpg; Phase 9,
+ * Task 14, D57). Back and the title in a header, then the panel. The
+ * rules read only --fh- tokens, so Day and Night follow the theme.
  *
  * The voice panel sits on --fh-tray, the inset panel color, in both the
  * input and the confirm phase. Below it, "Or start with" is a hairline
  * Row list with an icon tile, a gray hint and a chevron.
  */
 
-/* "Done" sits on the gutter like the close button it replaces. */
+.fh-capture {
+  padding-bottom: 24px;
+}
+
+/* ---- Title row: Back, the title and Done ---- */
+.fh-capture__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 8px 8px;
+}
+
+.fh-capture__title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-family: var(--fh-font-display);
+  font-size: 30px;
+  line-height: 36px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--fh-ink);
+}
+
+.fh-capture__title:focus {
+  outline: none;
+}
+
+/* Back armed: the words are not saved yet. */
+.fh-capture__leave {
+  margin: 0;
+  padding: 0 var(--fh-gutter) 8px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--fh-ink-2);
+}
+
+.fh-capture__form,
+.fh-capture__start {
+  padding-left: var(--fh-gutter);
+  padding-right: var(--fh-gutter);
+}
+
+@media (min-width: 900px) {
+  .fh-capture__head {
+    padding: 12px var(--fh-gutter-desktop) 8px 20px;
+  }
+
+  .fh-capture__form,
+  .fh-capture__start,
+  .fh-capture__leave {
+    padding-left: var(--fh-gutter-desktop);
+    padding-right: var(--fh-gutter-desktop);
+  }
+}
+
+/* "Done" sits on the gutter beside the title. */
 .fh-capture__done {
-  margin-right: -16px;
+  margin-right: -8px;
 }
 
 .fh-capture__form {

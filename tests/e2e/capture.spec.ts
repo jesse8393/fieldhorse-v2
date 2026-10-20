@@ -1,11 +1,12 @@
 // Universal Capture in the redesign (docs/design/2026-10-redesign/SPEC.md,
-// section 9.5, and PHASE2_PLAN.md task 13): the paper sheet the dock coin
-// opens, its one brushed gold action, the "Or start with" rows wired to
-// flows that already exist, and capture attached to the job it was opened
-// from. The model proposes and the person confirms: nothing writes until
-// Save. On a desktop (PHASE8_PLAN.md Task 13, D33) there is no floating
-// capture button: the sidebar carries a quiet Capture item under Search
-// with its key cap, and Cmd or Ctrl J and the palette still open it.
+// section 9.5; PHASE9_PLAN.md Task 14, D57): the screen /capture the dock
+// coin opens, its one brushed gold action, the "Or start with" rows wired
+// to flows that already exist, and capture attached to the job it was
+// opened from. The model proposes and the person confirms: nothing writes
+// until Save, and Save goes back to the screen the capture started on. On
+// a desktop (PHASE8_PLAN.md Task 13, D33) there is no floating capture
+// button: the sidebar carries a quiet Capture item under Search with its
+// key cap, and Cmd or Ctrl J and the palette still open it.
 import { expect, test, type Page } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 import { USER, restResponse } from '../../scripts/qa-mock.mjs'
@@ -19,10 +20,22 @@ function openFromCoin(page: Page) {
   return page.getByRole('navigation', { name: 'Primary' }).getByRole('button', { name: /Capture/ }).click()
 }
 
+// openCapture({ jobId }) from a screen: the event the app shell takes to /capture.
 function openOnJob(page: Page, jobId: string) {
   return page.evaluate((id) => {
     window.dispatchEvent(new CustomEvent('fh:open-capture', { detail: { jobId: id } }))
   }, jobId)
+}
+
+// The Capture screen, by its heading.
+function captureScreen(page: Page) {
+  return page.locator('.fh-capture')
+}
+
+async function expectCaptureOpen(page: Page) {
+  await expect(page).toHaveURL(/\/capture/)
+  await expect(page.getByRole('heading', { name: 'Capture', level: 1 })).toBeVisible()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
 }
 
 // The capture model's reply, as the /api/claude proxy returns it.
@@ -71,48 +84,66 @@ async function setSignal(page: Page, online: boolean) {
   }, online)
 }
 
-test.describe('capture sheet', () => {
+test.describe('capture screen', () => {
   // Each test signs in itself, some as crew.
   test.beforeEach(async ({ context: _context }, testInfo) => {
-    test.skip(!testInfo.project.name.startsWith('mobile'), 'Phone capture sheet')
+    test.skip(!testInfo.project.name.startsWith('mobile'), 'Phone capture screen')
   })
 
   test('the coin opens Capture with File it as the one gold button', async ({ context, page }) => {
     await signIn(context)
     await open(page, '/')
     await openFromCoin(page)
+    await expectCaptureOpen(page)
 
-    const sheet = page.getByRole('dialog', { name: 'Capture' })
-    await expect(sheet).toBeVisible()
-    await expect(sheet.getByRole('heading', { name: 'Capture', level: 2 })).toBeVisible()
-    await expect(sheet.getByRole('button', { name: 'Done' })).toBeVisible()
-    await expect(sheet.getByRole('button', { name: 'Start talking' })).toBeVisible()
-    await expect(sheet.getByRole('textbox', { name: 'Or type it' })).toBeVisible()
+    const screen = captureScreen(page)
+    await expect(screen.getByRole('button', { name: 'Back' })).toBeVisible()
+    await expect(screen.getByRole('button', { name: 'Done' })).toBeVisible()
+    await expect(screen.getByRole('button', { name: 'Start talking' })).toBeVisible()
+    await expect(screen.getByRole('textbox', { name: 'Or type it' })).toBeVisible()
 
-    const gold = sheet.locator('.fhc-btn--primary')
+    const gold = screen.locator('.fhc-btn--primary')
     await expect(gold).toHaveCount(1)
     await expect(gold).toHaveAccessibleName('File it')
     // Brushed once there is something to file.
-    await sheet.getByRole('textbox', { name: 'Or type it' }).fill('Pour moved to Friday')
+    await screen.getByRole('textbox', { name: 'Or type it' }).fill('Pour moved to Friday')
     await expect(gold).toBeEnabled()
     expect(await gold.evaluate((el) => getComputedStyle(el).backgroundImage)).toContain('linear-gradient')
-    await sheet.getByRole('textbox', { name: 'Or type it' }).fill('')
+    await screen.getByRole('textbox', { name: 'Or type it' }).fill('')
 
-    await sheet.getByRole('button', { name: 'Done' }).click()
-    await expect(sheet).toBeHidden()
+    // Done goes back to where the capture started.
+    await screen.getByRole('button', { name: 'Done' }).click()
+    await expect(page).toHaveURL(/\/$/)
+    await expect(screen).toHaveCount(0)
 
     // Cmd or Ctrl+J still opens it.
     await page.keyboard.press('Control+j')
-    await expect(page.getByRole('dialog', { name: 'Capture' })).toBeVisible()
+    await expectCaptureOpen(page)
   })
 
-  test('Or start with lists the flows that exist', async ({ context, page }) => {
+  test('Done with words not saved yet asks with a second tap', async ({ context, page }) => {
     await signIn(context)
     await open(page, '/')
     await openFromCoin(page)
+    await expectCaptureOpen(page)
+    const screen = captureScreen(page)
+    await screen.getByRole('textbox', { name: 'Or type it' }).fill('Pour moved to Friday')
+    await screen.getByRole('button', { name: 'Done' }).click()
+    // Still here: the first tap only asks.
+    await expectCaptureOpen(page)
+    await expect(screen.getByText('What you said or typed is not saved yet.')).toBeVisible()
+    await expect(page.getByRole('alertdialog')).toHaveCount(0)
+    await screen.getByRole('button', { name: 'Tap again to discard' }).click()
+    await expect(page).toHaveURL(/\/$/)
+  })
 
-    const sheet = page.getByRole('dialog', { name: 'Capture' })
-    const starts = sheet.getByRole('list', { name: 'Or start with' })
+  test('Or start with lists the flows that exist, and carries the words along', async ({ context, page }) => {
+    await signIn(context)
+    await open(page, '/')
+    await openFromCoin(page)
+    await expectCaptureOpen(page)
+
+    const starts = page.getByRole('list', { name: 'Or start with' })
     await expect(starts).toBeVisible()
     await expect(starts.getByRole('listitem')).toHaveCount(5)
     await expect(starts.getByRole('link', { name: /^Note/ })).toHaveAttribute('href', '/notes')
@@ -124,16 +155,22 @@ test.describe('capture sheet', () => {
     await expect(starts.getByRole('link', { name: /^Photo/ })).toHaveCount(0)
     await expect(starts.getByRole('link', { name: /^Invoice/ })).toHaveCount(0)
 
+    // Words typed so far go with the Lead and Quote rows as ?text=.
+    await page.getByRole('textbox', { name: 'Or type it' }).fill('Deck rebuild for Henderson')
+    await expect(starts.getByRole('link', { name: /^Lead/ })).toHaveAttribute('href', '/leads/new?text=Deck%20rebuild%20for%20Henderson')
+    await expect(starts.getByRole('link', { name: /^Quote/ })).toHaveAttribute('href', '/quotes/new?text=Deck%20rebuild%20for%20Henderson')
+
     await starts.getByRole('link', { name: /^Lead/ }).click()
-    await expect(page).toHaveURL(/\/leads\/new$/)
-    await expect(sheet).toBeHidden()
+    await expect(page).toHaveURL(/\/leads\/new\?text=/)
+    await expect(captureScreen(page)).toHaveCount(0)
   })
 
   test('crew get no lead, quote or invoice rows', async ({ context, page }) => {
     await signIn(context, { role: 'crew' })
     await open(page, '/')
     await openFromCoin(page)
-    const starts = page.getByRole('dialog', { name: 'Capture' }).getByRole('list', { name: 'Or start with' })
+    await expectCaptureOpen(page)
+    const starts = page.getByRole('list', { name: 'Or start with' })
     await expect(starts.getByRole('link', { name: /^Note/ })).toBeVisible()
     await expect(starts.getByRole('button', { name: /^Expense/ })).toBeVisible()
     await expect(starts.getByRole('link', { name: /^Time/ })).toBeVisible()
@@ -152,66 +189,74 @@ test.describe('capture sheet', () => {
 
     await open(page, '/')
     await openOnJob(page, 'c-job1')
-    const sheet = page.getByRole('dialog', { name: 'Capture' })
-    await expect(sheet).toBeVisible()
-    await expect(sheet.getByText('Attached to Slab + trench.')).toBeVisible()
+    await expect(page).toHaveURL(/\/capture\?job=c-job1$/)
+    const screen = captureScreen(page)
+    await expect(screen.getByText('Attached to Slab + trench.')).toBeVisible()
 
-    const starts = sheet.getByRole('list', { name: 'Or start with' })
+    const starts = page.getByRole('list', { name: 'Or start with' })
     await expect(starts.getByRole('link', { name: /^Photo/ })).toHaveAttribute('href', '/jobs/c-job1?tab=files')
     await expect(starts.getByRole('link', { name: /^Invoice/ })).toHaveAttribute('href', '/jobs/c-job1?action=send_invoice')
 
-    await sheet.getByRole('textbox', { name: 'Or type it' }).fill('Laser level is in the truck')
-    await sheet.getByRole('button', { name: 'File it' }).click()
+    await screen.getByRole('textbox', { name: 'Or type it' }).fill('Laser level is in the truck')
+    await screen.getByRole('button', { name: 'File it' }).click()
 
     // Confirm phase: what was typed, what it files as, the job it lands on.
-    await expect(sheet.getByText('Filed as')).toBeVisible()
-    await expect(sheet.getByText('“Laser level is in the truck”')).toBeVisible()
-    const chips = sheet.getByRole('list', { name: 'Filed as' })
+    await expect(screen.getByText('Filed as')).toBeVisible()
+    await expect(screen.getByText('“Laser level is in the truck”')).toBeVisible()
+    const chips = screen.getByRole('list', { name: 'Filed as' })
     await expect(chips.getByRole('listitem')).toHaveText(['Note', 'Slab + trench'])
-    await expect(sheet.getByText('Opened from Slab + trench, so it files there.')).toBeVisible()
-    const gold = sheet.locator('.fhc-btn--primary')
+    await expect(screen.getByText('Opened from Slab + trench, so it files there.')).toBeVisible()
+    const gold = screen.locator('.fhc-btn--primary')
     await expect(gold).toHaveCount(1)
     await expect(gold).toHaveAccessibleName('Save')
-    await expect(sheet.getByRole('button', { name: 'Edit', exact: true })).toBeVisible()
-    await expect(sheet.getByRole('button', { name: 'Just save it as a note' })).toHaveCount(0)
+    await expect(screen.getByRole('button', { name: 'Edit', exact: true })).toBeVisible()
+    await expect(screen.getByRole('button', { name: 'Just save it as a note' })).toHaveCount(0)
     expect(writes).toEqual([])
 
-    // Change opens the existing job select.
-    await sheet.getByRole('button', { name: 'Change job' }).click()
-    await expect(sheet.getByRole('combobox', { name: 'Job' })).toHaveValue('c-job1')
+    // Change opens the existing job select, which lists jobs, leads and quotes.
+    await screen.getByRole('button', { name: 'Change job' }).click()
+    const select = screen.getByRole('combobox', { name: 'Job' })
+    await expect(select).toHaveValue('c-job1')
+    await expect(select.locator('option', { hasText: 'Vintage Burkitt Station Drainage' })).toHaveCount(1)
+    await expect(select.locator('option', { hasText: 'Parking lot repour' })).toHaveCount(1)
 
     await gold.click()
-    await expect(sheet).toBeHidden()
+    // Save goes back to where the capture started.
+    await expect(page).toHaveURL(/\/$/)
     expect(writes.filter((u) => u.includes('/rest/v1/fh_notes'))).toHaveLength(1)
   })
 
   test('a lead outside the roster can still be attached', async ({ context, page }) => {
     await signIn(context)
-    // The roster query only returns active jobs here, so the lead has to
-    // be fetched by its id when the sheet opens on it.
+    // The job roster query only returns active jobs here, and the lead
+    // tables are emptied, so the lead has to be fetched by its id when the
+    // screen opens on it.
     await page.route((url) => url.pathname.endsWith('/rest/v1/fh_contacts') && url.searchParams.has('stage'), (route) => route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify([{ id: 'c-job1', user_id: 'qa-user-1', name: 'Plumbing Bellevue', job_title: 'Slab + trench', stage: 'job', amount: 33100 }])
     }))
+    await page.route((url) => url.pathname.endsWith('/rest/v1/fh_leads') || url.pathname.endsWith('/rest/v1/fh_quotes'), (route) => route.fulfill({
+      status: 200, contentType: 'application/json', body: '[]'
+    }))
     await mockModel(page, { kind: 'payment', summary: 'Log a deposit', job_id: 'c-lead1', confidence: 0.9, amount: 2500, method: 'check', payment_kind: 'deposit' })
     await open(page, '/')
     await openOnJob(page, 'c-lead1')
-    const sheet = page.getByRole('dialog', { name: 'Capture' })
-    await expect(sheet.getByText('Attached to Vintage Burkitt Station Drainage.')).toBeVisible()
+    const screen = captureScreen(page)
+    await expect(screen.getByText('Attached to Vintage Burkitt Station Drainage.')).toBeVisible()
     // A lead has nothing to invoice yet.
-    await expect(sheet.getByRole('list', { name: 'Or start with' }).getByRole('link', { name: /^Invoice/ })).toHaveCount(0)
+    await expect(page.getByRole('list', { name: 'Or start with' }).getByRole('link', { name: /^Invoice/ })).toHaveCount(0)
 
-    await sheet.getByRole('textbox', { name: 'Or type it' }).fill('Got a 2500 deposit check from Justin')
-    await sheet.getByRole('button', { name: 'File it' }).click()
+    await screen.getByRole('textbox', { name: 'Or type it' }).fill('Got a 2500 deposit check from Justin')
+    await screen.getByRole('button', { name: 'File it' }).click()
     // The model named the lead; normalizeIntent kept it because the
     // attached lead is in the roster it checks against.
-    const chips = sheet.getByRole('list', { name: 'Filed as' })
+    const chips = screen.getByRole('list', { name: 'Filed as' })
     await expect(chips.getByRole('listitem')).toHaveText(['Payment', '$2,500.00', 'Deposit by check', 'Vintage Burkitt Station Drainage'])
-    await expect(sheet.getByRole('button', { name: 'Just save it as a note' })).toBeVisible()
+    await expect(screen.getByRole('button', { name: 'Just save it as a note' })).toBeVisible()
   })
 
-  test('a note captured from the job page shows on its Spine without leaving the page', async ({ context, page }) => {
+  test('a note captured from the job page shows on its Spine when the screen returns', async ({ context, page }) => {
     await signIn(context)
     await mockModel(page, { kind: 'note', summary: 'Save a note', job_id: null, confidence: 0.8, text: 'Rebar is four sticks short' })
     const posted = await keepNotes(page)
@@ -221,20 +266,20 @@ test.describe('capture sheet', () => {
     await expect(spine.getByText('Inspector confirmed Friday.')).toBeVisible({ timeout: 30_000 })
 
     await page.getByRole('group', { name: 'Job actions' }).getByRole('button', { name: 'Capture a voice note for this job' }).click()
-    const sheet = page.getByRole('dialog', { name: 'Capture' })
-    await expect(sheet.getByText('Attached to Slab + trench.')).toBeVisible()
-    await sheet.getByRole('textbox', { name: 'Or type it' }).fill('Rebar is four sticks short')
-    await sheet.getByRole('button', { name: 'File it' }).click()
-    await expect(sheet.getByText('Opened from Slab + trench, so it files there.')).toBeVisible()
-    await sheet.getByRole('button', { name: 'Save' }).click()
-    await expect(sheet).toBeHidden()
+    await expect(page).toHaveURL(/\/capture\?job=c-job1$/)
+    const screen = captureScreen(page)
+    await expect(screen.getByText('Attached to Slab + trench.')).toBeVisible()
+    await screen.getByRole('textbox', { name: 'Or type it' }).fill('Rebar is four sticks short')
+    await screen.getByRole('button', { name: 'File it' }).click()
+    await expect(screen.getByText('Opened from Slab + trench, so it files there.')).toBeVisible()
+    await screen.getByRole('button', { name: 'Save' }).click()
 
+    // Back on the job page, no reload: the Spine reads the note it just saved.
+    await expect(page).toHaveURL(/\/jobs\/c-job1$/)
     expect(posted).toHaveLength(1)
     expect(posted[0]).toMatchObject({ contact_id: 'c-job1', text: 'Rebar is four sticks short', category: 'note' })
-    // Same page, no reload: the job's Spine reads the note it just saved.
     await expect(spine.getByText('Rebar is four sticks short')).toBeVisible()
     await expect(spine.getByText('Inspector confirmed Friday.')).toBeVisible()
-    await expect(page).toHaveURL(/\/jobs\/c-job1$/)
   })
 
   test('with no signal on the job page, the note waits and lands on the job', async ({ context, page }) => {
@@ -244,12 +289,13 @@ test.describe('capture sheet', () => {
     const spine = page.locator('.fhj-spine')
     await expect(spine.getByText('Inspector confirmed Friday.')).toBeVisible({ timeout: 30_000 })
 
-    await setSignal(page, false)
     await page.getByRole('group', { name: 'Job actions' }).getByRole('button', { name: 'Capture a voice note for this job' }).click()
-    const sheet = page.getByRole('dialog', { name: 'Capture' })
-    await sheet.getByRole('textbox', { name: 'Or type it' }).fill('Pump truck at seven')
-    await sheet.getByRole('button', { name: 'File it' }).click()
-    await expect(sheet).toBeHidden()
+    await expect(page).toHaveURL(/\/capture\?job=c-job1$/)
+    await setSignal(page, false)
+    const screen = captureScreen(page)
+    await screen.getByRole('textbox', { name: 'Or type it' }).fill('Pump truck at seven')
+    await screen.getByRole('button', { name: 'File it' }).click()
+    await expect(page).toHaveURL(/\/jobs\/c-job1$/)
     const queued = await page.evaluate(() => JSON.parse(localStorage.getItem('fh:capture-outbox') || '[]'))
     expect(queued).toMatchObject([{ text: 'Pump truck at seven', user_id: USER.id, job_id: 'c-job1' }])
     expect(posted).toEqual([])
@@ -312,23 +358,23 @@ test.describe('desktop capture', () => {
     const [searchCap, captureCap] = await Promise.all([search.locator('kbd').boundingBox(), cap.boundingBox()])
     expect(Math.abs((captureCap!.x + captureCap!.width) - (searchCap!.x + searchCap!.width))).toBeLessThanOrEqual(0.5)
 
-    // The item opens the same sheet the button did.
+    // The item opens the same screen the coin does.
     await capture.click()
-    const sheet = page.getByRole('dialog', { name: 'Capture' })
-    await expect(sheet).toBeVisible()
-    await expect(sheet.getByRole('textbox', { name: 'Or type it' })).toBeVisible()
-    await sheet.getByRole('button', { name: 'Done' }).click()
-    await expect(sheet).toBeHidden()
+    await expectCaptureOpen(page)
+    const screen = captureScreen(page)
+    await expect(screen.getByRole('textbox', { name: 'Or type it' })).toBeVisible()
+    await screen.getByRole('button', { name: 'Done' }).click()
+    await expect(page).toHaveURL(/\/jobs\/c-job1$/)
 
     // Ctrl J and Cmd J still open it.
     await page.keyboard.press('Control+j')
-    await expect(sheet).toBeVisible()
-    await sheet.getByRole('button', { name: 'Done' }).click()
-    await expect(sheet).toBeHidden()
+    await expectCaptureOpen(page)
+    await screen.getByRole('button', { name: 'Done' }).click()
+    await expect(page).toHaveURL(/\/jobs\/c-job1$/)
     await page.keyboard.press('Meta+j')
-    await expect(sheet).toBeVisible()
-    await sheet.getByRole('button', { name: 'Done' }).click()
-    await expect(sheet).toBeHidden()
+    await expectCaptureOpen(page)
+    await screen.getByRole('button', { name: 'Done' }).click()
+    await expect(page).toHaveURL(/\/jobs\/c-job1$/)
 
     // The palette action is still there.
     await page.keyboard.press('Control+k')
@@ -336,7 +382,7 @@ test.describe('desktop capture', () => {
     await expect(palette).toBeVisible()
     await palette.getByRole('option', { name: /Capture anything/ }).click()
     await expect(palette).toBeHidden()
-    await expect(sheet).toBeVisible()
+    await expectCaptureOpen(page)
   })
 
   test('the Jobs plus button keeps the corner now that nothing stacks above it', async ({ page }) => {

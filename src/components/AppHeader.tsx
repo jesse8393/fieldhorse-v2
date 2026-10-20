@@ -6,19 +6,22 @@ import { headerName } from '../lib/headerName.ts'
 import Icon from './fh/Icon.tsx'
 import Monogram from './fh/Monogram.tsx'
 import NotificationsBell from './NotificationsBell.tsx'
-import { openWorkspaceMenu } from './WorkspaceMenu.tsx'
 
-// Single entry point for search. CommandPalette opens at 900px and up,
-// MobileSearchOverlay below it; both listen for fh:open-palette and gate
-// themselves, so only one ever opens.
+// Single entry point for search. CommandPalette opens at 900px and up; below
+// it the app shell takes the same event to the /search screen (D57).
 function openSearch() {
   window.dispatchEvent(new CustomEvent('fh:open-palette'))
+}
+
+// The workspace menu is the screen /workspace (D57); the shell navigates.
+function openWorkspaceMenu() {
+  window.dispatchEvent(new CustomEvent('fh:open-menu'))
 }
 
 /**
  * AppHeader, the shared top bar (spec 8.2, decision D4).
  *
- * Phone: the company monogram on the left opens the workspace menu, the
+ * Phone: the company monogram on the left opens the workspace screen, the
  * company name sits beside it, and search and the bell are on the right.
  * The menu is in the same place on every screen, so every route is two
  * taps away and search is one.
@@ -44,7 +47,6 @@ export default function AppHeader() {
         type="button"
         className="fhs-header__menu"
         aria-label="Open workspace menu"
-        aria-haspopup="dialog"
         onClick={openWorkspaceMenu}
       >
         <Monogram name={company} logoUrl={profile?.logo_url} size={40} />

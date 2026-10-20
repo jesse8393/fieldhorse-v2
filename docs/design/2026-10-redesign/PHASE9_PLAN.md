@@ -349,11 +349,11 @@ The quote screen shows the client, title, the lines (tap a line to edit it in pl
 - Test: `tests/e2e/capture.spec.ts`, `tests/e2e/customers.spec.ts`, `tests/e2e/no-sheets.spec.ts` (new: visits every route in the app as the owner and asserts no element with `role="dialog"` or `[data-vaul-drawer]` ever mounts after tapping each button on the page)
 - Delete: `src/components/ui/drawer.tsx` once unused
 
-- [ ] Write the failing `no-sheets.spec.ts` and the capture and customers changes.
-- [ ] Run, see them fail.
-- [ ] Build and rewire. `grep -rn "vaul\|useConfirm\|role=\"dialog\"" src` returns only the command palette (a keyboard tool on desktop, allowed by D57 as the one exception; record it under D57).
-- [ ] Run the full e2e suite. Audit and dead CSS checks.
-- [ ] Commit: "Make Capture, Customers and every remaining pop up a screen".
+- [x] Write the failing `no-sheets.spec.ts` and the capture and customers changes.
+- [x] Run, see them fail.
+- [x] Build and rewire. `grep -rn "vaul\|useConfirm\|role=\"dialog\"" src` returns only the command palette (a keyboard tool on desktop, allowed by D57 as the one exception; record it under D57).
+- [x] Run the full e2e suite. Audit and dead CSS checks.
+- [x] Commit: "Make Capture, Customers and every remaining pop up a screen".
 
 ---
 

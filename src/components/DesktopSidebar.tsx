@@ -183,8 +183,8 @@ export default function DesktopSidebar() {
         </button>
       </div>
 
-      {/* Universal Capture, the same path the dock coin takes. CaptureSheet
-          also answers Cmd or Ctrl J and the palette's Capture anything. Its
+      {/* Universal Capture, the same path the dock coin takes: the /capture
+          screen, which Cmd or Ctrl J and the palette's Capture anything open too. Its
           key cap lines up under the Search cap, so New sits on the Search
           row (above) rather than beside Capture. */}
       <button

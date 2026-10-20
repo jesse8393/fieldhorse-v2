@@ -50,6 +50,8 @@ export type QuotePhoneProps = {
   /** Reads the linked client's email again. */
   onRetryEmail?: () => void
   clearing: boolean
+  /** Delete draft was tapped once; the next tap deletes (D57). */
+  clearArmed?: boolean
   patch: (updates: Record<string, any>) => Promise<{ error?: unknown } | undefined> | undefined
   onContactRefresh: () => void
   /** With an email: builds the PDF, uploads it and emails the customer. */
@@ -86,6 +88,7 @@ export default function QuotePhone({
   emailRetrying = false,
   onRetryEmail,
   clearing,
+  clearArmed = false,
   patch,
   onContactRefresh,
   onSend,
@@ -342,7 +345,7 @@ export default function QuotePhone({
 
       {deletable ? (
         <div className="fhq-danger">
-          <Button variant="destructive" disabled={clearing} onClick={onClearDraft}>Delete draft quote</Button>
+          <Button variant="destructive" disabled={clearing} onClick={onClearDraft}>{clearArmed ? 'Tap again to delete' : 'Delete draft quote'}</Button>
         </div>
       ) : approved ? (
         <p className="fhq-danger-note">Approved quotes cannot be deleted. Create a revision instead.</p>

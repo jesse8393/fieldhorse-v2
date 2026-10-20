@@ -29,6 +29,8 @@ type Props = {
   onBack: () => void
   onEdit?: () => void
   onDelete?: () => void
+  /** The delete button was tapped once; the next tap deletes (D57). */
+  deleteArmed?: boolean
   onNewDeal?: () => void
   onStatement?: () => void
   isEditing?: boolean
@@ -51,7 +53,7 @@ export default function SnowClientDetailBuild(props: Props) {
   const {
     client, lifetime, outstanding, activeCount, jobs = [], payments = [],
     tabs, activeTab, onTabChange,
-    onBack, onEdit, onDelete, onNewDeal, onStatement, isEditing, children,
+    onBack, onEdit, onDelete, deleteArmed = false, onNewDeal, onStatement, isEditing, children,
   } = props
 
   const status: { label: string; tone: 'good' | 'warn' | 'neutral' } = (() => {
@@ -122,10 +124,12 @@ export default function SnowClientDetailBuild(props: Props) {
             type="button"
             className="fh-build-icon-btn"
             onClick={onDelete}
-            aria-label="Delete"
-            title="Delete"
+            aria-label={deleteArmed ? 'Tap again to delete' : 'Delete'}
+            title={deleteArmed ? 'Tap again to delete this client' : 'Delete'}
+            style={deleteArmed ? { width: 'auto', padding: '0 12px', gap: 8 } : undefined}
           >
             <Trash2 size={14} />
+            {deleteArmed && <span style={{ fontSize: 12, fontWeight: 700 }}>Tap again to delete</span>}
           </button>
         )}
       </header>

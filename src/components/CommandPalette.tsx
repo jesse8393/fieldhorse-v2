@@ -1,7 +1,7 @@
 // Command palette (SPEC.md 9.12, render base/desktop-command.jpg).
 //
 // Desktop only: it opens at 900 px and up, from Control or Cmd+K or the
-// `fh:open-palette` event. Below 900 px MobileSearchOverlay takes over.
+// `fh:open-palette` event. Below 900 px the /search screen takes over.
 //
 // Search groups: Jobs, Actions (for the highlighted job), Customers,
 // Documents (only when files match), then Notes and Schedule when they
@@ -76,7 +76,7 @@ type NavEntry = {
 // The three New items open the create screens (SPEC D58): a lead, a
 // quote or a job starts on its own, with no chooser first.
 const QUICK_ACTIONS: NavEntry[] = [
-  { id: 'capture', label: 'Capture anything', hint: 'Voice, text, receipt, or photo', icon: Mic, event: 'fh:open-capture' },
+  { id: 'capture', label: 'Capture anything', hint: 'Voice, text, receipt, or photo', icon: Mic, to: '/capture' },
   { id: 'newLead', label: 'New lead', hint: 'Someone who called', icon: Plus, to: '/leads/new' },
   { id: 'newQuote', label: 'New quote', hint: 'Scope and a price to send', icon: FileText, to: '/quotes/new' },
   { id: 'newJob', label: 'New job', hint: 'Work that is on', icon: Briefcase, to: '/jobs/new' },

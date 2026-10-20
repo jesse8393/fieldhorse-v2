@@ -50,7 +50,8 @@ export async function markLost(contact: Contact) {
 /**
  * What Reopen asks first (Phase 8, Task 15), the way Mark lost does: one
  * tap on a closed or lost job used to move it straight back. A closed job
- * goes back to Jobs, a lost deal back to Leads. Pass it to useConfirm().
+ * goes back to Jobs, a lost deal back to Leads. Its body is the hint under
+ * the armed Tap again to reopen button (D57).
  */
 export function reopenQuestion(contact: Pick<Contact, 'stage'>) {
   return contact.stage === 'closed'
@@ -71,7 +72,7 @@ export async function reopen(contact: Contact) {
 export async function logPayment(contact: Contact, input: { id?: string | null; amount?: number | string | null; method?: string | null; kind?: string | null; reference?: string | null; paid_on?: string | null; invoice_id?: string | null }) {
   const res = await baseLogPayment(contact, input)
   // Don't fire success UI when the write failed, the caller surfaces the
-  // error (V3PaymentSheet throws on res.error). Firing a success haptic +
+  // error (the payment screens throw on res.error). Firing a success haptic +
   // "Payment logged" toast here would contradict the caller's error toast.
   if (res && 'error' in res && (res as any).error) {
     return res

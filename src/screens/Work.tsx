@@ -45,7 +45,7 @@ import { useAuth } from '../contexts/AuthContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { supabase } from '../lib/supabase.ts'
 import { markLost, reopen, reopenQuestion } from '../lib/pipeline.ts'
-import { useConfirm } from '../components/ConfirmSheet.tsx'
+import { useSecondTap } from '../lib/secondTap.ts'
 import { detailRoute, LIST_STAGE_META as STAGE_META } from '../lib/stages.ts'
 import { moneyK as money } from '../lib/format.ts'
 import { prefetchJobDetail } from './ContactDetail/hooks/useJobData.ts'
@@ -121,7 +121,6 @@ export default function Work() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const confirm = useConfirm() as (options: { title: string; body?: string; confirmLabel?: string }) => Promise<boolean>
   const { data: contacts = [], isLoading: loading, isError, error, refetch, isFetching } = useJobs()
   useJobsRealtime(user?.id, queryClient)
   // Role gate: the revenue stages (leads, quotes) and the sell actions
@@ -352,12 +351,12 @@ export default function Work() {
     navigate(detailRoute(c))
   }, [navigate])
   const handleLost = useCallback((c: JobRow) => run(c, markLost, { stage: 'lost' } as Partial<JobRow>, "Couldn't mark lost"), [run])
-  // Reopen asks first, like Mark lost on the job page: one tap used to move
-  // a closed or lost deal straight back (Phase 8, Task 15).
+  // Reopen asks first, like Mark lost on the job page: the card arms a
+  // "Tap again to reopen" button when Reopen is picked from its menu, and
+  // this runs on that second tap (D57).
   const handleReopen = useCallback(async (c: JobRow) => {
-    if (!(await confirm(reopenQuestion(c)))) return
     await run(c, reopen, { stage: c.stage === 'closed' ? 'job' : 'lead' } as Partial<JobRow>, "Couldn't reopen")
-  }, [confirm, run])
+  }, [run])
   const handleFollowUp = useCallback((c: JobRow, when: number | Date | null) => setFollowUp(c, when), [setFollowUp])
 
   const { stagger, item } = useFhMotion()
@@ -609,14 +608,17 @@ const DealCard = memo(function DealCard({ contact: c, isNew = false, busy, canSe
   // Calendar popover for "Pick a date…", anchored to the ⋯ button so
   // it opens exactly where the menu just closed.
   const [dateOpen, setDateOpen] = useState(false)
-  // Reopen asks a question (Phase 8, Task 15). Asked from inside the menu,
-  // the question took focus and then the closing menu handed it back to
-  // the ⋯ button behind the question: a screen reader never read it, Tab
-  // walked the page and Enter opened the menu again over it. So the menu
-  // item only leaves the ask here, and it is asked once the menu has gone
-  // and focus is back on the ⋯ button, which is then where the question
-  // returns focus when it closes.
+  // Reopen asks first (D57): picking it in the menu arms a "Tap again to
+  // reopen" button on the card, which runs the move on the second tap and
+  // goes back to resting on its own. The menu item only leaves the ask
+  // here, and it is run once the menu has gone and focus is back on the ⋯
+  // button, so the armed button can take focus from there.
   const askAfterMenuRef = useRef<(() => void) | null>(null)
+  const reopenTap = useSecondTap()
+  const reopenAgainRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (reopenTap.armed) reopenAgainRef.current?.focus()
+  }, [reopenTap.armed])
   const meta = STAGE_META[c.stage || 'lead'] || STAGE_META.lead
   const follow = followUpMeta(c)
   const phone = c.phone || c.fh_clients?.phone || ''
@@ -665,7 +667,7 @@ const DealCard = memo(function DealCard({ contact: c, isNew = false, busy, canSe
         onMouseEnter={() => onHover(c)}
         style={{
           position: 'relative',
-          display: 'flex', alignItems: 'center', gap: 12,
+          display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12,
           padding: '12px 12px 12px 24px',
           borderRadius: 10,
           background: 'var(--v3-surface)',
@@ -732,6 +734,30 @@ const DealCard = memo(function DealCard({ contact: c, isNew = false, busy, canSe
             </div>
           )}
         </button>
+
+        {/* Reopen was picked in the menu: the second tap moves the deal
+            back to Leads (or a closed job back to Jobs). */}
+        {reopenTap.armed && (
+          <div style={{ flex: '1 1 100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <span style={{ fontSize: 12, color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)' }}>
+              {reopenQuestion(c).body}
+            </span>
+            <button
+              ref={reopenAgainRef}
+              type="button"
+              onClick={() => reopenTap.tap(() => onReopen(c))}
+              disabled={busy}
+              style={{
+                flexShrink: 0, minHeight: 32, padding: '0 12px', borderRadius: 10,
+                border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
+                background: 'var(--v3-primary-soft)', color: 'var(--v3-primary-text)',
+                fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, cursor: 'pointer'
+              }}
+            >
+              Tap again to reopen
+            </button>
+          </div>
+        )}
 
         {/* ⋯, the only control on the card. The calendar Popover and
             the dropdown share this button: PopoverAnchor→Trigger→button
@@ -811,7 +837,7 @@ const DealCard = memo(function DealCard({ contact: c, isNew = false, busy, canSe
               </>
             )}
             {canReopen && (
-              <DropdownMenuItem onSelect={() => { askAfterMenuRef.current = () => onReopen(c) }}>
+              <DropdownMenuItem onSelect={() => { askAfterMenuRef.current = () => reopenTap.tap(() => onReopen(c)) }}>
                 <RotateCcw size={13} /> Reopen
               </DropdownMenuItem>
             )}

@@ -1034,10 +1034,12 @@ test.describe('money on a phone', () => {
     await expect(page).toHaveURL(/panel=statements/)
     await expect(page.getByRole('heading', { level: 1, name: 'Who owes you' })).toBeVisible()
     await page.getByRole('button', { name: /^Statement for/ }).first().click()
-    // The existing statement sheet opens for that customer (Task 14 moves it).
-    await expect(page.getByRole('dialog', { name: /^Statement for/ })).toBeVisible({ timeout: 15_000 })
-    await page.keyboard.press('Escape')
-    await expect(page.getByRole('dialog', { name: /^Statement for/ })).toBeHidden()
+    // The customer's statement screen opens (Task 14, D57); Back returns here.
+    await expect(page).toHaveURL(/\/clients\/cl-1\/statement$/)
+    await expect(page.getByRole('heading', { level: 1, name: /^Statement for/ })).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await page.getByRole('button', { name: 'Back' }).click()
+    await expect(page).toHaveURL(/panel=statements/)
     await page.getByRole('button', { name: 'Back to Money' }).click()
     await expect(moneyHeading(page)).toBeVisible()
 
@@ -1368,9 +1370,11 @@ test.describe('money on a desktop', () => {
       await expect(page.getByRole('columnheader', { name, exact: true })).toBeVisible()
     }
     await page.getByRole('button', { name: /^Statement for/ }).first().click()
-    await expect(page.getByRole('dialog', { name: /^Statement for/ })).toBeVisible({ timeout: 15_000 })
-    await page.keyboard.press('Escape')
-    await expect(page.getByRole('dialog', { name: /^Statement for/ })).toBeHidden()
+    await expect(page).toHaveURL(/\/clients\/cl-1\/statement$/)
+    await expect(page.getByRole('heading', { level: 1, name: /^Statement for/ })).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await page.getByRole('button', { name: 'Back' }).click()
+    await expect(page).toHaveURL(/panel=statements/)
     await page.getByRole('button', { name: 'Back to Money' }).click()
     await expect(moneyHeading(page)).toBeVisible()
 
@@ -1402,7 +1406,10 @@ test.describe('money on a desktop', () => {
     await expect(page.getByRole('link', { name: 'Rosa Delgado', exact: true })).toHaveAttribute('href', '/jobs/c-rosa?tab=financials')
     await page.getByRole('button', { name: 'Sort by Balance' }).click()
     await page.getByRole('button', { name: 'Log payment for Rosa Delgado' }).click()
-    await expect(page.getByText('Log what was paid.')).toBeVisible({ timeout: 15_000 })
+    // Log payment is the job's payment screen (Task 14, D57).
+    await expect(page).toHaveURL(/\/jobs\/[^/]+\/payment$/)
+    await expect(page.getByRole('heading', { level: 1, name: 'Log payment' })).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('dialog')).toHaveCount(0)
   })
 
   test('job balances filter and export the rows on screen', async ({ context, page }) => {

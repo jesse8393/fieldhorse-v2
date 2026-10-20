@@ -125,9 +125,6 @@ select:focus-visible,
 
 /* Brand rule: no gradient text. Solid brand gold instead — same accent,
    no clipped-fill effect (UI audit #38). */
-.fh-text-gradient-gold {
-  color: var(--v3-primary-text);
-}
 
 .fh-font-serif { font-family: var(--font-serif); }
 
@@ -737,20 +734,6 @@ html {
   scrollbar-gutter: stable;
 }
 
-/* Desktop treatment for bottom-sheet drawers (UI audit #27): full-width
-   phone sheets read as a mobile pattern on a large screen and could
-   extend past the viewport with two competing scrollbars. Centered,
-   width-capped, height-capped; the sheet body remains the only scroll
-   region. */
-@media (min-width: 900px) {
-  [vaul-drawer][vaul-drawer-direction='bottom'] {
-    max-width: 600px;
-    margin-left: auto;
-    margin-right: auto;
-    border-radius: 10px 18px 0 0;
-    max-height: 88dvh;
-  }
-}
 
 /* Scrollable strips (tab rows, chip rows) that must never draw a
    native scrollbar — content still scrolls by wheel/drag/keys. */
@@ -1848,36 +1831,6 @@ a {
 }
 
 /* =========================================================================
-   DESKTOP MODAL SIZING — Phase 2.5
-
-   ActionSheet and Drawer are mobile-
-   first slide-up sheets pinned to bottom: 0; left: 0; right: 0. On
-   desktop the full-viewport-width sheet reads as oddly stretched.
-   We cap the width and center horizontally — still a bottom sheet
-   visually, but constrained to a proper modal width. Mobile is
-   untouched (rules are inside the @media min-width: 900px block).
-
-   Vaul Drawer marks its content panel with [data-vaul-drawer-direction];
-   ActionSheet uses the `.fh-asheet` class (defined ~line 5220 below).
-   ========================================================================= */
-@media (min-width: 900px) {
-  /* Both vaul Drawer and our ActionSheet animate via inline
-     `transform: translate3d(...)` from framer-motion (or vaul's own
-     spring). Overriding transform here would kill the slide-up. So
-     centering uses `left: 0; right: 0; margin-inline: auto` plus a
-     `max-width` cap — same effect, no transform conflict. */
-  [data-vaul-drawer][data-vaul-drawer-direction='bottom'] {
-    max-width: 520px !important;
-    margin-inline: auto !important;
-    border-radius: 10px 18px 0 0 !important;
-  }
-  .fh-asheet {
-    max-width: 560px !important;
-    margin-inline: auto !important;
-  }
-}
-
-/* =========================================================================
    FAB ON DESKTOP, Phase 2
    ========================================================================= */
 @media (min-width: 900px) {
@@ -2527,35 +2480,6 @@ details > summary { list-style: none; }
 .fh-importer-chev { transition: transform 220ms ease; }
 details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 
-/* iOS Safari — Vaul drawer content is portaled to <body> with
-   inset-x-0/bottom-0. Belt-and-suspenders: clamp it to the dynamic
-   viewport width and kill any horizontal scroll. Without this, a
-   long input value or wide child can push the sheet past the right
-   edge of the visual viewport. */
-[vaul-drawer] {
-  max-width: 100dvw;
-  overflow-x: hidden;
-  box-sizing: border-box;
-}
-[vaul-drawer] * { box-sizing: border-box; max-width: 100%; }
-[vaul-drawer][vaul-drawer-direction='bottom'] {
-  left: 0;
-  right: 0;
-}
-
-.fh-kbd {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum";
-  font-size: 12px;
-  padding: 4px 8px;
-  border: 1px solid var(--rule-bold);
-  border-radius: 10px;
-  background: var(--surface-2);
-  color: var(--ink-strong);
-  letter-spacing: 0;
-}
-
 /* =========================================================================
    BUTTONS — extended variants
    ========================================================================= */
@@ -2941,372 +2865,6 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
 @media (max-width: 640px) {
   .fh-counter-row { flex-direction: column; align-items: stretch; }
   .fh-counter-row .fh-btn { width: 100%; justify-content: center; }
-}
-
-/* =========================================================================
-   ACTIONSHEET — full-height bottom sheet overlay.
-   Slides up 92% viewport, drag-to-dismiss, backdrop blur, sticky footer CTA.
-   ========================================================================= */
-
-.fh-asheet-root {
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-modal);
-  pointer-events: none;
-}
-.fh-asheet-root > * { pointer-events: auto; }
-
-.fh-asheet__scrim {
-  position: fixed;
-  inset: 0;
-  /* Solid scrim, no backdrop blur. The previous blur(2px) combined with
-     iOS keyboard inflate produced the "fog" effect reported in mobile QA. */
-  background: rgba(20, 20, 20, 0.62);
-}
-[data-theme='light'] .fh-asheet__scrim,
-:root:not([data-theme='dark']) .fh-asheet__scrim {
-  background: rgba(20, 20, 20, 0.55);
-}
-
-.fh-asheet {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  /* Adaptive height: prefer fitting content, but cap to visual viewport
-     minus keyboard. The cap is what keeps the commit footer visible when
-     the iOS keyboard is open. min-height stops the sheet from collapsing
-     too small when fields are few. */
-  height: auto;
-  min-height: 56vh;
-  max-height: calc(
-    var(--fh-vvh, 100dvh) - env(safe-area-inset-top) - 24px - var(--fh-kbd, 0px)
-  );
-  background: var(--surface-1);
-  border-top: 1px solid var(--rule-bold);
-  border-top-left-radius: 22px;
-  border-top-right-radius: 22px;
-  box-shadow: 0 -20px 60px -12px rgba(20, 20, 20, 0.55);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  overscroll-behavior: contain;
-  will-change: transform;
-  transition: max-height 220ms var(--ease);
-}
-[data-theme='dark'] .fh-asheet {
-  background: var(--onyx-2);
-}
-
-.fh-asheet__handle {
-  width: 44px;
-  height: 4px;
-  background: var(--rule-bold);
-  border-radius: 10px;
-  margin: 10px auto 8px;
-  cursor: grab;
-  flex-shrink: 0;
-}
-.fh-asheet:active .fh-asheet__handle { cursor: grabbing; }
-
-.fh-asheet__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-4);
-  padding: var(--space-3) var(--space-5) var(--space-3);
-  flex-shrink: 0;
-}
-.fh-asheet__headMeta {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-width: 0;
-}
-.fh-asheet__title {
-  font-family: var(--font-display);
-  font-size: 24px;
-  line-height: 0.95;
-  letter-spacing: 0;
-  color: var(--ink-strong);
-  margin: 0;
-}
-.fh-asheet__title-accent { color: var(--v3-primary-text); }
-
-.fh-asheet__close {
-  position: relative;
-  flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  background: transparent;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-spec);
-  color: var(--ink-muted);
-  cursor: pointer;
-  transition: border-color 160ms var(--ease), color 160ms var(--ease);
-}
-/* 32px visual, 44px tap target. */
-.fh-asheet__close::before {
-  content: '';
-  position: absolute;
-  inset: -7px;
-}
-.fh-asheet__close:hover {
-  border-color: var(--field-gold);
-  color: var(--v3-primary-text);
-}
-
-.fh-asheet__progress {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 var(--space-5);
-  flex-shrink: 0;
-}
-.fh-asheet__dot {
-  width: 32px;
-  height: 3px;
-  background: var(--rule);
-  border-radius: 10px;
-  transition: background 240ms var(--ease);
-}
-.fh-asheet__dot.is-on { background: var(--field-gold); }
-
-.fh-asheet__body {
-  flex: 1;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-  padding: var(--space-5);
-  padding-bottom: var(--space-6);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-
-.fh-asheet__foot {
-  flex-shrink: 0;
-  padding: var(--space-4) var(--space-5) calc(var(--space-4) + env(safe-area-inset-bottom));
-  border-top: 1px solid var(--rule);
-  background: var(--surface-1);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  align-items: stretch;
-}
-[data-theme='dark'] .fh-asheet__foot { background: var(--onyx-2); }
-
-.fh-asheet__commit {
-  width: 100%;
-  justify-content: center;
-  font-size: 16px;
-  letter-spacing: 0;
-  position: relative;
-  overflow: hidden;
-}
-.fh-asheet__commit-label {
-  position: relative;
-  z-index: 1;
-}
-.fh-asheet__commit.is-committing::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, var(--field-gold-deep) 0%, var(--field-gold) 60%, var(--field-gold-deep) 100%);
-  transform-origin: left center;
-  animation: fh-commit-fill 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  z-index: 0;
-}
-/* Destructive commit variant — red fill, used for confirm-to-delete sheets */
-.fh-btn--danger-solid {
-  background: var(--alert-red);
-  color: var(--raw-linen);
-  box-shadow:
-    0 2px 0 #C0392B,
-    0 8px 24px rgba(192, 57, 43, 0.28),
-    inset 0 1px 0 var(--v3-border-strong);
-}
-.fh-btn--danger-solid:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow:
-    0 3px 0 #C0392B,
-    0 12px 32px rgba(192, 57, 43, 0.4),
-    inset 0 1px 0 var(--v3-border-strong);
-}
-.fh-btn--danger-solid:active:not(:disabled) {
-  transform: translateY(1px);
-}
-.fh-asheet__commit.is-destructive.is-committing::before {
-  background: linear-gradient(90deg, #C0392B 0%, var(--alert-red) 60%, #C0392B 100%);
-}
-@keyframes fh-commit-fill {
-  from { transform: scaleX(0); }
-  to { transform: scaleX(1); }
-}
-
-/* ---- Sheet field primitives ---- */
-.fh-asheet-field {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.fh-asheet-field__k {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum";
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0;
-  color: var(--ink-muted);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-.fh-asheet-field input:not([type='checkbox']):not([type='radio']),
-.fh-asheet-field textarea,
-.fh-asheet-field select {
-  width: 100%;
-  font-family: var(--font-body);
-  font-size: 16px;
-  color: var(--ink-strong);
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid var(--rule);
-  padding: 12px 0;
-  outline: none;
-  transition: border-color 160ms var(--ease);
-  -webkit-appearance: none;
-  appearance: none;
-  border-radius: 0;
-  resize: vertical;
-}
-.fh-asheet-field select {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23C7A45A' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 4px center;
-  background-size: 14px;
-  padding-right: 24px;
-}
-/* Focus underline: matches the base rule's specificity (its :not()
-   chain used to outrank a plain :focus, so focused fields showed no
-   change at all) and doubles to 2px so keyboard focus reads clearly. */
-.fh-asheet-field input:not([type='checkbox']):not([type='radio']):focus,
-.fh-asheet-field textarea:focus,
-.fh-asheet-field select:focus {
-  border-bottom-color: var(--v3-primary-text);
-  box-shadow: 0 1px 0 var(--v3-primary-text);
-}
-
-/* ---- Chip row ---- */
-.fh-asheet-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.fh-asheet-chip {
-  position: relative;
-  padding: 12px 12px;
-  background: var(--surface-2);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-spec);
-  color: var(--ink-strong);
-  font-family: var(--font-body);
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0;
-  cursor: pointer;
-  transition: border-color 160ms var(--ease), background 160ms var(--ease), transform 160ms var(--ease);
-  overflow: hidden;
-}
-.fh-asheet-chip:hover:not(.is-on) {
-  border-color: color-mix(in srgb, var(--v3-primary) 50%, transparent);
-}
-.fh-asheet-chip.is-on {
-  background: linear-gradient(145deg, #141414 0%, var(--onyx) 100%);
-  border-color: var(--field-gold);
-  color: var(--raw-linen);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--v3-primary) 20%, transparent);
-  transform: translateY(-1px);
-}
-.fh-asheet-chip.is-on::before {
-  content: '';
-  position: absolute;
-  top: -8px;
-  left: -8px;
-  width: 22px;
-  height: 22px;
-  background: var(--field-gold);
-  transform: rotate(45deg);
-  opacity: 0.2;
-  pointer-events: none;
-}
-
-/* ---- Money field: gold Bebas $ + mono numeric input ---- */
-.fh-asheet-money {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--rule);
-  transition: border-color 160ms var(--ease);
-}
-.fh-asheet-money:focus-within {
-  border-bottom-color: var(--v3-primary-text);
-  box-shadow: 0 1px 0 var(--v3-primary-text);
-}
-.fh-asheet-money__prefix {
-  font-family: var(--font-display);
-  font-size: 24px;
-  color: var(--v3-primary-text);
-  line-height: 1;
-  letter-spacing: 0;
-}
-.fh-asheet-money__input {
-  flex: 1;
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum";
-  font-size: 24px;
-  font-weight: 500;
-  color: var(--ink-strong);
-  background: transparent;
-  border: none;
-  outline: none;
-  padding: 0;
-  letter-spacing: 0;
-  min-width: 0;
-  -moz-appearance: textfield;
-}
-.fh-asheet-money__input::-webkit-outer-spin-button,
-.fh-asheet-money__input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-
-/* Disabled commit — clearer "not ready" state. */
-.fh-asheet__commit:disabled {
-  background: var(--surface-2);
-  color: var(--ink-muted);
-  box-shadow: none;
-  cursor: not-allowed;
-  opacity: 1;
-}
-.fh-asheet__commit:disabled::before { content: none; }
-
-/* Body padding — keep the bottom clearance with safe-area for notched phones. */
-.fh-asheet__body {
-  padding-bottom: max(var(--space-6), calc(var(--space-4) + env(safe-area-inset-bottom)));
-}
-
-/* ---- Tablet+ sheet tops out at 640px centered ---- */
-@media (min-width: 720px) {
-  .fh-asheet {
-    max-width: 640px;
-    left: 50%;
-    transform: translateX(-50%);
-    border-top-left-radius: 14px;
-    border-top-right-radius: 14px;
-  }
 }
 
 /* =========================================================================
@@ -5094,41 +4652,27 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   .fh-build-settings-main { padding-bottom: 48px; }
   .fh-build-settings-main + * { position: relative; }
 
-  /* Modal/drawer shared shell — apply consistently to existing
-     Drawer / Dialog / ActionSheet content so they fit the viewport
-     and have a clean dark scrollbar instead of the native white. */
-  [role="dialog"],
-  [data-vaul-drawer],
-  [data-radix-dialog-content],
-  [data-vaul-overlay] ~ [data-vaul-drawer] {
+  /* The command palette, the one keyboard overlay (D57): fit the
+     viewport and use a slim dark scrollbar instead of the native white. */
+  [data-radix-dialog-content] {
     max-height: calc(100vh - 32px);
   }
 
-  /* Internal scroll surfaces inside drawers/dialogs use a slim dark
-     scrollbar matching the chrome. Webkit + Firefox covered. */
-  [role="dialog"] *::-webkit-scrollbar,
-  [data-vaul-drawer] *::-webkit-scrollbar,
   [data-radix-dialog-content] *::-webkit-scrollbar {
     width: 8px;
     height: 8px;
   }
-  [role="dialog"] *::-webkit-scrollbar-track,
-  [data-vaul-drawer] *::-webkit-scrollbar-track,
   [data-radix-dialog-content] *::-webkit-scrollbar-track {
     background: transparent;
   }
-  [role="dialog"] *::-webkit-scrollbar-thumb,
-  [data-vaul-drawer] *::-webkit-scrollbar-thumb,
   [data-radix-dialog-content] *::-webkit-scrollbar-thumb {
     background: var(--v3-border-mid);
     border-radius: 10px;
   }
-  [role="dialog"] *::-webkit-scrollbar-thumb:hover,
-  [data-vaul-drawer] *::-webkit-scrollbar-thumb:hover,
   [data-radix-dialog-content] *::-webkit-scrollbar-thumb:hover {
     background: var(--v3-border-strong);
   }
-  [role="dialog"], [data-vaul-drawer], [data-radix-dialog-content] {
+  [data-radix-dialog-content] {
     scrollbar-width: thin;
     scrollbar-color: var(--v3-border-strong) transparent;
   }
@@ -5404,22 +4948,10 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   color: var(--ink-strong, #F2EDE4) !important;
 }
 
-em.fh-text-gradient-gold {
-  background: none !important;
-  background-image: none !important;
-  -webkit-text-fill-color: currentColor !important;
-  color: var(--ink-strong, #F2EDE4) !important;
-  font-style: normal !important;
-  font-family: var(--font-body) !important;
-}
-
 /* Action-sheet title accent (the gold-colored emphasis word inside a
    bottom-sheet headline) → neutral. The 12 inline eyebrow tags in
    sheet components are scrubbed at the source; this catches the CSS
    pathway some sheets use via a class. */
-.fh-asheet__title-accent {
-  color: var(--ink-strong, #F2EDE4) !important;
-}
 
 /* Focus-ring + input-focus scrub.
    Every focused element previously lit up gold:

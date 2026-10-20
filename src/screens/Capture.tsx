@@ -1,14 +1,14 @@
-// src/components/CaptureSheet.tsx
+// src/screens/Capture.tsx
 //
 // Universal Capture, the one gesture that replaces navigating the app
-// to do data entry. Opened from anywhere (the dock coin, the sidebar's
-// Capture row, Cmd or Ctrl+J, the command palette) via the `fh:open-capture`
-// window event; openCapture({ jobId }) in lib/captureAttach.ts opens it
-// attached to the job on screen. The contractor says it, types it, or
-// snaps a receipt; Claude routes it into the right action (note, task,
-// payment, expense, schedule, lead) matched to the right job; the
-// operator confirms one editable card; one tap writes it through the
-// same helpers the rest of the app uses.
+// to do data entry. It is the screen /capture (Phase 9, Task 14, SPEC
+// D57): the dock coin, the sidebar's Capture row, Cmd or Ctrl+J and the
+// command palette all navigate here; openCapture({ jobId }) in
+// lib/captureAttach.ts opens it attached to the job on screen (?job=).
+// The contractor says it, types it, or snaps a receipt; Claude routes it
+// into the right action (note, task, payment, expense, schedule, lead)
+// matched to the right record; the operator confirms one editable card;
+// one tap writes it through the same helpers the rest of the app uses.
 //
 // Trust rules (docs/NORTH_STAR.md): the model proposes and the person
 // confirms, so nothing writes before Save. normalizeIntent() checks the
@@ -17,69 +17,95 @@
 //
 // Failure philosophy: capture must never lose words. AI down, offer
 // "save as note". No signal, queue in the offline outbox and sync as a
-// note (on the job the sheet was opened on) when the connection returns.
+// note (on the job the screen was opened on) when the connection returns.
 //
-// The sheet never navigates after Save. It refreshes what the capture
-// changed instead (refreshAfterCapture), so a note taken on a job page
-// shows on that job's Spine at once.
+// After Save the screen goes back to where it was opened from and
+// refreshes what the capture changed (refreshAfterCapture), so a note
+// taken on a job page shows on that job's Spine at once.
 //
-// Layout (SPEC.md 9.5, base/capture.jpg): the fh Sheet titled Capture
-// with Done; a voice panel on the tray (microphone, text, File it, then
-// Heard, Filed as chips, the job line with Change, Save and Edit); and
-// the "Or start with" rows into flows that already exist.
+// The roster the model matches against lists jobs, leads and quotes by
+// kind. A lead or quote is matched through the contact row it was moved
+// from (D56), so what the capture writes lands on a row that exists.
+//
+// Layout (SPEC.md 9.5, base/capture.jpg): Back and the title Capture in
+// the header; a voice panel on the tray (microphone, text, File it, then
+// Heard, Filed as chips, the job line with Change, Save and Edit); and the
+// "Or start with" rows into flows that already exist. The Lead and Quote
+// rows carry the dictated text along as ?text=.
 
-import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import type { LucideIcon } from 'lucide-react'
 import {
-  Camera, ChevronRight, Clock, FileText, HandCoins, Keyboard, Mic,
+  Camera, ChevronLeft, ChevronRight, Clock, FileText, HandCoins, Keyboard, Mic,
   NotepadText, ReceiptText, Square, Users
 } from 'lucide-react'
-import Button from './fh/Button.tsx'
-import Chip from './fh/Chip.tsx'
-import Field from './fh/Field.tsx'
-import Icon from './fh/Icon.tsx'
-import Row from './fh/Row.tsx'
-import Sheet, { useSheet } from './fh/Sheet.tsx'
-import { formatMoney } from './fh/money.ts'
+import Button from '../components/fh/Button.tsx'
+import Chip from '../components/fh/Chip.tsx'
+import Field from '../components/fh/Field.tsx'
+import Icon from '../components/fh/Icon.tsx'
+import IconButton from '../components/fh/IconButton.tsx'
+import Row from '../components/fh/Row.tsx'
+import { formatMoney } from '../components/fh/money.ts'
 import { supabase } from '../lib/supabase.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { hapticTap, hapticSuccess, hapticError } from '../lib/haptics.ts'
 import { toastSuccess, toastError, toastInfo } from '../lib/toast.ts'
 import { ACTIVE_STAGES } from '../lib/stages.ts'
 import { useNavAccess } from '../lib/useNavAccess.ts'
+import { useSecondTap } from '../lib/secondTap.ts'
 import {
   routeCapture, normalizeIntent, CAPTURE_KIND_META,
   EXPENSE_CATEGORIES, PAYMENT_KINDS,
   type CaptureIntent
 } from '../lib/captureIntelligence.ts'
-import { seedJob, withAttachedJob, type OpenCaptureDetail } from '../lib/captureAttach.ts'
+import { seedJob, withAttachedJob } from '../lib/captureAttach.ts'
 import { commitCapture, refreshAfterCapture, type CaptureContact } from '../lib/captureActions.ts'
-import { pushOutbox, flushOutbox, outboxCount } from '../lib/captureOutbox.ts'
+import { pushOutbox } from '../lib/captureOutbox.ts'
 import { compressImageToDataUrl, parseExpenseFromImage } from '../lib/docIntelligence.ts'
 import { speechErrorFeedback } from '../lib/speech.ts'
-import './capture-sheet.css'
+import './capture.css'
 
 type Phase = 'input' | 'parsing' | 'confirm' | 'saving'
 // Where the words came from, for the "Heard" line.
 type Source = 'voice' | 'text' | 'receipt'
 
 const ROSTER_COLUMNS = 'id,user_id,name,job_title,stage,amount'
+// Jobs in the roster: the work stages, never a lead or quote contact row
+// (those come from their own tables below).
+const JOB_STAGES = ACTIVE_STAGES.filter((s) => s !== 'lead' && s !== 'quote')
 
-export default function CaptureSheet() {
+type LeadRosterRow = { id: string; user_id: string; origin_contact_id: string | null; title: string | null; fh_clients: { name: string | null } | null }
+type QuoteRosterRow = LeadRosterRow & { amount: number | null }
+
+/** The lead and quote tables as roster entries, keyed by the contact row they were moved from. */
+function rosterFromRecords(rows: LeadRosterRow[] | QuoteRosterRow[], stage: 'lead' | 'quote'): CaptureContact[] {
+  return rows.map((r) => ({
+    id: r.origin_contact_id || r.id,
+    user_id: r.user_id,
+    name: r.fh_clients?.name || null,
+    job_title: r.title || null,
+    stage,
+    amount: 'amount' in r ? r.amount ?? null : null
+  } as CaptureContact))
+}
+
+export default function Capture() {
   const { user } = useAuth()
   const { canSee } = useNavAccess()
   const queryClient = useQueryClient()
-  const [open, setOpen] = useState(false)
+  const navigate = useNavigate()
+  const [params] = useSearchParams()
   const [phase, setPhase] = useState<Phase>('input')
   const [text, setText] = useState('')
   const [intent, setIntent] = useState<CaptureIntent | null>(null)
   const [contacts, setContacts] = useState<CaptureContact[]>([])
-  // The job the sheet was opened on (openCapture({ jobId })), and its row
-  // once loaded. Work past the roster's 100 most recent rows, and closed
-  // or lost work, is not in `contacts`, so the row is fetched by id.
-  const [attachedJobId, setAttachedJobId] = useState<string | null>(null)
+  // The job the screen was opened on (?job=, from openCapture({ jobId })),
+  // and its row once loaded. Work past the roster's 100 most recent rows,
+  // and closed or lost work, is not in `contacts`, so the row is fetched by id.
+  const attachedJobId = params.get('job') || null
   const [attachedJob, setAttachedJob] = useState<CaptureContact | null>(null)
   const [listening, setListening] = useState(false)
   const [source, setSource] = useState<Source>('text')
@@ -92,62 +118,45 @@ export default function CaptureSheet() {
   const recRef = useRef<any>(null)
   const voiceStartRef = useRef(0)
   const fileRef = useRef<HTMLInputElement>(null)
-  // Bumped on every reset, so a parse that returns after the sheet was
-  // closed or started over does not bring its card back.
+  // Bumped on every reset, so a parse that returns after the screen was
+  // left or started over does not bring its card back.
   const runRef = useRef(0)
   const ids = useId()
+  const titleRef = useRef<HTMLHeadingElement>(null)
+  // Back with words not saved yet asks with a second tap (D57).
+  const leaveTap = useSecondTap()
 
-  /* ── open via global event + Cmd/Ctrl+J ─────────────────── */
+  useEffect(() => { titleRef.current?.focus({ preventScroll: true }) }, [])
+
+  /* ── roster: jobs, leads and quotes for matching, plus the attached record ── */
   useEffect(() => {
-    function onOpen(e: Event) {
-      const jobId = (e as CustomEvent<OpenCaptureDetail | null | undefined>).detail?.jobId
-      setAttachedJobId(typeof jobId === 'string' && jobId ? jobId : null)
-      setOpen(true)
-    }
-    function onKey(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') {
-        e.preventDefault()
-        setOpen(true)
-      }
-    }
-    window.addEventListener('fh:open-capture', onOpen)
-    window.addEventListener('keydown', onKey)
-    return () => {
-      window.removeEventListener('fh:open-capture', onOpen)
-      window.removeEventListener('keydown', onKey)
-    }
-  }, [])
-
-  /* ── offline outbox: sync queued captures when we can ──────── */
-  const flush = useCallback(async () => {
-    if (!user?.id || !navigator.onLine || outboxCount() === 0) return
-    const n = await flushOutbox(user.id)
-    if (n > 0) {
-      // The notes landed on the jobs they were taken on; a job page on
-      // screen reads them now.
-      void queryClient.invalidateQueries({ queryKey: ['jobDetail'] })
-      toastSuccess(`Synced ${n} offline capture${n === 1 ? '' : 's'}`, 'Saved to Notes')
-    }
-  }, [user?.id, queryClient])
-
-  useEffect(() => {
-    flush()
-    window.addEventListener('online', flush)
-    return () => window.removeEventListener('online', flush)
-  }, [flush])
-
-  /* ── roster: active leads + jobs for matching, plus the attached job ── */
-  useEffect(() => {
-    if (!open || !user) return
+    if (!user) return
     let alive = true
     ;(async () => {
-      const { data } = await supabase
-        .from('fh_contacts')
-        .select(ROSTER_COLUMNS)
-        .in('stage', ACTIVE_STAGES)
-        .order('updated_at', { ascending: false })
-        .limit(100)
-      const list = (data ?? []) as CaptureContact[]
+      const [jobsRes, leadsRes, quotesRes] = await Promise.all([
+        supabase
+          .from('fh_contacts')
+          .select(ROSTER_COLUMNS)
+          .in('stage', JOB_STAGES)
+          .order('updated_at', { ascending: false })
+          .limit(100),
+        supabase
+          .from('fh_leads')
+          .select('id,user_id,origin_contact_id,title,fh_clients(name)')
+          .neq('status', 'lost')
+          .order('updated_at', { ascending: false })
+          .limit(100),
+        supabase
+          .from('fh_quotes')
+          .select('id,user_id,origin_contact_id,title,amount,fh_clients(name)')
+          .not('status', 'in', '("approved","rejected","expired","lost")')
+          .order('updated_at', { ascending: false })
+          .limit(100)
+      ])
+      const jobs = (jobsRes.data ?? []) as CaptureContact[]
+      const leads = rosterFromRecords((leadsRes.data ?? []) as unknown as LeadRosterRow[], 'lead')
+      const quotes = rosterFromRecords((quotesRes.data ?? []) as unknown as QuoteRosterRow[], 'quote')
+      const list = [...jobs, ...leads, ...quotes]
       let job: CaptureContact | null = null
       if (attachedJobId) {
         job = list.find((c) => c.id === attachedJobId) ?? null
@@ -161,11 +170,11 @@ export default function CaptureSheet() {
         }
       }
       if (!alive) return
-      if (data) setContacts(list)
+      setContacts(list)
       setAttachedJob(job)
     })()
     return () => { alive = false }
-  }, [open, user, attachedJobId])
+  }, [user, attachedJobId])
 
   // Elapsed time while the microphone is open.
   useEffect(() => {
@@ -197,17 +206,27 @@ export default function CaptureSheet() {
     setAmountDraft(null)
   }
 
-  function finish() {
-    setOpen(false)
-    reset()
-    setAttachedJobId(null)
-    setAttachedJob(null)
+  // Back to the screen this was opened from (the job page, Today), or
+  // Today when the screen was the first thing opened.
+  function leave() {
+    hapticTap()
+    runRef.current += 1
+    stopVoice()
+    const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0
+    if (idx > 0) navigate(-1)
+    else navigate('/', { replace: true })
   }
 
-  // Done, the grabber, Escape, or a start row leaving for its own flow.
-  function close() {
+  function finish() {
+    leave()
+  }
+
+  // Back while there are words that are not saved yet asks with a
+  // second tap; otherwise it just goes.
+  function onBack() {
     if (phase === 'saving') return
-    finish()
+    if (!dirty) { leave(); return }
+    leaveTap.tap(leave)
   }
 
   // The card opens on what still needs the person: a missing amount opens
@@ -318,7 +337,7 @@ export default function CaptureSheet() {
       }
       hapticSuccess()
       toastSuccess('Captured offline', "It'll sync as a note when you're back in signal.")
-      close()
+      finish()
       return
     }
 
@@ -353,9 +372,9 @@ export default function CaptureSheet() {
       void refreshAfterCapture(queryClient, user.id, it.job_id ?? null)
       hapticSuccess()
       toastSuccess(result.toast, it.summary)
+      // Back to where the capture was started; the refresh above makes
+      // the note, task or payment show there at once.
       finish()
-      // Deliberately no auto-navigation, capture is fire-and-forget;
-      // the operator stays on whatever screen they were working in.
       void result.link
     } catch (e: any) {
       hapticError()
@@ -380,7 +399,7 @@ export default function CaptureSheet() {
     else submit()
   }
 
-  // Words that are not saved yet: closing asks first.
+  // Words that are not saved yet: Back asks first.
   const dirty = !saving && (inConfirm || text.trim() !== '')
 
   const intentJob = intent?.job_id ? roster.find((c) => c.id === intent.job_id) ?? null : null
@@ -390,6 +409,7 @@ export default function CaptureSheet() {
   const starts = startRows({
     job: attachedJob,
     canSee,
+    text: text.trim(),
     onExpense: () => fileRef.current?.click()
   })
 
@@ -405,20 +425,17 @@ export default function CaptureSheet() {
   const heardText = source === 'receipt' ? null : text.trim()
 
   return (
-    <Sheet
-      open={open}
-      onOpenChange={(next) => { if (next) setOpen(true); else close() }}
-      title="Capture"
-      headerAction={<DoneButton />}
-      dirty={dirty}
-      discard={{
-        title: 'Discard this capture?',
-        body: 'What you said or typed is not saved yet.',
-        confirmLabel: 'Discard',
-        cancelLabel: 'Keep it'
-      }}
-      className="fh-capture"
-    >
+    <div className="fh-capture">
+      <header className="fh-capture__head">
+        <IconButton aria-label="Back" icon={ChevronLeft} variant="plain" size={44} onClick={onBack} />
+        <h1 className="fh-capture__title" ref={titleRef} tabIndex={-1}>Capture</h1>
+        <Button variant="quiet" className="fh-capture__done" onClick={onBack} disabled={saving}>
+          {leaveTap.armed ? 'Tap again to discard' : 'Done'}
+        </Button>
+      </header>
+      {leaveTap.armed && (
+        <p className="fh-capture__leave" role="status">What you said or typed is not saved yet.</p>
+      )}
       <form className="fh-capture__form" onSubmit={onSubmit}>
         {!inConfirm && (
           <div className="fh-capture__panel">
@@ -684,7 +701,7 @@ export default function CaptureSheet() {
                 </span>
               )
               return s.to
-                ? <Row key={s.key} as="li" to={s.to} onClick={close} title={title} next={next} />
+                ? <Row key={s.key} as="li" to={s.to} onClick={stopVoice} title={title} next={next} />
                 : <Row key={s.key} as="li" onClick={() => s.onClick?.()} disabled={busy} title={title} next={next} />
             })}
           </ul>
@@ -701,18 +718,7 @@ export default function CaptureSheet() {
         tabIndex={-1}
         aria-hidden="true"
       />
-    </Sheet>
-  )
-}
-
-// "Done" closes the sheet the way the grabber would, asking first when
-// there are words that are not saved yet.
-function DoneButton() {
-  const { requestClose } = useSheet()
-  return (
-    <Button variant="quiet" className="fh-capture__done" onClick={requestClose}>
-      Done
-    </Button>
+    </div>
   )
 }
 
@@ -749,19 +755,22 @@ type StartRow = {
   onClick?: () => void
 }
 
-function startRows({ job, canSee, onExpense }: {
+function startRows({ job, canSee, text, onExpense }: {
   job: CaptureContact | null
   canSee: (to: string) => boolean
+  /** What was dictated or typed so far, carried into the create screens. */
+  text: string
   onExpense: () => void
 }): StartRow[] {
+  const carried = text ? `?text=${encodeURIComponent(text)}` : ''
   const rows: (StartRow | false)[] = [
     // Photos live on a job (its Files tab, Photos first), so the row
     // needs one.
     job ? { key: 'photo', icon: Camera, title: 'Photo', hint: 'Opens this job’s photos.', to: `/jobs/${job.id}?tab=files` } : false,
     { key: 'note', icon: NotepadText, title: 'Note', hint: 'Type or talk.', to: '/notes' },
-    canSee('/leads') && { key: 'lead', icon: Users, title: 'Lead', hint: 'New customer or request.', to: '/leads/new' },
-    canSee('/quotes') && { key: 'quote', icon: FileText, title: 'Quote', hint: 'From your rate card.', to: '/quotes/new' },
-    // Invoices are sent from a job in progress (SendInvoiceSheet).
+    canSee('/leads') && { key: 'lead', icon: Users, title: 'Lead', hint: 'New customer or request.', to: `/leads/new${carried}` },
+    canSee('/quotes') && { key: 'quote', icon: FileText, title: 'Quote', hint: 'From your rate card.', to: `/quotes/new${carried}` },
+    // Invoices are sent from a job in progress.
     job && isWorkStage(job.stage) && canSee('/invoices')
       ? { key: 'invoice', icon: HandCoins, title: 'Invoice', hint: 'Bill this job.', to: `/jobs/${job.id}?action=send_invoice` }
       : false,

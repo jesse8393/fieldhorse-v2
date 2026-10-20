@@ -4,7 +4,7 @@
 // One input (spoken, typed, or OCR'd) goes in; one structured action
 // comes out: a note, todo, payment, expense, schedule event, or new
 // lead, optionally matched to an existing job. The operator always
-// confirms before anything is written (CaptureSheet renders the
+// confirms before anything is written (the Capture screen renders the
 // parsed intent as an editable card).
 //
 // Claude does the language work; normalizeIntent() is the trust

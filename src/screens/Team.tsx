@@ -8,18 +8,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Bell, ChevronRight, Copy, Plus, Search, Trash2, UserPlus, Mail, X,
+  Bell, ChevronRight, Search, Trash2, UserPlus, X,
 } from 'lucide-react'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import {
-  orgInviteCreate, orgInviteRevoke, orgMembersList, orgMemberRemove, orgMemberRole, orgMemberRate,
+  orgInviteRevoke, orgMembersList, orgMemberRemove, orgMemberRole, orgMemberRate,
   type OrgInvitePending, type OrgMember,
 } from '../lib/orgApi.ts'
 import type { OrgRole } from '../lib/permissions.ts'
 import { ORG_ROLES } from '../lib/permissions.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import MiniMetric from '../components/MiniMetric.tsx'
-import { useConfirm } from '../components/ConfirmSheet.tsx'
+import { useSecondTap } from '../lib/secondTap.ts'
 import { Eyebrow } from '../components/v3'
 import PaletteKeyCap, { paletteShortcut } from '../components/desktop/PaletteKeyCap.tsx'
 
@@ -49,7 +49,6 @@ export default function Team() {
   const [error, setError] = useState<string | null>(null)
   const [members, setMembers] = useState<OrgMember[]>([])
   const [invites, setInvites] = useState<OrgInvitePending[]>([])
-  const [inviteOpen, setInviteOpen] = useState(false)
 
   // In-flight guard, overlapping triggers (membership resolve +
   // retries) used to fire the same failing query up to 9 times.
@@ -134,7 +133,7 @@ export default function Team() {
                 type="button"
                 className="fh-build-primary-btn"
                 style={{ marginTop: 10 }}
-                onClick={() => setInviteOpen(true)}
+                onClick={() => navigate('/team/invite')}
               >
                 <UserPlus size={13} /> Invite teammate
               </button>
@@ -261,13 +260,6 @@ export default function Team() {
         </section>
       </main>
 
-      {inviteOpen && canInviteMembers && (
-        <InviteDialog
-          callerRole={role}
-          onClose={() => setInviteOpen(false)}
-          onSent={() => { setInviteOpen(false); load() }}
-        />
-      )}
     </div>
   )
 }
@@ -284,7 +276,8 @@ const ROLE_TIER: Record<string, number> = { crew: 0, foreman: 1, manager: 2, adm
    Only shown when the caller can manage the team AND outranks the member
   , mirrors the server guards in org-member-role/remove. */
 function MemberActions({ member, callerRole, canManage, onChanged }: any) {
-  const confirm = useConfirm()
+  // Removing a member takes a second tap on the same button (D57).
+  const removeTap = useSecondTap()
   const [busy, setBusy] = useState(false)
   const [rate, setRate] = useState(member.default_hourly_rate != null ? String(member.default_hourly_rate) : '')
 
@@ -334,7 +327,6 @@ function MemberActions({ member, callerRole, canManage, onChanged }: any) {
 
   async function remove() {
     if (busy) return
-    if (!(await confirm({ title: `Remove ${member.name || member.email || 'this member'} from the team?`, body: 'They lose access immediately.', destructive: true, confirmLabel: 'Remove' }))) return
     setBusy(true)
     try {
       await orgMemberRemove(member.user_id)
@@ -381,166 +373,15 @@ function MemberActions({ member, callerRole, canManage, onChanged }: any) {
       </select>
       <button
         type="button"
-        onClick={remove}
+        onClick={() => { if (!busy) removeTap.tap(() => { void remove() }) }}
         disabled={busy}
-        aria-label="Remove member"
-        title="Remove member"
-        style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', color: 'rgba(192, 57, 43,0.8)' }}
+        aria-label={removeTap.armed ? 'Tap again to remove' : 'Remove member'}
+        title={removeTap.armed ? `Tap again to remove ${member.name || member.email || 'this member'}. They lose access immediately.` : 'Remove member'}
+        style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', color: 'rgba(192, 57, 43,0.8)', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, fontFamily: 'var(--font-body)' }}
       >
         <Trash2 size={13} />
+        {removeTap.armed && <span>Tap again to remove</span>}
       </button>
     </span>
-  )
-}
-
-function InviteDialog({ callerRole, onClose, onSent }: { callerRole: OrgRole | null; onClose: () => void; onSent: () => void }) {
-  const [email, setEmail] = useState('')
-  const [role, setRole] = useState<OrgRole>('crew')
-  // Only roles strictly below the caller's tier are invitable, mirrors
-  // the server guard in org-invite-create.js so an admin can't mint an
-  // owner (or another admin) from the UI.
-  const callerTier = ROLE_TIER[callerRole || ''] ?? 0
-  const invitableRoles = ORG_ROLES.filter((r) => (ROLE_TIER[r] ?? 0) < callerTier)
-  const [sending, setSending] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [acceptUrl, setAcceptUrl] = useState<string | null>(null)
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
-    setSending(true)
-    try {
-      const res = await orgInviteCreate(email.trim().toLowerCase(), role)
-      setAcceptUrl(res.accept_url)
-    } catch (e: any) {
-      setError(e?.detail || e?.message || 'Could not create invite.')
-    } finally {
-      setSending(false)
-    }
-  }
-
-  async function copy(text: string) {
-    try {
-      await navigator.clipboard.writeText(text)
-      toastSuccess('Link copied')
-    } catch {
-      toastError('Copy failed, touch and hold to copy')
-    }
-  }
-
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Invite teammate"
-      style={{
-        position: 'fixed', inset: 0, zIndex: 90,
-        background: 'rgba(20, 20, 20,.55)',
-        display: 'grid', placeItems: 'center',
-      }}
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: '100%', maxWidth: 440,
-          margin: '0 16px',
-          padding: 24,
-          borderRadius: 10,
-          background: 'linear-gradient(180deg, rgba(20, 20, 20,.95), rgba(20, 20, 20,.98))',
-          border: '1px solid var(--v3-border-mid)',
-          boxShadow: '0 22px 60px rgba(20, 20, 20,.50)',
-        }}
-      >
-        <div className="fh-build-eyebrow" style={{ color: 'var(--v3-primary-text)' }}>Invite teammate</div>
-        <h2 style={{ margin: '6px 0 18px', fontFamily: 'var(--font-display)', fontSize: 24, letterSpacing: 0, color: 'var(--v3-text)' }}>
-          Add someone to the field.
-        </h2>
-
-        {acceptUrl ? (
-          <div>
-            <p style={{ margin: 0, fontSize: 14, color: 'var(--v3-text-secondary)', lineHeight: 1.5 }}>
-              Invite created. Share this link with <strong style={{ color: 'var(--v3-text)' }}>{email}</strong>:
-            </p>
-            <div style={{
-              marginTop: 12,
-              padding: '12px 12px',
-              borderRadius: 10,
-              background: 'rgba(20, 20, 20,.40)',
-              border: '1px solid rgba(201,150,58,.30)',
-              fontSize: 12,
-              fontFamily: 'var(--font-body)',
-              color: 'var(--v3-text)',
-              wordBreak: 'break-all',
-            }}>
-              {acceptUrl}
-            </div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-              <button type="button" className="fh-build-secondary-btn" onClick={() => copy(acceptUrl)}>
-                <Copy size={13} /> Copy link
-              </button>
-              <button type="button" className="fh-build-primary-btn" onClick={onSent} style={{ marginLeft: 'auto' }}>
-                Done
-              </button>
-            </div>
-          </div>
-        ) : (
-          <form onSubmit={submit}>
-            <label style={{ display: 'block', marginBottom: 14 }}>
-              <span className="fh-build-eyebrow" style={{ display: 'block', marginBottom: 6 }}>Email</span>
-              <div style={{ position: 'relative' }}>
-                <Mail size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--v3-text-muted)' }} />
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="teammate@company.com"
-                  style={{
-                    width: '100%',
-                    padding: '12px 12px 12px 32px',
-                    borderRadius: 10,
-                    background: 'rgba(20, 20, 20,.30)',
-                    border: '1px solid var(--v3-border-mid)',
-                    color: 'var(--v3-text)',
-                    fontFamily: 'var(--font-body)',
-                    fontSize: 14,
-                  }}
-                />
-              </div>
-            </label>
-
-            <label style={{ display: 'block', marginBottom: 18 }}>
-              <span className="fh-build-eyebrow" style={{ display: 'block', marginBottom: 6 }}>Role</span>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value as OrgRole)}
-                className="fh-build-select"
-                style={{ marginTop: 0 }}
-              >
-                {invitableRoles.map((r) => (
-                  <option key={r} value={r} style={{ textTransform: 'capitalize' }}>{r}</option>
-                ))}
-              </select>
-            </label>
-
-            {error && (
-              <div style={{ marginBottom: 14, padding: 12, borderRadius: 10, background: 'rgba(192, 57, 43,.10)', border: '1px solid rgba(192, 57, 43,.30)', color: 'var(--v3-danger-text)', fontSize: 12 }}>
-                {error}
-              </div>
-            )}
-
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button type="button" className="fh-build-secondary-btn" onClick={onClose} disabled={sending}>
-                Cancel
-              </button>
-              <button type="submit" className="fh-build-primary-btn" disabled={sending || !email}>
-                <Plus size={13} /> {sending ? 'Creating…' : 'Create invite'}
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
-    </div>
   )
 }

@@ -22,7 +22,7 @@
 // AFTER rounding so 999_999 reads "$1.00M", not "$1000K".
 //
 // Files with INTENTIONALLY different number-formatting rules (e.g.
-// V3PaymentSheet uses Intl.NumberFormat full currency) keep their own
+// the payment screens use Intl.NumberFormat full currency) keep their own
 // helpers, this module is for the dominant canonical shape only.
 
 function toNumber(n: unknown): number {

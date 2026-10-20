@@ -13,7 +13,7 @@
 import { useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
-import { HardHat, ListFilter, Plus, Search, SearchX } from 'lucide-react'
+import { HardHat, Plus, Search, SearchX } from 'lucide-react'
 import { Button, Chip, EmptyState, Field, IconButton, Row, SkeletonRows } from '../../components/fh'
 import DataErrorState from '../../components/DataErrorState.tsx'
 import { useAuth } from '../../contexts/AuthContext.tsx'
@@ -24,7 +24,6 @@ import { handleTablistKeyDown, tabId, tabPanelId, tabPanelProps } from '../../li
 import { buildLeadRows, buildQuoteRows } from '../../lib/leadsView.ts'
 import { todayYmd } from '../../lib/dates.ts'
 import { hapticTap } from '../../lib/haptics.ts'
-import JobsFilterSheet from './JobsFilterSheet.tsx'
 import './jobs.css'
 
 export type JobsPhoneProps = {
@@ -78,6 +77,11 @@ function rowEnd(row: JobsRowView): ReactNode {
   return items.length ? items : null
 }
 
+const JOBS_SORTS: { id: JobsSort; label: string }[] = [
+  { id: 'next', label: 'Next step' },
+  { id: 'amount', label: 'Amount' }
+]
+
 export default function JobsPhone({
   jobs,
   loading,
@@ -108,7 +112,6 @@ export default function JobsPhone({
     if (stageParam === 'lost') setShowLost(true)
   }
   const [sort, setSort] = useState<JobsSort>('next')
-  const [filterOpen, setFilterOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(() => search !== '')
 
   const tabs = useMemo(
@@ -291,14 +294,38 @@ export default function JobsPhone({
             aria-controls={searchOpen ? searchFieldId : undefined}
             onClick={toggleSearch}
           />
-          <IconButton
-            aria-label={filterTitle}
-            icon={ListFilter}
-            size={44}
-            aria-haspopup="dialog"
-            onClick={() => setFilterOpen(true)}
-          />
         </div>
+      </div>
+
+      {/* The filter and the sort are chips under the title (D57): lost
+          jobs show at the end of the list and never count toward the tabs;
+          sorting by amount is offered only to roles that may see money. */}
+      <div className="fhjl-chips" role="group" aria-label={filterTitle}>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={showLost}
+          className={`fhjl-chip${showLost ? ' is-on' : ''}`}
+          onClick={() => { hapticTap(); changeShowLost(!showLost) }}
+        >
+          Show lost jobs
+        </button>
+        {showMoney && (
+          <div className="fhjl-chips__sort" role="radiogroup" aria-label="Sort by">
+            {JOBS_SORTS.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                role="radio"
+                aria-checked={sort === s.id}
+                className={`fhjl-chip${sort === s.id ? ' is-on' : ''}`}
+                onClick={() => { hapticTap(); setSort(s.id) }}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {searchOpen && (
@@ -358,16 +385,6 @@ export default function JobsPhone({
         {hasRows ? body : <div className="fhjl-state">{body}</div>}
       </div>
 
-      <JobsFilterSheet
-        title={filterTitle}
-        open={filterOpen}
-        onOpenChange={setFilterOpen}
-        showLost={showLost}
-        onShowLostChange={changeShowLost}
-        sort={sort}
-        onSortChange={setSort}
-        canSortByAmount={showMoney}
-      />
     </div>
   )
 }

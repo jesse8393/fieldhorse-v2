@@ -581,7 +581,9 @@ test.describe('job page on a desktop, redesigned', () => {
     })
     await page.getByRole('button', { name: /Add a note, photos or a task/ }).click()
     expect(await page.evaluate(() => (window as unknown as { __captureDetail?: unknown }).__captureDetail)).toEqual({ jobId: 'c-job1' })
-    await expect(page.getByRole('dialog', { name: 'Capture' })).toBeVisible()
+    // Capture is a screen (D57), opened on this job.
+    await expect(page).toHaveURL(/\/capture\?job=c-job1$/)
+    await expect(page.getByRole('heading', { level: 1, name: 'Capture' })).toBeVisible()
     expect(writes).toEqual([])
   })
 

@@ -19,7 +19,7 @@ import { useAuth } from '../contexts/AuthContext.tsx'
 import CountUp from '../components/fx/CountUp.tsx'
 import SectionHeader from '../components/v3/SectionHeader.tsx'
 import { FilterPill, Eyebrow } from '../components/v3'
-import { useConfirm } from '../components/ConfirmSheet.tsx'
+import { useArmedId } from '../lib/secondTap.ts'
 import { parseAmount } from '../lib/amount.ts'
 
 // White-label: internal-only tool but no app-attributable phrasing
@@ -62,7 +62,8 @@ function capitalize(s: any) { return s ? s.charAt(0).toUpperCase() + s.slice(1) 
 
 export default function Bid() {
   const { user } = useAuth()
-  const confirm = useConfirm()
+  // Deleting a template takes a second tap on the same button (D57).
+  const deleteTap = useArmedId()
   const navigate = useNavigate()
   const [scope, setScope] = useState('')
   const [marginPct, setMarginPct] = useState(25)
@@ -312,7 +313,6 @@ export default function Bid() {
 
   async function deleteTemplate(t: any) {
     if (!t?.id) return
-    if (!(await confirm({ title: `Delete "${t.name}" from your templates?`, destructive: true }))) return
     try {
       const { error } = await supabase.from('fh_estimate_templates').delete().eq('id', t.id)
       if (error) throw error
@@ -474,17 +474,19 @@ export default function Bid() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => deleteTemplate(t)}
-                    aria-label={`Delete template ${t.name}`}
+                    onClick={() => deleteTap.tap(t.id, () => { void deleteTemplate(t) })}
+                    aria-label={deleteTap.armedId === t.id ? 'Tap again to delete' : `Delete template ${t.name}`}
+                    title={deleteTap.armedId === t.id ? `Tap again to delete "${t.name}" from your templates` : 'Delete template'}
                     style={{
-                      width: 26, height: 26, borderRadius: 10,
+                      width: deleteTap.armedId === t.id ? 'auto' : 26, height: 26, borderRadius: 10, padding: deleteTap.armedId === t.id ? '0 8px' : 0,
+                      fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-body)', whiteSpace: 'nowrap',
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                       background: 'transparent',
                       border: '1px solid rgba(192, 57, 43, 0.35)',
                       color: 'var(--v3-danger-text)', cursor: 'pointer'
                     }}
                   >
-                    <Trash2 size={12} aria-hidden="true" />
+                    {deleteTap.armedId === t.id ? 'Tap again to delete' : <Trash2 size={12} aria-hidden="true" />}
                   </button>
                 </li>
               ))}

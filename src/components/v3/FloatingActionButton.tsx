@@ -19,7 +19,7 @@ import { useIsDesktop } from '../../lib/useMediaQuery.ts'
  *
  *   Rendering via createPortal(..., document.body) lifts the FAB out
  *   of the screen tree entirely, so `position: fixed` always
- *   resolves correctly to the viewport. Same fix used by V3PaymentSheet.
+ *   resolves correctly to the viewport.
  *
  * Props:
  *   onClick        , required tap handler

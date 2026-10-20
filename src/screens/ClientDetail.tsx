@@ -10,7 +10,6 @@ import {
   Plus, Receipt, DollarSign, Clock
 } from 'lucide-react'
 import { hapticTap, hapticMedium, hapticError } from '../lib/haptics.ts'
-import ActionSheet from '../components/ActionSheet.tsx'
 import { SkeletonList } from '../components/Skeleton.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
 import { SegmentedTabs, Eyebrow, StampNumber } from '../components/v3'
@@ -20,7 +19,7 @@ import { useClientDetail, useInvalidateClientDetail, useInvalidateClients } from
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { toastError, toastInfo } from '../lib/toast.ts'
 import { stageColor, stageLabel } from '../lib/stages.ts'
-import StatementSheet from '../components/StatementSheet.tsx'
+import { useSecondTap } from '../lib/secondTap.ts'
 import { gatherStatement } from '../lib/statement.ts'
 import { rollupJobs } from '../lib/rollups.ts'
 import { composeClientTimeline, type TimelineEvent } from '../lib/clientTimeline.ts'
@@ -68,11 +67,11 @@ export default function ClientDetail() {
   const changeOrders = bundle?.changeOrders ?? []
   const [tab, setTab] = useState('overview')
   const [isEditing, setIsEditing] = useState(false)
-  // Destructive-confirm sheet state for delete client.
-  const [deleteOpen, setDeleteOpen] = useState(false)
+  // Deleting the client takes a second tap on the same button (D57).
+  const deleteTap = useSecondTap()
   const [deleting, setDeleting] = useState(false)
-  // Statement sheet, roll all open invoices into one document.
-  const [statementOpen, setStatementOpen] = useState(false)
+  // The statement is its own screen, every open invoice in one document.
+  const openStatement = () => navigate(`/clients/${id}/statement`)
 
   // Derived metrics, the shared rollup, NOT an inline copy. The inline
   // version this replaced excluded closed jobs and approved change
@@ -86,7 +85,7 @@ export default function ClientDetail() {
   const outstanding = rollup.outstanding
   const activeCount = rollup.activeCount
 
-  // Statement rollup, the SAME computation the StatementSheet/PDF use,
+  // Statement rollup, the SAME computation the statement screen and PDF use,
   // so the "Statement · $X across N properties" button always agrees
   // with the document it opens (previously the button showed
   // `outstanding`/`activeCount`, which use different stage sets and could
@@ -96,10 +95,10 @@ export default function ClientDetail() {
     [jobs, payments, changeOrders]
   )
 
-  // Open the destructive-confirm sheet. The header trash button hits this.
+  // The first tap arms the button, the second deletes.
   function requestDelete() {
-    if (!client?.id) return
-    setDeleteOpen(true)
+    if (!client?.id || deleting) return
+    deleteTap.tap(() => { void confirmDelete() })
   }
 
   // Writes match the client by id only. RLS keeps them inside the
@@ -111,7 +110,6 @@ export default function ClientDetail() {
     const { data, error } = await supabase.from('fh_clients').delete().eq('id', client.id).select('id')
     if (error || !data?.length) {
       setDeleting(false)
-      setDeleteOpen(false)
       toastError("Couldn't delete", error?.message || 'This client may already be gone. Refresh and try again.')
       return
     }
@@ -206,45 +204,6 @@ export default function ClientDetail() {
     </>
   )
 
-  // Shared overlays (delete confirm, statement sheet).
-  // Mounted in BOTH the desktop and mobile branches, they're portaled,
-  // so they render correctly wherever they sit in the tree. Previously
-  // these lived only in the mobile JSX, so on desktop the Delete and
-  // Statement buttons set state but nothing ever appeared.
-  const sheets = (
-    <>
-      <ActionSheet
-        open={deleteOpen}
-        title="Delete this client?"
-        accentWord="Delete"
-        sectionLabel="Destructive"
-        stepCount={1}
-        currentStep={1}
-        commitLabel={deleting ? 'Deleting…' : 'Delete client'}
-        commitBusy={deleting}
-        commitDisabled={deleting}
-        destructive
-        onClose={() => { if (!deleting) setDeleteOpen(false) }}
-        onCommit={confirmDelete}
-      >
-        <p style={{ margin: 0, color: 'var(--v3-text)', fontSize: '1rem', lineHeight: 1.45 }}>
-          Removing <strong>{client?.name || 'this client'}</strong>. Linked jobs keep running, they just lose the client link.
-        </p>
-      </ActionSheet>
-
-
-      <StatementSheet
-        open={statementOpen}
-        onClose={() => setStatementOpen(false)}
-        client={client}
-        jobs={jobs}
-        payments={payments}
-        changeOrders={changeOrders}
-        userId={user?.id}
-      />
-    </>
-  )
-
   if (isDesktop) {
     return (
       <Suspense fallback={null}>
@@ -260,14 +219,14 @@ export default function ClientDetail() {
           onTabChange={setTab}
           onBack={() => navigate('/clients')}
           onEdit={() => setIsEditing(!isEditing)}
-          onDelete={() => setDeleteOpen(true)}
+          onDelete={requestDelete}
+          deleteArmed={deleteTap.armed}
           onNewDeal={openNew}
-          onStatement={statementSummary.totalDue > 0 ? () => setStatementOpen(true) : undefined}
+          onStatement={statementSummary.totalDue > 0 ? openStatement : undefined}
           isEditing={isEditing}
         >
           {tabBody}
         </SnowClientDetailBuild>
-        {sheets}
       </Suspense>
     )
   }
@@ -295,9 +254,28 @@ export default function ClientDetail() {
           >
             <Pencil size={16} />
           </IconBtn>
-          <IconBtn onClick={() => { hapticError(); requestDelete() }} ariaLabel="Delete client" tone="danger">
-            <Trash2 size={16} />
-          </IconBtn>
+          {deleteTap.armed ? (
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.97 }}
+              onClick={() => { hapticError(); requestDelete() }}
+              disabled={deleting}
+              aria-label="Tap again to delete"
+              title={`Tap again to delete ${client?.name || 'this client'}. Linked jobs keep running, they just lose the client link.`}
+              style={{
+                minHeight: 40, padding: '0 12px', borderRadius: 10,
+                background: 'rgba(192, 57, 43, 0.10)', border: '1px solid color-mix(in srgb, var(--v3-danger) 35%, transparent)',
+                color: 'var(--v3-danger-text)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
+                whiteSpace: 'nowrap', cursor: 'pointer', WebkitTapHighlightColor: 'transparent'
+              }}
+            >
+              Tap again to delete
+            </motion.button>
+          ) : (
+            <IconBtn onClick={() => { hapticError(); requestDelete() }} ariaLabel="Delete client" tone="danger" disabled={deleting}>
+              <Trash2 size={16} />
+            </IconBtn>
+          )}
         </div>
       </div>
 
@@ -445,7 +423,7 @@ export default function ClientDetail() {
           <motion.button
             type="button"
             whileTap={{ scale: 0.99 }}
-            onClick={() => { hapticTap(); setStatementOpen(true) }}
+            onClick={() => { hapticTap(); openStatement() }}
             style={{
               width: '100%',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
@@ -487,8 +465,6 @@ export default function ClientDetail() {
         {tab === 'files' && <FilesList rows={files} />}
         {tab === 'notes' && <NotesList notes={notes} />}
       </div>
-
-      {sheets}
     </motion.div>
   )
 }

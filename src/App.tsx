@@ -78,6 +78,16 @@ const QuoteApprove   = lazy(() => import('./screens/quotes/QuoteApprove.tsx'))
 // The job's action screens and the event screen took the place of the
 // job page's and the Schedule's sheets (Phase 9, Task 13, D57).
 const JobPayment     = lazy(() => import('./screens/jobs/JobPayment.tsx'))
+// The screens that took the place of the last pop ups (Task 14, D57).
+const Capture        = lazy(() => import('./screens/Capture.tsx'))
+const Workspace      = lazy(() => import('./screens/Workspace.tsx'))
+const SearchScreen   = lazy(() => import('./screens/Search.tsx'))
+const ClientStatement = lazy(() => import('./screens/clients/ClientStatement.tsx'))
+const ClientsMerge   = lazy(() => import('./screens/clients/ClientsMerge.tsx'))
+const MilesNew       = lazy(() => import('./screens/MilesNew.tsx'))
+const SubNew         = lazy(() => import('./screens/SubNew.tsx'))
+const TeamInvite     = lazy(() => import('./screens/TeamInvite.tsx'))
+const SubPortalProfile = lazy(() => import('./screens/SubPortalProfile.tsx'))
 const JobPartner     = lazy(() => import('./screens/jobs/JobPartner.tsx'))
 const JobComplete    = lazy(() => import('./screens/jobs/JobComplete.tsx'))
 const JobMore        = lazy(() => import('./screens/jobs/JobMore.tsx'))
@@ -302,7 +312,9 @@ export default function App() {
           <Route path="/jobs/:id/more" element={<JobMore />} />
           <Route path="/jobs/:id/follow-up" element={<JobFollowUp />} />
           <Route path="/clients" element={<Clients />} />
+          <Route path="/clients/merge" element={<ClientsMerge />} />
           <Route path="/clients/:id" element={<ClientDetail />} />
+          <Route path="/clients/:id/statement" element={<ClientStatement />} />
           <Route path="/notes" element={<Notes />} />
           <Route path="/schedule" element={<Schedule />} />
           <Route path="/schedule/new" element={<EventNew />} />
@@ -311,17 +323,21 @@ export default function App() {
           <Route path="/bid" element={<Bid />} />
           <Route path="/compose" element={<Compose />} />
           <Route path="/analytics" element={<Analytics />} />
+          <Route path="/miles/new" element={<MilesNew />} />
           <Route path="/import" element={<Importer />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/pour-window" element={<PourWindow />} />
           <Route path="/subs" element={<Subs />} />
+          <Route path="/subs/new" element={<SubNew />} />
           <Route path="/subs/:key" element={<SubDetail />} />
           <Route path="/partners" element={<Partners />} />
           <Route path="/team" element={<Team />} />
+          <Route path="/team/invite" element={<TeamInvite />} />
           <Route path="/crew" element={<Crew />} />
           <Route path="/timesheets" element={<Timesheets />} />
           <Route path="/tasks" element={<Tasks />} />
           <Route path="/sub-portal" element={<SubPortal />} />
+          <Route path="/sub-portal/profile" element={<SubPortalProfile />} />
           <Route path="/invoices" element={<Invoices />} />
           <Route path="/invoices/:id" element={<InvoiceDetail />} />
           <Route path="/invoices/:id/payment" element={<InvoicePayment />} />
@@ -333,6 +349,9 @@ export default function App() {
           <Route path="/inbox/:conversationId" element={<Inbox />} />
           {/* The bell's list is a screen, not a sheet (decision D64). */}
           <Route path="/notifications" element={<Notifications />} />
+          <Route path="/capture" element={<Capture />} />
+          <Route path="/workspace" element={<Workspace />} />
+          <Route path="/search" element={<SearchScreen />} />
           {/* Alias routes, these URLs exist in muscle memory / older
               links but the screens live elsewhere. Explicit redirects
               beat the silent catch-all bounce to Home. (/leads is a

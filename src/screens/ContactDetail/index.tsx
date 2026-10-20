@@ -15,7 +15,6 @@ import { SkeletonBlock as SkeletonBlock_, SkeletonList as SkeletonList_ } from '
 const SkeletonBlock = SkeletonBlock_ as any
 const SkeletonList = SkeletonList_ as any
 import DataErrorState from '../../components/DataErrorState.tsx'
-import { useConfirm } from '../../components/ConfirmSheet.tsx'
 import { Eyebrow } from '../../components/v3'
 import { tabPanelProps } from '../../lib/tabs.ts'
 import { useJobData } from './hooks/useJobData.ts'
@@ -246,7 +245,8 @@ export default function ContactDetail() {
     paid, contractTotal, balance, credit, loading, isError, fetchAll, patch
   } = data
   const isDesktop = useIsDesktop()
-  const confirm = useConfirm() as any
+  // Reopen takes a second tap on the same gold button (D57).
+  const reopenTap = useSecondTap()
 
   // Role gates from lib/permissions.ts. Field roles (foreman, crew) reach
   // this screen from /work and /crew, but money stays with owner, admin
@@ -486,12 +486,14 @@ export default function ContactDetail() {
   // with the Spine first (decision D5) and the floating action capsule.
   const useDesktopShell = isDesktop
 
-  // Reopen asks first (Phase 8, Task 15); the question moves to a second
-  // tap with the rest of the confirm callers in Task 14.
-  async function onReopen() {
+  // Reopen asks first: the first tap arms the button and says where the
+  // job goes (reopenQuestion), the second moves it.
+  function onReopen() {
     if (!contact) return
-    const ok = await confirm(reopenQuestion(contact))
-    if (!ok) return
+    reopenTap.tap(() => { void reopenNow() })
+  }
+  async function reopenNow() {
+    if (!contact) return
     const res: any = await reopen(contact)
     if (res?.error) {
       toastError("Couldn't reopen", res.error.message || 'Try again')
@@ -505,10 +507,11 @@ export default function ContactDetail() {
   // lost job. Every one is a billing or pipeline move, so field roles get
   // none.
   const cta = canMoveMoney ? stageCtaFor(contact.stage, balance) : null
-  const stageCta: { label: string; onClick: () => void } | null = cta
+  const stageCta: { label: string; onClick: () => void; hint?: string } | null = cta
     ? {
-        label: cta.label,
-        onClick: cta.action === 'invoice' ? openInvoice : cta.action === 'complete' ? openComplete : () => { void onReopen() }
+        label: cta.action === 'reopen' && reopenTap.armed ? 'Tap again to reopen' : cta.label,
+        hint: cta.action === 'reopen' && reopenTap.armed ? reopenQuestion(contact).body : undefined,
+        onClick: cta.action === 'invoice' ? openInvoice : cta.action === 'complete' ? openComplete : onReopen
       }
     : null
 

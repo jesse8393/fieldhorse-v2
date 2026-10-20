@@ -119,9 +119,9 @@ test.describe('command palette', () => {
 
     await page.keyboard.press('Alt+KeyN')
     await expect(palette).toBeHidden()
-    const sheet = page.getByRole('dialog', { name: 'Capture' })
-    await expect(sheet).toBeVisible()
-    await expect(sheet.getByText('Attached to Slab + trench.')).toBeVisible()
+    // Capture is a screen (D57), opened on the job.
+    await expect(page).toHaveURL(/\/capture\?job=c-job1$/)
+    await expect(page.getByText('Attached to Slab + trench.')).toBeVisible()
   })
 
   test('plain letters type into the search field and run nothing', async ({ context, page }) => {
@@ -143,7 +143,6 @@ test.describe('command palette', () => {
 
     await expect(palette).toBeVisible()
     expect(page.url()).toBe(before)
-    await expect(page.getByRole('dialog', { name: 'Capture' })).toHaveCount(0)
   })
 
   test('a shortcut needs a job or one of its actions highlighted', async ({ context, page }) => {
@@ -162,7 +161,6 @@ test.describe('command palette', () => {
     await page.keyboard.press('Alt+KeyN')
     await expect(palette).toBeVisible()
     expect(page.url()).toBe(before)
-    await expect(page.getByRole('dialog', { name: 'Capture' })).toHaveCount(0)
   })
 
   test('Message opens the job when there is no phone number', async ({ context, page }) => {
@@ -212,13 +210,13 @@ test.describe('command palette', () => {
     // is not a usable signal here: the weather and font requests may never
     // settle on a slow runner.
     await expect(page.getByRole('region', { name: 'Unscheduled jobs' })).toBeVisible()
-    const before = page.url()
 
-    // A real textarea: Universal Capture's, opened by its own shortcut.
+    // A real textarea: Universal Capture's, on its own screen, opened by
+    // its own shortcut.
     await page.keyboard.press('Control+j')
-    const sheet = page.getByRole('dialog', { name: 'Capture' })
-    await expect(sheet).toBeVisible()
-    const field = sheet.getByRole('textbox', { name: 'Or type it' })
+    await expect(page).toHaveURL(/\/capture$/)
+    const before = page.url()
+    const field = page.getByRole('textbox', { name: 'Or type it' })
     await field.click()
 
     page.on('request', (req) => {
@@ -246,7 +244,8 @@ test.describe('command palette', () => {
 
     await capture.click()
     await expect(palette).toBeHidden()
-    await expect(page.getByRole('dialog', { name: 'Capture' })).toBeVisible()
+    await expect(page).toHaveURL(/\/capture$/)
+    await expect(page.getByRole('heading', { level: 1, name: 'Capture' })).toBeVisible()
   })
 
   test('Escape closes it', async ({ context, page }) => {

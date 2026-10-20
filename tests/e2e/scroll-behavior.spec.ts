@@ -168,14 +168,20 @@ test('restores mobile scroll after opening and closing the workspace menu', asyn
   await page.evaluate(() => window.scrollTo({ top: 640, behavior: 'instant' }))
   const before = await page.evaluate(() => window.scrollY)
 
+  // The workspace menu is a screen of its own (D57): it starts at the top,
+  // scrolling it never moves Settings, and Back returns to where Settings was.
   await page.getByRole('button', { name: 'Open workspace menu' }).click()
-  await expect(page.getByRole('dialog', { name: 'Workspace menu' })).toBeVisible()
+  await expect(page).toHaveURL(/\/workspace$/)
+  await expect(page.getByRole('navigation', { name: 'Workspace' })).toBeVisible()
+  await page.waitForTimeout(100)
+  expect(await page.evaluate(() => window.scrollY)).toBe(0)
   await page.mouse.move(8, 80)
   await page.mouse.wheel(0, 600)
   await page.waitForTimeout(100)
-  expect(await page.evaluate(() => window.scrollY)).toBe(0)
-  await page.getByRole('button', { name: 'Close menu' }).click()
-  await expect(page.getByRole('dialog', { name: 'Workspace menu' })).toBeHidden()
+  await page.getByRole('button', { name: 'Back' }).click()
+  await expect(page).toHaveURL(/\/settings$/)
+  await expect(page.getByRole('navigation', { name: 'Workspace' })).toHaveCount(0)
+  await page.waitForTimeout(300)
 
   expect(await page.evaluate(() => window.scrollY)).toBe(before)
   expect(await page.evaluate(() => getComputedStyle(document.body).overflow)).not.toBe('hidden')

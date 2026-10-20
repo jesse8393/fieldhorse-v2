@@ -18,8 +18,8 @@
 // Cash jobs / small projects don't need to touch this, the existing
 // single-invoice flow on the Invoice sub-tab stays exactly as it was.
 
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
-import { AnimatePresence } from 'framer-motion'
+import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Link } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { Plus, FileEdit, Send, Download, Check, X, Trash2, FileText } from 'lucide-react'
@@ -33,7 +33,7 @@ import { DEFAULT_PAYMENT_SCHEDULE } from '../../../components/documents'
 // Cents aware: whole amounts print as "$1,250", amounts with cents keep
 // them, so a generated $1,249.75 draw never reads "$1,250".
 import { money } from '../../../components/documents/format.ts'
-import { useConfirm } from '../../../components/ConfirmSheet.tsx'
+import { useArmedId } from '../../../lib/secondTap.ts'
 import { Eyebrow } from '../../../components/v3'
 import { countNoun } from '../../../lib/format.ts'
 import { invoiceAmountDue, invoiceDescription } from '../../../lib/invoices.ts'
@@ -42,8 +42,6 @@ import { splitByPercents } from '../../../lib/paymentSchedule.ts'
 import { useMembership } from '../../../contexts/MembershipContext.tsx'
 import { canEditJobMoney } from '../lib/jobAccess.ts'
 
-// Loaded on first "Mark paid" tap, like the other screens that open it.
-const V3PaymentSheet = lazy(() => import('../../../components/V3PaymentSheet.tsx'))
 
 function shortDate(iso: any) {
   const d = parseDateOnly(iso)
@@ -70,7 +68,9 @@ function dateInputFromIso(iso: any) {
 }
 
 export default function InvoiceDrawsSection({ contact, payments = [], changeOrders = [], insurance = null, userId }: any) {
-  const confirm = useConfirm()
+  // Void and Delete take a second tap on the same draw's button (D57).
+  const armedTap = useArmedId()
+  const navigate = useNavigate()
   const { profile } = useProfile()
   const { user } = useAuth()
   const queryClient = useQueryClient()
@@ -84,7 +84,6 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
   const [busyId, setBusyId] = useState<any>(null)
   // The draw a payment is being recorded against, and what is still owed
   // on it, while the payment sheet is open.
-  const [paying, setPaying] = useState<{ draw: any; owed: number } | null>(null)
   // Any owner, admin or manager of the job's company may edit, not only
   // the teammate who created the job (see lib/jobAccess.ts).
   const { orgId: viewerOrgId, canCreateFinancialDocs } = useMembership()
@@ -241,8 +240,9 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
 
   // Every balance (Paid to date, the job's balance, A/R, statements, the
   // customer's link) is summed from fh_payments, so marking a draw paid
-  // has to record the payment, not just flip its status. The payment
-  // sheet links the payment to this draw and logPayment settles it.
+  // has to record the payment, not just flip its status. The draw is an
+  // invoice, so its payment screen (/invoices/:id/payment, D57) records the
+  // payment linked to it and logPayment settles it.
   async function handleMarkPaid(draw: any) {
     if (!draw?.id || busyId) return
     // Money already on the books may cover this draw: a payment linked to
@@ -251,11 +251,8 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
     // is behind, and recording another payment would count it twice.
     const covered = invoicesPaidInFull({ invoices: draws, payments, contractTotal }).includes(draw.id)
     if (!covered) {
-      const linked = (payments || [])
-        .filter((p: any) => p?.invoice_id === draw.id)
-        .reduce((s: number, p: any) => s + Number(p.amount || 0), 0)
-      const owed = Math.max(0, Math.round((Number(draw.amount || 0) - linked) * 100) / 100)
-      setPaying({ draw, owed })
+      // The payment screen prefills what the draw still owes.
+      navigate(`/invoices/${draw.id}/payment`)
       return
     }
     setBusyId(draw.id)
@@ -274,8 +271,13 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
     }
   }
 
-  async function handleVoid(draw: any) {
-    if (!(await confirm({ title: `Void Draw #${draw.sequence_number}?`, body: 'It will stop counting toward the unbilled total.', destructive: true, confirmLabel: 'Void' }))) return
+  // The first tap arms the button; the second voids. A void draw stops
+  // counting toward the unbilled total.
+  function handleVoid(draw: any) {
+    armedTap.tap(`void:${draw.id}`, () => { void voidNow(draw) })
+  }
+
+  async function voidNow(draw: any) {
     setBusyId(draw.id)
     try {
       const { error } = await supabase
@@ -295,12 +297,15 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
   // Only a draft can be deleted. Its number never reached the customer,
   // while deleting a sent or paid draw hands its number to the next draw
   // and unlinks its payments. Void keeps that record on the books.
-  async function handleDelete(draw: any) {
+  function handleDelete(draw: any) {
     if (draw?.status !== 'draft') {
       toastError('Only drafts can be deleted', 'Void this draw instead so it stays on the books.')
       return
     }
-    if (!(await confirm({ title: `Delete Draw #${draw.sequence_number}?`, body: 'This cannot be undone.', destructive: true }))) return
+    armedTap.tap(`delete:${draw.id}`, () => { void deleteNow(draw) })
+  }
+
+  async function deleteNow(draw: any) {
     try {
       const { error } = await supabase
         .from('fh_invoices')
@@ -566,25 +571,11 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
           onMarkPaid={handleMarkPaid}
           onVoid={handleVoid}
           onDelete={handleDelete}
+          armedKey={armedTap.armedId}
           onDownload={handleDownload}
           onSend={handleSend}
         />
       )}
-      <AnimatePresence>
-        {paying && (
-          <Suspense fallback={null}>
-            <V3PaymentSheet
-              contact={contact}
-              balance={paying.owed}
-              // Prefill what is still owed on this draw, not its full
-              // amount, when part of it was already paid.
-              invoice={{ ...paying.draw, amount: paying.owed }}
-              onClose={() => setPaying(null)}
-              onLogged={() => { setPaying(null); fetchDraws(); refreshJob() }}
-            />
-          </Suspense>
-        )}
-      </AnimatePresence>
     </Shell>
   )
 }
@@ -707,7 +698,7 @@ function Summary({ contractTotal, drawsIssued, previouslyPaid, unbilled }: any) 
   )
 }
 
-function List({ draws, editingId, busyId, readOnly, onEdit, onCancelEdit, onSave, onMarkPaid, onVoid, onDelete, onDownload, onSend }: any) {
+function List({ draws, editingId, busyId, readOnly, armedKey, onEdit, onCancelEdit, onSave, onMarkPaid, onVoid, onDelete, onDownload, onSend }: any) {
   if (draws.length === 0) {
     return (
       <div style={{
@@ -736,6 +727,8 @@ function List({ draws, editingId, busyId, readOnly, onEdit, onCancelEdit, onSave
               onMarkPaid={() => onMarkPaid?.(d)}
               onVoid={() => onVoid?.(d)}
               onDelete={() => onDelete?.(d)}
+              voidArmed={armedKey === `void:${d.id}`}
+              deleteArmed={armedKey === `delete:${d.id}`}
             />
           )}
         </li>
@@ -744,7 +737,7 @@ function List({ draws, editingId, busyId, readOnly, onEdit, onCancelEdit, onSave
   )
 }
 
-function Row({ draw, busy, readOnly, onEdit, onDownload, onSend, onMarkPaid, onVoid, onDelete }: any) {
+function Row({ draw, busy, readOnly, onEdit, onDownload, onSend, onMarkPaid, onVoid, onDelete, voidArmed = false, deleteArmed = false }: any) {
   const isPaid = draw.status === 'paid'
   const isVoid = draw.status === 'void'
   const isOverdue = draw.status === 'overdue'
@@ -825,14 +818,14 @@ function Row({ draw, busy, readOnly, onEdit, onDownload, onSend, onMarkPaid, onV
               </IconBtn>
             )}
             {!isVoid && (
-              <IconBtn onClick={onVoid} disabled={busy} title="Void" aria-label="Void draw">
-                <X size={12} aria-hidden="true" />
+              <IconBtn onClick={onVoid} disabled={busy} title={voidArmed ? 'Tap again to void. It stops counting toward the unbilled total.' : 'Void'} aria-label={voidArmed ? 'Tap again to void' : 'Void draw'} wide={voidArmed}>
+                {voidArmed ? <span style={{ fontSize: 12, fontWeight: 700, padding: '0 8px', whiteSpace: 'nowrap' }}>Tap again to void</span> : <X size={12} aria-hidden="true" />}
               </IconBtn>
             )}
             {/* Drafts only: a sent or paid draw is voided, never deleted. */}
             {draw.status === 'draft' && (
-              <IconBtn onClick={onDelete} tone="danger" title="Delete" aria-label="Delete draw">
-                <Trash2 size={12} aria-hidden="true" />
+              <IconBtn onClick={onDelete} tone="danger" title={deleteArmed ? 'Tap again to delete. This cannot be undone.' : 'Delete'} aria-label={deleteArmed ? 'Tap again to delete' : 'Delete draw'} wide={deleteArmed}>
+                {deleteArmed ? <span style={{ fontSize: 12, fontWeight: 700, padding: '0 8px', whiteSpace: 'nowrap' }}>Tap again to delete</span> : <Trash2 size={12} aria-hidden="true" />}
               </IconBtn>
             )}
           </div>
@@ -892,7 +885,7 @@ function Editor({ initial, isNew, unbilled, onSave, onCancel }: any) {
               inputMode="decimal"
               value={form.amount}
               // Strip everything but digits/decimal, same rule as
-              // V3PaymentSheet/SendInvoiceSheet. Without it, typing
+              // the payment and invoice screens. Without it, typing
               // "1,500" (or pasting "$1,500") passed validation as NaN
               // and persisted a $0 draw.
               onChange={(e) => set('amount', e.target.value.replace(/[^0-9.]/g, ''))}
@@ -986,7 +979,8 @@ function Tag({ tone, children }: any) {
   )
 }
 
-function IconBtn({ children, onClick, disabled, tone, title, ...rest }: any) {
+// `wide` lets an armed button carry its words (Tap again to delete).
+function IconBtn({ children, onClick, disabled, tone, title, wide = false, ...rest }: any) {
   const danger = tone === 'danger'
   return (
     <button
@@ -996,7 +990,7 @@ function IconBtn({ children, onClick, disabled, tone, title, ...rest }: any) {
       title={title}
       {...rest}
       style={{
-        width: 26, height: 26, borderRadius: 10,
+        width: wide ? 'auto' : 26, height: 26, borderRadius: 10,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         background: 'transparent',
         border: `1px solid ${danger ? 'rgba(192, 57, 43, 0.35)' : 'var(--v3-border-strong)'}`,

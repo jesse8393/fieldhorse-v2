@@ -284,10 +284,10 @@ test.describe('cleanup guard', () => {
 
       if (isPhone(testInfo.project.name)) {
         await page.getByRole('button', { name: 'Search everything' }).click()
-        const search = page.getByRole('dialog', { name: 'Search' })
-        await expect(search).toBeVisible()
-        await search.getByRole('searchbox').fill('Plumb')
-        await expect(search.getByText('Plumbing Bellevue').first()).toBeVisible()
+        // Search is a screen below 900 px (D57).
+        await expect(page).toHaveURL(/\/search$/)
+        await page.getByRole('searchbox').fill('Plumb')
+        await expect(page.getByText('Plumbing Bellevue').first()).toBeVisible()
       } else {
         await page.keyboard.press('Control+k')
         const palette = page.getByRole('dialog', { name: 'Command palette' })
@@ -314,9 +314,10 @@ test.describe('cleanup guard', () => {
         // The sidebar's Capture row (decision D33).
         await page.getByRole('button', { name: /^Capture \(/ }).click()
       }
-      const sheet = page.getByRole('dialog', { name: 'Capture' })
-      await expect(sheet).toBeVisible()
-      await expect(sheet.getByRole('list', { name: 'Or start with' })).toBeVisible()
+      // Capture is a screen (D57).
+      await expect(page).toHaveURL(/\/capture$/)
+      await expect(page.getByRole('heading', { level: 1, name: 'Capture' })).toBeVisible()
+      await expect(page.getByRole('list', { name: 'Or start with' })).toBeVisible()
       await page.waitForTimeout(800)
 
       await expect(page).toHaveScreenshot(`capture-sheet-${mode}.png`, { animations: 'disabled', maxDiffPixels: 0 })
