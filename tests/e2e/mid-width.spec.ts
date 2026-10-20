@@ -206,7 +206,7 @@ test.describe(`a desktop ${WIDTH} px wide`, () => {
   // sideways is fine: the strip itself fits.
   test('the overflow check finds a block past the right edge, but not one inside a strip that scrolls sideways', async ({ context, page }) => {
     await open(context, page, '/invoices', { tables: MONEY })
-    await expect(page.getByRole('button', { name: 'New invoice' })).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByRole('link', { name: 'New invoice' })).toBeVisible({ timeout: 30_000 })
     await nothingRunsOffTheSide(page)
 
     await page.evaluate(() => {
@@ -294,8 +294,8 @@ test.describe(`a desktop ${WIDTH} px wide`, () => {
     await open(context, page, '/invoices', { tables: MONEY })
     await expect(page.getByRole('heading', { level: 1, name: 'Money' })).toBeVisible({ timeout: 30_000 })
     const overdue = page.getByRole('region', { name: 'Overdue', exact: true })
-    await expect(overdue.getByRole('button', { name: 'Remind Rosa Delgado' })).toBeVisible({ timeout: 30_000 })
-    await onScreenUnscrolled(page, page.getByRole('button', { name: 'New invoice' }))
+    await expect(overdue.getByRole('link', { name: 'Remind Rosa Delgado' })).toBeVisible({ timeout: 30_000 })
+    await onScreenUnscrolled(page, page.getByRole('link', { name: 'New invoice' }))
     await nothingRunsOffTheSide(page)
 
     for (const title of ['Overdue', 'Due soon', 'Waiting on approval', 'Paid']) {
