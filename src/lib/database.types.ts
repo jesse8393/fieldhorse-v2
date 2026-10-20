@@ -1390,7 +1390,7 @@ export type Database = {
         Insert: {
           quote_id?: string | null
           completed_at?: string | null
-          contact_id: string
+          contact_id?: string | null
           created_at?: string
           envelope_id: string
           id?: string
@@ -3871,7 +3871,7 @@ export type Database = {
           base_total?: number
           client_ip?: unknown
           client_user_agent?: string | null
-          contact_id: string
+          contact_id?: string | null
           created_at?: string
           excluded_count?: number
           id?: string
@@ -6243,9 +6243,10 @@ export type Database = {
           p_approved_by_email?: string
           p_approved_by_name: string
           p_base_total: number
-          p_contact_id: string
+          p_contact_id?: string | null
           p_excluded_count: number
           p_optional_total: number
+          p_quote_id?: string | null
           p_signature_data?: string
           p_signature_kind?: string
           p_snapshot: Json

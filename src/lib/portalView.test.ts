@@ -12,7 +12,7 @@ afterAll(() => {
   else process.env.TZ = originalTz
 })
 
-import { approvalNote, buildPortalView, depositNote, depositSentence, quoteFingerprint, type ApprovalNote, type PublicDocPayload } from './portalView.ts'
+import { approvalNote, buildPortalView, depositNote, depositSentence, portalStatus, quoteFingerprint, type ApprovalNote, type PublicDocPayload } from './portalView.ts'
 
 const NOW = new Date(2026, 9, 10, 9, 0, 0)
 
@@ -764,5 +764,23 @@ describe('the customer page after approval, continued', () => {
     ])
     const received = buildPortalView(payload({ payments: DEPOSIT_IN }, { proposal_status: 'approved' }, { name: 'Smith & Sons Paving' }), NOW)
     expect(received.steps[0]).toBe('Smith & Sons Paving sends you a start date.')
+  })
+})
+
+// Task 11: the link reads the quote record. The payload then carries the
+// quote id and the quote's own status, and the page reads those first.
+describe('a payload from a quote record', () => {
+  it('seeds the quote number with the quote id', () => {
+    const v = buildPortalView(payload({ quote_id: 'q-portal', status: 'sent' }, { id: 'c-elsewhere', quote_sent_at: '2026-10-02T12:00:00Z' }), NOW)
+    expect(v.quoteNumber).toBe('PC-2026-RTAL')
+  })
+
+  it('reads the status from the payload before the contact block', () => {
+    const approved = buildPortalView(payload({ quote_id: 'q-portal', status: 'approved' }, { proposal_status: 'sent' }), NOW)
+    expect(approved.approved).not.toBeNull()
+    expect(approved.open).toBe(false)
+    expect(portalStatus({ status: 'changes_requested', contact: { proposal_status: 'sent' } })).toBe('changes_requested')
+    expect(portalStatus({ contact: { proposal_status: 'Sent' } })).toBe('sent')
+    expect(portalStatus({})).toBe('')
   })
 })

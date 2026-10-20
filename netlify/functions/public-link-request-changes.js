@@ -9,6 +9,7 @@ import { createClient } from '@supabase/supabase-js'
 import { clientIp, hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
 import { sendPushToUser } from './lib/push.js'
 import { linkScope } from './lib/linkScope.js'
+import { loadQuoteForLink } from './lib/quoteApproval.js'
 
 const MAX_TOKEN_LENGTH = 256
 const MAX_NAME_LENGTH = 200
@@ -95,16 +96,22 @@ export default async function handler(request) {
 
   const { data: link, error: linkError } = await supabase
     .from('fh_public_links')
-    .select('id, user_id, org_id, contact_id, kind, revoked_at, expires_at')
+    .select('id, user_id, org_id, contact_id, quote_id, kind, revoked_at, expires_at')
     .eq('token', token)
     .maybeSingle()
   if (linkError) return json({ error: 'link_lookup_failed' }, 500)
-  if (!link || link.kind !== 'proposal' || !link.contact_id) {
+  if (!link || link.kind !== 'proposal' || (!link.contact_id && !link.quote_id)) {
     return json({ error: 'not_found' }, 404)
   }
   if (link.revoked_at) return json({ error: 'revoked' }, 404)
   if (link.expires_at && new Date(link.expires_at) < new Date()) {
     return json({ error: 'expired' }, 404)
+  }
+
+  // A link minted for a quote record writes the request on the quote
+  // (Task 11); contact links keep the job path below.
+  if (link.quote_id) {
+    return requestQuoteChanges(supabase, link, { requesterName, requestText })
   }
 
   const { data: contact, error: contactError } = await supabase
@@ -184,6 +191,90 @@ export default async function handler(request) {
     body: `${requesterName} left feedback for ${project}.`,
     link: `/quotes/${contact.id}?tab=quote`,
     tag: `quote-changes-${contact.id}`
+  })
+
+  return json({
+    ok: true,
+    requested_by: requesterName,
+    requested_at: requestedAt
+  })
+}
+
+// The quote path. Refused once the quote is approved (409), once it is
+// lost, rejected or expired (410), and once a job was made from it (410),
+// as the job path refuses a started job. The request lands on
+// fh_quotes.status, change_request_note and change_requested_at, with the
+// activity note and the alerts the job path writes.
+async function requestQuoteChanges(supabase, link, { requesterName, requestText }) {
+  const { quote, client } = await loadQuoteForLink(supabase, link)
+  if (!quote) return json({ error: 'gone' }, 410)
+
+  const status = String(quote.status || 'draft').toLowerCase()
+  if (status === 'approved') return json({ error: 'already_approved' }, 409)
+  if (status === 'rejected' || status === 'expired' || status === 'lost') {
+    return json({ error: 'gone' }, 410)
+  }
+  if (quote.job_id) return json({ error: 'gone' }, 410)
+
+  const requestedAt = new Date().toISOString()
+  const { data: updatedRows, error: updateError } = await supabase
+    .from('fh_quotes')
+    .update({
+      status: 'changes_requested',
+      change_request_note: requestText,
+      change_requested_at: requestedAt
+    })
+    .eq('id', quote.id)
+    .match(linkScope(link))
+    .in('status', ['draft', 'sent', 'viewed', 'changes_requested'])
+    .select('id')
+  if (updateError) return json({ error: 'request_failed' }, 500)
+  if (!updatedRows?.length) return json({ error: 'gone' }, 410)
+
+  const activityText = `Quote changes requested by ${requesterName}: ${requestText}`
+  const { error: noteError } = await supabase.from('fh_notes').insert({
+    user_id: link.user_id,
+    org_id: quote.org_id || link.org_id || null,
+    contact_id: null,
+    quote_id: quote.id,
+    text: activityText,
+    category: 'activity'
+  })
+  if (noteError) {
+    await supabase
+      .from('fh_quotes')
+      .update({
+        status: quote.status || 'sent',
+        change_request_note: quote.change_request_note || null,
+        change_requested_at: quote.change_requested_at || null
+      })
+      .eq('id', quote.id)
+      .match(linkScope(link))
+      .eq('status', 'changes_requested')
+      .eq('change_requested_at', requestedAt)
+    return json({ error: 'activity_write_failed' }, 500)
+  }
+
+  const project = quote.title || client?.name || 'Quote'
+  try {
+    await supabase.from('fh_notifications').insert({
+      user_id: link.user_id,
+      org_id: quote.org_id || link.org_id || null,
+      kind: 'quote_changes_requested',
+      title: 'Quote changes requested',
+      body: `${requesterName} requested changes for ${project}: ${requestText}`,
+      link: `/quotes/${quote.id}`
+    })
+  } catch {
+    // Notification delivery is best effort. The status and activity row
+    // remain the durable workflow record.
+  }
+
+  await sendPushToUser(supabase, link.user_id, {
+    title: 'Quote changes requested',
+    body: `${requesterName} left feedback for ${project}.`,
+    link: `/quotes/${quote.id}`,
+    tag: `quote-changes-${quote.id}`
   })
 
   return json({

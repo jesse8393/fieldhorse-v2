@@ -15,6 +15,8 @@ import { expect, test, type BrowserContext, type Locator, type Page } from '@pla
 import { signIn } from './helpers/signIn'
 
 type Overrides = {
+  /** The quote's own status (fh_quotes.status); defaults to the contact block's proposal_status. */
+  status?: string
   contact?: Record<string, unknown>
   company?: Record<string, unknown>
   payments?: Array<Record<string, unknown>>
@@ -31,25 +33,31 @@ const ITEMS = [
 ]
 
 // $18,458.00 of base lines, so the default schedule's deposit is $9,229.00.
-function proposalPayload({ contact = {}, company = {}, payments = [], items = ITEMS }: Overrides = {}) {
+// The link points at an fh_quotes row (Task 11): the payload carries the
+// quote id and the quote's status, and keeps the contact block the page
+// has always read, with the client standing in for the contact.
+function proposalPayload({ status, contact = {}, company = {}, payments = [], items = ITEMS }: Overrides = {}) {
+  const contactBlock = {
+    id: 'q-portal',
+    name: 'Marco Castellanos',
+    address: '1150 Cherry Blossom Ln, La Vergne',
+    phone: '615 555 0101',
+    email: 'marco@example.com',
+    job_title: 'Pool deck pour',
+    stage: 'quote',
+    proposal_status: 'sent',
+    amount: 18458,
+    created_at: '2026-10-01T12:00:00.000Z',
+    quote_sent_at: '2026-10-02T12:00:00.000Z',
+    terms_text: '',
+    ...contact
+  }
   return {
     ok: true,
     kind: 'proposal',
-    contact: {
-      id: 'c-portal',
-      name: 'Marco Castellanos',
-      address: '1150 Cherry Blossom Ln, La Vergne',
-      phone: '615 555 0101',
-      email: 'marco@example.com',
-      job_title: 'Pool deck pour',
-      stage: 'quote',
-      proposal_status: 'sent',
-      amount: 18458,
-      created_at: '2026-10-01T12:00:00.000Z',
-      quote_sent_at: '2026-10-02T12:00:00.000Z',
-      terms_text: '',
-      ...contact
-    },
+    quote_id: 'q-portal',
+    status: status ?? contactBlock.proposal_status,
+    contact: contactBlock,
     company: {
       name: 'Parker Construction',
       phone: '615 555 0100',
@@ -123,8 +131,9 @@ async function mockPortal(context: BrowserContext, initial: Payload): Promise<Sp
   await context.route('**/api/public-link-approve', async (route) => {
     const body = route.request().postDataJSON()
     spies.approve.push(body)
-    // What the server does: the proposal is approved from now on.
+    // What the server does: the quote is approved from now on.
     current = proposalPayload({
+      status: 'approved',
       contact: { ...current.contact, proposal_status: 'approved' },
       company: current.company,
       payments: current.payments
@@ -415,6 +424,24 @@ test('a company is called by its first word only when that word stands alone', a
   await expect(steps(page).nth(1)).toHaveText('Parker sends you a start date.')
   expect(spies.approve).toHaveLength(0)
   expect(spies.requestChanges).toHaveLength(0)
+  expect(spies.stray).toEqual([])
+})
+
+// Task 11: the link resolves the quote record, so the payload's own status
+// is what the page reads, and the number on the page is seeded by the quote
+// id (q-portal), not by whatever id the contact block carries.
+test('the page reads the quote record: its status and its id drive the headline and the number', async ({ page, context }) => {
+  const spies = await mockPortal(context, proposalPayload({ status: 'approved', contact: { id: 'c-elsewhere', proposal_status: 'sent' }, company: LINK, payments: DEPOSIT_IN }))
+  await openPortal(page)
+  await expect(headline(page)).toHaveText('Hi Marco, your quote is approved.')
+  await expect(page.getByText('Quote PC-2026-RTAL', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Approve this quote' })).toHaveCount(0)
+
+  spies.setPayload(proposalPayload({ status: 'changes_requested', contact: { id: 'c-elsewhere', proposal_status: 'sent' } }))
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await expect(headline(page)).toHaveText('Hi Marco, here is your quote.')
+  await expect(steps(page).first()).toHaveText('Parker sends you a revised proposal.')
+  expect(spies.approve).toHaveLength(0)
   expect(spies.stray).toEqual([])
 })
 

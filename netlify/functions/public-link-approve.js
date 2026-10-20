@@ -31,6 +31,10 @@ import { sendPushToUser } from './lib/push.js'
 import { linkScope } from './lib/linkScope.js'
 import { brandingUserIdFor } from './lib/orgAccess.js'
 import { proposalNumber } from './lib/docNumbers.js'
+import {
+  CLOSED_QUOTE_STATUSES, buildQuoteSnapshot, claimQuoteApproval, loadQuoteForLink,
+  recordQuoteVersion, releaseQuoteClaim, snapshotCompany, snapshotItems
+} from './lib/quoteApproval.js'
 
 const CLOSED_STAGES = new Set(['lost', 'closed'])
 
@@ -105,6 +109,11 @@ export default async function handler(req) {
   }
   if (link.kind !== 'proposal') {
     return json({ error: 'not_approvable', message: 'Only proposals can be approved via this link.' }, 400)
+  }
+
+  // A link minted for a quote record approves the quote (Task 11).
+  if (link.quote_id) {
+    return approveQuote(supabase, req, link, { signatureName, approvalNote })
   }
 
   const { data: contact } = await supabase
@@ -329,6 +338,110 @@ export default async function handler(req) {
     body: `${signatureName} signed${contact.name ? ` for ${contact.name}` : ''}`,
     link: `/jobs/${contact.id}`,
     tag: `quote-approved-${contact.id}`
+  })
+
+  return json({
+    ok: true,
+    version_number: newRow.version_number,
+    approved_at: newRow.created_at,
+    signed_by: signatureName
+  })
+}
+
+// Approval of a quote record through its link. The same refusal rules as
+// the job path: already approved (409), lost or rejected (409), past its
+// valid until date or marked expired (410), no lines (400). The approval
+// is claimed on fh_quotes.status first, the version is recorded by quote
+// id, and fh_quotes.approved_version_id points at it.
+async function approveQuote(supabase, req, link, { signatureName, approvalNote }) {
+  const { quote, client } = await loadQuoteForLink(supabase, link)
+  if (!quote) return json({ error: 'gone' }, 404)
+  const status = String(quote.status || 'draft').toLowerCase()
+  if (status === 'approved') {
+    return json({ error: 'already_approved', message: 'This proposal has already been approved.' }, 409)
+  }
+  if (CLOSED_QUOTE_STATUSES.has(status)) {
+    return json({ error: 'not_approvable', message: 'This proposal is no longer open. Ask your contractor for an updated one.' }, 409)
+  }
+  const quoteExpiry = quote.expires_at ? new Date(quote.expires_at) : null
+  if (quoteExpiry && !Number.isNaN(quoteExpiry.getTime())) {
+    const expiryEnd = new Date(quoteExpiry.getTime() + 24 * 60 * 60 * 1000)
+    if (expiryEnd < new Date()) {
+      return json({ error: 'quote_expired', message: 'This proposal has expired. Ask your contractor for updated pricing.' }, 410)
+    }
+  }
+  if (status === 'expired') {
+    return json({ error: 'quote_expired', message: 'This proposal has expired. Ask your contractor for updated pricing.' }, 410)
+  }
+
+  const brandUserId = await brandingUserIdFor(supabase, link)
+  const [{ data: items }, { data: profile }] = await Promise.all([
+    supabase.from('fh_quote_items').select('*').eq('quote_id', quote.id).order('sort_order', { ascending: true }),
+    supabase.from('profiles').select('*').eq('user_id', brandUserId).maybeSingle()
+  ])
+  const itemRows = items || []
+  if (itemRows.length === 0) {
+    return json({ error: 'empty_proposal', message: 'This proposal has no line items to approve.' }, 400)
+  }
+
+  const company = snapshotCompany(profile)
+  const snap = snapshotItems(itemRows)
+  const snapshot = buildQuoteSnapshot({
+    quote, client, company, snap,
+    takenAt: new Date().toISOString(),
+    extra: { approval_origin: 'public_link' }
+  })
+
+  const claim = await claimQuoteApproval(supabase, quote)
+  if (claim.error) {
+    console.error('[public-link-approve] quote approval claim failed', claim.error)
+    return json({ error: 'approve_failed', message: 'We could not record your approval. Please try again.' }, 500)
+  }
+  if (!claim.claimed) {
+    return json({ error: 'already_approved', message: 'This proposal has already been approved.' }, 409)
+  }
+
+  const recorded = await recordQuoteVersion(supabase, {
+    quote,
+    userId: link.user_id,
+    snapshot,
+    snap,
+    fields: {
+      approval_method: 'esign_link',
+      approved_by_name: signatureName,
+      approved_by_email: client?.email || null,
+      approval_note: approvalNote,
+      signature_kind: 'typed',
+      signature_data: signatureName,
+      client_ip: clientIp(req),
+      client_user_agent: req.headers.get('user-agent') || null
+    }
+  })
+  if (recorded.error) {
+    console.error('[public-link-approve] quote version insert failed', recorded.error)
+    await releaseQuoteClaim(supabase, quote)
+    return json({ error: 'approve_failed', message: 'We could not record your approval. Please try again.' }, 500)
+  }
+  const newRow = recorded.row
+
+  const who = client?.name || null
+  try {
+    await supabase.from('fh_notifications').insert({
+      user_id: link.user_id,
+      org_id: link.org_id || quote.org_id || null,
+      kind: 'quote_approved',
+      title: `Quote approved · ${moneyFmt(snap.baseTotal)}`,
+      body: `${signatureName} signed${who ? ` for ${who}` : ''}`,
+      link: `/quotes/${quote.id}`
+    })
+  } catch (e) {
+    console.warn('[public-link-approve] notification insert failed', e)
+  }
+  await sendPushToUser(supabase, link.user_id, {
+    title: `Quote approved · ${moneyFmt(snap.baseTotal)} 🎉`,
+    body: `${signatureName} signed${who ? ` for ${who}` : ''}`,
+    link: `/quotes/${quote.id}`,
+    tag: `quote-approved-${quote.id}`
   })
 
   return json({

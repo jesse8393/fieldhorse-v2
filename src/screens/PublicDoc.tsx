@@ -34,7 +34,7 @@ import ApproveProposalBar, { type ApproveCheck } from '../components/public/Appr
 import type { ProposalPortal } from '../components/documents/proposalThemes.tsx'
 import '../components/documents/fieldhorse-proposal.css'
 import { safePayUrl } from '../lib/payLink.ts'
-import { buildPortalView, quoteFingerprint, type PublicDocPayload } from '../lib/portalView.ts'
+import { buildPortalView, portalStatus, quoteFingerprint, type PublicDocPayload } from '../lib/portalView.ts'
 import { gatherStatement } from '../lib/statement.ts'
 
 type PublicDocState = { loading: boolean; data: PublicDocPayload | null; error: string | null }
@@ -55,7 +55,7 @@ function isFieldhorse(payload: PublicDocPayload): boolean {
 function approvable(payload: PublicDocPayload, now: Date): boolean {
   if (payload.kind !== 'proposal') return false
   if (isFieldhorse(payload)) return buildPortalView(payload, now).open
-  const status = String(payload.contact?.proposal_status || '').toLowerCase()
+  const status = portalStatus(payload)
   return status !== 'approved' && status !== 'changes_requested'
 }
 
@@ -172,7 +172,7 @@ export default function PublicDoc() {
   }, [load])
 
   const { loading, data, error } = state
-  const proposalStatus = String(data?.contact?.proposal_status || '').toLowerCase()
+  const proposalStatus = data ? portalStatus(data) : ''
 
   if (!loading && data && isFieldhorse(data)) {
     // Open means approvable: not approved, no changes requested, not
@@ -554,7 +554,7 @@ function ProposalView({ data, portal }: { data: PublicDocPayload; portal?: Propo
         issuedAt: contact?.quote_sent_at || contact?.created_at,
         expiresAt: contact?.quote_expires_at || null
       }}
-      status={(contact?.proposal_status || 'sent').toLowerCase()}
+      status={portalStatus(data) || 'sent'}
       portal={portal}
     />
   )

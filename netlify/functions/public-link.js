@@ -27,6 +27,7 @@ import { sendPushToUser } from './lib/push.js'
 import { clientIp, hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
 import { linkScope } from './lib/linkScope.js'
 import { brandingUserIdFor } from './lib/orgAccess.js'
+import { loadQuoteForLink } from './lib/quoteApproval.js'
 
 function trimHeader(value, max = 500) {
   const text = String(value || '').trim()
@@ -62,6 +63,7 @@ export function buildPublicLinkViewEvent(req, link, contact, salt) {
     p_ip_hash: hashPublicLinkIp(getPublicLinkClientIp(req), salt),
     p_metadata: {
       change_order_id: link.change_order_id || null,
+      quote_id: link.quote_id || null,
       request_id: trimHeader(req.headers.get('x-nf-request-id'), 120)
     }
   }
@@ -80,7 +82,22 @@ export function viewedLabelFor(link) {
   if (link.kind === 'change_order') {
     return { kindLabel: 'change order', detailLink: `/jobs/${link.contact_id}?tab=quote` }
   }
+  if (link.quote_id) {
+    return { kindLabel: 'proposal', detailLink: `/quotes/${link.quote_id}` }
+  }
   return { kindLabel: 'proposal', detailLink: `/quotes/${link.contact_id}?tab=quote` }
+}
+
+// The stage the portal reads (portalView.ts CLOSED_STAGES and jobFinished)
+// for a link that points at a quote record: a lost or rejected quote is
+// closed to approval; an approved quote whose job exists reads the job's
+// stage so a closed out job promises nothing more; anything else is an
+// open quote.
+export function quoteStage(quote, job) {
+  const status = String(quote?.status || '').toLowerCase()
+  if (status === 'lost' || status === 'rejected') return 'lost'
+  if (status === 'approved' && quote?.job_id && job?.stage) return String(job.stage)
+  return 'quote'
 }
 
 function json(body, status = 200) {
@@ -140,6 +157,11 @@ export default async function handler(req) {
   // rather than job-scoped, so they take a wholly separate load path.
   if (link.kind === 'statement') {
     return handleStatement(supabase, req, link)
+  }
+  // A proposal link minted for a quote record (fh_quotes) resolves the
+  // quote first; contact_id links keep the job path below.
+  if (link.quote_id) {
+    return handleQuote(supabase, req, link)
   }
 
   // 2. Load the contact + related data in parallel. Branding comes from the
@@ -338,6 +360,159 @@ function buildCompany(profile) {
     payment_link: profile.payment_link || '',
     payment_instructions: profile.payment_instructions || ''
   } : { name: 'My Company' }
+}
+
+// Quote path (Task 11). The link points at fh_quotes: the quote, its
+// client, its lines and the approved version are read by quote id. The
+// payload keeps the shape the job path returns, with the client standing
+// in for the contact and the quote for the job, so the customer page and
+// portalView.ts keep working; it also carries quote_id and the quote's own
+// status, which the page reads first. Payments, change orders, invoices
+// and photos belong to a job, so they come from the job made from the
+// quote when there is one, and are empty otherwise.
+async function handleQuote(supabase, req, link) {
+  const brandUserId = await brandingUserIdFor(supabase, link)
+  const [{ quote, client }, { data: profile }, { data: items }, { data: versions }] = await Promise.all([
+    loadQuoteForLink(supabase, link),
+    supabase.from('profiles').select('*').eq('user_id', brandUserId).maybeSingle(),
+    supabase.from('fh_quote_items').select('*').eq('quote_id', link.quote_id).order('sort_order', { ascending: true }),
+    supabase
+      .from('fh_quote_versions')
+      .select('id, version_number, status, approved_by_name, approved_at, created_at')
+      .eq('quote_id', link.quote_id)
+      .eq('status', 'approved')
+      .order('version_number', { ascending: false })
+      .limit(1)
+  ])
+
+  if (!quote) {
+    return json({ error: 'gone', message: 'This document is no longer available.' }, 404)
+  }
+
+  let job = null
+  let payments = []
+  let changeOrders = []
+  let invoices = []
+  let photos = []
+  if (quote.job_id) {
+    const [{ data: jobRow }, { data: pay }, { data: cos }, { data: inv }, { data: photoRows }] = await Promise.all([
+      supabase.from('fh_contacts').select('id, stage').eq('id', quote.job_id).match(linkScope(link)).maybeSingle(),
+      supabase.from('fh_payments').select(PUBLIC_PAYMENT_COLUMNS).eq('contact_id', quote.job_id).order('paid_on', { ascending: false }),
+      supabase.from('fh_change_orders').select(PUBLIC_CHANGE_ORDER_COLUMNS).eq('contact_id', quote.job_id).in('status', ['sent', 'approved']).order('sequence_number', { ascending: true }),
+      supabase
+        .from('fh_invoices')
+        .select('id, contact_id, sequence_number, title, amount, status, issued_at, due_at, description')
+        .eq('contact_id', quote.job_id)
+        .in('status', ['sent', 'paid', 'overdue'])
+        .order('sequence_number', { ascending: true }),
+      supabase
+        .from('fh_job_files')
+        .select('id, storage_path, caption, section_tag, uploaded_at')
+        .eq('job_id', quote.job_id)
+        .eq('kind', 'photo')
+        .order('uploaded_at', { ascending: true })
+        .limit(12)
+    ])
+    job = jobRow || null
+    payments = pay || []
+    changeOrders = cos || []
+    invoices = inv || []
+    photos = await signPhotos(supabase, photoRows)
+  }
+
+  const approvedVersion = Array.isArray(versions) && versions.length > 0 ? versions[0] : null
+  const company = buildCompany(profile)
+  const status = String(quote.status || 'draft').toLowerCase()
+
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
+  const shouldNotify = !link.last_viewed_at || new Date(link.last_viewed_at) < oneHourAgo
+  const who = client?.name || null
+  const sideEffects = [recordPublicLinkView(supabase, req, link, quote)]
+  if (shouldNotify) {
+    const { kindLabel, detailLink } = viewedLabelFor(link)
+    sideEffects.push(
+      supabase.from('fh_notifications').insert({
+        user_id: link.user_id,
+        org_id: link.org_id || quote.org_id || null,
+        kind: 'public_link_viewed',
+        title: `Customer viewed your ${kindLabel}`,
+        body: who ? `${who}${quote.title ? ` · ${quote.title}` : ''}` : null,
+        link: detailLink
+      }),
+      sendPushToUser(supabase, link.user_id, {
+        title: `Customer is viewing your ${kindLabel} 👀`,
+        body: who ? `${who}${quote.title ? ` · ${quote.title}` : ''}` : `Tap to open the ${kindLabel}`,
+        link: detailLink,
+        tag: `link-viewed-${link.id}`
+      })
+    )
+  }
+  const settled = await Promise.allSettled(sideEffects)
+  for (const result of settled) {
+    if (result.status === 'rejected') {
+      console.warn('[public-link] quote side effect failed', result.reason)
+    }
+  }
+
+  return json({
+    ok: true,
+    kind: link.kind,
+    change_order_id: null,
+    quote_id: quote.id,
+    status,
+    contact: {
+      id: quote.id,
+      name: client?.name || null,
+      address: client?.address || null,
+      phone: client?.phone || null,
+      email: client?.email || null,
+      job_title: quote.title || null,
+      job_type: quote.job_type || null,
+      stage: quoteStage(quote, job),
+      proposal_status: status,
+      quote_change_request_note: quote.change_request_note || null,
+      quote_change_requested_at: quote.change_requested_at || null,
+      quote_sent_at: quote.sent_at || null,
+      quote_expires_at: quote.expires_at || null,
+      created_at: quote.created_at,
+      terms_text: quote.terms_text || null,
+      scope_text: quote.scope_text || null,
+      exclusions_text: quote.exclusions_text || null,
+      amount: quote.amount,
+      approved_by_name: approvedVersion?.approved_by_name || null,
+      approved_at: approvedVersion?.approved_at || approvedVersion?.created_at || null
+    },
+    company,
+    items: items || [],
+    payments,
+    changeOrders,
+    insurance: null,
+    invoices,
+    photos
+  })
+}
+
+// Signed photo URLs for the public viewer, 24h TTL; a row that fails to
+// sign is left out so one bad row never kills the response.
+async function signPhotos(supabase, photoRows) {
+  if (!Array.isArray(photoRows) || photoRows.length === 0) return []
+  const paths = photoRows.map((r) => r.storage_path).filter(Boolean)
+  if (paths.length === 0) return []
+  const { data: signedRes } = await supabase.storage
+    .from('job-photos')
+    .createSignedUrls(paths, 60 * 60 * 24)
+  const signedByPath = new Map((signedRes || []).map((s) => [s.path, s.signedUrl]))
+  return photoRows
+    .map((r) => {
+      const url = signedByPath.get(r.storage_path)
+      if (!url) return null
+      return {
+        url,
+        section_tag: (r.section_tag || '').trim() || (r.caption || '').trim() || null,
+        caption: r.caption || null
+      }
+    })
+    .filter(Boolean)
 }
 
 // Statement path — client-scoped rollup of every open job. Loads the
