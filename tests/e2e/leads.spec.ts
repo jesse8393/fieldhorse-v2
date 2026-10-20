@@ -61,8 +61,14 @@ test.describe('the lead screen', () => {
     await open(page, '/leads/l-lead1')
     await page.getByRole('link', { name: 'Schedule estimate' }).click()
     await expect(page).toHaveURL(/\/schedule\/new\?lead=l-lead1$/, { timeout: 30_000 })
-    // Task 13 builds /schedule/new. When it lands, this test also checks
-    // the title field reads "Estimate" and the address is the lead's.
+    // The screen is prefilled from the lead (D60): the title reads Estimate,
+    // the lead is the linked record and the client's name and address are
+    // the where line. No sheet anywhere.
+    await expect(page.getByRole('heading', { name: 'Add event' })).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByLabel('Title')).toHaveValue('Estimate')
+    await expect(page.getByLabel('Link to')).toHaveValue('lead:l-lead1')
+    await expect(page.getByLabel('Where')).toHaveValue('Jeff Roy, 412 Burkitt Station Rd')
+    await expect(page.getByRole('dialog')).toHaveCount(0)
   })
 
   test('Quote this links the lead it came from', async ({ context, page }) => {

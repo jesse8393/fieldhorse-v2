@@ -1,13 +1,10 @@
 import { forwardRef, useEffect, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
 import { ChevronLeft, MoreHorizontal, Image as ImageIcon, Phone, MessageSquare, Navigation, Camera } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { Button, Chip, Field, Icon, IconButton, OnyxStage, Row, Sheet, StageRail } from '../../../components/fh'
+import { Chip, Icon, IconButton, OnyxStage, StageRail } from '../../../components/fh'
 import { cx } from '../../../components/fh/cx.ts'
 import { handleTablistKeyDown, tabId, tabPanelId } from '../../../lib/tabs.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
-import { FOLLOW_UP_PRESETS, followUpMeta, localYmd } from '../../../lib/followUp.ts'
-import type { FollowUpWhen } from '../../../lib/followUp.ts'
 import { navigateHrefHere } from '../../../lib/todayView.ts'
 import type { JobMoney } from '../lib/spine.ts'
 import type { JobPhotos } from './SpineList.tsx'
@@ -24,7 +21,8 @@ import './job-phone.css'
 // 4. The money strip, for money roles only.
 // 5. Quick actions: Call, Message, Navigate, Photos.
 //
-// JobSectionTabs (decision D5) and JobMoreSheet live here too.
+// JobSectionTabs (decision D5) lives here too. The more button opens the
+// job's More screen, /jobs/:id/more (Phase 9, Task 13, D57).
 
 function photoLabel(count: number) {
   return count === 1 ? '1 photo' : `${count} photos`
@@ -37,7 +35,7 @@ export type JobHeaderPhoneProps = {
   money: JobMoney | null
   backLabel: string
   onBack: () => void
-  /** Opens the job's action sheet; omit to hide the more button. */
+  /** Opens the job's More screen; omit to hide the more button. */
   onMore?: () => void
   onOpenPhotos: () => void
 }
@@ -296,121 +294,3 @@ export const JobSectionTabs = forwardRef<HTMLDivElement, {
     </div>
   )
 })
-
-export type JobMoreAction = {
-  id: string
-  label: string
-  subline?: string
-  onSelect: () => void
-}
-
-/* The more button's sheet: the job's less frequent actions (edit, open
-   the client, set a follow up, schedule, invite a partner, mark lost),
-   with Delete set apart at the bottom. "Set follow up" shows the current
-   date and opens its own choices in the same sheet: tomorrow, in 3 days,
-   next week, a picked date, or clear. */
-export function JobMoreSheet({ open, onOpenChange, title, actions, followUp, onDelete }: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  title: ReactNode
-  actions: JobMoreAction[]
-  /** Offered on open work; omit on lost and closed jobs. */
-  followUp?: { current: string | null; onSet: (when: FollowUpWhen) => void }
-  onDelete?: () => void
-}) {
-  const [view, setView] = useState<'main' | 'followup'>('main')
-  const [picked, setPicked] = useState('')
-  const [pickError, setPickError] = useState('')
-  const today = localYmd(new Date())
-
-  // Every opening starts on the main list.
-  useEffect(() => {
-    if (!open) {
-      setView('main')
-      setPicked('')
-      setPickError('')
-    }
-  }, [open])
-
-  function run(fn: () => void) {
-    onOpenChange(false)
-    fn()
-  }
-
-  const current = followUp?.current ?? null
-  const currentLabel = followUpMeta(current)?.label
-
-  if (view === 'followup' && followUp) {
-    return (
-      <Sheet
-        open={open}
-        onOpenChange={onOpenChange}
-        title="Set follow up"
-        description={currentLabel}
-        className="fhj-more-sheet"
-        headerAction={
-          <Button variant="quiet" size="mini" onClick={() => setView('main')}>Back</Button>
-        }
-      >
-        <ul className="fhj-more-sheet__list">
-          {FOLLOW_UP_PRESETS.map((p) => (
-            <Row key={p.days} as="li" title={p.label} onClick={() => run(() => followUp.onSet(p.days))} />
-          ))}
-        </ul>
-        <form
-          className="fhj-more-sheet__pick"
-          onSubmit={(e) => {
-            e.preventDefault()
-            const d = picked ? new Date(`${picked}T00:00:00`) : null
-            if (!d || Number.isNaN(d.getTime())) {
-              setPickError('Pick a date, then tap Set date.')
-              return
-            }
-            run(() => followUp.onSet(d))
-          }}
-        >
-          <Field
-            label="Pick a date"
-            type="date"
-            min={today}
-            value={picked}
-            error={pickError || undefined}
-            onChange={(e) => { setPicked(e.target.value); setPickError('') }}
-          />
-          <Button type="submit" variant="secondary" block>Set date</Button>
-        </form>
-        {current && (
-          <div className="fhj-more-sheet__danger">
-            <Button variant="quiet" block onClick={() => run(() => followUp.onSet(null))}>Clear follow up</Button>
-          </div>
-        )}
-      </Sheet>
-    )
-  }
-
-  return (
-    <Sheet open={open} onOpenChange={onOpenChange} title={title} className="fhj-more-sheet">
-      <ul className="fhj-more-sheet__list">
-        {actions.slice(0, 1).map((a) => (
-          <Row key={a.id} as="li" title={a.label} subline={a.subline} onClick={() => run(a.onSelect)} />
-        ))}
-        {followUp && (
-          <Row
-            as="li"
-            title="Set follow up"
-            subline={currentLabel}
-            onClick={() => setView('followup')}
-          />
-        )}
-        {actions.slice(1).map((a) => (
-          <Row key={a.id} as="li" title={a.label} subline={a.subline} onClick={() => run(a.onSelect)} />
-        ))}
-      </ul>
-      {onDelete && (
-        <div className="fhj-more-sheet__danger">
-          <Button variant="destructive" block onClick={() => run(onDelete)}>Delete job</Button>
-        </div>
-      )}
-    </Sheet>
-  )
-}

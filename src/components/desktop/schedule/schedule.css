@@ -453,6 +453,12 @@
   line-clamp: 1;
 }
 
+/* The Lead or Quote chip beside the title of a visit with no job behind it. */
+.fhsch-event__kind {
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
 .fhsch-event__meta {
   flex: none;
   overflow: hidden;

@@ -1,7 +1,8 @@
-// Writers for fh_schedule, shared by the Add event sheet and the desktop
-// Schedule board's drag and drop. Extracted from AddEventSheet's create
-// path so both write the same row, and so that row now carries org_id,
-// which the old path left to the database trigger (migration 035).
+// Writers for fh_schedule, shared by the event screen (/schedule/new) and
+// the desktop Schedule board's drag and drop. Both write the same row, and
+// that row carries org_id, which the old path left to the database trigger
+// (migration 035). A visit belongs to one record (SPEC D53, D60): a job
+// through contact_id, a lead through lead_id or a quote through quote_id.
 
 import { supabase } from './supabase.ts'
 
@@ -10,7 +11,13 @@ export type ScheduleEventInput = {
   /** The company the visit belongs to. Null when the person has none. */
   orgId: string | null
   contactId: string | null
+  /** The lead this visit is for (a lead's estimate, D60). */
+  leadId?: string | null
+  /** The quote this visit is for. */
+  quoteId?: string | null
   title: string
+  /** Where and who, such as the client's name and address. */
+  description?: string | null
   start_at: string
   end_at: string
   /** Shared series id for a recurring run; every occurrence carries it. */
@@ -27,7 +34,10 @@ function row(input: ScheduleEventInput) {
     ...(input.orgId ? { org_id: input.orgId } : {}),
     user_id: input.userId,
     contact_id: input.contactId || null,
+    lead_id: input.leadId || null,
+    quote_id: input.quoteId || null,
     title: input.title.trim(),
+    description: input.description?.trim() || null,
     start_at: input.start_at,
     end_at: input.end_at,
     recurring: input.recurring ?? null

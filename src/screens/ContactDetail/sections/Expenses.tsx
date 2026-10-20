@@ -7,11 +7,9 @@ import { crewLaborForContact, type CrewLabor } from '../../../lib/labor.ts'
 import { toastError, toastSuccess, toastUndo } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { todayYmd } from '../../../lib/dates.ts'
-import ActionSheet, { SheetField as SheetField_, SheetChipRow as SheetChipRow_, SheetMoneyField as SheetMoneyField_ } from '../../../components/ActionSheet.tsx'
+import { Button, Field } from '../../../components/fh'
+import { Choices, moneyInput } from '../../../screens/new/CreateShell.tsx'
 import { Eyebrow } from '../../../components/v3'
-const SheetField = SheetField_ as any
-const SheetChipRow = SheetChipRow_ as any
-const SheetMoneyField = SheetMoneyField_ as any
 
 const EXPENSE_CATEGORIES = [
   { value: 'Materials', label: 'Materials' },
@@ -61,8 +59,6 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
       expense_date: todayYmd()
     })
   }, [open])
-
-  const step = form.description ? (form.amount ? 3 : 2) : 1
 
   async function save() {
     if (!form.description.trim() || saving) return
@@ -157,7 +153,8 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
       <motion.button
         type="button"
         whileTap={{ scale: 0.98 }}
-        onClick={() => { hapticTap(); setOpen(true) }}
+        aria-expanded={open}
+        onClick={() => { hapticTap(); setOpen((v) => !v) }}
         style={{
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
           padding: '12px 16px', borderRadius: 10,
@@ -170,8 +167,25 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
         }}
       >
         <Plus size={14} aria-hidden="true" />
-        Add expense
+        {open ? 'Close' : 'Add expense'}
       </motion.button>
+
+      {open && (
+        <form
+          aria-label="New expense"
+          onSubmit={(e) => { e.preventDefault(); void save() }}
+          style={{
+            display: 'grid', gap: 4, padding: 16, borderRadius: 10,
+            background: 'var(--v3-surface)', border: '1px solid var(--v3-border)'
+          }}
+        >
+          <Field label="Description" autoFocus value={form.description} placeholder="What was bought" autoComplete="off" onChange={(e) => setForm({ ...form, description: e.target.value })} />
+          <Field label="Amount" inputMode="decimal" value={form.amount} placeholder="0.00" onChange={(e) => setForm({ ...form, amount: moneyInput(e.target.value) })} />
+          <Choices label="Category" options={EXPENSE_CATEGORIES} value={form.category} onChange={(v) => setForm({ ...form, category: v || form.category })} />
+          <Field label="Date" type="date" value={form.expense_date} onChange={(e) => setForm({ ...form, expense_date: e.target.value })} />
+          <Button type="submit" variant="secondary" size="lg" block loading={saving} disabled={!form.description.trim()}>Save expense</Button>
+        </form>
+      )}
 
       {expenses.length === 0 ? (
         <div style={{
@@ -253,46 +267,6 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
         </ul>
       )}
 
-      <ActionSheet
-        open={open}
-        title="New expense on the job."
-        accentWord="expense"
-        sectionLabel="New expense"
-        stepCount={3}
-        currentStep={step}
-        commitLabel={saving ? 'Committing…' : 'Commit expense'}
-        commitBusy={saving}
-        commitDisabled={!form.description.trim()}
-        onClose={() => setOpen(false)}
-        onCommit={save}
-      >
-        <SheetField label="Description">
-          <input
-            autoFocus
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-            placeholder="What was purchased?"
-          />
-        </SheetField>
-        <SheetMoneyField
-          label="Amount"
-          value={form.amount}
-          onChange={(v: any) => setForm({ ...form, amount: v })}
-        />
-        <SheetChipRow
-          label="Category"
-          value={form.category}
-          options={EXPENSE_CATEGORIES}
-          onChange={(v: any) => setForm({ ...form, category: v })}
-        />
-        <SheetField label="Date">
-          <input
-            type="date"
-            value={form.expense_date}
-            onChange={(e) => setForm({ ...form, expense_date: e.target.value })}
-          />
-        </SheetField>
-      </ActionSheet>
     </div>
   )
 }

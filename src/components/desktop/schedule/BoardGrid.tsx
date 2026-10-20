@@ -5,7 +5,7 @@
 
 import { useMemo, useRef, type CSSProperties } from 'react'
 import { useDroppable } from '@dnd-kit/core'
-import { Button, Skeleton } from '../../fh'
+import { Button, Chip, Skeleton } from '../../fh'
 import {
   WEEKDAYS,
   boardHours,
@@ -148,6 +148,8 @@ export default function BoardGrid({ days, view, events, loading, failed = false,
                   const title = event.title?.trim() || 'Untitled event'
                   const range = timeRangeLabel(start, end)
                   const job = event.fh_contacts?.name?.trim()
+                  // A lead's estimate or a quote's visit has no job behind it (D60).
+                  const kind = event.lead_id ? 'Lead' : event.quote_id ? 'Quote' : null
                   return (
                     <button
                       key={item.id}
@@ -159,11 +161,14 @@ export default function BoardGrid({ days, view, events, loading, failed = false,
                         left: `calc(${item.column} * 100% / ${item.columns} + 2px)`,
                         width: `calc(100% / ${item.columns} - 4px)`
                       }}
-                      aria-label={`${title}, ${status.word}, ${range}${job && job !== title ? `, ${job}` : ''}`}
+                      aria-label={`${title}, ${status.word}, ${range}${job && job !== title ? `, ${job}` : ''}${kind ? `, ${kind.toLowerCase()}` : ''}`}
                       title={`${title}, ${status.word}, ${range}`}
                       onClick={() => onOpenEvent?.(event)}
                     >
-                      <span className="fhsch-event__title">{title}</span>
+                      <span className="fhsch-event__title">
+                        {title}
+                        {kind && <Chip className="fhsch-event__kind" label={kind} />}
+                      </span>
                       <span className="fhsch-event__meta">
                         <span className="fhsch-event__word">{status.word}</span>
                         <span className="fhsch-event__comma">, </span>

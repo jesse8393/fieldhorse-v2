@@ -1,6 +1,6 @@
 // src/lib/partners.ts
 //
-// Partner-roster helpers for the InvitePartnerSheet "past partners"
+// Partner-roster helpers for the invite partner screen's "invited before"
 // suggestion strip. RLS scopes fh_job_partners to the caller's company,
 // but it ALSO returns the rows where the caller is the invited partner
 // on another contractor's job (fh_job_partners_partner_read). Those are

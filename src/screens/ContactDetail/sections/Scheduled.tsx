@@ -10,7 +10,7 @@ import { Eyebrow } from '../../../components/v3'
  * exact day in the calendar UI (and can drag/edit there).
  *
  * Schedule items come from useJobData (no internal fetch). To add a new
- * event, the parent's onOpenAddEvent prop opens AddEventSheet filled
+ * event, the parent's onOpenAddEvent prop opens the event screen filled
  * with this contact_id.
  */
 export default function ScheduledSection({ scheduleItems = [], onOpenAddEvent }: any) {

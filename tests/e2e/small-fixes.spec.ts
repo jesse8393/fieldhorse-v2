@@ -323,52 +323,38 @@ test.describe('Reopen asks first, like Mark lost', () => {
   })
 
   // The closeout record's own Reopen deletes the record (sign off, warranty,
-  // notes) and moves the job back, so it asks first as well.
-  test('the closeout record asks before it reopens, and keeps the record on Cancel', async ({ context, page }, testInfo) => {
+  // notes) and moves the job back, so it asks first as well. The record is
+  // a screen of its own now (Phase 9, Task 13, D57), and the question is a
+  // second tap on the same button, which goes back to resting on its own.
+  test('the closeout record asks before it reopens, and keeps the record until the second tap', async ({ context, page }, testInfo) => {
     test.skip(!isPhone(testInfo.project.name), 'Phone job page')
     await signIn(context, { tables: { fh_closeouts: [CLOSEOUT] } })
     const writes = watchWrites(page)
     await openJob(page, '/jobs/c-done')
     await page.getByRole('button', { name: 'More about this job' }).click()
     await page.getByRole('button', { name: 'Closeout record' }).click()
-    const sheet = page.getByRole('dialog', { name: 'Closeout on file.' })
-    const reopen = sheet.getByRole('button', { name: 'Reopen job' })
+    await expect(page).toHaveURL(/\/jobs\/c-done\/complete$/)
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: 'Closeout on file' })).toBeVisible({ timeout: 15_000 })
+    const reopen = page.getByRole('button', { name: 'Reopen job' })
     await expect(reopen).toBeVisible({ timeout: 15_000 })
 
-    // Escape answers the question only; the record stays open.
+    // The first tap only asks; the record is still on screen and nothing is written.
     await reopen.click()
-    const question = page.getByRole('alertdialog', { name: 'Reopen this job?' })
-    await expect(question).toBeVisible()
-    await expect(question).toContainText('It moves back to Jobs, and its closeout record is deleted')
-    await expect.poll(() => focusInQuestion(page)).toBe(true)
-    await page.keyboard.press('Escape')
-    await expect(question).toBeHidden()
-    await expect(sheet).toBeVisible()
-    await expect(reopen).toBeFocused()
-
-    // So does Cancel.
-    await reopen.click()
-    await expect(question).toBeVisible()
-    await question.getByRole('button', { name: 'Cancel' }).click()
-    await expect(question).toBeHidden()
-    await expect(sheet).toBeVisible()
-
-    // And so does a tap on the dimmed page above the sheet.
-    await reopen.click()
-    await expect(question).toBeVisible()
-    await page.mouse.click(195, 40)
-    await expect(question).toBeHidden()
+    const again = page.getByRole('button', { name: 'Tap again to reopen' })
+    await expect(again).toBeVisible()
+    await expect(page.getByRole('alertdialog')).toHaveCount(0)
+    await expect(page.getByText('It moves back to Jobs, and its closeout record is deleted')).toBeVisible()
     await page.waitForTimeout(400)
-    await expect(sheet).toBeVisible()
     expect(writes).toEqual([])
 
-    // Yes deletes the record, then moves the job back to Jobs.
-    await reopen.click()
-    await question.getByRole('button', { name: 'Reopen' }).click()
+    // The second tap deletes the record, then moves the job back to Jobs.
+    await again.click()
     await expect.poll(() => writes.length).toBe(2)
     expect(writes[0]).toMatch(/^DELETE fh_closeouts/)
     expect(writes[1]).toMatch(/^PATCH fh_contacts /)
     expect(JSON.parse(writes[1].replace(/^PATCH fh_contacts /, ''))).toMatchObject({ stage: 'job' })
+    await expect(page).toHaveURL(/\/jobs\/c-done$/)
   })
 
   test('the next action card asks too', async ({ context, page }, testInfo) => {
@@ -418,7 +404,7 @@ test.describe('Leaving a page while it asks', () => {
     test.skip(!isPhone(testInfo.project.name), 'Phone back button')
   })
 
-  test('the closeout question goes with the job page, and the next screen still takes taps', async ({ context, page }) => {
+  test('the closeout question goes with the closeout screen, and the job page still takes taps', async ({ context, page }) => {
     await signIn(context, { tables: { fh_closeouts: [CLOSEOUT] } })
     const writes = watchWrites(page)
     await openJobs(page)
@@ -426,20 +412,25 @@ test.describe('Leaving a page while it asks', () => {
     await expect(page.locator('.fhj-page')).toBeVisible({ timeout: 30_000 })
     await page.getByRole('button', { name: 'More about this job' }).click()
     await page.getByRole('button', { name: 'Closeout record' }).click()
-    const reopen = page.getByRole('dialog', { name: 'Closeout on file.' }).getByRole('button', { name: 'Reopen job' })
+    await expect(page).toHaveURL(/\/jobs\/c-done\/complete$/)
+    const reopen = page.getByRole('button', { name: 'Reopen job' })
     await expect(reopen).toBeVisible({ timeout: 15_000 })
     await reopen.click()
-    const question = page.getByRole('alertdialog', { name: 'Reopen this job?' })
-    await expect(question).toBeVisible()
+    const again = page.getByRole('button', { name: 'Tap again to reopen' })
+    await expect(again).toBeVisible()
 
     // The back button while it asks.
     await page.goBack()
-    await expect(page.getByRole('heading', { level: 1, name: 'Jobs' })).toBeVisible({ timeout: 30_000 })
-    // The question left with the record it asked about, unanswered.
-    await expect(question).toBeHidden()
+    await expect(page.locator('.fhj-page')).toBeVisible({ timeout: 30_000 })
+    // The question left with the screen it asked on, unanswered.
+    await expect(again).toBeHidden()
+    await expect(page.getByRole('alertdialog')).toHaveCount(0)
     await page.waitForTimeout(400)
     expect(writes).toEqual([])
-    await expectJobsTakeTaps(page)
+    // The job page takes taps.
+    expect(await page.evaluate(() => getComputedStyle(document.body).pointerEvents)).not.toBe('none')
+    await page.getByRole('button', { name: 'More about this job' }).click({ timeout: 5000 })
+    await expect(page.locator('#fhj-more-body')).toBeVisible()
   })
 
   // A line being typed on the quote screen is edited in place (Phase 9,

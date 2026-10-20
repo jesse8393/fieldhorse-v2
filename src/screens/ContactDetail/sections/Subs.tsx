@@ -6,10 +6,9 @@ import { recalcCost } from '../../../lib/stages.ts'
 import { toastError, toastSuccess, toastUndo } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { formatPhone } from '../../../lib/utils.ts'
-import ActionSheet, { SheetField as SheetField_, SheetChipRow as SheetChipRow_ } from '../../../components/ActionSheet.tsx'
+import { Button, Field } from '../../../components/fh'
+import { Choices } from '../../../screens/new/CreateShell.tsx'
 import { Eyebrow } from '../../../components/v3'
-const SheetField = SheetField_ as any
-const SheetChipRow = SheetChipRow_ as any
 
 const SUB_STATUSES = [
   { value: 'scheduled', label: 'Scheduled' },
@@ -36,7 +35,7 @@ function money(n: any) {
  * recalcCost(contact.id) so cost + margin stay current everywhere they
  * surface (Home KPIs, Job Detail Health, Jobs grid margin pill).
  *
- * Form lives inside ActionSheet (preserves the staged-step UX from legacy).
+ * The form opens in place under Add sub (D57): no sheet.
  */
 export default function SubsSection({ contact, subs = [], userId, fetchAll }: any) {
   const [open, setOpen] = useState(false)
@@ -48,7 +47,6 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }: an
   }, [open])
 
   const totalRate = subs.reduce((s: any, x: any) => s + Number(x.rate || 0), 0)
-  const step = form.name ? (form.trade || form.rate ? 3 : 2) : 1
 
   async function save() {
     if (!form.name.trim() || saving) return
@@ -120,7 +118,8 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }: an
       <motion.button
         type="button"
         whileTap={{ scale: 0.98 }}
-        onClick={() => { hapticTap(); setOpen(true) }}
+        aria-expanded={open}
+        onClick={() => { hapticTap(); setOpen((v) => !v) }}
         style={{
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
           padding: '12px 16px', borderRadius: 10,
@@ -133,8 +132,30 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }: an
         }}
       >
         <Plus size={14} aria-hidden="true" />
-        Add sub
+        {open ? 'Close' : 'Add sub'}
       </motion.button>
+
+      {open && (
+        <form
+          aria-label="New sub"
+          onSubmit={(e) => { e.preventDefault(); void save() }}
+          style={{
+            display: 'grid', gap: 4, padding: 16, borderRadius: 10,
+            background: 'var(--v3-surface)', border: '1px solid var(--v3-border)'
+          }}
+        >
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <Field label="Name" autoFocus value={form.name} placeholder="Crew lead name" autoComplete="off" onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            <Field label="Trade" value={form.trade} placeholder="Framer, roofer" autoComplete="off" onChange={(e) => setForm({ ...form, trade: e.target.value })} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
+            <Field label="Phone" type="tel" inputMode="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+            <Field label="Rate" inputMode="decimal" value={form.rate} placeholder="0" onChange={(e) => setForm({ ...form, rate: e.target.value.replace(/[^0-9.]/g, '') })} />
+          </div>
+          <Choices label="Status" options={SUB_STATUSES} value={form.status} onChange={(v) => setForm({ ...form, status: v || form.status })} />
+          <Button type="submit" variant="secondary" size="lg" block loading={saving} disabled={!form.name.trim()}>Save sub</Button>
+        </form>
+      )}
 
       {subs.length === 0 ? (
         <div style={{
@@ -218,42 +239,6 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }: an
         </ul>
       )}
 
-      <ActionSheet
-        open={open}
-        title="New sub on the crew."
-        accentWord="sub"
-        sectionLabel="New sub"
-        stepCount={3}
-        currentStep={step}
-        commitLabel={saving ? 'Committing…' : 'Commit sub'}
-        commitBusy={saving}
-        commitDisabled={!form.name.trim()}
-        onClose={() => setOpen(false)}
-        onCommit={save}
-      >
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4, 16px)' }}>
-          <SheetField label="Name">
-            <input autoFocus value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Crew lead name" />
-          </SheetField>
-          <SheetField label="Trade">
-            <input value={form.trade} onChange={(e) => setForm({ ...form, trade: e.target.value })} placeholder="Framer, roofer…" />
-          </SheetField>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4, 16px)' }}>
-          <SheetField label="Phone">
-            <input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-          </SheetField>
-          <SheetField label="Rate">
-            <input type="number" inputMode="decimal" value={form.rate} onChange={(e) => setForm({ ...form, rate: e.target.value })} placeholder="0" />
-          </SheetField>
-        </div>
-        <SheetChipRow
-          label="Status"
-          value={form.status}
-          options={SUB_STATUSES}
-          onChange={(v: any) => setForm({ ...form, status: v })}
-        />
-      </ActionSheet>
     </div>
   )
 }

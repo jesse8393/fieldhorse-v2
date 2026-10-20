@@ -1,0 +1,62 @@
+/*
+ * The event screen, /schedule/new and /schedule/:eventId/edit (Phase 9,
+ * Task 13, decisions D57 and D60). Class prefix fhev- (decision D41). Reads
+ * only --fh- tokens, so Day and Night follow on their own. The frame
+ * (Back, the title, the fields and the gold Save) comes from the create
+ * shell; this file lays out the date and time pair and the record picker,
+ * a native select drawn like a field.
+ */
+
+.fhev-when {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.fhev-pick {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin-bottom: 12px;
+}
+
+.fhev-pick__label {
+  font-family: var(--fh-font-body);
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--fh-ink-2);
+}
+
+.fhev-pick__select {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  margin: 0;
+  padding: 12px 16px;
+  border: 1px solid var(--fh-edge-strong);
+  border-radius: 12px;
+  box-sizing: border-box;
+  background: var(--fh-paper);
+  color: var(--fh-ink);
+  font-family: var(--fh-font-body);
+  font-size: 16px;
+  line-height: 22px;
+  appearance: auto;
+}
+
+.fhev-pick__select:disabled {
+  cursor: not-allowed;
+  background: var(--fh-tray);
+  border-color: var(--fh-hairline);
+  color: var(--fh-ink-3);
+}
+
+.fhev-pick__helper {
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}

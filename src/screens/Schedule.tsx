@@ -3,11 +3,10 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Plus, Calendar as CalendarIcon, Clock, MapPin, ChevronLeft, ChevronRight, Trash2, Pencil } from 'lucide-react'
 import { toast, toastSuccess, toastUndo, toastError } from '../lib/toast.ts'
-import ActionSheet from '../components/ActionSheet.tsx'
-import AddEventSheet from '../components/AddEventSheet.tsx'
 import { SkeletonList } from '../components/Skeleton.tsx'
 import { ScreenCloser, Eyebrow } from '../components/v3'
-import { Button } from '../components/fh'
+import { Button, Chip } from '../components/fh'
+import { useArmedId } from '../lib/secondTap.ts'
 import { supabase } from '../lib/supabase.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import {
@@ -126,16 +125,23 @@ export default function Schedule() {
 
   const [weather, setWeather] = useState<any>(null)
   const [weatherFailed, setWeatherFailed] = useState(false)
-  const [addOpen, setAddOpen] = useState(false)
-  // The desktop tray's Schedule button opens the same sheet with its job
-  // already picked and the visit named after it.
-  const [addPreset, setAddPreset] = useState<{ contactId: string; title: string } | null>(null)
-  const [editEvent, setEditEvent] = useState<any>(null)
-  // Destructive-confirm sheet for delete event. pendingDeleteEvt is the
-  // event row being deleted (for title display); deletingEvt is the
-  // commit-in-flight flag.
-  const [pendingDeleteEvt, setPendingDeleteEvt] = useState<any>(null)
-  const [deletingEvt, setDeletingEvt] = useState(false)
+  // Adding and editing a visit are screens of their own (Phase 9, Task 13,
+  // D57): /schedule/new, with ?job= and ?title= when the desktop tray's
+  // Schedule button names the visit after its job, and /schedule/:id/edit.
+  function openNewEvent(preset?: { contactId: string; title: string }) {
+    const sp = new URLSearchParams()
+    if (preset) {
+      sp.set('job', preset.contactId)
+      if (preset.title) sp.set('title', preset.title)
+    }
+    const qs = sp.toString()
+    navigate(`/schedule/new${qs ? `?${qs}` : ''}`)
+  }
+  function openEditEvent(event: any) {
+    if (event?.id) navigate(`/schedule/${encodeURIComponent(event.id)}/edit`)
+  }
+  // Delete asks with a second tap on the row's own button (D57).
+  const deleteTap = useArmedId()
 
   // If the URL had ?d=year month day, consume it once so the back button
   // doesn't keep forcing the cursor back to that day.
@@ -148,15 +154,11 @@ export default function Schedule() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Resolve the event row from id and open the destructive-confirm sheet.
-  // Both DayView and WeekView delete affordances funnel through here so
-  // the confirm UX is consistent and lifted out of the row components.
+  // Both DayView and WeekView delete affordances funnel through here: the
+  // first tap arms that row's button, the second deletes (with Undo).
   function requestDeleteEvent(evtId: any) {
     if (!evtId) return
-    const row = (events || []).find((e) => e.id === evtId)
-      || (upcoming || []).find((e) => e.id === evtId)
-      || { id: evtId, title: 'this event' }
-    setPendingDeleteEvt(row)
+    deleteTap.tap(String(evtId), () => { void deleteEvent(evtId) })
   }
 
   async function deleteEvent(evtId: any) {
@@ -317,30 +319,12 @@ export default function Schedule() {
             view={view}
             setView={setView}
             weather={hasCoords && !weatherFailed ? weather : undefined}
-            onAddEvent={() => { setAddPreset(null); setAddOpen(true) }}
+            onAddEvent={() => openNewEvent()}
             onNewJob={() => navigate('/jobs/new')}
-            onScheduleJob={(job) => {
-              setAddPreset({ contactId: job.id, title: jobLabel(job) })
-              setAddOpen(true)
-            }}
-            onOpenEvent={(event: any) => setEditEvent(event)}
+            onScheduleJob={(job) => openNewEvent({ contactId: job.id, title: jobLabel(job) })}
+            onOpenEvent={openEditEvent}
           />
         </Suspense>
-        <AddEventSheet
-          open={addOpen}
-          userId={user?.id}
-          defaultContactId={addPreset?.contactId ?? ''}
-          defaultTitle={addPreset?.title ?? ''}
-          onClose={() => { setAddOpen(false); setAddPreset(null) }}
-          onSaved={() => { setAddOpen(false); setAddPreset(null); load() }}
-        />
-        <AddEventSheet
-          open={!!editEvent}
-          userId={user?.id}
-          event={editEvent}
-          onClose={() => setEditEvent(null)}
-          onSaved={() => { setEditEvent(null); load() }}
-        />
       </>
     )
   }
@@ -371,7 +355,7 @@ export default function Schedule() {
               ? 'Today'
               : cursor.toLocaleDateString(undefined, { weekday: 'long' })}
           </h1>
-          <Button variant="secondary" size="mini" icon={Plus} onClick={() => setAddOpen(true)}>
+          <Button variant="secondary" size="mini" icon={Plus} onClick={() => openNewEvent()}>
             New event
           </Button>
         </div>
@@ -551,9 +535,10 @@ export default function Schedule() {
               events={events}
               now={new Date()}
               onClick={(id: any) => navigate(`/jobs/${id}`)}
-              onEdit={(ev: any) => setEditEvent(ev)}
+              onEdit={openEditEvent}
               onDelete={requestDeleteEvent}
-              onAdd={() => setAddOpen(true)}
+              deleteArmedId={deleteTap.armedId}
+              onAdd={() => openNewEvent()}
             />
           )}
           {events != null && view === 'week' && (
@@ -562,6 +547,7 @@ export default function Schedule() {
               events={events}
               onClick={(id: any) => navigate(`/jobs/${id}`)}
               onDelete={requestDeleteEvent}
+              deleteArmedId={deleteTap.armedId}
             />
           )}
           {events != null && view === 'month' && (
@@ -581,54 +567,6 @@ export default function Schedule() {
       </SwipeShell>
 
       <ScreenCloser caption="Tap a day above to plan the week ahead." />
-
-      <AddEventSheet
-        open={addOpen}
-        userId={user?.id}
-        onClose={() => setAddOpen(false)}
-        onSaved={() => { setAddOpen(false); load() }}
-      />
-
-      {/* Edit an existing event (in-place update). */}
-      <AddEventSheet
-        open={!!editEvent}
-        userId={user?.id}
-        event={editEvent}
-        onClose={() => setEditEvent(null)}
-        onSaved={() => { setEditEvent(null); load() }}
-      />
-
-      {/* Destructive-confirm sheet for delete event. The actual delete
-          flow (snapshot + optimistic removal + Undo toast + Supabase
-          delete with user_id guard + refresh) lives in deleteEvent;
-          this sheet only gates execution behind a confirm step. */}
-      <ActionSheet
-        open={!!pendingDeleteEvt}
-        title="Delete this event?"
-        accentWord="Delete"
-        sectionLabel="Destructive"
-        stepCount={1}
-        currentStep={1}
-        commitLabel={deletingEvt ? 'Deleting…' : 'Delete event'}
-        commitBusy={deletingEvt}
-        commitDisabled={deletingEvt}
-        destructive
-        onClose={() => { if (!deletingEvt) setPendingDeleteEvt(null) }}
-        onCommit={async () => {
-          if (!pendingDeleteEvt) return
-          setDeletingEvt(true)
-          try {
-            await deleteEvent(pendingDeleteEvt.id)
-          } finally {
-            setDeletingEvt(false)
-            setPendingDeleteEvt(null)
-          }
-        }}
-      >
-        <p style={{ margin: 0, color: 'var(--v3-text)', fontSize: '1rem', lineHeight: 1.45 }}>
-          Removing <strong>{pendingDeleteEvt?.title || 'this event'}</strong> from your schedule. You'll get an Undo toast right after, tap it to restore.
-        </p>
-      </ActionSheet>
     </motion.div>
   )
 }
@@ -713,7 +651,7 @@ const chevBtnStyle = {
   WebkitTapHighlightColor: 'transparent'
 }
 
-function DayView({ events, now, onClick, onEdit, onDelete, onAdd }: any) {
+function DayView({ events, now, onClick, onEdit, onDelete, deleteArmedId, onAdd }: any) {
   // Per-status counts, drive the All/Live/Upcoming/Done toggle badges
   // and let the filter persist even when zero of a bucket exists today.
   const [stateFilter, setStateFilter] = useState('all')
@@ -881,12 +819,15 @@ function DayView({ events, now, onClick, onEdit, onDelete, onAdd }: any) {
             const primary = e.fh_contacts?.name || e.title || 'Untitled'
             const secondary = e.fh_contacts?.name && e.title ? e.title : (e.description || (e.contact_id ? '' : 'Manual event'))
             const initial = (primary || '·').trim().charAt(0).toUpperCase()
+            // A lead's estimate or a quote's visit has no job behind it (D60).
+            const kind = e.lead_id ? 'Lead' : e.quote_id ? 'Quote' : null
             return (
               <ScheduleRow
                 key={e.id}
                 index={i}
                 primary={primary}
                 secondary={secondary}
+                kind={kind}
                 startStr={start}
                 endStr={end}
                 status={status}
@@ -894,6 +835,7 @@ function DayView({ events, now, onClick, onEdit, onDelete, onAdd }: any) {
                 onClick={() => e.contact_id && onClick(e.contact_id)}
                 onEdit={onEdit ? () => onEdit(e) : undefined}
                 onDelete={onDelete ? () => onDelete(e.id) : undefined}
+                deleteArmed={deleteArmedId === e.id}
                 isClickable={Boolean(e.contact_id)}
               />
             )
@@ -953,7 +895,7 @@ function splitTime(s: any) {
   return [s.slice(0, idx), s.slice(idx + 1)]
 }
 
-function ScheduleRow({ index, primary, secondary, startStr, endStr, status, onClick, onEdit, onDelete, isClickable }: any) {
+function ScheduleRow({ index, primary, secondary, kind, startStr, endStr, status, onClick, onEdit, onDelete, deleteArmed, isClickable }: any) {
   // 5/17, full visual port of the v3 design's dispatch-card pattern
   // (replaces the prior glass-row with status spine). Time column on
   // the left as HR/AM stamp, title + sub on the right, state pill at
@@ -992,7 +934,10 @@ function ScheduleRow({ index, primary, secondary, startStr, endStr, status, onCl
           <div className="dispatch-card__body">
             <div className="dispatch-card__head-row">
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="dispatch-card__title">{primary}</div>
+                <div className="dispatch-card__title">
+                  {primary}
+                  {kind && <Chip label={kind} style={{ marginLeft: 8, verticalAlign: 'middle' }} />}
+                </div>
                 {secondary && (
                   <div className="dispatch-card__sub">{secondary}</div>
                 )}
@@ -1034,33 +979,37 @@ function ScheduleRow({ index, primary, secondary, startStr, endStr, status, onCl
         <button
           type="button"
           onClick={(ev) => { ev.stopPropagation(); onDelete() }}
-          aria-label="Delete event"
+          aria-label={deleteArmed ? 'Tap again to delete' : 'Delete event'}
+          aria-pressed={deleteArmed ? true : undefined}
           style={{
             position: 'absolute',
             // Bottom-right instead of top-right, top-right is where
             // the LIVE / UP NEXT status pill lives, and stacking the
-            // trash icon next to it looked crowded ("UP NEXT🗑️").
+            // trash icon next to it looked crowded.
             bottom: 8,
             right: 8,
-            width: 28, height: 28, borderRadius: 10,
-            border: 'none', background: 'transparent',
-            color: 'var(--v3-text-muted)',
-            cursor: 'pointer', display: 'grid', placeItems: 'center',
-            opacity: 0.35,
+            minWidth: 28, height: 28, borderRadius: 10, padding: deleteArmed ? '0 8px' : 0,
+            border: deleteArmed ? '1px solid var(--v3-danger-bright)' : 'none',
+            background: deleteArmed ? 'var(--v3-danger-soft)' : 'transparent',
+            color: deleteArmed ? 'var(--v3-danger-text)' : 'var(--v3-text-muted)',
+            cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+            opacity: deleteArmed ? 1 : 0.35,
+            fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
             WebkitTapHighlightColor: 'transparent',
             transition: 'opacity 160ms ease, color 160ms ease'
           }}
           onMouseEnter={(ev) => { if (!canHover) return; ev.currentTarget.style.opacity = '1'; ev.currentTarget.style.color = 'var(--v3-danger-bright)' }}
-          onMouseLeave={(ev) => { ev.currentTarget.style.opacity = '0.35'; ev.currentTarget.style.color = 'var(--v3-text-muted)' }}
+          onMouseLeave={(ev) => { if (deleteArmed) return; ev.currentTarget.style.opacity = '0.35'; ev.currentTarget.style.color = 'var(--v3-text-muted)' }}
         >
           <Trash2 size={12} />
+          {deleteArmed && <span>Tap again</span>}
         </button>
       )}
     </motion.li>
   )
 }
 
-function WeekView({ start, events, onClick, onDelete }: any) {
+function WeekView({ start, events, onClick, onDelete, deleteArmedId }: any) {
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i))
   return (
     <div className="fh-week">
@@ -1088,7 +1037,8 @@ function WeekView({ start, events, onClick, onDelete }: any) {
                     <button
                       type="button"
                       onClick={(ev) => { ev.stopPropagation(); onDelete(e.id) }}
-                      aria-label="Delete event"
+                      aria-label={deleteArmedId === e.id ? 'Tap again to delete' : 'Delete event'}
+                      aria-pressed={deleteArmedId === e.id ? true : undefined}
                       style={{
                         position: 'absolute', top: 0, right: 0,
                         width: 40, height: 40, borderRadius: 10,

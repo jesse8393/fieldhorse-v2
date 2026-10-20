@@ -3,9 +3,7 @@ import { motion } from 'framer-motion'
 import { ClipboardCheck, CheckCircle2, XCircle, MinusCircle } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
 import { Switch } from '@/components/ui/switch'
-import {
-  Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription
-} from '@/components/ui/drawer'
+import { Button, Field } from '../../../components/fh'
 import { notifySelf } from '../../../lib/notifications.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { toastError } from '../../../lib/toast.ts'
@@ -43,7 +41,7 @@ export default function InspectionsSection({ contact, inspections = [], userId, 
 
   async function logResult(trade: any, result: any, notes: any) {
     // supabase-js returns { error } instead of throwing (network, RLS).
-    // On failure keep the drawer open with the notes, and skip the
+    // On failure keep the form open with the notes, and skip the
     // "Inspection logged" notification, since no record exists.
     const { error } = await supabase.from('fh_inspections').insert({
       user_id: userId,
@@ -122,7 +120,8 @@ export default function InspectionsSection({ contact, inspections = [], userId, 
                   key={t}
                   type="button"
                   whileTap={{ scale: 0.97 }}
-                  onClick={() => { hapticTap(); setActiveTrade(t) }}
+                  aria-pressed={activeTrade === t}
+                  onClick={() => { hapticTap(); setActiveTrade(activeTrade === t ? null : t) }}
                   style={{
                     display: 'flex', flexDirection: 'column', gap: 8,
                     padding: '12px 12px', borderRadius: 10,
@@ -159,12 +158,14 @@ export default function InspectionsSection({ contact, inspections = [], userId, 
             })}
           </div>
 
-          <InspectionLog
-            open={!!activeTrade}
-            trade={activeTrade}
-            onOpenChange={(v: any) => { if (!v) setActiveTrade(null) }}
-            onSave={logResult}
-          />
+          {activeTrade && (
+            <InspectionLog
+              key={activeTrade}
+              trade={activeTrade}
+              onCancel={() => setActiveTrade(null)}
+              onSave={logResult}
+            />
+          )}
         </>
       ) : (
         <div style={{
@@ -181,125 +182,79 @@ export default function InspectionsSection({ contact, inspections = [], userId, 
 }
 
 /**
- * InspectionLog drawer, pass / fail / N/A + notes. Wraps shadcn Vaul Drawer.
+ * InspectionLog, pass, fail or N/A and notes, a form in place under the
+ * trade grid (D57): no drawer. Keyed by trade, so picking another trade
+ * starts clean.
  */
-function InspectionLog({ open, trade, onOpenChange, onSave }: any) {
+function InspectionLog({ trade, onCancel, onSave }: { trade: string; onCancel: () => void; onSave: (trade: string, result: string, notes: string) => void | Promise<void> }) {
   const [result, setResult] = useState('pass')
   const [notes, setNotes] = useState('')
-  useEffect(() => {
-    if (!open) { setResult('pass'); setNotes('') }
-  }, [open])
-
-  function commit() {
-    onSave(trade, result, notes)
-  }
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent>
-        <DrawerHeader>
-          <Eyebrow as="div" tone="gold">
-            <ClipboardCheck size={12} />
-            Inspection
-          </Eyebrow>
-          <DrawerTitle asChild>
-            <h2 style={{
-              margin: '6px 0 0',
-              fontSize: 24, lineHeight: 1.1,
-              letterSpacing: 0, fontWeight: 600, color: 'var(--v3-text)'
-            }}>
-              Log {trade || 'inspection'}
-            </h2>
-          </DrawerTitle>
-          <DrawerDescription style={{
-            margin: '8px 0 0', fontFamily: 'var(--font-body)',
-            fontSize: 14, color: 'var(--v3-text-muted)', lineHeight: 1.45
-          }}>
-            Record the result and any notes from the inspector.
-          </DrawerDescription>
-        </DrawerHeader>
+    <form
+      aria-label={`Log ${trade}`}
+      onSubmit={(e) => { e.preventDefault(); void onSave(trade, result, notes) }}
+      style={{
+        display: 'flex', flexDirection: 'column', gap: 12,
+        padding: 16, borderRadius: 10,
+        background: 'var(--v3-surface)', border: '1px solid var(--v3-border)'
+      }}
+    >
+      <div>
+        <Eyebrow as="div" tone="gold">
+          <ClipboardCheck size={12} />
+          Inspection
+        </Eyebrow>
+        <h3 style={{ margin: '6px 0 0', fontSize: 20, lineHeight: 1.1, letterSpacing: 0, fontWeight: 600, color: 'var(--v3-text)' }}>
+          Log {trade}
+        </h3>
+        <p style={{ margin: '6px 0 0', fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--v3-text-muted)', lineHeight: 1.45 }}>
+          The result and any notes from the inspector.
+        </p>
+      </div>
 
-        <div style={{ padding: '8px 24px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <Eyebrow>
-              Result
-            </Eyebrow>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-              {['pass', 'fail', 'na'].map((r) => {
-                const on = result === r
-                const meta = RESULT_META[r]
-                return (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => { hapticTap(); setResult(r) }}
-                    style={{
-                      padding: '12px 8px', borderRadius: 10,
-                      border: on
-                        ? `1px solid color-mix(in srgb, ${meta.color} 50%, transparent)`
-                        : '1px solid var(--v3-border)',
-                      background: on ? meta.soft : 'var(--v3-surface)',
-                      color: on ? meta.color : 'var(--v3-text)',
-                      fontFamily: 'var(--font-body)',
-                      fontSize: 12, fontWeight: 700, letterSpacing: 0,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {meta.label}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <Eyebrow>
-              Notes
-            </Eyebrow>
-            <textarea
-              rows={3}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Corrections needed, next inspection date, inspector name…"
-              style={{
-                width: '100%', padding: '12px 12px', borderRadius: 10,
-                background: 'var(--v3-surface)', border: '1px solid var(--v3-border)',
-                color: 'var(--v3-text)', fontFamily: 'var(--font-body)',
-                fontSize: 14, outline: 'none', resize: 'vertical'
-              }}
-            />
-          </label>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 4 }}>
+      <div role="radiogroup" aria-label="Result" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+        {['pass', 'fail', 'na'].map((r) => {
+          const on = result === r
+          const meta = RESULT_META[r]
+          return (
             <button
+              key={r}
               type="button"
-              onClick={() => onOpenChange(false)}
+              role="radio"
+              aria-checked={on}
+              onClick={() => { hapticTap(); setResult(r) }}
               style={{
-                padding: '12px 12px', borderRadius: 10,
-                background: 'var(--v3-surface)', border: '1px solid var(--v3-border)',
-                color: 'var(--v3-text)', fontFamily: 'var(--font-body)',
-                fontSize: 14, fontWeight: 700, cursor: 'pointer'
+                padding: '12px 8px', borderRadius: 10,
+                border: on
+                  ? `1px solid color-mix(in srgb, ${meta.color} 50%, transparent)`
+                  : '1px solid var(--v3-border)',
+                background: on ? meta.soft : 'var(--v3-surface)',
+                color: on ? meta.color : 'var(--v3-text)',
+                fontFamily: 'var(--font-body)',
+                fontSize: 12, fontWeight: 700, letterSpacing: 0,
+                cursor: 'pointer'
               }}
             >
-              Cancel
+              {meta.label}
             </button>
-            <motion.button
-              type="button"
-              whileTap={{ scale: 0.97 }}
-              onClick={commit}
-              style={{
-                padding: '12px 12px', borderRadius: 10, border: 'none',
-                background: 'var(--v3-primary)', color: 'var(--v3-on-primary)',
-                fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
-                letterSpacing: 0, cursor: 'pointer',
-                boxShadow: '0 6px 18px rgba(201, 150, 58, 0.3)'
-              }}
-            >
-              Save
-            </motion.button>
-          </div>
-        </div>
-      </DrawerContent>
-    </Drawer>
+          )
+        })}
+      </div>
+
+      <Field
+        label="Notes"
+        multiline
+        rows={3}
+        value={notes}
+        placeholder="Corrections needed, next inspection date, inspector name"
+        onChange={(e) => setNotes(e.target.value)}
+      />
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <Button type="button" variant="quiet" onClick={onCancel}>Cancel</Button>
+        <Button type="submit" variant="secondary">Save</Button>
+      </div>
+    </form>
   )
 }

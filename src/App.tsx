@@ -75,6 +75,14 @@ const QuoteDetail    = lazy(() => import('./screens/quotes/QuoteDetail.tsx'))
 const QuoteTerms     = lazy(() => import('./screens/quotes/QuoteTerms.tsx'))
 const QuotePreview   = lazy(() => import('./screens/quotes/QuotePreview.tsx'))
 const QuoteApprove   = lazy(() => import('./screens/quotes/QuoteApprove.tsx'))
+// The job's action screens and the event screen took the place of the
+// job page's and the Schedule's sheets (Phase 9, Task 13, D57).
+const JobPayment     = lazy(() => import('./screens/jobs/JobPayment.tsx'))
+const JobPartner     = lazy(() => import('./screens/jobs/JobPartner.tsx'))
+const JobComplete    = lazy(() => import('./screens/jobs/JobComplete.tsx'))
+const JobMore        = lazy(() => import('./screens/jobs/JobMore.tsx'))
+const JobFollowUp    = lazy(() => import('./screens/jobs/JobFollowUp.tsx'))
+const EventNew       = lazy(() => import('./screens/schedule/EventNew.tsx'))
 // The redesign component sheet, in development builds only: the
 // condition is a build time constant, so production drops the chunk.
 const DesignSheet    = import.meta.env.DEV ? lazy(() => import('./screens/DesignSheet.tsx')) : null
@@ -288,10 +296,17 @@ export default function App() {
           <Route path="/pipeline" element={<LegacyBoardRedirect />} />
           <Route path="/jobs" element={<LegacyBoardRedirect defaultStage="active" />} />
           <Route path="/jobs/:id" element={<ContactDetailRoute />} />
+          <Route path="/jobs/:id/payment" element={<JobPayment />} />
+          <Route path="/jobs/:id/partner" element={<JobPartner />} />
+          <Route path="/jobs/:id/complete" element={<JobComplete />} />
+          <Route path="/jobs/:id/more" element={<JobMore />} />
+          <Route path="/jobs/:id/follow-up" element={<JobFollowUp />} />
           <Route path="/clients" element={<Clients />} />
           <Route path="/clients/:id" element={<ClientDetail />} />
           <Route path="/notes" element={<Notes />} />
           <Route path="/schedule" element={<Schedule />} />
+          <Route path="/schedule/new" element={<EventNew />} />
+          <Route path="/schedule/:eventId/edit" element={<EventNew />} />
           <Route path="/activity" element={<Activity />} />
           <Route path="/bid" element={<Bid />} />
           <Route path="/compose" element={<Compose />} />

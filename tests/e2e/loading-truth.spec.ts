@@ -989,14 +989,17 @@ test.describe('Job Files tab', () => {
       await expect.poll(() => reads.held).toBe(1)
 
       // A delete right after it: its reread works and finds one left.
+      // Delete asks with a second tap on the same button, not a sheet (D57).
       if (kind === 'photo') {
         await shown(second).click()
         await page.getByRole('button', { name: 'Delete photo', exact: true }).click()
+        await page.getByRole('button', { name: 'Tap again to delete', exact: true }).click()
       } else {
-        await panel(page, name).getByRole('listitem').filter({ hasText: second }).getByRole('button', { name: 'Delete file' }).click()
+        const row = panel(page, name).getByRole('listitem').filter({ hasText: second })
+        await row.getByRole('button', { name: 'Delete file' }).click()
+        await row.getByRole('button', { name: 'Tap again to delete' }).click()
       }
-      const confirm = page.getByRole('dialog', { name: `Delete this ${kind}?` })
-      await confirm.getByRole('button', { name: `Delete ${kind}`, exact: true }).click()
+      await expect(page.getByRole('dialog')).toHaveCount(0)
       await expect(counted(`1 ${kind}`)).toBeVisible()
       await expect(shown(second)).toHaveCount(0)
 

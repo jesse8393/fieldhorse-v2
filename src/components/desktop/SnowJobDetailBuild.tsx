@@ -52,6 +52,8 @@ type Props = {
   backLabel?: string
   onEdit?: () => void
   onDelete?: () => void
+  /** True while Delete waits for its second tap (D57); the button says so. */
+  deleteArmed?: boolean
   onAddEvent?: () => void
   /** The one gold action, following the stage (Send invoice, Approve quote, Reopen). */
   primaryAction?: { label: string; onClick: () => void } | null
@@ -93,7 +95,7 @@ function mailOrSms(contact: any): { href: string } | null {
 export default function SnowJobDetailBuild(props: Props) {
   const {
     contact, client, tabs, activeTab, onTabChange,
-    onBack, backLabel = 'Jobs', onEdit, onDelete, onAddEvent,
+    onBack, backLabel = 'Jobs', onEdit, onDelete, deleteArmed = false, onAddEvent,
     primaryAction, isEditing,
     coverUrl, coverAlt, money, railNotes, crewIds = [],
     onInvitePartner, onOpenClient,
@@ -161,7 +163,14 @@ export default function SnowJobDetailBuild(props: Props) {
               />
             )}
             {onDelete && (
-              <IconButton variant="onyx" size={44} icon={Trash2} aria-label="Delete this job" onClick={onDelete} />
+              <IconButton
+                variant="onyx"
+                size={44}
+                icon={Trash2}
+                aria-label={deleteArmed ? 'Tap again to delete' : 'Delete this job'}
+                aria-pressed={deleteArmed ? true : undefined}
+                onClick={onDelete}
+              />
             )}
           </div>
 

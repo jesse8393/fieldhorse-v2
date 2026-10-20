@@ -4,7 +4,7 @@
 // main action is on screen without scrolling:
 //
 //   Today      the next stop's Navigate
-//   Job page   the stage's gold action, Send invoice on a job in progress
+//   Job page   the stage's gold action, Invoice this on a job in progress
 //   Schedule   New job
 //   Money      New invoice (the page has no gold button, decision D29)
 //
@@ -235,11 +235,11 @@ test.describe(`a desktop ${WIDTH} px wide`, () => {
     await nothingRunsOffTheSide(page)
   })
 
-  test('the job page: nothing runs off the side, Send invoice is on screen and the facts sit above the composer', async ({ context, page }) => {
+  test('the job page: nothing runs off the side, Invoice this is on screen and the facts sit above the composer', async ({ context, page }) => {
     await open(context, page, '/jobs/c-job1')
     await expect(page.locator('[data-build-screen="SnowJobDetailBuild"]')).toBeVisible({ timeout: 30_000 })
     await expect(page.locator('.fhj-spine').getByText('Inspector confirmed Friday.')).toBeVisible()
-    await onScreenUnscrolled(page, page.locator('.fhd-banner').getByRole('button', { name: 'Send invoice' }))
+    await onScreenUnscrolled(page, page.locator('.fhd-banner').getByRole('button', { name: 'Invoice this' }))
 
     const strip = page.getByRole('region', { name: 'Job at a glance' })
     const composer = page.getByRole('button', { name: /Add a note, photos or a task/ })

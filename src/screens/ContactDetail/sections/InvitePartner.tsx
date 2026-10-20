@@ -4,7 +4,7 @@ import { hapticTap } from '../../../lib/haptics.ts'
 import { Eyebrow } from '../../../components/v3'
 
 /**
- * Invite Partner section, single-action surface that opens InvitePartnerSheet
+ * Invite Partner section, single-action surface that opens /jobs/:id/partner
  * (managed by the parent shell). Surfaces the "share this job with another
  * contractor" capability where it makes sense contextually (Job Detail →
  * Details → Invite Partner).

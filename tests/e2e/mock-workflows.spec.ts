@@ -170,7 +170,8 @@ test('keeps the desktop schedule planning workflow complete', async ({ page }, t
   await event.click()
   await expect(page.getByRole('heading', { name: 'Edit event' })).toBeVisible()
   await capture(page, testInfo, 'desktop-schedule-edit', true)
-  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await page.getByRole('button', { name: 'Back', exact: true }).click()
+  await expect(page.locator('.fhsch-board[data-view="day"]')).toBeVisible()
 
   await page.getByRole('button', { name: 'Month', exact: true }).click()
   await expect(page.locator('.fhsch-month')).toBeVisible()
@@ -181,7 +182,8 @@ test('keeps the desktop schedule planning workflow complete', async ({ page }, t
   await page.getByRole('button', { name: 'New event', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Add event' })).toBeVisible()
   await capture(page, testInfo, 'desktop-schedule-new', true)
-  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await page.getByRole('button', { name: 'Back', exact: true }).click()
+  await expect(page.locator('.fh-build-weekplan')).toBeVisible()
 
   expectNoPageErrors()
 })

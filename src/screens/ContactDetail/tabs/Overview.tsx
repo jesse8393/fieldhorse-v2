@@ -42,7 +42,7 @@ import SpineList from '../phone/SpineList.tsx'
  *   - schedule  → open that day on the Schedule screen (an event has no
  *                 done flag, and it is not the job, so nothing is completed)
  *   - stage     → call pipelineFn from pipeline.ts (markComplete/etc)
- *   - idle      → open AddEventSheet
+ *   - idle      → open the event screen
  *
  * Phone (spineFirst): the Spine comes first, and everything above sits
  * under a "More about this job" disclosure below it. The Spine carries
@@ -365,7 +365,7 @@ export default function OverviewTab({
             cannot read or write invoices, payments or closeouts. */}
         {canMoveMoney && isJobStage && (
           <Button variant="secondary" leftIcon={Receipt} onClick={() => { hapticTap(); onOpenSendInvoice?.() }}>
-            Send invoice
+            Invoice this
           </Button>
         )}
         {canMoveMoney && isExecutionStage && (

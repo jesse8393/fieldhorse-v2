@@ -144,16 +144,43 @@ test.describe('unscheduled tray', () => {
     }
   })
 
-  test('shows Plumbing Bellevue when the schedule is empty, and its Schedule button opens the event sheet with the job selected', async ({ context, page }) => {
+  test('shows Plumbing Bellevue when the schedule is empty, and its Schedule button opens the event screen with the job selected', async ({ context, page }) => {
     await setUp(context, page, { fh_schedule: [] })
     const tray = page.getByRole('region', { name: 'Unscheduled jobs' })
     const card = tray.locator('.fhsch-card', { hasText: 'Plumbing Bellevue' })
     await expect(card).toBeVisible()
     await card.getByRole('button', { name: 'Schedule', exact: true }).click()
-    const sheet = page.getByRole('dialog')
-    await expect(sheet.getByRole('heading', { name: 'Add event' })).toBeVisible()
-    await expect(sheet.getByLabel('Link to job')).toHaveValue('c-job1')
-    await expect(sheet.getByLabel('Title *')).toHaveValue('Plumbing Bellevue')
+    // A screen, not a sheet (D57).
+    await expect(page).toHaveURL(/\/schedule\/new\?job=c-job1&title=Plumbing\+Bellevue$/)
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: 'Add event' })).toBeVisible()
+    await expect(page.getByLabel('Link to')).toHaveValue('job:c-job1')
+    await expect(page.getByLabel('Title')).toHaveValue('Plumbing Bellevue')
+  })
+})
+
+test.describe('leads on the board', () => {
+  // Schedule estimate on a lead books an fh_schedule row with lead_id (D60).
+  // The board shows it with a Lead chip, since no job is behind it.
+  test("a lead's estimate shows on the Schedule with a Lead chip", async ({ context, page }) => {
+    await setUp(context, page, {
+      fh_schedule: [
+        ...SCHEDULE,
+        { id: 's5', user_id: 'qa-user-1', contact_id: null, lead_id: 'l-lead1', title: 'Estimate', description: 'Jeff Roy, 412 Burkitt Station Rd', start_at: '2026-10-08T19:00:00Z', end_at: '2026-10-08T20:00:00Z', created_at: '2026-10-01T12:00:00Z' }
+      ]
+    })
+    const visit = page.locator('.fh-build-weekplan__day.is-today').getByRole('button', { name: /Estimate/ })
+    await expect(visit).toBeVisible()
+    await expect(visit.locator('.fhc-chip', { hasText: 'Lead' })).toBeVisible()
+    // A job's visit carries no such chip.
+    const job = page.locator('.fh-build-weekplan__day.is-today').getByRole('button', { name: /Pour slab, crew A/ })
+    await expect(job.locator('.fhc-chip')).toHaveCount(0)
+    // Opening it edits the event on its own screen, with the lead still linked.
+    await visit.click()
+    await expect(page).toHaveURL(/\/schedule\/s5\/edit$/)
+    await expect(page.getByRole('heading', { name: 'Edit event' })).toBeVisible()
+    await expect(page.getByLabel('Link to')).toHaveValue('lead:l-lead1')
+    await expect(page.getByRole('dialog')).toHaveCount(0)
   })
 })
 

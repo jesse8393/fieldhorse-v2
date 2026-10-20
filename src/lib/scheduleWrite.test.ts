@@ -57,11 +57,22 @@ describe('createScheduleEvent', () => {
       org_id: 'org-1',
       user_id: 'user-1',
       contact_id: 'c-job1',
+      lead_id: null,
+      quote_id: null,
       title: 'Plumbing Bellevue',
+      description: null,
       start_at: '2026-10-09T18:00:00.000Z',
       end_at: '2026-10-09T19:00:00.000Z',
       recurring: null
     }])
+  })
+
+  it("writes lead_id and the where line for a lead's estimate, and quote_id for a quote's visit", async () => {
+    await createScheduleEvent({ ...input, contactId: null, leadId: 'l-lead1', title: 'Estimate', description: ' Jeff Roy, 412 Burkitt Station Rd ' })
+    expect(inserted()[0]).toMatchObject({ contact_id: null, lead_id: 'l-lead1', quote_id: null, title: 'Estimate', description: 'Jeff Roy, 412 Burkitt Station Rd' })
+    calls = []
+    await createScheduleEvent({ ...input, contactId: null, quoteId: 'q-quote', title: 'Walk the site' })
+    expect(inserted()[0]).toMatchObject({ contact_id: null, lead_id: null, quote_id: 'q-quote', description: null })
   })
 
   it('trims the title and writes a null contact_id for an event with no job', async () => {
