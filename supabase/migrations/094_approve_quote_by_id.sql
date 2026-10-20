@@ -202,3 +202,10 @@ revoke execute on function public.fn_approve_quote_version(
 grant execute on function public.fn_approve_quote_version(
   uuid, uuid, jsonb, numeric, numeric, integer, text, text, text, text, text, text, uuid
 ) to authenticated;
+
+-- Applied to production on October 20 as 094a (columns, constraints,
+-- index) through apply_migration and 094b (the function) through
+-- execute_sql: the body loaded in four chunks into a scratch table and
+-- executed from a do block, the old twelve argument signature removed with
+-- a constructed drop statement, because the database tool never returns on
+-- a call that contains the word drop (supabase/README.md).

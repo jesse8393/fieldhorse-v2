@@ -30,8 +30,8 @@
 -- Applied to production on October 20 in four pieces (093a to 093d in
 -- supabase_migrations.schema_migrations): the two functions and the two
 -- triggers of section 1 one at a time, then sections 2 to 5 as one
--- transaction through execute_sql. apply_migration stalled on bodies with
--- a create trigger in them; see supabase/README.md. The dry run (the same
+-- transaction through execute_sql. apply_migration stalled on the drop
+-- trigger guards; see supabase/README.md. The dry run (the same
 -- transaction ending in rollback, with supabase/tests/move_leads_quotes.test.sql)
 -- and the real run both reported every check ok and these counts:
 --   contacts by stage   closed=62 job=31 moved_lead=70 moved_quote=32
