@@ -54,6 +54,9 @@ const Landing        = lazy(() => import('./screens/Landing.tsx'))
 const InvoiceDetail  = lazy(() => import('./screens/InvoiceDetail.tsx'))
 const Inbox          = lazy(() => import('./screens/inbox/Inbox.tsx'))
 const Notifications  = lazy(() => import('./screens/Notifications.tsx'))
+// Leads have their own list and screen (PHASE9_PLAN Task 9, decision D65).
+const LeadsList      = lazy(() => import('./screens/leads/LeadsList.tsx'))
+const LeadDetail     = lazy(() => import('./screens/leads/LeadDetail.tsx'))
 // The redesign component sheet, in development builds only: the
 // condition is a build time constant, so production drops the chunk.
 const DesignSheet    = import.meta.env.DEV ? lazy(() => import('./screens/DesignSheet.tsx')) : null
@@ -189,6 +192,12 @@ function NewRecordDetailRoute({ kind }: { kind: 'lead' | 'quote' }) {
   return <NewRecordRoute kind={kind} id={id} fallback={<ContactDetailSplit id={id} />} />
 }
 
+/** /leads/:id: the lead screen, or the old detail screen for any other id. */
+function LeadDetailRoute() {
+  const { id = '' } = useParams()
+  return <LeadDetail id={id} fallback={<ContactDetailSplit id={id} />} />
+}
+
 function ContactDetailSplit({ id }: { id: string | undefined }) {
   const isWide = useMediaQuery('(min-width: 1680px)')
   return (
@@ -230,8 +239,8 @@ export default function App() {
         <Route element={<Gated><AppShell /></Gated>}>
           <Route path="/" element={<Home />} />
           <Route path="/work" element={<Work />} />
-          <Route path="/leads" element={<LegacyBoardRedirect defaultStage="leads" />} />
-          <Route path="/leads/:id" element={<NewRecordDetailRoute kind="lead" />} />
+          <Route path="/leads" element={<LeadsList />} />
+          <Route path="/leads/:id" element={<LeadDetailRoute />} />
           <Route path="/quotes" element={<LegacyBoardRedirect defaultStage="quotes" />} />
           <Route path="/quotes/:id" element={<NewRecordDetailRoute kind="quote" />} />
           <Route path="/pipeline" element={<LegacyBoardRedirect />} />

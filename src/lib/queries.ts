@@ -1324,3 +1324,125 @@ export function useSubDetail(key: string | undefined, userId: string | undefined
     enabled: !!key && !!userId && orgId !== undefined
   })
 }
+
+// ---- Leads and quotes (PHASE9_PLAN Task 9, SPEC D53, D55, D65) ----
+// Leads live on fh_leads and quotes on fh_quotes, each pointing at a
+// client. The lists carry the client so a row can show who; the detail
+// hooks read one row by id. Keys: ['leads', orgId], ['lead', id],
+// ['quotes', orgId], ['quote', id]. Writers invalidate ['leads'] or
+// ['quotes'] and the one record they changed.
+
+export type LeadClient = Pick<Client, 'id' | 'name' | 'phone' | 'email' | 'address'>
+export type LeadRow = Database['public']['Tables']['fh_leads']['Row'] & { fh_clients: LeadClient | null }
+export type QuoteRow = Database['public']['Tables']['fh_quotes']['Row'] & { fh_clients: LeadClient | null }
+
+const RECORD_CLIENT = 'fh_clients(id, name, phone, email, address)'
+
+export const leadsKey = (orgId: string | null | undefined) => ['leads', orgId ?? null] as const
+export const leadKey = (id: string | undefined) => ['lead', id] as const
+export const quotesKey = (orgId: string | null | undefined) => ['quotes', orgId ?? null] as const
+export const quoteKey = (id: string | undefined) => ['quote', id] as const
+
+async function fetchLeads(userId: string, orgId: string | null | undefined): Promise<LeadRow[]> {
+  return fetchAllRows<LeadRow>((from, to) =>
+    scoped(supabase.from('fh_leads').select(`*, ${RECORD_CLIENT}`), userId, orgId)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(from, to)
+  )
+}
+
+export function useLeads(userId: string | undefined) {
+  const orgId = useOrgScope(userId)
+  return useQuery({
+    queryKey: leadsKey(orgId),
+    queryFn: () => fetchLeads(userId as string, orgId),
+    enabled: !!userId && orgId !== undefined,
+    staleTime: 30_000
+  })
+}
+
+async function fetchLead(id: string): Promise<LeadRow | null> {
+  const { data, error } = await supabase.from('fh_leads').select(`*, ${RECORD_CLIENT}`).eq('id', id).maybeSingle()
+  if (error) throw error
+  return (data as LeadRow | null) ?? null
+}
+
+/** One lead by id. `data` is null when no fh_leads row has that id. */
+export function useLead(id: string | undefined, userId: string | undefined) {
+  return useQuery({
+    queryKey: leadKey(id),
+    queryFn: () => fetchLead(id as string),
+    enabled: !!id && !!userId
+  })
+}
+
+async function fetchQuotes(userId: string, orgId: string | null | undefined): Promise<QuoteRow[]> {
+  return fetchAllRows<QuoteRow>((from, to) =>
+    scoped(supabase.from('fh_quotes').select(`*, ${RECORD_CLIENT}`), userId, orgId)
+      .order('updated_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(from, to)
+  )
+}
+
+export function useQuotes(userId: string | undefined) {
+  const orgId = useOrgScope(userId)
+  return useQuery({
+    queryKey: quotesKey(orgId),
+    queryFn: () => fetchQuotes(userId as string, orgId),
+    enabled: !!userId && orgId !== undefined,
+    staleTime: 30_000
+  })
+}
+
+async function fetchQuote(id: string): Promise<QuoteRow | null> {
+  const { data, error } = await supabase.from('fh_quotes').select(`*, ${RECORD_CLIENT}`).eq('id', id).maybeSingle()
+  if (error) throw error
+  return (data as QuoteRow | null) ?? null
+}
+
+/** One quote by id. `data` is null when no fh_quotes row has that id. */
+export function useQuote(id: string | undefined, userId: string | undefined) {
+  return useQuery({
+    queryKey: quoteKey(id),
+    queryFn: () => fetchQuote(id as string),
+    enabled: !!id && !!userId
+  })
+}
+
+export function useInvalidateLeads() {
+  const client = useQueryClient()
+  return (id?: string) => {
+    void client.invalidateQueries({ queryKey: ['leads'] })
+    if (id) void client.invalidateQueries({ queryKey: leadKey(id) })
+  }
+}
+
+/** A schedule visit booked on a lead (fh_schedule start_at against lead_id). */
+export type LeadVisit = { lead_id: string | null; start_at: string | null }
+
+async function fetchLeadVisits(userId: string, orgId: string | null | undefined, fromIso: string): Promise<LeadVisit[]> {
+  const { data, error } = await scoped(supabase.from('fh_schedule').select('lead_id, start_at'), userId, orgId)
+    .not('lead_id', 'is', null)
+    .gte('start_at', fromIso)
+    .order('start_at', { ascending: true })
+  if (error) throw error
+  return (data ?? []) as LeadVisit[]
+}
+
+/**
+ * Visits booked on leads from the start of today on, for the "Estimate
+ * booked" chip on the leads list and the Jobs screen's Leads tab.
+ */
+export function useLeadVisits(userId: string | undefined) {
+  const orgId = useOrgScope(userId)
+  const now = new Date()
+  const fromIso = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+  return useQuery({
+    queryKey: ['leadVisits', orgId ?? null, fromIso],
+    queryFn: () => fetchLeadVisits(userId as string, orgId, fromIso),
+    enabled: !!userId && orgId !== undefined,
+    staleTime: 30_000
+  })
+}

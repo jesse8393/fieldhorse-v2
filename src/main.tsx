@@ -127,7 +127,7 @@ if (typeof window !== 'undefined') {
 try { localStorage.removeItem('fh-query-cache') } catch { /* non-fatal */ }
 // Bump only when the shape of persisted query data changes in a way that
 // old rows would break the new code.
-const QUERY_CACHE_VERSION = 'v1'
+const QUERY_CACHE_VERSION = 'v2'
 const queryPersister = createAsyncStoragePersister({
   storage: {
     getItem: (key: string) => idbGet(key).then((v) => v ?? null),

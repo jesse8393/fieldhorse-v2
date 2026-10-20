@@ -11,8 +11,8 @@
 
 const ROUTE_CHUNKS: Record<string, () => Promise<unknown>> = {
   '/work':        () => import('../screens/Work.tsx'),
+  '/leads':       () => import('../screens/leads/LeadsList.tsx'),
   // Legacy board paths redirect to /work, warm the Work chunk.
-  '/leads':       () => import('../screens/Work.tsx'),
   '/quotes':      () => import('../screens/Work.tsx'),
   '/pipeline':    () => import('../screens/Work.tsx'),
   '/jobs':        () => import('../screens/Work.tsx'),

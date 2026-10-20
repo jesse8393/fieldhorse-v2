@@ -26,7 +26,7 @@ function readQaNow(raw) {
 const now = readQaNow(process.env.QA_NOW)
 const day = 86400000
 const iso = (d) => new Date(d).toISOString()
-const CLIENT = { id: 'cl-1', name: 'Jeff Roy', phone: '555-0101', email: 'jeff@roy.com' }
+const CLIENT = { id: 'cl-1', name: 'Jeff Roy', phone: '555-0101', email: 'jeff@roy.com', address: '412 Burkitt Station Rd' }
 // Leads and quotes live in fh_leads and fh_quotes (SPEC D55). The four
 // contact rows the migration moved stay here with stage moved_lead or
 // moved_quote, as production has them, so an old /leads/c-lead1 link can
