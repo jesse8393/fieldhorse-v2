@@ -200,7 +200,7 @@ RLS: copy every policy on `fh_contacts` to `fh_leads` and `fh_quotes` by name, w
 
 **Files:**
 - Create migration: `supabase/migrations/093_move_leads_and_quotes.sql`
-- Create: `scripts/verify-move.mjs` (reads counts before and after through the service role on the copy, prints a table)
+- Create: `scripts/move-counts.mjs` (reads counts before and after through the service role on the copy, prints a table)
 - Test: `supabase/tests/move_leads_quotes.test.sql`
 
 The migration, in one transaction:
@@ -213,8 +213,8 @@ The migration, in one transaction:
 
 - [ ] Write the SQL test on the copy: seed one org with a lead with notes and a visit, a quote with two items and an approved public link, a lost lead, a lost job, a job with an invoice. Run the migration. Assert: `fh_leads` has 2 rows (one `open`, one `lost`), `fh_quotes` has 1 with `amount` equal to the item sum and `status approved`, the public link row carries `quote_id`, the schedule row carries `lead_id`, the lost job is still `stage lost`, the invoice has `client_id`, and the old rows read `moved_lead` and `moved_quote`.
 - [ ] Add the Review focus 4 assertion: `select token from fh_public_links where quote_id = :q` returns the approved link and `netlify/functions/public-link.js` (after Task 11) resolves it.
-- [ ] Run the test on a fresh copy of production: `scripts/verify-move.mjs` prints before and after counts (contacts by stage, leads, quotes, items with `quote_id`, links with `quote_id`, invoices with `client_id`). Keep that printout in `PROGRESS.md`.
-- [ ] Apply to production. Run `verify-move.mjs` against production read only and compare with the copy. Regenerate types.
+- [ ] Run the test on a fresh copy of production: `scripts/move-counts.mjs` prints before and after counts (contacts by stage, leads, quotes, items with `quote_id`, links with `quote_id`, invoices with `client_id`). Keep that printout in `PROGRESS.md`.
+- [ ] Apply to production. Run `move-counts.mjs` against production read only and compare with the copy. Regenerate types.
 - [ ] Commit: "Move leads and quotes out of the deals table and link what hung off them".
 
 ### Task 7: Old links keep working
@@ -394,7 +394,7 @@ The quote screen shows the client, title, the lines (tap a line to edit it in pl
 - [ ] `npm run test:all` and `npm run audit:design` green. `node scripts/find-dead-css.mjs` clean.
 - [ ] Run `QA_NOW=2026-10-08T14:00:00.000Z FH_VISUAL=1 npx playwright test cleanup-guard` and retake baselines only after viewing each diff; add guard shots for `/new`, `/leads/:id`, `/quotes/:id`, `/invoices/:id`, `/notifications`, `/capture`.
 - [ ] Take the screenshots listed under Finish into `docs/design/2026-10-redesign/phase9-review/`.
-- [ ] Write the Phase 9 summary at the top of `PROGRESS.md`, including the migration counts from `verify-move.mjs`.
+- [ ] Write the Phase 9 summary at the top of `PROGRESS.md`, including the migration counts from `move-counts.mjs`.
 - [ ] Push. Update the draft pull request. Tell Jesse the preview address once Netlify builds it.
 - [ ] Commit: "Add the Phase 9 summary and screenshots".
 

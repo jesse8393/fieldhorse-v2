@@ -91,3 +91,15 @@ supabase gen types typescript --project-id pnmhblvslftdzfcdezbw > src/lib/databa
 Review the pulled baseline before committing it. It will include the cron
 jobs only if they are part of the dumped schema; if not, add them to a
 migration by hand from the table above.
+
+## Applying through the database tool
+
+The Supabase MCP tool used in these sessions times out at sixty seconds and
+stalls on two kinds of body: anything containing `create trigger` sent
+through `apply_migration`, and transactions over roughly ten kilobytes sent
+through `execute_sql`. The same statements run in well under a second when
+sent on their own or inside a `begin; ... rollback;` dry run. The workaround
+used for 092 and 093: apply functions one per call, create triggers through
+`execute_sql`, keep a moving transaction short, and add the migration row to
+`supabase_migrations.schema_migrations` by hand when `execute_sql` did the
+work, so `list_migrations` stays honest.
