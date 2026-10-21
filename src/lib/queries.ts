@@ -20,6 +20,7 @@ import {
   type QueryClient
 } from '@tanstack/react-query'
 import { supabase } from './supabase.ts'
+import { MOVED_STAGE_FILTER } from './stages.ts'
 import { subMatchesKey } from './subIdentity.ts'
 import { loadPartnerDirectory } from './partners.ts'
 import { useOrgScope } from './orgScope.ts'
@@ -127,6 +128,7 @@ async function fetchJobs(): Promise<JobRow[]> {
   const { data, error } = await supabase
     .from('fh_contacts')
     .select(`${JOB_LIST_COLUMNS}, fh_clients(name, phone, email)`)
+    .not('stage', 'in', MOVED_STAGE_FILTER)
     .order('updated_at', { ascending: false })
     // Sanity ceiling: 2000 most-recently-touched deals is far beyond what
     // the list UX can present; without it one giant book turns every
@@ -256,6 +258,7 @@ export function useJobSearch(term: string) {
       const { data, error } = await supabase
         .from('fh_contacts')
         .select(`${JOB_LIST_COLUMNS}, fh_clients(name, phone, email)`)
+        .not('stage', 'in', MOVED_STAGE_FILTER)
         .or(orExpr)
         .order('updated_at', { ascending: false })
         .limit(100)
@@ -281,9 +284,15 @@ export function useInvalidateJobs() {
 // every payment (for outstanding). Bundled into one hook so the
 // screen gets a single loading flag, matching its prior behavior.
 
+export type ClientLeadRow = Pick<Database['public']['Tables']['fh_leads']['Row'], 'id' | 'client_id' | 'status'>
+export type ClientQuoteRow = Pick<Database['public']['Tables']['fh_quotes']['Row'], 'id' | 'client_id' | 'status' | 'amount' | 'job_id'>
+
 export type ClientsBundle = {
   clients: Client[]
   jobs: Pick<Contact, 'id' | 'client_id' | 'amount' | 'stage'>[]
+  /** Leads and quotes by client (D53), for the active count. */
+  leads: ClientLeadRow[]
+  quotes: ClientQuoteRow[]
   payments: Pick<Payment, 'contact_id' | 'amount'>[]
   changeOrders: Pick<Database['public']['Tables']['fh_change_orders']['Row'], 'contact_id' | 'amount' | 'status'>[]
 }
@@ -292,7 +301,7 @@ export const clientsKey = (userId: string | undefined, orgId?: string | null) =>
   ['clients', userId, orgId ?? null] as const
 
 async function fetchClientsBundle(userId: string, orgId?: string | null): Promise<ClientsBundle> {
-  const [clients, jobs, payments, changeOrders] = await Promise.all([
+  const [clients, jobs, payments, changeOrders, leads, quotes] = await Promise.all([
     // Paged too: the org wide roster can pass max-rows (1000).
     fetchAllRows<Client>((from, to) =>
       scoped(supabase.from('fh_clients').select('*'), userId, orgId)
@@ -303,6 +312,7 @@ async function fetchClientsBundle(userId: string, orgId?: string | null): Promis
     ),
     fetchAllRows<ClientsBundle['jobs'][number]>((from, to) =>
       scoped(supabase.from('fh_contacts').select('id, client_id, amount, stage'), userId, orgId)
+        .not('stage', 'in', MOVED_STAGE_FILTER)
         .order('id', { ascending: true })
         .range(from, to)
     ),
@@ -319,9 +329,19 @@ async function fetchClientsBundle(userId: string, orgId?: string | null): Promis
         .eq('status', 'approved')
         .order('id', { ascending: true })
         .range(from, to)
+    ),
+    fetchAllRows<ClientLeadRow>((from, to) =>
+      scoped(supabase.from('fh_leads').select('id, client_id, status'), userId, orgId)
+        .order('id', { ascending: true })
+        .range(from, to)
+    ),
+    fetchAllRows<ClientQuoteRow>((from, to) =>
+      scoped(supabase.from('fh_quotes').select('id, client_id, status, amount, job_id'), userId, orgId)
+        .order('id', { ascending: true })
+        .range(from, to)
     )
   ])
-  return { clients, jobs, payments, changeOrders }
+  return { clients, jobs, leads, quotes, payments, changeOrders }
 }
 
 export function useClientsBundle(userId: string | undefined) {
@@ -618,6 +638,7 @@ async function fetchActivity(userId: string, pageSize: number, orgId?: string | 
       .order('created_at', { ascending: false }).limit(pageSize),
     scoped(supabase.from('fh_contacts')
       .select('id, name, job_title, stage'), userId, orgId)
+      .not('stage', 'in', MOVED_STAGE_FILTER)
       .order('updated_at', { ascending: false }).limit(pageSize * 2)
   ])
   for (const result of [transitions, payments, changeOrders, invoices, contacts]) {
@@ -653,6 +674,10 @@ export function useActivityFeed(userId: string | undefined, pageSize = 60) {
 // first-class fh_invoices rows so the screen can list real issued
 // invoices, not just per-job balances. Bundled so the screen keeps a
 // single loading flag, matching its prior behavior.
+//
+// Invoices are read by the company (org_id, through `scoped`) and join
+// their client; a job is looked up only for an invoice whose contact_id is
+// set, since an invoice can bill a client with no job at all (D62).
 
 // Projected, the AR screen renders identity/billing fields only; the
 // wide text columns on fh_contacts (scope, notes, proposal bodies) never
@@ -670,7 +695,15 @@ export type InvoiceJob = Pick<
   fh_clients: Pick<Client, 'name' | 'email' | 'phone' | 'address'> | null
 }
 
-export type InvoiceRecord = Database['public']['Tables']['fh_invoices']['Row']
+// The client an invoice bills (D62), joined on fh_invoices.client_id. An
+// invoice with no job reads its customer from here; one with a job reads
+// the job first and falls back to this.
+export const INVOICE_CLIENT_COLUMNS = 'name, email, phone, address, company_name'
+export type InvoiceClient = Pick<Client, 'name' | 'email' | 'phone' | 'address' | 'company_name'>
+
+export type InvoiceRecord = Database['public']['Tables']['fh_invoices']['Row'] & {
+  fh_clients?: InvoiceClient | null
+}
 
 // The few columns the allocator (invoiceSettlement.ts) reads from an
 // invoice that is not an open bill: a draft, or a paid or void row.
@@ -728,14 +761,14 @@ export async function fetchInvoicesBundle(userId: string, orgId?: string | null)
     // The issued-invoice DISPLAY list: the 500 most recent cover the
     // lists, so a huge invoice history no longer ships every row. Nothing
     // is added up from it; the two uncapped reads below feed the totals.
-    scoped(supabase.from('fh_invoices').select('*'), userId, orgId)
+    scoped(supabase.from('fh_invoices').select(`*, fh_clients(${INVOICE_CLIENT_COLUMNS})`), userId, orgId)
       .order('created_at', { ascending: false })
       .limit(500),
     // Every open invoice, uncapped: Money's groups, Due this week and
     // the reminders read these, so an old unpaid bill past the newest 500
     // still counts.
     fetchAllRows<InvoiceRecord>((from, to) =>
-      scoped(supabase.from('fh_invoices').select('*'), userId, orgId)
+      scoped(supabase.from('fh_invoices').select(`*, fh_clients(${INVOICE_CLIENT_COLUMNS})`), userId, orgId)
         .in('status', [...OPEN_INVOICE_STATUSES])
         .order('id', { ascending: true })
         .range(from, to)
@@ -788,6 +821,93 @@ export function useInvoicesBundle(userId: string | undefined) {
 export function useInvalidateInvoices() {
   const client = useQueryClient()
   return () => client.invalidateQueries({ queryKey: ['invoices'] })
+}
+
+// ---- One invoice (D62) ----
+// Everything the invoice screens (/invoices/:id and its payment, edit and
+// remind screens) need: the fh_invoices row with its client, and, only when
+// the invoice points at a job, that job with its client, the job's
+// payments, approved change orders, insurance claim and other invoices, so
+// what the invoice owes is worked out the way Money works it out. An
+// invoice with no job carries just the payments linked to it.
+
+export type InvoiceRecordBundle = {
+  invoice: InvoiceRecord
+  client: (InvoiceClient & { id: string }) | null
+  job: InvoiceJob | null
+  payments: Payment[]
+  changeOrders: Database['public']['Tables']['fh_change_orders']['Row'][]
+  insurance: Database['public']['Tables']['fh_insurance_claims']['Row'] | null
+  /** Every invoice on the job, this one included; just this one without a job. */
+  jobInvoices: InvoiceRecord[]
+}
+
+export const invoiceRecordKey = (id: string | undefined) => ['invoiceRecord', id ?? null] as const
+
+export async function fetchInvoiceRecord(id: string): Promise<InvoiceRecordBundle> {
+  const { data: invoiceRow, error } = await supabase
+    .from('fh_invoices')
+    .select(`*, fh_clients(id, ${INVOICE_CLIENT_COLUMNS})`)
+    .eq('id', id)
+    .maybeSingle()
+  if (error) throw error
+  if (!invoiceRow) throw new Error('Invoice not found')
+  const invoice = invoiceRow as InvoiceRecord & { fh_clients?: (InvoiceClient & { id: string }) | null }
+  const client = invoice.fh_clients ?? null
+  const jobId = invoice.contact_id
+
+  if (!jobId) {
+    const { data: paymentRows, error: payErr } = await supabase
+      .from('fh_payments')
+      .select('*')
+      .eq('invoice_id', id)
+      .order('paid_on', { ascending: false })
+    if (payErr) throw payErr
+    return {
+      invoice, client, job: null,
+      payments: (paymentRows ?? []) as Payment[],
+      changeOrders: [], insurance: null, jobInvoices: [invoice]
+    }
+  }
+
+  const [jobRes, payRes, coRes, insRes, invRes] = await Promise.all([
+    supabase.from('fh_contacts').select(`${INVOICE_JOB_COLUMNS}, fh_clients(name, email, phone, address)`).eq('id', jobId).maybeSingle(),
+    supabase.from('fh_payments').select('*').eq('contact_id', jobId).order('paid_on', { ascending: false }),
+    supabase.from('fh_change_orders').select('*').eq('contact_id', jobId).eq('status', 'approved').order('sequence_number', { ascending: true }),
+    supabase.from('fh_insurance_claims').select('*').eq('contact_id', jobId).maybeSingle(),
+    supabase.from('fh_invoices').select('*').eq('contact_id', jobId).order('sequence_number', { ascending: true })
+  ])
+  if (jobRes.error) throw jobRes.error
+  if (payRes.error) throw payRes.error
+  if (coRes.error) throw coRes.error
+  if (insRes.error) throw insRes.error
+  if (invRes.error) throw invRes.error
+  const jobInvoices = (invRes.data ?? []) as InvoiceRecord[]
+  return {
+    invoice,
+    client,
+    job: (jobRes.data ?? null) as InvoiceJob | null,
+    payments: (payRes.data ?? []) as Payment[],
+    changeOrders: (coRes.data ?? []) as InvoiceRecordBundle['changeOrders'],
+    insurance: (insRes.data ?? null) as InvoiceRecordBundle['insurance'],
+    jobInvoices: jobInvoices.some((inv) => inv.id === invoice.id) ? jobInvoices : [...jobInvoices, invoice]
+  }
+}
+
+export function useInvoiceRecord(id: string | undefined, userId: string | undefined) {
+  return useQuery({
+    queryKey: invoiceRecordKey(id),
+    queryFn: () => fetchInvoiceRecord(id as string),
+    enabled: !!id && !!userId
+  })
+}
+
+export function useInvalidateInvoiceRecord() {
+  const client = useQueryClient()
+  return (id: string | undefined) => {
+    client.invalidateQueries({ queryKey: invoiceRecordKey(id) })
+    client.invalidateQueries({ queryKey: ['invoices'] })
+  }
 }
 
 // ---- Subs ----
@@ -882,6 +1002,7 @@ export const noteContactsKey = (userId: string | undefined, orgId?: string | nul
 async function fetchNoteContacts(userId: string, orgId?: string | null): Promise<NoteContact[]> {
   const rows = await fetchAllRows<NoteContact & { updated_at: string | null }>((from, to) =>
     scoped(supabase.from('fh_contacts').select('id, name, updated_at'), userId, orgId)
+      .not('stage', 'in', MOVED_STAGE_FILTER)
       .order('id', { ascending: true })
       .range(from, to)
   )
@@ -946,9 +1067,26 @@ export type ClientJob = Pick<
   'id' | 'name' | 'stage' | 'job_title' | 'job_type' | 'amount' | 'updated_at' | 'created_at'
 >
 
+export type ClientLead = Pick<
+  Database['public']['Tables']['fh_leads']['Row'],
+  'id' | 'title' | 'status' | 'job_type' | 'follow_up_on' | 'updated_at' | 'created_at'
+>
+export type ClientQuote = Pick<
+  Database['public']['Tables']['fh_quotes']['Row'],
+  'id' | 'title' | 'status' | 'amount' | 'job_id' | 'sent_at' | 'updated_at' | 'created_at'
+>
+export type ClientInvoice = Pick<
+  Database['public']['Tables']['fh_invoices']['Row'],
+  'id' | 'contact_id' | 'title' | 'amount' | 'status' | 'due_at' | 'sequence_number' | 'updated_at' | 'created_at'
+>
+
 export type ClientDetailBundle = {
   client: Client | null
   jobs: ClientJob[]
+  /** The client's leads, quotes and invoices, newest first (D53). */
+  leads: ClientLead[]
+  quotes: ClientQuote[]
+  invoices: ClientInvoice[]
   notes: (Database['public']['Tables']['fh_notes']['Row'] & {
     fh_contacts: Pick<Contact, 'name'> | null
   })[]
@@ -960,7 +1098,7 @@ export type ClientDetailBundle = {
 }
 
 const EMPTY_CLIENT_DETAIL: Omit<ClientDetailBundle, 'client'> = {
-  jobs: [], notes: [], files: [], payments: [], changeOrders: []
+  jobs: [], leads: [], quotes: [], invoices: [], notes: [], files: [], payments: [], changeOrders: []
 }
 
 export const clientDetailKey = (id: string | undefined, userId: string | undefined, orgId?: string | null) =>
@@ -976,17 +1114,43 @@ async function fetchClientDetail(id: string, userId: string, orgId?: string | nu
 
   if (!client) return { client: null, ...EMPTY_CLIENT_DETAIL }
 
-  const { data: jobsData, error: jobsErr } = await scoped(supabase
-    .from('fh_contacts')
-    .select('id, name, stage, job_title, job_type, amount, updated_at, created_at'), userId, orgId)
-    .eq('client_id', client.id)
-    .order('updated_at', { ascending: false })
-  if (jobsErr) throw jobsErr
+  const [jobsRes, leadsRes, quotesRes, invoicesRes] = await Promise.all([
+    scoped(supabase
+      .from('fh_contacts')
+      .select('id, name, stage, job_title, job_type, amount, updated_at, created_at'), userId, orgId)
+      .eq('client_id', client.id)
+      .not('stage', 'in', MOVED_STAGE_FILTER)
+      .order('updated_at', { ascending: false }),
+    scoped(supabase
+      .from('fh_leads')
+      .select('id, title, status, job_type, follow_up_on, updated_at, created_at'), userId, orgId)
+      .eq('client_id', client.id)
+      .order('updated_at', { ascending: false }),
+    scoped(supabase
+      .from('fh_quotes')
+      .select('id, title, status, amount, job_id, sent_at, updated_at, created_at'), userId, orgId)
+      .eq('client_id', client.id)
+      .order('updated_at', { ascending: false }),
+    scoped(supabase
+      .from('fh_invoices')
+      .select('id, contact_id, title, amount, status, due_at, sequence_number, updated_at, created_at'), userId, orgId)
+      .eq('client_id', client.id)
+      .order('updated_at', { ascending: false })
+  ])
+  if (jobsRes.error) throw jobsRes.error
+  if (leadsRes.error) throw leadsRes.error
+  if (quotesRes.error) throw quotesRes.error
+  if (invoicesRes.error) throw invoicesRes.error
 
-  const jobs = (jobsData ?? []) as ClientJob[]
+  const jobs = (jobsRes.data ?? []) as ClientJob[]
+  const records = {
+    leads: (leadsRes.data ?? []) as ClientLead[],
+    quotes: (quotesRes.data ?? []) as ClientQuote[],
+    invoices: (invoicesRes.data ?? []) as ClientInvoice[]
+  }
   const jobIds = jobs.map((r) => r.id)
   if (jobIds.length === 0) {
-    return { client: client as Client, ...EMPTY_CLIENT_DETAIL }
+    return { client: client as Client, ...EMPTY_CLIENT_DETAIL, ...records }
   }
 
   const [notesRes, filesRes, paymentsRes, coRes] = await Promise.all([
@@ -1014,6 +1178,7 @@ async function fetchClientDetail(id: string, userId: string, orgId?: string | nu
   return {
     client: client as Client,
     jobs,
+    ...records,
     notes: (notesRes.data ?? []) as ClientDetailBundle['notes'],
     files: (filesRes.data ?? []) as ClientDetailBundle['files'],
     payments: (paymentsRes.data ?? []) as ClientDetailBundle['payments'],
@@ -1051,8 +1216,17 @@ export type StageTransition = {
   transitioned_at: string
 }
 
+export type AnalyticsLead = Pick<Database['public']['Tables']['fh_leads']['Row'], 'id' | 'client_id' | 'status' | 'created_at' | 'updated_at'>
+export type AnalyticsQuote = Pick<
+  Database['public']['Tables']['fh_quotes']['Row'],
+  'id' | 'client_id' | 'status' | 'amount' | 'job_id' | 'sent_at' | 'created_at' | 'updated_at'
+>
+
 export type AnalyticsBundle = {
   contacts: Contact[]
+  /** Leads and quotes (D55), for the funnel and the pipeline counts. */
+  leads: AnalyticsLead[]
+  quotes: AnalyticsQuote[]
   mileage: Database['public']['Tables']['fh_mileage']['Row'][]
   payments: Payment[]
   invoices: Database['public']['Tables']['fh_invoices']['Row'][]
@@ -1065,7 +1239,7 @@ export const analyticsKey = (userId: string | undefined, orgId?: string | null) 
   ['analytics', userId, orgId ?? null] as const
 
 async function fetchAnalyticsBundle(userId: string, orgId?: string | null): Promise<AnalyticsBundle> {
-  const [c, m, p, inv, co, cli, st] = await Promise.all([
+  const [c, m, p, inv, co, cli, st, leads, quotes] = await Promise.all([
     // Explicit projection instead of `*`, fh_contacts carries wide text
     // columns (notes, scope, proposal HTML) Analytics never touches. This
     // list covers exactly the fields Analytics.tsx reads off a contact:
@@ -1077,6 +1251,7 @@ async function fetchAnalyticsBundle(userId: string, orgId?: string | null): Prom
       scoped(supabase
         .from('fh_contacts')
         .select('id, user_id, client_id, name, stage, amount, cost, created_at, completed_at, updated_at, follow_up_on, proposal_status, job_type, quote_sent_at'), userId, orgId)
+        .not('stage', 'in', MOVED_STAGE_FILTER)
         .order('id', { ascending: true })
         .range(from, to)
     ),
@@ -1109,7 +1284,17 @@ async function fetchAnalyticsBundle(userId: string, orgId?: string | null): Prom
       .from('fh_stage_transitions')
       .select('contact_id, from_stage, to_stage, transitioned_at'), userId, orgId)
       .order('transitioned_at', { ascending: false })
-      .limit(4000)
+      .limit(4000),
+    fetchAllRows<AnalyticsLead>((from, to) =>
+      scoped(supabase.from('fh_leads').select('id, client_id, status, created_at, updated_at'), userId, orgId)
+        .order('id', { ascending: true })
+        .range(from, to)
+    ),
+    fetchAllRows<AnalyticsQuote>((from, to) =>
+      scoped(supabase.from('fh_quotes').select('id, client_id, status, amount, job_id, sent_at, created_at, updated_at'), userId, orgId)
+        .order('id', { ascending: true })
+        .range(from, to)
+    )
   ])
   if (st.error) throw st.error
   // computeFunnel's days-to-decision pairing expects chronological order.
@@ -1118,6 +1303,8 @@ async function fetchAnalyticsBundle(userId: string, orgId?: string | null): Prom
     .sort((a, b) => new Date(a.transitioned_at).getTime() - new Date(b.transitioned_at).getTime())
   return {
     contacts: c,
+    leads,
+    quotes,
     mileage: m,
     payments: p,
     invoices: inv,
@@ -1314,5 +1501,127 @@ export function useSubDetail(key: string | undefined, userId: string | undefined
     queryKey: subDetailKey(key, userId, orgId),
     queryFn: () => fetchSubDetail(key as string, userId as string, orgId),
     enabled: !!key && !!userId && orgId !== undefined
+  })
+}
+
+// ---- Leads and quotes (PHASE9_PLAN Task 9, SPEC D53, D55, D65) ----
+// Leads live on fh_leads and quotes on fh_quotes, each pointing at a
+// client. The lists carry the client so a row can show who; the detail
+// hooks read one row by id. Keys: ['leads', orgId], ['lead', id],
+// ['quotes', orgId], ['quote', id]. Writers invalidate ['leads'] or
+// ['quotes'] and the one record they changed.
+
+export type LeadClient = Pick<Client, 'id' | 'name' | 'phone' | 'email' | 'address'>
+export type LeadRow = Database['public']['Tables']['fh_leads']['Row'] & { fh_clients: LeadClient | null }
+export type QuoteRow = Database['public']['Tables']['fh_quotes']['Row'] & { fh_clients: LeadClient | null }
+
+const RECORD_CLIENT = 'fh_clients(id, name, phone, email, address)'
+
+export const leadsKey = (orgId: string | null | undefined) => ['leads', orgId ?? null] as const
+export const leadKey = (id: string | undefined) => ['lead', id] as const
+export const quotesKey = (orgId: string | null | undefined) => ['quotes', orgId ?? null] as const
+export const quoteKey = (id: string | undefined) => ['quote', id] as const
+
+async function fetchLeads(userId: string, orgId: string | null | undefined): Promise<LeadRow[]> {
+  return fetchAllRows<LeadRow>((from, to) =>
+    scoped(supabase.from('fh_leads').select(`*, ${RECORD_CLIENT}`), userId, orgId)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(from, to)
+  )
+}
+
+export function useLeads(userId: string | undefined) {
+  const orgId = useOrgScope(userId)
+  return useQuery({
+    queryKey: leadsKey(orgId),
+    queryFn: () => fetchLeads(userId as string, orgId),
+    enabled: !!userId && orgId !== undefined,
+    staleTime: 30_000
+  })
+}
+
+async function fetchLead(id: string): Promise<LeadRow | null> {
+  const { data, error } = await supabase.from('fh_leads').select(`*, ${RECORD_CLIENT}`).eq('id', id).maybeSingle()
+  if (error) throw error
+  return (data as LeadRow | null) ?? null
+}
+
+/** One lead by id. `data` is null when no fh_leads row has that id. */
+export function useLead(id: string | undefined, userId: string | undefined) {
+  return useQuery({
+    queryKey: leadKey(id),
+    queryFn: () => fetchLead(id as string),
+    enabled: !!id && !!userId
+  })
+}
+
+async function fetchQuotes(userId: string, orgId: string | null | undefined): Promise<QuoteRow[]> {
+  return fetchAllRows<QuoteRow>((from, to) =>
+    scoped(supabase.from('fh_quotes').select(`*, ${RECORD_CLIENT}`), userId, orgId)
+      .order('updated_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(from, to)
+  )
+}
+
+export function useQuotes(userId: string | undefined) {
+  const orgId = useOrgScope(userId)
+  return useQuery({
+    queryKey: quotesKey(orgId),
+    queryFn: () => fetchQuotes(userId as string, orgId),
+    enabled: !!userId && orgId !== undefined,
+    staleTime: 30_000
+  })
+}
+
+async function fetchQuote(id: string): Promise<QuoteRow | null> {
+  const { data, error } = await supabase.from('fh_quotes').select(`*, ${RECORD_CLIENT}`).eq('id', id).maybeSingle()
+  if (error) throw error
+  return (data as QuoteRow | null) ?? null
+}
+
+/** One quote by id. `data` is null when no fh_quotes row has that id. */
+export function useQuote(id: string | undefined, userId: string | undefined) {
+  return useQuery({
+    queryKey: quoteKey(id),
+    queryFn: () => fetchQuote(id as string),
+    enabled: !!id && !!userId
+  })
+}
+
+export function useInvalidateLeads() {
+  const client = useQueryClient()
+  return (id?: string) => {
+    void client.invalidateQueries({ queryKey: ['leads'] })
+    if (id) void client.invalidateQueries({ queryKey: leadKey(id) })
+  }
+}
+
+/** A schedule visit booked on a lead (fh_schedule start_at against lead_id). */
+export type LeadVisit = { lead_id: string | null; start_at: string | null }
+
+async function fetchLeadVisits(userId: string, orgId: string | null | undefined, fromIso: string): Promise<LeadVisit[]> {
+  const { data, error } = await scoped(supabase.from('fh_schedule').select('lead_id, start_at'), userId, orgId)
+    .not('lead_id', 'is', null)
+    .gte('start_at', fromIso)
+    .order('start_at', { ascending: true })
+  if (error) throw error
+  return (data ?? []) as LeadVisit[]
+}
+
+/**
+ * Visits booked on leads from the start of today on, for the "Estimate
+ * booked" chip on the leads list and the Jobs screen's Leads tab.
+ */
+export function useLeadVisits(userId: string | undefined) {
+  const orgId = useOrgScope(userId)
+  const now = new Date()
+  const fromIso = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+  return useQuery({
+    queryKey: ['leadVisits', orgId ?? null, fromIso],
+    queryFn: () => fetchLeadVisits(userId as string, orgId, fromIso),
+    enabled: !!userId && orgId !== undefined,
+    staleTime: 30_000
   })
 }

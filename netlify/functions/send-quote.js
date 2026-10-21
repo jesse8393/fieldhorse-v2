@@ -80,6 +80,7 @@ export default async (request) => {
 
   const {
     contact_id,
+    quote_id,
     sender_user_id,
     recipient_email,
     recipient_name,
@@ -90,10 +91,12 @@ export default async (request) => {
   } = body || {}
   const followUpProvided = Object.prototype.hasOwnProperty.call(body || {}, 'follow_up_on')
 
-  if (!contact_id || !sender_user_id || !recipient_email || !storage_path) {
+  // A quote record (fh_quotes, Task 11) sends with quote_id; a job's
+  // proposal still sends with contact_id.
+  if ((!contact_id && !quote_id) || !sender_user_id || !recipient_email || !storage_path) {
     return json({
       error: 'missing_fields',
-      required: ['contact_id', 'sender_user_id', 'recipient_email', 'storage_path']
+      required: ['contact_id or quote_id', 'sender_user_id', 'recipient_email', 'storage_path']
     }, 400)
   }
 
@@ -130,17 +133,27 @@ export default async (request) => {
   // 1. Verify the caller may act on the contact (job): its creator, or an
   // owner, admin or manager of its company. Service role bypasses RLS, so
   // this check is what prevents open-relay use.
-  const access = await loadAccessibleRow(supabase, {
-    table: 'fh_contacts', id: contact_id, callerId: sender_user_id,
-    select: 'name, job_title, stage, proposal_status'
-  })
+  const isQuote = Boolean(quote_id)
+  const access = await loadAccessibleRow(supabase, isQuote
+    ? { table: 'fh_quotes', id: quote_id, callerId: sender_user_id, select: 'title, status, client_id' }
+    : { table: 'fh_contacts', id: contact_id, callerId: sender_user_id, select: 'name, job_title, stage, proposal_status' })
   if (access.error === 'lookup_failed') {
-    return json({ error: 'contact_lookup_failed', message: 'Could not load this job. Try again.' }, 500)
+    return json({ error: 'contact_lookup_failed', message: isQuote ? 'Could not load this quote. Try again.' : 'Could not load this job. Try again.' }, 500)
   }
   if (!access.row) {
     return json({ error: 'forbidden_or_not_found', message: 'This record was not found, or your role cannot send it. Ask an owner, admin or manager.' }, 403)
   }
-  const contact = access.row
+  // The row the email is written from: for a quote, its title and the
+  // client's name stand where the job's title and contact name did.
+  let contact = access.row
+  if (isQuote) {
+    const { data: client } = await supabase
+      .from('fh_clients')
+      .select('name')
+      .eq('id', access.row.client_id)
+      .maybeSingle()
+    contact = { ...access.row, job_title: access.row.title, name: client?.name || null }
+  }
 
   // 2. Pull the company's profile for branding (company name) and the
   // reply-to address. company_email is preferred over the operator's auth
@@ -256,25 +269,36 @@ export default async (request) => {
   // if the quote isn't already past 'sent' (approved/closed shouldn't
   // be demoted). The CHECK constraint from migration 014 enforces the
   // legal value set.
-  const { contactPatch, scheduledFollowUpOn } = buildQuoteTrackingPatch({
-    stage: contact.stage,
-    proposalStatus: contact.proposal_status,
-    sentAtIso,
-    followUpProvided,
-    followUpOn: safeFollowUpOn
-  })
-  // Access was established above; scope by id only so a teammate's send
-  // records the same tracking state as the creator's.
-  await supabase
-    .from('fh_contacts')
-    .update(contactPatch)
-    .eq('id', contact_id)
+  let scheduledFollowUpOn = null
+  if (isQuote) {
+    // fh_quotes keeps its own status and sent_at; it has no follow up date.
+    await supabase
+      .from('fh_quotes')
+      .update(buildQuoteSendPatch({ status: contact.status, sentAtIso }))
+      .eq('id', quote_id)
+  } else {
+    const tracking = buildQuoteTrackingPatch({
+      stage: contact.stage,
+      proposalStatus: contact.proposal_status,
+      sentAtIso,
+      followUpProvided,
+      followUpOn: safeFollowUpOn
+    })
+    scheduledFollowUpOn = tracking.scheduledFollowUpOn
+    // Access was established above; scope by id only so a teammate's send
+    // records the same tracking state as the creator's.
+    await supabase
+      .from('fh_contacts')
+      .update(tracking.contactPatch)
+      .eq('id', contact_id)
+  }
 
   // Activity log row — best effort, never blocks the success response.
   try {
     await supabase.from('fh_notes').insert({
       user_id: sender_user_id,
-      contact_id,
+      contact_id: isQuote ? null : contact_id,
+      quote_id: isQuote ? quote_id : null,
       text: scheduledFollowUpOn
         ? `Proposal sent to ${normalizedEmail}. Follow up ${formatFollowUpOn(scheduledFollowUpOn)}.`
         : `Proposal sent to ${normalizedEmail}`,
@@ -386,6 +410,15 @@ export function buildQuoteTrackingPatch({
     contactPatch,
     scheduledFollowUpOn: !locked && followUpProvided ? followUpOn : null
   }
+}
+
+// fh_quotes after a send: sent_at is always the latest send; the status
+// becomes sent unless the quote is already decided (approved, rejected,
+// lost or expired), which a resend never demotes.
+export function buildQuoteSendPatch({ status, sentAtIso }) {
+  const current = String(status || 'draft').toLowerCase()
+  const locked = ['approved', 'rejected', 'lost', 'expired'].includes(current)
+  return { status: locked ? current : 'sent', sent_at: sentAtIso }
 }
 
 function formatFollowUpOn(value) {

@@ -15,6 +15,8 @@ import { expect, test, type BrowserContext, type Locator, type Page } from '@pla
 import { signIn } from './helpers/signIn'
 
 type Overrides = {
+  /** The quote's own status (fh_quotes.status); defaults to the contact block's proposal_status. */
+  status?: string
   contact?: Record<string, unknown>
   company?: Record<string, unknown>
   payments?: Array<Record<string, unknown>>
@@ -31,25 +33,31 @@ const ITEMS = [
 ]
 
 // $18,458.00 of base lines, so the default schedule's deposit is $9,229.00.
-function proposalPayload({ contact = {}, company = {}, payments = [], items = ITEMS }: Overrides = {}) {
+// The link points at an fh_quotes row (Task 11): the payload carries the
+// quote id and the quote's status, and keeps the contact block the page
+// has always read, with the client standing in for the contact.
+function proposalPayload({ status, contact = {}, company = {}, payments = [], items = ITEMS }: Overrides = {}) {
+  const contactBlock = {
+    id: 'q-portal',
+    name: 'Marco Castellanos',
+    address: '1150 Cherry Blossom Ln, La Vergne',
+    phone: '615 555 0101',
+    email: 'marco@example.com',
+    job_title: 'Pool deck pour',
+    stage: 'quote',
+    proposal_status: 'sent',
+    amount: 18458,
+    created_at: '2026-10-01T12:00:00.000Z',
+    quote_sent_at: '2026-10-02T12:00:00.000Z',
+    terms_text: '',
+    ...contact
+  }
   return {
     ok: true,
     kind: 'proposal',
-    contact: {
-      id: 'c-portal',
-      name: 'Marco Castellanos',
-      address: '1150 Cherry Blossom Ln, La Vergne',
-      phone: '615 555 0101',
-      email: 'marco@example.com',
-      job_title: 'Pool deck pour',
-      stage: 'quote',
-      proposal_status: 'sent',
-      amount: 18458,
-      created_at: '2026-10-01T12:00:00.000Z',
-      quote_sent_at: '2026-10-02T12:00:00.000Z',
-      terms_text: '',
-      ...contact
-    },
+    quote_id: 'q-portal',
+    status: status ?? contactBlock.proposal_status,
+    contact: contactBlock,
     company: {
       name: 'Parker Construction',
       phone: '615 555 0100',
@@ -123,8 +131,9 @@ async function mockPortal(context: BrowserContext, initial: Payload): Promise<Sp
   await context.route('**/api/public-link-approve', async (route) => {
     const body = route.request().postDataJSON()
     spies.approve.push(body)
-    // What the server does: the proposal is approved from now on.
+    // What the server does: the quote is approved from now on.
     current = proposalPayload({
+      status: 'approved',
       contact: { ...current.contact, proposal_status: 'approved' },
       company: current.company,
       payments: current.payments
@@ -418,16 +427,36 @@ test('a company is called by its first word only when that word stands alone', a
   expect(spies.stray).toEqual([])
 })
 
+// Task 11: the link resolves the quote record, so the payload's own status
+// is what the page reads, and the number on the page is seeded by the quote
+// id (q-portal), not by whatever id the contact block carries.
+test('the page reads the quote record: its status and its id drive the headline and the number', async ({ page, context }) => {
+  const spies = await mockPortal(context, proposalPayload({ status: 'approved', contact: { id: 'c-elsewhere', proposal_status: 'sent' }, company: LINK, payments: DEPOSIT_IN }))
+  await openPortal(page)
+  await expect(headline(page)).toHaveText('Hi Marco, your quote is approved.')
+  await expect(page.getByText('Quote PC-2026-RTAL', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Approve this quote' })).toHaveCount(0)
+
+  spies.setPayload(proposalPayload({ status: 'changes_requested', contact: { id: 'c-elsewhere', proposal_status: 'sent' } }))
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await expect(headline(page)).toHaveText('Hi Marco, here is your quote.')
+  await expect(steps(page).first()).toHaveText('Parker sends you a revised proposal.')
+  expect(spies.approve).toHaveLength(0)
+  expect(spies.stray).toEqual([])
+})
+
 // "Preview as" says it is what the customer sees, and draws this page from
-// the job (the Fieldhorse theme, D22). The customer page reads the job's
-// payments, so the preview reads them too: an approved quote with its
-// deposit in shows the same steps and the same capsule in both.
+// the quote (the Fieldhorse theme, D22). The customer page reads the
+// quote's payments, so the preview reads them too: an approved quote with
+// its deposit in shows the same steps and the same capsule in both. Since
+// Phase 9 the quote is its own record (fh_quotes, D53) and the preview is
+// the screen /quotes/:id/preview (D57).
 
 // An approved $3,150.00 quote with half of it, the deposit the default
 // terms name, paid, for the signed in "Preview as" tests below.
 function previewTables() {
   const line = (id: string, description: string, amount: number, sort_order: number) => ({
-    id, user_id: 'qa-user-1', contact_id: 'c-quote', section: null, description, qty: 1, unit: null,
+    id, user_id: 'qa-user-1', quote_id: 'q-quote', contact_id: null, section: null, description, qty: 1, unit: null,
     rate: amount, amount, notes: null, is_optional: false, is_excluded: false, sort_order
   })
   return {
@@ -436,18 +465,18 @@ function previewTables() {
       onboarded_at: '2026-07-10T14:00:00.000Z', logo_url: null, company_email: 'office@parker.co',
       brand_accent_hex: null, estimate_template: 'fieldhorse', preferences: {}
     }],
-    fh_contacts: [{
-      id: 'c-quote', stage: 'quote', name: 'MMC Properties', job_title: 'Parking lot repour', amount: 3150,
-      proposal_status: 'approved', quote_sent_at: '2026-10-02T12:00:00.000Z', user_id: 'qa-user-1',
-      client_id: 'cl-1', phone: '555-0101', email: 'x@y.com', address: '412 Burkitt Station Rd',
-      notes: null, scope_text: null, terms_text: null, milestones: [], follow_up_on: null,
+    fh_quotes: [{
+      id: 'q-quote', user_id: 'qa-user-1', client_id: 'cl-1', origin_contact_id: 'c-quote', lead_id: null, job_id: null,
+      title: 'Parking lot repour', amount: 3150, status: 'approved', sent_at: '2026-10-02T12:00:00.000Z', expires_at: null,
+      scope_text: null, terms_text: null, exclusions_text: null, job_type: null, change_request_note: null,
+      change_requested_at: null, approved_version_id: null,
       created_at: '2026-10-01T12:00:00.000Z', updated_at: '2026-10-09T12:00:00.000Z',
-      completed_at: null, invoice_no: null, client_name: 'Jeff Roy',
-      fh_clients: { id: 'cl-1', name: 'Jeff Roy', phone: '555-0101', email: 'jeff@roy.com' }
+      fh_clients: { id: 'cl-1', name: 'MMC Properties', phone: '555-0101', email: 'jeff@roy.com', address: '412 Burkitt Station Rd' }
     }],
     fh_quote_items: [line('qi1', 'Excavate and grade', 2200, 0), line('qi2', 'Pump truck', 950, 1)],
-    // Half of the $3,150.00 total, the deposit the default terms name.
-    fh_payments: [{ id: 'pd1', user_id: 'qa-user-1', contact_id: 'c-quote', amount: 1575, kind: 'deposit', method: 'check', reference: '2210', paid_on: '2026-10-09', created_at: '2026-10-09T15:00:00.000Z' }]
+    // Half of the $3,150.00 total, the deposit the default terms name. The
+    // preview reads the quote's payments by its id until Task 11 moves them.
+    fh_payments: [{ id: 'pd1', user_id: 'qa-user-1', contact_id: 'q-quote', amount: 1575, kind: 'deposit', method: 'check', reference: '2210', paid_on: '2026-10-09', created_at: '2026-10-09T15:00:00.000Z' }]
   }
 }
 
@@ -462,10 +491,11 @@ async function spyOnSends(context: BrowserContext) {
 }
 
 async function openPreviewAs(page: Page) {
-  await page.goto('/quotes/c-quote?tab=quote', { waitUntil: 'domcontentloaded', timeout: 60_000 })
-  await expect(page.locator('.fhq-page')).toBeVisible({ timeout: 30_000 })
-  await page.getByRole('button', { name: 'Preview as MMC Properties' }).click()
-  return page.getByRole('dialog', { name: 'Proposal preview' })
+  await page.goto('/quotes/q-quote', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.locator('.fhqt-page')).toBeVisible({ timeout: 30_000 })
+  await page.getByRole('link', { name: 'Preview as MMC Properties' }).click()
+  await expect(page).toHaveURL(/\/quotes\/q-quote\/preview$/)
+  return page.getByRole('group', { name: 'Proposal preview' })
 }
 
 // What the preview shows once it has read the payments: the deposit is in.
@@ -491,8 +521,7 @@ async function expectNothingUnpaid(preview: Locator) {
   await expect(preview.getByText(/to reserve your start date|You pay the deposit\.|Pay deposit/)).toHaveCount(0)
 }
 
-test('the in app preview shows an approved quote with its deposit in as the customer page does', async ({ context, page }, testInfo) => {
-  test.skip(!testInfo.project.name.startsWith('mobile'), 'Preview as is on the phone quote page; the desktop Document view draws the same preview pane')
+test('the in app preview shows an approved quote with its deposit in as the customer page does', async ({ context, page }) => {
   const sends = await spyOnSends(context)
   await signIn(context, { tables: previewTables() })
   const preview = await openPreviewAs(page)
@@ -505,8 +534,7 @@ test('the in app preview shows an approved quote with its deposit in as the cust
 // the deposit." and no Deposit received chip (Phase 8 follow up B, second
 // review). It waits for the read as it waits for the photos, and a read
 // that fails says so, with Try again, and draws no quote.
-test('the in app preview waits for the payments, and says so when it cannot read them instead of showing nothing paid', async ({ context, page }, testInfo) => {
-  test.skip(!testInfo.project.name.startsWith('mobile'), 'Preview as is on the phone quote page; the desktop Document view draws the same preview pane')
+test('the in app preview waits for the payments, and says so when it cannot read them instead of showing nothing paid', async ({ context, page }) => {
   const sends = await spyOnSends(context)
   await signIn(context, { tables: previewTables() })
   // The preview's read of the job's payments: held until released, refused,

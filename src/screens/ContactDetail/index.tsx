@@ -1,41 +1,32 @@
 import { lazy, Suspense, useState, useMemo, useEffect, useRef } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
-import { AnimatePresence } from 'framer-motion'
 import { XCircle, ArrowRight } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useMembership } from '../../contexts/MembershipContext.tsx'
 import { supabase } from '../../lib/supabase.ts'
-import { markLost, startQuote, reopen, reopenQuestion } from '../../lib/pipeline.ts'
-import { stageColor, margin } from '../../lib/stages.ts'
+import { reopen, reopenQuestion } from '../../lib/pipeline.ts'
+import { newRecordRoute, recordRoute } from '../../lib/records.ts'
+import { stageColor, margin, isMovedStage } from '../../lib/stages.ts'
+import { MovedRecordRedirect } from '../../components/MovedRecordRedirect.tsx'
 import { toastSuccess, toastError } from '../../lib/toast.ts'
-import { hapticTap, hapticError } from '../../lib/haptics.ts'
+import { hapticTap } from '../../lib/haptics.ts'
+import { useSecondTap } from '../../lib/secondTap.ts'
 import { SkeletonBlock as SkeletonBlock_, SkeletonList as SkeletonList_ } from '../../components/Skeleton.tsx'
 const SkeletonBlock = SkeletonBlock_ as any
 const SkeletonList = SkeletonList_ as any
-import ActionSheet from '../../components/ActionSheet.tsx'
-import AddEventSheet from '../../components/AddEventSheet.tsx'
-import InvitePartnerSheet from '../../components/InvitePartnerSheet.tsx'
 import DataErrorState from '../../components/DataErrorState.tsx'
-import { useConfirm } from '../../components/ConfirmSheet.tsx'
-// Lazy, sheets only mount on operator action (Mark Complete /
-// Record Payment respectively).
-const MarkCompleteSheet = lazy(() => import('../../components/MarkCompleteSheet.tsx'))
-const V3PaymentSheet = lazy(() => import('../../components/V3PaymentSheet.tsx'))
-const SendInvoiceSheet = lazy(() => import('../../components/SendInvoiceSheet.tsx'))
 import { Eyebrow } from '../../components/v3'
 import { tabPanelProps } from '../../lib/tabs.ts'
 import { useJobData } from './hooks/useJobData.ts'
 import { computeJobHealth } from './lib/jobHealth.ts'
-import { tabsForStage, resolveTabForStage } from './lib/stageWorkspace.ts'
+import { tabsForStage, resolveTabForStage, stageCta as stageCtaFor } from './lib/stageWorkspace.ts'
 import { tabsForRole, pickVisibleTab } from './lib/jobAccess.ts'
 import OverviewTab from './tabs/Overview.tsx'
-// Lazy, non-default tabs + sections + ApproveQuoteSheet only render
+// Lazy, non-default tabs + sections only render
 // when the operator picks them. Saves ~290KB of code from the initial
 // ContactDetail route chunk. Overview stays eager because it's the
 // default tab (and would otherwise flash a suspense fallback on every
 // detail-page open).
-const QuoteTab = lazy(() => import('./tabs/Quote.tsx'))
 const DetailsTab = lazy(() => import('./tabs/Details.tsx'))
 const FinancialsTab = lazy(() => import('./tabs/Financials.tsx'))
 const FilesTab = lazy(() => import('./tabs/Files.tsx'))
@@ -43,18 +34,15 @@ const DailyLogsSection = lazy(() => import('./sections/DailyLogs.tsx'))
 const SelectionsSection = lazy(() => import('./sections/Selections.tsx'))
 const MaterialsSection = lazy(() => import('./sections/Materials.tsx'))
 const ChangeOrdersSection = lazy(() => import('./sections/ChangeOrdersSection.tsx'))
-const ApproveQuoteSheet = lazy(() => import('./sections/ApproveQuoteSheet.tsx'))
 const SnowJobDetailBuild = lazy(() => import('../../components/desktop/SnowJobDetailBuild.tsx'))
 import { useIsDesktop } from '../../lib/useMediaQuery.ts'
 import { useHideDock } from '../../lib/dockVisibility.ts'
 import { openCapture } from '../../lib/captureAttach.ts'
 import { jobMoney } from './lib/spine.ts'
 import { assignedCrewIds, railNotes } from './lib/jobDesktop.ts'
-import JobHeaderPhone, { JobSectionTabs, JobMoreSheet } from './phone/JobHeaderPhone.tsx'
-import type { JobMoreAction } from './phone/JobHeaderPhone.tsx'
+import JobHeaderPhone, { JobSectionTabs } from './phone/JobHeaderPhone.tsx'
 import JobActionCapsule from './phone/JobActionCapsule.tsx'
 import { useJobPhotos } from './phone/SpineList.tsx'
-import { saveFollowUp } from '../../lib/followUp.ts'
 
 // Tab fallback for Suspense, replaces fallback={null}, which made tab
 // taps look broken (active state animates, then blank space for the
@@ -71,9 +59,9 @@ function TabFallback() {
   )
 }
 
+// The job carries no Quote tab: a quote is a record of its own (Phase 9, D53).
 const TOP_TABS = [
   { id: 'overview',      label: 'Overview' },
-  { id: 'quote',         label: 'Quote' },
   { id: 'details',       label: 'Details' },
   { id: 'selections',    label: 'Selections' },
   { id: 'materials',     label: 'Materials' },
@@ -89,7 +77,7 @@ type JobActionIntentMeta = {
   title: string
   detail: string
   primaryLabel: string
-  tab: 'overview' | 'quote' | 'financials' | 'change_orders'
+  tab: 'overview' | 'financials' | 'change_orders'
 }
 
 const JOB_ACTION_INTENTS = {
@@ -104,8 +92,8 @@ const JOB_ACTION_INTENTS = {
     eyebrow: 'Quote signal',
     title: 'Quote follow up',
     detail: 'This quote has gone quiet after engagement. Review the proposal before calling or messaging.',
-    primaryLabel: 'Review quote',
-    tab: 'quote',
+    primaryLabel: 'Open overview',
+    tab: 'overview',
   },
   reschedule: {
     eyebrow: 'Schedule risk',
@@ -117,8 +105,8 @@ const JOB_ACTION_INTENTS = {
   send_invoice: {
     eyebrow: 'Billing action',
     title: 'Send invoice',
-    detail: 'This job is ready for billing. Create or send the invoice while the work is still fresh.',
-    primaryLabel: 'Send invoice',
+    detail: 'This job is ready for billing. Start the invoice while the work is still fresh.',
+    primaryLabel: 'Invoice this',
     tab: 'financials',
   },
   nudge_invoice: {
@@ -233,8 +221,11 @@ function ActionIntentBanner({
 }
 
 /**
- * ContactDetail, v3 parent shell. Composes the data hook + chrome + tab router
- * + modals. Tab content lives in ./tabs/. Section CRUD lives in ./sections/.
+ * ContactDetail, v3 parent shell. Composes the data hook + chrome + tab
+ * router. Tab content lives in ./tabs/. Section CRUD lives in ./sections/.
+ * Every action that used to open a sheet is a screen of its own (Phase 9,
+ * Task 13, D57): /jobs/:id/payment, /partner, /complete, /more and
+ * /follow-up, /schedule/new?job= and /invoices/new?job=.
  *
  * Tab state is URL-synced (?tab=overview|details|financials|files) so
  * notifications + emails can deep-link into a specific tab.
@@ -247,7 +238,6 @@ export default function ContactDetail() {
   const [searchParams, setSearchParams] = useSearchParams()
 
   const data = useJobData(id, user?.id)
-  const queryClient = useQueryClient()
   const {
     contact, subs, expenses, payments, inspections, notes,
     scheduleItems, scheduleCount, todos, clientSummary,
@@ -255,7 +245,8 @@ export default function ContactDetail() {
     paid, contractTotal, balance, credit, loading, isError, fetchAll, patch
   } = data
   const isDesktop = useIsDesktop()
-  const confirm = useConfirm() as any
+  // Reopen takes a second tap on the same gold button (D57).
+  const reopenTap = useSecondTap()
 
   // Role gates from lib/permissions.ts. Field roles (foreman, crew) reach
   // this screen from /work and /crew, but money stays with owner, admin
@@ -307,13 +298,8 @@ export default function ContactDetail() {
   // Field roles lose the money only tabs (Quote, Change orders) and get
   // Financials as an expenses only view.
   const visibleTabs = tabsForRole(TOP_TABS.filter((t) => stageTabs.includes(t.id as any)), canSeeMoney)
-  // Jobber-style: a quote IS the quote. Opening a quote-stage deal lands
-  // straight in the quote document instead of the Overview cockpit, so you
-  // don't "open a deal, then go build a quote." Every other stage keeps
-  // Overview as its home. `defaultTab` is also the param we omit from the
-  // URL, so navigating to Overview on a quote sets ?tab=overview (and
-  // doesn't bounce straight back to the quote).
-  const defaultTab = String(contact?.stage || '').toLowerCase() === 'quote' && canSeeMoney ? 'quote' : 'overview'
+  // Overview is home for every stage, and the param the URL omits.
+  const defaultTab = 'overview'
   const urlTab = (tabParam && VALID_TABS.has(tabParam))
     ? resolveTabForStage(contact?.stage, tabParam)
     : defaultTab
@@ -333,25 +319,29 @@ export default function ContactDetail() {
   // override so the URL wins again.
   useEffect(() => { setLocalTab(null) }, [tabParam])
 
-  // Modals, own state, parent dispatches
-  const [eventOpen, setEventOpen] = useState(false)
-  const [payModalOpen, setPayModalOpen] = useState(false)
-  const [inviteOpen, setInviteOpen] = useState(false)
-  const [deleteOpen, setDeleteOpen] = useState(false)
+  // The job's screens (D57). Each action is a route; Back returns here.
+  const home = recordRoute('job', id || '')
+  const openPayment = () => navigate(`${home}/payment`)
+  const openInvite = () => navigate(`${home}/partner`)
+  const openComplete = () => navigate(`${home}/complete`)
+  const openEvent = () => navigate(`/schedule/new?job=${encodeURIComponent(id || '')}`)
+  // Invoice this: a new invoice with the client and the balance filled (D61).
+  const openInvoice = () => navigate(newRecordRoute('invoice', { job: id || '' }))
+  // Delete asks with a second tap on the same button (D57).
+  const deleteTap = useSecondTap()
   const [deleting, setDeleting] = useState(false)
-  const [deleteErr, setDeleteErr] = useState('')
-  // Approve Quote sheet, lifted to root so the Overview NextAction CTA
-  // and the Quote tab ApproveBand both open the same sheet without
-  // duplicating state. Phase 4C-2.
-  const [approveOpen, setApproveOpen] = useState(false)
-  const [completeOpen, setCompleteOpen] = useState(false)
-  // Send-invoice sheet (pipeline v2), the job screen's one tap billing
-  // action. Opened by the stage CTA, Overview quick action, and the
-  // next-action resolver's 'sendInvoice' suggestion.
-  const [invoiceOpen, setInvoiceOpen] = useState(false)
-  // Edit mode is a flag the Overview tab + section editors read.
-  // Header EDIT button toggles + jumps to overview if currently on another tab.
-  const [isEditing, setIsEditing] = useState(false)
+  // Edit mode is a flag the Overview tab + section editors read. The
+  // header's Edit toggles it and jumps to overview if on another tab; the
+  // More screen's "Edit job details" arrives with ?edit=1.
+  const [isEditing, setIsEditing] = useState(() => searchParams.get('edit') === '1')
+  useEffect(() => {
+    if (searchParams.get('edit') !== '1') return
+    setIsEditing(true)
+    const sp = new URLSearchParams(searchParams)
+    sp.delete('edit')
+    setSearchParams(sp, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
 
   // Phone (spec 8.1 and 9.4): the page brings its own onyx action
   // capsule, so the dock steps aside while it is mounted. The header's
@@ -360,7 +350,6 @@ export default function ContactDetail() {
   useHideDock(!isDesktop)
   const jobPhotos = useJobPhotos(id)
   const tabsRef = useRef<HTMLDivElement | null>(null)
-  const [moreOpen, setMoreOpen] = useState(false)
   // Photos the capsule's camera took, waiting for the Files tab to upload.
   const [pendingPhotos, setPendingPhotos] = useState<File[] | null>(null)
   const requestedIntent = readJobActionIntent(searchParams.get('action'))
@@ -388,18 +377,23 @@ export default function ContactDetail() {
     clearActionIntent(resolvedTab)
 
     if (actionIntent === 'reschedule') {
-      setEventOpen(true)
+      openEvent()
       return
     }
     if (actionIntent === 'send_invoice' || actionIntent === 'nudge_invoice') {
-      setInvoiceOpen(true)
+      openInvoice()
     }
+  }
+
+  // The desktop banner's Delete: the first tap arms it, the second deletes.
+  function requestDelete() {
+    if (deleting || !canDeleteJob) return
+    deleteTap.tap(() => { void handleDelete() })
   }
 
   async function handleDelete() {
     if (deleting || !canDeleteJob) return
     setDeleting(true)
-    setDeleteErr('')
     try {
       const deletedName = contact?.name || 'this job'
       // By id only: the owner deletes any job in the org, whoever created
@@ -414,7 +408,7 @@ export default function ContactDetail() {
       if (error) throw error
       if (!removed || removed.length === 0) {
         setDeleting(false)
-        setDeleteErr("This job wasn't deleted. It may already be gone, or your account can't delete it.")
+        toastError("This job wasn't deleted", "It may already be gone, or your account can't delete it.")
         return
       }
       toastSuccess('Deleted', `${deletedName} and cascading rows removed`)
@@ -422,7 +416,7 @@ export default function ContactDetail() {
     } catch (e: any) {
       console.error('Delete contact failed:', e)
       setDeleting(false)
-      setDeleteErr("Couldn't delete this job. Check your connection and try again.")
+      toastError("Couldn't delete this job", 'Check your connection and try again.')
     }
   }
 
@@ -446,11 +440,17 @@ export default function ContactDetail() {
     )
   }
 
+  // The migration moved this row into fh_leads or fh_quotes (SPEC D56):
+  // an old link lands on the new record. A row that is gone gets the same
+  // lookup, in case the marked rows were cleaned up. The not found view
+  // below is the fallback when nothing points back at the id.
+  const lookForMoved = id && !isError && (!contact || isMovedStage(contact.stage))
+
   // Not found, or could not load. A failed fetch (offline, 5xx, expired
   // session) is not proof the job is gone, so it gets a retry instead of
   // "not found".
-  if (!contact) {
-    return (
+  if (!contact || lookForMoved) {
+    const notFound = (
       <div style={{ padding: '32px 24px', minHeight: '100%', background: 'var(--v3-bg)', textAlign: 'center' }}>
         <button
           type="button"
@@ -475,44 +475,25 @@ export default function ContactDetail() {
         )}
       </div>
     )
+    if (lookForMoved) return <MovedRecordRedirect id={id} fallback={notFound} />
+    return notFound
   }
 
-  // Phase 8, desktop dispatch. At >=900px every tab (including Quote)
-  // renders through DesktopJobDetail so the back button + eyebrow +
-  // tab nav stay visually consistent. The Quote tab's 2-pane workspace
-  // (.v3-screen--quote-active wrapper) is preserved; DesktopJobDetail
-  // hides its right context rail when tab === 'quote' so the Quote
-  // builder gets full width. 5/17 chrome unification, fixes the 5/13
-  // audit's "two design systems on one page" finding where switching
-  // to Quote on desktop swapped the entire chrome.
-  // Phone (<900px) draws the redesigned top (photo header, onyx band,
-  // stage rail, money strip, quick actions), the section tabs with the
-  // Spine first (decision D5) and the floating action capsule. Modals
-  // stay mounted at the wrapper level so both branches can dispatch them.
+  // Phase 8, desktop dispatch. At >=900px every tab renders through
+  // DesktopJobDetail so the back button + eyebrow + tab nav stay visually
+  // consistent. Phone (<900px) draws the redesigned top (photo header,
+  // onyx band, stage rail, money strip, quick actions), the section tabs
+  // with the Spine first (decision D5) and the floating action capsule.
   const useDesktopShell = isDesktop
 
-  // Per-stage primary action, gives the mobile deal screen the same
-  // "what do I do next at this stage" CTA the desktop shell already has
-  // (DesktopJobDetail's nextActionFor). Closed/lost are terminal → null.
-  // "Build quote" on a lead also transitions the stage to 'quote' so the
-  // deal actually advances, otherwise clicking it just jumps tabs and
-  // the lead never leaves the lead stage.
-  async function onBuildQuote() {
+  // Reopen asks first: the first tap arms the button and says where the
+  // job goes (reopenQuestion), the second moves it.
+  function onReopen() {
     if (!contact) return
-    const res: any = await startQuote(contact)
-    if (res?.error) {
-      toastError("Couldn't start quote", res.error.message || 'Try again')
-      return
-    }
-    await fetchAll()
-    setTab('quote')
+    reopenTap.tap(() => { void reopenNow() })
   }
-
-  // Reopen asks first, like Mark lost below (Phase 8, Task 15).
-  async function onReopen() {
+  async function reopenNow() {
     if (!contact) return
-    const ok = await confirm(reopenQuestion(contact))
-    if (!ok) return
     const res: any = await reopen(contact)
     if (res?.error) {
       toastError("Couldn't reopen", res.error.message || 'Try again')
@@ -521,47 +502,17 @@ export default function ContactDetail() {
     await fetchAll()
   }
 
-  // Mark lost is a sales move: money roles only, and only while the deal
-  // is still a lead or quote (same rule as the Work list). A won job
-  // marked lost would drop its revenue out of the won totals.
-  const canMarkLost = canMoveMoney && (contact.stage === 'lead' || contact.stage === 'quote')
-  async function onMarkLost() {
-    if (!contact || !canMarkLost) return
-    const ok = await confirm({
-      title: 'Mark this deal lost?',
-      body: 'It moves to the lost column. You can reopen it later as a lead.',
-      confirmLabel: 'Mark lost',
-      destructive: true
-    })
-    if (!ok) return
-    hapticError()
-    // pipeline.markLost toasts on success; only the failure needs one.
-    const res: any = await markLost(contact)
-    if (res?.error) {
-      toastError("Couldn't mark lost", res.error.message || 'Try again')
-      return
-    }
-    fetchAll()
-  }
-
-  // Job-stage CTA: the user's #1 ask, invoice straight from the job.
-  // While money is still owed the primary action is Send invoice; once
-  // the balance is collected the job is ready for its closeout.
-  // ('invoice' is the legacy alias of 'job', same treatment.) Every one
-  // of these is a pipeline or billing move, so field roles get none.
-  const stageCta: { label: string; onClick: () => void } | null =
-    !canMoveMoney ? null
-    : contact.stage === 'lead'    ? { label: 'Convert to quote', onClick: onBuildQuote }
-    : contact.stage === 'quote'
-      ? contact.proposal_status === 'changes_requested'
-        ? { label: 'Review changes', onClick: () => setTab('quote') }
-        : { label: 'Approve quote', onClick: () => setApproveOpen(true) }
-    : contact.stage === 'job' || contact.stage === 'invoice'
-      ? (Number(balance || 0) > 0
-          ? { label: 'Send invoice',   onClick: () => setInvoiceOpen(true) }
-          : { label: 'Mark complete',  onClick: () => setCompleteOpen(true) })
-    : contact.stage === 'closed'  ? { label: 'Reopen',         onClick: onReopen }
-    : contact.stage === 'lost'    ? { label: 'Reopen',         onClick: onReopen }
+  // The one gold action (SPEC D61): Invoice this while money is owed,
+  // Mark complete once the balance is collected, Reopen on a closed or
+  // lost job. Every one is a billing or pipeline move, so field roles get
+  // none.
+  const cta = canMoveMoney ? stageCtaFor(contact.stage, balance) : null
+  const stageCta: { label: string; onClick: () => void; hint?: string } | null = cta
+    ? {
+        label: cta.action === 'reopen' && reopenTap.armed ? 'Tap again to reopen' : cta.label,
+        hint: cta.action === 'reopen' && reopenTap.armed ? reopenQuestion(contact).body : undefined,
+        onClick: cta.action === 'invoice' ? openInvoice : cta.action === 'complete' ? openComplete : onReopen
+      }
     : null
 
   // Phone money strip: contract, paid, balance and the margin chip, for
@@ -586,18 +537,9 @@ export default function ContactDetail() {
     })
   }
 
-  // The more button's sheet carries what the old header row and menu
-  // did: edit, the linked client, schedule, partner, mark lost, delete.
+  // The more button opens the job's More screen, which carries what the
+  // old menu did: edit, the client, a follow up, a visit, a partner, delete.
   const isOwnerView = !!user?.id && contact.user_id === user.id
-  const moreActions: JobMoreAction[] = [
-    { id: 'edit', label: isEditing ? 'Stop editing' : 'Edit job details', onSelect: handleEditClick },
-    ...(isOwnerView && contact.client_id
-      ? [{ id: 'client', label: 'Open the client', subline: clientSummary?.name || undefined, onSelect: () => navigate(`/clients/${contact.client_id}`) }]
-      : []),
-    { id: 'event', label: 'Schedule an event', onSelect: () => setEventOpen(true) },
-    { id: 'partner', label: 'Invite a partner', onSelect: () => setInviteOpen(true) },
-    ...(canMarkLost ? [{ id: 'lost', label: 'Mark lost', onSelect: () => { void onMarkLost() } }] : [])
-  ]
 
   // Tab router, rendered once and placed in either shell. The desktop
   // and mobile branches used to carry their own copies, and the desktop
@@ -625,30 +567,15 @@ export default function ContactDetail() {
           canSeeMoney={canSeeMoney}
           canMoveMoney={canMoveMoney}
           onExitEdit={() => setIsEditing(false)}
-          onOpenAddEvent={() => setEventOpen(true)}
-          onOpenLogPayment={() => setPayModalOpen(true)}
-          onOpenInvitePartner={() => setInviteOpen(true)}
-          onOpenApproveQuote={() => setApproveOpen(true)}
-          onOpenMarkComplete={() => setCompleteOpen(true)}
-          onOpenSendInvoice={() => setInvoiceOpen(true)}
-          onOpenQuote={() => setTab('quote')}
+          onOpenAddEvent={openEvent}
+          onOpenLogPayment={openPayment}
+          onOpenInvitePartner={openInvite}
+          onOpenMarkComplete={openComplete}
+          onOpenSendInvoice={openInvoice}
           spineFirst
           inspections={inspections}
           onAddToSpine={() => openCapture({ jobId: contact.id })}
         />
-      )}
-      {tab === 'quote' && (
-        <Suspense fallback={<TabFallback />}>
-          <QuoteTab
-            contact={contact}
-            userId={user?.id}
-            fetchAll={fetchAll}
-            patch={patch}
-            onOpenApprove={() => setApproveOpen(true)}
-            insurance={insurance}
-            changeOrders={changeOrders}
-          />
-        </Suspense>
       )}
       {tab === 'details' && (
         <Suspense fallback={<TabFallback />}>
@@ -659,8 +586,8 @@ export default function ContactDetail() {
             userId={user?.id}
             fetchAll={fetchAll}
             patch={patch}
-            onOpenAddEvent={() => setEventOpen(true)}
-            onOpenInvitePartner={() => setInviteOpen(true)}
+            onOpenAddEvent={openEvent}
+            onOpenInvitePartner={openInvite}
             insurance={insurance}
             canSeeMoney={canSeeMoney}
           />
@@ -678,7 +605,7 @@ export default function ContactDetail() {
             userId={user?.id}
             fetchAll={fetchAll}
             patch={patch}
-            onOpenLogPayment={() => setPayModalOpen(true)}
+            onOpenLogPayment={openPayment}
             insurance={insurance}
             changeOrders={changeOrders}
             canSeeMoney={canSeeMoney}
@@ -726,10 +653,7 @@ export default function ContactDetail() {
   )
 
   return (
-    <div
-      className={`v3-screen v3-screen--job-detail${tab === 'quote' ? ' v3-screen--quote-active' : ''}`}
-      style={{ position: 'relative' }}
-    >
+    <div className="v3-screen v3-screen--job-detail" style={{ position: 'relative' }}>
       {useDesktopShell ? (
         (() => {
           // Compute truthful rail signals, null when there's no
@@ -813,8 +737,9 @@ export default function ContactDetail() {
               onBack={() => navigate(detailHome)}
               backLabel={detailBackLabel}
               onEdit={handleEditClick}
-              onDelete={canDeleteJob ? () => setDeleteOpen(true) : undefined}
-              onAddEvent={() => setEventOpen(true)}
+              onDelete={canDeleteJob ? requestDelete : undefined}
+              deleteArmed={deleteTap.armed}
+              onAddEvent={openEvent}
               primaryAction={stageCta}
               isEditing={isEditing}
               coverUrl={jobPhotos.cover?.url ?? null}
@@ -822,7 +747,7 @@ export default function ContactDetail() {
               money={phoneMoney}
               railNotes={deskRailNotes}
               crewIds={deskCrewIds}
-              onInvitePartner={() => setInviteOpen(true)}
+              onInvitePartner={openInvite}
               onOpenClient={isOwnerView && contact.client_id ? () => navigate(`/clients/${contact.client_id}`) : undefined}
               scheduleStatus={scheduleStatus}
               reportsMissing={reportsMissing}
@@ -852,7 +777,7 @@ export default function ContactDetail() {
           money={phoneMoney}
           backLabel={detailBackLabel}
           onBack={() => navigate(detailHome)}
-          onMore={() => setMoreOpen(true)}
+          onMore={() => navigate(`${home}/more`)}
           onOpenPhotos={() => openSection('files')}
         />
 
@@ -879,165 +804,13 @@ export default function ContactDetail() {
           {tabPanels}
         </div>
 
-        {/* The Quote tab brings its own capsule (the total variant, from
-            phone/QuotePhone.tsx), so this one steps aside there. Every
-            other tab keeps the actions capsule. */}
-        {tab !== 'quote' && (
-          <JobActionCapsule
-            action={stageCta}
-            onPhotos={(files) => { setPendingPhotos(files); openSection('files') }}
-            onVoice={() => openCapture({ jobId: contact.id })}
-          />
-        )}
-
-        <JobMoreSheet
-          open={moreOpen}
-          onOpenChange={setMoreOpen}
-          title={contact.job_title || contact.name || 'This job'}
-          actions={moreActions}
-          followUp={contact.stage === 'lost' || contact.stage === 'closed'
-            ? undefined
-            : { current: contact.follow_up_on ?? null, onSet: (when) => { void saveFollowUp(queryClient, contact, user?.id, when) } }}
-          onDelete={canDeleteJob ? () => setDeleteOpen(true) : undefined}
+        <JobActionCapsule
+          action={stageCta}
+          onPhotos={(files) => { setPendingPhotos(files); openSection('files') }}
+          onVoice={() => openCapture({ jobId: contact.id })}
         />
       </div>
       )}
-
-      {/* MODALS. The billing, closeout and approval sheets only mount for
-          money roles, so no stray open state can surface them to crew. */}
-      <AnimatePresence>
-        {payModalOpen && canMoveMoney && (
-          <Suspense fallback={null}>
-            <V3PaymentSheet
-              contact={contact}
-              balance={balance}
-              onClose={() => setPayModalOpen(false)}
-              onLogged={() => { setPayModalOpen(false); fetchAll() }}
-            />
-          </Suspense>
-        )}
-      </AnimatePresence>
-
-      <AddEventSheet
-        open={eventOpen}
-        userId={user?.id}
-        defaultContactId={contact.id}
-        onClose={() => setEventOpen(false)}
-        onSaved={() => { setEventOpen(false); toastSuccess('Event scheduled', 'Added to schedule'); fetchAll() }}
-      />
-
-      <InvitePartnerSheet
-        open={inviteOpen}
-        onOpenChange={setInviteOpen}
-        contactId={contact.id}
-        contactName={contact.name}
-        invitedByUserId={user?.id}
-      />
-
-      {canMoveMoney && (
-        <>
-          <Suspense fallback={null}>
-            <MarkCompleteSheet
-              open={completeOpen}
-              userId={user?.id}
-              contact={contact}
-              onClose={() => setCompleteOpen(false)}
-              onSaved={fetchAll}
-            />
-          </Suspense>
-
-          <Suspense fallback={null}>
-            <SendInvoiceSheet
-              open={invoiceOpen}
-              userId={user?.id}
-              contact={contact}
-              payments={payments}
-              changeOrders={changeOrders}
-              insurance={insurance}
-              onClose={() => setInvoiceOpen(false)}
-              onDone={fetchAll}
-            />
-          </Suspense>
-
-          <Suspense fallback={null}>
-            <ApproveQuoteSheet
-              open={approveOpen}
-              contact={contact}
-              userId={user?.id}
-              onClose={() => setApproveOpen(false)}
-              onApproved={fetchAll}
-            />
-          </Suspense>
-        </>
-      )}
-
-      <ActionSheet
-        open={deleteOpen}
-        title="Delete this job?"
-        accentWord="Delete"
-        sectionLabel="Destructive"
-        stepCount={1}
-        currentStep={1}
-        commitLabel={deleting ? 'Deleting…' : 'Yes, delete everything'}
-        commitBusy={deleting}
-        commitDisabled={deleting}
-        destructive
-        onClose={() => { if (!deleting) { setDeleteOpen(false); setDeleteErr('') } }}
-        onCommit={handleDelete}
-      >
-        {deleteErr && (
-          <div className="fh-sheet-error" role="alert">
-            <span className="fh-sheet-error__dot" aria-hidden="true" />
-            <span className="fh-sheet-error__text">{deleteErr}</span>
-            <button type="button" className="fh-sheet-error__dismiss" aria-label="Dismiss" onClick={() => setDeleteErr('')}>×</button>
-          </div>
-        )}
-        <p style={{ margin: 0, color: 'var(--v3-text)', fontSize: '1rem', lineHeight: 1.45 }}>
-          Removing <strong>{contact?.name || 'this job'}</strong> cascades to everything attached.
-        </p>
-        <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <DeleteCascadeRow label="Subs" count={subs.length} />
-          <DeleteCascadeRow label="Expenses" count={expenses.length} />
-          <DeleteCascadeRow label="Payments" count={payments.length} />
-          <DeleteCascadeRow label="Inspections" count={inspections.length} />
-          <DeleteCascadeRow label="Schedule items" count={scheduleCount} />
-          <DeleteCascadeRow label="Notes" count={notes.length} detail="detached + archived" />
-        </ul>
-        <Eyebrow as="p" tone="alert" style={{ margin: 0, fontSize: 12 }}>
-          This cannot be undone.
-        </Eyebrow>
-      </ActionSheet>
     </div>
   )
 }
-
-/* ============================================================
-   DELETE CASCADE ROW (used inside the delete ActionSheet)
-   ============================================================ */
-
-function DeleteCascadeRow({ label, count, detail = 'deleted' }: any) {
-  return (
-    <li style={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      padding: '8px 12px',
-      background: 'var(--v3-surface-2)',
-      border: '1px solid var(--v3-border)',
-      borderRadius: 10
-    }}>
-      <Eyebrow>
-        {label}
-      </Eyebrow>
-      <span style={{
-        fontFamily: 'var(--font-body)',
-        fontSize: 14,
-        color: 'var(--v3-text)',
-        fontVariantNumeric: 'tabular-nums'
-      }}>
-        {count} <span style={{ color: 'var(--v3-text-muted)', marginLeft: 6 }}>· {detail}</span>
-      </span>
-    </li>
-  )
-}
-

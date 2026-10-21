@@ -13,7 +13,11 @@
 // with the sheet open on a job keeps that job, and its note lands on the
 // job (contact_id), as it would have online.
 
+import { useEffect } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from './supabase.ts'
+import { useAuth } from '../contexts/AuthContext.tsx'
+import { toastSuccess } from './toast.ts'
 
 const KEY = 'fh:capture-outbox'
 const MAX_ITEMS = 100
@@ -163,4 +167,33 @@ export async function flushOutbox(userId: string): Promise<number> {
     flushing = false
   }
   return synced
+}
+
+/**
+ * Syncs queued captures from whichever screen is open: on mount, and again
+ * when the connection comes back. The Capture screen itself has usually
+ * been left by then. The notes land on the jobs they were taken on, so a
+ * job page on screen reads them at once.
+ */
+export function useCaptureOutboxSync(): void {
+  const { user } = useAuth()
+  const queryClient = useQueryClient()
+  const userId = user?.id
+  useEffect(() => {
+    if (!userId) return
+    let alive = true
+    async function flush() {
+      if (!navigator.onLine || outboxCount() === 0) return
+      const n = await flushOutbox(userId as string)
+      if (!alive || n === 0) return
+      void queryClient.invalidateQueries({ queryKey: ['jobDetail'] })
+      toastSuccess(`Synced ${n} offline capture${n === 1 ? '' : 's'}`, 'Saved to Notes')
+    }
+    void flush()
+    window.addEventListener('online', flush)
+    return () => {
+      alive = false
+      window.removeEventListener('online', flush)
+    }
+  }, [userId, queryClient])
 }

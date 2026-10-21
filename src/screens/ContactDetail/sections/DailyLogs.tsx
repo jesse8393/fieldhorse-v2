@@ -17,7 +17,7 @@ import { signedUrlsFor } from '../../../lib/signedUrls.ts'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { SkeletonList } from '../../../components/Skeleton.tsx'
-import { useConfirm } from '../../../components/ConfirmSheet.tsx'
+import { useArmedId } from '../../../lib/secondTap.ts'
 import { compressImageToBlob } from '../../../lib/docIntelligence.ts'
 import { todayYmd } from '../../../lib/dates.ts'
 import { Eyebrow } from '../../../components/v3'
@@ -72,7 +72,8 @@ function fmtTime(iso: string): string {
 type DraftPhoto = { local_id: string; preview_url: string; storage_path: string; size: number; uploading: boolean; existing?: boolean }
 
 export default function DailyLogsSection({ jobId, userId }: any) {
-  const confirm = useConfirm()
+  // Delete takes a second tap on the same log's button (D57).
+  const deleteTap = useArmedId()
   const queryClient = useQueryClient()
   const [rows, setRows] = useState<LogRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -347,8 +348,6 @@ export default function DailyLogsSection({ jobId, userId }: any) {
 
   async function remove(id: string) {
     hapticTap()
-    const ok = await confirm({ title: 'Delete this daily log?', body: 'This cannot be undone.', destructive: true })
-    if (!ok) return
     const row = rows.find((r) => r.id === id)
     setRows((rs) => rs.filter((r) => r.id !== id))
     const { data: deleted, error } = await supabase
@@ -611,17 +610,18 @@ export default function DailyLogsSection({ jobId, userId }: any) {
                       </button>
                       <button
                         type="button"
-                        onClick={() => remove(r.id)}
-                        aria-label="Delete log"
-                        title="Delete"
+                        onClick={() => deleteTap.tap(r.id, () => { void remove(r.id) })}
+                        aria-label={deleteTap.armedId === r.id ? 'Tap again to delete' : 'Delete log'}
+                        title={deleteTap.armedId === r.id ? 'Tap again to delete this log. This cannot be undone.' : 'Delete'}
                         style={{
-                          width: 28, height: 28, borderRadius: 10,
+                          width: deleteTap.armedId === r.id ? 'auto' : 28, height: 28, borderRadius: 10, padding: deleteTap.armedId === r.id ? '0 8px' : 0,
                           border: 'none', background: 'transparent',
-                          color: 'var(--v3-text-muted)', cursor: 'pointer',
+                          color: deleteTap.armedId === r.id ? 'var(--v3-danger-text)' : 'var(--v3-text-muted)', cursor: 'pointer',
                           display: 'grid', placeItems: 'center',
+                          fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-body)',
                         }}
                       >
-                        <Trash2 size={13} aria-hidden="true" />
+                        {deleteTap.armedId === r.id ? 'Tap again to delete' : <Trash2 size={13} aria-hidden="true" />}
                       </button>
                     </div>
                   )}

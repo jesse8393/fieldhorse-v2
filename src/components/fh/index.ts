@@ -66,7 +66,4 @@ export type { EmptyStateProps } from './EmptyState.tsx'
 export { default as KeyCap } from './KeyCap.tsx'
 export type { KeyCapProps } from './KeyCap.tsx'
 
-export { default as Sheet, useSheet } from './Sheet.tsx'
-export type { SheetProps, SheetDiscardCopy } from './Sheet.tsx'
-
 export { formatMoney } from './money.ts'

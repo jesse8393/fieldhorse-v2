@@ -20,9 +20,11 @@ import type {
 //
 //   Who owes you   every customer with a balance, and a statement for each
 //   All invoices   drafts, invoices due later than a week, paid and void,
-//                  with the old Outstanding and All choice
+//                  with the old Outstanding and All choice; each row opens
+//                  the invoice's screen, /invoices/:id (D62)
 //   Job balances   contract minus payments per job, with the aging summary
-//                  and the month's collection pace
+//                  and the month's collection pace; each row opens the
+//                  job's money tab
 
 export type MoneyPanel = 'statements' | 'invoices' | 'balances'
 
@@ -163,13 +165,11 @@ function invoiceRowEnd(row: MoneyInvoiceRow): ReactNode {
 export function InvoicesPanel({
   rows,
   filter,
-  onFilterChange,
-  onOpenInvoice
+  onFilterChange
 }: {
   rows: MoneyInvoiceRow[]
   filter: MoneyFilter
   onFilterChange: (next: MoneyFilter) => void
-  onOpenInvoice: (invoiceId: string) => void
 }) {
   const shown = filter === 'outstanding'
     ? rows.filter((r) => r.status === 'draft' || r.status === 'sent' || r.status === 'overdue')
@@ -193,7 +193,8 @@ export function InvoicesPanel({
               <Row
                 key={r.id}
                 as="li"
-                onClick={() => { hapticTap(); onOpenInvoice(r.id) }}
+                to={`/invoices/${r.id}`}
+                onClick={() => hapticTap()}
                 title={r.title}
                 subline={r.subline || undefined}
                 money={r.amount}
@@ -266,7 +267,7 @@ export function BalancesPanel({
                 <Row
                   key={r.job.id}
                   as="li"
-                  to={`/invoices/${r.job.id}`}
+                  to={`/jobs/${r.job.id}?tab=financials`}
                   title={r.job.name || 'Unnamed job'}
                   subline={r.job.job_title || undefined}
                   money={r.balance > 0 ? r.balance : 'Paid'}

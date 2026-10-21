@@ -22,11 +22,32 @@ function baseSource(overrides: Partial<HomeDashboardSource> = {}): HomeDashboard
     todaySchedules: [],
     tomorrowSchedules: [],
     photoUrlByJob: {},
-    proposalViews: [],
+    leads: [],
+    quotes: [],
     sentChangeOrders: [],
     openInvoices: [],
     approvedChangeOrders: [],
     ...overrides,
+  }
+}
+
+type Lead = HomeDashboardSource['leads'][number]
+type Quote = HomeDashboardSource['quotes'][number]
+
+function lead(partial: Partial<Lead> & { id: string }): Lead {
+  return {
+    client_id: 'cl-1', title: 'Driveway', status: 'open', follow_up_on: null, last_contact: null,
+    created_at: '2026-06-01T12:00:00.000Z', updated_at: '2026-06-01T12:00:00.000Z',
+    fh_clients: { name: 'Lead client' }, ...partial,
+  }
+}
+
+function quote(partial: Partial<Quote> & { id: string }): Quote {
+  return {
+    client_id: 'cl-1', title: 'Patio', status: 'draft', amount: 0, job_id: null, sent_at: null,
+    change_request_note: null, change_requested_at: null,
+    created_at: '2026-06-01T12:00:00.000Z', updated_at: '2026-06-01T12:00:00.000Z',
+    fh_clients: { name: 'Quote client' }, ...partial,
   }
 }
 
@@ -70,129 +91,145 @@ describe('buildHomeDashboardBundle', () => {
   })
 
   it('dedupes contacts before calculating dashboard totals', () => {
-    const source = baseSource({
-      contacts: [
-        {
-          id: 'lead-1',
-          name: 'Kitchen lead',
-          amount: 10000,
-          stage: 'lead',
-          created_at: '2026-06-01T12:00:00.000Z',
-          updated_at: '2026-06-01T12:00:00.000Z',
-          completed_at: null,
-          follow_up_on: null,
-          proposal_status: null,
-        },
-        {
-          id: 'lead-1',
-          name: 'Kitchen lead duplicate',
-          amount: 10000,
-          stage: 'lead',
-          created_at: '2026-06-01T12:00:00.000Z',
-          updated_at: '2026-06-01T12:00:00.000Z',
-          completed_at: null,
-          follow_up_on: null,
-          proposal_status: null,
-        },
-      ],
-    })
-
-    const bundle = buildHomeDashboardBundle(source)
+    const job = {
+      id: 'job-1',
+      name: 'Kitchen job',
+      amount: 10000,
+      stage: 'job',
+      created_at: '2026-06-01T12:00:00.000Z',
+      updated_at: '2026-06-01T12:00:00.000Z',
+      completed_at: null,
+      follow_up_on: null,
+      proposal_status: null,
+    }
+    const bundle = buildHomeDashboardBundle(baseSource({ contacts: [job, { ...job, name: 'Kitchen job duplicate' }] }))
 
     expect(bundle.pipeline).toBe(10000)
-    expect(bundle.stageBreakdown.lead).toBe(1)
-    expect(bundle.dealsAtRisk.followUps).toBe(1)
+    expect(bundle.stageBreakdown.active).toBe(1)
+    expect(bundle.stageRail.find((row) => row.key === 'job')).toEqual({ key: 'job', count: 1, total: 10000 })
   })
 
-  it('routes quote and change order actions to their exact job tabs', () => {
+  // Task 15: Needs an answer reads fh_leads and fh_quotes. A lead is due
+  // by its follow_up_on; a quote sent or viewed and quiet for 7 days is
+  // waiting on a nudge; a quote sent two days ago is left alone.
+  it('Needs an answer lists a lead whose follow up is due and a quote quiet for 7 days', () => {
     const bundle = buildHomeDashboardBundle(baseSource({
-      contacts: [{
-        id: 'quote-1',
-        name: 'Patio quote',
-        amount: 9000,
-        stage: 'quote',
-        created_at: '2026-06-01T12:00:00.000Z',
-        updated_at: '2026-06-17T12:00:00.000Z',
-        completed_at: null,
-        follow_up_on: null,
-        proposal_status: 'viewed',
-      }],
-      proposalViews: [{
-        contact_id: 'quote-1',
-        last_viewed_at: '2026-06-14T12:00:00.000Z',
-      }],
-      sentChangeOrders: [{
-        id: 'co-1',
-        contact_id: 'quote-1',
-        sequence_number: 2,
-        title: 'Drainage add',
-        amount: 1250,
-        updated_at: '2026-06-12T12:00:00.000Z',
-      }],
+      leads: [
+        lead({ id: 'lead-1', follow_up_on: '2026-06-15', fh_clients: { name: 'Rosa Delgado' } }),
+        // Quoted already: the quote carries the follow up now.
+        lead({ id: 'lead-2', status: 'quoted', follow_up_on: '2026-06-10', fh_clients: { name: 'Quoted lead' } }),
+        // Not due yet.
+        lead({ id: 'lead-3', follow_up_on: '2026-06-19', fh_clients: { name: 'Later lead' } }),
+      ],
+      quotes: [
+        quote({ id: 'quote-1', status: 'sent', amount: 9000, sent_at: '2026-06-09T12:00:00.000Z', updated_at: '2026-06-09T12:00:00.000Z', fh_clients: { name: 'Marcus Bell' } }),
+        quote({ id: 'quote-2', status: 'viewed', amount: 4000, sent_at: '2026-06-16T12:00:00.000Z', updated_at: '2026-06-16T12:00:00.000Z', fh_clients: { name: 'Fresh quote' } }),
+      ],
     }))
 
-    expect(bundle.nextActions.find((row) => row.kind === 'viewed-quiet')).toMatchObject({
-      tab: 'quote',
+    expect(bundle.nextActions.map((row) => row.id)).toEqual(['followup-due-lead-1', 'followup-quote-1'])
+    expect(bundle.nextActions[0]).toMatchObject({
+      kind: 'followup-due',
+      recordKind: 'lead',
+      recordId: 'lead-1',
+      contactId: '',
+      verb: 'Call',
+      contactName: 'Rosa Delgado',
+      title: 'Call Rosa Delgado',
+      detail: 'Follow up 3d overdue',
+      urgencyTone: 'danger',
+      intent: 'follow_up',
+    })
+    expect(bundle.nextActions[1]).toMatchObject({
+      kind: 'followup',
+      recordKind: 'quote',
+      recordId: 'quote-1',
+      contactName: 'Marcus Bell',
+      contactAmount: 9000,
+      detail: 'Quote waiting 9 days',
       intent: 'quote_followup',
     })
-    expect(bundle.nextActions.find((row) => row.kind === 'co-unsigned')).toMatchObject({
-      tab: 'change_orders',
-      intent: 'change_order_followup',
-    })
+    expect(bundle.nextActionsTotal).toBe(2)
+    expect(bundle.dealsAtRisk).toEqual({ count: 2, value: 9000, followUps: 1, quotesAttention: 1 })
+  })
+
+  it('the stage rail is four counts: leads, quotes, jobs and invoices due', () => {
+    const bundle = buildHomeDashboardBundle(baseSource({
+      contacts: [{
+        id: 'job-1', name: 'Deck', amount: 25000, stage: 'job',
+        created_at: '2026-05-01T12:00:00.000Z', updated_at: '2026-06-01T12:00:00.000Z',
+        completed_at: null, follow_up_on: null, proposal_status: null,
+      }],
+      leads: [lead({ id: 'lead-1' }), lead({ id: 'lead-2', status: 'lost' })],
+      quotes: [
+        quote({ id: 'quote-1', status: 'sent', amount: 9000 }),
+        quote({ id: 'quote-2', status: 'draft', amount: 1500 }),
+        // Made into a job: it is counted as the job now.
+        quote({ id: 'quote-3', status: 'approved', amount: 25000, job_id: 'job-1' }),
+        quote({ id: 'quote-4', status: 'lost', amount: 800 }),
+      ],
+      openInvoices: [
+        { id: 'inv-1', contact_id: 'job-1', title: 'Deposit', amount: 5000, due_at: '2026-06-30', status: 'sent' },
+      ],
+      payments: [{ contact_id: 'job-1', invoice_id: 'inv-1', amount: 2000, created_at: '2026-06-11T12:00:00.000Z', paid_on: '2026-06-11' }],
+    }))
+    expect(bundle.stageRail).toEqual([
+      { key: 'lead', count: 1, total: 0 },
+      { key: 'quote', count: 2, total: 10500 },
+      { key: 'job', count: 1, total: 25000 },
+      { key: 'invoice', count: 1, total: 3000 },
+    ])
+    expect(bundle.pipeline).toBe(35500)
   })
 
   it('puts customer quote changes at the front of the owner queue', () => {
     const bundle = buildHomeDashboardBundle(baseSource({
-      contacts: [{
+      quotes: [quote({
         id: 'quote-change-1',
-        name: 'Kitchen client',
+        status: 'changes_requested',
         amount: 18000,
-        stage: 'quote',
-        created_at: '2026-05-10T12:00:00.000Z',
+        sent_at: '2026-06-01T10:00:00.000Z',
         updated_at: '2026-06-01T10:00:00.000Z',
-        completed_at: null,
-        follow_up_on: null,
-        proposal_status: 'changes_requested',
-        quote_change_request_note: 'Please separate the cabinet allowance.',
-        quote_change_requested_at: '2026-06-18T10:00:00.000Z',
-      }],
+        change_request_note: 'Please separate the cabinet allowance.',
+        change_requested_at: '2026-06-18T10:00:00.000Z',
+        fh_clients: { name: 'Kitchen client' },
+      })],
     }))
 
     expect(bundle.nextActions[0]).toMatchObject({
       kind: 'quote-changes',
-      contactId: 'quote-change-1',
+      recordKind: 'quote',
+      recordId: 'quote-change-1',
       verb: 'Review',
+      contactName: 'Kitchen client',
       detail: 'Please separate the cabinet allowance.',
       urgencyTone: 'danger',
       tab: 'quote',
       intent: 'review_quote_changes',
     })
     expect(bundle.dealsAtRisk.quotesAttention).toBe(1)
-    expect(bundle.nextActions.filter((row) => row.contactId === 'quote-change-1')).toHaveLength(1)
+    // The quiet quote rule does not list it a second time.
+    expect(bundle.nextActions.filter((row) => row.recordId === 'quote-change-1')).toHaveLength(1)
   })
 
-  it('uses one explicit reminder action instead of duplicating a stale quote', () => {
+  it('routes change order actions to the change orders tab', () => {
     const bundle = buildHomeDashboardBundle(baseSource({
       contacts: [{
-        id: 'quote-follow-up-1',
-        name: 'Patio client',
-        amount: 12000,
-        stage: 'quote',
-        created_at: '2026-05-01T12:00:00.000Z',
-        updated_at: '2026-06-01T12:00:00.000Z',
-        completed_at: null,
-        follow_up_on: '2026-06-18',
-        proposal_status: 'sent',
+        id: 'job-1', name: 'Patio', amount: 9000, stage: 'job',
+        created_at: '2026-06-01T12:00:00.000Z', updated_at: '2026-06-17T12:00:00.000Z',
+        completed_at: null, follow_up_on: null, proposal_status: null,
+      }],
+      sentChangeOrders: [{
+        id: 'co-1', contact_id: 'job-1', sequence_number: 2, title: 'Drainage add', amount: 1250,
+        updated_at: '2026-06-12T12:00:00.000Z',
       }],
     }))
-
-    const actions = bundle.nextActions.filter((row) => row.contactId === 'quote-follow-up-1')
-    expect(actions).toHaveLength(1)
-    expect(actions[0]).toMatchObject({
-      kind: 'followup-due',
-      title: 'Call Patio client',
-      detail: 'Follow up due today',
-      intent: 'quote_followup',
+    expect(bundle.nextActions.find((row) => row.kind === 'co-unsigned')).toMatchObject({
+      recordKind: 'job',
+      recordId: 'job-1',
+      contactId: 'job-1',
+      tab: 'change_orders',
+      intent: 'change_order_followup',
     })
   })
 
@@ -271,23 +308,18 @@ describe('buildHomeDashboardBundle', () => {
   })
 
   it('keeps the 20 most urgent next actions and counts every one', () => {
-    // 25 leads quiet for 10 to 34 days; the longest wait is the most urgent.
-    const contacts = Array.from({ length: 25 }, (_, i) => ({
+    // 25 leads with follow ups 10 to 34 days overdue; the most overdue is
+    // the most urgent.
+    const leads = Array.from({ length: 25 }, (_, i) => lead({
       id: `lead-${i + 1}`,
-      name: `Lead ${i + 1}`,
-      amount: 1000,
-      stage: 'lead',
-      created_at: '2026-04-01T12:00:00.000Z',
-      updated_at: new Date(Date.parse('2026-06-08T12:00:00.000Z') - i * 86400000).toISOString(),
-      completed_at: null,
-      follow_up_on: null,
-      proposal_status: null,
+      follow_up_on: new Date(Date.parse('2026-06-08T12:00:00.000Z') - i * 86400000).toISOString().slice(0, 10),
+      fh_clients: { name: `Lead ${i + 1}` },
     }))
-    const bundle = buildHomeDashboardBundle(baseSource({ contacts }))
+    const bundle = buildHomeDashboardBundle(baseSource({ leads }))
     expect(bundle.nextActionsTotal).toBe(25)
     expect(bundle.nextActions).toHaveLength(20)
-    expect(bundle.nextActions[0].contactId).toBe('lead-25')
-    expect(bundle.nextActions[19].contactId).toBe('lead-6')
+    expect(bundle.nextActions[0].recordId).toBe('lead-25')
+    expect(bundle.nextActions[19].recordId).toBe('lead-6')
   })
 })
 

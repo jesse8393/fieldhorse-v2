@@ -1,7 +1,8 @@
-// Opening Universal Capture from anywhere in the app. The sheet listens
-// for the `fh:open-capture` window event (see CaptureSheet.tsx); a screen
-// that knows which job the person is looking at passes its id so the
-// capture is filed against that job.
+// Opening Universal Capture from anywhere in the app. Capture is the
+// screen /capture (SPEC D57); the app shell listens for the
+// `fh:open-capture` window event and navigates there (see AppShell.tsx and
+// screens/Capture.tsx). A screen that knows which job the person is
+// looking at passes its id so the capture is filed against that job.
 //
 // The attach is a suggestion with the same trust rules as the model's:
 // the job goes into the roster normalizeIntent validates against, it
@@ -14,6 +15,12 @@ export type OpenCaptureDetail = { jobId?: string }
 
 export function openCapture(detail: OpenCaptureDetail = {}): void {
   window.dispatchEvent(new CustomEvent<OpenCaptureDetail>('fh:open-capture', { detail }))
+}
+
+/** The Capture screen's route, with the attached job as ?job=. */
+export function captureRoute(detail: OpenCaptureDetail = {}): string {
+  const jobId = typeof detail.jobId === 'string' && detail.jobId ? detail.jobId : null
+  return jobId ? `/capture?job=${encodeURIComponent(jobId)}` : '/capture'
 }
 
 /**

@@ -105,13 +105,25 @@ describe('qa mock REST reads', () => {
     expect(ids('t?order=due.asc.nullsfirst', { t })).toEqual(['b', 'c', 'a', 'd'])
   })
 
+  it('negates a test with not. and never matches a null that way', () => {
+    const t = [
+      { id: 'job', stage: 'job' },
+      { id: 'lead', stage: 'lead' },
+      { id: 'moved', stage: 'moved_lead' },
+      { id: 'blank', stage: null }
+    ]
+    expect(ids('t?stage=not.eq.job', { t })).toEqual(['lead', 'moved'])
+    expect(ids('t?stage=not.in.("moved_lead","moved_quote")', { t })).toEqual(['job', 'lead'])
+    expect(ids('t?stage=not.is.null', { t })).toEqual(['job', 'lead', 'moved'])
+    expect(ids('t?stage=not.bogus.x', { t })).toEqual(['job', 'lead', 'moved', 'blank'])
+  })
+
   it('ignores what it does not model, as before', () => {
     const t = [
       { id: 'job', stage: 'job', name: 'Ann' },
       { id: 'lead', stage: 'lead', name: 'Bob' }
     ]
     const all = ['job', 'lead']
-    expect(ids('t?stage=not.eq.job', { t })).toEqual(all)
     expect(ids('t?or=(stage.eq.job,stage.eq.quote)', { t })).toEqual(all)
     expect(ids('t?name=ilike.*ann*', { t })).toEqual(all)
     expect(ids('t?tags=cs.{a}', { t })).toEqual(all)
@@ -122,7 +134,7 @@ describe('qa mock REST reads', () => {
 
   it('sends the filtered count before limit and offset when asked', () => {
     const prefer = { Prefer: 'count=exact' }
-    const page = read('fh_contacts?select=id&stage=in.(lead,quote)&order=id.asc&limit=1&offset=1', { headers: prefer })
+    const page = read('fh_contacts?select=id&stage=in.(moved_lead,moved_quote)&order=id.asc&limit=1&offset=1', { headers: prefer })
     expect(page.headers['content-range']).toBe('1-1/4')
     expect((page.json as Row[]).map((r) => r.id)).toEqual(['c-lead1'])
 
@@ -140,7 +152,7 @@ describe('qa mock REST reads', () => {
 
   it('answers single object requests with the one matching row, or 406 for none or several', () => {
     const object = { Accept: 'application/vnd.pgrst.object+json' }
-    const hit = read('fh_contacts?select=*&stage=eq.quote&order=amount.asc&limit=1', { headers: object })
+    const hit = read('fh_contacts?select=*&stage=eq.moved_quote&order=amount.asc&limit=1', { headers: object })
     expect(hit.status).toBe(200)
     expect((hit.json as Row).id).toBe('c-change')
 
@@ -148,8 +160,8 @@ describe('qa mock REST reads', () => {
     expect(none.status).toBe(406)
     expect((none.json as Row).code).toBe('PGRST116')
 
-    // Two quotes match, so PostgREST refuses to pick one.
-    const several = read('fh_contacts?select=*&stage=eq.quote', { headers: object })
+    // Two moved quotes match, so PostgREST refuses to pick one.
+    const several = read('fh_contacts?select=*&stage=eq.moved_quote', { headers: object })
     expect(several.status).toBe(406)
     expect(several.json).toMatchObject({ code: 'PGRST116', details: 'The result contains 2 rows' })
   })
@@ -159,14 +171,14 @@ describe('qa mock REST reads', () => {
     // it would return, and keeps its older answer.
     const object = { Accept: 'application/vnd.pgrst.object+json' }
     for (const path of [
-      'fh_contacts?select=*&stage=eq.quote&or=(id.eq.c-quote,id.eq.nope)',
-      'fh_contacts?select=*&stage=eq.quote&name=ilike.*mmc*',
-      'fh_contacts?select=*,fh_clients!inner(name)&stage=eq.quote',
-      'fh_contacts?select=*,fh_clients(name)&stage=eq.quote&fh_clients.name=eq.Jeff%20Roy'
+      'fh_contacts?select=*&stage=eq.moved_quote&or=(id.eq.c-quote,id.eq.nope)',
+      'fh_contacts?select=*&stage=eq.moved_quote&name=ilike.*mmc*',
+      'fh_contacts?select=*,fh_clients!inner(name)&stage=eq.moved_quote',
+      'fh_contacts?select=*,fh_clients(name)&stage=eq.moved_quote&fh_clients.name=eq.Jeff%20Roy'
     ]) {
       const res = read(path, { headers: object })
       expect(res.status, path).toBe(200)
-      expect((res.json as Row).stage, path).toBe('quote')
+      expect((res.json as Row).stage, path).toBe('moved_quote')
     }
   })
 

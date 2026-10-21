@@ -4,6 +4,7 @@ import { Sparkles, Copy, Check, MessageSquare, Mail, Mic, Send, PenLine, RotateC
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import BuildTopbar from '../components/desktop/BuildTopbar.tsx'
 import { supabase, authHeaders } from '../lib/supabase.ts'
+import { MOVED_STAGE_FILTER } from '../lib/stages.ts'
 import { useOrgScope } from '../lib/orgScope.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
@@ -59,6 +60,7 @@ export default function Compose() {
       .from('fh_contacts')
       .select('id, name, phone, email, job_title, job_type, stage, amount')
     ;(orgScope ? base.eq('org_id', orgScope) : base.eq('user_id', user.id))
+      .not('stage', 'in', MOVED_STAGE_FILTER)
       .order('updated_at', { ascending: false })
       .then(({ data }: any) => setContacts(data || []))
   }, [user, orgScope])

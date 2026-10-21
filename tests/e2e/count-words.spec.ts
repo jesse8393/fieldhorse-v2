@@ -73,7 +73,9 @@ test.describe('Customers on a desktop', () => {
   })
 })
 
-// ---- 10: the notifications drawer on a phone ---------------------------------
+// ---- 10: the notifications screen on a phone ---------------------------------
+// The bell opens the /notifications screen (decision D64), whose count line
+// reads "1 new notification." or "2 new notifications."
 
 test.describe('Notifications on a phone', () => {
   test.skip(({ isMobile }) => !isMobile, 'The bell sits in the phone header')
@@ -87,11 +89,12 @@ test.describe('Notifications on a phone', () => {
     [[note('nt1', 'MMC Properties approved the quote')], 'Notifications, 1 unread', '1 new notification.'],
     [[note('nt1', 'MMC Properties approved the quote'), note('nt2', 'Taylor Reed asked for changes')], 'Notifications, 2 unread', '2 new notifications.']
   ] as const) {
-    test(`the drawer reads "${heading}"`, async ({ context, page }) => {
+    test(`the screen reads "${heading}"`, async ({ context, page }) => {
       await signIn(context, { tables: { fh_notifications: [...rows] } })
       await open(page, '/work', '.fhs-header')
       await page.getByRole('button', { name: bell, exact: true }).click()
-      await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible()
+      await expect(page).toHaveURL(/\/notifications$/)
+      await expect(page.getByText(heading, { exact: true })).toBeVisible()
     })
   }
 })

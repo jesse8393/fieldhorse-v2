@@ -1,0 +1,149 @@
+/*
+ * The workspace screen, /workspace (spec 8.2; Phase 9, Task 14, D57):
+ * Back and the title, who is signed in, the route groups, the Auto, Day
+ * and Night control, the workspace switcher and Sign out. Reads only
+ * --fh- tokens, so Day and Night follow the theme.
+ */
+
+.fhws {
+  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+}
+
+.fhws-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 8px 8px;
+}
+
+.fhws-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-family: var(--fh-font-display);
+  font-size: 30px;
+  line-height: 36px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--fh-ink);
+}
+
+.fhws-title:focus {
+  outline: none;
+}
+
+.fhws-who {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px var(--fh-gutter) 16px;
+  border-bottom: 1px solid var(--fh-hairline);
+}
+
+.fhws-who__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.fhws-who__company,
+.fhws-who__email {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fhws-who__company { font: 600 18px/24px var(--fh-font-body); color: var(--fh-ink); }
+.fhws-who__email { font: 500 13px/16px var(--fh-font-body); color: var(--fh-ink-3); }
+
+.fhws-body {
+  padding: 0 12px 16px;
+}
+
+.fhws-group__title {
+  margin: 0;
+  padding: 16px 8px 8px;
+  font: 600 13px/16px var(--fh-font-body);
+  color: var(--fh-ink-3);
+}
+
+.fhws-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.fhws-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--fh-ink);
+  font: 500 16px/22px var(--fh-font-body);
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.fhws-row:hover { background: var(--fh-wash); }
+.fhws-row:active { background: var(--fh-wash-2); }
+.fhws-row.is-active { background: var(--fh-tray); font-weight: 600; }
+.fhws-row__icon { color: var(--fh-ink-3); flex-shrink: 0; }
+.fhws-row.is-active .fhws-row__icon { color: var(--fh-ink); }
+.fhws-row__label { flex: 1; min-width: 0; }
+.fhws-row__chevron { color: var(--fh-ink-4); flex-shrink: 0; }
+
+.fhws-group--settings {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+  padding: 16px 8px 0;
+  border-top: 1px solid var(--fh-hairline);
+}
+
+.fhws-foot {
+  padding: 8px 12px 0;
+  border-top: 1px solid var(--fh-hairline);
+}
+
+.fhws-signout {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--fh-ink-2);
+  font: 500 16px/22px var(--fh-font-body);
+  cursor: pointer;
+}
+
+.fhws-signout:hover { background: var(--fh-wash); color: var(--fh-ink); }
+
+@media (min-width: 900px) {
+  .fhws-head {
+    padding: 12px var(--fh-gutter-desktop) 8px 20px;
+  }
+
+  .fhws-who {
+    padding-left: var(--fh-gutter-desktop);
+    padding-right: var(--fh-gutter-desktop);
+  }
+
+  .fhws-body,
+  .fhws-foot {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+}

@@ -131,46 +131,57 @@ describe('wonYTD / profitYTD', () => {
   })
 })
 
+// Task 15: the funnel reads the records themselves. A lead is created on
+// fh_leads, a quote on fh_quotes, and a quote became a job when its job_id
+// points at an fh_contacts row (D54). Lost is a lost lead or a quote that
+// was lost, rejected or expired.
 describe('computeFunnel', () => {
   const now = new Date('2026-06-12T12:00:00Z')
   const day = (n: number) => new Date(now.getTime() - n * 86400000).toISOString()
-  const contacts = [
-    { created_at: day(10) },  // in window
-    { created_at: day(50) },  // in window
-    { created_at: day(120) }  // outside 90d
+  const leads = [
+    { id: 'l1', status: 'quoted', created_at: day(10), updated_at: day(8) },   // in window
+    { id: 'l2', status: 'open', created_at: day(50), updated_at: day(50) },    // in window
+    { id: 'l3', status: 'lost', created_at: day(120), updated_at: day(20) },   // created outside, lost inside
+    { id: 'l4', status: 'lost', created_at: day(200), updated_at: day(150) }   // lost outside the window
   ]
-  const transitions = [
-    // contact A: quote → won, 5 days to decide
-    { contact_id: 'a', to_stage: 'quote', transitioned_at: day(30) },
-    { contact_id: 'a', to_stage: 'job',   transitioned_at: day(25) },
-    // contact B: quote → lost, 10 days
-    { contact_id: 'b', to_stage: 'quote', transitioned_at: day(40) },
-    { contact_id: 'b', to_stage: 'lost',  transitioned_at: day(30) },
-    // contact C: quoted twice (counts once), no decision yet
-    { contact_id: 'c', to_stage: 'quote', transitioned_at: day(20) },
-    { contact_id: 'c', to_stage: 'quote', transitioned_at: day(5) },
-    // contact D: won outside the window, excluded from counts
-    { contact_id: 'd', to_stage: 'quote', transitioned_at: day(200) },
-    { contact_id: 'd', to_stage: 'job',   transitioned_at: day(150) }
+  const quotes = [
+    // a: sent, became job ja 5 days after it was made
+    { id: 'qa', status: 'approved', job_id: 'ja', created_at: day(30), updated_at: day(25) },
+    // b: lost 10 days after it was made
+    { id: 'qb', status: 'lost', job_id: null, created_at: day(40), updated_at: day(30) },
+    // c: still out
+    { id: 'qc', status: 'sent', job_id: null, created_at: day(20), updated_at: day(5) },
+    // d: became a job outside the window
+    { id: 'qd', status: 'approved', job_id: 'jd', created_at: day(200), updated_at: day(150) }
+  ]
+  const jobs = [
+    { id: 'ja', created_at: day(25) },
+    { id: 'jd', created_at: day(150) }
   ]
 
-  it('counts distinct contacts per funnel step inside the window', () => {
-    const f = computeFunnel(transitions, contacts, 90, now)
-    expect(f.newLeads).toBe(2)
-    expect(f.quoted).toBe(3)   // a, b, c, c only once
-    expect(f.won).toBe(1)      // a (d is outside window)
-    expect(f.lost).toBe(1)     // b
+  it('the funnel counts a quote that became a job as won', () => {
+    const f = computeFunnel({ leads, quotes, jobs }, 90, now)
+    expect(f.newLeads).toBe(2)   // l1, l2
+    expect(f.quoted).toBe(3)     // qa, qb, qc
+    expect(f.won).toBe(1)        // qa (qd is outside the window)
+    expect(f.lost).toBe(2)       // qb, and the lead l3
   })
 
   it('derives rates and decision speed', () => {
-    const f = computeFunnel(transitions, contacts, 90, now)
-    expect(f.winRate).toBeCloseTo(0.5, 5)            // 1 won / (1 won + 1 lost)
+    const f = computeFunnel({ leads, quotes, jobs }, 90, now)
+    expect(f.winRate).toBeCloseTo(1 / 3, 5)          // 1 won / (1 won + 2 lost)
     expect(f.quoteRate).toBeCloseTo(1, 5)            // 3 quoted / 2 new, clamped to 1
-    expect(f.avgDaysToDecision).toBeCloseTo(7.5, 5)  // (5 + 10) / 2
+    expect(f.avgDaysToDecision).toBeCloseTo(7.5, 5)  // qa 5 days, qb 10 days
+  })
+
+  it('reads the win date from the quote when its job is not in the list', () => {
+    const f = computeFunnel({ leads: [], quotes: [quotes[0]], jobs: [] }, 90, now)
+    expect(f.won).toBe(1)
+    expect(f.avgDaysToDecision).toBeCloseTo(5, 5)
   })
 
   it('handles empty inputs', () => {
-    const f = computeFunnel([], [], 90, now)
+    const f = computeFunnel({ leads: [], quotes: [], jobs: [] }, 90, now)
     expect(f).toEqual({
       newLeads: 0, quoted: 0, won: 0, lost: 0,
       quoteRate: 0, winRate: 0, avgDaysToDecision: 0

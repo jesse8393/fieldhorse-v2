@@ -31,18 +31,16 @@ test.describe('jobs on a phone', () => {
   test('lost behind the filter', async ({ context, page }) => {
     await signIn(context)
     await openJobs(page)
-    await expect(page.getByText('Justin Bryan', { exact: true })).toBeVisible()
+    await expect(page.getByText('Plumbing Bellevue', { exact: true })).toBeVisible()
     await expect(page.getByText('Old Mill HOA', { exact: true })).toHaveCount(0)
 
-    await page.getByRole('button', { name: 'Filter and sort' }).click()
-    const sheet = page.getByRole('dialog', { name: 'Filter and sort' })
-    await expect(sheet).toBeVisible()
-    const lost = sheet.getByRole('switch', { name: 'Show lost jobs' })
+    // The filter is a chip under the title (D57): no sheet to open or close.
+    const chips = page.getByRole('group', { name: 'Filter and sort' })
+    const lost = chips.getByRole('switch', { name: 'Show lost jobs' })
     await expect(lost).toHaveAttribute('aria-checked', 'false')
     await lost.click()
     await expect(lost).toHaveAttribute('aria-checked', 'true')
-    await sheet.getByRole('button', { name: 'Close' }).click()
-    await expect(sheet).toBeHidden()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
 
     await expect(page.getByText('Old Mill HOA', { exact: true })).toBeVisible()
   })

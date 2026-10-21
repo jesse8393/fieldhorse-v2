@@ -415,7 +415,8 @@ export async function drainQueue(
 
 const ITEM_LABELS: Record<string, [string, string]> = {
   fh_notes: ['note', 'notes'],
-  fh_contacts: ['lead', 'leads'],
+  fh_contacts: ['job', 'jobs'],
+  fh_leads: ['lead', 'leads'],
   fh_job_todos: ['task', 'tasks'],
   fh_expenses: ['expense', 'expenses'],
   fh_schedule: ['schedule event', 'schedule events'],

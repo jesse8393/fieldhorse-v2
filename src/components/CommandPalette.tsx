@@ -1,7 +1,7 @@
 // Command palette (SPEC.md 9.12, render base/desktop-command.jpg).
 //
 // Desktop only: it opens at 900 px and up, from Control or Cmd+K or the
-// `fh:open-palette` event. Below 900 px MobileSearchOverlay takes over.
+// `fh:open-palette` event. Below 900 px the /search screen takes over.
 //
 // Search groups: Jobs, Actions (for the highlighted job), Customers,
 // Documents (only when files match), then Notes and Schedule when they
@@ -73,15 +73,14 @@ type NavEntry = {
   event?: string
 }
 
-// Target /work directly (the collapsed deal list) rather than the legacy
-// board paths, so these don't round-trip through LegacyBoardRedirect and
-// its stage-synonym table. asStage seeds the New-deal sheet's stage.
+// The three New items open the create screens (SPEC D58): a lead, a
+// quote or a job starts on its own, with no chooser first.
 const QUICK_ACTIONS: NavEntry[] = [
-  { id: 'capture', label: 'Capture anything', hint: 'Voice, text, receipt, or photo', icon: Mic, event: 'fh:open-capture' },
-  { id: 'newLead', label: 'New lead', hint: 'Add an opportunity', icon: Plus, to: '/work?new=1' },
-  { id: 'newQuote', label: 'New quote', hint: 'Start a proposal with scope', icon: FileText, to: '/work?new=1&asStage=quote' },
-  { id: 'newJob', label: 'New job', hint: 'Create active work', icon: Briefcase, to: '/work?new=1&asStage=job' },
-  { id: 'followups', label: 'Work follow ups', hint: 'Deals due for a touch, up top', icon: Target, to: '/work?stage=leads' },
+  { id: 'capture', label: 'Capture anything', hint: 'Voice, text, receipt, or photo', icon: Mic, to: '/capture' },
+  { id: 'newLead', label: 'New lead', hint: 'Someone who called', icon: Plus, to: '/leads/new' },
+  { id: 'newQuote', label: 'New quote', hint: 'Scope and a price to send', icon: FileText, to: '/quotes/new' },
+  { id: 'newJob', label: 'New job', hint: 'Work that is on', icon: Briefcase, to: '/jobs/new' },
+  { id: 'followups', label: 'Work follow ups', hint: 'Deals due for a touch, up top', icon: Target, to: '/leads' },
   { id: 'collect', label: 'Collect money', hint: 'Invoices and balances', icon: Receipt, to: '/invoices' },
   { id: 'compose', label: 'Draft message', hint: 'AI compose for customers', icon: MessageSquare, to: '/compose' },
 ]
@@ -95,7 +94,7 @@ function homeHint() {
 
 const NAV_ITEMS: NavEntry[] = [
   { id: 'home', label: 'Command Center', hint: homeHint(), icon: Home, to: '/' },
-  { id: 'work', label: 'Work & Deals', hint: 'Every deal, lead to done, one list', icon: Briefcase, to: '/work' },
+  { id: 'work', label: 'Work & Deals', hint: 'Every deal, lead to done, one list', icon: Briefcase, to: '/jobs' },
   { id: 'clients', label: 'Clients', hint: 'Customer profiles', icon: Users, to: '/clients' },
   { id: 'schedule', label: 'Schedule', hint: 'Day, week, and month planning', icon: Calendar, to: '/schedule' },
 ]
@@ -116,7 +115,10 @@ const SYSTEM_ITEMS: NavEntry[] = [
 ]
 
 const ICON_FOR_KIND: Record<string, LucideIcon> = {
+  lead: Target,
+  quote: FileText,
   job: HardHat,
+  invoice: Receipt,
   client: Users,
   note: NotepadText,
   event: Calendar,
@@ -131,7 +133,7 @@ const ICON_FOR_ACTION: Record<PaletteActionId, LucideIcon> = {
   navigate: MapPin,
 }
 
-const EMPTY_RESULTS: SearchResults = { jobs: [], clients: [], notes: [], events: [], files: [], total: 0 }
+const EMPTY_RESULTS: SearchResults = { leads: [], quotes: [], jobs: [], invoices: [], clients: [], notes: [], events: [], files: [], total: 0 }
 
 // Row values. cmdk tracks the highlighted row by value, so these say what
 // a highlight means: a job row, or an action row of a job.
@@ -433,6 +435,9 @@ export default function CommandPalette() {
                       ))}
                     </Command.Group>
                   )}
+                  {renderEntityGroup('Leads', results.leads)}
+                  {renderEntityGroup('Quotes', results.quotes)}
+                  {renderEntityGroup('Invoices', results.invoices)}
                   {renderEntityGroup('Customers', results.clients)}
                   {renderEntityGroup('Documents', results.files)}
                   {renderEntityGroup('Notes', results.notes)}

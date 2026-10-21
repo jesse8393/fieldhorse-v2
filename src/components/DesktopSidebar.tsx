@@ -9,6 +9,9 @@
 // way the dock coin does on a phone (PHASE8_PLAN.md Task 13, D33). There
 // is no floating capture button on a desktop any more: it covered page
 // content and made a second gold element on pages meant to have one.
+// Under Capture, a New row with its own key cap (⌘N or Ctrl N) opens the
+// New screen, the one place a lead, quote, job, invoice or client starts
+// (PHASE9_PLAN Task 8, D58).
 // Main list: Today, Schedule, Jobs, Money, Inbox (only when the company's
 // messaging engine is on, decision D9), Customers, Reports. A
 // collapsible Team and office group holds the rest, so every route the
@@ -17,9 +20,9 @@
 // Mounted by AppShell only on desktop widths; global.css keeps
 // .fh-desktop-sidebar hidden below 900px.
 
-import { useMemo, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
-import { ChevronDown, LogOut, Mic, Search } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { ChevronDown, LogOut, Mic, Plus, Search } from 'lucide-react'
 import Icon from './fh/Icon.tsx'
 import KeyCap from './fh/KeyCap.tsx'
 import Monogram, { initialsFor } from './fh/Monogram.tsx'
@@ -86,6 +89,20 @@ export default function DesktopSidebar() {
   const env = useMemo(() => browserEnv(), [])
   const searchKeys = desktopShortcut('K', env)
   const captureKeys = desktopShortcut('J', env)
+  const newKeys = desktopShortcut('N', env)
+
+  // Cmd or Ctrl N opens the New screen while the sidebar is mounted, that
+  // is, on a desktop. The browser's own new window shortcut gives way.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'n') {
+        e.preventDefault()
+        navigate('/new')
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [navigate])
 
   // The short name the phone header shows (headerName): "Parker
   // Construction", not "Parker Constructi..." It wraps to two lines before
@@ -139,20 +156,37 @@ export default function DesktopSidebar() {
         </div>
       </div>
 
-      <button
-        type="button"
-        className="fhs-side__search"
-        onClick={openPalette}
-        aria-label={`Search everything (${searchKeys.spoken})`}
-        aria-keyshortcuts={searchKeys.combo}
-      >
-        <Icon icon={Search} size={18} />
-        <span>Search</span>
-        <KeyCap aria-hidden="true">{searchKeys.keys}</KeyCap>
-      </button>
+      {/* New and Search share one row, so the nav below still fits a 900 px
+          window (SPEC D58). New is a square; the Search cap keeps the row's
+          right edge. */}
+      <div className="fhs-side__toprow">
+        <Link
+          to="/new"
+          className="fhs-side__new"
+          aria-label={`New (${newKeys.spoken})`}
+          aria-keyshortcuts={newKeys.combo}
+          title={`New (${newKeys.keys})`}
+          onMouseEnter={() => prefetchRoute('/new')}
+        >
+          <Icon icon={Plus} size={18} />
+        </Link>
+        <button
+          type="button"
+          className="fhs-side__search"
+          onClick={openPalette}
+          aria-label={`Search everything (${searchKeys.spoken})`}
+          aria-keyshortcuts={searchKeys.combo}
+        >
+          <Icon icon={Search} size={18} />
+          <span>Search</span>
+          <KeyCap aria-hidden="true">{searchKeys.keys}</KeyCap>
+        </button>
+      </div>
 
-      {/* Universal Capture, the same path the dock coin takes. CaptureSheet
-          also answers Cmd or Ctrl J and the palette's Capture anything. */}
+      {/* Universal Capture, the same path the dock coin takes: the /capture
+          screen, which Cmd or Ctrl J and the palette's Capture anything open too. Its
+          key cap lines up under the Search cap, so New sits on the Search
+          row (above) rather than beside Capture. */}
       <button
         type="button"
         className="fhs-side__link fhs-side__capture"

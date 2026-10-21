@@ -25,7 +25,7 @@
 //   * Dictation only fills the text. The person reads it and taps Send.
 //     Send ends dictation first, so nothing it hears afterwards lands in
 //     the field. No audio is recorded: it is the browser's
-//     SpeechRecognition, used the way CaptureSheet uses it.
+//     SpeechRecognition, used the way the Capture screen uses it.
 //   * A conversation from another company shows "Not in this company" and
 //     no actions at all.
 //
@@ -49,7 +49,7 @@ import {
   groupByDay,
   replyChannel,
   replySubject,
-  stageChip,
+  recordChip,
   threadItems,
   timeLabel,
   useInboxActions,
@@ -260,7 +260,7 @@ export default function Thread({ conversationId, row: listRow, embedded = false 
   const shownRow = row ?? conversation ?? undefined
   const name = shownRow?.client_name?.trim() || shownRow?.company_name?.trim() || 'Conversation'
   const job = useMemo(() => (outside ? null : jobFor(row, jobs.data)), [outside, row, jobs.data])
-  const stage = outside ? null : stageChip(row?.latest_stage)
+  const stage = outside ? null : recordChip(row)
 
   const days = useMemo(() => groupByDay(threadItems(messages, runs)), [messages, runs])
   const itemCount = days.reduce((n, d) => n + d.items.length, 0)
@@ -337,7 +337,7 @@ export default function Thread({ conversationId, row: listRow, embedded = false 
   const [text, setText] = useState('')
   const sending = actions.sending
 
-  // ---- Dictation: the browser's SpeechRecognition, as CaptureSheet uses it.
+  // ---- Dictation: the browser's SpeechRecognition, as the Capture screen uses it.
   // It only fills the text; the person reads it and taps Send. Every
   // handler checks it still belongs to the current recognizer, so a result
   // from one that was stopped, aborted or replaced is ignored.

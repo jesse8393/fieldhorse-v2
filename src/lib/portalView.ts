@@ -30,6 +30,7 @@
 
 import { initialsFor } from '../components/fh/Monogram.tsx'
 import { proposalNumber } from '../components/documents/numbers.ts'
+import { quoteNumber as quoteRecordNumber } from './quotes.ts'
 import { parseDateOnly } from './dates.ts'
 import { moneyCents } from './format.ts'
 import { safePayUrl } from './payLink.ts'
@@ -125,6 +126,13 @@ export type PublicDocPayload = {
   /** 'proposal', 'invoice', 'change_order' or 'statement'. */
   kind: string
   change_order_id?: string | null
+  /** The fh_quotes row a proposal link points at (Task 11); null for a job's proposal. */
+  quote_id?: string | null
+  /**
+   * The quote's own status (fh_quotes.status) when the link points at a
+   * quote record. Read before contact.proposal_status (portalStatus).
+   */
+  status?: string | null
   contact?: PublicDocContact | null
   company?: PublicDocCompany | null
   items?: PublicDocItem[] | null
@@ -167,7 +175,7 @@ export type PortalView = {
    */
   headline: string
   addressLine: string
-  /** "PC-2026-RTAL", the number the letter themes and the PDF print; null without a job id. */
+  /** "PC-2026-RTAL", the number the letter themes and the PDF print; null without a quote or job id. */
   quoteNumber: string | null
   /** "October 2", or with the year when it is not this year; null when the payload has no date. */
   issuedOn: string | null
@@ -235,6 +243,15 @@ const NO_QUESTION_STAGES = new Set(['job', 'invoice', 'closed', 'lost'])
 
 function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
+}
+
+/**
+ * Where the quote stands, lower case: the payload's own status when the
+ * link points at a quote record, else the contact block's proposal_status,
+ * else ''. Every read of the status on the customer page goes through here.
+ */
+export function portalStatus(payload: Pick<PublicDocPayload, 'status' | 'contact'>): string {
+  return (text(payload.status) || text(payload.contact?.proposal_status)).toLowerCase()
 }
 
 // A line's words: the description without the "OPTION:" prefix the quote
@@ -505,16 +522,21 @@ export function buildPortalView(payload: PublicDocPayload, now: Date): PortalVie
     jobTitle && address ? `${jobTitle} at ${address}` : jobTitle || address
   )
 
-  const status = text(contact.proposal_status).toLowerCase()
+  const status = portalStatus(payload)
   const isApproved = status === 'approved'
   const approved = isApproved
     ? { name: text(contact.approved_by_name) || null, date: pageDate(contact.approved_at, now) }
     : null
 
   // The same issue date and number the letter themes print (ProposalTemplate).
+  // A quote record's number is seeded by the quote id (lib/quotes.ts); a
+  // job's proposal keeps the job id as its seed.
   const issuedIso = text(contact.quote_sent_at) || text(contact.created_at) || null
+  const quoteId = text(payload.quote_id)
   const contactId = text(contact.id)
-  const quoteNumber = contactId ? proposalNumber(company.name, contactId, issuedIso) : null
+  const quoteNumber = quoteId ? quoteRecordNumber(company.name, quoteId, issuedIso)
+    : contactId ? proposalNumber(company.name, contactId, issuedIso)
+    : null
   // Expiry applies only while the quote awaits the customer's decision: an
   // approved quote whose date passes is still approved (the customer has
   // committed), and one with changes requested is waiting on the

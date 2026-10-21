@@ -21,7 +21,7 @@ import { supabase } from '../../../lib/supabase.ts'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { SkeletonList } from '../../../components/Skeleton.tsx'
-import { useConfirm } from '../../../components/ConfirmSheet.tsx'
+import { useArmedId } from '../../../lib/secondTap.ts'
 import { Eyebrow } from '../../../components/v3'
 
 const SkeletonAny = SkeletonList as any
@@ -89,7 +89,8 @@ function rid(): string {
 }
 
 export default function SelectionsSection({ jobId, userId, clientId }: any) {
-  const confirm = useConfirm()
+  // Delete takes a second tap on the same selection's button (D57).
+  const deleteTap = useArmedId()
   const [rows, setRows] = useState<SelectionRow[]>([])
   const [loading, setLoading] = useState(true)
   const [composing, setComposing] = useState(false)
@@ -164,7 +165,6 @@ export default function SelectionsSection({ jobId, userId, clientId }: any) {
   }
 
   async function remove(id: string) {
-    if (!(await confirm({ title: 'Delete this selection?', destructive: true }))) return
     hapticTap()
     setRows((rs) => rs.filter((r) => r.id !== id))
     const { error } = await supabase.from('fh_selections').delete().eq('id', id)
@@ -234,7 +234,8 @@ export default function SelectionsSection({ jobId, userId, clientId }: any) {
                 onSetStatus={(s) => setStatus(r.id, s)}
                 onPick={(optId, by) => pickOption(r.id, optId, by)}
                 onPatch={(patch) => updateRow(r.id, patch)}
-                onDelete={() => remove(r.id)}
+                onDelete={() => deleteTap.tap(r.id, () => { void remove(r.id) })}
+                deleteArmed={deleteTap.armedId === r.id}
               />
             ))}
           </AnimatePresence>
@@ -253,7 +254,7 @@ export default function SelectionsSection({ jobId, userId, clientId }: any) {
 // ─── card ──────────────────────────────────────────────────────────
 
 function SelectionCard({
-  row, editing, onEditToggle, onSetStatus, onPick, onPatch, onDelete,
+  row, editing, onEditToggle, onSetStatus, onPick, onPatch, onDelete, deleteArmed = false,
 }: {
   row: SelectionRow
   editing: boolean
@@ -262,6 +263,8 @@ function SelectionCard({
   onPick: (optId: string, by?: string | null) => void
   onPatch: (patch: Partial<SelectionRow>) => void
   onDelete: () => void
+  /** Delete was tapped once; the next tap deletes (D57). */
+  deleteArmed?: boolean
 }) {
   const opts = row.options || []
   const picked = opts.find((o) => o.id === row.selected_option_id) || null
@@ -315,8 +318,13 @@ function SelectionCard({
           <button type="button" onClick={onEditToggle} aria-label="Edit selection" style={iconBtnStyle}>
             {editing ? <X size={13} /> : <Edit2 size={13} />}
           </button>
-          <button type="button" onClick={onDelete} aria-label="Delete selection" style={iconBtnStyle}>
-            <Trash2 size={13} />
+          <button
+            type="button"
+            onClick={onDelete}
+            aria-label={deleteArmed ? 'Tap again to delete' : 'Delete selection'}
+            style={deleteArmed ? { ...iconBtnStyle, width: 'auto', padding: '0 8px', fontSize: 12, fontWeight: 700, color: 'var(--v3-danger-text)' } : iconBtnStyle}
+          >
+            {deleteArmed ? 'Tap again to delete' : <Trash2 size={13} />}
           </button>
         </div>
       </div>

@@ -1,4 +1,4 @@
-// Single source of truth for job type options. Used by NewLeadSheet and Bid
+// Single source of truth for job type options. Used by the create screens and Bid
 // so the app speaks the same language end-to-end.
 
 export type JobType = { value: string; label: string }

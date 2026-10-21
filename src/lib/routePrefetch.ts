@@ -10,12 +10,12 @@
 // with real error handling on actual navigation).
 
 const ROUTE_CHUNKS: Record<string, () => Promise<unknown>> = {
-  '/work':        () => import('../screens/Work.tsx'),
-  // Legacy board paths redirect to /work, warm the Work chunk.
-  '/leads':       () => import('../screens/Work.tsx'),
-  '/quotes':      () => import('../screens/Work.tsx'),
-  '/pipeline':    () => import('../screens/Work.tsx'),
   '/jobs':        () => import('../screens/Work.tsx'),
+  '/leads':       () => import('../screens/leads/LeadsList.tsx'),
+  '/quotes':      () => import('../screens/quotes/QuotesList.tsx'),
+  // Legacy board paths redirect to /jobs, warm the Work chunk.
+  '/work':        () => import('../screens/Work.tsx'),
+  '/pipeline':    () => import('../screens/Work.tsx'),
   '/clients':     () => import('../screens/Clients.tsx'),
   '/notes':       () => import('../screens/Notes.tsx'),
   '/schedule':    () => import('../screens/Schedule.tsx'),

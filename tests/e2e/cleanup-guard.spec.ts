@@ -150,11 +150,53 @@ async function appReady(page: Page) {
 const SHOTS: Shot[] = [
   ...ROUTES.map((route) => ({ route, name: route === '/' ? 'today' : route.slice(1).replaceAll('/', '-'), ready: appReady })),
   {
-    route: '/invoices/c-job2',
-    name: 'invoice-c-job2',
+    route: '/invoices/inv1',
+    name: 'invoice-inv1',
     ready: async (page) => {
       await appReady(page)
-      await expect(page.locator('.fh-invoice-detail__hero')).toBeVisible({ timeout: 30_000 })
+      await expect(page.locator('.fhinv-hero')).toBeVisible({ timeout: 30_000 })
+    }
+  },
+  // Phase 9 screens (Task 17): the New menu, a lead, a quote, the
+  // notifications screen and Capture as a route of its own.
+  {
+    route: '/new',
+    name: 'new',
+    ready: async (page) => {
+      await appReady(page)
+      await expect(page.getByRole('heading', { level: 1, name: 'New' })).toBeVisible({ timeout: 30_000 })
+    }
+  },
+  {
+    route: '/leads/l-lead1',
+    name: 'lead-l-lead1',
+    ready: async (page) => {
+      await appReady(page)
+      await expect(page.getByRole('link', { name: 'Quote this' })).toBeVisible({ timeout: 30_000 })
+    }
+  },
+  {
+    route: '/quotes/q-quote',
+    name: 'quote-q-quote',
+    ready: async (page) => {
+      await appReady(page)
+      await expect(page.getByRole('button', { name: 'Make this a job' })).toBeVisible({ timeout: 30_000 })
+    }
+  },
+  {
+    route: '/notifications',
+    name: 'notifications',
+    ready: async (page) => {
+      await appReady(page)
+      await expect(page.getByRole('heading', { level: 1, name: 'Notifications' })).toBeVisible({ timeout: 30_000 })
+    }
+  },
+  {
+    route: '/capture',
+    name: 'capture',
+    ready: async (page) => {
+      await appReady(page)
+      await expect(page.getByRole('list', { name: 'Or start with' })).toBeVisible({ timeout: 30_000 })
     }
   },
   {
@@ -284,10 +326,10 @@ test.describe('cleanup guard', () => {
 
       if (isPhone(testInfo.project.name)) {
         await page.getByRole('button', { name: 'Search everything' }).click()
-        const search = page.getByRole('dialog', { name: 'Search' })
-        await expect(search).toBeVisible()
-        await search.getByRole('searchbox').fill('Plumb')
-        await expect(search.getByText('Plumbing Bellevue').first()).toBeVisible()
+        // Search is a screen below 900 px (D57).
+        await expect(page).toHaveURL(/\/search$/)
+        await page.getByRole('searchbox').fill('Plumb')
+        await expect(page.getByText('Plumbing Bellevue').first()).toBeVisible()
       } else {
         await page.keyboard.press('Control+k')
         const palette = page.getByRole('dialog', { name: 'Command palette' })
@@ -314,9 +356,10 @@ test.describe('cleanup guard', () => {
         // The sidebar's Capture row (decision D33).
         await page.getByRole('button', { name: /^Capture \(/ }).click()
       }
-      const sheet = page.getByRole('dialog', { name: 'Capture' })
-      await expect(sheet).toBeVisible()
-      await expect(sheet.getByRole('list', { name: 'Or start with' })).toBeVisible()
+      // Capture is a screen (D57).
+      await expect(page).toHaveURL(/\/capture$/)
+      await expect(page.getByRole('heading', { level: 1, name: 'Capture' })).toBeVisible()
+      await expect(page.getByRole('list', { name: 'Or start with' })).toBeVisible()
       await page.waitForTimeout(800)
 
       await expect(page).toHaveScreenshot(`capture-sheet-${mode}.png`, { animations: 'disabled', maxDiffPixels: 0 })

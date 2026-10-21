@@ -1,8 +1,102 @@
+## Phase 9 summary
+
+Hi Jesse. Phase 9 split your work into four separate records, a lead, a quote, a job and an invoice, each hanging off a client, and took every pop up out of the app. All seventeen tasks in the plan are done. The full check passed on the final commit: lint with no errors (the same 46 warnings as before), typecheck, all 1254 unit tests, 937 end to end tests passed on both projects with 429 skipped by device and none failing, no retries, the design audit, no dead CSS, the build, and the screenshot guard (108 shots on both projects, with fresh baselines because every signed in screen gained the New button and the new screens had none). The screenshots are in `docs/design/2026-10-redesign/phase9-review/`.
+
+### What changed
+
+Creating records. One New button (the plus in the phone header, the New row in the desktop sidebar, or Cmd N) opens a New screen with five rows: Lead, Quote, Job, Invoice and Client. Each row goes straight to that record's create screen, one tap saves, and you land on the record you made. A lead needs only a name, a quote only a client, a job a client and a title, an invoice a client and an amount; everything else can be filled later. Typing a name that matches nobody makes the client on the spot. Nothing asks who this is for first, and picking Quote, Job or Invoice never shows lead fields.
+
+Leads. Leads live in their own table and have their own list at Leads (also a tab on the Jobs screen). A lead screen shows the name and phone with Call and Message, the address with Navigate, what they need, notes that save when you leave the field, and two buttons: Schedule estimate books an Estimate visit with the address filled, and Quote this starts a quote with the client, title and notes carried over and marks the lead quoted. Mark lost asks with a second tap. Notes from the old row show under Earlier notes.
+
+Quotes. Quotes live in their own table with their own list at Quotes. The quote screen shows the lines (tap one to edit it in place, a plus row adds one), the total and deposit sentence, Scope and terms, the status, Preview, Send, Share link and Make this a job, which makes a new job with the quote's client, title, scope, amount and terms and lands on it. The customer link, send, approve and DocuSign all read the quote record. An approved quote stays a quote; the job it becomes is a new record.
+
+Jobs. Jobs stay where they were, and the Jobs screen is now at /jobs (old /work links land there). A job's Payment, Event, Partner, Complete, Follow up and More are screens of their own, Delete and Reopen confirm with a second tap, the Quote tab is gone, and the gold button reads Invoice this while money is owed, which starts an invoice with the client and the balance filled.
+
+Invoices and Money. An invoice is a record of its own: /invoices/:id is the invoice, with Collect payment, Resend, Remind, PDF, Share link, Edit and Void. An invoice with no job bills the client directly. Each invoice has a Description field that prints in the PDF Description column and in the email, prefilled with the job title when there is a job and blank otherwise. Money lists invoices and its rows are links; a job's own money lives on the job's Financials tab.
+
+Notifications and reminders. The bell opens the Notifications screen instead of a pop up. Each row opens its record, and a reminder has Done and Dismiss, which close it. The reminder engine now keys on the client, one open reminder per client and kind, skips lost leads, quotes and jobs, and reads the new lead and quote tables with links that open the right screen.
+
+No more pop ups. Every sheet, drawer, dialog and confirm box is gone. Capture is the screen /capture, the workspace menu is /workspace, phone search is /search, statements, merging, miles, subs, invites and the sub profile are screens, the Jobs filter and sort are chips, and every are you sure is a second tap on the same button. The one exception is the desktop command palette, a keyboard tool. A test taps every button on every route and checks nothing pops up.
+
+### What the migration did to your data
+
+Before the move your contacts held 64 leads, 25 quotes and 13 lost rows. After it: 62 closed jobs, 31 open jobs, 70 rows marked moved_lead and 32 marked moved_quote. The leads table holds 64 open leads and 6 lost. The quotes table holds 14 drafts, 10 sent, 1 with changes requested and 7 lost. 70 quote lines carry their quote id. 66 of 66 invoices carry their client. Reminders: 36 stale reminders on moved rows were closed, and about 68 fresh ones (59 leads, 9 quotes) will queue on the next daily run. Every migration was additive and reversible, and `scripts/move-counts.mjs` prints these counts read only whenever you want to check.
+
+### Blocked, and calls for you
+
+* The moved rows are kept, not deleted (D56). Once you have looked at the new Leads and Quotes screens and nothing is missing, say so and a later cleanup migration deletes the marked rows.
+* The fieldhorse.io domain still points at the dead site. It needs your Namecheap DNS change and the Netlify domain setting; nothing here touches Netlify.
+* The desktop Jobs list still carries the Work and deals title and chips from before; the phone list is the new Jobs screen. A rename is a small follow up.
+* Opening /jobs with no stage shows the All tab; the old /jobs link used to open the Jobs tab. Tap Jobs on the tab strip if you want only jobs.
+
+### New decisions in SPEC.md section 17
+
+* D53: four records, one client; any of the four can be created at any time.
+* D54: records link only by a tap (Quote this, Make this a job, Invoice this); nothing changes type on its own.
+* D55: jobs keep the contacts table; leads and quotes get their own tables with their own statuses.
+* D56: moved rows are marked moved_lead or moved_quote, not deleted, until you confirm nothing is missing.
+* D57: no pop up sheets; every flow is a screen with Back, and destructive actions confirm with a second tap.
+* D58: one New menu at /new with Lead, Quote, Job, Invoice and Client.
+* D59: fewest taps; each create screen saves with one tap and needs only a name, a client, or a client plus a title or amount.
+* D60: a lead has Schedule estimate and Quote this.
+* D61: a quote has Make this a job and a job has Invoice this, whatever the status.
+* D62: invoices stand alone with a client and a Description that prints on the PDF and in the email.
+* D63: reminders are per client, one open per kind, none for lost records, closed by Done or Dismiss.
+* D64: notifications are a screen; the bell goes there.
+* D65: Jobs, Quotes, Leads and Money are lists of their own records; the dock keeps Today, Jobs, Capture, Money, Schedule.
+
+### iPhone checklist
+
+1. Tap the plus in the header. The New screen lists Lead, Quote, Job, Invoice and Client.
+2. Tap Lead, type a new name, Save. You land on the lead with Schedule estimate and Quote this.
+3. On that lead, tap Quote this. The quote opens with the client and title filled; add a line and watch the total.
+4. On the quote, tap Make this a job. A job opens with the same title and amount.
+5. On the job, tap Invoice this. The invoice form has the client and the balance filled; Save.
+6. On the invoice, type a Description, leave the field, then tap PDF and check the Description column.
+7. Tap Jobs in the dock, then the Leads and Quotes tabs. Nothing you had is missing.
+8. Tap the bell. Mark one reminder Done; it leaves the list.
+9. Tap the gold coin. Capture opens as a screen with Back, not a sheet.
+10. On a lead, tap Mark lost once (it asks for a second tap), then Back without the second tap. Nothing changed.
+
 # Redesign progress, overnight run (Phases 2 to 7)
 
 Run rules and plans: `PHASE2_PLAN.md` to `PHASE7_PLAN.md` in this folder, decisions in `SPEC.md` section 17.
 
 **If this run is picked up by a new session:** read this file first and continue from the first task that is not `done`.
+
+## Phase 9, separate records and no pop ups
+
+Plan: `PHASE9_PLAN.md`. Branch `redesign/phase-9` from `main` (`0c7d8e8`). Pull request #227 (draft) against `main`. Decisions D53 to D65.
+
+### Failing before Phase 9
+
+Nothing. Main at `0c7d8e8` is the Phase 8 head, which passed CI (check and the full e2e job) on October 14, so that run is the baseline.
+
+### Phase 9 tasks
+
+| Task | Status | Commit | Notes |
+|---|---|---|---|
+| 1 The invoice description reaches the PDF and the email | done | this commit | `invoiceDescription` in `src/lib/invoices.ts` feeds the PDF Description column, the per draw PDF, the invoice screen's Service block and the draws editor's new Description field, so the invoice's own words print instead of the job title. |
+| 2 Notifications become a screen with Done and Dismiss | done | this commit | `/notifications` replaces the bell's drawer; Done and Dismiss call `fh_follow_up_set_status` (migration 090, written, not yet applied; the app's dismissed is stored as skipped because the status check allows queued, done, skipped and sent); the count words test moved from the drawer heading to the screen's count line |
+| 3 Reminders stop for lost deals and run per client | done | this commit | Migration 091 applied on October 19 after a rolled back dry run passed all four checks. 17 queued duplicates closed, 45 remain, one per client and kind. The 27 unread reminders that stay belong to demo contacts with no client, which Task 6 gives one |
+| 4 New tables for leads and quotes | done | this commit | Migration 092 applied on October 19 in eight pieces (the database tool times out on long statements). The rolled back check gave quote amount 1500 from two lines, lines inherit the quote's org, nine policies. The quote items inherit trigger was left as it is (it already fires on insert). Types added by hand; four invoice to job lookups now allow an invoice with no job |
+| 5 Pure converters and the data layer | done | this commit | `src/lib/records.ts`, `src/lib/leads.ts`, `src/lib/quotes.ts` with 27 unit tests. `createLead` and `createQuote` throw on a database error and return the row, unlike `createInvoice`. `quoteToJobDraft` takes the client as a third argument since a quote row carries no client name |
+| 6 The migration that moves leads and quotes | done | this commit | Migration 093 applied on October 20: recompute and triggers one piece at a time, then the move as one transaction (the database tool stalls on bodies with a create trigger, and on commits over about ten kilobytes). Dry run and real run both passed every check in `supabase/tests/move_leads_quotes.test.sql`. Before: lead 64, quote 25, lost 13. After: contacts closed 62, job 31, moved_lead 70, moved_quote 32; leads open 64, lost 6; quotes draft 14, sent 10, changes_requested 1, lost 7; 70 lines carry quote_id; 66 of 66 invoices carry client_id. No stage transition or event was written for the move. `scripts/move-counts.mjs` prints the same counts read only. Until Task 7 ships, the live app shows no leads or quotes, because the moved rows are stage values it does not know |
+| 7 Old links keep working | done | this commit | `MovedRecordRedirect` sends any old `/leads`, `/quotes` or `/jobs` link for a moved row to its new record; every `fh_contacts` list read excludes `moved_lead` and `moved_quote`; `STAGES` is job, closed, lost; mock fixtures moved to `fh_leads` (`l-lead1`, `l-lead2`) and `fh_quotes` (`q-quote`, `q-change`) and the mock models `not.` filters. Full e2e 653 passed, 0 failed. 43 specs that drive the old quote and lead screens are `test.fixme` until Tasks 9, 10 and 15 restore them; each carries the task number |
+| 8 The New screen and the create screens | done | this commit | `/new` with five rows, six create screens under one `CreateShell`, `ClientField` (type a name, pick a match or create), header New button, sidebar New row sharing a row with Capture, palette items. The three sheets and the `?new=1` paths are gone. A quote save lands on `/quotes/:id?lines=new`. 12 e2e tests |
+| 9 The lead screen | done | this commit | `/leads` and `/leads/:id` with Schedule estimate (to `/schedule/new?lead=`), Quote this (to `/quotes/new?lead=`), notes saved on blur, next estimate visit, Mark lost on a second tap, earlier notes from the moved row. Jobs tabs read `fh_leads` and `fh_quotes`. `QUERY_CACHE_VERSION` v2. 10 e2e tests |
+| 10 The quote screen | done | this commit | `/quotes`, `/quotes/:id` with lines edited in place, `/terms`, `/preview`, `/approve`, Make this a job. Quote sheets deleted; Bid pushes to a quote. Routes wrapped in a full width root so the desktop audit measures the shell column while the content stays 640 px. 26 e2e tests, 43 fixmes from Task 7 restored |
+| 11 The customer link, send and approve read the quote | done | this commit | `public-link.js` resolves `quote_id` first; approve, request changes, send, DocuSign write `fh_quotes`. Migration 094 applied on October 20 (nullable `contact_id` on versions and envelopes, `fn_approve_quote_version` gains `p_quote_id`, old signature removed). 14 function tests |
+| 12 The invoice screen and Money | done | this commit | `/invoices/:id` is the invoice row with `/payment`, `/edit`, `/remind` screens; the old invoice page is the job's Financials tab (`JobMoney`); Money rows are links and its sheets are gone; an invoice stands without a job (`client_id`, PDF without the contract block, client scoped public link); `send-invoice.js` and `public-link.js` take the client when there is no job. Four merge conflicts with Tasks 8, 10 and 11 resolved keeping both sides |
+| 13 The job screen loses its sheets and gains Invoice this | done | this commit | Payment, event, partner, complete, follow up and More are screens under `/jobs/:id/...`; `/schedule/new` and `/schedule/:id/edit` replace the event sheet and link a job, lead or quote; Delete and Reopen confirm with a second tap; the job's Quote tab is gone; the stage button reads Invoice this while a balance is owed. The Schedule marks a lead's estimate with a Lead chip |
+| 14 Capture, Customers and the rest become screens | done | this commit | Capture is `/capture` (the roster lists jobs, leads and quotes by kind; Lead and Quote rows carry `?text=`); the workspace menu is `/workspace` and phone search `/search`; statements are `/clients/:id/statement`, merging `/clients/merge`, miles `/miles/new`, subs `/subs/new`, invites `/team/invite`, the sub profile `/sub-portal/profile`; the Jobs filter and sort are chips; every `useConfirm` is a second tap; Log payment goes to the payment screens. `fh/Sheet`, `ui/drawer`, `ActionSheet`, `ConfirmSheet` and the sheet components are deleted; `tests/e2e/no-sheets.spec.ts` taps every button on every route |
+| 15 Today, Reports, Clients and the Inbox | done | this commit | Needs an answer reads open leads with a follow up due, quotes quiet for seven days and quotes with changes requested; the stage rail shows leads, quotes, jobs and invoices due; the funnel counts leads, quotes, quotes that became jobs and losses from the new tables; a client's Projects tab groups its four kinds; the Inbox chip reads the client's newest record kind (migration 095 applied on October 20); the palette and Search cover leads, quotes and invoices |
+| 16 Importer, webhooks, captures and the engine write the new records | done | this commit | Importer rows, webhook leads and captured leads become a client plus an `fh_leads` row; the reminder engine scores open leads and sent, viewed or changes requested quotes with `/leads/:id` and `/quotes/:id` links, and Done or Dismiss matches them. Migration 096 applied on October 20: 36 queued reminders on moved contacts closed; the dry run queued 68 fresh ones (59 leads, 9 quotes), which the daily cron will queue for real on its next run |
+| 17 Cut over, screenshots, summary | done | this commit | /jobs is the Jobs list and /work and /pipeline redirect to it (D65); the lifecycle walk in mock-workflows runs on the new screens; guard baselines retaken for every signed in screen (the New button and sidebar row) plus six new shots; 20 screenshots and the invoice PDF in phase9-review; full e2e 937 passed, 429 skipped, 0 failed |
+
+### Phase 9 notes
+
+* October 19: the four code reads and the production queries behind the plan are summarised in the plan's Research notes. The repeated reminders in the notifications list come from one customer having several deal rows, not from the engine repeating itself; none were sent.
 
 ## Phase 8 summary
 

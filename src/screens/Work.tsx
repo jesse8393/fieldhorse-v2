@@ -44,8 +44,8 @@ const Calendar = lazy(() => import('@/components/ui/calendar').then((m) => ({ de
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { supabase } from '../lib/supabase.ts'
-import { markWon, markLost, reopen, reopenQuestion } from '../lib/pipeline.ts'
-import { useConfirm } from '../components/ConfirmSheet.tsx'
+import { markLost, reopen, reopenQuestion } from '../lib/pipeline.ts'
+import { useSecondTap } from '../lib/secondTap.ts'
 import { detailRoute, LIST_STAGE_META as STAGE_META } from '../lib/stages.ts'
 import { moneyK as money } from '../lib/format.ts'
 import { prefetchJobDetail } from './ContactDetail/hooks/useJobData.ts'
@@ -56,8 +56,6 @@ import { useFhMotion } from '../lib/motion.ts'
 import { canHover } from '../lib/hover.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { useJobs, useJobsRealtime, useJobSearch, jobsKey, type JobRow } from '../lib/queries.ts'
-
-const NewLeadSheet = lazy(() => import('../components/NewLeadSheet.tsx'))
 
 type ChipId = 'all' | 'leads' | 'quotes' | 'active' | 'done' | 'lost'
 
@@ -123,7 +121,6 @@ export default function Work() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const confirm = useConfirm() as (options: { title: string; body?: string; confirmLabel?: string }) => Promise<boolean>
   const { data: contacts = [], isLoading: loading, isError, error, refetch, isFetching } = useJobs()
   useJobsRealtime(user?.id, queryClient)
   // Role gate: the revenue stages (leads, quotes) and the sell actions
@@ -154,34 +151,21 @@ export default function Work() {
     return () => clearTimeout(t)
   }, [search])
   const { data: serverHits = [], isError: searchDegraded } = useJobSearch(debouncedSearch)
-  const [addOpen, setAddOpen] = useState(false)
-  const [addStage, setAddStage] = useState<'lead' | 'quote' | 'job'>('lead')
-  const [justAddedId, setJustAddedId] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const loadError = isError
     ? error instanceof Error ? error.message : 'The work list failed to load.'
     : ''
 
-  // Deep links: ?stage=<chip> selects a chip; ?new=1 opens the create
-  // sheet (optionally ?asStage=job from Home's "New Job" tile).
-  // ?stage stays IN the URL so the active filter survives refresh and
-  // is shareable/bookmarkable (UI audit #30), only the one-shot
-  // new/asStage params are consumed.
+  // Deep links: ?stage=<chip> selects a chip. It stays IN the URL so the
+  // active filter survives refresh and is shareable/bookmarkable (UI
+  // audit #30). Creating a record is its own screen (/leads/new and the
+  // others, SPEC D57), so nothing opens from here.
   useEffect(() => {
     const requested = searchParams.get('stage')
-    const wantsNew = searchParams.get('new') === '1'
-    const asStage = searchParams.get('asStage')
     const requestedChip = chipFromStage(requested)
     if (requestedChip) setChip(requestedChip)
     if (!requested) setChip('all')
-    if (wantsNew) {
-      setAddStage(asStage === 'job' ? 'job' : asStage === 'quote' ? 'quote' : 'lead')
-      setAddOpen(true)
-      const sp = new URLSearchParams(searchParams)
-      sp.delete('new'); sp.delete('asStage')
-      setSearchParams(sp, { replace: true })
-    }
-  }, [searchParams, setSearchParams])
+  }, [searchParams])
 
   // Chip clicks write the URL; the effect above syncs state from it.
   const selectChip = (id: ChipId) => {
@@ -358,51 +342,27 @@ export default function Work() {
   // mounted cards.
   const handleOpen = useCallback((c: JobRow) => navigate(detailRoute(c)), [navigate])
   const handleHover = useCallback((c: JobRow) => { if (canHover) prefetchJobDetail(queryClient, c.id, user?.id) }, [queryClient, user?.id])
+  // Won is no longer a stage move (Phase 9, D54, D61): the quote screen's
+  // Make this a job makes the job, so Won opens the record.
   const handleWon = useCallback((c: JobRow) => {
     if (c.proposal_status === 'changes_requested') {
-      toastError('Review changes first', 'Send the revised quote before marking it won.')
-      navigate(`/quotes/${c.id}?tab=quote`)
-      return
+      toastError('Review changes first', 'Send the revised quote before making it a job.')
     }
-    run(c, markWon, null, "Couldn't mark won", () => navigate(`/jobs/${c.id}`))
-  }, [run, navigate])
+    navigate(detailRoute(c))
+  }, [navigate])
   const handleLost = useCallback((c: JobRow) => run(c, markLost, { stage: 'lost' } as Partial<JobRow>, "Couldn't mark lost"), [run])
-  // Reopen asks first, like Mark lost on the job page: one tap used to move
-  // a closed or lost deal straight back (Phase 8, Task 15).
+  // Reopen asks first, like Mark lost on the job page: the card arms a
+  // "Tap again to reopen" button when Reopen is picked from its menu, and
+  // this runs on that second tap (D57).
   const handleReopen = useCallback(async (c: JobRow) => {
-    if (!(await confirm(reopenQuestion(c)))) return
     await run(c, reopen, { stage: c.stage === 'closed' ? 'job' : 'lead' } as Partial<JobRow>, "Couldn't reopen")
-  }, [confirm, run])
+  }, [run])
   const handleFollowUp = useCallback((c: JobRow, when: number | Date | null) => setFollowUp(c, when), [setFollowUp])
 
   const { stagger, item } = useFhMotion()
 
-  const openNewLead = () => { setAddStage('lead'); setAddOpen(true) }
-
-  // ONE way in. Everything starts as a deal; Home's "New Job" tile
-  // deep links with ?asStage=job for work that skips selling.
-  const newLeadSheet = (
-    <Suspense fallback={null}>
-      <NewLeadSheet
-        open={addOpen}
-        userId={user?.id}
-        initialStage={addStage}
-        lockStage={addStage === 'lead'}
-        onClose={() => setAddOpen(false)}
-        onCreated={async (created: any) => {
-          setAddOpen(false)
-          if (created?.id && created.stage === 'quote') {
-            navigate(`/quotes/${created.id}?tab=quote`)
-            return
-          }
-          if (created?.id) setJustAddedId(created.id)
-          await refresh()
-          setTimeout(() => setJustAddedId(null), 1200)
-          toastSuccess('Added', created?.name ? `${created.name} is on the board` : 'On the board')
-        }}
-      />
-    </Suspense>
-  )
+  // New lead is a full screen (SPEC D57, D58).
+  const openNewLead = () => navigate('/leads/new')
 
   // Phone (below 900 px): the redesigned Jobs list (spec 9.3). The deal
   // cards, the stats line and their per row menus stay on desktop until
@@ -425,7 +385,6 @@ export default function Work() {
           // same roles that see no Leads or Quotes tab).
           onNewLead={isMoneyRole ? openNewLead : undefined}
         />
-        {newLeadSheet}
       </>
     )
   }
@@ -569,7 +528,7 @@ export default function Work() {
             {effectiveChip === 'all' && !search && (
               <button
                 type="button"
-                onClick={() => setAddOpen(true)}
+                onClick={openNewLead}
                 style={{
                   background: 'none', border: 'none', padding: 0,
                   color: 'var(--v3-primary-text)', fontWeight: 700, fontSize: 12, cursor: 'pointer'
@@ -589,7 +548,6 @@ export default function Work() {
               <DealCard
                 key={c.id}
                 contact={c}
-                isNew={c.id === justAddedId}
                 busy={busyId === c.id}
                 canSell={isMoneyRole}
                 onOpen={handleOpen}
@@ -604,8 +562,6 @@ export default function Work() {
           {hasMore && <div ref={sentinelRef} aria-hidden="true" style={{ height: 1 }} />}
         </motion.div>
       )}
-
-      {newLeadSheet}
 
       <FloatingActionButton
         onClick={openNewLead}
@@ -628,7 +584,7 @@ export default function Work() {
    ============================================================ */
 type DealCardProps = {
   contact: JobRow
-  isNew: boolean
+  isNew?: boolean
   busy: boolean
   // Whether this role may move the deal through the pipeline (Mark
   // won/lost). Field roles get follow-up actions but no stage moves.
@@ -648,18 +604,21 @@ type DealCardProps = {
 // search keystroke because the parent passed fresh inline-arrow callbacks
 // each render. With stable handlers (above) + memo, only cards whose own
 // props (contact ref / isNew / busy / canSell) actually change re-render.
-const DealCard = memo(function DealCard({ contact: c, isNew, busy, canSell: mayMoveStage, onOpen, onHover, onWon, onLost, onReopen, onFollowUp }: DealCardProps) {
+const DealCard = memo(function DealCard({ contact: c, isNew = false, busy, canSell: mayMoveStage, onOpen, onHover, onWon, onLost, onReopen, onFollowUp }: DealCardProps) {
   // Calendar popover for "Pick a date…", anchored to the ⋯ button so
   // it opens exactly where the menu just closed.
   const [dateOpen, setDateOpen] = useState(false)
-  // Reopen asks a question (Phase 8, Task 15). Asked from inside the menu,
-  // the question took focus and then the closing menu handed it back to
-  // the ⋯ button behind the question: a screen reader never read it, Tab
-  // walked the page and Enter opened the menu again over it. So the menu
-  // item only leaves the ask here, and it is asked once the menu has gone
-  // and focus is back on the ⋯ button, which is then where the question
-  // returns focus when it closes.
+  // Reopen asks first (D57): picking it in the menu arms a "Tap again to
+  // reopen" button on the card, which runs the move on the second tap and
+  // goes back to resting on its own. The menu item only leaves the ask
+  // here, and it is run once the menu has gone and focus is back on the ⋯
+  // button, so the armed button can take focus from there.
   const askAfterMenuRef = useRef<(() => void) | null>(null)
+  const reopenTap = useSecondTap()
+  const reopenAgainRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (reopenTap.armed) reopenAgainRef.current?.focus()
+  }, [reopenTap.armed])
   const meta = STAGE_META[c.stage || 'lead'] || STAGE_META.lead
   const follow = followUpMeta(c)
   const phone = c.phone || c.fh_clients?.phone || ''
@@ -708,7 +667,7 @@ const DealCard = memo(function DealCard({ contact: c, isNew, busy, canSell: mayM
         onMouseEnter={() => onHover(c)}
         style={{
           position: 'relative',
-          display: 'flex', alignItems: 'center', gap: 12,
+          display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12,
           padding: '12px 12px 12px 24px',
           borderRadius: 10,
           background: 'var(--v3-surface)',
@@ -775,6 +734,30 @@ const DealCard = memo(function DealCard({ contact: c, isNew, busy, canSell: mayM
             </div>
           )}
         </button>
+
+        {/* Reopen was picked in the menu: the second tap moves the deal
+            back to Leads (or a closed job back to Jobs). */}
+        {reopenTap.armed && (
+          <div style={{ flex: '1 1 100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <span style={{ fontSize: 12, color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)' }}>
+              {reopenQuestion(c).body}
+            </span>
+            <button
+              ref={reopenAgainRef}
+              type="button"
+              onClick={() => reopenTap.tap(() => onReopen(c))}
+              disabled={busy}
+              style={{
+                flexShrink: 0, minHeight: 32, padding: '0 12px', borderRadius: 10,
+                border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
+                background: 'var(--v3-primary-soft)', color: 'var(--v3-primary-text)',
+                fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, cursor: 'pointer'
+              }}
+            >
+              Tap again to reopen
+            </button>
+          </div>
+        )}
 
         {/* ⋯, the only control on the card. The calendar Popover and
             the dropdown share this button: PopoverAnchor→Trigger→button
@@ -854,7 +837,7 @@ const DealCard = memo(function DealCard({ contact: c, isNew, busy, canSell: mayM
               </>
             )}
             {canReopen && (
-              <DropdownMenuItem onSelect={() => { askAfterMenuRef.current = () => onReopen(c) }}>
+              <DropdownMenuItem onSelect={() => { askAfterMenuRef.current = () => reopenTap.tap(() => onReopen(c)) }}>
                 <RotateCcw size={13} /> Reopen
               </DropdownMenuItem>
             )}

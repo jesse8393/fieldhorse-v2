@@ -2,21 +2,20 @@ import { Suspense, useEffect, useLayoutEffect, useRef } from 'react'
 import { Navigate, Outlet, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
 import AppHeader from './AppHeader.tsx'
 import Dock from './fh/Dock.tsx'
-import WorkspaceMenu from './WorkspaceMenu.tsx'
 import { lazyWithRetry } from '../lib/lazyWithRetry.ts'
 // Lazy + conditional, DesktopSidebar is hidden by CSS on mobile but
 // still shipped + parsed. Gating on useIsDesktop saves the JS code
 // + parse cost for phone users, who outnumber desktop usage.
 const DesktopSidebar = lazyWithRetry(() => import('./DesktopSidebar.tsx'))
 import CommandPalette from './CommandPalette.tsx'
-import MobileSearchOverlay from './MobileSearchOverlay.tsx'
-import CaptureSheet from './CaptureSheet.tsx'
 import InstallPrompt from './InstallPrompt.tsx'
 import RouteErrorBoundary from './RouteErrorBoundary.tsx'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { startOutboxSync } from '../lib/outbox.ts'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { layoutForPath } from '../lib/appLayout.ts'
+import { captureRoute, type OpenCaptureDetail } from '../lib/captureAttach.ts'
+import { useCaptureOutboxSync } from '../lib/captureOutbox.ts'
 
 // Route-loading skeleton, matches Onyx bg so split-chunk fetches don't
 // flash a white screen. AppHeader and the dock stay mounted around it.
@@ -68,6 +67,7 @@ function permissionRouteForPath(pathname: string) {
   if (pathname.startsWith('/clients/')) return '/clients'
   if (pathname.startsWith('/subs/')) return '/subs'
   if (pathname.startsWith('/invoices/')) return '/invoices'
+  if (pathname.startsWith('/sub-portal/')) return '/sub-portal'
   return pathname
 }
 
@@ -103,9 +103,9 @@ export default function AppShell() {
   }, [])
 
   // A layout effect, so the listener moves to the new entry before the
-  // browser reports any scroll the page swap causes. While a sheet holds
-  // the scroll lock (lib/documentScrollLock.ts pins the body), scrollY
-  // reads 0, so those readings are skipped.
+  // browser reports any scroll the page swap causes. While something pins
+  // the body (position fixed), scrollY reads 0, so those readings are
+  // skipped.
   useLayoutEffect(() => {
     const key = location.key
     const remember = () => {
@@ -116,9 +116,8 @@ export default function AppShell() {
     return () => window.removeEventListener('scroll', remember)
   }, [location.key])
 
-  // A passive effect on purpose: sheets and drawers release their scroll
-  // lock (which scrolls back to where the old page was) in effect
-  // cleanups, and those run before this.
+  // A passive effect on purpose: effect cleanups that scroll (a screen
+  // leaving) run before this.
   useEffect(() => {
     const pathChanged = lastPathname.current !== location.pathname
     lastPathname.current = location.pathname
@@ -146,6 +145,9 @@ export default function AppShell() {
   // Offline outbox: drain queued writes on app start, on regaining
   // network, and whenever the tab becomes visible. See lib/outbox.ts.
   useEffect(() => startOutboxSync(), [])
+  // Captures taken with no signal sync as notes once it is back, from
+  // whichever screen is open (the Capture screen has usually been left).
+  useCaptureOutboxSync()
 
   // Role gate, decided while rendering so a screen this role may not
   // open never mounts (it would fire its queries, and the persisted
@@ -174,6 +176,44 @@ export default function AppShell() {
     }
     window.addEventListener('fh:navigate', onNav as EventListener)
     return () => window.removeEventListener('fh:navigate', onNav as EventListener)
+  }, [navigate])
+
+  // The pop ups are screens (SPEC D57). Capture answers openCapture() (the
+  // `fh:open-capture` event, with the job on screen attached) and Cmd or
+  // Ctrl+J; the workspace menu is /workspace; search below 900 px is
+  // /search, while the command palette stays the one keyboard overlay on a
+  // desktop.
+  useEffect(() => {
+    // The screen already open is not stacked on itself.
+    function go(to: string) {
+      const here = `${window.location.pathname}${window.location.search}`
+      if (here === to) return
+      if (window.location.pathname === to.split('?')[0]) navigate(to, { replace: true })
+      else navigate(to)
+    }
+    function onCapture(e: Event) {
+      go(captureRoute((e as CustomEvent<OpenCaptureDetail | null | undefined>).detail ?? {}))
+    }
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') {
+        e.preventDefault()
+        go(captureRoute())
+      }
+    }
+    function onMenu() { go('/workspace') }
+    function onPalette() {
+      if (typeof window !== 'undefined' && window.innerWidth < 900) go('/search')
+    }
+    window.addEventListener('fh:open-capture', onCapture)
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('fh:open-menu', onMenu)
+    window.addEventListener('fh:open-palette', onPalette)
+    return () => {
+      window.removeEventListener('fh:open-capture', onCapture)
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('fh:open-menu', onMenu)
+      window.removeEventListener('fh:open-palette', onPalette)
+    }
   }, [navigate])
 
   const layoutMode = layoutForPath(location.pathname)
@@ -237,16 +277,12 @@ export default function AppShell() {
         </div>
       </main>
 
-      {/* Phone: the dock (its Capture coin is the phone's capture entry)
-          and the workspace menu the header monogram opens. Desktop: the
+      {/* Phone: the dock (its Capture coin goes to /capture). Desktop: the
           sidebar above carries the Capture row (D33); nothing floats over
-          the page. The sheet also answers Cmd/Ctrl+J and the
-          `fh:open-capture` event everywhere. */}
+          the page but the command palette, the one keyboard overlay D57
+          keeps. */}
       {!isDesktop && <Dock />}
-      <WorkspaceMenu />
-      <CaptureSheet />
       <CommandPalette />
-      <MobileSearchOverlay />
       <InstallPrompt />
       {/* Toasts: one Sonner Toaster at the app root (components/AppToaster.tsx). */}
     </div>

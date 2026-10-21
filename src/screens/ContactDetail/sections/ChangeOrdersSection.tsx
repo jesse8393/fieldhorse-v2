@@ -17,7 +17,7 @@ import { Plus, FileEdit, Check, X, Trash2, FileText, Share2 } from 'lucide-react
 import { supabase } from '../../../lib/supabase.ts'
 import { mintPublicLink } from '../../../lib/publicLink.ts'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
-import { useConfirm } from '../../../components/ConfirmSheet.tsx'
+import { useArmedId } from '../../../lib/secondTap.ts'
 import { Eyebrow } from '../../../components/v3'
 // Cents aware, so a $1,249.50 change order never reads "$1,250".
 import { money } from '../../../components/documents/format.ts'
@@ -32,7 +32,8 @@ function shortDate(iso: any) {
 }
 
 export default function ChangeOrdersSection({ contact, userId, changeOrders = [], onChange }: any) {
-  const confirm = useConfirm()
+  // Void and Delete take a second tap on the same change order's button (D57).
+  const armedTap = useArmedId()
   // Any owner, admin or manager of the job's company may edit, not only
   // the teammate who created the job (see lib/jobAccess.ts).
   const { orgId: viewerOrgId, canCreateFinancialDocs } = useMembership()
@@ -174,13 +175,17 @@ export default function ChangeOrdersSection({ contact, userId, changeOrders = []
     }
   }
 
-  async function handleVoid(co: any) {
-    if (!(await confirm({ title: `Void CO #${co.sequence_number}?`, body: 'It will stop counting toward the contract total.', destructive: true, confirmLabel: 'Void' }))) return
-    await handleSave({ ...co, status: 'void' })
+  // The first tap arms the button; the second voids. A void change order
+  // stops counting toward the contract total.
+  function handleVoid(co: any) {
+    armedTap.tap(`void:${co.id}`, () => { void handleSave({ ...co, status: 'void' }) })
   }
 
-  async function handleDelete(co: any) {
-    if (!(await confirm({ title: `Delete CO #${co.sequence_number}?`, body: 'This cannot be undone.', destructive: true }))) return
+  function handleDelete(co: any) {
+    armedTap.tap(`delete:${co.id}`, () => { void deleteNow(co) })
+  }
+
+  async function deleteNow(co: any) {
     try {
       const { error } = await supabase
         .from('fh_change_orders')
@@ -219,6 +224,7 @@ export default function ChangeOrdersSection({ contact, userId, changeOrders = []
         onGetSignature={handleGetSignature}
         onVoid={handleVoid}
         onDelete={handleDelete}
+        armedKey={armedTap.armedId}
       />
     </SectionShell>
   )
@@ -279,7 +285,7 @@ function SectionHeader({ count, canAdd, onAdd }: any) {
   )
 }
 
-function List({ changeOrders, editingId, readOnly, onEdit, onCancelEdit, onSave, onApprove, onGetSignature, onVoid, onDelete }: any) {
+function List({ changeOrders, editingId, readOnly, armedKey, onEdit, onCancelEdit, onSave, onApprove, onGetSignature, onVoid, onDelete }: any) {
   if (!changeOrders.length) {
     return (
       <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--v3-text-muted)', fontSize: 12, fontFamily: 'var(--font-body)' }}>
@@ -307,6 +313,8 @@ function List({ changeOrders, editingId, readOnly, onEdit, onCancelEdit, onSave,
               onGetSignature={() => onGetSignature?.(co)}
               onVoid={() => onVoid?.(co)}
               onDelete={() => onDelete?.(co)}
+              voidArmed={armedKey === `void:${co.id}`}
+              deleteArmed={armedKey === `delete:${co.id}`}
             />
           )}
         </li>
@@ -315,7 +323,7 @@ function List({ changeOrders, editingId, readOnly, onEdit, onCancelEdit, onSave,
   )
 }
 
-function Row({ co, readOnly, onEdit, onApprove, onGetSignature, onVoid, onDelete }: any) {
+function Row({ co, readOnly, onEdit, onApprove, onGetSignature, onVoid, onDelete, voidArmed = false, deleteArmed = false }: any) {
   const isApproved = co.status === 'approved'
   const isVoid = co.status === 'void'
   const isDraft = co.status === 'draft'
@@ -382,12 +390,12 @@ function Row({ co, readOnly, onEdit, onApprove, onGetSignature, onVoid, onDelete
               <FileEdit size={12} aria-hidden="true" />
             </IconBtn>
             {!isVoid && (
-              <IconBtn onClick={onVoid} aria-label="Void change order" title="Void">
-                <X size={12} aria-hidden="true" />
+              <IconBtn onClick={onVoid} aria-label={voidArmed ? 'Tap again to void' : 'Void change order'} title={voidArmed ? 'Tap again to void. It stops counting toward the contract total.' : 'Void'} wide={voidArmed}>
+                {voidArmed ? <span style={{ fontSize: 12, fontWeight: 700, padding: '0 8px', whiteSpace: 'nowrap' }}>Tap again to void</span> : <X size={12} aria-hidden="true" />}
               </IconBtn>
             )}
-            <IconBtn onClick={onDelete} aria-label="Delete change order" tone="danger" title="Delete">
-              <Trash2 size={12} aria-hidden="true" />
+            <IconBtn onClick={onDelete} aria-label={deleteArmed ? 'Tap again to delete' : 'Delete change order'} tone="danger" title={deleteArmed ? 'Tap again to delete. This cannot be undone.' : 'Delete'} wide={deleteArmed}>
+              {deleteArmed ? <span style={{ fontSize: 12, fontWeight: 700, padding: '0 8px', whiteSpace: 'nowrap' }}>Tap again to delete</span> : <Trash2 size={12} aria-hidden="true" />}
             </IconBtn>
           </div>
         )}
@@ -563,7 +571,8 @@ function Tag({ tone, children }: any) {
   )
 }
 
-function IconBtn({ children, onClick, tone, title, ...rest }: any) {
+// `wide` lets an armed button carry its words (Tap again to delete).
+function IconBtn({ children, onClick, tone, title, wide = false, ...rest }: any) {
   const danger = tone === 'danger'
   return (
     <button
@@ -572,7 +581,7 @@ function IconBtn({ children, onClick, tone, title, ...rest }: any) {
       title={title}
       {...rest}
       style={{
-        width: 26, height: 26, borderRadius: 10,
+        width: wide ? 'auto' : 26, height: 26, borderRadius: 10,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         background: 'transparent',
         border: `1px solid ${danger ? 'rgba(192, 57, 43, 0.35)' : 'var(--v3-border-strong)'}`,

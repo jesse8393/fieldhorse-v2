@@ -1,0 +1,685 @@
+/*
+ * The quote screens (Phase 9, Task 10): the quote, its lines edited in
+ * place, Scope and terms, the preview, the approval and the Quotes list.
+ * Class prefix fhqt- (decision D41). Reads only the --fh- tokens, so Day
+ * and Night follow the theme on their own. Phone first; on a desktop the
+ * same column sits in the shell at 640 px.
+ */
+
+.fhqt-page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 12px var(--fh-gutter) 32px;
+  color: var(--fh-ink);
+  font-family: var(--fh-font-body);
+}
+
+/* global.css forces a muted outline color on every focused control, so
+   these restate the 2 px --fh-focus ring with the same weight. */
+.fhqt-opt__main:focus-visible,
+.fhqt-seg__option:focus-visible,
+.fhqt-suggest__item:focus-visible,
+.fhqt-switch:focus-visible,
+.fhqt-client__link:focus-visible {
+  outline: 2px solid var(--fh-focus) !important;
+  outline-color: var(--fh-focus) !important;
+  outline-offset: 2px;
+}
+
+/* ================================================================
+   Header: Back, the kicker, the status chip; then the title
+   ================================================================ */
+
+.fhqt-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: -12px;
+}
+
+.fhqt-kicker {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--fh-ink-2);
+}
+
+.fhqt-title {
+  margin: 12px 0 0;
+  font-family: var(--fh-font-display);
+  font-size: 30px;
+  line-height: 36px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--fh-ink);
+  overflow-wrap: anywhere;
+}
+
+.fhqt-title:focus {
+  outline: none;
+}
+
+.fhqt-client {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 8px 0 0;
+  font-size: 16px;
+  line-height: 22px;
+  color: var(--fh-ink-2);
+}
+
+.fhqt-client__link {
+  color: var(--fh-ink);
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: 7px;
+}
+
+.fhqt-client__link:hover {
+  text-decoration: underline;
+}
+
+.fhqt-client__number {
+  color: var(--fh-ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.fhqt-sub {
+  margin: 8px 0 0;
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--fh-ink-2);
+}
+
+/* The linked client's email could not be read: the line, then Try again
+   with its label on the line's left edge. */
+.fhqt-retry {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+}
+
+.fhqt-retry .fhc-btn {
+  margin-left: -12px;
+}
+
+/* ================================================================
+   Panels: the customer's change request, the approved note
+   ================================================================ */
+
+.fhqt-panel {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 14px;
+  background: var(--fh-tray);
+  box-shadow: inset 0 0 0 1px var(--fh-hairline-soft);
+}
+
+.fhqt-panel__title {
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+  color: var(--fh-ink);
+}
+
+.fhqt-panel__body {
+  margin: 8px 0 0;
+  font-size: 16px;
+  line-height: 22px;
+  color: var(--fh-ink);
+  overflow-wrap: anywhere;
+}
+
+.fhqt-panel__note {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+/* ================================================================
+   Lines: hairline rows, the plus row, one row opened into the editor
+   ================================================================ */
+
+.fhqt-loading {
+  margin-top: 16px;
+}
+
+.fhqt-lines {
+  margin-top: 16px;
+}
+
+.fhqt-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--fh-hairline);
+  border-bottom: 1px solid var(--fh-hairline);
+}
+
+.fhqt-lines .fhqt-add {
+  margin-top: 4px;
+  margin-left: -12px;
+  padding: 0 12px;
+  color: var(--fh-ink-2);
+}
+
+/* The editor stands where the row was: a paper card inside the list. */
+.fhqt-edit {
+  padding: 16px 0;
+}
+
+.fhqt-list > .fhqt-edit + .fhc-row,
+.fhqt-list > .fhc-row + .fhqt-edit {
+  border-top: 1px solid var(--fh-hairline-soft);
+}
+
+.fhqt-form {
+  display: grid;
+  gap: 16px;
+}
+
+.fhqt-form--page {
+  margin-top: 24px;
+}
+
+.fhqt-form__title {
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+  color: var(--fh-ink);
+}
+
+.fhqt-form__pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.fhqt-form__actions {
+  display: grid;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.fhqt-suggest {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px var(--fh-hairline);
+}
+
+.fhqt-suggest li + li {
+  border-top: 1px solid var(--fh-hairline-soft);
+}
+
+.fhqt-suggest__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  margin: 0;
+  padding: 8px 12px;
+  border: 0;
+  background: var(--fh-paper);
+  color: var(--fh-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.fhqt-suggest__name {
+  min-width: 0;
+  font-size: 16px;
+  line-height: 22px;
+  overflow-wrap: anywhere;
+}
+
+.fhqt-suggest__rate {
+  flex: none;
+  font-size: 14px;
+  line-height: 18px;
+  color: var(--fh-ink-3);
+}
+
+.fhqt-kind {
+  display: grid;
+  gap: 8px;
+}
+
+.fhqt-kind__label {
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--fh-ink-2);
+}
+
+.fhqt-kind__help {
+  margin: 0;
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+.fhqt-seg {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--fh-tray);
+  box-shadow: inset 0 0 0 1px var(--fh-edge-strong);
+}
+
+.fhqt-seg--wrap {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.fhqt-seg__option {
+  min-height: 44px;
+  margin: 0;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--fh-ink-2);
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.fhqt-seg__option.is-on {
+  background: var(--fh-ink);
+  color: var(--fh-paper);
+  font-weight: 600;
+}
+
+.fhqt-seg__option:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* ================================================================
+   Optional items: a paper panel, a switch each. Not included: a list.
+   ================================================================ */
+
+.fhqt-optional {
+  margin-top: 24px;
+  padding: 16px;
+  border-radius: 14px;
+  background: var(--fh-paper);
+  box-shadow: inset 0 0 0 1px var(--fh-hairline);
+}
+
+.fhqt-optional__title,
+.fhqt-excluded__title,
+.fhqt-share__title {
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+  color: var(--fh-ink);
+  overflow-wrap: anywhere;
+}
+
+.fhqt-optional__list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fhqt-opt {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 0;
+}
+
+.fhqt-opt + .fhqt-opt,
+.fhqt-optional__list .fhqt-edit + .fhqt-opt,
+.fhqt-optional__list .fhqt-opt + .fhqt-edit {
+  border-top: 1px solid var(--fh-hairline-soft);
+}
+
+.fhqt-opt__main {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  min-height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.fhqt-opt__main:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.fhqt-opt__title {
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+  color: var(--fh-ink);
+  overflow-wrap: anywhere;
+}
+
+.fhqt-opt__sub {
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--fh-ink-2);
+  overflow-wrap: anywhere;
+}
+
+/* The shadcn Switch, drawn from the tokens: a 52 by 32 track outlined in
+   --fh-edge-strong (a light track off, an ink track on), a paper thumb, a
+   44 px tall hit area. Tailwind's classes sit in its layer, so these
+   unlayered rules win. At night the off thumb is --fh-ink-2, because a
+   paper thumb would vanish into the dark track. */
+.fhqt-lines .fhqt-switch {
+  --fhqt-thumb: var(--fh-paper);
+  position: relative;
+  flex: none;
+  width: 52px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--fh-edge-strong);
+  border-radius: 999px;
+  background: var(--fh-edge);
+  box-shadow: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+[data-theme='dark'] .fhqt-lines .fhqt-switch {
+  --fhqt-thumb: var(--fh-ink-2);
+}
+
+.fhqt-lines .fhqt-switch::after {
+  content: '';
+  position: absolute;
+  inset: -8px -4px;
+}
+
+.fhqt-lines .fhqt-switch[data-state='checked'] {
+  border-color: var(--fh-ink);
+  background: var(--fh-ink);
+}
+
+/* aria-disabled while its save is out: it keeps focus (QuoteLines.tsx). */
+.fhqt-lines .fhqt-switch:disabled,
+.fhqt-lines .fhqt-switch[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.fhqt-lines .fhqt-switch [data-slot='switch-thumb'] {
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  border-radius: 999px;
+  background: var(--fhqt-thumb);
+  box-shadow: 0 1px 2px rgba(27, 26, 22, 0.35);
+  translate: 3px 0;
+}
+
+.fhqt-lines .fhqt-switch[data-state='checked'] [data-slot='switch-thumb'] {
+  background: var(--fh-paper);
+  translate: 23px 0;
+}
+
+.fhqt-excluded {
+  margin-top: 24px;
+}
+
+.fhqt-excluded .fhqt-list {
+  margin-top: 8px;
+}
+
+/* ================================================================
+   The total, the deposit sentence and the one gold Send
+   ================================================================ */
+
+.fhqt-total {
+  margin-top: 24px;
+  padding: 16px;
+  border-radius: 14px;
+  background: var(--fh-tray);
+  box-shadow: inset 0 0 0 1px var(--fh-hairline-soft);
+}
+
+.fhqt-total__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.fhqt-total__label {
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--fh-ink-2);
+}
+
+.fhqt-total__amount {
+  font-family: var(--fh-font-display);
+  font-size: 30px;
+  line-height: 36px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--fh-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.fhqt-total__note {
+  margin: 4px 0 16px;
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--fh-ink-2);
+}
+
+.fhqt-total__hint {
+  margin: 8px 0 0;
+  text-align: center;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+/* ================================================================
+   The rows that keep the rest of the quote reachable
+   ================================================================ */
+
+.fhqt-rows {
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--fh-hairline);
+  border-bottom: 1px solid var(--fh-hairline);
+}
+
+.fhqt-rows .fhc-row__end {
+  align-self: center;
+}
+
+.fhqt-chevron {
+  color: var(--fh-ink-4);
+}
+
+.fhqt-share {
+  margin-top: 24px;
+}
+
+.fhqt-share .fhqt-rows {
+  margin-top: 8px;
+}
+
+.fhqt-job {
+  margin-top: 24px;
+}
+
+.fhqt-job__note {
+  margin: 8px 0 0;
+  text-align: center;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+.fhqt-danger {
+  margin-top: 32px;
+}
+
+.fhqt-danger-note {
+  margin: 24px 0 0;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+/* ================================================================
+   The preview and the approval
+   ================================================================ */
+
+.fhqt-preview {
+  margin-top: 16px;
+  overflow-x: auto;
+  border-radius: 12px;
+}
+
+.fhqt-card {
+  display: grid;
+  gap: 4px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--fh-paper);
+  box-shadow: inset 0 0 0 1px var(--fh-hairline);
+}
+
+.fhqt-card__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.fhqt-card__name {
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--fh-ink);
+  overflow-wrap: anywhere;
+}
+
+.fhqt-card__amount {
+  font-family: var(--fh-font-display);
+  font-size: 20px;
+  line-height: 24px;
+  color: var(--fh-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.fhqt-card__line {
+  margin: 0;
+  font-size: 14px;
+  line-height: 18px;
+  color: var(--fh-ink-3);
+}
+
+.fhqt-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--fh-tray);
+  box-shadow: inset 0 0 0 1px var(--fh-hairline-soft);
+  font-size: 14px;
+  line-height: 18px;
+  color: var(--fh-ink);
+}
+
+.fhqt-alert {
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--fh-danger-fill);
+  color: var(--fh-danger-ink);
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+}
+
+/* ================================================================
+   The Quotes list
+   ================================================================ */
+
+.fhqt-page--list {
+  padding-top: 12px;
+}
+
+.fhqt-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 8px;
+}
+
+.fhqt-list-title {
+  min-width: 0;
+  margin: 0;
+  font-family: var(--fh-font-display);
+  font-size: 36px;
+  line-height: 40px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--fh-ink);
+}
+
+.fhqt-list-title:focus {
+  outline: none;
+}
+
+.fhqt-page--list .fhqt-rows {
+  margin-top: 8px;
+}
+
+@media (min-width: 900px) {
+  .fhqt-page {
+    padding: 24px var(--fh-gutter-desktop) 48px;
+  }
+}

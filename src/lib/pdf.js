@@ -960,7 +960,10 @@ export async function generateInvoice({
   changeOrders = [],
   invoices = [],
   currentInvoice = null,
-  photos = []
+  photos = [],
+  // False for an invoice with no job (D62): it is the whole contract, so
+  // there is no Contract position to reconcile it against.
+  showContractPosition = true
 } = {}) {
   const doc = createPdfDoc()
   const pageWidth = doc.internal.pageSize.getWidth()
@@ -1094,7 +1097,8 @@ export async function generateInvoice({
 
   // 6. Balance summary / contract position, the one reconciliation the
   //    customer can check (contract → COs → this invoice → paid → balance).
-  if (ct > 0 || pp > 0) {
+  //    An invoice with no job has nothing to reconcile against and skips it.
+  if (showContractPosition && (ct > 0 || pp > 0)) {
     // Plain ASCII signs: the standard PDF fonts cannot draw U+2212, and a
     // string holding it printed as junk, losing the sign on credits.
     const balanceRows = []

@@ -93,7 +93,9 @@ function action(n: number, extra: Partial<HomeNextAction> = {}): HomeNextAction 
   return {
     id: `a-${n}`,
     kind: 'followup',
-    contactId: `lead-${n}`,
+    recordKind: 'lead',
+    recordId: `lead-${n}`,
+    contactId: '',
     verb: 'Follow up',
     contactName: `Lead ${n}`,
     contactAmount: 0,
@@ -323,19 +325,20 @@ describe('Today past six, read through the dashboard queries', () => {
     }))
   }
 
-  // Leads gone quiet for ten days or more, each one a follow up to answer.
-  // The last one has waited longest.
+  // Leads (fh_leads rows) whose follow up fell due ten days ago or more,
+  // each one a call to make. The last one is the most overdue.
   function quietLeads(count: number) {
+    const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     return Array.from({ length: count }, (_, i) => ({
       id: `lead-${i + 1}`,
-      name: `Lead ${i + 1}`,
-      amount: 1000,
-      stage: 'lead',
+      client_id: `client-${i + 1}`,
+      title: 'Driveway',
+      status: 'open',
+      follow_up_on: ymd(at(9, 0, -(10 + i))),
+      last_contact: null,
       created_at: at(9, 0, -60).toISOString(),
       updated_at: at(9, 0, -(10 + i)).toISOString(),
-      completed_at: null,
-      follow_up_on: null,
-      proposal_status: null
+      fh_clients: { name: `Lead ${i + 1}` }
     }))
   }
 
@@ -373,24 +376,24 @@ describe('Today past six, read through the dashboard queries', () => {
   })
 
   it('with 14 actions the Needs an answer count reads 14', async () => {
-    fakeDb.tables.fh_contacts = quietLeads(14)
+    fakeDb.tables.fh_leads = quietLeads(14)
     const view = await todayAt(at(8))
     expect(view.answers).toHaveLength(3)
     expect(view.answersTotal).toBe(14)
   })
 
   it('in the evening with 14 actions, says 14 things before tomorrow', async () => {
-    fakeDb.tables.fh_contacts = quietLeads(14)
+    fakeDb.tables.fh_leads = quietLeads(14)
     const view = await todayAt(at(19, 40))
     expect(view.title).toEqual(['Quiet day.', '14 things before tomorrow.'])
   })
 
   it('See all lists the 20 most urgent and the count keeps every one', async () => {
-    fakeDb.tables.fh_contacts = quietLeads(25)
+    fakeDb.tables.fh_leads = quietLeads(25)
     const view = await todayAt(at(8))
     expect(view.answersTotal).toBe(25)
     expect(view.seeAll).toHaveLength(20)
-    expect(view.seeAll[0].contactId).toBe('lead-25')
+    expect(view.seeAll[0].recordId).toBe('lead-25')
     expect(view.answers.map((a) => a.id)).toEqual(view.seeAll.slice(0, 3).map((a) => a.id))
   })
 

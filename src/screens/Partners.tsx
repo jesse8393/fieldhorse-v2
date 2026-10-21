@@ -19,7 +19,7 @@ import {
   Users, Send, ShieldOff, Briefcase, Check, ChevronRight, Clock
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.tsx'
-import { useConfirm } from '../components/ConfirmSheet.tsx'
+import { useArmedId } from '../lib/secondTap.ts'
 import { hapticTap, hapticSuccess, hapticError } from '../lib/haptics.ts'
 import { toastSuccess, toastError, toastInfo } from '../lib/toast.ts'
 import { SkeletonList } from '../components/Skeleton.tsx'
@@ -59,7 +59,8 @@ function relTime(input: any) {
 export default function Partners() {
   const { user } = useAuth()
   const isDesktop = useIsDesktop()
-  const confirm = useConfirm()
+  // Revoking takes a second tap on the same partner's button (D57).
+  const revokeTap = useArmedId()
   const { data: rows = [], isLoading: loading } = usePartnerDirectory(user?.id)
   const load = useInvalidatePartners()
   const [filter, setFilter] = useState('all')
@@ -125,16 +126,15 @@ export default function Partners() {
     }
   }
 
-  async function revoke(partner: any) {
+  // The first tap arms the button; the second cuts their access to every
+  // job. They cannot re-accept old invites after this.
+  function revoke(partner: any) {
     const active = partner.jobs.filter((j: any) => j.status !== 'revoked')
     if (active.length === 0) return
-    const ok = await confirm({
-      title: `Revoke ${partner.name || partner.email}?`,
-      body: `Cuts their access to ${active.length} ${active.length === 1 ? 'job' : 'jobs'}. They can't re-accept old invites after this, you'll need to send a fresh one.`,
-      destructive: true,
-      confirmLabel: 'Revoke everywhere'
-    })
-    if (!ok) return
+    revokeTap.tap(partner.email, () => { void revokeNow(partner, active) })
+  }
+
+  async function revokeNow(partner: any, active: any[]) {
     setBusyKey(partner.email)
     try {
       for (const j of active) {
@@ -161,6 +161,7 @@ export default function Partners() {
         setFilter={setFilter}
         counts={counts}
         busyKey={busyKey}
+        revokeArmedKey={revokeTap.armedId}
         onResend={resend}
         onRevoke={revoke}
       />
@@ -256,6 +257,7 @@ export default function Partners() {
                 partner={p}
                 onResend={resend}
                 onRevoke={revoke}
+                revokeArmed={revokeTap.armedId === p.email}
                 busy={busyKey === p.email}
                 resendingKey={busyKey?.startsWith(`${p.email}|`) ? busyKey : null}
               />
@@ -281,7 +283,7 @@ function Metric({ label, tone = 'default', children }: any) {
   )
 }
 
-function PartnerCard({ partner, onResend, onRevoke, busy, resendingKey }: any) {
+function PartnerCard({ partner, onResend, onRevoke, revokeArmed = false, busy, resendingKey }: any) {
   const initial = (partner.name || partner.email).charAt(0).toUpperCase()
   return (
     <li>
@@ -432,7 +434,7 @@ function PartnerCard({ partner, onResend, onRevoke, busy, resendingKey }: any) {
               }}
             >
               <ShieldOff size={11} aria-hidden="true" />
-              Revoke
+              {revokeArmed ? 'Tap again to revoke everywhere' : 'Revoke'}
             </button>
           )}
         </footer>

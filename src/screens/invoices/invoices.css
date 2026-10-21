@@ -1,0 +1,295 @@
+/*
+ * The invoice screens (Phase 9, Task 12, decisions D57 and D62): the
+ * invoice at /invoices/:id and its payment, edit and remind screens. Class
+ * prefix fhinv- (decision D41). Reads only --fh- tokens, so Day and Night
+ * follow on their own. Back, the buttons, the chips, the fields and the
+ * skeleton come from the fh components; this file lays out the title row,
+ * the summary, the description, the stacked actions, the facts and the
+ * payment rows. Phone first; on a desktop the same screen sits in a 640 px
+ * column inside the shell.
+ */
+
+.fhinv {
+  padding-bottom: 32px;
+}
+
+/* The screen spans the desktop workspace; its content keeps the phone
+   layout in a 640 px column down the middle. */
+@media (min-width: 900px) {
+  .fhinv > * {
+    width: 100%;
+    max-width: 640px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+/* ---- Title row: Back, the title, one quiet action ---- */
+.fhinv-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 8px 8px;
+}
+
+.fhinv-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-family: var(--fh-font-display);
+  font-size: 30px;
+  line-height: 36px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--fh-ink);
+  overflow-wrap: anywhere;
+}
+
+.fhinv-title:focus {
+  outline: none;
+}
+
+/* ---- Summary: who, what, how much ---- */
+.fhinv-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px var(--fh-gutter) 16px;
+  border-bottom: 1px solid var(--fh-hairline);
+}
+
+.fhinv-hero__who {
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 17px;
+  line-height: 24px;
+  font-weight: 600;
+  color: var(--fh-ink);
+  overflow-wrap: anywhere;
+}
+
+.fhinv-hero__job {
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--fh-ink-2);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+a.fhinv-hero__job:hover,
+a.fhinv-hero__job:focus-visible {
+  color: var(--fh-ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.fhinv-hero__amount {
+  margin: 8px 0 0;
+  font-family: var(--fh-font-display);
+  font-size: 38px;
+  line-height: 44px;
+  font-weight: 600;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--fh-ink);
+}
+
+.fhinv-hero__amount.is-settled {
+  color: var(--fh-success-ink);
+}
+
+.fhinv-hero__status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 4px;
+}
+
+.fhinv-hero__dates,
+.fhinv-hero__facts {
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--fh-ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Sections: a small title, then its content ---- */
+.fhinv-section {
+  padding: 16px var(--fh-gutter) 0;
+}
+
+.fhinv-section__title {
+  margin: 0 0 8px;
+  font-family: var(--fh-font-body);
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  color: var(--fh-ink-3);
+}
+
+.fhinv-intro {
+  margin: 0;
+  padding: 0 var(--fh-gutter) 8px;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--fh-ink-2);
+}
+
+/* ---- Actions: stacked, one gold ---- */
+.fhinv-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px var(--fh-gutter) 8px;
+}
+
+.fhinv-actions > .fhc-btn--destructive {
+  margin-top: 8px;
+}
+
+.fhinv-helper {
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--fh-ink-2);
+}
+
+/* ---- A form: fields, then the one gold Save ---- */
+.fhinv-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px var(--fh-gutter) 0;
+}
+
+.fhinv-form__save {
+  padding-top: 12px;
+}
+
+/* A set of choices (payment method, kind): chips that act as radios. */
+.fhinv-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.fhinv-choices__label {
+  padding: 0;
+  font-family: var(--fh-font-body);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--fh-ink);
+}
+
+.fhinv-choices__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fhinv-choice {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid var(--fh-edge-strong);
+  background: var(--fh-paper);
+  color: var(--fh-ink);
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fhinv-choice[aria-checked="true"] {
+  border-color: var(--fh-gold-ink);
+  background: var(--fh-gold-line);
+  color: var(--fh-gold-ink);
+}
+
+.fhinv-choice:focus-visible {
+  outline: 2px solid var(--fh-focus);
+  outline-offset: 2px;
+}
+
+/* ---- Facts: To, Invoice, Amount on the remind screen ---- */
+.fhinv-facts {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 8px var(--fh-gutter) 0;
+}
+
+.fhinv-fact {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  box-shadow: inset 0 -1px 0 var(--fh-hairline);
+}
+
+.fhinv-fact dt {
+  flex: none;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--fh-ink-2);
+}
+
+.fhinv-fact dd {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 0;
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--fh-ink);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.fhinv-fact__sub {
+  font-weight: 400;
+  color: var(--fh-ink-2);
+}
+
+.fhinv-fact__amount {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Payments: hairline rows ---- */
+.fhinv-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fhinv-quiet {
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--fh-ink-2);
+}
+
+/* ---- Loading and failed states ---- */
+.fhinv-state {
+  padding: 16px var(--fh-gutter) 0;
+}

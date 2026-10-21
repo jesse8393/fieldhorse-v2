@@ -21,7 +21,7 @@ import SwipeableRow from '../components/SwipeableRow.tsx'
 import { Archive as ArchiveIcon } from 'lucide-react'
 import SectionHeader from '../components/v3/SectionHeader.tsx'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
-import { useConfirm } from '../components/ConfirmSheet.tsx'
+import { useSecondTap } from '../lib/secondTap.ts'
 import { Eyebrow } from '../components/v3'
 import DataErrorState from '../components/DataErrorState.tsx'
 import { SkeletonRows } from '../components/fh'
@@ -875,7 +875,8 @@ function VoiceButton({ listening, onStart, onStop }: any) {
    subtle hover lift, swipe actions for archive/delete on mobile.
    ============================================================ */
 function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArchive, onDelete }: any) {
-  const confirm = useConfirm()
+  // Delete takes a second tap on the same button (D57).
+  const deleteTap = useSecondTap()
   const body = note.text || note.body || ''
   const firstLine = (body.split('\n').find((l: any) => l.trim()) || '').trim()
   const title = note.parsed?.summary || firstLine.slice(0, 90) || 'Untitled note'
@@ -1028,14 +1029,15 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
             {onDelete && (
               <button
                 type="button"
-                onClick={async (ev) => {
+                onClick={(ev) => {
                   ev.stopPropagation()
-                  if (!(await confirm({ title: 'Delete this note?', body: 'This cannot be undone.', destructive: true }))) return
-                  onDelete()
+                  deleteTap.tap(onDelete)
                 }}
-                aria-label="Delete note"
+                aria-label={deleteTap.armed ? 'Tap again to delete' : 'Delete note'}
+                title={deleteTap.armed ? 'Tap again to delete this note. This cannot be undone.' : 'Delete note'}
                 style={{
-                  width: 32, height: 32,
+                  width: deleteTap.armed ? 'auto' : 32, height: 32, padding: deleteTap.armed ? '0 8px' : 0,
+                  fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-body)',
                   display: 'grid', placeItems: 'center',
                   borderRadius: 10,
                   background: 'transparent',
@@ -1058,7 +1060,7 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
                   ev.currentTarget.style.borderColor = 'transparent'
                 }}
               >
-                <Trash2 size={13} aria-hidden="true" />
+                {deleteTap.armed ? 'Tap again to delete' : <Trash2 size={13} aria-hidden="true" />}
               </button>
             )}
           </span>

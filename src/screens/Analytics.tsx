@@ -1,17 +1,16 @@
 import { lazy, Suspense, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { TrendingUp, BarChart3, DollarSign, Target, Car, Plus } from 'lucide-react'
 import { SkeletonStat } from '../components/Skeleton.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
 import { parseDateOnly } from '../lib/dates.ts'
 import CountUp from '../components/fx/CountUp.tsx'
-import LogMilesSheet from '../components/LogMilesSheet.tsx'
 import { useAnalyticsBundle, useInvalidateAnalytics } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { STAGES, ACTIVE_STAGES } from '../lib/stages.ts'
 import { wonYTD as wonYTDFn, profitYTD as profitYTDFn, closeRate as closeRateFn, avgMargin as avgMarginFn, computeFunnel } from '../lib/rollups.ts'
-import { toastSuccess } from '../lib/toast.ts'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
@@ -41,14 +40,18 @@ export default function Analytics() {
   // and that wait is loading too, never "Not enough data yet." or $0.
   const { data: bundle, isPending: loading, isError, refetch } = useAnalyticsBundle(user?.id)
   const load = useInvalidateAnalytics()
+  const navigate = useNavigate()
   const contacts = bundle?.contacts ?? []
+  // Leads and quotes are their own records (D55); the funnel and the
+  // pipeline counts read them, the money numbers still read the jobs.
+  const leadRows = useMemo(() => bundle?.leads ?? [], [bundle])
+  const quoteRows = useMemo(() => bundle?.quotes ?? [], [bundle])
   const mileage = bundle?.mileage ?? []
   const payments = bundle?.payments ?? []
   const invoices = bundle?.invoices ?? []
   const changeOrders = bundle?.changeOrders ?? []
   const clients = bundle?.clients ?? []
   const stageTransitions = bundle?.stageTransitions ?? []
-  const [logOpen, setLogOpen] = useState(false)
 
   // 12-week pipeline trend, bucket contacts by created_at week,
   // sum amount of rows still in active stages. Each bucket is Sunday-anchored.
@@ -78,10 +81,11 @@ export default function Analytics() {
     return buckets
   }, [contacts])
 
-  // Funnel, trailing 90 days from the stage-transition audit log.
+  // Funnel, trailing 90 days: leads made, quotes made, quotes that became
+  // a job (fh_quotes.job_id), leads and quotes lost.
   const funnel = useMemo(
-    () => computeFunnel(stageTransitions as any, contacts as any, 90),
-    [stageTransitions, contacts]
+    () => computeFunnel({ leads: leadRows, quotes: quoteRows, jobs: contacts }, 90),
+    [leadRows, quoteRows, contacts]
   )
 
   const stats = useMemo(() => {
@@ -149,8 +153,9 @@ export default function Analytics() {
     const avgMarginNote = (avgMargin == null)
       ? 'Log a job cost to enable'
       : `Across ${winsWithCost.length} won job${winsWithCost.length === 1 ? '' : 's'} with cost data`
-    const leads = contacts.filter((c) => c.stage === 'lead').length
-    const quotes = contacts.filter((c) => c.stage === 'quote').length
+    const leads = leadRows.filter((l) => l.status === 'open').length
+    // Quotes out: with the customer, not yet answered or made a job.
+    const quotes = quoteRows.filter((q) => ['sent', 'viewed', 'changes_requested'].includes(q.status) && !q.job_id).length
     const jobs = contacts.filter((c) => c.stage === 'job').length
     const closedCount = contacts.filter((c) => c.stage === 'closed').length
     const lostCount = contacts.filter((c) => c.stage === 'lost').length
@@ -218,7 +223,7 @@ export default function Analytics() {
       milesYTD, mileageDeduction,
       invoiced, collected,
     }
-  }, [contacts, mileage, invoices, payments, stageTransitions])
+  }, [contacts, leadRows, quoteRows, mileage, invoices, payments, stageTransitions])
 
   const byStage = useMemo(() => {
     // Legacy 'invoice'-stage rows count under 'job' (their v2 home).
@@ -431,7 +436,7 @@ export default function Analytics() {
         </motion.div>
       )}
 
-      {!loading && contacts.length === 0 && (
+      {!loading && contacts.length === 0 && leadRows.length === 0 && quoteRows.length === 0 && (
         <motion.div variants={item} className="v3-section" style={{ margin: '0 var(--v3-gutter) 14px' }}>
           <div className="v3-empty">
             <BarChart3 size={22} color="var(--v3-text-muted)" style={{ margin: '0 auto 8px' }} />
@@ -445,7 +450,7 @@ export default function Analytics() {
         </motion.div>
       )}
 
-      {!loading && contacts.length > 0 && (
+      {!loading && (contacts.length > 0 || leadRows.length > 0 || quoteRows.length > 0) && (
         <>
           {/* KPI GRID, wrapped in a v3-section so it reads as one
               framed dashboard zone, not loose tiles on the page. */}
@@ -615,7 +620,7 @@ export default function Analytics() {
                 <motion.button
                   type="button"
                   whileTap={{ scale: 0.97 }}
-                  onClick={() => setLogOpen(true)}
+                  onClick={() => navigate('/miles/new')}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -780,12 +785,6 @@ export default function Analytics() {
         </>
       )}
 
-      <LogMilesSheet
-        open={logOpen}
-        userId={user?.id}
-        onOpenChange={setLogOpen}
-        onSaved={() => { setLogOpen(false); load(); toastSuccess('Miles logged', 'Deduction updated') }}
-      />
     </motion.div>
   )
 }
@@ -843,7 +842,7 @@ function FunnelBar({ label, count, max, note, gold, danger }: any) {
       ? 'var(--v3-primary)'
       : 'var(--v3-text-muted)'
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+    <div data-funnel={label} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
       <Eyebrow style={{ width: 76, flexShrink: 0 }}>
         {label}
       </Eyebrow>

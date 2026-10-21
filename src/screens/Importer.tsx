@@ -19,6 +19,10 @@ import { Button } from '../ui/index.ts'
 import { parseAmount } from '../lib/amount.ts'
 import { leadKeys, markRepeats } from '../lib/importDedupe.ts'
 import { fetchAllRows } from '../lib/queries.ts'
+import { findOrCreateClient } from '../lib/clients.ts'
+import { useMembership } from '../contexts/MembershipContext.tsx'
+import { normalizePhoneKey } from '../lib/subIdentity.ts'
+import type { LeadInsert } from '../lib/leads.ts'
 
 // Rows per insert. One giant insert for a big export can hit request
 // size or statement time limits and fails as a whole.
@@ -84,6 +88,7 @@ function pick(row: any, header: any) {
 export default function Importer() {
   const isDesktop = useIsDesktop()
   const { user } = useAuth()
+  const { orgId } = useMembership()
   const [preset, setPreset] = useState('jobber')
   const [rows, setRows] = useState<any[]>([])
   const [mapped, setMapped] = useState<any[]>([])
@@ -113,21 +118,31 @@ export default function Importer() {
     })
   }, [user])
 
-  // Once a file is loaded, read the leads already in the pipeline (every
-  // row RLS lets this user see) so re-running an export skips them
-  // instead of doubling the pipeline. A failed read falls back to no
-  // repeat check rather than blocking the import.
+  // Once a file is loaded, read the leads already on file (every fh_leads
+  // row RLS lets this user see, with the client each one points at) so
+  // re-running an export skips them instead of doubling the pipeline. A
+  // failed read falls back to no repeat check rather than blocking the import.
   useEffect(() => {
     if (!user || rows.length === 0 || existingKeys) return
     let cancelled = false
-    fetchAllRows<{ name: string | null; phone: string | null; email: string | null; job_title: string | null }>((from, to) =>
+    type ExistingLead = { title: string | null; fh_clients: { name: string | null; phone: string | null; email: string | null } | null }
+    fetchAllRows<ExistingLead>((from, to) =>
       supabase
-        .from('fh_contacts')
-        .select('id, name, phone, email, job_title')
+        .from('fh_leads')
+        .select('id, title, fh_clients(name, phone, email)')
         .order('id', { ascending: true })
         .range(from, to)
     )
-      .then((existing) => { if (!cancelled) setExistingKeys(new Set(existing.flatMap(leadKeys))) })
+      .then((existing) => {
+        if (cancelled) return
+        const identities = existing.map((l) => ({
+          name: l.fh_clients?.name ?? null,
+          phone: l.fh_clients?.phone ?? null,
+          email: l.fh_clients?.email ?? null,
+          job_title: l.title
+        }))
+        setExistingKeys(new Set(identities.flatMap(leadKeys)))
+      })
       .catch((e) => {
         console.warn('[importer] repeat check unavailable', e)
         if (!cancelled) setExistingKeys(new Set())
@@ -186,8 +201,7 @@ export default function Importer() {
       job_type: pick(r, hm.job_type),
       // Exports format totals as "$4,500.00"; Number() made that NaN,
       // which saved as null and showed $0.
-      amount: parseAmount(pick(r, hm.amount)) ?? 0,
-      stage: 'lead'
+      amount: parseAmount(pick(r, hm.amount)) ?? 0
     })).filter((r) => r.name)
     setMapped(out)
   }
@@ -250,20 +264,56 @@ export default function Importer() {
   async function doImport() {
     if (!user || toImport.length === 0 || checkingRepeats) return
     setImporting(true)
-    setProgress(10)
-    const payload = toImport.map((m) => ({ ...m, user_id: user.id }))
+    setProgress(5)
+    const payload = toImport
+    // Each row becomes an fh_leads row pointing at a client (SPEC D53).
+    // The client is matched by phone, then email, then name across the
+    // company, or made, through the same helper every create path uses.
+    // Rows in one file that name the same person share one client.
+    const clientByKey = new Map<string, string>()
+    const keyFor = (m: any) => {
+      const phone = normalizePhoneKey(m.phone)
+      if (phone) return `p:${phone}`
+      const email = String(m.email || '').trim().toLowerCase()
+      if (email) return `e:${email}`
+      return `n:${String(m.name || '').trim().toLowerCase()}`
+    }
+    let landed = 0
+    let finalCount = 0
+    let error: { message: string } | null = null
+    const leads: LeadInsert[] = []
+    for (const m of payload) {
+      const k = keyFor(m)
+      let clientId = clientByKey.get(k) ?? null
+      if (!clientId) {
+        clientId = await findOrCreateClient(user.id, { name: m.name, phone: m.phone, email: m.email, address: m.address }, orgId)
+        if (clientId) clientByKey.set(k, clientId)
+      }
+      if (!clientId) { error = { message: `Could not save the customer for ${m.name}.` }; break }
+      leads.push({
+        user_id: user.id,
+        org_id: orgId ?? null,
+        client_id: clientId,
+        title: m.job_title || null,
+        job_type: m.job_type || null,
+        // fh_leads has no amount column; a total in the export stays in the notes.
+        notes: m.amount ? `Estimated amount $${Number(m.amount).toLocaleString('en-US', { maximumFractionDigits: 2 })}` : null,
+        source: 'import',
+        status: 'open'
+      })
+      setProgress(5 + Math.round((45 * leads.length) / payload.length))
+    }
     // Insert in chunks so a large export doesn't fail as one giant
     // request, and so the bar shows real progress.
-    let finalCount = 0
-    let landed = 0
-    let error: { message: string } | null = null
-    for (let i = 0; i < payload.length; i += IMPORT_CHUNK) {
-      const batch = payload.slice(i, i + IMPORT_CHUNK)
-      const res = await supabase.from('fh_contacts').insert(batch, { count: 'exact' })
-      if (res.error) { error = res.error; break }
-      landed += batch.length
-      finalCount += res.count ?? batch.length
-      setProgress(10 + Math.round((90 * landed) / payload.length))
+    if (!error) {
+      for (let i = 0; i < leads.length; i += IMPORT_CHUNK) {
+        const batch = leads.slice(i, i + IMPORT_CHUNK)
+        const res = await supabase.from('fh_leads').insert(batch, { count: 'exact' })
+        if (res.error) { error = res.error; break }
+        landed += batch.length
+        finalCount += res.count ?? batch.length
+        setProgress(50 + Math.round((50 * landed) / leads.length))
+      }
     }
     // Rows that landed are now on file: a retry or a second file in this
     // session must treat them as repeats.
@@ -298,7 +348,7 @@ export default function Importer() {
     setCsvHeaders([])
     setHeaderMap({})
     setIncludeRepeats(false)
-    toastSuccess(`Imported ${finalCount} ${countNoun(finalCount, 'contact')}`, 'Now in your Pipeline')
+    toastSuccess(`Imported ${finalCount} ${countNoun(finalCount, 'contact')}`, 'Now in your Leads')
   }
 
   async function copyWebhook() {
@@ -366,7 +416,7 @@ export default function Importer() {
                 ? `${mapped.length} ${countNoun(mapped.length, 'record')} ready for review.`
                 : `Choose a ${PRESETS[preset].label} export or a generic CSV.`}
             </p>
-            <span className="fh-importer-build__focus-meta">Destination · Leads pipeline</span>
+            <span className="fh-importer-build__focus-meta">Destination · Leads</span>
           </div>
           <div className="fh-build-mini-grid">
             <MiniMetric label="Rows loaded" value={String(rows.length)} accent={rows.length > 0} />
@@ -649,7 +699,7 @@ export default function Importer() {
 
           <div style={{ padding: '4px 12px 16px', borderTop: '1px solid var(--rule)' }}>
             <p style={{ margin: '12px 0 10px', fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.5 }}>
-              Use this link to send new leads into FieldHorse from your automations, GoHighLevel, Zapier, Make, your website form, anything that can call a URL. Each lead lands straight in your Pipeline.
+              Use this link to send new leads into FieldHorse from your automations, GoHighLevel, Zapier, Make, your website form, anything that can call a URL. Each lead lands straight in your Leads, with its client.
             </p>
             {webhookKey ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>

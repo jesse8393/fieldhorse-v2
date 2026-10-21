@@ -24,13 +24,17 @@ function randomToken() {
 export type PublicLinkKind = 'proposal' | 'invoice' | 'change_order' | 'statement'
 
 /**
- * Create a new public link. Proposal / invoice / change_order links
- * hang off a single job (contactId). A statement link is client-scoped
- * (clientId, no contactId) and rolls up every open job for that client.
+ * Create a new public link. A proposal link points at a quote record
+ * (quoteId, fh_quotes) or, for a job's proposal, at the job (contactId).
+ * Invoice and change_order links hang off a single job (contactId). A
+ * statement link is client-scoped (clientId, no contactId) and rolls up
+ * every open job for that client, and so is an invoice link for an
+ * invoice with no job (D62): it shows the client's job less invoices.
  * Returns the full row including the token + the public URL to share.
  */
-export async function mintPublicLink({ contactId = null, clientId = null, userId, kind, expiresAt = null, changeOrderId = null }: {
+export async function mintPublicLink({ contactId = null, quoteId = null, clientId = null, userId, kind, expiresAt = null, changeOrderId = null }: {
   contactId?: string | null
+  quoteId?: string | null
   clientId?: string | null
   userId: string | undefined
   kind: PublicLinkKind
@@ -41,6 +45,10 @@ export async function mintPublicLink({ contactId = null, clientId = null, userId
   if (!['proposal', 'invoice', 'change_order', 'statement'].includes(kind)) throw new Error(`unknown kind: ${kind}`)
   if (kind === 'statement') {
     if (!clientId) throw new Error('clientId required for statement links')
+  } else if (kind === 'proposal') {
+    if (!quoteId && !contactId) throw new Error('quoteId or contactId required')
+  } else if (kind === 'invoice') {
+    if (!contactId && !clientId) throw new Error('contactId or clientId required for invoice links')
   } else if (!contactId) {
     throw new Error('contactId required')
   }
@@ -50,8 +58,9 @@ export async function mintPublicLink({ contactId = null, clientId = null, userId
     .from('fh_public_links')
     .insert({
       user_id: userId,
-      contact_id: kind === 'statement' ? null : contactId,
-      client_id: kind === 'statement' ? clientId : null,
+      contact_id: kind === 'statement' || quoteId ? null : contactId,
+      quote_id: kind === 'proposal' ? quoteId : null,
+      client_id: kind === 'statement' || (kind === 'invoice' && !contactId) ? clientId : null,
       kind,
       token,
       expires_at: expiresAt ? expiresAt.toISOString() : null,
@@ -91,6 +100,20 @@ export async function listClientStatementLinks(clientId: string | undefined) {
 export function buildPublicUrl(token: string) {
   if (typeof window === 'undefined') return `/p/${token}`
   return `${window.location.origin}/p/${token}`
+}
+
+/**
+ * List active (not revoked) links for a quote record.
+ */
+export async function listQuotePublicLinks(quoteId: string | undefined) {
+  if (!quoteId) return []
+  const { data } = await supabase
+    .from('fh_public_links')
+    .select('*')
+    .eq('quote_id', quoteId)
+    .is('revoked_at', null)
+    .order('created_at', { ascending: false })
+  return data || []
 }
 
 /**

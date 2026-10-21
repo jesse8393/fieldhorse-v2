@@ -43,7 +43,7 @@ export type JobNextAction = {
  *   - milestone → patch contact.milestones[i].done = true (existing pattern)
  *   - todo      → fh_job_todos UPDATE done=true, completed_at=now()
  *   - stage     → call pipelineFn(contact)
- *   - idle      → open AddEventSheet
+ *   - idle      → open the event screen
  */
 const STAGE_DEFAULTS: Record<string, Pick<JobNextAction, 'title' | 'ctaLabel' | 'pipelineFn'>> = {
   lead:    { title: 'Send a quote.',                   ctaLabel: 'Convert to quote', pipelineFn: 'startQuote' },

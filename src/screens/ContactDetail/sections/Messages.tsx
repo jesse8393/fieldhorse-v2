@@ -7,7 +7,7 @@ import { resilientInsert } from '../../../lib/outbox.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { canHover } from '../../../lib/hover.ts'
 import { PostedByChip, Eyebrow } from '../../../components/v3'
-import { useConfirm } from '../../../components/ConfirmSheet.tsx'
+import { useArmedId } from '../../../lib/secondTap.ts'
 
 /**
  * Messages section, communication log (fh_notes) tied to this job.
@@ -20,7 +20,8 @@ import { useConfirm } from '../../../components/ConfirmSheet.tsx'
 export default function MessagesSection({ contactId, userId, notes = [], fetchAll }: any) {
   const [draft, setDraft] = useState('')
   const [saving, setSaving] = useState(false)
-  const confirm = useConfirm() as any
+  // Delete takes a second tap on the same note's button (D57).
+  const deleteTap = useArmedId()
 
   async function add() {
     const txt = draft.trim()
@@ -47,17 +48,9 @@ export default function MessagesSection({ contactId, userId, notes = [], fetchAl
   // deletion so the Undo can re-insert it. RLS scopes the delete to the
   // owner; partner-shared jobs let the original poster delete their own
   // posts via fh_notes_partner policy.
+  // The delete offers Undo for a few seconds (toastUndo below).
   async function remove(note: any) {
     if (!note?.id) return
-    // The delete offers Undo for a few seconds (toastUndo below), so the
-    // confirm says that rather than calling it permanent.
-    const ok = await confirm({
-      title: 'Delete this note?',
-      body: 'You can undo this for a few seconds.',
-      confirmLabel: 'Delete',
-      destructive: true
-    })
-    if (!ok) return
     hapticTap()
     const snapshot = { ...note }
     const { error } = await supabase.from('fh_notes').delete().eq('id', note.id)
@@ -185,11 +178,13 @@ export default function MessagesSection({ contactId, userId, notes = [], fetchAl
                 </div>
                 <button
                   type="button"
-                  onClick={() => remove(n)}
-                  aria-label="Delete note"
+                  onClick={() => deleteTap.tap(n.id, () => { void remove(n) })}
+                  aria-label={deleteTap.armedId === n.id ? 'Tap again to delete' : 'Delete note'}
+                  title={deleteTap.armedId === n.id ? 'Tap again to delete. You can undo for a few seconds.' : 'Delete note'}
                   style={{
                     flexShrink: 0,
-                    width: 36, height: 36,
+                    width: deleteTap.armedId === n.id ? 'auto' : 36, height: 36, padding: deleteTap.armedId === n.id ? '0 12px' : 0,
+                    fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-body)',
                     display: 'grid', placeItems: 'center',
                     borderRadius: 10,
                     background: 'transparent',
@@ -212,7 +207,7 @@ export default function MessagesSection({ contactId, userId, notes = [], fetchAl
                     ev.currentTarget.style.borderColor = 'transparent'
                   }}
                 >
-                  <Trash2 size={14} aria-hidden="true" />
+                  {deleteTap.armedId === n.id ? 'Tap again to delete' : <Trash2 size={14} aria-hidden="true" />}
                 </button>
               </motion.li>
             ))}

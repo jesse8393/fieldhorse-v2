@@ -9,7 +9,6 @@ import App from './App.tsx'
 import AppErrorBoundary from './components/AppErrorBoundary.tsx'
 import AppToaster from './components/AppToaster.tsx'
 import ThemeLocationSync from './components/ThemeLocationSync.tsx'
-import { ConfirmProvider } from './components/ConfirmSheet.tsx'
 import { AuthProvider } from './contexts/AuthContext.tsx'
 import { ProfileProvider } from './contexts/ProfileContext.tsx'
 import { MembershipProvider } from './contexts/MembershipContext.tsx'
@@ -127,7 +126,7 @@ if (typeof window !== 'undefined') {
 try { localStorage.removeItem('fh-query-cache') } catch { /* non-fatal */ }
 // Bump only when the shape of persisted query data changes in a way that
 // old rows would break the new code.
-const QUERY_CACHE_VERSION = 'v1'
+const QUERY_CACHE_VERSION = 'v2'
 const queryPersister = createAsyncStoragePersister({
   storage: {
     getItem: (key: string) => idbGet(key).then((v) => v ?? null),
@@ -175,13 +174,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
                       then skips transform and layout animations (slides,
                       springs) and keeps fades. */}
                   <MotionConfig reducedMotion="user">
-                    <ConfirmProvider>
-                      {/* Before App so it is listening before any screen's
-                          mount effects fire a toast. */}
-                      <AppToaster />
-                      <ThemeLocationSync />
-                      <App />
-                    </ConfirmProvider>
+                    {/* Before App so it is listening before any screen's
+                        mount effects fire a toast. */}
+                    <AppToaster />
+                    <ThemeLocationSync />
+                    <App />
                   </MotionConfig>
                 </MembershipProvider>
               </ProfileProvider>

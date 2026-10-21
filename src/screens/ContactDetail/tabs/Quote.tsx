@@ -14,7 +14,7 @@ import { dateInputToTimestamp, timestampToDateInput } from '../../../lib/dueDate
 import QuoteItemsSection, { type QuoteLinesState } from '../sections/QuoteItems.tsx'
 import QuoteTermsSection from '../sections/QuoteTerms.tsx'
 import ChangeOrdersSection from '../sections/ChangeOrdersSection.tsx'
-import { useConfirm } from '../../../components/ConfirmSheet.tsx'
+import { useSecondTap } from '../../../lib/secondTap.ts'
 import { proposalNumber } from '../../../components/documents/numbers.ts'
 import { DocumentPreviewPane, loadPreviewPhotos, loadProjectPhotosForPdf } from '../sections/DocumentPreviewPane.tsx'
 import { deriveStatus, shortDate } from '../lib/quoteStatus.ts'
@@ -419,17 +419,15 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
   // customer agreed to; we don't want a "clear draft" gesture to
   // appear to wipe an approved quote.
   const [clearing, setClearing] = useState(false)
-  const confirm = useConfirm() as any
-  async function handleClearDraft() {
-    if (!contact?.id || !userId) return
+  // Deleting the draft takes a second tap on the same button (D57): it
+  // removes the line items and the draft terms, and cannot be undone.
+  const clearTap = useSecondTap()
+  function handleClearDraft() {
+    if (!contact?.id || !userId || clearing) return
     if ((contact?.proposal_status || 'draft').toLowerCase() === 'approved') return
-    const ok = await confirm({
-      title: 'Delete this draft quote?',
-      body: 'This removes the quote line items and draft terms. This cannot be undone.',
-      confirmLabel: 'Delete draft',
-      destructive: true
-    })
-    if (!ok) return
+    clearTap.tap(() => { void clearDraftNow() })
+  }
+  async function clearDraftNow() {
     hapticTap()
     setClearing(true)
     try {
@@ -692,6 +690,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
         emailRetrying={emailRetrying}
         onRetryEmail={() => { void linkedEmail.refetch() }}
         clearing={clearing}
+        clearArmed={clearTap.armed}
         patch={patch}
         onContactRefresh={fetchAll}
         onSend={handleSend}
@@ -828,6 +827,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
           contact={contact}
           baseCount={knownBaseCount}
           clearing={clearing}
+          clearArmed={clearTap.armed}
           onClearDraft={handleClearDraft}
         />
       </aside>
@@ -907,7 +907,7 @@ function QuoteViewToggle({ value, onChange }: any) {
    to be wiped by a "clear draft" gesture. Renders nothing when
    the line item count is 0 AND status is draft (nothing to clear).
    ============================================================ */
-function ClearDraftBand({ contact, baseCount, clearing, onClearDraft }: any) {
+function ClearDraftBand({ contact, baseCount, clearing, clearArmed = false, onClearDraft }: any) {
   const status = (contact?.proposal_status || 'draft').toLowerCase()
   const isApproved = status === 'approved'
   const isEmptyDraft = status === 'draft' && baseCount === 0
@@ -983,7 +983,7 @@ function ClearDraftBand({ contact, baseCount, clearing, onClearDraft }: any) {
         }}
       >
         <Trash2 size={13} aria-hidden="true" />
-        {clearing ? 'Clearing…' : 'Delete draft quote'}
+        {clearing ? 'Clearing…' : clearArmed ? 'Tap again to delete' : 'Delete draft quote'}
       </motion.button>
     </div>
   )

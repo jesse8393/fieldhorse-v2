@@ -24,6 +24,8 @@ type Props = {
   setFilter: (filter: string) => void
   counts: Counts
   busyKey: string | null
+  /** The partner whose Revoke was tapped once; the next tap revokes (D57). */
+  revokeArmedKey?: string | null
   onResend: (partner: any, job: any) => void
   onRevoke: (partner: any) => void
 }
@@ -61,6 +63,7 @@ export default function SnowPartnersBuild({
   setFilter,
   counts,
   busyKey,
+  revokeArmedKey = null,
   onResend,
   onRevoke,
 }: Props) {
@@ -123,7 +126,7 @@ export default function SnowPartnersBuild({
           <div className="fh-build-focus">
             <div className="fh-build-eyebrow">Access coverage</div>
             <p><strong>{counts.accepted}</strong> accepted {counts.accepted === 1 ? 'partner' : 'partners'} across <strong>{summary.activeJobs}</strong> active job {summary.activeJobs === 1 ? 'share' : 'shares'}.</p>
-            <Link className="fh-build-inline-link" to="/work">Open jobs <ChevronRight size={12} /></Link>
+            <Link className="fh-build-inline-link" to="/jobs">Open jobs <ChevronRight size={12} /></Link>
           </div>
 
           <div className="fh-build-mini-grid">
@@ -172,7 +175,7 @@ export default function SnowPartnersBuild({
                 <Users size={22} aria-hidden="true" />
                 <strong>No partners yet</strong>
                 <span>Open a job to invite a foreman, subcontractor, or estimator.</span>
-                <Link className="fh-build-secondary-btn" to="/work">Open jobs</Link>
+                <Link className="fh-build-secondary-btn" to="/jobs">Open jobs</Link>
               </div>
             )}
 
@@ -189,6 +192,7 @@ export default function SnowPartnersBuild({
                 key={partner.email}
                 partner={partner}
                 busyKey={busyKey}
+                revokeArmed={revokeArmedKey === partner.email}
                 onResend={onResend}
                 onRevoke={onRevoke}
               />
@@ -230,9 +234,10 @@ export default function SnowPartnersBuild({
   )
 }
 
-function PartnerRow({ partner, busyKey, onResend, onRevoke }: {
+function PartnerRow({ partner, busyKey, revokeArmed = false, onResend, onRevoke }: {
   partner: any
   busyKey: string | null
+  revokeArmed?: boolean
   onResend: (partner: any, job: any) => void
   onRevoke: (partner: any) => void
 }) {
@@ -290,10 +295,12 @@ function PartnerRow({ partner, busyKey, onResend, onRevoke }: {
             className="fh-build-icon-action is-danger"
             onClick={() => onRevoke(partner)}
             disabled={busy}
-            aria-label={`Revoke access for ${partner.name || partner.email}`}
-            title="Revoke access"
+            aria-label={revokeArmed ? 'Tap again to revoke' : `Revoke access for ${partner.name || partner.email}`}
+            title={revokeArmed ? 'Tap again to revoke access on every job' : 'Revoke access'}
+            style={revokeArmed ? { width: 'auto', padding: '0 12px', gap: 8 } : undefined}
           >
             <ShieldOff size={13} />
+            {revokeArmed && <span style={{ fontSize: 12, fontWeight: 700 }}>Tap again to revoke</span>}
           </button>
         )}
       </div>

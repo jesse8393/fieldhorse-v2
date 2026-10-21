@@ -178,6 +178,12 @@ export function filterYTD<T extends Record<string, unknown>>(rows: T[] | null | 
   })
 }
 
+type TransitionRow = {
+  contact_id: string
+  to_stage: string
+  transitioned_at: string
+}
+
 // Resolve when each contact was WON: the first transition into a won
 // stage from the audit log (migration 023). Jobs edited later keep
 // their true win date, filtering by updated_at re-booked a $50K job
@@ -251,98 +257,90 @@ export function avgMargin(jobs: JobRow[] | null | undefined) {
 }
 
 // ---------------------------------------------------------------------
-// Sales funnel over a trailing window, computed from the stage-
-// transition audit log (migration 023) + contact created_at dates.
-// Counts are distinct contacts, not transition rows, so a lead bounced
-// back and re-quoted only counts once.
+// Sales funnel over a trailing window, read from the records themselves
+// (Phase 9, D53 and D54): leads on fh_leads, quotes on fh_quotes, and the
+// job a quote became through fh_quotes.job_id. Counts are distinct
+// records.
 export type FunnelStats = {
-  newLeads: number          // contacts created in the window
-  quoted: number            // distinct contacts that hit 'quote'
-  won: number               // distinct contacts that hit 'job' (won)
-  lost: number              // distinct contacts that hit 'lost'
+  newLeads: number          // leads created in the window
+  quoted: number            // quotes created in the window
+  won: number               // quotes whose job was created in the window
+  lost: number              // leads lost and quotes lost, rejected or expired in the window
   quoteRate: number         // quoted / newLeads, 0..1
   winRate: number           // won / (won + lost), 0..1
-  avgDaysToDecision: number // first 'quote' → first 'job'/'lost', days
+  avgDaysToDecision: number // quote created to its job created, or to its loss, days
 }
 
-type TransitionRow = {
-  contact_id: string
-  to_stage: string
-  transitioned_at: string
+type FunnelLead = { status?: string | null; created_at?: string | null; updated_at?: string | null }
+type FunnelQuote = { id?: string | null; status?: string | null; job_id?: string | null; created_at?: string | null; updated_at?: string | null }
+type FunnelJob = { id?: string | null; created_at?: string | null }
+
+export type FunnelSource = {
+  leads: FunnelLead[] | null | undefined
+  quotes: FunnelQuote[] | null | undefined
+  /** The jobs (fh_contacts rows), for when each quote's job was made. */
+  jobs?: FunnelJob[] | null | undefined
+}
+
+const LOST_QUOTE_STATUSES = new Set(['lost', 'rejected', 'expired'])
+
+function timeOf(iso: string | null | undefined): number {
+  const t = iso ? new Date(iso).getTime() : NaN
+  return Number.isFinite(t) ? t : NaN
 }
 
 export function computeFunnel(
-  transitions: TransitionRow[] | null | undefined,
-  contacts: Record<string, unknown>[] | null | undefined,
+  source: FunnelSource,
   windowDays = 90,
   now = new Date()
 ): FunnelStats {
-  const cutoff = new Date(now.getTime() - windowDays * 86400000)
+  const cutoff = now.getTime() - windowDays * 86400000
+  const inWindow = (t: number) => Number.isFinite(t) && t >= cutoff
 
-  const newLeads = (contacts || []).filter((c) => {
-    const created = new Date(String(c.created_at || ''))
-    return !Number.isNaN(created.getTime()) && created >= cutoff
-  }).length
-
-  const quotedSet = new Set<string>()
-  const wonSet = new Set<string>()
-  const lostSet = new Set<string>()
-  // Per contact: the LATEST decision (won/lost) inside the window wins.
-  // Counting a contact in both sets (lost in May, reopened and won in
-  // June) double-counted it in winRate's denominator.
-  const latestDecision = new Map<string, { stage: 'job' | 'lost'; at: number }>()
-  // Per contact: first quote time + first decision (won/lost) AFTER it.
-  const firstQuote = new Map<string, number>()
-  const firstDecisionAfterQuote = new Map<string, number>()
-
-  for (const t of transitions || []) {
-    const at = new Date(t.transitioned_at)
-    if (Number.isNaN(at.getTime())) continue
-    const inWindow = at >= cutoff
-    if (t.to_stage === 'quote') {
-      if (inWindow) quotedSet.add(t.contact_id)
-      if (!firstQuote.has(t.contact_id)) firstQuote.set(t.contact_id, at.getTime())
-    } else if (t.to_stage === 'job' || t.to_stage === 'lost') {
-      if (inWindow) {
-        const prev = latestDecision.get(t.contact_id)
-        if (!prev || at.getTime() >= prev.at) {
-          latestDecision.set(t.contact_id, { stage: t.to_stage, at: at.getTime() })
-        }
-      }
-      noteDecision(t.contact_id, at.getTime())
-    }
-  }
-  for (const [id, d] of latestDecision) {
-    if (d.stage === 'job') wonSet.add(id)
-    else lostSet.add(id)
+  const leads = source.leads || []
+  const quotes = source.quotes || []
+  const jobMadeAt = new Map<string, number>()
+  for (const j of source.jobs || []) {
+    if (j.id) jobMadeAt.set(j.id, timeOf(j.created_at))
   }
 
-  function noteDecision(id: string, time: number) {
-    const q = firstQuote.get(id)
-    if (q == null || time < q) return
-    if (!firstDecisionAfterQuote.has(id)) firstDecisionAfterQuote.set(id, time)
-  }
+  const newLeads = leads.filter((l) => inWindow(timeOf(l.created_at))).length
+  let lost = leads.filter((l) => l.status === 'lost' && inWindow(timeOf(l.updated_at))).length
 
+  let quoted = 0
+  let won = 0
   let daysSum = 0
   let daysN = 0
-  for (const [id, decidedAt] of firstDecisionAfterQuote) {
-    const q = firstQuote.get(id)
-    if (q == null) continue
-    // Only average decisions inside the window so ancient history
-    // doesn't skew "how fast do customers answer me lately".
-    if (decidedAt < cutoff.getTime()) continue
-    daysSum += (decidedAt - q) / 86400000
-    daysN += 1
+  for (const q of quotes) {
+    const made = timeOf(q.created_at)
+    if (inWindow(made)) quoted += 1
+    // Decided: it became a job (when that job was made, else when the
+    // quote last changed), or it was lost.
+    let decidedAt = NaN
+    let outcome: 'won' | 'lost' | null = null
+    if (q.job_id) {
+      const jobAt = jobMadeAt.get(q.job_id)
+      decidedAt = Number.isFinite(jobAt as number) ? (jobAt as number) : timeOf(q.updated_at)
+      outcome = 'won'
+    } else if (LOST_QUOTE_STATUSES.has(q.status || '')) {
+      decidedAt = timeOf(q.updated_at)
+      outcome = 'lost'
+    }
+    if (!outcome || !inWindow(decidedAt)) continue
+    if (outcome === 'won') won += 1
+    else lost += 1
+    if (Number.isFinite(made) && decidedAt >= made) {
+      daysSum += (decidedAt - made) / 86400000
+      daysN += 1
+    }
   }
 
-  const won = wonSet.size
-  const lost = lostSet.size
   return {
     newLeads,
-    quoted: quotedSet.size,
+    quoted,
     won,
     lost,
-    quoteRate: newLeads === 0 ? 0 : Math.min(1, quotedSet.size / newLeads),
+    quoteRate: newLeads === 0 ? 0 : Math.min(1, quoted / newLeads),
     winRate: won + lost === 0 ? 0 : won / (won + lost),
     avgDaysToDecision: daysN === 0 ? 0 : daysSum / daysN
   }

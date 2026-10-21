@@ -1,0 +1,148 @@
+/*
+ * The customer statement screen, /clients/:id/statement (Phase 9, Task
+ * 14, D57): Back and the title, the per property balances, the total and
+ * the three actions, Email statement in gold. Reads only --fh- tokens.
+ */
+
+.fhcs {
+  padding-bottom: 24px;
+}
+
+.fhcs-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 8px 8px;
+}
+
+.fhcs-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-family: var(--fh-font-display);
+  font-size: 30px;
+  line-height: 36px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--fh-ink);
+}
+
+.fhcs-title:focus {
+  outline: none;
+}
+
+.fhcs-lede {
+  margin: 0;
+  padding: 0 var(--fh-gutter) 8px;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--fh-ink-2);
+}
+
+.fhcs-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px var(--fh-gutter) 0;
+}
+
+.fhcs-empty {
+  margin: 0;
+  padding: 16px 0;
+  text-align: center;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--fh-ink-2);
+}
+
+.fhcs-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fhcs-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--fh-tray);
+}
+
+.fhcs-line__text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fhcs-line__property {
+  font: 600 15px/20px var(--fh-font-body);
+  color: var(--fh-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fhcs-line__paid {
+  font: 400 13px/16px var(--fh-font-body);
+  color: var(--fh-ink-3);
+}
+
+.fhcs-line__balance {
+  flex: none;
+  font: 600 15px/20px var(--fh-font-body);
+  color: var(--fh-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.fhcs-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--fh-gold-line);
+  background: var(--fh-paper);
+}
+
+.fhcs-total__label {
+  font: 600 13px/16px var(--fh-font-body);
+  color: var(--fh-gold-ink);
+}
+
+.fhcs-total__amount {
+  font-family: var(--fh-font-display);
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 600;
+  color: var(--fh-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.fhcs-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+}
+
+@media (min-width: 900px) {
+  .fhcs-head {
+    padding: 12px var(--fh-gutter-desktop) 8px 20px;
+  }
+
+  .fhcs-lede,
+  .fhcs-body {
+    padding-left: var(--fh-gutter-desktop);
+    padding-right: var(--fh-gutter-desktop);
+  }
+}

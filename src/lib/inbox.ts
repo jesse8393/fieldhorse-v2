@@ -358,16 +358,34 @@ export function groupByDay(items: ThreadItem[], now: Date = new Date()): ThreadD
 // Small pure helpers for the list and the composer
 // ---------------------------------------------------------------------------
 
-/** The job chip in a list row and a thread header: the stage in a word. */
+/**
+ * The job chip in a list row and a thread header: the stage in a word.
+ * Leads and quotes are not jobs any more (D55), so only a job stage
+ * reads as one; the view's latest_record names the other kinds.
+ */
 export function stageChip(stage: string | null | undefined): { label: string; tone: ChipTone } | null {
   switch (String(stage ?? '').toLowerCase()) {
-    case 'lead': return { label: 'Lead', tone: 'neutral' }
-    case 'quote': return { label: 'Quote', tone: 'info' }
     case 'job':
     case 'invoice': return { label: 'Job', tone: 'success' }
     case 'closed': return { label: 'Closed', tone: 'neutral' }
     case 'lost': return { label: 'Lost', tone: 'neutral' }
     default: return null
+  }
+}
+
+/**
+ * The record chip for a conversation: the client's newest record by kind
+ * (migration 095), with a job's stage when that record is a job. A row
+ * from the older view has no latest_record and falls back to the stage.
+ */
+export function recordChip(
+  row: Partial<Pick<InboxRow, 'latest_stage' | 'latest_record'>> | null | undefined
+): { label: string; tone: ChipTone } | null {
+  switch (String(row?.latest_record ?? '').toLowerCase()) {
+    case 'lead': return { label: 'Lead', tone: 'neutral' }
+    case 'quote': return { label: 'Quote', tone: 'info' }
+    case 'invoice': return { label: 'Invoice', tone: 'info' }
+    default: return stageChip(row?.latest_stage)
   }
 }
 

@@ -156,6 +156,7 @@ export function InvoicesTable({
   rows: MoneyInvoiceRow[]
   filter: MoneyFilter
   onFilterChange: (next: MoneyFilter) => void
+  /** A click on the row opens the invoice's screen, /invoices/:id. */
   onOpenInvoice: (invoiceId: string) => void
 }) {
   const shown = filter === 'outstanding'
@@ -217,7 +218,7 @@ export function InvoicesTable({
                     variant="quiet"
                     size="mini"
                     aria-label={`Open ${r.title}, ${r.subline}`}
-                    onClick={() => onOpenInvoice(r.id)}
+                    to={`/invoices/${r.id}`}
                   >
                     Open
                   </Button>
@@ -408,7 +409,7 @@ export function BalancesTable({
                 return (
                   <tr key={r.job.id} className="fhmd-row">
                     <td className="fhmd-cell--customer">
-                      <Link className="fhmd-name fhmd-name--link" to={`/invoices/${r.job.id}`}>{name}</Link>
+                      <Link className="fhmd-name fhmd-name--link" to={`/jobs/${r.job.id}?tab=financials`}>{name}</Link>
                       {r.job.job_title && <span className="fhmd-sub">{r.job.job_title}</span>}
                     </td>
                     <td>

@@ -30,6 +30,9 @@ import crypto from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import { brandingUserIdFor } from './lib/orgAccess.js'
 import { proposalNumber } from './lib/docNumbers.js'
+import {
+  buildQuoteSnapshot, claimQuoteApproval, recordQuoteVersion, snapshotCompany, snapshotItems
+} from './lib/quoteApproval.js'
 
 const STATUS_MAP = {
   sent: 'sent',
@@ -71,6 +74,9 @@ export function nextEnvelopeStatus(currentStatus, rawStatus) {
  * so the webhook still acknowledges the event.
  */
 export async function recordDocusignApproval(supabase, env, envelopeId, now = new Date()) {
+  // An envelope sent for a quote record (Task 11) approves the quote.
+  if (env.quote_id) return recordDocusignQuoteApproval(supabase, env, envelopeId, now)
+
   const { data: contact, error: contactErr } = await supabase
     .from('fh_contacts')
     .select('*')
@@ -243,6 +249,69 @@ export async function recordDocusignApproval(supabase, env, envelopeId, now = ne
   return { ok: true, versionId: newRow.id }
 }
 
+// The quote path of recordDocusignApproval: claim fh_quotes.status, snapshot
+// the quote's lines by quote id, record the version by quote id and point
+// fh_quotes.approved_version_id at it. Same return shape as the job path.
+async function recordDocusignQuoteApproval(supabase, env, envelopeId, now) {
+  const { data: quote, error: quoteErr } = await supabase
+    .from('fh_quotes')
+    .select('*')
+    .eq('id', env.quote_id)
+    .maybeSingle()
+  if (quoteErr || !quote) {
+    console.error('[docusign-webhook] quote lookup failed', { quote_id: env.quote_id, error: quoteErr })
+    return { ok: false, skipped: 'quote_not_found' }
+  }
+
+  const claim = await claimQuoteApproval(supabase, quote)
+  if (claim.error) {
+    console.error('[docusign-webhook] fh_quotes status update failed', { quote_id: quote.id, error: claim.error })
+    return { ok: false, skipped: 'claim_failed' }
+  }
+  if (!claim.claimed) return { ok: true, skipped: 'already_approved' }
+
+  const brandingUserId = (await brandingUserIdFor(supabase, quote)) || env.user_id
+  const [{ data: client }, { data: items, error: itemsErr }, { data: profile }] = await Promise.all([
+    supabase.from('fh_clients').select('id, name, phone, email, address').eq('id', quote.client_id).maybeSingle(),
+    supabase.from('fh_quote_items').select('*').eq('quote_id', quote.id).order('sort_order', { ascending: true }),
+    supabase.from('profiles').select('*').eq('user_id', brandingUserId).maybeSingle()
+  ])
+  if (itemsErr) console.error('[docusign-webhook] fh_quote_items lookup failed', { quote_id: quote.id, error: itemsErr })
+
+  const approvedAt = now.toISOString()
+  const snap = snapshotItems(items || [])
+  const signerName = String(env.recipient_name || '').trim() || String(client?.name || '').trim() || 'Customer'
+  const snapshot = buildQuoteSnapshot({
+    quote, client, company: snapshotCompany(profile), snap, takenAt: approvedAt,
+    extra: {
+      approval_origin: 'docusign',
+      docusign: { envelope_id: envelopeId, sent_at: env.sent_at || null, completed_at: approvedAt }
+    }
+  })
+
+  const recorded = await recordQuoteVersion(supabase, {
+    quote,
+    userId: env.user_id,
+    snapshot,
+    snap,
+    fields: {
+      // See the job path: esign_link is the closest allowed method.
+      approval_method: 'esign_link',
+      approved_by_name: signerName,
+      approved_by_email: env.recipient_email || client?.email || null,
+      approval_note: `Signed through DocuSign, envelope ${envelopeId}`,
+      signature_kind: null,
+      signature_data: null,
+      approved_at: approvedAt
+    }
+  })
+  if (recorded.error) {
+    console.error('[docusign-webhook] fh_quote_versions insert failed', { quote_id: quote.id, envelope_id: envelopeId, error: recorded.error })
+    return { ok: false, skipped: 'version_insert_failed' }
+  }
+  return { ok: true, versionId: recorded.row.id }
+}
+
 export default async (request) => {
   if (request.method !== 'POST') return new Response('method_not_allowed', { status: 405 })
 
@@ -300,7 +369,7 @@ export default async (request) => {
 
   const { data: env } = await supabase
     .from('fh_esign_envelopes')
-    .select('id, user_id, contact_id, recipient_name, recipient_email, status, sent_at')
+    .select('id, user_id, contact_id, quote_id, recipient_name, recipient_email, status, sent_at')
     .eq('envelope_id', envelopeId)
     .maybeSingle()
   if (!env) {
@@ -347,7 +416,7 @@ export default async (request) => {
       kind: 'quote_approved',
       title: 'Proposal signed',
       body: `${env.recipient_name || 'The customer'} signed via DocuSign`,
-      link: `/jobs/${env.contact_id}`
+      link: env.quote_id ? `/quotes/${env.quote_id}` : `/jobs/${env.contact_id}`
     })
     if (notifErr) {
       console.error('[docusign-webhook] notification insert failed', {

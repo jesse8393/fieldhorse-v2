@@ -24,8 +24,8 @@ import {
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import {
-  subPortalContext, subProfileUpdate, subUploadDoc, subDocSignedUrl,
-  type SubPortalContext, type DocKind, type SubProfile, type SubProfileUpdate,
+  mergedProfile, subPortalContext, subUploadDoc, subDocSignedUrl,
+  type SubPortalContext, type DocKind,
 } from '../lib/subApi.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { parseDateOnly } from '../lib/dates.ts'
@@ -80,23 +80,6 @@ function insuranceStatus(iso: string | null): { label: string; tone: 'good' | 'w
   return { label: 'Current', tone: 'good' }
 }
 
-// Merge fields across multiple matched profiles. When a sub works
-// for several GCs we surface ONE combined view of editable fields,
-// preferring the most-recently-updated non-null value per field.
-function mergedProfile(profiles: SubProfile[]): SubProfile | null {
-  if (profiles.length === 0) return null
-  // Profiles arrive sorted by updated_at desc already.
-  const out: any = { ...profiles[0] }
-  for (let i = 1; i < profiles.length; i++) {
-    for (const k of Object.keys(profiles[i] || {})) {
-      if (out[k] == null && (profiles[i] as any)[k] != null) {
-        out[k] = (profiles[i] as any)[k]
-      }
-    }
-  }
-  return out as SubProfile
-}
-
 export default function SubPortal() {
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -105,7 +88,6 @@ export default function SubPortal() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [ctx, setCtx] = useState<SubPortalContext | null>(null)
-  const [editOpen, setEditOpen] = useState(false)
   const [uploading, setUploading] = useState<DocKind | null>(null)
 
   const load = useCallback(async () => {
@@ -254,7 +236,7 @@ export default function SubPortal() {
                     Your profile
                   </div>
                   {profile && (
-                    <button type="button" onClick={() => setEditOpen(true)}>
+                    <button type="button" onClick={() => navigate('/sub-portal/profile')}>
                       <Edit2 size={11} aria-hidden="true" style={{ marginRight: 4 }} />
                       Edit
                     </button>
@@ -405,7 +387,7 @@ export default function SubPortal() {
                     : 'Add expiry + COI to keep contractors current.'}
                 </span>
                 {profile && (
-                  <button type="button" className="fh-build-rail-card__action" onClick={() => setEditOpen(true)}>
+                  <button type="button" className="fh-build-rail-card__action" onClick={() => navigate('/sub-portal/profile')}>
                     Update <ChevronRight size={13} />
                   </button>
                 )}
@@ -429,13 +411,6 @@ export default function SubPortal() {
         )}
       </main>
 
-      {editOpen && profile && (
-        <EditProfileDialog
-          initial={profile}
-          onClose={() => setEditOpen(false)}
-          onSaved={() => { setEditOpen(false); load() }}
-        />
-      )}
     </div>
   )
 }
@@ -540,190 +515,5 @@ function DocSlot({ kind, label, path, uploading, onUpload }: {
         )}
       </div>
     </div>
-  )
-}
-
-function EditProfileDialog({
-  initial,
-  onClose,
-  onSaved,
-}: {
-  initial: SubProfile
-  onClose: () => void
-  onSaved: () => void
-}) {
-  const [form, setForm] = useState<SubProfileUpdate>({
-    phone: initial.phone,
-    address: initial.address,
-    ein: initial.ein,
-    insurance_carrier: initial.insurance_carrier,
-    insurance_policy: initial.insurance_policy,
-    insurance_expires_on: initial.insurance_expires_on,
-    license_number: initial.license_number,
-    payment_handle: initial.payment_handle,
-    payment_method: initial.payment_method,
-  })
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [onClose])
-
-  function set<K extends keyof SubProfileUpdate>(key: K, value: SubProfileUpdate[K]) {
-    setForm((f) => ({ ...f, [key]: value }))
-  }
-
-  async function save() {
-    // Send only what the sub changed. The dialog starts from a profile merged
-    // across every contractor, so sending the whole form would copy one
-    // contractor's values onto all the others.
-    const norm = (v: unknown) => (v == null ? '' : String(v).trim())
-    const changed: SubProfileUpdate = {}
-    for (const key of Object.keys(form) as Array<keyof SubProfileUpdate>) {
-      if (norm(initial[key]) !== norm(form[key])) {
-        (changed as Record<string, unknown>)[key] = form[key]
-      }
-    }
-    if (Object.keys(changed).length === 0) {
-      onClose()
-      return
-    }
-    setSaving(true)
-    setError(null)
-    try {
-      await subProfileUpdate(changed)
-      toastSuccess('Profile updated')
-      onSaved()
-    } catch (e: any) {
-      setError(e?.detail || e?.message || 'Update failed.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Edit sub profile"
-      style={{
-        position: 'fixed', inset: 0, zIndex: 90,
-        background: 'rgba(20, 20, 20,.55)',
-        display: 'grid', placeItems: 'center',
-        padding: 16,
-      }}
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: '100%', maxWidth: 520,
-          maxHeight: 'calc(100vh - 32px)',
-          overflowY: 'auto',
-          padding: 24,
-          borderRadius: 10,
-          background: 'linear-gradient(180deg, rgba(20, 20, 20,.95), rgba(20, 20, 20,.98))',
-          border: '1px solid var(--v3-border-mid)',
-          boxShadow: '0 22px 60px rgba(20, 20, 20,.50)',
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            <div className="fh-build-eyebrow" style={{ color: 'var(--v3-primary-text)' }}>Edit profile</div>
-            <h2 style={{ margin: '6px 0 18px', fontFamily: 'var(--font-display)', fontSize: 24, letterSpacing: 0, color: 'var(--v3-text)' }}>
-              Keep your details current.
-            </h2>
-          </div>
-          <button type="button" onClick={onClose} aria-label="Close" style={{ background: 'transparent', border: 'none', color: 'var(--v3-text-muted)', cursor: 'pointer' }}>
-            <X size={18} />
-          </button>
-        </div>
-
-        <p style={{ margin: '0 0 16px', fontSize: 12, color: 'var(--v3-text-muted)' }}>
-          Updates apply to every contractor that has you on file. They can't change
-          your name, company, or email, those stay under each GC's control.
-        </p>
-
-        <div style={{ display: 'grid', gap: 12 }}>
-          <Field label="Phone" value={form.phone ?? ''} onChange={(v) => set('phone', v)} />
-          <Field label="Address" value={form.address ?? ''} onChange={(v) => set('address', v)} />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <Field label="EIN" value={form.ein ?? ''} onChange={(v) => set('ein', v)} />
-            <Field label="License #" value={form.license_number ?? ''} onChange={(v) => set('license_number', v)} />
-          </div>
-
-          <div style={{ borderTop: '1px solid var(--v3-border-mid)', paddingTop: 12, marginTop: 6 }}>
-            <div className="fh-build-eyebrow" style={{ marginBottom: 8 }}>Insurance</div>
-            <div style={{ display: 'grid', gap: 12 }}>
-              <Field label="Carrier" value={form.insurance_carrier ?? ''} onChange={(v) => set('insurance_carrier', v)} />
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <Field label="Policy #" value={form.insurance_policy ?? ''} onChange={(v) => set('insurance_policy', v)} />
-                <Field label="Expires" type="date" value={form.insurance_expires_on ?? ''} onChange={(v) => set('insurance_expires_on', v || null)} />
-              </div>
-            </div>
-          </div>
-
-          <div style={{ borderTop: '1px solid var(--v3-border-mid)', paddingTop: 12, marginTop: 6 }}>
-            <div className="fh-build-eyebrow" style={{ marginBottom: 8 }}>Payments</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <Field label="Method" value={form.payment_method ?? ''} onChange={(v) => set('payment_method', v)} placeholder="ACH / Check / Zelle / Venmo…" />
-              <Field label="Handle / acct" value={form.payment_handle ?? ''} onChange={(v) => set('payment_handle', v)} placeholder="@you or last-4" />
-            </div>
-          </div>
-        </div>
-
-        {error && (
-          <div style={{ marginTop: 14, padding: 12, borderRadius: 10, background: 'rgba(192, 57, 43,.10)', border: '1px solid rgba(192, 57, 43,.30)', color: 'var(--v3-danger-text)', fontSize: 12 }}>
-            {error}
-          </div>
-        )}
-
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 18 }}>
-          <button type="button" className="fh-build-secondary-btn" onClick={onClose} disabled={saving}>
-            Cancel
-          </button>
-          <button type="button" className="fh-build-primary-btn" onClick={save} disabled={saving}>
-            {saving ? 'Saving…' : 'Save changes'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function Field({
-  label, value, onChange, placeholder, type = 'text',
-}: {
-  label: string
-  value: string
-  onChange: (v: string) => void
-  placeholder?: string
-  type?: string
-}) {
-  return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <span className="fh-build-eyebrow">{label}</span>
-      <input
-        type={type}
-        value={value}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-        style={{
-          padding: '12px 12px',
-          borderRadius: 10,
-          background: 'rgba(20, 20, 20,.30)',
-          border: '1px solid var(--v3-border-mid)',
-          color: 'var(--v3-text)',
-          fontFamily: 'var(--font-body)',
-          fontSize: 14,
-          outline: 'none',
-        }}
-      />
-    </label>
   )
 }

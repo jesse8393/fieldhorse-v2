@@ -248,7 +248,7 @@ export default function SnowActivityBuild({ events, hasMore, isFetching, onLoadO
 
             <section className="fh-build-rail-card fh-activity-shortcuts">
               <div className="fh-build-eyebrow">Open workspace</div>
-              <Link to="/work">Work and deals <ArrowRight size={12} /></Link>
+              <Link to="/jobs">Jobs <ArrowRight size={12} /></Link>
               <Link to="/invoices">Invoices <ArrowRight size={12} /></Link>
               <Link to="/schedule">Schedule <ArrowRight size={12} /></Link>
             </section>

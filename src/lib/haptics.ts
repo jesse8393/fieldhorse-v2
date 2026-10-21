@@ -32,3 +32,6 @@ export function hapticSwipe() { vibrate([4, 6, 4]) }
 
 // Stage change, quote → job → invoice transitions. Heavier, confirming.
 export function hapticStageChange() { vibrate([12, 8, 20]) }
+
+/** A raw pattern, for the few places that tune their own buzz (SpecTabs). */
+export function haptic(pattern: number | number[] = 10) { vibrate(pattern) }

@@ -11,12 +11,15 @@ import { toastSuccess, toastError } from '../lib/toast.ts'
 import { hapticMedium, hapticSuccess } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { supabase } from '../lib/supabase.ts'
-import { useEstimateTemplates, useInvalidateEstimateTemplates } from '../lib/queries.ts'
+import { useClientsBundle, useEstimateTemplates, useInvalidateEstimateTemplates } from '../lib/queries.ts'
+import { useOrgScope } from '../lib/orgScope.ts'
+import { createQuote } from '../lib/quotes.ts'
+import { recordRoute } from '../lib/records.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import CountUp from '../components/fx/CountUp.tsx'
 import SectionHeader from '../components/v3/SectionHeader.tsx'
 import { FilterPill, Eyebrow } from '../components/v3'
-import { useConfirm } from '../components/ConfirmSheet.tsx'
+import { useArmedId } from '../lib/secondTap.ts'
 import { parseAmount } from '../lib/amount.ts'
 
 // White-label: internal-only tool but no app-attributable phrasing
@@ -59,7 +62,8 @@ function capitalize(s: any) { return s ? s.charAt(0).toUpperCase() + s.slice(1) 
 
 export default function Bid() {
   const { user } = useAuth()
-  const confirm = useConfirm()
+  // Deleting a template takes a second tap on the same button (D57).
+  const deleteTap = useArmedId()
   const navigate = useNavigate()
   const [scope, setScope] = useState('')
   const [marginPct, setMarginPct] = useState(25)
@@ -70,6 +74,12 @@ export default function Bid() {
   const [jobType, setJobType] = useState('')
   const [copied, setCopied] = useState(false)
   const [pushing, setPushing] = useState(false)
+  // The quote the bid becomes needs a client (SPEC D59): typed here, picked
+  // from the roster by name, or made in place when the name matches nobody.
+  const orgId = useOrgScope(user?.id)
+  const { data: clientsBundle } = useClientsBundle(user?.id)
+  const clients = clientsBundle?.clients ?? []
+  const [clientName, setClientName] = useState('')
   // Templates library (migration 024). Loaded via TanStack Query and
   // invalidated after every save/delete so the picker stays fresh.
   const { data: templates = [] } = useEstimateTemplates(user?.id)
@@ -148,30 +158,27 @@ export default function Bid() {
     setPicks((p) => p.includes(t) ? p.filter((x) => x !== t) : [...p, t])
   }
 
-  // Push the AI bid into a real quote: creates a new fh_contacts row at
-  // stage='quote' with the recommended price as contact.amount, then
-  // inserts one fh_quote_items row per AI line item (rate = high end of
-  // the range, so the operator can dial back rather than up, easier
-  // negotiation pattern). Navigates to /jobs/:id?tab=quote so the
-  // contractor lands in the editor ready to refine before sending.
-  //
-  // Single-shot insert per item, concurrent inserts are fine, the
-  // recalc trigger from migration 011 keeps fh_contacts.amount in
-  // sync with the sum of base items.
+  // Push the AI bid into a real quote (Phase 9, Task 10, D53): an fh_quotes
+  // row for the client named above, with one fh_quote_items row per AI line
+  // item carrying quote_id (rate = high end of the range, so the operator
+  // can dial back rather than up). Lands on /quotes/:id, ready to refine
+  // and send. A name that matches no client makes one in place (D59).
   async function pushToJob() {
     if (!bid || !total || !user?.id || pushing) return
+    const name = clientName.trim()
+    if (!name) {
+      toastError('Name the client first', 'Type who this quote is for. A new name makes a new client.')
+      return
+    }
     setPushing(true)
     try {
       const recommendedPrice = Math.round(total.withMargin)
       const jobTitle = bid.summary
         || (jobType ? `${capitalize(jobType)} project` : 'New estimate')
 
-      // ONE price everywhere. The header used to carry the recommended
-      // (with-margin) price while the quote items summed the raw
-      // high-end rates, two different totals for the same bid on the
-      // same screen ($9,673 up top, $8,620 in the builder). Scale every
-      // line rate so the items sum EXACTLY to the recommended price;
-      // the last item absorbs the rounding remainder.
+      // ONE price everywhere: scale every line rate so the items sum
+      // EXACTLY to the recommended price; the last item absorbs the
+      // rounding remainder.
       const rawItems = (bid.line_items || []).map((li: any) => ({
         li,
         qty: Number(li.qty || 1),
@@ -191,37 +198,38 @@ export default function Bid() {
         return { ...r, amount, rate }
       })
 
-      // 1. Create the contact (stage='quote' so it lands in the
-      //    Pipeline at the right column).
-      const { data: contact, error: cErr } = await supabase
-        .from('fh_contacts')
-        .insert({
-          user_id: user.id,
-          // The bid summary, not a generic label, a pipeline full of
-          // rows all named "New estimate" is unscannable. The real
-          // client attaches on the quote screen.
-          name: jobTitle,
-          job_title: jobTitle,
-          job_type: jobType || null,
-          amount: recommendedPrice,
-          stage: 'quote',
-          scope_text: scope || null,
-          notes: [
-            bid.assumptions?.length ? `Assumptions:\n${bid.assumptions.map((a: any) => `• ${a}`).join('\n')}` : '',
-            bid.risks?.length ? `Risks:\n${bid.risks.map((r: any) => `• ${r}`).join('\n')}` : ''
-          ].filter(Boolean).join('\n\n') || null
-        })
-        .select('*')
-        .single()
-      if (cErr) throw cErr
+      // 1. The client: an existing one by name, or a new row.
+      let clientId = clients.find((c: any) => String(c.name || '').trim().toLowerCase() === name.toLowerCase())?.id as string | undefined
+      if (!clientId) {
+        const { data: made, error: clErr } = await supabase
+          .from('fh_clients')
+          .insert({ user_id: user.id, org_id: orgId || null, name })
+          .select('id')
+          .single()
+        if (clErr) throw clErr
+        clientId = (made as { id: string }).id
+      }
 
-      // 2. Insert one fh_quote_items row per AI line item. Use the
-      //    high end of the rate range as the rate, gives the
-      //    contractor room to negotiate down rather than scrambling
-      //    to add charges later.
+      // 2. The quote, with the bid's notes as its scope.
+      const notes = [
+        scope || '',
+        bid.assumptions?.length ? `Assumptions:\n${bid.assumptions.map((a: any) => `${a}`).join('\n')}` : '',
+        bid.risks?.length ? `Risks:\n${bid.risks.map((r: any) => `${r}`).join('\n')}` : ''
+      ].filter(Boolean).join('\n\n')
+      const quote = await createQuote({
+        userId: user.id,
+        orgId: orgId || '',
+        clientId,
+        title: jobTitle,
+        scopeText: notes || null,
+        jobType: jobType || null
+      })
+
+      // 3. One fh_quote_items row per AI line item, on the quote.
       const items = scaledItems.map((r: any, idx: number) => ({
         user_id: user.id,
-        contact_id: contact.id,
+        quote_id: quote.id,
+        contact_id: null,
         section: TRADE_LABELS[picks[0]] || 'Scope',
         description: r.li.name + (r.li.notes ? ` (${r.li.notes})` : ''),
         qty: r.qty,
@@ -241,13 +249,12 @@ export default function Bid() {
       hapticSuccess()
       toastSuccess(
         'Pushed to a new quote',
-        `${items.length} line item${items.length === 1 ? '' : 's'} added · ${money(recommendedPrice)}`
+        `${items.length} line item${items.length === 1 ? '' : 's'} added, ${money(recommendedPrice)}`
       )
-      // Land on the Quote tab so the contractor can refine + send.
-      navigate(`/quotes/${contact.id}?tab=quote`)
+      navigate(recordRoute('quote', quote.id))
     } catch (e: any) {
       console.error('[bid] pushToJob failed:', e)
-      toastError("Couldn't create job from bid", e?.message || 'Try again.')
+      toastError("Couldn't create the quote from this bid", e?.message || 'Try again.')
     } finally {
       setPushing(false)
     }
@@ -306,7 +313,6 @@ export default function Bid() {
 
   async function deleteTemplate(t: any) {
     if (!t?.id) return
-    if (!(await confirm({ title: `Delete "${t.name}" from your templates?`, destructive: true }))) return
     try {
       const { error } = await supabase.from('fh_estimate_templates').delete().eq('id', t.id)
       if (error) throw error
@@ -468,17 +474,19 @@ export default function Bid() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => deleteTemplate(t)}
-                    aria-label={`Delete template ${t.name}`}
+                    onClick={() => deleteTap.tap(t.id, () => { void deleteTemplate(t) })}
+                    aria-label={deleteTap.armedId === t.id ? 'Tap again to delete' : `Delete template ${t.name}`}
+                    title={deleteTap.armedId === t.id ? `Tap again to delete "${t.name}" from your templates` : 'Delete template'}
                     style={{
-                      width: 26, height: 26, borderRadius: 10,
+                      width: deleteTap.armedId === t.id ? 'auto' : 26, height: 26, borderRadius: 10, padding: deleteTap.armedId === t.id ? '0 8px' : 0,
+                      fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-body)', whiteSpace: 'nowrap',
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                       background: 'transparent',
                       border: '1px solid rgba(192, 57, 43, 0.35)',
                       color: 'var(--v3-danger-text)', cursor: 'pointer'
                     }}
                   >
-                    <Trash2 size={12} aria-hidden="true" />
+                    {deleteTap.armedId === t.id ? 'Tap again to delete' : <Trash2 size={12} aria-hidden="true" />}
                   </button>
                 </li>
               ))}
@@ -783,11 +791,35 @@ export default function Bid() {
                   {copied ? <Check size={12} /> : <Copy size={12} />}
                   {copied ? 'Copied' : 'Copy'}
                 </button>
+                <input
+                  type="text"
+                  list="fh-bid-clients"
+                  value={clientName}
+                  onChange={(e) => setClientName(e.target.value)}
+                  placeholder="Client name"
+                  aria-label="Client for the quote"
+                  autoComplete="off"
+                  style={{
+                    minWidth: 0,
+                    flex: '1 1 160px',
+                    padding: '8px 12px',
+                    borderRadius: 10,
+                    border: '1px solid var(--v3-border-strong)',
+                    background: 'var(--v3-surface-2)',
+                    color: 'var(--v3-text)',
+                    fontFamily: 'var(--font-body)',
+                    fontSize: 14,
+                    outline: 'none'
+                  }}
+                />
+                <datalist id="fh-bid-clients">
+                  {clients.map((c: any) => <option key={c.id} value={c.name || ''} />)}
+                </datalist>
                 <button
                   type="button"
                   onClick={pushToJob}
                   disabled={pushing}
-                  title="Create a new job at stage='quote' with these line items filled, ready to refine + send"
+                  title="Make a quote for the named client with these line items filled, ready to refine and send"
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -806,7 +838,7 @@ export default function Bid() {
                   }}
                 >
                   <Briefcase size={12} />
-                  {pushing ? 'Creating…' : 'Push to job'}
+                  {pushing ? 'Creating' : 'Push to quote'}
                 </button>
               </div>
             </div>

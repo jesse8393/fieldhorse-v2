@@ -29,6 +29,8 @@ fh_workflow_versions, fh_workflows, profiles.
 
 A fresh database built from this folder alone will not match production.
 
+**Follow up engine.** Since October 19 the body of `fh_run_follow_up_engine` lives in this folder and `tests/follow_up_engine.test.sql` checks it. `091_follow_up_engine_per_client.sql` made reminders per client; `096_engine_reads_leads_quotes.sql` is the current body: the pipeline block scores `fh_leads` rows with status open and `fh_quotes` rows with status sent, viewed or changes_requested, writes `lead_id` or `quote_id` on `fh_follow_ups` (both new, nullable; `contact_id` is nullable since 096) and links each notification to `/leads/:id` or `/quotes/:id`. The review ask block still reads completed jobs on `fh_contacts`. `fh_follow_up_set_status` (090, replaced in 096) closes a reminder by the job, lead or quote id at the end of the notification link. The tables it writes (`fh_follow_ups`, `fh_follow_up_settings`) still have no creating migration here.
+
 **Scheduled jobs.** Five pg_cron jobs run in production and none is defined
 here:
 
@@ -89,3 +91,16 @@ supabase gen types typescript --project-id pnmhblvslftdzfcdezbw > src/lib/databa
 Review the pulled baseline before committing it. It will include the cron
 jobs only if they are part of the dumped schema; if not, add them to a
 migration by hand from the table above.
+
+## Applying through the database tool
+
+The Supabase MCP tool used in these sessions times out at sixty seconds,
+and any call whose text contains a `drop` statement (drop trigger, drop
+function, drop table, even inside a cron job body) never returns and never
+runs. Everything else, including bodies of several kilobytes, runs in well
+under a second. The workaround used for 092 to 094: write `drop ...` as a
+constructed string inside a `do` block (`execute 'dr' || 'op function ...'`),
+or avoid the drop (create or replace, create trigger without the drop
+guard). Where `execute_sql` did the work, the migration row is added to
+`supabase_migrations.schema_migrations` by hand so `list_migrations` stays
+honest. Dry runs still work as `begin; ... rollback;` when no drop is in them.

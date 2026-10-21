@@ -81,19 +81,23 @@ export default async (request) => {
 
   const {
     contact_id,
+    invoice_id,
     sender_user_id,
     recipient_email,
     recipient_name,
     storage_path,
     filename,
     sender_message,
-    amount_due
+    amount_due,
+    description
   } = body || {}
 
-  if (!contact_id || !sender_user_id || !recipient_email || !storage_path) {
+  // An invoice bills a job (contact_id) or, with no job, a client directly
+  // (D62): then the invoice row names the client through its client_id.
+  if ((!contact_id && !invoice_id) || !sender_user_id || !recipient_email || !storage_path) {
     return json({
       error: 'missing_fields',
-      required: ['contact_id', 'sender_user_id', 'recipient_email', 'storage_path']
+      required: ['contact_id or invoice_id', 'sender_user_id', 'recipient_email', 'storage_path']
     }, 400)
   }
 
@@ -122,19 +126,17 @@ export default async (request) => {
     return json({ error: 'rate_limited', message: 'Too many emails sent in a short time. Try again in a few minutes.' }, 429)
   }
 
-  // 1. Verify the caller may act on the contact (job): its creator, or an
-  // owner, admin or manager of its company.
-  const access = await loadAccessibleRow(supabase, {
-    table: 'fh_contacts', id: contact_id, callerId: sender_user_id,
-    select: 'name, job_title, amount'
-  })
-  if (access.error === 'lookup_failed') {
-    return json({ error: 'contact_lookup_failed', message: 'Could not load this job. Try again.' }, 500)
+  // 1. Verify the caller may act on the record: the job when the invoice
+  // bills one, else the invoice itself, whose client stands in for the
+  // job's name. Either way: its creator, or an owner, admin or manager of
+  // its company.
+  const contact = await loadBilledRecord(supabase, { contact_id, invoice_id, sender_user_id })
+  if (contact === 'lookup_failed') {
+    return json({ error: 'contact_lookup_failed', message: 'Could not load this record. Try again.' }, 500)
   }
-  if (!access.row) {
+  if (!contact) {
     return json({ error: 'forbidden_or_not_found', message: 'This record was not found, or your role cannot send it. Ask an owner, admin or manager.' }, 403)
   }
-  const contact = access.row
 
   // 2. Pull the company's branding for From-line + Reply-To + pay link.
   const brandingUserId = (await brandingUserIdFor(supabase, contact)) || sender_user_id
@@ -178,7 +180,9 @@ export default async (request) => {
   // empty (incomplete profile).
   const fromName = companyName || SEND_EMAIL_FROM_NAME
   const fromHeader = formatFromHeader(fromName, SEND_EMAIL_FROM)
-  const jobTitle = contact.job_title || 'your project'
+  // What the invoice is for: the invoice's own description when the client
+  // sent one (the same words its PDF prints), else the job title as before.
+  const jobTitle = textField(description).slice(0, 200) || contact.job_title || 'your project'
   const amountLabel = formatMoneyLabel(amount_due ?? contact.amount)
   const subject = `Invoice for ${jobTitle}${amountLabel ? ` (${amountLabel})` : ''}`
   // Optional fields read through textField so a non string value from a
@@ -250,19 +254,22 @@ export default async (request) => {
   const emailId = resendBody?.id || null
   const sentAtIso = new Date().toISOString()
 
-  // 6. Log activity. Best-effort, never blocks the success response.
-  // Schema note: fh_contacts has no invoice_sent_at column today, so the
+  // 6. Log activity on the job. Best-effort, never blocks the success
+  // response. fh_contacts has no invoice_sent_at column today, so the
   // activity log is the source of truth for "did we email this invoice".
-  // Adding the column is a future schema change.
-  try {
-    await supabase.from('fh_notes').insert({
-      user_id: sender_user_id,
-      contact_id,
-      text: `Invoice sent to ${normalizedEmail}${amountLabel ? ` (${amountLabel})` : ''}`,
-      category: 'activity'
-    })
-  } catch (e) {
-    console.warn('[send-invoice] activity log insert failed', e)
+  // An invoice with no job has no job note to write; its row's status
+  // moving to sent is its record.
+  if (contact_id) {
+    try {
+      await supabase.from('fh_notes').insert({
+        user_id: sender_user_id,
+        contact_id,
+        text: `Invoice sent to ${normalizedEmail}${amountLabel ? ` (${amountLabel})` : ''}`,
+        category: 'activity'
+      })
+    } catch (e) {
+      console.warn('[send-invoice] activity log insert failed', e)
+    }
   }
 
   return json({
@@ -270,6 +277,47 @@ export default async (request) => {
     email_id: emailId,
     sent_at: sentAtIso
   })
+}
+
+// The record the invoice bills, shaped like a job row ({ id, user_id,
+// org_id, name, job_title, amount }). With contact_id it is the job. With
+// only invoice_id (an invoice that bills a client with no job, D62) it is
+// the invoice row with the client's name on it and no job title, so the
+// email reads "Invoice for <description>" and greets the client.
+// Returns null when the caller may not act on it, 'lookup_failed' on a
+// database error.
+async function loadBilledRecord(supabase, { contact_id, invoice_id, sender_user_id }) {
+  if (contact_id) {
+    const access = await loadAccessibleRow(supabase, {
+      table: 'fh_contacts', id: contact_id, callerId: sender_user_id,
+      select: 'name, job_title, amount'
+    })
+    if (access.error === 'lookup_failed') return 'lookup_failed'
+    return access.row || null
+  }
+  const access = await loadAccessibleRow(supabase, {
+    table: 'fh_invoices', id: invoice_id, callerId: sender_user_id,
+    select: 'client_id, amount, title'
+  })
+  if (access.error === 'lookup_failed') return 'lookup_failed'
+  if (!access.row) return null
+  let clientName = ''
+  if (access.row.client_id) {
+    const { data: client } = await supabase
+      .from('fh_clients')
+      .select('name')
+      .eq('id', access.row.client_id)
+      .maybeSingle()
+    clientName = client?.name || ''
+  }
+  return {
+    id: access.row.id,
+    user_id: access.row.user_id,
+    org_id: access.row.org_id,
+    name: clientName,
+    job_title: null,
+    amount: access.row.amount
+  }
 }
 
 function formatMoneyLabel(n) {

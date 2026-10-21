@@ -75,6 +75,33 @@ test.describe('command palette', () => {
     await expect(palette.getByText('to close.')).toBeVisible()
   })
 
+  // Phase 9, Task 15: leads, quotes and invoices are records of their own
+  // (D53) and the search finds a lead by the name of its client.
+  test('search finds a lead by name', async ({ context, page }) => {
+    const LEAD = {
+      id: 'l-justin', user_id: 'qa-user-1', client_id: 'cl-justin', title: 'Vintage Burkitt Station Drainage',
+      status: 'open', job_type: 'Drainage', follow_up_on: null, notes: null, last_contact: null, quote_id: null,
+      created_at: '2026-10-01T12:00:00Z', updated_at: '2026-10-09T12:00:00Z',
+      fh_clients: { id: 'cl-justin', name: 'Justin Bryan' }
+    }
+    // The mock does not filter by text, so only the lead is seeded: a job
+    // would bring its Actions group along.
+    await signIn(context, { tables: { fh_contacts: [], fh_clients: [CLIENT], fh_leads: [LEAD], fh_quotes: [], fh_invoices: [] } })
+    await open(page)
+    const palette = await openPalette(page)
+    await palette.getByRole('combobox').fill('Justin')
+
+    const leads = palette.getByRole('group', { name: 'Leads' })
+    await expect(leads).toBeVisible()
+    const row = leads.getByRole('option', { name: /Justin Bryan.*Vintage Burkitt Station Drainage.*Lead/ })
+    await expect(row).toBeVisible()
+    // A lead has no job actions.
+    await expect(palette.getByRole('group', { name: 'Actions' })).toHaveCount(0)
+    await row.click()
+    await expect(palette).toBeHidden()
+    await expect(page).toHaveURL(/\/leads\/l-justin$/)
+  })
+
   test('Documents appears only when files match', async ({ context, page }) => {
     await signIn(context, { tables: { fh_contacts: [JOB], fh_clients: [CLIENT], fh_job_files: [FILE] } })
     await open(page)
@@ -119,9 +146,9 @@ test.describe('command palette', () => {
 
     await page.keyboard.press('Alt+KeyN')
     await expect(palette).toBeHidden()
-    const sheet = page.getByRole('dialog', { name: 'Capture' })
-    await expect(sheet).toBeVisible()
-    await expect(sheet.getByText('Attached to Slab + trench.')).toBeVisible()
+    // Capture is a screen (D57), opened on the job.
+    await expect(page).toHaveURL(/\/capture\?job=c-job1$/)
+    await expect(page.getByText('Attached to Slab + trench.')).toBeVisible()
   })
 
   test('plain letters type into the search field and run nothing', async ({ context, page }) => {
@@ -143,11 +170,13 @@ test.describe('command palette', () => {
 
     await expect(palette).toBeVisible()
     expect(page.url()).toBe(before)
-    await expect(page.getByRole('dialog', { name: 'Capture' })).toHaveCount(0)
   })
 
   test('a shortcut needs a job or one of its actions highlighted', async ({ context, page }) => {
-    await signIn(context, { tables: { fh_contacts: [JOB], fh_clients: [CLIENT] } })
+    // Only the job and its customer, so the arrow count below holds: the
+    // mock does not filter by text, and the default leads, quotes and
+    // invoices would add rows of their own (Task 15).
+    await signIn(context, { tables: { fh_contacts: [JOB], fh_clients: [CLIENT], fh_leads: [], fh_quotes: [], fh_invoices: [] } })
     await open(page)
     const before = page.url()
     const palette = await openPalette(page)
@@ -162,7 +191,6 @@ test.describe('command palette', () => {
     await page.keyboard.press('Alt+KeyN')
     await expect(palette).toBeVisible()
     expect(page.url()).toBe(before)
-    await expect(page.getByRole('dialog', { name: 'Capture' })).toHaveCount(0)
   })
 
   test('Message opens the job when there is no phone number', async ({ context, page }) => {
@@ -212,13 +240,13 @@ test.describe('command palette', () => {
     // is not a usable signal here: the weather and font requests may never
     // settle on a slow runner.
     await expect(page.getByRole('region', { name: 'Unscheduled jobs' })).toBeVisible()
-    const before = page.url()
 
-    // A real textarea: Universal Capture's, opened by its own shortcut.
+    // A real textarea: Universal Capture's, on its own screen, opened by
+    // its own shortcut.
     await page.keyboard.press('Control+j')
-    const sheet = page.getByRole('dialog', { name: 'Capture' })
-    await expect(sheet).toBeVisible()
-    const field = sheet.getByRole('textbox', { name: 'Or type it' })
+    await expect(page).toHaveURL(/\/capture$/)
+    const before = page.url()
+    const field = page.getByRole('textbox', { name: 'Or type it' })
     await field.click()
 
     page.on('request', (req) => {
@@ -246,7 +274,8 @@ test.describe('command palette', () => {
 
     await capture.click()
     await expect(palette).toBeHidden()
-    await expect(page.getByRole('dialog', { name: 'Capture' })).toBeVisible()
+    await expect(page).toHaveURL(/\/capture$/)
+    await expect(page.getByRole('heading', { level: 1, name: 'Capture' })).toBeVisible()
   })
 
   test('Escape closes it', async ({ context, page }) => {

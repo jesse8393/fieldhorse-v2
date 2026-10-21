@@ -110,11 +110,13 @@ export default async (request) => {
   // surfacing as an opaque 500. Required fields that are not non empty
   // strings get a 400.
   const contact_id = textField(body?.contact_id)
+  // A quote record (fh_quotes, Task 11) sends with quote_id instead.
+  const quote_id = textField(body?.quote_id)
   const sender_user_id = textField(body?.sender_user_id)
   const storage_path = textField(body?.storage_path)
   const email = textField(body?.recipient_email).toLowerCase()
-  if (!contact_id || !sender_user_id || !email || !storage_path) {
-    return json({ error: 'missing_fields', required: ['contact_id', 'sender_user_id', 'recipient_email', 'storage_path'] }, 400)
+  if ((!contact_id && !quote_id) || !sender_user_id || !email || !storage_path) {
+    return json({ error: 'missing_fields', required: ['contact_id or quote_id', 'sender_user_id', 'recipient_email', 'storage_path'] }, 400)
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: 'invalid_email' }, 400)
 
@@ -138,13 +140,17 @@ export default async (request) => {
 
   // 1. Access check: the job's creator, or an owner, admin or manager of
   // its company.
-  const access = await loadAccessibleRow(supabase, {
-    table: 'fh_contacts', id: contact_id, callerId: sender_user_id,
-    select: 'name, job_title'
-  })
-  if (access.error === 'lookup_failed') return json({ error: 'contact_lookup_failed', message: 'Could not load this job. Try again.' }, 500)
+  const isQuote = Boolean(quote_id)
+  const access = await loadAccessibleRow(supabase, isQuote
+    ? { table: 'fh_quotes', id: quote_id, callerId: sender_user_id, select: 'title, client_id' }
+    : { table: 'fh_contacts', id: contact_id, callerId: sender_user_id, select: 'name, job_title' })
+  if (access.error === 'lookup_failed') return json({ error: 'contact_lookup_failed', message: isQuote ? 'Could not load this quote. Try again.' : 'Could not load this job. Try again.' }, 500)
   if (!access.row) return json({ error: 'forbidden_or_not_found' }, 403)
-  const contact = access.row
+  let contact = access.row
+  if (isQuote) {
+    const { data: client } = await supabase.from('fh_clients').select('name').eq('id', access.row.client_id).maybeSingle()
+    contact = { ...access.row, job_title: access.row.title, name: client?.name || null }
+  }
 
   // 2. Download PDF → base64
   // Tenant guard: service role bypasses the per-user folder RLS, and every
@@ -231,7 +237,8 @@ export default async (request) => {
   let auditWarning = null
   const { error: envelopeRowErr } = await supabase.from('fh_esign_envelopes').insert({
     user_id: sender_user_id,
-    contact_id,
+    contact_id: isQuote ? null : contact_id,
+    quote_id: isQuote ? quote_id : null,
     envelope_id: envelopeId,
     provider: 'docusign',
     status: 'sent',
@@ -248,7 +255,8 @@ export default async (request) => {
 
   const { error: noteErr } = await supabase.from('fh_notes').insert({
     user_id: sender_user_id,
-    contact_id,
+    contact_id: isQuote ? null : contact_id,
+    quote_id: isQuote ? quote_id : null,
     text: `Sent proposal for e-signature to ${email} (DocuSign)`,
     category: 'activity'
   })

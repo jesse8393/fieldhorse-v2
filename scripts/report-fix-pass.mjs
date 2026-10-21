@@ -85,7 +85,7 @@ const lines = [
   '',
   'No off-palette colors or non-token control/card radii remain in audited product source, native manifests, public source assets, or server generated emails.',
   '',
-  '`#0000` remains only as the example card reference placeholder in `V3PaymentSheet.tsx`. It is user-entered text, not a color declaration.',
+  '`#0000` remained only as the example card reference placeholder in the payment sheet (since replaced by the payment screens). It was user-entered text, not a color declaration.',
   '',
   'The 999px pill radius remains restricted to Badge and StatusPill components. The design audit enforces this exception.',
   '',

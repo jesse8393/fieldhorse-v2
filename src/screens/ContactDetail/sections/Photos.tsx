@@ -18,7 +18,7 @@ import LoadingValue from '../../../components/LoadingValue.tsx'
 import { countNoun } from '../../../lib/format.ts'
 import { keepFocusOnRetry } from '../../../lib/retryFocus.ts'
 import { jobPhotosKey } from '../phone/SpineList.tsx'
-import ActionSheet from '../../../components/ActionSheet.tsx'
+import { useArmedId } from '../../../lib/secondTap.ts'
 import { Eyebrow } from '../../../components/v3'
 
 const BUCKET = 'job-photos'
@@ -75,7 +75,8 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
   const [uploading, setUploading] = useState(false)
   const [captioningIds, setCaptioningIds] = useState(() => new Set())
   // Destructive-confirm sheet state for delete photo.
-  const [pendingDelete, setPendingDelete] = useState<any>(null)
+  // Delete asks with a second tap on the same button (D57).
+  const deleteTap = useArmedId()
   const [deleting, setDeleting] = useState(false)
 
   const [lightboxIdx, setLightboxIdx] = useState(-1)
@@ -325,13 +326,14 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
 
   // Open the destructive-confirm sheet for this photo. The actual
   // storage + db delete happens in confirmRemove on commit.
+  // The first tap arms the lightbox's delete button, the second closes the
+  // lightbox and removes the photo from storage and the job record.
   function remove(row: any) {
-    if (!row) return
-    setPendingDelete(row)
+    if (!row || deleting) return
+    deleteTap.tap(row.id, () => { closeLightbox(); void confirmRemove(row) })
   }
 
-  async function confirmRemove() {
-    const row = pendingDelete
+  async function confirmRemove(row: any) {
     if (!row || deleting) return
     setDeleting(true)
     try {
@@ -355,7 +357,6 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
       toastError('Delete failed', ex?.message || 'Try again')
     } finally {
       setDeleting(false)
-      setPendingDelete(null)
     }
   }
 
@@ -624,31 +625,12 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
             onClose={closeLightbox}
             onSaveCaption={(c: any) => saveCaption(lightboxRow.id, c)}
             onSaveSectionTag={(t: any) => saveSectionTag(lightboxRow.id, t)}
-            onDelete={() => { closeLightbox(); remove(lightboxRow) }}
+            onDelete={() => remove(lightboxRow)}
+            deleteArmed={deleteTap.armedId === lightboxRow.id}
           />
         )}
       </AnimatePresence>
 
-      {/* Destructive-confirm sheet for delete photo. Storage + db
-          delete + refresh happen in confirmRemove on commit. */}
-      <ActionSheet
-        open={!!pendingDelete}
-        title="Delete this photo?"
-        accentWord="Delete"
-        sectionLabel="Destructive"
-        stepCount={1}
-        currentStep={1}
-        commitLabel={deleting ? 'Deleting…' : 'Delete photo'}
-        commitBusy={deleting}
-        commitDisabled={deleting}
-        destructive
-        onClose={() => { if (!deleting) setPendingDelete(null) }}
-        onCommit={confirmRemove}
-      >
-        <p style={{ margin: 0, color: 'var(--v3-text)', fontSize: '1rem', lineHeight: 1.45 }}>
-          Removing <strong>{pendingDelete?.filename || 'this photo'}</strong> from storage and the job record. This can't be undone.
-        </p>
-      </ActionSheet>
     </div>
   )
 }
@@ -657,7 +639,7 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
    PhotoLightbox, full-screen image with caption editor + nav
    ============================================================ */
 
-function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, onSaveCaption, onSaveSectionTag, onDelete }: any) {
+function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, onSaveCaption, onSaveSectionTag, onDelete, deleteArmed = false }: any) {
   const [caption, setCaption] = useState(row.caption || '')
   const [sectionTag, setSectionTag] = useState(row.section_tag || '')
   const [customTag, setCustomTag] = useState('')
@@ -746,15 +728,18 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
           <button
             type="button"
             onClick={onDelete}
-            aria-label="Delete photo"
+            aria-label={deleteArmed ? 'Tap again to delete' : 'Delete photo'}
+            aria-pressed={deleteArmed ? true : undefined}
             style={{
-              width: 40, height: 40, borderRadius: 10,
-              background: 'rgba(192, 57, 43, 0.18)', border: 'none',
-              color: '#C9963A', cursor: 'pointer',
-              display: 'grid', placeItems: 'center'
+              minWidth: 40, height: 40, borderRadius: 10, padding: deleteArmed ? '0 12px' : 0,
+              background: deleteArmed ? 'rgba(192, 57, 43, 0.5)' : 'rgba(192, 57, 43, 0.18)', border: 'none',
+              color: deleteArmed ? '#F2EDE4' : '#C9963A', cursor: 'pointer',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700
             }}
           >
             <Trash2 size={18} aria-hidden="true" />
+            {deleteArmed && <span>Tap again to delete</span>}
           </button>
         </div>
 

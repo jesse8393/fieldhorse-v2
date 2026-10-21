@@ -11,6 +11,24 @@ async function open(page: Page, path: string) {
   await expect(page.locator('.fhj-page')).toBeVisible({ timeout: 30_000 })
 }
 
+// Opens the Spine's "More about this job" disclosure. The page can render
+// again right after it mounts (its data and the viewer's role arrive), so a
+// tap that landed before that is tried once more.
+async function openMoreAboutJob(page: Page) {
+  const toggle = page.getByRole('button', { name: 'More about this job' })
+  const body = page.locator('#fhj-more-body')
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await toggle.click()
+    try {
+      await expect(body).toBeVisible({ timeout: 3000 })
+      return
+    } catch {
+      if (await toggle.getAttribute('aria-expanded') === 'true') return
+    }
+  }
+  await expect(body).toBeVisible()
+}
+
 // True when the tab sits wholly inside the strip and, while the row fades
 // at its right edge, ends before the 32 px fade begins.
 async function clearOfFade(row: Locator, strip: Locator, tab: Locator) {
@@ -48,7 +66,7 @@ test.describe('job page on a phone', () => {
     const gold = page.locator('.fhj-capsule .fhc-btn--primary')
     await expect(gold).toHaveCount(1)
     await expect(gold).toBeVisible()
-    await expect(gold).toHaveText('Send invoice')
+    await expect(gold).toHaveText('Invoice this')
     const box = await gold.boundingBox()
     const viewport = page.viewportSize()!
     expect(box!.x).toBeGreaterThanOrEqual(0)
@@ -113,9 +131,11 @@ test.describe('job page on a phone', () => {
     await expect(tabs.getByRole('tab', { name: 'Financials', exact: true })).toHaveAttribute('aria-selected', 'true')
     await expect(page).toHaveURL(/tab=financials/)
 
-    // The quote stage keeps its Quote tab.
-    await open(page, '/quotes/c-quote?tab=overview')
-    await expect(page.getByRole('tablist', { name: 'Job sections' }).getByRole('tab', { name: 'Quote', exact: true })).toHaveCount(1)
+    // A quote is its own screen (Phase 9, D53): its lines are one tap away too.
+    await page.goto('/quotes/q-quote', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    await expect(page.locator('.fhqt-page')).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByRole('heading', { level: 1, name: 'Parking lot repour' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Add a line' })).toBeVisible()
   })
 
   test('the tab row fades at the right while it overflows, and not once scrolled to the end', async ({ context, page }) => {
@@ -252,13 +272,13 @@ test.describe('job page on a phone', () => {
     const settled = await observed()
     expect(settled).toBeGreaterThan(0)
 
-    // Opening and closing the more sheet renders the page again, with the
-    // same tabs.
-    await page.getByRole('button', { name: 'More actions for this job' }).click()
-    const sheet = page.getByRole('dialog', { name: 'Slab + trench' })
-    await expect(sheet).toBeVisible()
-    await page.keyboard.press('Escape')
-    await expect(sheet).toBeHidden()
+    // Opening and closing the Spine's disclosure renders the page again,
+    // with the same tabs.
+    const more = page.getByRole('button', { name: 'More about this job' })
+    await more.click()
+    await expect(page.locator('#fhj-more-body')).toBeVisible()
+    await more.click()
+    await expect(page.locator('#fhj-more-body')).toBeHidden()
     expect(await observed()).toBe(settled)
   })
 
@@ -278,21 +298,83 @@ test.describe('job page on a phone', () => {
     expect(contentBottom).toBeLessThanOrEqual(capsuleTop)
   })
 
-  test('the more menu sets a follow up', async ({ context, page }) => {
+  test('the more menu is a screen, and sets a follow up on its own screen', async ({ context, page }) => {
     await signIn(context)
     await open(page, '/jobs/c-job1')
     await page.getByRole('button', { name: 'More actions for this job' }).click()
-    const sheet = page.getByRole('dialog', { name: 'Slab + trench' })
-    await expect(sheet.getByRole('button', { name: /Set follow up/ })).toBeVisible()
-    await expect(sheet.getByRole('button', { name: /Edit job details/ })).toBeVisible()
-    await sheet.getByRole('button', { name: /Set follow up/ }).click()
-    const choices = page.getByRole('dialog', { name: 'Set follow up' })
+    await expect(page).toHaveURL(/\/jobs\/c-job1\/more$/)
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(page.getByRole('heading', { level: 1, name: 'Slab + trench' })).toBeVisible()
+    await expect(page.getByRole('link', { name: /Set follow up/ })).toBeVisible()
+    await expect(page.getByRole('link', { name: /Edit job details/ })).toBeVisible()
+    await page.getByRole('link', { name: /Set follow up/ }).click()
+    await expect(page).toHaveURL(/\/jobs\/c-job1\/follow-up$/)
+    await expect(page.getByRole('dialog')).toHaveCount(0)
     for (const name of ['Tomorrow', 'In 3 days', 'Next week']) {
-      await expect(choices.getByRole('button', { name, exact: true })).toBeVisible()
+      await expect(page.getByRole('button', { name, exact: true })).toBeVisible()
     }
-    await expect(choices.getByLabel('Pick a date')).toBeVisible()
-    await choices.getByRole('button', { name: 'Tomorrow', exact: true }).click()
+    await expect(page.getByLabel('Pick a date')).toBeVisible()
+    await page.getByRole('button', { name: 'Tomorrow', exact: true }).click()
     await expect(page.getByText('Follow up set', { exact: true })).toBeVisible()
+    // Saving lands back on the job.
+    await expect(page).toHaveURL(/\/jobs\/c-job1$/)
+  })
+
+  // The sheets the job page used to open are screens of their own (D57):
+  // each button changes the URL and nothing with role dialog ever mounts.
+  test('the job page opens no dialog for payment, event, partner, complete or invoice', async ({ context, page }) => {
+    await signIn(context)
+    await open(page, '/jobs/c-job1')
+    const steps: [string, RegExp][] = [
+      ['Log payment', /\/jobs\/c-job1\/payment$/],
+      ['Schedule event', /\/schedule\/new\?job=c-job1$/],
+      ['Invite partner', /\/jobs\/c-job1\/partner$/],
+      ['Mark complete', /\/jobs\/c-job1\/complete$/]
+    ]
+    for (const [name, url] of steps) {
+      await openMoreAboutJob(page)
+      await page.locator('#fhj-more-body').getByRole('button', { name, exact: true }).click()
+      await expect(page).toHaveURL(url)
+      await expect(page.getByRole('dialog')).toHaveCount(0)
+      await expect(page.getByRole('button', { name: 'Back' })).toBeVisible()
+      await page.goBack()
+      await expect(page.locator('.fhj-page')).toBeVisible()
+    }
+    await page.locator('.fhj-capsule').getByRole('button', { name: 'Invoice this' }).click()
+    await expect(page).toHaveURL(/\/invoices\/new\?job=c-job1$/)
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+  })
+
+  test('Invoice this opens the new invoice screen with the balance', async ({ context, page }) => {
+    await signIn(context)
+    await open(page, '/jobs/c-job1')
+    await page.locator('.fhj-capsule').getByRole('button', { name: 'Invoice this' }).click()
+    await expect(page).toHaveURL(/\/invoices\/new\?job=c-job1$/)
+    await expect(page.getByRole('heading', { level: 1, name: 'New invoice' })).toBeVisible()
+    await expect(page.getByLabel('Amount')).toHaveValue('33100')
+    await expect(page.getByLabel('Description')).toHaveValue('Slab + trench')
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+  })
+
+  test('Delete asks with a second tap, not a sheet', async ({ context, page }) => {
+    await signIn(context)
+    const deletes: string[] = []
+    page.on('request', (req) => {
+      if (req.method() === 'DELETE' && req.url().includes('/rest/v1/fh_contacts')) deletes.push(req.url())
+    })
+    await open(page, '/jobs/c-job1')
+    await page.getByRole('button', { name: 'More actions for this job' }).click()
+    await expect(page).toHaveURL(/\/jobs\/c-job1\/more$/)
+    await page.getByRole('button', { name: 'Delete job' }).click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    const again = page.getByRole('button', { name: 'Tap again to delete' })
+    await expect(again).toBeVisible()
+    expect(deletes).toEqual([])
+    await again.click()
+    await expect.poll(() => deletes.length).toBe(1)
+    expect(deletes[0]).toMatch(/id=eq\.c-job1/)
+    await expect(page).toHaveURL(/\/(jobs|work)\b/)
+    await expect(page.getByRole('heading', { level: 1, name: 'Jobs' })).toBeVisible({ timeout: 30_000 })
   })
 
   test('the capsule camera hands its photos to the Files tab', async ({ context, page }) => {
@@ -318,8 +400,9 @@ test.describe('job page on a phone', () => {
     await open(page, '/jobs/c-job1?tab=financials&action=send_invoice')
     const cue = page.getByRole('region', { name: 'Dashboard action cue' })
     await expect(cue).toBeVisible()
-    await cue.getByRole('button', { name: 'Send invoice' }).click()
-    await expect(page.getByRole('dialog')).toBeVisible()
+    await cue.getByRole('button', { name: 'Invoice this' }).click()
+    await expect(page).toHaveURL(/\/invoices\/new\?job=c-job1$/)
+    await expect(page.getByRole('dialog')).toHaveCount(0)
   })
 
   test('lost job', async ({ context, page }) => {
@@ -435,7 +518,7 @@ test.describe('job page on a desktop, redesigned', () => {
     await expect(banner.getByRole('button', { name: 'Schedule', exact: true })).toBeVisible()
     const gold = page.locator('.fhc-btn--primary')
     await expect(gold).toHaveCount(1)
-    await expect(gold).toHaveText('Send invoice')
+    await expect(gold).toHaveText('Invoice this')
     // Shortcuts only fire inside the command palette, so the button draws no key cap.
     await expect(banner.locator('kbd')).toHaveCount(0)
 
@@ -498,7 +581,9 @@ test.describe('job page on a desktop, redesigned', () => {
     })
     await page.getByRole('button', { name: /Add a note, photos or a task/ }).click()
     expect(await page.evaluate(() => (window as unknown as { __captureDetail?: unknown }).__captureDetail)).toEqual({ jobId: 'c-job1' })
-    await expect(page.getByRole('dialog', { name: 'Capture' })).toBeVisible()
+    // Capture is a screen (D57), opened on this job.
+    await expect(page).toHaveURL(/\/capture\?job=c-job1$/)
+    await expect(page.getByRole('heading', { level: 1, name: 'Capture' })).toBeVisible()
     expect(writes).toEqual([])
   })
 
@@ -524,9 +609,12 @@ test.describe('job page on a desktop, redesigned', () => {
     await expect(tabs.getByRole('tab', { name: 'Financials', exact: true })).toHaveAttribute('aria-selected', 'true')
     await expect(page).toHaveURL(/tab=financials/)
 
-    // The quote stage keeps its Quote tab, and it opens first.
-    await openDesktop(page, '/quotes/c-quote')
-    await expect(page.getByRole('tablist', { name: 'Job sections' }).getByRole('tab', { name: 'Quote', exact: true })).toHaveAttribute('aria-selected', 'true')
+    // A quote is its own screen (Phase 9, D53), the same one as on a phone,
+    // and its lines open first.
+    await page.goto('/quotes/q-quote', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    await expect(page.locator('.fhqt-page')).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByRole('heading', { level: 1, name: 'Parking lot repour' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Add a line' })).toBeVisible()
   })
 
   test('deep links and the action cue keep working', async ({ context, page }) => {
@@ -538,11 +626,62 @@ test.describe('job page on a desktop, redesigned', () => {
     await expect(cue).toBeVisible()
   })
 
-  test('the stage action opens the invoice sheet', async ({ context, page }) => {
+  test('Invoice this opens the new invoice screen with the balance', async ({ context, page }) => {
     await signIn(context)
     await openDesktop(page, '/jobs/c-job1')
-    await page.locator('.fhd-banner').getByRole('button', { name: 'Send invoice' }).click()
-    await expect(page.getByRole('dialog')).toBeVisible()
+    await page.locator('.fhd-banner').getByRole('button', { name: 'Invoice this' }).click()
+    await expect(page).toHaveURL(/\/invoices\/new\?job=c-job1$/)
+    await expect(page.getByRole('heading', { level: 1, name: 'New invoice' })).toBeVisible()
+    await expect(page.getByLabel('Amount')).toHaveValue('33100')
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+  })
+
+  test('the job page opens no dialog for payment, event, partner, complete or invoice', async ({ context, page }) => {
+    await signIn(context)
+    await openDesktop(page, '/jobs/c-job1')
+    const banner = page.locator('.fhd-banner')
+    await banner.getByRole('button', { name: 'Schedule', exact: true }).click()
+    await expect(page).toHaveURL(/\/schedule\/new\?job=c-job1$/)
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await page.goBack()
+    await expect(page.locator('[data-build-screen="SnowJobDetailBuild"]')).toBeVisible({ timeout: 30_000 })
+    const steps: [string, RegExp][] = [
+      ['Log payment', /\/jobs\/c-job1\/payment$/],
+      ['Invite partner', /\/jobs\/c-job1\/partner$/],
+      ['Mark complete', /\/jobs\/c-job1\/complete$/]
+    ]
+    for (const [name, url] of steps) {
+      await openMoreAboutJob(page)
+      await page.locator('#fhj-more-body').getByRole('button', { name, exact: true }).click()
+      await expect(page).toHaveURL(url)
+      await expect(page.getByRole('dialog')).toHaveCount(0)
+      await page.goBack()
+      await expect(page.locator('[data-build-screen="SnowJobDetailBuild"]')).toBeVisible({ timeout: 30_000 })
+    }
+    await banner.getByRole('button', { name: 'Invoice this' }).click()
+    await expect(page).toHaveURL(/\/invoices\/new\?job=c-job1$/)
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+  })
+
+  test('Delete asks with a second tap, not a sheet', async ({ context, page }) => {
+    await signIn(context)
+    const deletes: string[] = []
+    page.on('request', (req) => {
+      if (req.method() === 'DELETE' && req.url().includes('/rest/v1/fh_contacts')) deletes.push(req.url())
+    })
+    await openDesktop(page, '/jobs/c-job1')
+    const banner = page.locator('.fhd-banner')
+    await banner.getByRole('button', { name: 'Delete this job' }).click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    const again = banner.getByRole('button', { name: 'Tap again to delete' })
+    await expect(again).toBeVisible()
+    expect(deletes).toEqual([])
+    await again.click()
+    await expect.poll(() => deletes.length).toBe(1)
+    expect(deletes[0]).toMatch(/id=eq\.c-job1/)
+    // The job is gone, so the page leaves it for the jobs list.
+    await expect(page).toHaveURL(/\/(jobs|work)\b/)
+    await expect(page.locator('[data-build-screen="SnowJobDetailBuild"]')).toHaveCount(0)
   })
 
   test('rail notes from the job', async ({ context, page }) => {

@@ -1,0 +1,283 @@
+/*
+ * The New screen and the six create screens (Phase 9, decisions D57 to
+ * D59). Class prefix fhnew- (decision D41). Reads only --fh- tokens, so
+ * Day and Night follow on their own. Back, the fields, the choice chips'
+ * neighbours and the gold Save come from the fh components; this file
+ * lays out the title row, the body column, the client matches, the
+ * choice chips, the job list and the save band.
+ */
+
+.fhnew {
+  padding-bottom: 24px;
+}
+
+/* ---- Title row: back and the title ---- */
+.fhnew-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 8px 8px;
+}
+
+.fhnew-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-family: var(--fh-font-display);
+  font-size: 30px;
+  line-height: 36px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--fh-ink);
+  overflow-wrap: anywhere;
+}
+
+.fhnew-title:focus {
+  outline: none;
+}
+
+/* ---- The body: one column of fields ---- */
+.fhnew-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px var(--fh-gutter) 0;
+}
+
+/* A line under the title on the New screen. */
+.fhnew-lede {
+  margin: 0;
+  padding: 0 var(--fh-gutter) 8px;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--fh-ink-2);
+}
+
+/* ---- The New screen's rows ---- */
+.fhnew-rows {
+  margin: 0;
+  padding: 0 var(--fh-gutter);
+  list-style: none;
+}
+
+.fhnew-rows .fhc-row__title {
+  font-size: 20px;
+  line-height: 24px;
+}
+
+/* ---- Client matches under the field ---- */
+.fhnew-client {
+  position: relative;
+}
+
+.fhnew-client__list {
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--fh-edge);
+  border-radius: 12px;
+  background: var(--fh-paper);
+  overflow: hidden;
+}
+
+.fhnew-client__item + .fhnew-client__item {
+  border-top: 1px solid var(--fh-hairline);
+}
+
+.fhnew-client__pick {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  min-height: 48px;
+  margin: 0;
+  padding: 12px 16px;
+  border: 0;
+  background: transparent;
+  color: var(--fh-ink);
+  font-family: var(--fh-font-body);
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.fhnew-client__pick:hover {
+  background: var(--fh-wash);
+}
+
+.fhnew-client__pick:focus {
+  outline: none;
+}
+
+.fhnew-client__pick:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--fh-focus);
+}
+
+.fhnew-client__name {
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 500;
+}
+
+.fhnew-client__sub {
+  font-size: 14px;
+  line-height: 18px;
+  color: var(--fh-ink-2);
+}
+
+/* ---- Choice chips: source, job type, due ---- */
+.fhnew-choices {
+  margin: 4px 0 12px;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.fhnew-choices__label {
+  padding: 0;
+  margin-bottom: 8px;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--fh-ink-2);
+}
+
+.fhnew-choices__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fhnew-choice {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid var(--fh-edge-strong);
+  border-radius: 999px;
+  background: var(--fh-paper);
+  color: var(--fh-ink);
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.fhnew-choice.is-on {
+  border-color: var(--fh-ink);
+  background: var(--fh-ink);
+  color: var(--fh-canvas);
+}
+
+.fhnew-choice:focus {
+  outline: none;
+}
+
+.fhnew-choice:focus-visible {
+  box-shadow: 0 0 0 2px var(--fh-focus);
+}
+
+/* ---- The invoice's job list: one job picked, or none ---- */
+.fhnew-jobs {
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--fh-edge);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.fhnew-jobs li + li {
+  border-top: 1px solid var(--fh-hairline);
+}
+
+.fhnew-job {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  margin: 0;
+  padding: 12px 16px;
+  border: 0;
+  background: transparent;
+  color: var(--fh-ink);
+  font-family: var(--fh-font-body);
+  font-size: 16px;
+  line-height: 20px;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.fhnew-job.is-on {
+  background: var(--fh-wash);
+  font-weight: 600;
+}
+
+.fhnew-job:focus {
+  outline: none;
+}
+
+.fhnew-job:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--fh-focus);
+}
+
+.fhnew-job__money {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  color: var(--fh-ink-2);
+}
+
+.fhnew-note {
+  margin: -4px 0 12px;
+  font-family: var(--fh-font-body);
+  font-size: 14px;
+  line-height: 18px;
+  color: var(--fh-ink-2);
+}
+
+/* ---- What went wrong, above Save ---- */
+.fhnew-error {
+  margin: 0;
+  padding: 8px var(--fh-gutter) 0;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--fh-danger-ink);
+}
+
+/* ---- The one gold button ---- */
+.fhnew-save {
+  padding: 16px var(--fh-gutter) 0;
+}
+
+.fhnew-save .fhc-btn {
+  width: 100%;
+}
+
+/* ---- Desktop: one column, like the phone, in the shell ---- */
+@media (min-width: 900px) {
+  .fhnew {
+    max-width: 640px;
+    padding-bottom: 32px;
+  }
+
+  .fhnew-head {
+    padding: 12px var(--fh-gutter-desktop) 8px 20px;
+  }
+
+  .fhnew-body,
+  .fhnew-rows,
+  .fhnew-lede,
+  .fhnew-error,
+  .fhnew-save {
+    padding-left: var(--fh-gutter-desktop);
+    padding-right: var(--fh-gutter-desktop);
+  }
+}

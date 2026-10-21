@@ -7,11 +7,9 @@ import {
   ChevronLeft, Pencil, X as XIcon, Save as SaveIcon,
   Briefcase, Paperclip, Image as ImageIcon, Download,
   Phone, Mail, MapPin, Trash2, MessageSquare, Users,
-  Plus, FileText, Receipt, DollarSign, Clock
+  Plus, Receipt, DollarSign, Clock
 } from 'lucide-react'
 import { hapticTap, hapticMedium, hapticError } from '../lib/haptics.ts'
-import ActionSheet from '../components/ActionSheet.tsx'
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 import { SkeletonList } from '../components/Skeleton.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
 import { SegmentedTabs, Eyebrow, StampNumber } from '../components/v3'
@@ -21,7 +19,8 @@ import { useClientDetail, useInvalidateClientDetail, useInvalidateClients } from
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { toastError, toastInfo } from '../lib/toast.ts'
 import { stageColor, stageLabel } from '../lib/stages.ts'
-import StatementSheet from '../components/StatementSheet.tsx'
+import { recordRoute, type RecordKind } from '../lib/records.ts'
+import { useSecondTap } from '../lib/secondTap.ts'
 import { gatherStatement } from '../lib/statement.ts'
 import { rollupJobs } from '../lib/rollups.ts'
 import { composeClientTimeline, type TimelineEvent } from '../lib/clientTimeline.ts'
@@ -63,20 +62,22 @@ export default function ClientDetail() {
   const invalidateClients = useInvalidateClients()
   const client = bundle?.client ?? null
   const jobs = bundle?.jobs ?? []
+  const leads = bundle?.leads ?? []
+  const quotes = bundle?.quotes ?? []
+  const invoices = bundle?.invoices ?? []
   const notes = bundle?.notes ?? []
   const files = bundle?.files ?? []
   const payments = bundle?.payments ?? []
   const changeOrders = bundle?.changeOrders ?? []
   const [tab, setTab] = useState('overview')
+  // Every row on the Projects tab opens its own record (D53).
+  const openRecord = (kind: RecordKind, recordId: string) => navigate(recordRoute(kind, recordId))
   const [isEditing, setIsEditing] = useState(false)
-  // Destructive-confirm sheet state for delete client.
-  const [deleteOpen, setDeleteOpen] = useState(false)
+  // Deleting the client takes a second tap on the same button (D57).
+  const deleteTap = useSecondTap()
   const [deleting, setDeleting] = useState(false)
-  // "New" chooser sheet, spin up a quote / job / invoice under this client.
-  const [newOpen, setNewOpen] = useState(false)
-  const [creating, setCreating] = useState(false)
-  // Statement sheet, roll all open invoices into one document.
-  const [statementOpen, setStatementOpen] = useState(false)
+  // The statement is its own screen, every open invoice in one document.
+  const openStatement = () => navigate(`/clients/${id}/statement`)
 
   // Derived metrics, the shared rollup, NOT an inline copy. The inline
   // version this replaced excluded closed jobs and approved change
@@ -90,7 +91,7 @@ export default function ClientDetail() {
   const outstanding = rollup.outstanding
   const activeCount = rollup.activeCount
 
-  // Statement rollup, the SAME computation the StatementSheet/PDF use,
+  // Statement rollup, the SAME computation the statement screen and PDF use,
   // so the "Statement · $X across N properties" button always agrees
   // with the document it opens (previously the button showed
   // `outstanding`/`activeCount`, which use different stage sets and could
@@ -100,10 +101,10 @@ export default function ClientDetail() {
     [jobs, payments, changeOrders]
   )
 
-  // Open the destructive-confirm sheet. The header trash button hits this.
+  // The first tap arms the button, the second deletes.
   function requestDelete() {
-    if (!client?.id) return
-    setDeleteOpen(true)
+    if (!client?.id || deleting) return
+    deleteTap.tap(() => { void confirmDelete() })
   }
 
   // Writes match the client by id only. RLS keeps them inside the
@@ -115,7 +116,6 @@ export default function ClientDetail() {
     const { data, error } = await supabase.from('fh_clients').delete().eq('id', client.id).select('id')
     if (error || !data?.length) {
       setDeleting(false)
-      setDeleteOpen(false)
       toastError("Couldn't delete", error?.message || 'This client may already be gone. Refresh and try again.')
       return
     }
@@ -139,38 +139,12 @@ export default function ClientDetail() {
     setIsEditing(false)
   }
 
-  // Create a new deal under this client at the chosen kind, prefilled
-  // with the client's contact info, then jump straight into it. A quote
-  // lands on the Quote builder; an "invoice" (materials/quick job, no
-  // quote needed) is a job in v2, it lands on Financials where the
-  // Send Invoice flow lives; a job lands on Overview.
-  async function createDealForClient(stage: 'quote' | 'job' | 'invoice') {
-    if (!client?.id || !user?.id || creating) return
-    setCreating(true)
-    const payload = {
-      user_id: user.id,
-      name: client.name || 'New ' + (stage === 'invoice' ? 'invoice' : stage),
-      phone: client.phone || null,
-      email: client.email || null,
-      address: client.address || null,
-      amount: 0,
-      // 'invoice' isn't a stage anymore (pipeline v2), a quick
-      // standalone invoice is a job you bill immediately.
-      stage: stage === 'invoice' ? 'job' : stage,
-      client_id: client.id
-    }
-    const { data, error } = await supabase.from('fh_contacts').insert(payload).select().single()
-    if (error) {
-      setCreating(false)
-      toastError("Couldn't create", error.message)
-      return
-    }
-    hapticMedium()
-    await fetchClient()
-    setCreating(false)
-    setNewOpen(false)
-    const dest = stage === 'invoice' ? '?tab=financials' : ''
-    navigate(stage === 'quote' ? `/quotes/${data.id}?tab=quote` : `/jobs/${data.id}${dest}`)
+  // New for this client (SPEC D58): the New screen, with this client
+  // carried to every create screen, so no chooser opens here.
+  function openNew() {
+    if (!client?.id) return
+    hapticTap()
+    navigate(`/new?client=${encodeURIComponent(client.id)}`)
   }
 
   // Rules-of-hooks: useIsDesktop must run before any conditional
@@ -229,62 +203,10 @@ export default function ClientDetail() {
         <ClientTimeline jobs={jobs} payments={payments} notes={notes} files={files} onOpen={(jobId: any) => jobId && navigate(`/jobs/${jobId}`)} />
       )}
       {tab === 'projects' && (
-        <ProjectsList jobs={jobs} payments={payments} changeOrders={changeOrders} onOpen={(jobId: any) => navigate(`/jobs/${jobId}`)} />
+        <ProjectsList jobs={jobs} leads={leads} quotes={quotes} invoices={invoices} payments={payments} changeOrders={changeOrders} onOpen={openRecord} />
       )}
       {tab === 'files' && <FilesList rows={files} />}
       {tab === 'notes' && <NotesList notes={notes} />}
-    </>
-  )
-
-  // Shared overlays (delete confirm, new-deal chooser, statement sheet).
-  // Mounted in BOTH the desktop and mobile branches, they're portaled,
-  // so they render correctly wherever they sit in the tree. Previously
-  // these lived only in the mobile JSX, so on desktop the Delete / New
-  // deal / Statement buttons set state but nothing ever appeared.
-  const sheets = (
-    <>
-      <ActionSheet
-        open={deleteOpen}
-        title="Delete this client?"
-        accentWord="Delete"
-        sectionLabel="Destructive"
-        stepCount={1}
-        currentStep={1}
-        commitLabel={deleting ? 'Deleting…' : 'Delete client'}
-        commitBusy={deleting}
-        commitDisabled={deleting}
-        destructive
-        onClose={() => { if (!deleting) setDeleteOpen(false) }}
-        onCommit={confirmDelete}
-      >
-        <p style={{ margin: 0, color: 'var(--v3-text)', fontSize: '1rem', lineHeight: 1.45 }}>
-          Removing <strong>{client?.name || 'this client'}</strong>. Linked jobs keep running, they just lose the client link.
-        </p>
-      </ActionSheet>
-
-      <Drawer open={newOpen} onOpenChange={(o: any) => { if (!o && !creating) setNewOpen(false) }}>
-        <DrawerContent>
-          <DrawerHeader>
-            <DrawerTitle>New for {client.name}</DrawerTitle>
-            <DrawerDescription>Start a quote, a quick job, or a standalone invoice, all linked to this client.</DrawerDescription>
-          </DrawerHeader>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 16px max(16px, env(safe-area-inset-bottom))' }}>
-            <NewDealOption icon={FileText} label="New quote" sub="Build an estimate to send" onClick={() => createDealForClient('quote')} disabled={creating} />
-            <NewDealOption icon={Briefcase} label="New job" sub="Quick job, skip the quote" onClick={() => createDealForClient('job')} disabled={creating} />
-            <NewDealOption icon={Receipt} label="New invoice" sub="Materials or misc, no quote needed" onClick={() => createDealForClient('invoice')} disabled={creating} />
-          </div>
-        </DrawerContent>
-      </Drawer>
-
-      <StatementSheet
-        open={statementOpen}
-        onClose={() => setStatementOpen(false)}
-        client={client}
-        jobs={jobs}
-        payments={payments}
-        changeOrders={changeOrders}
-        userId={user?.id}
-      />
     </>
   )
 
@@ -303,14 +225,14 @@ export default function ClientDetail() {
           onTabChange={setTab}
           onBack={() => navigate('/clients')}
           onEdit={() => setIsEditing(!isEditing)}
-          onDelete={() => setDeleteOpen(true)}
-          onNewDeal={() => setNewOpen(true)}
-          onStatement={statementSummary.totalDue > 0 ? () => setStatementOpen(true) : undefined}
+          onDelete={requestDelete}
+          deleteArmed={deleteTap.armed}
+          onNewDeal={openNew}
+          onStatement={statementSummary.totalDue > 0 ? openStatement : undefined}
           isEditing={isEditing}
         >
           {tabBody}
         </SnowClientDetailBuild>
-        {sheets}
       </Suspense>
     )
   }
@@ -338,9 +260,28 @@ export default function ClientDetail() {
           >
             <Pencil size={16} />
           </IconBtn>
-          <IconBtn onClick={() => { hapticError(); requestDelete() }} ariaLabel="Delete client" tone="danger">
-            <Trash2 size={16} />
-          </IconBtn>
+          {deleteTap.armed ? (
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.97 }}
+              onClick={() => { hapticError(); requestDelete() }}
+              disabled={deleting}
+              aria-label="Tap again to delete"
+              title={`Tap again to delete ${client?.name || 'this client'}. Linked jobs keep running, they just lose the client link.`}
+              style={{
+                minHeight: 40, padding: '0 12px', borderRadius: 10,
+                background: 'rgba(192, 57, 43, 0.10)', border: '1px solid color-mix(in srgb, var(--v3-danger) 35%, transparent)',
+                color: 'var(--v3-danger-text)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
+                whiteSpace: 'nowrap', cursor: 'pointer', WebkitTapHighlightColor: 'transparent'
+              }}
+            >
+              Tap again to delete
+            </motion.button>
+          ) : (
+            <IconBtn onClick={() => { hapticError(); requestDelete() }} ariaLabel="Delete client" tone="danger" disabled={deleting}>
+              <Trash2 size={16} />
+            </IconBtn>
+          )}
         </div>
       </div>
 
@@ -466,7 +407,7 @@ export default function ClientDetail() {
         <motion.button
           type="button"
           whileTap={{ scale: 0.99 }}
-          onClick={() => { hapticTap(); setNewOpen(true) }}
+          onClick={openNew}
           style={{
             width: '100%',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
@@ -488,7 +429,7 @@ export default function ClientDetail() {
           <motion.button
             type="button"
             whileTap={{ scale: 0.99 }}
-            onClick={() => { hapticTap(); setStatementOpen(true) }}
+            onClick={() => { hapticTap(); openStatement() }}
             style={{
               width: '100%',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
@@ -525,67 +466,12 @@ export default function ClientDetail() {
           <ClientTimeline jobs={jobs} payments={payments} notes={notes} files={files} onOpen={(jobId: any) => jobId && navigate(`/jobs/${jobId}`)} />
         )}
         {tab === 'projects' && (
-          <ProjectsList jobs={jobs} payments={payments} changeOrders={changeOrders} onOpen={(jobId: any) => navigate(`/jobs/${jobId}`)} />
+          <ProjectsList jobs={jobs} leads={leads} quotes={quotes} invoices={invoices} payments={payments} changeOrders={changeOrders} onOpen={openRecord} />
         )}
         {tab === 'files' && <FilesList rows={files} />}
         {tab === 'notes' && <NotesList notes={notes} />}
       </div>
-
-      {sheets}
     </motion.div>
-  )
-}
-
-/* ============================================================
-   NewDealOption, one row in the "New for {client}" chooser sheet
-   ============================================================ */
-
-function NewDealOption({ icon: Icon, label, sub, onClick, disabled }: any) {
-  return (
-    <motion.button
-      type="button"
-      whileTap={disabled ? undefined : { scale: 0.99 }}
-      onClick={() => { if (!disabled) { hapticTap(); onClick?.() } }}
-      disabled={disabled}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 12,
-        width: '100%', textAlign: 'left',
-        padding: '12px 16px', borderRadius: 10,
-        background: 'var(--v3-surface-2)',
-        border: '1px solid var(--v3-border-strong)',
-        color: 'var(--v3-text)',
-        cursor: disabled ? 'wait' : 'pointer',
-        opacity: disabled ? 0.6 : 1,
-        WebkitTapHighlightColor: 'transparent'
-      }}
-    >
-      <span aria-hidden="true" style={{
-        flexShrink: 0,
-        width: 40, height: 40, borderRadius: 10,
-        background: 'var(--v3-primary-soft)',
-        border: '1px solid color-mix(in srgb, var(--v3-primary) 28%, transparent)',
-        color: 'var(--v3-primary-text)',
-        display: 'grid', placeItems: 'center'
-      }}>
-        <Icon size={18} />
-      </span>
-      <span style={{ minWidth: 0, flex: 1 }}>
-        <span style={{
-          display: 'block',
-          fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
-          color: 'var(--v3-text)', lineHeight: 1.2
-        }}>
-          {label}
-        </span>
-        <span style={{
-          display: 'block', marginTop: 2,
-          fontFamily: 'var(--font-body)', fontSize: 12,
-          color: 'var(--v3-text-muted)', lineHeight: 1.3
-        }}>
-          {sub}
-        </span>
-      </span>
-    </motion.button>
   )
 }
 
@@ -1137,13 +1023,6 @@ function PipelineDistribution({ jobs, payments = [], onJump }: any) {
    chips + per-row paid/balance bar + relative-time stamp.
    ============================================================ */
 
-const PROJECT_FILTERS = [
-  { id: 'all',    label: 'All' },
-  { id: 'active', label: 'Active', match: (j: any) => ['lead', 'quote', 'job', 'invoice'].includes(j.stage as string) },
-  { id: 'won',    label: 'Complete', match: (j: any) => j.stage === 'closed' },
-  { id: 'lost',   label: 'Lost',   match: (j: any) => j.stage === 'lost' }
-]
-
 function relTime(input: any) {
   if (!input) return ''
   const d = input instanceof Date ? input : new Date(input)
@@ -1249,9 +1128,117 @@ function timelineDate(iso: string) {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...(sameYear ? {} : { year: 'numeric' }) })
 }
 
-function ProjectsList({ jobs, payments = [], changeOrders = [], onOpen }: any) {
-  const [filter, setFilter] = useState('all')
+const RECORD_ROW_STYLE = {
+  width: '100%',
+  position: 'relative',
+  display: 'flex', flexDirection: 'column', gap: 12,
+  padding: '12px 12px 12px 24px',
+  borderRadius: 10,
+  background: 'var(--v3-bg)',
+  border: '1px solid var(--v3-border-strong)',
+  boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 1px 2px rgba(20, 20, 20, 0.22)',
+  textAlign: 'left',
+  cursor: 'pointer',
+  color: 'var(--v3-text)',
+  overflow: 'hidden',
+  WebkitTapHighlightColor: 'transparent'
+} as const
 
+const TITLE_STYLE = {
+  fontFamily: 'var(--font-body)',
+  fontSize: 14, fontWeight: 700,
+  letterSpacing: 0,
+  color: 'var(--v3-text)',
+  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+} as const
+
+const DETAIL_STYLE = {
+  marginTop: 3,
+  fontFamily: 'var(--font-body)',
+  fontSize: 12,
+  color: 'var(--v3-text-muted)',
+  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+} as const
+
+const AMOUNT_STYLE = {
+  fontFamily: 'var(--font-display)',
+  fontSize: 16,
+  color: 'var(--v3-primary-text)',
+  letterSpacing: 0,
+  fontVariantNumeric: 'tabular-nums',
+  lineHeight: 1
+} as const
+
+/** The status of a lead, quote or invoice in a word. */
+function statusWord(status: string | null | undefined) {
+  const s = String(status || '').replace(/_/g, ' ').trim()
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''
+}
+
+function RecordGroup({ heading, count, children }: { heading: string; count: number; children: any }) {
+  const id = `fh-client-projects-${heading.toLowerCase()}`
+  return (
+    <section aria-labelledby={id} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <h3 id={id} style={{ margin: 0, display: 'flex', alignItems: 'baseline', gap: 8, fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, color: 'var(--v3-text)', letterSpacing: 0 }}>
+        {heading}
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--v3-text-muted)', fontVariantNumeric: 'tabular-nums' }}>{count}</span>
+      </h3>
+      {count === 0
+        ? <div style={{ fontSize: 12, color: 'var(--v3-text-muted)' }}>None yet.</div>
+        : <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>{children}</ul>}
+    </section>
+  )
+}
+
+/** One row of a group: a rail in the record's colour, a title, a detail line, a figure and a word. */
+function RecordRow({ color, title, detail, figure, word, stamp, onOpen }: any) {
+  return (
+    <li>
+      <motion.button
+        type="button"
+        whileTap={{ scale: 0.99 }}
+        whileHover={{ y: -2, backgroundColor: 'var(--v3-surface-3)' }}
+        transition={{ type: 'spring', stiffness: 620, damping: 28 }}
+        onClick={() => { hapticTap(); onOpen() }}
+        style={RECORD_ROW_STYLE}
+      >
+        <span aria-hidden="true" style={{
+          position: 'absolute',
+          left: 0, top: 12, bottom: 12,
+          width: 3,
+          borderRadius: '0 3px 3px 0',
+          background: color,
+          boxShadow: `0 0 12px ${color}66`
+        }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={TITLE_STYLE}>{title}</div>
+            <div style={DETAIL_STYLE}>{detail || '\u2003'}</div>
+          </div>
+          <div style={{ flexShrink: 0, textAlign: 'right' }}>
+            {figure != null && <div style={AMOUNT_STYLE}>{figure}</div>}
+            {word && (
+              <Eyebrow as="div" style={{ marginTop: figure != null ? 4 : 0, color }}>
+                {word}
+              </Eyebrow>
+            )}
+          </div>
+        </div>
+        {stamp && (
+          <Eyebrow as="div" style={{ color: 'var(--v3-text-faint, var(--v3-text-muted))', fontVariantNumeric: 'tabular-nums' }}>
+            {updatedLabel(stamp)}
+          </Eyebrow>
+        )}
+      </motion.button>
+    </li>
+  )
+}
+
+/* ============================================================
+   ProjectsList: the client's four kinds of record (D53), Leads,
+   Quotes, Jobs and Invoices, each row opening its own screen.
+   ============================================================ */
+function ProjectsList({ jobs, leads = [], quotes = [], invoices = [], payments = [], changeOrders = [], onOpen }: any) {
   const paidByJob = useMemo(() => {
     const m = new Map()
     for (const p of payments || []) {
@@ -1273,192 +1260,146 @@ function ProjectsList({ jobs, payments = [], changeOrders = [], onOpen }: any) {
     return m
   }, [changeOrders])
 
-  const filtered = useMemo(() => {
-    if (filter === 'all') return jobs
-    const cfg = PROJECT_FILTERS.find((f) => f.id === filter)
-    return cfg ? jobs.filter(cfg.match) : jobs
-  }, [jobs, filter])
-
-  if (jobs.length === 0) {
-    return <EmptyCard label="No projects linked to this client yet." />
+  if (jobs.length === 0 && leads.length === 0 && quotes.length === 0 && invoices.length === 0) {
+    return <EmptyCard label="No records linked to this client yet." />
   }
 
   return (
-    <div style={{ padding: '12px 0 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div style={{ padding: '12px 0 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <RecordGroup heading="Leads" count={leads.length}>
+        {leads.map((l: any) => (
+          <RecordRow
+            key={l.id}
+            color={stageColor('lead')}
+            title={l.title || 'Untitled lead'}
+            detail={[l.job_type, l.follow_up_on ? `Follow up ${new Date(`${l.follow_up_on}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : null].filter(Boolean).join(' · ')}
+            word={statusWord(l.status)}
+            stamp={relTime(l.updated_at)}
+            onOpen={() => onOpen('lead', l.id)}
+          />
+        ))}
+      </RecordGroup>
 
-      {/* Filter chips, dispatch-state pill pattern */}
-      <div role="tablist" aria-label="Project filter" style={{
-        display: 'flex', gap: 8, padding: 4,
-        borderRadius: 10,
-        background: 'var(--v3-surface)',
-        border: '1px solid var(--v3-border)',
-        boxShadow: 'inset 0 1px 0 var(--v3-glass-tint)'
-      }}>
-        {PROJECT_FILTERS.map((f) => {
-          const active = filter === f.id
-          const count = f.id === 'all' ? jobs.length : jobs.filter(f.match).length
+      <RecordGroup heading="Quotes" count={quotes.length}>
+        {quotes.map((q: any) => (
+          <RecordRow
+            key={q.id}
+            color={stageColor('quote')}
+            title={q.title || 'Untitled quote'}
+            detail={q.job_id ? 'Made into a job' : q.sent_at ? `Sent ${new Date(q.sent_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : null}
+            figure={money(q.amount)}
+            word={statusWord(q.status)}
+            stamp={relTime(q.updated_at)}
+            onOpen={() => onOpen('quote', q.id)}
+          />
+        ))}
+      </RecordGroup>
+
+      <RecordGroup heading="Jobs" count={jobs.length}>
+        {jobs.map((j: any) => {
+          const c = stageColor(j.stage)
+          const contract = Number(j.amount || 0) + (coByJob.get(j.id) || 0)
+          const paid = paidByJob.get(j.id) || 0
+          const billable = j.stage === 'job' || j.stage === 'invoice' || j.stage === 'closed'
+          // Under 50 cents is rounding dust, as in rollups.ts.
+          const balance = Math.max(0, contract - paid)
+          const due = balance > 0.5
+          const pct = contract > 0 ? Math.min(100, Math.round((paid / contract) * 100)) : 0
+          const stamp = relTime(j.updated_at)
           return (
-            <button
-              key={f.id}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => { hapticTap(); setFilter(f.id) }}
-              style={{
-                flex: 1,
-                padding: '8px 12px',
-                borderRadius: 10,
-                border: 'none',
-                background: active ? 'var(--v3-primary)' : 'transparent',
-                color: active ? 'var(--v3-on-primary)' : 'var(--v3-text-muted)',
-                fontFamily: 'var(--font-body)',
-                fontSize: 12, fontWeight: 700,
-                letterSpacing: 0,
-                fontVariantNumeric: 'tabular-nums',
-                cursor: 'pointer',
-                WebkitTapHighlightColor: 'transparent',
-                transition: 'background 0.15s, color 0.15s'
-              }}
-            >
-              {f.label} <span style={{ opacity: 0.65, fontWeight: 600 }}>{count}</span>
-            </button>
-          )
-        })}
-      </div>
+            <li key={j.id}>
+              <motion.button
+                type="button"
+                whileTap={{ scale: 0.99 }}
+                whileHover={{ y: -2, backgroundColor: 'var(--v3-surface-3)' }}
+                transition={{ type: 'spring', stiffness: 620, damping: 28 }}
+                onClick={() => { hapticTap(); onOpen('job', j.id) }}
+                style={RECORD_ROW_STYLE}
+              >
+                <span aria-hidden="true" style={{
+                  position: 'absolute',
+                  left: 0, top: 12, bottom: 12,
+                  width: 3,
+                  borderRadius: '0 3px 3px 0',
+                  background: c,
+                  boxShadow: `0 0 12px ${c}66`
+                }} />
 
-      {filtered.length === 0 ? (
-        <EmptyCard label="No projects in this filter." />
-      ) : (
-        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {filtered.map((j: any) => {
-            const c = stageColor(j.stage)
-            const contract = Number(j.amount || 0) + (coByJob.get(j.id) || 0)
-            const paid = paidByJob.get(j.id) || 0
-            const billable = j.stage === 'job' || j.stage === 'invoice' || j.stage === 'closed'
-            // Under 50 cents is rounding dust, as in rollups.ts.
-            const balance = Math.max(0, contract - paid)
-            const due = balance > 0.5
-            const pct = contract > 0 ? Math.min(100, Math.round((paid / contract) * 100)) : 0
-            const stamp = relTime(j.updated_at)
-            return (
-              <li key={j.id}>
-                <motion.button
-                  type="button"
-                  whileTap={{ scale: 0.99 }}
-                  whileHover={{ y: -2, backgroundColor: 'var(--v3-surface-3)' }}
-                  transition={{ type: 'spring', stiffness: 620, damping: 28 }}
-                  onClick={() => { hapticTap(); onOpen(j.id) }}
-                  style={{
-                    width: '100%',
-                    position: 'relative',
-                    display: 'flex', flexDirection: 'column', gap: 12,
-                    padding: '12px 12px 12px 24px',
-                    borderRadius: 10,
-                    background: 'var(--v3-bg)',
-                    border: '1px solid var(--v3-border-strong)',
-                    boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 1px 2px rgba(20, 20, 20, 0.22)',
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    color: 'var(--v3-text)',
-                    overflow: 'hidden',
-                    WebkitTapHighlightColor: 'transparent'
-                  }}
-                >
-                  <span aria-hidden="true" style={{
-                    position: 'absolute',
-                    left: 0, top: 12, bottom: 12,
-                    width: 3,
-                    borderRadius: '0 3px 3px 0',
-                    background: c,
-                    boxShadow: `0 0 12px ${c}66`
-                  }} />
+                {/* Row 1, title + amount */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={TITLE_STYLE}>{j.name || 'Untitled'}</div>
+                    <div style={DETAIL_STYLE}>{j.job_title || j.job_type || '\u2003'}</div>
+                  </div>
+                  <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                    <div style={AMOUNT_STYLE}>{money(contract)}</div>
+                    <Eyebrow as="div" style={{ marginTop: 4, color: c }}>
+                      {stageLabel(String(j.stage || ''))}
+                    </Eyebrow>
+                  </div>
+                </div>
 
-                  {/* Row 1, title + amount */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
+                {/* Row 2, paid bar (only when there's money to track) */}
+                {contract > 0 && billable && (
+                  <div>
+                    <div style={{
+                      height: 4, borderRadius: 10,
+                      background: 'var(--v3-glass-tint-2)',
+                      overflow: 'hidden'
+                    }}>
                       <div style={{
-                        fontFamily: 'var(--font-body)',
-                        fontSize: 14, fontWeight: 700,
-                        letterSpacing: 0,
-                        color: 'var(--v3-text)',
-                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-                      }}>
-                        {j.name || 'Untitled'}
-                      </div>
-                      <div style={{
-                        marginTop: 3,
-                        fontFamily: 'var(--font-body)',
-                        fontSize: 12,
-                        color: 'var(--v3-text-muted)',
-                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-                      }}>
-                        {j.job_title || j.job_type || '\u2003'}
-                      </div>
+                        width: `${pct}%`,
+                        height: '100%',
+                        background: pct >= 100 ? 'var(--v3-success-bright, #2D7A4F)' : c,
+                        borderRadius: 10
+                      }} />
                     </div>
-                    <div style={{ flexShrink: 0, textAlign: 'right' }}>
-                      <div style={{
-                        fontFamily: 'var(--font-display)',
-                        fontSize: 16,
-                        color: 'var(--v3-primary-text)',
-                        letterSpacing: 0,
-                        fontVariantNumeric: 'tabular-nums',
-                        lineHeight: 1
-                      }}>
-                        {money(contract)}
-                      </div>
-                      <Eyebrow as="div" style={{ marginTop: 4, color: c }}>
-                        {stageLabel(String(j.stage || ''))}
-                      </Eyebrow>
+                    <div style={{
+                      marginTop: 6,
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      gap: 8,
+                      fontFamily: 'var(--font-body)',
+                      fontSize: 12, fontWeight: 600,
+                      letterSpacing: 0,
+                      color: 'var(--v3-text-muted)',
+                      fontVariantNumeric: 'tabular-nums'
+                    }}>
+                      <span>
+                        {money(paid)} paid{paid > 0 ? ` · ${pct}%` : ''}
+                      </span>
+                      <span style={{ color: due ? 'var(--v3-danger-text)' : 'var(--v3-success-text)' }}>
+                        {due ? `${money(balance)} due` : 'Paid in full'}
+                      </span>
                     </div>
                   </div>
+                )}
 
-                  {/* Row 2, paid bar (only when there's money to track) */}
-                  {contract > 0 && billable && (
-                    <div>
-                      <div style={{
-                        height: 4, borderRadius: 10,
-                        background: 'var(--v3-glass-tint-2)',
-                        overflow: 'hidden'
-                      }}>
-                        <div style={{
-                          width: `${pct}%`,
-                          height: '100%',
-                          background: pct >= 100 ? 'var(--v3-success-bright, #2D7A4F)' : c,
-                          borderRadius: 10
-                        }} />
-                      </div>
-                      <div style={{
-                        marginTop: 6,
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        gap: 8,
-                        fontFamily: 'var(--font-body)',
-                        fontSize: 12, fontWeight: 600,
-                        letterSpacing: 0,
-                        color: 'var(--v3-text-muted)',
-                        fontVariantNumeric: 'tabular-nums'
-                      }}>
-                        <span>
-                          {money(paid)} paid{paid > 0 ? ` · ${pct}%` : ''}
-                        </span>
-                        <span style={{ color: due ? 'var(--v3-danger-text)' : 'var(--v3-success-text)' }}>
-                          {due ? `${money(balance)} due` : 'Paid in full'}
-                        </span>
-                      </div>
-                    </div>
-                  )}
+                {/* Row 3, last-touch stamp */}
+                {stamp && (
+                  <Eyebrow as="div" style={{ color: 'var(--v3-text-faint, var(--v3-text-muted))', fontVariantNumeric: 'tabular-nums' }}>
+                    {updatedLabel(stamp)}
+                  </Eyebrow>
+                )}
+              </motion.button>
+            </li>
+          )
+        })}
+      </RecordGroup>
 
-                  {/* Row 3, last-touch stamp */}
-                  {stamp && (
-                    <Eyebrow as="div" style={{ color: 'var(--v3-text-faint, var(--v3-text-muted))', fontVariantNumeric: 'tabular-nums' }}>
-                      {updatedLabel(stamp)}
-                    </Eyebrow>
-                  )}
-                </motion.button>
-              </li>
-            )
-          })}
-        </ul>
-      )}
+      <RecordGroup heading="Invoices" count={invoices.length}>
+        {invoices.map((inv: any) => (
+          <RecordRow
+            key={inv.id}
+            color={stageColor('invoice')}
+            title={inv.title || `Invoice ${inv.sequence_number || ''}`.trim()}
+            detail={inv.due_at ? `Due ${new Date(inv.due_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : null}
+            figure={money(inv.amount)}
+            word={statusWord(inv.status)}
+            stamp={relTime(inv.updated_at || inv.created_at)}
+            onOpen={() => onOpen('invoice', inv.id)}
+          />
+        ))}
+      </RecordGroup>
     </div>
   )
 }

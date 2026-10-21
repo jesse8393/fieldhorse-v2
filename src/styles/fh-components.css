@@ -65,11 +65,6 @@
   to { opacity: 1; }
 }
 
-@keyframes fhc-fade-out {
-  from { opacity: 1; }
-  to { opacity: 0; }
-}
-
 /* ================================================================
    Button
    ================================================================ */
@@ -1445,124 +1440,6 @@
 }
 
 /* ================================================================
-   Sheet (vaul)
-   ================================================================ */
-
-.fhc-sheet-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-modal);
-  background: rgba(22, 20, 15, 0.45);
-}
-
-.fhc-sheet {
-  position: fixed;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  z-index: var(--z-modal);
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  max-width: 640px;
-  max-height: calc(100dvh - 48px);
-  margin: 0 auto;
-  border: 1px solid var(--fh-hairline);
-  border-bottom: 0;
-  border-radius: 22px 22px 0 0;
-  box-sizing: border-box;
-  background: var(--fh-paper);
-  box-shadow: var(--fh-shadow-overlay);
-  color: var(--fh-ink);
-  font-family: var(--fh-font-body);
-}
-
-.fhc-sheet:focus,
-.fhc-sheet:focus-visible {
-  outline: none !important;
-}
-
-/* Rise in 280 ms, leave in 180 ms (spec 5.7). vaul sets 500 ms. */
-.fhc-sheet[data-vaul-drawer][data-state='open'],
-.fhc-sheet-overlay[data-vaul-overlay][data-state='open'] {
-  animation-duration: var(--dur-sheet-in);
-  animation-timing-function: var(--ease-out);
-}
-
-.fhc-sheet[data-vaul-drawer][data-state='closed'],
-.fhc-sheet-overlay[data-vaul-overlay][data-state='closed'] {
-  animation-duration: var(--dur-sheet-out);
-  animation-timing-function: var(--ease-mechanical);
-}
-
-.fhc-sheet__grabber {
-  flex: none;
-  width: 40px;
-  height: 4px;
-  margin: 8px auto 0;
-  border-radius: 999px;
-  background: var(--fh-edge);
-}
-
-.fhc-sheet__head {
-  flex: none;
-  display: grid;
-  gap: 4px;
-  padding: 8px 20px 0;
-}
-
-.fhc-sheet__titlebar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-}
-
-.fhc-sheet__title {
-  flex: 1;
-  min-width: 0;
-  margin: 0;
-  font-family: var(--fh-font-display);
-  font-size: 30px;
-  line-height: 32px;
-  font-weight: 600;
-  letter-spacing: 0;
-  color: var(--fh-ink);
-}
-
-.fhc-sheet__close {
-  margin-right: -8px;
-}
-
-.fhc-sheet__desc {
-  margin: 0;
-  font-size: 15px;
-  line-height: 20px;
-  color: var(--fh-ink-2);
-}
-
-.fhc-sheet__body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: 16px 20px max(20px, env(safe-area-inset-bottom, 0px));
-}
-
-.fhc-sheet.has-footer .fhc-sheet__body {
-  padding-bottom: 16px;
-}
-
-.fhc-sheet__foot {
-  flex: none;
-  display: flex;
-  gap: 12px;
-  padding: 12px 20px max(20px, env(safe-area-inset-bottom, 0px));
-  border-top: 1px solid var(--fh-hairline-soft);
-  background: var(--fh-paper);
-}
-
-/* ================================================================
    Reduced motion: fades only, shimmer and pulse hold still
    ================================================================ */
 
@@ -1587,15 +1464,6 @@
 
   .fhc-sync--syncing .fhc-sync__dot {
     animation: none;
-  }
-
-  /* vaul names its slide animations at five attributes deep. */
-  .fhc-sheet[data-vaul-drawer][data-vaul-drawer-direction='bottom'][data-vaul-snap-points='false'][data-state='open'] {
-    animation-name: fhc-fade-in;
-  }
-
-  .fhc-sheet[data-vaul-drawer][data-vaul-drawer-direction='bottom'][data-vaul-snap-points='false'][data-state='closed'] {
-    animation-name: fhc-fade-out;
   }
 }
 
@@ -1739,10 +1607,6 @@
   display: grid;
   gap: 12px;
   min-width: 0;
-}
-
-.fhc-ds__stack--loose {
-  gap: 20px;
 }
 
 .fhc-ds__grow {

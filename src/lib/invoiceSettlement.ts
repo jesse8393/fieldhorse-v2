@@ -305,6 +305,9 @@ export function allocateInvoiceDue({ invoices, payments, contractTotal = null, a
  * allocateInvoiceDue for many jobs at once: the invoices and payments are
  * grouped by contact_id and each job is allocated on its own.
  * contractFor gives a job's contract, or null when it is unknown.
+ *
+ * An invoice with no job (D62) is a contract of its own amount: it is
+ * allocated alone, with the payments linked to it.
  */
 export function amountsDueByInvoice({ invoices, payments, contractFor }: {
   invoices: DueInvoice[] | null | undefined
@@ -312,15 +315,28 @@ export function amountsDueByInvoice({ invoices, payments, contractFor }: {
   contractFor: (jobId: string) => number | null
 }): Map<string, number> {
   const invoicesByJob = new Map<string, DueInvoice[]>()
+  const alone: DueInvoice[] = []
   for (const inv of invoices || []) {
-    if (!inv?.contact_id) continue
+    if (!inv?.contact_id) {
+      if (inv?.id) alone.push(inv)
+      continue
+    }
     const list = invoicesByJob.get(inv.contact_id)
     if (list) list.push(inv)
     else invoicesByJob.set(inv.contact_id, [inv])
   }
   const paymentsByJob = new Map<string, DuePayment[]>()
+  const paymentsByInvoice = new Map<string, DuePayment[]>()
   for (const p of payments || []) {
-    if (!p?.contact_id || !invoicesByJob.has(p.contact_id)) continue
+    if (!p?.contact_id) {
+      if (p?.invoice_id) {
+        const list = paymentsByInvoice.get(p.invoice_id)
+        if (list) list.push(p)
+        else paymentsByInvoice.set(p.invoice_id, [p])
+      }
+      continue
+    }
+    if (!invoicesByJob.has(p.contact_id)) continue
     const list = paymentsByJob.get(p.contact_id)
     if (list) list.push(p)
     else paymentsByJob.set(p.contact_id, [p])
@@ -328,6 +344,10 @@ export function amountsDueByInvoice({ invoices, payments, contractFor }: {
   const out = new Map<string, number>()
   for (const [jobId, list] of invoicesByJob) {
     const due = allocateInvoiceDue({ invoices: list, payments: paymentsByJob.get(jobId) ?? [], contractTotal: contractFor(jobId) })
+    for (const [id, owed] of due) out.set(id, owed)
+  }
+  for (const inv of alone) {
+    const due = allocateInvoiceDue({ invoices: [inv], payments: paymentsByInvoice.get(inv.id) ?? [], contractTotal: toCents(inv.amount) / 100 })
     for (const [id, owed] of due) out.set(id, owed)
   }
   return out

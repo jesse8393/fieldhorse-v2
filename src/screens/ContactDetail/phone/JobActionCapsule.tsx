@@ -29,7 +29,8 @@ import './job-phone.css'
 // pull it off the viewport. Like the dock, it steps aside while the
 // on screen keyboard is open, so it never rides up over a field.
 
-type StageAction = { label: string; onClick: () => void }
+// `hint` sits under the button while it is armed (Tap again to reopen).
+type StageAction = { label: string; onClick: () => void; hint?: string }
 
 export type JobActionCapsuleProps =
   | {
@@ -117,14 +118,18 @@ export default function JobActionCapsule(props: JobActionCapsuleProps) {
         onClick={() => { hapticTap(); onVoice() }}
       />
       {action && (
-        <Button
-          variant="primary"
-          size="lg"
-          className="fhj-capsule__primary"
-          onClick={() => { hapticTap(); action.onClick() }}
-        >
-          {action.label}
-        </Button>
+        <div className="fhj-capsule__send">
+          <Button
+            variant="primary"
+            size="lg"
+            className="fhj-capsule__primary"
+            aria-describedby={action.hint ? hintId : undefined}
+            onClick={() => { hapticTap(); action.onClick() }}
+          >
+            {action.label}
+          </Button>
+          {action.hint && <span id={hintId} className="fhj-capsule__hint">{action.hint}</span>}
+        </div>
       )}
     </div>,
     document.body

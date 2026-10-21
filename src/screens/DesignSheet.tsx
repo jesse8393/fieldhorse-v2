@@ -25,14 +25,12 @@ import {
   OnyxStage,
   PhotoCard,
   Row,
-  Sheet,
   Skeleton,
   SkeletonRows,
   SpineEntry,
   StageRail,
   SyncPill,
-  VaultCard,
-  useSheet
+  VaultCard
 } from '../components/fh/index.ts'
 
 // Development only (/design, registered in App.tsx under import.meta.env.DEV).
@@ -295,32 +293,12 @@ function ListHead({ title, meta }: { title: string; meta: string }) {
   )
 }
 
-/* Cancel inside a sheet: asks first when there are unsaved changes. */
-function SheetCancel() {
-  const { requestClose } = useSheet()
-  return (
-    <Button variant="quiet" size="lg" onClick={requestClose}>
-      Cancel
-    </Button>
-  )
-}
-
 /* ------------------------------------------------------------------
    One column of specimens
    ------------------------------------------------------------------ */
 
-function Board({ theme, photos, sheetContainer }: { theme: Theme; photos: SamplePhotos | null; sheetContainer: HTMLElement | null }) {
+function Board({ theme, photos }: { theme: Theme; photos: SamplePhotos | null }) {
   const id = (name: string) => `fhc-ds-${theme}-${name}`
-  const [sheetOpen, setSheetOpen] = useState(false)
-  const [amount, setAmount] = useState('')
-  const [method, setMethod] = useState('')
-  const [note, setNote] = useState('')
-  const dirty = amount !== '' || method !== '' || note !== ''
-  const resetSheet = () => {
-    setAmount('')
-    setMethod('')
-    setNote('')
-  }
 
   return (
     <div className="fhc-ds__board">
@@ -805,65 +783,13 @@ function Board({ theme, photos, sheetContainer }: { theme: Theme; photos: Sample
         </Spec>
       </Group>
 
-      {/* ---------------- Sheet ---------------- */}
-      <Group id={id('sheet')} title="Sheet" note="Swipe down, Escape, a tap outside or Close all dismiss it. Type something first and it asks before it lets go.">
-        <Spec label="Bottom sheet with a form" wide>
+      {/* ---------------- Screens, not sheets ---------------- */}
+      <Group id={id('screens')} title="Screens, not sheets" note="Every create, edit, choose and confirm is a full screen with its own route (SPEC D57): Back and the title in the header, the fields, one gold button at the end (screens/new/CreateShell.tsx). A destructive action confirms with a second tap on the same button, which reads Tap again to delete for four seconds (lib/secondTap.ts). The desktop command palette is the one keyboard overlay that stays.">
+        <Spec label="A create screen" wide>
           <div className="fhc-ds__row">
-            <Button onClick={() => setSheetOpen(true)} data-testid={`open-sheet-${theme}`}>Log a payment</Button>
-            <span className="fhc-ds__note">{dirty ? 'Unsaved changes in the sheet.' : 'Nothing typed yet.'}</span>
+            <Button to="/leads/new">Open New lead</Button>
+            <span className="fhc-ds__note">Opens the real screen; there is no sheet to demonstrate.</span>
           </div>
-          <Sheet
-            open={sheetOpen}
-            onOpenChange={(next) => {
-              setSheetOpen(next)
-              if (!next) resetSheet()
-            }}
-            title="Log a payment"
-            description="Whitcomb garage slab, $6,187.50 balance"
-            dirty={dirty}
-            container={sheetContainer}
-            footer={
-              <>
-                <SheetCancel />
-                <Button
-                  variant="primary"
-                  size="lg"
-                  className="fhc-ds__grow"
-                  disabled={!amount}
-                  onClick={() => {
-                    setSheetOpen(false)
-                    resetSheet()
-                  }}
-                >
-                  Save payment
-                </Button>
-              </>
-            }
-          >
-            <div className="fhc-ds__stack fhc-ds__stack--loose">
-              <Field
-                label="Amount"
-                inputMode="decimal"
-                placeholder="6187.50"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                helper="The balance is $6,187.50."
-              />
-              <Field
-                label="Paid by"
-                placeholder="Card, check, cash or ACH"
-                value={method}
-                onChange={(e) => setMethod(e.target.value)}
-              />
-              <Field
-                label="Note"
-                multiline
-                placeholder="Anything the office should know"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-              />
-            </div>
-          </Sheet>
         </Spec>
       </Group>
     </div>
@@ -873,7 +799,6 @@ function Board({ theme, photos, sheetContainer }: { theme: Theme; photos: Sample
 export default function DesignSheet() {
   usePinDay()
   const photos = useSamplePhotos()
-  const [nightColumn, setNightColumn] = useState<HTMLDivElement | null>(null)
 
   return (
     <main className="fhc-ds">
@@ -888,12 +813,12 @@ export default function DesignSheet() {
       <div className="fhc-ds__cols">
         <section className="fhc-ds__col" aria-labelledby="fhc-ds-day-title">
           <h2 id="fhc-ds-day-title" className="fhc-ds__coltitle">Day</h2>
-          <Board theme="day" photos={photos} sheetContainer={null} />
+          <Board theme="day" photos={photos} />
         </section>
-        <div ref={setNightColumn} className="fhc-ds__col fhc-ds__col--night" data-theme="dark">
+        <div className="fhc-ds__col fhc-ds__col--night" data-theme="dark">
           <section aria-labelledby="fhc-ds-night-title">
             <h2 id="fhc-ds-night-title" className="fhc-ds__coltitle">Night</h2>
-            <Board theme="night" photos={photos} sheetContainer={nightColumn} />
+            <Board theme="night" photos={photos} />
           </section>
         </div>
       </div>

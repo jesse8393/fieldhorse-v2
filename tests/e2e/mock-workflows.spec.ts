@@ -34,33 +34,42 @@ test.beforeEach(async ({ context }) => {
 })
 
 test('keeps the work lifecycle action ready', async ({ page }, testInfo) => {
+  // Leads, quotes and jobs are separate records (SPEC D53 to D65): the
+  // lifecycle runs lead, quote, job, invoice, and each screen keeps its
+  // next action one tap away.
   const expectNoPageErrors = failOnPageErrors(page)
 
-  await openRoute(page, '/work')
-  // Phones get the redesigned Jobs list (spec 9.3); desktop keeps the deal board.
+  await openRoute(page, '/jobs')
+  // Phones get the Jobs list (spec 9.3); desktop keeps the deal board.
   const workHeading = testInfo.project.name.startsWith('mobile') ? /^jobs$/i : /work & deals/i
   await expect(page.getByRole('heading', { level: 1, name: workHeading })).toBeVisible()
-  await expect(page.getByText('Justin Bryan', { exact: true })).toBeVisible()
-  await expect(page.getByText('MMC Properties', { exact: true })).toBeVisible()
   await expect(page.getByText('Plumbing Bellevue', { exact: true })).toBeVisible()
   await capture(page, testInfo, 'work')
 
-  await openRoute(page, '/leads/c-lead1')
-  await expect(page.getByRole('button', { name: /convert to quote/i })).toBeVisible()
+  await openRoute(page, '/leads')
+  await expect(page.getByRole('heading', { level: 1, name: 'Leads' })).toBeVisible()
+  await expect(page.getByText('Vintage Burkitt Station Drainage', { exact: true }).first()).toBeVisible()
+  await openRoute(page, '/quotes')
+  await expect(page.getByRole('heading', { level: 1, name: 'Quotes' })).toBeVisible()
+  await expect(page.getByText('Parking lot repour', { exact: true }).first()).toBeVisible()
+
+  await openRoute(page, '/leads/l-lead1')
+  await expect(page.getByRole('link', { name: 'Schedule estimate' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Quote this' })).toBeVisible()
   await capture(page, testInfo, 'lead')
 
-  await openRoute(page, '/quotes/c-quote?tab=quote')
-  await expect(page.getByRole('button', { name: /approve quote/i })).toBeVisible()
-  await expect(page.getByText(/follow up [a-z]{3} \d{1,2}/i).first()).toBeVisible()
+  await openRoute(page, '/quotes/q-quote')
+  await expect(page.getByRole('button', { name: 'Make this a job' })).toBeVisible()
   await capture(page, testInfo, 'quote')
 
   await openRoute(page, '/jobs/c-job1')
-  const sendInvoice = page.getByRole('button', { name: /send invoice/i }).first()
-  await expect(sendInvoice).toBeVisible()
+  const invoiceThis = page.getByRole('button', { name: 'Invoice this' }).first()
+  await expect(invoiceThis).toBeVisible()
   await capture(page, testInfo, 'job')
-  await sendInvoice.click()
-  await expect(page.getByText(/create invoice|send invoice/i).last()).toBeVisible()
-  await capture(page, testInfo, 'send-invoice')
+  await invoiceThis.click()
+  await expect(page).toHaveURL(/\/invoices\/new\?job=c-job1$/)
+  await expect(page.getByRole('heading', { level: 1, name: 'New invoice' })).toBeVisible()
+  await capture(page, testInfo, 'new-invoice')
 
   expectNoPageErrors()
 })
@@ -169,7 +178,8 @@ test('keeps the desktop schedule planning workflow complete', async ({ page }, t
   await event.click()
   await expect(page.getByRole('heading', { name: 'Edit event' })).toBeVisible()
   await capture(page, testInfo, 'desktop-schedule-edit', true)
-  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await page.getByRole('button', { name: 'Back', exact: true }).click()
+  await expect(page.locator('.fhsch-board[data-view="day"]')).toBeVisible()
 
   await page.getByRole('button', { name: 'Month', exact: true }).click()
   await expect(page.locator('.fhsch-month')).toBeVisible()
@@ -180,7 +190,8 @@ test('keeps the desktop schedule planning workflow complete', async ({ page }, t
   await page.getByRole('button', { name: 'New event', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Add event' })).toBeVisible()
   await capture(page, testInfo, 'desktop-schedule-new', true)
-  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await page.getByRole('button', { name: 'Back', exact: true }).click()
+  await expect(page.locator('.fh-build-weekplan')).toBeVisible()
 
   expectNoPageErrors()
 })
@@ -222,7 +233,7 @@ test('uses the full desktop workspace without changing the mobile screens', asyn
     { path: '/activity', name: 'activity', ready: '[data-build-screen="SnowActivityBuild"]', minWidth: 1000 },
     { path: '/import', name: 'import', ready: '[data-build-screen="Importer"]', minWidth: 1000 },
     { path: '/partners', name: 'partners', ready: '[data-build-screen="SnowPartnersBuild"]', minWidth: 1000 },
-    { path: '/invoices/c-job2', name: 'invoice-detail', ready: '.v3-screen--invoice-detail', minWidth: 900 },
+    { path: '/invoices/inv1', name: 'invoice-detail', ready: '.fhinv', minWidth: 900 },
     { path: '/subs/qa-missing', name: 'sub-detail', ready: '[data-build-screen="SubDetailState"]', minWidth: 1000 },
     { path: '/sub-portal', name: 'sub-portal', ready: '[data-build-screen="SubPortal"]', minWidth: 1000 },
   ]
@@ -237,8 +248,8 @@ test('uses the full desktop workspace without changing the mobile screens', asyn
 
     if (route.name === 'invoice-detail') {
       const alignment = await page.evaluate(() => {
-        const screen = document.querySelector('.v3-screen--invoice-detail')?.getBoundingClientRect()
-        const actionbar = document.querySelector('.fh-invoice-actionbar')?.getBoundingClientRect()
+        const screen = document.querySelector('.fhinv')?.getBoundingClientRect()
+        const actionbar = document.querySelector('.fhinv-actions')?.getBoundingClientRect()
         return {
           centerDelta: screen && actionbar
             ? Math.abs((screen.left + screen.width / 2) - (actionbar.left + actionbar.width / 2))
@@ -278,7 +289,7 @@ test('uses the full desktop workspace without changing the mobile screens', asyn
   const compactDesktopRoutes = [
     { path: '/activity', ready: '[data-build-screen="SnowActivityBuild"]', table: '.fh-activity-table__head' },
     { path: '/partners', ready: '[data-build-screen="SnowPartnersBuild"]', table: '.fh-partners-table__head' },
-    { path: '/invoices/c-job2', ready: '.v3-screen--invoice-detail', table: null },
+    { path: '/invoices/inv1', ready: '.fhinv', table: null },
   ]
 
   for (const route of compactDesktopRoutes) {
@@ -286,8 +297,8 @@ test('uses the full desktop workspace without changing the mobile screens', asyn
     await expect(page.locator(route.ready)).toBeVisible()
     const geometry = await page.evaluate(({ table }) => {
       const tableElement = table ? document.querySelector(table) : null
-      const screen = document.querySelector('.v3-screen--invoice-detail')?.getBoundingClientRect()
-      const actionbar = document.querySelector('.fh-invoice-actionbar')?.getBoundingClientRect()
+      const screen = document.querySelector('.fhinv')?.getBoundingClientRect()
+      const actionbar = document.querySelector('.fhinv-actions')?.getBoundingClientRect()
       return {
         tableOverflow: tableElement ? tableElement.scrollWidth - tableElement.clientWidth : 0,
         invoiceCenterDelta: screen && actionbar
@@ -470,18 +481,16 @@ test('keeps customer quote change requests in the workflow', async ({ page }, te
   await expect(page.getByRole('button', { name: 'Request changes' })).toHaveCount(0)
   await capture(page, testInfo, 'quote-change-requested-customer', true)
 
-  await openRoute(page, '/quotes/c-change?tab=quote')
-  if (testInfo.project.name.startsWith('mobile')) {
-    // The phone's Quote tab is the editor itself (tests/e2e/quote.spec.ts):
-    // the request sits in a panel at the top and the capsule carries the
-    // send. "Review changes" stays the stage action on the other tabs.
-    await expect(page.getByRole('region', { name: 'Customer requested changes' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Send for approval' })).toBeVisible()
-  } else {
-    await expect(page.getByRole('button', { name: 'Review changes' }).first()).toBeVisible()
-  }
+  // The quote is its own screen on every device (Phase 9, D53, D57,
+  // tests/e2e/quote.spec.ts): the request sits in a panel at the top and
+  // Send for approval waits under the total.
+  await openRoute(page, '/quotes/q-change')
+  await expect(page.locator('.fhqt-page')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('region', { name: 'Customer requested changes' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Send for approval' })).toBeVisible()
   await expect(page.getByText('Please separate the cabinet allowance.', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: /approve quote/i })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: /approve quote/i })).toHaveCount(0)
   await capture(page, testInfo, 'quote-change-requested-operator', true)
 
   expectNoPageErrors()

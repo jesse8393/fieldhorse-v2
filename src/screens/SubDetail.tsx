@@ -23,7 +23,7 @@ import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { EmptyState } from '../ui/index.ts'
 import { parseDateOnly } from '../lib/dates.ts'
-import { useConfirm } from '../components/ConfirmSheet.tsx'
+import { useArmedId } from '../lib/secondTap.ts'
 import PaletteKeyCap, { paletteShortcut } from '../components/desktop/PaletteKeyCap.tsx'
 
 // SubDetail, vendor profile surface at /subs/:key.
@@ -996,7 +996,8 @@ function docType(file: File): string | null {
 
 function DocumentsSection({ profile, onChanged }: any) {
   const { user } = useAuth()
-  const confirm = useConfirm()
+  // Removing a document takes a second tap on the same slot's button (D57).
+  const removeTap = useArmedId()
   const [busySlot, setBusySlot] = useState<any>(null)
   const fileInputs = useRef({})
 
@@ -1045,15 +1046,6 @@ function DocumentsSection({ profile, onChanged }: any) {
     if (!currentPath) return
     const label = DOC_SLOTS.find((s) => s.id === slotId)?.label || slotId
     const owned = contractorOwnsDoc(currentPath, profile, user?.id)
-    const ok = await confirm({
-      title: `Remove the ${label}?`,
-      body: owned
-        ? 'The file is deleted from this vendor profile. Upload it again if you need it later.'
-        : 'This clears it from your vendor profile. The sub keeps their copy.',
-      confirmLabel: 'Remove',
-      destructive: true,
-    })
-    if (!ok) return
     setBusySlot(slotId)
     try {
       const { data, error } = await supabase
@@ -1153,12 +1145,14 @@ function DocumentsSection({ profile, onChanged }: any) {
                 </IconButton>
                 {onFile && (
                   <IconButton
-                    title="Remove"
+                    title={removeTap.armedId === slot.id ? `Tap again to remove the ${slot.label}` : 'Remove'}
+                    aria-label={removeTap.armedId === slot.id ? 'Tap again to remove' : `Remove ${slot.label}`}
+                    wide={removeTap.armedId === slot.id}
                     danger
-                    onClick={() => { hapticTap(); handleRemove(slot.id, slot.path, currentPath) }}
+                    onClick={() => { hapticTap(); removeTap.tap(slot.id, () => { void handleRemove(slot.id, slot.path, currentPath) }) }}
                     disabled={busy}
                   >
-                    <Trash2 size={14} />
+                    {removeTap.armedId === slot.id ? <span style={{ fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', padding: '0 8px' }}>Tap again to remove</span> : <Trash2 size={14} />}
                   </IconButton>
                 )}
               </div>
@@ -1308,16 +1302,17 @@ function StatusPill({ onFile }: any) {
   )
 }
 
-function IconButton({ children, onClick, disabled, primary, danger, title }: any) {
+// `wide` lets an armed button carry its words (Tap again to remove).
+function IconButton({ children, onClick, disabled, primary, danger, title, wide = false, 'aria-label': ariaLabel }: any) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
       title={title}
-      aria-label={title}
+      aria-label={ariaLabel || title}
       style={{
-        width: 36, height: 36,
+        width: wide ? 'auto' : 36, height: 36, padding: wide ? '0 4px' : 0,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         borderRadius: 10,
         border: `1px solid ${danger

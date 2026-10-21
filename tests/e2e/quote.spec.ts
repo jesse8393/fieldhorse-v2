@@ -1,7 +1,10 @@
-// The Quote tab on a phone (docs/design/2026-10-redesign/SPEC.md 9.6,
-// PHASE3_PLAN.md Task 3.4, render glamor/g-quote.jpg): lines as hairline
-// rows, optional items behind switches, the onyx capsule with the total,
-// the deposit and the one gold "Send for approval".
+// The quote screen (docs/design/2026-10-redesign/PHASE9_PLAN.md Task 10,
+// decisions D53 to D61): a quote is its own record on fh_quotes with its
+// lines on fh_quote_items by quote_id. The screen shows the client, the
+// title, the lines (tap one to edit it in place, a plus row adds one), the
+// total and the deposit sentence, Scope and terms, Preview, Send, Share link
+// and Make this a job. Nothing opens in a sheet (D57): every flow is a route
+// with Back.
 //
 // Nothing here may send anything. Every send route and every share link
 // insert is spied on through context.route, and the routes that would
@@ -13,11 +16,15 @@ const NOW = Date.now()
 const DAY = 86400000
 const iso = (ms: number) => new Date(ms).toISOString()
 
+// The mock's client, Jeff Roy, so "Preview as Jeff" and the approval's name.
+const CLIENT = { id: 'cl-1', name: 'Jeff Roy', phone: '555-0101', email: 'jeff@roy.com' }
+
 function item(id: string, description: string, over: Record<string, unknown> = {}) {
   return {
     id,
     user_id: 'qa-user-1',
-    contact_id: 'c-quote',
+    quote_id: 'q-quote',
+    contact_id: null,
     section: null,
     description,
     qty: 1,
@@ -42,34 +49,37 @@ const ITEMS = [
 ]
 
 // The mock's MMC Properties quote, written out so a test can change one field.
-function quoteContact(over: Record<string, unknown> = {}) {
-  const client = { id: 'cl-1', name: 'Jeff Roy', phone: '555-0101', email: 'jeff@roy.com' }
+function quoteRow(over: Record<string, unknown> = {}) {
   return {
-    id: 'c-quote',
-    stage: 'quote',
-    name: 'MMC Properties',
-    job_title: 'Parking lot repour',
-    amount: 3150,
-    proposal_status: 'sent',
-    quote_sent_at: iso(NOW - DAY),
-    follow_up_on: null,
+    id: 'q-quote',
     user_id: 'qa-user-1',
     client_id: 'cl-1',
-    phone: '555-0101',
-    email: 'x@y.com',
-    address: '412 Burkitt Station Rd',
-    notes: null,
+    origin_contact_id: 'c-quote',
+    lead_id: null,
+    job_id: null,
+    title: 'Parking lot repour',
+    amount: 46200,
+    status: 'sent',
+    sent_at: iso(NOW - DAY),
+    expires_at: null,
     scope_text: null,
     terms_text: null,
-    milestones: [],
+    exclusions_text: null,
+    job_type: null,
+    change_request_note: null,
+    change_requested_at: null,
+    approved_version_id: null,
     created_at: iso(NOW - 28 * DAY),
     updated_at: iso(NOW - DAY),
-    completed_at: null,
-    invoice_no: null,
-    client_name: client.name,
-    fh_clients: client,
+    fh_clients: CLIENT,
     ...over
   }
+}
+
+// The client as the mock's fh_clients table holds it: the quote screen reads
+// the client's email from here, fresh, the way Money does.
+function clientRow(over: Record<string, unknown> = {}) {
+  return { ...CLIENT, user_id: 'qa-user-1', company_name: null, address: '412 Burkitt Station Rd', created_at: iso(NOW - 60 * DAY), ...over }
 }
 
 type Calls = { send: { url: string; body: string }[]; publicLinks: number }
@@ -88,9 +98,9 @@ async function watchSends(context: BrowserContext): Promise<Calls> {
   return calls
 }
 
-async function openQuote(page: Page, path = '/quotes/c-quote?tab=quote') {
+async function openQuote(page: Page, path = '/quotes/q-quote') {
   await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 60_000 })
-  await expect(page.locator('.fhq-page')).toBeVisible({ timeout: 30_000 })
+  await expect(page.locator('.fhqt-page')).toBeVisible({ timeout: 30_000 })
 }
 
 function failOnPageErrors(page: Page) {
@@ -99,50 +109,75 @@ function failOnPageErrors(page: Page) {
   return () => expect(errors, errors.join('\n')).toEqual([])
 }
 
-test.describe('quote tab on a phone', () => {
-  test.beforeEach(async ({ page: _page }, testInfo) => {
-    test.skip(!testInfo.project.name.startsWith('mobile'), 'Phone layout')
-  })
+const total = (page: Page) => page.locator('.fhqt-total')
+const lines = (page: Page) => page.getByRole('list', { name: 'Line items' })
 
-  test('quote total and deposit', async ({ context, page }) => {
+test.describe('the quote screen', () => {
+  test('a quote opens with its lines and no sheet', async ({ context, page }) => {
     const noErrors = failOnPageErrors(page)
     await signIn(context, { tables: { fh_quote_items: ITEMS } })
     await openQuote(page)
 
-    const capsule = page.locator('.fhj-capsule')
-    await expect(capsule.getByText('Total', { exact: true })).toBeVisible()
-    await expect(capsule.getByText('$3,150.00', { exact: true })).toBeVisible()
-    await expect(capsule.getByText('Deposit $1,575.00 at approval')).toBeVisible()
-    const send = capsule.getByRole('button', { name: 'Send for approval' })
-    await expect(send).toBeEnabled()
+    // The client, the title and the status.
+    await expect(page.getByRole('heading', { level: 1, name: 'Parking lot repour' })).toBeVisible()
+    await expect(page.locator('.fhqt-client')).toContainText('Jeff Roy')
+    await expect(page.locator('.fhqt-head').getByText('Sent', { exact: true })).toBeVisible()
 
-    // One brushed gold action on the screen, and the dock steps aside.
-    await expect(page.locator('.fhc-btn--primary')).toHaveCount(1)
-    await expect(page.getByRole('navigation', { name: 'Primary' })).toBeHidden()
-
-    // The page: status chip with its word, lines with money, the optional panel.
-    await expect(page.getByRole('heading', { level: 2, name: 'Quote' })).toBeVisible()
-    await expect(page.locator('.fhq-head').getByText('Sent', { exact: true })).toBeVisible()
-    const lines = page.getByRole('list', { name: 'Line items' })
-    await expect(lines.getByText('Excavate and grade')).toBeVisible()
-    await expect(lines.getByText('1,100 sq ft at $2.00')).toBeVisible()
-    await expect(lines.getByText('$2,200.00')).toBeVisible()
-    await expect(lines.getByText('1 day at $950.00')).toBeVisible()
-    await expect(lines.getByText('Stamped ashlar')).toHaveCount(0)
+    // The lines with their money, and the optional panel.
+    await expect(lines(page).getByText('Excavate and grade')).toBeVisible()
+    await expect(lines(page).getByText('1,100 sq ft at $2.00')).toBeVisible()
+    await expect(lines(page).getByText('$2,200.00')).toBeVisible()
+    await expect(lines(page).getByText('1 day at $950.00')).toBeVisible()
+    await expect(lines(page).getByText('Stamped ashlar')).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Add a line' })).toBeVisible()
-    await expect(page.locator('.fhq-optional').getByText('Stamped ashlar, charcoal release')).toBeVisible()
-    await expect(page.locator('.fhq-optional').getByText('Adds $4,950.00')).toBeVisible()
+    await expect(page.locator('.fhqt-optional').getByText('Stamped ashlar, charcoal release')).toBeVisible()
+    await expect(page.locator('.fhqt-optional').getByText('Adds $4,950.00')).toBeVisible()
+
+    // The total and the deposit sentence, and the one gold Send.
+    await expect(total(page).getByText('Total', { exact: true })).toBeVisible()
+    await expect(total(page).getByText('$3,150.00', { exact: true })).toBeVisible()
+    await expect(total(page).getByText('Deposit $1,575.00 at approval')).toBeVisible()
+    await expect(total(page).getByRole('button', { name: 'Send for approval' })).toBeEnabled()
+    await expect(page.locator('.fhc-btn--primary')).toHaveCount(1)
+
+    // The rows that lead on: scope and terms, the preview, approving by hand.
+    await expect(page.getByRole('link', { name: /Scope and terms/ })).toBeVisible()
+    await expect(page.getByRole('link', { name: /Preview as Jeff/ })).toBeVisible()
+    await expect(page.getByRole('link', { name: /Approve quote/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Make this a job' })).toBeVisible()
+
+    // No sheet, drawer or dialog anywhere (D57).
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(page.locator('[data-vaul-drawer]')).toHaveCount(0)
     noErrors()
   })
 
-  test('the capsule keeps off the last row', async ({ context, page }) => {
+  test('the screen reads as one column on a desktop', async ({ context, page }, testInfo) => {
+    test.skip(!testInfo.project.name.startsWith('desktop'), 'Desktop layout')
     await signIn(context, { tables: { fh_quote_items: ITEMS } })
     await openQuote(page)
-    await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }))
-    await page.waitForTimeout(150)
-    const capsuleTop = await page.locator('.fhj-capsule').evaluate((el) => el.getBoundingClientRect().top)
-    const contentBottom = await page.locator('.fhq-page').evaluate((el) => el.getBoundingClientRect().bottom)
-    expect(contentBottom).toBeLessThanOrEqual(capsuleTop)
+    await expect(lines(page).getByText('Excavate and grade')).toBeVisible()
+    await expect(page.getByRole('link', { name: /Preview as Jeff/ })).toBeVisible()
+    await expect(page.locator('.fhj-capsule')).toHaveCount(0)
+    const width = await page.locator('.fhqt-page').evaluate((el) => el.getBoundingClientRect().width)
+    expect(width).toBeLessThanOrEqual(640)
+  })
+
+  test('the dock keeps off the last row', async ({ context, page }, testInfo) => {
+    test.skip(!testInfo.project.name.startsWith('mobile'), 'Phone layout')
+    await signIn(context, { tables: { fh_quote_items: ITEMS } })
+    await openQuote(page)
+    // The lines land after the quote; scroll once they are on the page, and
+    // read the geometry until the scroll has settled.
+    await expect(lines(page).getByText('Excavate and grade')).toBeVisible()
+    const dock = page.getByRole('navigation', { name: 'Primary' })
+    await expect(dock).toBeVisible()
+    await expect.poll(async () => {
+      await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }))
+      const dockTop = await dock.evaluate((el) => el.getBoundingClientRect().top)
+      const contentBottom = await page.locator('.fhqt-page').evaluate((el) => el.getBoundingClientRect().bottom)
+      return contentBottom - dockTop
+    }).toBeLessThanOrEqual(0)
   })
 
   test('preview never sends', async ({ context, page }) => {
@@ -150,15 +185,18 @@ test.describe('quote tab on a phone', () => {
     const calls = await watchSends(context)
     await openQuote(page)
 
-    await page.getByRole('button', { name: 'Preview as MMC Properties' }).click()
-    const preview = page.getByRole('dialog', { name: 'Proposal preview' })
+    await page.getByRole('link', { name: /Preview as Jeff/ }).click()
+    await expect(page).toHaveURL(/\/quotes\/q-quote\/preview$/)
+    const preview = page.getByRole('group', { name: 'Proposal preview' })
     await expect(preview).toBeVisible()
     // The customer's view: the lines and the money, drawn in the app.
     await expect(preview.getByText('Excavate and grade').first()).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText('This is what Jeff sees. Nothing is sent.')).toBeVisible()
     await page.waitForTimeout(500)
 
     expect(calls.send).toEqual([])
     expect(calls.publicLinks).toBe(0)
+    await expect(page.getByRole('dialog')).toHaveCount(0)
   })
 
   test('optional switch', async ({ context, page }) => {
@@ -166,18 +204,17 @@ test.describe('quote tab on a phone', () => {
     const calls = await watchSends(context)
     await openQuote(page)
 
-    const capsule = page.locator('.fhj-capsule')
     const toggle = page.getByRole('switch', { name: 'Include Stamped ashlar, charcoal release in the total' })
     await expect(toggle).toHaveAttribute('aria-checked', 'false')
-    await expect(capsule.getByText('$3,150.00', { exact: true })).toBeVisible()
+    await expect(total(page).getByText('$3,150.00', { exact: true })).toBeVisible()
 
     // The save goes through updateItem, which patches the row.
     const saved = page.waitForRequest((r) => r.method() === 'PATCH' && r.url().includes('/rest/v1/fh_quote_items'))
     await toggle.click()
     // The total moves at once. The mock does not store writes, so this is
     // the optimistic total, not the value after a refetch.
-    await expect(capsule.getByText('$8,100.00', { exact: true })).toBeVisible()
-    await expect(capsule.getByText('Deposit $4,050.00 at approval')).toBeVisible()
+    await expect(total(page).getByText('$8,100.00', { exact: true })).toBeVisible()
+    await expect(total(page).getByText('Deposit $4,050.00 at approval')).toBeVisible()
     await expect(toggle).toHaveAttribute('aria-checked', 'true')
     const request = await saved
     expect(request.url()).toContain('id=eq.qi3')
@@ -185,7 +222,7 @@ test.describe('quote tab on a phone', () => {
 
     // And back.
     await toggle.click()
-    await expect(capsule.getByText('$3,150.00', { exact: true })).toBeVisible()
+    await expect(total(page).getByText('$3,150.00', { exact: true })).toBeVisible()
     await expect(toggle).toHaveAttribute('aria-checked', 'false')
     expect(calls.send).toEqual([])
   })
@@ -193,32 +230,25 @@ test.describe('quote tab on a phone', () => {
   test('empty quote', async ({ context, page }) => {
     await signIn(context)
     await openQuote(page)
-    const capsule = page.locator('.fhj-capsule')
-    await expect(capsule.getByRole('button', { name: 'Send for approval' })).toBeDisabled()
-    await expect(capsule.getByText('Add at least one line')).toBeVisible()
-    // No line has a price, so the job's own amount ($46,200 in the mock)
+    await expect(total(page).getByRole('button', { name: 'Send for approval' })).toBeDisabled()
+    await expect(total(page).getByText('Add at least one line')).toBeVisible()
+    // No line has a price, so the quote's own amount ($46,200 in the mock)
     // stands in, as it does on the customer page (decision D31).
-    await expect(capsule.getByText('$46,200.00', { exact: true })).toBeVisible()
-    await expect(capsule.getByText('Deposit $23,100.00 at approval')).toBeVisible()
+    await expect(total(page).getByText('$46,200.00', { exact: true })).toBeVisible()
+    await expect(total(page).getByText('Deposit $23,100.00 at approval')).toBeVisible()
+    await expect(page.getByText('No lines yet.')).toBeVisible()
   })
 
-  test('the capsule total adds approved change orders and the deposit follows the terms', async ({ context, page }) => {
-    const changeOrders = [
-      { id: 'co-1', user_id: 'qa-user-1', contact_id: 'c-quote', sequence_number: 1, title: 'Extra curb', amount: 850, status: 'approved', approved_at: iso(NOW - DAY), created_at: iso(NOW - DAY) },
-      { id: 'co-2', user_id: 'qa-user-1', contact_id: 'c-quote', sequence_number: 2, title: 'Sealer', amount: 400, status: 'sent', approved_at: null, created_at: iso(NOW - DAY) }
-    ]
+  test('the deposit follows the terms', async ({ context, page }) => {
     await signIn(context, {
       tables: {
         fh_quote_items: ITEMS,
-        fh_contacts: [quoteContact({ terms_text: '$2,500 deposit on signing, balance at completion.' })],
-        fh_change_orders: changeOrders
+        fh_quotes: [quoteRow({ terms_text: '$2,500 deposit on signing, balance at completion.' })]
       }
     })
     await openQuote(page)
-    const capsule = page.locator('.fhj-capsule')
-    // $3,150 of lines plus the approved $850 change order; the sent one waits.
-    await expect(capsule.getByText('$4,000.00', { exact: true })).toBeVisible()
-    await expect(capsule.getByText('Deposit $2,500.00 at approval')).toBeVisible()
+    await expect(total(page).getByText('$3,150.00', { exact: true })).toBeVisible()
+    await expect(total(page).getByText('Deposit $2,500.00 at approval')).toBeVisible()
   })
 
   for (const [terms, note] of [
@@ -226,136 +256,135 @@ test.describe('quote tab on a phone', () => {
     ['50% down at rough in, 50% at completion.', 'Payment follows the terms']
   ]) {
     test(`terms that name no deposit read "${note}"`, async ({ context, page }) => {
-      await signIn(context, { tables: { fh_quote_items: ITEMS, fh_contacts: [quoteContact({ terms_text: terms })] } })
+      await signIn(context, { tables: { fh_quote_items: ITEMS, fh_quotes: [quoteRow({ terms_text: terms })] } })
       await openQuote(page)
-      const capsule = page.locator('.fhj-capsule')
-      await expect(capsule.getByText('$3,150.00', { exact: true })).toBeVisible()
-      await expect(capsule.getByText(note, { exact: true })).toBeVisible()
-      await expect(capsule.getByText(/^Deposit /)).toHaveCount(0)
+      await expect(total(page).getByText('$3,150.00', { exact: true })).toBeVisible()
+      await expect(total(page).getByText(note, { exact: true })).toBeVisible()
+      await expect(total(page).getByText(/^Deposit /)).toHaveCount(0)
     })
   }
 
   test('only optional lines cannot be sent', async ({ context, page }) => {
     await signIn(context, { tables: { fh_quote_items: [ITEMS[2]] } })
     await openQuote(page)
-    const capsule = page.locator('.fhj-capsule')
-    await expect(capsule.getByRole('button', { name: 'Send for approval' })).toBeDisabled()
-    await expect(capsule.getByText('Add at least one line')).toBeVisible()
-    await expect(capsule.getByText('$0.00', { exact: true })).toBeVisible()
-    await expect(page.locator('.fhq-optional').getByText('Stamped ashlar, charcoal release')).toBeVisible()
+    await expect(total(page).getByRole('button', { name: 'Send for approval' })).toBeDisabled()
+    await expect(total(page).getByText('Add at least one line')).toBeVisible()
+    await expect(total(page).getByText('$0.00', { exact: true })).toBeVisible()
+    await expect(page.locator('.fhqt-optional').getByText('Stamped ashlar, charcoal release')).toBeVisible()
   })
 
-  test('send for approval emails the proposal when the customer has an email', async ({ context, page }) => {
+  test('send for approval emails the proposal when the client has an email', async ({ context, page }) => {
     await signIn(context, { tables: { fh_quote_items: ITEMS } })
     const calls = await watchSends(context)
     // The proposal PDF uploads to storage before the send; the mock answers 404.
     await context.route('**/storage/v1/object/**', (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ Key: 'job-files/test.pdf' }) }))
-    // handleSend refuses when its own count of base lines is 0. The mock's
-    // content-range header never reaches the page (no CORS expose header),
-    // so that count is always 0 here; answer the count query the way a real
-    // project does.
-    await context.route((url) => url.pathname.includes('/rest/v1/fh_quote_items'), (route) => {
-      if (route.request().method() !== 'HEAD') return route.fallback()
-      return route.fulfill({
-        status: 200,
-        headers: { 'content-range': '0-1/2', 'access-control-allow-origin': '*', 'access-control-expose-headers': 'content-range' }
-      })
-    })
     await openQuote(page)
 
-    await expect(page.locator('.fhj-capsule').getByText('Copies a link')).toHaveCount(0)
-    await page.getByRole('button', { name: 'Send for approval' }).click()
+    await expect(total(page).getByText('Copies a link')).toHaveCount(0)
+    await total(page).getByRole('button', { name: 'Send for approval' }).click()
     await expect.poll(() => calls.send.length, { timeout: 30_000 }).toBe(1)
     const body = JSON.parse(calls.send[0].body)
     expect(calls.send[0].url).toContain('/api/send-quote')
-    expect(body).toMatchObject({ contact_id: 'c-quote', recipient_email: 'x@y.com' })
+    // The quote id goes along, and the email is the client's (lib/customerEmail.ts).
+    expect(body).toMatchObject({ quote_id: 'q-quote', recipient_email: 'jeff@roy.com' })
     expect(calls.publicLinks).toBe(0)
   })
 
   test('send for approval shares a link when there is no email', async ({ context, page }) => {
     await signIn(context, {
       tables: {
-        fh_contacts: [quoteContact({ email: null })],
-        // Neither the job nor its linked client has an email: the Quote tab
-        // looks on the client too, as Money does (Phase 8, Task 15).
-        fh_clients: [{ id: 'cl-1', user_id: 'qa-user-1', name: 'Jeff Roy', phone: '555-0101', email: null }],
+        fh_quotes: [quoteRow({ fh_clients: { ...CLIENT, email: null } })],
+        fh_clients: [clientRow({ email: null })],
         fh_quote_items: ITEMS,
         // The mock answers an insert with the first row of the table.
-        fh_public_links: [{ id: 'l1', user_id: 'qa-user-1', contact_id: 'c-quote', kind: 'proposal', token: 'abc123', created_at: iso(NOW) }]
+        fh_public_links: [{ id: 'l1', user_id: 'qa-user-1', contact_id: null, quote_id: 'q-quote', kind: 'proposal', token: 'abc123', created_at: iso(NOW) }]
       }
     })
     const calls = await watchSends(context)
     await openQuote(page)
 
-    await expect(page.locator('.fhj-capsule').getByText('Copies a link')).toBeVisible()
-    await expect(page.locator('.fhq-head').getByText(/No email on file/)).toBeVisible()
-    await page.getByRole('button', { name: 'Send for approval' }).click()
+    await expect(total(page).getByText('Copies a link')).toBeVisible()
+    await expect(page.locator('.fhqt-page').getByText(/No email on file/)).toBeVisible()
+    const marked = page.waitForRequest((r) => r.method() === 'PATCH' && r.url().includes('/rest/v1/fh_quotes'))
+    await total(page).getByRole('button', { name: 'Send for approval' }).click()
     await expect.poll(() => calls.publicLinks, { timeout: 30_000 }).toBe(1)
     await expect(page.getByText(/Share link (copied|ready)/).first()).toBeVisible()
+    // A link out the door marks the quote sent.
+    expect((await marked).postDataJSON()).toMatchObject({ status: 'sent' })
     expect(calls.send).toEqual([])
   })
 
   test('a customer name saved in sentence case shows whole in the labels', async ({ context, page }) => {
     // Read as a person only by recasing it, "Elite pools" is a guess, so the
     // labels in the app keep the name as it was saved.
+    const client = { ...CLIENT, name: 'Elite pools', email: null }
     await signIn(context, {
       tables: {
-        fh_contacts: [quoteContact({ name: 'Elite pools', email: null })],
-        // No email on the job or its linked client, so the line naming
-        // the customer shows (the Quote tab looks on the client too).
-        fh_clients: [{ id: 'cl-1', user_id: 'qa-user-1', name: 'Jeff Roy', phone: '555-0101', email: null }],
+        fh_quotes: [quoteRow({ fh_clients: client })],
+        fh_clients: [clientRow({ name: 'Elite pools', email: null })],
         fh_quote_items: ITEMS
       }
     })
     await openQuote(page)
 
-    await expect(page.getByRole('button', { name: 'Preview as Elite pools' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Preview as Elite pools' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Optional for Elite pools' })).toBeVisible()
-    await expect(page.locator('.fhq-head').getByText('No email on file for Elite pools.', { exact: false })).toBeVisible()
+    await expect(page.locator('.fhqt-page').getByText('No email on file for Elite pools.', { exact: false })).toBeVisible()
   })
 
   test('changes requested', async ({ context, page }) => {
     await signIn(context)
-    await openQuote(page, '/quotes/c-change?tab=quote')
-    const head = page.locator('.fhq-head')
+    await openQuote(page, '/quotes/q-change')
+    const head = page.locator('.fhqt-head')
     await expect(head.getByText('Changes requested', { exact: true })).toBeVisible()
     const panel = page.getByRole('region', { name: 'Customer requested changes' })
     await expect(panel.getByText('Please separate the cabinet allowance.')).toBeVisible()
     await expect(panel.getByText(/Approval stays paused until the revision is sent/)).toBeVisible()
     // Approving by hand is not offered while the customer waits on a revision.
-    await expect(page.getByRole('button', { name: /approve quote/i })).toHaveCount(0)
+    await expect(page.getByRole('link', { name: /approve quote/i })).toHaveCount(0)
+    // Make this a job stays: Jesse decides, not the software (D61).
+    await expect(page.getByRole('button', { name: 'Make this a job' })).toBeVisible()
   })
 
-  test('approving by hand stays one tap away', async ({ context, page }) => {
+  test('approving by hand is one tap away and a screen of its own', async ({ context, page }) => {
     await signIn(context, { tables: { fh_quote_items: ITEMS } })
     await openQuote(page)
-    const approve = page.getByRole('button', { name: /approve quote/i })
+    const approve = page.getByRole('link', { name: /approve quote/i })
     await expect(approve).toHaveCount(1)
     await approve.click()
-    await expect(page.getByRole('dialog')).toBeVisible()
+    await expect(page).toHaveURL(/\/quotes\/q-quote\/approve$/)
+    await expect(page.getByRole('heading', { name: 'Lock the approved quote.' })).toBeVisible()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    // The approval starts from the client's email and names the quote.
+    await expect(page.getByLabel('Email (optional)')).toHaveValue('jeff@roy.com')
+    await expect(page.getByLabel('Approved by')).toHaveValue('Jeff Roy')
   })
 
-  test('a line opens in a sheet and saves through updateItem', async ({ context, page }) => {
+  test('editing a line happens in place', async ({ context, page }) => {
     await signIn(context, { tables: { fh_quote_items: ITEMS } })
     await openQuote(page)
 
-    await page.getByRole('button', { name: /Pump truck/ }).click()
-    const sheet = page.getByRole('dialog', { name: 'Edit line' })
-    await expect(sheet).toBeVisible()
-    await expect(sheet.getByLabel('Description')).toHaveValue('Pump truck')
-    await expect(sheet.getByLabel('Rate')).toHaveValue('950')
+    await lines(page).getByRole('button', { name: /Pump truck/ }).click()
+    // The row opens into the editor where it stands: no dialog, same URL.
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(page).toHaveURL(/\/quotes\/q-quote$/)
+    const editor = page.getByRole('form', { name: 'Edit line' })
+    await expect(editor).toBeVisible()
+    await expect(editor.getByLabel('Description')).toHaveValue('Pump truck')
+    await expect(editor.getByLabel('Rate')).toHaveValue('950')
 
     // The amount follows quantity and rate while it still equals their product.
-    await sheet.getByLabel('Rate').fill('1000')
-    await expect(sheet.getByLabel('Amount')).toHaveValue('1000')
+    await editor.getByLabel('Rate').fill('1000')
+    await expect(editor.getByLabel('Amount')).toHaveValue('1000')
 
     const saved = page.waitForRequest((r) => r.method() === 'PATCH' && r.url().includes('/rest/v1/fh_quote_items'))
-    await sheet.getByRole('button', { name: 'Save changes' }).click()
+    await editor.getByRole('button', { name: 'Save changes' }).click()
     const request = await saved
     expect(request.url()).toContain('id=eq.qi2')
     expect(request.postDataJSON()).toMatchObject({ description: 'Pump truck', rate: 1000, amount: 1000, is_optional: false, is_excluded: false })
-    await expect(sheet).toBeHidden()
+    await expect(editor).toBeHidden()
+    await expect(lines(page).getByRole('button', { name: /Excavate and grade/ })).toBeVisible()
   })
 
   test('add a line', async ({ context, page }) => {
@@ -373,23 +402,26 @@ test.describe('quote tab on a phone', () => {
     await openQuote(page)
 
     await page.getByRole('button', { name: 'Add a line' }).click()
-    const sheet = page.getByRole('dialog', { name: 'Add a line' })
-    await expect(sheet).toBeVisible()
+    const editor = page.getByRole('form', { name: 'Add a line' })
+    await expect(editor).toBeVisible()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
     // A line needs a description, and the error says what to do.
-    await sheet.getByRole('button', { name: 'Add line' }).click()
-    await expect(sheet.getByText('Add a description, such as Excavate and grade.')).toBeVisible()
+    await editor.getByRole('button', { name: 'Add line', exact: true }).click()
+    await expect(editor.getByText('Add a description, such as Excavate and grade.')).toBeVisible()
 
-    await sheet.getByLabel('Description').fill('Haul off spoils')
-    await sheet.getByLabel('Quantity').fill('2')
-    await sheet.getByLabel('Unit').fill('loads')
-    await sheet.getByLabel('Rate').fill('390')
-    await expect(sheet.getByLabel('Amount')).toHaveValue('780')
+    await editor.getByLabel('Description').fill('Haul off spoils')
+    await editor.getByLabel('Quantity').fill('2')
+    await editor.getByLabel('Unit').fill('loads')
+    await editor.getByLabel('Rate').fill('390')
+    await expect(editor.getByLabel('Amount')).toHaveValue('780')
 
     const saved = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes('/rest/v1/fh_quote_items'))
-    await sheet.getByRole('button', { name: 'Add line' }).click()
+    await editor.getByRole('button', { name: 'Add line', exact: true }).click()
     const request = await saved
+    // The line belongs to the quote, not to a job.
     expect(request.postDataJSON()).toMatchObject({
-      contact_id: 'c-quote',
+      quote_id: 'q-quote',
+      contact_id: null,
       description: 'Haul off spoils',
       qty: 2,
       unit: 'loads',
@@ -398,55 +430,90 @@ test.describe('quote tab on a phone', () => {
       is_optional: false,
       is_excluded: false
     })
-    await expect(sheet).toBeHidden()
-    const lines = page.getByRole('list', { name: 'Line items' })
-    await expect(lines.getByText('Haul off spoils')).toBeVisible()
-    await expect(lines.getByText('2 loads at $390.00')).toBeVisible()
-    await expect(page.locator('.fhj-capsule').getByText('$3,930.00', { exact: true })).toBeVisible()
+    await expect(editor).toBeHidden()
+    await expect(lines(page).getByText('Haul off spoils')).toBeVisible()
+    await expect(lines(page).getByText('2 loads at $390.00')).toBeVisible()
+    await expect(total(page).getByText('$3,930.00', { exact: true })).toBeVisible()
   })
 
-  test('scope and terms stay editable and set the deposit', async ({ context, page }) => {
+  test('a new quote lands with its first line open', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: [] } })
+    await openQuote(page, '/quotes/q-quote?lines=new')
+    const editor = page.getByRole('form', { name: 'Add a line' })
+    await expect(editor).toBeVisible()
+    await expect(editor.getByLabel('Description')).toBeFocused()
+    await expect(page).toHaveURL(/\/quotes\/q-quote$/)
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+  })
+
+  test('scope and terms are a screen and set the deposit', async ({ context, page }) => {
     await signIn(context, { tables: { fh_quote_items: ITEMS } })
     await openQuote(page)
 
-    await page.getByRole('button', { name: /Scope and terms/ }).click()
-    const sheet = page.getByRole('dialog', { name: 'Scope and terms' })
-    await expect(sheet).toBeVisible()
+    await page.getByRole('link', { name: /Scope and terms/ }).click()
+    await expect(page).toHaveURL(/\/quotes\/q-quote\/terms$/)
+    await expect(page.getByRole('dialog')).toHaveCount(0)
     for (const label of ['Scope of work', 'Exclusions', 'Payment terms', 'Quote expires']) {
-      await expect(sheet.getByLabel(label)).toBeVisible()
+      await expect(page.getByLabel(label)).toBeVisible()
     }
-    await sheet.getByLabel('Payment terms').fill('30% deposit on signing, 70% on completion.')
-    const saved = page.waitForRequest((r) => r.method() === 'PATCH' && r.url().includes('/rest/v1/fh_contacts'))
-    await sheet.getByRole('button', { name: 'Save terms' }).click()
-    expect((await saved).postDataJSON()).toMatchObject({ terms_text: '30% deposit on signing, 70% on completion.' })
-    await expect(sheet).toBeHidden()
-    // The deposit follows what the terms say.
-    await expect(page.locator('.fhj-capsule').getByText('Deposit $945.00 at approval')).toBeVisible()
+    const terms = '30% deposit on signing, 70% on completion.'
+    await page.getByLabel('Payment terms').fill(terms)
+    // The mock keeps no writes, so once the terms are saved every read of
+    // the quote answers with them, as the database would.
+    let savedTerms = false
+    await context.route((url) => url.pathname.endsWith('/rest/v1/fh_quotes'), (route) => {
+      if (route.request().method() === 'GET' && savedTerms) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([quoteRow({ terms_text: terms })]) })
+      }
+      return route.fallback()
+    })
+    const saved = page.waitForRequest((r) => r.method() === 'PATCH' && r.url().includes('/rest/v1/fh_quotes'))
+    await page.getByRole('button', { name: 'Save terms' }).click()
+    const request = await saved
+    expect(request.url()).toContain('id=eq.q-quote')
+    expect(request.postDataJSON()).toMatchObject({ terms_text: terms })
+    savedTerms = true
+    // Saving goes back to the quote, where the deposit follows what the terms say.
+    await expect(page).toHaveURL(/\/quotes\/q-quote$/)
+    await expect(total(page).getByText('Deposit $945.00 at approval')).toBeVisible()
   })
 
-  test('sharing, downloading and electronic signature stay reachable', async ({ context, page }) => {
+  test('sharing, downloading and electronic signature stay reachable, with no sheet', async ({ context, page }) => {
     await signIn(context, { tables: { fh_quote_items: ITEMS } })
     await openQuote(page)
-    await page.getByRole('button', { name: /Share or download/ }).click()
-    const sheet = page.getByRole('dialog', { name: 'Share or download' })
+    const share = page.getByRole('list', { name: 'Share or download' })
     for (const name of ['Open the PDF', 'Download the PDF', 'Copy a share link', 'Send for electronic signature']) {
-      await expect(sheet.getByRole('button', { name: new RegExp(name) })).toBeVisible()
+      await expect(share.getByRole('button', { name: new RegExp(name) })).toBeEnabled()
     }
+    await expect(page.getByRole('dialog')).toHaveCount(0)
   })
 
-  test('a draft can be deleted, an approved quote cannot', async ({ browser, contextOptions, context, page }) => {
-    await signIn(context, { tables: { fh_quote_items: ITEMS, fh_contacts: [quoteContact({ proposal_status: 'draft' })] } })
+  test('a draft can be deleted with a second tap, an approved quote cannot', async ({ browser, contextOptions, context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS, fh_quotes: [quoteRow({ status: 'draft', sent_at: null })] } })
+    const writes: string[] = []
+    page.on('request', (req) => {
+      if (req.method() === 'DELETE' && req.url().includes('/rest/v1/')) writes.push(new URL(req.url()).pathname)
+    })
     await openQuote(page)
-    await expect(page.getByRole('button', { name: 'Delete draft quote' })).toBeVisible()
+    const remove = page.getByRole('button', { name: 'Delete draft quote' })
+    await expect(remove).toBeVisible()
+    // The first tap asks in place (D57); nothing is deleted yet.
+    await remove.click()
+    await expect(page.getByRole('button', { name: 'Tap again to delete' })).toBeVisible()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(page.getByRole('alertdialog')).toHaveCount(0)
+    expect(writes).toEqual([])
+    await page.getByRole('button', { name: 'Tap again to delete' }).click()
+    await expect(page).toHaveURL(/\/quotes$/, { timeout: 15_000 })
+    expect(writes).toContain('/rest/v1/fh_quote_items')
+    expect(writes).toContain('/rest/v1/fh_quotes')
 
-    // The approved quote opens in a fresh browser context. The job page
-    // keeps the last read in the offline cache for 30 seconds, so a second
-    // visit in the same context could still show the draft it just saw and
-    // never ask the mock again. That made this test a race.
+    // The approved quote opens in a fresh browser context, so no cache from
+    // the draft can stand in for it.
     const approvedContext = await browser.newContext(contextOptions)
     try {
       const approved = await approvedContext.newPage()
-      await signIn(approvedContext, { tables: { fh_quote_items: ITEMS, fh_contacts: [quoteContact({ proposal_status: 'approved' })] } })
+      await signIn(approvedContext, { tables: { fh_quote_items: ITEMS, fh_quotes: [quoteRow({ status: 'approved' })] } })
       await openQuote(approved)
       await expect(approved.getByRole('button', { name: 'Delete draft quote' })).toHaveCount(0)
       await expect(approved.getByText('Approved quotes cannot be deleted. Create a revision instead.')).toBeVisible()
@@ -455,38 +522,69 @@ test.describe('quote tab on a phone', () => {
     }
   })
 
-  test('the other tabs keep the action capsule', async ({ context, page }) => {
+  test('Make this a job lands on the new job', async ({ context, page }) => {
     await signIn(context, { tables: { fh_quote_items: ITEMS } })
+    const calls = await watchSends(context)
+    // The mock answers an insert with the first row of the table, which is
+    // a moved row here; answer with the job the database would make.
+    const inserted: Record<string, unknown>[] = []
+    await context.route((url) => url.pathname.endsWith('/rest/v1/fh_contacts'), (route) => {
+      const request = route.request()
+      if (request.method() !== 'POST') return route.fallback()
+      inserted.push(request.postDataJSON())
+      return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ id: 'job-new', ...request.postDataJSON() }) })
+    })
+    const copies: Record<string, unknown>[][] = []
+    await context.route((url) => url.pathname.endsWith('/rest/v1/fh_quote_items'), (route) => {
+      const request = route.request()
+      if (request.method() !== 'POST') return route.fallback()
+      copies.push(request.postDataJSON())
+      return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(request.postDataJSON()) })
+    })
+    const linked = page.waitForRequest((r) => r.method() === 'PATCH' && r.url().includes('/rest/v1/fh_quotes'))
     await openQuote(page)
-    await page.getByRole('tablist', { name: 'Job sections' }).getByRole('tab', { name: 'Details', exact: true }).click()
-    const capsule = page.locator('.fhj-capsule')
-    await expect(capsule.getByRole('button', { name: /photo/i })).toBeVisible()
-    await expect(capsule.getByRole('button', { name: /voice note/i })).toBeVisible()
-    await expect(capsule.getByRole('button', { name: 'Approve quote' })).toBeVisible()
-    await expect(capsule.getByText('Total', { exact: true })).toHaveCount(0)
+
+    await page.getByRole('button', { name: 'Make this a job' }).click()
+    await expect(page).toHaveURL(/\/jobs\/job-new$/, { timeout: 30_000 })
+
+    // The job copies the quote's client, title, scope and the base price (D61).
+    expect(inserted).toHaveLength(1)
+    expect(inserted[0]).toMatchObject({ stage: 'job', client_id: 'cl-1', name: 'Jeff Roy', job_title: 'Parking lot repour', amount: 3150 })
+    // Every line goes onto the job, and the quote points at the job.
+    expect(copies).toHaveLength(1)
+    expect(copies[0]).toHaveLength(3)
+    for (const row of copies[0]) expect(row).toMatchObject({ contact_id: 'job-new', quote_id: null })
+    expect((await linked).postDataJSON()).toEqual({ job_id: 'job-new' })
+    expect(calls.send).toEqual([])
+  })
+
+  test('an approved quote still offers Make this a job', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS, fh_quotes: [quoteRow({ status: 'approved' })] } })
+    await openQuote(page)
+    await expect(page.locator('.fhqt-head').getByText('Approved', { exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Make this a job' })).toBeEnabled()
+    // Once the quote has its job, the button opens that job instead.
+    await signIn(context, { tables: { fh_quote_items: ITEMS, fh_quotes: [quoteRow({ status: 'approved', job_id: 'c-job1' })] } })
+    await openQuote(page)
+    await expect(page.getByRole('button', { name: 'Make this a job' })).toHaveCount(0)
+    const open = page.getByRole('link', { name: 'Open the job' })
+    await expect(open).toBeVisible()
+    await open.click()
+    await expect(page).toHaveURL(/\/jobs\/c-job1$/)
   })
 })
 
-test.describe('quote tab stage actions', () => {
-  test('review changes stays the stage action on the other tabs', async ({ context, page }, testInfo) => {
-    test.skip(!testInfo.project.name.startsWith('mobile'), 'Phone layout')
+test.describe('the quotes list', () => {
+  test('lists every quote and opens one', async ({ context, page }) => {
     await signIn(context)
-    await openQuote(page, '/quotes/c-change?tab=quote')
-    await page.getByRole('tablist', { name: 'Job sections' }).getByRole('tab', { name: 'Details', exact: true }).click()
-    await expect(page.locator('.fhj-capsule').getByRole('button', { name: 'Review changes' })).toBeVisible()
-  })
-})
-
-test.describe('quote tab on a desktop', () => {
-  test('keeps the builder and the document toggle', async ({ context, page }, testInfo) => {
-    test.skip(!testInfo.project.name.startsWith('desktop'), 'Desktop layout')
-    await signIn(context, { tables: { fh_quote_items: ITEMS } })
-    await page.goto('/quotes/c-quote?tab=quote', { waitUntil: 'domcontentloaded', timeout: 60_000 })
-    await expect(page.locator('[data-build-screen="SnowJobDetailBuild"]')).toBeVisible({ timeout: 30_000 })
-    await expect(page.getByRole('heading', { name: 'Line items' })).toBeVisible()
-    await expect(page.getByRole('tab', { name: 'Builder' })).toBeVisible()
-    await expect(page.getByRole('tab', { name: 'Document' })).toBeVisible()
-    await expect(page.locator('.fhq-page')).toHaveCount(0)
-    await expect(page.locator('.fhj-capsule')).toHaveCount(0)
+    await page.goto('/quotes', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    await expect(page.getByRole('heading', { level: 1, name: 'Quotes' })).toBeVisible({ timeout: 30_000 })
+    const rows = page.getByRole('list', { name: 'Quotes' })
+    await expect(rows.getByText('Parking lot repour')).toBeVisible()
+    await expect(rows.getByText('Kitchen renovation')).toBeVisible()
+    await expect(rows.getByText('Changes requested', { exact: true })).toBeVisible()
+    await rows.getByRole('link', { name: /Parking lot repour/ }).click()
+    await expect(page).toHaveURL(/\/quotes\/q-quote$/)
+    await expect(page.locator('.fhqt-page')).toBeVisible({ timeout: 30_000 })
   })
 })

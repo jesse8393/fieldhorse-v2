@@ -1,0 +1,163 @@
+/*
+ * The job's action screens, /jobs/:id/payment, /partner, /complete, /more
+ * and /follow-up (Phase 9, Task 13, decision D57). Class prefix fhja-
+ * (decision D41). Reads only --fh- tokens, so Day and Night follow on
+ * their own. The frame (Back, the title, the fields and the one gold
+ * button) comes from the create shell; this file lays out the money facts,
+ * the recent partners strip, the ready link, the follow up choices and the
+ * room a destructive button keeps from the rest.
+ */
+
+/* ---- A line under the title ---- */
+.fhja-lede {
+  margin: 0 0 12px;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--fh-ink-2);
+}
+
+/* ---- Contract, paid and balance on the closeout ---- */
+.fhja-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.fhja-fact {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--fh-edge);
+  border-radius: 12px;
+  background: var(--fh-paper);
+}
+
+.fhja-fact dt {
+  font-family: var(--fh-font-body);
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--fh-ink-3);
+}
+
+.fhja-fact dd {
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 17px;
+  line-height: 22px;
+  font-weight: 600;
+  color: var(--fh-ink);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.fhja-fact--owed dd {
+  color: var(--fh-danger-ink);
+}
+
+/* ---- Recent partners: one tap fills the form ---- */
+.fhja-recent {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.fhja-recent__label {
+  font-family: var(--fh-font-body);
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--fh-ink-2);
+}
+
+.fhja-recent__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ---- The invite link, once it is ready ---- */
+.fhja-link {
+  margin: 0 0 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--fh-edge-strong);
+  border-radius: 12px;
+  background: var(--fh-paper);
+  font-family: var(--fh-font-body);
+  font-size: 14px;
+  line-height: 18px;
+  color: var(--fh-ink);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.fhja-note {
+  margin: 0 0 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--fh-edge);
+  border-radius: 12px;
+  background: var(--fh-tray);
+  font-family: var(--fh-font-body);
+  font-size: 14px;
+  line-height: 18px;
+  color: var(--fh-ink-2);
+}
+
+.fhja-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 0 0 12px;
+}
+
+/* ---- The follow up choices ---- */
+.fhja-choices {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+
+/* ---- The more screen's rows ---- */
+.fhja-rows {
+  margin: 0;
+  padding: 0 var(--fh-gutter);
+  list-style: none;
+}
+
+/* ---- A destructive action keeps its distance ---- */
+.fhja-danger {
+  display: grid;
+  gap: 8px;
+  padding: 24px var(--fh-gutter) 0;
+}
+
+.fhja-danger__why {
+  margin: 0;
+  font-family: var(--fh-font-body);
+  font-size: 14px;
+  line-height: 18px;
+  color: var(--fh-ink-2);
+}
+
+/* Inside the create shell's body the gutter is already there. */
+.fhnew-body .fhja-danger {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+@media (min-width: 900px) {
+  .fhja-rows,
+  .fhja-danger {
+    padding-left: var(--fh-gutter-desktop);
+    padding-right: var(--fh-gutter-desktop);
+  }
+
+  .fhnew-body .fhja-danger {
+    padding-left: 0;
+    padding-right: 0;
+  }
+}

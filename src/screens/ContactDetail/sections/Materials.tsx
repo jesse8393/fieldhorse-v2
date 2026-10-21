@@ -25,7 +25,7 @@ import { supabase } from '../../../lib/supabase.ts'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { SkeletonList } from '../../../components/Skeleton.tsx'
-import { useConfirm } from '../../../components/ConfirmSheet.tsx'
+import { useArmedId } from '../../../lib/secondTap.ts'
 import { Eyebrow } from '../../../components/v3'
 
 const SkeletonAny = SkeletonList as any
@@ -103,7 +103,8 @@ function parseBulkLine(raw: string): { qty: number; name: string } | null {
 }
 
 export default function MaterialsSection({ jobId, userId }: any) {
-  const confirm = useConfirm()
+  // Delete asks with a second tap on the row's own button (D57).
+  const deleteTap = useArmedId()
   const [rows, setRows] = useState<MaterialRow[]>([])
   const [loading, setLoading] = useState(true)
   const [bulkOpen, setBulkOpen] = useState(false)
@@ -205,12 +206,14 @@ export default function MaterialsSection({ jobId, userId }: any) {
     await patch(id, { installed_at: null } as any)
   }
 
-  async function remove(id: string) {
-    if (!(await confirm({ title: 'Delete this material row?', destructive: true }))) return
-    hapticTap()
-    setRows((rs) => rs.filter((r) => r.id !== id))
-    const { error } = await supabase.from('fh_materials').delete().eq('id', id)
-    if (error) { toastError("Couldn't delete", error.message); load() }
+  function remove(id: string) {
+    deleteTap.tap(id, () => {
+      hapticTap()
+      setRows((rs) => rs.filter((r) => r.id !== id))
+      void supabase.from('fh_materials').delete().eq('id', id).then(({ error }) => {
+        if (error) { toastError("Couldn't delete", error.message); load() }
+      })
+    })
   }
 
   // Status counts
@@ -232,10 +235,10 @@ export default function MaterialsSection({ jobId, userId }: any) {
           )}
         </Eyebrow>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button type="button" onClick={() => setNotesPromptOpen(true)} style={chipBtnGhost}>
+          <button type="button" aria-expanded={notesPromptOpen} onClick={() => { setNotesPromptOpen((v) => !v); setBulkOpen(false) }} style={chipBtnGhost}>
             <Sparkles size={11} /> Pull from notes
           </button>
-          <button type="button" onClick={() => setBulkOpen(true)} style={chipBtnGhost}>
+          <button type="button" aria-expanded={bulkOpen} onClick={() => { setBulkOpen((v) => !v); setNotesPromptOpen(false) }} style={chipBtnGhost}>
             <ListPlus size={11} /> Bulk add
           </button>
         </div>
@@ -322,6 +325,7 @@ export default function MaterialsSection({ jobId, userId }: any) {
                 onMarkInstalled={() => markInstalled(r.id)}
                 onUnmarkInstalled={() => unmarkInstalled(r.id)}
                 onDelete={() => remove(r.id)}
+                deleteArmed={deleteTap.armedId === r.id}
               />
             ))}
           </AnimatePresence>
@@ -357,7 +361,7 @@ export default function MaterialsSection({ jobId, userId }: any) {
 // ─── card ──────────────────────────────────────────────────────────
 
 function MaterialCard({
-  row, onPatch, onMarkOrdered, onMarkReceived, onMarkInstalled, onUnmarkInstalled, onDelete,
+  row, onPatch, onMarkOrdered, onMarkReceived, onMarkInstalled, onUnmarkInstalled, onDelete, deleteArmed = false,
 }: {
   row: MaterialRow
   onPatch: (p: Partial<MaterialRow>) => void
@@ -366,6 +370,8 @@ function MaterialCard({
   onMarkInstalled: () => void
   onUnmarkInstalled: () => void
   onDelete: () => void
+  /** True while Delete waits for its second tap (D57). */
+  deleteArmed?: boolean
 }) {
   const status = statusOf(row)
   const tone = STATUS_TONE[status]
@@ -444,7 +450,14 @@ function MaterialCard({
             <X size={13} />
           </button>
         )}
-        <button type="button" onClick={onDelete} title="Delete" aria-label="Delete" style={iconBtnStyle}>
+        <button
+          type="button"
+          onClick={onDelete}
+          title={deleteArmed ? 'Tap again to delete' : 'Delete'}
+          aria-label={deleteArmed ? 'Tap again to delete' : 'Delete'}
+          aria-pressed={deleteArmed ? true : undefined}
+          style={deleteArmed ? { ...iconBtnStyle, color: 'var(--v3-danger-text)', background: 'var(--v3-danger-soft)' } : iconBtnStyle}
+        >
           <Trash2 size={13} />
         </button>
       </div>
@@ -578,49 +591,34 @@ function NotesPullDialog({ jobId, onClose, onAdd }: {
   )
 }
 
-// ─── dialog shell + styles ─────────────────────────────────────────
+// ─── panel shell + styles ──────────────────────────────────────────
 
+// Bulk add and Pull from notes open in place under the header (D57): a
+// panel in the page, not a dialog over it.
 function DialogShell({ title, subtitle, onClose, children }: { title: string; subtitle?: string; onClose: () => void; children: any }) {
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
+    <section
       aria-label={title}
       style={{
-        position: 'fixed', inset: 0, zIndex: 90,
-        background: 'rgba(20, 20, 20,.55)',
-        display: 'grid', placeItems: 'center',
         padding: 16,
+        borderRadius: 10,
+        background: 'var(--v3-surface)',
+        border: '1px solid var(--v3-border)',
       }}
-      onClick={onClose}
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: '100%', maxWidth: 520,
-          maxHeight: 'calc(100vh - 32px)',
-          overflowY: 'auto',
-          padding: 24,
-          borderRadius: 10,
-          background: 'linear-gradient(180deg, rgba(20, 20, 20,.95), rgba(20, 20, 20,.98))',
-          border: '1px solid var(--v3-border-mid)',
-          boxShadow: '0 22px 60px rgba(20, 20, 20,.50)',
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            <div className="fh-build-eyebrow" style={{ color: 'var(--v3-primary-text)' }}>{title}</div>
-            {subtitle && (
-              <p style={{ margin: '6px 0 12px', fontSize: 12, color: 'var(--v3-text-muted)' }}>{subtitle}</p>
-            )}
-          </div>
-          <button type="button" onClick={onClose} aria-label="Close" style={{ background: 'transparent', border: 'none', color: 'var(--v3-text-muted)', cursor: 'pointer' }}>
-            <X size={18} />
-          </button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+        <div>
+          <div className="fh-build-eyebrow" style={{ color: 'var(--v3-primary-text)' }}>{title}</div>
+          {subtitle && (
+            <p style={{ margin: '6px 0 12px', fontSize: 12, color: 'var(--v3-text-muted)' }}>{subtitle}</p>
+          )}
         </div>
-        {children}
+        <button type="button" onClick={onClose} aria-label="Close" style={{ background: 'transparent', border: 'none', color: 'var(--v3-text-muted)', cursor: 'pointer' }}>
+          <X size={18} />
+        </button>
       </div>
-    </div>
+      {children}
+    </section>
   )
 }
 

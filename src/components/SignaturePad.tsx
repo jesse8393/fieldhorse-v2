@@ -132,10 +132,9 @@ export default function SignaturePad({
 
     function down(e: any) {
       e.preventDefault()
-      // Stop bubbling so the parent ActionSheet's framer-motion drag
-      // handler doesn't pick this gesture up and dismiss the sheet
-      // when the operator slightly oversteps the canvas. P2 fix from
-      // V3-QA-1B retest.
+      // Stop bubbling so a parent's own pointer handlers (a swipe row or a
+      // scroll container) do not pick this gesture up when the operator
+      // slightly oversteps the canvas.
       e.stopPropagation()
       try { canvas.setPointerCapture(e.pointerId) } catch { /* ignore */ }
       isDrawing.current = true

@@ -310,7 +310,13 @@ export type QuoteLinesState = {
  * each read that works; `onState` hears what the editor knows, and null
  * when it goes away.
  */
-export function useQuoteItems({ jobId, userId, onContactRefresh, onLoaded, onState }: any) {
+export function useQuoteItems({ jobId, quoteId, userId, onContactRefresh, onLoaded, onState }: any) {
+  // Phase 9 (SPEC D53, D55): a quote's lines carry quote_id and no
+  // contact_id; a job's lines carry contact_id. One of the two scopes the
+  // reads and the inserts. `scopeId` is the record whose lines these are.
+  const scopeColumn = quoteId ? 'quote_id' : 'contact_id'
+  const scopeId = quoteId || jobId
+  const scopeFields = quoteId ? { quote_id: quoteId, contact_id: null } : { contact_id: jobId }
   const [rows, setRows] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   // The latest read of the lines failed. The lines an earlier read brought
@@ -340,13 +346,13 @@ export function useQuoteItems({ jobId, userId, onContactRefresh, onLoaded, onSta
   // smooth instead of blinking on each write (the "glitchy" complaint).
   // Only the initial load shows the skeleton.
   const fetchRows = useCallback(async (opts?: { silent?: boolean }) => {
-    if (!jobId || !userId) return
+    if (!scopeId || !userId) return
     const seq = ++readSeq.current
     if (!opts?.silent) setLoading(true)
     const { data, error } = await supabase
       .from('fh_quote_items')
       .select('*')
-      .eq('contact_id', jobId)
+      .eq(scopeColumn, scopeId)
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: true })
     // A newer read has gone out since: it decides.
@@ -373,7 +379,7 @@ export function useQuoteItems({ jobId, userId, onContactRefresh, onLoaded, onSta
     setLoaded(true)
     setLoading(false)
     onLoadedRef.current?.()
-  }, [jobId, userId])
+  }, [scopeColumn, scopeId, userId])
 
   // Another job's lines never stand in for this one's, nor does a read of
   // them still out.
@@ -384,7 +390,7 @@ export function useQuoteItems({ jobId, userId, onContactRefresh, onLoaded, onSta
     loadedRef.current = false
     setLoaded(false)
     sortRef.current = 0
-  }, [jobId])
+  }, [scopeId])
 
   useEffect(() => { fetchRows() }, [fetchRows])
 
@@ -401,7 +407,7 @@ export function useQuoteItems({ jobId, userId, onContactRefresh, onLoaded, onSta
   // ============================================================
 
   async function addItem(input: any) {
-    if (!jobId || !userId) return null
+    if (!scopeId || !userId) return null
     // Until a read of the lines works the sort counter is not seeded, so a
     // new line would take sort order 0 and land among the first ones.
     if (!loadedRef.current) {
@@ -414,11 +420,11 @@ export function useQuoteItems({ jobId, userId, onContactRefresh, onLoaded, onSta
     }
     const sortOrder = Number.isFinite(input.sort_order) ? input.sort_order : sortRef.current++
     const tempId = `temp-${(typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${rows.length}-${sortOrder}`}`
-    const optimisticRow = { id: tempId, user_id: userId, contact_id: jobId, ...input, sort_order: sortOrder, _pending: true }
+    const optimisticRow = { id: tempId, user_id: userId, ...scopeFields, ...input, sort_order: sortOrder, _pending: true }
     // Show the line immediately, no network wait between entries. This is
     // what makes rapid multi-item entry feel instant instead of glitchy.
     setRows((rs) => [...rs, optimisticRow])
-    const payload = { user_id: userId, contact_id: jobId, ...input, sort_order: sortOrder }
+    const payload = { user_id: userId, ...scopeFields, ...input, sort_order: sortOrder }
     const { data, error } = await supabase
       .from('fh_quote_items')
       .insert(payload)

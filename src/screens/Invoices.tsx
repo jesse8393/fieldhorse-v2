@@ -1,48 +1,29 @@
-import { lazy, Suspense, useMemo, useState } from 'react'
-import { AnimatePresence } from 'framer-motion'
+import { lazy, Suspense, useMemo } from 'react'
 import { useInvoicesBundle, useInvalidateInvoices } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
-import { useProfile } from '../contexts/ProfileContext.tsx'
-import { sendInvoiceEmail, buildInvoicePdf, setInvoiceStatus } from '../lib/invoices.ts'
-// Lazy, pdf.js + transitive jspdf + autoTable deps are ~430KB. Only
-// loads on the first PDF action (per-row Generate or Email Invoice).
-async function loadPdf(): Promise<any> {
-  return import('../lib/pdf.js')
-}
-import { toastSuccess, toastError } from '../lib/toast.ts'
 import DataErrorState from '../components/DataErrorState.tsx'
-// V3PaymentSheet is lazy, only loads when an operator taps "Mark Paid".
-// Avoids dragging ~440KB into the initial Invoices route chunk.
-const V3PaymentSheet = lazy(() => import('../components/V3PaymentSheet.tsx'))
-import { useConfirm } from '../components/ConfirmSheet.tsx'
-import StatementSheet from '../components/StatementSheet.tsx'
 import { approvedCoByContact } from '../lib/statement.ts'
 import { parseDateOnly } from '../lib/dates.ts'
-import { invoiceDueNow, knownInvoices } from '../lib/moneyView.ts'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { useNow } from '../lib/useNow.ts'
-import { startInvoiceSend, useInvoicesSending } from '../lib/invoiceSends.ts'
 const SnowInvoices = lazy(() => import('../components/desktop/SnowInvoicesBuild.tsx'))
 import MoneyPhone from './money/MoneyPhone.tsx'
 import type { MoneyFilter } from './money/types.ts'
 
-// Invoices / AR, v3 money command screen.
+// Money (/invoices): invoices and what each job owes.
 //
 // Pipeline v2: two layers on one screen.
-//   1. ISSUED INVOICES, real fh_invoices rows (deposit / draws /
-//      final), each with its own status + send / download / mark-paid.
-//   2. JOB BALANCES, per-job outstanding (contract − paid), the
+//   1. INVOICES, real fh_invoices rows (a job's deposit, draws and final,
+//      or a bill against a client with no job, D62), each with its own
+//      status. A row opens the invoice's screen, /invoices/:id, where
+//      Send, PDF, Collect payment, Remind and Void live (D57).
+//   2. JOB BALANCES, per-job outstanding (contract less paid), the
 //      who-owes-me-what aging view, kept from the original screen.
-// The per-job Email action now creates a first-class invoice for the
-// balance instead of firing an untracked ad-hoc PDF.
 //
 // Below 900 px the screen is MoneyPhone (src/screens/money/) and from
 // 900 px up it is SnowInvoicesBuild (src/components/desktop/): this file
-// still loads the data and owns the send, download, void and payment
-// handlers, and hands them down to both. Per job Email, Download and Mark
-// paid live on the job's invoice page (InvoiceDetail, /invoices/:id),
-// which the Job balances list links to.
+// loads the data and builds the rows both read.
 
 function bucketFor(days: any) {
   if (days <= 30) return '0-30'
@@ -66,7 +47,6 @@ function resolveClient(job: any) {
 
 export default function Invoices() {
   const { user } = useAuth()
-  const { profile } = useProfile()
   // isPending, not isLoading: the query waits, disabled, until the company
   // is known (useOrgScope), and TanStack does not call a waiting query
   // loading, so both screens would draw $0.00 and "paid in full" for money
@@ -95,26 +75,11 @@ export default function Invoices() {
     else sp.set('view', next)
     setSearchParams(sp, { replace: true })
   }
-  // Row whose Mark Paid sheet is open. null = closed. Stores the full row
-  // so the sheet can prefill amount=balance and pass the contact (job).
-  // When the sheet was opened from a specific issued invoice, `invoice`
-  // rides along so the payment settles that fh_invoices row.
-  const [payingRow, setPayingRow] = useState<any>(null)
-  // The invoices whose email is mid send, one entry each, drive the Resend
-  // and Send reminder buttons' loading state. A set, not one id: a
-  // reminder for B finishing must not free A's button, and a second tap
-  // on A while it is in flight sends nothing. It lives in lib/invoiceSends,
-  // not here, so leaving Money mid send and coming back still finds the
-  // invoice busy.
-  const sendingIds = useInvoicesSending()
-  const confirm = useConfirm()
-
-  // Fast lookup: contact_id → job row (for invoice card labels + sends).
-  const jobById = useMemo(() => {
-    const m = new Map()
-    for (const j of jobs) m.set(j.id, j)
-    return m
-  }, [jobs])
+  // Log payment on a job balance (the desktop table) is the job's payment
+  // screen, and a customer's statement its own screen (D57).
+  const navigate = useNavigate()
+  const openPayment = (r: { job: { id: string } }) => navigate(`/jobs/${r.job.id}/payment`)
+  const openStatement = (g: { clientId: string }) => navigate(`/clients/${g.clientId}/statement`)
 
   // Receivable-age anchor per job: the earliest OPEN (issued but not
   // paid/void/draft) invoice's due date, else its issue date. A/R aging
@@ -178,7 +143,7 @@ export default function Invoices() {
   // BY-CLIENT A/R rollup, group every outstanding job balance under
   // its linked client so "who owes me, and how overdue" reads at a
   // glance. Each group carries the client's jobs + the worst aging
-  // bucket among them, and feeds the shared StatementSheet directly.
+  // bucket among them, and names the customer whose statement screen opens.
   const clientAR = useMemo(() => {
     const groups = new Map<string, any>()
     for (const r of rows) {
@@ -211,20 +176,6 @@ export default function Invoices() {
     }
     return Array.from(groups.values()).sort((a, b) => b.total - a.total)
   }, [rows])
-
-  const [statementClient, setStatementClient] = useState<any>(null)
-
-  // Issued invoices (first-class fh_invoices rows) with their job. The
-  // status and amount each screen shows come from moneyView's classify.
-  const invoiceRows = useMemo(
-    () => invoices.map((inv) => ({ invoice: inv, job: jobById.get(inv.contact_id) || null })),
-    [invoices, jobById]
-  )
-
-  // Every invoice the bundle knows (the display list, every open one and
-  // the paid and void ones), so a reminder email asks for what the row
-  // shows: invoiceAmountDue spreads money logged against the job over them.
-  const allInvoices = useMemo(() => (bundle ? knownInvoices(bundle) : []), [bundle])
 
   const totals = useMemo(() => {
     const out: Record<string, number> = { '0-30': 0, '31-60': 0, '60+': 0, total: 0, count: 0 }
@@ -263,143 +214,6 @@ export default function Invoices() {
     return { monthCollected, deltaPct }
   }, [payments, now])
 
-  const company = useMemo(() => ({
-    name: profile?.company_name || profile?.full_name || 'My Company',
-    address: profile?.company_address || '',
-    phone: profile?.company_phone || '',
-    // Prefer customer facing company_email (migration 015) over the
-    // operator's auth email so invoices show the public address.
-    email: profile?.company_email || (profile as any)?.email || '',
-    website: profile?.company_website || '',
-    logo_url: profile?.logo_url || null,
-    brand_accent_hex: profile?.brand_accent_hex || null,
-    license_number: profile?.license_number || '',
-    insured_text: profile?.insured_text || '',
-    // Pay link + instructions so the "How to pay" block renders on PDFs
-    // downloaded/emailed from this screen too (not just the send sheet).
-    payment_link: (profile as any)?.payment_link || '',
-    payment_instructions: (profile as any)?.payment_instructions || ''
-  }), [profile])
-
-  // Mark paid on an issued invoice links the payment to it, prefilled
-  // with what is still due on it (the amount its Money row shows): less
-  // what was paid against it, never more than the job's remaining
-  // balance, so clearing a bill the job already paid can't record the
-  // same money a second time.
-  function openInvoicePayment(r: any) {
-    if (!r?.job || !bundle) return
-    const due = invoiceDueNow(bundle, r.invoice.id)
-    setPayingRow({ job: r.job, balance: due, invoice: { ...r.invoice, amount: due } })
-  }
-
-  // Payments scoped to one job, feeds the per-invoice PDF's balance
-  // summary + payment history blocks.
-  function paymentsForJob(jobId: string) {
-    return payments.filter((p) => p.contact_id === jobId)
-  }
-
-  // Change orders scoped to one job, must be threaded into every PDF /
-  // email path or the customer facing balance omits signed CO money
-  // (the A/R row already includes it, so the doc would understate).
-  function changeOrdersForJob(jobId: string) {
-    return changeOrders.filter((co) => (co as any).contact_id === jobId)
-  }
-
-  function invoicesForJob(jobId: string) {
-    return allInvoices.filter((inv) => inv.contact_id === jobId)
-  }
-
-  // Per-invoice actions, operate on the first-class fh_invoices rows.
-  // Resolves true once the email has gone out. The Remind and Resend
-  // sheets close when lib/invoiceSends reports the email went out, not on
-  // this promise, so a sheet on a Money screen opened again mid send
-  // closes too. A reminder is the same email sent again; only the toast
-  // words it differently (decision D6).
-  async function handleInvoiceSend(r: any, options: { reminder?: boolean } = {}): Promise<boolean> {
-    const { invoice, job } = r
-    if (!user || !job) {
-      toastError("Couldn't resolve the job", 'This invoice belongs to a job that is no longer in the money pipeline.')
-      return false
-    }
-    const c = resolveClient(job)
-    if (!c.email) {
-      toastError('Add a client email first', `Open the linked client to add an email for ${c.name || 'this client'}.`)
-      return false
-    }
-    // A tap while this invoice's email is already going out does nothing,
-    // even from a Money screen opened again since that send started.
-    const finish = startInvoiceSend(invoice.id, { reminder: !!options.reminder })
-    if (!finish) return false
-    let sent = false
-    try {
-      const res = await sendInvoiceEmail({
-        invoice,
-        contact: job,
-        company,
-        userId: user.id,
-        recipientEmail: c.email,
-        payments: paymentsForJob(job.id),
-        changeOrders: changeOrdersForJob(job.id),
-        invoices: invoicesForJob(job.id)
-      })
-      if (res.ok) {
-        toastSuccess(`${options.reminder ? 'Reminder' : 'Invoice'} sent to ${res.recipient}`, res.filename)
-        refresh()
-        sent = true
-      } else if (res.reason === 'sender_not_configured') {
-        toastError("Email not sent, sender isn't configured", 'Downloaded the PDF so you can email it manually.')
-      } else {
-        throw new Error(res.message || 'Send failed')
-      }
-    } catch (e: any) {
-      toastError("Couldn't send invoice", e?.message || 'Try again')
-    } finally {
-      // Frees the buttons, and closes a sheet still showing this invoice
-      // once its email went out (useMoneySheets listens for it).
-      finish(sent)
-    }
-    return sent
-  }
-
-  async function handleInvoiceDownload(r: any) {
-    const { invoice, job } = r
-    if (!job) {
-      toastError("Couldn't resolve the job", 'This invoice belongs to a job that is no longer in the money pipeline.')
-      return
-    }
-    try {
-      const result = await buildInvoicePdf({
-        invoice, contact: job, company,
-        payments: paymentsForJob(job.id),
-        changeOrders: changeOrdersForJob(job.id),
-        invoices: invoicesForJob(job.id)
-      })
-      const { downloadPdf } = await loadPdf()
-      downloadPdf(result)
-      toastSuccess('Invoice PDF downloaded', result.filename)
-    } catch (e: any) {
-      toastError("Couldn't generate PDF", e?.message || 'Try again')
-    }
-  }
-
-  async function handleInvoiceVoid(r: any) {
-    const { invoice } = r
-    const ok = await confirm({
-      title: `Void ${invoice.title || `invoice #${invoice.sequence_number}`}?`,
-      body: 'It stops counting toward the job’s billed total. The record stays for the books.',
-      destructive: true,
-      confirmLabel: 'Void invoice'
-    })
-    if (!ok) return
-    const { error } = await setInvoiceStatus(invoice, 'void')
-    if (error) {
-      toastError("Couldn't void", error.message || 'Try again')
-      return
-    }
-    toastSuccess('Invoice voided', '')
-    refresh()
-  }
-
   const isDesktop = useIsDesktop()
 
   // Never render financial totals from a failed load, a fetch error would
@@ -424,7 +238,6 @@ export default function Invoices() {
           <SnowInvoices
             bundle={bundle}
             loading={loading}
-            invoiceRows={invoiceRows}
             jobBalances={filtered}
             totals={totals}
             clientAR={clientAR}
@@ -432,51 +245,21 @@ export default function Invoices() {
             filter={filter as MoneyFilter}
             onFilterChange={(f) => setFilter(f)}
             now={now}
-            sendingIds={sendingIds}
-            onSendInvoice={handleInvoiceSend}
-            onDownloadInvoice={handleInvoiceDownload}
-            onPayInvoice={openInvoicePayment}
-            onVoidInvoice={handleInvoiceVoid}
-            onStatement={(g) => setStatementClient(g)}
-            onPayRow={(r) => setPayingRow(r)}
-            onRefresh={() => refresh()}
+            onStatement={openStatement}
+            onPayRow={openPayment}
           />
         </Suspense>
-        <AnimatePresence>
-          {payingRow && (
-            <Suspense fallback={null}>
-              <V3PaymentSheet
-                contact={payingRow.job}
-                balance={payingRow.balance}
-                invoice={payingRow.invoice || null}
-                onClose={() => setPayingRow(null)}
-                onLogged={() => { setPayingRow(null); refresh() }}
-              />
-            </Suspense>
-          )}
-        </AnimatePresence>
-        <StatementSheet
-          open={!!statementClient}
-          onClose={() => setStatementClient(null)}
-          client={statementClient?.client || null}
-          jobs={statementClient?.jobs || []}
-          payments={payments}
-          changeOrders={changeOrders}
-          userId={user?.id}
-        />
       </>
     )
   }
 
   // Phone: the Money screen. It takes the same rows and handlers the
-  // desktop table gets; the payment and statement sheets below are the
-  // existing ones, opened from its invoice actions and its Who owes you list.
+  // desktop table gets; a statement opens as the customer's statement screen.
   return (
     <>
       <MoneyPhone
         bundle={bundle}
         loading={loading}
-        invoiceRows={invoiceRows}
         jobBalances={filtered}
         totals={totals}
         clientAR={clientAR}
@@ -484,35 +267,7 @@ export default function Invoices() {
         filter={filter as MoneyFilter}
         onFilterChange={(f) => setFilter(f)}
         now={now}
-        sendingIds={sendingIds}
-        onSendInvoice={handleInvoiceSend}
-        onDownloadInvoice={handleInvoiceDownload}
-        onPayInvoice={openInvoicePayment}
-        onVoidInvoice={handleInvoiceVoid}
-        onStatement={(g) => setStatementClient(g)}
-        onRefresh={() => refresh()}
-      />
-      <AnimatePresence>
-        {payingRow && (
-          <Suspense fallback={null}>
-            <V3PaymentSheet
-              contact={payingRow.job}
-              balance={payingRow.balance}
-              invoice={payingRow.invoice || null}
-              onClose={() => setPayingRow(null)}
-              onLogged={() => { setPayingRow(null); refresh() }}
-            />
-          </Suspense>
-        )}
-      </AnimatePresence>
-      <StatementSheet
-        open={!!statementClient}
-        onClose={() => setStatementClient(null)}
-        client={statementClient?.client || null}
-        jobs={statementClient?.jobs || []}
-        payments={payments}
-        changeOrders={changeOrders}
-        userId={user?.id}
+        onStatement={openStatement}
       />
     </>
   )

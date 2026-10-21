@@ -30,37 +30,41 @@ test.describe('phone shell', () => {
     await expect(dock.getByRole('link', { name: 'Today' })).toHaveAttribute('aria-current', 'page')
 
     await dock.getByRole('link', { name: 'Jobs' }).click()
-    await expect(page).toHaveURL(/\/work/)
+    await expect(page).toHaveURL(/\/jobs$/)
     await expect(dock.getByRole('link', { name: 'Jobs' })).toHaveAttribute('aria-current', 'page')
 
     await dock.getByRole('button', { name: /Capture/ }).click()
     await expect(page.getByRole('heading', { name: 'Capture', exact: true })).toBeVisible()
   })
 
-  test('the header monogram opens the workspace menu from any screen', async ({ page }) => {
-    for (const path of ['/', '/work', '/invoices', '/schedule']) {
+  test('the header monogram opens the workspace screen from any screen', async ({ page }) => {
+    for (const path of ['/', '/jobs', '/invoices', '/schedule']) {
       await open(page, path)
       await page.getByRole('button', { name: 'Open workspace menu' }).click()
-      const menu = page.getByRole('dialog', { name: 'Workspace menu' })
+      // A screen, not a sheet (D57).
+      await expect(page).toHaveURL(/\/workspace$/)
+      await expect(page.getByRole('dialog')).toHaveCount(0)
+      const menu = page.getByRole('navigation', { name: 'Workspace' })
       await expect(menu).toBeVisible()
       await expect(menu.getByRole('button', { name: 'Settings' })).toBeVisible()
-      await page.keyboard.press('Escape')
-      await expect(menu).toBeHidden()
+      await page.getByRole('button', { name: 'Back' }).click()
+      await expect(page).toHaveURL(new RegExp(`${path.replace('/', '\\/')}$`))
+      await expect(menu).toHaveCount(0)
     }
 
     // Every menu route is two taps away: open, then go.
     await page.getByRole('button', { name: 'Open workspace menu' }).click()
-    await page.getByRole('dialog', { name: 'Workspace menu' }).getByRole('button', { name: 'Subs' }).click()
+    await page.getByRole('navigation', { name: 'Workspace' }).getByRole('button', { name: 'Subs' }).click()
     await expect(page).toHaveURL(/\/subs/)
-    await expect(page.getByRole('dialog', { name: 'Workspace menu' })).toBeHidden()
+    await expect(page.getByRole('navigation', { name: 'Workspace' })).toHaveCount(0)
   })
 
   test('Day, Night and Auto switch from the menu and stick', async ({ page }) => {
     await open(page, '/')
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
     await page.getByRole('button', { name: 'Open workspace menu' }).click()
-    const menu = page.getByRole('dialog', { name: 'Workspace menu' })
-    await menu.getByRole('radio', { name: 'Night' }).check()
+    await expect(page).toHaveURL(/\/workspace$/)
+    await page.getByRole('radio', { name: 'Night' }).check()
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
     expect(await page.evaluate(() => localStorage.getItem('fh:theme-mode'))).toBe('night')
     await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#171611')
@@ -86,7 +90,8 @@ test.describe('phone shell', () => {
   test('last item clears the dock', async ({ page }) => {
     for (const path of ['/invoices', '/clients']) {
       await open(page, path)
-      await expect(page.locator('main').getByRole('button').first()).toBeVisible()
+      // Money's rows are links now (Phase 9, D62), Customers still has buttons.
+      await expect(page.locator('main').locator('a, button').first()).toBeVisible()
       // Scroll to the very bottom; long lists render more rows as they
       // near the end, so repeat until the page stops growing.
       let height = 0

@@ -9,7 +9,7 @@ import DataErrorState from '../../../components/DataErrorState.tsx'
 import LoadingValue from '../../../components/LoadingValue.tsx'
 import { countNoun } from '../../../lib/format.ts'
 import { keepFocusOnRetry } from '../../../lib/retryFocus.ts'
-import ActionSheet from '../../../components/ActionSheet.tsx'
+import { useArmedId } from '../../../lib/secondTap.ts'
 import { Eyebrow } from '../../../components/v3'
 import { extensionOf, isBlockedUpload, opensInline } from '../lib/fileTypes.ts'
 
@@ -37,7 +37,8 @@ export default function FilesSection({ jobId, userId }: any) {
   const [failed, setFailed] = useState(false)
   const [uploading, setUploading] = useState(false)
   // Destructive-confirm sheet state for delete file.
-  const [pendingDelete, setPendingDelete] = useState<any>(null)
+  // Delete asks with a second tap on the same button (D57).
+  const deleteTap = useArmedId()
   const [deleting, setDeleting] = useState(false)
   const inputRef = useRef<any>(null)
   // The section; Try again leaves focus on the sub tab's panel around it.
@@ -149,15 +150,14 @@ export default function FilesSection({ jobId, userId }: any) {
     window.open(data.signedUrl, '_blank', 'noopener')
   }
 
-  // Open the destructive-confirm sheet for this file. Storage + db
-  // delete happens in confirmRemove on commit.
+  // The first tap arms the row's delete button, the second removes the
+  // file from storage and the job record (confirmRemove).
   function remove(row: any) {
-    if (!row) return
-    setPendingDelete(row)
+    if (!row || deleting) return
+    deleteTap.tap(row.id, () => { void confirmRemove(row) })
   }
 
-  async function confirmRemove() {
-    const row = pendingDelete
+  async function confirmRemove(row: any) {
     if (!row || deleting) return
     setDeleting(true)
     try {
@@ -181,7 +181,6 @@ export default function FilesSection({ jobId, userId }: any) {
       toastError('Delete failed', ex?.message || 'Try again')
     } finally {
       setDeleting(false)
-      setPendingDelete(null)
     }
   }
 
@@ -303,11 +302,14 @@ export default function FilesSection({ jobId, userId }: any) {
               <button
                 type="button"
                 onClick={() => remove(r)}
-                aria-label="Delete file"
+                aria-label={deleteTap.armedId === r.id ? 'Tap again to delete' : 'Delete file'}
+                aria-pressed={deleteTap.armedId === r.id ? true : undefined}
+                disabled={deleting}
                 style={{
                   width: 32, height: 32, borderRadius: 10,
-                  background: 'transparent', border: 'none',
-                  color: 'var(--v3-text-muted)', cursor: 'pointer',
+                  background: deleteTap.armedId === r.id ? 'var(--v3-danger-soft)' : 'transparent',
+                  border: deleteTap.armedId === r.id ? '1px solid var(--v3-danger-bright)' : 'none',
+                  color: deleteTap.armedId === r.id ? 'var(--v3-danger-text)' : 'var(--v3-text-muted)', cursor: 'pointer',
                   display: 'grid', placeItems: 'center'
                 }}
               >
@@ -318,26 +320,6 @@ export default function FilesSection({ jobId, userId }: any) {
         </ul>
       )}
 
-      {/* Destructive-confirm sheet for delete file. Storage + db delete
-          + refresh happen in confirmRemove on commit. */}
-      <ActionSheet
-        open={!!pendingDelete}
-        title="Delete this file?"
-        accentWord="Delete"
-        sectionLabel="Destructive"
-        stepCount={1}
-        currentStep={1}
-        commitLabel={deleting ? 'Deleting…' : 'Delete file'}
-        commitBusy={deleting}
-        commitDisabled={deleting}
-        destructive
-        onClose={() => { if (!deleting) setPendingDelete(null) }}
-        onCommit={confirmRemove}
-      >
-        <p style={{ margin: 0, color: 'var(--v3-text)', fontSize: '1rem', lineHeight: 1.45 }}>
-          Removing <strong>{pendingDelete?.filename || 'this file'}</strong> from storage and the job record. This can't be undone.
-        </p>
-      </ActionSheet>
     </div>
   )
 }

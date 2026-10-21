@@ -50,8 +50,49 @@ const Partners       = lazy(() => import('./screens/Partners.tsx'))
 const SubDetail      = lazy(() => import('./screens/SubDetail.tsx'))
 const Invoices       = lazy(() => import('./screens/Invoices.tsx'))
 const Landing        = lazy(() => import('./screens/Landing.tsx'))
-const InvoiceDetail  = lazy(() => import('./screens/InvoiceDetail.tsx'))
+// The invoice screens (Phase 9, D57, D62): /invoices/:id is an fh_invoices
+// row; its payment, edit and remind flows are routes of their own. A job's
+// money lives at /jobs/:id?tab=financials (JobMoney).
+const InvoiceDetail  = lazy(() => import('./screens/invoices/InvoiceDetail.tsx'))
+const InvoicePayment = lazy(() => import('./screens/invoices/InvoicePayment.tsx'))
+const InvoiceEdit    = lazy(() => import('./screens/invoices/InvoiceEdit.tsx'))
+const InvoiceRemind  = lazy(() => import('./screens/invoices/InvoiceRemind.tsx'))
 const Inbox          = lazy(() => import('./screens/inbox/Inbox.tsx'))
+const Notifications  = lazy(() => import('./screens/Notifications.tsx'))
+// Leads have their own list and screen (PHASE9_PLAN Task 9, decision D65).
+const LeadsList      = lazy(() => import('./screens/leads/LeadsList.tsx'))
+const LeadDetail     = lazy(() => import('./screens/leads/LeadDetail.tsx'))
+const New            = lazy(() => import('./screens/New.tsx'))
+const LeadNew        = lazy(() => import('./screens/leads/LeadNew.tsx'))
+const QuoteNew       = lazy(() => import('./screens/quotes/QuoteNew.tsx'))
+const JobNew         = lazy(() => import('./screens/jobs/JobNew.tsx'))
+const InvoiceNew     = lazy(() => import('./screens/invoices/InvoiceNew.tsx'))
+const ClientNew      = lazy(() => import('./screens/clients/ClientNew.tsx'))
+// Quotes are records of their own (Phase 9, D53, D65): a list, the quote
+// and its three screens for terms, the preview and approval.
+const QuotesList     = lazy(() => import('./screens/quotes/QuotesList.tsx'))
+const QuoteDetail    = lazy(() => import('./screens/quotes/QuoteDetail.tsx'))
+const QuoteTerms     = lazy(() => import('./screens/quotes/QuoteTerms.tsx'))
+const QuotePreview   = lazy(() => import('./screens/quotes/QuotePreview.tsx'))
+const QuoteApprove   = lazy(() => import('./screens/quotes/QuoteApprove.tsx'))
+// The job's action screens and the event screen took the place of the
+// job page's and the Schedule's sheets (Phase 9, Task 13, D57).
+const JobPayment     = lazy(() => import('./screens/jobs/JobPayment.tsx'))
+// The screens that took the place of the last pop ups (Task 14, D57).
+const Capture        = lazy(() => import('./screens/Capture.tsx'))
+const Workspace      = lazy(() => import('./screens/Workspace.tsx'))
+const SearchScreen   = lazy(() => import('./screens/Search.tsx'))
+const ClientStatement = lazy(() => import('./screens/clients/ClientStatement.tsx'))
+const ClientsMerge   = lazy(() => import('./screens/clients/ClientsMerge.tsx'))
+const MilesNew       = lazy(() => import('./screens/MilesNew.tsx'))
+const SubNew         = lazy(() => import('./screens/SubNew.tsx'))
+const TeamInvite     = lazy(() => import('./screens/TeamInvite.tsx'))
+const SubPortalProfile = lazy(() => import('./screens/SubPortalProfile.tsx'))
+const JobPartner     = lazy(() => import('./screens/jobs/JobPartner.tsx'))
+const JobComplete    = lazy(() => import('./screens/jobs/JobComplete.tsx'))
+const JobMore        = lazy(() => import('./screens/jobs/JobMore.tsx'))
+const JobFollowUp    = lazy(() => import('./screens/jobs/JobFollowUp.tsx'))
+const EventNew       = lazy(() => import('./screens/schedule/EventNew.tsx'))
 // The redesign component sheet, in development builds only: the
 // condition is a build time constant, so production drops the chunk.
 const DesignSheet    = import.meta.env.DEV ? lazy(() => import('./screens/DesignSheet.tsx')) : null
@@ -146,12 +187,10 @@ function AppLoading({ label }: { label: string }) {
  * state because React kept the instance alive across param changes.
  */
 /**
- * LegacyBoardRedirect, /leads, /quotes, /jobs, /pipeline collapsed
- * into the single /work screen (IA round 2: "jobs leads quotes
- * invoices… it all sucks and is too complicated"). Old links, nav
- * habits, and deep links keep working: the stage/view intent maps to
- * the matching Work chip and every other query param rides along
- * (?new=1, ?asStage=job from Home's New Job tile, etc).
+ * LegacyBoardRedirect: /work and /pipeline land on /jobs, the Jobs list
+ * (Phase 9, D65). Old links, nav habits and deep links keep working: the
+ * stage/view intent maps to the matching Jobs tab and every other query
+ * param rides along.
  */
 function LegacyBoardRedirect({ defaultStage }: { defaultStage?: string }) {
   const [params] = useSearchParams()
@@ -168,11 +207,47 @@ function LegacyBoardRedirect({ defaultStage }: { defaultStage?: string }) {
   if (mapped) sp.set('stage', mapped)
   else sp.delete('stage')
   const search = sp.toString()
-  return <Navigate to={{ pathname: '/work', search: search ? `?${search}` : '' }} replace />
+  return <Navigate to={{ pathname: '/jobs', search: search ? `?${search}` : '' }} replace />
 }
 
 function ContactDetailRoute() {
   const { id } = useParams()
+  return <ContactDetailSplit id={id} />
+}
+
+/**
+ * /leads/:id (SPEC D55, D56). Leads live in their own table now, so the id
+ * is first read there. An old fh_contacts id the migration moved is sent
+ * on to the new record; any other contact id still opens the old detail
+ * screen.
+ */
+
+/** /leads/:id: the lead screen, or the old detail screen for any other id. */
+function LeadDetailRoute() {
+  const { id = '' } = useParams()
+  return <LeadDetail id={id} fallback={<ContactDetailSplit id={id} />} />
+}
+
+/**
+ * /quotes/:id is the quote screen (Phase 9, Task 10). When no fh_quotes
+ * row has the id, the old detail screen takes it: a moved row is sent on
+ * to its new quote, a live contact still opens.
+ */
+function QuoteDetailRoute() {
+  const { id = '' } = useParams()
+  return <QuoteScreen><QuoteDetail fallback={<ContactDetailSplit id={id} />} /></QuoteScreen>
+}
+
+/**
+ * The quote screens lay out as a 640 px column. This wrapper is the route's
+ * root, so the shell's column stays full width around it (the desktop
+ * route audit measures the root) while the content keeps its width.
+ */
+function QuoteScreen({ children }: { children: ReactNode }) {
+  return <div className="fhqt-screen">{children}</div>
+}
+
+function ContactDetailSplit({ id }: { id: string | undefined }) {
   const isWide = useMediaQuery('(min-width: 1680px)')
   return (
     <div className="fh-detail-split">
@@ -212,39 +287,70 @@ export default function App() {
         />
         <Route element={<Gated><AppShell /></Gated>}>
           <Route path="/" element={<Home />} />
-          <Route path="/work" element={<Work />} />
-          <Route path="/leads" element={<LegacyBoardRedirect defaultStage="leads" />} />
-          <Route path="/leads/:id" element={<ContactDetailRoute />} />
-          <Route path="/quotes" element={<LegacyBoardRedirect defaultStage="quotes" />} />
-          <Route path="/quotes/:id" element={<ContactDetailRoute />} />
+          <Route path="/work" element={<LegacyBoardRedirect />} />
+          {/* The New screen and the create screens (SPEC D58, D59). */}
+          <Route path="/new" element={<New />} />
+          <Route path="/leads/new" element={<LeadNew />} />
+          <Route path="/quotes/new" element={<QuoteNew />} />
+          <Route path="/jobs/new" element={<JobNew />} />
+          <Route path="/invoices/new" element={<InvoiceNew />} />
+          <Route path="/clients/new" element={<ClientNew />} />
+          <Route path="/leads" element={<LeadsList />} />
+          <Route path="/leads/:id" element={<LeadDetailRoute />} />
+          <Route path="/quotes" element={<QuoteScreen><QuotesList /></QuoteScreen>} />
+          <Route path="/quotes/:id" element={<QuoteDetailRoute />} />
+          <Route path="/quotes/:id/terms" element={<QuoteScreen><QuoteTerms /></QuoteScreen>} />
+          <Route path="/quotes/:id/preview" element={<QuoteScreen><QuotePreview /></QuoteScreen>} />
+          <Route path="/quotes/:id/approve" element={<QuoteScreen><QuoteApprove /></QuoteScreen>} />
           <Route path="/pipeline" element={<LegacyBoardRedirect />} />
-          <Route path="/jobs" element={<LegacyBoardRedirect defaultStage="active" />} />
+          <Route path="/jobs" element={<Work />} />
           <Route path="/jobs/:id" element={<ContactDetailRoute />} />
+          <Route path="/jobs/:id/payment" element={<JobPayment />} />
+          <Route path="/jobs/:id/partner" element={<JobPartner />} />
+          <Route path="/jobs/:id/complete" element={<JobComplete />} />
+          <Route path="/jobs/:id/more" element={<JobMore />} />
+          <Route path="/jobs/:id/follow-up" element={<JobFollowUp />} />
           <Route path="/clients" element={<Clients />} />
+          <Route path="/clients/merge" element={<ClientsMerge />} />
           <Route path="/clients/:id" element={<ClientDetail />} />
+          <Route path="/clients/:id/statement" element={<ClientStatement />} />
           <Route path="/notes" element={<Notes />} />
           <Route path="/schedule" element={<Schedule />} />
+          <Route path="/schedule/new" element={<EventNew />} />
+          <Route path="/schedule/:eventId/edit" element={<EventNew />} />
           <Route path="/activity" element={<Activity />} />
           <Route path="/bid" element={<Bid />} />
           <Route path="/compose" element={<Compose />} />
           <Route path="/analytics" element={<Analytics />} />
+          <Route path="/miles/new" element={<MilesNew />} />
           <Route path="/import" element={<Importer />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/pour-window" element={<PourWindow />} />
           <Route path="/subs" element={<Subs />} />
+          <Route path="/subs/new" element={<SubNew />} />
           <Route path="/subs/:key" element={<SubDetail />} />
           <Route path="/partners" element={<Partners />} />
           <Route path="/team" element={<Team />} />
+          <Route path="/team/invite" element={<TeamInvite />} />
           <Route path="/crew" element={<Crew />} />
           <Route path="/timesheets" element={<Timesheets />} />
           <Route path="/tasks" element={<Tasks />} />
           <Route path="/sub-portal" element={<SubPortal />} />
+          <Route path="/sub-portal/profile" element={<SubPortalProfile />} />
           <Route path="/invoices" element={<Invoices />} />
           <Route path="/invoices/:id" element={<InvoiceDetail />} />
+          <Route path="/invoices/:id/payment" element={<InvoicePayment />} />
+          <Route path="/invoices/:id/edit" element={<InvoiceEdit />} />
+          <Route path="/invoices/:id/remind" element={<InvoiceRemind />} />
           {/* The Inbox exists only while the company's messaging engine is
               on; the screen explains itself when it is off (decision D9). */}
           <Route path="/inbox" element={<Inbox />} />
           <Route path="/inbox/:conversationId" element={<Inbox />} />
+          {/* The bell's list is a screen, not a sheet (decision D64). */}
+          <Route path="/notifications" element={<Notifications />} />
+          <Route path="/capture" element={<Capture />} />
+          <Route path="/workspace" element={<Workspace />} />
+          <Route path="/search" element={<SearchScreen />} />
           {/* Alias routes, these URLs exist in muscle memory / older
               links but the screens live elsewhere. Explicit redirects
               beat the silent catch-all bounce to Home. (/leads is a

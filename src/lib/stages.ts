@@ -14,20 +14,30 @@ type Contact = Pick<
   'id' | 'user_id' | 'stage' | 'name' | 'job_title' | 'address' | 'amount'
 >
 
-// Pipeline v2 (migration 047): the 'invoice' stage is retired. A record
-// in lead/quote is a Lead; job/closed is a Job (every job is a won
-// deal); lost is a dead lead. Invoicing is fh_invoices rows issued
-// against a job, not a stage the whole job moves into. "Work done,
-// money out" is contact.completed_at. The legacy 'invoice' value stays
-// in the type + maps so pre-migration rows and old stage-transition
-// history still render; treat it as a synonym of 'job' everywhere.
+// Phase 9 (SPEC D55, D56): leads live in fh_leads and quotes in
+// fh_quotes. fh_contacts keeps job, closed and lost as the stages a person
+// can choose. The legacy values stay in the type so pre-migration rows and
+// old stage-transition history still render: 'invoice' is a synonym of
+// 'job'; 'lead' and 'quote' can only appear in history. The two moved
+// markers name rows the migration copied out; every list query drops them
+// and no screen ever labels them.
 export type StageId = 'lead' | 'quote' | 'job' | 'invoice' | 'closed' | 'lost'
+export type MovedStage = 'moved_lead' | 'moved_quote'
 
 export type Stage = { id: StageId; label: string; color: string; icon: string }
 
+export const HIDDEN_STAGES: readonly MovedStage[] = ['moved_lead', 'moved_quote']
+
+export function isMovedStage(stage: string | null | undefined): stage is MovedStage {
+  return (HIDDEN_STAGES as readonly string[]).includes(stage || '')
+}
+
+// The PostgREST filter value that drops moved rows from a list read:
+// .not('stage', 'in', MOVED_STAGE_FILTER). Single row reads by id do not
+// use it; the redirect in App.tsx handles a moved row there.
+export const MOVED_STAGE_FILTER = `(${HIDDEN_STAGES.map((s) => `"${s}"`).join(',')})`
+
 export const STAGES: Stage[] = [
-  { id: 'lead',    label: 'Lead',    color: 'var(--stage-lead)',    icon: 'lead' },
-  { id: 'quote',   label: 'Quote',   color: 'var(--stage-quote)',   icon: 'quote' },
   { id: 'job',     label: 'Job',     color: 'var(--stage-job)',     icon: 'job' },
   { id: 'closed',  label: 'Closed',  color: 'var(--stage-closed)',  icon: 'closed' },
   { id: 'lost',    label: 'Lost',    color: 'var(--stage-lost)',    icon: 'lost' }
@@ -35,18 +45,20 @@ export const STAGES: Stage[] = [
 
 export const STAGE_MAP: Record<string, Stage> = {
   ...Object.fromEntries(STAGES.map((s) => [s.id, s])),
-  // Legacy display entry only, never offered as a destination.
+  // Legacy display entries only, never offered as a destination.
+  lead:    { id: 'lead',    label: 'Lead',    color: 'var(--stage-lead)',    icon: 'lead' },
+  quote:   { id: 'quote',   label: 'Quote',   color: 'var(--stage-quote)',   icon: 'quote' },
   invoice: { id: 'invoice', label: 'Invoice', color: 'var(--stage-invoice)', icon: 'invoice' }
 }
 
-// A Lead, its own thing now: own screen (/leads), own lifecycle.
-// 'quote' is a lead with a quote in flight, not a separate entity.
+// Legacy lead stages, kept so old history and any row the migration has
+// not reached still classify. New leads are fh_leads rows.
 export const LEAD_STAGES = ['lead', 'quote']
 // A Job. 'invoice' included only as the legacy alias of 'job'.
 export const JOB_STAGES = ['job', 'invoice']
 // Won deals, every job is a won deal in the v2 model.
 export const WON_STAGES = ['job', 'invoice', 'closed']
-// Everything still in motion (open leads + active jobs).
+// Everything still in motion on fh_contacts.
 export const ACTIVE_STAGES = ['lead', 'quote', 'job', 'invoice']
 
 export function isLeadStage(stage: string | null | undefined) {
@@ -78,51 +90,9 @@ export async function transitionStage(contact: Contact, nextStage: StageId) {
   return { data, error }
 }
 
-export async function startQuote(contact: Contact) {
-  return transitionStage(contact, 'quote')
-}
-
-// Direct "Won" from the Leads board: move a lead/quote to Job WITHOUT
-// auto-creating a kickoff schedule event. approveQuote (below) is the
-// formal quote-approval path that also drops a kickoff; a one tap Won on
-// a raw lead shouldn't silently schedule a job for tomorrow 9am.
-export async function markWon(contact: Contact) {
-  return transitionStage(contact, 'job')
-}
-
-export async function approveQuote(contact: Contact) {
-  const { data, error } = await transitionStage(contact, 'job')
-  if (error) return { data, error, scheduleError: null }
-
-  // Default the kickoff to tomorrow 9am–5pm local. Operator can edit later.
-  const start = new Date()
-  start.setDate(start.getDate() + 1)
-  start.setHours(9, 0, 0, 0)
-  const end = new Date(start)
-  end.setHours(17, 0, 0, 0)
-
-  const title = contact.job_title || contact.name || 'New job'
-  const description = `Approved quote for ${contact.name || 'job'}${contact.address ? ` at ${contact.address}` : ''}`
-
-  const { error: schedErr } = await supabase.from('fh_schedule').insert({
-    user_id: contact.user_id,
-    contact_id: contact.id,
-    title,
-    description,
-    start_at: start.toISOString(),
-    end_at: end.toISOString()
-  })
-  // Secondary failure: the stage transition succeeded but the kickoff
-  // event didn't land. Log loudly (so it surfaces in monitoring) and
-  // surface `scheduleError` to callers who want to flag the partial
-  // success. The primary `error` stays null so the success toast keeps
-  // firing, the operator is now on the Job stage either way.
-  if (schedErr) {
-    console.error('[fieldhorse] approveQuote schedule insert failed', schedErr)
-  }
-
-  return { data, error: null, scheduleError: schedErr ?? null }
-}
+// Phase 9 (D54, D61): nothing moves a record along on its own. A quote is
+// made from a lead with Quote this, and a job from a quote with Make this a
+// job (lib/quotes.ts). startQuote, markWon and approveQuote are gone.
 
 // Work wrapped. Stays a 'job' (no more invoice stage), completed_at
 // flags "done, awaiting payment" so the money screens can chase the
@@ -374,17 +344,20 @@ export function marginTier(pct: number) {
 }
 
 // ─── detail routing ─────────────────────────────────────────────
-// THE stage → detail-URL mapping. Work, the desktop rail, Home's
-// pipeline, and universal search all consume this one function :
-// the audit found five drifting inline copies of it.
+// THE contact → detail-URL mapping. Work, the desktop rail, Home's
+// pipeline, and universal search all consume this one function.
 //   opts.financials: land on the money tab (opt-in, Home's pipeline
 //   uses it for invoice-age rows; list surfaces open the overview).
 export function detailRoute(
   c: { id: string; stage?: string | null },
   opts?: { financials?: boolean }
 ) {
+  // Every fh_contacts row a person can make is a job now (SPEC D55), and a
+  // lost row is a lost job: the migration moved lost leads and quotes out.
+  // A row still in a legacy lead or quote stage keeps its old path; those
+  // routes open the old detail screen for a row that was never moved.
   const stage = String(c?.stage || '').toLowerCase()
-  if (stage === 'lead' || stage === 'lost') return `/leads/${c.id}`
+  if (stage === 'lead') return `/leads/${c.id}`
   if (stage === 'quote') return `/quotes/${c.id}?tab=quote`
   return opts?.financials ? `/jobs/${c.id}?tab=financials` : `/jobs/${c.id}`
 }

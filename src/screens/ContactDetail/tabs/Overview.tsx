@@ -5,10 +5,8 @@ import { motion } from 'framer-motion'
 import { Plus, Pencil, X as XIcon, ShieldCheck, Receipt, RotateCcw, ChevronDown } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
 import { toYmd } from '../../../lib/dates.ts'
-import {
-  startQuote, approveQuote, markComplete, reopen, reopenQuestion
-} from '../../../lib/pipeline.ts'
-import { useConfirm } from '../../../components/ConfirmSheet.tsx'
+import { markComplete, reopen } from '../../../lib/pipeline.ts'
+import { useSecondTap } from '../../../lib/secondTap.ts'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
 import { hapticTap, hapticStageChange } from '../../../lib/haptics.ts'
 import {
@@ -44,7 +42,7 @@ import SpineList from '../phone/SpineList.tsx'
  *   - schedule  → open that day on the Schedule screen (an event has no
  *                 done flag, and it is not the job, so nothing is completed)
  *   - stage     → call pipelineFn from pipeline.ts (markComplete/etc)
- *   - idle      → open AddEventSheet
+ *   - idle      → open the event screen
  *
  * Phone (spineFirst): the Spine comes first, and everything above sits
  * under a "More about this job" disclosure below it. The Spine carries
@@ -90,7 +88,8 @@ export default function OverviewTab({
   const [moreOpen, setMoreOpen] = useState(false)
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const confirm = useConfirm() as (options: { title: string; body?: string; confirmLabel?: string }) => Promise<boolean>
+  // Reopen takes a second tap on the same button (D57).
+  const reopenTap = useSecondTap()
 
   const health = useMemo(
     () => computeJobHealth({ contact, payments, scheduleItems }),
@@ -111,10 +110,19 @@ export default function OverviewTab({
     ? Math.round((milestones.filter((m: any) => m.done).length / milestones.length) * 100)
     : 0
 
-  async function handleNextActionComplete() {
+  // Reopen asks first, as everywhere else: the first tap arms the button,
+  // the second moves the stage.
+  function handleNextActionComplete() {
     if (actionLoading) return
-    // Reopen asks first, as everywhere else (Phase 8, Task 15).
-    if (nextAction.kind === 'stage' && nextAction.pipelineFn === 'reopen' && !(await confirm(reopenQuestion(contact)))) return
+    if (nextAction.kind === 'stage' && nextAction.pipelineFn === 'reopen') {
+      reopenTap.tap(() => { void runNextAction() })
+      return
+    }
+    void runNextAction()
+  }
+
+  async function runNextAction() {
+    if (actionLoading) return
     setActionLoading(true)
     try {
       switch (nextAction.kind) {
@@ -181,7 +189,7 @@ export default function OverviewTab({
             break
           }
           // Billing intercept (pipeline v2): "Send invoice" opens the
-          // SendInvoiceSheet in the parent rather than mutating stage :
+          // the invoice screen from the parent rather than mutating stage :
           // invoicing isn't a stage anymore.
           if (nextAction.pipelineFn === 'sendInvoice') {
             hapticStageChange()
@@ -198,9 +206,6 @@ export default function OverviewTab({
             const res: any = await fn(contact)
             if (res?.error) throw res.error
             await fetchAll()
-            if (nextAction.pipelineFn === 'startQuote') {
-              onOpenQuote?.()
-            }
           } else if (nextAction.pipelineFn === 'logPayment') {
             // Log payment opens the modal in the parent, stays in flight as
             // the operator inputs amount/date/method.
@@ -237,7 +242,11 @@ export default function OverviewTab({
   }
 
   // The schedule CTA opens the event's day rather than completing it.
-  const nextActionCta = nextAction.kind === 'schedule' ? 'View on schedule' : nextAction.ctaLabel
+  const nextActionCta = nextAction.kind === 'schedule'
+    ? 'View on schedule'
+    : reopenTap.armed && nextAction.kind === 'stage' && nextAction.pipelineFn === 'reopen'
+      ? 'Tap again to reopen'
+      : nextAction.ctaLabel
 
   // True contract = base amount + approved change orders, the same
   // number the header balance, Financials tab, and customer PDF use.
@@ -370,7 +379,7 @@ export default function OverviewTab({
             cannot read or write invoices, payments or closeouts. */}
         {canMoveMoney && isJobStage && (
           <Button variant="secondary" leftIcon={Receipt} onClick={() => { hapticTap(); onOpenSendInvoice?.() }}>
-            Send invoice
+            Invoice this
           </Button>
         )}
         {canMoveMoney && isExecutionStage && (
@@ -485,9 +494,10 @@ export default function OverviewTab({
 
 /* ----------- helpers ----------- */
 
+// Phase 9 (D54): startQuote and approveQuote are gone. A lead's quote is
+// made with Quote this and a quote's approval is its own screen, so the
+// stage card only completes or reopens a job here.
 const STAGE_FN_MAP: Record<string, any> = {
-  startQuote,
-  approveQuote,
   markComplete,
   reopen
 }
@@ -628,7 +638,7 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId, canEditAmount = fa
 
   // Called when the operator picks (or clears) a client via the
   // ClientPicker below. Auto-hydrates empty form fields with the
-  // picked client's values, same merge policy as NewLeadSheet's
+  // picked client's values, same merge policy as the lead screen's
   // handleClientChange. User-typed values are never clobbered.
   function handleClientLink(picked: any) {
     if (!picked) {
@@ -697,7 +707,7 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId, canEditAmount = fa
       </div>
 
       {/* LINKED CLIENT, controlled ClientPicker. Picks auto-hydrate
-          empty fields on the form (same merge policy as NewLeadSheet)
+          empty fields on the form (same merge policy as the lead screen)
           and commit the new client_id alongside the regular field
           diff. Clearing the picker queues an unlink. */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

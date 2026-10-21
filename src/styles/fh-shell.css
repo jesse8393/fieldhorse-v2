@@ -267,135 +267,6 @@
 .fhs-dock__coin:active { transform: translateX(-50%) scale(0.96); filter: brightness(0.96); }
 .fhs-dock__coin:focus-visible { outline-offset: 4px; }
 
-/* ---- Workspace menu (spec 8.2) ---- */
-.fhs-menu-root {
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-modal);
-}
-.fhs-menu__scrim {
-  position: absolute;
-  inset: 0;
-  background: rgba(22, 20, 15, 0.45);
-}
-.fhs-menu {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  max-height: 88dvh;
-  display: flex;
-  flex-direction: column;
-  background: var(--fh-paper);
-  color: var(--fh-ink);
-  border-radius: 22px 22px 0 0;
-  box-shadow: var(--fh-shadow-overlay);
-}
-@media (min-width: 600px) {
-  .fhs-menu {
-    max-width: 520px;
-    margin: 0 auto;
-  }
-}
-.fhs-menu__grabber {
-  flex-shrink: 0;
-  width: 40px;
-  height: 4px;
-  margin: 8px auto 4px;
-  border-radius: 999px;
-  background: var(--fh-edge);
-}
-.fhs-menu__head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 12px 16px 20px;
-  border-bottom: 1px solid var(--fh-hairline);
-}
-.fhs-menu__who {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-.fhs-menu__company,
-.fhs-menu__email {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.fhs-menu__company { font: 600 18px/24px var(--fh-font-body); color: var(--fh-ink); }
-.fhs-menu__email { font: 500 13px/16px var(--fh-font-body); color: var(--fh-ink-3); }
-.fhs-menu__body {
-  flex: 1;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-  padding: 0 12px 16px;
-}
-.fhs-menu__group-title {
-  margin: 0;
-  padding: 16px 8px 8px;
-  font: 600 13px/16px var(--fh-font-body);
-  color: var(--fh-ink-3);
-}
-.fhs-menu__list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.fhs-menu__row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  min-height: 52px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 12px;
-  background: transparent;
-  color: var(--fh-ink);
-  font: 500 16px/22px var(--fh-font-body);
-  text-align: left;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  transition: background-color var(--dur-fast) var(--ease);
-}
-.fhs-menu__row:hover { background: var(--fh-wash); }
-.fhs-menu__row:active { background: var(--fh-wash-2); }
-.fhs-menu__row.is-active { background: var(--fh-tray); font-weight: 600; }
-.fhs-menu__row-icon { color: var(--fh-ink-3); flex-shrink: 0; }
-.fhs-menu__row.is-active .fhs-menu__row-icon { color: var(--fh-ink); }
-.fhs-menu__row-label { flex: 1; min-width: 0; }
-.fhs-menu__row-chevron { color: var(--fh-ink-4); flex-shrink: 0; }
-.fhs-menu__group--settings {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin-top: 16px;
-  padding: 16px 8px 0;
-  border-top: 1px solid var(--fh-hairline);
-}
-.fhs-menu__foot {
-  padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));
-  border-top: 1px solid var(--fh-hairline);
-}
-.fhs-menu__signout {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  min-height: 48px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 12px;
-  background: transparent;
-  color: var(--fh-ink-2);
-  font: 500 16px/22px var(--fh-font-body);
-  cursor: pointer;
-}
-.fhs-menu__signout:hover { background: var(--fh-wash); color: var(--fh-ink); }
-
 /* ---- Auto, Day, Night control (spec 10) ---- */
 .fhs-mode {
   min-width: 0;
@@ -511,6 +382,26 @@
 }
 .fhs-side__search span { flex: 1; }
 .fhs-side__search:hover { color: var(--fh-linen); border-color: var(--fh-edge); }
+.fhs-side__toprow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fhs-side__toprow .fhs-side__search { flex: 1; min-width: 0; }
+.fhs-side__new {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--fh-onyx-line);
+  border-radius: 12px;
+  background: var(--fh-onyx-2);
+  color: var(--fh-linen);
+  transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+.fhs-side__new:hover { border-color: var(--fh-edge); }
 .fhs-side__nav {
   flex: 1;
   min-height: 0;

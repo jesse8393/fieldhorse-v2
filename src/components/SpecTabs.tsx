@@ -6,7 +6,7 @@
 // the selected tab is in the Tab order; Left/Right/Home/End move between
 // options and Enter or Space selects.
 
-import { haptic } from './ActionSheet.tsx'
+import { haptic } from '../lib/haptics.ts'
 import { handleTablistKeyDown } from '../lib/tabs.ts'
 
 export default function SpecTabs({
