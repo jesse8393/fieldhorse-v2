@@ -203,7 +203,7 @@ export default function SettingsScreen() {
         ) : (
           <>
             <SectionTitle>Your brand</SectionTitle>
-            <Field label="Company name" value={name} onChange={setName} placeholder="Parker Construction" />
+            <Field label="Company name" value={name} onChange={setName} placeholder="Your company name" />
             <Field label="Your name" value={fullName} onChange={setFullName} placeholder="Owner / contact name" />
 
             <SectionTitle>Customer facing details</SectionTitle>

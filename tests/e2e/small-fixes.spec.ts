@@ -189,8 +189,8 @@ const CLOSEOUT = {
 }
 
 const NO_LOCATION_PROFILE = [{
-  user_id: 'qa-user-1', full_name: 'Jesse Parker', company_name: 'Parker Construction Company', onboarded_at: iso(NOW - 90 * DAY),
-  logo_url: null, location_lat: null, location_lon: null, services: ['Concrete'], company_email: 'office@parker.co',
+  user_id: 'qa-user-1', full_name: 'Casey Harlow', company_name: 'Harlow Construction Company', onboarded_at: iso(NOW - 90 * DAY),
+  logo_url: null, location_lat: null, location_lon: null, services: ['Concrete'], company_email: 'office@harlow.co',
   brand_accent_hex: null, preferences: { quote_follow_up: { enabled: true, days: 3 } }
 }]
 

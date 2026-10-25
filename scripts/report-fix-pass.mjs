@@ -53,7 +53,7 @@ const totals = Object.fromEntries(
 const lines = [
   '# FieldHorse Fix Pass 1 Handoff',
   '',
-  'Production repository: `C:\\Users\\Jesse\\OneDrive\\Desktop\\fieldhorse-v2`',
+  'Production repository: `C:\\Users\\owner\\OneDrive\\Desktop\\fieldhorse-v2`',
   '',
   'Production Supabase project: `pnmhblvslftdzfcdezbw`',
   '',

@@ -52,7 +52,7 @@ vi.mock('./supabase.ts', () => ({
 
 const { sendInvoiceEmail } = await import('./invoices.ts')
 
-const company = { name: 'Parker Construction Co.', address: '100 Main St', phone: '', email: 'admin@example.com' }
+const company = { name: 'Harlow Construction Co.', address: '100 Main St', phone: '', email: 'admin@example.com' }
 const contact = { id: '6f1c9b1e-0000-4000-8000-000000000001', name: 'Rosa Delgado', amount: 8000, job_title: 'Concrete steps', email: 'rosa@example.com' }
 
 function invoiceRow(status: string, issuedAt: string | null) {

@@ -1,6 +1,6 @@
 # Fieldhorse redesign: audit fixes (Phase 8)
 
-Paste this whole file into one Claude Code session on `jesse8393/fieldhorse-v2`. Use Opus for this run. Nobody can answer questions while it runs, so follow the run rules exactly.
+Paste this whole file into one Claude Code session on `fieldhorse-v2`. Use Opus for this run. Nobody can answer questions while it runs, so follow the run rules exactly.
 
 ## Why this run exists
 
@@ -46,7 +46,7 @@ Tier 1 first, in order. Then Tier 2. Then Tier 3. A finished Tier 1 is worth mor
 
 ### Finish
 
-At the end: run `npm run test:all` and `npm run audit:design`, rerun every compare script and look at every image, push, update the draft pull request with before and after images for every visual task, and write a "Phase 8 summary" at the top of `PROGRESS.md` for Jesse in plain words with no dashes: what changed, what is blocked, new decisions, and an iPhone checklist.
+At the end: run `npm run test:all` and `npm run audit:design`, rerun every compare script and look at every image, push, update the draft pull request with before and after images for every visual task, and write a "Phase 8 summary" at the top of `PROGRESS.md` for the owner in plain words with no dashes: what changed, what is blocked, new decisions, and an iPhone checklist.
 
 ---
 
@@ -193,7 +193,7 @@ A floating gold microphone sits 24 px from the bottom right on every desktop pag
 
 ### Task 14: Desktop between 900 and 1279 px
 
-* Sidebar company name: use `headerName` (the short name the phone uses), clamp to two lines, and add a `title` with the full name. "Parker Construction Company" currently shows as "Parker Constructi...".
+* Sidebar company name: use `headerName` (the short name the phone uses), clamp to two lines, and add a `title` with the full name. "Harlow Construction Company" currently shows as "Harlow Constructi...".
 * Job page below 1280 px: show a compact facts strip (balance, customer phone, address with Navigate) above the composer so it is not pushed below the whole Spine.
 * Money tables: give the Action column a fixed 96 px and hide the Job column below 1100 px.
 * Add e2e runs at 1024 by 768 for Today, Job, Schedule and Money that check nothing overflows horizontally and the primary action is visible without scrolling.
@@ -244,7 +244,7 @@ Only do this task if the line above reads `yes`. Otherwise mark it skipped.
 
 ---
 
-## Not in this run (for Jesse)
+## Not in this run (for the owner)
 
 * The Settings choice for the Fieldhorse customer page needs the database check widened (SQL in #220, decision D22). Then set `FIELDHORSE_TEMPLATE_SAVES` to true.
 * Server ideas that need a migration or function change: an `expected_total` check on approval, and a `p_dedupe_key` on `fh_send_message`.

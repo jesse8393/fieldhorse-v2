@@ -58,9 +58,9 @@ function proposalPayload({ contact = {}, company = {}, photos = [], items, payme
       ...contact
     },
     company: {
-      name: 'Parker Construction',
+      name: 'Harlow Construction',
       phone: '615 555 0100',
-      email: 'office@parker.co',
+      email: 'office@harlow.co',
       insured_text: 'Licensed and insured',
       license_number: '',
       logo_url: null,
@@ -253,14 +253,14 @@ test('shows the headline, the address and the total with cents', async ({ page, 
 
   await expect(page.getByRole('heading', { level: 1, name: 'Hi Marco, your quote is ready.' })).toBeVisible()
   await expect(page.getByText('Pool deck pour at 1150 Cherry Blossom Ln, La Vergne.')).toBeVisible()
-  await expect(page.getByText('Parker Construction', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('Harlow Construction', { exact: true }).first()).toBeVisible()
   await expect(page.getByText('Licensed and insured', { exact: true })).toBeVisible()
   await expect(page.getByRole('region', { name: 'Total' }).getByText('$18,458.00', { exact: true })).toBeVisible()
   // Empty terms: the default schedule's 50 percent, with no fixed promise
   // about a walkthrough the schedule never mentions (decision D31).
   await expect(page.getByText('Pay $9,229.00 now to reserve your start date.', { exact: true })).toBeVisible()
   await expect(page.getByText(/walkthrough/)).toHaveCount(0)
-  await expect(page.getByRole('link', { name: 'Call Parker Construction' })).toHaveAttribute('href', 'tel:6155550100')
+  await expect(page.getByRole('link', { name: 'Call Harlow Construction' })).toHaveAttribute('href', 'tel:6155550100')
   // Included rows are priced, optional and excluded items are not in them.
   await expect(page.getByRole('heading', { name: "What's included" })).toBeVisible()
   await expect(page.getByText('$2,200.00', { exact: true })).toBeVisible()
@@ -368,19 +368,19 @@ test('with no payment link there is no Pay deposit button', async ({ page, conte
 test('after approval with a payment link, Pay deposit opens the company link', async ({ page, context }) => {
   await mockPortal(context, proposalPayload({
     contact: { proposal_status: 'approved' },
-    company: { payment_link: 'venmo.com/u/parker' }
+    company: { payment_link: 'venmo.com/u/harlow' }
   }))
   await openPortal(page)
 
   const pay = page.getByRole('link', { name: 'Pay deposit $9,229.00' })
   await expect(pay).toBeVisible()
-  await expect(pay).toHaveAttribute('href', 'https://venmo.com/u/parker')
+  await expect(pay).toHaveAttribute('href', 'https://venmo.com/u/harlow')
   await expect(pay).toHaveAttribute('target', '_blank')
   await expect(pay).toHaveAttribute('rel', /noopener/)
 })
 
 test('before approval there is no Pay deposit button even when a link is set', async ({ page, context }) => {
-  await mockPortal(context, proposalPayload({ company: { payment_link: 'venmo.com/u/parker' } }))
+  await mockPortal(context, proposalPayload({ company: { payment_link: 'venmo.com/u/harlow' } }))
   await openPortal(page)
 
   await expect(page.getByRole('button', { name: 'Approve this quote' })).toBeVisible()
@@ -433,7 +433,7 @@ test('the question link under the approve button opens request changes', async (
   const spies = await mockPortal(context, proposalPayload())
   await openPortal(page)
 
-  await page.getByRole('button', { name: 'Ask Parker a question first' }).click()
+  await page.getByRole('button', { name: 'Ask Harlow a question first' }).click()
   await expect(page.getByLabel('Changes needed')).toBeVisible()
   await expect(page.getByLabel('Changes needed')).toHaveValue('')
   await expect(page.getByRole('button', { name: 'Approve this quote' })).toHaveCount(0)
@@ -450,7 +450,7 @@ test('Back from the question form never approves, even with the approval filled 
   await fillApproval(page)
 
   // Open the question form and come back without asking anything.
-  await page.getByRole('button', { name: 'Ask Parker a question first' }).click()
+  await page.getByRole('button', { name: 'Ask Harlow a question first' }).click()
   await expect(page.getByLabel('Changes needed')).toBeVisible()
   await page.getByRole('button', { name: 'Back' }).click()
   await expect(page.getByRole('button', { name: 'Approve this quote' })).toBeVisible()
@@ -473,7 +473,7 @@ test('what happens next is three numbered steps', async ({ page, context }) => {
   const steps = page.getByRole('list', { name: 'What happens next' }).getByRole('listitem')
   await expect(steps).toHaveText([
     'You approve and pay the deposit.',
-    'Parker sends you a start date.',
+    'Harlow sends you a start date.',
     'You pay 40% at material delivery and 10% at completion.'
   ])
 })
@@ -490,7 +490,7 @@ test('terms that name no deposit say payment follows the terms', async ({ page, 
   await expect(page.getByText(/Pay \$/)).toHaveCount(0)
   await expect(page.getByRole('list', { name: 'What happens next' }).getByRole('listitem')).toHaveText([
     'You approve the quote.',
-    'Parker sends you a start date.',
+    'Harlow sends you a start date.',
     'You pay as the payment terms say.'
   ])
   await page.getByRole('button', { name: 'Full details' }).click()
@@ -514,7 +514,7 @@ test('a deposit the terms name as an amount is the amount asked for', async ({ p
   // The terms mention the walkthrough, so the last step does too.
   await expect(page.getByRole('list', { name: 'What happens next' }).getByRole('listitem')).toHaveText([
     'You approve and pay the deposit.',
-    'Parker sends you a start date.',
+    'Harlow sends you a start date.',
     'You pay the balance after the walkthrough.'
   ])
 })
@@ -522,7 +522,7 @@ test('a deposit the terms name as an amount is the amount asked for', async ({ p
 test('after approval, Pay deposit asks for the deposit the terms name', async ({ page, context }) => {
   await mockPortal(context, proposalPayload({
     contact: { proposal_status: 'approved', terms_text: '30% deposit on signing.' },
-    company: { payment_link: 'venmo.com/u/parker' }
+    company: { payment_link: 'venmo.com/u/harlow' }
   }))
   await openPortal(page)
   await expect(page.getByRole('link', { name: 'Pay deposit $5,537.40' })).toBeVisible()
@@ -531,12 +531,12 @@ test('after approval, Pay deposit asks for the deposit the terms name', async ({
 test('after approval with no deposit, the payment link asks for no deposit', async ({ page, context }) => {
   await mockPortal(context, proposalPayload({
     contact: { proposal_status: 'approved', terms_text: 'No deposit required. Net 30 after completion.' },
-    company: { payment_link: 'venmo.com/u/parker' }
+    company: { payment_link: 'venmo.com/u/harlow' }
   }))
   await openPortal(page)
   const pay = page.getByRole('link', { name: 'Make a payment' })
   await expect(pay).toBeVisible()
-  await expect(pay).toHaveAttribute('href', 'https://venmo.com/u/parker')
+  await expect(pay).toHaveAttribute('href', 'https://venmo.com/u/harlow')
   await expect(page.getByRole('link', { name: /Pay deposit/ })).toHaveCount(0)
 })
 
@@ -592,7 +592,7 @@ test('the page ground follows Day and Night from the tokens, with no sign in', a
 test('nothing scrolls sideways on a phone, even with a long company and job name', async ({ page, context }) => {
   await mockPortal(context, proposalPayload({
     contact: { job_title: 'Rear pool deck pour with stamped border and integrated planters', address: '1150 Cherry Blossom Lane Extended, La Vergne, Tennessee' },
-    company: { name: 'Parker Construction and Concrete Company of Rutherford County' }
+    company: { name: 'Harlow Construction and Concrete Company of Rutherford County' }
   }))
   await openPortal(page)
 
@@ -604,7 +604,7 @@ test('nothing scrolls sideways on a phone, even with a long company and job name
 test('after the deposit is paid, the capsule says Deposit received and has no Pay deposit button', async ({ page, context }) => {
   await mockPortal(context, proposalPayload({
     contact: { proposal_status: 'approved' },
-    company: { payment_link: 'venmo.com/u/parker' },
+    company: { payment_link: 'venmo.com/u/harlow' },
     payments: [{ id: 'p1', amount: 9229, kind: 'deposit', paid_on: '2026-10-09' }]
   }))
   await openPortal(page)
@@ -619,7 +619,7 @@ test('after the deposit is paid, the capsule says Deposit received and has no Pa
 test('payments of any kind that add up to the deposit count as the deposit', async ({ page, context }) => {
   await mockPortal(context, proposalPayload({
     contact: { proposal_status: 'approved' },
-    company: { payment_link: 'venmo.com/u/parker' },
+    company: { payment_link: 'venmo.com/u/harlow' },
     payments: [
       { id: 'p1', amount: 5000, kind: 'progress', paid_on: '2026-10-08' },
       { id: 'p2', amount: 4229, kind: 'other', paid_on: '2026-10-09' }
@@ -634,7 +634,7 @@ test('payments of any kind that add up to the deposit count as the deposit', asy
 test('a partial payment keeps a pay button for the rest of the deposit', async ({ page, context }) => {
   await mockPortal(context, proposalPayload({
     contact: { proposal_status: 'approved' },
-    company: { payment_link: 'venmo.com/u/parker' },
+    company: { payment_link: 'venmo.com/u/harlow' },
     payments: [{ id: 'p1', amount: 5000, kind: 'deposit', paid_on: '2026-10-09' }]
   }))
   await openPortal(page)
@@ -642,7 +642,7 @@ test('a partial payment keeps a pay button for the rest of the deposit', async (
   await expect(page.getByText('Deposit received', { exact: true })).toHaveCount(0)
   const pay = page.getByRole('link', { name: 'Pay remaining deposit $4,229.00' })
   await expect(pay).toBeVisible()
-  await expect(pay).toHaveAttribute('href', 'https://venmo.com/u/parker')
+  await expect(pay).toHaveAttribute('href', 'https://venmo.com/u/harlow')
   await expect(page.getByRole('region', { name: 'Total' })
     .getByText('$5,000.00 paid so far. Pay the remaining $4,229.00 to reserve your start date.', { exact: true })).toBeVisible()
 })
@@ -652,7 +652,7 @@ test('shows the quote number, the issue date and valid until, and leaves out wha
   const spies = await mockPortal(context, proposalPayload({ contact: { quote_expires_at: '2026-11-02T04:59:59.999Z' } }))
   await openPortal(page)
 
-  await expect(page.getByText('Quote PC-2026-RTAL', { exact: true })).toBeVisible()
+  await expect(page.getByText('Quote HC-2026-RTAL', { exact: true })).toBeVisible()
   await expect(page.getByText('Issued October 2', { exact: true })).toBeVisible()
   await expect(page.getByText('Valid until November 1', { exact: true })).toBeVisible()
   // Still open: the approve bar is on the page.
@@ -661,7 +661,7 @@ test('shows the quote number, the issue date and valid until, and leaves out wha
   spies.setPayload(proposalPayload({ contact: { quote_sent_at: null, created_at: null } }))
   await page.reload({ waitUntil: 'domcontentloaded' })
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
-  await expect(page.getByText('Quote PC-2026-RTAL', { exact: true })).toBeVisible()
+  await expect(page.getByText('Quote HC-2026-RTAL', { exact: true })).toBeVisible()
   await expect(page.getByText(/^Issued /)).toHaveCount(0)
   await expect(page.getByText(/^Valid until /)).toHaveCount(0)
 })
@@ -674,8 +674,8 @@ test('an expired quote replaces the approve area with an expired note and the ca
   await expect(page.getByText('Expired October 5', { exact: true })).toBeVisible()
   const capsule = page.getByRole('region', { name: 'Quote expired' })
   await expect(capsule.getByText('This quote has expired.')).toBeVisible()
-  await expect(capsule.getByText('Ask Parker Construction for an updated one.')).toBeVisible()
-  await expect(capsule.getByRole('link', { name: 'Call Parker Construction' })).toHaveAttribute('href', 'tel:6155550100')
+  await expect(capsule.getByText('Ask Harlow Construction for an updated one.')).toBeVisible()
+  await expect(capsule.getByRole('link', { name: 'Call Harlow Construction' })).toHaveAttribute('href', 'tel:6155550100')
   await expect(page.getByRole('button', { name: 'Approve this quote' })).toHaveCount(0)
   await expect(page.getByLabel('Your full name')).toHaveCount(0)
   await expect(page.getByRole('button', { name: /Ask about this/ })).toHaveCount(0)
@@ -692,7 +692,7 @@ test('after approval the deposit note and the pay button stay past the valid unt
   await page.clock.setFixedTime(new Date('2026-10-10T14:00:00.000Z'))
   const spies = await mockPortal(context, proposalPayload({
     contact: { proposal_status: 'approved', quote_expires_at: '2026-10-06T04:59:59.999Z' },
-    company: { payment_link: 'https://venmo.com/u/parker' }
+    company: { payment_link: 'https://venmo.com/u/harlow' }
   }))
   await openPortal(page)
 
@@ -705,7 +705,7 @@ test('after approval the deposit note and the pay button stay past the valid unt
   // Once the deposit is in, the tray and the capsule both say so.
   spies.setPayload(proposalPayload({
     contact: { proposal_status: 'approved', quote_expires_at: '2026-10-06T04:59:59.999Z' },
-    company: { payment_link: 'https://venmo.com/u/parker' },
+    company: { payment_link: 'https://venmo.com/u/harlow' },
     payments: [{ id: 'p1', amount: 9229, kind: 'deposit', paid_on: '2026-10-09' }]
   }))
   await page.reload({ waitUntil: 'domcontentloaded' })
@@ -761,9 +761,9 @@ test('a quote with changes requested shows the request and no way to approve or 
   await expect(page.getByRole('region', { name: 'Total' }).getByText('Nothing is due while you wait for a revised proposal.', { exact: true })).toBeVisible()
   await expect(page.getByText(/Pay \$/)).toHaveCount(0)
   await expect(page.getByRole('list', { name: 'What happens next' }).getByRole('listitem')).toHaveText([
-    'Parker sends you a revised proposal.',
+    'Harlow sends you a revised proposal.',
     'You approve and pay the deposit.',
-    'Parker sends you a start date.',
+    'Harlow sends you a start date.',
     'You pay 40% at material delivery and 10% at completion.'
   ])
 })
@@ -1059,7 +1059,7 @@ test('a question sent after the quote was approved on another phone shows it app
 
   spies.setPayload(proposalPayload({ contact: { proposal_status: 'approved' } }))
   spies.setRequestReply({ status: 409, body: { ok: false, error: 'already_approved' } })
-  await page.getByRole('button', { name: 'Ask Parker a question first' }).click()
+  await page.getByRole('button', { name: 'Ask Harlow a question first' }).click()
   await page.getByLabel('Your full name').fill('Marco Castellanos')
   await page.getByLabel('Changes needed').fill('Can you start in May?')
   await page.getByRole('button', { name: 'Send request' }).click()
@@ -1109,12 +1109,12 @@ test('Back from the question form puts focus back on the control that opened it'
   await fillApproval(page)
 
   // Opened with the keyboard from the question link under Approve.
-  await page.getByRole('button', { name: 'Ask Parker a question first' }).focus()
+  await page.getByRole('button', { name: 'Ask Harlow a question first' }).focus()
   await page.keyboard.press('Enter')
   await expect(page.getByLabel('Changes needed')).toBeVisible()
   await page.getByRole('button', { name: 'Back' }).focus()
   await page.keyboard.press('Enter')
-  await expect(page.getByRole('button', { name: 'Ask Parker a question first' })).toBeFocused()
+  await expect(page.getByRole('button', { name: 'Ask Harlow a question first' })).toBeFocused()
 
   // Opened from Ask about this on the optional row; Space on Back.
   const ask = page.getByRole('button', { name: 'Ask about this, Stamped ashlar pattern' })
@@ -1172,8 +1172,8 @@ test('a quote marked lost says it is no longer open, with no way to approve or a
   const capsule = page.getByRole('region', { name: 'Quote closed' })
   await expect(capsule.getByText('Closed', { exact: true })).toBeVisible()
   await expect(capsule.getByText('This quote is no longer open.')).toBeVisible()
-  await expect(capsule.getByText('Ask Parker Construction for an updated one.')).toBeVisible()
-  await expect(capsule.getByRole('link', { name: 'Call Parker Construction' })).toHaveAttribute('href', 'tel:6155550100')
+  await expect(capsule.getByText('Ask Harlow Construction for an updated one.')).toBeVisible()
+  await expect(capsule.getByRole('link', { name: 'Call Harlow Construction' })).toHaveAttribute('href', 'tel:6155550100')
   await expect(page.getByRole('button', { name: 'Approve this quote' })).toHaveCount(0)
   await expect(page.getByLabel('Your full name')).toHaveCount(0)
   // The optional row is still there to read, with no dead button on it.
@@ -1268,7 +1268,7 @@ test('the signature field starts empty, capitalizes words, and Return does not s
   await expect(page.getByRole('button', { name: 'Approve this quote' })).toBeVisible()
 
   // Nor does Return in the question form's name field; the note takes new lines.
-  await page.getByRole('button', { name: 'Ask Parker a question first' }).click()
+  await page.getByRole('button', { name: 'Ask Harlow a question first' }).click()
   const note = page.getByLabel('Changes needed')
   await note.fill('Can you start in May?')
   await page.getByLabel('Your full name').press('Enter')

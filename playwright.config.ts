@@ -22,7 +22,7 @@ export default defineConfig({
   reporter: [['list']],
   use: {
     baseURL: process.env.SCROLL_BASE_URL || 'http://127.0.0.1:5173',
-    // Jesse works in Central time. CI runs in UTC, so pin the browser's
+    // The owner works in Central time. CI runs in UTC, so pin the browser's
     // zone or the hour, day and sun times in the specs would shift.
     timezoneId: 'America/Chicago',
     ...browserChannel,

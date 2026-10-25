@@ -13,7 +13,7 @@ describe('From header', () => {
   })
 
   it('drops quotes, backslashes, angle brackets and line breaks from the name', () => {
-    expect(formatFromHeader('J. "Bud" Parker\\Construction', addr)).toBe('"J. Bud Parker Construction" <notifications@fieldhorse.io>')
+    expect(formatFromHeader('J. "Bud" Harlow\\Construction', addr)).toBe('"J. Bud Harlow Construction" <notifications@fieldhorse.io>')
     expect(formatFromHeader('Evil <ceo@bank.example>', addr)).toBe('"Evil ceo@bank.example" <notifications@fieldhorse.io>')
     expect(formatFromHeader('Acme\r\nBcc: victim@example.com', addr)).toBe('"Acme Bcc: victim@example.com" <notifications@fieldhorse.io>')
   })

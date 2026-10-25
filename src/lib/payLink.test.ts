@@ -9,8 +9,8 @@ describe('safePayUrl', () => {
     expect(safePayUrl('tel:+16155550100')).toBe('tel:+16155550100')
   })
   it('prepends https:// to a bare host', () => {
-    expect(safePayUrl('venmo.com/u/parker')).toBe('https://venmo.com/u/parker')
-    expect(safePayUrl('cash.app/$parker')).toBe('https://cash.app/$parker')
+    expect(safePayUrl('venmo.com/u/harlow')).toBe('https://venmo.com/u/harlow')
+    expect(safePayUrl('cash.app/$harlow')).toBe('https://cash.app/$harlow')
   })
   it('drops dangerous schemes', () => {
     expect(safePayUrl('javascript:alert(1)')).toBe('')

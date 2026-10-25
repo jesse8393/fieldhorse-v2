@@ -4,7 +4,7 @@ import { useAccountLabels, formatAttribution } from '../../lib/accountAttributio
  * PostedByChip, compact byline for shared-job content.
  *
  * Renders a small eyebrow-style chip:
- *   "Posted by Parker Construction Co."
+ *   "Posted by Harlow Construction Co."
  *   "Added by Office Admin · Partner"
  *   "Created by you"
  *

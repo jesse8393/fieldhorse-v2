@@ -14,7 +14,7 @@
 // display. The shared sender mailbox is the technical envelope and
 // stays opaque — no "via FieldHorse" leaks anywhere in the inbox.
 //
-// True per-tenant sender domains (quotes@parkerconstructioncompany.com)
+// True per-tenant sender domains (quotes@yourcompany.com)
 // remain the Phase 2 plan once each tenant completes DNS verification.
 // Until then this display-name-only white-labeling is what the
 // customer reads.

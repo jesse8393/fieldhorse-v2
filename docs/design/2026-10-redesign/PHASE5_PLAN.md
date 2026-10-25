@@ -29,7 +29,7 @@
   * "You pay the balance after the walkthrough."
 * `payUrl` is `safePayUrl(company.payment_link)` or null.
 
-* [ ] **Step 1: Write the failing tests:** first name from "Marco Castellanos"; initials "PC" from "Parker Construction"; no photos gives `coverUrl` null; an approved quote fills `approved`; no payment link gives `payUrl` null; no generated string contains a dash character.
+* [ ] **Step 1: Write the failing tests:** first name from "Marco Castellanos"; initials "HC" from "Harlow Construction"; no photos gives `coverUrl` null; an approved quote fills `approved`; no payment link gives `payUrl` null; no generated string contains a dash character.
 * [ ] **Step 2:** Run. Expected: FAIL.
 * [ ] **Step 3:** Implement.
 * [ ] **Step 4:** Run. Expected: PASS.
@@ -72,7 +72,7 @@
 **Layout:**
 * Full screen onyx with grain. When `public/welcome.jpg` loads, show it in the top 55 percent fading into onyx.
 * FIELDHORSE wordmark: FIELD in brushed gold, HORSE in linen, gold hairline under it.
-* The line "Run every job like a captain."
+* The line "Every job, start to paid."
 * Email and password `Field`s with linen labels on onyx.
 * Brushed gold "Sign in".
 * Outlined linen "Create a workspace", which switches to the existing sign up mode.
@@ -81,7 +81,7 @@
 * `ResetPassword` and `PartnerInvite` use the same shell and drop `Aurora` and `GridPattern`.
 
 * [ ] **Step 1: Write the failing e2e tests:**
-  * signed out, `/login` shows "Run every job like a captain." and the button "Sign in";
+  * signed out, `/login` shows "Every job, start to paid." and the button "Sign in";
   * the `.fh-auth-screen` hard coded dark colors are gone, checked by the label's computed color equalling linen `rgb(242, 237, 228)` on the onyx background;
   * on mobile, focusing the password field keeps "Sign in" inside the visual viewport.
 * [ ] **Step 2:** Run. Expected: FAIL.

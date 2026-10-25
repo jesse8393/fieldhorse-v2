@@ -504,7 +504,7 @@ function swallowReturn(e: KeyboardEvent<HTMLFormElement>) {
 function FieldhorseCapsule(p: CapsuleProps) {
   const company = p.companyName?.trim() || ''
   const who = company || 'the contractor'
-  // "Ask Parker a question first", but "Ask The Concrete Guys" in full: the
+  // "Ask Harlow a question first", but "Ask The Concrete Guys" in full: the
   // short name the page's steps use (quoteMoney.ts).
   const askName = companyShortName(company, 'the contractor')
   // Each form has its own key, so switching between asking and approving

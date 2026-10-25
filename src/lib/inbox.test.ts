@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeAll, afterAll } from 'vitest'
 
 // The day labels and times read the local clock. Pin Central time, where
-// Jesse works, so they match on every machine and in CI (UTC). Set it as
+// the owner works, so they match on every machine and in CI (UTC). Set it as
 // the file loads too, because the fixtures build local dates right away.
 const originalTz = process.env.TZ
 process.env.TZ = 'America/Chicago'

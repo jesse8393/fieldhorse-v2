@@ -4,7 +4,7 @@ import { composeActivityEvents } from '../sections/composeActivityEvents.ts'
 import type { ActivityEvent } from '../sections/composeActivityEvents.ts'
 
 // These checks read the local hour, day or week. Pin Central time, where
-// Jesse works, so the result is the same on every machine and in CI (UTC).
+// the owner works, so the result is the same on every machine and in CI (UTC).
 // Set it as the file loads too, because the fixtures below build local
 // dates before any hook runs.
 const originalTz = process.env.TZ

@@ -356,7 +356,7 @@ function Board({ theme, photos }: { theme: Theme; photos: SamplePhotos | null })
         <Spec label="Full width, lg">
           <div className="fhc-ds__stack">
             <Button variant="primary" size="lg" block>Approve and pay $9,229.00</Button>
-            <Button variant="secondary" size="lg" block>Ask Jesse a question first</Button>
+            <Button variant="secondary" size="lg" block>Ask Harlow a question first</Button>
           </div>
         </Spec>
         <Spec label="On onyx" wide>
@@ -575,7 +575,7 @@ function Board({ theme, photos }: { theme: Theme; photos: SamplePhotos | null })
               day="today"
               dateTime="2026-10-09T07:12"
               title="Forms and rebar in, inspector signed off."
-              subline="3 photos by Jesse."
+              subline="3 photos by Casey."
               photos={photos ? [
                 { src: photos.forms, alt: 'Sample image: slab forms at sunset' },
                 { src: photos.rebar, alt: 'Sample image: rebar mat, close' },
@@ -613,7 +613,7 @@ function Board({ theme, photos }: { theme: Theme; photos: SamplePhotos | null })
           <div className="fhc-ds-today">
             <OnyxStage glow className="fhc-ds-today__stage">
               <div className="fhc-ds-today__top">
-                <span className="fhc-ds-today__company">Parker Construction</span>
+                <span className="fhc-ds-today__company">Harlow Construction</span>
                 <SyncPill status="synced" />
                 <IconButton aria-label="Notifications" icon={Bell} size={44} />
               </div>
@@ -689,7 +689,7 @@ function Board({ theme, photos }: { theme: Theme; photos: SamplePhotos | null })
           <VaultCard
             label="Collected this week"
             amount={9620}
-            corner={<span className="fhc-ds__monogram" aria-hidden="true">PC</span>}
+            corner={<span className="fhc-ds__monogram" aria-hidden="true">HC</span>}
             facts={[
               { label: 'Due this week', value: 7090 },
               { label: 'October so far', value: 31480 },

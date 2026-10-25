@@ -101,7 +101,7 @@ function inboxTables(clock) {
       conversation({ conversation_id: 'conv-tessa', client_id: 'cl-tessa', client_name: 'Tessa Holloway', last_preview: 'We can start Monday if the weather holds.', last_message_at: at(-(3 * 1440)), held_messages: 1, latest_stage: 'lead' })
     ],
     fh_messages: [
-      message({ id: 'm1', direction: 'outbound', status: 'sent', sent_by_kind: 'user', read_at: at(yesterdayFour48), created_at: at(yesterdayFour48), body: "Hi Priya, Jesse with Parker Construction. We're set for Thursday at 11:00 to look at the patio cover. I'll bring material samples." }),
+      message({ id: 'm1', direction: 'outbound', status: 'sent', sent_by_kind: 'user', read_at: at(yesterdayFour48), created_at: at(yesterdayFour48), body: "Hi Priya, Casey with Harlow Construction. We're set for Thursday at 11:00 to look at the patio cover. I'll bring material samples." }),
       message({ id: 'm2', created_at: at(yesterdayFour48 + 14), read_at: at(yesterdayFour48 + 17), body: 'Perfect, thank you!' }),
       message({ id: 'm3', created_at: at(94), body: ask })
     ],
@@ -376,7 +376,7 @@ async function portalSetup(context) {
       created_at: '2026-10-01T12:00:00.000Z', quote_sent_at: '2026-10-02T12:00:00.000Z', terms_text: ''
     },
     company: {
-      name: 'Parker Construction', phone: '615 555 0100', email: 'office@parker.co',
+      name: 'Harlow Construction', phone: '615 555 0100', email: 'office@harlow.co',
       insured_text: 'Licensed and insured, Murfreesboro', license_number: '', logo_url: null,
       estimate_template: 'fieldhorse', payment_link: ''
     },

@@ -2,7 +2,7 @@
 
 Status: approved design, checked against the code on October 10, 2026. Section 16 lists every correction from that check. Section 17 records the decisions made on October 10.
 Date: October 9, 2026
-Owner: Jesse Parker
+Owner: Fieldhorse
 Applies to: `fieldhorse-v2` (React 18, Vite 6, Tailwind 4, shadcn on the `radix-ui` package, TanStack Query, Supabase)
 
 ## 1. Purpose
@@ -20,7 +20,7 @@ Rebuild the look and navigation of Fieldhorse so a contractor can run a whole da
 
 ## 2. Approved references
 
-* Design canvas (private to Jesse): https://claude.ai/artifact/GBzNhVmHEp4Gf5M3tNAQQU
+* Design canvas (private to the owner): https://claude.ai/artifact/GBzNhVmHEp4Gf5M3tNAQQU
   * Row 1: direction, Foundations sheet, Components sheet
   * Row 2: coded phone screens (Today, Jobs, Job, Capture, Quote, Money, Inbox, Night)
   * Row 3: coded desktop screens (Schedule, Job)
@@ -294,9 +294,9 @@ Every screen follows: one onyx stage, one gold action, hairline lists on plaster
 
 ### 9.1 Welcome and Login (`Login.tsx`), Phase 5
 
-* Top 62 percent: a photo of finished work fading into onyx. Use real Parker Construction or Shyld photos, not stock and not AI images. Until real photos exist, show onyx with grain only.
+* Top 62 percent: a photo of finished work fading into onyx. Use real photos of finished work, not stock and not AI images. Until real photos exist, show onyx with grain only.
 * FIELDHORSE wordmark, FIELD in brushed gold, HORSE in linen, gold hairline under it.
-* Line: "Run every job like a captain."
+* Line: "Every job, start to paid."
 * Brushed gold "Sign in", outlined linen "Create a workspace", small smoke line "Bring your jobs over from Jobber in a few minutes."
 * Existing sign in, reset and invite flows stay as they are.
 
@@ -369,7 +369,7 @@ The quote editor lives inside the job detail and `Bid.tsx`; confirm the exact co
 * Headline: "Hi Marco, your quote is ready." Address line. Gold hairline.
 * Total panel in a paper tray: total, deposit sentence.
 * "What's included" rows, optional upgrade switch, "What happens next" numbered steps (a real sequence, so numbers are right here).
-* Bottom onyx capsule: brushed gold "Approve and pay $9,229.00", linen link "Ask Jesse a question first".
+* Bottom onyx capsule: brushed gold "Approve and pay $9,229.00", linen link "Ask Harlow a question first".
 * "Powered by Fieldhorse" small at the very bottom.
 * Approval, signature (`SignaturePad.tsx`) and payment link (`lib/payLink.ts`) logic stay as they are.
 
@@ -449,7 +449,7 @@ The quote editor lives inside the job detail and `Bid.tsx`; confirm the exact co
 * `npm run test:all` passes after every phase, and so does `npm run audit:design`, which Phase 1 moves from the old six color palette and single radius to the scales in section 5.
 * A unit test that reads the token values and asserts every pair in section 12 meets its threshold in Day and Night.
 * Playwright screenshots for each finished screen at 390 by 844 (Day and Night) and 1440 by 900, kept as baselines in `tests/`.
-* Manual check on Jesse's iPhone as an installed PWA: safe areas, dock above the home indicator, keyboard hides the dock, toasts clear the Dynamic Island, voice capture still records.
+* Manual check on the owner's iPhone as an installed PWA: safe areas, dock above the home indicator, keyboard hides the dock, toasts clear the Dynamic Island, voice capture still records.
 * Before each deploy, confirm `dist/` has **no** `_redirects` file. All redirects live in `netlify.toml`: the `/assets/*` rule that returns a real 404 for missing files, then the `/*` to `/index.html` fallback. A `_redirects` file would be read first and its catch all would hide the asset rule. The live site was checked on October 10: a missing asset returns 404 and app routes return 200.
 
 ## 14. Risks
@@ -461,9 +461,9 @@ The quote editor lives inside the job detail and `Bid.tsx`; confirm the exact co
 * **Inbox timing.** Phase 6 depends on the Growth frontend work; the dock shows Schedule in that slot until it ships.
 * **Photo weight.** Full bleed photos on slow job site connections, with no image transformations on the Free plan. Upload time thumbnails, lazy loading below the fold and reserved boxes keep this in check.
 
-## 15. Open questions for Jesse
+## 15. Open questions for the owner
 
-1. Can you send two or three real photos of finished Parker Construction or Shyld work for the Welcome screen and the portal fallback?
+1. Can you send two or three real photos of finished work for the Welcome screen and the portal fallback?
 2. Should Night switch on automatically at sunset, or start in Day until someone turns it on? Built as Auto for now (D1).
 3. Settled: the fifth dock slot shows Schedule until the Inbox ships (D2).
 
@@ -502,19 +502,19 @@ All eleven contrast figures in the October 9 table matched the WCAG formula with
 
 | Id | Question | Decision |
 |---|---|---|
-| D1 | Night at sunset by default, or Day until someone turns Night on | Auto at sunset, as the canvas note says. Not answered directly yet; a one line change if Jesse prefers Day |
-| D2 | Fifth dock slot before the Inbox ships | Schedule until Phase 6 (Jesse) |
-| D3 | Jobs tabs | All, Leads, Quotes, Jobs, Done, with Lost behind the filter button (Jesse) |
-| D4 | Where the workspace menu and search live on a phone | Monogram at the top left of the header on every screen, search beside the bell (Jesse) |
+| D1 | Night at sunset by default, or Day until someone turns Night on | Auto at sunset, as the canvas note says. Not answered directly yet; a one line change if the owner prefers Day |
+| D2 | Fifth dock slot before the Inbox ships | Schedule until Phase 6 (the owner) |
+| D3 | Jobs tabs | All, Leads, Quotes, Jobs, Done, with Lost behind the filter button (the owner) |
+| D4 | Where the workspace menu and search live on a phone | Monogram at the top left of the header on every screen, search beside the bell (the owner) |
 | D5 | Where a job's sections live on a phone, in place of the "Details" sheet in 9.4 | The existing section tabs stay below the quick actions, restyled as text tabs with the gold underline, and Overview becomes the Spine. Quote, Details, Selections, Materials, Change orders, Daily logs, Financials and Files each stay one tap away, with less risk than moving them into a sheet (Phase 2 plan) |
 | D6 | Money reminders | "Remind" sends the invoice email again through the existing `sendInvoiceEmail`. No text message reminders until the Growth Engine inbox ships. There is no "due soon" today; Phase 3 adds it as invoices due in the next 7 days |
 | D7 | Customer portal scope | Approval stays the typed name the server already records. No selectable upgrades and no in portal payment in this round. Optional items show read only with an "Ask about this" link. After approval, a "Pay deposit" button opens the company payment link when one is set |
 | D8 | Quote editor money | No overhead line (the app has no overhead concept). The deposit is the first step of the payment schedule (`DEFAULT_PAYMENT_SCHEDULE`, 50 percent). "Preview as" renders the proposal in the app and never mints a public link |
 | D9 | When the Inbox appears | The fifth dock slot and the sidebar Inbox item show only when the company's `fh_org_settings.engine_enabled` is true. Otherwise the slot stays Schedule |
 | D10 | What counts as unscheduled | Desktop Schedule's Unscheduled tray lists jobs in the job stage with no schedule entry from today on |
-| D11 | Hero photos | No hero photo ships in the app yet. Welcome and Login use onyx with grain until Jesse supplies real photos. The code reads `public/welcome.jpg` when it exists |
-| D12 | Who approved, on the portal | `/api/public-link` returns `proposal_status` but not the approver's name or date, and server files are off limits. The portal shows "Approved" when `proposal_status` is `approved`, and "Approved by {name} on {date}" only if the payload ever carries them. Adding them to the payload is server work for Jesse later |
-| D13 | Default proposal theme | The Fieldhorse theme ships as a choice in Settings. A missing `estimate_template` keeps resolving to classic, so no customer's live portal changes until Jesse picks the new theme. The PDF function keeps its own templates; matching the PDF is server work for later |
+| D11 | Hero photos | No hero photo ships in the app yet. Welcome and Login use onyx with grain until the owner supplies real photos. The code reads `public/welcome.jpg` when it exists |
+| D12 | Who approved, on the portal | `/api/public-link` returns `proposal_status` but not the approver's name or date, and server files are off limits. The portal shows "Approved" when `proposal_status` is `approved`, and "Approved by {name} on {date}" only if the payload ever carries them. Adding them to the payload is server work for the owner later |
+| D13 | Default proposal theme | The Fieldhorse theme ships as a choice in Settings. A missing `estimate_template` keeps resolving to classic, so no customer's live portal changes until the owner picks the new theme. The PDF function keeps its own templates; matching the PDF is server work for later |
 | D14 | Whether D4's header also sits on detail screens with a full bleed photo | No. D4 covers the main screens (the choice was "monogram on every main screen"). The Job page, with its Quote tab, runs the photo under the status bar with translucent back and more buttons, as both renders show, so search and the menu are one back tap away there (Phase 2 review). First recorded as D6 in the Phase 2 pull request; renumbered because D6 to D13 were set for the later phases |
 | D15 | How the Money groups are counted | Overdue: the due day has ended. Due soon: due today through day 7. Due this week includes overdue invoices (it is "due by Saturday"). Waiting on approval: sent and viewed quotes. Paid: the last 10 days. Margin averages won jobs that have a cost above zero and shows "None yet" when no job has one (the jobs list has no cost, so Money reads it from the invoices bundle) (Phase 3 build) |
 | D16 | Where the old phone Money features went | Aging summary, the Outstanding or All filter and the per job balances moved to pages at `?panel=invoices`, `?panel=balances` and `?panel=statements`, so Back closes them. Per invoice Send, PDF, Mark paid and Void are in the invoice sheet. The per job Email, Download and Mark paid buttons are one tap deeper, on the invoice page (Phase 3 build) |
@@ -557,7 +557,7 @@ All eleven contrast figures in the October 9 table matched the WCAG formula with
 | D53 | Four records, one client | A client is the root. A lead, a quote, a job and an invoice are separate records, each with a client_id. Any of the four can be created at any time with no other record first. A lead is information from a customer who has no quote yet |
 | D54 | Links only by a tap | A quote points at the lead it came from, a job at the quote it came from, an invoice at the job it bills, and each pointer is set only when the person taps Quote this, Make this a job or Invoice this. Nothing changes a record's type on its own. An approved quote stays a quote; the job it becomes is a new record that copies scope and price |
 | D55 | Jobs keep their table | Jobs stay on fh_contacts, whose stage keeps only job, closed and lost. Leads live in fh_leads with status open, quoted or lost. Quotes live in fh_quotes with status draft, sent, viewed, changes_requested, approved, rejected, expired or lost |
-| D56 | Moved rows are marked, not deleted | The migration copies lead and quote rows into the new tables and sets the old row's stage to moved_lead or moved_quote. Every screen, query, view and function ignores those two stages. Each new row keeps origin_contact_id so notes, files and visits attached to the old row stay reachable. A later cleanup deletes the marked rows once Jesse confirms nothing is missing |
+| D56 | Moved rows are marked, not deleted | The migration copies lead and quote rows into the new tables and sets the old row's stage to moved_lead or moved_quote. Every screen, query, view and function ignores those two stages. Each new row keeps origin_contact_id so notes, files and visits attached to the old row stay reachable. A later cleanup deletes the marked rows once the owner confirms nothing is missing |
 | D57 | No pop up sheets | Every create, edit, choose and confirm is a full screen with its own route, reached by a tap and left by Back. Destructive actions confirm in place with a second tap on the same button within 4 seconds. Capture becomes the screen /capture. The fh Sheet, the shadcn Drawer and ActionSheet are removed once every caller has a route. The desktop command palette is the one keyboard overlay that stays. Recorded in Task 14: `src/components/CommandPalette.tsx` is the only file under `src` that renders `role="dialog"`; it opens from Cmd or Ctrl K at 900 px and up, and below that width the same event opens the `/search` screen |
 | D58 | One New menu | One New button (phone header, desktop sidebar row and Cmd N) opens /new, a full screen with Lead, Quote, Job, Invoice and Client. Each goes straight to that record's create screen. The client is picked or typed on the create screen itself |
 | D59 | Fewest taps | Every create screen saves with one tap and lands on the record it made. Lead needs a name; Quote needs a client; Job needs a client and a title; Invoice needs a client and an amount. A new client is created in place by typing a name that matches nobody |

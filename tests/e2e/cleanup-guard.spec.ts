@@ -115,7 +115,7 @@ const PROPOSAL = {
     created_at: '2026-10-01T12:00:00.000Z', quote_sent_at: '2026-10-02T12:00:00.000Z', terms_text: ''
   },
   company: {
-    name: 'Parker Construction', phone: '615 555 0100', email: 'office@parker.co', insured_text: 'Licensed and insured',
+    name: 'Harlow Construction', phone: '615 555 0100', email: 'office@harlow.co', insured_text: 'Licensed and insured',
     license_number: '', logo_url: null, estimate_template: 'fieldhorse', payment_link: ''
   },
   items: [

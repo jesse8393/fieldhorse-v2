@@ -106,7 +106,7 @@ describe('quoteToJobDraft', () => {
 
 describe('quoteNumber', () => {
   it('keeps the proposal shape and uses the last four characters of the quote id', () => {
-    expect(quoteNumber('Parker Construction', 'quote-a1b2', '2026-03-04T00:00:00Z')).toBe('PC-2026-A1B2')
+    expect(quoteNumber('Harlow Construction', 'quote-a1b2', '2026-03-04T00:00:00Z')).toBe('HC-2026-A1B2')
   })
 })
 

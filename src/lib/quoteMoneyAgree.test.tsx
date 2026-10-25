@@ -30,7 +30,7 @@ const CHANGE_ORDERS = [
   { id: 'co1', sequence_number: 1, title: 'Extra footing', amount: 1000, status: 'approved' },
   { id: 'co2', sequence_number: 2, title: 'Pending idea', amount: 900, status: 'sent' }
 ]
-const COMPANY = { name: 'Parker Construction', phone: '615 555 0100', estimate_template: 'fieldhorse', payment_link: '' }
+const COMPANY = { name: 'Harlow Construction', phone: '615 555 0100', estimate_template: 'fieldhorse', payment_link: '' }
 
 function contactWith(termsText: string, amount = 9000) {
   return {
@@ -126,7 +126,7 @@ describe('the capsule, the preview and the customer page agree', () => {
 // loadPreviewPayments) and hands them to the template, which must draw
 // them the way the customer page does (Phase 8 follow up B review).
 describe('the preview and the customer page agree after approval', () => {
-  const LINKED = { ...COMPANY, payment_link: 'venmo.com/u/parker' }
+  const LINKED = { ...COMPANY, payment_link: 'venmo.com/u/harlow' }
 
   // What the Fieldhorse preview draws from the props the preview pane
   // gives the template, with the job's payments.
@@ -154,7 +154,7 @@ describe('the preview and the customer page agree after approval', () => {
       steps: [...(/<ol class="fhp-steps"[^>]*>(.*?)<\/ol>/.exec(html)?.[1] ?? '').matchAll(/<li>(.*?)<\/li>/g)].map((m) => m[1]),
       capsuleText: /class="fhp-capsule__text">([^<]*)</.exec(html)?.[1] ?? '',
       depositReceived: html.includes('Deposit received'),
-      payLabel: /<a [^>]*href="https:\/\/venmo\.com\/u\/parker"[^>]*>(?:<[^>]+>)*([^<]+)</.exec(html)?.[1] ?? null
+      payLabel: /<a [^>]*href="https:\/\/venmo\.com\/u\/harlow"[^>]*>(?:<[^>]+>)*([^<]+)</.exec(html)?.[1] ?? null
     }
   }
 
@@ -169,7 +169,7 @@ describe('the preview and the customer page agree after approval', () => {
   const CASES: Array<{ state: string; payments: PublicDocPayment[]; first: string }> = [
     { state: 'nothing paid', payments: [], first: 'You pay the deposit.' },
     { state: 'part of the deposit paid', payments: [{ id: 'p1', amount: 2000, kind: 'deposit', paid_on: '2026-10-08' }], first: 'You pay the deposit.' },
-    { state: 'the deposit received', payments: [{ id: 'p1', amount: 5000, kind: 'deposit', paid_on: '2026-10-09' }], first: 'Parker sends you a start date.' }
+    { state: 'the deposit received', payments: [{ id: 'p1', amount: 5000, kind: 'deposit', paid_on: '2026-10-09' }], first: 'Harlow sends you a start date.' }
   ]
 
   for (const { state, payments, first } of CASES) {

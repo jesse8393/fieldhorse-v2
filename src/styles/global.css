@@ -3506,7 +3506,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   }
 
   /* Phase 0 (Jun 10 rollout): collapse threshold dropped 1280 → 1000.
-     Jesse's laptop runs Windows 150% scaling and tops out at ~1003 CSS
+     The owner's laptop runs Windows 150% scaling and tops out at ~1003 CSS
      px, so the old 1280 collapse rendered the stacked phone layout on
      every screen for him. New cascade:
        ≥1280   full 3-zone Home (pipeline | today | rail) per the mock

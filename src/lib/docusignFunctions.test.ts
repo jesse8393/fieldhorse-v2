@@ -78,7 +78,7 @@ function jobTables(overrides: Partial<Row> = {}) {
       { id: 'i3', contact_id: 'job-1', description: 'Heated floor', qty: 1, rate: 600, amount: 600, is_optional: true, sort_order: 3 },
       { id: 'i4', contact_id: 'job-1', description: 'Permits', qty: 1, rate: 0, amount: 0, is_excluded: true, sort_order: 4 }
     ],
-    profiles: [{ user_id: 'creator', company_name: 'Parker Construction Co.' }],
+    profiles: [{ user_id: 'creator', company_name: 'Harlow Construction Co.' }],
     fh_quote_versions: [{ id: 'v-old', contact_id: 'job-1', version_number: 1, status: 'approved' }],
     org_members: []
   }
@@ -150,7 +150,7 @@ describe('DocuSign completion records the approval', () => {
     expect(ALLOWED_METHODS).toContain(created.approval_method)
     expect(created.snapshot).toMatchObject({ approval_origin: 'docusign', docusign: { envelope_id: 'ENV-123' } })
     expect(created.snapshot.items).toHaveLength(4)
-    expect(created.snapshot.company.name).toBe('Parker Construction Co.')
+    expect(created.snapshot.company.name).toBe('Harlow Construction Co.')
     expect(versions.find((v) => v.id === 'v-old')).toMatchObject({ status: 'superseded', superseded_by: created.id })
 
     // The job was created by someone else than the sender and still flips.

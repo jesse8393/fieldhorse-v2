@@ -549,7 +549,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
             due_at: null,
             notes: '',
             // Prefilled with the job title (D62) so the stored column is
-            // filled; Jesse can change it before saving.
+            // filled; the owner can change it before saving.
             description: contact?.job_title || ''
           }}
           onSave={async (payload: any) => { const ok = await handleSave(payload); if (ok) setCreating(false) }}

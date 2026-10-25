@@ -15,7 +15,7 @@ alter table public.fh_notes
 -- ============================================================
 -- PROFILES — DISPLAY NAME
 -- ============================================================
--- Used on Home greeting ("Evening, Jesse.") and avatar initials. Safe to run
+-- Used on Home greeting ("Evening, Casey.") and avatar initials. Safe to run
 -- on existing profiles; existing rows remain NULL until user fills it in.
 alter table public.profiles
   add column if not exists full_name text;

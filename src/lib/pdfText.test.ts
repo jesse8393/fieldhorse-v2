@@ -43,7 +43,7 @@ describe('installWinAnsiText', () => {
     const doc = installWinAnsiText(new jsPDF({ unit: 'mm', format: 'letter' }))
     doc.text('Paid to date \u2212$500.00', 10, 10)
     doc.text(['Pay online \u2192 x', 'ok'], 10, 20)
-    doc.textWithLink('Pay online \u2192 venmo.com/u/parker', 10, 30, { url: 'https://venmo.com/u/parker' })
+    doc.textWithLink('Pay online \u2192 venmo.com/u/harlow', 10, 30, { url: 'https://venmo.com/u/harlow' })
     const strings = drawnStrings(doc)
     expect(strings).toContain('Paid to date -$500.00')
     expect(strings).toContain('Pay online -> x')

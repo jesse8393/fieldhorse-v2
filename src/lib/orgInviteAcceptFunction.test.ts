@@ -50,9 +50,9 @@ describe('org invite accept marks the teammate onboarded', () => {
   })
 
   it('never overwrites an existing onboarded_at or other profile fields', async () => {
-    const profiles: Profile[] = [{ user_id: 'owner-1', onboarded_at: '2025-01-01T00:00:00.000Z', company_name: 'Parker Construction' }]
+    const profiles: Profile[] = [{ user_id: 'owner-1', onboarded_at: '2025-01-01T00:00:00.000Z', company_name: 'Harlow Construction' }]
     await markOnboarded(fakeAdmin(profiles), 'owner-1')
-    expect(profiles[0]).toEqual({ user_id: 'owner-1', onboarded_at: '2025-01-01T00:00:00.000Z', company_name: 'Parker Construction' })
+    expect(profiles[0]).toEqual({ user_id: 'owner-1', onboarded_at: '2025-01-01T00:00:00.000Z', company_name: 'Harlow Construction' })
   })
 
   it('leaves other users alone', async () => {

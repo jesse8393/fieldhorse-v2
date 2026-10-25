@@ -104,8 +104,8 @@ export default function DesktopSidebar() {
     return () => window.removeEventListener('keydown', onKey)
   }, [navigate])
 
-  // The short name the phone header shows (headerName): "Parker
-  // Construction", not "Parker Constructi..." It wraps to two lines before
+  // The short name the phone header shows (headerName): "Harlow
+  // Construction", not "Harlow Constructi..." It wraps to two lines before
   // it is cut, and its title carries the full name (PHASE8_PLAN.md Task 14).
   const company = headerName(orgName, profile?.company_name, profile?.full_name)
   const companyFull = headerFullName(orgName, profile?.company_name, profile?.full_name)

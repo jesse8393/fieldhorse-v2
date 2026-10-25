@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeAll, afterAll } from 'vitest'
 
-// The approval date is read in local time. Pin Central time, where Jesse
+// The approval date is read in local time. Pin Central time, where the owner
 // works, so the result is the same on every machine and in CI (UTC). Set it
 // as the file loads too, because the fixtures below build dates before any
 // hook runs.
@@ -35,7 +35,7 @@ function payload(partial: Partial<PublicDocPayload> = {}, contact: Record<string
       ...contact
     },
     company: {
-      name: 'Parker Construction',
+      name: 'Harlow Construction',
       phone: '615 555 0100',
       logo_url: null,
       insured_text: 'Licensed and insured',
@@ -72,16 +72,16 @@ describe('buildPortalView', () => {
     expect(v.headline).toBe('Hi there, your quote is ready.')
   })
 
-  it('makes the initials PC from Parker Construction and keeps the company name', () => {
+  it('makes the initials HC from Harlow Construction and keeps the company name', () => {
     const v = buildPortalView(payload(), NOW)
-    expect(v.companyName).toBe('Parker Construction')
-    expect(v.initials).toBe('PC')
+    expect(v.companyName).toBe('Harlow Construction')
+    expect(v.initials).toBe('HC')
     expect(v.logoUrl).toBeNull()
   })
 
   it('passes the logo through when the company has one', () => {
-    const v = buildPortalView(payload({}, {}, { logo_url: 'https://cdn.example.com/parker.png' }), NOW)
-    expect(v.logoUrl).toBe('https://cdn.example.com/parker.png')
+    const v = buildPortalView(payload({}, {}, { logo_url: 'https://cdn.example.com/harlow.png' }), NOW)
+    expect(v.logoUrl).toBe('https://cdn.example.com/harlow.png')
   })
 
   it('has no cover when there are no photos, and the newest photo when there are', () => {
@@ -120,7 +120,7 @@ describe('buildPortalView', () => {
   it('gives no pay link without a payment link, and a safe one with one', () => {
     expect(buildPortalView(payload(), NOW).payUrl).toBeNull()
     expect(buildPortalView(payload({}, {}, { payment_link: '   ' }), NOW).payUrl).toBeNull()
-    expect(buildPortalView(payload({}, {}, { payment_link: 'venmo.com/u/parker' }), NOW).payUrl).toBe('https://venmo.com/u/parker')
+    expect(buildPortalView(payload({}, {}, { payment_link: 'venmo.com/u/harlow' }), NOW).payUrl).toBe('https://venmo.com/u/harlow')
     expect(buildPortalView(payload({}, {}, { payment_link: 'javascript:alert(1)' }), NOW).payUrl).toBeNull()
   })
 
@@ -194,7 +194,7 @@ describe('buildPortalView', () => {
     const v = buildPortalView(payload(), NOW)
     expect(v.steps).toEqual([
       'You approve and pay the deposit.',
-      'Parker sends you a start date.',
+      'Harlow sends you a start date.',
       'You pay 40% at material delivery and 10% at completion.'
     ])
     const solo = buildPortalView(payload({}, {}, { name: 'Shyld' }), NOW)
@@ -226,7 +226,7 @@ describe('buildPortalView', () => {
     const v = buildPortalView(payload({}, { terms_text: '30% deposit, balance after the walkthrough.' }), NOW)
     expect(v.steps[2]).toBe('You pay the balance after the walkthrough.')
     const plain = buildPortalView(payload({}, { terms_text: 'Net 30 after completion.' }), NOW)
-    expect(plain.steps).toEqual(['You approve the quote.', 'Parker sends you a start date.', 'You pay as the payment terms say.'])
+    expect(plain.steps).toEqual(['You approve the quote.', 'Harlow sends you a start date.', 'You pay as the payment terms say.'])
     expect(depositSentence(plain.deposit)).not.toMatch(/walkthrough/)
   })
 
@@ -234,7 +234,7 @@ describe('buildPortalView', () => {
   // first name rules the customer page shows after approval and on bad data.
   it('reads the quote number, the issue date and the valid until date from the payload', () => {
     const v = buildPortalView(payload({}, { id: 'c-portal', quote_sent_at: '2026-10-02T12:00:00Z', quote_expires_at: '2026-11-02T04:59:59.999Z' }), NOW)
-    expect(v.quoteNumber).toBe('PC-2026-RTAL')
+    expect(v.quoteNumber).toBe('HC-2026-RTAL')
     expect(v.issuedOn).toBe('October 2')
     expect(v.validUntil).toBe('November 1')
     expect(v.expired).toBe(false)
@@ -390,7 +390,7 @@ describe('buildPortalView', () => {
     expect(quoteFingerprint(payload({}, {}, { warranty_default: '90 day workmanship warranty.', license_number: 'TN 1234' }))).not.toBe(same)
     expect(quoteFingerprint(payload({}, {}, { warranty_default: 'Two year workmanship warranty.', license_number: 'TN 9999' }))).not.toBe(same)
     expect(quoteFingerprint(payload({}, {}, { warranty_default: 'Two year workmanship warranty.', license_number: 'TN 1234', insured_text: 'Insured' }))).not.toBe(same)
-    expect(quoteFingerprint(payload({}, {}, { warranty_default: 'Two year workmanship warranty.', license_number: 'TN 1234', name: 'Parker Concrete' }))).not.toBe(same)
+    expect(quoteFingerprint(payload({}, {}, { warranty_default: 'Two year workmanship warranty.', license_number: 'TN 1234', name: 'Harlow Concrete' }))).not.toBe(same)
     // The authority line names who the customer approves for.
     expect(quoteFingerprint(payload({}, { name: 'Ana Castellanos' }, { warranty_default: 'Two year workmanship warranty.', license_number: 'TN 1234' }))).not.toBe(same)
     // How to reach the company says who it is, not what is agreed.
@@ -434,9 +434,9 @@ describe('buildPortalView', () => {
     // so the deposit and the balance are still named and the payments
     // listed add up to the whole price.
     expect(waiting.steps).toEqual([
-      'Parker sends you a revised proposal.',
+      'Harlow sends you a revised proposal.',
       'You approve and pay the deposit.',
-      'Parker sends you a start date.',
+      'Harlow sends you a start date.',
       'You pay 40% at material delivery and 10% at completion.'
     ])
     // Whatever the terms say about a deposit.
@@ -444,7 +444,7 @@ describe('buildPortalView', () => {
       const v = buildPortalView(payload({}, { proposal_status: 'changes_requested', terms_text: terms }), NOW)
       const open = buildPortalView(payload({}, { proposal_status: 'sent', terms_text: terms }), NOW)
       expect(depositNote(v), terms).toBe('Nothing is due while you wait for a revised proposal.')
-      expect(v.steps[0], terms).toBe('Parker sends you a revised proposal.')
+      expect(v.steps[0], terms).toBe('Harlow sends you a revised proposal.')
       expect(v.steps.slice(1), terms).toEqual(open.steps)
       for (const text of [depositNote(v), ...v.steps]) expect(text, text).not.toMatch(DASH)
     }
@@ -493,18 +493,18 @@ describe('buildPortalView', () => {
 // the customer has already done, a job closed out after approval promises
 // nothing more, and the company is called by a name that stands alone.
 describe('the customer page after approval, continued', () => {
-  const LINK = { payment_link: 'venmo.com/u/parker' }
+  const LINK = { payment_link: 'venmo.com/u/harlow' }
   const PART = [{ id: 'p1', amount: 5000, kind: 'deposit', paid_on: '2026-10-08' }]
   const DEPOSIT_IN = [{ id: 'p1', amount: 9229, kind: 'deposit', paid_on: '2026-10-09' }]
   const NO_DEPOSIT = 'No deposit required. Net 30 after completion.'
   const OPEN_STEPS = [
     'You approve and pay the deposit.',
-    'Parker sends you a start date.',
+    'Harlow sends you a start date.',
     'You pay 40% at material delivery and 10% at completion.'
   ]
   const OWED_STEPS = [
     'You pay the deposit.',
-    'Parker sends you a start date.',
+    'Harlow sends you a start date.',
     'You pay 40% at material delivery and 10% at completion.'
   ]
 
@@ -539,7 +539,7 @@ describe('the customer page after approval, continued', () => {
       steps: OWED_STEPS,
       jobFinished: false,
       note: 'Pay $9,229.00 now to reserve your start date.',
-      capsule: { title: 'Thank you.', text: 'Parker Construction has your approval and will be in touch with next steps.', depositReceived: false, payLabel: 'Pay deposit $9,229.00' }
+      capsule: { title: 'Thank you.', text: 'Harlow Construction has your approval and will be in touch with next steps.', depositReceived: false, payLabel: 'Pay deposit $9,229.00' }
     },
     {
       state: 'approved with part of the deposit paid',
@@ -548,31 +548,31 @@ describe('the customer page after approval, continued', () => {
       steps: OWED_STEPS,
       jobFinished: false,
       note: '$5,000.00 paid so far. Pay the remaining $4,229.00 to reserve your start date.',
-      capsule: { title: 'Thank you.', text: 'Parker Construction has your approval and $5,000.00 toward the deposit, and will be in touch with next steps.', depositReceived: false, payLabel: 'Pay remaining deposit $4,229.00' }
+      capsule: { title: 'Thank you.', text: 'Harlow Construction has your approval and $5,000.00 toward the deposit, and will be in touch with next steps.', depositReceived: false, payLabel: 'Pay remaining deposit $4,229.00' }
     },
     {
       state: 'approved with the deposit received',
       payload: payload({ payments: DEPOSIT_IN }, { proposal_status: 'approved' }, LINK),
       headline: 'Hi Marco, your quote is approved.',
-      steps: ['Parker sends you a start date.', 'You pay 40% at material delivery and 10% at completion.'],
+      steps: ['Harlow sends you a start date.', 'You pay 40% at material delivery and 10% at completion.'],
       jobFinished: false,
       note: 'Deposit of $9,229.00 received.',
-      capsule: { title: 'Thank you.', text: 'Parker Construction has your approval and your $9,229.00 deposit, and will be in touch with your start date.', depositReceived: true, payLabel: null }
+      capsule: { title: 'Thank you.', text: 'Harlow Construction has your approval and your $9,229.00 deposit, and will be in touch with your start date.', depositReceived: true, payLabel: null }
     },
     {
       state: 'approved with no deposit due',
       payload: payload({}, { proposal_status: 'approved', terms_text: NO_DEPOSIT }, LINK),
       headline: 'Hi Marco, your quote is approved.',
-      steps: ['Parker sends you a start date.', 'You pay as the payment terms say.'],
+      steps: ['Harlow sends you a start date.', 'You pay as the payment terms say.'],
       jobFinished: false,
       note: 'No deposit is due. Payment follows the terms below.',
-      capsule: { title: 'Thank you.', text: 'Parker Construction has your approval and will be in touch with next steps.', depositReceived: false, payLabel: 'Make a payment' }
+      capsule: { title: 'Thank you.', text: 'Harlow Construction has your approval and will be in touch with next steps.', depositReceived: false, payLabel: 'Make a payment' }
     },
     {
       state: 'waiting on changes requested',
       payload: payload({}, { proposal_status: 'changes_requested' }, LINK),
       headline: 'Hi Marco, here is your quote.',
-      steps: ['Parker sends you a revised proposal.', ...OPEN_STEPS],
+      steps: ['Harlow sends you a revised proposal.', ...OPEN_STEPS],
       jobFinished: false,
       note: 'Nothing is due while you wait for a revised proposal.',
       capsule: null
@@ -602,10 +602,10 @@ describe('the customer page after approval, continued', () => {
       steps: [],
       jobFinished: true,
       note: '',
-      capsule: { title: 'Thank you.', text: 'Parker Construction has your approval.', depositReceived: false, payLabel: 'Make a payment' }
+      capsule: { title: 'Thank you.', text: 'Harlow Construction has your approval.', depositReceived: false, payLabel: 'Make a payment' }
     },
     {
-      // Not a finished job: Jesse decides what a lost job that was
+      // Not a finished job: The owner decides what a lost job that was
       // approved should say, so it reads as any approved quote does.
       state: 'approved and lost',
       payload: payload({}, { proposal_status: 'approved', stage: 'lost' }, LINK),
@@ -613,7 +613,7 @@ describe('the customer page after approval, continued', () => {
       steps: OWED_STEPS,
       jobFinished: false,
       note: 'Pay $9,229.00 now to reserve your start date.',
-      capsule: { title: 'Thank you.', text: 'Parker Construction has your approval and will be in touch with next steps.', depositReceived: false, payLabel: 'Pay deposit $9,229.00' }
+      capsule: { title: 'Thank you.', text: 'Harlow Construction has your approval and will be in touch with next steps.', depositReceived: false, payLabel: 'Pay deposit $9,229.00' }
     }
   ]
 
@@ -667,7 +667,7 @@ describe('the customer page after approval, continued', () => {
       expect(v.steps, label).toEqual([])
       expect(depositNote(v), label).toBe('')
       const capsule = approvalNote(v)
-      expect(capsule?.text, label).toBe('Parker Construction has your approval.')
+      expect(capsule?.text, label).toBe('Harlow Construction has your approval.')
       expect(capsule?.payLabel, label).toBe(payLabel)
       expect(capsule?.depositReceived, label).toBe(received)
       for (const text of [depositNote(v), capsule?.text ?? '', ...v.steps]) expect(text, label).not.toMatch(/start date|next steps/)
@@ -675,7 +675,7 @@ describe('the customer page after approval, continued', () => {
     // No payment link, no button.
     const noLink = buildPortalView(payload({}, finished), NOW)
     expect(approvalNote(noLink)?.payLabel).toBeNull()
-    expect(approvalNote(noLink)?.text).toBe('Parker Construction has your approval.')
+    expect(approvalNote(noLink)?.text).toBe('Harlow Construction has your approval.')
   })
 
   // A job on terms with no deposit has no deposit to be received, so its
@@ -705,7 +705,7 @@ describe('the customer page after approval, continued', () => {
       expect(v.jobFinished, label).toBe(true)
       const capsule = approvalNote(v)
       expect(capsule?.payLabel, label).toBe(payLabel)
-      expect(capsule?.text, label).toBe('Parker Construction has your approval.')
+      expect(capsule?.text, label).toBe('Harlow Construction has your approval.')
       // No deposit is named, so no chip says one was received.
       expect(capsule?.depositReceived, label).toBe(false)
     }
@@ -746,7 +746,7 @@ describe('the customer page after approval, continued', () => {
     for (const [name, short] of [
       ['The Concrete Guys', 'The Concrete Guys'],
       ['Smith & Sons Paving', 'Smith & Sons Paving'],
-      ['Parker Construction', 'Parker'],
+      ['Harlow Construction', 'Harlow'],
       [null, 'Your contractor']
     ] as const) {
       for (const { state, steps } of named(name)) {
@@ -772,7 +772,7 @@ describe('the customer page after approval, continued', () => {
 describe('a payload from a quote record', () => {
   it('seeds the quote number with the quote id', () => {
     const v = buildPortalView(payload({ quote_id: 'q-portal', status: 'sent' }, { id: 'c-elsewhere', quote_sent_at: '2026-10-02T12:00:00Z' }), NOW)
-    expect(v.quoteNumber).toBe('PC-2026-RTAL')
+    expect(v.quoteNumber).toBe('HC-2026-RTAL')
   })
 
   it('reads the status from the payload before the contact block', () => {

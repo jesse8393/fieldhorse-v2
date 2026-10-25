@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
-// These checks read the local day. Pin Central time, where Jesse works,
+// These checks read the local day. Pin Central time, where the owner works,
 // so the result is the same on every machine and in CI (UTC). Set it as
 // the file loads too, because the fixtures build local dates before any
 // hook runs.

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { assignedCrewIds, documentRows, railNotes, shortDate } from './jobDesktop.ts'
 
-// These checks read the local day. Pin Central time, where Jesse works, so
+// These checks read the local day. Pin Central time, where the owner works, so
 // the result is the same on every machine and in CI (UTC). Set it as the
 // file loads too, because the fixtures below build local dates before any
 // hook runs.

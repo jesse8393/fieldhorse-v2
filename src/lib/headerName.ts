@@ -5,7 +5,7 @@
 // The workspace name comes first because it is the name the team chose
 // for the app, then the profile's company name, then the person's own
 // name. A trailing legal word ("Company", "Co.", "LLC") is dropped so
-// "Parker Construction Company" reads "Parker Construction" and "Acme LLC"
+// "Harlow Construction Company" reads "Harlow Construction" and "Acme LLC"
 // reads "Acme", but only when what is left is a name on its own: "My
 // Company" (the name the server gives a workspace made without one),
 // "Smith & Co.", "Jones and Company" and "The Fence Company" stay whole.
@@ -50,8 +50,8 @@ export function headerName(
 
 /**
  * The full name behind headerName, for a title on the short one: the
- * profile's company name when it shortens to the name shown ("Parker
- * Construction Company" behind "Parker Construction"), else the name the
+ * profile's company name when it shortens to the name shown ("Harlow
+ * Construction Company" behind "Harlow Construction"), else the name the
  * short one came from, with its legal word kept.
  */
 export function headerFullName(
@@ -73,7 +73,7 @@ export function headerFullName(
  * is then the profile's own), when the two names agree once their legal
  * words are set aside ("Smith & Co." and "Smith & Company"), or when this
  * is the one workspace the person owns, whatever it is called. Someone
- * who runs Shyld Roofing and works crew at Parker Construction sees Parker
+ * who runs Shyld Roofing and works crew at Harlow Construction sees Harlow
  * with its initials there, never Shyld's city or logo.
  */
 export function profileCompanyIsWorkspace({ orgName, companyName, ownsWorkspace, workspacesOwned }: {

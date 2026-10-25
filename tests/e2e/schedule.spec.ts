@@ -633,7 +633,7 @@ test.describe('crew this week', () => {
           org_id: 'org-1',
           invites: [],
           members: [
-            { id: 'm1', user_id: 'qa-user-1', role: 'owner', joined_at: '2026-01-01T00:00:00Z', invited_by: null, is_self: true, default_hourly_rate: null, name: 'Jesse Parker', company_name: null, email: 'qa@fieldhorse.local' },
+            { id: 'm1', user_id: 'qa-user-1', role: 'owner', joined_at: '2026-01-01T00:00:00Z', invited_by: null, is_self: true, default_hourly_rate: null, name: 'Casey Harlow', company_name: null, email: 'qa@fieldhorse.local' },
             { id: 'm2', user_id: 'crew-1', role: 'crew', joined_at: '2026-01-01T00:00:00Z', invited_by: null, is_self: false, default_hourly_rate: null, name: 'Terrence Moody', company_name: null, email: 'terrence@example.com' }
           ]
         })

@@ -15,7 +15,7 @@ const TEN_K: MoneyItem[] = [
 ]
 
 function money(over: Partial<QuoteMoneyInput> = {}) {
-  return quoteMoney({ items: TEN_K, changeOrders: [], contactAmount: 10000, termsText: '', companyName: 'Parker Construction', ...over })
+  return quoteMoney({ items: TEN_K, changeOrders: [], contactAmount: 10000, termsText: '', companyName: 'Harlow Construction', ...over })
 }
 
 describe('quoteMoney total', () => {
@@ -135,7 +135,7 @@ describe('quoteMoney steps', () => {
   it('follows the default schedule when the terms are empty', () => {
     expect(money().steps).toEqual([
       'You approve and pay the deposit.',
-      'Parker sends you a start date.',
+      'Harlow sends you a start date.',
       'You pay 40% at material delivery and 10% at completion.'
     ])
   })
@@ -143,7 +143,7 @@ describe('quoteMoney steps', () => {
   it('points at the terms for the balance when they name a deposit', () => {
     expect(money({ termsText: '30% deposit on signing, 70% on completion.' }).steps).toEqual([
       'You approve and pay the deposit.',
-      'Parker sends you a start date.',
+      'Harlow sends you a start date.',
       'You pay the balance as the payment terms say.'
     ])
     expect(money({ termsText: '$2,500 deposit due at signing.' }).steps[0]).toBe('You approve and pay the deposit.')
@@ -160,7 +160,7 @@ describe('quoteMoney steps', () => {
   it('asks for no deposit when there is none or the terms name none', () => {
     const steps = [
       'You approve the quote.',
-      'Parker sends you a start date.',
+      'Harlow sends you a start date.',
       'You pay as the payment terms say.'
     ]
     expect(money({ termsText: 'No deposit required.' }).steps).toEqual(steps)
@@ -188,7 +188,7 @@ describe('quoteMoney steps', () => {
   it('names the company in full when its first word cannot stand alone', () => {
     expect(money({ companyName: 'The Concrete Guys' }).steps[1]).toBe('The Concrete Guys sends you a start date.')
     expect(money({ companyName: 'Smith & Sons Paving' }).steps[1]).toBe('Smith & Sons Paving sends you a start date.')
-    expect(money({ companyName: 'Parker Construction' }).steps[1]).toBe('Parker sends you a start date.')
+    expect(money({ companyName: 'Harlow Construction' }).steps[1]).toBe('Harlow sends you a start date.')
   })
 })
 
@@ -197,10 +197,10 @@ describe('quoteMoney steps', () => {
 // approve capsule share it.
 describe('companyShortName', () => {
   it('is the first word when that word stands on its own', () => {
-    expect(companyShortName('Parker Construction')).toBe('Parker')
-    expect(companyShortName('Parker Construction Company')).toBe('Parker')
+    expect(companyShortName('Harlow Construction')).toBe('Harlow')
+    expect(companyShortName('Harlow Construction Company')).toBe('Harlow')
     expect(companyShortName('Shyld')).toBe('Shyld')
-    expect(companyShortName('  Parker   Construction  ')).toBe('Parker')
+    expect(companyShortName('  Harlow   Construction  ')).toBe('Harlow')
     // Words that only begin like an article or a joining word.
     expect(companyShortName('Andersen Roofing')).toBe('Andersen')
     expect(companyShortName('Theodore Builders')).toBe('Theodore')
@@ -219,20 +219,20 @@ describe('companyShortName', () => {
     }
   })
 
-  // "Parker, Inc." printed "Parker, sends you a start date." and "Mr.
+  // "Harlow, Inc." printed "Harlow, sends you a start date." and "Mr.
   // Handyman of Nashville" printed "Ask Mr. a question first": a first
   // word that ends in a comma or a period is a fragment, an abbreviation
   // or a name that goes on.
   it('is the whole name when the first word ends in a comma or a period', () => {
-    for (const name of ['Parker, Inc.', 'Smith, Jones & Co.', 'Mr. Handyman of Nashville', 'St. Louis Paving', 'J. Parker Construction', 'J.R. Concrete']) {
+    for (const name of ['Harlow, Inc.', 'Smith, Jones & Co.', 'Mr. Handyman of Nashville', 'St. Louis Paving', 'J. Harlow Construction', 'J.R. Concrete']) {
       expect(companyShortName(name), name).toBe(name)
     }
-    expect(money({ companyName: 'Parker, Inc.' }).steps[1]).toBe('Parker, Inc. sends you a start date.')
+    expect(money({ companyName: 'Harlow, Inc.' }).steps[1]).toBe('Harlow, Inc. sends you a start date.')
     expect(companyShortName('Mr. Handyman of Nashville', 'the contractor')).toBe('Mr. Handyman of Nashville')
     // Punctuation inside the first word, or later in the name, changes nothing.
-    expect(companyShortName("Parker's Paving")).toBe("Parker's")
+    expect(companyShortName("Harlow's Paving")).toBe("Harlow's")
     expect(companyShortName('A1 Concrete, LLC')).toBe('A1')
-    expect(companyShortName('Parker Construction Co.')).toBe('Parker')
+    expect(companyShortName('Harlow Construction Co.')).toBe('Harlow')
   })
 
   it('stands in with Your contractor, or the words a sentence asks for, when there is no name', () => {
@@ -241,7 +241,7 @@ describe('companyShortName', () => {
     expect(companyShortName('   ')).toBe('Your contractor')
     expect(companyShortName('', 'the contractor')).toBe('the contractor')
     expect(companyShortName('The Concrete Guys', 'the contractor')).toBe('The Concrete Guys')
-    expect(companyShortName('Parker Construction', 'the contractor')).toBe('Parker')
+    expect(companyShortName('Harlow Construction', 'the contractor')).toBe('Harlow')
   })
 })
 
@@ -252,19 +252,19 @@ describe('stepsAfterApproval', () => {
   it('asks for the deposit first while any of it is still owed', () => {
     expect(stepsAfterApproval(money().steps, true)).toEqual([
       'You pay the deposit.',
-      'Parker sends you a start date.',
+      'Harlow sends you a start date.',
       'You pay 40% at material delivery and 10% at completion.'
     ])
     expect(stepsAfterApproval(money({ termsText: '30% deposit, balance after the walkthrough.' }).steps, true)).toEqual([
       'You pay the deposit.',
-      'Parker sends you a start date.',
+      'Harlow sends you a start date.',
       'You pay the balance after the walkthrough.'
     ])
   })
 
   it('starts with the start date once the deposit is in', () => {
     expect(stepsAfterApproval(money().steps, false)).toEqual([
-      'Parker sends you a start date.',
+      'Harlow sends you a start date.',
       'You pay 40% at material delivery and 10% at completion.'
     ])
   })
@@ -272,7 +272,7 @@ describe('stepsAfterApproval', () => {
   it('starts with the start date when no deposit is due', () => {
     for (const termsText of ['No deposit required.', '50% down at rough in, 50% at completion.']) {
       expect(stepsAfterApproval(money({ termsText }).steps, false), termsText).toEqual([
-        'Parker sends you a start date.',
+        'Harlow sends you a start date.',
         'You pay as the payment terms say.'
       ])
     }
