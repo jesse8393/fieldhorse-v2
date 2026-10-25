@@ -240,7 +240,7 @@ function message(partial: Record<string, unknown>) {
 const MESSAGES = [
   message({
     id: 'm1', direction: 'outbound', status: 'sent', sent_by_kind: 'user', created_at: '2026-10-09T21:48:00Z',
-    body: "Hi Priya, Jesse with Parker Construction. We're set for Thursday at 11:00 to look at the patio cover."
+    body: "Hi Priya, Casey with Harlow Construction. We're set for Thursday at 11:00 to look at the patio cover."
   }),
   message({ id: 'm2', created_at: '2026-10-09T22:02:00Z', body: 'Perfect, thank you!' }),
   message({ id: 'm3', created_at: '2026-10-10T13:14:00Z', body: 'Can we push to 11:30? Daycare pickup ran long.' })

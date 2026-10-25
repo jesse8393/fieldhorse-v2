@@ -15,11 +15,11 @@ const day = 86400000
 const iso = (d) => new Date(d).toISOString()
 
 const company = {
-  name: 'Parker Construction Company',
+  name: 'Harlow Construction Company',
   address: '412 Burkitt Station Rd, Nolensville, TN 37135',
   phone: '(615) 555-0142',
-  email: 'office@parkerconstruction.co',
-  website: 'parkerconstruction.co',
+  email: 'office@harlowconstruction.co',
+  website: 'harlowconstruction.co',
   logo_url: null,
   brand_accent_hex: null,
   estimate_template: 'classic',
@@ -27,7 +27,7 @@ const company = {
   insured_text: 'Licensed, bonded & insured · GL $2M',
   warranty_default: 'All workmanship is guaranteed for two (2) years from the date of substantial completion. Manufacturer warranties on materials pass through to the owner. This proposal is valid for 30 days from the issue date; pricing may be revised thereafter due to material cost changes.',
   payment_link: 'https://buy.stripe.com/example',
-  payment_instructions: 'We accept check, ACH, and all major cards. Make checks payable to Parker Construction Company.'
+  payment_instructions: 'We accept check, ACH, and all major cards. Make checks payable to Harlow Construction Company.'
 }
 
 const contact = {

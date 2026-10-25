@@ -1,6 +1,6 @@
 # FIELDHORSE V2 — PREMIUM STACK MIGRATION
 
-**Run inside `C:\Users\Jesse\Desktop\fieldhorse-v2`**
+**Run inside `C:\Users\owner\Desktop\fieldhorse-v2`**
 Goal: layer the premium UI stack (shadcn/ui + Tailwind v4 + Motion + Aceternity FX + Vaul + Sonner + cmdk + Lucide) on top of the existing app **without breaking any working flows**. Preserve react-router, Supabase Auth, ProfileContext, ThemeContext, all 13 screens, and the entire `global.css` / `tokens.css` system.
 
 ---
@@ -47,7 +47,7 @@ Goal: layer the premium UI stack (shadcn/ui + Tailwind v4 + Motion + Aceternity 
 ## PHASE 0 — SAFETY NET (≈ 5 min)
 
 ```bash
-cd C:\Users\Jesse\Desktop\fieldhorse-v2
+cd C:\Users\owner\Desktop\fieldhorse-v2
 git status
 git add -A
 git commit -m "chore: pre-premium-upgrade snapshot" --allow-empty
@@ -57,7 +57,7 @@ npm run dev
 
 Confirm dev server boots at `http://localhost:5173`. Render Home screen successfully. If it does not boot, **STOP and report**.
 
-Also tell Jesse to run this in the **Supabase SQL editor** (it's a manual step — Claude Code cannot do this from the laptop):
+Also tell the owner to run this in the **Supabase SQL editor** (it's a manual step — Claude Code cannot do this from the laptop):
 
 ```sql
 -- Cleanup stray test events from dev sessions
@@ -67,7 +67,7 @@ where title ilike '%garage pour%' or title ilike '%clear to work%';
 
 Report how many rows were deleted.
 
-**👋 CHECK-IN 0** — git branch ✓ · dev boots ✓ · stale rows deleted: ___ · wait for Jesse's "go" before Phase 1.
+**👋 CHECK-IN 0** — git branch ✓ · dev boots ✓ · stale rows deleted: ___ · wait for the owner's "go" before Phase 1.
 
 ---
 
@@ -440,7 +440,7 @@ export default function ScanLine({ className = '' }) {
 
 **`src/components/fx/GreetingTitle.jsx`**
 ```jsx
-export default function GreetingTitle({ prefix = 'Morning,', name = 'Jesse' }) {
+export default function GreetingTitle({ prefix = 'Morning,', name = 'Casey' }) {
   return (
     <h1
       className="fh-font-serif"
@@ -1075,7 +1075,7 @@ export default function Login() {
           <h1 className="fh-font-serif" style={{ fontSize: 32, lineHeight: 1.1, letterSpacing: '-0.02em', marginTop: 28, fontWeight: 400 }}>
             Welcome,<br /><em className="fh-font-serif-italic fh-text-gradient-gold">operator.</em>
           </h1>
-          <p style={{ marginTop: 10, color: 'var(--ink-muted)', fontSize: 13 }}>Sign in to run every job like a captain.</p>
+          <p style={{ marginTop: 10, color: 'var(--ink-muted)', fontSize: 13 }}>Sign in to Fieldhorse.</p>
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 20, borderRadius: 18, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)', backdropFilter: 'blur(20px)' }}>

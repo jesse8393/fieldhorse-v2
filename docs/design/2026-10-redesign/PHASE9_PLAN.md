@@ -10,7 +10,7 @@
 
 **Spec:** This file, plus `docs/design/2026-10-redesign/SPEC.md` section 17 (decisions D1 to D52, and D53 onward recorded by this phase).
 
-**Why this plan exists.** Jesse's words on October 19: "leads, quotes, job, invoice still are a process but they need to be separate. I should be able to create any of them at any time without starting to be a lead." "If I choose quote, job or invoice, the lead screens shouldn't come up." "Leads need a schedule estimate and quote this button." "I hate the pop up little screens." "Everything is about efficiency." He also showed an invoice PDF whose Description column printed the job title, and a notifications pop up full of repeated reminders.
+**Why this plan exists.** The owner's words on October 19: "leads, quotes, job, invoice still are a process but they need to be separate. I should be able to create any of them at any time without starting to be a lead." "If I choose quote, job or invoice, the lead screens shouldn't come up." "Leads need a schedule estimate and quote this button." "I hate the pop up little screens." "Everything is about efficiency." He also showed an invoice PDF whose Description column printed the job title, and a notifications pop up full of repeated reminders.
 
 **What the research found.** `fh_contacts` is one table with a `stage` column (lead, quote, job, closed, lost). A quote is a lead whose stage flipped. Quote lines, the customer link, approvals, the schedule, photos, time punches and invoices all hang off that one row. Production holds 195 of these rows across 7 companies (64 lead, 25 quote, 31 job, 62 closed, 13 lost), 173 clients, 66 invoices and 206 quote lines. The repeated reminders in the notifications list are not an engine bug: Mary Ward has three job records, so she gets three review asks; Justin Bryan has five records. Reminders are per deal and should be per client. None of them was sent to a customer. Thirty four pop up surfaces exist (11 `fh` Sheets, 16 shadcn Drawers, 7 ActionSheets, plus confirms and dialogs). `/invoices/:id` takes a job id, not an invoice id. The invoice description column exists in the database (migration 050) but the draws editor and the detail screen never show it.
 
@@ -35,7 +35,7 @@
 
 ### Database rules for this phase
 
-Jesse has given permission to change the database (October 19). The rules that keep that safe:
+The owner has given permission to change the database (October 19). The rules that keep that safe:
 
 * Every change is a file in `supabase/migrations/` first, applied with `mcp__Supabase__apply_migration`, never typed into the SQL editor.
 * Every migration is additive and reversible: new tables, new nullable columns, new indexes, backfills that copy. Nothing drops a table or column in this phase. Old rows that moved are marked, not deleted (D56).
@@ -46,7 +46,7 @@ Jesse has given permission to change the database (October 19). The rules that k
 
 ### Never do these
 
-* Never merge any pull request. Never push to `main`. Jesse merges after the preview. Never touch Netlify settings, environment variables or secrets.
+* Never merge any pull request. Never push to `main`. The owner merges after the preview. Never touch Netlify settings, environment variables or secrets.
 * Never send an email, text or message, and never call `/api/send-*`, `/api/docusign-send` or `fh_send_message` outside mocked tests.
 * Never delete or weaken an existing test to make a build pass. Never use `--no-verify`. Never add a dependency.
 * Never use `git reset --hard` past another task's work, `git clean -x` or a force push.
@@ -55,11 +55,11 @@ Jesse has given permission to change the database (October 19). The rules that k
 
 * After a careful debugging pass and three fix attempts, undo that task with `git revert` of its own commits, mark it `blocked` with the error and what you tried, and continue with the next task that does not depend on it. A blocked migration is reverted with a new down migration that drops only what the blocked one added, never by hand.
 * If the plan and the code disagree, follow the intent, note the difference in `PROGRESS.md`, and keep going.
-* If a decision is not covered, pick the option with the fewest taps for Jesse, record it as a new D number, and keep going.
+* If a decision is not covered, pick the option with the fewest taps for the owner, record it as a new D number, and keep going.
 
 ### Finish
 
-Run `npm run test:all` and `npm run audit:design`. Take phone and desktop screenshots of every new screen (the New menu, each of the four create screens, a lead with its two buttons, a quote with Make this a job, a job with Invoice this, the invoice screen, the notifications screen, the invoice PDF with its description). Push. Update the draft pull request with the screenshots. Write a "Phase 9 summary" at the top of `PROGRESS.md` for Jesse in plain words with no dashes: what changed, what is blocked, new decisions, what the migration did to his data in numbers, and an iPhone checklist.
+Run `npm run test:all` and `npm run audit:design`. Take phone and desktop screenshots of every new screen (the New menu, each of the four create screens, a lead with its two buttons, a quote with Make this a job, a job with Invoice this, the invoice screen, the notifications screen, the invoice PDF with its description). Push. Update the draft pull request with the screenshots. Write a "Phase 9 summary" at the top of `PROGRESS.md` for the owner in plain words with no dashes: what changed, what is blocked, new decisions, what the migration did to his data in numbers, and an iPhone checklist.
 
 ---
 
@@ -70,12 +70,12 @@ Run `npm run test:all` and `npm run audit:design`. Take phone and desktop screen
 | D53 | Four records, one client | A client is the root. A lead, a quote, a job and an invoice are separate records, each with a `client_id`. Any of the four can be created at any time with no other record first. A lead is information from a customer who has no quote yet. |
 | D54 | Links only by a tap | A quote points at the lead it came from, a job at the quote it came from, an invoice at the job it bills, and each pointer is set only when the person taps Quote this, Make this a job or Invoice this. Nothing changes a record's type on its own. An approved quote stays a quote; the job it becomes is a new record that copies scope and price. |
 | D55 | Jobs keep their table | Jobs stay on `fh_contacts`. Its `stage` keeps only `job`, `closed` and `lost`. Leads live in `fh_leads` with status `open`, `quoted` or `lost`. Quotes live in `fh_quotes` with status `draft`, `sent`, `viewed`, `changes_requested`, `approved`, `rejected`, `expired` or `lost`. |
-| D56 | Moved rows are marked, not deleted | The migration copies lead and quote rows into the new tables and sets the old row's `stage` to `moved_lead` or `moved_quote`. Every screen, query, view and function ignores those two stages. Each new row keeps `origin_contact_id` so notes, files and visits attached to the old row stay reachable. A cleanup migration in a later phase deletes the marked rows once Jesse confirms nothing is missing. |
+| D56 | Moved rows are marked, not deleted | The migration copies lead and quote rows into the new tables and sets the old row's `stage` to `moved_lead` or `moved_quote`. Every screen, query, view and function ignores those two stages. Each new row keeps `origin_contact_id` so notes, files and visits attached to the old row stay reachable. A cleanup migration in a later phase deletes the marked rows once the owner confirms nothing is missing. |
 | D57 | No pop up sheets | Every create, edit, choose and confirm is a full screen with its own route, reached by a tap and left by Back. The dock and header stay. Destructive actions confirm in place with a second tap on the same button ("Delete" becomes "Tap again to delete" for 4 seconds). Capture becomes the screen `/capture`. The `fh` Sheet, the shadcn Drawer and ActionSheet are removed from the app once every caller has a route. |
 | D58 | One New menu | One New button (phone: the gold coin's long press menu is gone; a New button sits in the header; desktop: the sidebar New row and ⌘N) opens `/new`, a full screen with four rows: Lead, Quote, Job, Invoice, plus Client under them. Each row goes straight to that record's create screen. No chooser asks "who is this for" first; the client is picked or typed on the create screen itself. |
 | D59 | Fewest taps | Every create screen saves with one tap and lands on the record it made. Required fields: Lead needs a name; Quote needs a client; Job needs a client and a title; Invoice needs a client and an amount. Everything else can be filled later. A new client is created in place by typing a name that matches nobody. |
 | D60 | Lead buttons | A lead screen has two buttons: Schedule estimate (opens `/schedule/new?lead=:id` with the lead's address and name filled, title "Estimate", and books an `fh_schedule` row with `lead_id`) and Quote this (opens `/quotes/new?lead=:id` with the client, title and notes filled, and marks the lead `quoted` with `quote_id` once the quote saves). |
-| D61 | Quote and job buttons | A quote has Make this a job (creates a job with the quote's client, title, scope, amount and terms, sets `fh_quotes.job_id`, and lands on the job). A job has Invoice this (opens `/invoices/new?job=:id` with the client and the balance filled). Both are available regardless of status; an unapproved quote can still become a job, since Jesse decides, not the software. |
+| D61 | Quote and job buttons | A quote has Make this a job (creates a job with the quote's client, title, scope, amount and terms, sets `fh_quotes.job_id`, and lands on the job). A job has Invoice this (opens `/invoices/new?job=:id` with the client and the balance filled). Both are available regardless of status; an unapproved quote can still become a job, since the owner decides, not the software. |
 | D62 | Invoices stand alone | `fh_invoices` gets `client_id` and `contact_id` becomes nullable. An invoice with no job bills the client directly. The invoice has a Description field that prints in the PDF Description column and in the email, prefilled with the job title when there is a job and blank otherwise. `/invoices/:id` means an invoice row; a job's money lives at `/jobs/:id?tab=financials`. |
 | D63 | Reminders per client | The follow up engine keys on the client, not the deal. One open reminder per client and kind. Lost leads, lost quotes and lost jobs get no reminders. A reminder can be marked Done or Dismissed from the notifications screen, and that closes the `fh_follow_ups` row. |
 | D64 | Notifications are a screen | `/notifications` replaces the bell's pop up. The bell navigates there. Each row opens its record. Reminders show Done and Dismiss. |
@@ -85,7 +85,7 @@ Run `npm run test:all` and `npm run audit:design`. Take phone and desktop screen
 
 ## Review focus
 
-Five things no task's tests fully exercise and that would bite Jesse first. Each line names the test that pins it in the owning task.
+Five things no task's tests fully exercise and that would bite the owner first. Each line names the test that pins it in the owning task.
 
 1. A client with two open leads and one quote: Quote this on the second lead must link only that lead. Pinned in Task 9 (`leads.spec.ts`, "Quote this links the lead it came from").
 2. A quote whose lines total $0 pressed Make this a job: the job gets amount 0 and no deposit sentence, never a crash. Pinned in Task 10 (`quoteToJob.test.ts`, "a quote with no lines makes a job with no amount").
@@ -99,7 +99,7 @@ Five things no task's tests fully exercise and that would bite Jesse first. Each
 
 ### Task 1: The invoice description reaches the PDF and the email
 
-The database column exists. The create sheet prefills it with the job title and nothing lets Jesse edit it afterwards, so the PDF prints the job title.
+The database column exists. The create sheet prefills it with the job title and nothing lets the owner edit it afterwards, so the PDF prints the job title.
 
 **Files:**
 - Modify: `src/screens/ContactDetail/sections/InvoiceDrawsSection.tsx` (the `Editor` form near line 826 and `handleSave` near 131)
@@ -395,7 +395,7 @@ The quote screen shows the client, title, the lines (tap a line to edit it in pl
 - [ ] Run `QA_NOW=2026-10-08T14:00:00.000Z FH_VISUAL=1 npx playwright test cleanup-guard` and retake baselines only after viewing each diff; add guard shots for `/new`, `/leads/:id`, `/quotes/:id`, `/invoices/:id`, `/notifications`, `/capture`.
 - [ ] Take the screenshots listed under Finish into `docs/design/2026-10-redesign/phase9-review/`.
 - [ ] Write the Phase 9 summary at the top of `PROGRESS.md`, including the migration counts from `move-counts.mjs`.
-- [ ] Push. Update the draft pull request. Tell Jesse the preview address once Netlify builds it.
+- [ ] Push. Update the draft pull request. Tell the owner the preview address once Netlify builds it.
 - [ ] Commit: "Add the Phase 9 summary and screenshots".
 
 ---

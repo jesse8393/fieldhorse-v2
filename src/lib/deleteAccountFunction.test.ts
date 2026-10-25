@@ -16,9 +16,9 @@ describe('account deletion plan', () => {
     const plan = planAccountDeletion({
       memberships: [{ org_id: ORG_A, role: 'owner' }],
       teammates: [{ org_id: ORG_A, user_id: 'crew-1', role: 'crew', joined_at: '2026-01-01' }],
-      orgNames: { [ORG_A]: 'Parker Construction' }
+      orgNames: { [ORG_A]: 'Harlow Construction' }
     })
-    expect(plan.blocked).toEqual([{ orgId: ORG_A, orgName: 'Parker Construction' }])
+    expect(plan.blocked).toEqual([{ orgId: ORG_A, orgName: 'Harlow Construction' }])
     expect(plan.handoffs).toEqual([])
     expect(plan.soloOrgIds).toEqual([])
   })

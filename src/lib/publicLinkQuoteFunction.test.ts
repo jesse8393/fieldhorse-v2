@@ -140,7 +140,7 @@ function quoteTables(quote: Partial<Row> = {}, extra: Record<string, Row[]> = {}
     fh_insurance_claims: [],
     fh_notifications: [],
     fh_notes: [],
-    profiles: [{ user_id: 'owner', company_name: 'Parker Construction', estimate_template: 'fieldhorse' }],
+    profiles: [{ user_id: 'owner', company_name: 'Harlow Construction', estimate_template: 'fieldhorse' }],
     org_members: [{ org_id: 'org-1', user_id: 'owner', role: 'owner', revoked_at: null, joined_at: '2026-01-01T00:00:00.000Z' }],
     ...extra
   }
@@ -186,7 +186,7 @@ describe('a proposal link with quote_id', () => {
       scope_text: 'Pour and finish',
       amount: 3000
     })
-    expect(body.company.name).toBe('Parker Construction')
+    expect(body.company.name).toBe('Harlow Construction')
     // The view was recorded against the link.
     expect(currentFake.rpcCalls.map((c) => c.name)).toContain('fh_record_public_link_view')
   })
@@ -244,7 +244,7 @@ describe('approving a quote through its link', () => {
     currentFake = fakeSupabase(quoteTables())
     await postApprove({ token: 't1', signature_name: 'Marco Castellanos' })
     const snapshot = currentFake.tables.fh_quote_versions[0].snapshot
-    expect(snapshot.quote_number).toBe('PC-2026-RTAL')
+    expect(snapshot.quote_number).toBe('HC-2026-RTAL')
     expect(snapshot.quote.id).toBe(QUOTE_ID)
   })
 
@@ -326,7 +326,7 @@ describe('a DocuSign completion on a quote envelope', () => {
     expect(result.ok).toBe(true)
     const version = fake.tables.fh_quote_versions.find((v) => v.id === result.versionId)!
     expect(version).toMatchObject({ quote_id: QUOTE_ID, status: 'approved', base_total: 3000, optional_total: 400 })
-    expect(version.snapshot.quote_number).toBe('PC-2026-RTAL')
+    expect(version.snapshot.quote_number).toBe('HC-2026-RTAL')
     expect(fake.tables.fh_quotes[0]).toMatchObject({ status: 'approved', approved_version_id: version.id })
   })
 

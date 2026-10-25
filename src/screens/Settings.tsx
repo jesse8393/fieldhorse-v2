@@ -709,7 +709,7 @@ export default function Settings() {
               rows={3}
               value={paymentInstructions}
               onChange={(e) => setPaymentInstructions(e.target.value)}
-              placeholder="Checks payable to Parker Construction Co. · Zelle: pay@parkerconstructioncompany.com"
+              placeholder="Checks payable to your company · Zelle: pay@yourcompany.com"
               style={{ ...brandInputStyle, resize: 'vertical', lineHeight: 1.45 }}
             />
           </BrandField>

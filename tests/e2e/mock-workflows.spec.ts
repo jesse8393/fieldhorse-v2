@@ -421,8 +421,8 @@ test('keeps customer quote change requests in the workflow', async ({ page }, te
           quote_sent_at: '2026-07-29T12:00:00.000Z',
         },
         company: {
-          name: 'Parker Construction Company',
-          email: 'office@parker.co',
+          name: 'Harlow Construction Company',
+          email: 'office@harlow.co',
           estimate_template: 'classic',
         },
         items: [{

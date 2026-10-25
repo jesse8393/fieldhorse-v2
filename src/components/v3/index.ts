@@ -15,7 +15,7 @@ export { default as FilterPill } from './FilterPill.tsx'
 export { default as FloatingActionButton } from './FloatingActionButton.tsx'
 
 /* Account attribution, inline byline chip for shared-job content
-   ("Posted by Parker Construction Co." etc.). Resolves via the
+   ("Posted by Harlow Construction Co." etc.). Resolves via the
    fh_resolve_account_labels RPC (migration 016). */
 export { default as PostedByChip } from './PostedByChip.tsx'
 

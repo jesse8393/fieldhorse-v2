@@ -23,7 +23,7 @@
 //
 // Manual test recipe:
 //   1. npm run dev
-//   2. Sign in (Parker Construction account or any test account).
+//   2. Sign in (Harlow Construction account or any test account).
 //   3. Open any job's detail page → Quote tab.
 //   4. Add line items across 4 sections:
 //        Roof Replacement, Deck to Concrete,

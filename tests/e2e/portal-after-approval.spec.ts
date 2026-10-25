@@ -59,9 +59,9 @@ function proposalPayload({ status, contact = {}, company = {}, payments = [], it
     status: status ?? contactBlock.proposal_status,
     contact: contactBlock,
     company: {
-      name: 'Parker Construction',
+      name: 'Harlow Construction',
       phone: '615 555 0100',
-      email: 'office@parker.co',
+      email: 'office@harlow.co',
       insured_text: 'Licensed and insured',
       license_number: '',
       logo_url: null,
@@ -80,7 +80,7 @@ function proposalPayload({ status, contact = {}, company = {}, payments = [], it
 
 type Payload = ReturnType<typeof proposalPayload>
 
-const LINK = { payment_link: 'venmo.com/u/parker' }
+const LINK = { payment_link: 'venmo.com/u/harlow' }
 const DEPOSIT_IN = [{ id: 'p1', amount: 9229, kind: 'deposit', paid_on: '2026-10-09' }]
 const PART = [{ id: 'p1', amount: 5000, kind: 'deposit', paid_on: '2026-10-08' }]
 // The deposit and the final payment: the whole $18,458.00.
@@ -182,7 +182,7 @@ test('an approved quote with the deposit received says approved and lists only w
   // Approving and paying the deposit are done, so the steps start at the
   // start date and the balance stays named.
   await expect(steps(page)).toHaveText([
-    'Parker sends you a start date.',
+    'Harlow sends you a start date.',
     'You pay 40% at material delivery and 10% at completion.'
   ])
   await expect(page.getByText(/You approve/)).toHaveCount(0)
@@ -191,7 +191,7 @@ test('an approved quote with the deposit received says approved and lists only w
   // D44 as it was: Deposit received, its note under the total, and no pay button.
   await expect(capsule(page).getByText('Approved', { exact: true })).toBeVisible()
   await expect(capsule(page).getByText('Deposit received', { exact: true })).toBeVisible()
-  await expect(capsule(page).getByText('Parker Construction has your approval and your $9,229.00 deposit, and will be in touch with your start date.')).toBeVisible()
+  await expect(capsule(page).getByText('Harlow Construction has your approval and your $9,229.00 deposit, and will be in touch with your start date.')).toBeVisible()
   await expect(total(page).getByText('Deposit of $9,229.00 received.', { exact: true })).toBeVisible()
   await expect(page.getByRole('link', { name: /^Pay / })).toHaveCount(0)
   await expect(page.getByRole('link', { name: 'Make a payment' })).toHaveCount(0)
@@ -217,10 +217,10 @@ test('a finished job promises no start date and no next steps, and its payment l
   await expect(page.getByText(/Pay \$/)).toHaveCount(0)
 
   await expect(capsule(page).getByText('Approved', { exact: true })).toBeVisible()
-  await expect(capsule(page).getByText('Parker Construction has your approval.', { exact: true })).toBeVisible()
+  await expect(capsule(page).getByText('Harlow Construction has your approval.', { exact: true })).toBeVisible()
   const pay = page.getByRole('link', { name: 'Make a payment' })
   await expect(pay).toBeVisible()
-  await expect(pay).toHaveAttribute('href', 'https://venmo.com/u/parker')
+  await expect(pay).toHaveAttribute('href', 'https://venmo.com/u/harlow')
   await expect(pay).toHaveAttribute('target', '_blank')
   await expect(page.getByRole('link', { name: /Pay deposit|Pay remaining deposit/ })).toHaveCount(0)
   // Still nothing to ask and nothing to approve.
@@ -235,7 +235,7 @@ test('a finished job promises no start date and no next steps, and its payment l
     await page.reload({ waitUntil: 'domcontentloaded' })
     await expect(headline(page)).toHaveText('Hi Marco, your quote is approved.')
     await expect(capsule(page).getByText('Deposit received', { exact: true })).toBeVisible()
-    await expect(capsule(page).getByText('Parker Construction has your approval.', { exact: true })).toBeVisible()
+    await expect(capsule(page).getByText('Harlow Construction has your approval.', { exact: true })).toBeVisible()
     await expect(total(page).getByText(/deposit|due|start date|paid/i)).toHaveCount(0)
     await expect(page.getByRole('heading', { name: 'What happens next' })).toHaveCount(0)
     await expect(page.getByText(/start date|next steps/)).toHaveCount(0)
@@ -247,14 +247,14 @@ test('a finished job promises no start date and no next steps, and its payment l
   // for a payment instead.
   spies.setPayload(proposalPayload({ contact: finished, company: LINK, payments: PART }))
   await page.reload({ waitUntil: 'domcontentloaded' })
-  await expect(capsule(page).getByText('Parker Construction has your approval.', { exact: true })).toBeVisible()
+  await expect(capsule(page).getByText('Harlow Construction has your approval.', { exact: true })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Make a payment' })).toBeVisible()
   await expect(page.getByRole('link', { name: /Pay deposit|Pay remaining deposit/ })).toHaveCount(0)
 
   // Without a payment link there is no button at all.
   spies.setPayload(proposalPayload({ contact: finished }))
   await page.reload({ waitUntil: 'domcontentloaded' })
-  await expect(capsule(page).getByText('Parker Construction has your approval.', { exact: true })).toBeVisible()
+  await expect(capsule(page).getByText('Harlow Construction has your approval.', { exact: true })).toBeVisible()
   await expect(capsule(page).getByRole('link')).toHaveCount(0)
 
   expect(spies.approve).toHaveLength(0)
@@ -272,14 +272,14 @@ test('a finished job on terms with no deposit asks for no payment once it is pai
   const spies = await mockPortal(context, proposalPayload({ contact: finished, company: LINK, payments: FULL }))
   await openPortal(page)
   await expect(headline(page)).toHaveText('Hi Marco, your quote is approved.')
-  await expect(capsule(page).getByText('Parker Construction has your approval.', { exact: true })).toBeVisible()
+  await expect(capsule(page).getByText('Harlow Construction has your approval.', { exact: true })).toBeVisible()
   await expect(capsule(page).getByRole('link')).toHaveCount(0)
   await expect(page.getByRole('link', { name: 'Make a payment' })).toHaveCount(0)
 
   // With part of it paid, it still offers one.
   spies.setPayload(proposalPayload({ contact: finished, company: LINK, payments: PART }))
   await page.reload({ waitUntil: 'domcontentloaded' })
-  await expect(capsule(page).getByText('Parker Construction has your approval.', { exact: true })).toBeVisible()
+  await expect(capsule(page).getByText('Harlow Construction has your approval.', { exact: true })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Make a payment' })).toBeVisible()
   expect(spies.stray).toEqual([])
 })
@@ -291,7 +291,7 @@ test('an approved quote with the deposit still due asks for the deposit first', 
   await expect(headline(page)).toHaveText('Hi Marco, your quote is approved.')
   await expect(steps(page)).toHaveText([
     'You pay the deposit.',
-    'Parker sends you a start date.',
+    'Harlow sends you a start date.',
     'You pay 40% at material delivery and 10% at completion.'
   ])
   await expect(page.getByRole('link', { name: 'Pay deposit $9,229.00' })).toBeVisible()
@@ -301,7 +301,7 @@ test('an approved quote with the deposit still due asks for the deposit first', 
   await page.reload({ waitUntil: 'domcontentloaded' })
   await expect(steps(page)).toHaveText([
     'You pay the deposit.',
-    'Parker sends you a start date.',
+    'Harlow sends you a start date.',
     'You pay 40% at material delivery and 10% at completion.'
   ])
   await expect(page.getByRole('link', { name: 'Pay remaining deposit $4,229.00' })).toBeVisible()
@@ -310,7 +310,7 @@ test('an approved quote with the deposit still due asks for the deposit first', 
   spies.setPayload(proposalPayload({ contact: { proposal_status: 'approved', terms_text: 'No deposit required. Net 30 after completion.' }, company: LINK }))
   await page.reload({ waitUntil: 'domcontentloaded' })
   await expect(steps(page)).toHaveText([
-    'Parker sends you a start date.',
+    'Harlow sends you a start date.',
     'You pay as the payment terms say.'
   ])
   await expect(page.getByRole('link', { name: 'Make a payment' })).toBeVisible()
@@ -332,7 +332,7 @@ test('approving on the page turns the headline to approved, unless the page cann
   await expect(headline(page)).toHaveText('Hi Marco, your quote is approved.')
   await expect(steps(page)).toHaveText([
     'You pay the deposit.',
-    'Parker sends you a start date.',
+    'Harlow sends you a start date.',
     'You pay 40% at material delivery and 10% at completion.'
   ])
 
@@ -365,7 +365,7 @@ test('the headline reads here is your quote while changes are requested, after e
   await openPortal(page)
   await expect(headline(page)).toHaveText('Hi Marco, here is your quote.')
   // The steps while it waits stay as D44 has them.
-  await expect(steps(page).first()).toHaveText('Parker sends you a revised proposal.')
+  await expect(steps(page).first()).toHaveText('Harlow sends you a revised proposal.')
 
   spies.setPayload(proposalPayload({ contact: { quote_expires_at: '2026-10-06T04:59:59.999Z' } }))
   await page.reload({ waitUntil: 'domcontentloaded' })
@@ -385,17 +385,17 @@ test('the headline reads here is your quote while changes are requested, after e
 })
 
 test('an approved quote whose job was marked lost reads as approved, not as a finished job', async ({ page, context }) => {
-  // What a lost job that was approved should say is Jesse's call; until
+  // What a lost job that was approved should say is the owner's call; until
   // then it reads as any approved quote does.
   const spies = await mockPortal(context, proposalPayload({ contact: { proposal_status: 'approved', stage: 'lost' }, company: LINK }))
   await openPortal(page)
   await expect(headline(page)).toHaveText('Hi Marco, your quote is approved.')
   await expect(steps(page)).toHaveText([
     'You pay the deposit.',
-    'Parker sends you a start date.',
+    'Harlow sends you a start date.',
     'You pay 40% at material delivery and 10% at completion.'
   ])
-  await expect(capsule(page).getByText('Parker Construction has your approval and will be in touch with next steps.')).toBeVisible()
+  await expect(capsule(page).getByText('Harlow Construction has your approval and will be in touch with next steps.')).toBeVisible()
   await expect(page.getByRole('link', { name: 'Pay deposit $9,229.00' })).toBeVisible()
   expect(spies.stray).toEqual([])
 })
@@ -420,8 +420,8 @@ test('a company is called by its first word only when that word stands alone', a
   // A first word that stands alone is still the short name.
   spies.setPayload(proposalPayload())
   await page.reload({ waitUntil: 'domcontentloaded' })
-  await expect(page.getByRole('button', { name: 'Ask Parker a question first' })).toBeVisible()
-  await expect(steps(page).nth(1)).toHaveText('Parker sends you a start date.')
+  await expect(page.getByRole('button', { name: 'Ask Harlow a question first' })).toBeVisible()
+  await expect(steps(page).nth(1)).toHaveText('Harlow sends you a start date.')
   expect(spies.approve).toHaveLength(0)
   expect(spies.requestChanges).toHaveLength(0)
   expect(spies.stray).toEqual([])
@@ -434,13 +434,13 @@ test('the page reads the quote record: its status and its id drive the headline 
   const spies = await mockPortal(context, proposalPayload({ status: 'approved', contact: { id: 'c-elsewhere', proposal_status: 'sent' }, company: LINK, payments: DEPOSIT_IN }))
   await openPortal(page)
   await expect(headline(page)).toHaveText('Hi Marco, your quote is approved.')
-  await expect(page.getByText('Quote PC-2026-RTAL', { exact: true })).toBeVisible()
+  await expect(page.getByText('Quote HC-2026-RTAL', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Approve this quote' })).toHaveCount(0)
 
   spies.setPayload(proposalPayload({ status: 'changes_requested', contact: { id: 'c-elsewhere', proposal_status: 'sent' } }))
   await page.reload({ waitUntil: 'domcontentloaded' })
   await expect(headline(page)).toHaveText('Hi Marco, here is your quote.')
-  await expect(steps(page).first()).toHaveText('Parker sends you a revised proposal.')
+  await expect(steps(page).first()).toHaveText('Harlow sends you a revised proposal.')
   expect(spies.approve).toHaveLength(0)
   expect(spies.stray).toEqual([])
 })
@@ -461,8 +461,8 @@ function previewTables() {
   })
   return {
     profiles: [{
-      user_id: 'qa-user-1', full_name: 'Jesse Parker', company_name: 'Parker Construction Company',
-      onboarded_at: '2026-07-10T14:00:00.000Z', logo_url: null, company_email: 'office@parker.co',
+      user_id: 'qa-user-1', full_name: 'Casey Harlow', company_name: 'Harlow Construction Company',
+      onboarded_at: '2026-07-10T14:00:00.000Z', logo_url: null, company_email: 'office@harlow.co',
       brand_accent_hex: null, estimate_template: 'fieldhorse', preferences: {}
     }],
     fh_quotes: [{
@@ -503,13 +503,13 @@ async function expectDepositIn(preview: Locator) {
   await expect(preview.getByRole('heading', { level: 1 })).toHaveText('Hi there, your quote is approved.', { timeout: 15_000 })
   // Approving and paying the deposit are done, as on the customer page.
   await expect(preview.getByRole('list', { name: 'What happens next' }).getByRole('listitem')).toHaveText([
-    'Parker sends you a start date.',
+    'Harlow sends you a start date.',
     'You pay 40% at material delivery and 10% at completion.'
   ])
   await expect(preview.getByRole('region', { name: 'Total' }).getByText('Deposit of $1,575.00 received.', { exact: true })).toBeVisible()
   const approval = preview.getByRole('region', { name: 'Approval' })
   await expect(approval.getByText('Deposit received', { exact: true })).toBeVisible()
-  await expect(approval.getByText('Parker Construction Company has your approval and your $1,575.00 deposit, and will be in touch with your start date.')).toBeVisible()
+  await expect(approval.getByText('Harlow Construction Company has your approval and your $1,575.00 deposit, and will be in touch with your start date.')).toBeVisible()
   await expect(preview.getByText('You pay the deposit.', { exact: true })).toHaveCount(0)
 }
 
@@ -654,7 +654,7 @@ test('every capsule button stays inside the capsule and shows its whole label, w
     'Mr. Handyman of Nashville',
     'The Roof Doctor of Middle Tennessee',
     'The Concrete Guys',
-    'Parker Construction'
+    'Harlow Construction'
   ]
   // A $218,458.00 job: after $5,000.00, $104,229.00 of the deposit is left.
   const BIG = [{ ...ITEMS[0], rate: 218458, amount: 218458 }]

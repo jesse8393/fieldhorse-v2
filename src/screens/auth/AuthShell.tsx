@@ -6,7 +6,7 @@
 // The FIELDHORSE wordmark sits at the top of the column, and waits, clear,
 // for its face (Bebas Neue) so a wider fallback never runs off a phone. When
 // public/welcome.jpg exists, the top 55 percent shows it fading into onyx;
-// until Jesse supplies a photo the stage is onyx with grain only, and a
+// until the owner supplies a photo the stage is onyx with grain only, and a
 // missing file never shows a broken image box.
 //
 // On a phone the soft keyboard must not cover the button: while a field has

@@ -436,7 +436,7 @@ export default function Landing() {
             margin: 0
           }}
         >
-          I run Parker Construction in Tennessee. I built Fieldhorse
+          I run a construction company in Tennessee. I built Fieldhorse
           because nothing out there fit a company my size without a
           sales call and a training week. You are not buying software
           from a vendor. You are using the same app I run my own jobs
@@ -451,7 +451,7 @@ export default function Landing() {
             color: MUTE
           }}
         >
-          Jesse Parker · Founder
+          From the founder
         </p>
       </section>
 

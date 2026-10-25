@@ -171,7 +171,7 @@ function pdfText(doc: any): string {
 // Review of task 5: the reminder email and the PDF it attaches must name
 // one figure, so the PDF hero reads the same allocation as amount_due.
 describe('buildInvoicePdf', () => {
-  const company = { name: 'Parker Construction Co.', address: '100 Main St', phone: '', email: 'admin@example.com' }
+  const company = { name: 'Harlow Construction Co.', address: '100 Main St', phone: '', email: 'admin@example.com' }
   const contact = { id: '6f1c9b1e-0000-4000-8000-000000000001', name: 'Rosa Delgado', amount: 10000, job_title: 'Patio pour', email: 'rosa@example.com' }
   const i1 = { id: 'i1', contact_id: contact.id, title: 'Deposit', amount: 5000, status: 'overdue', sequence_number: 1, due_at: '2026-10-02', issued_at: '2026-09-25T12:00:00Z', notes: null, description: null } as any
   const i2 = { ...i1, id: 'i2', title: 'Final', status: 'sent', sequence_number: 2, due_at: '2026-10-09' }
@@ -228,7 +228,7 @@ describe('invoiceDescription', () => {
 // Its contract is its own amount, so what it owes is its amount less its
 // payments, and its PDF has no Contract position block to reconcile against.
 describe('an invoice with no job', () => {
-  const company = { name: 'Parker Construction Co.', address: '100 Main St', phone: '', email: 'admin@example.com' }
+  const company = { name: 'Harlow Construction Co.', address: '100 Main St', phone: '', email: 'admin@example.com' }
   const client = { id: 'cl-1', name: 'Rosa Delgado', email: 'rosa@example.com', phone: '555-0101', address: '412 Burkitt Station Rd' }
   const invoice = {
     id: 'inv-solo', contact_id: null, client_id: 'cl-1', title: 'Gravel delivery', amount: 1200, status: 'sent',

@@ -67,7 +67,7 @@ async function stubSignedOut(context: BrowserContext, photo: 'present' | 'missin
     route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ inviter_company: 'Parker Construction', job_title: 'Back porch' })
+      body: JSON.stringify({ inviter_company: 'Harlow Construction', job_title: 'Back porch' })
     })
   )
   return authCalls
@@ -205,7 +205,7 @@ test('Reset password and Partner invite reach the right edge too, with the photo
   expectFullWidth(await measure(page), '/reset-password')
 
   await page.goto('/partner-invite/tok123')
-  await expect(page.getByRole('heading', { level: 1, name: 'Parker Construction invited you to manage together.' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Harlow Construction invited you to manage together.' })).toBeVisible()
   await photoShown(page)
   await page.evaluate(() => document.fonts.ready)
   expectFullWidth(await measure(page), '/partner-invite')
@@ -234,7 +234,7 @@ test('Login with the photo still fits the window with an alert or a notice line 
   }
 
   // A failed sign in.
-  await page.getByLabel('Email').fill('jesse@parker.co')
+  await page.getByLabel('Email').fill('casey@harlow.co')
   await page.getByLabel('Password').fill('not the password')
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
   await expect(page.getByRole('alert')).toHaveText('Invalid login credentials')
@@ -247,7 +247,7 @@ test('Login with the photo still fits the window with an alert or a notice line 
   await everySize('the email asked for')
 
   // The reset link sent.
-  await page.getByLabel('Email').fill('jesse@parker.co')
+  await page.getByLabel('Email').fill('casey@harlow.co')
   await page.getByRole('button', { name: 'Forgot password?' }).click()
   await expect(page.getByRole('status')).toHaveText('Reset link sent. Check your email.')
   await expect(page.locator('.fha-notice')).toBeVisible()
@@ -287,7 +287,7 @@ function column(page: Page): Promise<Column> {
 }
 
 async function failSignIn(page: Page) {
-  await page.getByLabel('Email').fill('jesse@parker.co')
+  await page.getByLabel('Email').fill('casey@harlow.co')
   await page.getByLabel('Password').fill('not the password')
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
   await expect(page.getByRole('alert')).toHaveText('Invalid login credentials')

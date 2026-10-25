@@ -123,11 +123,11 @@ const SEVEN = {
   ]
 }
 
-// Jesse's profile when the company he runs is Shyld Roofing: its address
+// The owner's profile when the company he runs is Shyld Roofing: its address
 // and its logo (a small PNG, so the monogram can show it).
 const PIXEL_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII='
 const SHYLD_PROFILE = {
-  user_id: 'qa-user-1', full_name: 'Jesse Parker', company_name: 'Shyld Roofing Co.', company_address: '210 Lake Dr, Smyrna, TN 37167',
+  user_id: 'qa-user-1', full_name: 'Casey Harlow', company_name: 'Shyld Roofing Co.', company_address: '210 Lake Dr, Smyrna, TN 37167',
   logo_url: PIXEL_URL, onboarded_at: '2026-07-01T12:00:00Z', location_lat: 35.98, location_lon: -86.52, services: ['Roofing'],
   company_email: 'office@shyld.co', brand_accent_hex: null, preferences: {}
 }
@@ -438,15 +438,15 @@ test.describe(`a desktop ${WIDTH} px wide`, () => {
   test('the sidebar shows the short company name whole, with the full name as its title', async ({ context, page }) => {
     await open(context, page, '/invoices', { tables: MONEY })
     const name = page.getByRole('complementary', { name: 'Primary navigation' }).locator('.fhs-side__company')
-    await expect(name).toHaveText('Parker Construction')
-    await expect(name).toHaveAttribute('title', 'Parker Construction Company')
+    await expect(name).toHaveText('Harlow Construction')
+    await expect(name).toHaveAttribute('title', 'Harlow Construction Company')
     const state = await lineState(name)
     expect(state.lines).toBeLessThanOrEqual(2)
     expect(state, 'no ellipsis').toMatchObject({ clamped: false, cutSideways: false })
   })
 
   test('a long company name wraps to two lines at most, and the title keeps all of it', async ({ context, page }) => {
-    const long = 'Parker Construction and Concrete Restoration of Middle Tennessee'
+    const long = 'Harlow Construction and Concrete Restoration of Middle Tennessee'
     await open(context, page, '/invoices', { tables: { ...MONEY, organizations: [{ id: 'org-1', name: long }] } })
     const name = page.getByRole('complementary', { name: 'Primary navigation' }).locator('.fhs-side__company')
     await expect(name).toHaveText(long)
@@ -465,14 +465,14 @@ test.describe(`a desktop ${WIDTH} px wide`, () => {
   })
 
   // The profile is the person's, not the workspace's: it holds the city
-  // and logo of the company they run. Jesse runs Shyld Roofing and works
-  // crew at Parker Construction, so in Parker the sidebar shows Parker's
+  // and logo of the company they run. The owner runs Shyld Roofing and works
+  // crew at Harlow Construction, so in Harlow the sidebar shows Harlow's
   // name with its initials, never Shyld's city or logo.
   test('in a workspace someone else owns, the sidebar has its name and initials, not the city and logo of the company the person runs', async ({ context, page }) => {
     await open(context, page, '/', { role: 'crew', tables: { fh_schedule: SCHEDULE, profiles: [SHYLD_PROFILE] } })
     const brand = page.getByRole('complementary', { name: 'Primary navigation' }).locator('.fhs-side__brand')
-    await expect(brand.locator('.fhs-side__company')).toHaveText('Parker Construction', { timeout: 30_000 })
-    await expect(brand.locator('.fhc-monogram__initials')).toHaveText('PC')
+    await expect(brand.locator('.fhs-side__company')).toHaveText('Harlow Construction', { timeout: 30_000 })
+    await expect(brand.locator('.fhc-monogram__initials')).toHaveText('HC')
     await expect(brand.locator('img')).toHaveCount(0)
     await expect(brand.getByText('Smyrna, TN')).toHaveCount(0)
   })
@@ -482,7 +482,7 @@ test.describe(`a desktop ${WIDTH} px wide`, () => {
   test('in the workspace the person owns, the sidebar keeps their city and logo', async ({ context, page }) => {
     await open(context, page, '/invoices', { tables: { ...MONEY, profiles: [SHYLD_PROFILE] } })
     const brand = page.getByRole('complementary', { name: 'Primary navigation' }).locator('.fhs-side__brand')
-    await expect(brand.locator('.fhs-side__company')).toHaveText('Parker Construction', { timeout: 30_000 })
+    await expect(brand.locator('.fhs-side__company')).toHaveText('Harlow Construction', { timeout: 30_000 })
     await expect(brand.locator('.fhs-side__city')).toHaveText('Smyrna, TN')
     await expect(brand.locator('img')).toHaveAttribute('src', PIXEL_URL)
   })

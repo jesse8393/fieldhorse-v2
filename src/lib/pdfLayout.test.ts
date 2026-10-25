@@ -72,10 +72,10 @@ const INVOICE_DISCLAIMER = 'Pricing covers labor, material, standard equipment, 
 const PROPOSAL_DISCLAIMER = 'Pricing includes labor, material, standard equipment, placement, finishing, and cleanup for the listed scope only. Pricing is based on visible site conditions at time of estimating. Any hidden conditions, field changes, requested by owner additions, or scope deviations may require additional pricing through written change order approval. Estimate valid for 30 days.'
 
 const company = {
-  name: 'Parker Construction Co.',
+  name: 'Harlow Construction Co.',
   address: '100 Main St, Murfreesboro TN',
   phone: '(615) 555-0100',
-  email: 'admin@parkerconstructioncompany.com',
+  email: 'admin@harlowconstructioncompany.com',
   warranty_default: 'One year workmanship warranty on all installed work.'
 }
 const contact = {
@@ -189,7 +189,7 @@ describe('amount due hero', () => {
 describe('characters the standard fonts cannot draw', () => {
   it('prints credits and payments with a readable minus sign', async () => {
     const r: any = await generateInvoice({
-      company: { ...company, payment_link: 'venmo.com/u/parker' },
+      company: { ...company, payment_link: 'venmo.com/u/harlow' },
       contact: { ...contact, name: 'Justin \u{1F44D} Bryan' },
       lineItems: [{ description: 'Deposit → cabinets', notes: '12′ run, ≥ 3 coats', qty: 1, rate: 2500, amount: 2500 }],
       invoiceId: contact.id, contractTotal: 10000, previouslyPaid: 500,
@@ -200,7 +200,7 @@ describe('characters the standard fonts cannot draw', () => {
     expect(text.some((t) => t.includes('\u0000'))).toBe(false)
     expect(text).toContain('-$500.00')
     expect(text).toContain('-$300.00')
-    expect(text).toContain('Pay online at venmo.com/u/parker')
+    expect(text).toContain('Pay online at venmo.com/u/harlow')
     expect(text.join(' ')).toContain('Deposit -> cabinets')
     expect(text.join(' ')).toContain('12\' run, >= 3 coats')
   })

@@ -128,7 +128,7 @@ async function stubPartnerInvite(context: BrowserContext) {
     route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ inviter_company: 'Parker Construction', job_title: 'Back porch' })
+      body: JSON.stringify({ inviter_company: 'Harlow Construction', job_title: 'Back porch' })
     })
   )
 }
@@ -224,7 +224,7 @@ test.describe('Welcome and Login', () => {
       const stub = await stubSignedOut(context, 'missing')
       await openLogin(page)
 
-      await expect(page.getByRole('heading', { level: 1, name: 'Run every job like a captain.' })).toBeVisible()
+      await expect(page.getByRole('heading', { level: 1, name: 'Every job, start to paid.' })).toBeVisible()
       await expect(page.getByRole('img', { name: 'Fieldhorse' })).toBeVisible()
       await expect(page.getByRole('button', { name: 'Create a workspace' })).toBeVisible()
       await expect(page.getByRole('button', { name: 'Forgot password?' })).toBeVisible()
@@ -500,7 +500,7 @@ test.describe('Welcome and Login', () => {
 test.describe('The wordmark on a screen that mounts while Bebas Neue loads', () => {
   const lazyScreens = [
     { name: 'Reset password', path: '/reset-password', code: 'ResetPassword', title: 'Reset your password.' },
-    { name: 'Partner invite', path: '/partner-invite/tok123', code: 'PartnerInvite', title: 'Parker Construction invited you to manage together.' }
+    { name: 'Partner invite', path: '/partner-invite/tok123', code: 'PartnerInvite', title: 'Harlow Construction invited you to manage together.' }
   ]
 
   for (const screen of lazyScreens) {
@@ -539,7 +539,7 @@ test.describe('The wordmark on a screen that mounts while Bebas Neue loads', () 
     await holdScreenCode(context, 'Landing', font.requested)
     await page.goto('/')
     await page.getByRole('button', { name: 'Sign in' }).first().click()
-    await expect(page.getByRole('heading', { level: 1, name: 'Run every job like a captain.' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Every job, start to paid.' })).toBeVisible()
     const wordmark = page.getByRole('img', { name: 'Fieldhorse' })
 
     expect(await bebasChecks(page), 'check() answers true, as Safari does').toBe(true)
@@ -563,7 +563,7 @@ test.describe('The wordmark on a screen that mounts while Bebas Neue loads', () 
     await holdScreenCode(context, 'PartnerInvite', font.requested)
     await page.setViewportSize({ width: 320, height: 568 })
     await page.goto('/partner-invite/tok123')
-    await expect(page.getByRole('heading', { level: 1, name: 'Parker Construction invited you to manage together.' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Harlow Construction invited you to manage together.' })).toBeVisible()
     const wordmark = page.getByRole('img', { name: 'Fieldhorse' })
 
     // The file failed, and check() still calls the face ready.
@@ -574,7 +574,7 @@ test.describe('The wordmark on a screen that mounts while Bebas Neue loads', () 
 
     // Sign in mounts a new stage after the failure: the fallback again, whole.
     await page.getByRole('link', { name: 'Sign in' }).click()
-    await expect(page.getByRole('heading', { level: 1, name: 'Run every job like a captain.' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Every job, start to paid.' })).toBeVisible()
     await expect(wordmark).toHaveCSS('opacity', '1')
     expectWholeWord(await wordmarkLayout(wordmark))
   })
@@ -584,7 +584,7 @@ test.describe('The wordmark on a screen that mounts while Bebas Neue loads', () 
     await stubPartnerInvite(context)
     const font = await holdWordmarkFont(context)
     await page.goto('/partner-invite/tok123')
-    await expect(page.getByRole('heading', { level: 1, name: 'Parker Construction invited you to manage together.' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Harlow Construction invited you to manage together.' })).toBeVisible()
     const wordmark = page.getByRole('img', { name: 'Fieldhorse' })
 
     // The 3 second wait runs out and the fallback shows, whole.
@@ -595,7 +595,7 @@ test.describe('The wordmark on a screen that mounts while Bebas Neue loads', () 
     // Sign in draws a new stage. The wait is over for this visit, so the
     // word shows from the first frame instead of hiding for another wait.
     await page.getByRole('link', { name: 'Sign in' }).click()
-    await expect(page.getByRole('heading', { level: 1, name: 'Run every job like a captain.' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Every job, start to paid.' })).toBeVisible()
     const atOnce = await wordmarkLayout(wordmark)
     expect(atOnce.opacity, `the wordmark shows at once: ${JSON.stringify(atOnce)}`).toBe(1)
     expectWholeWord(atOnce)
@@ -627,12 +627,12 @@ test.describe('Reset password and partner invite use the same shell', () => {
       route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ inviter_company: 'Parker Construction', job_title: 'Back porch' })
+        body: JSON.stringify({ inviter_company: 'Harlow Construction', job_title: 'Back porch' })
       })
     )
     await page.goto('/partner-invite/tok123')
 
-    await expect(page.getByRole('heading', { level: 1, name: 'Parker Construction invited you to manage together.' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Harlow Construction invited you to manage together.' })).toBeVisible()
     await expect(page.getByRole('main')).toHaveCSS('background-color', ONYX)
     await expectOnyxShell(page)
     await expect(page.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/login?partner_invite=tok123')

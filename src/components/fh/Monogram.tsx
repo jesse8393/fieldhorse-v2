@@ -13,7 +13,7 @@ type MonogramProps = {
   className?: string
 }
 
-/** Up to two initials: "Parker Construction" gives "PC", "Shyld" gives "S". */
+/** Up to two initials: "Harlow Construction" gives "HC", "Shyld" gives "S". */
 export function initialsFor(name?: string | null): string {
   const words = (name || '').trim().split(/\s+/).filter((w) => /[A-Za-z0-9]/.test(w))
   if (words.length === 0) return 'FH'

@@ -65,7 +65,7 @@ export type QuoteMoneyInput = {
   changeOrders?: MoneyChangeOrder[] | null
   contactAmount?: number | string | null
   termsText?: string | null
-  /** The company name, for the second step ("Parker sends you a start date."). */
+  /** The company name, for the second step ("Harlow sends you a start date."). */
   companyName?: string | null
 }
 
@@ -87,18 +87,18 @@ export function lineAmount(item: MoneyItem): number {
 }
 
 // A first word that ends in a comma or a period: the name goes on past it
-// ("Parker, Inc.") or the word is an abbreviation ("Mr. Handyman", "St.
+// ("Harlow, Inc.") or the word is an abbreviation ("Mr. Handyman", "St.
 // Louis Paving", "J.R. Concrete").
 const ENDS_IN_PUNCTUATION = /[.,]$/
 
 /**
- * The name a sentence calls the company by: its first word, so "Parker
- * Construction" gives "Parker", unless that word cannot stand for the
+ * The name a sentence calls the company by: its first word, so "Harlow
+ * Construction" gives "Harlow", unless that word cannot stand for the
  * company on its own. Then it is the whole name: when the first word is
  * The, A, An, My, Our or Your ("The Concrete Guys", "My Company"), when
  * the next word joins it to more of the name with &, + or and ("Smith &
  * Sons Paving"), or when the first word ends in a comma or a period
- * ("Parker, Inc.", "Mr. Handyman of Nashville"). The first two are the
+ * ("Harlow, Inc.", "Mr. Handyman of Nashville"). The first two are the
  * word lists headerName.ts reads to tell when a company name cannot be cut
  * short. No name gives the fallback: "Your contractor" to open a sentence,
  * or what the sentence asks for ("the contractor").

@@ -175,7 +175,7 @@ export type PortalView = {
    */
   headline: string
   addressLine: string
-  /** "PC-2026-RTAL", the number the letter themes and the PDF print; null without a quote or job id. */
+  /** "HC-2026-RTAL", the number the letter themes and the PDF print; null without a quote or job id. */
   quoteNumber: string | null
   /** "October 2", or with the year when it is not this year; null when the payload has no date. */
   issuedOn: string | null
@@ -552,7 +552,7 @@ export function buildPortalView(payload: PublicDocPayload, now: Date): PortalVie
   const closed = !isApproved && CLOSED_STAGES.has(stage)
   // Closeout moves an approved job to closed and leaves the quote approved.
   // An approved quote whose job was marked lost is not a finished job; what
-  // it should say is Jesse's call, so it reads as any approved quote does.
+  // it should say is the owner's call, so it reads as any approved quote does.
   const jobFinished = isApproved && stage === 'closed'
   const open = !decided && !expired && !closed
   const canAsk = open && status !== 'rejected' && !NO_QUESTION_STAGES.has(stage)

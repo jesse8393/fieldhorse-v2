@@ -5,7 +5,7 @@ import { describe, expect, it, vi, beforeAll, afterAll } from 'vitest'
 // limit and offset as PostgREST does. Phase 8, task 5: the totals must not
 // come from the display list capped at 500 invoices.
 
-// Money reads the local day. Pin Central time, where Jesse works.
+// Money reads the local day. Pin Central time, where the owner works.
 const originalTz = process.env.TZ
 process.env.TZ = 'America/Chicago'
 beforeAll(() => { process.env.TZ = 'America/Chicago' })

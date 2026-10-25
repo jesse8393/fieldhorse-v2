@@ -12,10 +12,10 @@ import { describe, it, expect } from 'vitest'
 import { generateInvoice, generateQuote, generateCertificate, generateStatement } from './pdf.js'
 
 const company = {
-  name: 'Parker Construction Co.',
+  name: 'Harlow Construction Co.',
   address: '100 Main St, Murfreesboro TN',
   phone: '(615) 555-0100',
-  email: 'admin@parkerconstructioncompany.com',
+  email: 'admin@harlowconstructioncompany.com',
   license_number: 'TN-123456',
   warranty_default: 'One year workmanship warranty on all installed work.'
 }
@@ -118,7 +118,7 @@ describe('pdf engine smoke', () => {
   })
 
   it('renders the pay block when a payment link is set (invoice + statement)', async () => {
-    const payCompany = { ...company, payment_link: 'venmo.com/u/parker', payment_instructions: 'Checks payable to Parker Construction Co.' }
+    const payCompany = { ...company, payment_link: 'venmo.com/u/harlow', payment_instructions: 'Checks payable to Harlow Construction Co.' }
     const inv = await generateInvoice({
       company: payCompany, contact,
       lineItems: [{ description: 'Final balance', qty: 1, rate: 1380, amount: 1380 }],

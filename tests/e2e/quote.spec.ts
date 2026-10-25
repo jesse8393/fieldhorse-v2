@@ -343,7 +343,7 @@ test.describe('the quote screen', () => {
     await expect(panel.getByText(/Approval stays paused until the revision is sent/)).toBeVisible()
     // Approving by hand is not offered while the customer waits on a revision.
     await expect(page.getByRole('link', { name: /approve quote/i })).toHaveCount(0)
-    // Make this a job stays: Jesse decides, not the software (D61).
+    // Make this a job stays: The owner decides, not the software (D61).
     await expect(page.getByRole('button', { name: 'Make this a job' })).toBeVisible()
   })
 

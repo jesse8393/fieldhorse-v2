@@ -1,6 +1,6 @@
 # Claude Code session: Fieldhorse redesign Phase 2 (field screens) plus Phase 1 fixes
 
-Paste this whole file into Claude Code for the `jesse8393/fieldhorse-v2` repository.
+Paste this whole file into Claude Code for the `fieldhorse-v2` repository.
 
 ## How to run this session
 
@@ -106,7 +106,7 @@ Content does scroll out from under the dock, but nothing shows it is passing beh
 
 ### Task 4: Short company name in the header
 
-The header shows `profile.company_name` and truncates "Parker Construction Comp...".
+The header shows `profile.company_name` and truncates "Harlow Construction Comp...".
 
 **Files:**
 * Create: `src/lib/headerName.ts`, `src/lib/headerName.test.ts`
@@ -116,10 +116,10 @@ The header shows `profile.company_name` and truncates "Parker Construction Comp.
 * Produces: `headerName(orgName: string | null | undefined, companyName: string | null | undefined, fullName: string | null | undefined): string`. Order: org name, then company name, then full name, then "Your company". Trims, drops a trailing "Company", "Co." or "LLC" word.
 
 * [ ] **Step 1: Write the failing tests:**
-  * `headerName('Parker Construction', 'Parker Construction Company', 'Jesse Parker')` returns `'Parker Construction'`
-  * `headerName(null, 'Parker Construction Company', null)` returns `'Parker Construction'`
+  * `headerName('Harlow Construction', 'Harlow Construction Company', 'Casey Harlow')` returns `'Harlow Construction'`
+  * `headerName(null, 'Harlow Construction Company', null)` returns `'Harlow Construction'`
   * `headerName(null, 'Shyld Roofing Co.', null)` returns `'Shyld Roofing'`
-  * `headerName(null, null, 'Jesse Parker')` returns `'Jesse Parker'`
+  * `headerName(null, null, 'Casey Harlow')` returns `'Casey Harlow'`
   * `headerName('', '  ', null)` returns `'Your company'`
 * [ ] **Step 2:** Run `npx vitest run src/lib/headerName.test.ts`. Expected: FAIL.
 * [ ] **Step 3:** Implement and use it in `AppHeader.tsx` with `useMembership().orgName`. Let the name wrap to two lines at 15 px before it ever truncates.

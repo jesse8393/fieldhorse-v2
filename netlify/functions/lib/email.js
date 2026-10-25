@@ -3,7 +3,7 @@
 // Shared email-rendering helpers for the send-* functions.
 
 // RFC 5322 From header with the display name as a quoted string. Company
-// names such as `Smith & Sons, LLC` or `J. "Bud" Parker` broke the
+// names such as `Smith & Sons, LLC` or `J. "Bud" Harlow` broke the
 // unquoted `${name} <${address}>` form (the comma splits an address list,
 // the quote ends the name early). Quotes, backslashes, angle brackets and
 // control characters are dropped from the name, so it can neither break

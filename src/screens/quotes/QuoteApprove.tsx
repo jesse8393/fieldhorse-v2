@@ -5,7 +5,7 @@
 // quote id. Task 11 teaches the function to write fh_quotes; until then the
 // screen marks the quote approved itself once the version row is confirmed
 // by a second read. Approving never makes the quote a job (D54): Make this a
-// job on the quote screen does that, when Jesse says so.
+// job on the quote screen does that, when the owner says so.
 //
 // Nothing here sends anything. A customer's own approval through the share
 // link is recorded by /api/public-link-approve, not here.

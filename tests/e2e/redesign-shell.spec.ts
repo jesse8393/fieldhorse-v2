@@ -125,7 +125,7 @@ test.describe('phone shell', () => {
 test.describe('phone header name', () => {
   test('a long company name wraps to two lines and is never cut off', async ({ context, page }, testInfo) => {
     test.skip(!testInfo.project.name.startsWith('mobile'), 'Phone header')
-    const long = 'Parker Construction and Concrete Restoration'
+    const long = 'Harlow Construction and Concrete Restoration'
     await signInWith(context, { tables: { organizations: [{ id: 'org-1', name: long }] } })
     await open(page, '/')
     const name = page.locator('.fhs-header__company')

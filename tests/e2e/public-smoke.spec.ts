@@ -5,7 +5,7 @@ test.describe('public app shell', () => {
     await page.goto('/login')
 
     await expect(page.getByRole('main')).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Run every job like a captain.' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Every job, start to paid.' })).toBeVisible()
     await expect(page.getByLabel('Email')).toBeEnabled()
     await expect(page.getByLabel('Password')).toBeEnabled()
     await expect(page.getByRole('button', { name: /sign in|add supabase env/i })).toBeVisible()

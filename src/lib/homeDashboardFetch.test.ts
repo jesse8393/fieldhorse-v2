@@ -6,7 +6,7 @@ import { describe, expect, it, vi, beforeAll, afterAll } from 'vitest'
 // ones, and Today should read them only for the jobs that have an open
 // bill, not the whole company's history.
 
-// Today reads the local day. Pin Central time, where Jesse works.
+// Today reads the local day. Pin Central time, where the owner works.
 const originalTz = process.env.TZ
 process.env.TZ = 'America/Chicago'
 beforeAll(() => { process.env.TZ = 'America/Chicago' })

@@ -3,11 +3,11 @@ import { headerFullName, headerName, profileCompanyIsWorkspace } from './headerN
 
 describe('headerName', () => {
   it('prefers the workspace name', () => {
-    expect(headerName('Parker Construction', 'Parker Construction Company', 'Jesse Parker')).toBe('Parker Construction')
+    expect(headerName('Harlow Construction', 'Harlow Construction Company', 'Casey Harlow')).toBe('Harlow Construction')
   })
 
   it('falls back to the company name without a trailing Company', () => {
-    expect(headerName(null, 'Parker Construction Company', null)).toBe('Parker Construction')
+    expect(headerName(null, 'Harlow Construction Company', null)).toBe('Harlow Construction')
   })
 
   it('drops a trailing Co.', () => {
@@ -19,7 +19,7 @@ describe('headerName', () => {
   })
 
   it('falls back to the person', () => {
-    expect(headerName(null, null, 'Jesse Parker')).toBe('Jesse Parker')
+    expect(headerName(null, null, 'Casey Harlow')).toBe('Casey Harlow')
   })
 
   it('says Your company when nothing is set', () => {
@@ -38,7 +38,7 @@ describe('headerName', () => {
   // "My Company" is the name the server gives a workspace made without one
   // (migrations 032 and 062), so it must never read "My".
   it('keeps the whole name when dropping the legal word would leave only My, The or a word like it', () => {
-    expect(headerName('My Company', 'Parker Construction Company', 'Jesse Parker')).toBe('My Company')
+    expect(headerName('My Company', 'Harlow Construction Company', 'Casey Harlow')).toBe('My Company')
     expect(headerName('The Company', null, null)).toBe('The Company')
     expect(headerName('Our Co.', null, null)).toBe('Our Co.')
   })
@@ -73,11 +73,11 @@ describe('headerName', () => {
 // name cut to two lines, or shortened, can still be read in full.
 describe('headerFullName', () => {
   it('is the company name the profile spells out when it shortens to the name shown', () => {
-    expect(headerFullName('Parker Construction', 'Parker Construction Company', 'Jesse Parker')).toBe('Parker Construction Company')
+    expect(headerFullName('Harlow Construction', 'Harlow Construction Company', 'Casey Harlow')).toBe('Harlow Construction Company')
   })
 
   it('reads the two names without minding case', () => {
-    expect(headerFullName('parker construction', 'Parker Construction Company', null)).toBe('Parker Construction Company')
+    expect(headerFullName('harlow construction', 'Harlow Construction Company', null)).toBe('Harlow Construction Company')
   })
 
   it('keeps the legal word the short name dropped', () => {
@@ -86,21 +86,21 @@ describe('headerFullName', () => {
   })
 
   it('stays with the workspace name when the profile names another company', () => {
-    expect(headerFullName('Shyld', 'Parker Construction Company', null)).toBe('Shyld')
+    expect(headerFullName('Shyld', 'Harlow Construction Company', null)).toBe('Shyld')
   })
 
   it('keeps a long name whole', () => {
-    const long = 'Parker Construction and Concrete Restoration of Middle Tennessee'
+    const long = 'Harlow Construction and Concrete Restoration of Middle Tennessee'
     expect(headerFullName(long, null, null)).toBe(long)
   })
 
   it('falls back to the person, then to Your company', () => {
-    expect(headerFullName(null, null, 'Jesse Parker')).toBe('Jesse Parker')
+    expect(headerFullName(null, null, 'Casey Harlow')).toBe('Casey Harlow')
     expect(headerFullName('', '  ', null)).toBe('Your company')
   })
 
   it('is the name shown when that name keeps its legal word', () => {
-    expect(headerFullName('My Company', 'Parker Construction Company', 'Jesse Parker')).toBe('My Company')
+    expect(headerFullName('My Company', 'Harlow Construction Company', 'Casey Harlow')).toBe('My Company')
     expect(headerFullName('Smith & Co.', null, null)).toBe('Smith & Co.')
   })
 })
@@ -115,8 +115,8 @@ describe('profileCompanyIsWorkspace', () => {
   })
 
   it('is the workspace when its company name shortens to the workspace name, in any case', () => {
-    expect(profileCompanyIsWorkspace({ orgName: 'Parker Construction', companyName: 'Parker Construction Company', ownsWorkspace: false, workspacesOwned: 0 })).toBe(true)
-    expect(profileCompanyIsWorkspace({ orgName: 'PARKER CONSTRUCTION, LLC', companyName: 'Parker Construction Co.', ownsWorkspace: false, workspacesOwned: 0 })).toBe(true)
+    expect(profileCompanyIsWorkspace({ orgName: 'Harlow Construction', companyName: 'Harlow Construction Company', ownsWorkspace: false, workspacesOwned: 0 })).toBe(true)
+    expect(profileCompanyIsWorkspace({ orgName: 'HARLOW CONSTRUCTION, LLC', companyName: 'Harlow Construction Co.', ownsWorkspace: false, workspacesOwned: 0 })).toBe(true)
   })
 
   it('matches names that differ only in the legal word, even one the name shown keeps', () => {
@@ -125,17 +125,17 @@ describe('profileCompanyIsWorkspace', () => {
   })
 
   it('is not a workspace someone else owns', () => {
-    // Jesse runs Shyld Roofing and works crew at Parker Construction.
-    expect(profileCompanyIsWorkspace({ orgName: 'Parker Construction', companyName: 'Shyld Roofing Co.', ownsWorkspace: false, workspacesOwned: 1 })).toBe(false)
-    expect(profileCompanyIsWorkspace({ orgName: 'Parker Construction', companyName: null, ownsWorkspace: false, workspacesOwned: 0 })).toBe(false)
+    // The owner runs Shyld Roofing and works crew at Harlow Construction.
+    expect(profileCompanyIsWorkspace({ orgName: 'Harlow Construction', companyName: 'Shyld Roofing Co.', ownsWorkspace: false, workspacesOwned: 1 })).toBe(false)
+    expect(profileCompanyIsWorkspace({ orgName: 'Harlow Construction', companyName: null, ownsWorkspace: false, workspacesOwned: 0 })).toBe(false)
   })
 
   it('is the one workspace the person owns, even under a name that no longer matches', () => {
-    expect(profileCompanyIsWorkspace({ orgName: 'Parker', companyName: 'Parker Concrete and Stone', ownsWorkspace: true, workspacesOwned: 1 })).toBe(true)
+    expect(profileCompanyIsWorkspace({ orgName: 'Harlow', companyName: 'Harlow Concrete and Stone', ownsWorkspace: true, workspacesOwned: 1 })).toBe(true)
   })
 
   it('needs the names to agree for someone who owns more than one workspace', () => {
-    expect(profileCompanyIsWorkspace({ orgName: 'Parker Construction', companyName: 'Shyld Roofing Co.', ownsWorkspace: true, workspacesOwned: 2 })).toBe(false)
+    expect(profileCompanyIsWorkspace({ orgName: 'Harlow Construction', companyName: 'Shyld Roofing Co.', ownsWorkspace: true, workspacesOwned: 2 })).toBe(false)
     expect(profileCompanyIsWorkspace({ orgName: 'Shyld Roofing', companyName: 'Shyld Roofing Co.', ownsWorkspace: true, workspacesOwned: 2 })).toBe(true)
   })
 })
