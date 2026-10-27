@@ -18,6 +18,8 @@ import {
   CalendarDays,
 } from 'lucide-react'
 import { weatherLabel } from '../../lib/weather.ts'
+import { dailyForecastStatus } from '../../lib/forecastAssessment.ts'
+import ForecastBasis from '../ForecastBasis.tsx'
 import MiniMetric from '../MiniMetric.tsx'
 import PaletteKeyCap, { paletteShortcut } from './PaletteKeyCap.tsx'
 
@@ -49,6 +51,7 @@ type Props = {
   hasCoords: boolean
   cityName: string
   weather: any
+  receivedAt: number | null
   currentWindow: WorkWindow | null | undefined
   daily: DailyRow[]
   tradeRows: TradeRow[]
@@ -61,6 +64,8 @@ type Props = {
 const STATUS_TONE: Record<string, 'good' | 'warn' | 'bad' | 'neutral'> = {
   go: 'good',
   caution: 'warn',
+  warn: 'warn',
+  stop: 'bad',
   'no-go': 'bad',
   nogo: 'bad',
 }
@@ -85,19 +90,10 @@ function fmtDate(iso: string) {
   } catch { return '' }
 }
 
-function dayWorkStatus(d: DailyRow): { tone: 'good' | 'warn' | 'bad'; label: string } {
-  const rain = d.rainPct ?? 0
-  const wind = d.windMax ?? 0
-  const tMax = d.tMax ?? 70
-  const tMin = d.tMin ?? 50
-  if (rain >= 60 || wind >= 25 || tMax >= 100 || tMin <= 32) return { tone: 'bad', label: 'No-go' }
-  if (rain >= 30 || wind >= 15 || tMax >= 90 || tMin <= 40) return { tone: 'warn', label: 'Caution' }
-  return { tone: 'good', label: 'Go' }
-}
 
 export default function SnowForecastBuild(props: Props) {
   const {
-    loading, err, hasCoords, cityName, weather,
+    loading, err, hasCoords, cityName, weather, receivedAt,
     currentWindow, daily, tradeRows,
     onPinLocation, onRetry, onGoToSchedule,
   } = props
@@ -106,7 +102,7 @@ export default function SnowForecastBuild(props: Props) {
   const tMax = current.temperature_2m
   const wind = current.wind_speed_10m
   const humidity = current.relative_humidity_2m
-  const rain = current.precipitation ?? 0
+  const rain = current.precipitation
 
   // No forecast yet (loading or failed): stay neutral instead of claiming
   // a clear day, and say what is going on.
@@ -117,10 +113,11 @@ export default function SnowForecastBuild(props: Props) {
     : currentWindow?.label || (windowTone === 'good' ? 'Clear to work' : windowTone === 'warn' ? 'Proceed with caution' : 'Hold work')
 
   // Best work window over the next 7 days = first 'good' day
-  const bestDay = daily.find((d) => dayWorkStatus(d).tone === 'good')
-  const rainRiskDays = daily.filter((d) => (d.rainPct ?? 0) >= 50).length
-  const noGoDays = daily.filter((d) => dayWorkStatus(d).tone === 'bad').length
-  const suggestedAction = !hasForecast
+  const bestDay = daily.find((d) => dailyForecastStatus(d).tone === 'good')
+  const rainKnownDays = daily.filter((d) => typeof d.rainPct === 'number' && Number.isFinite(d.rainPct))
+  const rainRiskDays = rainKnownDays.filter((d) => d.rainPct! >= 50).length
+  const noGoDays = daily.filter((d) => dailyForecastStatus(d).tone === 'bad').length
+  const suggestedAction = !hasForecast || windowTone === 'neutral'
     ? 'Check the forecast before dispatch'
     : noGoDays >= 3
     ? 'Reschedule outdoor crews'
@@ -167,7 +164,7 @@ export default function SnowForecastBuild(props: Props) {
         </button>
       </header>
 
-      <main className="fh-build-main">
+      <div className="fh-build-main">
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
             <div className="fh-build-good">Planning</div>
@@ -195,9 +192,11 @@ export default function SnowForecastBuild(props: Props) {
             <MiniMetric label="Temperature" value={tMax != null ? `${Math.round(tMax)}°` : '\u2003'} accent />
             <MiniMetric label="Wind" value={wind != null ? `${Math.round(wind)} mph` : '\u2003'} tone={(wind ?? 0) >= 20 ? 'warn' : undefined} />
             <MiniMetric label="Humidity" value={humidity != null ? `${Math.round(humidity)}%` : '\u2003'} />
-            <MiniMetric label="Rain now" value={!hasForecast ? '\u2003' : rain > 0 ? `${rain.toFixed(2)}″` : '0″'} tone={rain > 0 ? 'warn' : undefined} />
+            <MiniMetric label="Rain now" value={!hasForecast || rain == null ? '\u2003' : rain > 0 ? `${rain.toFixed(2)}″` : '0″'} tone={rain > 0 ? 'warn' : undefined} />
           </div>
         </section>
+
+        <ForecastBasis weather={weather} receivedAt={receivedAt} generalOutlook trades={tradeRows.map((row) => row.trade)} />
 
         {err && (
           <div className="fh-build-banner is-warn" role="alert">
@@ -230,7 +229,7 @@ export default function SnowForecastBuild(props: Props) {
                     {hasCoords ? 'Forecast unavailable.' : 'Pin a location to load the forecast.'}
                   </div>
                 ) : daily.slice(0, 7).map((d, i) => {
-                  const s = dayWorkStatus(d)
+                  const s = dailyForecastStatus(d)
                   return (
                     <div key={d.time || i} className={`fh-build-forecast-day is-${s.tone}`}>
                       <div className="fh-build-forecast-day__head">
@@ -243,12 +242,12 @@ export default function SnowForecastBuild(props: Props) {
                       </div>
                       <div className="fh-build-forecast-day__row">
                         <Droplets size={11} />
-                        <span>{(d.rainPct ?? 0)}%</span>
+                        <span>{d.rainPct == null ? 'Unknown' : `${d.rainPct}%`}</span>
                         {(d.rainSum ?? 0) > 0 && <span className="fh-build-rel">{(d.rainSum ?? 0).toFixed(2)}″</span>}
                       </div>
                       <div className="fh-build-forecast-day__row">
                         <Wind size={11} />
-                        <span>{Math.round(d.windMax ?? 0)} mph</span>
+                        <span>{d.windMax == null ? 'Unknown' : `${Math.round(d.windMax)} mph`}</span>
                       </div>
                       <span className={`fh-build-dot is-${s.tone}`}>{s.label}</span>
                     </div>
@@ -276,9 +275,9 @@ export default function SnowForecastBuild(props: Props) {
                 return (
                   <div key={t.trade} className="fh-build-table__row is-trades">
                     <strong style={{ textTransform: 'capitalize' }}>{t.trade}</strong>
-                    <span className={`fh-build-dot is-${tt}`}>{t.label || t.status || 'Unknown'}</span>
+                    <span className={`fh-build-dot is-${tt}`}>{t.label || ({ go: 'Within limits', warn: 'Caution', stop: 'Review', unknown: 'Unknown' } as Record<string, string>)[t.status] || 'Unknown'}</span>
                     <span className="fh-build-truncate fh-build-rel" title={(t.reasons || []).join(' · ')}>
-                      {(t.reasons || []).slice(0, 2).join(' · ') || '\u2003'}
+                      {(t.reasons || []).slice(0, 2).join(' · ') || 'No configured limit triggered.'}
                     </span>
                   </div>
                 )
@@ -290,14 +289,14 @@ export default function SnowForecastBuild(props: Props) {
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Best work window</div>
               <strong>{bestDay ? fmtDay(bestDay.time) : '\u2003'}</strong>
-              <span>{bestDay ? fmtDate(bestDay.time) : daily.length ? 'No clear days ahead' : 'No forecast yet'}</span>
+              <span>{bestDay ? fmtDate(bestDay.time) : daily.length ? 'No clear day identified' : 'No forecast yet'}</span>
               {bestDay && <div className="fh-build-spark is-gold" />}
             </section>
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Rain risk</div>
-              <strong style={{ color: !daily.length ? undefined : rainRiskDays > 0 ? 'var(--v3-primary-text)' : 'var(--v3-success-text)' }}>{daily.length ? rainRiskDays : '\u2003'}</strong>
-              <span>{daily.length ? 'days ≥ 50% chance' : 'No forecast yet'}</span>
+              <strong style={{ color: !rainKnownDays.length ? undefined : rainRiskDays > 0 ? 'var(--v3-primary-text)' : 'var(--v3-success-text)' }}>{rainKnownDays.length ? rainRiskDays : 'Unknown'}</strong>
+              <span>{rainKnownDays.length ? `of ${rainKnownDays.length} assessed days at 50% rain or more` : 'Rain readings unavailable'}</span>
               {rainRiskDays > 0 && <div className="fh-build-spark is-gold" />}
             </section>
 
@@ -314,14 +313,14 @@ export default function SnowForecastBuild(props: Props) {
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Wind</div>
               <strong>{wind != null ? `${Math.round(wind)} mph` : '\u2003'}</strong>
-              <span>{(wind ?? 0) >= 20 ? 'Lift work risky' : 'Within limits'}</span>
+              <span>{wind == null ? 'Reading unavailable' : wind >= 20 ? 'Review wind conditions' : 'Check applicable trade limits'}</span>
             </section>
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Suggested action</div>
               <strong>{suggestedAction}</strong>
               <span>
-                {noGoDays} of next 7 days marked unavailable
+                {noGoDays} of {daily.length} forecast days trigger general limits
               </span>
               {onGoToSchedule && (
                 <button type="button" className="fh-build-rail-card__action" onClick={onGoToSchedule}>
@@ -331,7 +330,7 @@ export default function SnowForecastBuild(props: Props) {
             </section>
           </aside>
         </section>
-      </main>
+      </div>
     </div>
   )
 }

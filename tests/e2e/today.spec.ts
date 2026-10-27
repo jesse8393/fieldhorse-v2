@@ -93,8 +93,9 @@ async function seeAllAnswers(page: Page) {
   await expect(answers.getByText('25', { exact: true })).toBeVisible()
   await expect(answers.getByRole('listitem')).toHaveCount(3)
   await answers.getByRole('link', { name: 'See all' }).click()
-  await expect(answers.getByRole('listitem')).toHaveCount(20)
-  await expect(answers.getByText('Showing 20 of 25, most urgent first.')).toBeVisible()
+  await expect(answers.getByRole('listitem')).toHaveCount(25)
+  await expect(answers.getByRole('listitem').last()).toContainText('Quiet lead 1')
+  await expect(answers.getByText('Showing 20 of 25, most urgent first.')).toHaveCount(0)
   await expect(answers.getByRole('listitem').first()).toContainText('Quiet lead 25')
 }
 
@@ -136,7 +137,10 @@ async function coldOpen(context: BrowserContext, page: Page) {
   await expect(page.getByText('Forecast unavailable right now.')).toBeVisible({ timeout: 15_000 })
   await expect(page.getByText(/\d+° and /)).toHaveCount(0)
   // And the schedule it shows is last night's, which the screen says.
-  await expect(page.getByText('Today could not refresh')).toBeVisible({ timeout: 15_000 })
+  // The installed PostgREST SDK retries network reads after 1s, 2s and 4s;
+  // TanStack retries that whole read once after 1s. Allow its 15s minimum
+  // plus request and render overhead before expecting the final error.
+  await expect(page.getByText('Today could not refresh')).toBeVisible({ timeout: 25_000 })
 }
 
 // Open Meteo as getWeather asks for it: 71 and partly cloudy now, rain
@@ -312,7 +316,7 @@ test.describe('today on a phone', () => {
     await expect(page.getByRole('region', { name: 'Your day' }).getByText('Done', { exact: true })).toHaveCount(6)
   })
 
-  test('every thing waiting counts in the evening, and See all lists the 20 most urgent', async ({ context, page }) => {
+  test('every thing waiting counts in the evening, and See all reaches every action', async ({ context, page }) => {
     await setUp(context, page, { at: EVENING, tables: ONLY_QUIET_LEADS })
     await seeAllAnswers(page)
   })
@@ -399,7 +403,7 @@ test.describe('today on a desktop', () => {
     await expect(page.getByRole('region', { name: 'This week' }).getByRole('link', { name: 'Thursday, October 8, today, 8 visits' })).toBeVisible()
   })
 
-  test('every thing waiting counts in the evening, and See all lists the 20 most urgent', async ({ context, page }) => {
+  test('every thing waiting counts in the evening, and See all reaches every action', async ({ context, page }) => {
     await setUp(context, page, { at: EVENING, tables: ONLY_QUIET_LEADS })
     await seeAllAnswers(page)
   })

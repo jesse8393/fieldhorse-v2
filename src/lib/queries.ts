@@ -623,7 +623,7 @@ export const activityKey = (userId: string | undefined, orgId: string | null | u
   ['activity', userId, orgId ?? null, pageSize] as const
 
 async function fetchActivity(userId: string, pageSize: number, orgId?: string | null): Promise<ActivityBundle> {
-  const [transitions, payments, changeOrders, invoices, contacts] = await Promise.all([
+  const [transitions, payments, changeOrders, invoices] = await Promise.all([
     scoped(supabase.from('fh_stage_transitions')
       .select('id, contact_id, from_stage, to_stage, transitioned_at, user_id'), userId, orgId)
       .order('transitioned_at', { ascending: false }).limit(pageSize),
@@ -635,15 +635,26 @@ async function fetchActivity(userId: string, pageSize: number, orgId?: string | 
       .order('created_at', { ascending: false }).limit(pageSize),
     scoped(supabase.from('fh_invoices')
       .select('id, contact_id, sequence_number, title, amount, status, issued_at, created_at, user_id'), userId, orgId)
-      .order('created_at', { ascending: false }).limit(pageSize),
-    scoped(supabase.from('fh_contacts')
-      .select('id, name, job_title, stage'), userId, orgId)
-      .not('stage', 'in', MOVED_STAGE_FILTER)
-      .order('updated_at', { ascending: false }).limit(pageSize * 2)
+      .order('created_at', { ascending: false }).limit(pageSize)
   ])
-  for (const result of [transitions, payments, changeOrders, invoices, contacts]) {
+  for (const result of [transitions, payments, changeOrders, invoices]) {
     if (result.error) throw result.error
   }
+  // Historical events still reference the original contact after a lead
+  // or quote moves. Migration 093 retains that identity and redirects the
+  // old URL. Look up the actual referenced records, including moved ones,
+  // rather than an unrelated slice of recently edited jobs.
+  const contactIds = [...new Set(
+    [transitions, payments, changeOrders, invoices]
+      .flatMap((result) => (result.data ?? []).map((row) => row.contact_id))
+      .filter((id): id is string => Boolean(id))
+  )]
+  const batches = Array.from({ length: Math.ceil(contactIds.length / 100) }, (_, index) => contactIds.slice(index * 100, (index + 1) * 100))
+  const contactResults = await Promise.all(batches.map((ids) => scoped(
+    supabase.from('fh_contacts').select('id, name, job_title, stage').in('id', ids), userId, orgId
+  )))
+  for (const result of contactResults) if (result.error) throw result.error
+  const contacts = contactResults.flatMap((result) => result.data ?? [])
   // "More to load" iff one of the four event sources filled its page.
   // (contacts is a lookup table, not an event source, exclude it.)
   const hasMore = [transitions, payments, changeOrders, invoices]
@@ -653,7 +664,7 @@ async function fetchActivity(userId: string, pageSize: number, orgId?: string | 
     payments: (payments.data ?? []) as ActivityBundle['payments'],
     changeOrders: (changeOrders.data ?? []) as ActivityBundle['changeOrders'],
     invoices: (invoices.data ?? []) as ActivityBundle['invoices'],
-    contacts: (contacts.data ?? []) as ActivityBundle['contacts'],
+    contacts: contacts as ActivityBundle['contacts'],
     hasMore
   }
 }
@@ -863,19 +874,24 @@ export async function fetchInvoiceRecord(id: string): Promise<InvoiceRecordBundl
       .eq('invoice_id', id)
       .order('paid_on', { ascending: false })
     if (payErr) throw payErr
+    const siblings = invoice.client_id ? await fetchAllRows<InvoiceRecord>((from, to) => {
+      let q = supabase.from('fh_invoices').select('*').eq('client_id', invoice.client_id!).is('contact_id', null)
+      q = invoice.org_id ? q.eq('org_id', invoice.org_id) : q.eq('user_id', invoice.user_id)
+      return q.order('id').range(from, to)
+    }) : [invoice]
     return {
       invoice, client, job: null,
       payments: (paymentRows ?? []) as Payment[],
-      changeOrders: [], insurance: null, jobInvoices: [invoice]
+      changeOrders: [], insurance: null, jobInvoices: siblings.some(i => i.id === invoice.id) ? siblings : [...siblings, invoice]
     }
   }
 
   const [jobRes, payRes, coRes, insRes, invRes] = await Promise.all([
     supabase.from('fh_contacts').select(`${INVOICE_JOB_COLUMNS}, fh_clients(name, email, phone, address)`).eq('id', jobId).maybeSingle(),
     supabase.from('fh_payments').select('*').eq('contact_id', jobId).order('paid_on', { ascending: false }),
-    supabase.from('fh_change_orders').select('*').eq('contact_id', jobId).eq('status', 'approved').order('sequence_number', { ascending: true }),
+    fetchAllRows<InvoiceRecordBundle['changeOrders'][number]>((from, to) => supabase.from('fh_change_orders').select('*').eq('contact_id', jobId).eq('status', 'approved').order('sequence_number', { ascending: true }).order('id').range(from, to)).then(data => ({ data, error: null })),
     supabase.from('fh_insurance_claims').select('*').eq('contact_id', jobId).maybeSingle(),
-    supabase.from('fh_invoices').select('*').eq('contact_id', jobId).order('sequence_number', { ascending: true })
+    fetchAllRows<InvoiceRecord>((from, to) => supabase.from('fh_invoices').select('*').eq('contact_id', jobId).order('sequence_number', { ascending: true }).order('id').range(from, to)).then(data => ({ data, error: null }))
   ])
   if (jobRes.error) throw jobRes.error
   if (payRes.error) throw payRes.error
@@ -966,13 +982,13 @@ export function useInvalidateSubs(userId?: string, orgId?: string | null) {
 }
 
 // ---- Notes ----
-// The 80 most recent notes plus a slim contacts list (id/name) used to
+// Complete note history plus a slim contacts list used to
 // tag a note to a job. Returned as one bundle so the screen keeps one
 // loading flag. The screen mutates the notes optimistically via
 // setQueryData(notesKey(userId)), so the cache is the source of truth.
 
 export type Note = Database['public']['Tables']['fh_notes']['Row']
-export type NoteContact = Pick<Contact, 'id' | 'name'>
+export type NoteContact = Pick<Contact, 'id' | 'name' | 'job_title' | 'address'>
 
 export type NotesBundle = {
   notes: Note[]
@@ -983,14 +999,11 @@ export type NotesBundle = {
 // own notebook (its archive and delete writes are guarded by user_id).
 // The cached bundle carries no contacts; useNotesBundle adds them.
 async function fetchNotesBundle(userId: string): Promise<NotesBundle> {
-  const { data, error } = await supabase
-    .from('fh_notes')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(80)
-  if (error) throw error
-  return { notes: (data ?? []) as Note[], contacts: [] }
+  const notes = await fetchAllRows<Note>((from, to) => supabase
+    .from('fh_notes').select('*').eq('user_id', userId)
+    .order('id', { ascending: true }).range(from, to))
+  notes.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+  return { notes, contacts: [] }
 }
 
 export const noteContactsKey = (userId: string | undefined, orgId?: string | null) =>
@@ -1001,14 +1014,14 @@ export const noteContactsKey = (userId: string | undefined, orgId?: string | nul
 // recently touched first.
 async function fetchNoteContacts(userId: string, orgId?: string | null): Promise<NoteContact[]> {
   const rows = await fetchAllRows<NoteContact & { updated_at: string | null }>((from, to) =>
-    scoped(supabase.from('fh_contacts').select('id, name, updated_at'), userId, orgId)
+    scoped(supabase.from('fh_contacts').select('id, name, job_title, address, updated_at'), userId, orgId)
       .not('stage', 'in', MOVED_STAGE_FILTER)
       .order('id', { ascending: true })
       .range(from, to)
   )
   return rows
     .sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || ''))
-    .map(({ id, name }) => ({ id, name }))
+    .map(({ id, name, job_title, address }) => ({ id, name, job_title, address }))
 }
 
 export function notesKey(userId: string | undefined) {
@@ -1020,21 +1033,23 @@ export function useNotesBundle(userId: string | undefined) {
   // in with `select`, so the notes cache stays at notesKey(userId),
   // which Notes.tsx patches optimistically with setQueryData.
   const orgId = useOrgScope(userId)
-  const contacts = useQuery({
+  const contactsQuery = useQuery({
     queryKey: noteContactsKey(userId, orgId),
     queryFn: () => fetchNoteContacts(userId as string, orgId),
     enabled: !!userId && orgId !== undefined
-  }).data
+  })
+  const contacts = contactsQuery.data
   const withContacts = useCallback(
     (bundle: NotesBundle): NotesBundle => (contacts ? { ...bundle, contacts } : bundle),
     [contacts]
   )
-  return useQuery({
+  const notesQuery = useQuery({
     queryKey: notesKey(userId),
     queryFn: () => fetchNotesBundle(userId as string),
     enabled: !!userId,
     select: withContacts
   })
+  return { ...notesQuery, contactsReady: contactsQuery.isSuccess, contactsError: contactsQuery.isError, retryContacts: contactsQuery.refetch }
 }
 
 // ---- Partners ----
@@ -1044,10 +1059,11 @@ export function useNotesBundle(userId: string | undefined) {
 // includeRevoked is fixed so revoked rows can be filtered client-side.
 
 export function usePartnerDirectory(userId: string | undefined) {
+  const orgId = useOrgScope(userId)
   return useQuery({
-    queryKey: ['partners', userId],
-    queryFn: () => loadPartnerDirectory({ includeRevoked: true }),
-    enabled: !!userId
+    queryKey: ['partners', userId, orgId],
+    queryFn: () => loadPartnerDirectory({ includeRevoked: true, orgId }),
+    enabled: !!userId && orgId !== undefined
   })
 }
 
@@ -1390,20 +1406,21 @@ export function useInvalidateInvoiceDetail() {
 
 export type EstimateTemplate = Database['public']['Tables']['fh_estimate_templates']['Row']
 
-async function fetchEstimateTemplates(): Promise<EstimateTemplate[]> {
-  const { data, error } = await supabase
-    .from('fh_estimate_templates')
-    .select('*')
-    .order('updated_at', { ascending: false })
-  if (error) throw error
-  return (data ?? []) as EstimateTemplate[]
+async function fetchEstimateTemplates(userId: string, orgId: string | null | undefined): Promise<EstimateTemplate[]> {
+  return fetchAllRows<EstimateTemplate>((from, to) =>
+    scoped(supabase.from('fh_estimate_templates').select('*'), userId, orgId)
+      .order('updated_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(from, to)
+  )
 }
 
 export function useEstimateTemplates(userId: string | undefined) {
+  const orgId = useOrgScope(userId)
   return useQuery({
-    queryKey: ['estimateTemplates', userId],
-    queryFn: fetchEstimateTemplates,
-    enabled: !!userId
+    queryKey: ['estimateTemplates', userId, orgId],
+    queryFn: () => fetchEstimateTemplates(userId as string, orgId),
+    enabled: !!userId && orgId !== undefined
   })
 }
 

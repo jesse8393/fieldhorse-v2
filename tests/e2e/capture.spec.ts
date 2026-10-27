@@ -385,22 +385,15 @@ test.describe('desktop capture', () => {
     await expectCaptureOpen(page)
   })
 
-  test('the Jobs plus button keeps the corner now that nothing stacks above it', async ({ page }) => {
+  test('the Jobs create action stays visible and opens the lead screen without a Capture FAB', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await open(page, '/work')
-    const fabs = page.locator('.fh-fab')
-    await expect(fabs).toHaveCount(1)
-    await expect(fabs).toHaveAccessibleName('New deal')
+    const create = page.getByRole('button', { name: 'New lead', exact: true })
+    await expect(create).toBeVisible()
+    await expect(create).toBeInViewport()
     await expect(page.locator('.fh-fab--capture')).toHaveCount(0)
-    const box = await fabs.boundingBox()
-    // 24 px from the right and bottom edges (global.css, desktop .fh-fab).
-    // html keeps a stable scrollbar gutter, so a fixed element's right
-    // edge resolves against the html box, 15 px short of the window.
-    const edge = await page.evaluate(() => {
-      const r = document.documentElement.getBoundingClientRect()
-      return { right: r.right, bottom: window.innerHeight }
-    })
-    expect(Math.round(edge.right - (box!.x + box!.width))).toBe(24)
-    expect(Math.round(edge.bottom - (box!.y + box!.height))).toBe(24)
+    await create.click()
+    await expect(page).toHaveURL(/\/leads\/new$/)
+    await expect(page.getByRole('heading', { level: 1, name: 'New lead', exact: true })).toBeVisible()
   })
 })

@@ -3,7 +3,7 @@ import type { Database } from './database.types.ts'
 
 const env = (import.meta as any).env
 const url = env.VITE_SUPABASE_URL as string
-const key = env.VITE_SUPABASE_ANON_KEY as string
+const key = (env.VITE_SUPABASE_PUBLISHABLE_KEY || env.VITE_SUPABASE_ANON_KEY) as string
 export const isSupabaseConfigured = Boolean(url && key)
 
 if (!isSupabaseConfigured) {

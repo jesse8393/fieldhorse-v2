@@ -36,7 +36,7 @@ import QuoteLines, { type QuoteLinesChange } from './QuoteLines.tsx'
 import { useQuote } from './useQuote.ts'
 import { quoteStatusView, quoteTitle, type QuoteWithClient } from './quoteShape.ts'
 import {
-  buildQuotePdf, canMarkSent, companyFromProfile, downloadQuotePdf, isIosStandalone, mintQuoteLink,
+  buildQuotePdf, canMarkSent, companyFromProfile, downloadQuotePdf, isIosStandalone, markQuoteSent, mintQuoteLink,
   NoLinesError, sendQuoteByEmail, sendQuoteForSignature
 } from './quoteDocument.ts'
 import './quotes.css'
@@ -46,7 +46,7 @@ import './quotes.css'
 const LINES_FAILED = "We couldn't load the lines."
 const NEEDS_A_LINE = 'Add at least one line.'
 
-type Busy = 'send' | 'share' | 'pdf' | 'download' | 'esign' | 'job' | 'delete' | null
+type Busy = 'send' | 'mark' | 'share' | 'pdf' | 'download' | 'esign' | 'job' | 'delete' | null
 
 export default function QuoteDetail({ fallback }: { fallback?: ReactNode }) {
   const { id = '' } = useParams()
@@ -70,7 +70,7 @@ export default function QuoteDetail({ fallback }: { fallback?: ReactNode }) {
       </div>
     )
   }
-  return <QuoteScreen quote={state.quote as QuoteWithClient} refresh={state.refresh} patch={state.patch} />
+  return <QuoteScreen quote={state.quote as QuoteWithClient} refresh={state.refresh} />
 }
 
 function QuoteGone() {
@@ -85,10 +85,9 @@ function QuoteGone() {
 type ScreenProps = {
   quote: QuoteWithClient
   refresh: () => Promise<void>
-  patch: ReturnType<typeof useQuote>['patch']
 }
 
-function QuoteScreen({ quote, refresh, patch }: ScreenProps) {
+function QuoteScreen({ quote, refresh }: ScreenProps) {
   const { user } = useAuth()
   const { profile } = useProfile()
   const navigate = useNavigate()
@@ -135,12 +134,12 @@ function QuoteScreen({ quote, refresh, patch }: ScreenProps) {
   const emailRetrying = linked.isError && linked.isFetching
   const emailKnown = !emailPending && !emailFailed
   const hasEmail = emailKnown && recipientEmail !== ''
+  const sendLabel = emailKnown && !hasEmail ? 'Copy approval link' : approved ? 'Send again' : 'Send for approval'
 
   const [busy, setBusy] = useState<Busy>(null)
   const waiting = items.loading || busy !== null || lines.switchSaving
   const needsLines = !items.loading && !live.canSend
   const linesLine = linesFailed ? LINES_FAILED : NEEDS_A_LINE
-  const sendLabel = approved ? 'Send again' : 'Send for approval'
   const sendHint = needsLines
     ? (linesFailed ? LINES_FAILED : 'Add at least one line')
     : emailFailed
@@ -175,16 +174,18 @@ function QuoteScreen({ quote, refresh, patch }: ScreenProps) {
   const onShare = () => run('share', async () => {
     const url = await mintQuoteLink(quote, userId as string)
     // On an iPhone added to the home screen the share sheet is how a link
-    // goes out, so offer it while the tap is still fresh. Closing it, or a
-    // browser that refuses, falls back to copying the link.
+    // goes out, so offer it while the tap is still fresh. Cancellation
+    // leaves the clipboard and lifecycle alone; refusal permits copying.
     let shared = false
     if (isIosStandalone() && typeof navigator.share === 'function') {
       try {
         await navigator.share({ title: `Proposal for ${client?.name || 'your project'}`, url })
         shared = true
-      } catch { /* closed or refused: copy instead */ }
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') return
+        // An unavailable share sheet still permits copying.
+      }
     }
-    if (canMarkSent(quote.status)) await patch({ status: 'sent', sent_at: new Date().toISOString() })
     if (!shared) {
       try {
         await navigator.clipboard.writeText(url)
@@ -194,6 +195,18 @@ function QuoteScreen({ quote, refresh, patch }: ScreenProps) {
       }
     }
   }, "Couldn't mint share link")
+
+  const onMarkSent = () => run('mark', async () => {
+    if (!canMarkSent(quote.status) || quote.job_id) return
+    try {
+      await markQuoteSent(quote.id, quote.status)
+    } catch (error) {
+      await refresh()
+      throw error
+    }
+    await refresh()
+    toastSuccess('Quote marked as sent', 'Recorded that you shared the proposal with the customer.')
+  }, "Couldn't update the quote")
 
   const onOpenPdf = () => {
     // Open the tab now, inside the tap: building the PDF takes seconds, and
@@ -258,7 +271,7 @@ function QuoteScreen({ quote, refresh, patch }: ScreenProps) {
       if (lines.error) throw new Error(lines.error.message)
       const row = await supabase.from('fh_quotes').delete().eq('id', quote.id)
       if (row.error) throw new Error(row.error.message)
-      toastSuccess('Draft quote deleted')
+      toastSuccess(quote.status === 'draft' ? 'Draft quote deleted' : 'Quote deleted')
       navigate('/quotes', { replace: true })
     }, "Couldn't delete the quote")
   }
@@ -293,7 +306,7 @@ function QuoteScreen({ quote, refresh, patch }: ScreenProps) {
       {status.sub && <p className="fhqt-sub">{status.sub}</p>}
       {emailKnown && !hasEmail && !approved && (
         <p className="fhqt-sub">
-          No email on file for {who}. Send for approval copies a link you can text or paste.
+          No email on file for {who}. Copy an approval link to text or paste. Copying keeps the current quote status.
         </p>
       )}
       {emailFailed && (
@@ -307,7 +320,7 @@ function QuoteScreen({ quote, refresh, patch }: ScreenProps) {
         <section className="fhqt-panel" aria-labelledby="fhqt-changes-title">
           <h2 className="fhqt-panel__title" id="fhqt-changes-title">Customer requested changes</h2>
           <p className="fhqt-panel__body">
-            {quote.change_request_note || 'Review the customer feedback before sending a revised quote.'}
+            {quote.change_request_note || 'No written feedback came with this request. Contact the customer to confirm the changes before revising.'}
           </p>
           <p className="fhqt-panel__note">
             Update the quote, then send it again. Approval stays paused until the revision is sent.
@@ -382,7 +395,8 @@ function QuoteScreen({ quote, refresh, patch }: ScreenProps) {
       <section className="fhqt-share" aria-labelledby="fhqt-share-title">
         <h2 className="fhqt-share__title" id="fhqt-share-title">Share or download</h2>
         <ul className="fhqt-rows" aria-label="Share or download">
-          <Row as="li" title="Copy a share link" subline={needsLines ? linesLine : 'Makes a link the customer can open, and marks the quote as sent.'} next={chevron} disabled={waiting || needsLines} onClick={onShare} />
+          <Row as="li" title="Copy a share link" subline={needsLines ? linesLine : 'Makes a customer link. Copying does not change the quote status.'} next={chevron} disabled={waiting || needsLines} onClick={onShare} />
+          {canMarkSent(quote.status) && !quote.job_id && <Row as="li" title="Mark as sent" subline="Use after you have shared the proposal with the customer." next={chevron} disabled={waiting || needsLines} onClick={onMarkSent} />}
           <Row as="li" title="Open the PDF" subline={needsLines ? linesLine : 'Builds the proposal and opens it in a new tab.'} next={chevron} disabled={waiting || needsLines} onClick={onOpenPdf} />
           <Row as="li" title="Download the PDF" subline={needsLines ? linesLine : 'Saves a copy to this device.'} next={chevron} disabled={waiting || needsLines} onClick={onDownload} />
           <Row as="li" title="Send for electronic signature" subline={esignLine} next={chevron} disabled={waiting || needsLines || !hasEmail} onClick={onEsign} />
@@ -407,7 +421,7 @@ function QuoteScreen({ quote, refresh, patch }: ScreenProps) {
       {deletable ? (
         <div className="fhqt-danger">
           <Button variant="destructive" disabled={busy !== null} loading={busy === 'delete'} onClick={onDelete}>
-            {armed ? 'Tap again to delete' : 'Delete draft quote'}
+            {armed ? 'Tap again to delete' : quote.status === 'draft' ? 'Delete draft quote' : 'Delete quote'}
           </Button>
         </div>
       ) : approved ? (

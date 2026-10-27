@@ -206,7 +206,7 @@
 }
 
 .fhjl-chip {
-  min-height: 32px;
+  min-height: 44px;
   padding: 0 12px;
   border: 1px solid var(--fh-edge-strong);
   border-radius: var(--fh-r-chip);
@@ -220,8 +220,25 @@
 .fhjl-chip.is-on {
   border-color: var(--fh-gold-line);
   background: var(--fh-gold-lo);
-  color: var(--fh-ink);
+  color: var(--fh-on-gold);
   font-weight: 600;
+}
+
+.fhjl--desktop {
+  width: 100%;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding-top: 20px;
+}
+
+.fhjl--desktop .fhjl-search { max-width: 760px; }
+.fhjl--desktop .fhjl-tabs { gap: 32px; }
+.fhjl--desktop .fhjl-group { padding-bottom: 20px; }
+.fhjl-desktop-job { margin-top: 8px; }
+
+@media (max-width: 420px) {
+  .fhjl-tabs { gap: 12px; }
+  .fhjl-tab { font-size: 14px; }
 }
 
 .fhjl-chip:focus-visible {

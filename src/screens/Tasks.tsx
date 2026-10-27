@@ -234,7 +234,7 @@ export default function Tasks() {
   if (!memLoading && !canSeeAllJobs) {
     return (
       <div className="fh-build-page" data-build-screen="Tasks">
-        <main className="fh-build-main">
+        <div className="fh-build-main">
           <section className="fh-build-hero-row fh-build-hero-row--page">
             <div>
               <div className="fh-build-good">Tasks</div>
@@ -244,7 +244,7 @@ export default function Tasks() {
           <div className="fh-build-table__empty">
             Your role ({role || 'unknown'}) can't see every task. Open <button type="button" className="fh-build-inline-link" onClick={() => navigate('/crew')}>your crew home</button> instead, that's your own task list.
           </div>
-        </main>
+        </div>
       </div>
     )
   }
@@ -279,7 +279,7 @@ export default function Tasks() {
         </button>
       </header>
 
-      <main className="fh-build-main">
+      <div className="fh-build-main">
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
             <div className="fh-build-good">Team</div>
@@ -450,7 +450,7 @@ export default function Tasks() {
             </section>
           )
         })}
-      </main>
+      </div>
     </div>
   )
 }

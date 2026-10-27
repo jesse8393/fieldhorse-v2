@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { countNoun, money } from '../../lib/format.ts'
 import MiniMetric from '../MiniMetric.tsx'
+import { completedMonthComparison } from '../../lib/reportingMetrics.ts'
 import LoadingValue from '../LoadingValue.tsx'
 import TopbarWeather from './TopbarWeather.tsx'
 import PaletteKeyCap, { paletteShortcut } from './PaletteKeyCap.tsx'
@@ -31,6 +32,8 @@ type RevenueRow = {
   value?: number
   amount?: number
   total?: number
+  period?: string
+  partial?: boolean
 }
 
 type TopClient = {
@@ -75,15 +78,9 @@ function pct(n: number | null | undefined) {
   // "5398% margin" reading, the double-multiplication bug. Fixed by
   // formatting the value as entered. Mobile uses fmtPct which always
   // expected 0-100, so the source-of-truth was already correct.
-  const v = Number(n || 0)
+  if (n == null) return 'Not enough data'
+  const v = Number(n)
   return `${Math.round(v)}%`
-}
-
-// collectionRate is computed locally below as a 0-1 ratio (paid/total),
-// not a percentage. Wrap it through this helper before passing to pct().
-function ratioToPct(r: number | null | undefined) {
-  if (r == null) return null
-  return Number(r) * 100
 }
 
 function revenueValue(row: RevenueRow) {
@@ -100,23 +97,9 @@ export default function SnowAnalyticsBuild(props: Props) {
   const strongestStage = [...byStage].sort((a, b) => b.value - a.value)[0]
   const weakestStage = [...byStage].sort((a, b) => a.value - b.value)[0]
 
-  // Only compute a real collection rate when BOTH invoiced and
-  // collected have come through as real numbers from the parent.
-  // If either side is null (no invoice/payment data loaded), the
-  // Cash risk card shows "Not connected" instead of a fabricated rate.
-  const collectionRate = (stats.invoiced != null && stats.collected != null && Number(stats.invoiced) > 0)
-    ? (Number(stats.collected) / Number(stats.invoiced))
-    : null
-  const cashConnected = stats.invoiced != null && stats.collected != null
-
-  // The last bucket is the current partial month. Comparing it with a
-  // full prior month makes every first-of-month dashboard look like a
-  // collapse, so trend only compares the two latest completed months.
-  const lastCompleteMonth = revenueByMonth[revenueByMonth.length - 2]
-  const previousCompleteMonth = revenueByMonth[revenueByMonth.length - 3]
-  const monthOverMonth = (lastCompleteMonth && previousCompleteMonth)
-    ? revenueValue(lastCompleteMonth) - revenueValue(previousCompleteMonth)
-    : 0
+  const comparison = completedMonthComparison(revenueByMonth)
+  const monthOverMonth = comparison.amount
+  const comparisonLabel = comparison.label
 
   // While the numbers load, a skeleton stands in each value's place.
   const pending = (label: string, width = 72) => <LoadingValue label={label} width={width} height={20} />
@@ -137,30 +120,32 @@ export default function SnowAnalyticsBuild(props: Props) {
           <PaletteKeyCap />
         </button>
         <div className="fh-build-topbar__meta">
-          <span>Year to date · {new Date().getFullYear()}</span>
+          <span>As of {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
           <TopbarWeather lead />
         </div>
         <button className="fh-build-icon-btn" type="button" onClick={() => window.dispatchEvent(new CustomEvent('fh:navigate', { detail: { to: '/activity' } }))} aria-label="Open activity" title="Activity"><Bell size={16} /></button>
       </header>
 
-      <main className="fh-build-main">
+      <div className="fh-build-main">
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
             <div className="fh-build-good">Business</div>
-            <h1 className="fh-build-title">Analytics</h1>
+            <h1 className="fh-build-title">Reports</h1>
           </div>
 
           <div className="fh-build-focus">
-            <div className="fh-build-eyebrow">Top KPIs · YTD</div>
+            <div className="fh-build-eyebrow">Business overview</div>
             {loading ? (
               <p><LoadingValue label="Loading your numbers" width={240} height={14} /></p>
             ) : (
               <>
                 <p>
-                  {money(stats.wonYTD || 0)} won · {pct(stats.closeRate || 0)} close rate ·
-                  {' '}{pct(stats.avgMargin || 0)} margin
+                  {money(stats.wonYTD || 0)} won · {pct(stats.closeRate)} win rate over 90 days ·
+                  {' '}{pct(stats.avgMargin)} tracked margin
                 </p>
                 {stats.avgMarginNote && <p style={{ marginTop: 6 }}>{stats.avgMarginNote}</p>}
+                {stats.closeRateNote && <p style={{ marginTop: 6 }}>{stats.closeRateNote}</p>}
+                <p style={{ marginTop: 6 }}>Tracked profit YTD: {stats.profitYTD == null ? 'Not enough cost data' : money(stats.profitYTD)}. {stats.profitNote}</p>
               </>
             )}
           </div>
@@ -168,8 +153,8 @@ export default function SnowAnalyticsBuild(props: Props) {
           <div className="fh-build-mini-grid">
             <MiniMetric label="Pipeline" value={loading ? pending('Loading the pipeline') : money(stats.pipeline || 0)} accent />
             <MiniMetric label="Won YTD" value={loading ? pending('Loading won this year') : money(stats.wonYTD || 0)} />
-            <MiniMetric label="Close rate" value={loading ? pending('Loading the close rate') : pct(stats.closeRate || 0)} />
-            <MiniMetric label="Avg margin" value={loading ? pending('Loading the average margin') : pct(stats.avgMargin || 0)} />
+            <MiniMetric label="Win rate · 90 days" value={loading ? pending('Loading the win rate') : pct(stats.closeRate)} />
+            <MiniMetric label="Avg margin" value={loading ? pending('Loading the average margin') : pct(stats.avgMargin)} />
           </div>
         </section>
 
@@ -179,7 +164,7 @@ export default function SnowAnalyticsBuild(props: Props) {
             (vs. an honest $0 from a user with no activity). */}
         <div className="fh-build-kpi-strip">
           <KpiCell
-            label="Invoiced YTD"
+            label="Issued invoices YTD"
             value={loading ? pending('Loading invoiced this year', 64) : stats.invoiced == null ? 'Not connected' : money(stats.invoiced)}
             muted={!loading && stats.invoiced == null}
           />
@@ -191,7 +176,7 @@ export default function SnowAnalyticsBuild(props: Props) {
           <KpiCell label="Active leads" value={loading ? pending('Loading active leads', 40) : String(stats.leads || 0)} />
           <KpiCell label="Quotes out" value={loading ? pending('Loading quotes out', 40) : String(stats.quotes || 0)} />
           <KpiCell label="Miles YTD" value={loading ? pending('Loading miles this year', 48) : Number(stats.milesYTD || 0).toLocaleString()} />
-          <KpiCell label="Mileage deduction" value={loading ? pending('Loading the mileage deduction', 64) : money(stats.mileageDeduction || 0)} />
+          <KpiCell label="Mileage estimate" value={loading ? pending('Loading the mileage deduction', 64) : stats.mileageDeduction == null ? 'Rate needed' : money(stats.mileageDeduction)} />
         </div>
 
         <section className="fh-build-content-grid fh-build-content-grid--analytics">
@@ -228,17 +213,18 @@ export default function SnowAnalyticsBuild(props: Props) {
               <header className="fh-build-card-head">
                 <div className="fh-build-eyebrow">Revenue received · last {revenueByMonth.length} months</div>
                 <span className="fh-build-rel">
-                  {monthOverMonth > 0 ? (
+                  {monthOverMonth != null && monthOverMonth > 0 ? (
                     <span style={{ color: 'var(--v3-success-text)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                      <TrendingUp size={12} /> {money(monthOverMonth)} MoM
+                      <TrendingUp size={12} /> {money(monthOverMonth)} more
                     </span>
-                  ) : monthOverMonth < 0 ? (
+                  ) : monthOverMonth != null && monthOverMonth < 0 ? (
                     <span style={{ color: 'var(--v3-danger-text)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                      <TrendingDown size={12} /> {money(Math.abs(monthOverMonth))} MoM
+                      <TrendingDown size={12} /> {money(Math.abs(monthOverMonth))} less
                     </span>
                   ) : '\u2003'}
                 </span>
               </header>
+              <p className="fh-build-rel" style={{ padding: '0 16px' }}>{comparisonLabel}. Current month shown separately as partial.</p>
               <div className="fh-build-trend-chart">
                 {loading ? (
                   <div className="fh-build-table__empty">Loading…</div>
@@ -250,7 +236,7 @@ export default function SnowAnalyticsBuild(props: Props) {
                   return (
                     <div key={i} className="fh-build-trend-col" title={`${r.label || r.month || ''}: ${money(v)}`}>
                       <div className="fh-build-trend-col__bar" style={{ height: `${Math.max(h * 1.3, 6)}px` }} />
-                      <div className="fh-build-trend-col__label">{r.label || r.month || ''}</div>
+                      <div className="fh-build-trend-col__label">{r.label || r.month || ''}{r.partial ? ' · so far' : ''}</div>
                       <div className="fh-build-trend-col__value">{money(v)}</div>
                     </div>
                   )
@@ -315,23 +301,12 @@ export default function SnowAnalyticsBuild(props: Props) {
             </section>
 
             <section className="fh-build-rail-card">
-              <div className="fh-build-eyebrow">Cash risk</div>
-              {loading ? railPending : cashConnected ? (
+              <div className="fh-build-eyebrow">Recorded payments YTD</div>
+              {loading ? railPending : (
                 <>
-                  <strong style={{
-                    color: collectionRate == null
-                      ? undefined
-                      : Number(stats.invoiced) > Number(stats.collected) ? 'var(--v3-danger-text)' : 'var(--v3-success-text)',
-                  }}>
-                    {collectionRate != null ? pct(ratioToPct(collectionRate)) : '\u2003'}
-                  </strong>
-                  <span>{collectionRate != null ? 'collection rate YTD' : 'Nothing invoiced YTD'}</span>
-                  {collectionRate != null && collectionRate < 0.8 && <div className="fh-build-spark is-red" />}
-                </>
-              ) : (
-                <>
-                  <strong>Not connected</strong>
-                  <span>Invoice + payment data unavailable</span>
+                  <strong>{stats.collected == null ? 'No payments recorded' : money(stats.collected)}</strong>
+                  <span>Receipts by payment date. Payments may settle invoices issued in earlier periods.</span>
+                  <span>Issued invoices exclude drafts and voids. Contract value remains separate.</span>
                 </>
               )}
             </section>
@@ -347,25 +322,25 @@ export default function SnowAnalyticsBuild(props: Props) {
             </section>
 
             <section className="fh-build-rail-card">
-              <div className="fh-build-eyebrow">Forecast note</div>
+              <div className="fh-build-eyebrow">Completed month comparison</div>
               {loading ? railPending : (
                 <>
                   <strong>
-                    {monthOverMonth > 0 ? 'Trending up' : monthOverMonth < 0 ? 'Trending down' : 'Flat'}
+                    {monthOverMonth == null ? 'Not enough history' : monthOverMonth > 0 ? 'Receipts increased' : monthOverMonth < 0 ? 'Receipts decreased' : 'No change'}
                   </strong>
                   <span>
-                    {monthOverMonth !== 0 ? `${money(Math.abs(monthOverMonth))} vs prior full month` : 'Hold steady'}
+                    {comparisonLabel}{monthOverMonth == null ? '' : `. ${money(Math.abs(monthOverMonth))} ${monthOverMonth > 0 ? 'more' : monthOverMonth < 0 ? 'less' : 'change'}.`}
                   </span>
                   <div className="fh-build-rail-card__spark">
                     <Target size={14} />
-                    <span>{pct(stats.closeRate || 0)} close rate</span>
+                    <span>{pct(stats.closeRate)} win rate over 90 days</span>
                   </div>
                 </>
               )}
             </section>
           </aside>
         </section>
-      </main>
+      </div>
     </div>
   )
 }

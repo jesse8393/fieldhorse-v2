@@ -1,3 +1,4 @@
+import { supabaseServiceConfig } from './lib/serviceConfig.js'
 // Netlify Function — Claude API proxy.
 // Keeps the Anthropic API key server-side. Browser hits /api/claude
 // which is redirected here via netlify.toml.
@@ -90,6 +91,17 @@ export default async (request) => {
     })
   }
 
+  if (request.method === 'GET') {
+    const { url, publicKey, secretKey } = supabaseServiceConfig()
+    const token = request.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim()
+    if (!token) return json({ error: 'missing_token' }, 401)
+    if (!url || !(publicKey || secretKey)) return json({ error: 'server_misconfigured' }, 503)
+    const auth = createClient(url, publicKey || secretKey, { auth: { autoRefreshToken: false, persistSession: false } })
+    const { data, error } = await auth.auth.getUser(token)
+    if (error || !data?.user) return json({ error: 'invalid_token' }, 401)
+    return json({ configured: Boolean(secretKey && process.env.ANTHROPIC_API_KEY?.trim()) })
+  }
+
   if (request.method !== 'POST') {
     return json({ error: 'method_not_allowed' }, 405)
   }
@@ -99,8 +111,7 @@ export default async (request) => {
     return json({ error: 'missing_api_key', message: 'ANTHROPIC_API_KEY is not set on the server' }, 500)
   }
 
-  const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-  const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const { url: SUPABASE_URL, secretKey: SERVICE_KEY, publicKey: ANON_KEY } = supabaseServiceConfig()
   if (!SUPABASE_URL || !SERVICE_KEY) {
     return json({ error: 'server_misconfigured', message: 'Server is missing Supabase credentials.' }, 500)
   }
@@ -238,7 +249,7 @@ export default async (request) => {
 function corsHeaders() {
   return {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization'
   }
 }

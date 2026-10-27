@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ChevronLeft, MapPin, Wind, Droplets, Thermometer, CloudSun, AlertTriangle, Check, X } from 'lucide-react'
 import { useProfile } from '../contexts/ProfileContext.tsx'
-import { getWeather, workWindow, hourlyStrip, weatherLabel, tradeStatus, reverseGeocode, MURFREESBORO } from '../lib/weather.ts'
+import { getWeather, weatherLabel, reverseGeocode, MURFREESBORO, WEATHER_FRESH_MS } from '../lib/weather.ts'
+import { assessWorkWindow, assessTrade, assessedHourlyStrip } from '../lib/forecastAssessment.ts'
+import ForecastBasis from '../components/ForecastBasis.tsx'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
@@ -23,11 +25,13 @@ const TONE: Record<string, any> = {
   stop: { fg: '#C0392B', ink: 'var(--v3-danger-text)',  bg: 'rgba(192,57,43,0.15)',  border: 'rgba(192,57,43,0.35)',  label: 'Stand down' }
 }
 
-function statusTone(status: any) { return TONE[status] || TONE.go }
+function statusTone(status: any) { return TONE[status] || NEUTRAL_TONE }
 
 // Before a forecast arrives (loading, or the request failed) the screen must
 // not wear the green "clear to work" tone.
 const NEUTRAL_TONE = { fg: '#5C5C5C', ink: 'var(--v3-text-muted)', bg: 'var(--surface-2)', border: 'var(--rule)', label: '' }
+
+const EMPTY_SERVICES: string[] = []
 
 const FORECAST_ERROR = "Couldn't load the forecast. Check your connection and try again."
 
@@ -71,6 +75,7 @@ export default function PourWindow() {
   const { profile, upsertProfile, refresh } = useProfile()
   const navigate = useNavigate()
   const [weather, setWeather] = useState<any>(null)
+  const [receivedAt, setReceivedAt] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
   // True when the forecast request itself failed (not a location error), so
@@ -80,15 +85,15 @@ export default function PourWindow() {
   const [cityName, setCityName] = useState('')
 
   const hasCoords = profile?.location_lat != null && profile?.location_lon != null
-  const services = profile?.services || []
+  const services = profile?.services || EMPTY_SERVICES
 
   useEffect(() => {
     let cancelled = false
     const lat = profile?.location_lat ?? MURFREESBORO.lat
     const lon = profile?.location_lon ?? MURFREESBORO.lon
-    setLoading(true); setErr(''); setForecastFailed(false)
+    setLoading(true); setErr(''); setForecastFailed(false); setWeather(null); setReceivedAt(null)
     getWeather(lat, lon)
-      .then((d) => { if (!cancelled) setWeather(d) })
+      .then((d) => { if (!cancelled) { setWeather(d); setReceivedAt(Date.now()) } })
       .catch(() => {
         if (cancelled) return
         setErr(FORECAST_ERROR)
@@ -99,6 +104,10 @@ export default function PourWindow() {
   }, [profile?.location_lat, profile?.location_lon, reloadTick])
 
   function retryForecast() { setReloadTick((n) => n + 1) }
+  useEffect(() => {
+    const timer = window.setInterval(() => setReloadTick((n) => n + 1), WEATHER_FRESH_MS)
+    return () => window.clearInterval(timer)
+  }, [])
 useEffect(() => {
     let cancelled = false
     const lat = profile?.location_lat ?? MURFREESBORO.lat
@@ -123,13 +132,13 @@ useEffect(() => {
   }
 
   const currentWindow = useMemo(
-    () => workWindow(weather?.current, services),
+    () => assessWorkWindow(weather?.current, services),
     [weather, services]
   )
   // Anchor "Next 24 hours" on the forecast's own clock (current.time is
   // local to the forecast spot) so it starts at the hour in progress.
   const strip = useMemo(
-    () => hourlyStrip(weather?.hourly, services, 24, weather?.current?.time),
+    () => assessedHourlyStrip(weather?.hourly, services, weather?.current?.time),
     [weather, services]
   )
   const daily = useMemo(() => {
@@ -139,9 +148,9 @@ useEffect(() => {
       time: t,
       tMax: d.temperature_2m_max?.[i],
       tMin: d.temperature_2m_min?.[i],
-      rainPct: d.precipitation_probability_max?.[i] ?? 0,
-      rainSum: d.precipitation_sum?.[i] ?? 0,
-      windMax: d.wind_speed_10m_max?.[i] ?? 0
+      rainPct: d.precipitation_probability_max?.[i],
+      rainSum: d.precipitation_sum?.[i],
+      windMax: d.wind_speed_10m_max?.[i]
     }))
   }, [weather])
 
@@ -158,7 +167,7 @@ useEffect(() => {
       seen.add(k)
       return true
     })
-    return list.map((t) => ({ trade: t, ...tradeStatus(t, snap) }))
+    return list.map((t) => ({ trade: t, ...assessTrade(t, snap) }))
   }, [weather, services])
 
   const tone = weather ? statusTone(currentWindow?.status || 'go') : NEUTRAL_TONE
@@ -171,7 +180,7 @@ useEffect(() => {
   const currentHumidity = weather?.current?.relative_humidity_2m
   // Null until a forecast arrives, so the tile stays blank instead of
   // claiming 0.00 in/h of rain.
-  const currentRain = weather?.current ? (weather.current.precipitation ?? 0) : null
+  const currentRain = weather?.current ? (weather.current.precipitation ?? null) : null
 
   const { stagger, item } = useFhMotion()
   const isDesktop = useIsDesktop()
@@ -185,6 +194,7 @@ useEffect(() => {
           hasCoords={hasCoords}
           cityName={cityName}
           weather={weather}
+          receivedAt={receivedAt}
           currentWindow={currentWindow}
           daily={daily}
           tradeRows={tradeRows}
@@ -261,6 +271,7 @@ useEffect(() => {
         )}
       </motion.div>
 
+      <div style={{ margin: '0 20px' }}><ForecastBasis weather={weather} receivedAt={receivedAt} trades={tradeRows.map((r) => r.trade)} /></div>
       {/* TODAY HERO */}
       <motion.div variants={item} style={{ margin: '0 20px 14px' }}>
       <OnyxStage
@@ -457,14 +468,14 @@ useEffect(() => {
                       <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 12, fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--ink-muted)', flexWrap: 'wrap' }}>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                           <Droplets size={11} />
-                          {Math.round(d.rainPct)}%
+                          {d.rainPct == null ? 'Unknown' : `${Math.round(d.rainPct)}%`}
                         </span>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                           <Wind size={11} />
-                          {Math.round(d.windMax)} mph
+                          {d.windMax == null ? 'Unknown' : `${Math.round(d.windMax)} mph`}
                         </span>
                         <Eyebrow style={{ gap: 4, padding: '4px 8px', borderRadius: 10, background: t.bg, border: `1px solid ${t.border}`, color: t.ink }}>
-                          {dayStatus === 'go' ? 'Go' : dayStatus === 'warn' ? 'Tight' : 'Stop'}
+                          {dayStatus === 'go' ? 'Within limits' : dayStatus === 'warn' ? 'Caution' : dayStatus === 'stop' ? 'Review' : 'Unknown'}
                         </Eyebrow>
                       </div>
                     </div>
@@ -499,7 +510,7 @@ useEffect(() => {
           )}
           {tradeRows.map((r) => {
             const t = statusTone(r.status)
-            const Glyph = r.status === 'go' ? Check : r.status === 'warn' ? AlertTriangle : X
+            const Glyph = r.status === 'go' ? Check : r.status === 'stop' ? X : AlertTriangle
             return (
               <div
                 key={r.trade}
@@ -523,18 +534,18 @@ useEffect(() => {
                   <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, color: 'var(--ink-strong)', textTransform: 'capitalize' }}>
                     {r.trade}
                   </div>
-                  {r.status !== 'go' && r.reasons?.length > 0 ? (
+                  {r.reasons?.length > 0 ? (
                     <div style={{ marginTop: 2, fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--ink-muted)' }}>
                       {r.trade.toLowerCase()}: {r.reasons[0].toLowerCase()}
                     </div>
                   ) : (
                     <div style={{ marginTop: 2, fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--ink-faint)' }}>
-                      Within spec
+                      No configured limit triggered.
                     </div>
                   )}
                 </div>
                 <Eyebrow style={{ flexShrink: 0, padding: '4px 8px', borderRadius: 10, background: t.bg, border: `1px solid ${t.border}`, color: t.ink }}>
-                  {r.status === 'go' ? 'Go' : r.status === 'warn' ? 'Tight' : 'Stop'}
+                  {r.status === 'go' ? 'Within limits' : r.status === 'warn' ? 'Caution' : r.status === 'stop' ? 'Review' : 'Unknown'}
                 </Eyebrow>
               </div>
             )
@@ -550,9 +561,11 @@ useEffect(() => {
 // daily max values when no hourly slice matches.
 function dayAggregateStatus(weather: any, services: any, dayIso: any) {
   const h = weather?.hourly
-  if (!h?.time || !dayIso) return 'go'
+  if (!h?.time || !dayIso) return 'unknown'
   const dayPrefix = dayIso.slice(0, 10) // "year month day"
   let worst = 'go'
+  let samples = 0
+  let unknown = false
   for (let i = 0; i < h.time.length; i++) {
     if (!String(h.time[i]).startsWith(dayPrefix)) continue
     const hr = new Date(h.time[i]).getHours()
@@ -563,11 +576,13 @@ function dayAggregateStatus(weather: any, services: any, dayIso: any) {
       wind_speed_10m: h.wind_speed_10m?.[i],
       relative_humidity_2m: h.relative_humidity_2m?.[i]
     }
-    const w = workWindow(snap, services)
+    samples++
+    const w = assessWorkWindow(snap, services)
+    if (w.status === 'unknown') unknown = true
     if (w.status === 'stop') return 'stop'
     if (w.status === 'warn' && worst !== 'stop') worst = 'warn'
   }
-  return worst
+  return !samples || unknown ? 'unknown' : worst
 }
 
 function Metric({ Icon, label, value, unit }: any) {

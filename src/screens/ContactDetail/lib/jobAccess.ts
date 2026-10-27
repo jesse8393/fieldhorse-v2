@@ -11,13 +11,13 @@
 export type DetailTab = { id: string; label: string }
 
 // Tabs whose whole content reads money tables field roles cannot see.
-const MONEY_ONLY_TABS = new Set(['quote', 'change_orders'])
+const MONEY_ONLY_TABS = new Set(['quote', 'change_orders', 'subs', 'insurance', 'draws'])
 
 /** Filter and relabel the stage's tabs for the viewer's role. */
 export function tabsForRole<T extends DetailTab>(tabs: T[], canSeeMoney: boolean): T[] {
   if (canSeeMoney) return tabs
   return tabs
-    .filter((t) => !MONEY_ONLY_TABS.has(t.id))
+    .filter((t) => !MONEY_ONLY_TABS.has(t.id) && t.id !== 'expenses')
     .map((t) => (t.id === 'financials' ? { ...t, label: 'Expenses' } : t))
 }
 

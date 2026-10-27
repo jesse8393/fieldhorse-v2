@@ -126,7 +126,7 @@ export default function SnowSubsBuild(props: Props) {
         </button>
       </header>
 
-      <main className="fh-build-main">
+      <div className="fh-build-main">
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
             <div className="fh-build-good">Office</div>
@@ -257,7 +257,7 @@ export default function SnowSubsBuild(props: Props) {
             </section>
           </aside>
         </section>
-      </main>
+      </div>
     </div>
   )
 }

@@ -1,45 +1,15 @@
-// src/screens/Work.tsx, THE list. (IA collapse, round 2)
-//
-// User verdict on the four-desk model: "Jobs leads quotes invoices…
-// it all sucks and is too complicated. Still is too much."
-// They were right. A deal is ONE thing that moves lead → quote →
-// active → paid → done; splitting it across Leads / Quotes / Jobs /
-// Pipeline boards (each with its own layout, card design, and cockpit
-// panels) forced the operator to learn four screens for one object.
-//
-// This screen replaces all four:
-//   - one search bar
-//   - one row of stage chips (All · Leads · Quotes · Active · Done,
-//     Lost only when it exists)
-//   - ONE card design for every deal, spine + name + title + $ +
-//     stage pill + follow-up chip when due + one ⋯ menu
-//   - tap a card → the stage-aware detail, where the single big CTA
-//     already lives (Convert to quote / Approve / Send invoice)
-//
-// /leads, /quotes, /jobs, /pipeline all redirect here (App.tsx keeps
-// the mapping so old links and habits still land correctly).
-
+// One inventory for every viewport. Desktop may add job quick actions,
+// but membership, filters, counts and source records stay shared.
 import { lazy, Suspense, memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { motion, AnimatePresence } from 'framer-motion'
-import {
-  Search, Phone as PhoneIcon, MessageSquare as MsgIcon, Sparkles,
-  CalendarClock, CalendarDays, Trophy, XCircle, MoreHorizontal, RotateCcw
-} from 'lucide-react'
+import { motion } from 'framer-motion'
+import { Phone as PhoneIcon, MessageSquare as MsgIcon, CalendarClock, CalendarDays, Trophy, XCircle, MoreHorizontal, RotateCcw } from 'lucide-react'
 import SwipeableRow from '../components/SwipeableRow.tsx'
-import { SkeletonList } from '../components/Skeleton.tsx'
-import DataErrorState from '../components/DataErrorState.tsx'
-import { FilterPill, FloatingActionButton, ScreenCloser, StatusPill } from '../components/v3'
+import { StatusPill } from '../components/v3'
 import JobsPhone from './jobs/JobsPhone.tsx'
-import {
-  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
-  DropdownMenuItem, DropdownMenuSeparator
-} from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
-// Lazy, react-day-picker (~tens of KB) only loads when someone opens the
-// follow-up date picker. Work is the hot list route (its chunk is warmed
-// on sidebar hover for 5 paths), so keep the calendar off the critical path.
 const Calendar = lazy(() => import('@/components/ui/calendar').then((m) => ({ default: m.Calendar })))
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
@@ -47,60 +17,14 @@ import { supabase } from '../lib/supabase.ts'
 import { markLost, reopen, reopenQuestion } from '../lib/pipeline.ts'
 import { useSecondTap } from '../lib/secondTap.ts'
 import { detailRoute, LIST_STAGE_META as STAGE_META } from '../lib/stages.ts'
-import { moneyK as money } from '../lib/format.ts'
+import { moneyCents as money } from '../lib/format.ts'
 import { prefetchJobDetail } from './ContactDetail/hooks/useJobData.ts'
-import { useInfiniteRender } from '../lib/useInfiniteRender.ts'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
-import { useFhMotion } from '../lib/motion.ts'
 import { canHover } from '../lib/hover.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { useJobs, useJobsRealtime, useJobSearch, jobsKey, type JobRow } from '../lib/queries.ts'
-
-type ChipId = 'all' | 'leads' | 'quotes' | 'active' | 'done' | 'lost'
-
-const CHIPS: { id: ChipId; label: string; match: (c: JobRow) => boolean }[] = [
-  // 'All' really means all: it used to exclude lost, so its count (26)
-  // never matched the sum of the stage chips (28), flagged by the UI
-  // audit (#11) as "data does not agree with itself".
-  { id: 'all',    label: 'All',    match: () => true },
-  { id: 'leads',  label: 'Leads',  match: (c) => c.stage === 'lead' },
-  { id: 'quotes', label: 'Quotes', match: (c) => c.stage === 'quote' },
-  { id: 'active', label: 'Active', match: (c) => c.stage === 'job' || c.stage === 'invoice' },
-  { id: 'done',   label: 'Done',   match: (c) => c.stage === 'closed' },
-  { id: 'lost',   label: 'Lost',   match: (c) => c.stage === 'lost' }
-]
-
-// Old and new ?stage= values for the desktop chips. The phone tabs write
-// 'jobs' (decision D3), which is the desktop 'active' chip.
-function chipFromStage(stage: string | null): ChipId | null {
-  const id = stage === 'jobs' ? 'active' : stage
-  return id && CHIPS.some((c) => c.id === id) ? (id as ChipId) : null
-}
-
-// The search both layouts share. Local (cached) rows: filter the recent
-// window by a naive substring. Server hits already matched the WHOLE book
-// via a wildcard ilike that normalizes punctuation ('615-555-1234' ~
-// '(615) 555-1234'). Do NOT run a raw .includes() over them again, that
-// discarded exactly the punctuation normalized hits the server search
-// found. Union them in applying only the view filter + dedupe. Dedupe
-// against the rows we're KEEPING, so a cached row the naive filter
-// dropped but the server matched is recovered via its server hit twin.
-function searchJobs(contacts: JobRow[], serverHits: JobRow[], search: string, match: (c: JobRow) => boolean): JobRow[] {
-  const q = search.trim().toLowerCase()
-  let localRows = contacts.filter(match)
-  if (q) {
-    localRows = localRows.filter((c) =>
-      [c.name, c.phone, c.email, c.address, c.referred_by, c.job_type, c.job_title]
-        .filter(Boolean)
-        .some((s) => String(s).toLowerCase().includes(q))
-    )
-  }
-  if (!q || !serverHits.length) return localRows
-  const seen = new Set(localRows.map((c) => c.id))
-  const extra = serverHits.filter((h) => !seen.has(h.id) && match(h))
-  return localRows.concat(extra)
-}
+import { searchWorkJobs } from '../lib/workList.ts'
 
 function followUpMeta(c: Pick<JobRow, 'follow_up_on'>): { label: string; tone: 'danger' | 'warn' | 'muted' } | null {
   if (!c.follow_up_on) return null
@@ -115,156 +39,28 @@ function followUpMeta(c: Pick<JobRow, 'follow_up_on'>): { label: string; tone: '
   return { label: `Follow up ${due.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`, tone: 'muted' }
 }
 
-// Detail route per stage, canonical mapping imported from stages.ts.
-
 export default function Work() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { data: contacts = [], isLoading: loading, isError, error, refetch, isFetching } = useJobs()
   useJobsRealtime(user?.id, queryClient)
-  // Role gate: the revenue stages (leads, quotes) and the sell actions
-  // (Mark won/lost) belong to the money roles. Crew/foreman previously
-  // couldn't reach /leads or /quotes at all; now that everything funnels
-  // through /work, gate those surfaces in-view instead, they see only
-  // the active/done work they're actually on, with no deal $ or pipeline
-  // moves. Fail CLOSED while membership resolves: the list hydrates
-  // instantly from IDB cache, so defaulting to money-visible would flash
-  // '$ in play', Leads/Quotes rows, and dollar amounts to a crew member
-  // on every cold open until membership resolved. Owners simply see the
-  // money view a beat later, the correct trade.
   const { canCreateFinancialDocs, canSeeFinancials, loading: membershipLoading } = useMembership()
   const isMoneyRole = !membershipLoading && canCreateFinancialDocs
-  // Amounts on the phone rows, group totals and notes: the same rule the
-  // job page uses (owner, admin, manager), failing closed while loading.
   const showMoney = !membershipLoading && canSeeFinancials
   const isDesktop = useIsDesktop()
-  const [searchParams, setSearchParams] = useSearchParams()
-  const [chip, setChip] = useState<ChipId>('all')
   const [search, setSearch] = useState('')
-  // Server-side search: the cached list holds the 2000 most-recent deals;
-  // typing also queries the whole book (debounced) and the hits merge in
-  // below, so an operator can find a deal from years back by name.
   const [debouncedSearch, setDebouncedSearch] = useState('')
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 300)
-    return () => clearTimeout(t)
+    const timer = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(timer)
   }, [search])
-  const { data: serverHits = [], isError: searchDegraded } = useJobSearch(debouncedSearch)
+  const { data: serverHits = [], isError: searchDegraded, isPlaceholderData: searchPlaceholder } = useJobSearch(debouncedSearch)
+  const searchCurrent = !searchPlaceholder && search.trim().toLowerCase() === debouncedSearch.trim().toLowerCase()
+  const rows = useMemo(() => searchWorkJobs(contacts, searchCurrent ? serverHits : [], search), [contacts, serverHits, search, searchCurrent])
+  const contactsById = useMemo(() => new Map(rows.map((row) => [row.id, row])), [rows])
   const [busyId, setBusyId] = useState<string | null>(null)
-  const loadError = isError
-    ? error instanceof Error ? error.message : 'The work list failed to load.'
-    : ''
-
-  // Deep links: ?stage=<chip> selects a chip. It stays IN the URL so the
-  // active filter survives refresh and is shareable/bookmarkable (UI
-  // audit #30). Creating a record is its own screen (/leads/new and the
-  // others, SPEC D57), so nothing opens from here.
-  useEffect(() => {
-    const requested = searchParams.get('stage')
-    const requestedChip = chipFromStage(requested)
-    if (requestedChip) setChip(requestedChip)
-    if (!requested) setChip('all')
-  }, [searchParams])
-
-  // Chip clicks write the URL; the effect above syncs state from it.
-  const selectChip = (id: ChipId) => {
-    const sp = new URLSearchParams(searchParams)
-    if (id === 'all') sp.delete('stage')
-    else sp.set('stage', id)
-    setSearchParams(sp, { replace: true })
-    setChip(id)
-  }
-
-  // Money roles see the full lifecycle; field roles see only the work
-  // they're on (Active/Done). 'all' stays for both but, for field roles,
-  // its match excludes leads/quotes below.
-  const visibleChips = useMemo(
-    () => isMoneyRole ? CHIPS : CHIPS.filter((c) => c.id === 'all' || c.id === 'active' || c.id === 'done'),
-    [isMoneyRole]
-  )
-
-  const chipCounts = useMemo<Partial<Record<ChipId, number>>>(() => {
-    if (loading) return {}
-    const out: Partial<Record<ChipId, number>> = {}
-    for (const c of visibleChips) {
-      // Field roles never count lead/quote rows, even under 'all'.
-      out[c.id] = contacts.filter((row) =>
-        c.match(row) && (isMoneyRole || (row.stage !== 'lead' && row.stage !== 'quote'))
-      ).length
-    }
-    return out
-  }, [contacts, loading, visibleChips, isMoneyRole])
-  const lostCount = Number(chipCounts.lost || 0)
-
-  // For a field role, if the URL/deep-link left them on a now-hidden chip,
-  // fall back to 'all'. Same for Lost once nothing is lost: its pill is
-  // hidden then, so the view would be an empty list with no active pill.
-  const effectiveChip: ChipId =
-    !visibleChips.some((c) => c.id === chip) || (chip === 'lost' && !loading && lostCount === 0) ? 'all' : chip
-
-  // Drop a ?stage the view fell back from, so the address, the active
-  // pill, the list and the empty state all agree. Waits until the role
-  // and a fresh list have loaded: membership fails closed (field view)
-  // while it resolves, and a cached list can be missing newer lost deals.
-  useEffect(() => {
-    // The phone tabs read ?stage= themselves (JobsPhone).
-    if (!isDesktop) return
-    if (loading || membershipLoading || isError || isFetching) return
-    if (chip === effectiveChip || !searchParams.has('stage')) return
-    const sp = new URLSearchParams(searchParams)
-    sp.delete('stage')
-    setSearchParams(sp, { replace: true })
-  }, [isDesktop, loading, membershipLoading, isError, isFetching, chip, effectiveChip, searchParams, setSearchParams])
-
-  // Field roles never see lead/quote rows, even under the All chip.
-  // Memoized so the list below filters again only when the view changes.
-  const activeChip = useMemo(() => {
-    const baseChip = CHIPS.find((c) => c.id === effectiveChip) || CHIPS[0]
-    return isMoneyRole
-      ? baseChip
-      : { ...baseChip, match: (c: JobRow) => baseChip.match(c) && c.stage !== 'lead' && c.stage !== 'quote' }
-  }, [effectiveChip, isMoneyRole])
-
-  const filtered = useMemo(() => {
-    const rows = searchJobs(contacts, serverHits, search, activeChip.match)
-    // Follow ups due float to the top; inside each band, newest first.
-    // Decorate-sort-undecorate: parse each row's dates ONCE (O(n)) instead
-    // of up to 4× per comparison (O(n log n) parses), matters on long lists.
-    const decorated = rows.map((c) => ({
-      c,
-      fu: c.follow_up_on ? new Date(c.follow_up_on).getTime() : Infinity,
-      up: new Date(c.updated_at || c.created_at || 0).getTime()
-    }))
-    decorated.sort((a, b) => (a.fu !== b.fu ? a.fu - b.fu : b.up - a.up))
-    return decorated.map((d) => d.c)
-  }, [contacts, serverHits, activeChip, search])
-
-  // Phone rows: everything the role may see that matches the search;
-  // JobsPhone splits them into tabs and groups. Field roles never see
-  // lead or quote rows, as on desktop.
-  const phoneRows = useMemo(
-    () => isDesktop
-      ? []
-      : searchJobs(contacts, serverHits, search, (c) => isMoneyRole || (c.stage !== 'lead' && c.stage !== 'quote')),
-    [isDesktop, contacts, serverHits, search, isMoneyRole]
-  )
-
-  const { visible, sentinelRef, hasMore } = useInfiniteRender(filtered, `${effectiveChip}|${search}`)
-
-  const summary = useMemo(() => {
-    // Field roles: count only the active work they can see, and never
-    // surface deal dollar amounts.
-    const openStages = isMoneyRole ? ['lead', 'quote', 'job', 'invoice'] : ['job', 'invoice']
-    const open = contacts.filter((c) => openStages.includes(c.stage || ''))
-    const inPlay = isMoneyRole ? open.reduce((s, c) => s + Number(c.amount || 0), 0) : 0
-    const due = open.filter((c) => {
-      const m = followUpMeta(c)
-      return m && (m.tone === 'danger' || m.tone === 'warn')
-    }).length
-    return { open: open.length, inPlay, due }
-  }, [contacts, isMoneyRole])
-
+  const loadError = isError ? error instanceof Error ? error.message : 'The job list could not load.' : ''
   // Guards concurrent stage moves without making `run` depend on the
   // busyId state (which would re-create every per-row handler on each
   // busy toggle and defeat DealCard's memoization). busyId state stays
@@ -355,222 +151,32 @@ export default function Work() {
   // "Tap again to reopen" button when Reopen is picked from its menu, and
   // this runs on that second tap (D57).
   const handleReopen = useCallback(async (c: JobRow) => {
-    await run(c, reopen, { stage: c.stage === 'closed' ? 'job' : 'lead' } as Partial<JobRow>, "Couldn't reopen")
+    await run(c, reopen, null, "Couldn't reopen")
   }, [run])
   const handleFollowUp = useCallback((c: JobRow, when: number | Date | null) => setFollowUp(c, when), [setFollowUp])
 
-  const { stagger, item } = useFhMotion()
-
-  // New lead is a full screen (SPEC D57, D58).
-  const openNewLead = () => navigate('/leads/new')
-
-  // Phone (below 900 px): the redesigned Jobs list (spec 9.3). The deal
-  // cards, the stats line and their per row menus stay on desktop until
-  // Phase 4; on a phone the stage actions live on the job page.
-  if (!isDesktop) {
-    return (
-      <>
-        <JobsPhone
-          jobs={phoneRows}
-          loading={loading}
-          loadError={loadError}
-          retrying={isFetching}
-          onRetry={() => { void refetch() }}
-          search={search}
-          onSearchChange={setSearch}
-          searchDegraded={searchDegraded}
-          showMoney={showMoney}
-          fieldView={!isMoneyRole}
-          // Crew and foremen never sell, so they get no New lead (the
-          // same roles that see no Leads or Quotes tab).
-          onNewLead={isMoneyRole ? openNewLead : undefined}
-        />
-      </>
-    )
-  }
-
   return (
-    <motion.div
-      className="v3-screen v3-screen--work"
-      variants={stagger}
-      initial="hidden"
-      animate="show"
-      style={{ position: 'relative' }}
-    >
-      {/* HEADER, one title, one honest stat line. No cockpit panels:
-          Home already owns "what should I do next"; this screen's job
-          is the list. */}
-      <motion.div className="fh-work__head" variants={item} style={{ padding: '12px 24px 8px' }}>
-        <div className="fhs-screen-head">
-          <h1 className="jobs-title">
-            Work <span style={{ color: 'var(--v3-primary-text)' }}>&amp; deals</span>
-          </h1>
-        </div>
-        <div className="jobs-stats">
-          {loading ? (
-            <span style={{ color: 'var(--v3-text-muted)' }}>Loading…</span>
-          ) : (
-            <>
-              <span><b>{summary.open}</b> open</span>
-              {summary.inPlay > 0 && (
-                <>
-                  <span className="dot-sep">·</span>
-                  <span><b>{money(summary.inPlay)}</b> in play</span>
-                </>
-              )}
-              {summary.due > 0 && (
-                <>
-                  <span className="dot-sep">·</span>
-                  <span className="jobs-stats__alert"><b>{summary.due}</b> need a follow up</span>
-                </>
-              )}
-            </>
-          )}
-        </div>
-      </motion.div>
-
-      {/* SEARCH */}
-      <motion.div className="fh-work__search" variants={item} style={{ padding: '12px 24px 12px' }}>
-        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-          <Search size={16} style={{ position: 'absolute', left: 14, color: 'var(--v3-text-muted)', pointerEvents: 'none' }} />
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            aria-label="Search work"
-            autoComplete="off"
-            placeholder="Search names, numbers, addresses..."
-            style={{
-              width: '100%', boxSizing: 'border-box',
-              padding: '12px 12px 12px 32px', borderRadius: 10,
-              background: 'var(--v3-surface)', border: '1px solid var(--v3-border)',
-              color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 14,
-              outline: 'none'
-            }}
-          />
-        </div>
-        {/* Whole-book search failed (offline / server error): results
-            below are the cached recent window only, say so instead of
-            letting old deals silently look deleted. */}
-        {searchDegraded && search.trim().length >= 2 && (
-          <div role="status" style={{
-            marginTop: 6, fontSize: 12, fontFamily: 'var(--font-body)',
-            color: 'var(--v3-primary-text)', display: 'flex', alignItems: 'center', gap: 8
-          }}>
-            <Sparkles size={11} aria-hidden="true" />
-            Showing recent deals only, full history search is unreachable right now.
-          </div>
-        )}
-      </motion.div>
-
-      {/* STAGE CHIPS, the whole pipeline in one row. */}
-      <motion.div className="fh-work__chips" variants={item} style={{ padding: '0 var(--v3-gutter) 12px' }}>
-        {/* A labelled group of toggle buttons (FilterPill sets aria-pressed).
-            Not a tablist: the pills filter one list rather than switching
-            panels, and every pill stays in the Tab order. */}
-        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }} role="group" aria-label="Stage filters">
-          {visibleChips.filter((c) => c.id !== 'lost' || lostCount > 0).map((c) => (
-            <FilterPill
-              key={c.id}
-              active={effectiveChip === c.id}
-              count={chipCounts[c.id]}
-              ariaLabel={`Show ${c.label.toLowerCase()}`}
-              onClick={() => { hapticTap(); selectChip(c.id) }}
-            >
-              {c.label}
-            </FilterPill>
-          ))}
-        </div>
-      </motion.div>
-
-      {/* LIST */}
-      {loadError && filtered.length > 0 && (
-        <motion.div variants={item} style={{ padding: '0 var(--v3-gutter) 12px' }}>
-          <DataErrorState
-            compact
-            title="Could not refresh"
-            message="Showing the last loaded results."
-            onRetry={() => { void refetch() }}
-            actionLabel={isFetching ? 'Retrying' : 'Retry'}
-          />
-        </motion.div>
-      )}
-
-      {loading && (
-        <motion.div className="fh-work__list fh-work__list--loading" variants={item} style={{ padding: '0 var(--v3-gutter) 32px' }}>
-          <SkeletonList rows={6} />
-        </motion.div>
-      )}
-
-      {!loading && loadError && filtered.length === 0 && (
-        <motion.div className="fh-work__list fh-work__list--empty" variants={item} style={{ padding: '0 var(--v3-gutter) 32px' }}>
-          <DataErrorState
-            title="Could not load your work"
-            message={loadError}
-            onRetry={() => { void refetch() }}
-            actionLabel={isFetching ? 'Retrying' : 'Retry'}
-          />
-        </motion.div>
-      )}
-
-      {!loading && !loadError && filtered.length === 0 && (
-        <motion.div className="fh-work__list fh-work__list--empty" variants={item} style={{ padding: '0 var(--v3-gutter) 32px' }}>
-          <div className="v3-empty">
-            <Sparkles size={20} color="var(--v3-text-muted)" style={{ margin: '0 auto 8px' }} />
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
-              {effectiveChip !== 'all' || search ? 'Nothing matches that view.' : 'No work yet.'}
-            </div>
-            <div style={{ fontSize: 12, marginBottom: 10 }}>
-              {effectiveChip !== 'all' || search
-                ? 'Clear the search or switch stage to see more.'
-                : 'Add the next phone call and let it move through the stages.'}
-            </div>
-            {effectiveChip === 'all' && !search && (
-              <button
-                type="button"
-                onClick={openNewLead}
-                style={{
-                  background: 'none', border: 'none', padding: 0,
-                  color: 'var(--v3-primary-text)', fontWeight: 700, fontSize: 12, cursor: 'pointer'
-                }}
-              >
-                Add your first deal →
-              </button>
-            )}
-          </div>
-        </motion.div>
-      )}
-
-      {!loading && filtered.length > 0 && (
-        <motion.div className="fh-work__list" variants={item} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 var(--v3-gutter) 32px' }}>
-          <AnimatePresence>
-            {visible.map((c) => (
-              <DealCard
-                key={c.id}
-                contact={c}
-                busy={busyId === c.id}
-                canSell={isMoneyRole}
-                onOpen={handleOpen}
-                onHover={handleHover}
-                onWon={handleWon}
-                onLost={handleLost}
-                onReopen={handleReopen}
-                onFollowUp={handleFollowUp}
-              />
-            ))}
-          </AnimatePresence>
-          {hasMore && <div ref={sentinelRef} aria-hidden="true" style={{ height: 1 }} />}
-        </motion.div>
-      )}
-
-      <FloatingActionButton
-        onClick={openNewLead}
-        ariaLabel="New deal"
-        hideOnDesktop={false}
-      />
-
-      <ScreenCloser caption={`${filtered.length} ${filtered.length === 1 ? 'deal' : 'deals'} in this view.`} />
-    </motion.div>
+    <JobsPhone
+      jobs={rows}
+      loading={loading || membershipLoading}
+      loadError={loadError}
+      retrying={isFetching}
+      onRetry={() => { void refetch() }}
+      search={search}
+      onSearchChange={setSearch}
+      searchDegraded={searchDegraded}
+      showMoney={showMoney}
+      fieldView={!isMoneyRole}
+      onNewLead={isMoneyRole ? () => navigate('/leads/new') : undefined}
+      desktop={isDesktop}
+      renderJobRow={isDesktop ? (row) => {
+        const contact = contactsById.get(row.id)
+        if (!contact || row.to !== detailRoute(contact)) return null
+        return <DealCard contact={contact} busy={busyId === contact.id} canSell={isMoneyRole} showMoney={showMoney}
+          onOpen={handleOpen} onHover={handleHover} onWon={handleWon} onLost={handleLost}
+          onReopen={handleReopen} onFollowUp={handleFollowUp} />
+      } : undefined}
+    />
   )
 }
 
@@ -589,6 +195,7 @@ type DealCardProps = {
   // Whether this role may move the deal through the pipeline (Mark
   // won/lost). Field roles get follow-up actions but no stage moves.
   canSell: boolean
+  showMoney: boolean
   // Handlers take the contact as an arg (rather than closing over it in
   // the parent) so their identity is stable across renders, that's what
   // lets React.memo below skip the untouched cards on every keystroke.
@@ -604,7 +211,7 @@ type DealCardProps = {
 // search keystroke because the parent passed fresh inline-arrow callbacks
 // each render. With stable handlers (above) + memo, only cards whose own
 // props (contact ref / isNew / busy / canSell) actually change re-render.
-const DealCard = memo(function DealCard({ contact: c, isNew = false, busy, canSell: mayMoveStage, onOpen, onHover, onWon, onLost, onReopen, onFollowUp }: DealCardProps) {
+const DealCard = memo(function DealCard({ contact: c, isNew = false, busy, canSell: mayMoveStage, showMoney, onOpen, onHover, onWon, onLost, onReopen, onFollowUp }: DealCardProps) {
   // Calendar popover for "Pick a date…", anchored to the ⋯ button so
   // it opens exactly where the menu just closed.
   const [dateOpen, setDateOpen] = useState(false)
@@ -622,7 +229,7 @@ const DealCard = memo(function DealCard({ contact: c, isNew = false, busy, canSe
   const meta = STAGE_META[c.stage || 'lead'] || STAGE_META.lead
   const follow = followUpMeta(c)
   const phone = c.phone || c.fh_clients?.phone || ''
-  const est = money(c.amount)
+  const est = showMoney && c.amount != null ? money(c.amount) : null
   const isTerminal = c.stage === 'lost' || c.stage === 'closed'
   // Sell actions require both a sellable stage AND a money role.
   const canSell = mayMoveStage && (c.stage === 'lead' || c.stage === 'quote')
@@ -769,11 +376,11 @@ const DealCard = memo(function DealCard({ contact: c, isNew = false, busy, canSe
             <DropdownMenuTrigger asChild>
             <button
               type="button"
-              aria-label="Deal actions"
+              aria-label={`Actions for ${c.name || c.job_title || 'job'}`}
               hidden={!hasActions}
               disabled={busy || !hasActions}
               style={{
-                flexShrink: 0, width: 36, height: 36, borderRadius: 10,
+                flexShrink: 0, width: 44, height: 44, borderRadius: 10,
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                 background: 'transparent', border: '1px solid var(--v3-border)',
                 color: 'var(--v3-text-muted)', cursor: busy ? 'wait' : 'pointer',

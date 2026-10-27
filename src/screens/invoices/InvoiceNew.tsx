@@ -13,7 +13,9 @@ import CreateShell, { Choices, moneyInput, useDraft } from '../new/CreateShell.t
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useMembership } from '../../contexts/MembershipContext.tsx'
 import { supabase } from '../../lib/supabase.ts'
-import { contractTotals, createInvoice } from '../../lib/invoices.ts'
+import { createInvoice } from '../../lib/invoices.ts'
+import { fetchInvoiceReviewContext } from '../../lib/invoiceReviewContext.ts'
+import { reviewInvoice } from '../../lib/invoiceReview.js'
 import { JOB_STAGES } from '../../lib/stages.ts'
 import { recordRoute } from '../../lib/records.ts'
 import { hapticMedium } from '../../lib/haptics.ts'
@@ -48,16 +50,10 @@ function dueAt(days: string): string | null {
 
 // The job's balance: contract plus approved change orders, less what has
 // been paid (the figure Invoice this hands over, D61).
-async function jobBalance(jobId: string, amount: number | null): Promise<number> {
-  const [payments, changeOrders] = await Promise.all([
-    supabase.from('fh_payments').select('amount').eq('contact_id', jobId),
-    supabase.from('fh_change_orders').select('amount, status').eq('contact_id', jobId)
-  ])
-  return contractTotals({
-    contact: { amount: amount ?? 0 },
-    payments: payments.data || [],
-    changeOrders: changeOrders.data || []
-  }).balance
+async function jobBalance(jobId: string, _amount: number | null): Promise<number> {
+  const context = await fetchInvoiceReviewContext(jobId)
+  if (context.contractTotal == null) return 0
+  return Math.max(0, Math.round((context.contractTotal - context.invoices.reduce((sum, invoice) => sum + (Number.isFinite(Number(invoice.amount)) ? Math.max(0, Number(invoice.amount)) : 0), 0)) * 100) / 100)
 }
 
 export default function InvoiceNew() {
@@ -95,7 +91,9 @@ export default function InvoiceNew() {
       const { data } = await supabase.from('fh_contacts').select('id, job_title, name, amount, client_id, stage').eq('id', jobParam).maybeSingle()
       if (!alive || !data) return
       const job = data as Job
-      const balance = await jobBalance(job.id, job.amount)
+      let balance: number
+      try { balance = await jobBalance(job.id, job.amount) }
+      catch { if (alive) setErrors({ save: 'Could not verify existing invoices. Retry before billing this job.' }); return }
       if (!alive) return
       patch({ jobId: job.id, amount: balance > 0 ? String(balance) : '', description: job.job_title || '' })
       if (job.client_id) {
@@ -130,8 +128,10 @@ export default function InvoiceNew() {
 
   async function pickJob(job: Job | null) {
     if (!job) { patch({ jobId: '' }); return }
-    const balance = await jobBalance(job.id, job.amount)
-    patch({ jobId: job.id, amount: balance > 0 ? String(balance) : form.amount, description: form.description || job.job_title || '' })
+    let balance: number
+    try { balance = await jobBalance(job.id, job.amount) }
+    catch { setErrors({ save: 'Could not verify existing invoices. Retry before billing this job.' }); return }
+    patch({ jobId: job.id, amount: String(balance), description: form.description || job.job_title || '' })
   }
 
   async function save() {
@@ -146,6 +146,9 @@ export default function InvoiceNew() {
     try {
       const picked = await resolveClientId(client, { userId: user.id, orgId })
       if (!picked) throw new Error('Enter a client.')
+      const context = await fetchInvoiceReviewContext(form.jobId || null, picked.id)
+      const review = reviewInvoice({ invoice: { id: 'new', contact_id: form.jobId || null, client_id: picked.id, amount, title: form.description, due_at: dueAt(form.due), status: 'draft' }, ...context })
+      if (review.excess > 0) throw new Error(`Only ${formatMoney(review.available ?? 0)} remains unreserved on this contract. Review existing drafts or approve added scope before billing more.`)
       const { data, error } = await createInvoice({
         contact: form.jobId ? { id: form.jobId } : null,
         clientId: picked.id,
@@ -185,11 +188,11 @@ export default function InvoiceNew() {
               )
             })}
           </ul>
-          <p className="fhnew-note">{form.jobId ? 'Bills this job.' : 'No job picked: bills the client directly.'}</p>
+          <p className="fhnew-note">{form.jobId ? 'Bills this job. Prefilled amount excludes existing invoices and reserved drafts.' : 'No job picked: bills the client directly.'}</p>
         </fieldset>
       )}
       <Field label="Amount" inputMode="decimal" placeholder="0.00" value={form.amount} error={errors.amount} onChange={(e) => set('amount', moneyInput(e.target.value))} />
-      <Field label="Description" helper="Prints on the invoice." value={form.description} onChange={(e) => set('description', e.target.value)} />
+      <Field label="Description" helper="Prints on the invoice. Name separate installments clearly, such as Draw 2 or Final balance." value={form.description} onChange={(e) => set('description', e.target.value)} />
       <Choices label="Due" options={DUE} value={form.due} onChange={(v) => set('due', v)} />
       <Field label="Payment instructions" multiline placeholder="Check, Zelle, or card by link" value={form.instructions} onChange={(e) => set('instructions', e.target.value)} />
     </CreateShell>

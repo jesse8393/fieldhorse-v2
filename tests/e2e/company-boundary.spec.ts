@@ -1,12 +1,13 @@
-// Jobs and quotes stay inside the active company (Phase 8, Task 7).
+// Current company boundaries after leads and quotes moved to their own tables.
 //
 // The jobs list (useJobs) carries every company the person belongs to plus
 // the jobs a partner shared with them, because the Jobs list is meant to
 // show those. The screens that act on jobs read only the active company:
 // the Unscheduled tray on the desktop Schedule, which writes visits, and
 // Money's Waiting on approval group. Here the mock's active company is
-// org-1, and a partner's job and quote from org-2 come back in the jobs
-// list the way row level security returns a shared job.
+// org-1, and a partner's job from org-2 comes back through job sharing.
+// Migrations 092/093 do not carry that share to the new quote table:
+// canonical quotes require org membership and money visibility.
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 
@@ -53,17 +54,31 @@ const PARTNER = {
 const CONTACTS = [
   contact({ id: 'c-own-job', stage: 'job', name: 'Plumbing Bellevue', job_title: 'Slab and trench', amount: 33100 }),
   contact({
-    id: 'c-own-quote', stage: 'quote', name: 'Marco Castellanos', job_title: 'Pool deck pour', amount: 18458,
+    id: 'c-own-quote', stage: 'moved_quote', name: 'Marco Castellanos', job_title: 'Pool deck pour', amount: 18458,
     proposal_status: 'sent', quote_sent_at: '2026-10-07T11:00:00Z'
   }),
   contact({ ...PARTNER, id: 'c-partner-job', stage: 'job', name: 'Kessler Build', job_title: 'Barn foundation', amount: 52000, created_at: '2026-10-05T12:00:00Z' }),
   contact({
-    ...PARTNER, id: 'c-partner-quote', stage: 'quote', name: 'Whitfield Homes', job_title: 'Basement walls', amount: 27300,
+    ...PARTNER, id: 'c-partner-quote', stage: 'moved_quote', name: 'Whitfield Homes', job_title: 'Basement walls', amount: 27300,
     proposal_status: 'viewed', quote_sent_at: '2026-10-06T15:00:00Z'
   })
 ]
 
-const TABLES = { fh_contacts: CONTACTS, fh_schedule: [], fh_invoices: [], fh_payments: [] }
+const QUOTES = [
+  {
+    id: 'q-own-quote', org_id: 'org-1', user_id: 'qa-user-1', client_id: 'cl-marco',
+    title: 'Pool deck pour', amount: 18458, status: 'sent', job_id: null,
+    sent_at: '2026-10-07T11:00:00Z', created_at: '2026-09-01T12:00:00Z', updated_at: '2026-10-07T11:00:00Z',
+    fh_clients: { ...CLIENT, id: 'cl-marco', name: 'Marco Castellanos' }
+  },
+  {
+    id: 'q-partner-quote', org_id: 'org-2', user_id: 'partner-user-1', client_id: 'cl-whitfield',
+    title: 'Basement walls', amount: 27300, status: 'viewed', job_id: null,
+    sent_at: '2026-10-06T15:00:00Z', created_at: '2026-09-01T12:00:00Z', updated_at: '2026-10-06T15:00:00Z',
+    fh_clients: { ...PARTNER_CLIENT, id: 'cl-whitfield', name: 'Whitfield Homes' }
+  }
+]
+const TABLES = { fh_contacts: CONTACTS, fh_quotes: QUOTES, fh_schedule: [], fh_invoices: [], fh_payments: [] }
 
 async function open(context: BrowserContext, page: Page, path: string) {
   await signIn(context, { tables: TABLES })
@@ -94,6 +109,7 @@ test.describe('Money, Waiting on approval', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Money' })).toBeVisible({ timeout: 30_000 })
     const waiting = page.getByRole('region', { name: 'Waiting on approval' })
     await expect(waiting.getByText('Marco Castellanos', { exact: true })).toBeVisible()
+    await expect(waiting.getByRole('link').filter({ hasText: 'Marco Castellanos' })).toHaveAttribute('href', '/quotes/q-own-quote')
     await expect(waiting.getByText('Whitfield Homes', { exact: true })).toHaveCount(0)
     await expect(waiting.getByText('$27,300.00', { exact: true })).toHaveCount(0)
   })
@@ -105,18 +121,28 @@ test.describe('Money, Waiting on approval', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Money' })).toBeVisible({ timeout: 30_000 })
     const waiting = page.getByRole('region', { name: 'Waiting on approval', exact: true })
     await expect(waiting.getByText('Marco Castellanos', { exact: true })).toBeVisible()
+    await expect(waiting.getByRole('link', { name: /^Open Marco Castellanos/ })).toHaveAttribute('href', '/quotes/q-own-quote')
     await expect(waiting.getByText('Whitfield Homes', { exact: true })).toHaveCount(0)
     await expect(waiting.getByText('$27,300.00', { exact: true })).toHaveCount(0)
   })
 })
 
-// The Jobs list is meant to show a partner's shared jobs, so it keeps them.
+// A job share still authorizes the job, but not the partner company's quotes.
 test.describe('the Jobs list', () => {
-  test('still shows the partner job and quote shared with this person', async ({ context, page }) => {
+  test('keeps the shared partner job while canonical quotes stay in the active company', async ({ context, page }) => {
+    const quoteReads: URL[] = []
+    page.on('request', (request) => {
+      const url = new URL(request.url())
+      if (request.method() === 'GET' && url.pathname.endsWith('/rest/v1/fh_quotes')) quoteReads.push(url)
+    })
     await open(context, page, '/work')
     const main = page.locator('#fh-main')
     await expect(main.getByText('Plumbing Bellevue', { exact: true }).first()).toBeVisible({ timeout: 30_000 })
     await expect(main.getByText('Kessler Build', { exact: true }).first()).toBeVisible()
-    await expect(main.getByText('Whitfield Homes', { exact: true }).first()).toBeVisible()
+    await expect(main.getByRole('link', { name: /Marco Castellanos/ })).toHaveAttribute('href', '/quotes/q-own-quote')
+    await expect(main.getByText('Whitfield Homes', { exact: true })).toHaveCount(0)
+    await expect(main.locator('a[href="/quotes/q-partner-quote"]')).toHaveCount(0)
+    expect(quoteReads.length).toBeGreaterThan(0)
+    expect(quoteReads.every((url) => url.searchParams.get('org_id') === 'eq.org-1')).toBe(true)
   })
 })

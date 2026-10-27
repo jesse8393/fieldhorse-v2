@@ -28,6 +28,7 @@
 //   last one is the newest and is the cover; a payload that dates them
 //   (`uploaded_at`) is read by date instead.
 
+import { proposalIssuedAt } from './proposalDate.ts'
 import { initialsFor } from '../components/fh/Monogram.tsx'
 import { proposalNumber } from '../components/documents/numbers.ts'
 import { quoteNumber as quoteRecordNumber } from './quotes.ts'
@@ -43,6 +44,7 @@ export type PublicDocItem = {
   id?: string
   section?: string | null
   description?: string | null
+  notes?: string | null
   qty?: number | null
   unit?: string | null
   rate?: number | null
@@ -148,7 +150,7 @@ export type PublicDocPayload = {
 
 /* ---- The view ---- */
 
-export type PortalLine = { title: string; amount: number }
+export type PortalLine = { title: string; amount: number; detail?: string }
 
 /** What the job has collected so far, against the deposit the terms name. */
 export type PortalPaid = {
@@ -455,6 +457,7 @@ export function quoteFingerprint(payload: PublicDocPayload): string {
   const lines = orderedItems(payload.items).map((item) => [
     text(item.section),
     text(item.description),
+    text(item.notes),
     Number(item.qty) || 0,
     text(item.unit),
     cents(item.rate),
@@ -494,7 +497,8 @@ export function buildPortalView(payload: PublicDocPayload, now: Date): PortalVie
   const optional: PortalLine[] = []
   for (const item of items) {
     if (item.is_excluded) continue
-    const line = { title: itemTitle(item), amount: lineAmount(item) }
+    const detail = text(item.notes)
+    const line = { title: itemTitle(item), amount: lineAmount(item), ...(detail ? { detail } : {}) }
     if (item.is_optional) optional.push(line)
     else included.push(line)
   }
@@ -531,7 +535,7 @@ export function buildPortalView(payload: PublicDocPayload, now: Date): PortalVie
   // The same issue date and number the letter themes print (ProposalTemplate).
   // A quote record's number is seeded by the quote id (lib/quotes.ts); a
   // job's proposal keeps the job id as its seed.
-  const issuedIso = text(contact.quote_sent_at) || text(contact.created_at) || null
+  const issuedIso = proposalIssuedAt(contact)
   const quoteId = text(payload.quote_id)
   const contactId = text(contact.id)
   const quoteNumber = quoteId ? quoteRecordNumber(company.name, quoteId, issuedIso)

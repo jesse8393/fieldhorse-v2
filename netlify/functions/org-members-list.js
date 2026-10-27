@@ -1,16 +1,18 @@
+import { supabaseServiceConfig } from './lib/serviceConfig.js'
 // Netlify Function — List members + pending invites for the caller's org.
 // POST /api/org-members-list  { org_id? }
 // Authorization: Bearer <supabase access token>
 // The acting org comes from lib/membership.js.
 //
-// Why an edge function instead of a direct client query:
-//   public.org_members has a deliberately narrow RLS policy
-//   (`org_members_self_read`) that only permits reading the caller's
-//   OWN row. That avoids the self-recursion that took down migration
-//   033. Listing teammates therefore has to go through service-role
-//   here, which applies the role gate in JS before returning data.
+// This privileged endpoint hydrates roster identities and permits field roles
+// to see teammates while withholding management-only rates. Migration 058
+// also permits owner/admin/manager browser reads of org_members; the app uses
+// those existing policies for a limited read-only fallback when this service
+// is unavailable. Field roles must never mistake their self-only RLS result
+// for the complete team.
 
 import { createClient } from '@supabase/supabase-js'
+import { readAllRows } from './lib/pagedRows.js'
 import { emailsForUsers } from './lib/authEmails.js'
 import { resolveCallerMembership } from './lib/membership.js'
 
@@ -22,9 +24,7 @@ export default async (request) => {
     return json({ error: 'method_not_allowed' }, 405)
   }
 
-  const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-  const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
-  const ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
+  const { url: SUPABASE_URL, secretKey: SERVICE_KEY, publicKey: ANON_KEY } = supabaseServiceConfig()
   if (!SUPABASE_URL || !SERVICE_KEY || !ANON_KEY) {
     return json({ error: 'server_misconfigured' }, 500)
   }
@@ -61,12 +61,12 @@ export default async (request) => {
   const orgId = myMember.org_id
 
   // 2. List members of this org.
-  const { data: memberRows, error: memErr } = await admin
+  const { data: memberRows, error: memErr } = await readAllRows((from, to) => admin
     .from('org_members')
     .select('id, user_id, role, joined_at, revoked_at, invited_by, default_hourly_rate')
     .eq('org_id', orgId)
     .is('revoked_at', null)
-    .order('joined_at', { ascending: true })
+    .order('joined_at', { ascending: true }).order('id').range(from, to))
 
   if (memErr) { console.error('[org-members-list] member list failed', memErr); return json({ error: 'member_list_failed', message: 'Could not load the team roster. Try again shortly.' }, 500) }
 
@@ -76,11 +76,13 @@ export default async (request) => {
   const userIds = (memberRows || []).map((m) => m.user_id)
   let profilesById = {}
   if (userIds.length > 0) {
-    const { data: profs } = await admin
-      .from('profiles')
-      .select('user_id, full_name, company_name')
-      .in('user_id', userIds)
-    profilesById = Object.fromEntries((profs || []).map((p) => [p.user_id, p]))
+    for (let offset = 0; offset < userIds.length; offset += 100) {
+      const { data: profs } = await admin
+        .from('profiles')
+        .select('user_id, full_name, company_name')
+        .in('user_id', userIds.slice(offset, offset + 100))
+      Object.assign(profilesById, Object.fromEntries((profs || []).map((p) => [p.user_id, p])))
+    }
   }
   // auth.users emails for this roster only (see lib/authEmails.js).
   // Non-fatal: members render without emails if the admin API fails.
@@ -108,13 +110,15 @@ export default async (request) => {
 
   // 4. Pending invites (un-accepted, not expired).
   const nowIso = new Date().toISOString()
-  const { data: inviteRows } = await admin
+  const { data: inviteRows, error: inviteErr } = await readAllRows((from, to) => admin
     .from('org_invites')
     .select('id, email, role, expires_at, accepted_at, created_at, invited_by')
     .eq('org_id', orgId)
     .is('accepted_at', null)
     .gt('expires_at', nowIso)
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: false }).order('id').range(from, to))
+
+  if (inviteErr) console.error('[org-members-list] invite list failed', inviteErr)
 
   return json({
     ok: true,
@@ -122,6 +126,8 @@ export default async (request) => {
     org_id: orgId,
     members,
     invites: inviteRows || [],
+    invites_available: !inviteErr,
+    ...(inviteErr ? { warning: 'invites_unavailable' } : {}),
   })
 }
 

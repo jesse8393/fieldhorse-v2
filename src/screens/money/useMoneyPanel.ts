@@ -7,12 +7,10 @@
 // and puts focus back on the Money heading.
 
 import { useEffect, useRef } from 'react'
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { isMoneyPanel, type MoneyPanel } from './MoneyPanels.tsx'
 
 export function useMoneyPanel() {
-  const navigate = useNavigate()
-  const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
 
   const panelParam = searchParams.get('panel')
@@ -43,15 +41,12 @@ export function useMoneyPanel() {
     scrollBefore.current = window.scrollY
   }
 
-  // Back closes the panel the way the browser's Back would; a page opened
-  // straight on a panel has no history to go back to, so it drops the param.
+  // This control promises Money, even after changing reconciliation buckets.
+  // Browser Back retains its usual history behavior separately.
   const closePanel = () => {
-    if (location.key !== 'default') {
-      navigate(-1)
-      return
-    }
     const sp = new URLSearchParams(searchParams)
     sp.delete('panel')
+    sp.delete('bucket')
     setSearchParams(sp, { replace: true })
   }
 

@@ -259,16 +259,17 @@ export function eventStatus(
  * as the Add event sheet writes it.
  */
 export function crewHours(
-  events: { assigned_to?: string | null; start_at?: string | null; end_at?: string | null }[]
+  events: { assigned_to?: string | null; assigned_user_ids?: string[] | null; start_at?: string | null; end_at?: string | null }[]
 ): { id: string; hours: number }[] {
   const totals = new Map<string, number>()
   for (const e of events) {
-    if (!e.assigned_to) continue
+    const assigned = [...new Set([...(e.assigned_user_ids || []), ...(e.assigned_to ? [e.assigned_to] : [])])]
+    if (!assigned.length) continue
     const start = e.start_at ? Date.parse(e.start_at) : NaN
     if (!Number.isFinite(start)) continue
     const end = e.end_at ? Date.parse(e.end_at) : NaN
     const ms = Number.isFinite(end) && end > start ? end - start : 60 * 60 * 1000
-    totals.set(e.assigned_to, (totals.get(e.assigned_to) ?? 0) + ms)
+    for (const memberId of assigned) totals.set(memberId, (totals.get(memberId) ?? 0) + ms)
   }
   return [...totals.entries()]
     .map(([id, ms]) => ({ id, hours: ms / 3_600_000 }))

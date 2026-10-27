@@ -402,18 +402,6 @@
    The phone page's pieces, set for the left column
    ================================================================ */
 
-/* A mouse has no sideways swipe, so on a narrow window the tabs wrap
-   instead of scrolling out of reach. */
-.fhd-main .fhj-tabs__strip {
-  flex-wrap: wrap;
-  padding: 0;
-  overflow: visible;
-}
-
-.fhd-main .fhj-tabs__strip::after {
-  display: none;
-}
-
 .fhd-panel {
   min-width: 0;
 }

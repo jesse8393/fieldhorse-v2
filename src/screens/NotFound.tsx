@@ -11,7 +11,7 @@ export default function NotFound() {
   const { pathname } = useLocation()
   return (
     <div className="fh-build-page" data-build-screen="NotFound">
-      <main className="fh-build-main" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60dvh' }}>
+      <div className="fh-build-main" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60dvh' }}>
         <section style={{ textAlign: 'center', maxWidth: 420, padding: '32px 24px' }}>
           <Compass size={28} aria-hidden="true" style={{ color: 'var(--v3-text-muted)', marginBottom: 12 }} />
           <div className="fh-build-eyebrow">Page not found</div>
@@ -24,7 +24,7 @@ export default function NotFound() {
             Back to Home
           </Link>
         </section>
-      </main>
+      </div>
     </div>
   )
 }

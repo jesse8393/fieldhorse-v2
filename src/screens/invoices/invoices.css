@@ -293,3 +293,10 @@ a.fhinv-hero__job:focus-visible {
 .fhinv-state {
   padding: 16px var(--fh-gutter) 0;
 }
+
+.fhinv-review { padding: 16px; margin: 16px 0; border: 1px solid var(--v3-border-strong); border-radius: 10px; background: var(--v3-surface-2); }
+.fhinv-review h2 { font-size: 18px; margin: 0 0 10px; }
+.fhinv-review p, .fhinv-review li, .fhinv-review label { font-size: 14px; line-height: 1.55; }
+.fhinv-review a { display: inline-flex; align-items: center; min-height: 44px; color: var(--v3-text); }
+.fhinv-review label { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-3) 0; min-height: 44px; }
+.fhinv-review input { margin-top: 4px; width: 20px; height: 20px; flex-shrink: 0; }

@@ -4,7 +4,7 @@ import type { HTMLAttributes, ElementType } from 'react'
  * Eyebrow, canonical small label. Sentence case: the text renders as
  * typed, so callers write it the way it should read (spec 5.6).
  *
- * Replaces 50+ inline `<span style={{ fontSize: 12, fontWeight: 700,
+ * Replaces 50+ inline `<span style={{ fontSize: 'var(--fh-type-label, 14px)', fontWeight: 700,
  * letterSpacing: 0, color: ... }}>` blocks scattered across screens.
  *
  * Tone variants:
@@ -43,16 +43,16 @@ export default function Eyebrow({
 }: EyebrowProps) {
   return (
     <Component
-      className={className}
+      className={['fh-eyebrow', className].filter(Boolean).join(' ')}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
         gap: 8,
         fontFamily: 'var(--font-body)',
-        fontSize: 12,
+        fontSize: 'var(--fh-type-label, 14px)',
         fontWeight: 700,
         letterSpacing: 0,
-        lineHeight: 1,
+        lineHeight: 1.4,
         color: TONE_COLOR[tone] || TONE_COLOR.default,
         ...style
       }}

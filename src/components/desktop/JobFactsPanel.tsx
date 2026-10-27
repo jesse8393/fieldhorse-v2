@@ -139,7 +139,7 @@ export default function JobFactsPanel({
         <VaultCard
           className="fhd-vault"
           as="div"
-          label={preDealLabel ?? 'Balance'}
+          label={preDealLabel ?? 'Contract balance'}
           amount={preDealLabel ? money.contract : money.balance}
           facts={facts}
           factsLayout="rows"

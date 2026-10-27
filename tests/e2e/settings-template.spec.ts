@@ -7,7 +7,7 @@ import { signIn } from './helpers/signIn'
 
 test('the template choice offers only the four designs the database accepts', async ({ page, context }) => {
   await signIn(context)
-  await page.goto('/settings')
+  await page.goto('/settings#templates')
 
   const picker = page.locator('#templates')
   await expect(picker).toBeAttached({ timeout: 20_000 })

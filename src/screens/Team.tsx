@@ -22,6 +22,7 @@ import MiniMetric from '../components/MiniMetric.tsx'
 import { useSecondTap } from '../lib/secondTap.ts'
 import { Eyebrow } from '../components/v3'
 import PaletteKeyCap, { paletteShortcut } from '../components/desktop/PaletteKeyCap.tsx'
+import { teamLoadError } from '../lib/serviceErrors.ts'
 
 function fmtJoined(iso: string | null): string {
   if (!iso) return '\u2003'
@@ -49,42 +50,50 @@ export default function Team() {
   const [error, setError] = useState<string | null>(null)
   const [members, setMembers] = useState<OrgMember[]>([])
   const [invites, setInvites] = useState<OrgInvitePending[]>([])
+  const [readOnly, setReadOnly] = useState(false)
+  const [invitesAvailable, setInvitesAvailable] = useState(true)
 
-  // In-flight guard, overlapping triggers (membership resolve +
-  // retries) used to fire the same failing query up to 9 times.
-  const inFlight = useRef(false)
+  // A workspace switch must start a fresh request. Ignore late answers from
+  // the previous workspace and clear its rows before rendering the next one.
+  const requestId = useRef(0)
   const load = useCallback(async () => {
-    if (inFlight.current) return
-    inFlight.current = true
+    const request = ++requestId.current
     setLoading(true)
     setError(null)
+    setMembers([])
+    setInvites([])
+    setReadOnly(false)
+    setInvitesAvailable(false)
     try {
-      const res = await orgMembersList()
+      const res = await orgMembersList(orgId)
+      if (request !== requestId.current) return
+      if (orgId && res.org_id !== orgId) throw new Error('workspace_mismatch')
       setMembers(res.members || [])
       setInvites(res.invites || [])
+      setReadOnly(Boolean(res.read_only))
+      setInvitesAvailable(res.invites_available !== false)
     } catch (e: any) {
-      // Never print raw database errors to the operator (the audit
-      // caught a literal Postgres "column ... does not exist" string
-      // in this banner). Log the real error; show a human one.
+      if (request !== requestId.current) return
       console.error('[team] roster load failed', e)
-      setError("Couldn't load your team roster. Try again in a moment.")
+      setError(teamLoadError(e))
     } finally {
-      inFlight.current = false
-      setLoading(false)
+      if (request === requestId.current) setLoading(false)
     }
-  }, [])
+  }, [orgId])
 
   useEffect(() => {
-    // Only call once the membership context has resolved, avoids a
-    // 403 from the backend during the brief signed-in-but-no-membership
-    // window.
-    // Reloads when the workspace changes too.
-    if (!membershipLoading) load()
-  }, [membershipLoading, load, orgId])
+    if (!membershipLoading) void load()
+    return () => { requestId.current += 1 }
+  }, [membershipLoading, load])
 
   const activeCount = members.length
   const ownerCount = members.filter((m) => m.role === 'owner').length
   const fieldCount = members.filter((m) => m.role === 'foreman' || m.role === 'crew').length
+  const count = (value: number) => loading
+    ? <span style={{ fontSize: 16 }}>Loading</span>
+    : error
+      ? <span style={{ fontSize: 16 }}>Unavailable</span>
+      : String(value)
 
   return (
     <div className="fh-build-page" data-build-screen="Team">
@@ -116,7 +125,7 @@ export default function Team() {
         </button>
       </header>
 
-      <main className="fh-build-main">
+      <div className="fh-build-main">
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
             <div className="fh-build-good">Office</div>
@@ -128,7 +137,7 @@ export default function Team() {
             <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--v3-text)', margin: '8px 0 4px', textTransform: 'capitalize' }}>
               {role || 'No membership'}
             </p>
-            {canInviteMembers && (
+            {canInviteMembers && !readOnly && !error && !loading && (
               <button
                 type="button"
                 className="fh-build-primary-btn"
@@ -141,25 +150,32 @@ export default function Team() {
           </div>
 
           <div className="fh-build-mini-grid">
-            <MiniMetric label="Active members" value={loading ? '\u2003' : String(activeCount)} accent />
-            <MiniMetric label="Owners + admins" value={loading ? '\u2003' : String(ownerCount + members.filter((m) => m.role === 'admin').length)} />
-            <MiniMetric label="Foremen + crew" value={loading ? '\u2003' : String(fieldCount)} />
-            <MiniMetric label="Pending invites" value={loading ? '\u2003' : String(invites.length)} tone={!loading && invites.length > 0 ? 'warn' : undefined} />
+            <MiniMetric label="Active members" value={count(activeCount)} accent />
+            <MiniMetric label="Owners + admins" value={count(ownerCount + members.filter((m) => m.role === 'admin').length)} />
+            <MiniMetric label="Foremen + crew" value={count(fieldCount)} />
+            <MiniMetric label="Pending invites" value={invitesAvailable ? count(invites.length) : <span style={{ fontSize: 16 }}>Unavailable</span>} tone={!loading && !error && invites.length > 0 ? 'warn' : undefined} />
           </div>
         </section>
 
         {error && (
-          <div className="fh-build-banner is-warn" style={{ cursor: 'default' }}>
+          <div role="alert" className="fh-build-banner is-warn" style={{ cursor: 'default' }}>
             <X size={14} />
             <span>{error}</span>
             <button type="button" className="fh-build-banner__cta" onClick={load} style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer' }}>Retry →</button>
           </div>
         )}
 
+        {readOnly && (
+          <div role="status" className="fh-build-banner is-warn">
+            <span>Limited roster. Membership is verified, but names, email and management actions need workspace setup.</span>
+            <button type="button" className="fh-build-banner__cta" onClick={() => { void load() }}>Retry full roster</button>
+          </div>
+        )}
+
         <section className="fh-build-content-grid fh-build-content-grid--clients">
           <section className="fh-build-card fh-build-table">
             <header className="fh-build-card-head">
-              <div className="fh-build-eyebrow">Active members · {members.length}</div>
+              <div className="fh-build-eyebrow">Active members{!loading && !error ? ` · ${members.length}` : ''}</div>
             </header>
 
             <div className="fh-build-table__head is-team">
@@ -173,10 +189,13 @@ export default function Team() {
             {loading && (
               <div className="fh-build-table__empty">Loading team…</div>
             )}
-            {!loading && members.length === 0 && (
+            {!loading && error && (
+              <div className="fh-build-table__empty">Roster unavailable. Team membership could not be checked.</div>
+            )}
+            {!loading && !error && members.length === 0 && (
               <div className="fh-build-table__empty">No active members yet.</div>
             )}
-            {!loading && members.map((m) => (
+            {!loading && !error && members.map((m) => (
               <div key={m.id} className="fh-build-table__row is-team">
                 <strong className="fh-build-truncate" title={m.name || ''}>
                   {m.name || (m.is_self ? 'You' : '\u2003')}
@@ -188,7 +207,7 @@ export default function Team() {
                 <MemberActions
                   member={m}
                   callerRole={role}
-                  canManage={canManageTeam}
+                  canManage={canManageTeam && !readOnly}
                   onChanged={load}
                 />
               </div>
@@ -197,8 +216,13 @@ export default function Team() {
 
           <aside className="fh-build-rail fh-build-rail--page">
             <section className="fh-build-rail-card">
-              <div className="fh-build-eyebrow">Pending invites · {invites.length}</div>
-              {invites.length === 0 ? (
+              <div className="fh-build-eyebrow">Pending invites{!loading && !error && invitesAvailable ? ` · ${invites.length}` : ''}</div>
+              {loading || error || !invitesAvailable ? (
+                <>
+                  <strong>{loading ? 'Loading' : 'Unavailable'}</strong>
+                  <span>{loading ? 'Checking invitations' : 'Invitation status could not be checked'}</span>
+                </>
+              ) : invites.length === 0 ? (
                 <>
                   <strong>None</strong>
                   <span>No outstanding invitations</span>
@@ -214,7 +238,7 @@ export default function Team() {
                           {' · '}exp {fmtExpires(inv.expires_at)}
                         </span>
                       </div>
-                      {canManageTeam && (
+                      {canManageTeam && !readOnly && (
                         <button
                           type="button"
                           className="fh-build-icon-action is-danger"
@@ -258,7 +282,7 @@ export default function Team() {
             </section>
           </aside>
         </section>
-      </main>
+      </div>
 
     </div>
   )
@@ -338,9 +362,9 @@ function MemberActions({ member, callerRole, canManage, onChanged }: any) {
   }
 
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', gridColumn: '1 / -1', justifyContent: 'flex-end' }}>
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }} title="Crew hourly rate, feeds job labor cost">
-        <span style={{ color: 'var(--v3-text-muted, rgba(242, 237, 228,.5))', fontSize: 12 }}>$</span>
+        <span style={{ color: 'var(--v3-text-muted, rgba(242, 237, 228,.5))', fontSize: 14 }}>$</span>
         <input
           type="number"
           inputMode="decimal"
@@ -354,16 +378,16 @@ function MemberActions({ member, callerRole, canManage, onChanged }: any) {
           placeholder="\u2003"
           aria-label={`Hourly rate for ${member.name || member.email || 'member'}`}
           className="fh-build-select"
-          style={{ width: 56, fontSize: 12, padding: '4px 8px' }}
+          style={{ width: 88, minHeight: 44, fontSize: 16, padding: '8px' }}
         />
-        <span style={{ color: 'var(--v3-text-muted, rgba(242, 237, 228,.5))', fontSize: 12 }}>/hr</span>
+        <span style={{ color: 'var(--v3-text-muted, rgba(242, 237, 228,.5))', fontSize: 14 }}>/hr</span>
       </span>
       <select
         value={member.role}
         disabled={busy}
         onChange={(e) => changeRole(e.target.value as OrgRole)}
         className="fh-build-select"
-        style={{ fontSize: 12, padding: '4px 8px' }}
+        style={{ minHeight: 44, fontSize: 16, padding: '8px' }}
         aria-label="Change role"
       >
         <option value={member.role} style={{ textTransform: 'capitalize' }}>{member.role}</option>
@@ -377,7 +401,7 @@ function MemberActions({ member, callerRole, canManage, onChanged }: any) {
         disabled={busy}
         aria-label={removeTap.armed ? 'Tap again to remove' : 'Remove member'}
         title={removeTap.armed ? `Tap again to remove ${member.name || member.email || 'this member'}. They lose access immediately.` : 'Remove member'}
-        style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', color: 'rgba(192, 57, 43,0.8)', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, fontFamily: 'var(--font-body)' }}
+        style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', color: 'rgba(192, 57, 43,0.8)', display: 'inline-flex', alignItems: 'center', gap: 4, minHeight: 44, minWidth: 44, fontSize: 14, fontFamily: 'var(--font-body)' }}
       >
         <Trash2 size={13} />
         {removeTap.armed && <span>Tap again to remove</span>}

@@ -67,7 +67,7 @@ export default function Subs() {
   const { data: bundle, isLoading: subsLoading } = useSubsBundle(user?.id, scopeOrgId)
   const loading = membership.loading || subsLoading
   const load = useInvalidateSubs(user?.id, scopeOrgId)
-  const rows = bundle?.subs ?? []
+  const rows = useMemo(() => bundle?.subs ?? [], [bundle?.subs])
   const [q, setQ] = useState('')
   const [tradeFilter, setTradeFilter] = useState('')
 
@@ -219,7 +219,7 @@ export default function Subs() {
         }}>
           {/* Header row: section eyebrow + state chip + Add sub action */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
-            <Eyebrow tone="gold">
+            <Eyebrow as="h1" tone="gold" style={{ margin: 0 }}>
               <Hammer size={11} aria-hidden="true" />
               Sub directory
             </Eyebrow>

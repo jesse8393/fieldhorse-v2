@@ -17,7 +17,7 @@ afterAll(() => {
 vi.mock('./supabase.ts', () => ({ supabase: {} }))
 
 import { buildInvoiceList, buildMoneyView, classifyInvoice, invoiceDueNow, type MoneyRow } from './moneyView.ts'
-import type { InvoicesBundle, JobRow } from './queries.ts'
+import type { InvoicesBundle, QuoteRow } from './queries.ts'
 
 // Thursday, October 8, 2026, noon. The week runs Sunday Oct 4 to Saturday Oct 10.
 const NOW = new Date(2026, 9, 8, 12, 0, 0)
@@ -86,31 +86,25 @@ function bundle(partial: Partial<InvoicesBundle> = {}): InvoicesBundle {
   return { jobs: [job({ id: 'j1' })], payments: [], invoices: [], changeOrders: [], ...partial }
 }
 
-function quote(partial: Partial<JobRow> & { id: string }): JobRow {
+function quote(partial: Partial<QuoteRow> & { id: string }): QuoteRow {
   return {
     user_id: 'u1',
+    org_id: 'org-1',
     client_id: 'cl-2',
-    name: 'MMC Properties',
-    phone: null,
-    email: null,
-    address: null,
-    stage: 'quote',
+    title: 'Parking lot repour',
     amount: 46200,
-    job_title: 'Parking lot repour',
-    job_type: null,
-    referred_by: null,
-    proposal_status: 'sent',
-    follow_up_on: null,
-    completed_at: null,
-    quote_sent_at: new Date(2026, 9, 7, 12, 0, 0).toISOString(),
+    status: 'sent',
+    job_id: null,
+    sent_at: new Date(2026, 9, 7, 12, 0, 0).toISOString(),
     updated_at: new Date(2026, 9, 7).toISOString(),
     created_at: new Date(2026, 9, 1).toISOString(),
-    fh_clients: null,
+    fh_clients: { id: 'cl-2', name: 'MMC Properties', email: null, phone: null, address: null },
     ...partial
-  } as JobRow
+  } as QuoteRow
 }
 
-const build = (b: InvoicesBundle, quotes: JobRow[] = []) => buildMoneyView({ bundle: b, quotes, now: NOW })
+const COMPANY = { orgId: 'org-1', userId: 'u1' }
+const build = (b: InvoicesBundle, quotes: QuoteRow[] = []) => buildMoneyView({ bundle: b, quotes, now: NOW, company: COMPANY })
 const DASH = /[-–—]/
 
 describe('week and month totals', () => {
@@ -255,7 +249,7 @@ describe('overdue and due soon', () => {
     const view = build(bundle({ invoices: [invoice({ id: 'i1', due_at: '2026-10-07', title: 'Final balance' })] }))
     const row = view.overdue[0]
     expect(row.title).toBe('Harold Wickham')
-    expect(row.subline).toBe('Driveway replacement, final balance')
+    expect(row.subline).toContain('Driveway replacement, final balance · Invoice 1')
     expect(row.invoiceId).toBe('i1')
     expect(row.to).toBe('/jobs/j1?tab=financials')
   })
@@ -293,8 +287,26 @@ describe('due this week', () => {
 })
 
 describe('waiting on approval', () => {
+  it('keeps canonical quotes inside the active company even if a mixed cache includes partner rows', () => {
+    const rows = [
+      quote({ id: 'own' }),
+      quote({ id: 'coworker', user_id: 'another-member' }),
+      quote({ id: 'partner', org_id: 'org-2' }),
+      quote({ id: 'unscoped', org_id: null })
+    ]
+    expect(build(bundle(), rows).waiting.map((row) => row.id)).toEqual(['own', 'coworker'])
+    expect(buildMoneyView({ bundle: bundle(), quotes: rows, now: NOW, company: null }).waiting).toEqual([])
+    expect(buildMoneyView({ bundle: bundle(), quotes: rows, now: NOW }).waiting).toEqual([])
+  })
+
+  it('uses only the signed in person’s quotes when no company is active', () => {
+    const rows = [quote({ id: 'own', org_id: null }), quote({ id: 'other', user_id: 'someone-else', org_id: null })]
+    const view = buildMoneyView({ bundle: bundle(), quotes: rows, now: NOW, company: { userId: 'u1', orgId: null } })
+    expect(view.waiting.map((row) => row.id)).toEqual(['own'])
+  })
+
   it('writes Sent yesterday for a quote sent 1 day ago', () => {
-    const view = build(bundle(), [quote({ id: 'q1', quote_sent_at: new Date(2026, 9, 7, 12, 0, 0).toISOString() })])
+    const view = build(bundle(), [quote({ id: 'q1', sent_at: new Date(2026, 9, 7, 12, 0, 0).toISOString() })])
     expect(view.waiting).toHaveLength(1)
     expect(view.waiting[0].note).toBe('Sent yesterday')
     expect(view.waiting[0].amount).toBe(46200)
@@ -302,39 +314,41 @@ describe('waiting on approval', () => {
     expect(view.waiting[0].subline).toBe('Parking lot repour')
     expect(view.waiting[0].invoiceId).toBeNull()
     expect(view.waiting[0].canRemind).toBe(false)
-    expect(view.waiting[0].to).toBe('/quotes/q1?tab=quote')
+    expect(view.waiting[0].to).toBe('/quotes/q1')
   })
 
   it('writes Sent 4 days ago, and a date after a week', () => {
     const view = build(bundle(), [
-      quote({ id: 'q4', quote_sent_at: new Date(2026, 9, 4, 12, 0, 0).toISOString() }),
-      quote({ id: 'q9', quote_sent_at: new Date(2026, 8, 29, 12, 0, 0).toISOString() })
+      quote({ id: 'q4', sent_at: new Date(2026, 9, 4, 12, 0, 0).toISOString() }),
+      quote({ id: 'q9', sent_at: new Date(2026, 8, 29, 12, 0, 0).toISOString() })
     ])
     expect(view.waiting.find((r) => r.id === 'q4')?.note).toBe('Sent 4 days ago')
     expect(view.waiting.find((r) => r.id === 'q9')?.note).toBe('Sent Sep 29')
   })
 
   it('keeps a viewed quote waiting, as Jobs and Today do', () => {
-    const view = build(bundle(), [quote({ id: 'q1', proposal_status: 'viewed', quote_sent_at: new Date(2026, 9, 4, 12, 0, 0).toISOString() })])
+    const view = build(bundle(), [quote({ id: 'q1', status: 'viewed', sent_at: new Date(2026, 9, 4, 12, 0, 0).toISOString() })])
     expect(view.waiting[0].note).toBe('Viewed, sent 4 days ago')
   })
 
-  it('leaves out drafts, approved quotes and other stages', () => {
+  it('leaves out drafts, decided quotes and quotes already made into jobs', () => {
     const view = build(bundle(), [
-      quote({ id: 'draft', proposal_status: null }),
-      quote({ id: 'approved', proposal_status: 'approved' }),
-      quote({ id: 'changes', proposal_status: 'changes_requested' }),
-      quote({ id: 'lead', stage: 'lead' }),
-      quote({ id: 'job', stage: 'job' })
+      quote({ id: 'draft', status: 'draft' }),
+      quote({ id: 'approved', status: 'approved' }),
+      quote({ id: 'changes', status: 'changes_requested' }),
+      quote({ id: 'rejected', status: 'rejected' }),
+      quote({ id: 'expired', status: 'expired' }),
+      quote({ id: 'lost', status: 'lost' }),
+      quote({ id: 'converted', status: 'sent', job_id: 'j1' })
     ])
     expect(view.waiting).toHaveLength(0)
   })
 
   it('lists the quote that has waited longest first', () => {
     const view = build(bundle(), [
-      quote({ id: 'new', quote_sent_at: new Date(2026, 9, 7, 12, 0, 0).toISOString() }),
-      quote({ id: 'old', quote_sent_at: new Date(2026, 9, 2, 12, 0, 0).toISOString() }),
-      quote({ id: 'unknown', quote_sent_at: null })
+      quote({ id: 'new', sent_at: new Date(2026, 9, 7, 12, 0, 0).toISOString() }),
+      quote({ id: 'old', sent_at: new Date(2026, 9, 2, 12, 0, 0).toISOString() }),
+      quote({ id: 'unknown', sent_at: null })
     ])
     expect(view.waiting.map((r) => r.id)).toEqual(['old', 'new', 'unknown'])
     expect(view.waiting[2].note).toBe('Sent')
@@ -371,15 +385,16 @@ describe('margin', () => {
       ]
     }))
     expect(view.marginPct).toBe(25)
+    expect(view.marginNote).toBe('Based on 2 of 3 jobs with recorded costs')
   })
 
   it('is null when no job has a cost', () => {
     expect(build(bundle()).marginPct).toBeNull()
   })
 
-  it('keeps one wild cost from running away', () => {
+  it('does not conceal a recorded loss by capping its costs', () => {
     const view = build(bundle({ jobs: [job({ id: 'a', amount: 1000, cost: 99000 })] }))
-    expect(view.marginPct).toBe(-100)
+    expect(view.marginPct).toBe(-9800)
   })
 })
 
@@ -391,6 +406,7 @@ describe('empty and edge cases', () => {
       dueThisWeek: 0,
       monthToDate: 0,
       marginPct: null,
+      marginNote: 'Based on 0 of 0 jobs with recorded costs',
       overdue: [],
       dueSoon: [],
       waiting: [],
@@ -433,9 +449,9 @@ describe('empty and edge cases', () => {
         payments: [payment({ id: 'p', paid_on: '2026-10-01' })]
       }),
       [
-        quote({ id: 'q1', quote_sent_at: new Date(2026, 9, 7, 12).toISOString() }),
-        quote({ id: 'q2', proposal_status: 'viewed', quote_sent_at: new Date(2026, 9, 3, 12).toISOString() }),
-        quote({ id: 'q3', quote_sent_at: new Date(2025, 11, 30, 12).toISOString() })
+        quote({ id: 'q1', sent_at: new Date(2026, 9, 7, 12).toISOString() }),
+        quote({ id: 'q2', status: 'viewed', sent_at: new Date(2026, 9, 3, 12).toISOString() }),
+        quote({ id: 'q3', sent_at: new Date(2025, 11, 30, 12).toISOString() })
       ]
     )
     const rows: MoneyRow[] = [...view.overdue, ...view.dueSoon, ...view.waiting, ...view.paid]

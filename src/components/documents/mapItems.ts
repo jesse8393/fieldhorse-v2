@@ -44,7 +44,7 @@ export function mapItemsToScope(items: QuoteItem[] = []) {
   for (const it of items) {
     const amt = Number(it.amount != null ? it.amount : (Number(it.qty || 1) * Number(it.rate || 0)))
     if (it.is_excluded) {
-      exclusions.push(it.description || 'Excluded scope')
+      exclusions.push([it.description || 'Excluded scope', it.notes].filter(Boolean).join(': '))
       continue
     }
     const sectionTitle = (it.section || 'General').trim() || 'General'

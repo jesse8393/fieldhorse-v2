@@ -1,0 +1,20 @@
+.fh-communication { color:var(--v3-text); font-family:var(--font-body); min-width:0; padding:20px; border:1px solid var(--v3-border); border-radius:10px; background:var(--v3-surface); }
+.fh-communication__heading { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.fh-communication h2 { font-size:20px; margin:0; }
+.fh-communication h3 { font-size:16px; margin:10px 0 4px; }
+.fh-communication p { line-height:1.55; font-size:14px; }
+.fh-communication__note,.fh-communication__recipient { color:var(--v3-text-muted); }
+.fh-communication__filters { display:grid; grid-template-columns:minmax(0,2fr) minmax(120px,1fr); gap:12px; margin:20px 0; }
+.fh-communication__filters label { display:flex; flex-direction:column; gap:var(--space-2); font-size:14px; font-weight:600; }
+.fh-communication__filters input,.fh-communication__filters select { width:100%; min-width:0; min-height:44px; padding:var(--space-3); border-radius:var(--fh-r-control); border:1px solid var(--v3-border-strong); background:var(--v3-surface-2); color:var(--v3-text); font:inherit; font-size:16px; }
+.fh-communication__list { list-style:none; padding:0; margin:0; }
+.fh-communication__list li { padding:20px 0; border-top:1px solid var(--v3-border); }
+.fh-communication__meta { display:flex; flex-wrap:wrap; justify-content:space-between; gap:var(--space-2) 16px; color:var(--v3-text-muted); font-size:13px; line-height:1.5; }
+.fh-communication__body { white-space:pre-wrap; overflow-wrap:anywhere; }
+.fh-communication__recipient { overflow-wrap:anywhere; margin:0; }
+.fh-communication__actions { display:flex; flex-wrap:wrap; gap:8px 16px; align-items:center; }
+.fh-communication button,.fh-communication a { display:inline-flex; align-items:center; justify-content:center; min-height:44px; padding:8px 12px; border:1px solid var(--v3-border-strong); border-radius:var(--fh-r-control); background:transparent; color:var(--v3-text); font:inherit; font-size:14px; font-weight:600; text-decoration:none; cursor:pointer; }
+.fh-communication button:focus-visible,.fh-communication a:focus-visible { outline:2px solid var(--v3-primary); outline-offset:3px; }
+.fh-communication__error { color:var(--v3-danger-text); }
+.fh-communication__more { width:100%; }
+@media(max-width:420px) { .fh-communication { padding:16px; } .fh-communication__filters { grid-template-columns:1fr; } }

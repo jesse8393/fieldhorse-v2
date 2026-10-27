@@ -3,7 +3,7 @@
 // A vault card with what came in this week, what falls due this week, the
 // month so far and the margin; then four groups of rows: Overdue, Due soon,
 // Waiting on approval and Paid (the last 10 days). Every number comes from
-// what the screen already loads (the invoices bundle and the jobs list).
+// the invoices bundle and the active company's canonical quotes.
 // What an invoice still asks for comes from the one allocator in
 // invoiceSettlement.ts, and the groups and totals read every open invoice,
 // not the display list capped at 500 (Phase 8, task 5).
@@ -17,12 +17,14 @@
 // dashes of any kind. Names and titles that people typed pass through
 // untouched. Money is returned as plain numbers; the screen prints cents.
 
-import type { InvoicesBundle, JobRow } from './queries.ts'
+import type { InvoicesBundle, QuoteRow } from './queries.ts'
+import { inActiveCompany, type ActiveCompany } from './activeCompany.ts'
 import { invoiceAmountDue } from './invoices.ts'
 import { amountsDueByInvoice, isOpenInvoice, knownContractTotal, type DueInvoice } from './invoiceSettlement.ts'
 import { avgMargin } from './rollups.ts'
 import { parseDateOnly } from './dates.ts'
 import { detailRoute } from './stages.ts'
+import { invoiceReference } from './invoiceReference.ts'
 
 export type MoneyChip = { label: string; tone: 'success' | 'info' | 'danger' | 'neutral' }
 
@@ -50,6 +52,7 @@ export type MoneyView = {
   monthToDate: number
   /** Average margin of won jobs that have a cost, as a percent; null when none do. */
   marginPct: number | null
+  marginNote: string
   overdue: MoneyRow[]
   dueSoon: MoneyRow[]
   waiting: MoneyRow[]
@@ -283,7 +286,7 @@ function classify(inv: Invoice, ctx: Context): Classified {
   const row: MoneyInvoiceRow = {
     id: inv.id,
     title: customerName(job, client),
-    subline: job?.job_title ? `${job.job_title}, ${lowerFirst(title)}` : title,
+    subline: `${job?.job_title ? `${job.job_title}, ${lowerFirst(title)}` : title} · ${invoiceReference(inv)}`,
     amount: owed,
     note,
     chip,
@@ -326,29 +329,31 @@ function paidRow(p: Payment, day: Date, ctx: Context, invoices: Map<string, Invo
   }
 }
 
-function waitingRows(quotes: JobRow[], now: Date): MoneyRow[] {
+// Quotes moved to fh_quotes in migration 093. A shared job does not grant
+// access to another company's quotes; unknown scope yields no quote rows.
+function waitingRows(quotes: QuoteRow[], now: Date, company: ActiveCompany | null | undefined): MoneyRow[] {
   const waiting = quotes
     .filter((q) => {
-      const status = String(q.proposal_status || '').toLowerCase()
-      return q.stage === 'quote' && (status === 'sent' || status === 'viewed')
+      const status = String(q.status || '').toLowerCase()
+      return inActiveCompany(q, company) && !q.job_id && (status === 'sent' || status === 'viewed')
     })
-    .map((q) => ({ q, sent: parseInstant(q.quote_sent_at) }))
+    .map((q) => ({ q, sent: parseInstant(q.sent_at) }))
     // Whoever has waited longest first; a quote with no sent date last.
     .sort((a, b) => (a.sent?.getTime() ?? Infinity) - (b.sent?.getTime() ?? Infinity))
 
   return waiting.map(({ q, sent }) => {
-    const viewed = String(q.proposal_status || '').toLowerCase() === 'viewed'
+    const viewed = String(q.status || '').toLowerCase() === 'viewed'
     let note: string
     if (viewed) note = sent ? `Viewed, sent ${ago(sent, now)}` : 'Viewed'
     else note = sent ? `Sent ${ago(sent, now)}` : 'Sent'
     return {
       id: q.id,
-      title: customerName(q),
-      subline: (q.job_title || '').trim(),
+      title: customerName(null, q.fh_clients),
+      subline: (q.title || '').trim(),
       amount: Number(q.amount) || 0,
       note,
       chip: null,
-      to: detailRoute(q),
+      to: `/quotes/${q.id}`,
       invoiceId: null,
       canRemind: false
     }
@@ -356,18 +361,17 @@ function waitingRows(quotes: JobRow[], now: Date): MoneyRow[] {
 }
 
 // The margin of won jobs that have a cost. A job with no cost recorded
-// would read as 100 percent, so it is left out, and one wild cost cannot
-// pull a job below minus 100 percent. The mean itself is avgMargin's.
+// would read as 100 percent, so it is left out. Real losses may exceed
+// the contract value; do not silently cap those costs to change the result.
 function marginPct(jobs: InvoiceJob[]): number | null {
   const costed = jobs
     .filter((j) => Number(j.amount) > 0 && Number(j.cost) > 0)
-    .map((j) => ({ ...j, cost: Math.min(Number(j.cost), Number(j.amount) * 2) }))
   if (costed.length === 0) return null
   return Math.round(avgMargin(costed) * 1000) / 10
 }
 
-export function buildMoneyView(input: { bundle: InvoicesBundle; quotes: JobRow[]; now: Date }): MoneyView {
-  const { bundle, quotes, now } = input
+export function buildMoneyView(input: { bundle: InvoicesBundle; quotes: QuoteRow[]; now: Date; company?: ActiveCompany | null }): MoneyView {
+  const { bundle, quotes, now, company } = input
   const ctx = contextFor(bundle, now)
   const week = weekBounds(now)
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -413,9 +417,10 @@ export function buildMoneyView(input: { bundle: InvoicesBundle; quotes: JobRow[]
     dueThisWeek: cents(dueThisWeek),
     monthToDate: cents(monthToDate),
     marginPct: marginPct(bundle.jobs),
+    marginNote: `Based on ${bundle.jobs.filter((j) => Number(j.amount) > 0 && Number(j.cost) > 0).length} of ${bundle.jobs.length} jobs with recorded costs`,
     overdue: overdue.sort(byDue).map((e) => e.row),
     dueSoon: dueSoon.sort(byDue).map((e) => e.row),
-    waiting: waitingRows(quotes, now),
+    waiting: waitingRows(quotes, now, company),
     paid: paidList.map(({ p, day }) => paidRow(p, day, ctx, invoicesById))
   }
 }

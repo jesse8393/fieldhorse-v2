@@ -1,9 +1,9 @@
-import { forwardRef, useEffect, useRef, useState } from 'react'
+import { forwardRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { ChevronLeft, MoreHorizontal, Image as ImageIcon, Phone, MessageSquare, Navigation, Camera } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { Chip, Icon, IconButton, OnyxStage, StageRail } from '../../../components/fh'
 import { cx } from '../../../components/fh/cx.ts'
-import { handleTablistKeyDown, tabId, tabPanelId } from '../../../lib/tabs.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { navigateHrefHere } from '../../../lib/todayView.ts'
 import type { JobMoney } from '../lib/spine.ts'
@@ -110,7 +110,7 @@ export default function JobHeaderPhone({ contact, photos, money, backLabel, onBa
                 <dd>{money.paid}</dd>
               </div>
               <div className="fhj-money__item">
-                <dt>Balance</dt>
+                <dt>Contract balance</dt>
                 <dd>{money.balance}</dd>
               </div>
             </dl>
@@ -125,7 +125,7 @@ export default function JobHeaderPhone({ contact, photos, money, backLabel, onBa
             <QuickAction icon={Phone} label="Call" href={phone ? `tel:${phone}` : undefined} aria-label={phone ? `Call ${who}` : 'Call, no phone on file'} />
           </li>
           <li>
-            <QuickAction icon={MessageSquare} label="Message" href={phone ? `sms:${phone}` : undefined} aria-label={phone ? `Message ${who}` : 'Message, no phone on file'} />
+            <QuickAction icon={MessageSquare} label="Message" href={`/compose?contact=${encodeURIComponent(contact.id)}&channel=${contact?.email || !phone ? 'email' : 'sms'}`} aria-label={`Message ${who}`} />
           </li>
           <li>
             <QuickAction
@@ -167,6 +167,9 @@ function QuickAction({ icon, label, href, external, onClick, 'aria-label': ariaL
       <span className="fhj-quick__label" aria-hidden="true">{label}</span>
     </>
   )
+  if (href?.startsWith('/')) {
+    return <Link className="fhj-quick__action" to={href} aria-label={ariaLabel} onClick={() => hapticTap()}>{body}</Link>
+  }
   if (href) {
     return (
       <a
@@ -195,102 +198,36 @@ function QuickAction({ icon, label, href, external, onClick, 'aria-label': ariaL
 
 export type JobSectionTab = { id: string; label: string }
 
-// Room a tab brought into view keeps from the strip's right edge: the
-// 32 px fade plus a little, so the selected tab never sits under it. The
-// strip's scroll-padding (job-phone.css) gives the arrow keys, which
-// scroll the focused tab into view, the same room.
-const TAB_END_ROOM = 40
+const SECTION_GROUPS = [
+  { label: 'Progress', ids: ['overview', 'logs'] },
+  { label: 'Work plan', ids: ['details', 'tasks', 'schedule', 'inspections', 'selections', 'materials'] },
+  { label: 'Money', ids: ['financials', 'draws', 'expenses', 'subs', 'change_orders', 'insurance'] },
+  { label: 'Documents and people', ids: ['files', 'documents', 'messages', 'partner'] }
+]
 
-/* The job's sections as text tabs with the gold underline (decision D5).
-   Overview reads "Spine". Manual activation per lib/tabs.ts; the strip
-   scrolls sideways and keeps the selected tab in view, on load and when
-   the tabs change too. While more tabs wait past the right edge the row
-   fades there (fhj-tabs--fade), and the fade goes once the strip is
-   scrolled to its end. */
+/** Every destination is one choice away. No nested tab state to reset. */
 export const JobSectionTabs = forwardRef<HTMLDivElement, {
   tabs: JobSectionTab[]
   value: string
   onChange: (id: string) => void
   idBase: string
 }>(function JobSectionTabs({ tabs, value, onChange, idBase }, ref) {
-  const stripRef = useRef<HTMLDivElement | null>(null)
-  const [fade, setFade] = useState(false)
-  const selectedIndex = Math.max(0, tabs.findIndex((t) => t.id === value))
-  // The page builds a new tabs array on every render; the tabs as drawn,
-  // which ones and their labels, are what the effects below follow.
-  const tabsKey = tabs.map((t) => `${t.id}:${t.label}`).join('|')
-
-  // Brings the selected tab into view when it changes, and again when the
-  // tabs do: on a cold open the job draws from the saved cache before the
-  // viewer's role loads, and the money tabs (Quote, Change orders) join
-  // the strip after that, ahead of the tab a link opened.
-  useEffect(() => {
-    const strip = stripRef.current
-    if (!strip || strip.scrollWidth <= strip.clientWidth) return
-    const tab = strip.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')
-    if (!tab) return
-    const stripBox = strip.getBoundingClientRect()
-    const tabBox = tab.getBoundingClientRect()
-    if (tabBox.left < stripBox.left) {
-      strip.scrollLeft -= stripBox.left - tabBox.left + 20
-    } else if (tabBox.right > stripBox.right - TAB_END_ROOM) {
-      // The last tab lands at the strip's end, so the fade clears with it;
-      // any other stops short of the fade.
-      const last = tab.nextElementSibling?.getAttribute('role') !== 'tab'
-      strip.scrollLeft = last ? strip.scrollWidth : strip.scrollLeft + tabBox.right - stripBox.right + TAB_END_ROOM
-    }
-  }, [value, tabsKey])
-
-  // Measured on every scroll, and again when the strip or a tab changes
-  // size (a resize, or the web font arriving), since only the tabs' own
-  // boxes tell the strip's scroll width. Watched afresh only when the tabs
-  // change.
-  useEffect(() => {
-    const strip = stripRef.current
-    if (!strip) return
-    const measure = () => {
-      const room = strip.scrollWidth - strip.clientWidth
-      setFade(room > 1 && strip.scrollLeft < room - 1)
-    }
-    measure()
-    strip.addEventListener('scroll', measure, { passive: true })
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure)
-    observer?.observe(strip)
-    for (const child of Array.from(strip.children)) observer?.observe(child)
-    return () => {
-      strip.removeEventListener('scroll', measure)
-      observer?.disconnect()
-    }
-  }, [tabsKey])
-
+  const groups = SECTION_GROUPS.map(group => ({ ...group, tabs: tabs.filter(tab => group.ids.includes(tab.id)) })).filter(group => group.tabs.length)
   return (
-    <div className={cx('fhj-tabs', fade && 'fhj-tabs--fade')} ref={ref}>
-      <div
-        ref={stripRef}
-        className="fhj-tabs__strip"
-        role="tablist"
-        aria-label="Job sections"
-        onKeyDown={handleTablistKeyDown}
-      >
-        {tabs.map((t, i) => {
-          const active = t.id === value
-          return (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              id={tabId(idBase, t.id)}
-              aria-selected={active}
-              aria-controls={active ? tabPanelId(idBase, t.id) : undefined}
-              tabIndex={i === selectedIndex ? 0 : -1}
-              className={cx('fhj-tabs__tab', active && 'is-active')}
-              onClick={() => { if (!active) { hapticTap(); onChange(t.id) } }}
-            >
-              {t.id === 'overview' ? 'Spine' : t.label}
-            </button>
-          )
-        })}
-      </div>
+    <div className="fh-job-sections" ref={ref}>
+      <label className="fh-job-sections__picker" htmlFor={`${idBase}-select`}>
+        Job section
+        <select id={`${idBase}-select`} value={value} onChange={event => { hapticTap(); onChange(event.target.value) }}>
+          {groups.map(group => <optgroup key={group.label} label={group.label}>
+            {group.tabs.map(tab => <option key={tab.id} value={tab.id}>{tab.label}</option>)}
+          </optgroup>)}
+        </select>
+      </label>
+      <nav className="fh-job-sections__shortcuts" aria-label="Job shortcuts">
+        {tabs.filter(tab => ['overview', 'tasks', 'schedule', 'draws', 'files'].includes(tab.id)).map(tab => <button key={tab.id} type="button" aria-current={value === tab.id ? 'page' : undefined}
+          className={cx('fh-job-sections__link', value === tab.id && 'is-active')}
+          onClick={() => { hapticTap(); onChange(tab.id) }}>{tab.label}</button>)}
+      </nav>
     </div>
   )
 })

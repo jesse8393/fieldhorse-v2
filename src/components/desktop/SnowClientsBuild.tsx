@@ -7,7 +7,8 @@
 // a real CSV export of the current view. Search/filter stay upstream
 // in the parent screen (the topbar input drives `filtered`).
 
-import { useMemo, useState } from 'react'
+import { useId, useMemo } from 'react'
+import { useHistoryEntryState } from '../../lib/useHistoryEntryState.ts'
 import {
   ArrowDown,
   ArrowUp,
@@ -104,14 +105,14 @@ const COLUMNS = [
   columnHelper.accessor((r) => r.client.name || 'Unnamed', { id: 'name', header: 'Client' }),
   columnHelper.accessor((r) => r.status.rank, { id: 'status', header: 'Status' }),
   columnHelper.accessor((r) => r.lastTouch, { id: 'last', header: 'Last touch' }),
-  columnHelper.accessor((r) => r.outstanding, { id: 'outstanding', header: 'Open value' }),
-  columnHelper.accessor((r) => r.activeCount, { id: 'active', header: 'Active jobs' }),
+  columnHelper.accessor((r) => r.outstanding, { id: 'outstanding', header: 'Contract balance' }),
+  columnHelper.accessor((r) => r.activeCount, { id: 'active', header: 'Active work' }),
   columnHelper.accessor((r) => r.nextAction, { id: 'next', header: 'Next action' }),
 ]
 
 function toCsv(rows: ClientRow[]): string {
   return buildCsv(
-    ['Client', 'Status', 'Last activity', 'Outstanding', 'Active jobs', 'Next action', 'Phone', 'Email'],
+    ['Client', 'Status', 'Last activity', 'Contract balance', 'Active work', 'Next action', 'Phone', 'Email'],
     rows.map((r) => [
       r.client.name || 'Unnamed',
       r.status.label,
@@ -124,6 +125,13 @@ function toCsv(rows: ClientRow[]): string {
     ])
   )
 }
+
+const DEFAULT_SORT: SortingState = []
+const validSort = (value: unknown): value is SortingState => Array.isArray(value) && value.length <= 6 && value.every(item =>
+  item && ['name', 'status', 'last', 'outstanding', 'active', 'next'].includes(item.id) && typeof item.desc === 'boolean')
+const validWindow = (value: unknown): value is { key: string; count: number } => !!value && typeof value === 'object' &&
+  typeof (value as { key?: unknown }).key === 'string' && Number.isInteger((value as { count?: unknown }).count) &&
+  Number((value as { count?: unknown }).count) >= 60 && Number((value as { count?: unknown }).count) <= 100_000
 
 export default function SnowClientsBuild(props: Props) {
   const {
@@ -161,12 +169,13 @@ export default function SnowClientsBuild(props: Props) {
       : stale
         ? { label: 'Cooling', tone: 'warn', rank: 1 }
         : { label: 'Active', tone: 'good', rank: 2 }
-    const nextAction = ro.outstanding > 0 ? 'Chase invoice' : stale && isActive ? 'Follow up' : isActive ? 'On track' : 'Contact again'
+    const nextAction = ro.outstanding > 0 ? 'Review balance' : stale && isActive ? 'Follow up' : isActive ? 'Active work' : 'Contact again'
     return { client: r, status, lastTouch, outstanding: ro.outstanding, activeCount: ro.activeCount, nextAction }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [filtered, rollupFor])
 
-  const [sorting, setSorting] = useState<SortingState>([])
+  const sortDescriptionId = useId()
+  const [sorting, setSorting] = useHistoryEntryState('clients:sorting', DEFAULT_SORT, validSort)
   const table = useReactTable({
     data: enriched,
     columns: COLUMNS,
@@ -176,6 +185,11 @@ export default function SnowClientsBuild(props: Props) {
     getSortedRowModel: getSortedRowModel(),
   })
   const viewRows = table.getRowModel().rows
+  const viewKey = JSON.stringify([q, filter, sorting])
+  const initialWindow = useMemo(() => ({ key: viewKey, count: 60 }), [viewKey])
+  const [renderWindow, setRenderWindow] = useHistoryEntryState('clients:window', initialWindow, validWindow)
+  const visibleCount = renderWindow.key === viewKey ? renderWindow.count : 60
+  const visibleRows = viewRows.slice(0, visibleCount)
 
   // The Book of business line counts the same clients twice: those the
   // search and filter show, then how many of those have open jobs.
@@ -198,6 +212,7 @@ export default function SnowClientsBuild(props: Props) {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search clients..."
+            aria-label="Search clients"
           />
           <PaletteKeyCap />
         </div>
@@ -215,11 +230,11 @@ export default function SnowClientsBuild(props: Props) {
         </button>
       </header>
 
-      <main className="fh-build-main">
+      <div className="fh-build-main">
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
             <div className="fh-build-good">Office</div>
-            <h1 className="fh-build-title">Clients</h1>
+            <h1 className="fh-build-title">Customers</h1>
           </div>
 
           {/* One filter control per screen: the counted pill row below
@@ -233,7 +248,7 @@ export default function SnowClientsBuild(props: Props) {
               ) : (
                 <>
                   {filtered.length.toLocaleString()} {countNoun(filtered.length, BOOK_NOUN[filter] ?? 'client')} ·
-                  {' '}{openInView.toLocaleString()} with open jobs
+                  {' '}{openInView.toLocaleString()} with active work
                 </>
               )}
             </p>
@@ -242,7 +257,7 @@ export default function SnowClientsBuild(props: Props) {
           <div className="fh-build-mini-grid">
             <MiniMetric label="Total clients" value={loading ? pending('Loading total clients') : rows.length.toLocaleString()} />
             <MiniMetric label="Active relationships" value={loading ? pending('Loading active relationships') : String(screenStats.activeAccounts)} accent />
-            <MiniMetric label="Outstanding AR" value={loading ? pending('Loading outstanding', 72) : money(screenStats.outstanding)} tone={screenStats.outstanding > 0 ? 'warn' : undefined} />
+            <MiniMetric label="Contract balance" value={loading ? pending('Loading outstanding', 72) : money(screenStats.outstanding)} tone={screenStats.outstanding > 0 ? 'warn' : undefined} />
             <MiniMetric label="Needs follow up" value={loading ? pending('Loading follow ups') : String(needsFollowUp)} tone={needsFollowUp > 0 ? 'warn' : undefined} />
           </div>
         </section>
@@ -265,6 +280,7 @@ export default function SnowClientsBuild(props: Props) {
                 type="button"
                 className={`fh-build-pill${active ? ' is-active' : ''}`}
                 onClick={() => setFilter(f.key)}
+                aria-pressed={active}
               >
                 {f.label}
                 {!loading && <span className="fh-build-pill__count">{count}</span>}
@@ -292,10 +308,11 @@ export default function SnowClientsBuild(props: Props) {
                     className={`fh-build-sort${dir ? ' is-sorted' : ''}`}
                     onClick={header.column.getToggleSortingHandler()}
                     aria-label={`Sort by ${String(header.column.columnDef.header)}`}
-                    aria-sort={dir === 'asc' ? 'ascending' : dir === 'desc' ? 'descending' : undefined}
+                    aria-describedby={`${sortDescriptionId}-${header.id}`}
                   >
                     {String(header.column.columnDef.header)}
-                    {dir === 'asc' ? <ArrowUp size={10} /> : dir === 'desc' ? <ArrowDown size={10} /> : <ArrowUpDown size={10} className="fh-build-sort__hint" />}
+                    <span id={`${sortDescriptionId}-${header.id}`} className="fhc-vh">{dir === 'asc' ? 'Sorted ascending' : dir === 'desc' ? 'Sorted descending' : 'Not sorted'}</span>
+                    {dir === 'asc' ? <ArrowUp size={10} aria-hidden="true" /> : dir === 'desc' ? <ArrowDown size={10} aria-hidden="true" /> : <ArrowUpDown size={10} aria-hidden="true" className="fh-build-sort__hint" />}
                   </button>
                 )
               })}
@@ -308,7 +325,7 @@ export default function SnowClientsBuild(props: Props) {
             {!loading && viewRows.length === 0 && (
               <div className="fh-build-table__empty">No clients match. <button type="button" className="fh-build-inline-link" onClick={onNewClient}>+ New client</button>.</div>
             )}
-            {!loading && viewRows.slice(0, 60).map((tr) => {
+            {!loading && visibleRows.map((tr) => {
               const { client: r, status, outstanding, activeCount, nextAction } = tr.original
               return (
                 <button
@@ -330,9 +347,12 @@ export default function SnowClientsBuild(props: Props) {
               )
             })}
 
-            {!loading && viewRows.length > 60 && (
+            {!loading && viewRows.length > 0 && (
               <div className="fh-build-table__more">
-                Showing first 60 of {viewRows.length.toLocaleString()}. Sort or search to surface the rest, or Export CSV for everything.
+                <p aria-live="polite">Showing {visibleRows.length.toLocaleString()} of {viewRows.length.toLocaleString()} clients.</p>
+                {visibleRows.length < viewRows.length && <button type="button" className="fh-build-secondary-btn"
+                  onClick={() => setRenderWindow({ key: viewKey, count: visibleCount + 60 })}
+                  style={{ minHeight: 44 }}>Load more clients</button>}
               </div>
             )}
           </section>
@@ -353,7 +373,7 @@ export default function SnowClientsBuild(props: Props) {
               {loading ? railPending : (
                 <>
                   <strong>{screenStats.activeAccounts}</strong>
-                  <span>with open jobs</span>
+                  <span>with active work</span>
                 </>
               )}
             </section>
@@ -396,7 +416,7 @@ export default function SnowClientsBuild(props: Props) {
             </section>
           </aside>
         </section>
-      </main>
+      </div>
     </div>
   )
 }

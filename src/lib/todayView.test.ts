@@ -4,6 +4,7 @@ import type { HomeDashboardBundle, HomeNextAction, HomeTodayOnSite } from './hom
 import { dayHeadline, nightHeadline } from './todayHeadline.ts'
 import {
   answerCopy,
+  answerRepairPath,
   buildTodayView,
   currentForecast,
   forecastWindow,
@@ -35,8 +36,10 @@ afterAll(() => {
 const fakeDb = vi.hoisted(() => {
   type DbRow = Record<string, unknown>
   const tables: Record<string, DbRow[]> = {}
+  const requests: { table: string; calls: [string, unknown[]][] }[] = []
   function from(table: string): unknown {
     const calls: [string, unknown[]][] = []
+    requests.push({ table, calls })
     const respond = () => {
       let rows = tables[table] ?? []
       for (const [method, args] of calls) {
@@ -62,7 +65,7 @@ const fakeDb = vi.hoisted(() => {
     })
     return query
   }
-  return { tables, from }
+  return { tables, requests, from }
 })
 vi.mock('./supabase.ts', () => ({ supabase: { from: (table: string) => fakeDb.from(table) } }))
 
@@ -305,6 +308,7 @@ describe('buildTodayView', () => {
 describe('Today past six, read through the dashboard queries', () => {
   beforeEach(() => {
     for (const table of Object.keys(fakeDb.tables)) delete fakeDb.tables[table]
+    fakeDb.requests.length = 0
   })
 
   async function todayAt(now: Date) {
@@ -341,6 +345,29 @@ describe('Today past six, read through the dashboard queries', () => {
       fh_clients: { name: `Lead ${i + 1}` }
     }))
   }
+
+  it.each([
+    { orgId: 'org-1', column: 'org_id', value: 'org-1' },
+    { orgId: null, column: 'user_id', value: 'user-1' }
+  ])('reads the lead phone inside the existing $column scope and offers contact repair', async ({ orgId, column, value }) => {
+    fakeDb.tables.fh_leads = [{
+      ...quietLeads(1)[0],
+      client_id: 'client-1',
+      fh_clients: { name: 'Rosa Delgado', phone: '  ' }
+    }]
+    const now = at(8)
+    const loaded = await fetchHomeDashboard('user-1', now, orgId)
+    const item = buildTodayView({ bundle: loaded, now }).answers[0]
+    expect(item).toMatchObject({ clientId: 'client-1', contactPhone: null, verb: 'Add phone' })
+    expect(answerCopy(item, now)).toMatchObject({ title: 'Add phone for Rosa Delgado', actionLabel: 'Add phone' })
+    expect(answerRepairPath(item)).toBe('/clients/client-1?edit=contact')
+    const reads = fakeDb.requests.filter((request) => request.table === 'fh_leads')
+    expect(reads.length).toBeGreaterThan(0)
+    for (const read of reads) {
+      expect(read.calls).toContainEqual(['eq', [column, value]])
+      expect(read.calls.some(([method, args]) => method === 'select' && String(args[0]).includes('fh_clients(name, phone)'))).toBe(true)
+    }
+  })
 
   it('with eight visits reads "Eight stops." and the seventh can be the next stop', async () => {
     fakeDb.tables.fh_schedule = [...eightVisits(0), ...eightVisits(1)]
@@ -388,11 +415,11 @@ describe('Today past six, read through the dashboard queries', () => {
     expect(view.title).toEqual(['Quiet day.', '14 things before tomorrow.'])
   })
 
-  it('See all lists the 20 most urgent and the count keeps every one', async () => {
+  it('See all lists every action in urgency order', async () => {
     fakeDb.tables.fh_leads = quietLeads(25)
     const view = await todayAt(at(8))
     expect(view.answersTotal).toBe(25)
-    expect(view.seeAll).toHaveLength(20)
+    expect(view.seeAll).toHaveLength(25)
     expect(view.seeAll[0].recordId).toBe('lead-25')
     expect(view.answers.map((a) => a.id)).toEqual(view.seeAll.slice(0, 3).map((a) => a.id))
   })
@@ -521,6 +548,23 @@ describe('tomorrowLine', () => {
 
 describe('answerCopy', () => {
   const now = at(8)
+
+  it('only recommends a call when a phone is known and has a repair path for missing details', () => {
+    const due = action(1, { kind: 'followup-due', clientId: 'client-1', contactName: 'Rosa', contactPhone: '6155550101' })
+    expect(answerCopy(due, now)).toMatchObject({ title: 'Call Rosa', actionLabel: 'Nudge' })
+    expect(answerRepairPath(due)).toBeNull()
+    for (const phone of [null, undefined, '', '   ']) {
+      const missing = { ...due, contactPhone: phone }
+      expect(answerCopy(missing, now)).toMatchObject({ title: 'Add phone for Rosa', actionLabel: 'Add phone' })
+      expect(answerCopy(missing, now).subline).toContain('No phone on file')
+      expect(answerRepairPath(missing)).toBe('/clients/client-1?edit=contact')
+    }
+    // Older cached rows have no client ID. Their existing lead route can
+    // recover the details, so avoid promising a call or an editor URL.
+    const cached = action(2, { kind: 'followup-due', contactName: 'Rosa' })
+    expect(answerCopy(cached, now).title).toBe('Follow up with Rosa')
+    expect(answerRepairPath(cached)).toBeNull()
+  })
 
   it('turns an overdue invoice into a sentence with money in cents', () => {
     const copy = answerCopy(action(1, {

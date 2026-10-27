@@ -4,7 +4,7 @@ import { nothingRunsOffTheSide } from './helpers/overflow.ts'
 
 const routes = [
   { name: 'home', path: '/', ready: '[data-build-screen="SnowHomeBuild"]' },
-  { name: 'work', path: '/work', ready: '.v3-screen--work' },
+  { name: 'work', path: '/work', ready: '.fhjl--desktop' },
   // Leads and quotes live in fh_leads and fh_quotes. Until Tasks 9 and 10
   // build their screens, the route shows the record's title.
   { name: 'lead-detail', path: '/leads/l-lead1', ready: 'h1.fhl-title:has-text("Jeff Roy")' },

@@ -12,14 +12,18 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Field, SkeletonRows } from '../../components/fh'
 import CreateShell, { Choices } from '../new/CreateShell.tsx'
 import DataErrorState from '../../components/DataErrorState.tsx'
+import RecordPicker from '../../components/RecordPicker.tsx'
+import CrewAllocation from './CrewAllocation.tsx'
+import { useMembership } from '../../contexts/MembershipContext.tsx'
+import { eventAssignees, canAllocateCrew, allocationConflicts, fetchAllocationEvents, allocationWriteError } from '../../lib/scheduleAllocation.ts'
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { supabase } from '../../lib/supabase.ts'
 import { useOrgScope } from '../../lib/orgScope.ts'
-import { useInvalidateSchedule, useJobs, useLeads, useQuotes, type JobRow, type LeadRow, type QuoteRow } from '../../lib/queries.ts'
+import { useInvalidateSchedule, useCompanyJobs, useLeads, useQuotes, type JobRow, type LeadRow, type QuoteRow } from '../../lib/queries.ts'
 import { createScheduleEvents } from '../../lib/scheduleWrite.ts'
 import { toastError, toastSuccess } from '../../lib/toast.ts'
 import { todayYmd, toYmd } from '../../lib/dates.ts'
-import { localDateTimeMs, eventDurationMs } from '../../lib/scheduleDates.ts'
+import { localDateTimeMs, eventDurationMs, scheduleOccurrences } from '../../lib/scheduleDates.ts'
 import { isMovedStage } from '../../lib/stages.ts'
 import { jobLabel } from '../../lib/scheduleBoard.ts'
 import { leadName, leadNeed } from '../../lib/leadsView.ts'
@@ -38,11 +42,13 @@ type EventRow = {
   contact_id: string | null
   lead_id: string | null
   quote_id: string | null
+  assigned_to?: string | null
+  assigned_user_ids?: string[] | null
 }
 
 const REPEAT = [
   { value: 'once', label: 'One time' },
-  { value: 'series', label: 'Repeats, 4 times' }
+  { value: 'series', label: 'Recurring series' }
 ]
 
 function linkValue(link: Link): string {
@@ -69,32 +75,34 @@ function whereLine(client: { name?: string | null; address?: string | null } | n
   return [client?.name?.trim(), client?.address?.trim()].filter(Boolean).join(', ')
 }
 
-async function fetchEvent(id: string): Promise<EventRow | null> {
-  const { data, error } = await supabase
+async function fetchEvent(id: string, userId: string, orgId: string | null): Promise<EventRow | null> {
+  const query = supabase
     .from('fh_schedule')
-    .select('id, title, description, start_at, end_at, contact_id, lead_id, quote_id')
+    .select('*')
     .eq('id', id)
-    .maybeSingle()
+  const { data, error } = await (orgId ? query.eq('org_id', orgId) : query.eq('user_id', userId)).maybeSingle()
   if (error) throw error
   return (data as EventRow | null) ?? null
 }
 
 export default function EventNew() {
   const { eventId } = useParams()
+  const { user } = useAuth()
+  const orgScope = useOrgScope(user?.id)
   const [eventState, setEventState] = useState<{ status: 'loading' | 'ready' | 'missing' | 'failed'; row: EventRow | null }>(
     () => ({ status: eventId ? 'loading' : 'ready', row: null })
   )
   const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
-    if (!eventId) return
+    if (!eventId || !user?.id || orgScope === undefined) return
     let alive = true
     setEventState({ status: 'loading', row: null })
-    fetchEvent(eventId)
+    fetchEvent(eventId, user.id, orgScope)
       .then((row) => { if (alive) setEventState({ status: row ? 'ready' : 'missing', row }) })
       .catch(() => { if (alive) setEventState({ status: 'failed', row: null }) })
     return () => { alive = false }
-  }, [eventId, attempt])
+  }, [eventId, attempt, user?.id, orgScope])
 
   if (eventId && eventState.status !== 'ready') {
     return (
@@ -113,7 +121,7 @@ export default function EventNew() {
     )
   }
 
-  return <EventForm key={eventState.row?.id ?? 'new'} event={eventState.row} />
+  return <EventForm key={`${orgScope || 'personal'}:${eventState.row?.id ?? 'new'}`} event={eventState.row} />
 }
 
 function EventForm({ event }: { event: EventRow | null }) {
@@ -122,18 +130,20 @@ function EventForm({ event }: { event: EventRow | null }) {
   const { user } = useAuth()
   const [params] = useSearchParams()
   const orgScope = useOrgScope(user?.id)
+  const membership = useMembership()
+  const mayAllocate = canAllocateCrew(membership.role)
   const invalidateSchedule = useInvalidateSchedule()
 
   // The three kinds of record a visit can belong to (D53).
-  const jobsQuery = useJobs()
-  const leadsQuery = useLeads(user?.id)
-  const quotesQuery = useQuotes(user?.id)
+  const jobsQuery = useCompanyJobs()
+  const leadsQuery = useLeads(membership.canSeeFinancials ? user?.id : undefined)
+  const quotesQuery = useQuotes(membership.canSeeFinancials ? user?.id : undefined)
   const jobs = useMemo<JobRow[]>(
     () => ((jobsQuery.data ?? []) as JobRow[]).filter((j) => !isMovedStage(j.stage) && j.stage !== 'lost'),
     [jobsQuery.data]
   )
-  const leads = useMemo<LeadRow[]>(() => (leadsQuery.data ?? []).filter((l) => l.status !== 'lost'), [leadsQuery.data])
-  const quotes = useMemo<QuoteRow[]>(() => (quotesQuery.data ?? []).filter((q) => q.status !== 'lost'), [quotesQuery.data])
+  const leads = useMemo<LeadRow[]>(() => membership.canSeeFinancials ? (leadsQuery.data ?? []).filter((l) => l.status !== 'lost') : [], [leadsQuery.data, membership.canSeeFinancials])
+  const quotes = useMemo<QuoteRow[]>(() => membership.canSeeFinancials ? (quotesQuery.data ?? []).filter((q) => q.status !== 'lost') : [], [quotesQuery.data, membership.canSeeFinancials])
 
   const presetLink: Link = useMemo(() => {
     if (event) return linkFromRow(event)
@@ -154,8 +164,11 @@ function EventForm({ event }: { event: EventRow | null }) {
   const [link, setLink] = useState<Link>(presetLink)
   const [repeat, setRepeat] = useState<'once' | 'series'>('once')
   const [every, setEvery] = useState('7')
+  const [occurrences, setOccurrences] = useState('5')
+  const [duration, setDuration] = useState(() => String(eventDurationMs(event) / 60_000))
+  const [assignedIds, setAssignedIds] = useState(() => eventAssignees(event))
   const [saving, setSaving] = useState(false)
-  const [errors, setErrors] = useState<{ title?: string; when?: string; save?: string }>({})
+  const [errors, setErrors] = useState<{ title?: string; when?: string; duration?: string; recurrence?: string; save?: string }>({})
   // The where line follows the linked record until the person types one.
   const [whereTyped, setWhereTyped] = useState(!!event?.description)
 
@@ -177,7 +190,9 @@ function EventForm({ event }: { event: EventRow | null }) {
     if (line) setWhere(line)
   }, [link, leads, quotes, jobs, whereTyped])
 
-  const listsLoading = jobsQuery.isPending || leadsQuery.isPending || quotesQuery.isPending
+  const listsLoading = jobsQuery.isPending || (membership.canSeeFinancials && (leadsQuery.isPending || quotesQuery.isPending))
+
+  const visitPreview = useMemo(() => scheduleOccurrences(date, time, Number(duration), repeat === 'series' ? Number(every) : 7, repeat === 'series' ? Number(occurrences) : 1), [date, time, duration, repeat, every, occurrences])
 
   async function save() {
     if (saving) return
@@ -185,12 +200,22 @@ function EventForm({ event }: { event: EventRow | null }) {
     if (!title.trim()) next.title = 'Give the event a title.'
     const startMs = localDateTimeMs(date, time)
     if (startMs == null) next.when = 'Pick a date and a time.'
+    if (!Number.isFinite(Number(duration)) || Number(duration) <= 0) next.duration = 'Enter a duration above zero.'
+    if (!next.when && !next.duration && visitPreview.length === 0) next.recurrence = 'Use whole days and 2 to 52 visits.'
+    if (repeat === 'series' && Number(occurrences) < 2) next.recurrence = 'Choose at least two visits.'
     setErrors(next)
-    if (next.title || next.when || startMs == null) return
+    if (Object.keys(next).length || startMs == null) return
     setSaving(true)
     try {
+      if (orgScope === undefined || membership.loading) throw new Error('Your workspace is still loading. Try again shortly.')
+      if (assignedIds.length) {
+        if (!mayAllocate) throw new Error('Only an owner, admin or manager can change an assigned visit.')
+        if (!orgScope) throw new Error('Choose a company before assigning crew.')
+        const latest = await fetchAllocationEvents(orgScope, visitPreview)
+        if (allocationConflicts(visitPreview, assignedIds, latest, event?.id).length) throw new Error('A selected crew member has a scheduling conflict. Choose another time or crew.')
+      }
       if (event) {
-        // Update the one row in place, keeping the event's length. Matched
+        // Update one row with the selected duration. Matched
         // by id only: RLS scopes the company, and .select('id') turns a zero
         // row update into a visible failure.
         const { data: updated, error } = await supabase.from('fh_schedule').update({
@@ -200,9 +225,10 @@ function EventForm({ event }: { event: EventRow | null }) {
           lead_id: link?.kind === 'lead' ? link.id : null,
           quote_id: link?.kind === 'quote' ? link.id : null,
           start_at: new Date(startMs).toISOString(),
-          end_at: new Date(startMs + eventDurationMs(event)).toISOString()
+          end_at: visitPreview[0].end_at,
+          ...(mayAllocate && (assignedIds.length > 0 || eventAssignees(event).length > 0) ? { assigned_user_ids: assignedIds, assigned_to: assignedIds[0] || null } : {})
         }).eq('id', event.id).select('id')
-        if (error) throw new Error(error.message || 'Try again.')
+        if (error) throw new Error(allocationWriteError(error))
         if (!updated?.length) throw new Error('The event was not changed. Refresh and try again.')
         invalidateSchedule()
         hapticMedium()
@@ -213,9 +239,8 @@ function EventForm({ event }: { event: EventRow | null }) {
       // One hour long by default, so the Live and Done filters have a window.
       // A series shares one id in the recurring column, so the Schedule can
       // remove the whole run at once.
-      const everyDays = Math.max(1, Number(every) || 7)
       const seriesId = repeat === 'series' ? (crypto.randomUUID?.() || `series-${startMs}`) : null
-      const row = (s: number) => ({
+      const row = (visit: { start_at: string; end_at: string }) => ({
         userId: user?.id as string,
         orgId: orgScope ?? null,
         contactId: link?.kind === 'job' ? link.id : null,
@@ -223,19 +248,11 @@ function EventForm({ event }: { event: EventRow | null }) {
         quoteId: link?.kind === 'quote' ? link.id : null,
         title,
         description: where,
-        start_at: new Date(s).toISOString(),
-        end_at: new Date(s + 60 * 60 * 1000).toISOString(),
-        recurring: seriesId
+        ...visit,
+        recurring: seriesId,
+        ...(assignedIds.length ? { assignedUserIds: assignedIds } : {})
       })
-      const rows = [row(startMs)]
-      if (seriesId) {
-        // Step by calendar days so every occurrence keeps the same local
-        // start time across a daylight saving change.
-        for (let i = 1; i <= 4; i++) {
-          const s = localDateTimeMs(date, time, everyDays * i)
-          if (s != null) rows.push(row(s))
-        }
-      }
+      const rows = visitPreview.map(row)
       const result = await createScheduleEvents(rows)
       if ('error' in result) throw new Error(result.error)
       invalidateSchedule()
@@ -286,52 +303,17 @@ function EventForm({ event }: { event: EventRow | null }) {
         <Field label="Date" type="date" value={date} error={errors.when ? ' ' : undefined} onChange={(e) => setDate(e.target.value)} />
         <Field label="Time" type="time" value={time} error={errors.when} onChange={(e) => setTime(e.target.value)} />
       </div>
-      <div className="fhev-pick">
-        <label className="fhev-pick__label" htmlFor="fhev-link">Link to</label>
-        <select
-          id="fhev-link"
-          className="fhev-pick__select"
-          value={linkValue(link)}
-          disabled={saving}
-          onChange={(e) => setLink(parseLink(e.target.value))}
-        >
-          <option value="">None</option>
-          {presetMissing && link && (
-            <option value={linkValue(link)}>
-              {link.kind === 'job' ? 'This job' : link.kind === 'lead' ? 'This lead' : 'This quote'}
-            </option>
-          )}
-          {jobs.length > 0 && (
-            <optgroup label="Jobs">
-              {jobs.map((j) => {
-                const work = j.job_title?.trim()
-                return (
-                  <option key={j.id} value={`job:${j.id}`}>
-                    {jobLabel(j)}{work && work !== jobLabel(j) ? `, ${work}` : ''}
-                  </option>
-                )
-              })}
-            </optgroup>
-          )}
-          {leads.length > 0 && (
-            <optgroup label="Leads">
-              {leads.map((l) => (
-                <option key={l.id} value={`lead:${l.id}`}>{leadName(l)}, {leadNeed(l)}</option>
-              ))}
-            </optgroup>
-          )}
-          {quotes.length > 0 && (
-            <optgroup label="Quotes">
-              {quotes.map((q) => (
-                <option key={q.id} value={`quote:${q.id}`}>{q.fh_clients?.name?.trim() || 'Unnamed'}{q.title ? `, ${q.title}` : ''}</option>
-              ))}
-            </optgroup>
-          )}
-        </select>
-        <p className="fhev-pick__helper">
-          {listsLoading ? 'Loading jobs, leads and quotes.' : 'A job, a lead or a quote. The visit shows on its record.'}
-        </p>
-      </div>
+      <Field label="Duration in minutes" type="number" inputMode="numeric" min={1} value={duration} error={errors.duration} onChange={(e) => setDuration(e.target.value)} />
+      {visitPreview[0] && <p className="fhev-pick__helper">Ends {new Date(visitPreview[0].end_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</p>}
+      <RecordPicker id="fhev-link" label="Link to" value={linkValue(link)} onChange={(value) => setLink(parseLink(value))}
+        disabled={saving} loading={listsLoading} clearLabel="None" placeholder="Search customer, project or address"
+        error={jobsQuery.isError || (membership.canSeeFinancials && (leadsQuery.isError || quotesQuery.isError)) ? 'Some records could not load. Existing links remain selected.' : undefined}
+        options={[
+          ...(presetMissing && link ? [{ value: linkValue(link), label: `Linked ${link.kind}`, description: 'Unavailable in this list' }] : []),
+          ...jobs.map((j) => ({ value: `job:${j.id}`, label: jobLabel(j), description: [j.job_title, j.address, j.id.slice(0, 8)].filter(Boolean).join(' · '), group: 'Jobs' })),
+          ...(membership.canSeeFinancials ? leads.map((l) => ({ value: `lead:${l.id}`, label: leadName(l), description: [leadNeed(l), l.fh_clients?.address, l.id.slice(0, 8)].filter(Boolean).join(' · '), group: 'Leads' })) : []),
+          ...(membership.canSeeFinancials ? quotes.map((q) => ({ value: `quote:${q.id}`, label: q.fh_clients?.name?.trim() || q.title || 'Unnamed quote', description: [q.title, q.fh_clients?.address, q.id.slice(0, 8)].filter(Boolean).join(' · '), group: 'Quotes' })) : [])
+        ]} />
       <Field
         label="Where"
         value={where}
@@ -339,18 +321,21 @@ function EventForm({ event }: { event: EventRow | null }) {
         autoComplete="off"
         onChange={(e) => { setWhere(e.target.value); setWhereTyped(true) }}
       />
+      {orgScope && <CrewAllocation orgId={orgScope} visits={visitPreview} assignedIds={assignedIds} onChange={setAssignedIds} editingId={event?.id} disabled={saving} readOnly={!mayAllocate} />}
       {!editing && (
         <>
           <Choices label="Repeat" options={REPEAT} value={repeat} onChange={(v) => setRepeat(v === 'series' ? 'series' : 'once')} />
           {repeat === 'series' && (
-            <Field
-              label="Every how many days"
-              type="number"
-              inputMode="numeric"
-              min={1}
-              value={every}
-              onChange={(e) => setEvery(e.target.value)}
-            />
+            <>
+              <div className="fhev-when">
+                <Field label="Repeat every days" type="number" inputMode="numeric" min={1} step={1} value={every} onChange={(e) => setEvery(e.target.value)} />
+                <Field label="Total visits" type="number" inputMode="numeric" min={2} max={52} step={1} value={occurrences} error={errors.recurrence} onChange={(e) => setOccurrences(e.target.value)} />
+              </div>
+              <section className="fhev-preview" aria-label="Recurring visit preview">
+                <p>{visitPreview.length} visits total, including this date. Every {every || '?'} days.</p>
+                <ol>{visitPreview.map((visit) => <li key={visit.start_at}>{new Date(visit.start_at).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} until {new Date(visit.end_at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</li>)}</ol>
+              </section>
+            </>
           )}
         </>
       )}

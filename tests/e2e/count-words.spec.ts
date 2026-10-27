@@ -40,36 +40,36 @@ test.describe('Customers on a desktop', () => {
     await signIn(context, { tables: { fh_clients: [JEFF] } })
     await open(page, '/clients', '[data-build-screen="SnowClientsBuild"]')
     await expect(meta(page)).toContainText('1 client on file')
-    await expect(book(page)).toHaveText('1 client · 1 with open jobs')
+    await expect(book(page)).toHaveText('1 client · 1 with active work')
     await expect(totalCard(page)).toContainText('relationship in book')
     await expect(totalCard(page)).not.toContainText('relationships in book')
 
     // A search that finds nobody: both numbers follow it.
     await search(page).fill('zzz')
-    await expect(book(page)).toHaveText('0 clients · 0 with open jobs')
+    await expect(book(page)).toHaveText('0 clients · 0 with active work')
     await search(page).fill('')
-    await expect(book(page)).toHaveText('1 client · 1 with open jobs')
+    await expect(book(page)).toHaveText('1 client · 1 with active work')
 
     // Each filter names its clients, in the singular for one.
     await filter(page, 'Active').click()
-    await expect(book(page)).toHaveText('1 active client · 1 with open jobs')
+    await expect(book(page)).toHaveText('1 active client · 1 with active work')
     await filter(page, 'Recent').click()
-    await expect(book(page)).toHaveText('0 recent clients · 0 with open jobs')
+    await expect(book(page)).toHaveText('0 recent clients · 0 with active work')
   })
 
   test('two clients read in the plural, and a search counts only the clients it finds', async ({ context, page }) => {
     await signIn(context, { tables: { fh_clients: [JEFF, ANN] } })
     await open(page, '/clients', '[data-build-screen="SnowClientsBuild"]')
     await expect(meta(page)).toContainText('2 clients on file')
-    await expect(book(page)).toHaveText('2 clients · 1 with open jobs')
+    await expect(book(page)).toHaveText('2 clients · 1 with active work')
     await expect(totalCard(page)).toContainText('relationships in book')
 
     // Ann has no open job, so a search for her counts none.
     await search(page).fill('Ann')
-    await expect(book(page)).toHaveText('1 client · 0 with open jobs')
+    await expect(book(page)).toHaveText('1 client · 0 with active work')
     await filter(page, 'Active').click()
     await search(page).fill('')
-    await expect(book(page)).toHaveText('1 active client · 1 with open jobs')
+    await expect(book(page)).toHaveText('1 active client · 1 with active work')
   })
 })
 
@@ -115,8 +115,8 @@ test.describe('Photo upload', () => {
       route.request().method() === 'POST'
         ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ Key: 'job-photos/photo.jpg' }) })
         : route.fallback())
-    await open(page, '/jobs/c-job1?tab=files', '[role="tablist"][aria-label="Files sub-tabs"]')
-    const input = page.getByRole('tabpanel', { name: 'Photos', exact: true }).locator('input[type="file"]')
+    await open(page, '/jobs/c-job1?tab=files', '#fh-job-files-panel-photos')
+    const input = page.locator('#fh-job-files-panel-photos').locator('input[type="file"]')
 
     await input.setInputFiles([photo('slab.png')])
     const one = page.locator('[data-sonner-toast]').filter({ hasText: 'Added 1' })
@@ -229,7 +229,7 @@ test.describe('Settings', () => {
           body: '[]'
         })
       })
-      await open(page, '/settings', 'text=Clears the example clients')
+      await open(page, '/settings?section=account', 'text=Clears the example clients')
       // The first press asks; the second, beside Cancel, removes.
       await page.getByRole('button', { name: 'Remove sample data', exact: true }).click()
       await expect(page.getByRole('button', { name: 'Cancel', exact: true })).toBeVisible()

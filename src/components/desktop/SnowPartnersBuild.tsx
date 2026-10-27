@@ -11,18 +11,20 @@ import {
   ShieldOff,
   Users,
 } from 'lucide-react'
+import PartnerAccessDetails from '../PartnerAccessDetails.tsx'
 import MiniMetric from '../MiniMetric.tsx'
 import { SkeletonList } from '../Skeleton.tsx'
-
-type Counts = { all: number; pending: number; accepted: number; revoked: number }
+import type { PartnerCounts } from '../../lib/partnerView.ts'
 
 type Props = {
   rows: any[]
   filtered: any[]
   loading: boolean
+  error?: boolean
+  onRetry?: () => void
   filter: string
   setFilter: (filter: string) => void
-  counts: Counts
+  counts: PartnerCounts
   busyKey: string | null
   /** The partner whose Revoke was tapped once; the next tap revokes (D57). */
   revokeArmedKey?: string | null
@@ -59,6 +61,8 @@ export default function SnowPartnersBuild({
   rows,
   filtered,
   loading,
+  error = false,
+  onRetry,
   filter,
   setFilter,
   counts,
@@ -78,14 +82,14 @@ export default function SnowPartnersBuild({
 
   const summary = useMemo(() => {
     const jobs = rows.reduce((total, partner) => total + (partner.jobs?.length || 0), 0)
-    const activeJobs = rows.reduce((total, partner) => total + (partner.jobs || []).filter((job: any) => job.status !== 'revoked').length, 0)
+    const activeJobs = counts.acceptedShares
     const roles = new Map<string, number>()
     for (const partner of rows) {
       const role = partner.role || 'Unassigned'
       roles.set(role, (roles.get(role) || 0) + 1)
     }
     return { jobs, activeJobs, roles: Array.from(roles.entries()).sort((a, b) => b[1] - a[1]) }
-  }, [rows])
+  }, [rows, counts.acceptedShares])
 
   return (
     <div className="fh-build-page fh-partners-build" data-build-screen="SnowPartnersBuild" data-build-route="/partners">
@@ -103,7 +107,7 @@ export default function SnowPartnersBuild({
         <div className="fh-build-topbar__meta">
           <span>{rows.length.toLocaleString()} {rows.length === 1 ? 'partner' : 'partners'} on file</span>
           <span className="fh-build-vline" />
-          <span>{summary.activeJobs.toLocaleString()} active job {summary.activeJobs === 1 ? 'share' : 'shares'}</span>
+          <span>{summary.activeJobs.toLocaleString()} accepted job {summary.activeJobs === 1 ? 'share' : 'shares'}</span>
         </div>
         <button
           className="fh-build-icon-btn"
@@ -116,7 +120,7 @@ export default function SnowPartnersBuild({
         </button>
       </header>
 
-      <main className="fh-build-main">
+      <div className="fh-build-main">
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
             <div className="fh-build-good">Office</div>
@@ -125,18 +129,19 @@ export default function SnowPartnersBuild({
 
           <div className="fh-build-focus">
             <div className="fh-build-eyebrow">Access coverage</div>
-            <p><strong>{counts.accepted}</strong> accepted {counts.accepted === 1 ? 'partner' : 'partners'} across <strong>{summary.activeJobs}</strong> active job {summary.activeJobs === 1 ? 'share' : 'shares'}.</p>
+            <p><strong>{counts.accepted}</strong> {counts.accepted === 1 ? 'partner has' : 'partners have'} accepted access to <strong>{summary.activeJobs}</strong> job {summary.activeJobs === 1 ? 'share' : 'shares'}.</p>
             <Link className="fh-build-inline-link" to="/jobs">Open jobs <ChevronRight size={12} /></Link>
           </div>
 
           <div className="fh-build-mini-grid">
-            <MiniMetric label="Total partners" value={String(counts.all)} />
-            <MiniMetric label="Accepted" value={String(counts.accepted)} accent />
-            <MiniMetric label="Pending invites" value={String(counts.pending)} tone={counts.pending > 0 ? 'warn' : undefined} />
-            <MiniMetric label="Jobs shared" value={String(summary.jobs)} />
+            <MiniMetric label="Total partners" value={error ? 'Unavailable' : String(counts.all)} />
+            <MiniMetric label="Accepted partners" value={error ? 'Unavailable' : String(counts.accepted)} accent />
+            <MiniMetric label="Pending invitations" value={error ? 'Unavailable' : String(counts.pendingShares)} tone={counts.pendingShares > 0 ? 'warn' : undefined} />
+            <MiniMetric label="All job shares" value={error ? 'Unavailable' : String(summary.jobs)} />
           </div>
         </section>
 
+        {error && <div role="alert" className="fh-build-banner is-warn">Could not check partner access. <button type="button" onClick={onRetry}>Retry</button></div>}
         <div className="fh-build-filterbar" aria-label="Filter partners">
           {FILTERS.map((item) => (
             <button
@@ -147,10 +152,11 @@ export default function SnowPartnersBuild({
               aria-pressed={filter === item.id}
             >
               {item.label}
-              <span className="fh-build-pill__count">{counts[item.id as keyof Counts]}</span>
+              <span className="fh-build-pill__count">{counts[item.id as keyof PartnerCounts]}</span>
             </button>
           ))}
         </div>
+        <p className="fh-build-rel" style={{ fontSize: 14, lineHeight: 1.5 }}>Each filter counts partners with at least one job share in that status. A partner can appear in more than one filter.</p>
 
         <section className="fh-build-content-grid fh-build-content-grid--partners">
           <section className="fh-build-card fh-partners-table">
@@ -170,7 +176,7 @@ export default function SnowPartnersBuild({
 
             {loading && <div className="fh-partners-table__loading"><SkeletonList rows={6} card={false} /></div>}
 
-            {!loading && rows.length === 0 && (
+            {!loading && !error && rows.length === 0 && (
               <div className="fh-partners-table__empty">
                 <Users size={22} aria-hidden="true" />
                 <strong>No partners yet</strong>
@@ -201,21 +207,21 @@ export default function SnowPartnersBuild({
 
           <aside className="fh-build-rail fh-build-rail--page">
             <section className="fh-build-rail-card">
-              <div className="fh-build-eyebrow">Accepted</div>
+              <div className="fh-build-eyebrow">Accepted partners</div>
               <strong>{counts.accepted}</strong>
               <span>with active access</span>
             </section>
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Pending invites</div>
-              <strong className={counts.pending > 0 ? 'fh-partners-build__warn' : undefined}>{counts.pending}</strong>
-              <span>{counts.pending === 1 ? 'invite needs a response' : 'invites need a response'}</span>
+              <strong className={counts.pendingShares > 0 ? 'fh-partners-build__warn' : undefined}>{counts.pendingShares}</strong>
+              <span>{counts.pendingShares === 1 ? 'job invitation needs a response' : 'job invitations need a response'}</span>
             </section>
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Job access</div>
               <strong>{summary.activeJobs}</strong>
-              <span>active {summary.activeJobs === 1 ? 'share' : 'shares'}</span>
+              <span>accepted {summary.activeJobs === 1 ? 'share' : 'shares'}</span>
             </section>
 
             <section className="fh-build-rail-card">
@@ -229,7 +235,7 @@ export default function SnowPartnersBuild({
             </section>
           </aside>
         </section>
-      </main>
+      </div>
     </div>
   )
 }
@@ -261,13 +267,13 @@ function PartnerRow({ partner, busyKey, revokeArmed = false, onResend, onRevoke 
           const key = `${partner.email}|${job.partnerId}`
           const resending = busyKey === key
           return (
-            <div key={key}>
+            <div key={key} style={{ gridTemplateColumns: 'minmax(0, 1fr) auto 44px', minHeight: 44 }}>
               <Link to={`/jobs/${job.id}`} title={job.name || job.jobTitle || 'Untitled job'}>
                 <BriefcaseBusiness size={12} aria-hidden="true" />
                 <span>{job.name || job.jobTitle || 'Untitled job'}</span>
               </Link>
               <span className={`fh-build-dot ${statusTone(job.status)}`}>{job.status}</span>
-              {job.status !== 'revoked' && (
+              {!['revoked', 'left'].includes(job.status) && (
                 <button
                   type="button"
                   className="fh-build-icon-action"
@@ -275,10 +281,12 @@ function PartnerRow({ partner, busyKey, revokeArmed = false, onResend, onRevoke 
                   disabled={busy || resending}
                   aria-label={`Resend invite for ${job.name || job.jobTitle || 'job'}`}
                   title="Resend invite"
+                  style={{ width: 44, height: 44 }}
                 >
                   {resending ? <Check size={12} /> : <Send size={12} />}
                 </button>
               )}
+              <div style={{ gridColumn: '1 / -1', minWidth: 0 }}><PartnerAccessDetails status={job.status} role={job.role} /></div>
             </div>
           )
         })}

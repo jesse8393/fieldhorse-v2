@@ -27,7 +27,7 @@ import { SkeletonList } from '../components/Skeleton.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
 import { Eyebrow } from '../components/v3'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
-import { paymentEventTime } from '../lib/activityTime.ts'
+import { activityBucketLabel, paymentEventTime } from '../lib/activityTime.ts'
 import SnowActivityBuild from '../components/desktop/SnowActivityBuild.tsx'
 
 const PAGE_SIZE = 60
@@ -53,19 +53,6 @@ const STAGE_TONE: Record<string, any> = {
 
 // Group events by relative date bucket so the feed reads as a
 // timeline of "today / yesterday / this week / older" sections.
-function bucketLabel(d: any) {
-  if (!d) return 'Earlier'
-  const now = new Date()
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
-  const ts = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
-  const dayMs = 24 * 60 * 60 * 1000
-  if (ts === today) return 'Today'
-  if (ts === today - dayMs) return 'Yesterday'
-  if (ts > today - 7 * dayMs) return 'This week'
-  if (ts > today - 30 * dayMs) return 'This month'
-  return d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
-}
-
 function timeAt(d: any) {
   if (!d) return ''
   return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
@@ -156,6 +143,7 @@ export default function Activity() {
           when: new Date(inv.issued_at || inv.created_at),
           contact: inv.contact_id ? contactById.get(inv.contact_id) : undefined,
           contactId: inv.contact_id ?? '',
+          to: `/invoices/${inv.id}`,
           kind: 'invoice',
           icon: Receipt,
           tone: inv.status === 'paid' ? 'green' : 'gold',
@@ -175,7 +163,7 @@ export default function Activity() {
     if (!events) return null
     const buckets = new Map()
     for (const e of events) {
-      const label = bucketLabel(e.when)
+      const label = activityBucketLabel(e.when)
       if (!buckets.has(label)) buckets.set(label, [])
       buckets.get(label).push(e)
     }
@@ -257,7 +245,7 @@ export default function Activity() {
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12
           }}>
             <Sparkles size={26} aria-hidden="true" color="var(--v3-text-muted)" />
-            <div>Nothing has happened yet. Create a lead, log a payment, or send a proposal to see the timeline fill in.</div>
+            <div>No activity has been recorded yet. Stage changes, payments, invoices, and change orders will appear here.</div>
           </div>
         )}
         {grouped && grouped.map(([label, items]) => (
@@ -309,12 +297,12 @@ function EventRow({ event }: any) {
     red:     { fg: 'var(--v3-danger-text)', bg: 'rgba(192, 57, 43,0.10)', br: 'rgba(192, 57, 43,0.30)' }
   } as Record<string, any>)[event.tone || 'neutral']
 
-  const jobName = event.contact?.name || event.contact?.job_title || 'Unknown job'
+  const jobName = [event.contact?.name, event.contact?.job_title].filter(Boolean).join(' · ') || 'Record unavailable'
 
   return (
     <li>
       <Link
-        to={`/jobs/${event.contactId}`}
+        to={event.to || (event.contactId ? `/jobs/${event.contactId}` : '/jobs')}
         style={{
           display: 'grid',
           gridTemplateColumns: '36px 1fr auto',

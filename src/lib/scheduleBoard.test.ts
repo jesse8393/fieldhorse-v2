@@ -313,6 +313,10 @@ describe('eventStatus', () => {
 })
 
 describe('crewHours', () => {
+  it('counts a full visit for every crew member without double counting the legacy assignee', () => {
+    expect(crewHours([{ assigned_to: 'alice', assigned_user_ids: ['alice', 'bob'], start_at: '2026-10-28T13:00:00Z', end_at: '2026-10-28T15:00:00Z' }]))
+      .toEqual([{ id: 'alice', hours: 2 }, { id: 'bob', hours: 2 }])
+  })
   it('adds the hours each person is booked and lists the busiest first', () => {
     const rows = [
       { assigned_to: 'terrence', start_at: at(8).toISOString(), end_at: at(11).toISOString() },

@@ -9,7 +9,7 @@
 // All persistence flows through lib/rateCard.ts so Bid.jsx and any
 // future consumer pulls the same merged view via loadUserRateCard().
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Plus, Save as SaveIcon, RotateCcw, Trash2, Check } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext.tsx'
@@ -20,6 +20,7 @@ import {
   loadUserRateCard, upsertRate, resetRate
 } from '../../lib/rateCard.ts'
 import { Eyebrow } from '../v3'
+import '../../styles/settings.css'
 
 function slugify(s: any) {
   return String(s || '')
@@ -31,6 +32,7 @@ function slugify(s: any) {
 
 export default function RateCardEditor() {
   const { user } = useAuth()
+  const userId = user?.id
   const [merged, setMerged] = useState<any>({})
   const [overrides, setOverrides] = useState<any>({})
   const [loading, setLoading] = useState(true)
@@ -38,16 +40,16 @@ export default function RateCardEditor() {
   const [adding, setAdding] = useState(false)
   const [newLabel, setNewLabel] = useState('')
 
-  async function reload() {
-    if (!user?.id) return
+  const reload = useCallback(async () => {
+    if (!userId) return
     setLoading(true)
-    const { merged, overrides } = await loadUserRateCard(user!.id)
+    const { merged, overrides } = await loadUserRateCard(userId)
     setMerged(merged)
     setOverrides(overrides)
     setLoading(false)
-  }
+  }, [userId])
 
-  useEffect(() => { reload() }, [user?.id])
+  useEffect(() => { reload() }, [reload])
 
   const rows = useMemo(() => {
     const seedKeys = Object.keys(RATE_CARD)
@@ -71,7 +73,11 @@ export default function RateCardEditor() {
     setDraft((d: any) => ({
       ...d,
       [key]: {
-        ...getDraft({ key, current: merged[key] || RATE_CARD[key] }),
+        ...(d[key] || {
+          unit: (merged[key] || RATE_CARD[key])?.unit || 'lump',
+          rate_low: String((merged[key] || RATE_CARD[key])?.low ?? 0),
+          rate_high: String((merged[key] || RATE_CARD[key])?.high ?? 0),
+        }),
         [field]: value,
         dirty: true
       }
@@ -171,7 +177,7 @@ export default function RateCardEditor() {
       <div style={{
         padding: 12, borderRadius: 10,
         background: 'var(--surface-2)', border: '1px solid var(--rule)',
-        color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontSize: 12
+        color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontSize: 14
       }}>
         Loading rate card…
       </div>
@@ -179,14 +185,14 @@ export default function RateCardEditor() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div className="fh-rate-editor" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <p style={{
         margin: '-2px 0 6px',
-        fontFamily: 'var(--font-body)', fontSize: 12,
-        color: 'var(--ink-faint, var(--ink-muted))',
+        fontFamily: 'var(--font-body)', fontSize: 14,
+        color: 'var(--fh-ink-2)',
         lineHeight: 1.45
       }}>
-        These rates feed the AI bid engine and the manual fallback when AI is offline. Edit any row to override the default; reset returns it to the shipping value.
+        These rates are used for bid estimates. Each trade saves separately. Change a rate, then use its save button. Reset restores the default.
       </p>
 
       <div style={{
@@ -197,6 +203,8 @@ export default function RateCardEditor() {
       }}>
         {rows.map((row, i) => {
           const d = getDraft(row)
+          const tradeLabel = row.current?.label || TRADE_LABELS[row.key] || row.key
+          const fieldId = `rate-${row.key}`
           const isCustom = row.custom
           const isOverride = !!overrides[row.key]
           const seedLow = RATE_CARD[row.key]?.low
@@ -208,46 +216,32 @@ export default function RateCardEditor() {
             d.unit !== seedUnit
           )
           return (
-            <div
+            <fieldset
               key={row.key}
-              style={{
-                padding: '12px 12px',
-                borderTop: i === 0 ? 'none' : '1px solid var(--rule)',
-                display: 'grid',
-                gridTemplateColumns: '1fr',
-                gap: 8
-              }}
+              className="fh-rate-editor__trade"
+              style={{ borderTop: i === 0 ? 'none' : '1px solid var(--rule)' }}
             >
-              {/* Row 1, label + badges */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{
-                  flex: 1, minWidth: 0,
-                  fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
-                  color: 'var(--ink-strong)',
-                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-                }}>
-                  {row.current?.label || TRADE_LABELS[row.key] || row.key}
-                </span>
+              <legend>{tradeLabel} rates</legend>
+              <div className="fh-rate-editor__badges">
                 {isCustom && (
                   <Eyebrow style={{ padding: '4px 8px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-muted)' }}>
                     Custom
                   </Eyebrow>
                 )}
                 {isOverride && !isCustom && (
-                  <Eyebrow style={{ padding: '4px 8px', borderRadius: 10, background: 'rgba(201,150,58,0.14)', border: '1px solid rgba(201,150,58,0.35)', color: 'var(--field-gold-bright, var(--field-gold, #C9963A))' }}>
+                  <Eyebrow style={{ padding: '4px 8px', borderRadius: 10, background: 'rgba(201,150,58,0.14)', border: '1px solid rgba(201,150,58,0.35)', color: 'var(--fh-gold-ink)' }}>
                     Customized
                   </Eyebrow>
                 )}
               </div>
 
               {/* Row 2, unit / low / high inputs */}
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: '90px 1fr 1fr auto',
-                gap: 8,
-                alignItems: 'center'
-              }}>
+              <div className="fh-rate-editor__fields">
+                <label htmlFor={`${fieldId}-unit`}>
+                  <span>Unit</span>
                 <select
+                  id={`${fieldId}-unit`}
+                  aria-label={`${tradeLabel} unit`}
                   value={d.unit}
                   onChange={(e) => setField(row.key, 'unit', e.target.value)}
                   disabled={d.saving}
@@ -256,7 +250,12 @@ export default function RateCardEditor() {
                   {RATE_UNITS.includes(d.unit) ? null : <option value={d.unit}>{d.unit}</option>}
                   {RATE_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
                 </select>
+                </label>
+                <label htmlFor={`${fieldId}-low`}>
+                  <span>Low price ($)</span>
                 <input
+                  id={`${fieldId}-low`}
+                  aria-label={`${tradeLabel} low price ($)`}
                   type="number"
                   inputMode="decimal"
                   min={0}
@@ -267,7 +266,12 @@ export default function RateCardEditor() {
                   placeholder="Low"
                   style={cellInput}
                 />
+                </label>
+                <label htmlFor={`${fieldId}-high`}>
+                  <span>High price ($)</span>
                 <input
+                  id={`${fieldId}-high`}
+                  aria-label={`${tradeLabel} high price ($)`}
                   type="number"
                   inputMode="decimal"
                   min={0}
@@ -278,14 +282,16 @@ export default function RateCardEditor() {
                   placeholder="High"
                   style={cellInput}
                 />
-                <div style={{ display: 'flex', gap: 4 }}>
+                </label>
+                <div className="fh-rate-editor__actions">
                   {d.dirty && (
                     <motion.button
                       type="button"
                       whileTap={{ scale: 0.95 }}
                       onClick={() => { hapticTap(); save(row) }}
                       disabled={d.saving}
-                      aria-label="Save rate"
+                      aria-label={`Save ${tradeLabel} rate`}
+                      title={`Save ${tradeLabel} rate`}
                       style={iconBtn('primary', d.saving)}
                     >
                       {d.saving ? <Check size={14} /> : <SaveIcon size={14} />}
@@ -297,7 +303,8 @@ export default function RateCardEditor() {
                       whileTap={{ scale: 0.95 }}
                       onClick={() => { hapticTap(); revert(row) }}
                       disabled={d.saving}
-                      aria-label={isCustom ? 'Delete trade' : 'Reset to default'}
+                      aria-label={isCustom ? `Delete ${tradeLabel} trade` : `Reset ${tradeLabel} to default`}
+                      title={isCustom ? `Delete ${tradeLabel} trade` : `Reset ${tradeLabel} to default`}
                       style={iconBtn('muted', d.saving)}
                     >
                       {isCustom ? <Trash2 size={14} /> : <RotateCcw size={14} />}
@@ -309,14 +316,14 @@ export default function RateCardEditor() {
               {/* Seed hint when overridden */}
               {showSeed && (
                 <div style={{
-                  fontFamily: 'var(--font-body)', fontSize: 12,
-                  color: 'var(--ink-faint, var(--ink-muted))',
+                  fontFamily: 'var(--font-body)', fontSize: 14,
+                  color: 'var(--fh-ink-2)',
                   fontVariantNumeric: 'tabular-nums'
                 }}>
                   Default · {seedUnit} · ${seedLow} to ${seedHigh}
                 </div>
               )}
-            </div>
+            </fieldset>
           )
         })}
       </div>
@@ -337,6 +344,7 @@ export default function RateCardEditor() {
             type="text"
             value={newLabel}
             onChange={(e) => setNewLabel(e.target.value)}
+            aria-label="New trade name"
             placeholder="e.g. Cabinet install"
             autoFocus
             style={cellInput}
@@ -346,10 +354,10 @@ export default function RateCardEditor() {
             onClick={() => { hapticTap(); addCustom() }}
             disabled={!newLabel.trim()}
             style={{
-              padding: '8px 12px', borderRadius: 10, border: 'none',
+              minHeight: 44, padding: '8px 12px', borderRadius: 10, border: 'none',
               background: 'var(--field-gold, #C9963A)',
               color: 'var(--on-gold, #141414)',
-              fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
+              fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700,
               letterSpacing: 0,
               cursor: newLabel.trim() ? 'pointer' : 'wait',
               opacity: newLabel.trim() ? 1 : 0.5
@@ -361,7 +369,7 @@ export default function RateCardEditor() {
             type="button"
             onClick={() => { setAdding(false); setNewLabel('') }}
             style={iconBtn('muted', false)}
-            aria-label="Cancel"
+            aria-label="Cancel adding trade"
           >
             ✕
           </button>
@@ -376,7 +384,7 @@ export default function RateCardEditor() {
             border: '1px dashed var(--rule)',
             background: 'transparent',
             color: 'var(--ink-muted)',
-            fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600,
+            fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600,
             cursor: 'pointer',
             display: 'inline-flex', alignItems: 'center', gap: 8,
             alignSelf: 'flex-start'
@@ -399,6 +407,8 @@ const cellInput: import('react').CSSProperties = {
   fontSize: 14,
   outline: 'none',
   width: '100%',
+  minWidth: 0,
+  minHeight: 44,
   boxSizing: 'border-box',
   fontVariantNumeric: 'tabular-nums'
 }
@@ -414,7 +424,7 @@ function iconBtn(tone: any, busy: any) {
     ? { bg: 'var(--field-gold, #C9963A)', fg: 'var(--on-gold, #141414)', border: 'rgba(201,150,58,0.4)' }
     : { bg: 'var(--surface-2)', fg: 'var(--ink-muted)', border: 'var(--rule)' }
   return {
-    width: 32, height: 32, borderRadius: 10,
+    width: 44, height: 44, borderRadius: 10,
     background: palette.bg,
     border: `1px solid ${palette.border}`,
     color: palette.fg,

@@ -1,5 +1,6 @@
 import { lazy, Suspense, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 const SnowClientDetailBuild = lazy(() => import('../components/desktop/SnowClientDetailBuild.tsx'))
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
@@ -12,10 +13,13 @@ import {
 import { hapticTap, hapticMedium, hapticError } from '../lib/haptics.ts'
 import { SkeletonList } from '../components/Skeleton.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
+import CustomerBlockers from '../components/CustomerBlockers.tsx'
 import { SegmentedTabs, Eyebrow, StampNumber } from '../components/v3'
 import { tabPanelProps } from '../lib/tabs.ts'
 import { supabase } from '../lib/supabase.ts'
 import { useClientDetail, useInvalidateClientDetail, useInvalidateClients } from '../lib/queries.ts'
+import { homeDashboardKey } from '../lib/homeDashboard.ts'
+import { useOrgScope } from '../lib/orgScope.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { toastError, toastInfo } from '../lib/toast.ts'
 import { stageColor, stageLabel } from '../lib/stages.ts'
@@ -52,7 +56,10 @@ const TABS = [
 export default function ClientDetail() {
   const { id } = useParams()
   const { user } = useAuth()
+  const queryClient = useQueryClient()
+  const orgId = useOrgScope(user?.id)
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
 
   const { data: bundle, isPending: loading, isError, refetch } = useClientDetail(id, user?.id)
   const invalidateClientDetail = useInvalidateClientDetail()
@@ -61,18 +68,18 @@ export default function ClientDetail() {
   // change here so a deleted, renamed or edited client isn't stale there.
   const invalidateClients = useInvalidateClients()
   const client = bundle?.client ?? null
-  const jobs = bundle?.jobs ?? []
+  const jobs = useMemo(() => bundle?.jobs ?? [], [bundle?.jobs])
   const leads = bundle?.leads ?? []
   const quotes = bundle?.quotes ?? []
   const invoices = bundle?.invoices ?? []
   const notes = bundle?.notes ?? []
   const files = bundle?.files ?? []
-  const payments = bundle?.payments ?? []
-  const changeOrders = bundle?.changeOrders ?? []
+  const payments = useMemo(() => bundle?.payments ?? [], [bundle?.payments])
+  const changeOrders = useMemo(() => bundle?.changeOrders ?? [], [bundle?.changeOrders])
   const [tab, setTab] = useState('overview')
   // Every row on the Projects tab opens its own record (D53).
   const openRecord = (kind: RecordKind, recordId: string) => navigate(recordRoute(kind, recordId))
-  const [isEditing, setIsEditing] = useState(false)
+  const [isEditing, setIsEditing] = useState(() => searchParams.get('edit') === 'contact')
   // Deleting the client takes a second tap on the same button (D57).
   const deleteTap = useSecondTap()
   const [deleting, setDeleting] = useState(false)
@@ -136,6 +143,10 @@ export default function ClientDetail() {
     }
     await fetchClient()
     void invalidateClients()
+    // Today's follow up actions read the customer's current phone.
+    if (user?.id && orgId !== undefined) {
+      void queryClient.invalidateQueries({ queryKey: homeDashboardKey(user.id, orgId) })
+    }
     setIsEditing(false)
   }
 
@@ -585,6 +596,8 @@ function CockpitMetric({ label, tone = 'default', size = 'md', children }: any) 
 function OverviewRead({ client, lifetime, outstanding, activeCount, jobs = [], payments = [], onJump }: any) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 0 24px' }}>
+
+      <CustomerBlockers clientId={client.id} jobs={jobs} />
 
       {/* PIPELINE DISTRIBUTION, counts + value per stage, jumps to Projects */}
       {jobs.length > 0 && (

@@ -346,7 +346,7 @@ export function tomorrowLine(tomorrow: HomeTodayOnSite[], forecast?: unknown): s
 
 /* ---------------- Needs an answer ---------------- */
 
-export type AnswerAction = 'Remind' | 'Nudge' | 'Reply' | 'Schedule' | 'Close job'
+export type AnswerAction = 'Remind' | 'Nudge' | 'Reply' | 'Schedule' | 'Close job' | 'Add phone'
 export type AnswerDot = 'danger' | 'neutral' | 'info'
 export type AnswerCopy = { title: string; subline: string; actionLabel: AnswerAction; dot: AnswerDot }
 
@@ -363,6 +363,12 @@ function dayCount(n: number): string {
 function sentence(parts: (string | null | false)[]): string {
   const text = parts.filter(Boolean).join(', ')
   return text.charAt(0).toUpperCase() + text.slice(1)
+}
+
+/** Missing lead contact details open the existing customer editor. */
+export function answerRepairPath(action: HomeNextAction): string | null {
+  if (action.kind !== 'followup-due' || action.recordKind !== 'lead' || action.contactPhone?.trim() || !action.clientId) return null
+  return `/clients/${encodeURIComponent(action.clientId)}?edit=contact`
 }
 
 /**
@@ -389,10 +395,12 @@ export function answerCopy(action: HomeNextAction, now: Date): AnswerCopy {
       return { title: `Follow up with ${name}`, subline: sentence([money, `quiet for ${days}`]), actionLabel: 'Nudge', dot }
     case 'followup-due': {
       const late = Math.round(Number.isNaN(elapsed) ? 0 : elapsed)
+      const hasPhone = !!action.contactPhone?.trim()
+      const repair = answerRepairPath(action)
       return {
-        title: `Call ${name}`,
-        subline: sentence([money, late <= 0 ? 'follow up is due today' : `follow up was due ${dayCount(late)} ago`]),
-        actionLabel: 'Nudge',
+        title: hasPhone ? `Call ${name}` : repair ? `Add phone for ${name}` : `Follow up with ${name}`,
+        subline: sentence([money, !hasPhone && 'no phone on file', late <= 0 ? 'follow up is due today' : `follow up was due ${dayCount(late)} ago`]),
+        actionLabel: repair ? 'Add phone' : 'Nudge',
         dot
       }
     }

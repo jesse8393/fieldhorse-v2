@@ -6,8 +6,8 @@
 // Waiting on approval and Paid, with the columns Customer, Job, Amount,
 // Status and Action. A click on an invoice row opens the invoice's screen,
 // /invoices/:id, where Send, PDF, Collect payment and Void live; Remind
-// opens /invoices/:id/remind; a quote or payment row opens its job (D57,
-// D62). New invoice opens /invoices/new.
+// opens /invoices/:id/remind; quotes open /quotes/:id and payments open
+// their job (D57, D62). New invoice opens /invoices/new.
 //
 // The old desktop page kept its aging summary, the Outstanding and All
 // filter, who owes you with statements, per job balances with Log payment,
@@ -23,13 +23,17 @@
 // ?panel= link: no $0.00 stands in for money that has not loaded.
 
 import { useMemo } from 'react'
+import { buildMoneyReconciliation } from '../../lib/moneyReconciliation.ts'
+import { ReconciliationLinks, ReconciliationPanel } from '../../screens/money/Reconciliation.tsx'
 import { Link, useNavigate } from 'react-router-dom'
 import { ChevronRight, Plus, Receipt } from 'lucide-react'
 import { ArrowLeft } from 'lucide-react'
 import { Button, EmptyState, IconButton, Skeleton, SkeletonRows, VaultCard, formatMoney } from '../fh'
 import Monogram from '../fh/Monogram.tsx'
 import { useProfile } from '../../contexts/ProfileContext.tsx'
-import { useCompanyJobs } from '../../lib/queries.ts'
+import { useAuth } from '../../contexts/AuthContext.tsx'
+import DataErrorState from '../DataErrorState.tsx'
+import { useActiveCompany, useQuotes } from '../../lib/queries.ts'
 import { buildInvoiceList, buildMoneyView } from '../../lib/moneyView.ts'
 import { PANEL_TITLES, plural } from '../../screens/money/MoneyPanels.tsx'
 import { useMoneyPanel } from '../../screens/money/useMoneyPanel.ts'
@@ -58,16 +62,19 @@ export default function SnowInvoicesBuild({
   onPayRow
 }: SnowInvoicesBuildProps) {
   const { profile } = useProfile()
+  const { user } = useAuth()
   const navigate = useNavigate()
-  const jobsQuery = useCompanyJobs()
+  const company = useActiveCompany()
+  const quotesQuery = useQuotes(user?.id)
   const { panel, titleRef, panelHref, openPanel, closePanel } = useMoneyPanel()
 
-  const waiting = loading || jobsQuery.isLoading
+  const waiting = loading || quotesQuery.isPending || !company
   const view = useMemo(
-    () => (bundle ? buildMoneyView({ bundle, quotes: jobsQuery.data ?? [], now }) : null),
-    [bundle, jobsQuery.data, now]
+    () => (bundle ? buildMoneyView({ bundle, quotes: quotesQuery.data ?? [], company, now }) : null),
+    [bundle, quotesQuery.data, company, now]
   )
   const invoiceList = useMemo(() => (bundle ? buildInvoiceList({ bundle, now }) : []), [bundle, now])
+  const reconciliation = useMemo(() => bundle ? buildMoneyReconciliation(bundle, jobBalances, now) : [], [bundle, jobBalances, now])
   const openInvoiceCount = useMemo(
     () => invoiceList.filter((r) => r.status === 'draft' || r.status === 'sent' || r.status === 'overdue').length,
     [invoiceList]
@@ -89,7 +96,7 @@ export default function SnowInvoicesBuild({
           <IconButton variant="paper" icon={ArrowLeft} size={48} shape="square" aria-label="Back to Money" onClick={closePanel} />
           <h1 className="fhmd-title" ref={titleRef} tabIndex={-1}>{PANEL_TITLES[panel]}</h1>
         </header>
-        <main className="fhmd-main">
+        <div className="fhmd-main">
           {loading || !bundle ? (
             // Opened by its URL before the bundle arrived, or before it was
             // even asked for while the company is unknown: no empty table
@@ -99,6 +106,7 @@ export default function SnowInvoicesBuild({
             </div>
           ) : (
             <>
+              {panel === 'reconciliation' && <ReconciliationPanel groups={reconciliation} />}
               {panel === 'statements' && <StatementsTable groups={clientAR} onStatement={onStatement} />}
               {panel === 'invoices' && (
                 <InvoicesTable rows={invoiceList} filter={filter} onFilterChange={onFilterChange} onOpenInvoice={openInvoice} />
@@ -116,7 +124,7 @@ export default function SnowInvoicesBuild({
               )}
             </>
           )}
-        </main>
+        </div>
       </div>
     )
   }
@@ -131,7 +139,7 @@ export default function SnowInvoicesBuild({
         </div>
       </header>
 
-      <main className="fhmd-main">
+      <div className="fhmd-main">
         <div className="fhmd-top">
           <div className="fhmd-vault">
             {waiting || !view ? (
@@ -143,11 +151,12 @@ export default function SnowInvoicesBuild({
                 facts={[
                   { label: 'Due this week', value: view.dueThisWeek },
                   { label: `${month} so far`, value: view.monthToDate },
-                  { label: 'Margin', value: view.marginPct == null ? 'None yet' : `${view.marginPct.toFixed(1)}%` }
+                  { label: 'Tracked margin', value: view.marginPct == null ? 'None yet' : `${view.marginPct.toFixed(1)}%` }
                 ]}
                 corner={<Monogram name={profile?.company_name} logoUrl={profile?.logo_url} size={32} />}
               />
             )}
+            {!pending && view && <p className="fhmd-quiet">{view.marginNote}. Untracked costs excluded.</p>}
           </div>
           {pending ? (
             <Skeleton shape="block" height={222} className="fhmd-aging__skel" />
@@ -156,6 +165,7 @@ export default function SnowInvoicesBuild({
           )}
         </div>
 
+        {!pending && <ReconciliationLinks groups={reconciliation} />}
         {pending ? (
           <div className="fhmd-more" aria-hidden="true">
             {['statements', 'invoices', 'balances'].map((id) => (
@@ -226,6 +236,7 @@ export default function SnowInvoicesBuild({
             {!hasDue && openInvoiceCount > 0 && (
               <p className="fhmd-quiet">Nothing is due in the next 7 days. The rest are in All invoices above.</p>
             )}
+            {quotesQuery.isError && <DataErrorState title="Could not load quotes waiting on approval" actionLabel="Try again" onRetry={() => { void quotesQuery.refetch() }} />}
             {view.waiting.length > 0 && (
               <GroupTable
                 id="waiting"
@@ -248,7 +259,7 @@ export default function SnowInvoicesBuild({
             )}
           </>
         )}
-      </main>
+      </div>
     </div>
   )
 }

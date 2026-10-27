@@ -21,6 +21,7 @@
 // Nothing here sends anything: every send route is answered by a stub.
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
+import { restResponse } from '../../scripts/qa-mock.mjs'
 
 const NOW = Date.now()
 const DAY = 86400000
@@ -112,6 +113,19 @@ async function openJobs(page: Page) {
   await expect(page.getByRole('heading', { level: 1, name: 'Jobs' })).toBeVisible({ timeout: 30_000 })
 }
 
+/** Lost jobs stay out of All until the operator enables the explicit filter. */
+async function openLostDealCard(page: Page) {
+  await openJobs(page)
+  const card = page.getByRole('article').filter({ has: page.getByRole('button', { name: 'Actions for Old Mill HOA', exact: true }) })
+  await expect(card).toHaveCount(0)
+  const lost = page.getByRole('group', { name: 'Filter and sort' }).getByRole('switch', { name: 'Show lost jobs' })
+  await expect(lost).toHaveAttribute('aria-checked', 'false')
+  await lost.click()
+  await expect(lost).toHaveAttribute('aria-checked', 'true')
+  await expect(card).toBeVisible({ timeout: 30_000 })
+  return card
+}
+
 async function openJob(page: Page, path: string) {
   await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 60_000 })
   await expect(page.locator('.fhj-page')).toBeVisible({ timeout: 30_000 })
@@ -183,6 +197,8 @@ function quoteRow(over: Record<string, unknown> = {}) {
 }
 
 // The closed job's closeout record: sign off, warranty and notes.
+const LOST_JOB_HISTORY = [{ id: 'st-lost-job', contact_id: 'c-lost', user_id: 'qa-user-1', from_stage: 'quote', to_stage: 'job', created_at: iso(NOW - 30 * DAY) }]
+
 const CLOSEOUT = {
   id: 'co1', user_id: 'qa-user-1', contact_id: 'c-done', warranty_start_date: '2026-09-20', warranty_months: 12,
   signoff_method: 'verbal', signoff_name: 'Danielle Ortiz', notes: 'Walkthrough done.', final_amount: 9600, created_at: iso(NOW - 20 * DAY)
@@ -197,18 +213,29 @@ const NO_LOCATION_PROFILE = [{
 test.describe('Reopen asks first, like Mark lost', () => {
   test('the deal card asks with a second tap, and leaving it alone writes nothing', async ({ context, page }, testInfo) => {
     test.skip(isPhone(testInfo.project.name), 'Desktop deal cards')
-    await signIn(context)
+    await signIn(context, { tables: { fh_stage_transitions: LOST_JOB_HISTORY } })
+    // The shared REST mock acknowledges PATCH without saving it. Keep this
+    // context's contact rows mutable so the post-save refetch can prove the
+    // reopened job remains visible in the Jobs group.
+    const contacts = JSON.parse(restResponse('https://qa-mock.supabase.co/rest/v1/fh_contacts').body)
+    await context.route((url) => url.pathname.endsWith('/rest/v1/fh_contacts'), async (route) => {
+      const request = route.request()
+      const url = new URL(request.url())
+      if (request.method() === 'PATCH' && url.searchParams.get('id') === 'eq.c-lost' && url.searchParams.get('user_id') === 'eq.qa-user-1') {
+        Object.assign(contacts.find((row: { id: string }) => row.id === 'c-lost'), request.postDataJSON())
+      }
+      const response = restResponse(request.url(), { method: request.method(), headers: request.headers(), tables: { fh_contacts: contacts } })
+      await route.fulfill({ status: response.status, contentType: 'application/json', body: response.body, headers: response.headers })
+    })
     const patches = watchPatches(page, 'fh_contacts')
-    await page.goto('/work', { waitUntil: 'domcontentloaded', timeout: 60_000 })
-    const card = page.locator('.fh-deal-card', { hasText: 'Old Mill HOA' })
-    await expect(card).toBeVisible({ timeout: 30_000 })
+    const card = await openLostDealCard(page)
 
     // Reopen in the menu arms a Tap again button on the card; no dialog.
-    await card.getByRole('button', { name: 'Deal actions' }).click()
+    await card.getByRole('button', { name: 'Actions for Old Mill HOA', exact: true }).click()
     await page.getByRole('menuitem', { name: 'Reopen' }).click()
     const again = card.getByRole('button', { name: 'Tap again to reopen' })
     await expect(again).toBeVisible()
-    await expect(card).toContainText('It moves back to Leads.')
+    await expect(card).toContainText('It moves back to Jobs.')
     await expect(page.getByRole('alertdialog')).toHaveCount(0)
     await page.waitForTimeout(300)
     expect(patches).toEqual([])
@@ -217,16 +244,17 @@ test.describe('Reopen asks first, like Mark lost', () => {
     await expect(again).toBeHidden({ timeout: 6000 })
     expect(patches).toEqual([])
 
-    await card.getByRole('button', { name: 'Deal actions' }).click()
+    await card.getByRole('button', { name: 'Actions for Old Mill HOA', exact: true }).click()
     await page.getByRole('menuitem', { name: 'Reopen' }).click()
     await card.getByRole('button', { name: 'Tap again to reopen' }).click()
     await expect.poll(() => patches.length).toBe(1)
-    expect(JSON.parse(patches[0])).toEqual({ stage: 'lead' })
+    expect(JSON.parse(patches[0])).toEqual({ stage: 'job' })
+    await expect(page.getByRole('region', { name: 'Jobs', exact: true }).getByRole('button', { name: 'Actions for Old Mill HOA', exact: true })).toBeVisible()
   })
 
   test('the job page asks before it reopens a lost job', async ({ context, page }, testInfo) => {
     test.skip(!isPhone(testInfo.project.name), 'Phone job page')
-    await signIn(context)
+    await signIn(context, { tables: { fh_stage_transitions: LOST_JOB_HISTORY } })
     const patches = watchPatches(page, 'fh_contacts')
     await openJob(page, '/jobs/c-lost')
     const reopen = page.locator('.fhj-capsule .fhc-btn--primary')
@@ -236,7 +264,7 @@ test.describe('Reopen asks first, like Mark lost', () => {
     await reopen.click()
     await expect(reopen).toHaveText('Tap again to reopen')
     await expect(page.getByRole('alertdialog')).toHaveCount(0)
-    await expect(page.locator('.fhj-capsule')).toContainText('It moves back to Leads.')
+    await expect(page.locator('.fhj-capsule')).toContainText('It moves back to Jobs.')
     await page.waitForTimeout(300)
     expect(patches).toEqual([])
 
@@ -247,12 +275,30 @@ test.describe('Reopen asks first, like Mark lost', () => {
     await reopen.click()
     await reopen.click()
     await expect.poll(() => patches.length).toBe(1)
-    expect(JSON.parse(patches[0])).toEqual({ stage: 'lead' })
+    expect(JSON.parse(patches[0])).toEqual({ stage: 'job' })
+  })
+
+  test('a legacy lost record without won history stays lost and explains why it cannot reopen as a job', async ({ context, page }, testInfo) => {
+    await signIn(context)
+    const patches = watchPatches(page, 'fh_contacts')
+    if (isPhone(testInfo.project.name)) {
+      await openJob(page, '/jobs/c-lost')
+      await page.locator('.fhj-capsule .fhc-btn--primary').click()
+      await page.getByRole('button', { name: 'Tap again to reopen', exact: true }).click()
+    } else {
+      const card = await openLostDealCard(page)
+      await card.getByRole('button', { name: 'Actions for Old Mill HOA', exact: true }).click()
+      await page.getByRole('menuitem', { name: 'Reopen' }).click()
+      await card.getByRole('button', { name: 'Tap again to reopen', exact: true }).click()
+      await expect(page.getByRole('region', { name: 'Lost', exact: true }).getByRole('button', { name: 'Actions for Old Mill HOA', exact: true })).toBeVisible()
+    }
+    await expect(page.getByText('This record has no previous job. Review its lead or quote before reopening.', { exact: true })).toBeVisible()
+    expect(patches).toEqual([])
   })
 
   test('a closed job says it goes back to Jobs', async ({ context, page }, testInfo) => {
     test.skip(!isPhone(testInfo.project.name), 'Phone job page')
-    await signIn(context)
+    await signIn(context, { tables: { fh_stage_transitions: LOST_JOB_HISTORY } })
     const patches = watchPatches(page, 'fh_contacts')
     await openJob(page, '/jobs/c-done')
     const reopen = page.locator('.fhj-capsule .fhc-btn--primary')
@@ -270,12 +316,10 @@ test.describe('Reopen asks first, like Mark lost', () => {
   // Enter opens the menu again.
   test('from the keyboard, the deal card Tap again button takes focus and Enter answers it', async ({ context, page }, testInfo) => {
     test.skip(isPhone(testInfo.project.name), 'Desktop deal cards')
-    await signIn(context)
+    await signIn(context, { tables: { fh_stage_transitions: LOST_JOB_HISTORY } })
     const patches = watchPatches(page, 'fh_contacts')
-    await page.goto('/work', { waitUntil: 'domcontentloaded', timeout: 60_000 })
-    const card = page.locator('.fh-deal-card', { hasText: 'Old Mill HOA' })
-    await expect(card).toBeVisible({ timeout: 30_000 })
-    const trigger = card.getByRole('button', { name: 'Deal actions' })
+    const card = await openLostDealCard(page)
+    const trigger = card.getByRole('button', { name: 'Actions for Old Mill HOA', exact: true })
 
     await trigger.focus()
     await page.keyboard.press('Enter')
@@ -296,17 +340,15 @@ test.describe('Reopen asks first, like Mark lost', () => {
     await page.keyboard.press('Enter')
     await expect(page.getByRole('menu')).toHaveCount(0)
     await expect.poll(() => patches.length).toBe(1)
-    expect(JSON.parse(patches[0])).toEqual({ stage: 'lead' })
+    expect(JSON.parse(patches[0])).toEqual({ stage: 'job' })
   })
 
   test('by mouse, Enter then answers the Tap again button, not the menu behind it', async ({ context, page }, testInfo) => {
     test.skip(isPhone(testInfo.project.name), 'Desktop deal cards')
-    await signIn(context)
+    await signIn(context, { tables: { fh_stage_transitions: LOST_JOB_HISTORY } })
     const patches = watchPatches(page, 'fh_contacts')
-    await page.goto('/work', { waitUntil: 'domcontentloaded', timeout: 60_000 })
-    const card = page.locator('.fh-deal-card', { hasText: 'Old Mill HOA' })
-    await expect(card).toBeVisible({ timeout: 30_000 })
-    const trigger = card.getByRole('button', { name: 'Deal actions' })
+    const card = await openLostDealCard(page)
+    const trigger = card.getByRole('button', { name: 'Actions for Old Mill HOA', exact: true })
 
     await trigger.click()
     await page.getByRole('menuitem', { name: 'Reopen' }).click()
@@ -320,7 +362,7 @@ test.describe('Reopen asks first, like Mark lost', () => {
     await page.keyboard.press('Enter')
     await expect(page.getByRole('menu')).toHaveCount(0)
     await expect.poll(() => patches.length).toBe(1)
-    expect(JSON.parse(patches[0])).toEqual({ stage: 'lead' })
+    expect(JSON.parse(patches[0])).toEqual({ stage: 'job' })
   })
 
   // The closeout record's own Reopen deletes the record (sign off, warranty,
@@ -360,7 +402,7 @@ test.describe('Reopen asks first, like Mark lost', () => {
 
   test('the next action card asks too', async ({ context, page }, testInfo) => {
     test.skip(!isPhone(testInfo.project.name), 'Phone job page')
-    await signIn(context)
+    await signIn(context, { tables: { fh_stage_transitions: LOST_JOB_HISTORY } })
     const patches = watchPatches(page, 'fh_contacts')
     await openJob(page, '/jobs/c-lost')
     await page.getByRole('button', { name: 'More about this job' }).click()
@@ -377,7 +419,7 @@ test.describe('Reopen asks first, like Mark lost', () => {
 
     await again.click()
     await expect.poll(() => patches.length).toBe(1)
-    expect(JSON.parse(patches[0])).toEqual({ stage: 'lead' })
+    expect(JSON.parse(patches[0])).toEqual({ stage: 'job' })
   })
 })
 

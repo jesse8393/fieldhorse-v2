@@ -513,7 +513,7 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
           message="Check your connection and try again."
           actionLabel="Try again"
           onRetry={() => {
-            keepFocusOnRetry(rootRef.current?.closest<HTMLElement>('[role="tabpanel"]') ?? rootRef.current)
+            keepFocusOnRetry(rootRef.current?.closest<HTMLElement>('[data-job-section], [role="tabpanel"]') ?? rootRef.current)
             void fetchRows()
           }}
         />

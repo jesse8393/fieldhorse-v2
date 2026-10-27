@@ -205,21 +205,33 @@ export default async (request) => {
   const emailId = resendBody?.id || null
   const sentAtIso = new Date().toISOString()
 
-  // Activity log — best effort. contact_id is nullable so generic
-  // messages still record a sender_user_id row that surfaces on Notes
-  // even when no job is linked.
+  // Preserve the actual sent content. A failed history write must never be
+  // reported as a failed send: retrying would send a duplicate email.
+  let historySaved = false
   try {
-    await supabase.from('fh_notes').insert({
+    const { error: historyError } = await supabase.from('fh_notes').insert({
       user_id: sender_user_id,
-      contact_id: contact_id || null,
-      text: `Message sent to ${normalizedEmail}${contact?.name ? ` (${contact.name})` : ''}`,
-      category: 'activity'
+      org_id: contact.org_id || null,
+      contact_id,
+      text: `Email sent to ${normalizedEmail}${contact?.name ? ` (${contact.name})` : ''}`,
+      category: 'email',
+      parsed: { communication: {
+        version: 1,
+        channel: 'email',
+        status: 'sent',
+        to: normalizedEmail,
+        subject: finalSubject,
+        body: trimmedBody,
+        provider_message_id: emailId,
+      } },
     })
-  } catch (e) {
-    console.warn('[send-message] activity log insert failed', e)
+    historySaved = !historyError
+    if (historyError) console.warn('[send-message] communication history unavailable')
+  } catch {
+    console.warn('[send-message] communication history unavailable')
   }
 
-  return json({ ok: true, email_id: emailId, sent_at: sentAtIso })
+  return json({ ok: true, email_id: emailId, sent_at: sentAtIso, history_saved: historySaved })
 }
 
 function renderMessageHtml({ body, senderLine, companyName }) {

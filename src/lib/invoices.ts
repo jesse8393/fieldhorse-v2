@@ -106,12 +106,14 @@ export function invoiceAmountDue({ invoice, contact, payments = [], changeOrders
 }
 
 export async function fetchInvoicesForContact(contactId: string) {
-  const { data, error } = await supabase
-    .from('fh_invoices')
-    .select('*')
-    .eq('contact_id', contactId)
-    .order('sequence_number', { ascending: true })
-  return { data: (data || []) as InvoiceRow[], error }
+  const rows: InvoiceRow[] = []
+  for (let from = 0; ; from += 500) {
+    const { data, error } = await supabase.from('fh_invoices').select('*').eq('contact_id', contactId)
+      .order('sequence_number', { ascending: true }).order('id').range(from, from + 499)
+    if (error) return { data: [] as InvoiceRow[], error }
+    rows.push(...(data ?? []) as InvoiceRow[])
+    if ((data?.length ?? 0) < 500) return { data: rows, error: null }
+  }
 }
 
 // An invoice bills a job (contact or contactId) or, with no job, the client
@@ -339,7 +341,7 @@ export type SendInvoiceResult =
 // (server pulls it with service role) → POST /api/send-invoice → flip
 // the row to 'sent'. On a missing Resend config the PDF downloads
 // locally so the operator can email it by hand.
-export async function sendInvoiceEmail({ invoice, contact, client = null, company, userId, recipientEmail, payments = [], changeOrders = [], invoices = null, insurance = null }: {
+export async function sendInvoiceEmail({ invoice, duplicateReviewed = false, contact, client = null, company, userId, recipientEmail, payments = [], changeOrders = [], invoices = null, insurance = null }: {
   invoice: InvoiceRow
   /** The job the invoice bills, or null when it bills the client directly (D62). */
   contact: any
@@ -353,6 +355,7 @@ export async function sendInvoiceEmail({ invoice, contact, client = null, compan
   /** The job's invoices, so the email asks for what invoiceAmountDue allocates to this one. */
   invoices?: DueInvoice[] | null
   insurance?: any
+  duplicateReviewed?: boolean
 }): Promise<SendInvoiceResult> {
   const job = contact || null
   const to = billTo(job, client)
@@ -398,6 +401,8 @@ export async function sendInvoiceEmail({ invoice, contact, client = null, compan
     body: JSON.stringify({
       contact_id: job?.id || null,
       invoice_id: invoice.id,
+      invoice_updated_at: invoice.updated_at,
+      duplicate_reviewed: duplicateReviewed,
       client_id: invoice.client_id || client?.id || null,
       sender_user_id: userId,
       recipient_email: recipient,
@@ -417,9 +422,9 @@ export async function sendInvoiceEmail({ invoice, contact, client = null, compan
     return { ok: false, reason: 'sender_not_configured' }
   }
   if (!sendRes.ok || !sendBody?.ok) {
-    const detail = sendBody?.detail || sendBody?.error || 'Unknown provider error'
+    const detail = sendBody?.message || sendBody?.detail || sendBody?.error || 'Unknown provider error'
     const status = sendBody?.provider_status ? ` (HTTP ${sendBody.provider_status})` : ''
-    return { ok: false, reason: 'error', message: `Resend rejected${status}: ${detail}` }
+    return { ok: false, reason: 'error', message: `Delivery stopped${status}: ${detail}` }
   }
 
   // Don't downgrade a paid invoice just because the PDF was sent again.

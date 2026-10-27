@@ -244,7 +244,12 @@ export default function LeadDetail({ id, fallback }: LeadDetailProps) {
               </span>
             </div>
           ) : (
-            <p className="fhl-muted">No phone number yet.</p>
+            <div className="fhl-line">
+              <p className="fhl-muted">No phone number yet.</p>
+              {lead.client_id && (
+                <Button variant="secondary" size="mini" to={`/clients/${encodeURIComponent(lead.client_id)}?edit=contact`}>Add phone</Button>
+              )}
+            </div>
           )}
           {address ? (
             <div className="fhl-line">
@@ -263,7 +268,12 @@ export default function LeadDetail({ id, fallback }: LeadDetailProps) {
               </span>
             </div>
           ) : (
-            <p className="fhl-muted">No address yet.</p>
+            <div className="fhl-line">
+              <p className="fhl-muted">No address yet.</p>
+              {lead.client_id && (
+                <Button variant="secondary" size="mini" to={`/clients/${encodeURIComponent(lead.client_id)}?edit=contact`}>Add address</Button>
+              )}
+            </div>
           )}
         </section>
 

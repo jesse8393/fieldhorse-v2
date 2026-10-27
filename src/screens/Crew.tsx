@@ -2,7 +2,7 @@
 //
 // Read-mostly view of the punching user's own data:
 //   - Today's schedule slice (fh_schedule rows where assigned_to is
-//     the caller, OR all rows in their org if assigned_to isn't set)
+//     the caller, OR an unassigned visit created by the caller)
 //   - Active punch + clock in/out controls (fh_time_punches)
 //   - Own task list (fh_job_todos belonging to user_id) plus a
 //     truthful "not-tracked" hint when no tasks exist
@@ -40,10 +40,14 @@ import PaletteKeyCap, { paletteShortcut } from '../components/desktop/PaletteKey
 import DataErrorState from '../components/DataErrorState.tsx'
 import LoadingValue from '../components/LoadingValue.tsx'
 import { SkeletonRows } from '../components/fh'
+import { eventAssignees } from '../lib/scheduleAllocation.ts'
 import { keepFocusOnRetry } from '../lib/retryFocus.ts'
 
 type ScheduleRow = {
   id: string
+  user_id?: string
+  assigned_to?: string | null
+  assigned_user_ids?: string[] | null
   title: string | null
   start_at: string | null
   end_at: string | null
@@ -85,7 +89,7 @@ function fmtMinutes(min: number): string {
 export default function Crew() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { orgName, role, loading: memLoading } = useMembership()
+  const { orgId, orgName, role, loading: memLoading } = useMembership()
 
   // The active punch is undefined until a read of it works, and it takes
   // every read of it that works, so a running shift shows even when another
@@ -143,7 +147,8 @@ export default function Crew() {
       listMyRecentPunches(user.id, 10, { throwOnError: true }),
       supabase
         .from('fh_schedule')
-        .select('id, title, start_at, end_at, description, contact_id')
+        .select('*')
+        .eq(orgId ? 'org_id' : 'user_id', orgId || user.id)
         .gte('start_at', start.toISOString())
         .lt('start_at', end.toISOString())
         .order('start_at', { ascending: true }),
@@ -174,12 +179,15 @@ export default function Crew() {
       && todos.status === 'fulfilled' && !todos.value.error
     ) {
       setRecentPunches(recent.value)
-      setSchedule(((sched.value.data || []) as ScheduleRow[]))
+      setSchedule(((sched.value.data || []) as ScheduleRow[]).filter((event) => {
+        const assigned = eventAssignees(event)
+        return assigned.includes(user.id) || (assigned.length === 0 && event.user_id === user.id)
+      }))
       setTasks(((todos.value.data || []) as TodoRow[]))
     } else {
       setFailed(true)
     }
-  }, [user])
+  }, [user, orgId])
 
   useEffect(() => { if (!memLoading) load() }, [memLoading, load])
 
@@ -353,7 +361,7 @@ export default function Crew() {
         </button>
       </header>
 
-      <main className="fh-build-main">
+      <div className="fh-build-main">
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
             <div className="fh-build-good">{fmtDayHeading(new Date())}</div>
@@ -657,7 +665,7 @@ export default function Crew() {
             </section>
           </aside>
         </section>
-      </main>
+      </div>
     </div>
   )
 }

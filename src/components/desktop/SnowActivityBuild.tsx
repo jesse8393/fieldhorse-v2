@@ -12,12 +12,14 @@ import type { LucideIcon } from 'lucide-react'
 import BuildTopbar from './BuildTopbar.tsx'
 import MiniMetric from '../MiniMetric.tsx'
 import { SkeletonList } from '../Skeleton.tsx'
+import { activityBucketLabel } from '../../lib/activityTime.ts'
 
 type ActivityEvent = {
   id: string
   when: Date
   contact?: { name?: string; job_title?: string }
   contactId?: string
+  to?: string
   kind: string
   icon?: LucideIcon
   tone?: string
@@ -44,18 +46,6 @@ const FILTERS = [
   { id: 'change', label: 'Changes', match: (event: ActivityEvent) => event.kind.startsWith('co_') },
 ]
 
-function bucketLabel(date: Date) {
-  const now = new Date()
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
-  const timestamp = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
-  const day = 86_400_000
-  if (timestamp === today) return 'Today'
-  if (timestamp === today - day) return 'Yesterday'
-  if (timestamp > today - 7 * day) return 'This week'
-  if (timestamp > today - 30 * day) return 'This month'
-  return date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
-}
-
 function money(value: number) {
   return Number(value || 0).toLocaleString(undefined, {
     style: 'currency',
@@ -81,7 +71,7 @@ function toneClass(tone?: string) {
 
 export default function SnowActivityBuild({ events, hasMore, isFetching, onLoadOlder }: Props) {
   const [filter, setFilter] = useState('all')
-  const rows = events || []
+  const rows = useMemo(() => events || [], [events])
 
   const filterCounts = useMemo(() => Object.fromEntries(
     FILTERS.map((item) => [item.id, rows.filter(item.match).length])
@@ -95,7 +85,7 @@ export default function SnowActivityBuild({ events, hasMore, isFetching, onLoadO
   const grouped = useMemo(() => {
     const buckets = new Map<string, ActivityEvent[]>()
     for (const event of filtered) {
-      const label = bucketLabel(event.when)
+      const label = activityBucketLabel(event.when)
       if (!buckets.has(label)) buckets.set(label, [])
       buckets.get(label)?.push(event)
     }
@@ -106,14 +96,14 @@ export default function SnowActivityBuild({ events, hasMore, isFetching, onLoadO
     const jobs = new Set(rows.map((event) => event.contactId).filter(Boolean))
     const payments = rows.filter((event) => event.kind === 'payment')
     const changes = rows.filter((event) => event.kind.startsWith('co_'))
-    const today = rows.filter((event) => bucketLabel(event.when) === 'Today')
+    const today = rows.filter((event) => activityBucketLabel(event.when) === 'Today')
     const paymentTotal = payments.reduce((sum, event) => sum + Number(event.amount || 0), 0)
     const jobCounts = new Map<string, { count: number; name: string }>()
     for (const event of rows) {
       const key = event.contactId || 'unknown'
       const current = jobCounts.get(key) || {
         count: 0,
-        name: event.contact?.name || event.contact?.job_title || 'Unknown job',
+        name: [event.contact?.name, event.contact?.job_title].filter(Boolean).join(' · ') || 'Record unavailable',
       }
       current.count += 1
       jobCounts.set(key, current)
@@ -128,11 +118,11 @@ export default function SnowActivityBuild({ events, hasMore, isFetching, onLoadO
         searchPlaceholder="Search jobs, clients, invoices, notes..."
         meta={[
           `${rows.length.toLocaleString()} recent ${rows.length === 1 ? 'event' : 'events'}`,
-          `${summary.jobs.toLocaleString()} ${summary.jobs === 1 ? 'job' : 'jobs'} represented`,
+          `${summary.jobs.toLocaleString()} ${summary.jobs === 1 ? 'record' : 'records'} represented`,
         ]}
       />
 
-      <main className="fh-build-main">
+      <div className="fh-build-main">
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
             <div className="fh-build-good">Recent</div>
@@ -185,7 +175,7 @@ export default function SnowActivityBuild({ events, hasMore, isFetching, onLoadO
               <div className="fh-activity-ledger__empty">
                 <ActivityIcon size={22} aria-hidden="true" />
                 <strong>No activity yet</strong>
-                <span>Create a lead, log a payment, or send a proposal and it will appear here.</span>
+                <span>Stage changes, payments, invoices, and change orders will appear here.</span>
               </div>
             )}
 
@@ -205,7 +195,7 @@ export default function SnowActivityBuild({ events, hasMore, isFetching, onLoadO
                 </header>
                 <div className="fh-activity-table__head" aria-hidden="true">
                   <span>Activity</span>
-                  <span>Job</span>
+                  <span>Record</span>
                   <span>Type</span>
                   <span>When</span>
                   <span />
@@ -241,7 +231,7 @@ export default function SnowActivityBuild({ events, hasMore, isFetching, onLoadO
             </section>
 
             <section className="fh-build-rail-card">
-              <div className="fh-build-eyebrow">Most active job</div>
+              <div className="fh-build-eyebrow">Most active record</div>
               <strong className="fh-activity-build__rail-title">{summary.busiest?.name || '\u2003'}</strong>
               <span>{summary.busiest ? `${summary.busiest.count} recent ${summary.busiest.count === 1 ? 'event' : 'events'}` : 'No recent activity'}</span>
             </section>
@@ -254,16 +244,16 @@ export default function SnowActivityBuild({ events, hasMore, isFetching, onLoadO
             </section>
           </aside>
         </section>
-      </main>
+      </div>
     </div>
   )
 }
 
 function DesktopEventRow({ event }: { event: ActivityEvent }) {
   const Icon = event.icon || ActivityIcon
-  const jobName = event.contact?.name || event.contact?.job_title || 'Unknown job'
+  const jobName = [event.contact?.name, event.contact?.job_title].filter(Boolean).join(' · ') || 'Record unavailable'
   return (
-    <Link className="fh-activity-table__row" to={`/jobs/${event.contactId}`}>
+    <Link className="fh-activity-table__row" to={event.to || (event.contactId ? `/jobs/${event.contactId}` : '/jobs')}>
       <span className={`fh-activity-table__icon ${toneClass(event.tone)}`} aria-hidden="true"><Icon size={15} /></span>
       <span className="fh-activity-table__event">
         <strong>{event.title}</strong>

@@ -10,14 +10,14 @@
 //   - `invoice` is the legacy alias of `job` and gets the same tabs; a
 //     contact row still at a sales stage reads as a job too.
 
-export type DealTabId = 'overview' | 'details' | 'financials' | 'files' | 'logs' | 'selections' | 'materials' | 'change_orders'
+export type DealTabId = 'overview' | 'details' | 'financials' | 'files' | 'logs' | 'selections' | 'materials' | 'change_orders' | 'tasks' | 'schedule' | 'inspections' | 'partner' | 'insurance' | 'subs' | 'expenses' | 'documents' | 'messages' | 'draws'
 
-const JOB_TABS: DealTabId[] = ['overview', 'details', 'selections', 'materials', 'logs', 'change_orders', 'financials', 'files']
+const JOB_TABS: DealTabId[] = ['overview', 'details', 'tasks', 'schedule', 'inspections', 'partner', 'selections', 'materials', 'logs', 'change_orders', 'financials', 'draws', 'subs', 'expenses', 'insurance', 'files', 'documents', 'messages']
 
 const STAGE_TABS: Record<string, DealTabId[]> = {
   job:     JOB_TABS,
-  closed:  ['overview', 'selections', 'materials', 'logs', 'change_orders', 'financials', 'files'],
-  lost:    ['overview', 'files']
+  closed:  ['overview', 'selections', 'materials', 'logs', 'change_orders', 'financials', 'draws', 'subs', 'expenses', 'insurance', 'files', 'documents', 'messages'],
+  lost:    ['overview', 'files', 'documents', 'messages']
 }
 
 export type JobStage = 'job' | 'closed' | 'lost'

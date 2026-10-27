@@ -1,0 +1,17 @@
+.fh-record-picker { position: relative; display: grid; gap: 8px; width: 100%; min-width: 0; flex: 1 1 200px; font-family: var(--fh-font-body); }
+.fh-record-picker > label { color: var(--fh-ink-2); font-size: 14px; font-weight: 600; }
+.fh-record-picker__field { display: flex; align-items: center; position: relative; }
+.fh-record-picker__field > svg { position: absolute; right: var(--space-4); pointer-events: none; color: var(--fh-ink-2); }
+.fh-record-picker input { width: 100%; min-width: 0; min-height: 48px; box-sizing: border-box; padding: var(--space-3) var(--space-7) var(--space-3) var(--space-4); border: 1px solid var(--fh-edge-strong); border-radius: 10px; color: var(--fh-ink); background: var(--fh-paper); font: inherit; font-size: 16px; }
+.fh-record-picker input:focus-visible { outline: 2px solid var(--fh-ink-2); outline-offset: 2px; }
+.fh-record-picker input:disabled { opacity: .6; cursor: not-allowed; }
+.fh-record-picker__results { position: absolute; top: 100%; left: 0; right: 0; z-index: 70; border: 1px solid var(--fh-edge-strong); border-radius: 10px; background: var(--fh-paper); box-shadow: var(--fh-shadow-overlay); overflow: hidden; }
+.fh-record-picker__list { max-height: min(280px, 40vh); overflow-y: auto; overscroll-behavior: contain; }
+.fh-record-picker__option { padding: var(--space-3) var(--space-4); min-height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 12px; box-sizing: border-box; cursor: pointer; color: var(--fh-ink); }
+.fh-record-picker__option > div { min-width: 0; overflow-wrap: anywhere; }
+.fh-record-picker__option > svg { flex-shrink: 0; }
+.fh-record-picker__option.is-active { background: var(--fh-tray); }
+.fh-record-picker__name { display: block; font-size: 16px; font-weight: 600; }
+.fh-record-picker__description, .fh-record-picker__status { display: block; margin: 0; font-size: 14px; line-height: 1.4; color: var(--fh-ink-2); overflow-wrap: anywhere; }
+.fh-record-picker__status { padding: var(--space-3) var(--space-4); }
+.fh-record-picker__error { margin: 0; color: var(--v3-danger); font-size: 14px; }

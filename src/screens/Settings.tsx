@@ -1,10 +1,11 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { createContext, lazy, Suspense, useContext, useCallback, useEffect, useId, useRef, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { MapPin, Trash2, LogOut, Upload as UploadIcon, Bell, CalendarClock } from 'lucide-react'
 import BrandLogoPicker from '../components/BrandLogoPicker.tsx'
 import OrgSwitcher from '../components/OrgSwitcher.tsx'
 import RateCardEditor from '../components/settings/RateCardEditor.tsx'
+import '../styles/settings.css'
 const SnowSettingsBuild = lazy(() => import('../components/desktop/SnowSettingsBuild.tsx'))
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { supabase } from '../lib/supabase.ts'
@@ -14,17 +15,20 @@ import { reverseGeocode } from '../lib/weather.ts'
 import ThemeModeControl from '../components/fh/ThemeModeControl.tsx'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { pushSupport, pushEnabled, enablePush, disablePush } from '../lib/push.ts'
-import { safePayUrl } from '../lib/payLink.ts'
 import { hapticMedium, hapticSuccess } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { countNoun } from '../lib/format.ts'
 import { Switch } from '@/components/ui/switch'
 import { Eyebrow } from '../components/v3'
 import {
-  mergeQuoteFollowUpPreferences,
   QUOTE_FOLLOW_UP_DAY_OPTIONS,
   readQuoteFollowUpPreferences,
 } from '../lib/quoteFollowUp.ts'
+
+import { preferenceObject, updateProfilePreferences } from '../lib/profilePreferences.ts'
+import { activeSettingsSection, SETTINGS_SECTIONS, SETTINGS_SECTION_FIELDS, settingsSectionDirty, settingsSectionFor, settingsSectionPatch, type SettingsSection } from '../lib/settingsSections.ts'
+
+const SettingsSectionContext = createContext<SettingsSection>('business')
 
 const SERVICES = ['Concrete', 'Framing', 'Roofing', 'Electrical', 'Plumbing', 'HVAC', 'Drywall', 'Paint', 'Tile', 'Landscaping', 'Excavation', 'Insulation']
 
@@ -86,7 +90,10 @@ export default function Settings() {
   const { profile, upsertProfile, refresh } = useProfile()
   const navigate = useNavigate()
   // Every route change, a same page hash link included (see the hash jump).
-  const { key: routeKey } = useLocation()
+  const { key: routeKey, search, hash } = useLocation()
+  const activeSection = activeSettingsSection(search, hash)
+  const sectionDetails = SETTINGS_SECTIONS.find((section) => section.id === activeSection)!
+  const [savedSection, setSavedSection] = useState<SettingsSection | null>(null)
   const [displayName, setDisplayName] = useState(profile?.full_name || '')
   const [companyName, setCompanyName] = useState(profile?.company_name || '')
   // Customer facing branding fields (migration 015). Empty strings save
@@ -205,22 +212,23 @@ export default function Settings() {
   const seededRef = useRef<{ userId: string | null; form: SettingsForm } | null>(null)
 
   // Copy profile values into the form. Every profile write hands back a
-  // new profile object (a logo upload, the display name saving on blur,
+  // new profile object (a logo upload, saving another settings section,
   // pinning the location, a refetch), and reseeding every field on each
   // one threw away whatever the operator had typed but not saved yet. A
-  // field they edited now keeps their text unless the profile's own value
-  // for that field changed. `all` reseeds everything, used after Save so
-  // the form shows exactly what was stored.
-  const seedForm = useCallback((source: any, all = false) => {
+  // edited field keeps its draft through unrelated profile writes and refreshes.
+  // A confirmed section save normalizes only values that still match the
+  // submitted snapshot, preserving anything typed while the save was in flight.
+  const seedForm = useCallback((source: any, saved?: { section: SettingsSection; form: SettingsForm }) => {
     const next = formFromProfile(source)
     const prev = seededRef.current
     const sourceUserId: string | null = source?.user_id ?? null
-    const reseedAll = all || !prev || prev.userId !== sourceUserId
+    const reseedAll = !prev || prev.userId !== sourceUserId
     const pick = <K extends keyof SettingsForm>(key: K) => (current: SettingsForm[K]): SettingsForm[K] => {
       if (reseedAll || !prev) return next[key]
       const edited = !sameFormValue(current, prev.form[key])
-      const changedOnServer = !sameFormValue(next[key], prev.form[key])
-      return edited && !changedOnServer ? current : next[key]
+      const savedField = saved && (SETTINGS_SECTION_FIELDS[saved.section] as readonly string[]).includes(key)
+      if (savedField && sameFormValue(current, saved.form[key])) return next[key]
+      return edited ? current : next[key]
     }
     setDisplayName(pick('displayName'))
     setCompanyName(pick('companyName'))
@@ -243,122 +251,54 @@ export default function Settings() {
 
   useEffect(() => { seedForm(profile) }, [profile, seedForm])
 
-  const profileQuoteFollowUp = readQuoteFollowUpPreferences(profile?.preferences)
-  const profileServices = Array.from(new Set(
-    (profile?.services || [])
-      .map((service) => String(service || '').trim())
-      .filter((service) => service && SERVICES.includes(service))
-  )).sort()
-  const hasUnsavedChanges = Boolean(profile) && (
-    displayName !== (profile?.full_name || '') ||
-    companyName !== (profile?.company_name || '') ||
-    companyPhone !== (profile?.company_phone || '') ||
-    companyEmail !== (profile?.company_email || '') ||
-    companyWebsite !== (profile?.company_website || '') ||
-    companyAddress !== (profile?.company_address || '') ||
-    licenseNumber !== (profile?.license_number || '') ||
-    insuredText !== (profile?.insured_text || '') ||
-    warrantyDefault !== (profile?.warranty_default || '') ||
-    paymentLink !== ((profile as any)?.payment_link || '') ||
-    paymentInstructions !== ((profile as any)?.payment_instructions || '') ||
-    brandAccentHex.toLowerCase() !== (profile?.brand_accent_hex || '').toLowerCase() ||
-    estimateTemplate !== ((profile as any)?.estimate_template || 'classic') ||
-    quoteFollowUpEnabled !== profileQuoteFollowUp.enabled ||
-    quoteFollowUpDays !== profileQuoteFollowUp.days ||
-    JSON.stringify([...services].sort()) !== JSON.stringify(profileServices)
-  )
-
-  async function saveDisplayName() {
-    const next = displayName.trim()
-    if (next === (profile?.full_name || '')) return
-    await upsertProfile({ full_name: next || null })
-    refresh()
+  const currentForm = {
+    displayName, companyName, companyPhone, companyEmail, companyWebsite, companyAddress,
+    licenseNumber, insuredText, warrantyDefault, paymentLink, paymentInstructions,
+    brandAccentHex, estimateTemplate, quoteFollowUpEnabled, quoteFollowUpDays, services,
   }
+  const storedForm = formFromProfile(profile)
+  const dirtySections = SETTINGS_SECTIONS.filter((section) => Boolean(profile) && settingsSectionDirty(section.id, currentForm, storedForm))
+  const hasUnsavedChanges = dirtySections.length > 0
+  const sectionHasChanges = dirtySections.some((section) => section.id === activeSection)
+  const sectionHasProfileFields = !['rates', 'account'].includes(activeSection)
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return
+    const protectDraft = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = '' }
+    window.addEventListener('beforeunload', protectDraft)
+    return () => window.removeEventListener('beforeunload', protectDraft)
+  }, [hasUnsavedChanges])
 
   function toggleService(s: any) {
     setServices((arr) => arr.includes(s) ? arr.filter((x) => x !== s) : [...arr, s])
   }
 
   async function save() {
+    if (saving || !sectionHasChanges) return
+    const section = activeSection
     setSaving(true)
-    // Empty strings -> null so downstream PDF code can rely on `is null`
-    // checks. company_name keeps its existing trim-and-pass behavior so
-    // legacy callers (Invoices, Quote PDF) continue reading a non-null
-    // string even if the operator clears the input briefly.
-    const nullIfBlank = (s: any) => {
-      const t = (s || '').trim()
-      return t.length === 0 ? null : t
-    }
-    // Validate brand accent before save. Migration 015's CHECK
-    // constraint will reject anything off-format with an opaque
-    // Postgres error; catching it here lets us surface a friendly
-    // toast instead.
-    const rawAccent = (brandAccentHex || '').trim()
-    let safeAccent = null
-    if (rawAccent) {
-      if (!/^#[0-9a-fA-F]{6}$/.test(rawAccent)) {
-        toastError(
-          'Brand color must be a #RRGGBB hex',
-          `"${rawAccent}" doesn't look like a 6-digit hex (e.g. #C9963A). Settings not saved.`
-        )
-        setSaving(false)
-        return
+    setSaved(false)
+    try {
+      if (section === 'preferences') {
+        if (!user) throw new Error('Sign in again to save preferences.')
+        await updateProfilePreferences(user.id, (current) => preferenceObject(settingsSectionPatch(section, currentForm, current).preferences))
+      } else {
+        const patch = settingsSectionPatch(section, currentForm, profile?.preferences)
+        const { data: savedProfile, error } = await upsertProfile(patch)
+        if (error) throw error
+        // Preserve drafts in other sections while normalizing saved fields.
+        if (savedProfile) seedForm(savedProfile, { section, form: currentForm })
       }
-      safeAccent = rawAccent.toLowerCase()
-    }
-
-    // Pay links pasted from an app often drop the scheme ("venmo.com/…");
-    // safePayUrl (shared) prepends https:// so the stored value is a real
-    // clickable URL. It allow-lists http(s), mailto and tel, so a dangerous
-    // link (javascript:, data:, …) is never stored and later rendered as an
-    // href on a customer facing page. App deep links (venmo://,
-    // cashapp://) aren't on that list either, and they used to be dropped
-    // silently, clearing the link while the toast said "Saved". Stop and
-    // say so instead.
-    const rawPayLink = (paymentLink || '').trim()
-    const payLink = safePayUrl(rawPayLink)
-    if (rawPayLink && !payLink) {
-      toastError(
-        'Use a web link for payments',
-        "App links like venmo:// don't open for every customer. Paste a web address instead, like venmo.com/u/yourname. Settings not saved."
-      )
+      await refresh()
+      setSavedSection(section)
+      setSaved(true)
+      hapticSuccess()
+      toastSuccess(`${sectionDetails.label} saved`, 'Your changes are saved')
+    } catch (error: any) {
+      toastError(`Couldn't save ${sectionDetails.label.toLowerCase()}`, error?.message || 'Try again in a moment.')
+    } finally {
       setSaving(false)
-      return
     }
-
-    const { data: savedProfile, error } = await upsertProfile({
-      full_name: nullIfBlank(displayName),
-      company_name: companyName,
-      company_phone: nullIfBlank(companyPhone),
-      company_email: nullIfBlank(companyEmail),
-      company_website: nullIfBlank(companyWebsite),
-      company_address: nullIfBlank(companyAddress),
-      license_number: nullIfBlank(licenseNumber),
-      insured_text: nullIfBlank(insuredText),
-      warranty_default: nullIfBlank(warrantyDefault),
-      payment_link: nullIfBlank(payLink),
-      payment_instructions: nullIfBlank(paymentInstructions),
-      brand_accent_hex: safeAccent,
-      estimate_template: estimateTemplate || 'classic',
-      preferences: mergeQuoteFollowUpPreferences(profile?.preferences, {
-        enabled: quoteFollowUpEnabled,
-        days: quoteFollowUpDays,
-      }),
-      services
-    })
-    if (error) {
-      setSaving(false)
-      toastError("Couldn't save settings", error.message || 'Try again in a moment.')
-      return
-    }
-    // Show exactly what was stored (trimmed, https:// added, and so on).
-    if (savedProfile) seedForm(savedProfile, true)
-    await refresh()
-    setSaving(false)
-    setSaved(true)
-    hapticSuccess()
-    toastSuccess('Saved', 'Settings updated')
-    setTimeout(() => setSaved(false), 1600)
   }
 
   async function handleSignOut() {
@@ -426,10 +366,11 @@ export default function Settings() {
     function attemptScroll(deadline: number) {
       if (cancelled) return
       const hash = window.location.hash
-      if (!hash) return
-      const el = document.getElementById(hash.slice(1))
+      if (!hash && !search) return
+      const el = hash ? document.getElementById(hash.slice(1)) : document.querySelector<HTMLElement>('.fh-settings-section:not([hidden])')
       if (el) {
         el.scrollIntoView({ behavior: 'auto', block: 'start' })
+        if (el.classList.contains('fh-settings-section') && (search || hash)) el.focus({ preventScroll: true })
         const top = el.getBoundingClientRect().top
         if (top >= -8 && top < 240) return // landed, stop retrying
       }
@@ -450,11 +391,9 @@ export default function Settings() {
       window.removeEventListener('hashchange', jumpToHash)
       window.removeEventListener('popstate', jumpToHash)
     }
-  }, [routeKey])
+  }, [routeKey, search, hash])
 
-  // Real, honest "setup readiness" calculation, only counts fields
-  // that actually map to columns the profile screen exposes. No fake
-  // weight to inflate the percentage.
+  // Optional details are suggestions, never prerequisites for a ready profile.
   const profileChecks = [
     { key: 'companyName', filled: !!(companyName && companyName.trim()), label: 'Company name' },
     { key: 'companyPhone', filled: !!(companyPhone && companyPhone.trim()), label: 'Company phone' },
@@ -465,34 +404,83 @@ export default function Settings() {
     { key: 'services', filled: services.length > 0, label: 'Services configured' },
     { key: 'location', filled: !!(profile?.location_lat && profile?.location_lon), label: 'Pin business location' },
   ]
-  const filledCount = profileChecks.filter((c) => c.filled).length
-  const profileCompletePct = Math.round((filledCount / profileChecks.length) * 100)
-  const missingItems = profileChecks.filter((c) => !c.filled).map((c) => c.label)
+  const companyReady = profileChecks[0].filled
+  const optionalItems = profileChecks.filter((c) => c.key !== 'companyName' && !c.filled).map((c) => c.label)
   const brandReady = !!profile?.logo_url || !!(brandAccentHex && brandAccentHex.trim())
   const hasLogo = !!profile?.logo_url
   const hasLocation = !!(profile?.location_lat && profile?.location_lon)
 
+  const saveAction = (
+      <div className="fh-settings-save-bar">
+        <motion.button
+          type="button"
+          whileTap={{ scale: 0.97 }}
+          onClick={save} className="fh-press-instant"
+          disabled={saving || !sectionHasChanges}
+          style={{
+            pointerEvents: 'auto',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            height: 44,
+            minHeight: 44,
+            padding: '0 16px',
+            borderRadius: 10,
+            background: 'var(--fh-gold)',
+            color: 'var(--onyx)',
+            fontFamily: 'var(--font-body)',
+            fontSize: 14,
+            letterSpacing: 0,
+            border: 'none',
+            cursor: saving || !sectionHasChanges ? 'default' : 'pointer',
+            boxShadow: 'var(--fh-shadow-soft)',
+            opacity: saving || !sectionHasChanges ? 0.65 : 1
+          }}
+        >
+          <UploadIcon size={16} aria-hidden="true" />
+          {saving ? 'Saving...' : 'Save changes'}
+        </motion.button>
+      </div>
+  )
+
   const sections = (
-    <>
+    <SettingsSectionContext.Provider value={activeSection}>
+      <div className="fh-settings-tools">
+        <nav className="fh-settings-nav" aria-label="Settings sections">
+          {SETTINGS_SECTIONS.map((section) => {
+            const dirty = dirtySections.some((item) => item.id === section.id)
+            return <Link key={section.id} to={`/settings?section=${section.id}`} aria-current={activeSection === section.id ? 'page' : undefined}>
+              {section.label}{dirty && <span className="fh-settings-draft-dot" aria-label="Unsaved changes" />}
+            </Link>
+          })}
+        </nav>
+        <div className="fh-settings-tools__save">
+          <div>
+            <p className="fh-settings-section-description">{sectionDetails.description}</p>
+            <p role="status">{saving ? 'Saving your changes' : sectionHasChanges ? `Unsaved ${sectionDetails.label.toLowerCase()} changes` : saved && savedSection === activeSection ? 'Your changes are saved' : sectionHasProfileFields ? 'No unsaved changes in this section' : 'Changes save with each action'}</p>
+            {dirtySections.some((section) => section.id !== activeSection) && <p className="fh-settings-retained-drafts">Drafts kept in {dirtySections.filter((section) => section.id !== activeSection).map((section) => section.label).join(', ')}.</p>}
+          </div>
+          {isDesktop && sectionHasProfileFields && saveAction}
+        </div>
+      </div>
 
       {/* BRAND */}
-      <Section variants={item} title={<>Your <em>brand.</em></>} sub="Make Fieldhorse feel like your app.">
+      <Section id="business" variants={item} title={<>Your <em>brand.</em></>} sub="Make Fieldhorse feel like your app.">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <Eyebrow style={{ color: 'var(--ink-muted)' }}>Display name</Eyebrow>
+            <Eyebrow style={{ color: 'var(--fh-ink-2)', fontSize: 14 }}>Display name</Eyebrow>
             <input
               type="text"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              onBlur={saveDisplayName}
-              placeholder="First name or full name"
+                            placeholder="First name or full name"
               style={{ padding: '12px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none' }}
             />
-            <span style={{ fontSize: 12, color: 'var(--ink-faint)', fontFamily: 'var(--font-body)' }}>Shown on the greeting and avatar initials.</span>
+            <span className="fh-settings-help">Shown on the greeting and avatar initials.</span>
           </label>
 
           <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <Eyebrow style={{ color: 'var(--ink-muted)' }}>Company name</Eyebrow>
+            <Eyebrow style={{ color: 'var(--fh-ink-2)', fontSize: 14 }}>Company name</Eyebrow>
             <input
               type="text"
               value={companyName}
@@ -526,12 +514,13 @@ export default function Settings() {
           contractor's clients see on quotes, invoices, and approval
           certificates. Saved together via the bottom Save Changes bar. */}
       <Section
+        id="documents"
         variants={item}
         title={<>Customer facing <em>details.</em></>}
         sub="These details strengthen your proposals, invoices, and approvals when filled in. Only company name is needed to get started, everything else is optional and can be added anytime."
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <BrandField label="Company phone">
+          <BrandField label="Company phone" optional>
             <input
               type="tel"
               inputMode="tel"
@@ -543,7 +532,7 @@ export default function Settings() {
             />
           </BrandField>
 
-          <BrandField label="Company email">
+          <BrandField label="Company email" optional>
             <input
               type="email"
               inputMode="email"
@@ -630,7 +619,7 @@ export default function Settings() {
         </div>
       </Section>
 
-      <Section variants={item} title={<>Quote <em>follow ups.</em></>}>
+      <Section id="quote-reminders" variants={item} title={<>Quote <em>follow ups.</em></>}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
@@ -651,7 +640,7 @@ export default function Settings() {
                 <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, color: 'var(--ink-strong)' }}>
                   Set reminder when quote is sent
                 </div>
-                <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--ink-muted)', marginTop: 2 }}>
+                <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--fh-ink-2)', marginTop: 2 }}>
                   {quoteFollowUpEnabled ? `${quoteFollowUpDays} ${quoteFollowUpDays === 1 ? 'day' : 'days'} after sending` : 'Off'}
                 </div>
               </div>
@@ -665,7 +654,7 @@ export default function Settings() {
 
           {quoteFollowUpEnabled && (
             <label style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <Eyebrow style={{ color: 'var(--ink-muted)' }}>Reminder delay</Eyebrow>
+              <Eyebrow style={{ color: 'var(--fh-ink-2)', fontSize: 14 }}>Reminder delay</Eyebrow>
               <select
                 value={quoteFollowUpDays}
                 onChange={(event) => setQuoteFollowUpDays(Number(event.target.value))}
@@ -687,6 +676,7 @@ export default function Settings() {
           Link) and it becomes a "Pay now" button everywhere money goes
           out. Saved with the bottom Save Changes bar. */}
       <Section
+        id="payments"
         variants={item}
         title={<>Getting <em>paid.</em></>}
         sub="Paste a payment link you already use, Venmo, Zelle, Square, PayPal, or a Stripe Payment Link. It becomes a “Pay now” button on every invoice and statement you send. Leave blank to keep collecting the way you do now."
@@ -717,7 +707,7 @@ export default function Settings() {
       </Section>
 
       {/* SERVICES */}
-      <Section variants={item} title={<>What you <em>do.</em></>} meta={`${services.length} picked`}>
+      <Section id="services" variants={item} title={<>What you <em>do.</em></>} meta={`${services.length} picked`}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {SERVICES.map((s) => {
             const isOn = services.includes(s)
@@ -726,6 +716,7 @@ export default function Settings() {
                 key={s}
                 type="button"
                 onClick={() => toggleService(s)}
+                aria-pressed={isOn}
                 style={{
                   padding: '8px 12px',
                   borderRadius: 10,
@@ -733,7 +724,8 @@ export default function Settings() {
                   background: isOn ? 'rgba(201,150,58,0.14)' : 'var(--surface-2)',
                   color: isOn ? 'var(--v3-primary-text)' : 'var(--ink-muted)',
                   fontFamily: 'var(--font-body)',
-                  fontSize: 12,
+                  fontSize: 14,
+                  minHeight: 44,
                   fontWeight: 700,
                   cursor: 'pointer',
                   transition: 'all 160ms ease'
@@ -749,7 +741,7 @@ export default function Settings() {
       {/* RATE CARD, per-tenant overrides for the AI bid engine. Edits
           persist to fh_rate_cards (migration 026); Bid.jsx loads the
           merged view on mount via loadUserRateCard(). */}
-      <Section variants={item} title={<>Your <em>rates.</em></>} sub="Override the AI bid defaults or add trades you bid often.">
+      <Section id="rates" variants={item} title={<>Your <em>rates.</em></>} sub="Override the AI bid defaults or add trades you bid often.">
         <RateCardEditor />
       </Section>
 
@@ -758,7 +750,7 @@ export default function Settings() {
           LAT/LON pair the audit called out as unfriendly. Raw coords stay
           available as muted secondary text so the operator can still
           eyeball precision when needed. */}
-      <Section variants={item} title={<>Where you <em>work.</em></>}>
+      <Section id="work-location" variants={item} title={<>Where you <em>work.</em></>}>
         {/* /settings#location lands here: the weather slots link to it
             when the company has no pinned spot. */}
         <div id="location" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', scrollMarginTop: 96 }}>
@@ -773,7 +765,7 @@ export default function Settings() {
             background: 'var(--surface-2)',
             border: '1px solid var(--rule)'
           }}>
-            <Eyebrow style={{ color: 'var(--ink-muted)' }}>
+            <Eyebrow style={{ color: 'var(--fh-ink-2)', fontSize: 14 }}>
               Service area
             </Eyebrow>
             <span style={{
@@ -790,7 +782,7 @@ export default function Settings() {
             {profile?.location_lat && (
               <span style={{
                 fontFamily: 'var(--font-body)',
-                fontSize: 12,
+                fontSize: 14,
                 color: 'var(--ink-faint)',
                 fontVariantNumeric: 'tabular-nums',
                 letterSpacing: 0
@@ -814,6 +806,7 @@ export default function Settings() {
       {/* APPEARANCE: Auto, Day and Night (spec section 10). Auto turns to
           Night at sunset where the company works. */}
       <Section
+        id="appearance"
         variants={item}
         title={<>Built for <em>daylight.</em></>}
         sub="Day reads in direct sun. Night is easy on the eyes after dark. Auto switches at sunset."
@@ -823,6 +816,7 @@ export default function Settings() {
 
       {/* ACCOUNT */}
       <Section
+        id="notifications"
         variants={item}
         title={<>On your <em>lock screen.</em></>}
         sub="Get pinged the moment a quote is approved or a new lead lands."
@@ -830,7 +824,7 @@ export default function Settings() {
         <PushRow userId={user?.id} />
       </Section>
 
-      <Section variants={item} title={<>Your <em>session.</em></>}>
+      <Section id="account" variants={item} title={<>Your <em>session.</em></>}>
         {/* Workspace picker; renders nothing for a single company. */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <OrgSwitcher />
@@ -839,7 +833,7 @@ export default function Settings() {
               <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, color: 'var(--ink-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {user?.email}
               </div>
-              <div style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 2 }}>Signed in</div>
+              <div style={{ fontSize: 14, color: 'var(--fh-ink-2)', marginTop: 2 }}>Signed in</div>
             </div>
             <motion.button
               type="button"
@@ -858,12 +852,13 @@ export default function Settings() {
       {/* DEV · CLEANUP */}
       {canWipe && (
         <Section
+          id="sample-data"
           variants={item}
           title={<>Remove <em>sample data.</em></>}
           meta="Demo"
           metaTone="red"
         >
-          <p style={{ margin: 0, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontSize: 12 }}>
+          <p style={{ margin: 0, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontSize: 14 }}>
             Clears the example clients, jobs, and activity that were loaded to show you around. Only removes sample data, your own clients and jobs are never touched.
           </p>
           <div style={{ marginTop: 10 }}>
@@ -893,14 +888,14 @@ export default function Settings() {
                   whileTap={{ scale: 0.97 }}
                   onClick={wipeTestData}
                   disabled={wiping}
-                  style={{ padding: '12px 12px', borderRadius: 10, background: 'linear-gradient(135deg, #C0392B, #C0392B)', border: 'none', color: 'var(--raw-linen)', fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: 0, cursor: 'pointer', boxShadow: '0 6px 16px rgba(192,57,43,0.4)' }}
+                  style={{ padding: '12px 12px', borderRadius: 10, background: 'var(--fh-danger)', border: 'none', color: 'var(--raw-linen)', fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: 0, cursor: 'pointer', boxShadow: '0 6px 16px rgba(192,57,43,0.4)' }}
                 >
                   {wiping ? 'Removing…' : 'Remove sample data'}
                 </motion.button>
               </div>
             )}
             {wipeResult && (
-              <p style={{ margin: '10px 0 0', color: wipeResult.startsWith("Couldn't") ? 'var(--v3-danger-text)' : 'var(--v3-success-text)', fontSize: 12, fontFamily: 'var(--font-body)' }}>
+              <p style={{ margin: '10px 0 0', color: wipeResult.startsWith("Couldn't") ? 'var(--v3-danger-text)' : 'var(--v3-success-text)', fontSize: 14, fontFamily: 'var(--font-body)' }}>
                 {wipeResult}
               </p>
             )}
@@ -908,54 +903,8 @@ export default function Settings() {
         </Section>
       )}
 
-      {/* Desktop keeps the action in flow. Mobile only shows a compact
-          floating action after a field changes, leaving ordinary
-          scrolling with one persistent chrome layer instead of three. */}
-      {(isDesktop || hasUnsavedChanges || saving || saved) && <div
-        className="fh-settings-save-bar"
-        style={{
-          position: isDesktop ? 'static' : 'fixed',
-          left: 'auto',
-          right: isDesktop ? 'auto' : 80,
-          bottom: isDesktop ? 'auto' : 'calc(var(--fh-mobile-dock-height) + 16px)',
-          zIndex: 'calc(var(--z-nav, 40) - 1)',
-          padding: isDesktop ? '12px 0 0' : 0,
-          display: 'flex',
-          justifyContent: 'flex-end',
-          background: 'transparent',
-          pointerEvents: 'none'
-        }}
-      >
-        <motion.button
-          type="button"
-          whileTap={{ scale: 0.97 }}
-          onClick={save} className="fh-press-instant"
-          disabled={saving}
-          style={{
-            pointerEvents: 'auto',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-            height: 40,
-            minHeight: 40,
-            padding: '0 16px',
-            borderRadius: 10,
-            background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
-            color: 'var(--onyx)',
-            fontFamily: 'var(--font-body)',
-            fontSize: 14,
-            letterSpacing: 0,
-            border: 'none',
-            cursor: saving ? 'default' : 'pointer',
-            boxShadow: '0 8px 20px rgba(201,150,58,0.35)',
-            opacity: saving ? 0.65 : 1
-          }}
-        >
-          <UploadIcon size={16} />
-          {saving ? 'Saving...' : saved ? 'Saved' : 'Save changes'}
-        </motion.button>
-      </div>}
-    </>
+      {!isDesktop && sectionHasProfileFields && (sectionHasChanges || saving || (saved && savedSection === activeSection)) && saveAction}
+    </SettingsSectionContext.Provider>
   )
 
   if (isDesktop) {
@@ -963,12 +912,12 @@ export default function Settings() {
       <Suspense fallback={null}><SnowSettingsBuild
         userEmail={user?.email}
         companyName={companyName}
-        profileCompletePct={profileCompletePct}
+        companyReady={companyReady}
         brandReady={brandReady}
         servicesCount={services.length}
         hasLogo={hasLogo}
         hasLocation={hasLocation}
-        missingItems={missingItems}
+        optionalItems={optionalItems}
         onSignOut={async () => { await signOut(); navigate('/login', { replace: true }) }}
       >
         {sections}
@@ -977,15 +926,14 @@ export default function Settings() {
   }
 
   return (
-    <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: hasUnsavedChanges || saving || saved ? 56 : 0, position: 'relative' }}>
+    <motion.div className="fh-screen fh-settings" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: hasUnsavedChanges || saving || saved ? 56 : 0, position: 'relative' }}>
       {/* HEADER */}
       <motion.div variants={item} style={{ padding: '12px 24px 12px' }}>
         <Eyebrow>
-          Profile
+          Account
         </Eyebrow>
-        <h1 style={{ margin: '4px 0 0', fontSize: 24, lineHeight: 1.1, letterSpacing: 0, fontWeight: 600, color: 'var(--ink-strong)' }}>
-          Your business,{' '}
-          organized.
+        <h1 style={{ margin: '4px 0 0', fontSize: 'var(--fh-type-page)', lineHeight: 1.1, letterSpacing: 0, fontWeight: 600, color: 'var(--ink-strong)' }}>
+          Settings
         </h1>
       </motion.div>
       {sections}
@@ -1038,7 +986,7 @@ function PushRow({ userId }: { userId?: string }) {
           <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, color: 'var(--ink-strong)' }}>
             Add to Home Screen first
           </div>
-          <div style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 2 }}>
+          <div style={{ fontSize: 14, color: 'var(--fh-ink-2)', marginTop: 2 }}>
             iPhone: Share → Add to Home Screen, then open Fieldhorse from the icon and flip this on.
           </div>
         </div>
@@ -1049,7 +997,7 @@ function PushRow({ userId }: { userId?: string }) {
   if (support === 'unsupported') {
     return (
       <div style={rowStyle}>
-        <div style={{ fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
+        <div style={{ fontSize: 14, color: 'var(--fh-ink-2)', fontFamily: 'var(--font-body)' }}>
           This browser doesn't support push notifications.
         </div>
       </div>
@@ -1062,7 +1010,7 @@ function PushRow({ userId }: { userId?: string }) {
         <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, color: 'var(--ink-strong)' }}>
           Push notifications
         </div>
-        <div style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 2 }}>
+        <div style={{ fontSize: 14, color: 'var(--fh-ink-2)', marginTop: 2 }}>
           {enabled ? 'On for this device' : 'Off, approvals and new leads stay silent'}
         </div>
       </div>
@@ -1125,7 +1073,7 @@ function DeleteAccountRow({ onDone }: { onDone: () => void }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        style={{ marginTop: 10, background: 'none', border: 'none', padding: '4px 4px', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
+        style={{ marginTop: 10, background: 'none', border: 'none', padding: '8px 4px', minHeight: 44, color: 'var(--fh-ink-2)', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
       >
         Delete my account
       </button>
@@ -1134,8 +1082,8 @@ function DeleteAccountRow({ onDone }: { onDone: () => void }) {
 
   return (
     <div style={{ marginTop: 10, padding: '12px', borderRadius: 10, background: 'rgba(192,57,43,0.08)', border: '1px solid rgba(192,57,43,0.35)' }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--v3-danger-text)', marginBottom: 4 }}>Permanently delete your account</div>
-      <p style={{ margin: '0 0 10px', fontSize: 12, color: 'var(--ink-muted)', lineHeight: 1.5 }}>
+      <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--v3-danger-text)', marginBottom: 4 }}>Permanently delete your account</div>
+      <p style={{ margin: '0 0 10px', fontSize: 14, color: 'var(--fh-ink-2)', lineHeight: 1.5 }}>
         This closes your login and erases your personal data. If you run Fieldhorse alone, every contact, job, quote, invoice, payment, photo, and file is erased too. If you work on a team, the records you created stay with the team and pass to an owner. The only owner of a team has to make someone else an owner first. It can't be undone. Type <strong>DELETE</strong> to confirm.
       </p>
       <input
@@ -1143,6 +1091,7 @@ function DeleteAccountRow({ onDone }: { onDone: () => void }) {
         value={confirmText}
         onChange={(e) => setConfirmText(e.target.value)}
         placeholder="DELETE"
+        aria-label="Type DELETE to confirm account deletion"
         autoCapitalize="characters"
         disabled={busy}
         style={{ width: '100%', boxSizing: 'border-box', padding: '12px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none', marginBottom: 10 }}
@@ -1157,18 +1106,26 @@ function DeleteAccountRow({ onDone }: { onDone: () => void }) {
   )
 }
 
-function Section({ variants, title, sub, meta, metaTone, children }: any) {
+function Section({ id, variants, title, sub, meta, metaTone, children }: any) {
+  const headingId = useId()
+  const activeSection = useContext(SettingsSectionContext)
+  const hidden = settingsSectionFor(id || 'account') !== activeSection
   const metaBg = metaTone === 'red'
     ? { background: 'var(--v3-danger-soft)', border: '1px solid color-mix(in srgb, var(--v3-danger) 40%, transparent)', color: 'var(--v3-danger-text)' }
     : { background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)', color: 'var(--v3-text-muted)' }
   return (
     <motion.section
       variants={variants}
-      className="v3-section"
-      style={{ margin: '0 var(--v3-gutter) 14px' }}
+      className="v3-section fh-settings-section"
+      id={id}
+      aria-labelledby={headingId}
+      hidden={hidden}
+      tabIndex={-1}
+      style={{ margin: '0 var(--v3-gutter) 14px', display: hidden ? 'none' : undefined }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: sub ? 4 : 10, gap: 12 }}>
         <h2
+          id={headingId}
           style={{ margin: 0, fontSize: 20, lineHeight: 1.15, letterSpacing: 0, fontWeight: 600, color: 'var(--v3-text)' }}
         >
           {renderSectionTitle(title)}
@@ -1181,7 +1138,7 @@ function Section({ variants, title, sub, meta, metaTone, children }: any) {
               padding: '4px 8px',
               borderRadius: 10,
               fontFamily: 'var(--font-body)',
-              fontSize: 12,
+              fontSize: 14,
               fontWeight: 700,
               letterSpacing: 0,
               ...metaBg
@@ -1192,7 +1149,7 @@ function Section({ variants, title, sub, meta, metaTone, children }: any) {
         )}
       </div>
       {sub && (
-        <p style={{ margin: '0 0 12px', fontSize: 12, color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}>
+        <p style={{ margin: '0 0 12px', fontSize: 14, color: 'var(--fh-ink-2)', fontFamily: 'var(--font-body)', lineHeight: 1.5 }}>
           {sub}
         </p>
       )}
@@ -1218,17 +1175,20 @@ function renderSectionTitle(node: any) {
 function Meta({ label, value }: any) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '8px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', minWidth: 80 }}>
-      <Eyebrow style={{ color: 'var(--ink-muted)' }}>{label}</Eyebrow>
+      <Eyebrow style={{ color: 'var(--fh-ink-2)', fontSize: 14 }}>{label}</Eyebrow>
       <span style={{ fontFamily: 'var(--font-display)', fontSize: 16, letterSpacing: 0, color: 'var(--ink-strong)' }}>{value}</span>
     </div>
   )
 }
 
 function BrandField({ label, hint, optional, children }: any) {
+  const labelId = useId()
+  const isDirectField = ['input', 'textarea', 'select'].includes(children?.type)
+  const Container = isDirectField ? 'label' : 'div'
   return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-        <Eyebrow style={{ color: 'var(--ink-muted)' }}>
+    <Container role={isDirectField ? undefined : 'group'} aria-labelledby={isDirectField ? undefined : labelId} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <span id={labelId} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+        <Eyebrow style={{ color: 'var(--fh-ink-2)', fontSize: 14 }}>
           {label}
         </Eyebrow>
         {optional && (
@@ -1240,13 +1200,13 @@ function BrandField({ label, hint, optional, children }: any) {
       {children}
       {hint && (
         <span style={{
-          fontSize: 12, color: 'var(--ink-faint, var(--ink-muted))',
+          fontSize: 14, color: 'var(--fh-ink-2)',
           fontFamily: 'var(--font-body)', lineHeight: 1.4
         }}>
           {hint}
         </span>
       )}
-    </label>
+    </Container>
   )
 }
 
@@ -1260,6 +1220,7 @@ const brandInputStyle: import('react').CSSProperties = {
   fontSize: 14,
   outline: 'none',
   width: '100%',
+  minWidth: 0,
   boxSizing: 'border-box'
 }
 
@@ -1324,9 +1285,9 @@ function EstimateTemplatePicker({ value, onChange }: any) {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>{t.name}</span>
-              {on && <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, color: 'var(--v3-primary-text)' }}>Selected</span>}
+              {on && <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: 0, color: 'var(--v3-primary-text)' }}>Selected</span>}
             </div>
-            <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, lineHeight: 1.4, color: 'var(--ink-muted)' }}>{t.blurb}</span>
+            <span style={{ fontFamily: 'var(--font-body)', fontSize: 14, lineHeight: 1.4, color: 'var(--fh-ink-2)' }}>{t.blurb}</span>
           </button>
         )
       })}
@@ -1358,6 +1319,7 @@ function BrandColorEditor({ value, onChange, companyName }: any) {
         >
           <input
             type="color"
+            aria-label="Pick brand color"
             value={isHex ? v : '#C9963A'}
             onChange={(e) => onChange(e.target.value)}
             style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }}
@@ -1366,6 +1328,7 @@ function BrandColorEditor({ value, onChange, companyName }: any) {
         <input
           type="text"
           value={v}
+          aria-label="Brand color hex code"
           onChange={(e) => onChange(e.target.value)}
           placeholder="#C9963A"
           spellCheck={false}
@@ -1387,7 +1350,7 @@ function BrandColorEditor({ value, onChange, companyName }: any) {
               padding: '8px 12px', borderRadius: 10,
               background: 'transparent', border: '1px solid var(--rule)',
               color: 'var(--ink-muted)', fontFamily: 'var(--font-body)',
-              fontSize: 12, fontWeight: 600, cursor: 'pointer'
+              fontSize: 14, fontWeight: 600, cursor: 'pointer'
             }}
           >
             Reset
@@ -1405,9 +1368,10 @@ function BrandColorEditor({ value, onChange, companyName }: any) {
               type="button"
               onClick={() => onChange(p.hex)}
               aria-label={`Use ${p.name}`}
+              aria-pressed={isOn}
               title={p.name}
               style={{
-                width: 28, height: 28, borderRadius: 10,
+                width: 44, height: 44, borderRadius: 10,
                 background: p.hex,
                 border: isOn ? '2px solid var(--ink-strong)' : '1px solid var(--rule)',
                 cursor: 'pointer',
@@ -1462,7 +1426,7 @@ function BrandColorEditor({ value, onChange, companyName }: any) {
 
       {usingDefault && (
         <span style={{
-          fontFamily: 'var(--font-body)', fontSize: 12,
+          fontFamily: 'var(--font-body)', fontSize: 14,
           color: 'var(--ink-faint, var(--ink-muted))'
         }}>
           Using the FieldHorse default. Pick a preset, paste a hex (e.g. <code>#5C5C5C</code>), or tap the swatch to choose your own.

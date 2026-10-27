@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Calculator, Sparkles, Copy, Check, FileText, Briefcase, BookmarkPlus, Trash2, X } from 'lucide-react'
+import { Calculator, Sparkles, Copy, Check, FileText, Briefcase, BookmarkPlus, Star, Trash2, X } from 'lucide-react'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import BuildTopbar from '../components/desktop/BuildTopbar.tsx'
 import { RATE_CARD, TRADE_LABELS, loadUserRateCard } from '../lib/rateCard.ts'
@@ -21,6 +21,14 @@ import SectionHeader from '../components/v3/SectionHeader.tsx'
 import { FilterPill, Eyebrow } from '../components/v3'
 import { useArmedId } from '../lib/secondTap.ts'
 import { parseAmount } from '../lib/amount.ts'
+import { useProfile } from '../contexts/ProfileContext.tsx'
+import { useActiveCompany } from '../lib/queries.ts'
+import { onlyActiveCompany } from '../lib/activeCompany.ts'
+import { updateProfilePreferences } from '../lib/profilePreferences.ts'
+import { changeTemplatePreferences, templatePreferences, type TemplatePreferences } from './estimates/estimateLibrary.ts'
+import QuoteLibrary from './estimates/QuoteLibrary.tsx'
+import DataErrorState from '../components/DataErrorState.tsx'
+
 
 // White-label: internal-only tool but no app-attributable phrasing
 // just in case any of the output is shown to a customer downstream.
@@ -62,6 +70,27 @@ function capitalize(s: any) { return s ? s.charAt(0).toUpperCase() + s.slice(1) 
 
 export default function Bid() {
   const { user } = useAuth()
+  const { profile, refresh: refreshProfile } = useProfile()
+  const company = useActiveCompany()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const workspaceView = searchParams.get('view') === 'quotes' ? 'quotes' : searchParams.get('view') === 'templates' ? 'templates' : 'builder'
+  function setWorkspaceView(view: string) {
+    const next = new URLSearchParams(searchParams)
+    next.set('view', view)
+    setSearchParams(next, { replace: true })
+  }
+  const [templateSaving, setTemplateSaving] = useState<string | null>(null)
+  const [libraryFilter, setLibraryFilter] = useState('all')
+  async function saveTemplatePreference(id: string, patch: Partial<TemplatePreferences>) {
+    if (!user?.id || templateSaving) return
+    setTemplateSaving(id)
+    try {
+      await updateProfilePreferences(user.id, current => changeTemplatePreferences(current, id, patch))
+      await refreshProfile()
+      toastSuccess('Library updated')
+    } catch (error) { toastError('Could not update library', error instanceof Error ? error.message : 'Try again.') }
+    finally { setTemplateSaving(null) }
+  }
   // Deleting a template takes a second tap on the same button (D57).
   const deleteTap = useArmedId()
   const navigate = useNavigate()
@@ -82,9 +111,21 @@ export default function Bid() {
   const [clientName, setClientName] = useState('')
   // Templates library (migration 024). Loaded via TanStack Query and
   // invalidated after every save/delete so the picker stays fresh.
-  const { data: templates = [] } = useEstimateTemplates(user?.id)
+  const templateQueryState = useEstimateTemplates(user?.id)
+  const templates = useMemo(() => onlyActiveCompany(templateQueryState.data || [], company), [templateQueryState.data, company])
   const fetchTemplates = useInvalidateEstimateTemplates()
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [templateQuery, setTemplateQuery] = useState('')
+  const [templateType, setTemplateType] = useState('')
+  const templateTypes = useMemo(() => Array.from(new Set(templates.map(template => template.job_type || 'Uncategorized'))).sort(), [templates])
+  const matchingTemplates = useMemo(() => {
+    const needle = templateQuery.trim().toLocaleLowerCase()
+    return templates.filter(template => (libraryFilter === 'all' || (libraryFilter === 'favorites' ? templatePreferences(profile?.preferences, template.id).favorite : templatePreferences(profile?.preferences, template.id).category === libraryFilter))
+      && (!templateType || (template.job_type || 'Uncategorized') === templateType)
+      && (!needle || [template.name, template.description, template.job_type, JSON.stringify(template.line_items)]
+        .filter(Boolean).join(' ').toLocaleLowerCase().includes(needle)))
+      .sort((a, b) => Number(templatePreferences(profile?.preferences, b.id).favorite) - Number(templatePreferences(profile?.preferences, a.id).favorite))
+  }, [templates, templateQuery, templateType, libraryFilter, profile?.preferences])
   const [savingTemplate, setSavingTemplate] = useState(false)
   const [templateNamePrompt, setTemplateNamePrompt] = useState('')
   // Merged rate card (seed defaults + user overrides + custom trades).
@@ -272,6 +313,7 @@ export default function Bid() {
     try {
       const { error } = await supabase.from('fh_estimate_templates').insert({
         user_id: user.id,
+        org_id: orgId,
         name,
         description: bid.summary || null,
         job_type: jobType || null,
@@ -307,6 +349,7 @@ export default function Bid() {
     if (t.job_type) setJobType(t.job_type)
     setScope(`Loaded from template: ${t.name}`)
     setPickerOpen(false)
+    setWorkspaceView('builder')
     hapticSuccess()
     toastSuccess('Template loaded', t.name)
   }
@@ -347,7 +390,7 @@ export default function Bid() {
 
   return (
     <motion.div
-      className={`v3-screen${isDesktop ? ' fh-build-utility fh-bid-workspace' : ''}`}
+      className={`v3-screen${isDesktop ? ' fh-build-utility fh-bid-workspace' : ''}${workspaceView !== 'builder' ? ' fh-bid-workspace--library' : ''}`}
       data-build-screen={isDesktop ? 'Bid' : undefined}
       variants={stagger}
       initial="hidden"
@@ -391,7 +434,7 @@ export default function Bid() {
             fontWeight: 700,
             color: 'var(--v3-text)'
           }}>
-            {isDesktop ? 'Estimate builder' : 'Build a clean estimate'}
+            Estimates
           </h1>
           <p style={{
             margin: '6px 0 0',
@@ -400,16 +443,27 @@ export default function Bid() {
             lineHeight: 1.5,
             color: 'var(--v3-text-muted)'
           }}>
-            Describe the scope below. FieldHorse returns a structured bid with line items, ranges, and a recommended price.
+            Manage quotes, reuse templates and build your next estimate.
           </p>
+          {workspaceView !== 'quotes' && templateQueryState.isError && <DataErrorState title="Templates unavailable" message="Check your connection and try again." onRetry={() => { void templateQueryState.refetch() }} />}
+          <nav aria-label="Estimate workspace" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 12 }}>
+            <Link to="/bid?view=quotes" aria-current={workspaceView === 'quotes' ? 'page' : undefined} className="fh-build-secondary-btn" style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center' }}>All quotes</Link>
+            <Link to="/bid?view=builder" aria-current={workspaceView === 'builder' ? 'page' : undefined} className="fh-build-secondary-btn" style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center' }}>Estimate builder</Link>
+            <Link to="/bid?view=templates" aria-current={workspaceView === 'templates' ? 'page' : undefined} className="fh-build-secondary-btn" style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center' }}>Templates</Link>
+            {workspaceView !== 'quotes' && <Link to="/quotes/new" className="fh-build-secondary-btn" style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center' }}>New quote</Link>}
+          </nav>
         </div>
       </motion.div>
+
+      {workspaceView === 'quotes' && <QuoteLibrary />}
+      {workspaceView === 'templates' && templateQueryState.isPending && <p className="fh-estimate-library" role="status">Loading templates…</p>}
+      {workspaceView === 'templates' && !templateQueryState.isPending && !templateQueryState.isError && templates.length === 0 && <section className="fh-estimate-library"><h2>No templates yet</h2><p>Build an estimate, then save its scope and line items as a reusable template.</p><Link to="/bid?view=builder">Build an estimate</Link></section>}
 
       {/* TEMPLATES RAIL, surfaces saved estimate templates above the
           scope input so the operator can load a previous bid as a
           starting point instead of typing or re-running the AI. Only
           renders when at least one template exists. */}
-      {templates.length > 0 && (
+      {workspaceView !== 'quotes' && templates.length > 0 && (
         <motion.div
           className="fh-bid-workspace__templates"
           variants={item}
@@ -422,23 +476,51 @@ export default function Bid() {
                 · {templates.length}
               </span>
             </Eyebrow>
+            {workspaceView !== 'templates' && (
             <button
               type="button"
               onClick={() => setPickerOpen((v) => !v)}
+              aria-expanded={pickerOpen}
+              aria-controls="estimate-template-browser"
               style={{
                 background: 'transparent', border: 'none',
                 color: 'var(--v3-primary-text)',
                 fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-                letterSpacing: 0, cursor: 'pointer', padding: 0
+                letterSpacing: 0, cursor: 'pointer', padding: '8px 0', minHeight: 44
               }}
             >
               {pickerOpen ? 'Hide' : 'Browse all'}
             </button>
+            )}
           </div>
-          {pickerOpen ? (
+          {pickerOpen || workspaceView === 'templates' ? (
+            <div id="estimate-template-browser">
+              <p style={{ fontSize: 14, color: 'var(--v3-text-muted)' }}>Favorites and library categories follow your account. Categories describe how you use a template.</p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
+                <label style={{ display: 'grid', gap: 8, flex: '1 1 180px', fontSize: 14 }}>Library view
+                  <select value={libraryFilter} onChange={event => setLibraryFilter(event.target.value)} style={{ minHeight: 44, padding: 12, fontSize: 16, borderRadius: 10, color: 'var(--v3-text)', background: 'var(--v3-surface)', border: '1px solid var(--v3-border-strong)' }}>
+                    <option value="all">All templates</option><option value="favorites">Favorites</option><option value="reusable">Reusable templates</option><option value="imported">Imported references</option>
+                  </select>
+                </label>
+                <label style={{ display: 'grid', gap: 8, flex: '1 1 240px', fontSize: 14 }}>
+                  Search templates
+                  <input type="search" value={templateQuery} onChange={event => setTemplateQuery(event.target.value)}
+                    placeholder="Name, scope or material" style={{ minHeight: 44, padding: 12, fontSize: 16, borderRadius: 10, color: 'var(--v3-text)', background: 'var(--v3-surface)', border: '1px solid var(--v3-border-strong)' }} />
+                </label>
+                <label style={{ display: 'grid', gap: 8, flex: '1 1 180px', fontSize: 14 }}>
+                  Template job type
+                  <select value={templateType} onChange={event => setTemplateType(event.target.value)}
+                    style={{ minHeight: 44, padding: 12, fontSize: 16, borderRadius: 10, color: 'var(--v3-text)', background: 'var(--v3-surface)', border: '1px solid var(--v3-border-strong)' }}>
+                    <option value="">All job types</option>
+                    {templateTypes.map(type => <option key={type} value={type}>{type}</option>)}
+                  </select>
+                </label>
+              </div>
+              <p aria-live="polite" style={{ fontSize: 14 }}>{matchingTemplates.length} of {templates.length} templates</p>
+              {matchingTemplates.length === 0 && <p>No templates match. Try another search or job type.</p>}
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {templates.map((t) => (
-                <li key={t.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 8, alignItems: 'center', padding: '12px 12px', borderRadius: 10, background: 'var(--v3-surface)', border: '1px solid var(--v3-border)' }}>
+              {matchingTemplates.map((t) => (
+                <li key={t.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto auto', gap: 8, alignItems: 'center', padding: '12px 12px', borderRadius: 10, background: 'var(--v3-surface)', border: '1px solid var(--v3-border)' }}>
                   <button
                     type="button"
                     onClick={() => loadTemplate(t)}
@@ -457,12 +539,17 @@ export default function Bid() {
                       {t.total_high ? ` · ${money(t.total_high)}` : ''}
                       {t.job_type ? ` · ${capitalize(t.job_type)}` : ''}
                     </span>
+                    <span style={{ fontSize: 12, color: 'var(--v3-text-muted)' }}>
+                      {templatePreferences(profile?.preferences, t.id).category === 'imported' ? 'Imported reference' : 'Reusable template'} · Updated {new Date(t.updated_at).toLocaleDateString()}
+                      {Array.isArray(t.line_items) && t.line_items.length > 0
+                        ? ` · Units: ${Array.from(new Set((t.line_items as any[]).map(line => line?.unit).filter(Boolean))).join(', ') || 'per item'}` : ''}
+                    </span>
                   </button>
                   <button
                     type="button"
                     onClick={() => loadTemplate(t)}
                     style={{
-                      padding: '8px 12px', borderRadius: 10,
+                      padding: '8px 12px', borderRadius: 10, minHeight: 44,
                       background: 'color-mix(in srgb, var(--v3-primary) 14%, transparent)',
                       border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
                       color: 'var(--v3-primary-text)',
@@ -478,7 +565,7 @@ export default function Bid() {
                     aria-label={deleteTap.armedId === t.id ? 'Tap again to delete' : `Delete template ${t.name}`}
                     title={deleteTap.armedId === t.id ? `Tap again to delete "${t.name}" from your templates` : 'Delete template'}
                     style={{
-                      width: deleteTap.armedId === t.id ? 'auto' : 26, height: 26, borderRadius: 10, padding: deleteTap.armedId === t.id ? '0 8px' : 0,
+                      width: deleteTap.armedId === t.id ? 'auto' : 44, minHeight: 44, borderRadius: 10, padding: deleteTap.armedId === t.id ? '0 8px' : 0,
                       fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-body)', whiteSpace: 'nowrap',
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                       background: 'transparent',
@@ -488,9 +575,27 @@ export default function Bid() {
                   >
                     {deleteTap.armedId === t.id ? 'Tap again to delete' : <Trash2 size={12} aria-hidden="true" />}
                   </button>
+                  <div style={{ gridColumn: '1 / -1', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
+                    <button type="button" disabled={templateSaving !== null} aria-pressed={templatePreferences(profile?.preferences, t.id).favorite}
+                      aria-label={`${templatePreferences(profile?.preferences, t.id).favorite ? 'Remove favorite' : 'Favorite'} ${t.name}`}
+                      onClick={() => { void saveTemplatePreference(t.id, { favorite: !templatePreferences(profile?.preferences, t.id).favorite }) }}
+                      style={{ minHeight: 44, padding: '8px 12px', display: 'inline-flex', alignItems: 'center', gap: 8, border: '1px solid var(--v3-border)', borderRadius: 'var(--fh-r-control)', background: 'var(--v3-surface)', color: 'var(--v3-primary-text)' }}>
+                      <Star size={16} fill={templatePreferences(profile?.preferences, t.id).favorite ? 'currentColor' : 'none'} aria-hidden="true" />
+                      {templatePreferences(profile?.preferences, t.id).favorite ? 'Favorited' : 'Favorite'}
+                    </button>
+                    <label style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, fontSize: 14 }}>Library category
+                      <select aria-label={`Category for ${t.name}`} value={templatePreferences(profile?.preferences, t.id).category} disabled={templateSaving !== null}
+                        onChange={event => { void saveTemplatePreference(t.id, { category: event.target.value as 'reusable' | 'imported' }) }}
+                        style={{ minHeight: 44, padding: 8, border: '1px solid var(--v3-border-strong)', borderRadius: 'var(--fh-r-control)', fontSize: 16, color: 'var(--v3-text)', background: 'var(--v3-surface)' }}>
+                        <option value="reusable">Reusable template</option><option value="imported">Imported reference</option>
+                      </select>
+                    </label>
+                    {templateSaving === t.id && <span role="status">Saving library preference…</span>}
+                  </div>
                 </li>
               ))}
             </ul>
+            </div>
           ) : (
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {templates.slice(0, 6).map((t) => (
@@ -531,6 +636,7 @@ export default function Bid() {
         </motion.div>
       )}
 
+      {workspaceView === 'builder' && <>
       {/* SCOPE INPUT CARD, primary workspace */}
       <motion.div
         variants={item}
@@ -542,6 +648,7 @@ export default function Bid() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
           {/* Scope textarea */}
           <textarea
+            aria-label="Estimate scope"
             value={scope}
             onChange={(e) => setScope(e.target.value)}
             rows={5}
@@ -550,13 +657,12 @@ export default function Bid() {
               width: '100%',
               padding: '12px 12px',
               borderRadius: 10,
-              background: 'var(--v3-surface-2)',
+              background: 'var(--v3-surface)',
               border: '1px solid var(--v3-border-strong)',
               color: 'var(--v3-text)',
               fontFamily: 'var(--font-body)',
-              fontSize: 14,
+              fontSize: 16,
               lineHeight: 1.5,
-              outline: 'none',
               resize: 'vertical',
               minHeight: 120,
               boxSizing: 'border-box'
@@ -897,7 +1003,7 @@ export default function Bid() {
                     transition={{ delay: 0.15 + i * 0.04 }}
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '1fr auto auto',
+                      gridTemplateColumns: 'minmax(0, 1fr) auto auto',
                       gap: 12,
                       alignItems: 'center',
                       padding: '12px 12px',
@@ -1007,6 +1113,7 @@ export default function Bid() {
           </motion.div>
         )}
       </AnimatePresence>
+      </>}
     </motion.div>
   )
 }

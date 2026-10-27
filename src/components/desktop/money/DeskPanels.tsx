@@ -47,20 +47,22 @@ import type {
 /** Outstanding by age: the total, then Current, Late and Overdue, each with its range. */
 export function AgingSummary({ totals, pace }: { totals: AgingTotals; pace?: CollectionPace }) {
   return (
-    <section className="fhmd-aging" aria-label="Outstanding by age">
+    <section className="fhmd-aging" aria-label="Contract balances by reference age">
       <div className="fhmd-aging__head">
-        <p className="fhmd-aging__label">Total outstanding</p>
+        <p className="fhmd-aging__label">Remaining contract value</p>
         <p className="fhmd-aging__total">{formatMoney(totals.total)}</p>
       </div>
+      <p className="fhmd-intro">Contract value less payments, including unbilled work. Reference age uses the oldest open invoice date, otherwise the job creation date. Overdue invoices appear separately below.</p>
       <dl className="fhmd-aging__facts">
         {AGING.map((b) => (
           <div key={b.id} className="fhmd-aging__fact">
             <dt>{b.label}</dt>
-            <dd>{formatMoney(totals[b.id])}</dd>
+            <dd><Link to={`/invoices?panel=reconciliation&bucket=${encodeURIComponent(b.id)}`}>{formatMoney(totals[b.id])}</Link></dd>
             <dd className="fhmd-aging__range">{b.range}</dd>
           </div>
         ))}
       </dl>
+      <Link className="fhmd-name--link" to="/invoices?panel=balances">View contributing job balances</Link>
       {pace && pace.monthCollected > 0 && (
         <p className="fhmd-aging__pace">
           {`${formatMoney(pace.monthCollected)} collected this month`}
@@ -72,11 +74,9 @@ export function AgingSummary({ totals, pace }: { totals: AgingTotals; pace?: Col
   )
 }
 
-function AgingChip({ bucket, days }: { bucket: string; days?: number }) {
+function AgingChip({ bucket }: { bucket: string }) {
   const aging = agingLabel(bucket)
-  // A bill not yet due has an age of zero or less: just "Current".
-  const label = days !== undefined && days > 0 ? `${aging.label}, ${plural(days, 'day', 'days')}` : aging.label
-  return <Chip label={label} tone={aging.tone} />
+  return <Chip label={aging.label} tone={aging.tone} />
 }
 
 /* ---------------- Who owes you ---------------- */
@@ -95,7 +95,7 @@ export function StatementsTable({
   return (
     <>
       <p className="fhmd-intro">
-        Customers with a balance, the most overdue first. A statement rolls every open invoice into one document.
+        Customers with remaining contract value, oldest reference dates first. Statements include job balances and payments, including work not yet invoiced.
       </p>
       <table className={cx('fhmd-table fhmd-table--panel', compact && 'fhmd-table--compact')} aria-label="Who owes you">
         <colgroup>
@@ -416,13 +416,11 @@ export function BalancesTable({
                       <div className="fhmd-status">
                         {!r.isOutstanding ? (
                           <Chip label="Paid" tone="success" />
-                        ) : compact ? (
+                        ) : (
                           <>
                             <AgingChip bucket={r.bucket} />
                             {r.ageDays > 0 && <span className="fhmd-status__sub">{plural(r.ageDays, 'day', 'days')}</span>}
                           </>
-                        ) : (
-                          <AgingChip bucket={r.bucket} days={r.ageDays} />
                         )}
                       </div>
                     </td>

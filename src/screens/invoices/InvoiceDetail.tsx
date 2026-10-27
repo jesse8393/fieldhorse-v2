@@ -1,3 +1,4 @@
+import { invoiceReference } from '../../lib/invoiceReference.ts'
 // The invoice screen, /invoices/:id, where :id is an fh_invoices row (Phase
 // 9, Task 12, decisions D57 and D62). One invoice: who it bills (a job, or
 // a client with no job), what it still owes, its description, its actions
@@ -24,6 +25,7 @@ import { BellRing, ChevronLeft, DollarSign, FileDown, Link as LinkIcon, Send } f
 import { Button, Chip, Field, IconButton, Row, SkeletonRows, formatMoney } from '../../components/fh'
 import type { ChipTone } from '../../components/fh'
 import DataErrorState from '../../components/DataErrorState.tsx'
+import InvoiceBillingReview from '../../components/InvoiceBillingReview.tsx'
 import { buildInvoicePdf, setInvoiceStatus } from '../../lib/invoices.ts'
 import { mintPublicLink } from '../../lib/publicLink.ts'
 import { supabase } from '../../lib/supabase.ts'
@@ -58,11 +60,13 @@ function statusChip(standing: { status: string; daysLate: number }): { label: st
 export default function InvoiceDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { user, query, record, figures, company, now, sending, refresh, patchInvoice, send } = useInvoiceScreen(id)
+  const { user, query, record, figures, billingReview, company, now, sending, refresh, patchInvoice, send } = useInvoiceScreen(id)
   const waitId = useId()
   const titleRef = useRef<HTMLHeadingElement>(null)
   useEffect(() => { titleRef.current?.focus({ preventScroll: true }) }, [])
 
+  const [duplicateReviewed, setDuplicateReviewed] = useState(false)
+  useEffect(() => { setDuplicateReviewed(false) }, [id, record])
   const [downloading, setDownloading] = useState(false)
   const [sharing, setSharing] = useState(false)
   const [voidArmed, setVoidArmed] = useState(false)
@@ -115,6 +119,10 @@ export default function InvoiceDetail() {
   // no job. The customer opens /p/:token and sees the branded invoice.
   async function handleShare() {
     if (!record || !user || sharing) return
+    if (record.invoice.status === 'draft' && billingReview && (billingReview.excess > 0 || billingReview.duplicates.length && !duplicateReviewed)) {
+      toastError('Review billing first', 'Resolve contract limits and review similar invoices before sharing.')
+      return
+    }
     hapticTap()
     setSharing(true)
     try {
@@ -212,6 +220,7 @@ export default function InvoiceDetail() {
       </header>
 
       <section className="fhinv-hero" aria-label="Invoice summary">
+        <p className="fhinv-hero__facts" title={invoice.id}>{invoiceReference(invoice)}</p>
         <p className="fhinv-hero__who">{to.name || 'Customer'}</p>
         {record.job ? (
           <Link className="fhinv-hero__job" to={`/jobs/${record.job.id}?tab=financials`}>{jobTitle || 'Open job'}</Link>
@@ -226,11 +235,12 @@ export default function InvoiceDetail() {
           {dates && <span className="fhinv-hero__dates">{dates}</span>}
         </div>
         <p className="fhinv-hero__facts">
-          {`${formatMoney(Number(invoice.amount) || 0)} invoiced`}
+          {`${formatMoney(Number(invoice.amount) || 0)} ${standing.status === 'draft' ? 'draft amount, not yet issued' : 'invoice amount'}`}
           {paidOnIt > 0 ? `, ${formatMoney(paidOnIt)} paid on it` : ''}
         </p>
       </section>
 
+      {isDraft && billingReview && <InvoiceBillingReview review={billingReview} acknowledged={duplicateReviewed} onAcknowledge={setDuplicateReviewed} />}
       <section className="fhinv-section" aria-label="Description">
         <Field
           multiline
@@ -259,7 +269,7 @@ export default function InvoiceDetail() {
           </Button>
         )}
         {!settled && (
-          <Button variant="secondary" size="md" block icon={Send} loading={sending} onClick={() => void send()}>
+          <Button variant="secondary" size="md" block icon={Send} loading={sending} onClick={() => void send({ duplicateReviewed })}>
             {isDraft ? 'Send' : 'Resend'}
           </Button>
         )}

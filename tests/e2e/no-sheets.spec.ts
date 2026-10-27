@@ -1,7 +1,10 @@
 // No pop ups anywhere (PHASE9_PLAN Task 14, SPEC D57). As the owner, every
 // authenticated route in the app is visited on both the phone and the
-// desktop, and every button on the page is tapped once, each from a fresh
-// load of the route. Nothing with role="dialog" or [data-vaul-drawer] may
+// desktop, and every route button is tapped once, each from a fresh load.
+// Shared shell buttons get their own case on each project instead of the
+// same sidebar/header/dock actions being repeated on every route. Headers
+// inside main remain route coverage, including their contextual actions.
+// Nothing with role="dialog" or [data-vaul-drawer] may
 // ever mount. The desktop command palette is the one exception D57 allows,
 // so its trigger (Search everything, Cmd or Ctrl K) is the one button left
 // alone, as is Sign out, which would end the session the rest of the
@@ -37,10 +40,19 @@ async function open(page: Page, path: string) {
 }
 
 type Target = { name: string; nth: number }
+type Scope = 'route' | 'shell'
 
-/** The visible, enabled buttons on the page, by accessible name, in page order. */
-async function buttonsOn(page: Page): Promise<Target[]> {
-  const names = await page.locator('button:visible:not([disabled])').evaluateAll((els) => els.map((el) => {
+// The partition is exhaustive: every enabled visible button is either
+// inside the routed main landmark or outside it in the shared shell.
+function candidates(page: Page, scope: Scope) {
+  return scope === 'route'
+    ? page.locator('#fh-main button:visible:not([disabled])')
+    : page.locator('button:visible:not([disabled]):not(#fh-main button)')
+}
+
+/** Visible, enabled buttons in one scope, by accessible name and order. */
+async function buttonsOn(page: Page, scope: Scope): Promise<Target[]> {
+  const names = await candidates(page, scope).evaluateAll((els) => els.map((el) => {
     const b = el as HTMLButtonElement
     const labelled = b.getAttribute('aria-labelledby')
     const byRef = labelled ? labelled.split(/\s+/).map((id) => document.getElementById(id)?.textContent || '').join(' ').trim() : ''
@@ -59,27 +71,52 @@ async function buttonsOn(page: Page): Promise<Target[]> {
   return out
 }
 
+async function exerciseButtons(page: Page, scope: Scope, route: string, prepare: () => Promise<void>) {
+  await prepare()
+  await expect(page.locator(POPUP)).toHaveCount(0)
+  const targets = await buttonsOn(page, scope)
+  for (const target of targets) {
+    // A fresh load per button: a previous navigation or mutation has no
+    // say over the next. Duplicate names resolve within the same scope
+    // and the same visible/enabled set used to discover them.
+    await prepare()
+    const button = candidates(page, scope)
+      .and(page.getByRole('button', { name: target.name, exact: true }))
+      .nth(target.nth)
+    if (!(await button.isVisible().catch(() => false))) continue
+    await button.click({ timeout: 5000 }).catch(() => {})
+    await page.waitForTimeout(500)
+    await expect(page.locator(POPUP), `${route}: "${target.name}" opened a pop up`).toHaveCount(0)
+  }
+}
+
+async function openShell(page: Page) {
+  await open(page, '/')
+  // The sidebar can start collapsed on Today. Include the controls that
+  // other routes reveal automatically, and verify that opening the group
+  // is itself inline. Fresh loads restore this precondition even after
+  // the toggle's own case closes it. The phone has no sidebar group.
+  const more = page.getByRole('button', { name: 'Team and office', exact: true })
+  if (await more.isVisible().catch(() => false)) {
+    if (await more.getAttribute('aria-expanded') === 'false') await more.click()
+  }
+  await expect(page.locator(POPUP), 'Opening shared navigation mounted a pop up').toHaveCount(0)
+}
+
 test.describe('no sheet, drawer or dialog mounts anywhere', () => {
   test.describe.configure({ mode: 'parallel' })
+
+  test('shared sidebar, header and dock controls', async ({ context, page }) => {
+    test.setTimeout(420_000)
+    await signIn(context)
+    await exerciseButtons(page, 'shell', 'Shared shell', () => openShell(page))
+  })
 
   for (const route of ROUTES) {
     test(route, async ({ context, page }) => {
       test.setTimeout(420_000)
       await signIn(context)
-      await open(page, route)
-      await expect(page.locator(POPUP)).toHaveCount(0)
-      const targets = await buttonsOn(page)
-
-      for (const t of targets) {
-        // A fresh load per button: one that navigated away or changed the
-        // page has no say over the next.
-        await open(page, route)
-        const button = page.getByRole('button', { name: t.name, exact: true }).nth(t.nth)
-        if (!(await button.isVisible().catch(() => false))) continue
-        await button.click({ timeout: 5000 }).catch(() => {})
-        await page.waitForTimeout(500)
-        await expect(page.locator(POPUP), `${route}: "${t.name}" opened a pop up`).toHaveCount(0)
-      }
+      await exerciseButtons(page, 'route', route, () => open(page, route))
     })
   }
 })

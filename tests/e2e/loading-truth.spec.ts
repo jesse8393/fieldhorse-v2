@@ -759,7 +759,7 @@ test.describe('Customers', () => {
       const cockpit = page.locator('.fh-clients__cockpit')
       await expect.poll(() => read.held.length).toBeGreaterThan(0)
       await holds(async () => {
-        await expect(cockpit.getByText('Lifetime billed', { exact: true })).toBeVisible()
+        await expect(cockpit.getByText('Won contract value', { exact: true })).toBeVisible()
         await expect(cockpit.getByRole('status').first()).toBeVisible()
         await expect(cockpit).not.toContainText('$0')
         await expect(cockpit).not.toContainText('0 accounts')
@@ -779,7 +779,7 @@ test.describe('Customers', () => {
       await expect(meta).not.toContainText('on file')
       await expect(meta.getByRole('status')).toBeVisible()
       await expect(focus.getByText('Book of business', { exact: true })).toBeVisible()
-      await expect(focus).not.toContainText('with open jobs')
+      await expect(focus).not.toContainText('with active work')
       await expect(focus.getByRole('status')).toBeVisible()
       await expect(tiles.getByRole('status', inPage)).toHaveCount(4)
       await expect(tiles).not.toContainText('$0')
@@ -788,7 +788,7 @@ test.describe('Customers', () => {
     })
     read.release()
     await expect(meta).toContainText('on file')
-    await expect(focus).toContainText('with open jobs')
+    await expect(focus).toContainText('with active work')
     await expect(page.locator('.fh-build-mini').filter({ hasText: 'Total clients' }).locator('strong')).toHaveText('1')
     await expect(page.locator('[data-build-screen="SnowClientsBuild"]').getByRole('status', inPage)).toHaveCount(0)
   })
@@ -799,7 +799,7 @@ test.describe('Customers', () => {
     await page.goto('/clients', { waitUntil: 'domcontentloaded', timeout: 60_000 })
     const error = page.getByRole('alert').filter({ hasText: "Couldn't load clients" })
     await expect(error).toBeVisible({ timeout: 30_000 })
-    for (const line of [/clients? on file/, /\b0 accounts?\b/, /No accounts yet/, /with open jobs/]) {
+    for (const line of [/clients? on file/, /\b0 accounts?\b/, /No accounts yet/, /with active work/]) {
       await expect(page.getByText(line)).toHaveCount(0)
     }
     failing.on = false
@@ -819,8 +819,6 @@ test.describe('Customers', () => {
 test.describe('Job Files tab', () => {
   // The sub tab panels, by id: the job's own Files tab is a tabpanel named Files too.
   const panel = (page: Page, name: 'Photos' | 'Files') => page.locator(`#fh-job-files-panel-${name.toLowerCase()}`)
-  const subTab = (page: Page, name: 'Photos' | 'Files') =>
-    page.getByRole('tablist', { name: 'Files sub-tabs' }).getByRole('tab', { name, exact: true })
   const kindRead = (kind: 'photo' | 'file'): Matcher => (url, method) => method === 'GET' && url.searchParams.get('kind') === `eq.${kind}`
 
   for (const [kind, name, count, empty] of [
@@ -830,8 +828,7 @@ test.describe('Job Files tab', () => {
     test(`${name}: no count while the read is out, and the loaded tab reads as before`, async ({ context, page }) => {
       await signIn(context)
       const read = await hold(context, 'fh_job_files', kindRead(kind))
-      await open(page, '/jobs/c-job1?tab=files', '[role="tablist"][aria-label="Files sub-tabs"]')
-      if (name === 'Files') await subTab(page, 'Files').click()
+      await open(page, `/jobs/c-job1?tab=${name === 'Files' ? 'documents' : 'files'}`, '#fh-job-files-panel-' + name.toLowerCase())
       await expect.poll(() => read.held.length).toBeGreaterThan(0)
       await holds(async () => {
         await expect(panel(page, name).getByRole('status').first()).toBeVisible()
@@ -847,8 +844,7 @@ test.describe('Job Files tab', () => {
     test(`${name}: a failed read shows an error with Try again, not the empty card`, async ({ context, page }) => {
       await signIn(context)
       const failing = await fail(context, 'fh_job_files', kindRead(kind))
-      await open(page, '/jobs/c-job1?tab=files', '[role="tablist"][aria-label="Files sub-tabs"]')
-      if (name === 'Files') await subTab(page, 'Files').click()
+      await open(page, `/jobs/c-job1?tab=${name === 'Files' ? 'documents' : 'files'}`, '#fh-job-files-panel-' + name.toLowerCase())
       const error = panel(page, name).getByRole('alert')
       await expect(error).toContainText("Couldn't load", { timeout: 15_000 })
       await expect(panel(page, name)).not.toContainText(count)
@@ -901,8 +897,7 @@ test.describe('Job Files tab', () => {
         }
         return route.fallback()
       })
-      await open(page, '/jobs/c-job1?tab=files', '[role="tablist"][aria-label="Files sub-tabs"]')
-      if (name === 'Files') await subTab(page, 'Files').click()
+      await open(page, `/jobs/c-job1?tab=${name === 'Files' ? 'documents' : 'files'}`, '#fh-job-files-panel-' + name.toLowerCase())
       const shown = (label: string) => kind === 'photo'
         ? panel(page, name).getByRole('img', { name: label })
         : panel(page, name).getByText(label, { exact: true })
@@ -975,8 +970,7 @@ test.describe('Job Files tab', () => {
         }
         return route.fallback()
       })
-      await open(page, '/jobs/c-job1?tab=files', '[role="tablist"][aria-label="Files sub-tabs"]')
-      if (name === 'Files') await subTab(page, 'Files').click()
+      await open(page, `/jobs/c-job1?tab=${name === 'Files' ? 'documents' : 'files'}`, '#fh-job-files-panel-' + name.toLowerCase())
       const shown = (label: string) => kind === 'photo'
         ? panel(page, name).getByRole('img', { name: label })
         : panel(page, name).getByText(label, { exact: true })
@@ -1058,8 +1052,8 @@ test.describe('Field reports', () => {
     })
     read.release()
     await expect(page.locator('.fh-build-topbar__meta')).toContainText('1 report captured')
-    await expect(rail).toContainText('All clear')
-    await expect(rail).toContainText('All linked')
+    await expect(rail).toContainText('No risks recorded across report history')
+    await expect(rail).toContainText('All reports carry a job link')
     await expect(page.locator('[data-build-screen="SnowNotesBuild"]').getByRole('status', inPage)).toHaveCount(0)
   })
 

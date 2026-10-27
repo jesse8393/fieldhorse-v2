@@ -11,6 +11,7 @@
 // export form only resolves through bundler interop. Using the named
 // form lets headless QA scripts (scripts/qa-render-proposal.mjs)
 // render the same code path the browser uses.
+import { proposalIssuedAt } from './proposalDate.ts'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { loadLogoForPdf, loadImageForPdf } from './pdfLogo.ts'
@@ -130,7 +131,7 @@ function itemAmount(it) {
 // plain prose while "320 sf" still surfaces. Mirrors the HTML preview's
 // scopeLine() so both surfaces render the same text.
 function proposalScopeLine(it) {
-  const desc = (it.description || '').trim()
+  const desc = [(it.description || '').trim(), (it.notes || '').trim()].filter(Boolean).join('\n')
   const qty = Number(it.qty || 1)
   const unit = (it.unit || '').trim()
   if (qty > 1) return `${desc} · ${qty}${unit ? ` ${unit}` : ''}`
@@ -1725,6 +1726,7 @@ export async function generateQuote({
   terms = '',
   exclusions = '',
   expiresAt = null,
+  issuedAt = null,
   status = 'draft',
   quoteId,
   approval = null,
@@ -1741,7 +1743,8 @@ export async function generateQuote({
     ? await loadLogoForPdf(company.logo_url, { maxDimension: 720 })
     : null
   const brandRGB = parseBrandAccentRgb(company?.brand_accent_hex) || FIELD_GOLD
-  const number = docProposalNumber(company?.name, quoteId || contact?.id)
+  const documentDate = issuedAt || proposalIssuedAt(contact) || new Date()
+  const number = docProposalNumber(company?.name, quoteId || contact?.id, documentDate)
 
   // Group items into rows. Each scope section (e.g. "Concrete add on")
   // becomes ONE row, its items list as scope lines in the description
@@ -1773,7 +1776,7 @@ export async function generateQuote({
   if (template === 'slate' || template === 'mint' || template === 'editorial') {
     const lineItems = (mapped.scopeSections || []).flatMap((sec) =>
       (sec.items || []).map((it) => ({
-        description: (it.description || '').trim(),
+        description: [(it.description || '').trim(), (it.notes || '').trim()].filter(Boolean).join('\n'),
         qty: Number(it.qty || 1),
         unit: (it.unit || '').trim(),
         rate: Number(it.rate || 0),
@@ -1782,7 +1785,7 @@ export async function generateQuote({
     )
     const upgradeItems = (mapped.upgrades || []).flatMap((sec) =>
       (sec.items || []).map((it) => ({
-        description: (it.description || '').trim(),
+        description: [(it.description || '').trim(), (it.notes || '').trim()].filter(Boolean).join('\n'),
         qty: Number(it.qty || 1),
         unit: (it.unit || '').trim(),
         rate: Number(it.rate || 0),
@@ -1796,7 +1799,7 @@ export async function generateQuote({
     await drawThemedProposal(doc, {
       template, pageWidth, pageHeight, margin, company, logo,
       contact, number,
-      issuedAt: new Date(), expiresAt,
+      issuedAt: documentDate, expiresAt,
       projectTitle: String(contact?.job_title || '').trim(),
       scope: scope || '',
       warranty: (company?.warranty_default || '').trim(),
@@ -1819,7 +1822,7 @@ export async function generateQuote({
   const bottom = footer.contentBottom
 
   // Letterhead (premium company-name chrome + Issued / Valid until meta)
-  const estMetaRows = [{ label: 'Issued', value: formatDocDate(new Date()) }]
+  const estMetaRows = [{ label: 'Issued', value: formatDocDate(documentDate) }]
   if (expiresAt) estMetaRows.push({ label: 'Valid until', value: formatDocDate(expiresAt), strong: true })
   let cursor = drawModernLetterhead(doc, {
     pageWidth, margin, docType: 'Estimate', number, company, logo, brandRGB,

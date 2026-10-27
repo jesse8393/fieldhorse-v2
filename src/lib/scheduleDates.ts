@@ -7,6 +7,9 @@
 
 const HOUR_MS = 60 * 60 * 1000
 
+/** All schedule layouts use Sunday as their first day. */
+export const SCHEDULE_WEEK_START = 0 as const
+
 /**
  * Local midnight on the first day of the week that holds `d`.
  * weekStartsOn: 0 = Sunday, 1 = Monday.
@@ -45,4 +48,18 @@ export function eventDurationMs(event: { start_at?: string | null; end_at?: stri
   const end = event?.end_at ? Date.parse(event.end_at) : NaN
   const span = end - start
   return Number.isFinite(span) && span > 0 ? span : HOUR_MS
+}
+
+/** Build the exact visits shown in the recurrence preview and written on save. */
+export function scheduleOccurrences(date: string, time: string, durationMinutes: number, everyDays = 7, count = 1): { start_at: string; end_at: string }[] {
+  if (!Number.isFinite(durationMinutes) || durationMinutes <= 0 || !Number.isInteger(everyDays) || everyDays < 1 || !Number.isInteger(count) || count < 1 || count > 52) return []
+  const visits: { start_at: string; end_at: string }[] = []
+  for (let i = 0; i < count; i++) {
+    const start = localDateTimeMs(date, time, everyDays * i)
+    if (start == null) return []
+    const end = start + durationMinutes * 60_000
+    if (!Number.isFinite(end) || Math.abs(end) > 8.64e15) return []
+    visits.push({ start_at: new Date(start).toISOString(), end_at: new Date(end).toISOString() })
+  }
+  return visits
 }

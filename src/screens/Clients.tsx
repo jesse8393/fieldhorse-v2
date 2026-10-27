@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Search, Briefcase, ChevronRight, AlertTriangle } from 'lucide-react'
@@ -6,7 +6,7 @@ import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { SkeletonList } from '../components/Skeleton.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
 import LoadingValue from '../components/LoadingValue.tsx'
-import { useInfiniteRender } from '../lib/useInfiniteRender.ts'
+import { useHistoryEntryState } from '../lib/useHistoryEntryState.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useClientsBundle, useInvalidateClients } from '../lib/queries.ts'
@@ -26,18 +26,26 @@ function money(n: any) {
   return `$${Math.round(v).toLocaleString()}`
 }
 
+const validWindow = (value: unknown): value is number => Number.isInteger(value) && Number(value) >= 40 && Number(value) <= 100_000
+
 export default function Clients() {
   const { user } = useAuth()
   const navigate = useNavigate()
   // isPending, not isLoading: the read waits for the company scope first,
   // and that wait is loading too, never "$0" over "0 accounts".
   const { data: bundle, isPending: loading, isError } = useClientsBundle(user?.id)
-  const rows = bundle?.clients ?? []
+  const rows = useMemo(() => bundle?.clients ?? [], [bundle?.clients])
   const invalidateClients = useInvalidateClients()
-  const [q, setQ] = useState('')
   // Filter lives in the URL (?filter=) so it survives refresh and is
   // shareable, like the deal-page tabs already are (UI audit #30).
   const [searchParams, setSearchParams] = useSearchParams()
+  const q = searchParams.get('q') || ''
+  const setQ = (value: string) => {
+    const next = new URLSearchParams(searchParams)
+    if (value) next.set('q', value)
+    else next.delete('q')
+    setSearchParams(next, { replace: true })
+  }
   const urlFilter = searchParams.get('filter')
   const filter = urlFilter === 'active' || urlFilter === 'recent' ? urlFilter : 'all'
   const setFilter = (next: string) => {
@@ -55,11 +63,11 @@ export default function Clients() {
   // stale fh_clients.total_lifetime_value / active_jobs_count columns.
   // Single source of truth shared with Client detail (rollups.ts).
   // Both come from the same Query bundle as the client roster.
-  const jobs = bundle?.jobs ?? []
-  const leads = bundle?.leads ?? []
-  const quotes = bundle?.quotes ?? []
-  const payments = bundle?.payments ?? []
-  const changeOrders = bundle?.changeOrders ?? []
+  const jobs = useMemo(() => bundle?.jobs ?? [], [bundle?.jobs])
+  const leads = useMemo(() => bundle?.leads ?? [], [bundle?.leads])
+  const quotes = useMemo(() => bundle?.quotes ?? [], [bundle?.quotes])
+  const payments = useMemo(() => bundle?.payments ?? [], [bundle?.payments])
+  const changeOrders = useMemo(() => bundle?.changeOrders ?? [], [bundle?.changeOrders])
 
   // After a save/merge, invalidate the clients query so the list +
   // rollups refresh. Replaces the old load() refetch.
@@ -116,12 +124,9 @@ export default function Clients() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, q, filter, rollupMap])
 
-  // Bounded render window that grows on scroll, the client book can run to
-  // thousands of rows; keep the DOM small without changing the row design.
-  const { visible: visibleClients, sentinelRef: clientsSentinelRef, hasMore: clientsHasMore } = useInfiniteRender(
-    filtered,
-    `${filter}|${q}`
-  )
+  const [visibleCount, setVisibleCount] = useHistoryEntryState(`clients:${user?.id || ''}`, 40, validWindow)
+  const visibleClients = filtered.slice(0, visibleCount)
+  const clientsHasMore = visibleCount < filtered.length
 
   const totalLifetime = useMemo(() => {
     let total = 0
@@ -237,14 +242,14 @@ export default function Clients() {
         <div style={{
           padding: '12px 16px',
           borderRadius: 10,
-          background: 'linear-gradient(180deg, var(--v3-bg) 0%, var(--v3-surface) 72%)',
+          background: 'var(--v3-surface)',
           border: '1px solid var(--v3-border)',
-          boxShadow: '0 1px 0 rgba(242, 237, 228, 0.06) inset, 0 1px 2px rgba(20, 20, 20, 0.40), 0 8px 22px rgba(20, 20, 20, 0.42), 0 20px 44px rgba(20, 20, 20, 0.28)'
+          boxShadow: 'none'
         }}>
           {/* Header row: section eyebrow + state chip */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
-              <Eyebrow tone="gold">Clients</Eyebrow>
+              <Eyebrow as="h1" tone="gold" style={{ margin: 0 }}>Customers</Eyebrow>
               {!loading && <ClientsStateChip stats={screenStats} totalAccounts={rows.length} />}
             </div>
             {/* The add action sits in the header on a phone; the dock coin
@@ -254,7 +259,7 @@ export default function Clients() {
             </Button>
           </div>
 
-          {/* KPI strip, Lifetime billed | Outstanding (when populated) */}
+          {/* KPI strip, Won contract value | Outstanding (when populated) */}
           <div style={{
             display: 'grid',
             gridTemplateColumns: screenStats.outstanding > 0 ? '1fr 1px 1fr' : '1fr',
@@ -262,9 +267,9 @@ export default function Clients() {
             gap: 12
           }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-              <Eyebrow tone="gold">Lifetime billed</Eyebrow>
+              <Eyebrow tone="gold">Won contract value</Eyebrow>
               <StampNumber size="2xl" tone="gold" style={{ display: 'block', lineHeight: 0.95 }}>
-                {loading ? <LoadingValue label="Loading lifetime billed" width={112} height={28} /> : money(totalLifetime)}
+                {loading ? <LoadingValue label="Loading won contract value" width={112} height={28} /> : money(totalLifetime)}
               </StampNumber>
               <Eyebrow as="div" style={{ marginTop: 2 }}>
                 {loading ? <LoadingValue label="Loading your accounts" width={72} height={12} /> : <>{rows.length} {rows.length === 1 ? 'account' : 'accounts'}</>}
@@ -356,7 +361,7 @@ export default function Clients() {
               </div>
               <div style={{
                 marginTop: 2,
-                fontFamily: 'var(--font-body)', fontSize: 12,
+                fontFamily: 'var(--font-body)', fontSize: 14,
                 color: 'var(--v3-text-muted)'
               }}>
                 {duplicateClusters.length} {duplicateClusters.length === 1 ? 'cluster' : 'clusters'} sharing a phone or email
@@ -406,19 +411,19 @@ export default function Clients() {
               <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--v3-text)' }}>
                 No accounts yet
               </div>
-              <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--v3-text-muted)', lineHeight: 1.5, maxWidth: 320 }}>
+              <p style={{ margin: '4px 0 0', fontSize: 14, color: 'var(--v3-text-muted)', lineHeight: 1.5, maxWidth: 320 }}>
                 A client is the person you work for. Bills get sent to them, jobs roll up to them.
               </p>
             </div>
             <button type="button" onClick={() => openNew()} style={{
-              background: 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
+              background: 'var(--v3-primary)',
               color: 'var(--v3-on-primary)',
               border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
               padding: '12px 16px', borderRadius: 10,
-              fontWeight: 700, fontSize: 12,
+              fontWeight: 700, fontSize: 14,
               letterSpacing: 0,
               cursor: 'pointer',
-              boxShadow: '0 0 0 2px rgba(201, 150, 58, 0.14), 0 4px 12px rgba(201, 150, 58, 0.28)'
+              boxShadow: 'none'
             }}>
               Add your first client
             </button>
@@ -486,11 +491,9 @@ export default function Clients() {
             role="list"
             style={{
               borderRadius: 10,
-              background: 'var(--v3-surface-glass)',
-              backdropFilter: 'blur(14px) saturate(1.1)',
-              WebkitBackdropFilter: 'blur(14px) saturate(1.1)',
+              background: 'var(--v3-surface)',
               border: '1px solid var(--v3-border)',
-              boxShadow: '0 1px 0 var(--v3-glass-tint) inset, 0 8px 22px rgba(20, 20, 20, 0.40)',
+              boxShadow: 'none',
               overflow: 'hidden'
             }}
           >
@@ -511,7 +514,11 @@ export default function Clients() {
                 />
               )
             })}
-            {clientsHasMore && <div ref={clientsSentinelRef} aria-hidden="true" style={{ height: 1 }} />}
+            <div style={{ padding: 16 }}>
+              <p aria-live="polite" style={{ fontSize: 14 }}>Showing {visibleClients.length} of {filtered.length} customers.</p>
+              {clientsHasMore && <button type="button" className="fh-build-secondary-btn" style={{ minHeight: 44 }}
+                onClick={() => setVisibleCount(count => count + 40)}>Load more customers</button>}
+            </div>
           </div>
         )}
       </motion.div>
@@ -565,13 +572,10 @@ function formatRelative(date: any) {
 function ClientRow({ client: c, rollup: r, lastActivityRel, index, isTop, isLast, onOpen }: any) {
   const subline = useMemo(() => {
     if (r.outstanding > 0) {
-      return { text: `Owes ${money(r.outstanding)}`, tone: 'danger' }
-    }
-    if (r.activeCount > 0 && r.outstanding > 0) {
-      return { text: `${r.activeCount} active · ${money(r.outstanding)} outstanding`, tone: 'gold' }
+      return { text: `Contract balance ${money(r.outstanding)}`, tone: 'gold' }
     }
     if (r.activeCount > 0) {
-      return { text: `${r.activeCount} active ${r.activeCount === 1 ? 'job' : 'jobs'}`, tone: 'muted' }
+      return { text: `${r.activeCount} active work ${r.activeCount === 1 ? 'item' : 'items'}`, tone: 'muted' }
     }
     if (c.company_name) return { text: c.company_name, tone: 'muted' }
     return { text: '\u2003', tone: 'muted' }
@@ -592,9 +596,8 @@ function ClientRow({ client: c, rollup: r, lastActivityRel, index, isTop, isLast
   // "selected" state ("yellow and stuck" per user). All rows now share
   // the same neutral treatment; the featured card carries the emphasis.
   return (
-    <button
+    <div role="listitem"><button
       type="button"
-      role="listitem"
       onClick={() => { hapticTap(); onOpen() }}
       style={{
         display: 'flex',
@@ -645,7 +648,7 @@ function ClientRow({ client: c, rollup: r, lastActivityRel, index, isTop, isLast
         </div>
         <span style={{
           fontFamily: 'var(--font-body)',
-          fontSize: 12,
+          fontSize: 14,
           fontWeight: subline.tone === 'muted' ? 500 : 700,
           color: sublineColor,
           fontVariantNumeric: 'tabular-nums',
@@ -662,7 +665,7 @@ function ClientRow({ client: c, rollup: r, lastActivityRel, index, isTop, isLast
             2. last-activity relative time if known (recently-added
                value from migration 007's last_activity_at column)
             3. "lifetime" as a quiet label */}
-      <div style={{ flexShrink: 0, textAlign: 'right', opacity: r.lifetime > 0 ? 1 : 0.45 }}>
+      <div style={{ flexShrink: 0, textAlign: 'right', opacity: 1 }}>
         <div style={{
           fontFamily: 'var(--font-display)',
           fontSize: 16, lineHeight: 1,
@@ -675,7 +678,7 @@ function ClientRow({ client: c, rollup: r, lastActivityRel, index, isTop, isLast
         <div style={{
           marginTop: 4,
           fontFamily: 'var(--font-body)',
-          fontSize: 12,
+          fontSize: 14,
           color: 'var(--v3-text-muted)',
           fontVariantNumeric: 'tabular-nums'
         }}>
@@ -688,7 +691,7 @@ function ClientRow({ client: c, rollup: r, lastActivityRel, index, isTop, isLast
       </div>
 
       <ChevronRight size={14} color="var(--v3-text-muted)" aria-hidden="true" style={{ flexShrink: 0 }} />
-    </button>
+    </button></div>
   )
 }
 
@@ -703,10 +706,10 @@ function ClientsStateChip({ stats, totalAccounts }: any) {
   const { owesAccounts, activeAccounts } = stats
   let bg, border, color, label
   if (owesAccounts > 0) {
-    bg = 'var(--v3-danger-soft)'
-    border = 'color-mix(in srgb, var(--v3-danger) 38%, transparent)'
-    color = 'var(--v3-danger-bright)'
-    label = `${owesAccounts} ${owesAccounts === 1 ? 'owes' : 'owe'} balance`
+    bg = 'var(--v3-primary-soft)'
+    border = 'var(--v3-border)'
+    color = 'var(--v3-primary-text)'
+    label = `${owesAccounts} with contract balances`
   } else if (activeAccounts > 0) {
     bg = 'var(--v3-primary-soft)'
     border = 'color-mix(in srgb, var(--v3-primary) 35%, transparent)'

@@ -212,7 +212,7 @@ export default function Timesheets() {
   if (!memLoading && !canApproveTimesheets) {
     return (
       <div className="fh-build-page" data-build-screen="Timesheets">
-        <main className="fh-build-main">
+        <div className="fh-build-main">
           <section className="fh-build-hero-row fh-build-hero-row--page">
             <div>
               <div className="fh-build-good">Timesheets</div>
@@ -222,7 +222,7 @@ export default function Timesheets() {
           <div className="fh-build-table__empty">
             Your role ({role || 'unknown'}) can't approve timesheets. Ask an owner or admin.
           </div>
-        </main>
+        </div>
       </div>
     )
   }
@@ -257,7 +257,7 @@ export default function Timesheets() {
         </button>
       </header>
 
-      <main className="fh-build-main">
+      <div className="fh-build-main">
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
             <div className="fh-build-good">Team</div>
@@ -419,7 +419,7 @@ export default function Timesheets() {
             </section>
           )
         })}
-      </main>
+      </div>
     </div>
   )
 }

@@ -76,8 +76,14 @@ const MONEY = {
     contact({ id: 'c-lorraine', stage: 'job', name: 'Lorraine Beasley', job_title: 'Bath retile', amount: 9000 }),
     contact({ id: 'c-gail', stage: 'job', name: 'Gail Abernathy', job_title: 'Roof repair', amount: 6000 }),
     contact({ id: 'c-darnell', stage: 'closed', name: 'Darnell Whitcomb', job_title: 'Garage slab', amount: 9600, cost: 6960, completed_at: '2026-09-29T12:00:00Z' }),
-    contact({ id: 'c-marco', stage: 'quote', name: 'Marco Castellanos', job_title: 'Pool deck pour', amount: 18458, proposal_status: 'sent', quote_sent_at: '2026-10-07T11:00:00Z' })
+    contact({ id: 'c-marco', stage: 'moved_quote', name: 'Marco Castellanos', job_title: 'Pool deck pour', amount: 18458, proposal_status: 'sent', quote_sent_at: '2026-10-07T11:00:00Z' })
   ],
+  fh_quotes: [{
+    id: 'q-marco', org_id: 'org-1', user_id: 'qa-user-1', client_id: 'cl-marco',
+    title: 'Pool deck pour', amount: 18458, status: 'sent', job_id: null,
+    sent_at: '2026-10-07T11:00:00Z', created_at: '2026-09-01T12:00:00Z', updated_at: '2026-10-07T11:00:00Z',
+    fh_clients: { id: 'cl-marco', name: 'Marco Castellanos', phone: '555-0101', email: 'marco@example.com', address: null }
+  }],
   fh_invoices: [
     invoice({ id: 'i-rosa-dep', contact_id: 'c-rosa', title: 'Deposit', amount: 3000, status: 'paid', sequence_number: 1, due_at: '2026-09-25', issued_at: '2026-09-18T12:00:00Z', created_at: '2026-09-18T12:00:00Z' }),
     invoice({ id: 'i-rosa', contact_id: 'c-rosa', title: 'Final', amount: 1240, sequence_number: 2, due_at: '2026-10-02' }),
@@ -313,8 +319,8 @@ test.describe(`a desktop ${WIDTH} px wide`, () => {
     // own column, or under the customer's name once that column is gone.
     const rosa = overdue.getByRole('row', { name: /Rosa Delgado/ })
     const nameCell = rosa.getByRole('cell').first()
-    await expect(rosa.getByText('Concrete steps, final', { exact: true })).toBeVisible()
-    await expect(nameCell.getByText('Concrete steps, final', { exact: true })).toHaveCount(WIDTH < 1100 ? 1 : 0)
+    await expect(rosa.getByText('Concrete steps, final · Invoice 2 · i-rosa', { exact: true })).toBeVisible()
+    await expect(nameCell.getByText('Concrete steps, final · Invoice 2 · i-rosa', { exact: true })).toHaveCount(WIDTH < 1100 ? 1 : 0)
   })
 
   test('Money pages: All invoices and Who owes you keep their buttons whole', async ({ context, page }) => {
@@ -354,13 +360,9 @@ test.describe(`a desktop ${WIDTH} px wide`, () => {
       await expect(hollis.getByText('$248,500.00', { exact: true })).toBeVisible()
       await expect(hollis.getByText('$186,375.00', { exact: true })).toBeVisible()
       await expect(hollis.getByText('$62,125.00', { exact: true })).toHaveCount(width < 1100 ? 0 : 1)
-      // The age reads in the chip, or under it below 1100 px.
-      if (width < 1100) {
-        await expect(hollis.getByText('Overdue', { exact: true })).toBeVisible()
-        await expect(hollis.getByText('129 days', { exact: true })).toBeVisible()
-      } else {
-        await expect(hollis.getByText('Overdue, 129 days', { exact: true })).toBeVisible()
-      }
+      // Keep the reference-age bucket and exact age readable at every width.
+      await expect(hollis.getByText('Over 60 days', { exact: true })).toBeVisible()
+      await expect(hollis.getByText('129 days', { exact: true })).toBeVisible()
 
       // Each amount on one line, inside its cell (a Paid cell with nothing
       // paid yet is empty).

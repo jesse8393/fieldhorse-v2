@@ -115,7 +115,7 @@ describe('buildHomeDashboardBundle', () => {
   it('Needs an answer lists a lead whose follow up is due and a quote quiet for 7 days', () => {
     const bundle = buildHomeDashboardBundle(baseSource({
       leads: [
-        lead({ id: 'lead-1', follow_up_on: '2026-06-15', fh_clients: { name: 'Rosa Delgado' } }),
+        lead({ id: 'lead-1', follow_up_on: '2026-06-15', fh_clients: { name: 'Rosa Delgado', phone: '6155550101' } }),
         // Quoted already: the quote carries the follow up now.
         lead({ id: 'lead-2', status: 'quoted', follow_up_on: '2026-06-10', fh_clients: { name: 'Quoted lead' } }),
         // Not due yet.
@@ -151,6 +151,19 @@ describe('buildHomeDashboardBundle', () => {
     })
     expect(bundle.nextActionsTotal).toBe(2)
     expect(bundle.dealsAtRisk).toEqual({ count: 2, value: 9000, followUps: 1, quotesAttention: 1 })
+  })
+
+  it('missing phone repair keeps due leads in the same urgency order', () => {
+    const leads = [
+      lead({ id: 'older', follow_up_on: '2026-06-10', fh_clients: { name: 'Rosa', phone: null } }),
+      lead({ id: 'recent', follow_up_on: '2026-06-17', fh_clients: { name: 'Marcus', phone: '6155550101' } })
+    ]
+    const actions = buildHomeDashboardBundle(baseSource({ leads })).nextActions
+    const callable = buildHomeDashboardBundle(baseSource({ leads: leads.map((row) => ({ ...row, fh_clients: { ...row.fh_clients!, phone: '6155550101' } })) })).nextActions
+    expect(actions[0]).toMatchObject({ id: 'followup-due-older', verb: 'Add phone', title: 'Add phone for Rosa', clientId: 'cl-1', contactPhone: null })
+    expect(actions[1]).toMatchObject({ id: 'followup-due-recent', verb: 'Call', title: 'Call Marcus' })
+    expect(actions.map(({ id, urgency, urgencyTone, dueIso }) => ({ id, urgency, urgencyTone, dueIso })))
+      .toEqual(callable.map(({ id, urgency, urgencyTone, dueIso }) => ({ id, urgency, urgencyTone, dueIso })))
   })
 
   it('the stage rail is four counts: leads, quotes, jobs and invoices due', () => {
@@ -307,7 +320,7 @@ describe('buildHomeDashboardBundle', () => {
     expect(health?.billing).toBe('Outstanding') // the $2K CO is still owed
   })
 
-  it('keeps the 20 most urgent next actions and counts every one', () => {
+  it('keeps every next action ordered by urgency so See all reaches the full queue', () => {
     // 25 leads with follow ups 10 to 34 days overdue; the most overdue is
     // the most urgent.
     const leads = Array.from({ length: 25 }, (_, i) => lead({
@@ -317,9 +330,10 @@ describe('buildHomeDashboardBundle', () => {
     }))
     const bundle = buildHomeDashboardBundle(baseSource({ leads }))
     expect(bundle.nextActionsTotal).toBe(25)
-    expect(bundle.nextActions).toHaveLength(20)
+    expect(bundle.nextActions).toHaveLength(25)
     expect(bundle.nextActions[0].recordId).toBe('lead-25')
     expect(bundle.nextActions[19].recordId).toBe('lead-6')
+    expect(bundle.nextActions[24].recordId).toBe('lead-1')
   })
 })
 

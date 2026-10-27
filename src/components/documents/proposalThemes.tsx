@@ -35,12 +35,14 @@ import InsuranceModeBlock from './InsuranceModeBlock.tsx'
 import ChangeOrdersBlock from './ChangeOrdersBlock.tsx'
 import { Button, Chip, Icon, OnyxStage, Row, formatMoney } from '../fh'
 import Monogram from '../fh/Monogram.tsx'
+import DocumentLogo, { useDocumentLogo } from './DocumentLogo.tsx'
 import { cx } from '../fh/cx.ts'
 import { approvalNote, buildPortalView, depositNote, type PortalView, type PublicDocPayload, type PublicDocPayment } from '../../lib/portalView.ts'
 import './fieldhorse-proposal.css'
 
 export type ProposalLineItem = {
   description: string
+  notes?: string
   qty: number
   unit?: string
   rate: number
@@ -101,7 +103,7 @@ const PAD = 56
 /* ─── Page wrapper ─── */
 function Page({ background = '#F2EDE4', color = '#141414', children }: any) {
   return (
-    <article
+    <article className="fh-doc-layout fh-doc-letter-page"
       style={{
         width: '100%',
         maxWidth: `${PAGE_W}px`,
@@ -116,7 +118,7 @@ function Page({ background = '#F2EDE4', color = '#141414', children }: any) {
         position: 'relative'
       }}
     >
-      <div style={{ padding: `${PAD}px ${PAD}px ${PAD + 20}px` }}>{children}</div>
+      <div className="fh-doc-content" style={{ padding: 'var(--fh-doc-padding, 56px)', paddingBottom: 'calc(var(--fh-doc-padding, 56px) + 20px)' }}>{children}</div>
     </article>
   )
 }
@@ -128,14 +130,14 @@ function LogoMark({ company, maxHeight = 64, align = 'left' }: any) {
     .toUpperCase().replace(/[^A-Z]/g, '').slice(0, 2) || 'MC'
   if (company?.logo_url) {
     return (
-      <img loading="lazy"src={company.logo_url}
+      <DocumentLogo className="fh-doc-mark" loading="lazy" src={company.logo_url}
         alt={`${company?.name || 'Company'} logo`}
-        style={{ maxHeight, maxWidth: 220, objectFit: 'contain', display: 'block', margin: align === 'right' ? '0 0 0 auto' : 0 }}
+        style={{ maxHeight, maxWidth: 'min(220px, 100%)', objectFit: 'contain', display: 'block', margin: align === 'right' ? '0 0 0 auto' : 0 }}
       />
     )
   }
   return (
-    <div style={{
+    <div className="fh-doc-mark" style={{
       width: maxHeight, height: maxHeight, borderRadius: 10,
       background: '#141414', color: '#F2EDE4', display: 'grid', placeItems: 'center',
       fontFamily: DOC_FONTS.display, fontSize: maxHeight * 0.36, fontWeight: 600,
@@ -144,6 +146,10 @@ function LogoMark({ company, maxHeight = 64, align = 'left' }: any) {
       {monogram}
     </div>
   )
+}
+
+function ItemDescription({ item }: { item: ProposalLineItem }) {
+  return <><span style={{ whiteSpace: 'pre-wrap' }}>{item.description}</span>{item.notes && <div className="fh-doc-item-notes">{item.notes}</div>}</>
 }
 
 function fmtDate(d: any) {
@@ -192,7 +198,7 @@ function SupportingSections({ view, accent, muted = '#5C5C5C', mid = '#141414', 
       {photos.length > 0 && (
         <section>
           <Label>Project photos</Label>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 8 }}>
+          <div className="fh-doc-columns" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 8 }}>
             {photos.slice(0, 6).map((p: any, i: number) => p?.url && (
               <div key={i} style={{ width: '100%', aspectRatio: '4 / 3', background: '#F2EDE4', borderRadius: 10, overflow: 'hidden' }}>
                 <img src={p.url} alt={p.caption || 'Project photo'} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
@@ -205,14 +211,14 @@ function SupportingSections({ view, accent, muted = '#5C5C5C', mid = '#141414', 
       {upgrades.length > 0 && (
         <section>
           <Label>Optional upgrades</Label>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+          <table className="fh-doc-items" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
             <tbody>
               {upgrades.flatMap((g: any) => g.items).map((it: any, i: number) => (
-                <tr key={i} style={{ borderBottom: `1px solid ${rule}` }}>
-                  <td style={{ ...tdL, color: mid }}>{it.description}</td>
-                  <td style={{ ...tdR, color: mid }}>{qtyLabel(it)}</td>
-                  <td style={{ ...tdR, color: mid }}>{money(it.rate, { cents: true })}</td>
-                  <td style={{ ...tdR, color: mid, fontWeight: 600 }}>{money(it.amount, { cents: true })}</td>
+                <tr key={i} className="fh-doc-item-row" style={{ borderBottom: `1px solid ${rule}` }}>
+                  <td className="fh-doc-item-description" style={{ ...tdL, color: mid }}><ItemDescription item={it} /></td>
+                  <td data-label="Quantity" style={{ ...tdR, color: mid }}>{qtyLabel(it)}</td>
+                  <td data-label="Unit price" style={{ ...tdR, color: mid }}>{money(it.rate, { cents: true })}</td>
+                  <td data-label="Amount" style={{ ...tdR, color: mid, fontWeight: 600 }}>{money(it.amount, { cents: true })}</td>
                 </tr>
               ))}
             </tbody>
@@ -254,7 +260,7 @@ function SupportingSections({ view, accent, muted = '#5C5C5C', mid = '#141414', 
         <p style={{ margin: '0 0 22px', fontSize: 12, lineHeight: 1.5, color: mid, maxWidth: '62ch' }}>
           By signing below, the customer authorizes the company to perform the work outlined in this estimate and agrees to the terms and conditions contained herein.
         </p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+        <div className="fh-doc-columns" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
           <SignatureLine label="Client signature" name={stamped ? (approval?.clientName || recipient?.name) : null} dataUrl={stamped ? approval?.clientSignatureDataUrl : null} date={stamped ? approvedAt : ''} muted={muted} />
           <SignatureLine label="Contractor signature" name={stamped ? company?.name : null} dataUrl={stamped ? approval?.contractorSignatureDataUrl : null} date={stamped ? approval?.contractorApprovedAt : ''} muted={muted} />
         </div>
@@ -342,20 +348,20 @@ export function SlateProposal({ view }: { view: ProposalView }) {
         <LogoMark company={company} maxHeight={64} />
       </div>
 
-      <div style={{ background: bar, color: pal.onAccent, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, padding: '12px 24px', margin: `0 -${PAD - 0}px`, paddingLeft: PAD, paddingRight: PAD }}>
+      <div className="fh-doc-columns fh-doc-meta-band" style={{ background: bar, color: pal.onAccent, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, padding: '12px 24px', margin: `0 -${PAD - 0}px`, paddingLeft: PAD, paddingRight: PAD }}>
         <MetaCell label="Estimate No." value={view.number} />
         <MetaCell label="Issue Date" value={fmtDate(view.issuedAt) || '\u2003'} />
         <MetaCell label="Valid Until" value={fmtDate(view.expiresAt) || '\u2003'} />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, padding: '24px 0 24px', borderBottom: `1px solid ${pal.rule}` }}>
+      <div className="fh-doc-columns" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, padding: '24px 0 24px', borderBottom: `1px solid ${pal.rule}` }}>
         <PartyCol label="From" name={company?.name} lines={addressLines(company)} />
         <PartyCol label="For" name={recipient?.name} lines={addressLines(recipient)} />
       </div>
 
       {view.projectTitle && <ProjectHeading title={view.projectTitle} color="#141414" />}
 
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 18, fontSize: 14 }}>
+      <table className="fh-doc-items" style={{ width: '100%', borderCollapse: 'collapse', marginTop: 18, fontSize: 14 }}>
         <thead>
           <tr style={{ borderBottom: '2px solid #141414' }}>
             <th style={thL}>Description</th>
@@ -366,18 +372,18 @@ export function SlateProposal({ view }: { view: ProposalView }) {
         </thead>
         <tbody>
           {view.lineItems.map((it, i) => (
-            <tr key={i} style={{ borderBottom: `1px solid ${pal.rule}` }}>
-              <td style={tdL}>{it.description}</td>
-              <td style={tdR}>{qtyLabel(it)}</td>
-              <td style={tdR}>{money(it.rate, { cents: true })}</td>
-              <td style={{ ...tdR, fontWeight: 600 }}>{money(it.amount, { cents: true })}</td>
+            <tr key={i} className="fh-doc-item-row" style={{ borderBottom: `1px solid ${pal.rule}` }}>
+              <td className="fh-doc-item-description" style={tdL}><ItemDescription item={it} /></td>
+              <td data-label="Quantity" style={tdR}>{qtyLabel(it)}</td>
+              <td data-label="Unit price" style={tdR}>{money(it.rate, { cents: true })}</td>
+              <td data-label="Amount" style={{ ...tdR, fontWeight: 600 }}>{money(it.amount, { cents: true })}</td>
             </tr>
           ))}
         </tbody>
       </table>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
-        <div style={{ minWidth: 300 }}><TotalsRows view={view} /></div>
+        <div style={{ width: 300, maxWidth: '100%' }}><TotalsRows view={view} /></div>
       </div>
 
       <SupportingSections view={view} accent={bar} mid={pal.mid} muted={pal.muted} rule={pal.rule} />
@@ -395,8 +401,8 @@ export function MintProposal({ view }: { view: ProposalView }) {
   const greenSoft = pal.accentSoft
   return (
     <Page>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, gap: 16 }}>
-        <div style={{ minWidth: 0, maxWidth: '62%' }}>
+      <div className="fh-doc-letterhead" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, gap: 16 }}>
+        <div className="fh-doc-brand-copy" style={{ minWidth: 0, flex: '1 1 300px', maxWidth: '62%' }}>
           <div style={{ fontSize: 20, fontWeight: 700, color: '#141414' }}>{company?.name || '\u2003'}</div>
           {addressLines(company).map((l, i) => (
             <div key={i} style={{ fontSize: 12, color: '#5C5C5C', lineHeight: 1.5, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{l}</div>
@@ -409,7 +415,7 @@ export function MintProposal({ view }: { view: ProposalView }) {
         <span style={{ fontFamily: DOC_FONTS.display, fontSize: 24, letterSpacing: 0, color: green, fontWeight: 700 }}>ESTIMATE</span>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 26 }}>
+      <div className="fh-doc-columns" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 26 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: green, marginBottom: 4 }}>To</div>
           <div style={{ fontSize: 16, color: '#141414', marginBottom: 4 }}>{recipient?.name || '\u2003'}</div>
@@ -426,7 +432,7 @@ export function MintProposal({ view }: { view: ProposalView }) {
 
       {view.projectTitle && <ProjectHeading title={view.projectTitle} color={green} />}
 
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 14, fontSize: 14 }}>
+      <table className="fh-doc-items" style={{ width: '100%', borderCollapse: 'collapse', marginTop: 14, fontSize: 14 }}>
         <thead>
           <tr style={{ background: green, color: pal.onAccent }}>
             <th style={{ ...thR, color: pal.onAccent, padding: '12px 12px', width: '12%' }}>Qty</th>
@@ -437,18 +443,18 @@ export function MintProposal({ view }: { view: ProposalView }) {
         </thead>
         <tbody>
           {view.lineItems.map((it, i) => (
-            <tr key={i} style={{ borderBottom: `1px solid ${pal.rule}` }}>
-              <td style={{ ...tdR, paddingLeft: 12, paddingRight: 12 }}>{qtyLabel(it)}</td>
-              <td style={tdL}>{it.description}</td>
-              <td style={tdR}>{money(it.rate, { cents: true })}</td>
-              <td style={{ ...tdR, fontWeight: 600 }}>{money(it.amount, { cents: true })}</td>
+            <tr key={i} className="fh-doc-item-row" style={{ borderBottom: `1px solid ${pal.rule}` }}>
+              <td data-label="Quantity" style={{ ...tdR, paddingLeft: 12, paddingRight: 12 }}>{qtyLabel(it)}</td>
+              <td className="fh-doc-item-description" style={tdL}><ItemDescription item={it} /></td>
+              <td data-label="Unit price" style={tdR}>{money(it.rate, { cents: true })}</td>
+              <td data-label="Amount" style={{ ...tdR, fontWeight: 600 }}>{money(it.amount, { cents: true })}</td>
             </tr>
           ))}
         </tbody>
       </table>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
-        <div style={{ minWidth: 300 }}><TotalsRows view={view} accentText={green} boxed={greenSoft} /></div>
+        <div style={{ width: 300, maxWidth: '100%' }}><TotalsRows view={view} accentText={green} boxed={greenSoft} /></div>
       </div>
 
       <SupportingSections view={view} accent={green} mid={pal.mid} muted={pal.muted} rule={pal.rule} />
@@ -467,7 +473,7 @@ export function EditorialProposal({ view }: { view: ProposalView }) {
   const ink = pal.ink
   return (
     <Page background={sand} color={ink}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div className="fh-doc-letterhead" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 24 }}>
         <div>
           {view.projectTitle && (
             <div style={{ fontFamily: DOC_FONTS.serif, fontSize: 24, color: ink, marginBottom: 2 }}>{view.projectTitle}</div>
@@ -477,7 +483,7 @@ export function EditorialProposal({ view }: { view: ProposalView }) {
         <LogoMark company={company} maxHeight={72} align="right" />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 24, margin: '34px 0 28px' }}>
+      <div className="fh-doc-columns" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 24, margin: '34px 0 28px' }}>
         <EditCol label="" lines={[company?.name, ...addressLines(company)]} tan={tan} />
         <EditCol label="" lines={[recipient?.name, ...addressLines(recipient)]} tan={tan} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -495,7 +501,7 @@ export function EditorialProposal({ view }: { view: ProposalView }) {
       )}
 
       <div style={{ fontFamily: DOC_FONTS.serif, fontSize: 20, color: tan, marginBottom: 8, letterSpacing: 0 }}>COST BREAKDOWN</div>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+      <table className="fh-doc-items" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
         <thead>
           <tr style={{ borderBottom: `1px solid ${tan}` }}>
             <th style={{ ...thL, color: ink }}>Service</th>
@@ -506,11 +512,11 @@ export function EditorialProposal({ view }: { view: ProposalView }) {
         </thead>
         <tbody>
           {view.lineItems.map((it, i) => (
-            <tr key={i} style={{ borderBottom: `1px solid ${pal.rule}` }}>
-              <td style={{ ...tdL, color: ink }}>{it.description}</td>
-              <td style={{ ...tdR, color: ink }}>{qtyLabel(it)}</td>
-              <td style={{ ...tdR, color: ink }}>{money(it.rate, { cents: true })}</td>
-              <td style={{ ...tdR, color: ink, fontWeight: 600 }}>{money(it.amount, { cents: true })}</td>
+            <tr key={i} className="fh-doc-item-row" style={{ borderBottom: `1px solid ${pal.rule}` }}>
+              <td className="fh-doc-item-description" style={{ ...tdL, color: ink }}><ItemDescription item={it} /></td>
+              <td data-label="Quantity" style={{ ...tdR, color: ink }}>{qtyLabel(it)}</td>
+              <td data-label="Unit price" style={{ ...tdR, color: ink }}>{money(it.rate, { cents: true })}</td>
+              <td data-label="Amount" style={{ ...tdR, color: ink, fontWeight: 600 }}>{money(it.amount, { cents: true })}</td>
             </tr>
           ))}
         </tbody>
@@ -825,6 +831,7 @@ export function FieldhorseProposal({ view }: { view: ProposalView }) {
   const portal = view.portal
   const payload = portal?.payload ?? payloadFromView(view)
   const pv = buildPortalView(payload, new Date())
+  const logoSrc = useDocumentLogo(pv.logoUrl)
   const status = String(payload.contact?.proposal_status || '').toLowerCase()
   const [failedCover, setFailedCover] = useState<string | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
@@ -874,7 +881,7 @@ export function FieldhorseProposal({ view }: { view: ProposalView }) {
         )}
         <div className="fhp-col fhp-head__inner">
           <div className="fhp-brand">
-            <Monogram name={pv.companyName} logoUrl={pv.logoUrl} size={40} />
+            <Monogram name={pv.companyName} logoUrl={logoSrc} size={40} />
             <div className="fhp-brand__text">
               <p className="fhp-brand__name">{pv.companyName}</p>
               {pv.trustLine && <p className="fhp-brand__trust">{pv.trustLine}</p>}
@@ -924,7 +931,7 @@ export function FieldhorseProposal({ view }: { view: ProposalView }) {
             </div>
             <ul className="fhp-lines">
               {pv.included.map((line, i) => (
-                <Row key={i} as="li" title={line.title} money={line.amount} />
+                <Row key={i} as="li" title={line.title} subline={line.detail} money={line.amount} />
               ))}
             </ul>
             {detailsOpen && <FullDetails id={detailsId} view={view} coverUrl={pv.coverUrl} />}
@@ -960,6 +967,7 @@ export function FieldhorseProposal({ view }: { view: ProposalView }) {
                   key={i}
                   as="li"
                   title={line.title}
+                  subline={line.detail}
                   money={`+${formatMoney(line.amount)}`}
                   next={onAsk ? (
                     <Button

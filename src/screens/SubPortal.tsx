@@ -116,8 +116,8 @@ export default function SubPortal() {
   useEffect(() => { if (!memLoading) load() }, [memLoading, load])
 
   const profile = useMemo(() => mergedProfile(ctx?.matched_profiles || []), [ctx])
-  const partners = ctx?.accepted_partners || []
-  const jobs = ctx?.linked_jobs || {}
+  const partners = useMemo(() => ctx?.accepted_partners || [], [ctx?.accepted_partners])
+  const jobs = useMemo(() => ctx?.linked_jobs || {}, [ctx?.linked_jobs])
 
   // No payment figures in the portal: fh_payments rows are the GC's
   // client receipts, not money paid to the sub. The old "Paid YTD" KPI
@@ -179,7 +179,7 @@ export default function SubPortal() {
         </button>
       </header>
 
-      <main className="fh-build-main">
+      <div className="fh-build-main">
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
             <div className="fh-build-good">Sub portal</div>
@@ -409,7 +409,7 @@ export default function SubPortal() {
             </aside>
           </section>
         )}
-      </main>
+      </div>
 
     </div>
   )

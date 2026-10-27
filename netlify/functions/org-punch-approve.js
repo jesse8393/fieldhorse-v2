@@ -1,3 +1,4 @@
+import { supabaseServiceConfig } from './lib/serviceConfig.js'
 // Netlify Function — Approve one or many time punches.
 // POST /api/org-punch-approve  { punch_ids: string[], org_id? }
 // Authorization: Bearer <supabase access token>
@@ -28,9 +29,7 @@ export default async (request) => {
     return json({ error: 'method_not_allowed' }, 405)
   }
 
-  const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-  const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
-  const ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
+  const { url: SUPABASE_URL, secretKey: SERVICE_KEY, publicKey: ANON_KEY } = supabaseServiceConfig()
   if (!SUPABASE_URL || !SERVICE_KEY || !ANON_KEY) {
     return json({ error: 'server_misconfigured' }, 500)
   }

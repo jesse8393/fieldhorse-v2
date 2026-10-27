@@ -12,6 +12,10 @@ import { supabase } from '../../lib/supabase.ts'
 import { toYmd } from '../../lib/dates.ts'
 import { hapticTap } from '../../lib/haptics.ts'
 import { toastError, toastSuccess } from '../../lib/toast.ts'
+import { fetchInvoiceReviewContext } from '../../lib/invoiceReviewContext.ts'
+import { reviewInvoice } from '../../lib/invoiceReview.js'
+import InvoiceBillingReview from '../../components/InvoiceBillingReview.tsx'
+import { knownContractTotal } from '../../lib/invoiceSettlement.ts'
 import { goBackFrom, useInvoiceScreen } from './useInvoiceScreen.ts'
 import './invoices.css'
 
@@ -46,8 +50,22 @@ export default function InvoiceEdit() {
       setAmountError('Enter an amount, such as 1240.00')
       return
     }
+    if (invoice.status === 'paid' || invoice.status === 'void') { setAmountError('Paid and void invoices cannot be edited.'); return }
     setAmountError('')
     setSaving(true)
+    try {
+      const context = await fetchInvoiceReviewContext(invoice.contact_id, invoice.client_id)
+      const review = reviewInvoice({ invoice: { ...invoice, amount, title: shown.title }, ...context })
+      if (review.excess > 0 && amount > Number(invoice.amount)) {
+        setSaving(false)
+        setAmountError('This increase exceeds approved contract value. Reduce an unused draft or approve added scope first.')
+        return
+      }
+    } catch {
+      setSaving(false)
+      setAmountError('Could not verify current invoices. Retry before saving.')
+      return
+    }
     const patch = {
       title: shown.title.trim() || null,
       amount,
@@ -55,10 +73,10 @@ export default function InvoiceEdit() {
       due_at: shown.due ? new Date(`${shown.due}T12:00:00`).toISOString() : null,
       notes: shown.notes.trim() || null
     }
-    const { error } = await supabase.from('fh_invoices').update(patch).eq('id', invoice.id)
+    const { data, error } = await supabase.from('fh_invoices').update(patch).eq('id', invoice.id).eq('status', invoice.status).select('id').maybeSingle()
     setSaving(false)
-    if (error) {
-      toastError("Couldn't save the invoice", error.message || 'Try again')
+    if (error || !data) {
+      toastError("Couldn't save the invoice", error?.message || 'Invoice status changed. Refresh and try again.')
       return
     }
     hapticTap()
@@ -98,6 +116,7 @@ export default function InvoiceEdit() {
     <div className="v3-screen fhinv" data-build-screen="InvoiceEdit">
       {header}
       <p className="fhinv-intro">{`${figures.to.name || 'Customer'}${record.job?.job_title ? `, ${record.job.job_title}` : ''}`}</p>
+      <InvoiceBillingReview review={reviewInvoice({ invoice: { ...invoice, amount: Number(shown.amount), title: shown.title }, invoices: record.jobInvoices, contractTotal: record.job ? knownContractTotal({ amount: record.job.amount, changeOrders: record.changeOrders }) : null })} />
       <form className="fhinv-form" onSubmit={(e) => void submit(e)}>
         <Field label="Title" value={shown.title} disabled={saving} placeholder="Deposit, Progress draw 2, Final balance" onChange={(e) => set({ title: e.target.value })} />
         <Field

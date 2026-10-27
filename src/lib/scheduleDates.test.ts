@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { startOfWeek, localDateTimeMs, eventDurationMs } from './scheduleDates.ts'
+import { startOfWeek, localDateTimeMs, eventDurationMs, scheduleOccurrences, SCHEDULE_WEEK_START } from './scheduleDates.ts'
 
 // These assert local wall clock results, so they hold in any timezone.
 // Run with TZ=America/Chicago to exercise the daylight saving cases.
@@ -86,5 +86,27 @@ describe('eventDurationMs', () => {
     expect(eventDurationMs({ start_at: '2026-10-09T14:00:00Z', end_at: '2026-10-09T13:00:00Z' })).toBe(3600_000)
     expect(eventDurationMs({ start_at: '2026-10-09T14:00:00Z', end_at: 'garbage' })).toBe(3600_000)
     expect(eventDurationMs(null)).toBe(3600_000)
+  })
+})
+
+// Preview and submitted series share these exact timestamps.
+describe('scheduleOccurrences', () => {
+  it('uses an explicit total count and selected duration across DST', () => {
+    const visits = scheduleOccurrences('2026-10-28', '08:00', 90, 7, 5)
+    expect(visits).toHaveLength(5)
+    expect(visits.every((visit) => new Date(visit.start_at).getHours() === 8)).toBe(true)
+    expect(visits.every((visit) => Date.parse(visit.end_at) - Date.parse(visit.start_at) === 90 * 60_000)).toBe(true)
+    expect(new Date(visits[4].start_at).getDate()).toBe(25)
+  })
+  it('rejects malformed durations and recurrence before writing', () => {
+    expect(scheduleOccurrences('2026-10-28', '08:00', 0, 7, 5)).toEqual([])
+    expect(scheduleOccurrences('2026-10-28', '08:00', 60, 1.5, 5)).toEqual([])
+    expect(scheduleOccurrences('2026-10-28', '08:00', 60, 7, 53)).toEqual([])
+    expect(scheduleOccurrences('', '08:00', 60)).toEqual([])
+  })
+  it('keeps Sunday inside the same week at every layout width', () => {
+    const sunday = new Date(2026, 9, 25)
+    expect(startOfWeek(sunday, SCHEDULE_WEEK_START)).toEqual(sunday)
+    expect(startOfWeek(new Date(2026, 9, 31), SCHEDULE_WEEK_START)).toEqual(sunday)
   })
 })

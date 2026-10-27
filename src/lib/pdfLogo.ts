@@ -6,15 +6,16 @@
 // mark and to embed jobsite photos.
 //
 // Strategy, single path for all formats:
-//   1. fetch() the signed URL with an AbortController timeout
+//   1. fetch() the signed URL with one fetch/body/decode deadline
 //   2. blob → object URL (same-origin)
 //   3. <img> with crossOrigin="anonymous"
 //   4. drawImage() onto an offscreen canvas, scaled to maxDimension
 //   5. canvas.toDataURL(), taint-safe because data was ingested via
 //      fetch() (already in our origin's memory)
 //
-// Output format: the logo is re-encoded as PNG so its transparency
-// survives. Photos are re-encoded as JPEG (loadImageForPdf): a 900px
+// Output format: logos stay PNG. Transparent marks receive the document
+// ink or paper backing that best contrasts with their visible pixels;
+// opaque artwork is unchanged. Photos are re-encoded as JPEG: a 900px
 // jobsite photo is roughly 1 MB as PNG against about 120 KB as JPEG, and
 // jsPDF also has to parse and deflate PNG data on the main thread, so PNG
 // photos made multi MB proposals that were slow to build on a phone and
@@ -24,15 +25,17 @@
 // WebP. Returns null on any failure so the caller can fall back to a
 // typographic wordmark, an image never blocks a PDF.
 //
-// Cache: module-level Map keyed by `${format}:${maxDimension}:${url}`.
+// Cache: module-level Map keyed by format, size, backdrop treatment and URL.
 // Stores promises (so concurrent calls share one fetch) and the resolved
 // value is { dataUrl, format, width, height } | null. Negative results are
 // cached for the session, a transient failure won't retry on every
 // Preview / Download / Send. Operators can refresh to retry.
 
+import { logoBackdrop } from './logoContrast.ts'
+
 export type ImageFormat = 'png' | 'jpeg'
 export type LogoDescriptor = { dataUrl: string; format: 'PNG' | 'JPEG'; width: number; height: number }
-type LoadOptions = { maxDimension?: number; timeoutMs?: number; format?: ImageFormat }
+type LoadOptions = { maxDimension?: number; timeoutMs?: number; format?: ImageFormat; contrastBackdrop?: boolean }
 
 const JPEG_QUALITY = 0.82
 
@@ -40,27 +43,29 @@ const cache = new Map<string, Promise<LogoDescriptor | null>>()
 
 /**
  * Load an image and return a jsPDF-compatible image descriptor. PNG by
- * default, which keeps a logo's transparent background.
+ * default, with a contrasting backing for transparent logos.
  */
-export function loadLogoForPdf(logoUrl: string | null | undefined, { maxDimension = 720, timeoutMs = 8000, format = 'png' }: LoadOptions = {}): Promise<LogoDescriptor | null> {
+export function loadLogoForPdf(logoUrl: string | null | undefined, { maxDimension = 720, timeoutMs = 8000, format = 'png', contrastBackdrop = true }: LoadOptions = {}): Promise<LogoDescriptor | null> {
   if (!logoUrl || typeof logoUrl !== 'string') return Promise.resolve(null)
 
-  const key = `${format}:${maxDimension}:${logoUrl}`
+  const key = `${format}:${maxDimension}:${contrastBackdrop}:${logoUrl}`
   const cached = cache.get(key)
   if (cached) return cached
 
-  const p = doLoad(logoUrl, maxDimension, timeoutMs, format).catch(() => null)
+  const p = doLoad(logoUrl, maxDimension, timeoutMs, format, contrastBackdrop).catch(() => null)
   cache.set(key, p)
   return p
 }
 
-async function doLoad(url: string, maxDimension: number, timeoutMs: number, format: ImageFormat): Promise<LogoDescriptor | null> {
-  const blob = await fetchWithTimeout(url, timeoutMs)
-  if (!blob) return null
-
-  const objectUrl = URL.createObjectURL(blob)
+async function doLoad(url: string, maxDimension: number, timeoutMs: number, format: ImageFormat, contrastBackdrop: boolean): Promise<LogoDescriptor | null> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  let objectUrl: string | null = null
   try {
-    const img = await loadImage(objectUrl)
+    const blob = await fetchBlob(url, controller.signal)
+    if (!blob || controller.signal.aborted) return null
+    objectUrl = URL.createObjectURL(blob)
+    const img = await loadImage(objectUrl, controller.signal)
     if (!img) return null
 
     const srcW = img.naturalWidth || img.width
@@ -92,6 +97,18 @@ async function doLoad(url: string, maxDimension: number, timeoutMs: number, form
       return null
     }
 
+    if (format === 'png' && contrastBackdrop) {
+      try {
+        const background = logoBackdrop(ctx.getImageData(0, 0, targetW, targetH).data)
+        if (background) {
+          ctx.globalCompositeOperation = 'destination-over'
+          ctx.fillStyle = background
+          ctx.fillRect(0, 0, targetW, targetH)
+          ctx.globalCompositeOperation = 'source-over'
+        }
+      } catch { /* Keep the original appearance if pixels cannot be read. */ }
+    }
+
     let dataUrl: string
     try {
       dataUrl = format === 'jpeg'
@@ -107,47 +124,55 @@ async function doLoad(url: string, maxDimension: number, timeoutMs: number, form
 
     return { dataUrl, format: format === 'jpeg' ? 'JPEG' : 'PNG', width: targetW, height: targetH }
   } finally {
-    URL.revokeObjectURL(objectUrl)
+    clearTimeout(timer)
+    controller.abort()
+    if (objectUrl) URL.revokeObjectURL(objectUrl)
   }
 }
 
-function fetchWithTimeout(url: string, timeoutMs: number): Promise<Blob | null> {
+function fetchBlob(url: string, signal: AbortSignal): Promise<Blob | null> {
+  if (signal.aborted) return Promise.resolve(null)
   return new Promise((resolve) => {
-    const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null
-    const timer = setTimeout(() => {
-      try { ctrl?.abort() } catch {}
-      resolve(null)
-    }, timeoutMs)
+    let settled = false
+    const finish = (blob: Blob | null) => {
+      if (settled) return
+      settled = true
+      signal.removeEventListener('abort', onAbort)
+      resolve(blob)
+    }
+    const onAbort = () => finish(null)
+    signal.addEventListener('abort', onAbort, { once: true })
 
     fetch(url, {
-      signal: ctrl?.signal,
+      signal,
       mode: 'cors',
       credentials: 'omit',
       cache: 'force-cache'
     })
-      .then(async (r) => {
-        clearTimeout(timer)
-        if (!r.ok) { resolve(null); return }
-        try {
-          const b = await r.blob()
-          resolve(b)
-        } catch {
-          resolve(null)
-        }
-      })
-      .catch(() => {
-        clearTimeout(timer)
-        resolve(null)
-      })
+      .then(async (r) => r.ok ? await r.blob() : null)
+      .then(finish, () => finish(null))
   })
 }
 
-function loadImage(src: string): Promise<HTMLImageElement | null> {
+function loadImage(src: string, signal: AbortSignal): Promise<HTMLImageElement | null> {
+  if (signal.aborted) return Promise.resolve(null)
   return new Promise((resolve) => {
     const img = new Image()
+    let settled = false
+    const finish = (loaded: HTMLImageElement | null) => {
+      if (settled) return
+      settled = true
+      signal.removeEventListener('abort', onAbort)
+      img.onload = null
+      img.onerror = null
+      if (!loaded) img.removeAttribute('src')
+      resolve(loaded)
+    }
+    const onAbort = () => finish(null)
+    signal.addEventListener('abort', onAbort, { once: true })
     img.crossOrigin = 'anonymous'
-    img.onload = () => resolve(img)
-    img.onerror = () => resolve(null)
+    img.onload = () => finish(img)
+    img.onerror = () => finish(null)
     img.src = src
   })
 }
@@ -169,5 +194,5 @@ export function clearLogoCache() {
  *   loadImageForPdf(...) for project photos / hero images
  */
 export function loadImageForPdf(url: string | null | undefined, options: LoadOptions = {}): Promise<LogoDescriptor | null> {
-  return loadLogoForPdf(url, { ...options, format: options.format || 'jpeg' })
+  return loadLogoForPdf(url, { ...options, format: options.format || 'jpeg', contrastBackdrop: false })
 }
