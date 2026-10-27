@@ -14,6 +14,7 @@
 
 import { supabase } from './supabase.ts'
 import type { OrgRole } from './permissions.ts'
+import { loadLimitedTeamRoster } from './teamRoster.ts'
 
 let currentOrgId: string | null = null
 
@@ -65,6 +66,9 @@ export type OrgMembersListResponse = {
   org_id: string
   members: OrgMember[]
   invites: OrgInvitePending[]
+  read_only?: boolean
+  invites_available?: boolean
+  warning?: string
 }
 
 async function authHeader(): Promise<Record<string, string>> {
@@ -73,7 +77,7 @@ async function authHeader(): Promise<Record<string, string>> {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
-async function callJson<T>(path: string, body: any, opts: { auth?: boolean } = { auth: true }): Promise<T> {
+async function callJson<T>(path: string, body: any, opts: { auth?: boolean; signal?: AbortSignal } = { auth: true }): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (opts.auth !== false) {
     Object.assign(headers, await authHeader())
@@ -82,6 +86,7 @@ async function callJson<T>(path: string, body: any, opts: { auth?: boolean } = {
     method: 'POST',
     headers,
     body: JSON.stringify(body || {}),
+    signal: opts.signal,
   })
   const text = await res.text()
   let parsed: any
@@ -113,8 +118,22 @@ export function orgInviteAccept(
   return callJson('/api/org-invite-accept', { token })
 }
 
-export function orgMembersList(): Promise<{ ok: true } & OrgMembersListResponse> {
-  return callJson('/api/org-members-list', withOrg({}))
+export async function orgMembersList(orgId = currentOrgId): Promise<{ ok: true } & OrgMembersListResponse> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 15000)
+  try {
+    return await callJson('/api/org-members-list', orgId ? { org_id: orgId } : {}, { signal: controller.signal })
+  } catch (error) {
+    const status = Number((error as { status?: number }).status)
+    // Never fall back after an authentication or authorization denial.
+    if (!orgId || (status >= 400 && status < 500 && status !== 404)) throw error
+    const fallback = new AbortController()
+    const fallbackTimeout = setTimeout(() => fallback.abort(), 10000)
+    try { return await loadLimitedTeamRoster(orgId, supabase, fallback.signal) } catch { throw error }
+    finally { clearTimeout(fallbackTimeout) }
+  } finally {
+    clearTimeout(timeout)
+  }
 }
 
 export function orgInviteCreate(

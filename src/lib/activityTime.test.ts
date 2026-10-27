@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { paymentEventTime } from './activityTime.ts'
+import { activityBucketLabel, paymentEventTime } from './activityTime.ts'
 
 // The bug only shows west of UTC, so pin a US timezone for these cases.
 const originalTz = process.env.TZ
@@ -31,5 +31,21 @@ describe('paymentEventTime', () => {
 
   it('returns null when neither date is usable', () => {
     expect(paymentEventTime(null, null)).toEqual({ when: null, dateOnly: false })
+  })
+})
+
+describe('activity calendar periods', () => {
+  it('does not label a rolling week or month as a calendar period', () => {
+    const sunday = new Date(2026, 9, 25, 12)
+    expect(activityBucketLabel(new Date(2026, 9, 23), sunday)).toBe('This month')
+    expect(activityBucketLabel(new Date(2026, 8, 30), sunday)).toBe('September 2026')
+    expect(activityBucketLabel(new Date(2026, 9, 24), sunday)).toBe('Yesterday')
+    expect(activityBucketLabel(new Date(2026, 9, 25), sunday)).toBe('Today')
+    expect(activityBucketLabel(new Date(2026, 9, 26), sunday)).toBe('Upcoming')
+  })
+
+  it('uses Sunday calendar weeks and handles yesterday across daylight saving', () => {
+    expect(activityBucketLabel(new Date(2026, 9, 25), new Date(2026, 9, 28))).toBe('This week')
+    expect(activityBucketLabel(new Date(2026, 10, 1), new Date(2026, 10, 2))).toBe('Yesterday')
   })
 })

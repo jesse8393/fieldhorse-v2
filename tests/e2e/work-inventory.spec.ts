@@ -1,0 +1,91 @@
+import { test, expect } from '@playwright/test'
+import { signIn } from './helpers/signIn.ts'
+
+test.describe('one work inventory across layouts', () => {
+  test('leads and quotes keep their records and counts when resized', async ({ context, page }) => {
+    await signIn(context)
+    for (const stage of ['leads', 'quotes']) {
+      await page.setViewportSize({ width: 390, height: 844 })
+      await page.goto(`/jobs?stage=${stage}`)
+      const panel = page.getByRole('tabpanel')
+      await expect(panel.locator(`a[href^="/${stage}/"]`).first()).toBeVisible()
+      const small = await panel.locator(`a[href^="/${stage}/"]`).evaluateAll((links) => links.map((link) => link.getAttribute('href')).sort())
+      const count = await page.getByRole('tab', { selected: true }).locator('.fhjl-tab__count').innerText()
+      expect(small.length).toBeGreaterThan(0)
+      await page.setViewportSize({ width: 1486, height: 1024 })
+      await expect(page.getByRole('heading', { level: 1, name: 'Jobs' })).toBeVisible()
+      expect(await panel.locator(`a[href^="/${stage}/"]`).evaluateAll((links) => links.map((link) => link.getAttribute('href')).sort())).toEqual(small)
+      await expect(page.getByRole('tab', { selected: true }).locator('.fhjl-tab__count')).toHaveText(count)
+      await expect(page).toHaveURL(new RegExp(`stage=${stage}$`))
+      const search = page.getByRole('searchbox', { name: 'Search jobs', exact: true })
+      const searchButton = page.getByRole('button', { name: 'Search jobs', exact: true })
+      await searchButton.click()
+      await expect(search).toBeFocused()
+      await expect(searchButton).not.toHaveAttribute('aria-expanded')
+    }
+  })
+  test('All contains sales records, not just their badge counts', async ({ context, page }) => {
+    await signIn(context)
+    await page.goto('/jobs')
+    await expect(page.getByRole('tabpanel').locator('a[href^="/leads/"]').first()).toBeVisible()
+    await expect(page.getByRole('tabpanel').locator('a[href^="/quotes/"]').first()).toBeVisible()
+  })
+  for (const stage of ['leads', 'quotes']) {
+    test(`a ${stage} service failure hides unknown totals and retry restores them`, async ({ context, page }) => {
+      await signIn(context)
+      let failing = true
+      await page.route(new RegExp(`/rest/v1/fh_${stage}\\?`), (route) => failing
+        ? route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: 'Unavailable' }) })
+        : route.fallback())
+      await page.goto(`/jobs?stage=${stage}`)
+      await expect(page.getByText('Could not load sales records', { exact: true })).toBeVisible({ timeout: 30000 })
+      const affected = page.getByRole('tab', { name: new RegExp(`^${stage}`, 'i') })
+      const all = page.getByRole('tab', { name: /^All/ })
+      const unaffected = page.getByRole('tab', { name: stage === 'leads' ? /^Quotes/ : /^Leads/ })
+      await expect(affected).toHaveAccessibleName(new RegExp('count unavailable$'))
+      await expect(affected.locator('.fhjl-tab__count')).toHaveCount(0)
+      await expect(all.locator('.fhjl-tab__count')).toHaveCount(0)
+      await expect(unaffected.locator('.fhjl-tab__count')).toHaveText(/^[1-9]\d*$/)
+      await expect(page.getByText(stage === 'leads' ? 'No open leads.' : 'No quotes waiting.', { exact: true })).toHaveCount(0)
+      // Keyboard tab activation and the error panel remain usable together.
+      await affected.focus()
+      await page.keyboard.press('Home')
+      await expect(all).toBeFocused()
+      await page.keyboard.press('Enter')
+      await expect(all).toHaveAttribute('aria-selected', 'true')
+      await expect(page.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', await all.getAttribute('id') as string)
+      await expect(page.getByText('Some sales records could not load', { exact: true })).toBeVisible()
+      failing = false
+      await page.getByRole('tabpanel').getByRole('button', { name: 'Retry', exact: true }).click()
+      await expect(affected.locator('.fhjl-tab__count')).toHaveText(/^[1-9]\d*$/)
+      await expect(all.locator('.fhjl-tab__count')).toHaveText(/^[1-9]\d*$/)
+      await expect(affected).not.toHaveAccessibleName(/count unavailable/)
+      await expect(page.getByRole('tabpanel').locator(`a[href^="/${stage}/"]`).first()).toBeVisible()
+    })
+  }
+  test('a failed refresh keeps cached leads visible while marking their total unavailable', async ({ context, page }) => {
+    await signIn(context)
+    await page.goto('/jobs?stage=leads')
+    const rows = page.getByRole('tabpanel').locator('a[href^="/leads/"]')
+    await expect(rows.first()).toBeVisible()
+    const before = await rows.evaluateAll((links) => links.map((link) => link.getAttribute('href')))
+    await page.route(/\/rest\/v1\/fh_leads\?/, (route) => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: 'Unavailable' }) }))
+    await page.clock.setFixedTime(new Date(Date.now() + 60_000))
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange', { bubbles: true })))
+    await expect(page.getByText('Some sales records could not load', { exact: true })).toBeVisible({ timeout: 30000 })
+    expect(await rows.evaluateAll((links) => links.map((link) => link.getAttribute('href')))).toEqual(before)
+    await expect(page.getByRole('tab', { name: /^Leads/ }).locator('.fhjl-tab__count')).toHaveCount(0)
+    await expect(page.getByRole('tab', { name: /^All/ }).locator('.fhjl-tab__count')).toHaveCount(0)
+    await expect(page.getByRole('tab', { name: /^Quotes/ }).locator('.fhjl-tab__count')).toHaveText(/^[1-9]\d*$/)
+  })
+  test('crew retains job access without sales or amounts at desktop width', async ({ context, page }) => {
+    await signIn(context, { role: 'crew' })
+    await page.setViewportSize({ width: 1486, height: 1024 })
+    await page.goto('/jobs')
+    await expect(page.getByRole('heading', { name: 'Jobs', level: 1 })).toBeVisible()
+    await expect(page.getByRole('tabpanel')).toContainText('Plumbing Bellevue')
+    await expect(page.getByRole('tab', { name: /^Leads/ })).toHaveCount(0)
+    await expect(page.getByRole('tab', { name: /^Quotes/ })).toHaveCount(0)
+    await expect(page.getByRole('tabpanel')).not.toContainText('$')
+  })
+})

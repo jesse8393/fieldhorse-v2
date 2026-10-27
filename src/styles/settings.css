@@ -1,0 +1,151 @@
+/* Settings has its own reading and focus rhythm. Keep these adjustments
+   local rather than changing type or controls throughout the application. */
+.fh-settings-help {
+  margin: 0;
+  color: var(--fh-ink-2);
+  font-family: var(--fh-font-body);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.fh-settings-tools {
+  margin: 0 var(--v3-gutter) 16px;
+  padding: 12px;
+  border: 1px solid var(--fh-edge);
+  border-radius: var(--fh-r-card);
+  background: var(--fh-paper);
+}
+.fh-settings-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+.fh-settings-nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: var(--fh-r-chip);
+  color: var(--fh-ink);
+  font-family: var(--fh-font-body);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.fh-settings-nav a:hover { background: var(--fh-tray); }
+.fh-settings-tools__save {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--fh-hairline);
+  padding-top: 8px;
+}
+.fh-settings-tools__save p {
+  margin: 0;
+  color: var(--fh-ink-2);
+  font-size: 14px;
+  line-height: 1.4;
+}
+.fh-settings-save-bar {
+  position: fixed;
+  right: 80px;
+  bottom: calc(var(--fh-mobile-dock-height) + 16px);
+  z-index: calc(var(--z-nav, 40) - 1);
+  display: flex;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+.fh-settings-section { scroll-margin-top: 24px; }
+.fh-settings :is(input, select, textarea):focus-visible,
+.fh-settings :is(button, a):focus-visible,
+.fh-rate-editor :is(input, select, button):focus-visible {
+  outline: 2px solid var(--fh-focus) !important;
+  outline-offset: 3px;
+}
+.fh-rate-editor__trade {
+  min-width: 0;
+  margin: 0;
+  padding: 12px;
+  border: 0;
+}
+.fh-rate-editor__trade legend {
+  float: left;
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 0;
+  color: var(--fh-ink);
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.fh-rate-editor__badges { display: flex; flex-wrap: wrap; gap: 8px; clear: both; }
+.fh-rate-editor__badges:not(:empty) { margin-bottom: 8px; }
+.fh-rate-editor__fields {
+  display: grid;
+  grid-template-columns: minmax(72px, 0.8fr) repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  clear: both;
+  align-items: end;
+}
+.fh-rate-editor__fields label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 8px;
+  color: var(--fh-ink-2);
+  font-size: 14px;
+  line-height: 1.3;
+}
+.fh-rate-editor__actions { display: flex; gap: 8px; grid-column: 1 / -1; justify-content: flex-end; }
+.fh-rate-editor__actions:empty { display: none; }
+@media (max-width: 520px) {
+  .fh-rate-editor__fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fh-rate-editor__fields > label:first-child { grid-column: 1 / -1; }
+}
+@media (min-width: 900px) {
+  .fh-build-settings-main > .fh-settings-tools {
+    position: sticky;
+    top: 12px;
+    z-index: 10;
+    margin: 0;
+    box-shadow: var(--fh-shadow-soft);
+  }
+  .fh-settings-save-bar { position: static; }
+  .fh-settings-section { scroll-margin-top: 172px; }
+  .fh-settings .fh-build-focus .fh-settings-help { font-size: 14px; }
+  .fh-settings .fh-build-rail-card > span,
+  .fh-settings .fh-build-rail-list__title { font-size: 14px; line-height: 1.5; }
+}
+
+.fh-settings-nav a {
+  text-decoration: none;
+  border: 1px solid transparent;
+  gap: 8px;
+}
+.fh-settings-nav a[aria-current='page'] {
+  background: var(--fh-tray);
+  border-color: var(--fh-edge-strong);
+  color: var(--fh-ink);
+}
+.fh-settings-draft-dot {
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--fh-gold-ink);
+}
+.fh-settings-tools__save { margin-top: 8px; padding-top: 12px; align-items: flex-start; }
+.fh-settings-tools__save .fh-settings-section-description { color: var(--fh-ink); margin-bottom: 4px; }
+.fh-settings-tools__save .fh-settings-retained-drafts { margin-top: 4px; }
+.fh-settings-section[hidden] { display: none !important; }
+.fh-settings .fh-settings-save-bar button { white-space: nowrap; }
+@media (max-width: 899px) {
+  .fh-settings-tools { margin-inline: var(--v3-gutter); }
+  .fh-settings-save-bar { right: var(--v3-gutter); }
+}
+
+/* Section navigation announces the destination without drawing a border
+   around the entire form. Keyboard focus on controls remains visible. */
+.fh-settings-section:focus-visible { outline: none !important; }

@@ -27,6 +27,17 @@ function normalizeResponse(data: any) {
   return data
 }
 
+async function requestError(res: Response): Promise<Error> {
+  const body = await res.json().catch(() => ({}))
+  // Retain only the machine readable code. Raw upstream details must not
+  // become product copy in a consumer's error banner.
+  const error = new Error(`AI request failed: ${res.status}`)
+  return Object.assign(error, {
+    status: res.status,
+    code: typeof body?.error === 'string' ? body.error : undefined
+  })
+}
+
 export async function claudeMessage({ system, messages, maxTokens = 1024, model, effort }: { system?: string; messages: ClaudeMessage[]; maxTokens?: number; model?: string; effort?: 'low' | 'medium' | 'high' }) {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
@@ -37,7 +48,7 @@ export async function claudeMessage({ system, messages, maxTokens = 1024, model,
       body: JSON.stringify({ model: model || MODEL, system, messages, max_tokens: maxTokens, effort }),
       signal: controller.signal
     })
-    if (!res.ok) throw new Error(`Claude request failed: ${res.status}`)
+    if (!res.ok) throw await requestError(res)
     return normalizeResponse(await res.json())
   } catch (err) {
     if ((err as Error)?.name === 'AbortError') {
@@ -91,7 +102,7 @@ export async function claudeVision({ system, prompt, imageData, mediaType, maxTo
       body: JSON.stringify({ model: MODEL, system, messages, max_tokens: maxTokens }),
       signal: controller.signal
     })
-    if (!res.ok) throw new Error(`Claude vision request failed: ${res.status}`)
+    if (!res.ok) throw await requestError(res)
     return normalizeResponse(await res.json())
   } catch (err) {
     if ((err as Error)?.name === 'AbortError') {
@@ -110,4 +121,20 @@ export function extractJson(text: string | null | undefined) {
   const match = text.match(/\{[\s\S]*\}/)
   if (!match) return null
   try { return JSON.parse(match[0]) } catch { return null }
+}
+
+/** Checks server configuration only. It never sends a draft or calls the AI provider. */
+export async function getAiReadiness(): Promise<'configured' | 'unavailable' | 'unknown'> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 5000)
+  try {
+    const response = await fetch('/api/claude', { headers: await authHeaders(), signal: controller.signal })
+    if (!response.ok) return 'unknown'
+    const body = await response.json()
+    return body?.configured === true ? 'configured' : body?.configured === false ? 'unavailable' : 'unknown'
+  } catch {
+    return 'unknown'
+  } finally {
+    clearTimeout(timeout)
+  }
 }

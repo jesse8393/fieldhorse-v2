@@ -228,7 +228,7 @@ export default function FilesSection({ jobId, userId }: any) {
           message="Check your connection and try again."
           actionLabel="Try again"
           onRetry={() => {
-            keepFocusOnRetry(rootRef.current?.closest<HTMLElement>('[role="tabpanel"]') ?? rootRef.current)
+            keepFocusOnRetry(rootRef.current?.closest<HTMLElement>('[data-job-section], [role="tabpanel"]') ?? rootRef.current)
             void fetchRows()
           }}
         />

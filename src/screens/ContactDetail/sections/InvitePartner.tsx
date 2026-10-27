@@ -2,6 +2,7 @@ import { motion } from 'framer-motion'
 import { Users, UserPlus } from 'lucide-react'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { Eyebrow } from '../../../components/v3'
+import PartnerAccessDetails from '../../../components/PartnerAccessDetails.tsx'
 
 /**
  * Invite Partner section, single-action surface that opens /jobs/:id/partner
@@ -49,10 +50,10 @@ export default function InvitePartnerSection({ contact, onOpenInvitePartner }: a
             fontFamily: 'var(--font-body)', fontSize: 14,
             color: 'var(--v3-text-muted)', lineHeight: 1.5
           }}>
-            They'll see schedule, milestones, and notes, but not your client info or pricing.
-            Invite by email; they accept via link.
+            Give a trusted partner access to this job, including linked customer details and job pricing. Review permissions before inviting.
           </p>
         </div>
+        <PartnerAccessDetails />
         <motion.button
           type="button"
           whileTap={{ scale: 0.98 }}

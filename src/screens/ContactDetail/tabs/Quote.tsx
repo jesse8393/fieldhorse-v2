@@ -1,3 +1,4 @@
+import { proposalIssuedAt } from '../../../lib/proposalDate.ts'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Eye, Download, Send, ShieldCheck, Lock, Trash2, Link as LinkIcon, PenLine } from 'lucide-react'
@@ -355,6 +356,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
       terms: pendingTerms || '',
       exclusions: pendingExclusions || '',
       expiresAt: pendingExpiresIso,
+      issuedAt: proposalIssuedAt(contact),
       status: contact.proposal_status || 'draft',
       quoteId: contact.id,
       photos: photos as any,

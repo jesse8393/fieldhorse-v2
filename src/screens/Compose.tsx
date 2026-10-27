@@ -1,4 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import RecordPicker from '../components/RecordPicker.tsx'
+import CommunicationHistory from '../components/CommunicationHistory.tsx'
+import { emailDraft, plainDraft as stripMarkdown } from '../lib/composeDraft.ts'
 import { motion } from 'framer-motion'
 import { Sparkles, Copy, Check, MessageSquare, Mail, Mic, Send, PenLine, RotateCw } from 'lucide-react'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
@@ -8,12 +12,13 @@ import { MOVED_STAGE_FILTER } from '../lib/stages.ts'
 import { useOrgScope } from '../lib/orgScope.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
-import { claudeMessage } from '../lib/anthropic.ts'
+import { claudeMessage, getAiReadiness } from '../lib/anthropic.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { hapticMedium, hapticSuccess } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { FilterPill, Eyebrow } from '../components/v3'
 import { countNoun } from '../lib/format.ts'
+import { aiDraftError } from '../lib/serviceErrors.ts'
 
 const CHANNELS = [
   { id: 'sms', label: 'SMS', tone: 'Keep it under 160 chars. Tight. No emoji. Punctuation minimal.', Icon: MessageSquare },
@@ -34,17 +39,36 @@ const INTENTS = [
 export default function Compose() {
   const { user } = useAuth()
   const { profile } = useProfile()
-  const [channel, setChannel] = useState('sms')
+  const [params, setParams] = useSearchParams()
+  const [channel, setChannel] = useState(() => params.get('channel') === 'email' ? 'email' : 'sms')
   const [intent, setIntent] = useState(INTENTS[0])
-  const [contactId, setContactId] = useState('')
+  const [contactId, setContactId] = useState(() => params.get('contact') || '')
   const [contact, setContact] = useState<any>(null)
   const [contacts, setContacts] = useState<any[]>([])
+  const [contactsLoading, setContactsLoading] = useState(true)
+  const [contactsError, setContactsError] = useState('')
+  const [reloadContacts, setReloadContacts] = useState(0)
+  const [historyVersion, setHistoryVersion] = useState(0)
+  const [emailUnavailable, setEmailUnavailable] = useState(false)
+  const [handoff, setHandoff] = useState<{ contactId: string; channel: string; body: string; subject?: string; to: string } | null>(null)
+  const [loggingHandoff, setLoggingHandoff] = useState(false)
+  const sendLock = useRef(false)
   const [context, setContext] = useState('')
   const [draft, setDraft] = useState('')
-  // Manual mode (AI unavailable): the draft panel shows an editable
-  // textarea instead of the read-only preview.
+  // Writing is always available, whether or not AI is configured.
   const [manual, setManual] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [aiReadiness, setAiReadiness] = useState<'configured' | 'unavailable' | 'unknown'>('unknown')
+  const [readinessAttempt, setReadinessAttempt] = useState(0)
+  useEffect(() => {
+    let active = true
+    void getAiReadiness().then((status) => {
+      if (!active) return
+      setAiReadiness(status)
+      if (status === 'unavailable') setManual(true)
+    })
+    return () => { active = false }
+  }, [readinessAttempt])
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState('')
   // Real-send state (email channel only). Sent flag flips back to false
@@ -55,27 +79,53 @@ export default function Compose() {
   // The company's jobs, not only the ones this user created.
   const orgScope = useOrgScope(user?.id)
   useEffect(() => {
+    let active = true
     if (!user || orgScope === undefined) return
+    setContactsLoading(true)
+    setContacts([])
+    setContactsError('')
     const base = supabase
       .from('fh_contacts')
-      .select('id, name, phone, email, job_title, job_type, stage, amount')
+      .select('id, client_id, name, phone, email, job_title, job_type, address, stage, amount, fh_clients(name,phone,email,address)')
     ;(orgScope ? base.eq('org_id', orgScope) : base.eq('user_id', user.id))
       .not('stage', 'in', MOVED_STAGE_FILTER)
       .order('updated_at', { ascending: false })
-      .then(({ data }: any) => setContacts(data || []))
-  }, [user, orgScope])
+      .then(({ data, error }: any) => {
+        if (!active) return
+        setContactsLoading(false)
+        setContacts((data || []).map((row: any) => ({ ...row, name: row.fh_clients?.name || row.name, phone: row.fh_clients?.phone || row.phone, email: row.fh_clients?.email || row.email, address: row.address || row.fh_clients?.address })))
+        if (error) setContactsError('Contacts could not load. Try again.')
+      })
+    return () => { active = false }
+  }, [user, orgScope, reloadContacts])
 
   useEffect(() => {
     setContact(contacts.find((c) => c.id === contactId) || null)
   }, [contactId, contacts])
 
+  useEffect(() => {
+    const selected = params.get('contact') || ''
+    setContactId(selected)
+    setHandoff(null)
+    setSent(false)
+  }, [params])
+
+  function chooseContact(value: string) {
+    setContactId(value)
+    setHandoff(null)
+    setSent(false)
+    setParams((current) => {
+      const next = new URLSearchParams(current)
+      if (value) next.set('contact', value)
+      else next.delete('contact')
+      return next
+    }, { replace: true })
+  }
+
   async function generate() {
     const ch = CHANNELS.find((c) => c.id === channel)
-    // A hand written message must survive another failed AI attempt.
-    const manualDraft = manual && draft.trim() ? draft : ''
+    // Keep the current message visible until a replacement succeeds.
     setLoading(true)
-    setDraft('')
-    setManual(false)
     setError('')
     setCopied(false)
     try {
@@ -94,23 +144,12 @@ export default function Compose() {
       })
       const text = res?.content?.[0]?.text || ''
       if (!text) throw new Error('Empty response from AI')
-      hapticSuccess(); setDraft(text)
+      hapticSuccess(); setDraft(text); setManual(false)
       toastSuccess('Draft ready', 'Copy, send, or edit')
     } catch (e: any) {
       console.error('[compose] generate failed:', e)
-      const msg = String(e?.message || '').toLowerCase()
-      if (msg.includes('missing_api_key') || msg.includes('500')) {
-        setError('AI not configured. Set ANTHROPIC_API_KEY in your Netlify env vars to enable drafting.')
-      } else if (msg.includes('404') || msg.includes('failed to fetch')) {
-        setError('AI endpoint unreachable. Check your network or try again in a moment.')
-      } else {
-        setError(e?.message || 'AI generation failed.')
-      }
-      if (manualDraft) {
-        setDraft(manualDraft)
-        setManual(true)
-        toastError('AI still unavailable', 'Your message is still here.')
-      }
+      setError(aiDraftError(e))
+      setManual(true)
     } finally {
       setLoading(false)
     }
@@ -118,15 +157,47 @@ export default function Compose() {
 
   async function copy() {
     if (!draft.trim()) return
-    await navigator.clipboard.writeText(draft)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1800)
+    try {
+      await navigator.clipboard.writeText(draft)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
+    } catch {
+      toastError("Couldn't copy", 'Select the message text and copy it manually.')
+    }
   }
 
-  async function sendAction() {
+  function sendAction() {
     if (!contact || !draft.trim()) return
-    if (channel === 'sms' && contact.phone) window.location.href = `sms:${contact.phone}?body=${encodeURIComponent(draft)}`
-    if (channel === 'email' && contact.email) window.location.href = `mailto:${contact.email}?body=${encodeURIComponent(draft)}`
+    const to = channel === 'email' ? contact.email : contact.phone
+    if (!to || !['sms', 'email'].includes(channel)) return
+    const email = emailDraft(draft, contact.job_title || intent || `Message from ${profile?.company_name || 'your contractor'}`)
+    setHandoff({ contactId: contact.id, channel, body: channel === 'email' ? email.body : draft.trim(), subject: channel === 'email' ? email.subject : undefined, to })
+    window.location.href = channel === 'email'
+      ? `mailto:${to}?subject=${encodeURIComponent(email.subject)}&body=${encodeURIComponent(email.body)}`
+      : `sms:${to}?body=${encodeURIComponent(draft)}`
+  }
+
+  async function logHandoff() {
+    if (!handoff || !user || loggingHandoff) return
+    setLoggingHandoff(true)
+    try {
+      const { error } = await supabase.from('fh_notes').insert({
+        user_id: user.id,
+        org_id: orgScope || null,
+        contact_id: handoff.contactId,
+        category: handoff.channel === 'sms' ? 'text' : 'email',
+        text: `${handoff.channel === 'sms' ? 'SMS' : 'Email'} reported sent to ${handoff.to}`,
+        parsed: { communication: { version: 1, channel: handoff.channel, status: 'reported_sent', to: handoff.to, body: handoff.body, subject: handoff.subject || '' } },
+      })
+      if (error) throw error
+      setHandoff(null)
+      setHistoryVersion((value) => value + 1)
+      toastSuccess('Communication recorded', 'Delivery and replies stay in your messaging app.')
+    } catch {
+      toastError("Couldn't save the communication", 'The message remains available. Try recording it again.')
+    } finally {
+      setLoggingHandoff(false)
+    }
   }
 
   // Real on the server email send via Resend (POST /api/send-message).
@@ -139,14 +210,14 @@ export default function Compose() {
   // returns 503 sender_not_configured, operators on a non-Resend
   // deploy can still ship the draft through their mail client.
   async function handleSendEmail() {
-    if (!contact?.email || !draft.trim() || sending) return
+    if (!contact?.email || !draft.trim() || sendLock.current) return
+    sendLock.current = true
     setSending(true)
     setError('')
     try {
       // Subject derived from intent + contact context, short and honest.
-      const subjectGuess = contact.job_title
-        ? `Re: ${contact.job_title}`
-        : intent || `Message from ${profile?.company_name || 'your contractor'}`
+      const email = emailDraft(draft, contact.job_title || intent || `Message from ${profile?.company_name || 'your contractor'}`)
+      if (!email.body.trim()) throw new Error('Write a message below the subject before sending.')
       const res = await fetch('/api/send-message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
@@ -155,16 +226,16 @@ export default function Compose() {
           sender_user_id: user!.id,
           recipient_email: contact.email,
           recipient_name: contact.name || null,
-          subject: subjectGuess,
-          body: draft
+          subject: email.subject,
+          body: email.body
         })
       })
       const data = await res.json().catch(() => ({}))
 
       if (res.status === 503 && data?.error === 'sender_not_configured') {
         // Friendly fallback, open the mail client with the draft prefilled.
-        toastSuccess('Opening email app', 'Direct send not configured, pasting into your mail client.')
-        sendAction()
+        setEmailUnavailable(true)
+        toastError('Direct email unavailable', 'Your draft is safe. Use Open email app to send it.')
         return
       }
       if (!res.ok || !data?.ok) {
@@ -173,16 +244,19 @@ export default function Compose() {
 
       hapticSuccess()
       setSent(true)
+      setHistoryVersion((value) => value + 1)
+      if (data.history_saved === false) toastError('Email sent, history unavailable', 'Do not send again. The email provider accepted this message, but its history could not be saved.')
       toastSuccess(
         `Email sent to ${contact.email}`,
         `${draft.length} ${countNoun(draft.length, 'char')} · ${countWords(draft)} ${countNoun(countWords(draft), 'word')}`
       )
       setTimeout(() => setSent(false), 2400)
     } catch (e: any) {
-      // The inline error block belongs to drafting and only shows while
-      // there is no draft, so a failed send was invisible. Say it plainly.
+      // Sending is a separate action from drafting; report its failure
+      // without replacing the message or the drafting status.
       toastError("Couldn't send the email", e?.message || 'Try again in a moment.')
     } finally {
+      sendLock.current = false
       setSending(false)
     }
   }
@@ -201,7 +275,7 @@ export default function Compose() {
   const isDesktop = useIsDesktop()
   // Copy and Send need real text; a blank or whitespace draft can't go out.
   const hasText = !!draft.trim()
-  const canEmail = !!contact?.email && hasText
+  const canEmail = !!contact?.email && !!emailDraft(draft, '').body.trim()
   const canSms = !!contact?.phone && hasText
 
   return (
@@ -225,9 +299,11 @@ export default function Compose() {
           <div style={{ padding: '12px var(--v3-gutter) 12px' }}>
             <div className="fh-build-good">Dispatch</div>
             <h1 className="fh-build-title">Message composer</h1>
+            <Link to="/inbox?view=history" className="fh-build-outline-btn">Communication history</Link>
           </div>
         </div>
       )}
+      {!isDesktop && <h1 style={{ padding: '16px 24px 4px', fontSize: 'var(--fh-type-page)', margin: 0 }}>Message composer</h1>}
       {/* INPUT COCKPIT, black-glass panel: header eyebrow + channel pills
           + intent + contact + context chips + CTA */}
       <motion.div className="fh-compose-workspace__input" variants={item} style={{ padding: '8px 24px 12px' }}>
@@ -259,7 +335,7 @@ export default function Compose() {
                   letterSpacing: 0,
                   textTransform: 'none',
                   fontWeight: 600,
-                  fontSize: 12,
+                  fontSize: 14,
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
@@ -310,23 +386,20 @@ export default function Compose() {
                 </select>
               </Field>
 
-              <Field label="Contact">
-                <select
-                  value={contactId}
-                  onChange={(e) => setContactId(e.target.value)}
-                  style={selectStyle}
-                >
-                  <option value="">No contact (generic message)</option>
-                  {contacts.map((c) => {
-                    const tail = c.job_title || c.job_type || c.stage || ''
-                    return (
-                      <option key={c.id} value={c.id}>
-                        {c.name}{tail ? `, ${tail}` : ''}
-                      </option>
-                    )
-                  })}
-                </select>
-              </Field>
+              <RecordPicker
+                label="Contact"
+                value={contactId}
+                onChange={chooseContact}
+                options={contacts.map((row) => ({ value: row.id, label: row.name || 'Unnamed customer', description: [row.job_title || row.job_type, row.address, row.stage].filter(Boolean).join(' · ') }))}
+                clearLabel="No contact (generic message)"
+                loading={contactsLoading}
+                error={contactsError}
+              />
+              {contactsError && <button type="button" className="fh-build-outline-btn" onClick={() => setReloadContacts((value) => value + 1)}>Retry contacts</button>}
+              {contact && ((channel === 'email' && !contact.email) || (channel === 'sms' && !contact.phone)) && <div style={{ fontSize: 14, lineHeight: 1.5 }}>
+                <p>This customer has no {channel === 'email' ? 'email address' : 'phone number'} saved. You can still draft and copy a message.</p>
+                <Link className="fh-build-outline-btn" to={contact.client_id ? `/clients/${contact.client_id}?edit=contact` : `/jobs/${contact.id}`} style={{ minHeight: 44 }}>Add contact details</Link>
+              </div>}
 
               <Field label="Extra context">
                 <textarea
@@ -364,14 +437,14 @@ export default function Compose() {
               type="button"
               whileTap={{ scale: 0.98 }}
               onClick={() => { hapticMedium(); generate() }}
-              disabled={loading}
+              disabled={loading || aiReadiness === 'unavailable'}
               style={{
                 padding: '12px 16px',
                 borderRadius: 10,
                 border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
                 background: loading
                   ? 'var(--v3-surface-2)'
-                  : 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
+                  : 'var(--v3-primary)',
                 color: loading ? 'var(--v3-text-muted)' : 'var(--v3-on-primary)',
                 fontFamily: 'var(--font-body)',
                 fontSize: 14,
@@ -394,11 +467,27 @@ export default function Compose() {
               ) : (
                 <Sparkles size={15} />
               )}
-              {loading ? 'Drafting…' : 'Generate draft'}
+              {loading ? 'Drafting…' : aiReadiness === 'unavailable' ? 'AI drafting unavailable' : 'Generate draft'}
             </motion.button>
 
+            <button
+              type="button"
+              className="fh-build-outline-btn"
+              disabled={loading}
+              onClick={() => { setManual(true); setError('') }}
+              style={{ minHeight: 44 }}
+            >
+              <PenLine size={15} aria-hidden="true" />
+              {draft ? 'Edit message' : 'Write manually'}
+            </button>
+
+            {aiReadiness === 'unavailable' && <div role="status" style={{ fontSize: 14, lineHeight: 1.5 }}>
+              <p>AI drafting needs workspace setup. You can write and send your message below.</p>
+              <button type="button" className="fh-build-outline-btn" onClick={() => setReadinessAttempt((value) => value + 1)} style={{ minHeight: 44 }}>Check AI availability</button>
+            </div>}
+
             {/* Error block */}
-            {error && !draft && (
+            {error && (
               <div role="alert" style={{
                 padding: '12px 12px',
                 borderRadius: 10,
@@ -406,28 +495,11 @@ export default function Compose() {
                 border: '1px solid color-mix(in srgb, var(--v3-danger) 40%, transparent)',
                 color: 'var(--v3-text)',
                 fontFamily: 'var(--font-body)',
-                fontSize: 12,
+                fontSize: 14,
                 lineHeight: 1.5
               }}>
                 <div style={{ fontWeight: 700, color: 'var(--v3-danger-text)', marginBottom: 4 }}>AI unavailable</div>
-                <div style={{ color: 'var(--v3-text-muted)', marginBottom: 10 }}>{error}</div>
-                <button
-                  type="button"
-                  onClick={() => { setError(''); setDraft(''); setManual(true) }}
-                  style={{
-                    padding: '8px 12px',
-                    borderRadius: 10,
-                    border: '1px solid var(--v3-border-strong)',
-                    background: 'var(--v3-surface-2)',
-                    color: 'var(--v3-text)',
-                    fontFamily: 'var(--font-body)',
-                    fontSize: 12,
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
-                >
-                  Write manually →
-                </button>
+                <div style={{ color: 'var(--v3-text-muted)' }}>{error}</div>
               </div>
             )}
           </div>
@@ -477,8 +549,8 @@ export default function Compose() {
                 // are read only, so without this there was nothing to type in.
                 <textarea
                   rows={6}
-                  autoFocus
                   value={draft}
+                  readOnly={loading}
                   onChange={(e) => setDraft(e.target.value)}
                   aria-label="Message"
                   placeholder="Write your message here."
@@ -493,6 +565,14 @@ export default function Compose() {
                   intent={intent}
                 />
               )}
+
+              <p style={{ color: 'var(--v3-text-muted)', fontSize: 14, lineHeight: 1.5, margin: '12px 0 0' }}>
+                {channel === 'sms'
+                  ? 'Open SMS hands this message to your messaging app. Finish sending there, then confirm here to record it. Replies stay in your SMS app.'
+                  : channel === 'email'
+                    ? 'Send email sends through Fieldhorse and records the message below. Open email app uses your own mail app instead. Replies to these emails stay in your company mailbox.'
+                    : 'Copy this script and read it when you call. No call or voicemail is sent by Fieldhorse.'}
+              </p>
 
               {/* Action row, 5/17 Compose-end-to-end port.
                   Per the design's CTA bar (screens-compose-nav.jsx)
@@ -528,7 +608,7 @@ export default function Compose() {
                 <button
                   type="button"
                   onClick={regenerate}
-                  disabled={loading}
+                  disabled={loading || aiReadiness === 'unavailable'}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -540,7 +620,7 @@ export default function Compose() {
                     border: '1px solid var(--v3-border-strong)',
                     color: loading ? 'var(--v3-text-muted)' : 'var(--v3-text)',
                     fontFamily: 'var(--font-body)',
-                    fontSize: 12,
+                    fontSize: 14,
                     fontWeight: 600,
                     cursor: loading ? 'default' : 'pointer',
                     WebkitTapHighlightColor: 'transparent'
@@ -564,7 +644,7 @@ export default function Compose() {
                     border: '1px solid var(--v3-border-strong)',
                     color: hasText ? 'var(--v3-text)' : 'var(--v3-text-muted)',
                     fontFamily: 'var(--font-body)',
-                    fontSize: 12,
+                    fontSize: 14,
                     fontWeight: 600,
                     cursor: hasText ? 'pointer' : 'default',
                     WebkitTapHighlightColor: 'transparent'
@@ -589,7 +669,7 @@ export default function Compose() {
                       border: '1px solid var(--v3-border)',
                       color: 'var(--v3-text-muted)',
                       fontFamily: 'var(--font-body)',
-                      fontSize: 12,
+                      fontSize: 14,
                       fontWeight: 600,
                       cursor: 'default'
                     }}
@@ -612,15 +692,15 @@ export default function Compose() {
                       borderRadius: 10,
                       border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
                       background: sent
-                        ? 'linear-gradient(180deg, var(--v3-success-bright) 0%, var(--v3-success) 100%)'
+                        ? 'var(--v3-success)'
                         : (sending || !canEmail)
                           ? 'var(--v3-surface-2)'
-                          : 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
+                          : 'var(--v3-primary)',
                       color: (sending || !canEmail)
                         ? 'var(--v3-text-muted)'
                         : 'var(--v3-on-primary)',
                       fontFamily: 'var(--font-body)',
-                      fontSize: 12,
+                      fontSize: 14,
                       fontWeight: 700,
                       letterSpacing: 0,
                       cursor: (sending || !canEmail) ? 'not-allowed' : 'pointer',
@@ -651,11 +731,11 @@ export default function Compose() {
                       borderRadius: 10,
                       border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
                       background: canSms
-                        ? 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)'
+                        ? 'var(--v3-primary)'
                         : 'var(--v3-surface-2)',
                       color: canSms ? 'var(--v3-on-primary)' : 'var(--v3-text-muted)',
                       fontFamily: 'var(--font-body)',
-                      fontSize: 12,
+                      fontSize: 14,
                       fontWeight: 700,
                       letterSpacing: 0,
                       cursor: canSms ? 'pointer' : 'not-allowed',
@@ -671,6 +751,12 @@ export default function Compose() {
                   </button>
                 )}
               </div>
+              {channel === 'email' && emailUnavailable && <button type="button" className="fh-build-outline-btn" onClick={sendAction} disabled={!canEmail} style={{ minHeight: 44, marginTop: 12 }}>Open email app</button>}
+              {handoff && <div role="status" style={{ paddingTop: 16, fontSize: 14, lineHeight: 1.5 }}>
+                <p>Finish sending in your {handoff.channel === 'sms' ? 'SMS' : 'email'} app. Nothing has been marked sent here.</p>
+                <button type="button" className="fh-build-outline-btn" onClick={logHandoff} disabled={loggingHandoff} style={{ minHeight: 44 }}>{loggingHandoff ? 'Saving…' : 'I sent it, record communication'}</button>
+                <button type="button" className="fh-build-outline-btn" onClick={() => setHandoff(null)} disabled={loggingHandoff} style={{ minHeight: 44, marginTop: 8 }}>Not sent, dismiss</button>
+              </div>}
             </div>
           </motion.div>
         ) : (
@@ -689,14 +775,15 @@ export default function Compose() {
               border: '1px dashed var(--v3-border-strong)',
               color: 'var(--v3-text-muted)',
               fontFamily: 'var(--font-body)',
-              fontSize: 12,
+              fontSize: 14,
               lineHeight: 1.5
             }}>
-              The draft will appear here. Pick a channel + intent above, then tap{' '}
-              <strong style={{ color: 'var(--v3-primary-text)' }}>Generate draft</strong>.
+              Write your message now, or choose a channel and intent to generate a draft.
             </div>
           </motion.div>
         )}
+      {contact && <div style={{ gridColumn: '1 / -1', padding: '0 24px 24px' }}><CommunicationHistory contactId={contact.id} clientId={contact.client_id} refreshKey={historyVersion} /></div>}
+      {!isDesktop && <Link to="/inbox?view=history" className="fh-build-outline-btn" style={{ margin: '0 24px', minHeight: 44 }}>Communication history</Link>}
     </motion.div>
   )
 }
@@ -734,7 +821,7 @@ function ContextChip({ children, tone = 'default' }: any) {
         : 'var(--v3-border)'}`,
       color: isGold ? 'var(--v3-primary-text)' : 'var(--v3-text)',
       fontFamily: 'var(--font-body)',
-      fontSize: 12,
+      fontSize: 14,
       fontWeight: 600,
       letterSpacing: 0,
       lineHeight: 1.3
@@ -774,7 +861,7 @@ function SmsHero({ draft, contact }: any) {
     <div style={{
       borderRadius: 10,
       border: '1px solid color-mix(in srgb, var(--v3-primary) 22%, var(--v3-border-strong))',
-      background: 'linear-gradient(180deg, var(--v3-surface-2), var(--v3-surface))',
+      background: 'var(--v3-surface-2)',
       overflow: 'hidden'
     }}>
       {/* Phone status bar */}
@@ -818,7 +905,7 @@ function SmsHero({ draft, contact }: any) {
           <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, color: 'var(--v3-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {contact?.name || 'New recipient'}
           </div>
-          <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--v3-text-muted)', fontVariantNumeric: 'tabular-nums' }}>
+          <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--v3-text-muted)', fontVariantNumeric: 'tabular-nums' }}>
             {contact?.phone || 'No phone on file'}
           </div>
         </div>
@@ -854,27 +941,11 @@ function SmsHero({ draft, contact }: any) {
 // fenced code blocks, headings) that Claude sometimes emits so the
 // recipient doesn't see literal asterisks in the email body. Audit flagged
 // "**Subject: ...**" rendering with raw asterisks visible.
-function stripMarkdown(text: any) {
-  if (!text) return ''
-  return text
-    .replace(/\*\*(.+?)\*\*/g, '$1')
-    .replace(/__(.+?)__/g, '$1')
-    .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '$1')
-    .replace(/(?<!_)_(?!_)(.+?)(?<!_)_(?!_)/g, '$1')
-    .replace(/^#{1,6}\s+/gm, '')
-    .replace(/`{1,3}([^`]+)`{1,3}/g, '$1')
-}
 
 function EmailHero({ draft, contact, profile, intent }: any) {
   const fromName = profile?.company_name || profile?.full_name || 'Sender'
   const fromAddr = profile?.company_email || profile?.email || ''
-  const cleaned = stripMarkdown(draft)
-  // Pull a "Subject:" line out of the body if the AI wrote one, so the
-  // subject header gets it and the body doesn't repeat it.
-  const subjectMatch = cleaned.match(/^\s*Subject\s*:\s*(.+?)\s*$/m)
-  const extractedSubject = subjectMatch ? subjectMatch[1].trim() : ''
-  const body = subjectMatch ? cleaned.replace(subjectMatch[0], '').replace(/^\n+/, '') : cleaned
-  const subjectGuess = extractedSubject || contact?.job_title || intent || `Message from ${fromName}`
+  const { subject: subjectGuess, body } = emailDraft(draft, contact?.job_title || intent || `Message from ${fromName}`)
   return (
     <div style={{
       borderRadius: 10,
@@ -886,7 +957,7 @@ function EmailHero({ draft, contact, profile, intent }: any) {
         padding: '12px 12px',
         borderBottom: '1px solid var(--v3-border)',
         display: 'flex', flexDirection: 'column', gap: 4,
-        fontFamily: 'var(--font-body)', fontSize: 12,
+        fontFamily: 'var(--font-body)', fontSize: 14,
         color: 'var(--v3-text-muted)'
       }}>
         <div style={{ display: 'flex', gap: 12 }}>
@@ -924,7 +995,7 @@ function VoiceHero({ draft }: any) {
     <div style={{
       borderRadius: 10,
       border: '1px solid var(--v3-border-strong)',
-      background: 'linear-gradient(180deg, var(--v3-surface-2), var(--v3-surface))',
+      background: 'var(--v3-surface-2)',
       padding: '12px 16px',
       display: 'flex', flexDirection: 'column', gap: 12
     }}>
@@ -950,7 +1021,7 @@ const selectStyle: import('react').CSSProperties = {
   border: '1px solid var(--v3-border-strong)',
   color: 'var(--v3-text)',
   fontFamily: 'var(--font-body)',
-  fontSize: 14,
+  fontSize: 16,
   outline: 'none',
   width: '100%',
   boxSizing: 'border-box'

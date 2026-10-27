@@ -12,6 +12,7 @@ import { authHeaders } from '../../lib/supabase.ts'
 import { loadPastPartners, PARTNER_ROLES, type PastPartner } from '../../lib/partners.ts'
 import { toastError, toastSuccess } from '../../lib/toast.ts'
 import { hapticMedium, hapticTap } from '../../lib/haptics.ts'
+import PartnerAccessDetails from '../../components/PartnerAccessDetails.tsx'
 import { JobScreenFallback, useJobScreen } from './jobScreen.tsx'
 
 const ROLES = PARTNER_ROLES.map((r) => ({ value: r, label: r }))
@@ -90,7 +91,7 @@ function PartnerForm({ contactId, contactName, userId, goBack, home }: {
       if (!res.ok) {
         const code = body?.error || `http_${res.status}`
         const detail = body?.detail || body?.hint
-        throw new Error(detail ? `${friendlyInviteError(code)} ${detail}` : friendlyInviteError(code))
+        throw new Error(friendlyInviteError(code))
       }
       hapticMedium()
       if (body?.sent) {
@@ -98,7 +99,7 @@ function PartnerForm({ contactId, contactName, userId, goBack, home }: {
         goBack()
       } else if (body?.invite_url) {
         if (body?.sender_not_configured) setWhy('Email is not set up yet, so share the link yourself.')
-        else if (body?.send_failed) setWhy(`The email did not go out${body?.provider_status ? ` (HTTP ${body.provider_status})` : ''}: ${body?.detail || 'unknown provider error'}. Share the link yourself.`)
+        else if (body?.send_failed) setWhy('The email did not go out. Share the link yourself or retry later.')
         setReadyUrl(String(body.invite_url))
       } else {
         toastSuccess('Invite sent', `${trimmed} will get the link shortly.`)
@@ -162,7 +163,7 @@ function PartnerForm({ contactId, contactName, userId, goBack, home }: {
   return (
     <CreateShell title="Invite a partner" saveLabel="Send invite" saving={sending} error={error} backTo={home} onSave={send}>
       <p className="fhja-lede">
-        They get a link to {contactName || 'this job'} and see this job only, not your other work, rates or clients.
+        Invite a trusted partner to {contactName || 'this job'}. Sharing includes this job, its linked customer details and job pricing.
       </p>
       {past.length > 0 && (
         <div className="fhja-recent">
@@ -188,6 +189,7 @@ function PartnerForm({ contactId, contactName, userId, goBack, home }: {
         onChange={(e) => { setEmail(e.target.value); setError(undefined) }}
       />
       <Choices label="Role on this job" options={ROLES} value={role} onChange={setRole} />
+      <PartnerAccessDetails role={role} open />
     </CreateShell>
   )
 }

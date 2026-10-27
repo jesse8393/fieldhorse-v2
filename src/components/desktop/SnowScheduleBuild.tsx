@@ -73,6 +73,7 @@ import {
   weekRangeLabel,
   ymdKey
 } from '../../lib/scheduleBoard.ts'
+import { SCHEDULE_WEEK_START, startOfWeek } from '../../lib/scheduleDates.ts'
 import { createScheduleEvent, deleteScheduleEvent } from '../../lib/scheduleWrite.ts'
 
 type EventRow = BoardEvent
@@ -176,7 +177,7 @@ export default function SnowScheduleBuild(props: Props) {
   const days: Date[] = useMemo(() => {
     const base = startOfDay(cursor)
     if (view === 'day') return [base]
-    const weekStart = addDays(base, -base.getDay())
+    const weekStart = startOfWeek(base, SCHEDULE_WEEK_START)
     return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
   }, [cursor, view])
 

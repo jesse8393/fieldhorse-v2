@@ -16,7 +16,6 @@ const SkeletonBlock = SkeletonBlock_ as any
 const SkeletonList = SkeletonList_ as any
 import DataErrorState from '../../components/DataErrorState.tsx'
 import { Eyebrow } from '../../components/v3'
-import { tabPanelProps } from '../../lib/tabs.ts'
 import { useJobData } from './hooks/useJobData.ts'
 import { computeJobHealth } from './lib/jobHealth.ts'
 import { tabsForStage, resolveTabForStage, stageCta as stageCtaFor } from './lib/stageWorkspace.ts'
@@ -61,14 +60,24 @@ function TabFallback() {
 
 // The job carries no Quote tab: a quote is a record of its own (Phase 9, D53).
 const TOP_TABS = [
-  { id: 'overview',      label: 'Overview' },
-  { id: 'details',       label: 'Details' },
-  { id: 'selections',    label: 'Selections' },
-  { id: 'materials',     label: 'Materials' },
+  { id: 'overview', label: 'Activity' },
+  { id: 'details', label: 'Milestones' },
+  { id: 'tasks', label: 'Tasks' },
+  { id: 'schedule', label: 'Schedule' },
+  { id: 'inspections', label: 'Inspections' },
+  { id: 'selections', label: 'Selections' },
+  { id: 'materials', label: 'Materials' },
+  { id: 'logs', label: 'Daily logs' },
+  { id: 'financials', label: 'Contract balance' },
+  { id: 'draws', label: 'Invoices' },
+  { id: 'expenses', label: 'Expenses' },
+  { id: 'subs', label: 'Subcontractors' },
   { id: 'change_orders', label: 'Change orders' },
-  { id: 'logs',          label: 'Daily logs' },
-  { id: 'financials',    label: 'Financials' },
-  { id: 'files',         label: 'Files' }
+  { id: 'insurance', label: 'Insurance' },
+  { id: 'files', label: 'Photos' },
+  { id: 'documents', label: 'Files' },
+  { id: 'messages', label: 'Messages' },
+  { id: 'partner', label: 'Partner access' }
 ]
 const VALID_TABS = new Set(TOP_TABS.map((t) => t.id))
 
@@ -577,9 +586,10 @@ export default function ContactDetail() {
           onAddToSpine={() => openCapture({ jobId: contact.id })}
         />
       )}
-      {tab === 'details' && (
+      {['details', 'tasks', 'schedule', 'inspections', 'insurance', 'partner'].includes(tab) && (
         <Suspense fallback={<TabFallback />}>
           <DetailsTab
+            section={tab}
             contact={contact}
             inspections={inspections}
             scheduleItems={scheduleItems}
@@ -593,9 +603,10 @@ export default function ContactDetail() {
           />
         </Suspense>
       )}
-      {tab === 'financials' && (
+      {['financials', 'expenses', 'subs', 'draws'].includes(tab) && (
         <Suspense fallback={<TabFallback />}>
           <FinancialsTab
+            section={tab}
             contact={contact}
             subs={subs}
             expenses={expenses}
@@ -612,9 +623,10 @@ export default function ContactDetail() {
           />
         </Suspense>
       )}
-      {tab === 'files' && (
+      {['files', 'documents', 'messages'].includes(tab) && (
         <Suspense fallback={<TabFallback />}>
           <FilesTab
+            section={tab}
             contact={contact}
             notes={notes}
             userId={user?.id}
@@ -800,7 +812,7 @@ export default function ContactDetail() {
           idBase="fh-job-tabs"
         />
 
-        <div {...tabPanelProps('fh-job-tabs', tab)}>
+        <div role="region" aria-label={`${visibleTabs.find(item => item.id === tab)?.label || 'Job section'} workspace`}>
           {tabPanels}
         </div>
 

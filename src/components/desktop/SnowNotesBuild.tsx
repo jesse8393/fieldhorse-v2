@@ -1,3 +1,4 @@
+import RecordPicker from '../RecordPicker.tsx'
 // SnowNotesBuild, desktop /notes in the Build direction.
 //
 // Drop-in for SnowNotes at >=900px. Treats notes as field intelligence
@@ -26,8 +27,10 @@ import LoadingValue from '../LoadingValue.tsx'
 import TopbarWeather from './TopbarWeather.tsx'
 import { countNoun } from '../../lib/format.ts'
 import PaletteKeyCap, { paletteShortcut } from './PaletteKeyCap.tsx'
+import { reportJobLabel, type ReportJob } from '../../lib/reportHistory.ts'
+import ReportDetails from '../ReportDetails.tsx'
 
-type Contact = { id: string; name?: string | null }
+type Contact = ReportJob
 type Note = {
   id: string
   body?: string | null
@@ -62,10 +65,16 @@ type Props = {
   /** The Latest reports card, where focus waits while Try again reads again. */
   reportsRef?: (el: HTMLElement | null) => void
   contacts: Contact[]
+  contactsReady: boolean
+  contactsError: boolean
   recent: Note[]
+  historySearch: ReactNode
+  historyMore: ReactNode
+  historyQuery: string
+  onShowUnlinked: () => void
   linkedGroups: { contactId: string; name: string; items: Note[] }[]
   actionItems: { noteId: string; contactId: string | null; text: string; when: string | null }[]
-  cockpitStats: { total: number; recent24: number; parsedCount: number; riskCount: number }
+  cockpitStats: { total: number; recent24: number; parsedCount: number; riskCount: number; unlinkedCount: number }
   draft: string
   setDraft: (s: string) => void
   // Parent screen stores contactId as plain string ('' when unlinked),
@@ -100,7 +109,7 @@ function relTime(iso: any) {
 
 export default function SnowNotesBuild(props: Props) {
   const {
-    loading, readError = null, reportsRef, contacts, recent, actionItems, cockpitStats,
+    loading, readError = null, reportsRef, contacts, contactsReady, contactsError, recent, historySearch, historyMore, historyQuery, onShowUnlinked, actionItems, cockpitStats,
     draft, setDraft, contactId, setContactId,
     saving, parsing, parsed, parseError,
     voiceState, onStartVoice, onStopVoice, onParse, onSave,
@@ -109,7 +118,7 @@ export default function SnowNotesBuild(props: Props) {
 
   const listening = !!(voiceState && (voiceState.listening || voiceState === 'listening'))
   const failed = readError != null
-  const unlinkedCount = recent.filter((n) => !n.contact_id).length
+  const unlinkedCount = cockpitStats.unlinkedCount
   // While the reports load, a skeleton stands in each count's place.
   const pending = (label: string, width = 48) => <LoadingValue label={label} width={width} height={20} />
   const railPending = <strong>{pending('Loading', 56)}</strong>
@@ -141,7 +150,7 @@ export default function SnowNotesBuild(props: Props) {
         <button className="fh-build-icon-btn" type="button" onClick={() => window.dispatchEvent(new CustomEvent('fh:navigate', { detail: { to: '/activity' } }))} aria-label="Open activity" title="Activity"><Bell size={16} /></button>
       </header>
 
-      <main className="fh-build-main">
+      <div className="fh-build-main">
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
             <div className="fh-build-good">Operations</div>
@@ -152,30 +161,30 @@ export default function SnowNotesBuild(props: Props) {
           {!failed && (
             <>
               <div className="fh-build-focus">
-                <div className="fh-build-eyebrow">Today's pulse</div>
+                <div className="fh-build-eyebrow">Report history</div>
                 <p>
                   {loading ? (
                     <LoadingValue label="Loading today's pulse" width={200} height={14} />
                   ) : (
                     <>
                       {cockpitStats.recent24} captured in 24h ·
-                      {' '}{cockpitStats.parsedCount} parsed by AI
+                      {' '}{cockpitStats.parsedCount} parsed by AI across all reports
                     </>
                   )}
                 </p>
                 {cockpitStats.riskCount > 0 && (
                   <p style={{ color: 'var(--v3-primary-text)', marginTop: 6 }}>
                     <AlertTriangle size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
-                    {cockpitStats.riskCount} open risk{cockpitStats.riskCount === 1 ? '' : 's'} flagged
+                    {cockpitStats.riskCount} report{cockpitStats.riskCount === 1 ? '' : 's'} with flagged risks across all history
                   </p>
                 )}
               </div>
 
               <div className="fh-build-mini-grid">
-                <MiniMetric label="Reports today" value={loading ? pending('Loading reports today') : String(cockpitStats.recent24)} accent />
-                <MiniMetric label="AI parsed" value={loading ? pending('Loading AI parsed reports') : String(cockpitStats.parsedCount)} />
-                <MiniMetric label="Open risks" value={loading ? pending('Loading open risks') : String(cockpitStats.riskCount)} tone={cockpitStats.riskCount > 0 ? 'warn' : undefined} />
-                <MiniMetric label="Missing job link" value={loading ? pending('Loading missing job links') : String(unlinkedCount)} tone={unlinkedCount > 0 ? 'warn' : undefined} />
+                <MiniMetric label="Reports in 24h" value={loading ? pending('Loading reports in 24h') : String(cockpitStats.recent24)} accent />
+                <MiniMetric label="AI parsed, all reports" value={loading ? pending('Loading AI parsed reports') : String(cockpitStats.parsedCount)} />
+                <MiniMetric label="Reports with risks, all" value={loading ? pending('Loading flagged reports') : String(cockpitStats.riskCount)} tone={cockpitStats.riskCount > 0 ? 'warn' : undefined} />
+                <MiniMetric label="Unlinked, all reports" value={loading ? pending('Loading missing job links') : String(unlinkedCount)} tone={unlinkedCount > 0 ? 'warn' : undefined} />
               </div>
             </>
           )}
@@ -199,27 +208,20 @@ export default function SnowNotesBuild(props: Props) {
 
               <div className="fh-build-capture__body">
                 <textarea
+                  aria-label="Field report"
                   className="fh-build-capture__textarea"
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   placeholder="What happened on site? Speak or type, AI will pull out action items, risks, and materials."
                   rows={4}
+                  style={{ background: 'var(--v3-surface)', border: '1px solid var(--v3-border-strong)', fontSize: 16 }}
                 />
 
                 <div className="fh-build-capture__row">
-                  <label className="fh-build-capture__label">
-                    <LinkIcon size={12} /> Link to job
-                  </label>
-                  <select
-                    className="fh-build-select"
-                    value={contactId || ''}
-                    onChange={(e) => setContactId(e.target.value)}
-                  >
-                    <option value="">: Unlinked :</option>
-                    {contacts.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name || 'Unnamed'}</option>
-                    ))}
-                  </select>
+                  <RecordPicker id="report-job" label="Link to job" disabled={!contactsReady} loading={!contactsReady && !contactsError}
+                    error={contactsError ? 'Job names unavailable. Retry job lookup below.' : undefined} value={contactId || ''} onChange={setContactId}
+                    options={contacts.map((c) => ({ value: c.id, label: reportJobLabel(c) }))}
+                    clearLabel="No job link" placeholder="Search customer, job, address or reference" />
                 </div>
 
                 {parseError && (
@@ -275,18 +277,20 @@ export default function SnowNotesBuild(props: Props) {
                 <div className="fh-build-eyebrow">
                   {loading || failed
                     ? 'Latest reports'
-                    : <>Latest {recent.length} of {cockpitStats.total.toLocaleString()} {countNoun(cockpitStats.total, 'report')}</>}
+                    : <>Report history · {cockpitStats.total.toLocaleString()} {countNoun(cockpitStats.total, 'report')}</>}
                 </div>
               </header>
+
+              {!failed && <div style={{ padding: '0 16px' }}>{historySearch}</div>}
 
               {failed && readError}
               {loading && (
                 <div className="fh-build-table__empty">Loading reports…</div>
               )}
               {!loading && !failed && recent.length === 0 && (
-                <div className="fh-build-table__empty">No reports yet, start one above.</div>
+                <div className="fh-build-table__empty">{historyQuery ? 'No reports match your search. Try another word, job or address.' : 'No reports yet, start one above.'}</div>
               )}
-              {!loading && recent.slice(0, 25).map((n: any) => {
+              {!loading && recent.map((n: any) => {
                 const linkedJob = contacts.find((c) => c.id === n.contact_id)
                 const p = asParsed(n.parsed)
                 const hasParsed = !!(p && (p.summary || p.action_items?.length || p.risks?.length))
@@ -299,20 +303,21 @@ export default function SnowNotesBuild(props: Props) {
                         {hasParsed && <span className="fh-build-chip is-gold"><Sparkles size={10} /> Parsed</span>}
                         {hasRisk && <span className="fh-build-chip is-warn"><AlertTriangle size={10} /> Risk</span>}
                         {linkedJob && (
-                          <button type="button" className="fh-build-chip is-link" onClick={() => onOpenJob(linkedJob.id)}>
-                            <LinkIcon size={10} /> {linkedJob.name}
+                          <button type="button" className="fh-build-chip is-link" onClick={() => onOpenJob(linkedJob.id)} style={{ whiteSpace: 'normal', maxWidth: '100%', textAlign: 'left', overflowWrap: 'anywhere' }}>
+                            <LinkIcon size={10} /> {reportJobLabel(linkedJob)}
                           </button>
                         )}
-                        {!linkedJob && <span className="fh-build-chip is-muted">Unlinked</span>}
+                        {!linkedJob && <span className="fh-build-chip is-muted">{n.contact_id ? (contactsReady ? 'Linked job unavailable' : 'Job details not loaded') : 'Unlinked'}</span>}
                         <span className="fh-build-note-row__time">{relTime(n.created_at)}</span>
                       </div>
                       <p className="fh-build-note-row__body">{body || '(empty report)'}</p>
+                      <ReportDetails report={n} />
                     </div>
                     <div className="fh-build-note-row__actions">
-                      <button type="button" className="fh-build-icon-action" onClick={() => onMarkDone(n.id)} title="Archive">
+                      <button type="button" className="fh-build-icon-action" onClick={() => onMarkDone(n.id)} title="Archive" aria-label="Archive report">
                         <CheckCircle2 size={14} />
                       </button>
-                      <button type="button" className="fh-build-icon-action is-danger" onClick={() => onDelete(n.id)} title="Delete">
+                      <button type="button" className="fh-build-icon-action is-danger" onClick={() => onDelete(n.id)} title="Delete" aria-label="Delete report">
                         <Trash2 size={14} />
                       </button>
                     </div>
@@ -320,11 +325,7 @@ export default function SnowNotesBuild(props: Props) {
                 )
               })}
 
-              {!loading && recent.length > 25 && (
-                <div className="fh-build-table__more">
-                  Showing first 25 of {recent.length.toLocaleString()}.
-                </div>
-              )}
+              {!loading && !failed && <div style={{ padding: '0 16px' }}>{historyMore}</div>}
             </section>
           </div>
 
@@ -332,7 +333,7 @@ export default function SnowNotesBuild(props: Props) {
           {!failed && (
             <aside className="fh-build-rail fh-build-rail--page">
               <section className="fh-build-rail-card">
-                <div className="fh-build-eyebrow">Reports today</div>
+                <div className="fh-build-eyebrow">Reports in 24h</div>
                 {loading ? railPending : (
                   <>
                     <strong>{cockpitStats.recent24}</strong>
@@ -346,19 +347,19 @@ export default function SnowNotesBuild(props: Props) {
                 {loading ? railPending : (
                   <>
                     <strong>{cockpitStats.parsedCount}</strong>
-                    <span>structured by AI</span>
+                    <span>across all reports</span>
                   </>
                 )}
               </section>
 
               <section className="fh-build-rail-card">
-                <div className="fh-build-eyebrow">Open risks</div>
+                <div className="fh-build-eyebrow">Reports with flagged risks</div>
                 {loading ? railPending : (
                   <>
                     <strong style={{ color: cockpitStats.riskCount > 0 ? 'var(--v3-danger-text)' : undefined }}>
                       {cockpitStats.riskCount}
                     </strong>
-                    <span>{cockpitStats.riskCount > 0 ? 'Needs triage' : 'All clear'}</span>
+                    <span>{cockpitStats.riskCount > 0 ? 'Across all report history' : 'No risks recorded across report history'}</span>
                     {cockpitStats.riskCount > 0 && <div className="fh-build-spark is-red" />}
                   </>
                 )}
@@ -369,7 +370,8 @@ export default function SnowNotesBuild(props: Props) {
                 {loading ? railPending : (
                   <>
                     <strong style={{ color: unlinkedCount > 0 ? 'var(--v3-primary-text)' : undefined }}>{unlinkedCount}</strong>
-                    <span>{unlinkedCount > 0 ? 'Tie reports to jobs' : 'All linked'}</span>
+                    <span>{unlinkedCount > 0 ? 'Across all report history' : 'All reports carry a job link'}</span>
+                    {unlinkedCount > 0 && <button type="button" className="fh-build-inline-link" onClick={onShowUnlinked} style={{ minHeight: 44 }}>Review unlinked reports</button>}
                   </>
                 )}
               </section>
@@ -389,7 +391,7 @@ export default function SnowNotesBuild(props: Props) {
             </aside>
           )}
         </section>
-      </main>
+      </div>
     </div>
   )
 }

@@ -18,12 +18,12 @@ describe('tabsForStage', () => {
   })
 
   it('keeps lost minimal', () => {
-    expect(tabsForStage('lost')).toEqual(['overview', 'files'])
+    expect(tabsForStage('lost')).toEqual(['overview', 'files', 'documents', 'messages'])
   })
 
   it('reads every other stage as a job, including a missing one', () => {
     const job = tabsForStage('job')
-    expect(job).toEqual(['overview', 'details', 'selections', 'materials', 'logs', 'change_orders', 'financials', 'files'])
+    expect(job).toEqual(expect.arrayContaining(['overview', 'details', 'tasks', 'schedule', 'inspections', 'selections', 'materials', 'logs', 'change_orders', 'financials', 'draws', 'expenses', 'files', 'documents', 'messages']))
     expect(tabsForStage('invoice')).toEqual(job)
     expect(tabsForStage('lead')).toEqual(job)
     expect(tabsForStage(undefined)).toEqual(job)

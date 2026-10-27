@@ -44,6 +44,7 @@ const QUOTES = [
 async function open(page: Page) {
   await page.goto('/analytics', { waitUntil: 'domcontentloaded', timeout: 60_000 })
   await expect(page.locator('.fh-app')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('heading', { name: 'Reports', exact: true })).toBeVisible({ timeout: 30_000 })
 }
 
 test.describe('Reports read the four records', () => {
@@ -51,6 +52,8 @@ test.describe('Reports read the four records', () => {
     await signIn(context, { tables: { fh_leads: LEADS, fh_quotes: QUOTES } })
     await open(page)
     const phone = !testInfo.project.name.startsWith('desktop')
+    await expect(page.getByText('No lost deals logged yet', { exact: true })).toHaveCount(0)
+    await expect(page.getByText('1 won · 2 lost · last 90 days', { exact: true })).toBeVisible()
 
     if (phone) {
       await expect(page.getByText('Owner KPIs', { exact: true })).toBeVisible({ timeout: 30_000 })
@@ -73,5 +76,42 @@ test.describe('Reports read the four records', () => {
     await expect(screen.locator('.fh-build-kpi-cell').filter({ hasText: 'Active leads' })).toContainText('1')
     await expect(screen.locator('.fh-build-kpi-cell').filter({ hasText: 'Quotes out' })).toContainText('2')
     await expect(screen.locator('.fh-build-rail-card').filter({ hasText: 'Active leads' }).locator('strong')).toHaveText('1')
+  })
+
+  test('profit discloses missing costs instead of including untracked jobs as pure profit', async ({ context, page }, testInfo) => {
+    await signIn(context, { tables: {
+      fh_contacts: [
+        { id: 'costed', user_id: USER.id, stage: 'job', name: 'Costed client', amount: 1000, cost: 200, updated_at: iso(NOW), created_at: iso(NOW) },
+        { id: 'uncosted', user_id: USER.id, stage: 'job', name: 'Uncosted client', amount: 100000, cost: null, updated_at: iso(NOW), created_at: iso(NOW) }
+      ],
+      fh_stage_transitions: [], fh_invoices: [], fh_payments: []
+    } })
+    await open(page)
+    await expect(page.getByText(/1 of 2 won jobs have cost data\. 1 excluded\./)).toBeVisible()
+    if (testInfo.project.name.startsWith('desktop')) {
+      await expect(page.locator('.fh-build-focus')).toContainText('Tracked profit YTD: $800')
+      await expect(page.locator('.fh-build-kpi-cell').filter({ hasText: 'Issued invoices YTD' })).toContainText('$0')
+    } else {
+      await expect(page.getByText('Tracked profit YTD', { exact: true }).locator('..')).toContainText('$800')
+      await expect(page.getByText('Issued invoices YTD', { exact: true }).locator('..')).toContainText('$0')
+    }
+  })
+
+  test('completed month comparison names both source months beside a partial current month', async ({ context, page }, testInfo) => {
+    test.skip(!testInfo.project.name.startsWith('desktop'), 'The comparison appears in the desktop report')
+    await page.clock.setFixedTime(new Date('2026-10-27T15:00:00Z'))
+    await signIn(context, { tables: {
+      fh_payments: [
+        { id: 'aug', user_id: USER.id, contact_id: 'c-job1', amount: 63000, paid_on: '2026-08-15' },
+        { id: 'sep', user_id: USER.id, contact_id: 'c-job1', amount: 16000, paid_on: '2026-09-15' },
+        { id: 'oct', user_id: USER.id, contact_id: 'c-job1', amount: 15000, paid_on: '2026-10-15' }
+      ]
+    } })
+    await open(page)
+    const chart = page.locator('.fh-build-chart-card').filter({ hasText: 'Revenue received' })
+    await expect(chart).toContainText('September 2026 versus August 2026')
+    await expect(chart).toContainText('$47K less')
+    await expect(chart).toContainText('Oct · so far')
+    await expect(page.getByText('collection rate YTD', { exact: true })).toHaveCount(0)
   })
 })

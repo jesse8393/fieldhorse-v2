@@ -98,7 +98,7 @@ export default function SpineList({
   return (
     <section className="fhj-spine" aria-labelledby="fhj-spine-title">
       <div className="fhj-spine__head">
-        <h2 id="fhj-spine-title" className="fhj-spine__title">Spine</h2>
+        <h2 id="fhj-spine-title" className="fhj-spine__title">Activity</h2>
         <Button variant="quiet" size="mini" icon={Plus} onClick={onAdd} aria-label="Add to this job">
           Add
         </Button>

@@ -1,3 +1,4 @@
+import { proposalIssuedAt } from '../../../lib/proposalDate.ts'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../../../lib/supabase.ts'
 import { ProposalTemplate, mapItemsToScope } from '../../../components/documents'
@@ -151,14 +152,14 @@ export function DocumentPreviewPane({ company, contact, items, photos = [], paym
           }}
           paymentTermsText={contact?.terms_text || ''}
           warrantyText={company?.warranty_default || ''}
-          exclusions={exclusions}
+          exclusions={[...exclusions, ...String(contact?.exclusions_text || '').split(/\n+/).map((line) => line.trim()).filter(Boolean)]}
           insurance={insurance}
           changeOrders={changeOrders}
           photos={photos}
           payments={paid.payments}
           approval={approval}
           meta={{
-            issuedAt: contact?.quote_sent_at || contact?.created_at,
+            issuedAt: proposalIssuedAt(contact || {}),
             expiresAt: contact?.quote_expires_at || null
           }}
           status={docStatus}

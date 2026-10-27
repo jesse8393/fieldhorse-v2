@@ -5,7 +5,7 @@ import { useMembership } from '../contexts/MembershipContext.tsx'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
 import { weatherQuery } from '../lib/weather.ts'
-import { currentForecast } from '../lib/todayView.ts'
+import { answerRepairPath, currentForecast } from '../lib/todayView.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { useHomeDashboard, useHomeDashboardRealtime } from '../lib/homeDashboard.ts'
 import type { HomeNextAction } from '../lib/homeDashboard.ts'
@@ -151,6 +151,8 @@ function jobActionPath(contactId: any, tab?: any, intent?: any) {
 // A lead or a quote opens its own screen (D53); a job row keeps the tab
 // and the action it asks for.
 function nextActionPath(action: HomeNextAction) {
+  const repair = answerRepairPath(action)
+  if (repair) return repair
   if (action?.recordKind === 'lead' || action?.recordKind === 'quote') return recordRoute(action.recordKind, action.recordId)
   if (!action?.contactId) return '/jobs'
   return jobActionPath(action.contactId, action.tab, action.intent)

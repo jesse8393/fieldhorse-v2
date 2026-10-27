@@ -99,16 +99,39 @@ test('a job saves with a client and a title', async ({ context, page }) => {
   expect(inserts[0]).toMatchObject({ stage: 'job', client_id: 'cl-1', job_title: 'Shed slab', name: 'Jeff Roy' })
 })
 
-test('an invoice from a job prefills the balance', async ({ context, page }) => {
-  await signIn(context, { tables: JOB_FIRST })
+test('an invoice from a job prefills only unbilled contract value', async ({ context, page }) => {
+  await signIn(context, { tables: {
+    ...JOB_FIRST,
+    // The paid deposit consumes half the contract. Do not inherit the
+    // default sent progress invoice, which already bills the other half.
+    fh_invoices: [{ id: 'inv0', user_id: 'qa-user-1', client_id: 'cl-1', contact_id: 'c-job2', title: 'Deposit', amount: 6400, status: 'paid', sequence_number: 1, issued_at: NOW, created_at: NOW }]
+  } })
   await open(page, '/invoices/new?job=c-job2')
   await expect(page.getByRole('heading', { level: 1, name: 'New invoice' })).toBeVisible({ timeout: 30_000 })
-  // Harold's $12,800 driveway less the $6,400 he paid.
+  // Harold's $12,800 contract less the $6,400 already invoiced.
   await expect(page.getByLabel('Amount')).toHaveValue('6400', { timeout: 30_000 })
   await expect(page.getByLabel('Description')).toHaveValue('Driveway replacement')
   await expect(page.getByLabel('Client')).toHaveValue('Jeff Roy')
   await page.getByRole('button', { name: 'Save invoice' }).click()
   await expect(page).toHaveURL(/\/invoices\/inv0$/, { timeout: 30_000 })
+})
+
+test('a fully invoiced job never prefills or saves the unpaid balance again', async ({ context, page }) => {
+  await signIn(context, { tables: JOB_FIRST })
+  let invoiceWrites = 0
+  await context.route(/\/rest\/v1\/fh_invoices(\?|$)/, async (route) => {
+    if (route.request().method() === 'POST') invoiceWrites += 1
+    await route.fallback()
+  })
+  await open(page, '/invoices/new?job=c-job2')
+  // Default records already invoice the full 12800, despite 6400 remaining unpaid.
+  await expect(page.getByLabel('Description')).toHaveValue('Driveway replacement')
+  await expect(page.getByLabel('Client')).toHaveValue('Jeff Roy')
+  await expect(page.getByLabel('Amount')).toHaveValue('')
+  await page.getByLabel('Amount').fill('6400')
+  await page.getByRole('button', { name: 'Save invoice' }).click()
+  await expect(page.getByText(/Only \$0(?:\.00)? remains unreserved/)).toBeVisible()
+  expect(invoiceWrites).toBe(0)
 })
 
 test('typing a new name on Quote creates the client', async ({ context, page }) => {

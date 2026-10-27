@@ -113,7 +113,7 @@ export default function SubDetail() {
   const queryClient = useQueryClient()
   const { data: bundle, isPending: queryPending, isError, error: queryError } = useSubDetail(key, user?.id, scopeOrgId)
   const loading = membership.loading || queryPending
-  const subRows = bundle?.subRows ?? []
+  const subRows = useMemo(() => bundle?.subRows ?? [], [bundle?.subRows])
   const contacts = bundle?.contacts ?? {}
   const profile = bundle?.profile ?? null
   const error = isError ? (queryError?.message || 'Could not load sub') : ''
@@ -561,7 +561,7 @@ function SubDetailDesktop({
         </button>
       </header>
 
-      <main className="fh-build-main">
+      <div className="fh-build-main">
         <section className="fh-build-hero-row fh-build-hero-row--page">
           <div>
             <div className="fh-build-good">Vendor profile</div>
@@ -720,7 +720,7 @@ function SubDetailDesktop({
             </section>
           </aside>
         </section>
-      </main>
+      </div>
     </div>
   )
 }
@@ -758,7 +758,7 @@ function SubDetailStatePage({
           <span>Vendor profile</span>
         </div>
       </header>
-      <main className="fh-build-main">
+      <div className="fh-build-main">
         <section className="fh-build-card fh-subdetail-state-card">
           {loading ? (
             <div className="fh-subdetail-loading-grid" aria-label={title}>
@@ -778,7 +778,7 @@ function SubDetailStatePage({
             <DataErrorState title={title} message={message} />
           )}
         </section>
-      </main>
+      </div>
     </div>
   )
 }

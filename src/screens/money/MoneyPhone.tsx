@@ -19,12 +19,16 @@
 // "Due today" and the month label roll over while the screen stays open.
 
 import { useMemo } from 'react'
+import { buildMoneyReconciliation } from '../../lib/moneyReconciliation.ts'
+import { ReconciliationLinks, ReconciliationPanel } from './Reconciliation.tsx'
 import { Link } from 'react-router-dom'
 import { ChevronRight, Receipt } from 'lucide-react'
 import { Button, Chip, EmptyState, Row, Skeleton, SkeletonRows, VaultCard, formatMoney } from '../../components/fh'
 import Monogram from '../../components/fh/Monogram.tsx'
 import { useProfile } from '../../contexts/ProfileContext.tsx'
-import { useCompanyJobs } from '../../lib/queries.ts'
+import { useAuth } from '../../contexts/AuthContext.tsx'
+import DataErrorState from '../../components/DataErrorState.tsx'
+import { useActiveCompany, useQuotes } from '../../lib/queries.ts'
 import { buildInvoiceList, buildMoneyView, type MoneyRow } from '../../lib/moneyView.ts'
 import { hapticTap } from '../../lib/haptics.ts'
 import {
@@ -122,15 +126,18 @@ export default function MoneyPhone({
   onStatement
 }: MoneyPhoneProps) {
   const { profile } = useProfile()
-  const jobsQuery = useCompanyJobs()
+  const { user } = useAuth()
+  const company = useActiveCompany()
+  const quotesQuery = useQuotes(user?.id)
   const { panel, titleRef, panelHref, openPanel, closePanel } = useMoneyPanel()
 
-  const waiting = loading || jobsQuery.isLoading
+  const waiting = loading || quotesQuery.isPending || !company
   const view = useMemo(
-    () => (bundle ? buildMoneyView({ bundle, quotes: jobsQuery.data ?? [], now }) : null),
-    [bundle, jobsQuery.data, now]
+    () => (bundle ? buildMoneyView({ bundle, quotes: quotesQuery.data ?? [], company, now }) : null),
+    [bundle, quotesQuery.data, company, now]
   )
   const invoiceList = useMemo(() => (bundle ? buildInvoiceList({ bundle, now }) : []), [bundle, now])
+  const reconciliation = useMemo(() => bundle ? buildMoneyReconciliation(bundle, jobBalances, now) : [], [bundle, jobBalances, now])
   const openInvoiceCount = useMemo(
     () => invoiceList.filter((r) => r.status === 'draft' || r.status === 'sent' || r.status === 'overdue').length,
     [invoiceList]
@@ -149,6 +156,7 @@ export default function MoneyPhone({
             </div>
           ) : (
             <>
+              {panel === 'reconciliation' && <ReconciliationPanel groups={reconciliation} />}
               {panel === 'statements' && <StatementsPanel groups={clientAR} onStatement={onStatement} />}
               {panel === 'invoices' && (
                 <InvoicesPanel
@@ -193,7 +201,7 @@ export default function MoneyPhone({
             facts={[
               { label: 'Due this week', value: view.dueThisWeek },
               { label: `${month} so far`, value: view.monthToDate },
-              { label: 'Margin', value: view.marginPct == null ? 'None yet' : `${view.marginPct.toFixed(1)}%` }
+              { label: 'Tracked margin', value: view.marginPct == null ? 'None yet' : `${view.marginPct.toFixed(1)}%` }
             ]}
             corner={<Monogram name={profile?.company_name} logoUrl={profile?.logo_url} size={32} />}
           />
@@ -206,6 +214,8 @@ export default function MoneyPhone({
         </div>
       ) : (
         <>
+          <p className="fhm-quiet">{view.marginNote}. Untracked costs excluded.</p>
+          <ReconciliationLinks groups={reconciliation} />
           {view.overdue.length > 0 && (
             <Group
               id="overdue"
@@ -239,6 +249,7 @@ export default function MoneyPhone({
           {!hasDue && openInvoiceCount > 0 && (
             <p className="fhm-quiet">Nothing is due in the next 7 days. The rest are in All invoices below.</p>
           )}
+          {quotesQuery.isError && <DataErrorState title="Could not load quotes waiting on approval" actionLabel="Try again" onRetry={() => { void quotesQuery.refetch() }} />}
           {view.waiting.length > 0 && (
             <Group
               id="waiting"

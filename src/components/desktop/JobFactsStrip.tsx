@@ -32,7 +32,7 @@ export default function JobFactsStrip({ contact, client, money }: {
       <dl className="fhd-strip__list">
         {money && (
           <div className="fhd-strip__fact">
-            <dt>{preDealLabel ?? 'Balance'}</dt>
+            <dt>{preDealLabel ?? 'Contract balance'}</dt>
             <dd className="fhd-strip__money">{preDealLabel ? money.contract : money.balance}</dd>
           </div>
         )}

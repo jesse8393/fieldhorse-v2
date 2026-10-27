@@ -28,6 +28,8 @@
 // premium invoices (Stripe, Ramp, high-end architecture firms) carry
 // identity without shouting.
 
+import './documents-responsive.css'
+import DocumentLogo from './DocumentLogo.tsx'
 import { DOC_COLORS, DOC_FONTS, DOC_SPACE, resolveBrandGold } from './tokens.ts'
 
 /**
@@ -62,7 +64,7 @@ export default function DocumentShell({
 
   return (
     <article
-      className="fh-doc-shell"
+      className="fh-doc-shell fh-doc-layout"
       style={{
         width: '100%',
         maxWidth: `${DOC_SPACE.pageWidthPx}px`,
@@ -81,7 +83,7 @@ export default function DocumentShell({
           accent color frames the page. */}
       <div style={{ height: 3, background: brand }} aria-hidden="true" />
 
-      <div
+      <div className="fh-doc-content"
         style={{
           padding: `${DOC_SPACE.marginPx - 8}px ${DOC_SPACE.marginPx}px ${DOC_SPACE.marginPx - 12}px`,
           display: 'flex',
@@ -90,7 +92,7 @@ export default function DocumentShell({
         }}
       >
         {/* ─── Letterhead ─────────────────────────────────── */}
-        <header
+        <header className="fh-doc-letterhead"
           style={{
             display: 'flex',
             justifyContent: 'space-between',
@@ -141,9 +143,9 @@ export default function DocumentShell({
 
 function CompanyIdentity({ company, contactLine }: any) {
   return (
-    <div style={{ minWidth: 0, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+    <div className="fh-doc-identity" style={{ minWidth: 0, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
       {company?.logo_url && (
-        <img
+        <DocumentLogo
           loading="lazy"
           src={company.logo_url}
           alt=""
@@ -261,7 +263,7 @@ function DocMeta({ docType, number, metaRows, status }: any) {
 
 function PartiesRow({ recipient, recipientLabel, project }: any) {
   return (
-    <section
+    <section className="fh-doc-columns"
       style={{
         display: 'grid',
         gridTemplateColumns: project ? '1fr 1fr' : '1fr',

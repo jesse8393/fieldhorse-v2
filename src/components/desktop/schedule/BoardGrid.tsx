@@ -1,3 +1,4 @@
+import { eventAssignees } from '../../../lib/scheduleAllocation.ts'
 // The Day and Week board (spec 9.10): hourly slots on a paper panel, the
 // today column tinted with a gold dot and a 2 px gold now line, and visit
 // blocks laid out side by side with packDay. Every slot is a drop target
@@ -145,6 +146,7 @@ export default function BoardGrid({ days, view, events, loading, failed = false,
                   const rawEnd = event.end_at ? new Date(event.end_at) : null
                   const end = rawEnd && rawEnd.getTime() > start.getTime() ? rawEnd : new Date(start.getTime() + 3_600_000)
                   const status = eventStatus({ start_at: event.start_at ?? null, end_at: event.end_at ?? null }, event.fh_contacts?.stage, now)
+                  const assignedCount = eventAssignees(event).length
                   const title = event.title?.trim() || 'Untitled event'
                   const range = timeRangeLabel(start, end)
                   const job = event.fh_contacts?.name?.trim()
@@ -161,7 +163,7 @@ export default function BoardGrid({ days, view, events, loading, failed = false,
                         left: `calc(${item.column} * 100% / ${item.columns} + 2px)`,
                         width: `calc(100% / ${item.columns} - 4px)`
                       }}
-                      aria-label={`${title}, ${status.word}, ${range}${job && job !== title ? `, ${job}` : ''}${kind ? `, ${kind.toLowerCase()}` : ''}`}
+                      aria-label={`${title}, ${status.word}, ${range}${job && job !== title ? `, ${job}` : ''}${kind ? `, ${kind.toLowerCase()}` : ''}${assignedCount ? `, ${assignedCount} crew assigned` : ''}`}
                       title={`${title}, ${status.word}, ${range}`}
                       onClick={() => onOpenEvent?.(event)}
                     >
@@ -174,6 +176,7 @@ export default function BoardGrid({ days, view, events, loading, failed = false,
                         <span className="fhsch-event__comma">, </span>
                         <span className="fhsch-event__time">{range}</span>
                       </span>
+                      {assignedCount > 0 && item.height >= 80 && <span className="fhsch-event__meta">{assignedCount} crew assigned</span>}
                     </button>
                   )
                 })}

@@ -25,7 +25,7 @@ type ContactRow = Pick<
   'quote_change_request_note' | 'quote_change_requested_at' | 'address' | 'job_title'
 >>
 
-type ClientName = { name: string | null } | null
+type ClientName = { name: string | null; phone?: string | null } | null
 
 // Phase 9 (D53, D55): leads and quotes are their own records, each
 // pointing at a client, whose name is what Today calls them.
@@ -103,6 +103,9 @@ export type HomeNextAction = {
   recordId: string
   /** The job's id, or '' when the row is about a lead or a quote. */
   contactId: string
+  /** Present on lead follow ups so missing details can be repaired. */
+  clientId?: string | null
+  contactPhone?: string | null
   verb: string
   contactName: string
   contactAmount: number
@@ -184,7 +187,7 @@ export type HomeDashboardBundle = {
   todayOnSite: HomeTodayOnSite[]
   /** The next local day's visits, the same shape as todayOnSite. */
   tomorrowOnSite: HomeTodayOnSite[]
-  /** The most urgent next actions, at most NEXT_ACTIONS_KEPT, for See all. */
+  /** Every next action, ordered by urgency, for See all. */
   nextActions: HomeNextAction[]
   /**
    * How many next actions there are in all, which can be more than
@@ -267,10 +270,6 @@ function latestMs(...isos: (string | null | undefined)[]): number {
   }
   return latest
 }
-
-// Today counts every next action but keeps only this many, most urgent
-// first, for its See all list.
-export const NEXT_ACTIONS_KEPT = 20
 
 export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashboardBundle {
   const now = source.now
@@ -436,18 +435,22 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
     const due = new Date(`${lead.follow_up_on}T12:00:00`)
     const overdueDays = Math.max(0, Math.round((now.getTime() - due.getTime()) / 86400000))
     const name = clientName(lead, 'Unnamed lead')
+    const phone = lead.fh_clients?.phone?.trim() || null
+    const verb = phone ? 'Call' : lead.client_id ? 'Add phone' : 'Follow up'
     actions.push({
       id: `followup-due-${lead.id}`,
       kind: 'followup-due',
       recordKind: 'lead',
       recordId: lead.id,
       contactId: '',
-      verb: 'Call',
+      clientId: lead.client_id,
+      contactPhone: phone,
+      verb,
       contactName: name,
       contactAmount: 0,
       dueIso: due.toISOString(),
       dueKind: 'overdue',
-      title: `Call ${name}`,
+      title: phone ? `Call ${name}` : lead.client_id ? `Add phone for ${name}` : `Follow up with ${name}`,
       detail: overdueDays === 0 ? 'Follow up due today' : `Follow up ${overdueDays}d overdue`,
       urgencyLabel: overdueDays === 0 ? 'Due today' : 'Overdue',
       urgencyTone: overdueDays >= 2 ? 'danger' : 'warn',
@@ -666,7 +669,7 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
     stageRail,
     todayOnSite,
     tomorrowOnSite,
-    nextActions: actions.slice(0, NEXT_ACTIONS_KEPT),
+    nextActions: actions,
     nextActionsTotal: actions.length,
     photoUrlByJob: source.photoUrlByJob,
   }
@@ -694,7 +697,7 @@ const CONTACT_COLUMNS =
 
 const INVOICE_COLUMNS = 'id, contact_id, title, amount, due_at, status, sequence_number, created_at'
 
-const LEAD_COLUMNS = 'id, client_id, title, status, follow_up_on, last_contact, created_at, updated_at, fh_clients(name)'
+const LEAD_COLUMNS = 'id, client_id, title, status, follow_up_on, last_contact, created_at, updated_at, fh_clients(name, phone)'
 
 const QUOTE_COLUMNS =
   'id, client_id, title, status, amount, job_id, sent_at, change_request_note, change_requested_at, created_at, updated_at, fh_clients(name)'

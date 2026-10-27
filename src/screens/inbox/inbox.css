@@ -685,3 +685,8 @@
     padding: 8px var(--fh-gutter-desktop) 16px;
   }
 }
+
+.fhi-history-nav { display:flex; flex-wrap:wrap; gap:8px; padding:12px 24px; border-bottom:1px solid var(--v3-border); }
+.fhi-history-nav a { display:inline-flex; align-items:center; min-height:44px; padding:8px 12px; border-radius:var(--fh-r-chip); border:1px solid var(--v3-border); color:var(--v3-text); font-size:14px; font-weight:600; text-decoration:none; }
+.fhi-history-nav a[aria-current="page"] { background:var(--v3-surface-2); border-color:var(--v3-text-muted); }
+.fhi-history-nav a:focus-visible { outline:2px solid var(--v3-primary); outline-offset:3px; }

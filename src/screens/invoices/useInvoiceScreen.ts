@@ -26,6 +26,8 @@ import {
   sendInvoiceEmail,
   type BillTo
 } from '../../lib/invoices.ts'
+import { reviewInvoice } from '../../lib/invoiceReview.js'
+import { knownContractTotal } from '../../lib/invoiceSettlement.ts'
 import { classifyInvoice, type InvoiceStanding } from '../../lib/moneyView.ts'
 import { onInvoiceSent, startInvoiceSend, useInvoicesSending } from '../../lib/invoiceSends.ts'
 import { invoiceRecordKey, useInvalidateInvoiceRecord, useInvoiceRecord, type InvoiceRecord, type InvoiceRecordBundle } from '../../lib/queries.ts'
@@ -118,6 +120,7 @@ export function useInvoiceScreen(id: string | undefined) {
 
   const record = query.data ?? null
   const figures = useMemo(() => (record ? describeInvoice(record, now) : null), [record, now])
+  const billingReview = useMemo(() => record ? reviewInvoice({ invoice: record.invoice, invoices: record.jobInvoices, contractTotal: record.job ? knownContractTotal({ amount: record.job.amount, changeOrders: record.changeOrders }) : null }) : null, [record])
   const company = useMemo(() => companyFromProfile(profile), [profile])
   const sending = !!id && sendingIds.has(id)
 
@@ -152,9 +155,13 @@ export function useInvoiceScreen(id: string | undefined) {
   // the same email sent again; only the toast words it differently).
   // Resolves true once the email has gone out. A tap while this invoice's
   // email is already going out, from any screen, sends nothing.
-  const send = useCallback(async (options: { reminder?: boolean } = {}): Promise<boolean> => {
+  const send = useCallback(async (options: { reminder?: boolean; duplicateReviewed?: boolean } = {}): Promise<boolean> => {
     if (!record || !user || !figures) return false
     if (settling.current) return false
+    if (record.invoice.status === 'draft' && billingReview) {
+      if (billingReview.excess > 0) { toastError('Review contract billing', 'Invoices and drafts exceed approved scope. Reduce or void unused drafts before sending.'); return false }
+      if (billingReview.duplicates.length && !options.duplicateReviewed) { toastError('Review similar invoices', 'Confirm this bills a separate installment before sending.'); return false }
+    }
     if (!figures.to.email) {
       toastError('Add a client email first', `Open the linked client to add an email for ${figures.to.name || 'this client'}.`)
       return false
@@ -165,6 +172,7 @@ export function useInvoiceScreen(id: string | undefined) {
     try {
       const res = await sendInvoiceEmail({
         invoice: record.invoice,
+        duplicateReviewed: !!options.duplicateReviewed,
         contact: record.job,
         client: record.client,
         company,
@@ -190,7 +198,7 @@ export function useInvoiceScreen(id: string | undefined) {
       finish(sent)
     }
     return sent
-  }, [record, user, figures, company, refresh])
+  }, [record, user, figures, company, refresh, billingReview])
 
-  return { user, query, record, figures, company, now, sending, refresh, patchInvoice, send }
+  return { user, query, record, figures, billingReview, company, now, sending, refresh, patchInvoice, send }
 }

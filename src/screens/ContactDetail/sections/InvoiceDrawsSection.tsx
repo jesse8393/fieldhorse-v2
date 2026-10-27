@@ -36,7 +36,9 @@ import { money } from '../../../components/documents/format.ts'
 import { useArmedId } from '../../../lib/secondTap.ts'
 import { Eyebrow } from '../../../components/v3'
 import { countNoun } from '../../../lib/format.ts'
-import { invoiceAmountDue, invoiceDescription } from '../../../lib/invoices.ts'
+import { fetchInvoiceReviewContext } from '../../../lib/invoiceReviewContext.ts'
+import { reviewInvoice } from '../../../lib/invoiceReview.js'
+import { fetchInvoicesForContact, invoiceAmountDue, invoiceDescription } from '../../../lib/invoices.ts'
 import { invoicesPaidInFull } from '../../../lib/invoiceSettlement.ts'
 import { splitByPercents } from '../../../lib/paymentSchedule.ts'
 import { useMembership } from '../../../contexts/MembershipContext.tsx'
@@ -111,11 +113,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
   const fetchDraws = useCallback(async () => {
     if (!contactId) return
     setLoading(true)
-    const { data, error } = await supabase
-      .from('fh_invoices')
-      .select('*')
-      .eq('contact_id', contactId)
-      .order('sequence_number', { ascending: true })
+    const { data, error } = await fetchInvoicesForContact(contactId)
     if (error) toastError("Couldn't load draws", error.message)
     setDraws(data || [])
     setLoadFailed(!!error)
@@ -146,6 +144,12 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
         due_at: payload.due_at || null,
         notes: payload.notes?.trim() || null,
         description: payload.description?.trim() || null
+      }
+      const context = await fetchInvoiceReviewContext(contact.id, contact.client_id)
+      const review = reviewInvoice({ invoice: { ...row, id: payload.id || 'new' }, ...context })
+      const prior = context.invoices.find(invoice => invoice.id === payload.id)
+      if (review.excess > 0 && (!prior || amount > Number(prior.amount))) {
+        throw new Error('This draw exceeds approved contract value. Reduce or void unused drafts, or approve added scope first.')
       }
       let res
       if (payload.id) {
@@ -391,6 +395,14 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
   // "Draw N of M" stamped in the title.
   async function handleDownload(draw: any) {
     if (busyId) return
+    if (draw.status === 'draft') {
+      const review = reviewInvoice({ invoice: draw, invoices: draws, contractTotal })
+      if (review.excess > 0 || review.duplicates.length) {
+        navigate(`/invoices/${draw.id}`)
+        toastError('Review this draft before sending', 'Check similar invoices and approved contract value.')
+        return
+      }
+    }
     setBusyId(draw.id)
     try {
       const result = await buildDrawPdf(draw)
@@ -428,6 +440,14 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       )
       return
     }
+    if (draw.status === 'draft') {
+      const review = reviewInvoice({ invoice: draw, invoices: draws, contractTotal })
+      if (review.excess > 0 || review.duplicates.length) {
+        navigate(`/invoices/${draw.id}`)
+        toastError('Review this draft before sending', 'Check similar invoices and approved contract value.')
+        return
+      }
+    }
     setBusyId(draw.id)
     try {
       const result = await buildDrawPdf(draw)
@@ -464,6 +484,8 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
         headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify({
           contact_id: contact.id,
+          invoice_id: draw.id,
+          invoice_updated_at: draw.updated_at,
           sender_user_id: user.id,
           recipient_email: recipientEmail,
           recipient_name: contact.name || null,
@@ -486,7 +508,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
         return
       }
       if (!sendRes.ok || !sendBody?.ok) {
-        const detail = sendBody?.detail || sendBody?.error || 'Unknown provider error'
+        const detail = sendBody?.message || sendBody?.detail || sendBody?.error || 'Unknown provider error'
         const status = sendBody?.provider_status ? ` (HTTP ${sendBody.provider_status})` : ''
         throw new Error(`Resend rejected${status}: ${detail}`)
       }

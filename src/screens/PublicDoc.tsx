@@ -22,6 +22,7 @@
 // Anyone with the token can view; the on the server function gates
 // expiry / revocation / not-found.
 
+import { proposalIssuedAt } from '../lib/proposalDate.ts'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import {
@@ -551,7 +552,7 @@ function ProposalView({ data, portal }: { data: PublicDocPayload; portal?: Propo
       changeOrders={changeOrders}
       photos={photos || []}
       meta={{
-        issuedAt: contact?.quote_sent_at || contact?.created_at,
+        issuedAt: proposalIssuedAt(contact || {}),
         expiresAt: contact?.quote_expires_at || null
       }}
       status={portalStatus(data) || 'sent'}

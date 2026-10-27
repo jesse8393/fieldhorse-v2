@@ -33,6 +33,7 @@ import './styles/v3.css'
 import './styles/redesign.css'
 import './styles/fh-components.css'
 import './styles/fh-shell.css'
+import './styles/page-system.css'
 // Loaded LAST so cascade-equal rules win. See file header for context.
 import './styles/mobile-keyboard-fix.css'
 

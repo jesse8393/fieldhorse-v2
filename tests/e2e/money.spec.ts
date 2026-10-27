@@ -65,7 +65,7 @@ const CONTACTS = [
   contact({ id: 'c-gail', stage: 'job', name: 'Gail Abernathy', job_title: 'Roof repair', amount: 6000 }),
   contact({ id: 'c-darnell', stage: 'closed', name: 'Darnell Whitcomb', job_title: 'Garage slab', amount: 9600, cost: 6960, completed_at: '2026-09-29T12:00:00Z' }),
   contact({
-    id: 'c-marco', stage: 'quote', name: 'Marco Castellanos', job_title: 'Pool deck pour', amount: 18458,
+    id: 'c-marco', stage: 'moved_quote', name: 'Marco Castellanos', job_title: 'Pool deck pour', amount: 18458,
     proposal_status: 'sent', quote_sent_at: '2026-10-07T11:00:00Z'
   })
 ]
@@ -92,7 +92,13 @@ const PAYMENTS = [
   payment({ id: 'p-tue', contact_id: 'c-rosa', amount: 3000, paid_on: '2026-10-06', created_at: '2026-10-06T15:00:00Z' })
 ]
 
-const TABLES = { fh_contacts: CONTACTS, fh_invoices: INVOICES, fh_payments: PAYMENTS }
+const QUOTES = [{
+  id: 'q-marco', org_id: 'org-1', user_id: 'qa-user-1', client_id: 'cl-marco',
+  title: 'Pool deck pour', amount: 18458, status: 'sent', job_id: null,
+  sent_at: '2026-10-07T11:00:00Z', created_at: '2026-09-01T12:00:00Z', updated_at: '2026-10-07T11:00:00Z',
+  fh_clients: { id: 'cl-marco', name: 'Marco Castellanos', phone: '555-0101', email: 'marco@example.com', address: null }
+}]
+const TABLES = { fh_contacts: CONTACTS, fh_quotes: QUOTES, fh_invoices: INVOICES, fh_payments: PAYMENTS }
 
 async function openMoney(
   context: BrowserContext,
@@ -531,7 +537,22 @@ async function tapThroughTheLanding(page: Page, phone: boolean, button: Locator,
     if (!hit || !buttonNode.contains(hit)) return 'off'
     return buttonNode.getAttribute('aria-busy') === 'true' ? 'busy' : 'free'
   }, [x, y])
-  const tap = () => (phone ? page.touchscreen.tap(x, y) : page.mouse.click(x, y))
+  // Bind input to this particular button. A page.mouse.click at frozen
+  // coordinates can race the automatic return to Money and activate an
+  // unrelated link underneath it. That is a different action, not another
+  // attempt to send this invoice. Detached buttons end this stress input;
+  // every other input failure still fails the test.
+  const target = await button.elementHandle()
+  if (!target) throw new Error('The send button is no longer available')
+  const tap = async () => {
+    try {
+      if (phone) await target.tap({ force: true, timeout: 1_000 })
+      else await target.click({ force: true, timeout: 1_000 })
+    } catch (error) {
+      if (await target.evaluate((node) => !node.isConnected)) return
+      throw error
+    }
+  }
 
   // A few taps while the email is still going out, then on through its landing.
   for (let n = 0; n < 3; n++) {
@@ -726,14 +747,14 @@ async function expectPanelsWaitForTheCompany(context: BrowserContext, page: Page
     await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible({ timeout: 30_000 })
     await expect(page.getByText('$0.00', { exact: true })).toHaveCount(0)
     await expect(page.getByText(empty, { exact: true })).toHaveCount(0)
-    await expect(page.getByText('Total outstanding', { exact: true })).toHaveCount(0)
+    await expect(page.getByText('Remaining contract value', { exact: true })).toHaveCount(0)
     await expect(page.getByText('Loading money', { exact: true })).toBeAttached()
   }
 
   // The membership arrives, and Job balances shows what is really owed.
   release()
-  const aging = page.getByRole('region', { name: 'Outstanding by age' })
-  await expect(aging.getByText('Total outstanding', { exact: true })).toBeVisible({ timeout: 15_000 })
+  const aging = page.getByRole('region', { name: 'Contract balances by reference age' })
+  await expect(aging.getByText('Remaining contract value', { exact: true })).toBeVisible({ timeout: 15_000 })
   await expect(aging.getByText('$21,792.00', { exact: true })).toBeVisible()
   await expect(page.getByText('Loading money', { exact: true })).toHaveCount(0)
 }
@@ -748,7 +769,7 @@ async function expectInvoiceWithoutAJob(page: Page) {
   await openInvoiceRow(page, 'Overdue', /^Jeff Roy/, 'i-solo')
   await expect(page.getByRole('heading', { level: 1, name: 'Gravel delivery' })).toBeVisible()
   await expect(page.locator('.fhinv-hero').getByText('$1,000.00', { exact: true })).toBeVisible()
-  await expect(page.locator('.fhinv-hero').getByText('$1,200.00 invoiced, $200.00 paid on it', { exact: true })).toBeVisible()
+  await expect(page.locator('.fhinv-hero').getByText('$1,200.00 invoice amount, $200.00 paid on it', { exact: true })).toBeVisible()
   await expect(page.locator('.fhinv-actions').getByRole('link', { name: 'Open client' })).toHaveAttribute('href', '/clients/cl-1')
   await expect(page.locator('.fhinv-actions').getByRole('link', { name: 'Open job' })).toHaveCount(0)
   await page.locator('.fhinv-actions').getByRole('link', { name: 'Collect payment' }).click()
@@ -771,7 +792,7 @@ test.describe('money on a phone', () => {
     await expect(vault.getByText('$6,090.00', { exact: true })).toBeVisible()
     await expect(vault.getByText('October so far', { exact: true })).toBeVisible()
     await expect(vault.getByText('$4,620.50', { exact: true })).toBeVisible()
-    await expect(vault.getByText('Margin', { exact: true })).toBeVisible()
+    await expect(vault.getByText('Tracked margin', { exact: true })).toBeVisible()
     await expect(vault.getByText('27.5%', { exact: true })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Reports' })).toHaveAttribute('href', '/analytics')
 
@@ -808,7 +829,7 @@ test.describe('money on a phone', () => {
   })
 
   test('groups without rows stay out', async ({ context, page }) => {
-    await openMoney(context, page, { tables: { fh_invoices: [], fh_contacts: [CONTACTS[3]] } })
+    await openMoney(context, page, { tables: { fh_invoices: [], fh_quotes: [], fh_contacts: [CONTACTS[3]] } })
     await expect(page.getByRole('heading', { level: 2, name: 'Paid', exact: true })).toBeVisible()
     for (const title of ['Overdue', 'Due soon', 'Waiting on approval']) {
       await expect(page.getByRole('heading', { level: 2, name: title, exact: true })).toHaveCount(0)
@@ -1020,10 +1041,10 @@ test.describe('money on a phone', () => {
     await expect(voidIt).toBeVisible()
   })
 
-  test('quotes and paid rows open the job', async ({ context, page }) => {
+  test('a waiting quote opens its canonical quote screen', async ({ context, page }) => {
     await openMoney(context, page)
     await page.getByRole('region', { name: 'Waiting on approval' }).getByText('Marco Castellanos', { exact: true }).click()
-    await expect(page).toHaveURL(/\/quotes\/c-marco/)
+    await expect(page).toHaveURL(/\/quotes\/q-marco$/)
   })
 
   test('statements, all invoices and job balances stay reachable', async ({ context, page }) => {
@@ -1064,11 +1085,11 @@ test.describe('money on a phone', () => {
     // Job balances: the aging summary and a link to each job's money tab.
     await page.getByRole('link', { name: /^Job balances/ }).click()
     await expect(page.getByRole('heading', { level: 1, name: 'Job balances' })).toBeVisible()
-    const aging = page.getByRole('region', { name: 'Outstanding by age' })
-    for (const label of ['Current', 'Late', 'Overdue']) {
+    const aging = page.getByRole('region', { name: 'Contract balances by reference age' })
+    for (const label of ['Up to 30 days', '31 to 60 days', 'Over 60 days']) {
       await expect(aging.getByText(label, { exact: true })).toBeVisible()
     }
-    await expect(aging.getByText('Total outstanding', { exact: true })).toBeVisible()
+    await expect(aging.getByText('Remaining contract value', { exact: true })).toBeVisible()
     await expect(page.getByRole('link', { name: /Rosa Delgado/ })).toHaveAttribute('href', '/jobs/c-rosa?tab=financials')
   })
 
@@ -1148,7 +1169,7 @@ test.describe('money on a desktop', () => {
     await expect(vault.getByText('$6,090.00', { exact: true })).toBeVisible()
     await expect(vault.getByText('October so far', { exact: true })).toBeVisible()
     await expect(vault.getByText('$4,620.50', { exact: true })).toBeVisible()
-    await expect(vault.getByText('Margin', { exact: true })).toBeVisible()
+    await expect(vault.getByText('Tracked margin', { exact: true })).toBeVisible()
     await expect(vault.getByText('27.5%', { exact: true })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Reports' })).toHaveAttribute('href', '/analytics')
     // New invoice is a link to the create screen (Task 8).
@@ -1170,7 +1191,7 @@ test.describe('money on a desktop', () => {
     const overdue = page.getByRole('region', { name: 'Overdue', exact: true })
     const rosa = overdue.getByRole('row', { name: /Rosa Delgado/ })
     await expect(rosa.getByText('Rosa Delgado', { exact: true })).toBeVisible()
-    await expect(rosa.getByText('Concrete steps, final', { exact: true })).toBeVisible()
+    await expect(rosa.getByText('Concrete steps, final · Invoice 2 · i-rosa', { exact: true })).toBeVisible()
     await expect(rosa.getByText('$1,240.00', { exact: true })).toBeVisible()
     await expect(rosa.getByText('6 days overdue', { exact: true })).toBeVisible()
     await expect(rosa.getByRole('link', { name: 'Remind Rosa Delgado' })).toHaveAttribute('href', '/invoices/i-rosa/remind')
@@ -1288,7 +1309,7 @@ test.describe('money on a desktop', () => {
     const soon = page.getByRole('region', { name: 'Due soon', exact: true })
 
     // A click anywhere on the row.
-    await soon.getByText('Roof repair, balance', { exact: true }).click()
+    await soon.getByRole('cell', { name: 'Roof repair, balance · Invoice 1 · i-gail', exact: true }).click()
     await expect(page).toHaveURL(/\/invoices\/i-gail$/)
     await expect(page.getByRole('dialog')).toHaveCount(0)
     const actions = page.locator('.fhinv-actions')
@@ -1329,15 +1350,15 @@ test.describe('money on a desktop', () => {
     await expectInvoiceWithoutAJob(page)
   })
 
-  test('quote and paid rows open the job', async ({ context, page }) => {
+  test('a waiting quote opens its quote screen and a paid row opens its job', async ({ context, page }) => {
     await openMoney(context, page)
     const waiting = page.getByRole('region', { name: 'Waiting on approval', exact: true })
-    await expect(waiting.getByRole('link', { name: /^Open Marco Castellanos/ })).toHaveAttribute('href', /\/quotes\/c-marco/)
+    await expect(waiting.getByRole('link', { name: /^Open Marco Castellanos/ })).toHaveAttribute('href', '/quotes/q-marco')
     const paid = page.getByRole('region', { name: 'Paid', exact: true })
     await expect(paid.getByRole('link', { name: 'Open Darnell Whitcomb, Garage slab, deposit' })).toHaveAttribute('href', '/jobs/c-darnell?tab=financials')
     // A click on the row does what Open does.
     await waiting.getByText('Pool deck pour', { exact: true }).click()
-    await expect(page).toHaveURL(/\/quotes\/c-marco/)
+    await expect(page).toHaveURL(/\/quotes\/q-marco$/)
   })
 
   test('empty money', async ({ context, page }) => {
@@ -1398,11 +1419,11 @@ test.describe('money on a desktop', () => {
     // balance, Log payment, and the CSV export.
     await page.getByRole('link', { name: /^Job balances/ }).click()
     await expect(page.getByRole('heading', { level: 1, name: 'Job balances' })).toBeVisible()
-    const aging = page.getByRole('region', { name: 'Outstanding by age' })
-    for (const label of ['Current', 'Late', 'Overdue']) {
+    const aging = page.getByRole('region', { name: 'Contract balances by reference age' })
+    for (const label of ['Up to 30 days', '31 to 60 days', 'Over 60 days']) {
       await expect(aging.getByText(label, { exact: true })).toBeVisible()
     }
-    await expect(aging.getByText('Total outstanding', { exact: true })).toBeVisible()
+    await expect(aging.getByText('Remaining contract value', { exact: true })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Rosa Delgado', exact: true })).toHaveAttribute('href', '/jobs/c-rosa?tab=financials')
     await page.getByRole('button', { name: 'Sort by Balance' }).click()
     await page.getByRole('button', { name: 'Log payment for Rosa Delgado' }).click()
@@ -1513,14 +1534,14 @@ test.describe('money on a desktop', () => {
     expect(await page.locator('.fhc-skel').count()).toBeGreaterThan(3)
     // No number and no count stands in for data that has not arrived.
     await expect(page.getByText('$0.00', { exact: true })).toHaveCount(0)
-    await expect(page.getByText('Total outstanding', { exact: true })).toHaveCount(0)
+    await expect(page.getByText('Remaining contract value', { exact: true })).toHaveCount(0)
     await expect(page.getByText('Nobody owes you', { exact: true })).toHaveCount(0)
     await expect(page.getByText('0 open', { exact: true })).toHaveCount(0)
     await expect(page.getByText('0 jobs with a balance', { exact: true })).toHaveCount(0)
 
     release()
-    const aging = page.getByRole('region', { name: 'Outstanding by age' })
-    await expect(aging.getByText('Total outstanding', { exact: true })).toBeVisible({ timeout: 15_000 })
+    const aging = page.getByRole('region', { name: 'Contract balances by reference age' })
+    await expect(aging.getByText('Remaining contract value', { exact: true })).toBeVisible({ timeout: 15_000 })
     await expect(page.getByRole('link', { name: /^All invoices/ })).toContainText('5 open')
     await expect(page.getByRole('link', { name: /^Statements/ })).toContainText('1 customer owes you')
   })

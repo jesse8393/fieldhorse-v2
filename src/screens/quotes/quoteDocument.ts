@@ -9,6 +9,7 @@
 // sending. Task 11 teaches them to read the quote by quote_id; until then
 // the old contact id rides along when the quote has one.
 
+import { proposalIssuedAt } from '../../lib/proposalDate.ts'
 import { supabase, authHeaders } from '../../lib/supabase.ts'
 import { mintPublicLink } from '../../lib/publicLink.ts'
 import { quoteFollowUpDate } from '../../lib/quoteFollowUp.ts'
@@ -104,6 +105,7 @@ export async function buildQuotePdf({ quote, company, userId, recipientEmail, in
     terms: quote.terms_text || '',
     exclusions: quote.exclusions_text || '',
     expiresAt: quote.expires_at || null,
+    issuedAt: proposalIssuedAt(quote),
     status: quote.status || 'draft',
     quoteId: quote.id,
     photos,
@@ -205,9 +207,31 @@ export async function mintQuoteLink(quote: QuoteWithClient, userId: string): Pro
   return link.url
 }
 
-/** A quote that is still waiting on the customer is marked sent when a link goes out. */
+/** Only a draft or requested revision needs a manual delivery acknowledgement. */
 export function canMarkSent(status: string | null | undefined): boolean {
-  return !['approved', 'rejected', 'expired', 'lost'].includes(String(status || '').toLowerCase())
+  return ['draft', 'changes_requested'].includes(String(status || '').toLowerCase())
+}
+
+/** Confirm delivery only while the stored quote is still the version of its
+ * lifecycle the operator saw. A concurrent approval, request or conversion
+ * must win over this acknowledgement. */
+export async function markQuoteSent(quoteId: string, expectedStatus: string | null | undefined) {
+  const status = String(expectedStatus || '').toLowerCase()
+  if (!quoteId || !canMarkSent(status)) throw new Error('This quote cannot be marked as sent.')
+  const sentAt = new Date().toISOString()
+  const { data, error } = await supabase
+    .from('fh_quotes')
+    .update({ status: 'sent', sent_at: sentAt })
+    .eq('id', quoteId)
+    .eq('status', status)
+    .is('job_id', null)
+    .select('id,status,sent_at')
+    .maybeSingle()
+  if (error) throw new Error(error.message || 'The quote could not be updated.')
+  if (!data || data.id !== quoteId || data.status !== 'sent' || !data.sent_at || Date.parse(data.sent_at) !== Date.parse(sentAt)) {
+    throw new Error('This quote has changed. Review its current status before marking it as sent.')
+  }
+  return data
 }
 
 /** An iPhone running the app from the home screen, where the share sheet hands a link on. */

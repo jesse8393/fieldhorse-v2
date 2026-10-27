@@ -291,10 +291,10 @@ test.describe('the quote screen', () => {
     expect(calls.publicLinks).toBe(0)
   })
 
-  test('send for approval shares a link when there is no email', async ({ context, page }) => {
+  test('copying an approval link preserves draft status until delivery is acknowledged', async ({ context, page }) => {
     await signIn(context, {
       tables: {
-        fh_quotes: [quoteRow({ fh_clients: { ...CLIENT, email: null } })],
+        fh_quotes: [quoteRow({ status: 'draft', sent_at: null, fh_clients: { ...CLIENT, email: null } })],
         fh_clients: [clientRow({ email: null })],
         fh_quote_items: ITEMS,
         // The mock answers an insert with the first row of the table.
@@ -302,16 +302,39 @@ test.describe('the quote screen', () => {
       }
     })
     const calls = await watchSends(context)
+    let stored = quoteRow({ status: 'draft', sent_at: null, fh_clients: { ...CLIENT, email: null } })
+    await context.route((url) => url.pathname.endsWith('/rest/v1/fh_quotes'), async (route) => {
+      const request = route.request()
+      if (request.method() === 'PATCH') {
+        const url = new URL(request.url())
+        if (url.searchParams.get('status') !== `eq.${stored.status}` || url.searchParams.get('job_id') !== 'is.null') {
+          return route.fulfill({ status: 200, contentType: 'application/json', body: 'null' })
+        }
+        stored = { ...stored, ...request.postDataJSON() }
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(stored) })
+      }
+      if (request.method() === 'GET') {
+        const single = request.headers().accept?.includes('vnd.pgrst.object')
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(single ? stored : [stored]) })
+      }
+      return route.fallback()
+    })
     await openQuote(page)
 
     await expect(total(page).getByText('Copies a link')).toBeVisible()
     await expect(page.locator('.fhqt-page').getByText(/No email on file/)).toBeVisible()
-    const marked = page.waitForRequest((r) => r.method() === 'PATCH' && r.url().includes('/rest/v1/fh_quotes'))
-    await total(page).getByRole('button', { name: 'Send for approval' }).click()
+    const patches: object[] = []
+    page.on('request', (r) => { if (r.method() === 'PATCH' && r.url().includes('/rest/v1/fh_quotes')) patches.push(r.postDataJSON()) })
+    await total(page).getByRole('button', { name: 'Copy approval link' }).click()
     await expect.poll(() => calls.publicLinks, { timeout: 30_000 }).toBe(1)
     await expect(page.getByText(/Share link (copied|ready)/).first()).toBeVisible()
-    // A link out the door marks the quote sent.
-    expect((await marked).postDataJSON()).toMatchObject({ status: 'sent' })
+    expect(patches).toEqual([])
+    await expect(page.locator('.fhqt-head').getByText('Draft', { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: /^Mark as sent/ }).click()
+    await expect.poll(() => patches.length).toBe(1)
+    expect(patches[0]).toMatchObject({ status: 'sent' })
+    await expect(page.getByText('Quote marked as sent', { exact: true })).toBeVisible()
+    await expect(page.locator('.fhqt-head').getByText('Sent', { exact: true })).toBeVisible()
     expect(calls.send).toEqual([])
   })
 

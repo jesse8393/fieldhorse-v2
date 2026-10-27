@@ -1,0 +1,51 @@
+import { expect, test } from '@playwright/test'
+import { signIn } from './helpers/signIn.ts'
+
+test.use({ timezoneId: 'America/Chicago' })
+
+test('Sunday remains visible and mobile can schedule an unscheduled job', async ({ context, page }) => {
+  await signIn(context, { tables: { fh_schedule: [] } })
+  await page.clock.setFixedTime(new Date('2026-10-25T15:00:00Z'))
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/schedule?d=2026-10-25')
+  const week = page.getByLabel('Selected calendar week')
+  const sunday = week.getByRole('button', { name: 'Sunday, October 25' })
+  await expect(sunday).toHaveAttribute('aria-pressed', 'true')
+  const box = await sunday.boundingBox()
+  expect(box).not.toBeNull()
+  expect(box!.x).toBeGreaterThanOrEqual(0)
+  expect(box!.x + box!.width).toBeLessThanOrEqual(390)
+  await expect(week.getByRole('button').first()).toHaveAccessibleName('Sunday, October 25')
+  await page.getByRole('button', { name: 'Next week', exact: true }).click()
+  await expect(week.getByRole('button').first()).toHaveAccessibleName('Sunday, November 1')
+  await page.getByRole('button', { name: 'Previous week', exact: true }).click()
+  await expect(week.getByRole('button').first()).toHaveAccessibleName('Sunday, October 25')
+  const tray = page.getByRole('region', { name: 'Unscheduled jobs' })
+  await tray.locator('summary').click()
+  await tray.getByRole('button', { name: 'Schedule Plumbing Bellevue' }).click()
+  await expect(page).toHaveURL(/\/schedule\/new\?job=c-job1&title=/)
+  await expect(page.getByLabel('Link to', { exact: true })).toHaveValue('Plumbing Bellevue')
+})
+
+test('duration and displayed recurrence match submitted visits', async ({ context, page }) => {
+  await signIn(context)
+  let submitted: { start_at: string; end_at: string; recurring: string }[] = []
+  await context.route('**/rest/v1/fh_schedule*', async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback()
+    submitted = route.request().postDataJSON()
+    return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(submitted.map((_, i) => ({ id: `audit-${i}` }))) })
+  })
+  await page.goto('/schedule/new')
+  await page.getByLabel('Title', { exact: true }).fill('Site work')
+  await page.getByLabel('Date', { exact: true }).fill('2026-10-28')
+  await page.getByLabel('Time', { exact: true }).fill('08:00')
+  await page.getByLabel('Duration in minutes').fill('90')
+  await page.getByRole('button', { name: 'Recurring series' }).click()
+  await page.getByLabel('Total visits').fill('3')
+  await expect(page.getByRole('region', { name: 'Recurring visit preview' }).getByRole('listitem')).toHaveCount(3)
+  await page.getByRole('button', { name: 'Save event', exact: true }).click()
+  await expect.poll(() => submitted.length).toBe(3)
+  expect(submitted.every((visit) => Date.parse(visit.end_at) - Date.parse(visit.start_at) === 90 * 60_000)).toBe(true)
+  expect(new Set(submitted.map((visit) => visit.recurring)).size).toBe(1)
+  expect(submitted.map((visit) => visit.start_at)).toEqual(['2026-10-28T13:00:00.000Z', '2026-11-04T14:00:00.000Z', '2026-11-11T14:00:00.000Z'])
+})

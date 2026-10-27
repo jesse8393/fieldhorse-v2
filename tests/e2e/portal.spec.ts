@@ -653,10 +653,18 @@ test('shows the quote number, the issue date and valid until, and leaves out wha
   await openPortal(page)
 
   await expect(page.getByText('Quote PC-2026-RTAL', { exact: true })).toBeVisible()
-  await expect(page.getByText('Issued October 2', { exact: true })).toBeVisible()
+  await expect(page.getByText('Issued October 1', { exact: true })).toBeVisible()
   await expect(page.getByText('Valid until November 1', { exact: true })).toBeVisible()
   // Still open: the approve bar is on the page.
   await expect(page.getByRole('button', { name: 'Approve this quote' })).toBeVisible()
+
+  // Sending an existing quote again changes delivery history, not the
+  // document's issue date, number or validity date.
+  spies.setPayload(proposalPayload({ contact: { quote_sent_at: '2026-10-08T12:00:00.000Z', quote_expires_at: '2026-11-02T04:59:59.999Z' } }))
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await expect(page.getByText('Quote PC-2026-RTAL', { exact: true })).toBeVisible()
+  await expect(page.getByText('Issued October 1', { exact: true })).toBeVisible()
+  await expect(page.getByText('Valid until November 1', { exact: true })).toBeVisible()
 
   spies.setPayload(proposalPayload({ contact: { quote_sent_at: null, created_at: null } }))
   await page.reload({ waitUntil: 'domcontentloaded' })
@@ -1166,7 +1174,7 @@ test('a quote marked lost says it is no longer open, with no way to approve or a
   const spies = await mockPortal(context, proposalPayload({ contact: { stage: 'lost', quote_expires_at: '2026-11-02T04:59:59.999Z' } }))
   await openPortal(page)
   // A closed quote is good until no date any more.
-  await expect(page.getByText('Issued October 2', { exact: true })).toBeVisible()
+  await expect(page.getByText('Issued October 1', { exact: true })).toBeVisible()
   await expect(page.getByText(/^(Valid until|Expired) /)).toHaveCount(0)
 
   const capsule = page.getByRole('region', { name: 'Quote closed' })

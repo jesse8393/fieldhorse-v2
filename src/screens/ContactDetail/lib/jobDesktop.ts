@@ -123,9 +123,9 @@ export function railNotes(input: RailNotesInput): Partial<Record<RailSegmentId, 
   const paid = Number(input.paid ?? 0)
   const balance = Number(input.balance ?? 0)
   if (canSeeMoney && started && (contract > 0 || paid > 0) && Number.isFinite(balance)) {
-    if (balance > 0.005) notes.invoice = `${moneyCents(balance)} balance`
-    else if (balance < -0.005) notes.invoice = `${moneyCents(Math.abs(balance))} credit`
-    else notes.invoice = 'Paid in full'
+    if (balance > 0.005) notes.invoice = `${moneyCents(balance)} contract balance`
+    else if (balance < -0.005) notes.invoice = `${moneyCents(Math.abs(balance))} paid above contract`
+    else notes.invoice = 'Contract paid in full'
   }
 
   if (stage === 'closed') {

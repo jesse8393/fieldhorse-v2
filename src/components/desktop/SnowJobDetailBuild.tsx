@@ -31,7 +31,6 @@ import { cx } from '../fh/cx.ts'
 import { initialsFor } from '../fh/Monogram.tsx'
 import { useProfile } from '../../contexts/ProfileContext.tsx'
 import { openCapture } from '../../lib/captureAttach.ts'
-import { tabPanelProps } from '../../lib/tabs.ts'
 import { useMediaQuery } from '../../lib/useMediaQuery.ts'
 import { JobSectionTabs } from '../../screens/ContactDetail/phone/JobHeaderPhone.tsx'
 import type { JobMoney } from '../../screens/ContactDetail/lib/spine.ts'
@@ -84,14 +83,6 @@ type Props = {
   children: ReactNode
 }
 
-function mailOrSms(contact: any): { href: string } | null {
-  const phone = String(contact?.phone || '').trim()
-  if (phone) return { href: `sms:${phone}` }
-  const email = String(contact?.email || '').trim()
-  if (email) return { href: `mailto:${email}` }
-  return null
-}
-
 export default function SnowJobDetailBuild(props: Props) {
   const {
     contact, client, tabs, activeTab, onTabChange,
@@ -116,7 +107,6 @@ export default function SnowJobDetailBuild(props: Props) {
   const title = jobTitle || name || 'Untitled job'
   const address = String(contact?.address || contact?.job_address || '').trim()
   const sub = [jobTitle ? name : '', address].filter(Boolean).join(', ')
-  const message = mailOrSms(contact)
   const who = name || 'this customer'
 
   const wide = activeTab === 'quote'
@@ -126,7 +116,7 @@ export default function SnowJobDetailBuild(props: Props) {
 
   return (
     <div className="fh-build-page fh-build-detail fhd-page" data-build-screen="SnowJobDetailBuild">
-      <main className="fh-build-main">
+      <div className="fh-build-main">
         <OnyxStage as="header" hairline={false} className={cx('fhd-banner', hasPhoto && 'has-photo')}>
           {hasPhoto && (
             <div className="fhd-banner__photo">
@@ -190,15 +180,9 @@ export default function SnowJobDetailBuild(props: Props) {
             </div>
 
             <div className="fhd-banner__actions">
-              {message ? (
-                <Button variant="secondary" icon={MessageSquare} href={message.href} aria-label={`Message ${who}`}>
-                  Message
-                </Button>
-              ) : (
-                <Button variant="secondary" icon={MessageSquare} disabled aria-label="Message, no phone or email on file">
-                  Message
-                </Button>
-              )}
+              <Button variant="secondary" icon={MessageSquare} to={`/compose?contact=${encodeURIComponent(contact.id)}&channel=${contact?.email || !contact?.phone ? 'email' : 'sms'}`} aria-label={`Message ${who}`}>
+                Message
+              </Button>
               {onAddEvent && (
                 <Button variant="secondary" onClick={onAddEvent}>Schedule</Button>
               )}
@@ -231,7 +215,7 @@ export default function SnowJobDetailBuild(props: Props) {
               <JobSectionTabs tabs={tabs} value={activeTab} onChange={onTabChange} idBase="fh-job-tabs" />
             )}
 
-            <div {...tabPanelProps('fh-job-tabs', activeTab)} className="fhd-panel fh-build-detail-main">
+            <div role="region" aria-label={`${tabs.find(item => item.id === activeTab)?.label || 'Job section'} workspace`} className="fhd-panel fh-build-detail-main">
               {children}
             </div>
           </div>
@@ -253,7 +237,7 @@ export default function SnowJobDetailBuild(props: Props) {
             />
           )}
         </div>
-      </main>
+      </div>
     </div>
   )
 }

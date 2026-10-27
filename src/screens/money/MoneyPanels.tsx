@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { ArrowLeft, Check, Receipt } from 'lucide-react'
 import { Button, Chip, EmptyState, IconButton, Row, formatMoney } from '../../components/fh'
@@ -26,23 +27,24 @@ import type {
 //                  and the month's collection pace; each row opens the
 //                  job's money tab
 
-export type MoneyPanel = 'statements' | 'invoices' | 'balances'
+export type MoneyPanel = 'statements' | 'invoices' | 'balances' | 'reconciliation'
 
 export const PANEL_TITLES: Record<MoneyPanel, string> = {
   statements: 'Who owes you',
   invoices: 'All invoices',
-  balances: 'Job balances'
+  balances: 'Job balances',
+  reconciliation: 'Billing reconciliation'
 }
 
 export function isMoneyPanel(value: string | null): value is MoneyPanel {
-  return value === 'statements' || value === 'invoices' || value === 'balances'
+  return value === 'statements' || value === 'invoices' || value === 'balances' || value === 'reconciliation'
 }
 
 // The aging buckets and their words. Color never carries it alone.
 export const AGING = [
-  { id: '0-30', label: 'Current', range: '0 to 30 days', tone: 'neutral' },
-  { id: '31-60', label: 'Late', range: '31 to 60 days', tone: 'neutral' },
-  { id: '60+', label: 'Overdue', range: 'Over 60 days', tone: 'danger' }
+  { id: '0-30', label: 'Up to 30 days', range: 'Reference age', tone: 'neutral' },
+  { id: '31-60', label: '31 to 60 days', range: 'Reference age', tone: 'neutral' },
+  { id: '60+', label: 'Over 60 days', range: 'Reference age', tone: 'neutral' }
 ] as const satisfies readonly { id: keyof AgingTotals; label: string; range: string; tone: ChipTone }[]
 
 export function agingLabel(bucket: string): { label: string; tone: ChipTone } {
@@ -114,7 +116,7 @@ export function StatementsPanel({
   return (
     <div className="fhm-panel">
       <p className="fhm-panel__intro">
-        Customers with a balance, the most overdue first. A statement rolls every open invoice into one document.
+        Customers with remaining contract value, oldest reference dates first. Statements include job balances and payments, including work not yet invoiced.
       </p>
       {groups.length === 0 ? (
         <EmptyState icon={Check} title="Nobody owes you right now." />
@@ -229,14 +231,15 @@ export function BalancesPanel({
 
   return (
     <div className="fhm-panel">
-      <section className="fhm-aging" aria-label="Outstanding by age">
-        <p className="fhm-aging__label">Total outstanding</p>
+      <section className="fhm-aging" aria-label="Contract balances by reference age">
+        <p className="fhm-aging__label">Remaining contract value</p>
         <p className="fhm-aging__total">{formatMoney(totals.total)}</p>
+        <p className="fhm-panel__intro">Contract value less payments, including unbilled work. Reference age uses the oldest open invoice date, otherwise the job creation date. Overdue invoices appear separately on Money.</p>
         <dl className="fhm-aging__facts">
           {AGING.map((b) => (
             <div key={b.id} className="fhm-aging__fact">
               <dt>{b.label}</dt>
-              <dd>{formatMoney(totals[b.id])}</dd>
+              <dd><Link to={`/invoices?panel=reconciliation&bucket=${encodeURIComponent(b.id)}`}>{formatMoney(totals[b.id])}</Link></dd>
               <dd className="fhm-aging__range">{b.range}</dd>
             </div>
           ))}

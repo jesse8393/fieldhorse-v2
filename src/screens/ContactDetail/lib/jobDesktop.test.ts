@@ -64,7 +64,7 @@ describe('railNotes', () => {
     expect(notes.lead).toBe('Sep 23, website')
     expect(notes.quote).toBe('Approved Sep 28')
     expect(notes.job).toBe('Pour slab today, Inspection Fri')
-    expect(notes.invoice).toBe('$6,187.50 balance')
+    expect(notes.invoice).toBe('$6,187.50 contract balance')
     expect(notes.closed).toBeUndefined()
   })
 
@@ -102,7 +102,7 @@ describe('railNotes', () => {
     expect(notes.job).toBe('Pour slab today')
   })
 
-  it('shows the finish date and a paid in full invoice for a finished job', () => {
+  it('shows the finish date and a fully paid contract for a finished job', () => {
     const notes = railNotes({
       contact: { ...job, completed_at: at(9, 3, 15) },
       contractTotal: 9600,
@@ -112,12 +112,12 @@ describe('railNotes', () => {
       now: NOW
     })
     expect(notes.job).toBe('Done Oct 3')
-    expect(notes.invoice).toBe('Paid in full')
+    expect(notes.invoice).toBe('Contract paid in full')
   })
 
-  it('notes a credit instead of a negative balance', () => {
+  it('states payments above contract instead of implying an invoice credit', () => {
     const notes = railNotes({ contact: job, contractTotal: 1000, paid: 1200, balance: -200, canSeeMoney: true, now: NOW })
-    expect(notes.invoice).toBe('$200.00 credit')
+    expect(notes.invoice).toBe('$200.00 paid above contract')
   })
 
   it('notes the quote status while the deal is still a quote', () => {

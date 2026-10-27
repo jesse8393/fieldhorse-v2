@@ -66,7 +66,11 @@ test.describe('the lead screen', () => {
     // the where line. No sheet anywhere.
     await expect(page.getByRole('heading', { name: 'Add event' })).toBeVisible({ timeout: 30_000 })
     await expect(page.getByLabel('Title')).toHaveValue('Estimate')
-    await expect(page.getByLabel('Link to')).toHaveValue('lead:l-lead1')
+    const linkedRecord = page.getByRole('combobox', { name: 'Link to', exact: true })
+    await expect(linkedRecord).toHaveValue('Jeff Roy')
+    await linkedRecord.click()
+    await expect(page.getByRole('option').filter({ hasText: 'Vintage Burkitt Station Drainage' }).filter({ hasText: 'l-lead1' })).toHaveAttribute('aria-selected', 'true')
+    await linkedRecord.press('Escape')
     await expect(page.getByLabel('Where')).toHaveValue('Jeff Roy, 412 Burkitt Station Rd')
     await expect(page.getByRole('dialog')).toHaveCount(0)
   })

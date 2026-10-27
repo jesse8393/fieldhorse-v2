@@ -30,17 +30,20 @@ import { revokePartnerRow } from '../lib/partners.ts'
 import { stageColor } from '../lib/stages.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import SnowPartnersBuild from '../components/desktop/SnowPartnersBuild.tsx'
+import PartnerAccessDetails from '../components/PartnerAccessDetails.tsx'
+import { partnerHasStatus, summarizePartnerShares } from '../lib/partnerView.ts'
 
 const STATUS_FILTERS = [
   { id: 'all',      label: 'All',      match: () => true },
-  { id: 'pending',  label: 'Pending',  match: (p: any) => p.status === 'pending' },
-  { id: 'accepted', label: 'Accepted', match: (p: any) => p.status === 'accepted' },
-  { id: 'revoked',  label: 'Revoked',  match: (p: any) => p.status === 'revoked' }
+  { id: 'pending',  label: 'Pending',  match: (p: any) => partnerHasStatus(p, 'pending') },
+  { id: 'accepted', label: 'Accepted', match: (p: any) => partnerHasStatus(p, 'accepted') },
+  { id: 'revoked',  label: 'Revoked',  match: (p: any) => partnerHasStatus(p, 'revoked') }
 ]
 
 // Display word for a partner or partner job status (pending, accepted,
 // revoked), the same words the filter chips use.
 function statusWord(status: any) {
+  if (status === 'left') return 'Left job'
   return STATUS_FILTERS.find((f) => f.id !== 'all' && f.id === status)?.label || status
 }
 
@@ -61,30 +64,12 @@ export default function Partners() {
   const isDesktop = useIsDesktop()
   // Revoking takes a second tap on the same partner's button (D57).
   const revokeTap = useArmedId()
-  const { data: rows = [], isLoading: loading } = usePartnerDirectory(user?.id)
+  const { data: rows = [], isLoading: loading, isError, refetch } = usePartnerDirectory(user?.id)
   const load = useInvalidatePartners()
   const [filter, setFilter] = useState('all')
   const [busyKey, setBusyKey] = useState<any>(null)
 
-  // The Pending metric used to count only top-level partner records with
-  // status='pending'. But the data model also has per-job share status :
-  // an "accepted" partner can have individual jobs still in pending
-  // state. The audit caught the summary saying "Pending 0" while an
-  // accepted partner's card showed a "Matthew Addition, PENDING" row.
-  // Now: pending = partner-level pending + any job-level pending shares
-  // on otherwise-accepted partners.
-  const counts = useMemo(() => {
-    const partnerPending = rows.filter((p) => p.status === 'pending').length
-    const jobPending = rows
-      .filter((p) => p.status === 'accepted')
-      .reduce((s, p) => s + (Array.isArray(p.jobs) ? p.jobs.filter((j: any) => j.status === 'pending').length : 0), 0)
-    return {
-      all: rows.length,
-      pending: partnerPending + jobPending,
-      accepted: rows.filter((p) => p.status === 'accepted').length,
-      revoked: rows.filter((p) => p.status === 'revoked').length
-    }
-  }, [rows])
+  const counts = useMemo(() => summarizePartnerShares(rows), [rows])
 
   const filtered = useMemo(() => {
     const cfg = STATUS_FILTERS.find((f) => f.id === filter)
@@ -104,7 +89,7 @@ export default function Partners() {
           invited_by_user_id: user.id,
           partner_email: partner.email,
           partner_name: partner.name || null,
-          partner_role: partner.role || null,
+          partner_role: job.role || null,
           send_email: true
         })
       })
@@ -157,6 +142,8 @@ export default function Partners() {
         rows={rows}
         filtered={filtered}
         loading={loading}
+        error={isError}
+        onRetry={() => { void refetch() }}
         filter={filter}
         setFilter={setFilter}
         counts={counts}
@@ -186,11 +173,11 @@ export default function Partners() {
           boxShadow: '0 1px 0 rgba(242, 237, 228, 0.04) inset, 0 8px 22px rgba(20, 20, 20, 0.40)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-            <Eyebrow tone="gold">Partners</Eyebrow>
+            <Eyebrow as="h1" tone="gold" style={{ margin: 0 }}>Partners</Eyebrow>
             <span style={{
               fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--v3-text-muted)'
             }}>
-              {counts.all} total
+              {isError ? 'Unavailable' : `${counts.all} total`}
             </span>
           </div>
           <div style={{
@@ -199,15 +186,16 @@ export default function Partners() {
             gap: 12,
             alignItems: 'end'
           }}>
-            <Metric label="Accepted" tone="good">{counts.accepted}</Metric>
-            <Metric label="Pending"  tone="gold">{counts.pending}</Metric>
-            <Metric label="Revoked"  tone="muted">{counts.revoked}</Metric>
+            <Metric label="Accepted partners" tone="good">{isError ? 'Unknown' : counts.accepted}</Metric>
+            <Metric label="Pending shares" tone="gold">{isError ? 'Unknown' : counts.pendingShares}</Metric>
+            <Metric label="Revoked shares" tone="muted">{isError ? 'Unknown' : counts.revokedShares}</Metric>
           </div>
         </div>
       </div>
 
       {/* Filter chips */}
       <div style={{ padding: '0 24px 12px' }}>
+        <p style={{ color: 'var(--v3-text-muted)', fontSize: 14, lineHeight: 1.5 }}>Each filter counts partners with at least one job share in that status. A partner can appear in more than one filter.</p>
         <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
           {STATUS_FILTERS.map((f) => (
             <FilterPill
@@ -223,10 +211,11 @@ export default function Partners() {
         </div>
       </div>
 
+      {isError && <div role="alert" style={{ margin: '0 24px 16px' }}>Could not check partner access. <button type="button" onClick={() => { void refetch() }}>Retry</button></div>}
       {/* List */}
       <div style={{ padding: '0 24px 32px' }}>
         {loading && <SkeletonList rows={4} card={false} />}
-        {!loading && rows.length === 0 && (
+        {!loading && !isError && rows.length === 0 && (
           <div style={{
             padding: '32px 24px', borderRadius: 10,
             background: 'var(--v3-surface)',
@@ -384,7 +373,7 @@ function PartnerCard({ partner, onResend, onRevoke, revokeArmed = false, busy, r
                     : 'var(--v3-primary-text)' }}>
                   {statusWord(j.status)}
                 </Eyebrow>
-                {j.status !== 'revoked' && (
+                {!['revoked', 'left'].includes(j.status) && (
                   <button
                     type="button"
                     onClick={() => { hapticTap(); onResend(partner, j) }}
@@ -395,6 +384,7 @@ function PartnerCard({ partner, onResend, onRevoke, revokeArmed = false, busy, r
                     {isResending ? <Check size={13} /> : <Send size={13} />}
                   </button>
                 )}
+                <div style={{ gridColumn: '1 / -1' }}><PartnerAccessDetails status={j.status} role={j.role} /></div>
               </li>
             )
           })}
@@ -458,7 +448,7 @@ function StatusBadge({ status }: any) {
 
 function iconBtnStyle(busy: any) {
   return {
-    width: 32, height: 32, borderRadius: 10,
+    width: 44, height: 44, borderRadius: 10,
     background: 'var(--v3-surface-2)',
     border: '1px solid var(--v3-border-strong)',
     color: busy ? 'var(--v3-success-text)' : 'var(--v3-text)',

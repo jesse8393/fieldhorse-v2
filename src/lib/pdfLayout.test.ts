@@ -293,3 +293,18 @@ describe('project photo groups', () => {
     expect(cut!.length).toBeLessThan(longTag.length)
   })
 })
+
+
+describe('proposal issue date parity', () => {
+  it.each(['classic', 'slate', 'mint', 'editorial', 'fieldhorse'])('retains the recorded issue date in %s exports', async (template) => {
+    const result: any = await generateQuote({
+      company: { ...company, estimate_template: template }, contact,
+      issuedAt: '2024-02-14T12:00:00Z',
+      items: [{ description: 'Scope', qty: 1, rate: 100, amount: 100 }],
+    } as any)
+    const text = textRuns(result.doc).map((run) => run.text).join(' ')
+    expect(text).toMatch(/February 14, 2024|02\/14\/2024/)
+    expect(result.number).toContain('-2024-')
+    expect(text).toContain(result.number)
+  })
+})

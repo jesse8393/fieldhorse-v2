@@ -22,7 +22,7 @@ const JOB = {
   updated_at: '2026-10-09T12:00:00Z'
 }
 const CLIENT = { id: 'cl-1', user_id: 'qa-user-1', name: 'Jeff Roy', company_name: null, phone: '555-0101', email: 'jeff@roy.com' }
-const FILE = { id: 'f1', filename: 'Quote 1042.pdf', kind: 'file', job_id: 'c-job1' }
+const FILE = { id: 'f1', user_id: 'qa-user-1', filename: 'Quote 1042.pdf', kind: 'file', job_id: 'c-job1' }
 
 async function open(page: Page, path = '/schedule') {
   await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 60_000 })
@@ -110,6 +110,77 @@ test.describe('command palette', () => {
     const docs = palette.getByRole('group', { name: 'Documents' })
     await expect(docs).toBeVisible()
     await expect(docs.getByRole('option', { name: /Quote 1042\.pdf/ })).toBeVisible()
+  })
+
+  test('search waits for company resolution before reading documents', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_contacts: [JOB], fh_clients: [CLIENT], fh_job_files: [FILE] } })
+    let releaseMembership = () => {}
+    const membershipGate = new Promise<void>((resolve) => { releaseMembership = resolve })
+    let heldMembership = 0
+    const fileScopes: string[] = []
+    await context.route(/\/rest\/v1\/org_members(\?|$)/, async (route) => {
+      heldMembership += 1
+      await membershipGate
+      await route.fallback()
+    })
+    await context.route(/\/rest\/v1\/fh_job_files(\?|$)/, async (route) => {
+      fileScopes.push(new URL(route.request().url()).searchParams.get('org_id') || 'owner fallback')
+      await route.fallback()
+    })
+    await open(page)
+    const palette = await openPalette(page)
+    await palette.getByRole('combobox').fill('Quote')
+    await expect.poll(() => heldMembership).toBeGreaterThan(0)
+    await page.waitForTimeout(350)
+    expect(fileScopes).toEqual([])
+    releaseMembership()
+    await expect(palette.getByRole('option', { name: /Quote 1042\.pdf/ })).toBeVisible()
+    expect(fileScopes).toEqual(['eq.org-1'])
+  })
+
+  test('company changes refresh an open search and reject a late previous-company answer', async ({ context, page }) => {
+    const previousFile = { ...FILE, filename: 'Previous company contract.pdf' }
+    const currentFile = { ...FILE, id: 'f2', org_id: 'org-2', filename: 'Current company contract.pdf' }
+    await signIn(context, { tables: {
+      fh_contacts: [JOB], fh_clients: [CLIENT], fh_job_files: [previousFile, currentFile],
+      organizations: [{ id: 'org-1', name: 'Previous company' }, { id: 'org-2', name: 'Current company' }],
+    } })
+    let currentOrg = 'org-1'
+    await context.route(/\/rest\/v1\/org_members(\?|$)/, async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([
+        { id: 'membership', org_id: currentOrg, user_id: 'qa-user-1', role: 'owner', revoked_at: null, joined_at: '2026-01-01T00:00:00Z' },
+      ]) })
+    })
+    let holdPrevious = false
+    let heldPrevious = 0
+    let releasePrevious = () => {}
+    const previousGate = new Promise<void>((resolve) => { releasePrevious = resolve })
+    await context.route(/\/rest\/v1\/fh_job_files(\?|$)/, async (route) => {
+      const org = new URL(route.request().url()).searchParams.get('org_id')
+      if (holdPrevious && org === 'eq.org-1') {
+        heldPrevious += 1
+        await previousGate
+      }
+      await route.fallback()
+    })
+    await open(page)
+    const palette = await openPalette(page)
+    const input = palette.getByRole('combobox')
+    await input.fill('contract')
+    await expect(palette.getByRole('option', { name: /Previous company contract/ })).toBeVisible()
+    holdPrevious = true
+    await input.fill('contract revised')
+    await expect.poll(() => heldPrevious).toBe(1)
+    currentOrg = 'org-2'
+    // Membership refresh may select a different company after an access change.
+    await page.evaluate(() => window.dispatchEvent(new Event('online')))
+    await expect(palette.getByRole('option', { name: /Current company contract/ })).toBeVisible()
+    await expect(palette.getByRole('option', { name: /Previous company contract/ })).toHaveCount(0)
+    releasePrevious()
+    await page.waitForTimeout(350)
+    await expect(palette.getByRole('option', { name: /Current company contract/ })).toBeVisible()
+    await expect(palette.getByRole('option', { name: /Previous company contract/ })).toHaveCount(0)
+    await expect(input).toHaveValue('contract revised')
   })
 
   test('crew do not get Create invoice', async ({ context, page }) => {

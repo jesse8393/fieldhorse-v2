@@ -4351,6 +4351,8 @@ export type Database = {
         Row: {
           lead_id: string | null
           quote_id: string | null
+          /** Optional until the reviewed crew allocation SQL is applied. */
+          assigned_user_ids?: string[]
           assigned_to: string | null
           contact_id: string | null
           created_at: string | null
@@ -4367,6 +4369,7 @@ export type Database = {
         Insert: {
           lead_id?: string | null
           quote_id?: string | null
+          assigned_user_ids?: string[]
           assigned_to?: string | null
           contact_id?: string | null
           created_at?: string | null
@@ -4383,6 +4386,7 @@ export type Database = {
         Update: {
           lead_id?: string | null
           quote_id?: string | null
+          assigned_user_ids?: string[]
           assigned_to?: string | null
           contact_id?: string | null
           created_at?: string | null

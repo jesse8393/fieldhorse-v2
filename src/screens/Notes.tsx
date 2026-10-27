@@ -1,3 +1,4 @@
+import RecordPicker from '../components/RecordPicker.tsx'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -26,6 +27,8 @@ import { Eyebrow } from '../components/v3'
 import DataErrorState from '../components/DataErrorState.tsx'
 import { SkeletonRows } from '../components/fh'
 import { keepFocusOnRetry } from '../lib/retryFocus.ts'
+import { filterReports, reportJobLabel, reportStats } from '../lib/reportHistory.ts'
+import ReportDetails from '../components/ReportDetails.tsx'
 const SnowNotes = lazy(() => import('../components/desktop/SnowNotesBuild.tsx'))
 
 const SYSTEM = `You are Fieldhorse, a construction operations AI. You receive rough field notes dictated or typed by a contractor from a jobsite. Parse them into structured JSON with fields: summary (one sentence), action_items (array of strings with owners if mentioned), risks (array), materials_needed (array), follow_up_date (ISO date if mentioned or null). Return ONLY JSON, no prose.`
@@ -55,9 +58,9 @@ export default function Notes() {
   const queryClient = useQueryClient()
   // isPending, not isLoading, so nothing reads as empty before the first
   // read lands; isError, so a failed read is never "All clear".
-  const { data: bundle, isPending: loading, isError, refetch } = useNotesBundle(user?.id)
-  const notes = bundle?.notes ?? []
-  const contacts = bundle?.contacts ?? []
+  const { data: bundle, isPending: loading, isError, refetch, contactsReady, contactsError, retryContacts } = useNotesBundle(user?.id)
+  const notes = useMemo(() => bundle?.notes ?? [], [bundle?.notes])
+  const contacts = useMemo(() => bundle?.contacts ?? [], [bundle?.contacts])
   const [draft, setDraft] = useState('')
   const [contactId, setContactId] = useState('')
   const [saving, setSaving] = useState(false)
@@ -163,14 +166,9 @@ export default function Notes() {
     } catch (e: any) {
       console.error('[notes] parse failed:', e)
       setParsed(null)
-      const msg = String(e?.message || '').toLowerCase()
-      if (msg.includes('missing_api_key') || msg.includes('500')) {
-        setParseError('AI not configured. Set ANTHROPIC_API_KEY in your Netlify env vars to enable parsing.')
-      } else if (msg.includes('failed to fetch') || msg.includes('404')) {
-        setParseError('AI endpoint unreachable.')
-      } else {
-        setParseError(e?.message || 'AI parse failed.')
-      }
+      setParseError(navigator.onLine === false
+        ? 'Reconnect to use AI parsing. Your report text stays here, ready to save.'
+        : 'AI parsing could not finish. Try again, or save your report as written.')
     } finally {
       setParsing(false)
     }
@@ -260,33 +258,71 @@ export default function Notes() {
 
   /* ───────── DATA SHAPING ───────── */
 
-  // Recent Activity = top 6 chronologically, regardless of linkage
-  const recent = useMemo(() => notes.slice(0, 6), [notes])
-
-  // Cockpit summary stats, derived from already-loaded notes; no extra
-  // queries. recent24 = notes created in the last 24h; parsedCount =
-  // notes with any parsed signal; riskCount = notes flagged with any
-  // parsed risk. The risk count is the urgent/triage read.
-  const cockpitStats = useMemo(() => {
-    const now = Date.now()
-    const day = 24 * 60 * 60 * 1000
-    let recent24 = 0
-    let parsedCount = 0
-    let riskCount = 0
-    for (const n of notes) {
-      const ts = n?.created_at ? new Date(n.created_at).getTime() : 0
-      if (ts && now - ts < day) recent24++
-      if ((n as any)?.parsed && (
-        (n as any).parsed.summary ||
-        (n as any).parsed.action_items?.length ||
-        (n as any).parsed.risks?.length ||
-        (n as any).parsed.follow_up_date ||
-        (n as any).parsed.materials_needed?.length
-      )) parsedCount++
-      if ((n as any)?.parsed?.risks?.length) riskCount++
-    }
-    return { total: notes.length, recent24, parsedCount, riskCount }
-  }, [notes])
+  const historyQuery = searchParams.get('q') || ''
+  const historyJob = searchParams.get('job') || ''
+  const historyLinkage = searchParams.get('linkage') || ''
+  const historyFrom = searchParams.get('from') || ''
+  const historyTo = searchParams.get('to') || ''
+  const historyKey = JSON.stringify([historyQuery, historyJob, historyLinkage, historyFrom, historyTo])
+  const historyFiltered = Boolean(historyQuery || historyJob || historyLinkage || historyFrom || historyTo)
+  const [historyWindow, setHistoryWindow] = useState({ query: '', count: 12 })
+  const historyLimit = historyWindow.query === historyKey ? historyWindow.count : 12
+  const matchedReports = useMemo(() => filterReports(notes, contacts, historyQuery, {
+    jobId: historyJob, linkage: historyLinkage === 'unavailable' && !contactsReady ? '' : historyLinkage, from: historyFrom, to: historyTo,
+  }), [notes, contacts, historyQuery, historyJob, historyLinkage, historyFrom, historyTo, contactsReady])
+  const recent = matchedReports.slice(0, historyLimit)
+  const cockpitStats = useMemo(() => reportStats(notes), [notes])
+  const setHistoryFilter = (key: string, value: string) => {
+    // Router rendering can lag behind consecutive field events. History is
+    // updated synchronously, so keep the preceding filter change intact.
+    const next = new URLSearchParams(window.location.search)
+    if (value) next.set(key, value)
+    else next.delete(key)
+    setSearchParams(next, { replace: true })
+  }
+  const historyControl = { width: '100%', minHeight: 44, padding: 12, fontSize: 16, borderRadius: 10,
+    background: 'var(--v3-surface)', color: 'var(--v3-text)', border: '1px solid var(--v3-border-strong)' }
+  const historySearch = <div style={{ margin: '12px 0', fontSize: 14 }}>
+    <p style={{ color: 'var(--v3-text-muted)', lineHeight: 1.5 }}>Your report history. Includes reports you captured, with dates in your local time.</p>
+    <label style={{ display: 'grid', gap: 8 }}>
+      Search reports
+      <input type="search" value={historyQuery} placeholder="Report text, customer, job or address"
+        onChange={event => setHistoryFilter('q', event.target.value)} style={historyControl} />
+    </label>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 190px), 1fr))', gap: 12, marginTop: 12 }}>
+      <RecordPicker label="History job" loading={!contactsReady && !contactsError} disabled={!contactsReady} value={historyJob} onChange={value => setHistoryFilter('job', value)} clearLabel="All jobs"
+        options={contacts.map(job => ({ value: job.id, label: reportJobLabel(job) }))} />
+      <label style={{ display: 'grid', gap: 8 }}>Job link
+        <select value={historyLinkage} onChange={event => setHistoryFilter('linkage', event.target.value)} style={historyControl}>
+          <option value="">Any link status</option><option value="linked">Linked to a job</option>
+          <option value="unlinked">No job link</option><option value="unavailable" disabled={!contactsReady}>Linked job unavailable</option>
+        </select>
+      </label>
+      <label style={{ display: 'grid', gap: 8 }}>From date
+        <input type="date" value={historyFrom} max={historyTo || undefined} onChange={event => setHistoryFilter('from', event.target.value)} style={historyControl} />
+      </label>
+      <label style={{ display: 'grid', gap: 8 }}>Through date
+        <input type="date" value={historyTo} min={historyFrom || undefined} onChange={event => setHistoryFilter('to', event.target.value)} style={historyControl} />
+      </label>
+    </div>
+    {!contactsReady && <p role={contactsError ? 'alert' : 'status'} style={{ lineHeight: 1.5 }}>
+      {contactsError ? 'Job names could not load. Report text and dates remain available.' : 'Loading job names…'}
+      {historyLinkage === 'unavailable' && ' Unavailable job filtering is paused. Showing reports matching your other filters.'}
+      {contactsError && <button type="button" className="fh-build-inline-link" style={{ minHeight: 44, marginLeft: 8 }} onClick={() => { void retryContacts() }}>Retry job lookup</button>}
+    </p>}
+    {historyFrom && historyTo && historyFrom > historyTo && <p role="alert">Through date must be on or after From date.</p>}
+    {historyFiltered && <button type="button" className="fh-build-secondary-btn" style={{ marginTop: 12, minHeight: 44 }} onClick={() => {
+      const next = new URLSearchParams(searchParams)
+      for (const key of ['q', 'job', 'linkage', 'from', 'to']) next.delete(key)
+      setSearchParams(next, { replace: true })
+    }}>Clear history filters</button>}
+  </div>
+  const historyMore = <div style={{ padding: '12px 0', fontSize: 14 }}>
+    <p aria-live="polite">Showing {recent.length} of {matchedReports.length} {historyFiltered ? 'matching ' : ''}reports. Newest first.</p>
+    {recent.length < matchedReports.length && <button type="button" className="fh-build-secondary-btn"
+      onClick={() => setHistoryWindow({ query: historyKey, count: historyLimit + 12 })}
+      style={{ minHeight: 44 }}>Load more reports</button>}
+  </div>
 
   // Linked to Jobs = notes WITH contact_id, grouped by contact name
   const linkedGroups = useMemo(() => {
@@ -296,12 +332,12 @@ export default function Notes() {
       const key = n.contact_id
       if (!map.has(key)) {
         const c = contacts.find((x) => x.id === key)
-        map.set(key, { contactId: key, name: c?.name || 'Unknown job', items: [] })
+        map.set(key, { contactId: key, name: c ? reportJobLabel(c) : contactsReady ? 'Linked job unavailable' : 'Job details not loaded', items: [] })
       }
       map.get(key).items.push(n)
     }
     return Array.from(map.values())
-  }, [notes, contacts])
+  }, [notes, contacts, contactsReady])
 
   // Action Items = aggregate parsed.action_items across all notes
   const actionItems = useMemo(() => {
@@ -347,7 +383,16 @@ export default function Notes() {
           readError={readFailed ? readError : null}
           reportsRef={setReportsEl}
           contacts={contacts}
+          contactsReady={contactsReady}
+          contactsError={contactsError}
           recent={recent}
+          historySearch={historySearch}
+          historyMore={historyMore}
+          historyQuery={historyFiltered ? 'filtered' : ''}
+          onShowUnlinked={() => {
+            setSearchParams({ linkage: 'unlinked' }, { replace: true })
+            requestAnimationFrame(() => reportsEl.current?.scrollIntoView({ block: 'start' }))
+          }}
           linkedGroups={linkedGroups}
           actionItems={actionItems}
           cockpitStats={cockpitStats}
@@ -410,11 +455,11 @@ export default function Notes() {
             <CockpitDivider />
             <CockpitStat label="24h" value={cockpitStats.recent24} />
             <CockpitDivider />
-            <CockpitStat label="AI" value={cockpitStats.parsedCount} tone="gold" />
+            <CockpitStat label="AI total" value={cockpitStats.parsedCount} tone="gold" />
             {cockpitStats.riskCount > 0 && (
               <>
                 <CockpitDivider />
-                <CockpitStat label="Risks" value={cockpitStats.riskCount} tone="alert" />
+                <CockpitStat label="Risk reports total" value={cockpitStats.riskCount} tone="alert" />
               </>
             )}
           </div>
@@ -442,6 +487,7 @@ export default function Notes() {
         }}
       >
         <textarea
+          aria-label="Field report"
           className="fh-notes-textarea"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -453,14 +499,15 @@ export default function Notes() {
             width: '100%',
             resize: 'vertical',
             minHeight: 110,
-            background: 'transparent',
-            border: 'none',
+            background: 'var(--v3-surface)',
+            border: '1px solid var(--v3-border-strong)',
             color: 'var(--v3-text)',
             fontFamily: 'var(--font-body)',
-            fontSize: 14,
+            fontSize: 16,
             lineHeight: 1.55,
-            outline: 'none',
-            padding: 0
+            padding: 12,
+            borderRadius: 10,
+            boxSizing: 'border-box'
           }}
         />
 
@@ -492,27 +539,9 @@ export default function Notes() {
           paddingTop: 12,
           borderTop: '1px solid var(--v3-border)'
         }}>
-          <select
-            value={contactId}
-            onChange={(e) => setContactId(e.target.value)}
-            aria-label="Link this note to a job"
-            style={{
-              flex: '1 1 180px',
-              minWidth: 160,
-              padding: '12px 12px',
-              borderRadius: 10,
-              background: 'var(--v3-surface-2)',
-              border: '1px solid var(--v3-border-strong)',
-              color: 'var(--v3-text)',
-              fontFamily: 'var(--font-body)',
-              fontSize: 14,
-              outline: 'none',
-              cursor: 'pointer'
-            }}
-          >
-            <option value="">No job link</option>
-            {contacts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          <RecordPicker label="Link this note to a job" disabled={!contactsReady} loading={!contactsReady && !contactsError} error={contactsError ? 'Job names unavailable. Retry job lookup below.' : undefined} value={contactId} onChange={setContactId}
+            options={contacts.map((c) => ({ value: c.id, label: reportJobLabel(c) }))}
+            clearLabel="No job link" placeholder="Search customer, job, address or reference" />
 
           <button
             type="button"
@@ -565,7 +594,7 @@ export default function Notes() {
               border: '1px solid color-mix(in srgb, var(--v3-danger) 40%, transparent)',
               color: 'var(--v3-text)',
               fontFamily: 'var(--font-body)',
-              fontSize: 12,
+              fontSize: 14,
               lineHeight: 1.5
             }}
           >
@@ -601,7 +630,7 @@ export default function Notes() {
               <ParsedList title="Risks" items={parsed.risks} Icon={AlertTriangle} tone="warn" />
               <ParsedList title="Materials" items={parsed.materials_needed} Icon={Package} />
               {parsed.follow_up_date && (
-                <p style={{ margin: '10px 0 0', fontSize: 12, fontFamily: 'var(--font-body)', color: 'var(--v3-text-muted)', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                <p style={{ margin: '10px 0 0', fontSize: 14, fontFamily: 'var(--font-body)', color: 'var(--v3-text-muted)', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                   <Calendar size={12} />
                   Follow up: <strong style={{ color: 'var(--v3-primary-text)' }}>{parsed.follow_up_date}</strong>
                 </p>
@@ -622,6 +651,7 @@ export default function Notes() {
         tabIndex={-1}
       >
         <SectionHeader label="Recent activity" />
+        {!readFailed && historySearch}
 
         {readFailed ? (
           <div style={{ marginTop: 4 }}>{readError}</div>
@@ -638,9 +668,9 @@ export default function Notes() {
           <div className="v3-empty" style={{ marginTop: 4 }}>
             <Activity size={22} color="var(--v3-text-muted)" style={{ margin: '0 auto 8px' }} />
             <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
-              Nothing logged yet.
+              {historyFiltered ? 'No reports match your search.' : 'Nothing logged yet.'}
             </div>
-            <div style={{ fontSize: 12 }}>Use the capture above. Voice or type, both work.</div>
+            <div style={{ fontSize: 14 }}>{historyFiltered ? 'Try another word or adjust your filters.' : 'Use the capture above. Voice or type, both work.'}</div>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
@@ -663,8 +693,10 @@ export default function Notes() {
         )}
       </motion.div>
 
+      {!loading && !readFailed && <div style={{ margin: '0 var(--v3-gutter)' }}>{historyMore}</div>}
+
       {/* ─────────── LINKED TO JOBS ─────────── */}
-      {!loading && linkedGroups.length > 0 && (
+      {!loading && !historyFiltered && linkedGroups.length > 0 && (
         <motion.div
           variants={item}
           className="v3-section"
@@ -748,7 +780,7 @@ export default function Notes() {
           actionable list. If no notes have been parsed yet, render a
           placeholder so the section's purpose is visible. After a failed
           read there is nothing to list, so the section waits. */}
-      {!readFailed && (
+      {!readFailed && !historyFiltered && (
         <motion.div
           variants={item}
           className="v3-section v3-section--quiet"
@@ -769,7 +801,7 @@ export default function Notes() {
               <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
                 No action items yet.
               </div>
-              <div style={{ fontSize: 12, lineHeight: 1.5 }}>
+              <div style={{ fontSize: 14, lineHeight: 1.5 }}>
                 Tap <strong style={{ color: 'var(--v3-primary-text)' }}>AI parse</strong> on a note above to extract action items, risks, and materials.
               </div>
             </div>
@@ -811,7 +843,7 @@ export default function Notes() {
                         {a.text}
                       </div>
                       {c?.name && (
-                        <div style={{ marginTop: 4, fontSize: 12, color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)' }}>
+                        <div style={{ marginTop: 4, fontSize: 14, color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)' }}>
                           From {c.name}
                         </div>
                       )}
@@ -926,9 +958,6 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
         exit={{ opacity: 0, y: -4 }}
         transition={{ duration: 0.22, delay: Math.min(index * 0.04, 0.20), ease: [0.2, 0.8, 0.2, 1] }}
         whileHover={{ y: -2 }}
-        onClick={onTap}
-        role={onTap ? 'button' : 'article'}
-        tabIndex={onTap ? 0 : undefined}
         style={{
           position: 'relative',
           overflow: 'hidden',
@@ -937,7 +966,6 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
           background: 'var(--v3-surface)',
           border: '1px solid var(--v3-border-strong)',
           boxShadow: '0 1px 0 var(--v3-glass-tint-2) inset, 0 4px 14px rgba(20, 20, 20, 0.30)',
-          cursor: onTap ? 'pointer' : 'default',
           WebkitTapHighlightColor: 'transparent',
           transition: 'border-color 200ms ease, box-shadow 200ms ease, background-color 200ms ease'
         }}
@@ -1037,7 +1065,7 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
                 title={deleteTap.armed ? 'Tap again to delete this note. This cannot be undone.' : 'Delete note'}
                 style={{
                   width: deleteTap.armed ? 'auto' : 32, height: 32, padding: deleteTap.armed ? '0 8px' : 0,
-                  fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-body)',
+                  fontSize: 14, fontWeight: 700, fontFamily: 'var(--font-body)',
                   display: 'grid', placeItems: 'center',
                   borderRadius: 10,
                   background: 'transparent',
@@ -1084,13 +1112,15 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
           </p>
         )}
 
+        <ReportDetails report={note} />
+
         {/* Footer metadata */}
         {(!hideJobChip && contact?.name) || actionCount > 0 ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
             {!hideJobChip && contact?.name && (
-              <Eyebrow style={{ gap: 4, padding: '4px 8px', borderRadius: 10, background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)' }}>
+              <Eyebrow style={{ gap: 4, padding: '4px 8px', borderRadius: 10, background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)', whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
                 <Briefcase size={10} color="var(--v3-primary)" />
-                {contact.name}
+                {reportJobLabel(contact)}
               </Eyebrow>
             )}
             {actionCount > 0 && (
@@ -1101,6 +1131,9 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
             )}
           </div>
         ) : null}
+        {contact && onTap && <button type="button" onClick={onTap} className="v3-section-link" style={{ minHeight: 44, marginTop: 8 }}>
+          Open linked job <ChevronRight size={14} aria-hidden="true" />
+        </button>}
       </motion.article>
     </SwipeableRow>
   )

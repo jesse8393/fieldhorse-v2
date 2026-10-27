@@ -13,6 +13,7 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, authHeaders } from '../../lib/supabase.ts'
 import { useInvoiceDetail, useInvalidateInvoiceDetail } from '../../lib/queries.ts'
+import { reviewInvoice } from '../../lib/invoiceReview.js'
 import { fetchInvoicesForContact, createInvoice, invoiceAmountDue, invoiceDescription, sendInvoiceEmail } from '../../lib/invoices.ts'
 import { pickBalanceInvoice } from '../../lib/invoiceSettlement.ts'
 import { moneyExact } from '../../lib/format.ts'
@@ -65,7 +66,7 @@ function bucketFor(days: any) {
 
 function fmtMoney(n: any) {
   return Number(n || 0).toLocaleString(undefined, {
-    style: 'currency', currency: 'USD', maximumFractionDigits: 0
+    style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2
   })
 }
 
@@ -117,9 +118,9 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
     onChanged?.()
   }
   const contact = bundle?.contact ?? null
-  const payments = bundle?.payments ?? []
+  const payments = useMemo(() => bundle?.payments ?? [], [bundle])
   const insurance = bundle?.insurance ?? null
-  const changeOrders = bundle?.changeOrders ?? []
+  const changeOrders = useMemo(() => bundle?.changeOrders ?? [], [bundle])
   const error = isError ? (queryError?.message || 'Could not load invoice') : ''
 
   // First-class invoice draws (fh_invoices) for this job. fh_contacts has
@@ -235,8 +236,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
     // visible buckets cover the common cases without inventing schema.
     if (totals.isClosed) return { label: 'Closed', tone: 'muted' }
     if (totals.isPaid) return { label: 'Paid', tone: 'good' }
-    if (totals.bucket === '60+') return { label: 'Overdue', tone: 'danger' }
-    return { label: 'Outstanding', tone: 'gold' }
+    return { label: 'Remaining', tone: 'gold' }
   }, [totals])
 
   const company = useMemo(() => ({
@@ -386,6 +386,12 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
       invoice = created
     }
     const wasDraft = String(invoice.status || '').toLowerCase() === 'draft'
+    const review = reviewInvoice({ invoice, invoices: rows, contractTotal: totals.amount > 0 ? totals.amount : null })
+    if (wasDraft && (review.excess > 0 || review.duplicates.length)) {
+      navigate(`/invoices/${invoice.id}`)
+      toastError('Review this draft before sending', 'Check similar invoices and approved contract value.')
+      return
+    }
     const res = await sendInvoiceEmail({
       invoice,
       // Same recipient block as this screen's own PDF (client fallbacks).
@@ -488,6 +494,8 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
         headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify({
           contact_id: contact.id,
+          invoice_id: billingDraw?.id || null,
+          invoice_updated_at: billingDraw?.updated_at,
           sender_user_id: user!.id,
           recipient_email: resolved.email,
           recipient_name: resolved.name || null,
@@ -511,7 +519,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
         // so the operator sees exactly why the send failed instead of
         // hunting through Netlify function logs. Was previously hidden
         // behind a generic "Email send failed." string.
-        const detail = sendBody?.detail || sendBody?.error || 'Unknown provider error'
+        const detail = sendBody?.message || sendBody?.detail || sendBody?.error || 'Unknown provider error'
         const status = sendBody?.provider_status ? ` (HTTP ${sendBody.provider_status})` : ''
         throw new Error(`Resend rejected${status}: ${detail}`)
       }
@@ -644,7 +652,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
           {/* Status pill + age */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
             <StatusPill status={status} />
-            {!totals.isClosed && !totals.isPaid && (
+            {!totals.isClosed && !totals.isPaid && billingDraw && (
               <span style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4,
                 fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600,
@@ -686,7 +694,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
               {totals.isPaid ? 'Paid' : fmtMoney(totals.balance)}
             </StampNumber>
             <Eyebrow as="div" style={{ marginTop: 6 }}>
-              {totals.isPaid ? `${fmtMoney(totals.amount)} fully paid` : `Balance · ${fmtMoney(totals.amount)} contract`}
+              {totals.isPaid ? `${fmtMoney(totals.amount)} fully paid` : `Remaining contract value · ${fmtMoney(totals.amount)} total`}
             </Eyebrow>
           </div>
 
@@ -772,7 +780,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
           fontFamily: 'var(--font-body)', fontSize: 12,
           color: 'var(--v3-text-muted)', lineHeight: 1.4
         }}>
-          The amount is the job's contract. Each draw has its own invoice screen under Draws.
+          This balance includes work not yet invoiced. Issued invoice amounts and due dates appear under Draws; they can differ from the remaining contract value.
         </div>
       </motion.div>
 
@@ -1165,7 +1173,7 @@ function StatusPill({ status }: any) {
   })()
   return (
     <Eyebrow style={{ padding: '4px 12px', borderRadius: 10, background: palette.bg, border: `1px solid ${palette.border}`, color: palette.color }}>
-      Invoice · {status.label}
+      Contract balance · {status.label}
     </Eyebrow>
   )
 }

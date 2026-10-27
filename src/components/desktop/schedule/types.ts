@@ -10,6 +10,7 @@ export type BoardEvent = {
   lead_id?: string | null
   quote_id?: string | null
   assigned_to?: string | null
+  assigned_user_ids?: string[] | null
   fh_contacts?: { name?: string | null; stage?: string | null } | null
 }
 

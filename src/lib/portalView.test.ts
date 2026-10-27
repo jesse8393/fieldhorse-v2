@@ -377,6 +377,8 @@ describe('buildPortalView', () => {
     // A reworded line, an optional line's price, and the place of the work.
     const reworded = payload().items!.map((it) => it.id === 'i3' ? { ...it, description: '5 in slab' } : it)
     expect(quoteFingerprint(payload({ items: reworded }))).not.toBe(same)
+    const noted = payload().items!.map((it) => it.id === 'i3' ? { ...it, notes: 'Includes both landings.' } : it)
+    expect(quoteFingerprint(payload({ items: noted }))).not.toBe(same)
     const option = payload().items!.map((it) => it.id === 'i5' ? { ...it, rate: 5950, amount: 5950 } : it)
     expect(quoteFingerprint(payload({ items: option }))).not.toBe(same)
     expect(quoteFingerprint(payload({}, { address: '1152 Cherry Blossom Ln, La Vergne' }))).not.toBe(same)

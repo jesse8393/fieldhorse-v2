@@ -5,6 +5,7 @@
 // through contact_id, a lead through lead_id or a quote through quote_id.
 
 import { supabase } from './supabase.ts'
+import { allocationWriteError } from './scheduleAllocation.ts'
 
 export type ScheduleEventInput = {
   userId: string
@@ -22,6 +23,8 @@ export type ScheduleEventInput = {
   end_at: string
   /** Shared series id for a recurring run; every occurrence carries it. */
   recurring?: string | null
+  /** Explicit crew selection. Omitted by older callers to preserve compatibility. */
+  assignedUserIds?: string[]
 }
 
 export type CreateScheduleEventResult = { id: string } | { error: string }
@@ -40,7 +43,8 @@ function row(input: ScheduleEventInput) {
     description: input.description?.trim() || null,
     start_at: input.start_at,
     end_at: input.end_at,
-    recurring: input.recurring ?? null
+    recurring: input.recurring ?? null,
+    ...(input.assignedUserIds ? { assigned_user_ids: [...new Set(input.assignedUserIds)], assigned_to: input.assignedUserIds[0] || null } : {})
   }
 }
 
@@ -53,12 +57,13 @@ export async function createScheduleEvents(inputs: ScheduleEventInput[]): Promis
   if (inputs.length === 0) return { ids: [] }
   try {
     const { data, error } = await supabase.from('fh_schedule').insert(inputs.map(row)).select('id')
-    if (error) return { error: error.message || 'Try again.' }
+    if (error) return { error: allocationWriteError(error) }
     const ids = ((data ?? []) as { id: string }[]).map((r) => r.id)
     if (ids.length === 0) return { error: 'The event was not saved. Try again.' }
+    if (ids.length !== inputs.length) return { error: 'Could not confirm every visit. Refresh the schedule before trying again.' }
     return { ids }
   } catch (e) {
-    return { error: (e as { message?: string })?.message || 'Try again.' }
+    return { error: allocationWriteError(e as { code?: string; message?: string }) }
   }
 }
 

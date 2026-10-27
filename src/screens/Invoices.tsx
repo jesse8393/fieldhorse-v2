@@ -203,6 +203,7 @@ export default function Invoices() {
       // a day in every US timezone).
       const t = (parseDateOnly(p.paid_on) || parseDateOnly(p.created_at))?.getTime() ?? NaN
       const amt = Number(p.amount || 0)
+      if (t > now.getTime()) continue
       if (t >= startOfMonth) monthCollected += amt
       else if (t >= threeMonthsAgo) priorTotal += amt
     }

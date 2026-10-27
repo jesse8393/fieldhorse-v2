@@ -1,3 +1,4 @@
+import { eventAssignees } from '../lib/scheduleAllocation.ts'
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
@@ -13,16 +14,20 @@ import {
   useScheduleEvents,
   useUpcomingEvents,
   useInvalidateSchedule,
-  useDropScheduleEvent
+  useDropScheduleEvent,
+  useBookedVisits,
+  useCompanyJobs
 } from '../lib/queries.ts'
 import { useProfile } from '../contexts/ProfileContext.tsx'
-import { getWeather, workWindow } from '../lib/weather.ts'
+import { getWeather } from '../lib/weather.ts'
+import { assessWorkWindow } from '../lib/forecastAssessment.ts'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { canHover } from '../lib/hover.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
-import { startOfWeek } from '../lib/scheduleDates.ts'
-import { jobLabel } from '../lib/scheduleBoard.ts'
+import { SCHEDULE_WEEK_START, startOfWeek } from '../lib/scheduleDates.ts'
+import { jobLabel, trayJobs } from '../lib/scheduleBoard.ts'
+import './schedule/schedule-event.css'
 const SnowSchedule = lazy(() => import('../components/desktop/SnowScheduleBuild.tsx'))
 
 const VIEWS = [
@@ -75,10 +80,8 @@ export default function Schedule() {
   const range = useMemo(() => {
     if (view === 'day') return { start: cursor, end: addDays(cursor, 1) }
     if (view === 'week') {
-      // Fetch the same seven days the visible grid draws. The mobile
-      // WeekView and dispatch strip start the week on Monday; the desktop
-      // planner (SnowScheduleBuild) starts it on Sunday.
-      const s = startOfWeek(cursor, isDesktop ? 0 : 1)
+      // Both responsive layouts show and fetch the same Sunday week.
+      const s = startOfWeek(cursor, SCHEDULE_WEEK_START)
       return { start: s, end: addDays(s, 7) }
     }
     const monthStart = new Date(cursor.getFullYear(), cursor.getMonth(), 1)
@@ -86,7 +89,7 @@ export default function Schedule() {
     const gridStart = addDays(monthStart, -monthStart.getDay())
     const gridEnd = addDays(gridStart, 42)
     return { start: gridStart, end: gridEnd, monthStart, monthEnd }
-  }, [view, cursor, isDesktop])
+  }, [view, cursor])
 
   // TanStack Query replaces the manual events/upcoming/loading useState
   // + load()/loadUpcoming() callbacks. keepPreviousData inside the hook
@@ -238,6 +241,7 @@ export default function Schedule() {
 
   function shift(n: any) {
     if (view === 'day') setCursor((d) => addDays(d, n))
+    else if (view === 'month') shiftMonth(n)
     else setCursor((d) => addDays(d, 7 * n))
   }
 
@@ -256,7 +260,7 @@ export default function Schedule() {
   }
 
   const windowRead = useMemo(
-    () => workWindow(weather?.current, profile?.services || []),
+    () => assessWorkWindow(weather?.current, profile?.services || []),
     [weather, profile?.services]
   )
 
@@ -374,10 +378,10 @@ export default function Schedule() {
           the work window reports go, warn and stop, so map them, and stay
           neutral until a forecast has actually loaded. */}
       {hasCoords && (
-        <motion.div variants={item} className={`fh-weatherbar${weather?.current ? ` fh-weatherbar--${WEATHERBAR_TONE[windowRead.status] || 'good'}` : ''}`} style={{ margin: '10px 20px 0' }}>
+        <motion.div variants={item} className={`fh-weatherbar${weather?.current ? ` fh-weatherbar--${WEATHERBAR_TONE[windowRead.status] || 'neutral'}` : ''}`} style={{ margin: '10px 20px 0' }}>
           <span className="fh-weatherbar__dot" aria-hidden="true" />
           <span className="fh-weatherbar__label">{weather?.current ? windowRead.label : weatherFailed ? 'Forecast unavailable' : 'Loading forecast'}</span>
-          {windowRead.reasons.length > 0 && <span className="fh-weatherbar__reason">{windowRead.reasons.join(' · ')}</span>}
+          {windowRead.reasons.length > 0 && <span className="fh-weatherbar__reason">{windowRead.reasons.slice(0, 2).join(' · ')}</span>}
         </motion.div>
       )}
 
@@ -387,8 +391,8 @@ export default function Schedule() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button
               type="button"
-              onClick={() => shiftMonth(-1)}
-              aria-label="Previous month"
+              onClick={() => view === 'month' ? shiftMonth(-1) : setCursor((d) => addDays(d, -7))}
+              aria-label={view === 'month' ? 'Previous month' : 'Previous week'}
               style={chevBtnStyle}
             >
               <ChevronLeft size={16} />
@@ -403,12 +407,12 @@ export default function Schedule() {
               minWidth: 130,
               textAlign: 'center'
             }}>
-              {cursor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+              {view === 'month' ? cursor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }) : `Week of ${startOfWeek(cursor, SCHEDULE_WEEK_START).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`}
             </span>
             <button
               type="button"
-              onClick={() => shiftMonth(1)}
-              aria-label="Next month"
+              onClick={() => view === 'month' ? shiftMonth(1) : setCursor((d) => addDays(d, 7))}
+              aria-label={view === 'month' ? 'Next month' : 'Next week'}
               style={chevBtnStyle}
             >
               <ChevronRight size={16} />
@@ -433,17 +437,16 @@ export default function Schedule() {
         </div>
       </motion.div>
 
-      {/* WEEK STRIP, 7 cells anchored to Monday. Highlighted cell = cursor;
+      {/* WEEK STRIP, 7 cells anchored to Sunday. Highlighted cell = cursor;
           ring around today (when not selected). Tap any day to jump. */}
       {/* DISPATCH STRIP, slim 52px day pills, design's dispatch-day pattern.
           Today gets a bright gold gradient; selected (non-today) gets a
           gold-soft tint with a subtle border accent. */}
       <motion.div variants={item}>
-        <div className="dispatch-strip">
+        <div className="dispatch-strip fhev-week-strip" aria-label="Selected calendar week">
           {Array.from({ length: 7 }, (_, i) => {
             const today = startOfDay(new Date())
-            const cursorDow = (cursor.getDay() + 6) % 7
-            const day = addDays(cursor, i - cursorDow)
+            const day = addDays(startOfWeek(cursor, SCHEDULE_WEEK_START), i)
             const isSelected = sameDay(day, cursor)
             const isToday = sameDay(day, today)
             const dayName = day.toLocaleDateString(undefined, { weekday: 'short' }).slice(0, 3)
@@ -455,6 +458,7 @@ export default function Schedule() {
                 key={day.toISOString()}
                 type="button"
                 onClick={() => { hapticTap(); setCursor(startOfDay(day)); setView('day') }}
+                aria-label={day.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
                 aria-pressed={isSelected}
                 className={`dispatch-day${isToday ? ' is-today' : ''}${isSelected && !isToday ? ' is-selected' : ''}`}
               >
@@ -566,6 +570,7 @@ export default function Schedule() {
         </motion.div>
       </SwipeShell>
 
+      <MobileUnscheduledJobs onSchedule={(job) => openNewEvent({ contactId: job.id, title: jobLabel(job) })} />
       <ScreenCloser caption="Tap a day above to plan the week ahead." />
     </motion.div>
   )
@@ -828,6 +833,7 @@ function DayView({ events, now, onClick, onEdit, onDelete, deleteArmedId, onAdd 
                 primary={primary}
                 secondary={secondary}
                 kind={kind}
+                crewCount={eventAssignees(e).length}
                 startStr={start}
                 endStr={end}
                 status={status}
@@ -895,7 +901,7 @@ function splitTime(s: any) {
   return [s.slice(0, idx), s.slice(idx + 1)]
 }
 
-function ScheduleRow({ index, primary, secondary, kind, startStr, endStr, status, onClick, onEdit, onDelete, deleteArmed, isClickable }: any) {
+function ScheduleRow({ index, primary, secondary, kind, crewCount, startStr, endStr, status, onClick, onEdit, onDelete, deleteArmed, isClickable }: any) {
   // 5/17, full visual port of the v3 design's dispatch-card pattern
   // (replaces the prior glass-row with status spine). Time column on
   // the left as HR/AM stamp, title + sub on the right, state pill at
@@ -946,6 +952,7 @@ function ScheduleRow({ index, primary, secondary, kind, startStr, endStr, status
                 {pill.label}
               </span>
             </div>
+            {crewCount > 0 && <div className="dispatch-card__sub">{crewCount} crew assigned</div>}
             {endStr && (
               <div className="dispatch-card__addr">
                 <Clock size={10} aria-hidden="true" />
@@ -1098,3 +1105,22 @@ function MonthView({ cursor, events, onDay }: any) {
   )
 }
 
+
+function MobileUnscheduledJobs({ onSchedule }: { onSchedule: (job: import('../lib/queries.ts').JobRow) => void }) {
+  const { user } = useAuth()
+  const jobs = useCompanyJobs()
+  const from = startOfDay(new Date()).toISOString()
+  const booked = useBookedVisits(user?.id, from)
+  const available = jobs.data && booked.data ? trayJobs(jobs.data, booked.data.map((row) => row.contact_id), new Set()) : null
+  const failed = jobs.isError || booked.isError
+  return (
+    <section className="fhev-unscheduled" aria-label="Unscheduled jobs">
+      <h2>Unscheduled jobs</h2>
+      {jobs.isPending || booked.isPending ? <SkeletonList rows={2} card={false} /> : <>
+        {failed && <div role="alert"><p>Could not refresh unscheduled jobs.</p><Button variant="secondary" size="mini" onClick={() => { void jobs.refetch(); void booked.refetch() }}>Try again</Button></div>}
+        {available && available.length === 0 && <p>Every active job has a date.</p>}
+        {available && available.length > 0 && <details><summary>Show {available.length} unscheduled jobs</summary><ul>{available.map((job) => <li key={job.id}><div><strong>{jobLabel(job)}</strong>{job.address && <p>{job.address}</p>}</div><Button variant="secondary" size="mini" aria-label={`Schedule ${jobLabel(job)}`} onClick={() => onSchedule(job)}>Schedule</Button></li>)}</ul></details>}
+      </>}
+    </section>
+  )
+}

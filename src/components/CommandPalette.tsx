@@ -62,6 +62,7 @@ import { openCapture } from '../lib/captureAttach.ts'
 import { stageLabel } from '../lib/stages.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
+import { useOrgScope, type OrgScope } from '../lib/orgScope.ts'
 import '../styles/command-palette.css'
 
 type NavEntry = {
@@ -93,21 +94,21 @@ function homeHint() {
 }
 
 const NAV_ITEMS: NavEntry[] = [
-  { id: 'home', label: 'Command Center', hint: homeHint(), icon: Home, to: '/' },
-  { id: 'work', label: 'Work & Deals', hint: 'Every deal, lead to done, one list', icon: Briefcase, to: '/jobs' },
-  { id: 'clients', label: 'Clients', hint: 'Customer profiles', icon: Users, to: '/clients' },
+  { id: 'home', label: 'Today', hint: homeHint(), icon: Home, to: '/' },
+  { id: 'work', label: 'Jobs', hint: 'Every deal, lead to done, one list', icon: Briefcase, to: '/jobs' },
+  { id: 'clients', label: 'Customers', hint: 'Customer profiles', icon: Users, to: '/clients' },
   { id: 'schedule', label: 'Schedule', hint: 'Day, week, and month planning', icon: Calendar, to: '/schedule' },
 ]
 
 const REVENUE_ITEMS: NavEntry[] = [
   { id: 'bid', label: 'Estimates', hint: 'Scope to number', icon: Calculator, to: '/bid' },
-  { id: 'invoices', label: 'Invoices', hint: 'Collect and reconcile', icon: Receipt, to: '/invoices' },
-  { id: 'analytics', label: 'Analytics', hint: 'Pipeline and margin', icon: BarChart3, to: '/analytics' },
+  { id: 'invoices', label: 'Money', hint: 'Collect and reconcile', icon: Receipt, to: '/invoices' },
+  { id: 'analytics', label: 'Reports', hint: 'Pipeline and margin', icon: BarChart3, to: '/analytics' },
   { id: 'forecast', label: 'Forecast', hint: 'Pour window and capacity', icon: LineChart, to: '/pour-window' },
 ]
 
 const SYSTEM_ITEMS: NavEntry[] = [
-  { id: 'notes', label: 'Activity feed', hint: 'Notes and field intelligence', icon: FileText, to: '/notes' },
+  { id: 'notes', label: 'Field reports', hint: 'Notes and field intelligence', icon: FileText, to: '/notes' },
   { id: 'tasks', label: 'Tasks', hint: 'Owner queue', icon: ClipboardCheck, to: '/tasks' },
   { id: 'team', label: 'Team', hint: 'Roles and operators', icon: UsersRound, to: '/team' },
   { id: 'import', label: 'Import data', hint: 'CSV and webhooks', icon: Upload, to: '/import' },
@@ -189,7 +190,7 @@ function PaletteRow({ value, icon, title, sub, chevron, keys, shortcut, onSelect
 export default function CommandPalette() {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<SearchResults>(EMPTY_RESULTS)
+  const [resultSnapshot, setResultSnapshot] = useState<{ userId: string; scope: OrgScope; data: SearchResults } | null>(null)
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState('')
   // The highlighted row's cmdk value, and the job the Actions group is for.
@@ -197,6 +198,12 @@ export default function CommandPalette() {
   const [activeJobId, setActiveJobId] = useState<string | null>(null)
   const navigate = useNavigate()
   const { user } = useAuth()
+  const orgScope = useOrgScope(user?.id)
+  // Old-company rows disappear in the render that changes workspace, before
+  // the next request starts. Late answers are also rejected by effect cleanup.
+  const results = resultSnapshot && resultSnapshot.userId === user?.id && resultSnapshot.scope === orgScope
+    ? resultSnapshot.data
+    : EMPTY_RESULTS
   const { canViewRoute, canCreateFinancialDocs, role, loading: membershipLoading } = useMembership()
 
   const env = useMemo(
@@ -226,7 +233,7 @@ export default function CommandPalette() {
   useEffect(() => {
     if (!open) {
       setQuery('')
-      setResults(EMPTY_RESULTS)
+      setResultSnapshot(null)
       setSearching(false)
       setSearchError('')
       setHighlight('')
@@ -237,22 +244,24 @@ export default function CommandPalette() {
   useEffect(() => {
     if (!open) return
     const q = query.trim()
-    if (!q) {
-      setResults(EMPTY_RESULTS)
+    if (!q || !user?.id) {
+      setResultSnapshot(null)
       setSearching(false)
       setSearchError('')
       return
     }
     setSearching(true)
     setSearchError('')
+    // Do not issue an owner-scoped search while the company is unresolved.
+    if (orgScope === undefined) return
     let cancelled = false
     const t = setTimeout(async () => {
       try {
-        const data = await universalSearch(q, user?.id)
-        if (!cancelled) setResults(data)
+        const data = await universalSearch(q, user.id, orgScope)
+        if (!cancelled) setResultSnapshot({ userId: user.id, scope: orgScope, data })
       } catch (e: unknown) {
         if (!cancelled) {
-          setResults(EMPTY_RESULTS)
+          setResultSnapshot(null)
           setSearchError(e instanceof Error && e.message ? e.message : 'Search is unavailable right now.')
         }
       } finally {
@@ -263,7 +272,7 @@ export default function CommandPalette() {
       cancelled = true
       clearTimeout(t)
     }
-  }, [query, open, user?.id])
+  }, [query, open, user?.id, orgScope])
 
   function go(to: string) {
     setOpen(false)

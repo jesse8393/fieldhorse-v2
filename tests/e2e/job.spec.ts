@@ -3,7 +3,7 @@
 // falls back to the onyx band, the stage rail, the money strip, the
 // section tabs with the Spine first, and the floating action capsule
 // that takes the dock's place.
-import { expect, test, type Locator, type Page, type Route } from '@playwright/test'
+import { expect, test, type Page, type Route } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 
 async function open(page: Page, path: string) {
@@ -27,17 +27,6 @@ async function openMoreAboutJob(page: Page) {
     }
   }
   await expect(body).toBeVisible()
-}
-
-// True when the tab sits wholly inside the strip and, while the row fades
-// at its right edge, ends before the 32 px fade begins.
-async function clearOfFade(row: Locator, strip: Locator, tab: Locator) {
-  const fading = /\bfhj-tabs--fade\b/.test((await row.getAttribute('class')) || '')
-  const stripBox = await strip.boundingBox()
-  const tabBox = await tab.boundingBox()
-  if (!stripBox || !tabBox) return false
-  const end = stripBox.x + stripBox.width - (fading ? 32 : 0)
-  return tabBox.x >= stripBox.x - 1 && tabBox.x + tabBox.width <= end
 }
 
 test.describe('job page on a phone', () => {
@@ -109,26 +98,26 @@ test.describe('job page on a phone', () => {
     await expect(page.locator('.fhj-spine img')).toHaveCount(0)
     // The count still opens the photos.
     await hero.getByRole('button', { name: '2 photos' }).click()
-    await expect(page.getByRole('tablist', { name: 'Job sections' }).getByRole('tab', { name: 'Files', exact: true })).toHaveAttribute('aria-selected', 'true')
-    await expect(page.getByRole('tab', { name: 'Photos' })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('region', { name: 'Photos workspace', exact: true })).toBeVisible()
+    await expect(page.getByRole('combobox', { name: 'Job section', exact: true })).toHaveValue('files')
   })
 
   test('spine first', async ({ context, page }) => {
     await signIn(context)
     await open(page, '/jobs/c-job1')
-    await expect(page.getByRole('tab', { name: 'Spine' })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('combobox', { name: 'Job section', exact: true })).toHaveValue('overview')
     await expect(page.locator('.fhj-spine').getByText('Inspector confirmed Friday.')).toBeVisible()
   })
 
   test('every section stays one tap away', async ({ context, page }) => {
     await signIn(context)
     await open(page, '/jobs/c-job1')
-    const tabs = page.getByRole('tablist', { name: 'Job sections' })
-    for (const name of ['Spine', 'Details', 'Selections', 'Materials', 'Change orders', 'Daily logs', 'Financials', 'Files']) {
-      await expect(tabs.getByRole('tab', { name, exact: true })).toHaveCount(1)
+    const sections = page.getByRole('combobox', { name: 'Job section', exact: true })
+    for (const name of ['Activity', 'Milestones', 'Tasks', 'Schedule', 'Selections', 'Materials', 'Change orders', 'Daily logs', 'Contract balance', 'Invoices', 'Photos', 'Files']) {
+      await expect(sections.getByRole('option', { name, exact: true })).toHaveCount(1)
     }
-    await tabs.getByRole('tab', { name: 'Financials', exact: true }).click()
-    await expect(tabs.getByRole('tab', { name: 'Financials', exact: true })).toHaveAttribute('aria-selected', 'true')
+    await sections.selectOption('financials')
+    await expect(sections).toHaveValue('financials')
     await expect(page).toHaveURL(/tab=financials/)
 
     // A quote is its own screen (Phase 9, D53): its lines are one tap away too.
@@ -138,85 +127,58 @@ test.describe('job page on a phone', () => {
     await expect(page.getByRole('button', { name: 'Add a line' })).toBeVisible()
   })
 
-  test('the tab row fades at the right while it overflows, and not once scrolled to the end', async ({ context, page }) => {
+  test('the section selector fits a narrow phone without horizontal scrolling', async ({ context, page }) => {
     await signIn(context)
+    await page.setViewportSize({ width: 320, height: 740 })
     await open(page, '/jobs/c-job1')
-    const tabs = page.getByRole('tablist', { name: 'Job sections' })
-    await expect(tabs.getByRole('tab', { name: 'Files', exact: true })).toHaveCount(1)
-    const row = page.locator('.fhj-tabs', { has: tabs })
-    // Eight tabs do not fit a phone, so the strip scrolls sideways.
-    expect(await tabs.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true)
-    await expect(row).toHaveClass(/fhj-tabs--fade/)
-    await tabs.evaluate((el) => { el.scrollLeft = el.scrollWidth })
-    await expect(row).not.toHaveClass(/fhj-tabs--fade/)
-    await tabs.evaluate((el) => { el.scrollLeft = 0 })
-    await expect(row).toHaveClass(/fhj-tabs--fade/)
+    const selector = page.getByRole('combobox', { name: 'Job section', exact: true })
+    const box = (await selector.boundingBox())!
+    expect(box.x).toBeGreaterThanOrEqual(0)
+    expect(box.x + box.width).toBeLessThanOrEqual(320)
+    expect(box.height).toBeGreaterThanOrEqual(44)
+    await expect(page.getByRole('tablist')).toHaveCount(0)
   })
 
-  test('opening the page on its last tab scrolls that tab into view, with no fade over it', async ({ context, page }) => {
-    await signIn(context)
-    await open(page, '/jobs/c-job1?tab=files')
-    const tabs = page.getByRole('tablist', { name: 'Job sections' })
-    const files = tabs.getByRole('tab', { name: 'Files', exact: true })
-    await expect(files).toHaveAttribute('aria-selected', 'true')
-    await expect.poll(async () => {
-      const strip = await tabs.boundingBox()
-      const tab = await files.boundingBox()
-      return strip && tab ? tab.x >= strip.x - 1 && tab.x + tab.width <= strip.x + strip.width + 1 : false
-    }).toBe(true)
-    await expect(page.locator('.fhj-tabs', { has: tabs })).not.toHaveClass(/fhj-tabs--fade/)
-  })
-
-  test('a tab selected when the page opens sits clear of the fade', async ({ context, page }) => {
-    await signIn(context)
-    for (const id of ['change_orders', 'logs', 'financials']) {
+  for (const id of ['change_orders', 'logs', 'financials', 'files', 'documents', 'tasks']) {
+    test(`deep linked ${id} stays selected on reload`, async ({ context, page }) => {
+      await signIn(context)
       await open(page, `/jobs/c-job1?tab=${id}`)
-      const tabs = page.getByRole('tablist', { name: 'Job sections' })
-      const selected = tabs.locator('[role="tab"][aria-selected="true"]')
-      await expect(selected).toHaveCount(1)
-      await expect.poll(() => clearOfFade(page.locator('.fhj-tabs', { has: tabs }), tabs, selected), id).toBe(true)
-    }
-  })
+      await expect(page.getByRole('combobox', { name: 'Job section', exact: true })).toHaveValue(id)
+      await page.reload()
+      await expect(page.locator('.fhj-page')).toBeVisible({ timeout: 30_000 })
+      await expect(page.getByRole('combobox', { name: 'Job section', exact: true })).toHaveValue(id)
+    })
+  }
 
-  test('a tab opened by a link stays clear of the fade when the money tabs arrive after the job', async ({ context, page }) => {
-    // On a cold open the job draws from the saved cache while the role is
-    // still loading, so the first strip has no Change orders and calls
-    // Financials Expenses. Hold the role's first read until the job draws.
+  test('section selection survives membership loading', async ({ context, page }) => {
     await signIn(context)
     const isMembers = (url: URL) => url.pathname.endsWith('/rest/v1/org_members')
-    for (const id of ['logs', 'financials', 'files']) {
-      let release = () => {}
-      const held = new Promise<void>((resolve) => { release = resolve })
-      const hold = async (route: Route) => { await held; await route.fallback() }
-      await context.route(isMembers, hold)
-      await open(page, `/jobs/c-job1?tab=${id}`)
-      const tabs = page.getByRole('tablist', { name: 'Job sections' })
-      const selected = tabs.locator('[role="tab"][aria-selected="true"]')
-      const changeOrders = tabs.getByRole('tab', { name: 'Change orders', exact: true })
-      await expect(selected).toHaveCount(1)
-      await expect(changeOrders, `${id}, before the role loads`).toHaveCount(0)
-      release()
-      await expect(changeOrders).toHaveCount(1)
-      await expect.poll(() => clearOfFade(page.locator('.fhj-tabs', { has: tabs }), tabs, selected), id).toBe(true)
-      await context.unroute(isMembers, hold)
-    }
+    let release = () => {}
+    const held = new Promise<void>(resolve => { release = resolve })
+    const hold = async (route: Route) => { await held; await route.fallback() }
+    await context.route(isMembers, hold)
+    await open(page, '/jobs/c-job1?tab=logs')
+    const selector = page.getByRole('combobox', { name: 'Job section', exact: true })
+    await expect(selector).toHaveValue('logs')
+    await expect(selector.locator('option[value="change_orders"]')).toHaveCount(0)
+    release()
+    await expect(selector.locator('option[value="change_orders"]')).toHaveCount(1)
+    await expect(selector).toHaveValue('logs')
+    await context.unroute(isMembers, hold)
   })
 
-  test('a tab reached with the arrow keys sits clear of the fade', async ({ context, page }) => {
+  test('native keyboard selection opens a section without a second tab row', async ({ context, page }) => {
     await signIn(context)
     await open(page, '/jobs/c-job1')
-    const tabs = page.getByRole('tablist', { name: 'Job sections' })
-    const row = page.locator('.fhj-tabs', { has: tabs })
-    await tabs.getByRole('tab', { name: 'Spine', exact: true }).focus()
-    for (const name of ['Details', 'Selections', 'Materials', 'Change orders', 'Daily logs', 'Financials', 'Files']) {
-      await page.keyboard.press('ArrowRight')
-      const tab = tabs.getByRole('tab', { name, exact: true })
-      await expect(tab).toBeFocused()
-      await expect.poll(() => clearOfFade(row, tabs, tab), name).toBe(true)
-    }
+    const selector = page.getByRole('combobox', { name: 'Job section', exact: true })
+    await selector.focus()
+    await page.keyboard.press('ArrowDown')
+    await page.keyboard.press('Enter')
+    await expect(selector).not.toHaveValue('overview')
+    await expect(page.getByRole('tablist')).toHaveCount(0)
   })
 
-  test('opened from the Jobs list, the header spans the page and the fade sits on the tab strip', async ({ context, page }) => {
+  test('opened from the Jobs list, the header spans the page and the section selector fits', async ({ context, page }) => {
     await signIn(context)
     // By tapping a row, so the Jobs list's styles are already on the page
     // when the job draws: the way most people reach a job.
@@ -237,49 +199,10 @@ test.describe('job page on a phone', () => {
     const factsBox = (await page.locator('.fhj-facts').boundingBox())!
     expect(factsBox.y).toBeGreaterThanOrEqual(heroBox.y + heroBox.height - 1)
 
-    // The strip runs edge to edge and the fade covers its last 32 px.
-    const tabs = page.getByRole('tablist', { name: 'Job sections' })
-    const row = page.locator('.fhj-tabs', { has: tabs })
-    await expect(row).toHaveClass(/fhj-tabs--fade/)
-    const strip = (await tabs.boundingBox())!
-    expect(near(strip.x, 0) && near(strip.x + strip.width, width), `strip ${strip.x} to ${strip.x + strip.width}`).toBe(true)
-    const fade = await row.evaluate((el) => {
-      const box = el.getBoundingClientRect()
-      const after = getComputedStyle(el, '::after')
-      const right = box.right - parseFloat(after.right)
-      return { left: right - parseFloat(after.width), right }
-    })
-    expect(near(fade.right, strip.x + strip.width) && near(fade.left, strip.x + strip.width - 32), `fade ${fade.left} to ${fade.right}`).toBe(true)
-  })
-
-  test('the tab row measures itself once, not on every render of the page', async ({ context, page }) => {
-    // Count how often a ResizeObserver starts watching the tab strip.
-    await page.addInitScript(() => {
-      const observe = ResizeObserver.prototype.observe
-      const w = window as unknown as { __stripObserved: number }
-      w.__stripObserved = 0
-      ResizeObserver.prototype.observe = function (target: Element, options?: ResizeObserverOptions) {
-        if (target instanceof Element && target.classList.contains('fhj-tabs__strip')) w.__stripObserved += 1
-        return observe.call(this, target, options)
-      }
-    })
-    await signIn(context)
-    await open(page, '/jobs/c-job1')
-    const tabs = page.getByRole('tablist', { name: 'Job sections' })
-    await expect(tabs.getByRole('tab', { name: 'Files', exact: true })).toHaveCount(1)
-    await page.waitForLoadState('networkidle')
-    const observed = () => page.evaluate(() => (window as unknown as { __stripObserved: number }).__stripObserved)
-    const settled = await observed()
-    expect(settled).toBeGreaterThan(0)
-
-    // Opening and closing the Spine's disclosure renders the page again,
-    // with the same tabs.
-    const more = page.getByRole('button', { name: 'More about this job' })
-    await more.click()
-    await expect(page.locator('#fhj-more-body')).toBeVisible()
-    await more.click()
-    await expect(page.locator('#fhj-more-body')).toBeHidden()
-    expect(await observed()).toBe(settled)
+    const selector = page.getByRole('combobox', { name: 'Job section', exact: true })
+    const box = (await selector.boundingBox())!
+    expect(box.x).toBeGreaterThanOrEqual(0)
+    expect(box.x + box.width).toBeLessThanOrEqual(width)
   })
 
   test('the page scrolls clear of the capsule', async ({ context, page }) => {
@@ -291,7 +214,7 @@ test.describe('job page on a phone', () => {
     await page.waitForTimeout(150)
     const capsuleTop = await page.locator('.fhj-capsule').evaluate((el) => el.getBoundingClientRect().top)
     const contentBottom = await page.locator('.fhj-page').evaluate((el) => {
-      const panel = el.querySelector('[role="tabpanel"]')
+      const panel = el.querySelector('[role="region"][aria-label$=" workspace"]')
       const last = panel?.lastElementChild ?? panel
       return last ? last.getBoundingClientRect().bottom : 0
     })
@@ -387,15 +310,15 @@ test.describe('job page on a phone', () => {
       mimeType: 'image/png',
       buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=', 'base64')
     })
-    await expect(page.getByRole('tablist', { name: 'Job sections' }).getByRole('tab', { name: 'Files', exact: true })).toHaveAttribute('aria-selected', 'true')
-    await expect(page.getByRole('tab', { name: 'Photos' })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('region', { name: 'Photos workspace', exact: true })).toBeVisible()
+    await expect(page.getByRole('combobox', { name: 'Job section', exact: true })).toHaveValue('files')
   })
 
   test('deep links into the job keep working', async ({ context, page }) => {
     await signIn(context)
     await open(page, '/jobs/c-job1?tab=files')
-    await expect(page.getByRole('tablist', { name: 'Job sections' }).getByRole('tab', { name: 'Files', exact: true })).toHaveAttribute('aria-selected', 'true')
-    await expect(page.getByRole('tab', { name: 'Photos' })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('region', { name: 'Photos workspace', exact: true })).toBeVisible()
+    await expect(page.getByRole('combobox', { name: 'Job section', exact: true })).toHaveValue('files')
 
     await open(page, '/jobs/c-job1?tab=financials&action=send_invoice')
     const cue = page.getByRole('region', { name: 'Dashboard action cue' })
@@ -494,7 +417,7 @@ test.describe('job page on a desktop, redesigned', () => {
     await expect(rail.locator('[aria-current="step"]')).toHaveText(/^Job/)
 
     const facts = page.getByRole('complementary', { name: 'Job facts' })
-    await expect(facts.getByText('Balance', { exact: true })).toBeVisible()
+    await expect(facts.getByText('Contract balance', { exact: true })).toBeVisible()
     await expect(facts.getByText('$33,100.00').first()).toBeVisible()
     await expect(facts.getByText('Contract', { exact: true })).toBeVisible()
     await expect(facts.getByText('Paid', { exact: true })).toBeVisible()
@@ -514,7 +437,7 @@ test.describe('job page on a desktop, redesigned', () => {
     await expect(banner.getByRole('link', { name: 'Back to jobs' }).or(banner.getByRole('button', { name: 'Back to jobs' }))).toBeVisible()
 
     // Message and Schedule are secondary; the stage action is the one gold button.
-    await expect(banner.getByRole('link', { name: /^Message/ })).toHaveAttribute('href', /^sms:/)
+    await expect(banner.getByRole('link', { name: /^Message/ })).toHaveAttribute('href', '/compose?contact=c-job1&channel=email')
     await expect(banner.getByRole('button', { name: 'Schedule', exact: true })).toBeVisible()
     const gold = page.locator('.fhc-btn--primary')
     await expect(gold).toHaveCount(1)
@@ -587,26 +510,29 @@ test.describe('job page on a desktop, redesigned', () => {
     expect(writes).toEqual([])
   })
 
-  test('the tab row wraps on a desktop, so it never fades', async ({ context, page }) => {
+  test('desktop section destinations fit without horizontal scrolling', async ({ context, page }, testInfo) => {
     await signIn(context)
     await openDesktop(page, '/jobs/c-job1')
-    const tabs = page.getByRole('tablist', { name: 'Job sections' })
-    await expect(tabs.getByRole('tab', { name: 'Files', exact: true })).toHaveCount(1)
-    expect(await tabs.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true)
-    await expect(page.locator('.fhj-tabs', { has: tabs })).not.toHaveClass(/fhj-tabs--fade/)
+    const nav = page.getByRole('navigation', { name: 'Job shortcuts', exact: true })
+    await expect(nav.getByRole('button', { name: 'Photos', exact: true })).toBeVisible()
+    expect(await nav.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
+    for (const button of await nav.getByRole('button').all()) {
+      expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+    }
+    await page.screenshot({ path: testInfo.outputPath('workspace-job.png'), fullPage: true })
   })
 
   test('the Spine is the first tab and every section stays one click away', async ({ context, page }) => {
     await signIn(context)
     await openDesktop(page, '/jobs/c-job1')
-    const tabs = page.getByRole('tablist', { name: 'Job sections' })
-    await expect(tabs.getByRole('tab', { name: 'Spine', exact: true })).toHaveAttribute('aria-selected', 'true')
+    const nav = page.getByRole('navigation', { name: 'Job shortcuts', exact: true })
+    await expect(nav.getByRole('button', { name: 'Activity', exact: true })).toHaveAttribute('aria-current', 'page')
     await expect(page.locator('.fhj-spine').getByText('Inspector confirmed Friday.')).toBeVisible()
-    for (const name of ['Details', 'Selections', 'Materials', 'Change orders', 'Daily logs', 'Financials', 'Files']) {
-      await expect(tabs.getByRole('tab', { name, exact: true })).toHaveCount(1)
+    for (const name of ['Milestones', 'Tasks', 'Schedule', 'Selections', 'Materials', 'Change orders', 'Daily logs', 'Contract balance', 'Invoices', 'Photos', 'Files']) {
+      await expect(page.getByRole('combobox', { name: 'Job section', exact: true }).getByRole('option', { name, exact: true })).toHaveCount(1)
     }
-    await tabs.getByRole('tab', { name: 'Financials', exact: true }).click()
-    await expect(tabs.getByRole('tab', { name: 'Financials', exact: true })).toHaveAttribute('aria-selected', 'true')
+    await page.getByRole('combobox', { name: 'Job section', exact: true }).selectOption('financials')
+    await expect(page.getByRole('combobox', { name: 'Job section', exact: true })).toHaveValue('financials')
     await expect(page).toHaveURL(/tab=financials/)
 
     // A quote is its own screen (Phase 9, D53), the same one as on a phone,
@@ -620,7 +546,7 @@ test.describe('job page on a desktop, redesigned', () => {
   test('deep links and the action cue keep working', async ({ context, page }) => {
     await signIn(context)
     await openDesktop(page, '/jobs/c-job1?tab=files')
-    await expect(page.getByRole('tablist', { name: 'Job sections' }).getByRole('tab', { name: 'Files', exact: true })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('region', { name: 'Photos workspace', exact: true })).toBeVisible()
     await openDesktop(page, '/jobs/c-job1?tab=financials&action=send_invoice')
     const cue = page.getByRole('region', { name: 'Dashboard action cue' })
     await expect(cue).toBeVisible()
@@ -708,7 +634,7 @@ test.describe('job page on a desktop, redesigned', () => {
     await expect(rail.getByText('Sep 23, website')).toBeVisible()
     await expect(rail.getByText('Approved Sep 28')).toBeVisible()
     await expect(rail.getByText('Pour slab today, Inspection Fri')).toBeVisible()
-    await expect(rail.getByText('$6,187.50 balance')).toBeVisible()
+    await expect(rail.getByText('$6,187.50 contract balance')).toBeVisible()
     const facts = page.getByRole('complementary', { name: 'Job facts' })
     await expect(facts.getByText('$6,187.50').first()).toBeVisible()
     await expect(facts.getByText('$12,375.00')).toBeVisible()
@@ -727,7 +653,7 @@ test.describe('job page on a desktop, redesigned', () => {
     await openDesktop(page, '/jobs/c-job1')
     await expect(page.locator('.fhd-banner').getByRole('heading', { level: 1, name: 'Slab + trench' })).toBeVisible()
     await expect(page.getByRole('list', { name: 'Stage' })).toBeVisible()
-    await expect(page.getByText('Balance')).toHaveCount(0)
+    await expect(page.getByText('Contract balance')).toHaveCount(0)
     await expect(page.getByText('Contract', { exact: true })).toHaveCount(0)
     await expect(page.getByText('Margin', { exact: true })).toHaveCount(0)
     await expect(page.getByText(/\$33,100/)).toHaveCount(0)

@@ -85,9 +85,9 @@ describe('createScheduleEvent', () => {
     expect(inserted()[0]).not.toHaveProperty('org_id')
   })
 
-  it('returns the database message when the insert fails', async () => {
+  it('gives safe recovery guidance when the insert fails', async () => {
     response = { data: null, error: { message: 'new row violates row level security' } }
-    expect(await createScheduleEvent(input)).toEqual({ error: 'new row violates row level security' })
+    expect(await createScheduleEvent(input)).toEqual({ error: 'The event could not be saved. Refresh the schedule and try again.' })
   })
 
   it('returns an error, and writes nothing, when the title is blank', async () => {
@@ -104,6 +104,12 @@ describe('createScheduleEvent', () => {
 })
 
 describe('createScheduleEvents', () => {
+  it('persists every selected member and reports a concurrent booking failure', async () => {
+    await createScheduleEvents([{ ...input, assignedUserIds: ['alice', 'bob', 'alice'] }])
+    expect(inserted()[0]).toMatchObject({ assigned_user_ids: ['alice', 'bob'], assigned_to: 'alice' })
+    response = { data: null, error: { code: '23P01', message: 'constraint violation' } }
+    expect(await createScheduleEvents([{ ...input, assignedUserIds: ['alice'] }])).toEqual({ error: expect.stringContaining('Refresh availability') })
+  })
   it('writes a whole recurring series in one insert, each row carrying the shared series id and org_id', async () => {
     response = { data: [{ id: 'a' }, { id: 'b' }], error: null }
     const result = await createScheduleEvents([

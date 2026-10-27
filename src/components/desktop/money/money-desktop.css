@@ -386,11 +386,10 @@
 .fhmd-table--balances .fhmd-col--amount { width: 12%; }
 
 /* Below 1280 px Job balances' columns stop sharing the width by percent:
-   each money column holds a seven figure amount, Status holds its widest
-   chip ("Overdue, 1000 days"), the two actions stack, and the customer
-   takes what is left. Below 1100 px Paid steps aside and the age reads
-   under a one word chip (Task 14). These follow the rules above on
-   purpose, so they win for this table. */
+   each money column holds a seven figure amount, Status holds the age
+   bucket with exact days below it, the two actions stack, and the customer
+   takes what is left. Below 1100 px Paid steps aside. These follow the
+   rules above on purpose, so they win for this table. */
 @media (max-width: 1279px) {
   .fhmd-table--balances .fhmd-col--customer { width: auto; }
   .fhmd-table--balances .fhmd-col--status { width: 152px; }

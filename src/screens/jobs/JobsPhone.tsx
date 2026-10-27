@@ -19,9 +19,9 @@ import DataErrorState from '../../components/DataErrorState.tsx'
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useNavAccess } from '../../lib/useNavAccess.ts'
 import { useJobVisits, useLeads, useLeadVisits, useQuotes, type JobRow } from '../../lib/queries.ts'
-import { buildJobsList, jobsVisitWindow, JOBS_TABS, type JobsGroup, type JobsRowView, type JobsSort, type JobsTab } from '../../lib/jobsList.ts'
+import { jobsVisitWindow, JOBS_TABS, type JobsRowView, type JobsSort, type JobsTab } from '../../lib/jobsList.ts'
 import { handleTablistKeyDown, tabId, tabPanelId, tabPanelProps } from '../../lib/tabs.ts'
-import { buildLeadRows, buildQuoteRows } from '../../lib/leadsView.ts'
+import { buildWorkList } from '../../lib/workList.ts'
 import { todayYmd } from '../../lib/dates.ts'
 import { hapticTap } from '../../lib/haptics.ts'
 import './jobs.css'
@@ -29,6 +29,8 @@ import './jobs.css'
 export type JobsPhoneProps = {
   /** Rows the viewer may see, already narrowed to the search. */
   jobs: JobRow[]
+  desktop?: boolean
+  renderJobRow?: (row: JobsRowView) => ReactNode
   loading: boolean
   /** Empty when the last load worked. */
   loadError: string
@@ -93,7 +95,9 @@ export default function JobsPhone({
   searchDegraded,
   showMoney,
   fieldView,
-  onNewLead
+  onNewLead,
+  desktop = false,
+  renderJobRow
 }: JobsPhoneProps) {
   const { user } = useAuth()
   const { canSee } = useNavAccess()
@@ -127,45 +131,42 @@ export default function JobsPhone({
   const range = useMemo(() => jobsVisitWindow(dayKey), [dayKey])
   const { data: visits } = useJobVisits(user?.id, range.start, range.end)
 
-  const contactsView = useMemo(
-    () => buildJobsList({ jobs, tab, showLost, showMoney, now: new Date(), visits, sort }),
-    [jobs, tab, showLost, showMoney, visits, sort]
-  )
-
-  // Leads and quotes live in their own tables (SPEC D55, D65): the Leads
-  // tab lists fh_leads and the Quotes tab fh_quotes. Field roles never
-  // read either. A search narrows them by who and what.
+  // Shared on desktop and phone. Sales tables remain disabled for field
+  // roles, even if a former owner view exists in the query cache.
   const leadsQuery = useLeads(fieldView ? undefined : user?.id)
   const quotesQuery = useQuotes(fieldView ? undefined : user?.id)
   const { data: leadVisits } = useLeadVisits(fieldView ? undefined : user?.id)
-  const view = useMemo(() => {
-    const now = new Date()
-    const leadRows = buildLeadRows(leadsQuery.data ?? [], { search, visits: leadVisits, now })
-    const quoteRows = buildQuoteRows(quotesQuery.data ?? [], { search, showMoney })
-    const counts = {
-      ...contactsView.counts,
-      leads: leadRows.length,
-      quotes: quoteRows.length,
-      all: contactsView.counts.all + leadRows.length + quoteRows.length
-    }
-    if (tab !== 'leads' && tab !== 'quotes') return { counts, groups: contactsView.groups }
-    const own = tab === 'leads' ? leadRows : quoteRows
-    const groups: JobsGroup[] = own.length === 0
-      ? []
-      : [{
-          id: tab,
-          title: tab === 'leads' ? 'Leads' : 'Quotes',
-          total: null,
-          note: tab === 'leads'
-            ? (own.length === 1 ? '1 open lead' : `${own.length} open leads`)
-            : (own.length === 1 ? '1 quote' : `${own.length} quotes`),
-          rows: own
-        }]
-    // The lost switch keeps showing lost jobs under either tab.
-    const lostGroup = contactsView.groups.find((g) => g.id === 'lost')
-    if (lostGroup) groups.push(lostGroup)
-    return { counts, groups }
-  }, [contactsView, tab, leadsQuery.data, quotesQuery.data, leadVisits, search, showMoney])
+  const view = useMemo(() => buildWorkList({
+    jobs, leads: fieldView ? [] : leadsQuery.data ?? [], quotes: fieldView ? [] : quotesQuery.data ?? [],
+    leadVisits, visits, tab, showLost, showMoney, fieldView, search, sort, now: new Date()
+  }), [jobs, fieldView, leadsQuery.data, quotesQuery.data, leadVisits, visits, tab, showLost, showMoney, search, sort])
+  const salesPending = !fieldView && (leadsQuery.isPending || quotesQuery.isPending)
+  const leadsFailed = !fieldView && leadsQuery.isError
+  const quotesFailed = !fieldView && quotesQuery.isError
+  // A failed read is an unknown count, including when the fallback array is
+  // empty. Keep cached rows visible below with their refresh notice, but do
+  // not present a stale or partial badge as the current inventory total.
+  const countFailed: Record<JobsTab, boolean> = {
+    all: Boolean(loadError) || leadsFailed || quotesFailed,
+    leads: leadsFailed,
+    quotes: quotesFailed,
+    jobs: Boolean(loadError),
+    done: Boolean(loadError),
+  }
+  const countPending: Record<JobsTab, boolean> = {
+    all: loading || salesPending,
+    leads: !fieldView && leadsQuery.isPending,
+    quotes: !fieldView && quotesQuery.isPending,
+    jobs: loading,
+    done: loading,
+  }
+  const salesError = (tab === 'all' && (leadsFailed || quotesFailed)) ||
+    (tab === 'leads' && leadsFailed) || (tab === 'quotes' && quotesFailed)
+  const retrySales = () => {
+    if (fieldView) return
+    if (leadsFailed) void leadsQuery.refetch()
+    if (quotesFailed) void quotesQuery.refetch()
+  }
 
   const writeStage = (stage: string | null) => {
     const sp = new URLSearchParams(searchParams)
@@ -208,12 +209,14 @@ export default function JobsPhone({
   const filterTitle = showMoney ? 'Filter and sort' : 'Filter'
   const query = search.trim()
   const hasRows = view.groups.length > 0
-  const tabLoading = (tab === 'leads' && leadsQuery.isPending) || (tab === 'quotes' && quotesQuery.isPending)
+  const tabLoading = !fieldView && ((tab === 'all' && salesPending) || (tab === 'leads' && leadsQuery.isPending) || (tab === 'quotes' && quotesQuery.isPending))
 
   let body: ReactNode
   if ((loading || tabLoading) && !hasRows) {
     body = <SkeletonRows rows={6} label="Loading jobs" />
-  } else if (loadError && jobs.length === 0) {
+  } else if (salesError && !hasRows) {
+    body = <DataErrorState title="Could not load sales records" message="Your leads and quotes could not be loaded. Try again." onRetry={retrySales} />
+  } else if (loadError && !hasRows && tab !== 'leads' && tab !== 'quotes') {
     body = (
       <DataErrorState
         title="Could not load your jobs"
@@ -259,9 +262,12 @@ export default function JobsPhone({
             <p className="fhjl-group__note">{g.note}</p>
           </div>
           <ul className="fhjl-rows">
-            {g.rows.map((r) => (
+            {g.rows.map((r) => {
+              const custom = (g.id === 'jobs' || g.id === 'done' || g.id === 'lost') ? renderJobRow?.(r) : null
+              if (custom) return <li key={r.to} className="fhjl-desktop-job">{custom}</li>
+              return (
               <Row
-                key={r.id}
+                key={r.to}
                 as="li"
                 to={r.to}
                 title={r.title}
@@ -269,7 +275,8 @@ export default function JobsPhone({
                 money={r.money}
                 next={rowEnd(r)}
               />
-            ))}
+              )
+            })}
           </ul>
         </section>
       )
@@ -277,7 +284,7 @@ export default function JobsPhone({
   }
 
   return (
-    <div className="v3-screen fhjl">
+    <div className={`v3-screen fhjl${desktop ? ' v3-screen--jobs fhjl--desktop' : ''}`}>
       <div className="fhjl-head">
         <h1 className="fhjl-title">Jobs</h1>
         <div className="fhjl-head__actions">
@@ -290,9 +297,9 @@ export default function JobsPhone({
             aria-label="Search jobs"
             icon={Search}
             size={44}
-            aria-expanded={searchOpen}
-            aria-controls={searchOpen ? searchFieldId : undefined}
-            onClick={toggleSearch}
+            aria-expanded={desktop ? undefined : searchOpen}
+            aria-controls={desktop || searchOpen ? searchFieldId : undefined}
+            onClick={desktop ? () => searchRef.current?.focus() : toggleSearch}
           />
         </div>
       </div>
@@ -328,7 +335,7 @@ export default function JobsPhone({
         )}
       </div>
 
-      {searchOpen && (
+      {(searchOpen || desktop) && (
         <div className="fhjl-search">
           <Field
             ref={searchRef}
@@ -358,20 +365,22 @@ export default function JobsPhone({
               role="tab"
               id={tabId(idBase, t.id)}
               aria-selected={selected}
+              aria-label={countFailed[t.id] ? `${t.label}, count unavailable` : undefined}
               aria-controls={tabPanelId(idBase, t.id)}
               tabIndex={selected ? 0 : -1}
               className="fhjl-tab"
               onClick={() => { if (!selected) selectTab(t.id) }}
             >
               <span className="fhjl-tab__label">{t.label}</span>
-              {!loading && <span className="fhjl-tab__count">{view.counts[t.id]}</span>}
+              {!countPending[t.id] && !countFailed[t.id] && <span className="fhjl-tab__count">{view.counts[t.id]}</span>}
             </button>
           )
         })}
       </div>
 
       <div className="fhjl-list" {...tabPanelProps(idBase, tab)}>
-        {loadError && jobs.length > 0 && (
+        {salesError && hasRows && <div className="fhjl-notice"><DataErrorState compact title="Some sales records could not load" message="These results may be incomplete. Retry to refresh your leads and quotes." onRetry={retrySales} /></div>}
+        {loadError && hasRows && (
           <div className="fhjl-notice">
             <DataErrorState
               compact

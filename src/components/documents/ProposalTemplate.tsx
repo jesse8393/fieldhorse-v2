@@ -19,6 +19,7 @@
 //   9. Terms grid         (payment terms · warranty · exclusions)
 //  10. Approval           (blank sig lines, or the recorded approval)
 
+import './documents-responsive.css'
 import DocumentShell, { StatusChip } from './DocumentShell.tsx'
 import LineItemsTable from './LineItemsTable.tsx'
 import InsuranceModeBlock from './InsuranceModeBlock.tsx'
@@ -268,6 +269,8 @@ function itemAmount(it: any) {
 function normalizeItem(it: any) {
   return {
     description: (it.description || '\u2003').trim().replace(/^OPTION\s*[:–-]\s*/i, ''),
+    notes: String(it.notes || '').trim(),
+    detailLines: String(it.notes || '').split(/\n+/).map((line) => line.trim()).filter(Boolean),
     qty: Number(it.qty || 1),
     unit: (it.unit || '').trim(),
     rate: Number(it.rate || 0),
@@ -331,6 +334,7 @@ function AddOnsTable({ items }: any) {
           <tr key={i}>
             <td style={{ padding: '12px 12px 12px 0', borderBottom: `1px solid ${DOC_COLORS.rule}`, verticalAlign: 'top' }}>
               <span style={{ color: DOC_COLORS.ink }}>{it.description}</span>
+              {it.notes && <div className="fh-doc-item-notes">{it.notes}</div>}
               {it.section && (
                 <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: DOC_COLORS.inkFaint }}>
                   {it.section}

@@ -58,12 +58,12 @@ test('an old job link to a moved row lands on the new record', async ({ context,
   await expect(page).toHaveURL(/\/leads\/l-1$/, { timeout: 30_000 })
 })
 
-test('moved rows never show on Jobs, Today or Money', async ({ context, page, isMobile }) => {
+test('moved rows never show on Jobs, Today or Money', async ({ context, page }) => {
   await signIn(context, { tables: TABLES })
   await page.clock.setFixedTime(new Date(NOW))
 
   await open(page, '/work')
-  await expect(page.getByRole('heading', { level: 1, name: isMobile ? 'Jobs' : /Work/ })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('heading', { level: 1, name: 'Jobs' })).toBeVisible({ timeout: 30_000 })
   await expect(page.getByText('Plumbing Bellevue').first()).toBeVisible()
   await expect(page.getByText(/Moved Ghost/)).toHaveCount(0)
 
@@ -81,11 +81,11 @@ test('moved rows never show on Jobs, Today or Money', async ({ context, page, is
 // The cut over (PHASE9_PLAN Task 17, SPEC D65): /jobs is the Jobs list,
 // /work and /pipeline land on it, and Leads, Quotes and Money are lists of
 // their own records.
-test('/work lands on /jobs and keeps its stage', async ({ context, page, isMobile }) => {
+test('/work lands on /jobs and keeps its stage', async ({ context, page }) => {
   await signIn(context, { tables: TABLES })
   await open(page, '/work')
   await expect(page).toHaveURL(/\/jobs$/, { timeout: 30_000 })
-  await expect(page.getByRole('heading', { level: 1, name: isMobile ? 'Jobs' : /Work/ })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('heading', { level: 1, name: 'Jobs' })).toBeVisible({ timeout: 30_000 })
   await expect(page.getByText('Plumbing Bellevue').first()).toBeVisible()
 
   await open(page, '/work?stage=lost&q=mill')
@@ -94,11 +94,11 @@ test('/work lands on /jobs and keeps its stage', async ({ context, page, isMobil
   await expect(page).toHaveURL(/\/jobs$/, { timeout: 30_000 })
 })
 
-test('/jobs, /leads, /quotes and /invoices are their own lists', async ({ context, page, isMobile }) => {
+test('/jobs, /leads, /quotes and /invoices are their own lists', async ({ context, page }) => {
   await signIn(context, { tables: TABLES })
   await open(page, '/jobs')
   await expect(page).toHaveURL(/\/jobs$/, { timeout: 30_000 })
-  await expect(page.getByRole('heading', { level: 1, name: isMobile ? 'Jobs' : /Work/ })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('heading', { level: 1, name: 'Jobs' })).toBeVisible({ timeout: 30_000 })
 
   await open(page, '/leads')
   await expect(page).toHaveURL(/\/leads$/, { timeout: 30_000 })

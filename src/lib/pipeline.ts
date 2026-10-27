@@ -7,11 +7,12 @@ import {
   markLost as baseMarkLost,
   logPayment as baseLogPayment,
   STAGE_MAP,
-  type StageId
+  WON_STAGES
 } from './stages.ts'
 import { toast, hapticMedium, hapticSuccess } from './toast.ts'
 import { moneyExact } from './format.ts'
 import type { Database } from './database.types.ts'
+import { supabase } from './supabase.ts'
 
 // The stage helpers only read identity + display fields, never the full
 // row, declare exactly that so projected list rows (JobRow) are valid
@@ -49,23 +50,31 @@ export async function markLost(contact: Contact) {
 
 /**
  * What Reopen asks first (Phase 8, Task 15), the way Mark lost does: one
- * tap on a closed or lost job used to move it straight back. A closed job
- * goes back to Jobs, a lost deal back to Leads. Its body is the hint under
+ * tap on a closed or lost job used to move it straight back. Closed jobs
+ * return to Jobs; lost records first need evidence they were jobs. Its body is the hint under
  * the armed Tap again to reopen button (D57).
  */
-export function reopenQuestion(contact: Pick<Contact, 'stage'>) {
-  return contact.stage === 'closed'
-    ? { title: 'Reopen this job?', body: 'It moves back to Jobs.', confirmLabel: 'Reopen' }
-    : { title: 'Reopen this deal?', body: 'It moves back to Leads.', confirmLabel: 'Reopen' }
+export function reopenQuestion(_contact: Pick<Contact, 'stage'>) {
+  return { title: 'Reopen this job?', body: 'It moves back to Jobs.', confirmLabel: 'Reopen' }
 }
 
 export async function reopen(contact: Contact) {
-  // closed → job (billing adjustments / extra payments happen on the
-  // job itself now that invoicing isn't a stage). lost → lead (they're
-  // back in play but uncommitted).
-  const next: StageId = contact.stage === 'closed' ? 'job' : 'lead'
-  const res = await transitionStage(contact, next)
-  if (!res.error) notify(next, 'Reopened to')
+  if (contact.stage !== 'closed' && contact.stage !== 'lost') {
+    return { data: null, error: { message: 'Only closed or lost jobs can be reopened.' } }
+  }
+  if (contact.stage === 'lost') {
+    // Migration 093 moves never-won lost contacts to their lead/quote
+    // tables and retains lost jobs. Check the same history before a write:
+    // an older unmigrated lead must never become a job merely by reopening.
+    const { data: history, error } = await supabase.from('fh_stage_transitions')
+      .select('to_stage').eq('contact_id', contact.id).in('to_stage', WON_STAGES).limit(1)
+    if (error) return { data: null, error: { message: 'Could not verify this job’s history. Try again.' } }
+    if (!history?.length) return { data: null, error: { message: 'This record has no previous job. Review its lead or quote before reopening.' } }
+  }
+  // Leads and quotes have their own tables. Never write a legacy lead
+  // stage that would remove this job from the current work inventory.
+  const res = await transitionStage(contact, 'job')
+  if (!res.error) notify('job', 'Reopened to')
   return res
 }
 

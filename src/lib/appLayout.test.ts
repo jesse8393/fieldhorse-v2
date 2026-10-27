@@ -5,6 +5,13 @@ describe('layoutForPath', () => {
   it.each([
     '/',
     '/activity',
+    '/settings',
+    '/team',
+    '/tasks',
+    '/timesheets',
+    '/crew',
+    '/clients/client-1',
+    '/jobs/job-1',
     '/import',
     '/partners',
     '/sub-portal',

@@ -24,7 +24,8 @@
    restate it with the same weight. */
 .fhj-hero__count:focus-visible,
 .fhj-quick__action:focus-visible,
-.fhj-tabs__tab:focus-visible,
+.fh-job-sections__picker select:focus-visible,
+.fh-job-sections__link:focus-visible,
 .fhj-more__toggle:focus-visible {
   outline: 2px solid var(--fh-focus) !important;
   outline-color: var(--fh-focus) !important;
@@ -320,93 +321,6 @@
 }
 
 /* ================================================================
-   Section tabs (decision D5)
-   ================================================================ */
-
-.fhj-tabs {
-  border-bottom: 1px solid var(--fh-hairline);
-}
-
-.fhj-tabs__strip {
-  display: flex;
-  gap: 24px;
-  padding: 0 20px;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-  /* A tab the arrow keys bring into view keeps the gutter on the left and
-     clears the 32 px fade on the right (JobSectionTabs' TAB_END_ROOM). */
-  scroll-padding-inline: 20px 40px;
-}
-
-.fhj-tabs__strip::-webkit-scrollbar {
-  display: none;
-}
-
-/* The strip's end padding, which a scrolling flex row drops. */
-.fhj-tabs__strip::after {
-  content: '';
-  flex: 0 0 1px;
-}
-
-/* While more tabs wait past the right edge, the last 32 px fade into the
-   page. JobSectionTabs sets the class and clears it at the end. */
-.fhj-tabs--fade {
-  position: relative;
-}
-
-.fhj-tabs--fade::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 32px;
-  background: linear-gradient(to right, transparent, var(--fh-plaster));
-  pointer-events: none;
-}
-
-.fhj-tabs__tab {
-  position: relative;
-  flex: none;
-  min-height: 48px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--fh-ink-3);
-  font-family: var(--fh-font-body);
-  font-size: 15px;
-  line-height: 20px;
-  font-weight: 500;
-  white-space: nowrap;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.fhj-tabs__tab:hover {
-  color: var(--fh-ink-2);
-}
-
-.fhj-tabs__tab.is-active {
-  color: var(--fh-ink);
-  font-weight: 600;
-}
-
-.fhj-tabs__tab.is-active::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 2px;
-  border-radius: 999px;
-  background: var(--fh-gold);
-}
-
-/* ================================================================
    The Spine and the "More about this job" disclosure
    ================================================================ */
 
@@ -630,4 +544,19 @@
   .fhj-capsule {
     display: none;
   }
+}
+
+/* Direct section navigation replaces two nested scrolling tab strips. */
+.fh-job-sections { margin: 20px 0 0; border-block: 1px solid var(--v3-border); padding: 16px var(--v3-gutter); }
+.fh-job-sections__picker { display: grid; gap: 8px; font-size: 14px; font-weight: 600; color: var(--v3-text-muted); }
+.fh-job-sections__picker select { width: 100%; min-height: 48px; padding: var(--space-3); border: 1px solid var(--v3-border-strong); border-radius: 10px; color: var(--v3-text); background: var(--v3-surface); font: inherit; font-size: 16px; }
+.fh-job-sections__shortcuts { display: none; }
+@media (min-width: 900px) {
+  .fh-job-sections { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 20px; padding-inline: 0; }
+  .fh-job-sections__picker { flex: 1 1 200px; max-width: 320px; }
+  .fh-job-sections__shortcuts { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+  .fh-job-sections__link { border: 0; background: transparent; text-align: center; min-height: 44px; border-radius: var(--fh-r-chip); padding: var(--space-2) var(--space-3); font: inherit; font-size: 14px; color: var(--v3-text); cursor: pointer; }
+  .fh-job-sections__link:hover { background: var(--v3-surface-2); }
+  .fh-job-sections__link.is-active { background: var(--v3-primary-soft); color: var(--v3-primary-text); font-weight: 700; }
+  .fh-job-sections__link:focus-visible, .fh-job-sections__picker select:focus-visible { outline: 2px solid var(--v3-primary-text); outline-offset: 2px; }
 }

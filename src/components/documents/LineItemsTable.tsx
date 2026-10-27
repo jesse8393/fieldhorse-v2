@@ -37,7 +37,7 @@ export default function LineItemsTable({
 }) {
   if (layout === 'grouped') {
     return (
-      <table style={tableStyle()}>
+      <table className="fh-doc-items" style={tableStyle()}>
         <thead>
           <HeadRow showQty={showQty} amountHeading={amountHeading} />
         </thead>
@@ -110,7 +110,7 @@ export default function LineItemsTable({
                     </div>
                   )) : <span style={{ color: DOC_COLORS.inkFaint }}>{' '}</span>}
                 </Td>
-                <Td align="right" mono bold>{money(amount, { cents: true })}</Td>
+                <Td label="Amount" align="right" mono bold>{money(amount, { cents: true })}</Td>
               </tr>
             )
           })}
@@ -121,7 +121,7 @@ export default function LineItemsTable({
 
   // 'detailed', flat itemized rows.
   return (
-    <table style={tableStyle()}>
+    <table className="fh-doc-items" style={tableStyle()}>
       <thead>
         <HeadRow showQty={showQty} amountHeading={amountHeading} />
       </thead>
@@ -180,8 +180,8 @@ function ItemRow({ item, showQty }: any) {
   const amount = itemAmount(item)
   const detailLines = item.detailLines || []
   return (
-    <tr>
-      <Td>
+    <tr className="fh-doc-item-row">
+      <Td className="fh-doc-item-description">
         <span style={{ color: DOC_COLORS.ink }}>{item.description || '\u2003'}</span>
         {detailLines.map((line: string, i: number) => (
           <div key={i} style={{ marginTop: 3, fontSize: 12, color: DOC_COLORS.inkMuted }}>
@@ -190,14 +190,14 @@ function ItemRow({ item, showQty }: any) {
         ))}
       </Td>
       {showQty && (
-        <Td align="right" mono muted>
+        <Td label="Quantity" align="right" mono muted>
           {qty}{unit ? ` ${unit}` : ''}
         </Td>
       )}
       {showQty && (
-        <Td align="right" mono muted>{money(rate, { cents: true })}</Td>
+        <Td label="Unit price" align="right" mono muted>{money(rate, { cents: true })}</Td>
       )}
-      <Td align="right" mono bold>{money(amount, { cents: true })}</Td>
+      <Td label="Amount" align="right" mono bold>{money(amount, { cents: true })}</Td>
     </tr>
   )
 }
@@ -224,9 +224,9 @@ function Th({ children, align = 'left', style }: { children?: import('react').Re
   )
 }
 
-function Td({ children, align = 'left', mono = false, bold = false, muted = false }: { children?: import('react').ReactNode; align?: any; mono?: boolean; bold?: boolean; muted?: boolean }) {
+function Td({ children, align = 'left', mono = false, bold = false, muted = false, className, label }: { children?: import('react').ReactNode; align?: any; mono?: boolean; bold?: boolean; muted?: boolean; className?: string; label?: string }) {
   return (
-    <td
+    <td className={className} data-label={label}
       style={{
         verticalAlign: 'top',
         padding: align === 'left' ? '12px 12px 12px 0' : '12px 0 12px 12px',

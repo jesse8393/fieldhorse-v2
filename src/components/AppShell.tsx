@@ -61,6 +61,7 @@ function RouteFallback() {
  * canvas they get.
  */
 function permissionRouteForPath(pathname: string) {
+  if (pathname.startsWith('/schedule/')) return '/schedule'
   if (pathname.startsWith('/leads/')) return '/leads'
   if (pathname.startsWith('/quotes/')) return '/quotes'
   if (pathname.startsWith('/jobs/')) return '/jobs'

@@ -38,3 +38,6 @@ verify*.mjs
 # Playwright output
 test-results/
 playwright-report/
+
+# Supabase CLI generated state
+supabase/.temp/

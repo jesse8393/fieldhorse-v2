@@ -8,7 +8,7 @@
 // withoutOwnPartnerRows); otherwise we just dedupe by email and prefer
 // the most recent name/role for each partner.
 
-import { supabase } from './supabase.ts'
+import { getActiveOrgId, supabase } from './supabase.ts'
 
 async function signedInUserId(): Promise<string | null> {
   const { data } = await supabase.auth.getSession()
@@ -62,6 +62,7 @@ type PartnerDirectoryRow = {
   invited_at: string | null
   accepted_at: string | null
   job_id: string | null
+  deleted_by_partner_at: string | null
   fh_contacts: { id: string; name: string | null; job_title: string | null; stage: string | null } | null
 }
 
@@ -80,23 +81,24 @@ type PartnerDirectoryRow = {
 //
 // Pulls every row tied to invited_by_user_id (RLS enforces tenant
 // isolation). Joins fh_contacts inline for job name + stage.
-export async function loadPartnerDirectory({ includeRevoked = true, limitRows = 500 }: { includeRevoked?: boolean; limitRows?: number } = {}): Promise<PartnerEntry[]> {
+export async function loadPartnerDirectory({ includeRevoked = true, orgId = getActiveOrgId() }: { includeRevoked?: boolean; orgId?: string | null } = {}): Promise<PartnerEntry[]> {
   const sel = [
     'id', 'partner_email', 'partner_name', 'partner_role',
-    'status', 'invited_at', 'accepted_at', 'job_id',
+    'status', 'invited_at', 'accepted_at', 'job_id', 'deleted_by_partner_at',
     'fh_contacts!fh_job_partners_job_id_fkey ( id, name, job_title, stage )'
   ].join(', ')
-
   const uid = await signedInUserId()
-  const { data, error } = await withoutOwnPartnerRows(supabase
-    .from('fh_job_partners')
-    .select(sel), uid)
-    .order('invited_at', { ascending: false })
-    .limit(limitRows)
-
-  if (error || !Array.isArray(data)) return []
-
-  const rows = data as unknown as PartnerDirectoryRow[]
+  if (!uid) return []
+  const rows: PartnerDirectoryRow[] = []
+  for (let offset = 0; ; offset += 500) {
+    let query = withoutOwnPartnerRows(supabase.from('fh_job_partners').select(sel), uid)
+    query = orgId ? query.eq('org_id', orgId) : query.eq('invited_by_user_id', uid)
+    const { data, error } = await query.order('invited_at', { ascending: false }).order('id').range(offset, offset + 499)
+    if (error) throw error
+    if (!Array.isArray(data)) throw new Error('Partner directory unavailable')
+    rows.push(...data as unknown as PartnerDirectoryRow[])
+    if (data.length < 500) break
+  }
   const byEmail = new Map<string, PartnerEntry>()
   for (const row of rows) {
     if (!row?.partner_email) continue
@@ -108,7 +110,7 @@ export async function loadPartnerDirectory({ includeRevoked = true, limitRows = 
       name: row.fh_contacts?.name || null,
       jobTitle: row.fh_contacts?.job_title || null,
       stage: row.fh_contacts?.stage || null,
-      status: row.status || 'pending',
+      status: row.deleted_by_partner_at && row.status === 'accepted' ? 'left' : row.status || 'pending',
       role: row.partner_role || null
     }
     if (!byEmail.has(email)) {
@@ -116,7 +118,7 @@ export async function loadPartnerDirectory({ includeRevoked = true, limitRows = 
         email,
         name: row.partner_name || '',
         role: row.partner_role || '',
-        status: row.status || 'pending',
+        status: jobEntry.status,
         lastInvitedAt: row.invited_at || null,
         jobs: [jobEntry]
       })
@@ -126,7 +128,7 @@ export async function loadPartnerDirectory({ includeRevoked = true, limitRows = 
       if (!e.name && row.partner_name) e.name = row.partner_name
       if (!e.role && row.partner_role) e.role = row.partner_role
       // Roll status up: prefer accepted, then pending, then revoked, then declined.
-      e.status = rollupStatus(e.status, row.status)
+      e.status = rollupStatus(e.status, jobEntry.status)
       if (row.invited_at && (!e.lastInvitedAt || new Date(row.invited_at) > new Date(e.lastInvitedAt))) {
         e.lastInvitedAt = row.invited_at
       }
@@ -137,7 +139,7 @@ export async function loadPartnerDirectory({ includeRevoked = true, limitRows = 
 }
 
 function rollupStatus(a: string, b: string | null | undefined) {
-  const rank: Record<string, number> = { accepted: 4, pending: 3, revoked: 2, declined: 1 }
+  const rank: Record<string, number> = { accepted: 4, pending: 3, revoked: 2, declined: 1, left: 1 }
   return (rank[b || ''] || 0) > (rank[a] || 0) ? (b as string) : a
 }
 
@@ -159,9 +161,12 @@ export async function revokePartnerRow(partnerId: string | undefined) {
 // Each entry: { email, name, role, lastInvitedAt, status, jobCount }.
 export async function loadPastPartners({ excludeJobId = null, limit = 8 }: { excludeJobId?: string | null; limit?: number } = {}): Promise<PastPartner[]> {
   const uid = await signedInUserId()
-  const { data, error } = await withoutOwnPartnerRows(supabase
-    .from('fh_job_partners')
+  if (!uid) return []
+  const orgId = getActiveOrgId()
+  let query = withoutOwnPartnerRows(supabase.from('fh_job_partners')
     .select('partner_email, partner_name, partner_role, status, invited_at, accepted_at, job_id'), uid)
+  query = orgId ? query.eq('org_id', orgId) : query.eq('invited_by_user_id', uid)
+  const { data, error } = await query
     .order('accepted_at', { ascending: false, nullsFirst: false })
     .order('invited_at', { ascending: false })
     .limit(200)

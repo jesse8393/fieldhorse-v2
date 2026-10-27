@@ -1,3 +1,4 @@
+import { supabaseServiceConfig } from './lib/serviceConfig.js'
 // Netlify Function — Org invite preview.
 // POST /api/org-invite-info  { token }
 //
@@ -16,8 +17,7 @@ export default async (request) => {
     return json({ error: 'method_not_allowed' }, 405)
   }
 
-  const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-  const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const { url: SUPABASE_URL, secretKey: SERVICE_KEY, publicKey: ANON_KEY } = supabaseServiceConfig()
   if (!SUPABASE_URL || !SERVICE_KEY) {
     return json({ error: 'server_misconfigured' }, 500)
   }

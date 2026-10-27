@@ -15,7 +15,8 @@
 // thread, on the agent's draft.
 
 import { useEffect, useRef } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
+import CommunicationHistory from '../../components/CommunicationHistory.tsx'
 import { Inbox as InboxIcon, MessageSquare } from 'lucide-react'
 import { Button, Chip, EmptyState, Row, SkeletonRows } from '../../components/fh'
 import DataErrorState from '../../components/DataErrorState.tsx'
@@ -58,7 +59,16 @@ function InboxList({ rows, loading, error, onRetry, selectedId }: ListProps) {
           onRetry={onRetry}
         />
       ) : rows.length === 0 ? (
-        <EmptyState icon={InboxIcon} title="No conversations yet." />
+        <EmptyState
+          icon={InboxIcon}
+          title="No conversations yet."
+          action={
+            <>
+              <p className="fhi-off__note">Messages from your connected messaging channels appear here. Messages sent from your phone or email app stay in those apps.</p>
+              <Button variant="secondary" size="md" to="/compose">Write a message</Button>
+            </>
+          }
+        />
       ) : (
         <ul className="fhi-rows">
           {rows.map((row) => {
@@ -116,7 +126,7 @@ function EngineOff() {
           canEditSettings ? (
             <Button variant="secondary" size="md" to="/settings">Open Settings</Button>
           ) : (
-            <p className="fhi-off__note">Ask an owner or an admin to turn it on.</p>
+            <p className="fhi-off__note">Ask an owner or an admin to turn it on. Recorded communications remain available under Communication history.</p>
           )
         }
       />
@@ -126,6 +136,8 @@ function EngineOff() {
 
 export default function Inbox() {
   const { conversationId } = useParams()
+  const [params] = useSearchParams()
+  const historyView = params.get('view') === 'history' && !conversationId
   const isDesktop = useIsDesktop()
   const engine = useEngineEnabled()
   const inbox = useInbox({ enabled: engine === true })
@@ -142,11 +154,18 @@ export default function Inbox() {
   const loading = engine === undefined || (engine === true && inbox.isLoading)
 
   const title = <h1 className="fhi-title" ref={titleRef} tabIndex={-1}>Inbox</h1>
+  const navigation = <nav className="fhi-history-nav" aria-label="Messaging views">
+    <Link to="/inbox" aria-current={!historyView ? 'page' : undefined}>Conversations</Link>
+    <Link to="/inbox?view=history" aria-current={historyView ? 'page' : undefined}>Communication history</Link>
+    <Link to="/compose">New message</Link>
+  </nav>
+
+  if (historyView) return <div className="fhi"><header className="fhi-head">{title}</header>{navigation}<div style={{ padding: '16px 24px 32px' }}><CommunicationHistory /></div></div>
 
   if (engine === false) {
     return (
       <div className="fhi">
-        <header className="fhi-head">{title}</header>
+        <header className="fhi-head">{title}</header>{navigation}
         <EngineOff />
       </div>
     )
@@ -175,7 +194,7 @@ export default function Inbox() {
     return (
       <div className="fhi fhi--split">
         <aside className="fhi-split__list" aria-label="Conversations">
-          <header className="fhi-head">{title}</header>
+          <header className="fhi-head">{title}</header>{navigation}
           {list}
         </aside>
         <section className="fhi-split__detail" aria-label="Conversation">
@@ -183,7 +202,10 @@ export default function Inbox() {
             <Thread key={conversationId} conversationId={conversationId} row={openRow} embedded />
           ) : (
             <div className="fhi-split__empty">
-              <EmptyState icon={MessageSquare} title="Choose a conversation to read it." />
+              <EmptyState
+                icon={MessageSquare}
+                title={rows.length > 0 ? 'Choose a conversation to read it.' : 'Customer conversations will appear here.'}
+              />
             </div>
           )}
         </section>
@@ -193,7 +215,7 @@ export default function Inbox() {
 
   return (
     <div className="fhi">
-      <header className="fhi-head">{title}</header>
+      <header className="fhi-head">{title}</header>{navigation}
       {list}
     </div>
   )

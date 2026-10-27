@@ -1,0 +1,21 @@
+.fh-estimate-library { grid-column: 1 / -1; margin: 0 var(--v3-gutter) 24px; min-width: 0; }
+.fh-estimate-library__heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.fh-estimate-library h2 { margin: 0; font-size: 24px; }
+.fh-estimate-library p { color: var(--v3-text-muted); font-size: 14px; line-height: 1.5; }
+.fh-estimate-library__filters { display: grid; grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr)); gap: 12px; margin: 20px 0; }
+.fh-estimate-library__filters label { display: grid; gap: 8px; font-size: 14px; }
+.fh-estimate-library__filters input, .fh-estimate-library__filters select { width: 100%; min-width: 0; min-height: 44px; padding: var(--space-3); border: 1px solid var(--v3-border-strong); border-radius: var(--fh-r-control); background: var(--v3-surface); color: var(--v3-text); font: inherit; font-size: 16px; }
+.fh-estimate-library__rows { list-style: none; padding: 0; border-top: 1px solid var(--v3-border); }
+.fh-estimate-library__rows li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px 24px; padding: var(--space-4) 0; border-bottom: 1px solid var(--v3-border); }
+.fh-estimate-library__record, .fh-estimate-library__value { display: grid; gap: var(--space-2); min-width: 0; }
+.fh-estimate-library__record > a { font-size: 17px; font-weight: 650; color: var(--v3-text); overflow-wrap: anywhere; }
+.fh-estimate-library__record span, .fh-estimate-library__record small, .fh-estimate-library__value span { font-size: 14px; color: var(--v3-text-muted); }
+.fh-estimate-library__value { text-align: right; }
+.fh-estimate-library__value strong { font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 18px; }
+.fh-estimate-library__actions { display: flex; gap: 8px 20px; flex-wrap: wrap; grid-column: 1 / -1; }
+.fh-estimate-library__actions a { display: inline-flex; align-items: center; min-height: 44px; color: var(--v3-primary-text); font-size: 14px; }
+.fh-estimate-library__empty { padding: 24px; background: var(--v3-surface); border: 1px solid var(--v3-border); border-radius: 10px; }
+.fh-estimate-library__empty button { min-height: 44px; }
+.fh-estimate-library a:focus-visible, .fh-estimate-library button:focus-visible { outline: 2px solid var(--v3-primary-text); outline-offset: 3px; }
+@media (max-width: 600px) { .fh-estimate-library__filters { grid-template-columns: 1fr; } .fh-estimate-library__rows li { gap: var(--space-3); } .fh-estimate-library__value strong { font-size: 16px; } }
+@media (min-width: 900px) { .fh-estimate-library { margin: 0 0 24px; } .fh-bid-workspace--library { grid-template-areas: "topbar topbar" "header header" "library library" !important; } .fh-bid-workspace--library > .fh-estimate-library, .fh-bid-workspace--library > .fh-bid-workspace__templates { grid-area: library; } }

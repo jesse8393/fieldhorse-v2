@@ -40,9 +40,8 @@ test('keeps the work lifecycle action ready', async ({ page }, testInfo) => {
   const expectNoPageErrors = failOnPageErrors(page)
 
   await openRoute(page, '/jobs')
-  // Phones get the Jobs list (spec 9.3); desktop keeps the deal board.
-  const workHeading = testInfo.project.name.startsWith('mobile') ? /^jobs$/i : /work & deals/i
-  await expect(page.getByRole('heading', { level: 1, name: workHeading })).toBeVisible()
+  // Both layouts use the shared Jobs inventory and destination name.
+  await expect(page.getByRole('heading', { level: 1, name: 'Jobs' })).toBeVisible()
   await expect(page.getByText('Plumbing Bellevue', { exact: true })).toBeVisible()
   await capture(page, testInfo, 'work')
 
@@ -116,7 +115,7 @@ test('keeps money, schedule, settings, and missing routes usable', async ({ page
   // is a row under Due soon, named for the customer, with the job and the
   // invoice.
   await expect(page.getByRole('heading', { level: 1, name: 'Money' })).toBeVisible()
-  await expect(page.getByText('Driveway replacement, progress draw 1', { exact: true })).toBeVisible()
+  await expect(page.getByText('Driveway replacement, progress draw 1 · Invoice 2 · inv1', { exact: true })).toBeVisible()
   await capture(page, testInfo, 'invoices')
 
   await openRoute(page, '/schedule')
@@ -131,6 +130,7 @@ test('keeps money, schedule, settings, and missing routes usable', async ({ page
     await companyName.fill(`${await companyName.inputValue()} LLC`)
   }
   await expect(settingsSave).toBeVisible()
+  await page.getByRole('navigation', { name: 'Settings sections' }).getByRole('link', { name: 'Preferences', exact: true }).click()
   const quoteReminderSetting = page.getByText('Set reminder when quote is sent', { exact: true })
   await expect(quoteReminderSetting).toBeVisible()
   await expect(page.getByLabel('Quote reminder delay')).toHaveValue('3')
@@ -247,6 +247,9 @@ test('uses the full desktop workspace without changing the mobile screens', asyn
     await nothingRunsOffTheSide(page, route.path)
 
     if (route.name === 'invoice-detail') {
+      // The invoice shell also renders during loading; measure its actions
+      // only after the record has resolved and the complete workspace mounts.
+      await expect(page.locator('.fhinv-actions')).toBeVisible()
       const alignment = await page.evaluate(() => {
         const screen = document.querySelector('.fhinv')?.getBoundingClientRect()
         const actionbar = document.querySelector('.fhinv-actions')?.getBoundingClientRect()

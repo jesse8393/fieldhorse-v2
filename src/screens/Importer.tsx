@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 // @ts-ignore -- papaparse ships no types
 import Papa from 'papaparse'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -348,7 +349,7 @@ export default function Importer() {
     setCsvHeaders([])
     setHeaderMap({})
     setIncludeRepeats(false)
-    toastSuccess(`Imported ${finalCount} ${countNoun(finalCount, 'contact')}`, 'Now in your Leads')
+    toastSuccess(`Imported ${finalCount} ${countNoun(finalCount, 'contact')}`, 'Open Jobs, then Leads to review imported records.')
   }
 
   async function copyWebhook() {
@@ -383,7 +384,7 @@ export default function Importer() {
         />
       )}
 
-      <main className={isDesktop ? 'fh-importer-build__main' : undefined}>
+      <div className={isDesktop ? 'fh-importer-build__main' : undefined}>
       {/* HEADER */}
       {!isDesktop && <motion.div variants={item} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '24px 24px 12px' }}>
         <div style={{ minWidth: 0, flex: 1 }}>
@@ -416,7 +417,7 @@ export default function Importer() {
                 ? `${mapped.length} ${countNoun(mapped.length, 'record')} ready for review.`
                 : `Choose a ${PRESETS[preset].label} export or a generic CSV.`}
             </p>
-            <span className="fh-importer-build__focus-meta">Destination · Leads</span>
+            <Link className="fh-importer-build__focus-meta" to="/jobs?stage=leads">Destination · Jobs / Leads</Link>
           </div>
           <div className="fh-build-mini-grid">
             <MiniMetric label="Rows loaded" value={String(rows.length)} accent={rows.length > 0} />
@@ -434,6 +435,10 @@ export default function Importer() {
             CSV upload
           </Eyebrow>
         </header>
+        <p style={{ fontSize: 14, lineHeight: 1.5, color: 'var(--ink-muted)' }}>
+          Upload a CSV, review column mapping and preview records before importing. Imported records appear in Jobs under Leads.
+          {' '}<Link to="/jobs?stage=leads" style={{ color: 'var(--v3-primary-text)', textDecoration: 'underline' }}>Open lead workspace</Link>
+        </p>
 
         {/* Preset selector */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
@@ -666,6 +671,9 @@ export default function Importer() {
               }}
             >
               {done.err || `Imported ${done.count} ${countNoun(done.count, 'contact')}`}
+              <div style={{ marginTop: 12 }}>
+                <Link to="/jobs?stage=leads" className="fh-build-secondary-btn" style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center' }}>View imported leads</Link>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -676,7 +684,7 @@ export default function Importer() {
           example payload is labelled "Example lead details" so it
           reads as guidance, not a JSON spec. */}
       <motion.section variants={item} className="v3-section fh-importer-build__intake" style={{ margin: '0 var(--v3-gutter) 14px' }}>
-        <details open={isDesktop ? true : undefined} style={{ borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', overflow: 'hidden' }}>
+        <details style={{ borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', overflow: 'hidden' }}>
           <summary
             style={{
               display: 'flex',
@@ -691,7 +699,7 @@ export default function Importer() {
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
               <Zap size={14} color="var(--field-gold-bright)" />
               <Eyebrow style={{ color: 'var(--ink-strong)' }}>
-                Lead intake link
+                Automation and developer setup
               </Eyebrow>
             </span>
             <ChevronDown size={16} color="var(--ink-muted)" className="fh-importer-chev" />
@@ -699,7 +707,8 @@ export default function Importer() {
 
           <div style={{ padding: '4px 12px 16px', borderTop: '1px solid var(--rule)' }}>
             <p style={{ margin: '12px 0 10px', fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.5 }}>
-              Use this link to send new leads into FieldHorse from your automations, GoHighLevel, Zapier, Make, your website form, anything that can call a URL. Each lead lands straight in your Leads, with its client.
+              Send new leads from GoHighLevel, Zapier, Make or a website form. Each lead appears in Jobs under Leads, linked to its customer.
+              {' '}<Link to="/jobs?stage=leads">Open lead workspace</Link>
             </p>
             {webhookKey ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)' }}>
@@ -771,7 +780,7 @@ export default function Importer() {
           </div>
         </details>
       </motion.section>
-      </main>
+      </div>
     </motion.div>
   )
 }

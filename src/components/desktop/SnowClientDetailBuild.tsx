@@ -51,7 +51,7 @@ function relTime(iso: any) {
 
 export default function SnowClientDetailBuild(props: Props) {
   const {
-    client, lifetime, outstanding, activeCount, jobs = [], payments = [],
+    client, lifetime, outstanding, activeCount, jobs = [],
     tabs, activeTab, onTabChange,
     onBack, onEdit, onDelete, deleteArmed = false, onNewDeal, onStatement, isEditing, children,
   } = props
@@ -79,12 +79,12 @@ export default function SnowClientDetailBuild(props: Props) {
 
   // Next action heuristic, honest derivations from data
   const nextAction = outstanding > 0
-    ? { label: 'Chase outstanding invoice', tone: 'warn' as const }
+    ? { label: 'Review remaining contract balance', tone: 'warn' as const }
     : activeCount === 0
       ? { label: 'Contact again client', tone: 'neutral' as const }
       : status.tone === 'warn'
         ? { label: 'Follow up on stale jobs', tone: 'warn' as const }
-        : { label: 'On track', tone: 'good' as const }
+        : { label: 'Review active work', tone: 'neutral' as const }
 
   return (
     <div className="fh-build-page fh-build-detail" data-build-screen="SnowClientDetailBuild">
@@ -134,7 +134,7 @@ export default function SnowClientDetailBuild(props: Props) {
         )}
       </header>
 
-      <main className="fh-build-main">
+      <div className="fh-build-main">
         <section className="fh-build-hero-row fh-build-hero-row--detail">
           <div>
             <div className="fh-build-good">Relationship file</div>
@@ -154,7 +154,7 @@ export default function SnowClientDetailBuild(props: Props) {
             <MiniMetric label="Lifetime value" value={money(lifetime)} accent />
             <MiniMetric label="Open value" value={openValue > 0 ? money(openValue) : '\u2003'} />
             <MiniMetric label="Active jobs" value={String(activeCount)} />
-            <MiniMetric label="Outstanding AR" value={outstanding > 0 ? money(outstanding) : '\u2003'} tone={outstanding > 0 ? 'warn' : undefined} />
+            <MiniMetric label="Remaining contract value" value={outstanding > 0 ? money(outstanding) : '\u2003'} tone={outstanding > 0 ? 'warn' : undefined} />
           </div>
         </section>
 
@@ -192,23 +192,23 @@ export default function SnowClientDetailBuild(props: Props) {
           <aside className="fh-build-rail fh-build-rail--page">
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Next action</div>
-              <strong style={{ color: nextAction.tone === 'warn' ? 'var(--v3-primary-text)' : nextAction.tone === 'good' ? 'var(--v3-success-text)' : undefined }}>
+              <strong style={{ color: nextAction.tone === 'warn' ? 'var(--v3-primary-text)' : undefined }}>
                 {nextAction.label}
               </strong>
-              <span>derived from open work + AR</span>
+              <span>Based on contract balances and activity</span>
             </section>
 
             {outstanding > 0 && (
               <section className="fh-build-rail-card">
-                <div className="fh-build-eyebrow">Outstanding AR</div>
+                <div className="fh-build-eyebrow">Remaining contract value</div>
                 <strong style={{ color: 'var(--v3-primary-text)' }}>{moneyFull(outstanding)}</strong>
-                <span>owed across {(payments || []).length || activeCount} job{(payments || []).length === 1 ? '' : 's'}</span>
+                <span>Contract value less recorded payments, including unbilled work</span>
                 <div className="fh-build-spark is-gold" />
               </section>
             )}
 
             <section className="fh-build-rail-card">
-              <div className="fh-build-eyebrow">Open risks</div>
+              <div className="fh-build-eyebrow">Relationship activity</div>
               {activeCount === 0 ? (
                 <span>No active jobs</span>
               ) : status.tone === 'warn' ? (
@@ -220,12 +220,13 @@ export default function SnowClientDetailBuild(props: Props) {
                 </>
               ) : (
                 <>
-                  <strong style={{ color: 'var(--v3-success-text)' }}>None</strong>
-                  <span>Relationship healthy</span>
+                  <strong style={{ color: 'var(--v3-success-text)' }}>Recent activity</strong>
+                  <span>Activity recorded within 30 days</span>
                 </>
               )}
             </section>
 
+            <p className="fh-build-rel">Delivery and billing review appears in Overview.</p>
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Recent activity</div>
               {recent.length === 0 ? (
@@ -271,7 +272,7 @@ export default function SnowClientDetailBuild(props: Props) {
             </section>
           </aside>
         </section>
-      </main>
+      </div>
     </div>
   )
 }

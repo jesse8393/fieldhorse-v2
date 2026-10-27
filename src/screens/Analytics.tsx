@@ -6,11 +6,13 @@ import { TrendingUp, BarChart3, DollarSign, Target, Car, Plus } from 'lucide-rea
 import { SkeletonStat } from '../components/Skeleton.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
 import { parseDateOnly } from '../lib/dates.ts'
+import { mileageRateNote, mileageYearSummary } from '../lib/mileageRates.ts'
+import { financialYearSummary, paymentsReceivedInPeriod } from '../lib/reportingMetrics.ts'
 import CountUp from '../components/fx/CountUp.tsx'
 import { useAnalyticsBundle, useInvalidateAnalytics } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { STAGES, ACTIVE_STAGES } from '../lib/stages.ts'
-import { wonYTD as wonYTDFn, profitYTD as profitYTDFn, closeRate as closeRateFn, avgMargin as avgMarginFn, computeFunnel } from '../lib/rollups.ts'
+import { wonYTD as wonYTDFn, profitCoverageYTD, computeFunnel } from '../lib/rollups.ts'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
@@ -41,17 +43,17 @@ export default function Analytics() {
   const { data: bundle, isPending: loading, isError, refetch } = useAnalyticsBundle(user?.id)
   const load = useInvalidateAnalytics()
   const navigate = useNavigate()
-  const contacts = bundle?.contacts ?? []
+  const contacts = useMemo(() => bundle?.contacts ?? [], [bundle])
   // Leads and quotes are their own records (D55); the funnel and the
   // pipeline counts read them, the money numbers still read the jobs.
   const leadRows = useMemo(() => bundle?.leads ?? [], [bundle])
   const quoteRows = useMemo(() => bundle?.quotes ?? [], [bundle])
-  const mileage = bundle?.mileage ?? []
-  const payments = bundle?.payments ?? []
-  const invoices = bundle?.invoices ?? []
+  const mileage = useMemo(() => bundle?.mileage ?? [], [bundle])
+  const payments = useMemo(() => bundle?.payments ?? [], [bundle])
+  const invoices = useMemo(() => bundle?.invoices ?? [], [bundle])
   const changeOrders = bundle?.changeOrders ?? []
-  const clients = bundle?.clients ?? []
-  const stageTransitions = bundle?.stageTransitions ?? []
+  const clients = useMemo(() => bundle?.clients ?? [], [bundle])
+  const stageTransitions = useMemo(() => bundle?.stageTransitions ?? [], [bundle])
 
   // 12-week pipeline trend, bucket contacts by created_at week,
   // sum amount of rows still in active stages. Each bucket is Sunday-anchored.
@@ -96,29 +98,16 @@ export default function Analytics() {
     // stage-transition log so editing an old job (which bumps
     // updated_at) can't re-book last year's revenue into this year.
     const wonYTD = wonYTDFn(contacts, stageTransitions as any)
-    const profitYTD = profitYTDFn(contacts, stageTransitions as any)
-    // Close rate honesty guard (5/17, replaces Phase 11's sample-size-3
-    // guard which still showed 100% when an operator had 3+ wins and 0
-    // losses). Requires BOTH at least one won AND at least one lost so
-    // the denominator (won + lost) is meaningful, and a total sample
-    // of at least 3 so a single 1-of-1 win doesn't read as 100%.
-    // Below either threshold the KPI tile renders "\u2003" via its null branch.
-    // Pipeline v2: every job is a won deal ('invoice' is the legacy alias).
-    const wonCount = contacts.filter((c) => c.stage === 'job' || c.stage === 'invoice' || c.stage === 'closed').length
-    const lostTerminalCount = contacts.filter((c) => c.stage === 'lost').length
-    const terminalSample = wonCount + lostTerminalCount
-    const closeRate = (wonCount >= 1 && lostTerminalCount >= 1 && terminalSample >= 3)
-      ? closeRateFn(contacts) * 100
-      : null
-    // Subtitle tells the operator what's holding the value back when null,
-    // OR contextualizes the sample size when present.
-    const closeRateNote = (closeRate == null)
-      ? (lostTerminalCount === 0
-          ? 'No lost deals logged yet'
-          : wonCount === 0
-            ? 'No wins yet'
-            : `Need ${3 - terminalSample} more closed deal${3 - terminalSample === 1 ? '' : 's'}`)
-      : `${wonCount} won · ${lostTerminalCount} lost`
+    const profitCoverage = profitCoverageYTD(contacts, stageTransitions as any)
+    const profitYTD = profitCoverage.profit
+    const profitNote = profitCoverage.costed
+      ? `${profitCoverage.costed} of ${profitCoverage.total} won jobs have cost data. ${profitCoverage.missing} excluded.`
+      : 'Add job costs to calculate tracked profit'
+    // Match the adjacent funnel: current lead/quote outcomes over 90 days,
+    // not legacy lost contact rows that no longer hold sales records.
+    const decided = funnel.won + funnel.lost
+    const closeRate = decided >= 3 ? funnel.winRate * 100 : null
+    const closeRateNote = `${funnel.won} won · ${funnel.lost} lost · last 90 days${decided < 3 ? '. At least 3 outcomes needed.' : ''}`
     // Avg margin honesty guard (5/17, replaces the wonHasCost gate
     // which allowed wildly high averages when most wins had no cost
     // recorded). The shared avgMarginFn counts (amount - 0)/amount as
@@ -132,18 +121,14 @@ export default function Analytics() {
       Number(c.amount) > 0 &&
       Number(c.cost) > 0
     )
-    // Per-job margin clamped to [-1, 1]. Without the clamp, a job with
-    // a unit mismatch (cost stored in cents vs amount stored in dollars,
-    // or a stale rate vs revised amount) produced a 5398% average, the
-    // audit flagged it as a calculation error. The clamp keeps each
-    // job's contribution in physically-possible territory before the
-    // mean is taken.
+    // Preserve actual recorded losses. Cost coverage remains explicit,
+    // and amounts are never silently capped to make a ratio look normal.
     const avgMargin = winsWithCost.length >= 1
       ? (winsWithCost.reduce((s, c) => {
           const a = Number(c.amount || 0)
           const k = Number(c.cost || 0)
           const m = (a - k) / a
-          return s + Math.max(-1, Math.min(1, m))
+          return s + m
         }, 0) / winsWithCost.length) * 100
       : null
     // The "won job" qualifier is misleading without context, the
@@ -152,78 +137,33 @@ export default function Analytics() {
     // average is only across jobs WITH cost data logged.
     const avgMarginNote = (avgMargin == null)
       ? 'Log a job cost to enable'
-      : `Across ${winsWithCost.length} won job${winsWithCost.length === 1 ? '' : 's'} with cost data`
+      : `Across ${winsWithCost.length} won job${winsWithCost.length === 1 ? '' : 's'} with cost data, all time`
     const leads = leadRows.filter((l) => l.status === 'open').length
     // Quotes out: with the customer, not yet answered or made a job.
     const quotes = quoteRows.filter((q) => ['sent', 'viewed', 'changes_requested'].includes(q.status) && !q.job_id).length
     const jobs = contacts.filter((c) => c.stage === 'job').length
     const closedCount = contacts.filter((c) => c.stage === 'closed').length
     const lostCount = contacts.filter((c) => c.stage === 'lost').length
-    const yearStart = new Date(new Date().getFullYear(), 0, 1).getTime()
     // Year to date means this calendar year only: the mileage fetch
     // returns every drive ever logged, so summing it all inflated the
     // tax deduction with prior years. drove_on is date-only, parse LOCAL
     // so a Jan 1 drive isn't pushed back into last year.
-    const milesYTD = mileage.reduce((s, m) => {
-      const t = parseDateOnly(m.drove_on)?.getTime() ?? NaN
-      return t >= yearStart ? s + Number(m.miles || 0) : s
-    }, 0)
-    const mileageDeduction = milesYTD * 0.67
-    // Real YTD invoiced/collected totals, computed from the same
-    // payments/invoices arrays the rest of this screen reads.
-    // Returned as null when the underlying array is empty so the
-    // desktop Build component can render "\u2003" instead of $0, that
-    // distinguishes "no financial data hooked up" from "you've
-    // invoiced $0 this year".
-    // Prefer fh_invoices rows when present (operators who use the full
-    // invoice flow). Fall back to summing contract amounts on jobs that
-    // have reached the invoice or closed stage this year, matches the
-    // Invoices screen's own definition (it also computes from contacts,
-    // not fh_invoices), so "Invoiced YTD" stays connected even for
-    // operators who skip the formal invoice creation step.
-    const invoicedFromInvoices = invoices.reduce((s, inv) => {
-      // Void invoices don't count toward billed (the Void action's own
-      // copy says so), and drafts were never issued, exclude both.
-      const st = String(inv.status || '').toLowerCase()
-      if (st === 'void' || st === 'draft') return s
-      const t = new Date(inv.issued_at || inv.created_at || 0).getTime()
-      return (Number.isFinite(t) && t >= yearStart) ? s + Number(inv.amount || 0) : s
-    }, 0)
-    const invoicedFromContacts = contacts.reduce((s, c) => {
-      // Closed jobs + jobs whose work is complete (legacy 'invoice'
-      // stage rides along for pre-migration rows).
-      const billed = c.stage === 'closed' || c.stage === 'invoice' || (c.stage === 'job' && c.completed_at)
-      if (!billed) return s
-      // Anchor on when the work completed, not updated_at, editing an
-      // old job bumps updated_at and would re-book it into this year.
-      const t = new Date(c.completed_at || c.updated_at || c.created_at || 0).getTime()
-      return (Number.isFinite(t) && t >= yearStart) ? s + Number(c.amount || 0) : s
-    }, 0)
-    // Take the LARGER of the two estimates: an operator who logs
-    // payments but rarely creates fh_invoices rows would otherwise
-    // read "Invoiced YTD $2K" next to "Collected YTD $101K", an
-    // impossibility the UI audit flagged (#11). Billed work is at
-    // least what the contact-level records show.
-    const invoicedBest = Math.max(invoicedFromInvoices, invoicedFromContacts)
-    const invoiced = invoicedBest > 0 ? invoicedBest : null
-    const collected = payments.length === 0
-      ? null
-      : payments.reduce((s, p) => {
-          // paid_on is a date-only column, parse as LOCAL so a Jan 1
-          // payment isn't shoved before the local year start (UTC parse
-          // lands it Dec 31 of last year and drops it from YTD).
-          const when = parseDateOnly(p.paid_on) || parseDateOnly(p.created_at)
-          const t = when ? when.getTime() : NaN
-          return (Number.isFinite(t) && t >= yearStart) ? s + Number(p.amount || 0) : s
-        }, 0)
+    const mileageSummary = mileageYearSummary(mileage)
+    const milesYTD = mileageSummary.miles
+    const mileageDeduction = mileageSummary.deduction
+    // Issued invoices are a different obligation from completed contract
+    // value. Never take the larger total just to match payments received.
+    const financials = financialYearSummary(invoices, payments)
+    const invoiced = financials.issued
+    const collected = financials.received
     return {
-      pipeline, wonYTD, profitYTD, avgMargin, avgMarginNote,
+      pipeline, wonYTD, profitYTD, profitNote, avgMargin, avgMarginNote,
       leads, quotes, jobs, closedCount, lostCount,
       closeRate, closeRateNote,
-      milesYTD, mileageDeduction,
+      milesYTD, mileageDeduction, mileageNote: mileageSummary.missingRates ? mileageRateNote(new Date().getFullYear()) : 'Estimated from business rates by drive date',
       invoiced, collected,
     }
-  }, [contacts, leadRows, quoteRows, mileage, invoices, payments, stageTransitions])
+  }, [contacts, leadRows, quoteRows, mileage, invoices, payments, stageTransitions, funnel])
 
   const byStage = useMemo(() => {
     // Legacy 'invoice'-stage rows count under 'job' (their v2 home).
@@ -249,16 +189,11 @@ export default function Analytics() {
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
       const next = new Date(now.getFullYear(), now.getMonth() - i + 1, 1)
-      const total = payments.reduce((s, p) => {
-        // Local-parse the date-only paid_on so a payment dated the 1st
-        // of a month isn't bucketed into the previous month.
-        const when = parseDateOnly(p.paid_on) || parseDateOnly(p.created_at)
-        if (!when) return s
-        if (when >= d && when < next) return s + Number(p.amount || 0)
-        return s
-      }, 0)
+      const total = paymentsReceivedInPeriod(payments, d, next, now)
       buckets.push({
         label: d.toLocaleDateString(undefined, { month: 'short' }),
+        period: d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+        partial: i === 0,
         total: Math.round(total)
       })
     }
@@ -299,7 +234,9 @@ export default function Analytics() {
   // contact name. Last 90 days only (active book of business, not
   // ancient history).
   const topClients = useMemo(() => {
-    const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
+    const now = new Date()
+    const cutoff = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
+    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
     const contactById = new Map(contacts.map((c) => [c.id, c]))
     const clientById = new Map(clients.map((c) => [c.id, c]))
     const totals = new Map()
@@ -307,7 +244,7 @@ export default function Analytics() {
       // paid_on is date-only, parse LOCAL (same rule as the YTD sums
       // above) so boundary-day payments don't shift out of the window.
       const when = parseDateOnly(p.paid_on) || parseDateOnly(p.created_at)
-      if (!when || when < cutoff) continue
+      if (!when || when < cutoff || when >= tomorrow) continue
       const c = contactById.get(p.contact_id as string)
       const clientName = c?.client_id ? clientById.get(c.client_id)?.name : null
       const key = clientName || c?.name || 'Unknown'
@@ -415,10 +352,10 @@ export default function Analytics() {
             Reports & insights
           </span>
           <h1 className="v3-h1" style={{ marginTop: 6 }}>
-            Know your <em>numbers.</em>
+            Reports
           </h1>
           <p className="v3-caption" style={{ marginTop: 6, lineHeight: 1.5 }}>
-            Pipeline, revenue, margins, and work volume, at a glance.
+            Know your numbers. Job value, payments, cost coverage and sales outcomes.
           </p>
         </div>
       </motion.div>
@@ -443,7 +380,7 @@ export default function Analytics() {
             <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
               Not enough data yet.
             </div>
-            <div style={{ fontSize: 12, lineHeight: 1.5 }}>
+            <div style={{ fontSize: 14, lineHeight: 1.5 }}>
               Add a few leads and start closing. Analytics lights up once the pipeline moves.
             </div>
           </div>
@@ -468,12 +405,14 @@ export default function Analytics() {
             }}>
               <KPI label="Pipeline"          to={stats.pipeline}         format={fmtMoneyCompact} Icon={TrendingUp} gold />
               <KPI label="Won YTD"           to={stats.wonYTD}           format={fmtMoneyCompact} Icon={DollarSign} gold />
-              <KPI label="Profit YTD"        to={stats.profitYTD}        format={fmtMoneyCompact} Icon={DollarSign} gold />
+              <KPI label="Issued invoices YTD" to={stats.invoiced} format={fmtMoneyCompact} Icon={DollarSign} note="Issued amounts, excluding drafts and voids" />
+              <KPI label="Payments received YTD" to={stats.collected} format={fmtMoneyCompact} Icon={DollarSign} note="Receipts by payment date, including earlier invoices" />
+              <KPI label="Tracked profit YTD" to={stats.profitYTD} format={fmtMoneyCompact} Icon={DollarSign} note={stats.profitNote} gold />
               <KPI label="Avg margin"        to={stats.avgMargin}        format={fmtPct}          Icon={Target} note={stats.avgMarginNote} />
-              <KPI label="Close rate"        to={stats.closeRate}        format={fmtPct}          Icon={Target} note={stats.closeRateNote} />
+              <KPI label="Win rate · 90 days"        to={stats.closeRate}        format={fmtPct}          Icon={Target} note={stats.closeRateNote} />
               <KPI label="Active leads"      to={stats.leads}            format={fmtInt}          Icon={TrendingUp} />
               <KPI label="Miles YTD"         to={stats.milesYTD}         format={fmtInt}          Icon={Car} />
-              <KPI label="Mileage deduction" to={stats.mileageDeduction} format={fmtMoneyCompact} Icon={Car} />
+              <KPI label="Mileage estimate" to={stats.mileageDeduction} format={fmtMoneyCompact} Icon={Car} note={stats.mileageNote} />
             </div>
           </motion.div>
 
@@ -492,7 +431,7 @@ export default function Analytics() {
             </div>
             {funnel.newLeads === 0 && funnel.quoted === 0 ? (
               <div className="v3-empty" style={{ padding: '12px 0' }}>
-                <div style={{ fontSize: 12, lineHeight: 1.5, color: 'var(--v3-text-muted)' }}>
+                <div style={{ fontSize: 14, lineHeight: 1.5, color: 'var(--v3-text-muted)' }}>
                   No pipeline movement in the last 90 days yet.
                 </div>
               </div>
@@ -535,8 +474,8 @@ export default function Analytics() {
                       <span key={i} style={{ width: 5, height: `${h}px`, borderRadius: 10, background: 'var(--field-gold-bright)' }} />
                     ))}
                   </div>
-                  <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, color: 'var(--v3-text)' }}>Not enough data yet</div>
-                  <div style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--v3-text-muted)' }}>The trend lights up once you have 4+ weeks of pipeline.</div>
+                  <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, color: 'var(--v3-text)' }}>Not enough data yet</div>
+                  <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--v3-text-muted)' }}>The trend lights up once you have 4+ weeks of pipeline.</div>
                 </div>
               ) : (
               <ResponsiveContainer width="100%" height="100%">
@@ -550,8 +489,8 @@ export default function Analytics() {
                   <XAxis dataKey="week" hide />
                   <YAxis hide />
                   <Tooltip
-                    contentStyle={{ background: 'var(--surface-1)', border: '1px solid var(--rule-bold)', borderRadius: 10, fontFamily: 'var(--font-body)', fontSize: 12 }}
-                    labelStyle={{ color: 'var(--ink-muted)', fontSize: 12, letterSpacing: 0 }}
+                    contentStyle={{ background: 'var(--surface-1)', border: '1px solid var(--rule-bold)', borderRadius: 10, fontFamily: 'var(--font-body)', fontSize: 14 }}
+                    labelStyle={{ color: 'var(--ink-muted)', fontSize: 14, letterSpacing: 0 }}
                     itemStyle={{ color: 'var(--v3-primary-text)', fontWeight: 700 }}
                     formatter={(v) => [fmtMoneyCompact(v), 'Pipeline']}
                   />
@@ -578,11 +517,11 @@ export default function Analytics() {
                 return (
                   <div key={s.id}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, color: 'var(--v3-text)' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, color: 'var(--v3-text)' }}>
                         <span style={{ width: 6, height: 6, borderRadius: 10, background: s.color }} />
                         {s.label}
                       </span>
-                      <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 8, fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--v3-text-muted)' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 8, fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--v3-text-muted)' }}>
                         <span style={{ fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: 0, color: 'var(--v3-text)', fontVariantNumeric: 'tabular-nums' }}>{fmtMoneyCompact(s.value)}</span>
                         <span style={{ color: 'var(--v3-text-muted)', opacity: 0.55 }}>·</span>
                         <span style={{ fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: 0, color: 'var(--v3-text-muted)', fontVariantNumeric: 'tabular-nums' }}>{s.count}</span>
@@ -615,7 +554,7 @@ export default function Analytics() {
               </span>
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                 <Eyebrow tone="gold" style={{ padding: '4px 8px', borderRadius: 10, background: 'var(--v3-primary-soft)', border: '1px solid color-mix(in srgb, var(--v3-primary) 30%, transparent)' }}>
-                  IRS 2026 · $0.67/mi
+                  {mileageRateNote(new Date().getFullYear())}
                 </Eyebrow>
                 <motion.button
                   type="button"
@@ -631,7 +570,7 @@ export default function Analytics() {
                     background: 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)',
                     color: 'var(--v3-on-primary)',
                     fontFamily: 'var(--font-body)',
-                    fontSize: 12,
+                    fontSize: 14,
                     fontWeight: 700,
                     letterSpacing: 0,
                     cursor: 'pointer',
@@ -648,7 +587,7 @@ export default function Analytics() {
               <div className="v3-empty" style={{ marginTop: 4 }}>
                 <Car size={20} color="var(--v3-text-muted)" style={{ margin: '0 auto 8px' }} />
                 <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>No miles logged.</div>
-                <div style={{ fontSize: 12 }}>Log drives as you go. Every mile is $0.67 deducted at tax time.</div>
+                <div style={{ fontSize: 14 }}>Log business drives as you go. Estimates use the rate for each drive date; eligibility depends on business use.</div>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
@@ -690,20 +629,21 @@ export default function Analytics() {
               gap: 12
             }}>
               {/* Revenue by month */}
-              <InsightCard title="Revenue · last 6 months">
+              <InsightCard title="Payments received · last 6 months">
                 <RevenueBars data={revenueByMonth} maxValue={maxMonthlyRevenue} />
               </InsightCard>
 
               {/* Win rate by type */}
               {winRateByType.length > 0 && (
-                <InsightCard title="Win rate by job type">
+                <InsightCard title="Job outcomes by type">
+                  <p className="v3-caption">Job records only, all time. Lead and quote outcomes appear in the 90 day funnel.</p>
                   <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
                     {winRateByType.map((r) => (
                       <li key={r.type} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 12, alignItems: 'center' }}>
-                        <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--v3-text)' }}>
+                        <span style={{ fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--v3-text)' }}>
                           {r.type}
                         </span>
-                        <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--v3-text-muted)' }}>
+                        <span style={{ fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--v3-text-muted)' }}>
                           {r.won}/{r.total}
                         </span>
                         <span style={{
@@ -729,12 +669,12 @@ export default function Analytics() {
                       <li key={c.name}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
                           <span style={{
-                            fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--v3-text)',
+                            fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--v3-text)',
                             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%'
                           }}>
                             {c.name}
                           </span>
-                          <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700, color: 'var(--v3-success-text)', fontVariantNumeric: 'tabular-nums' }}>
+                          <span style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, color: 'var(--v3-success-text)', fontVariantNumeric: 'tabular-nums' }}>
                             {money(c.amount)}
                           </span>
                         </div>
@@ -751,18 +691,18 @@ export default function Analytics() {
                 </InsightCard>
               )}
 
-              {/* Retainage held + deposit lag, two stat blocks combined */}
+              {/* Retainage payments recorded + deposit lag, two stat blocks combined */}
               <InsightCard title="Cash collection telemetry">
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   <div>
                     <Eyebrow as="div">
-                      Retainage held
+                      Retainage payments recorded
                     </Eyebrow>
                     <div style={{ marginTop: 4, fontFamily: 'var(--font-display)', fontSize: 24, color: retainageOutstanding > 0 ? 'var(--v3-primary-text)' : 'var(--v3-text-muted)', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
                       {money(retainageOutstanding)}
                     </div>
-                    <div style={{ marginTop: 3, fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--v3-text-muted)' }}>
-                      Tagged retainage payments across the book
+                    <div style={{ marginTop: 3, fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--v3-text-muted)' }}>
+                      Recorded receipts tagged retainage. This does not represent unpaid retainage.
                     </div>
                   </div>
                   <div>
@@ -772,7 +712,7 @@ export default function Analytics() {
                     <div style={{ marginTop: 4, fontFamily: 'var(--font-display)', fontSize: 24, color: 'var(--v3-text)', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
                       {avgDepositLagDays ? `${avgDepositLagDays.avg}d` : '\u2003'}
                     </div>
-                    <div style={{ marginTop: 3, fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--v3-text-muted)' }}>
+                    <div style={{ marginTop: 3, fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--v3-text-muted)' }}>
                       {avgDepositLagDays
                         ? `Quote sent → first payment, n=${avgDepositLagDays.sample}`
                         : 'No deposits matched to sent quotes yet'}
@@ -863,7 +803,7 @@ function FunnelBar({ label, count, max, note, gold, danger }: any) {
         {count}
       </span>
       {note && (
-        <span style={{ flexShrink: 0, fontSize: 12, color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)' }}>
+        <span style={{ flexShrink: 0, fontSize: 14, color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)' }}>
           {note}
         </span>
       )}
@@ -936,12 +876,12 @@ function KPI({ label, to, format, Icon, gold, note }: any) {
         <div style={{
           marginTop: 6,
           fontFamily: 'var(--font-body)',
-          fontSize: 12,
+          fontSize: 14,
           fontWeight: 500,
           letterSpacing: 0,
           color: to == null ? 'var(--v3-text-muted)' : 'var(--v3-text-muted)',
-          lineHeight: 1.3,
-          opacity: 0.85
+          lineHeight: 1.5,
+          opacity: 1
         }}>
           {note}
         </div>

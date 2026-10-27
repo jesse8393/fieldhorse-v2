@@ -30,10 +30,10 @@ test('shows an honest forecast failure state and recovers on retry', async ({ co
   const failure = page.getByText("Couldn't load the forecast", { exact: false })
   await expect(failure).toBeVisible({ timeout: 15_000 })
   await expect(page.getByText('Forecast unavailable', { exact: true }).first()).toBeVisible()
-  await expect(page.getByText('Clear to work', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('Within configured weather limits', { exact: true })).toHaveCount(0)
 
   failForecast = false
   await page.getByRole('button', { name: 'Try again' }).click()
   await expect(failure).toHaveCount(0, { timeout: 15_000 })
-  await expect(page.getByText('Clear to work', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('Within configured weather limits', { exact: true }).first()).toBeVisible()
 })

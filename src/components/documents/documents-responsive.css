@@ -1,0 +1,92 @@
+/* A document can be narrow inside a desktop preview as well as on a phone.
+   Scope the responsive layout to its own width, not the application viewport. */
+.fh-doc-layout {
+  container: fh-document / inline-size;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.fh-doc-item-notes {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.fh-doc-letterhead > *, .fh-doc-columns > * { min-width: 0; }
+.fh-doc-mark { flex: 0 0 auto; }
+.fhp-lines .fhc-row__sub { white-space: pre-wrap; overflow: visible; text-overflow: clip; }
+
+@container fh-document (max-width: 700px) {
+  .fh-doc-letterhead, .fh-doc-identity {
+    flex-direction: column !important;
+    gap: 16px !important;
+  }
+  .fh-doc-letterhead > * {
+    flex-basis: auto !important;
+    max-width: 100% !important;
+    width: 100%;
+  }
+  .fh-doc-letterhead .fh-doc-mark {
+    order: -1;
+    width: auto;
+    max-width: min(220px, 100%);
+    align-self: flex-start;
+    margin-left: 0 !important;
+  }
+}
+
+@container fh-document (max-width: 560px) {
+  .fh-doc-content {
+    --fh-doc-padding: 20px;
+    padding: 24px 20px 32px !important;
+    gap: 24px !important;
+  }
+  .fh-doc-columns {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 20px !important;
+  }
+  .fh-doc-meta-band {
+    margin-inline: -20px !important;
+    padding-inline: 20px !important;
+  }
+  .fh-doc-items, .fh-doc-items tbody { display: block; width: 100%; }
+  .fh-doc-items thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .fh-doc-items tr.fh-doc-item-row {
+    display: grid;
+    grid-template-columns: minmax(60px, 0.8fr) minmax(0, 1fr) minmax(0, 1.1fr);
+    gap: 12px;
+    padding: 16px 0;
+    border-bottom: 1px solid color-mix(in srgb, #141414 12%, #F2EDE4);
+  }
+  .fh-doc-items .fh-doc-item-row td {
+    display: block;
+    padding: 0 !important;
+    border: 0 !important;
+    min-width: 0;
+    text-align: left !important;
+    font-size: 13px !important;
+    white-space: normal !important;
+  }
+  .fh-doc-items .fh-doc-item-description {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    font-size: 15px !important;
+    line-height: 1.5;
+  }
+  .fh-doc-items .fh-doc-item-row td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 4px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .fh-doc-items tr:not(.fh-doc-item-row) { display: table; table-layout: fixed; width: 100%; }
+}

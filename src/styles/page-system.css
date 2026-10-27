@@ -1,0 +1,92 @@
+/* Application page system. Shared selectors keep older and newer modules
+   on one hierarchy. Customer documents and onyx feature stages keep their
+   own composition; this file governs workspace reading and controls. */
+:root {
+  --fh-type-page: 30px;
+  --fh-type-section: var(--type-20);
+  --fh-type-body: 16px;
+  --fh-type-help: 14px;
+  --fh-type-label: 14px;
+  --fh-page-gap: 24px;
+  --fh-control-height: 44px;
+}
+
+.fh-build-page .fh-build-title,
+.v3-screen > :is(header, .v3-header) h1,
+.v3-h1 {
+  font-family: var(--fh-font-display);
+  font-size: var(--fh-type-page);
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: 0;
+}
+
+.fh-build-page :is(.fh-build-good, .fh-build-eyebrow, .fh-build-mini > span, .fh-build-rel, .fh-build-table__head),
+.v3-eyebrow,
+.fh-eyebrow {
+  font-size: var(--fh-type-label);
+  line-height: 1.4;
+  color: var(--fh-ink-2);
+  opacity: 1;
+}
+
+.fh-build-page :is(.fh-build-focus > p, .fh-build-rail-card > span, .fh-build-rail-list__title, .fh-build-table__empty, .fh-build-table__more, .fh-build-topbar__meta),
+.v3-caption {
+  font-size: var(--fh-type-help);
+  line-height: 1.5;
+  color: var(--fh-ink-2);
+  opacity: 1;
+}
+
+.fh-build-page :is(.fh-build-card, .fh-build-focus, .fh-build-mini, .fh-build-window-card, .fh-build-rail-card) {
+  border-radius: var(--fh-r-card);
+  border-color: var(--fh-edge);
+  box-shadow: var(--fh-shadow-soft);
+}
+
+.fh-build-page :is(.fh-build-card-head, .fh-build-rail-card) {
+  gap: 12px;
+}
+
+.fh-build-page :is(.fh-build-cta, .fh-build-search, .fh-build-view-toggle > button, .fh-build-rail-card__action),
+.v3-btn,
+.v3-btn--sm,
+.v3-section-link {
+  min-height: var(--fh-control-height);
+  height: auto;
+  font-size: var(--fh-type-label);
+  line-height: 1.3;
+}
+.v3-btn,
+.v3-btn--sm { padding-top: var(--space-3); padding-bottom: var(--space-3); }
+.v3-btn--icon-only,
+.v3-btn--sm.v3-btn--icon-only { min-width: var(--fh-control-height); }
+.v3-btn--primary { background: var(--fh-gold); box-shadow: var(--fh-shadow-soft); }
+.v3-section-link::before { content: none; }
+
+/* Essential input text remains readable without triggering phone zoom. */
+.fh-settings :is(input:not([type='checkbox']):not([type='radio']):not([type='color']), select, textarea) {
+  font-size: var(--fh-type-body) !important;
+  min-height: var(--fh-control-height);
+}
+
+@media (min-width: 900px) {
+  .fh-build-page .fh-build-main { padding: var(--fh-page-gap); }
+  .fh-build-page .fh-build-hero-row--page { gap: var(--fh-page-gap); margin-bottom: var(--fh-page-gap); }
+}
+@media (max-width: 899px) {
+  :root { --fh-type-page: var(--type-24); --fh-page-gap: 20px; }
+  .fh-build-page .fh-build-title { overflow-wrap: anywhere; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .v3-btn,
+  .fh-build-page :is(.fh-build-cta, .fh-build-card) { transition: none; }
+}
+
+/* Read and recover states use the same rhythm as populated screens. */
+:is(.fh-data-error__body > span, .fh-emptystate__sub) {
+  font-size: var(--fh-type-help);
+  line-height: 1.5;
+  color: var(--fh-ink-2);
+}
+.fh-data-error__retry { min-height: var(--fh-control-height); font-size: var(--fh-type-label); }

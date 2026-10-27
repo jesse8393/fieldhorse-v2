@@ -34,6 +34,7 @@
 // returns 503 with a friendly error so the client can surface
 // "Email sender is not configured yet."
 
+import { reviewInvoice } from '../../src/lib/invoiceReview.js'
 import { createClient } from '@supabase/supabase-js'
 import { renderPayBlock as payBlock, formatFromHeader, renderParagraphs, textField } from './lib/email.js'
 import { loadAccessibleRow, brandingUserIdFor } from './lib/orgAccess.js'
@@ -136,6 +137,51 @@ export default async (request) => {
   }
   if (!contact) {
     return json({ error: 'forbidden_or_not_found', message: 'This record was not found, or your role cannot send it. Ask an owner, admin or manager.' }, 403)
+  }
+
+  if (!invoice_id) return json({ error: 'tracked_invoice_required', message: 'Open or create an invoice before sending a payment request.' }, 409)
+
+  // Re-read the actual invoice and its obligations immediately before delivery.
+  // The request cannot attach an invoice from a different job or company.
+  if (invoice_id) {
+    const access = await loadAccessibleRow(supabase, {
+      table: 'fh_invoices', id: invoice_id, callerId: sender_user_id,
+      select: 'contact_id, client_id, title, description, amount, status, due_at, updated_at'
+    })
+    if (access.error === 'lookup_failed') return json({ error: 'billing_review_unavailable', message: 'Could not verify current billing. Try again.' }, 503)
+    const invoice = access.row
+    if (!invoice || (invoice.contact_id || null) !== (contact_id || null)) return json({ error: 'invoice_mismatch', message: 'This invoice does not belong to the selected record.' }, 403)
+    if (invoice.updated_at && body.invoice_updated_at !== invoice.updated_at) return json({ error: 'invoice_changed', message: 'This invoice changed after it was opened. Refresh and review before sending.' }, 409)
+    if (!Number.isFinite(Number(invoice.amount)) || Number(invoice.amount) <= 0) return json({ error: 'invalid_invoice_amount', message: 'Enter a positive invoice amount before sending.' }, 409)
+    if (invoice.status === 'void') return json({ error: 'invoice_void', message: 'A void invoice cannot be sent.' }, 409)
+    if (invoice.status === 'draft') {
+      const siblings = []
+      for (let from = 0; ; from += 500) {
+        let query = supabase.from('fh_invoices').select('id, contact_id, client_id, title, description, amount, status, due_at').neq('status', 'void')
+        query = invoice.org_id ? query.eq('org_id', invoice.org_id) : query.eq('user_id', invoice.user_id)
+        query = invoice.contact_id ? query.eq('contact_id', invoice.contact_id) : query.eq('client_id', invoice.client_id).is('contact_id', null)
+        const result = await query.order('id').range(from, from + 499)
+        if (result.error) return json({ error: 'billing_review_unavailable', message: 'Could not verify current invoices. Try again.' }, 503)
+        siblings.push(...(result.data || []))
+        if ((result.data?.length || 0) < 500) break
+      }
+      let contractTotal = null
+      if (invoice.contact_id) {
+        if (contact.amount != null && !Number.isFinite(Number(contact.amount))) return json({ error: 'invalid_contract_amount', message: 'Review the saved contract amount before sending.' }, 409)
+        let approved = 0
+        for (let from = 0; ; from += 500) {
+          const changes = await supabase.from('fh_change_orders').select('amount').eq('contact_id', invoice.contact_id).eq('status', 'approved').order('id').range(from, from + 499)
+          if (changes.error) return json({ error: 'billing_review_unavailable', message: 'Could not verify approved scope. Try again.' }, 503)
+          if ((changes.data || []).some(row => !Number.isFinite(Number(row.amount)))) return json({ error: 'invalid_scope_amount', message: 'Review approved change amounts before sending.' }, 409)
+          approved += (changes.data || []).reduce((sum, row) => sum + Number(row.amount || 0), 0)
+          if ((changes.data?.length || 0) < 500) break
+        }
+        if (Number(contact.amount) > 0 || approved > 0) contractTotal = Number(contact.amount || 0) + approved
+      }
+      const review = reviewInvoice({ invoice, invoices: siblings, contractTotal })
+      if (review.excess > 0) return json({ error: 'contract_billing_exceeded', message: 'Invoices and drafts exceed approved contract value. Reduce or void unused drafts before sending.' }, 409)
+      if (review.duplicates.length && body.duplicate_reviewed !== true) return json({ error: 'duplicate_review_required', message: 'Similar invoices found. Refresh the invoice and confirm this bills a separate installment.' }, 409)
+    }
   }
 
   // 2. Pull the company's branding for From-line + Reply-To + pay link.

@@ -170,11 +170,12 @@ export function rollupByClient(
 // last year in every US timezone, silently dropping Jan-1 rows from YTD.
 export function filterYTD<T extends Record<string, unknown>>(rows: T[] | null | undefined, dateField: string, now = new Date()): T[] {
   const yearStart = new Date(now.getFullYear(), 0, 1).getTime()
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime()
   return (rows || []).filter((r) => {
     const v = r?.[dateField]
     if (!v) return false
     const d = parseDateOnly(v as string)
-    return d != null && d.getTime() >= yearStart
+    return d != null && d.getTime() >= yearStart && d.getTime() < tomorrow
   })
 }
 
@@ -205,11 +206,12 @@ function wonAtByContact(transitions: TransitionRow[] | null | undefined) {
 // jobs that predate the audit log.
 function wonThisYear(jobs: JobRow[] | null | undefined, transitions: TransitionRow[] | null | undefined, now: Date) {
   const yearStart = new Date(now.getFullYear(), 0, 1).getTime()
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime()
   const wonAt = wonAtByContact(transitions)
   return (jobs || []).filter((j) => {
     if (!WON_STAGES.has(j.stage || '')) return false
     const anchor = (j.id ? wonAt.get(j.id) : undefined) ?? parseDateOnly(j.updated_at)?.getTime() ?? NaN
-    return Number.isFinite(anchor) && anchor >= yearStart
+    return Number.isFinite(anchor) && anchor >= yearStart && anchor < tomorrow
   })
 }
 
@@ -224,6 +226,20 @@ export function profitYTD(jobs: JobRow[] | null | undefined, transitions: Transi
     const cost = Number(j.cost || 0)
     return s + (amount - cost)
   }, 0)
+}
+
+// A missing/zero cost cannot distinguish untracked cost from a true zero.
+// Report the observed sample explicitly instead of treating every uncosted
+// job as pure profit. Keep legacy profitYTD callers unchanged.
+export function profitCoverageYTD(jobs: JobRow[] | null | undefined, transitions: TransitionRow[] | null | undefined = null, now = new Date()) {
+  const won = wonThisYear(jobs, transitions, now)
+  const costed = won.filter((j) => Number(j.cost) > 0 && Number.isFinite(Number(j.cost)))
+  return {
+    profit: costed.length ? costed.reduce((sum, j) => sum + Number(j.amount || 0) - Number(j.cost), 0) : null,
+    costed: costed.length,
+    total: won.length,
+    missing: won.length - costed.length
+  }
 }
 
 // Won YTD = sum of amount for jobs that hit a won stage this year.
@@ -295,7 +311,8 @@ export function computeFunnel(
   now = new Date()
 ): FunnelStats {
   const cutoff = now.getTime() - windowDays * 86400000
-  const inWindow = (t: number) => Number.isFinite(t) && t >= cutoff
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime()
+  const inWindow = (t: number) => Number.isFinite(t) && t >= cutoff && t < tomorrow
 
   const leads = source.leads || []
   const quotes = source.quotes || []
