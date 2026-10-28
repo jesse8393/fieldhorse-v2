@@ -163,16 +163,16 @@ describe('redesign token contrast (spec section 12)', () => {
   })
 
   it('keeps the spec figures it quotes', () => {
-    // Spot checks against the numbers printed in spec section 12, so the
+    // Spot checks against the measurements documented in LIGHT_GLASS_IMPLEMENTATION.md, so the
     // document and the tokens cannot drift apart unnoticed.
     const at = (vars: Record<string, string>, a: string, b: string) =>
       Number(ratio(resolve(vars, a), resolve(vars, b)).toFixed(1))
-    expect(at(day, '--fh-ink', '--fh-plaster')).toBe(14.3)
-    expect(at(day, '--fh-ink-3', '--fh-plaster')).toBe(5)
-    expect(at(day, '--fh-on-gold', '--fh-gold-lo')).toBe(4.8)
+    expect(at(day, '--fh-ink', '--fh-plaster')).toBe(14.2)
+    expect(at(day, '--fh-ink-3', '--fh-plaster')).toBe(5.1)
+    expect(at(day, '--fh-on-gold', '--fh-gold-lo')).toBe(6.8)
     expect(at(day, '--fh-linen', '--fh-onyx')).toBe(15.8)
     expect(at(day, '--fh-smoke', '--fh-onyx')).toBe(5.9)
     expect(at(night, '--fh-ink-3', '--fh-tray')).toBe(4.8)
-    expect(at(day, '--fh-edge-strong', '--fh-paper')).toBe(3.6)
+    expect(at(day, '--fh-edge-strong', '--fh-paper')).toBe(3.7)
   })
 })

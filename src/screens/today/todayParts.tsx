@@ -185,6 +185,7 @@ export function StageLine({ view, loading, hasLocation, forecast, forecastError,
 export function NextStopCard({ next, maps, ratio }: { next: TodayNextStop; maps: (address: string) => string; ratio?: string }) {
   const time = stopTime(next.startAt)
   const shared = {
+    emptyTone: 'paper' as const,
     // A no break space keeps "7:30 am" together where the photo's text
     // column is narrow, instead of "Next stop, 7:30" over "am".
     eyebrow: time ? `Next stop, ${time.time}\u00a0${time.suffix}` : 'Next stop',

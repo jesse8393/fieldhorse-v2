@@ -272,7 +272,7 @@ test('keeps desktop chrome stable on long routes', async ({ page }, testInfo) =>
 
     for (const path of routes) {
       await openRoute(page, path)
-      await expect(page.locator('.fh-desktop-sidebar')).toBeVisible()
+      await expect(page.locator('.fh-glass-header')).toBeVisible()
       await expect(page.locator('.fhs-dock')).toBeHidden()
       if (process.env.QA_SCREENSHOTS === '1') {
         await page.screenshot({
@@ -286,26 +286,17 @@ test('keeps desktop chrome stable on long routes', async ({ page }, testInfo) =>
       }))
       await page.waitForTimeout(80)
 
-      const sidebar = await page.locator('.fh-desktop-sidebar').boundingBox()
-      const workspaceHeader = page.locator('.fh-build-topbar:visible, .fh-app-header:visible').first()
-      const sidebarOverflow = await page.locator('.fh-desktop-sidebar').evaluate((element) => {
-        const nav = element.querySelector<HTMLElement>('.fhs-side__nav')!
-        return {
-          shell: element.scrollHeight - element.clientHeight,
-          nav: nav.scrollHeight - nav.clientHeight,
-          scrollbarWidth: getComputedStyle(nav).scrollbarWidth,
-          horizontal: document.documentElement.scrollWidth - document.documentElement.clientWidth
-        }
-      })
-      console.log(`DESKTOP ${viewport.width}x${viewport.height} ${path}: ${JSON.stringify(await scrollSnapshot(page))}`)
-      expect(sidebar?.y).toBe(0)
-      expect(sidebar?.height).toBe(viewport.height)
+      const workspaceHeader = page.locator('.fh-glass-header')
       await expect(workspaceHeader).toBeVisible()
-      expect((await workspaceHeader.boundingBox())?.y).toBe(0)
-      expect(sidebarOverflow.shell).toBeLessThanOrEqual(0)
-      expect(sidebarOverflow.scrollbarWidth).toBe('none')
-      if (viewport.height >= 900) expect(sidebarOverflow.nav).toBeLessThanOrEqual(0)
-      expect(sidebarOverflow.horizontal).toBeLessThanOrEqual(0)
+      const headerBox = (await workspaceHeader.boundingBox())!
+      expect(headerBox.y).toBe(0)
+      expect(headerBox.width).toBeLessThanOrEqual(viewport.width)
+      const overflow = await workspaceHeader.evaluate(element => ({
+        header: element.scrollWidth - element.clientWidth,
+        page: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      }))
+      expect(overflow.header).toBeLessThanOrEqual(1)
+      expect(overflow.page).toBeLessThanOrEqual(0)
       if (process.env.QA_SCREENSHOTS === '1') {
         await page.screenshot({
           path: testInfo.outputPath(`desktop-${viewport.width}x${viewport.height}-${path.replaceAll('/', '_') || 'home'}-bottom.png`)
@@ -320,16 +311,11 @@ test('keeps every desktop navigation item reachable on a short viewport', async 
   await page.setViewportSize({ width: 1440, height: 740 })
   await openRoute(page, '/')
 
-  const sidebar = page.locator('.fh-desktop-sidebar')
-  const footer = page.locator('.fhs-side__foot')
-  const settings = sidebar.getByRole('button', { name: 'Settings', exact: true })
-  await expect(footer).toBeVisible()
+  await page.locator('.fh-glass-nav').getByRole('link', { name: 'More', exact: true }).click()
+  const settings = page.getByRole('navigation', { name: 'Workspace' }).getByRole('button', { name: 'Settings', exact: true })
   await settings.scrollIntoViewIfNeeded()
-  await expect(settings).toBeVisible()
-  await expect(footer).toBeVisible()
+  await expect(settings).toBeInViewport()
+  await page.getByRole('button', { name: 'Sign out', exact: true }).scrollIntoViewIfNeeded()
+  await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toBeInViewport()
 
-  const scrollbarWidth = await sidebar.locator('.fhs-side__nav').evaluate((nav) =>
-    getComputedStyle(nav).scrollbarWidth
-  )
-  expect(scrollbarWidth).toBe('none')
 })

@@ -40,12 +40,13 @@ test.describe('job page on a phone', () => {
 
     const title = page.getByRole('heading', { level: 1, name: 'Slab + trench' })
     await expect(title).toBeVisible()
-    const client = page.locator('.fhj-hero').getByText('Plumbing Bellevue')
+    const client = page.locator('.fh-job-phone-heading').getByText(/Plumbing Bellevue/)
     await expect(client).toBeVisible()
     const titleBox = await title.boundingBox()
     const clientBox = await client.boundingBox()
     expect(clientBox!.y).toBeGreaterThan(titleBox!.y)
 
+    await page.locator('.fh-job-finance-disclosure summary').click()
     const current = page.getByRole('list', { name: 'Stage' }).locator('[aria-current="step"]')
     await expect(current).toHaveText(/^Job/)
 
@@ -71,9 +72,9 @@ test.describe('job page on a phone', () => {
   test('job without photos', async ({ context, page }) => {
     await signIn(context)
     await open(page, '/jobs/c-job1')
-    const hero = page.locator('.fhj-hero')
+    const hero = page.locator('.fh-job-phone-heading')
     await expect(hero.getByRole('heading', { level: 1, name: 'Slab + trench' })).toBeVisible()
-    await expect(hero.getByText('Plumbing Bellevue')).toBeVisible()
+    await expect(hero.getByText(/Plumbing Bellevue/)).toBeVisible()
     await page.waitForLoadState('networkidle')
     await expect(hero.locator('img')).toHaveCount(0)
     await expect(hero.getByRole('button', { name: /photos/i })).toHaveCount(0)
@@ -91,7 +92,7 @@ test.describe('job page on a phone', () => {
       }
     })
     await open(page, '/jobs/c-job1')
-    const hero = page.locator('.fhj-hero')
+    const hero = page.locator('.fh-job-phone-heading')
     await expect(hero.getByRole('heading', { level: 1, name: 'Slab + trench' })).toBeVisible()
     await expect(page.locator('.fhj-spine').getByText('2 photos', { exact: true })).toBeVisible()
     await expect(hero.locator('img')).toHaveCount(0)
@@ -191,7 +192,7 @@ test.describe('job page on a phone', () => {
     const near = (a: number, b: number) => Math.abs(a - b) <= 1
 
     // One column: the onyx hero spans the page and the facts sit under it.
-    const hero = page.locator('.fhj-hero')
+    const hero = page.locator('.fh-job-phone-heading')
     await expect(hero.getByRole('heading', { level: 1, name: 'Slab + trench' })).toBeVisible()
     expect(await page.locator('.fhj-page .fhj-head').evaluate((el) => getComputedStyle(el).display)).not.toBe('flex')
     const heroBox = (await hero.boundingBox())!
@@ -331,6 +332,7 @@ test.describe('job page on a phone', () => {
   test('lost job', async ({ context, page }) => {
     await signIn(context)
     await open(page, '/jobs/c-lost')
+    await page.locator('.fh-job-finance-disclosure summary').click()
     const rail = page.locator('.fhc-rail')
     await expect(rail.getByText('Lost', { exact: true })).toBeVisible()
     await expect(page.getByRole('list', { name: 'Stage' }).locator('[aria-current="step"]')).toHaveCount(0)
@@ -412,6 +414,7 @@ test.describe('job page on a desktop, redesigned', () => {
     await signIn(context)
     await openDesktop(page, '/jobs/c-job1')
 
+    await page.locator('.fh-job-lifecycle summary').click()
     const rail = page.getByRole('list', { name: 'Stage' })
     await expect(rail).toBeVisible()
     await expect(rail.locator('[aria-current="step"]')).toHaveText(/^Job/)
@@ -423,49 +426,50 @@ test.describe('job page on a desktop, redesigned', () => {
     await expect(facts.getByText('Paid', { exact: true })).toBeVisible()
 
     await expect(page.getByText('Weather not set')).toHaveCount(0)
-    await expect(page.locator('.fhd-banner').getByText(/71°/)).toBeVisible()
+    await expect(page.locator('.fh-job-workspace').getByText(/71°/)).toBeVisible()
   })
 
   test('the banner, the one gold action and no key cap', async ({ context, page }) => {
     await signIn(context)
     await openDesktop(page, '/jobs/c-job1')
-    const banner = page.locator('.fhd-banner')
+    const banner = page.locator('.fh-job-workspace')
 
     // Job title as the heading, the client and address under it.
     await expect(banner.getByRole('heading', { level: 1, name: 'Slab + trench' })).toBeVisible()
-    await expect(banner.getByText('Plumbing Bellevue, 412 Burkitt Station Rd')).toBeVisible()
+    await expect(banner.getByText('Plumbing Bellevue · 412 Burkitt Station Rd')).toBeVisible()
     await expect(banner.getByRole('link', { name: 'Back to jobs' }).or(banner.getByRole('button', { name: 'Back to jobs' }))).toBeVisible()
 
     // Message and Schedule are secondary; the stage action is the one gold button.
     await expect(banner.getByRole('link', { name: /^Message/ })).toHaveAttribute('href', '/compose?contact=c-job1&channel=email')
-    await expect(banner.getByRole('button', { name: 'Schedule', exact: true })).toBeVisible()
+    await expect(page.locator('.fh-job-secondary-actions').getByRole('button', { name: 'Schedule', exact: true })).toBeVisible()
     const gold = page.locator('.fhc-btn--primary')
     await expect(gold).toHaveCount(1)
-    await expect(gold).toHaveText('Invoice this')
+    await expect(gold).toHaveText('Add to job')
     // Shortcuts only fire inside the command palette, so the button draws no key cap.
     await expect(banner.locator('kbd')).toHaveCount(0)
 
-    // Edit and delete stay one click away.
-    await expect(banner.getByRole('button', { name: 'Edit job details' })).toBeVisible()
-    await expect(banner.getByRole('button', { name: 'Delete this job' })).toBeVisible()
+    await banner.getByRole('button', { name: 'More actions for this job' }).click()
+    await expect(page.getByRole('menuitem', { name: 'Edit job details' })).toBeVisible()
+    await expect(page.getByRole('menuitem', { name: 'Delete this job' })).toBeVisible()
+    await page.keyboard.press('Escape')
   })
 
-  test('job without photos falls back to onyx', async ({ context, page }) => {
+  test('job without photos keeps a compact visit summary', async ({ context, page }) => {
     await signIn(context)
     await openDesktop(page, '/jobs/c-job1')
     await page.waitForLoadState('networkidle')
-    const banner = page.locator('.fhd-banner')
+    const banner = page.locator('.fh-job-workspace')
     await expect(banner.getByRole('heading', { level: 1, name: 'Slab + trench' })).toBeVisible()
     await expect(banner.locator('img')).toHaveCount(0)
-    const bg = await banner.evaluate((el) => getComputedStyle(el).backgroundColor)
-    expect(bg).not.toBe('rgba(0, 0, 0, 0)')
+    await expect(banner.locator('.fh-job-context--no-photo .fh-job-visit')).toBeVisible()
+    await expect(banner.locator('.fh-job-cover')).toHaveCount(0)
   })
 
   test('photo signing fails', async ({ context, page }) => {
     // Rows exist but the mock's storage answers 404, so no url signs.
     await signIn(context, { tables: { fh_job_files: SLAB_PHOTOS } })
     await openDesktop(page, '/jobs/c-job1')
-    const banner = page.locator('.fhd-banner')
+    const banner = page.locator('.fh-job-workspace')
     await expect(banner.getByRole('heading', { level: 1, name: 'Slab + trench' })).toBeVisible()
     await expect(page.locator('.fhj-spine').getByText('2 photos', { exact: true })).toBeVisible()
     await page.waitForLoadState('networkidle')
@@ -476,7 +480,7 @@ test.describe('job page on a desktop, redesigned', () => {
     await signIn(context, { tables: { fh_job_files: SLAB_PHOTOS } })
     await mockPhotoStorage(context, 'ok')
     await openDesktop(page, '/jobs/c-job1')
-    const banner = page.locator('.fhd-banner')
+    const banner = page.locator('.fh-job-workspace')
     await expect(banner.locator('img')).toHaveCount(1)
     await expect(banner.locator('img')).toHaveAttribute('alt', 'Forms and rebar in')
     await expect(banner.getByRole('heading', { level: 1, name: 'Slab + trench' })).toBeVisible()
@@ -486,9 +490,9 @@ test.describe('job page on a desktop, redesigned', () => {
     await mockPhotoStorage(context, 'missing')
     await second.clock.setFixedTime(new Date('2026-10-10T12:40:00.000Z'))
     await second.goto('/jobs/c-job1', { waitUntil: 'domcontentloaded', timeout: 60_000 })
-    await expect(second.locator('.fhd-banner').getByRole('heading', { level: 1, name: 'Slab + trench' })).toBeVisible({ timeout: 30_000 })
+    await expect(second.locator('.fh-job-workspace').getByRole('heading', { level: 1, name: 'Slab + trench' })).toBeVisible({ timeout: 30_000 })
     await second.waitForLoadState('networkidle')
-    await expect(second.locator('.fhd-banner img')).toHaveCount(0)
+    await expect(second.locator('.fh-job-workspace img')).toHaveCount(0)
   })
 
   test('the composer opens Capture on this job and writes nothing', async ({ context, page }) => {
@@ -502,7 +506,7 @@ test.describe('job page on a desktop, redesigned', () => {
       const w = window as unknown as { __captureDetail?: unknown }
       window.addEventListener('fh:open-capture', (e) => { w.__captureDetail = (e as CustomEvent).detail })
     })
-    await page.getByRole('button', { name: /Add a note, photos or a task/ }).click()
+    await page.getByRole('button', { name: 'Add to job', exact: true }).click()
     expect(await page.evaluate(() => (window as unknown as { __captureDetail?: unknown }).__captureDetail)).toEqual({ jobId: 'c-job1' })
     // Capture is a screen (D57), opened on this job.
     await expect(page).toHaveURL(/\/capture\?job=c-job1$/)
@@ -514,7 +518,8 @@ test.describe('job page on a desktop, redesigned', () => {
     await signIn(context)
     await openDesktop(page, '/jobs/c-job1')
     const nav = page.getByRole('navigation', { name: 'Job shortcuts', exact: true })
-    await expect(nav.getByRole('button', { name: 'Photos', exact: true })).toBeVisible()
+    await expect(nav.getByRole('button', { name: 'Schedule', exact: true })).toBeVisible()
+    await expect(page.getByRole('combobox', { name: 'Job section' }).getByRole('option', { name: 'Photos', exact: true })).toHaveCount(1)
     expect(await nav.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
     for (const button of await nav.getByRole('button').all()) {
       expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44)
@@ -555,7 +560,7 @@ test.describe('job page on a desktop, redesigned', () => {
   test('Invoice this opens the new invoice screen with the balance', async ({ context, page }) => {
     await signIn(context)
     await openDesktop(page, '/jobs/c-job1')
-    await page.locator('.fhd-banner').getByRole('button', { name: 'Invoice this' }).click()
+    await page.locator('.fh-job-workspace').getByRole('button', { name: 'Invoice this' }).click()
     await expect(page).toHaveURL(/\/invoices\/new\?job=c-job1$/)
     await expect(page.getByRole('heading', { level: 1, name: 'New invoice' })).toBeVisible()
     await expect(page.getByLabel('Amount')).toHaveValue('33100')
@@ -565,8 +570,8 @@ test.describe('job page on a desktop, redesigned', () => {
   test('the job page opens no dialog for payment, event, partner, complete or invoice', async ({ context, page }) => {
     await signIn(context)
     await openDesktop(page, '/jobs/c-job1')
-    const banner = page.locator('.fhd-banner')
-    await banner.getByRole('button', { name: 'Schedule', exact: true }).click()
+    const banner = page.locator('.fh-job-workspace')
+    await page.locator('.fh-job-secondary-actions').getByRole('button', { name: 'Schedule', exact: true }).click()
     await expect(page).toHaveURL(/\/schedule\/new\?job=c-job1$/)
     await expect(page.getByRole('dialog')).toHaveCount(0)
     await page.goBack()
@@ -596,10 +601,11 @@ test.describe('job page on a desktop, redesigned', () => {
       if (req.method() === 'DELETE' && req.url().includes('/rest/v1/fh_contacts')) deletes.push(req.url())
     })
     await openDesktop(page, '/jobs/c-job1')
-    const banner = page.locator('.fhd-banner')
-    await banner.getByRole('button', { name: 'Delete this job' }).click()
+    const banner = page.locator('.fh-job-workspace')
+    await banner.getByRole('button', { name: 'More actions for this job' }).click()
+    await page.getByRole('menuitem', { name: 'Delete this job' }).click()
     await expect(page.getByRole('dialog')).toHaveCount(0)
-    const again = banner.getByRole('button', { name: 'Tap again to delete' })
+    const again = page.getByRole('menuitem', { name: 'Tap again to delete' })
     await expect(again).toBeVisible()
     expect(deletes).toEqual([])
     await again.click()
@@ -630,6 +636,7 @@ test.describe('job page on a desktop, redesigned', () => {
       }
     })
     await openDesktop(page, '/jobs/c-job1')
+    await page.locator('.fh-job-lifecycle summary').click()
     const rail = page.getByRole('list', { name: 'Stage' })
     await expect(rail.getByText('Sep 23, website')).toBeVisible()
     await expect(rail.getByText('Approved Sep 28')).toBeVisible()
@@ -643,22 +650,25 @@ test.describe('job page on a desktop, redesigned', () => {
   test('a lost job shows the Lost chip and offers Reopen', async ({ context, page }) => {
     await signIn(context)
     await openDesktop(page, '/jobs/c-lost')
+    await page.locator('.fh-job-lifecycle summary').click()
     await expect(page.locator('.fhc-rail').getByText('Lost', { exact: true })).toBeVisible()
     await expect(page.getByRole('list', { name: 'Stage' }).locator('[aria-current="step"]')).toHaveCount(0)
-    await expect(page.locator('.fhc-btn--primary')).toHaveText('Reopen')
+    await expect(page.getByRole('button', { name: 'Reopen', exact: true })).toBeVisible()
   })
 
   test('crew see no money and no gold action', async ({ context, page }) => {
     await signIn(context, { role: 'crew' })
     await openDesktop(page, '/jobs/c-job1')
-    await expect(page.locator('.fhd-banner').getByRole('heading', { level: 1, name: 'Slab + trench' })).toBeVisible()
+    await expect(page.locator('.fh-job-workspace').getByRole('heading', { level: 1, name: 'Slab + trench' })).toBeVisible()
+    await page.locator('.fh-job-lifecycle summary').click()
     await expect(page.getByRole('list', { name: 'Stage' })).toBeVisible()
     await expect(page.getByText('Contract balance')).toHaveCount(0)
     await expect(page.getByText('Contract', { exact: true })).toHaveCount(0)
     await expect(page.getByText('Margin', { exact: true })).toHaveCount(0)
     await expect(page.getByText(/\$33,100/)).toHaveCount(0)
     await expect(page.getByText(/balance/i)).toHaveCount(0)
-    await expect(page.locator('.fhc-btn--primary')).toHaveCount(0)
+    await expect(page.locator('.fhc-btn--primary')).toHaveText('Add to job')
+    await expect(page.getByRole('button', { name: 'Invoice this', exact: true })).toHaveCount(0)
     await expect(page.getByRole('complementary', { name: 'Job facts' })).toBeVisible()
   })
 })

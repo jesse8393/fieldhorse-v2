@@ -13,28 +13,28 @@
  */
 :root {
   /* ---- Ground and ink, Day (spec 5.1) ---- */
-  --fh-plaster: #EDE8DF;
-  --fh-paper: #FBF9F5;
-  --fh-tray: #F5F1EA;
-  --fh-hairline: #DAD3C7;
-  --fh-hairline-soft: #EAE5DC;
-  --fh-edge: #C7BFB1;
+  --fh-plaster: #F3F1ED;
+  --fh-paper: #FFFEFC;
+  --fh-tray: #F7F5F1;
+  --fh-hairline: #DFDDD8;
+  --fh-hairline-soft: #ECEAE6;
+  --fh-edge: #D4D0C9;
   --fh-edge-strong: #8B8375;
-  --fh-ink: #1B1A16;
-  --fh-ink-2: #4F4B43;
-  --fh-ink-3: #66615A;
+  --fh-ink: #202126;
+  --fh-ink-2: #505158;
+  --fh-ink-3: #65666D;
   --fh-ink-4: #8B8375;
   --fh-focus: #1B1A16;
   /* Gold as small text (links, amounts in gold). 5.2:1 on plaster. */
-  --fh-gold-ink: #7A5A1F;
+  --fh-gold-ink: #A53D1E;
 
   /* ---- Gold (spec 5.2) ---- */
-  --fh-gold: #C9963A;
-  --fh-gold-hi: #E6C278;
-  --fh-gold-lo: #AD7E2E;
-  --fh-gold-brushed: linear-gradient(180deg, #E6C278 0%, #C9963A 55%, #AD7E2E 100%);
+  --fh-gold: #BA4824;
+  --fh-gold-hi: #BD4C28;
+  --fh-gold-lo: #9E3A1C;
+  --fh-gold-brushed: linear-gradient(180deg, #C6502A, #B84421);
   --fh-gold-edge: inset 0 1px 0 rgba(255, 244, 214, 0.75), inset 0 -1px 0 rgba(80, 52, 12, 0.35);
-  --fh-on-gold: #1B1A16;
+  --fh-on-gold: #FFFFFF;
 
   /* ---- Onyx stage, the same in both themes (spec 5.3) ---- */
   --fh-onyx: #16140F;
@@ -65,15 +65,17 @@
   --fh-neutral: #8B8375;
 
   /* ---- Type (spec 5.6) ---- */
-  --fh-font-body: 'Barlow', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --fh-font-display: 'Barlow Condensed', 'Barlow', -apple-system, BlinkMacSystemFont, sans-serif;
-  --fh-font-wordmark: 'Bebas Neue', 'Barlow Condensed', sans-serif;
+  --fh-font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --fh-font-display: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --fh-font-wordmark: var(--fh-font-body);
 
   /* ---- Shape, depth (spec 5.7) ---- */
   --fh-r-chip: 7px;
-  --fh-r-control: 12px;
-  --fh-r-control-lg: 14px;
-  --fh-r-card: 14px;
+  --fh-r-hairline: 2px;
+  --fh-tracking-title: -.035em;
+  --fh-r-control: 8px;
+  --fh-r-control-lg: 10px;
+  --fh-r-card: 12px;
   --fh-r-photo: 18px;
   --fh-r-vault: 22px;
   --fh-r-sheet: 22px;
@@ -110,10 +112,10 @@
   --onyx-light-1: color-mix(in srgb, var(--fh-onyx) 94%, var(--fh-linen) 6%);
   --onyx-light-2: color-mix(in srgb, var(--fh-onyx) 90%, var(--fh-linen) 10%);
   --onyx-light-3: color-mix(in srgb, var(--fh-onyx) 84%, var(--fh-linen) 16%);
-  --gold-10: rgba(201, 150, 58, 0.10);
-  --gold-20: rgba(201, 150, 58, 0.20);
-  --gold-30: rgba(201, 150, 58, 0.30);
-  --gold-45: rgba(201, 150, 58, 0.45);
+  --gold-10: rgba(186, 72, 36, 0.10);
+  --gold-20: rgba(186, 72, 36, 0.20);
+  --gold-30: rgba(186, 72, 36, 0.30);
+  --gold-45: rgba(186, 72, 36, 0.45);
   --linen-dark-1: var(--fh-tray);
   --linen-dark-2: var(--fh-hairline-soft);
   --linen-muted: var(--fh-ink-2);
@@ -243,6 +245,13 @@
   --fh-chrome-veil-2: var(--fh-veil-2);
   --fh-chrome-veil-0: var(--fh-veil-0);
   --fh-canvas: var(--fh-plaster);
+  /* Light glass: translucency belongs to chrome, never reading surfaces. */
+  --fh-glass: rgba(255, 254, 252, 0.88);
+  --fh-glass-edge: rgba(255, 255, 255, 0.95);
+  --fh-glass-shadow: 0 8px 32px rgba(51, 43, 30, 0.06), inset 0 1px 0 var(--fh-glass-edge);
+  --fh-glass-blur: blur(22px) saturate(1.15);
+  --fh-accent-soft: #FBECE5;
+  --fh-ambient: #EAE2D7;
 
   --v3-primary: var(--fh-gold);
   --v3-primary-hot: var(--fh-gold);
@@ -311,6 +320,10 @@
 /* ---- Night (spec 5.5). Only --fh- values change; the legacy names
    above follow through their var() references. ---- */
 [data-theme='dark'] {
+  --fh-glass: rgba(33, 31, 25, 0.94);
+  --fh-glass-edge: rgba(255, 255, 255, 0.10);
+  --fh-accent-soft: #3A2821;
+  --fh-ambient: #25221C;
   --fh-plaster: #171611;
   --fh-paper: #211F19;
   --fh-tray: #2A2720;
@@ -323,10 +336,10 @@
   --fh-ink-3: #9A9183;
   --fh-ink-4: #7A7366;
   --fh-focus: #F2EDE4;
-  --fh-gold-ink: #C9963A;
+  --fh-gold-ink: #EBA58A;
   --fh-dock: #1E1C16;
   --fh-stage: #24211B;
-  --fh-stage-edge: rgba(201, 150, 58, 0.32);
+  --fh-stage-edge: rgba(186, 72, 36, 0.32);
 
   --fh-success: #5FB37F;
   --fh-success-fill: #1F3A2B;

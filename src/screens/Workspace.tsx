@@ -21,6 +21,7 @@ import { useMembership } from '../contexts/MembershipContext.tsx'
 import { MENU_GROUPS, isActive } from '../lib/navItems.ts'
 import { useNavAccess } from '../lib/useNavAccess.ts'
 import { hapticTap } from '../lib/haptics.ts'
+import { headerFullName, profileCompanyIsWorkspace } from '../lib/headerName.ts'
 import './workspace.css'
 
 export default function Workspace() {
@@ -28,7 +29,7 @@ export default function Workspace() {
   const { pathname } = useLocation()
   const { signOut, user } = useAuth()
   const { profile } = useProfile()
-  const { memberships } = useMembership()
+  const { memberships, orgName, isOwner } = useMembership()
   const { canSee, hasCrew } = useNavAccess()
   const titleRef = useRef<HTMLHeadingElement>(null)
 
@@ -39,7 +40,8 @@ export default function Workspace() {
     .map((g) => ({ ...g, items: g.items.filter((it) => canSee(it.to)) }))
     .filter((g) => g.items.length > 0)
 
-  const company = profile?.company_name?.trim() || profile?.full_name?.trim() || 'Your workspace'
+  const company = headerFullName(orgName, profile?.company_name, profile?.full_name)
+  const ownCompany = profileCompanyIsWorkspace({ orgName, companyName: profile?.company_name, ownsWorkspace: isOwner, workspacesOwned: memberships.filter(m => m.role === 'owner').length })
 
   // Back to the screen the monogram was tapped on.
   function goBack() {
@@ -70,7 +72,7 @@ export default function Workspace() {
       </header>
 
       <div className="fhws-who">
-        <Monogram name={company} logoUrl={profile?.logo_url} size={48} />
+        <Monogram name={company} logoUrl={ownCompany ? profile?.logo_url : null} size={48} />
         <div className="fhws-who__text">
           <span className="fhws-who__company">{company}</span>
           {user?.email && <span className="fhws-who__email">{user.email}</span>}

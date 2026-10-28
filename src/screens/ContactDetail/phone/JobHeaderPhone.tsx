@@ -1,28 +1,19 @@
 import { forwardRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronLeft, MoreHorizontal, Image as ImageIcon, Phone, MessageSquare, Navigation, Camera } from 'lucide-react'
+import { ChevronDown, ChevronLeft, MoreHorizontal, Image as ImageIcon, Phone, MessageSquare, Navigation, Camera } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { Chip, Icon, IconButton, OnyxStage, StageRail } from '../../../components/fh'
+import { Chip, Icon, IconButton, StageRail } from '../../../components/fh'
 import { cx } from '../../../components/fh/cx.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { navigateHrefHere } from '../../../lib/todayView.ts'
 import type { JobMoney } from '../lib/spine.ts'
 import type { JobPhotos } from './SpineList.tsx'
+import JobStatus from '../../../components/fh/JobStatus.tsx'
+import JobVisitSummary, { type JobVisit } from '../../../components/fh/JobVisitSummary.tsx'
 import './job-phone.css'
 
-// The top of the Job page on a phone (spec 9.4, render glamor/g-job.jpg):
-//
-// 1. The newest job photo, full bleed under the status bar, fading into
-//    the onyx band. With no photo, or one that fails to sign or load,
-//    the band stands alone with the same text and no image box.
-// 2. The band: job title in Barlow Condensed, then the client and the
-//    address in smoke, closed by the gold hairline.
-// 3. The stage rail (a lost job shows the neutral Lost chip).
-// 4. The money strip, for money roles only.
-// 5. Quick actions: Call, Message, Navigate, Photos.
-//
-// JobSectionTabs (decision D5) lives here too. The more button opens the
-// job's More screen, /jobs/:id/more (Phase 9, Task 13, D57).
+// Mobile job identity, real photography, contextual actions, and visit summary.
+// The full lifecycle and role-filtered finances remain in an inline disclosure.
 
 function photoLabel(count: number) {
   return count === 1 ? '1 photo' : `${count} photos`
@@ -38,12 +29,13 @@ export type JobHeaderPhoneProps = {
   /** Opens the job's More screen; omit to hide the more button. */
   onMore?: () => void
   onOpenPhotos: () => void
+  scheduleItems?: JobVisit[]
+  onOpenSchedule?: () => void
 }
 
-export default function JobHeaderPhone({ contact, photos, money, backLabel, onBack, onMore, onOpenPhotos }: JobHeaderPhoneProps) {
+export default function JobHeaderPhone({ contact, photos, money, backLabel, onBack, onMore, onOpenPhotos, scheduleItems, onOpenSchedule }: JobHeaderPhoneProps) {
   const cover = photos.cover
   const [failedSrc, setFailedSrc] = useState<string | null>(null)
-  const [loadedSrc, setLoadedSrc] = useState<string | null>(null)
   const hasPhoto = !!cover && cover.url !== failedSrc
 
   const name = String(contact?.name || '').trim()
@@ -66,37 +58,25 @@ export default function JobHeaderPhone({ contact, photos, money, backLabel, onBa
 
   return (
     <div className="fhj-head">
-      <OnyxStage as="header" className={cx('fhj-hero', hasPhoto && 'has-photo')}>
-        {hasPhoto && (
-          <div className="fhj-hero__photo">
-            <img
-              className={cx('fhj-hero__img', loadedSrc === cover.url && 'is-loaded')}
-              src={cover.url}
-              alt={cover.alt}
-              decoding="async"
-              onLoad={() => setLoadedSrc(cover.url)}
-              onError={() => setFailedSrc(cover.url)}
-            />
-            {countButton}
-          </div>
-        )}
-
-        <div className="fhj-hero__bar">
-          <IconButton variant="onyx" icon={ChevronLeft} aria-label={`Back to ${backLabel.toLowerCase()}`} onClick={onBack} />
-          <div className="fhj-hero__bar-end">
-            {!hasPhoto && countButton}
-            {onMore && <IconButton variant="onyx" icon={MoreHorizontal} aria-label="More actions for this job" onClick={onMore} />}
-          </div>
+      <header className="fh-job-phone-heading">
+        <div className="fh-job-phone-heading__bar">
+          <button type="button" className="fh-job-back" onClick={onBack} aria-label={`Back to ${backLabel.toLowerCase()}`}><ChevronLeft size={17} aria-hidden="true" />{backLabel}</button>
+          {onMore && <IconButton variant="paper" icon={MoreHorizontal} aria-label="More actions for this job" onClick={onMore} />}
         </div>
-
-        <div className="fhj-hero__band">
-          <h1 className="fhj-hero__title">{title}</h1>
-          {sub && <p className="fhj-hero__sub">{sub}</p>}
-        </div>
-      </OnyxStage>
+        <h1>{title}</h1>
+        {sub && <p>{sub}</p>}
+        <JobStatus record={contact} />
+        {hasPhoto && <div className="fh-job-cover">
+          <img src={cover.url} alt={cover.alt} decoding="async" onError={() => setFailedSrc(cover.url)} />
+          {countButton}
+        </div>}
+        {!hasPhoto && countButton}
+      </header>
 
       <div className="fhj-facts">
-        <StageRail record={contact} aria-label="Stage" className="fhj-rail" />
+        <details className="fh-job-finance-disclosure">
+          <summary>{money ? 'Job finances & status' : 'Job status'}<ChevronDown size={16} aria-hidden="true" /></summary>
+          <StageRail record={contact} aria-label="Stage" className="fhj-rail" />
 
         {money && (
           <div className="fhj-money">
@@ -119,6 +99,8 @@ export default function JobHeaderPhone({ contact, photos, money, backLabel, onBa
             )}
           </div>
         )}
+
+        </details>
 
         <ul className="fhj-quick" aria-label="Quick actions">
           <li>
@@ -146,6 +128,7 @@ export default function JobHeaderPhone({ contact, photos, money, backLabel, onBa
           </li>
         </ul>
       </div>
+      {onOpenSchedule && <div className="fh-job-phone-visit"><JobVisitSummary visits={scheduleItems} onOpen={onOpenSchedule} /></div>}
     </div>
   )
 }
@@ -213,18 +196,22 @@ export const JobSectionTabs = forwardRef<HTMLDivElement, {
   idBase: string
 }>(function JobSectionTabs({ tabs, value, onChange, idBase }, ref) {
   const groups = SECTION_GROUPS.map(group => ({ ...group, tabs: tabs.filter(tab => group.ids.includes(tab.id)) })).filter(group => group.tabs.length)
+  const shortcuts = tabs.filter(tab => ['overview', 'tasks', 'schedule'].includes(tab.id))
+  const inShortcuts = shortcuts.some(tab => tab.id === value)
   return (
     <div className="fh-job-sections" ref={ref}>
-      <label className="fh-job-sections__picker" htmlFor={`${idBase}-select`}>
-        Job section
-        <select id={`${idBase}-select`} value={value} onChange={event => { hapticTap(); onChange(event.target.value) }}>
+      <label className={cx('fh-job-sections__picker', !inShortcuts && 'is-active')} htmlFor={`${idBase}-select`}>
+        <span className="fhc-vh">Job section</span>
+        <span className="fh-job-sections__current" aria-hidden="true">{inShortcuts ? 'More' : tabs.find(tab => tab.id === value)?.label || 'More'}</span>
+        <ChevronDown size={15} aria-hidden="true" />
+        <select id={`${idBase}-select`} aria-label="Job section" value={value} title="All job sections" onChange={event => { hapticTap(); onChange(event.target.value) }}>
           {groups.map(group => <optgroup key={group.label} label={group.label}>
             {group.tabs.map(tab => <option key={tab.id} value={tab.id}>{tab.label}</option>)}
           </optgroup>)}
         </select>
       </label>
       <nav className="fh-job-sections__shortcuts" aria-label="Job shortcuts">
-        {tabs.filter(tab => ['overview', 'tasks', 'schedule', 'draws', 'files'].includes(tab.id)).map(tab => <button key={tab.id} type="button" aria-current={value === tab.id ? 'page' : undefined}
+        {shortcuts.map(tab => <button key={tab.id} type="button" aria-current={value === tab.id ? 'page' : undefined}
           className={cx('fh-job-sections__link', value === tab.id && 'is-active')}
           onClick={() => { hapticTap(); onChange(tab.id) }}>{tab.label}</button>)}
       </nav>

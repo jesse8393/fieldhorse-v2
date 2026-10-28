@@ -8,6 +8,7 @@ import { cx } from './cx.ts'
 // .fh-onyx-scope, so components placed on it need no changes.
 
 export type OnyxStageProps = {
+  tone?: 'onyx' | 'paper'
   /** Warm gold glow from the top right corner. */
   glow?: boolean
   /** The 1 px gold hairline at the bottom. On by default. */
@@ -18,6 +19,7 @@ export type OnyxStageProps = {
 } & Omit<HTMLAttributes<HTMLElement>, 'className' | 'children'>
 
 export default function OnyxStage({
+  tone = 'onyx',
   glow = false,
   hairline = true,
   as: Tag = 'section',
@@ -29,8 +31,9 @@ export default function OnyxStage({
     <Tag
       {...rest}
       className={cx(
-        'fhc-stage fh-onyx-scope fh-grain',
-        glow && 'fhc-stage--glow',
+        'fhc-stage',
+        tone === 'paper' ? 'fhc-stage--paper' : 'fh-onyx-scope fh-grain',
+        glow && tone === 'onyx' && 'fhc-stage--glow',
         hairline && 'fhc-stage--hairline',
         className
       )}

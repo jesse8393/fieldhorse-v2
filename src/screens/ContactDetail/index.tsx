@@ -761,6 +761,7 @@ export default function ContactDetail() {
               crewIds={deskCrewIds}
               onInvitePartner={openInvite}
               onOpenClient={isOwnerView && contact.client_id ? () => navigate(`/clients/${contact.client_id}`) : undefined}
+              scheduleItems={scheduleItems}
               scheduleStatus={scheduleStatus}
               reportsMissing={reportsMissing}
               billingStatus={canSeeMoney ? billingStatus : null}
@@ -791,6 +792,8 @@ export default function ContactDetail() {
           onBack={() => navigate(detailHome)}
           onMore={() => navigate(`${home}/more`)}
           onOpenPhotos={() => openSection('files')}
+          scheduleItems={scheduleItems}
+          onOpenSchedule={visibleTabs.some(item => item.id === 'schedule') ? () => openSection('schedule') : undefined}
         />
 
         {actionIntentMeta && (

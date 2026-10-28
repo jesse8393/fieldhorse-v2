@@ -329,34 +329,19 @@ test.describe('desktop capture', () => {
       await expect(page.getByRole('button', { name: /^Capture/ })).toHaveCount(1)
     }
 
-    const sidebar = page.getByRole('complementary', { name: 'Primary navigation' })
+    const sidebar = page.locator('.fh-glass-header')
     const search = sidebar.getByRole('button', { name: /^Search everything/ })
     const capture = sidebar.getByRole('button', { name: /^Capture/ })
     await expect(search).toBeVisible()
     await expect(capture).toBeVisible()
 
-    // Under Search and above the main list.
-    const [s, c, t] = await Promise.all([
-      search.boundingBox(),
-      capture.boundingBox(),
-      sidebar.getByRole('button', { name: 'Today', exact: true }).boundingBox()
-    ])
-    expect(c!.y).toBeGreaterThan(s!.y + s!.height - 1)
-    expect(t!.y).toBeGreaterThan(c!.y + c!.height - 1)
-    // A real control: at least 40 px tall like the rows around it, and quiet (no brushed gold).
-    expect(c!.height).toBeGreaterThanOrEqual(40)
-    expect(await capture.evaluate((el) => getComputedStyle(el).backgroundImage)).toBe('none')
-
-    // The key cap prints the platform's modifier and the shortcut is declared.
-    const cap = capture.locator('kbd')
-    await expect(cap).toBeVisible()
+    // The header keeps capture and search visible and keyboard-discoverable.
+    const [searchBox, captureBox] = await Promise.all([search.boundingBox(), capture.boundingBox()])
+    expect(Math.abs(searchBox!.y - captureBox!.y)).toBeLessThanOrEqual(4)
+    expect(captureBox!.height).toBeGreaterThanOrEqual(44)
     const isMac = await page.evaluate(() => /Macintosh/.test(navigator.userAgent))
-    await expect(cap).toHaveText(isMac ? '⌘J' : 'Ctrl J')
     await expect(capture).toHaveAttribute('aria-keyshortcuts', isMac ? 'Meta+J' : 'Control+J')
     await expect(capture).toHaveAccessibleName(isMac ? 'Capture (Command J)' : 'Capture (Control J)')
-    // The Capture cap lines up under the Search cap: the same right edge.
-    const [searchCap, captureCap] = await Promise.all([search.locator('kbd').boundingBox(), cap.boundingBox()])
-    expect(Math.abs((captureCap!.x + captureCap!.width) - (searchCap!.x + searchCap!.width))).toBeLessThanOrEqual(0.5)
 
     // The item opens the same screen the coin does.
     await capture.click()

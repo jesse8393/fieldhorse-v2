@@ -196,6 +196,7 @@ export default function MoneyPhone({
           <Skeleton shape="block" height={212} className="fhm-vault__skel" />
         ) : (
           <VaultCard
+            tone="paper"
             label="Collected this week"
             amount={view.collectedThisWeek}
             facts={[

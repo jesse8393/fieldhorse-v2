@@ -1,47 +1,24 @@
-// SnowJobDetailBuild, desktop chrome for /jobs/:id (spec 9.11, render
-// glamor/g-desktop-job.jpg).
-//
-// Top to bottom: the photo banner (the newest job photo, or onyx alone)
-// with the title, client and address and the actions; the full width stage
-// rail with a note under each segment; then two columns. Left, a composer
-// row that opens Capture on this job, the section tabs (Overview reads
-// "Spine") and the open tab's content. Right, the facts panel. Below
-// 1280 px the facts panel drops under the Spine, so a compact strip with
-// the balance, the customer's phone and the address sits above the
-// composer (PHASE8_PLAN.md Task 14).
-//
-// Presentational. Receives the existing tab content (Overview, Quote,
-// Details, Financials, Files and the rest) as children. Forms, edit and
-// save, invoice generation, quote acceptance, partner invite and notes
-// capture all stay in the parent. The composer only opens Capture, which
-// proposes and waits for the person's confirm, so nothing here writes.
-//
-// The old rail cards (job health, schedule, reports, billing, change
-// orders) are replaced by what the render draws: schedule and balance are
-// rail notes, billing is the Balance card, change orders are a facts
-// section, and the health score and next action stay in the Spine tab's
-// "More about this job". The props that fed them are still accepted.
-
+// Light glass job workspace. Existing role-filtered sections and action handlers stay in the parent.
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { Bell, ChevronLeft, MessageSquare, Pencil, Plus, Trash2 } from 'lucide-react'
-import { Button, IconButton, OnyxStage, StageRail } from '../fh/index.ts'
+import { ChevronLeft, MessageSquare, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Button, IconButton, StageRail } from '../fh/index.ts'
 import type { StageRailProps } from '../fh/index.ts'
 import { cx } from '../fh/cx.ts'
-import { initialsFor } from '../fh/Monogram.tsx'
-import { useProfile } from '../../contexts/ProfileContext.tsx'
 import { openCapture } from '../../lib/captureAttach.ts'
-import { useMediaQuery } from '../../lib/useMediaQuery.ts'
 import { JobSectionTabs } from '../../screens/ContactDetail/phone/JobHeaderPhone.tsx'
 import type { JobMoney } from '../../screens/ContactDetail/lib/spine.ts'
 import JobFactsPanel from './JobFactsPanel.tsx'
-import JobFactsStrip from './JobFactsStrip.tsx'
+import JobVisitSummary, { type JobVisit } from '../fh/JobVisitSummary.tsx'
+import JobStatus from '../fh/JobStatus.tsx'
 import TopbarWeather from './TopbarWeather.tsx'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu.tsx'
 import './job-desktop.css'
 
 type Tab = { id: string; label: string }
 
 type Props = {
+  scheduleItems?: JobVisit[]
   contact: any
   client?: any                    // resolved client record if joined
   tabs: Tab[]
@@ -57,7 +34,7 @@ type Props = {
   /** The one gold action, following the stage (Send invoice, Approve quote, Reopen). */
   primaryAction?: { label: string; onClick: () => void } | null
   isEditing?: boolean
-  /** The newest job photo that signed. Null or a photo that will not load leaves the onyx band. */
+  /** An actual signed job photo. Missing or failed photos leave a compact visit summary. */
   coverUrl?: string | null
   coverAlt?: string
   /** Contract, paid, balance and margin, for money roles only; null hides the Balance card. */
@@ -87,155 +64,55 @@ export default function SnowJobDetailBuild(props: Props) {
   const {
     contact, client, tabs, activeTab, onTabChange,
     onBack, backLabel = 'Jobs', onEdit, onDelete, deleteArmed = false, onAddEvent,
-    primaryAction, isEditing,
-    coverUrl, coverAlt, money, railNotes, crewIds = [],
-    onInvitePartner, onOpenClient,
-    scheduleStatus, changeOrderTotals,
-    showMoney = true,
-    children,
+    primaryAction, isEditing, coverUrl, coverAlt, money, railNotes, crewIds = [],
+    onInvitePartner, onOpenClient, scheduleStatus, changeOrderTotals,
+    scheduleItems = [], showMoney = true, children,
   } = props
-
-  const { profile } = useProfile()
-  // The cover that failed to load, and the one that has. Keyed by url so a
-  // newer photo is tried again.
   const [failedSrc, setFailedSrc] = useState<string | null>(null)
-  const [loadedSrc, setLoadedSrc] = useState<string | null>(null)
   const hasPhoto = !!coverUrl && coverUrl !== failedSrc
-
-  const name = String(contact?.name || '').trim()
-  const jobTitle = String(contact?.job_title || '').trim()
-  const title = jobTitle || name || 'Untitled job'
-  const address = String(contact?.address || contact?.job_address || '').trim()
-  const sub = [jobTitle ? name : '', address].filter(Boolean).join(', ')
-  const who = name || 'this customer'
-
-  const wide = activeTab === 'quote'
-  const me = String((profile as any)?.full_name || '').trim()
-  // The facts panel stands beside the Spine from 1280 px (job-desktop.css).
-  const factsBeside = useMediaQuery('(min-width: 1280px)')
+  const title = String(contact?.job_title || contact?.name || 'Untitled job').trim()
+  const subtitle = [contact?.job_title ? contact?.name : '', contact?.address || contact?.job_address].filter(Boolean).join(' · ')
 
   return (
-    <div className="fh-build-page fh-build-detail fhd-page" data-build-screen="SnowJobDetailBuild">
+    <div className="fh-build-page fh-build-detail fhd-page fh-job-workspace" data-build-screen="SnowJobDetailBuild">
       <div className="fh-build-main">
-        <OnyxStage as="header" hairline={false} className={cx('fhd-banner', hasPhoto && 'has-photo')}>
-          {hasPhoto && (
-            <div className="fhd-banner__photo">
-              <img
-                className={cx('fhd-banner__img', loadedSrc === coverUrl && 'is-loaded')}
-                src={coverUrl as string}
-                alt={coverAlt || 'Newest job photo'}
-                decoding="async"
-                onLoad={() => setLoadedSrc(coverUrl as string)}
-                onError={() => setFailedSrc(coverUrl as string)}
-              />
-            </div>
-          )}
-
-          <div className="fhd-banner__util">
-            {/* The forecast pill, a Set location link for an owner when
-                the company has no pinned spot, or nothing at all. */}
-            <TopbarWeather className="fhd-weather" />
-            <IconButton
-              variant="onyx"
-              size={44}
-              icon={Bell}
-              aria-label="Open activity"
-              onClick={() => window.dispatchEvent(new CustomEvent('fh:navigate', { detail: { to: '/activity' } }))}
-            />
-            {onEdit && (
-              <IconButton
-                variant="onyx"
-                size={44}
-                icon={Pencil}
-                aria-label={isEditing ? 'Stop editing' : 'Edit job details'}
-                aria-pressed={isEditing ? true : undefined}
-                onClick={onEdit}
-              />
-            )}
-            {onDelete && (
-              <IconButton
-                variant="onyx"
-                size={44}
-                icon={Trash2}
-                aria-label={deleteArmed ? 'Tap again to delete' : 'Delete this job'}
-                aria-pressed={deleteArmed ? true : undefined}
-                onClick={onDelete}
-              />
-            )}
-          </div>
-
-          <div className="fhd-banner__body">
-            <div className="fhd-banner__text">
-              <button
-                type="button"
-                className="fhd-back"
-                onClick={onBack}
-                aria-label={`Back to ${backLabel.toLowerCase()}`}
-              >
-                <ChevronLeft size={18} strokeWidth={1.75} aria-hidden="true" />
-                {backLabel}
-              </button>
-              <h1 className="fhd-banner__title">{title}</h1>
-              {sub && <p className="fhd-banner__sub">{sub}</p>}
-            </div>
-
-            <div className="fhd-banner__actions">
-              <Button variant="secondary" icon={MessageSquare} to={`/compose?contact=${encodeURIComponent(contact.id)}&channel=${contact?.email || !contact?.phone ? 'email' : 'sms'}`} aria-label={`Message ${who}`}>
-                Message
-              </Button>
-              {onAddEvent && (
-                <Button variant="secondary" onClick={onAddEvent}>Schedule</Button>
-              )}
-              {primaryAction && (
-                <Button variant="primary" onClick={primaryAction.onClick}>{primaryAction.label}</Button>
-              )}
+        <header className="fh-job-heading">
+          <button type="button" className="fh-job-back" onClick={onBack} aria-label={`Back to ${backLabel.toLowerCase()}`}><ChevronLeft size={16} aria-hidden="true" />{backLabel}</button>
+          <div className="fh-job-heading__row">
+            <div className="fh-job-heading__identity"><div className="fh-job-heading__title"><h1>{title}</h1><JobStatus record={contact} /></div>{subtitle && <p>{subtitle}</p>}<TopbarWeather className="fh-job-weather" /></div>
+            <div className="fh-job-heading__actions">
+              <Button variant="primary" icon={Plus} onClick={() => openCapture({ jobId: contact.id })}>Add to job</Button>
+              {(onEdit || onDelete) && <DropdownMenu>
+                <DropdownMenuTrigger asChild><IconButton variant="paper" icon={MoreHorizontal} aria-label="More actions for this job" /></DropdownMenuTrigger>
+                <DropdownMenuContent className="fh-job-action-menu" align="end" sideOffset={8}>
+                  {onEdit && <DropdownMenuItem onSelect={onEdit}><Pencil size={16} aria-hidden="true" />{isEditing ? 'Stop editing' : 'Edit job details'}</DropdownMenuItem>}
+                  {onDelete && <DropdownMenuItem variant="destructive" onSelect={(event: Event) => { event.preventDefault(); onDelete() }}><Trash2 size={16} aria-hidden="true" />{deleteArmed ? 'Tap again to delete' : 'Delete this job'}</DropdownMenuItem>}
+                  {deleteArmed && <p role="status">Permanently removes this job and its attached records. Select again to delete.</p>}
+                </DropdownMenuContent>
+              </DropdownMenu>}
             </div>
           </div>
-        </OnyxStage>
-
-        <StageRail record={contact} notes={railNotes} aria-label="Stage" className="fhd-rail" />
-
-        <div className={cx('fhd-grid', wide && 'is-wide')}>
+        </header>
+        <div className={cx('fh-job-context', !hasPhoto && 'fh-job-context--no-photo')}>
+          {hasPhoto && <div className="fh-job-cover"><img src={coverUrl as string} alt={coverAlt || 'Newest job photo'} decoding="async" onError={() => setFailedSrc(coverUrl as string)} /></div>}
+          <JobVisitSummary visits={scheduleItems} onOpen={tabs.some(t => t.id === 'schedule') ? () => onTabChange('schedule') : onAddEvent} />
+        </div>
+        <div className="fh-job-toolbar">
+          <JobSectionTabs tabs={tabs} value={activeTab} onChange={onTabChange} idBase="fh-job-tabs" />
+        </div>
+        <div className="fh-job-columns">
           <div className="fhd-main">
-            {!wide && !factsBeside && (
-              <JobFactsStrip contact={contact} client={client} money={showMoney ? money ?? null : null} />
-            )}
-
-            <button
-              type="button"
-              className="fhd-composer"
-              onClick={() => openCapture({ jobId: contact?.id })}
-            >
-              <span className="fhd-avatar" aria-hidden="true">{me ? initialsFor(me) : <Plus size={18} strokeWidth={1.75} />}</span>
-              <span className="fhd-composer__hint">Add a note, photos or a task to this job</span>
-              <span className="fhd-composer__pill" aria-hidden="true">Add</span>
-            </button>
-
-            {tabs.length > 0 && (
-              <JobSectionTabs tabs={tabs} value={activeTab} onChange={onTabChange} idBase="fh-job-tabs" />
-            )}
-
-            <div role="region" aria-label={`${tabs.find(item => item.id === activeTab)?.label || 'Job section'} workspace`} className="fhd-panel fh-build-detail-main">
-              {children}
-            </div>
+            <div role="region" aria-label={`${tabs.find(item => item.id === activeTab)?.label || 'Job section'} workspace`} className="fhd-panel fh-build-detail-main">{children}</div>
           </div>
-
-          {!wide && (
-            <JobFactsPanel
-              contact={contact}
-              client={client}
-              money={showMoney ? money ?? null : null}
-              canSeeMoney={showMoney}
-              tabs={tabs}
-              crewIds={crewIds}
-              scheduleLabel={scheduleStatus?.label ?? null}
-              changeOrderTotals={showMoney ? changeOrderTotals ?? null : null}
-              onOpenTab={onTabChange}
-              onInvitePartner={onInvitePartner}
-              onOpenClient={onOpenClient}
-              onEdit={onEdit}
-            />
-          )}
+          <div className="fh-job-sidebar">
+            <div className="fh-job-secondary-actions">
+              <Button variant="secondary" icon={MessageSquare} to={`/compose?contact=${encodeURIComponent(contact.id)}&channel=${contact?.email || !contact?.phone ? 'email' : 'sms'}`}>Message</Button>
+              {onAddEvent && <Button variant="secondary" onClick={onAddEvent}>Schedule</Button>}
+              {primaryAction && <Button variant="secondary" onClick={primaryAction.onClick}>{primaryAction.label}</Button>}
+            </div>
+            <JobFactsPanel contact={contact} client={client} money={showMoney ? money ?? null : null} canSeeMoney={showMoney} tabs={tabs} crewIds={crewIds} scheduleLabel={scheduleStatus?.label ?? null} changeOrderTotals={showMoney ? changeOrderTotals ?? null : null} onOpenTab={onTabChange} onInvitePartner={onInvitePartner} onOpenClient={onOpenClient} onEdit={onEdit} />
+            <details className="fh-job-lifecycle"><summary>Job lifecycle</summary><StageRail record={contact} notes={railNotes} aria-label="Stage" /></details>
+          </div>
         </div>
       </div>
     </div>

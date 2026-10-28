@@ -60,7 +60,7 @@ export default function Dock() {
 
   const dock = (
     <nav
-      className={`fhs-dock fh-onyx-scope${hidden ? ' is-hidden' : ''}`}
+      className={`fhs-dock${hidden ? ' is-hidden' : ''}`}
       aria-label="Primary"
     >
       <div className="fhs-dock__side">

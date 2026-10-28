@@ -146,6 +146,7 @@ export default function SnowInvoicesBuild({
               <Skeleton shape="block" height={222} className="fhmd-vault__skel" />
             ) : (
               <VaultCard
+                tone="paper"
                 label="Collected this week"
                 amount={view.collectedThisWeek}
                 facts={[

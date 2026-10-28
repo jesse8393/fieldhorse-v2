@@ -405,7 +405,7 @@ async function leaveMoneyAndComeBack(page: Page, phone: boolean) {
   await page.evaluate(() => { (window as unknown as { fhSameDocument?: boolean }).fhSameDocument = true })
   const go = (label: string) => phone
     ? page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: label })
-    : page.getByRole('complementary', { name: 'Primary navigation' }).getByRole('button', { name: label, exact: true })
+    : page.locator('.fh-glass-nav').getByRole('link', { name: label, exact: true })
   await go('Today').click()
   await expect(page).not.toHaveURL(/\/invoices/)
   await expect(moneyHeading(page)).toHaveCount(0)

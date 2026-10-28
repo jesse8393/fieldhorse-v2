@@ -19,7 +19,7 @@ export const THEME_MODES: ThemeMode[] = ['auto', 'day', 'night']
 
 /** Browser chrome and status bar color for each theme: plaster and night plaster. */
 export const THEME_COLOR: Record<ResolvedTheme, string> = {
-  light: '#EDE8DF',
+  light: '#F3F1ED',
   dark: '#171611'
 }
 

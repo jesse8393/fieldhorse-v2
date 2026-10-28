@@ -10,6 +10,11 @@ const extensions = new Set(['.css', '.html', '.js', '.json', '.jsx', '.ts', '.ts
 // named by the mobile app, the email and document templates, the customer
 // pages and older screens, so they stay until those are rebuilt.
 const allowedColors = new Set([
+  // Approved light-glass palette. Legacy colors remain for customer documents.
+  '#F3F1ED', '#FFFEFC', '#F7F5F1', '#DFDDD8', '#ECEAE6', '#D4D0C9',
+  '#202126', '#505158', '#65666D', '#A53D1E', '#BA4824', '#BD4C28',
+  '#9E3A1C', '#C6502A', '#B84421', '#FFFFFF', '#EBA58A', '#FBECE5',
+  '#EAE2D7', '#3A2821', '#25221C',
   // Legacy brand colors
   '#C9963A', '#141414', '#F2EDE4', '#5C5C5C', '#C0392B', '#2D7A4F',
   // Day ground and ink
@@ -50,7 +55,7 @@ function isWordmarkType(file, text, index, value) {
 // and sheets 22, dock 28, pills 999 (spec 5.7).
 const allowedRadius = new Set([7, 10, 12, 14, 18, 22, 28, 999])
 const allowedRgb = new Set([
-  '201,150,58',
+  '201,150,58', '186,72,36', '255,254,252', '255,255,255', '51,43,30', '33,31,25',
   '20,20,20',
   '242,237,228',
   '92,92,92',

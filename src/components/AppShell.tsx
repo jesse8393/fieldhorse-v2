@@ -2,11 +2,6 @@ import { Suspense, useEffect, useLayoutEffect, useRef } from 'react'
 import { Navigate, Outlet, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
 import AppHeader from './AppHeader.tsx'
 import Dock from './fh/Dock.tsx'
-import { lazyWithRetry } from '../lib/lazyWithRetry.ts'
-// Lazy + conditional, DesktopSidebar is hidden by CSS on mobile but
-// still shipped + parsed. Gating on useIsDesktop saves the JS code
-// + parse cost for phone users, who outnumber desktop usage.
-const DesktopSidebar = lazyWithRetry(() => import('./DesktopSidebar.tsx'))
 import CommandPalette from './CommandPalette.tsx'
 import InstallPrompt from './InstallPrompt.tsx'
 import RouteErrorBoundary from './RouteErrorBoundary.tsx'
@@ -200,6 +195,10 @@ export default function AppShell() {
         e.preventDefault()
         go(captureRoute())
       }
+      if (window.innerWidth >= 900 && (e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'n') {
+        e.preventDefault()
+        go('/new')
+      }
     }
     function onMenu() { go('/workspace') }
     function onPalette() {
@@ -221,7 +220,7 @@ export default function AppShell() {
 
   return (
     <div
-      className={`fh-app fh-app--layout-${layoutMode}`}
+      className={`fh-app fh-app--glass fh-app--layout-${layoutMode}`}
       data-layout={layoutMode}
       style={{ position: 'relative' }}
     >
@@ -240,12 +239,6 @@ export default function AppShell() {
       {/* Desktop-only persistent left rail. CSS hides this under 900px
           so phones / narrow tablets keep the BottomNav-driven mobile
           experience verbatim. */}
-      {isDesktop && (
-        <Suspense fallback={null}>
-          <DesktopSidebar />
-        </Suspense>
-      )}
-
       <AppHeader />
 
       {/* Routed screen content.
@@ -259,11 +252,8 @@ export default function AppShell() {
           navigation always completes and any per-screen crash falls back
           to a v3 error card instead of a blank page.
 
-          Phase 1 desktop shell: the inner wrapper carries the layout
-          width cap. .fh-app__main absorbs the desktop sidebar offset
-          (padding-left), and .fh-app__main-inner holds the centered
-          content column (440 / 1280px depending on layout mode). This
-          split lets the sidebar inset coexist with margin:auto centering. */}
+          The inner wrapper sets the responsive content width. Global
+          navigation stays in the shared header at desktop sizes. */}
       <main
         id="fh-main"
         className="fh-app__main"
@@ -278,10 +268,8 @@ export default function AppShell() {
         </div>
       </main>
 
-      {/* Phone: the dock (its Capture coin goes to /capture). Desktop: the
-          sidebar above carries the Capture row (D33); nothing floats over
-          the page but the command palette, the one keyboard overlay D57
-          keeps. */}
+      {/* Phone navigation and Capture remain in the dock; desktop Capture
+          lives in the header. The command palette is shared. */}
       {!isDesktop && <Dock />}
       <CommandPalette />
       <InstallPrompt />
