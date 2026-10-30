@@ -13,38 +13,38 @@
  */
 :root {
   /* ---- Ground and ink, Day (spec 5.1) ---- */
-  --fh-plaster: #F3F1ED;
-  --fh-paper: #FFFEFC;
-  --fh-tray: #F7F5F1;
-  --fh-hairline: #DFDDD8;
-  --fh-hairline-soft: #ECEAE6;
-  --fh-edge: #D4D0C9;
-  --fh-edge-strong: #8B8375;
-  --fh-ink: #202126;
-  --fh-ink-2: #505158;
-  --fh-ink-3: #65666D;
-  --fh-ink-4: #8B8375;
-  --fh-focus: #1B1A16;
+  --fh-plaster: #FFFFFF;
+  --fh-paper: #FFFFFF;
+  --fh-tray: #F5F5F5;
+  --fh-hairline: #DEDEDE;
+  --fh-hairline-soft: #EEEEEE;
+  --fh-edge: #D4D4D4;
+  --fh-edge-strong: #858585;
+  --fh-ink: #202020;
+  --fh-ink-2: #545454;
+  --fh-ink-3: #626262;
+  --fh-ink-4: #858585;
+  --fh-focus: #202020;
   /* Gold as small text (links, amounts in gold). 5.2:1 on plaster. */
-  --fh-gold-ink: #A53D1E;
+  --fh-gold-ink: #AD4029;
 
   /* ---- Gold (spec 5.2) ---- */
-  --fh-gold: #BA4824;
-  --fh-gold-hi: #BD4C28;
-  --fh-gold-lo: #9E3A1C;
-  --fh-gold-brushed: linear-gradient(180deg, #C6502A, #B84421);
-  --fh-gold-edge: inset 0 1px 0 rgba(255, 244, 214, 0.75), inset 0 -1px 0 rgba(80, 52, 12, 0.35);
+  --fh-gold: #AD4029;
+  --fh-gold-hi: #AD4029;
+  --fh-gold-lo: #923620;
+  --fh-gold-brushed: var(--fh-gold);
+  --fh-gold-edge: none;
   --fh-on-gold: #FFFFFF;
 
   /* ---- Onyx stage, the same in both themes (spec 5.3) ---- */
-  --fh-onyx: #16140F;
-  --fh-onyx-2: #211F19;
-  --fh-onyx-line: #352F26;
-  --fh-dock: #16140F;
-  --fh-linen: #F2EDE4;
-  --fh-smoke: #9A9183;
-  --fh-gold-line: #C9963A;
-  --fh-focus-on-onyx: #F2EDE4;
+  --fh-onyx: #141414;
+  --fh-onyx-2: #222222;
+  --fh-onyx-line: #383838;
+  --fh-dock: #141414;
+  --fh-linen: #F5F5F5;
+  --fh-smoke: #ABABAB;
+  --fh-gold-line: #E3957F;
+  --fh-focus-on-onyx: #F5F5F5;
   /* The surface onyx stages and vault cards paint. Onyx by day; lifted a
      step at night, with a faint gold edge, so a stage still reads as its
      own layer on the night ground (Phase 2, task 1). */
@@ -53,20 +53,20 @@
   --fh-scrim: linear-gradient(180deg, rgba(22, 20, 15, 0) 0%, rgba(22, 20, 15, 0.78) 100%);
 
   /* ---- Status, jewel tones (spec 5.4). Every color travels with a word. ---- */
-  --fh-success: #2E7D4F;
-  --fh-success-fill: #DCEADF;
-  --fh-success-ink: #1D5536;
-  --fh-info: #3B5F85;
-  --fh-info-fill: #DCE5EE;
-  --fh-info-ink: #2C4A6B;
+  --fh-success: #626262;
+  --fh-success-fill: #EEEEEE;
+  --fh-success-ink: #454545;
+  --fh-info: #626262;
+  --fh-info-fill: #EEEEEE;
+  --fh-info-ink: #454545;
   --fh-danger: #B3362A;
   --fh-danger-fill: #F2DCD8;
   --fh-danger-ink: #7E2419;
-  --fh-neutral: #8B8375;
+  --fh-neutral: #858585;
 
   /* ---- Type (spec 5.6) ---- */
-  --fh-font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --fh-font-display: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --fh-font-body: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --fh-font-display: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --fh-font-wordmark: var(--fh-font-body);
 
   /* ---- Shape, depth (spec 5.7) ---- */
@@ -80,19 +80,19 @@
   --fh-r-vault: 22px;
   --fh-r-sheet: 22px;
   --fh-r-dock: 28px;
-  --fh-shadow-raised: 0 18px 30px -18px rgba(60, 40, 10, 0.45), 0 2px 6px rgba(60, 40, 10, 0.08);
+  --fh-shadow-raised: 0 18px 30px -18px rgba(20, 20, 20, 0.45), 0 2px 6px rgba(20, 20, 20, 0.08);
   --fh-shadow-overlay: 0 16px 28px -14px rgba(22, 20, 15, 0.55);
-  --fh-shadow-soft: 0 1px 2px rgba(60, 40, 10, 0.06), 0 8px 24px -12px rgba(60, 40, 10, 0.18);
+  --fh-shadow-soft: 0 1px 2px rgba(20, 20, 20, 0.06), 0 8px 24px -12px rgba(20, 20, 20, 0.18);
   --fh-gutter: 20px;
   --fh-gutter-desktop: 28px;
   --fh-sidebar-w: 232px;
   /* Neutral wash for icon buttons and skeleton bars. */
-  --fh-wash: rgba(27, 26, 22, 0.05);
-  --fh-wash-2: rgba(27, 26, 22, 0.08);
+  --fh-wash: rgba(32, 32, 32, 0.05);
+  --fh-wash-2: rgba(32, 32, 32, 0.08);
   /* Header veil over scrolling content. */
-  --fh-veil-1: rgba(237, 232, 223, 0.92);
-  --fh-veil-2: rgba(237, 232, 223, 0.78);
-  --fh-veil-0: rgba(237, 232, 223, 0);
+  --fh-veil-1: rgba(255, 255, 255, 0.92);
+  --fh-veil-2: rgba(255, 255, 255, 0.78);
+  --fh-veil-0: rgba(255, 255, 255, 0);
 
   /* ================================================================
      Legacy names, mapped onto the tokens above (spec section 6).
@@ -112,10 +112,10 @@
   --onyx-light-1: color-mix(in srgb, var(--fh-onyx) 94%, var(--fh-linen) 6%);
   --onyx-light-2: color-mix(in srgb, var(--fh-onyx) 90%, var(--fh-linen) 10%);
   --onyx-light-3: color-mix(in srgb, var(--fh-onyx) 84%, var(--fh-linen) 16%);
-  --gold-10: rgba(186, 72, 36, 0.10);
-  --gold-20: rgba(186, 72, 36, 0.20);
-  --gold-30: rgba(186, 72, 36, 0.30);
-  --gold-45: rgba(186, 72, 36, 0.45);
+  --gold-10: rgba(173, 64, 41, 0.10);
+  --gold-20: rgba(173, 64, 41, 0.20);
+  --gold-30: rgba(173, 64, 41, 0.30);
+  --gold-45: rgba(173, 64, 41, 0.45);
   --linen-dark-1: var(--fh-tray);
   --linen-dark-2: var(--fh-hairline-soft);
   --linen-muted: var(--fh-ink-2);
@@ -246,12 +246,12 @@
   --fh-chrome-veil-0: var(--fh-veil-0);
   --fh-canvas: var(--fh-plaster);
   /* Light glass: translucency belongs to chrome, never reading surfaces. */
-  --fh-glass: rgba(255, 254, 252, 0.88);
+  --fh-glass: rgba(255, 255, 255, 0.94);
   --fh-glass-edge: rgba(255, 255, 255, 0.95);
-  --fh-glass-shadow: 0 8px 32px rgba(51, 43, 30, 0.06), inset 0 1px 0 var(--fh-glass-edge);
+  --fh-glass-shadow: 0 8px 32px rgba(20, 20, 20, 0.06), inset 0 1px 0 var(--fh-glass-edge);
   --fh-glass-blur: blur(22px) saturate(1.15);
-  --fh-accent-soft: #FBECE5;
-  --fh-ambient: #EAE2D7;
+  --fh-accent-soft: #F6EAE6;
+  --fh-ambient: #EEEEEE;
 
   --v3-primary: var(--fh-gold);
   --v3-primary-hot: var(--fh-gold);
@@ -320,45 +320,45 @@
 /* ---- Night (spec 5.5). Only --fh- values change; the legacy names
    above follow through their var() references. ---- */
 [data-theme='dark'] {
-  --fh-glass: rgba(33, 31, 25, 0.94);
+  --fh-glass: rgba(32, 32, 32, 0.94);
   --fh-glass-edge: rgba(255, 255, 255, 0.10);
-  --fh-accent-soft: #3A2821;
-  --fh-ambient: #25221C;
-  --fh-plaster: #171611;
-  --fh-paper: #211F19;
-  --fh-tray: #2A2720;
-  --fh-hairline: #352F26;
-  --fh-hairline-soft: #2C2821;
-  --fh-edge: #4A443A;
-  --fh-edge-strong: #7A7366;
-  --fh-ink: #F2EDE4;
-  --fh-ink-2: #C9C1B3;
-  --fh-ink-3: #9A9183;
-  --fh-ink-4: #7A7366;
-  --fh-focus: #F2EDE4;
+  --fh-accent-soft: #352723;
+  --fh-ambient: #242424;
+  --fh-plaster: #171717;
+  --fh-paper: #222222;
+  --fh-tray: #292929;
+  --fh-hairline: #383838;
+  --fh-hairline-soft: #303030;
+  --fh-edge: #4A4A4A;
+  --fh-edge-strong: #858585;
+  --fh-ink: #F5F5F5;
+  --fh-ink-2: #C9C9C9;
+  --fh-ink-3: #ABABAB;
+  --fh-ink-4: #858585;
+  --fh-focus: #F5F5F5;
   --fh-gold-ink: #EBA58A;
-  --fh-dock: #1E1C16;
-  --fh-stage: #24211B;
-  --fh-stage-edge: rgba(186, 72, 36, 0.32);
+  --fh-dock: #202020;
+  --fh-stage: #262626;
+  --fh-stage-edge: rgba(173, 64, 41, 0.32);
 
-  --fh-success: #5FB37F;
-  --fh-success-fill: #1F3A2B;
-  --fh-success-ink: #9ED1B1;
-  --fh-info: #6E93BA;
-  --fh-info-fill: #1E2F40;
-  --fh-info-ink: #A9C4DE;
+  --fh-success: #ABABAB;
+  --fh-success-fill: #303030;
+  --fh-success-ink: #D4D4D4;
+  --fh-info: #ABABAB;
+  --fh-info-fill: #303030;
+  --fh-info-ink: #D4D4D4;
   --fh-danger: #D6735F;
   --fh-danger-fill: #3A1F1A;
   --fh-danger-ink: #E8B3A8;
-  --fh-neutral: #7A7366;
+  --fh-neutral: #858585;
 
-  --fh-shadow-soft: 0 1px 2px rgba(10, 9, 6, 0.35), 0 8px 24px -12px rgba(10, 9, 6, 0.55);
-  --fh-shadow-raised: 0 18px 30px -18px rgba(10, 9, 6, 0.7), 0 2px 6px rgba(10, 9, 6, 0.3);
-  --fh-wash: rgba(242, 237, 228, 0.06);
-  --fh-wash-2: rgba(242, 237, 228, 0.10);
-  --fh-veil-1: rgba(23, 22, 17, 0.92);
-  --fh-veil-2: rgba(23, 22, 17, 0.78);
-  --fh-veil-0: rgba(23, 22, 17, 0);
+  --fh-shadow-soft: 0 1px 2px rgba(20, 20, 20, 0.35), 0 8px 24px -12px rgba(20, 20, 20, 0.55);
+  --fh-shadow-raised: 0 18px 30px -18px rgba(20, 20, 20, 0.7), 0 2px 6px rgba(20, 20, 20, 0.3);
+  --fh-wash: rgba(245, 245, 245, 0.06);
+  --fh-wash-2: rgba(245, 245, 245, 0.10);
+  --fh-veil-1: rgba(23, 23, 23, 0.92);
+  --fh-veil-2: rgba(23, 23, 23, 0.78);
+  --fh-veil-0: rgba(23, 23, 23, 0);
 
   /* On Night the inverse ink is the dark one. */
   --ink-inverse: var(--fh-onyx);

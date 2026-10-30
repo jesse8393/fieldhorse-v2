@@ -44,7 +44,7 @@ export default function AppHeader() {
 
   return (
     <header className="fh-app-header fhs-header fh-glass-header">
-      <Link className="fh-glass-wordmark" to={primary[0]?.to ?? '/workspace'} aria-label="Fieldhorse home">fieldhorse<span aria-hidden="true">.</span></Link>
+      <Link className="fh-glass-wordmark" to={primary[0]?.to ?? '/workspace'} aria-label="Fieldhorse home"><svg className="fh-wordmark-symbol" viewBox="0 0 28 28" fill="none" aria-hidden="true"><path d="M5 25V4h20M10 25V10h15" stroke="currentColor" strokeWidth="2.5" /></svg><span className="fh-wordmark-text">fieldhorse<span aria-hidden="true">.</span></span></Link>
       <nav className="fh-glass-nav" aria-label="Primary">
         {primary.map(item => <Link key={item.to} to={item.to} aria-current={isActive(item, pathname) ? 'page' : undefined}
           onPointerEnter={() => prefetchRoute(item.to)} onFocus={() => prefetchRoute(item.to)}>{item.label}</Link>)}

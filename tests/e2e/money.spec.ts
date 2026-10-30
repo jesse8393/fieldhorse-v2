@@ -1218,8 +1218,9 @@ test.describe('money on a desktop', () => {
     await expect(paid.getByText('Garage slab, deposit', { exact: true })).toBeVisible()
     await expect(paid.getByText('$6,187.50', { exact: true })).toBeVisible()
 
-    // Nothing gold on the page, and no sheet anywhere.
-    await expect(page.locator('.fhc-btn--primary')).toHaveCount(0)
+    // Creating an invoice is the single primary action; reminders remain contextual.
+    await expect(page.locator('.fhc-btn--primary')).toHaveCount(1)
+    await expect(page.locator('.fhc-btn--primary')).toHaveText('New invoice')
     await expect(page.getByRole('dialog')).toHaveCount(0)
   })
 

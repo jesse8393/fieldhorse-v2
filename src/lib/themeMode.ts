@@ -19,8 +19,8 @@ export const THEME_MODES: ThemeMode[] = ['auto', 'day', 'night']
 
 /** Browser chrome and status bar color for each theme: plaster and night plaster. */
 export const THEME_COLOR: Record<ResolvedTheme, string> = {
-  light: '#F3F1ED',
-  dark: '#171611'
+  light: '#FFFFFF',
+  dark: '#171717'
 }
 
 // Without a location, Auto treats 7 am to 7 pm as day.

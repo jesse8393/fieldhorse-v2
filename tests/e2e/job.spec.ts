@@ -46,6 +46,7 @@ test.describe('job page on a phone', () => {
     const clientBox = await client.boundingBox()
     expect(clientBox!.y).toBeGreaterThan(titleBox!.y)
 
+    await page.locator('.fh-job-contact-disclosure > summary').click()
     await page.locator('.fh-job-finance-disclosure summary').click()
     const current = page.getByRole('list', { name: 'Stage' }).locator('[aria-current="step"]')
     await expect(current).toHaveText(/^Job/)
@@ -98,7 +99,8 @@ test.describe('job page on a phone', () => {
     await expect(hero.locator('img')).toHaveCount(0)
     await expect(page.locator('.fhj-spine img')).toHaveCount(0)
     // The count still opens the photos.
-    await hero.getByRole('button', { name: '2 photos' }).click()
+    await page.locator('.fh-job-contact-disclosure > summary').click()
+    await page.getByRole('button', { name: '2 photos', exact: true }).click()
     await expect(page.getByRole('region', { name: 'Photos workspace', exact: true })).toBeVisible()
     await expect(page.getByRole('combobox', { name: 'Job section', exact: true })).toHaveValue('files')
   })
@@ -332,6 +334,7 @@ test.describe('job page on a phone', () => {
   test('lost job', async ({ context, page }) => {
     await signIn(context)
     await open(page, '/jobs/c-lost')
+    await page.locator('.fh-job-contact-disclosure > summary').click()
     await page.locator('.fh-job-finance-disclosure summary').click()
     const rail = page.locator('.fhc-rail')
     await expect(rail.getByText('Lost', { exact: true })).toBeVisible()
@@ -444,7 +447,7 @@ test.describe('job page on a desktop, redesigned', () => {
     await expect(page.locator('.fh-job-secondary-actions').getByRole('button', { name: 'Schedule', exact: true })).toBeVisible()
     const gold = page.locator('.fhc-btn--primary')
     await expect(gold).toHaveCount(1)
-    await expect(gold).toHaveText('Add to job')
+    await expect(gold).toHaveText('Add update')
     // Shortcuts only fire inside the command palette, so the button draws no key cap.
     await expect(banner.locator('kbd')).toHaveCount(0)
 
@@ -461,8 +464,9 @@ test.describe('job page on a desktop, redesigned', () => {
     const banner = page.locator('.fh-job-workspace')
     await expect(banner.getByRole('heading', { level: 1, name: 'Slab + trench' })).toBeVisible()
     await expect(banner.locator('img')).toHaveCount(0)
-    await expect(banner.locator('.fh-job-context--no-photo .fh-job-visit')).toBeVisible()
-    await expect(banner.locator('.fh-job-cover')).toHaveCount(0)
+    await expect(banner.locator('.fh-work-execution .fh-job-visit')).toBeVisible()
+    await expect(banner.getByRole('heading', { name: /^Open tasks/ })).toBeVisible()
+    await expect(banner.locator('.fh-work-photo')).toHaveCount(0)
   })
 
   test('photo signing fails', async ({ context, page }) => {
@@ -476,13 +480,14 @@ test.describe('job page on a desktop, redesigned', () => {
     await expect(banner.locator('img')).toHaveCount(0)
   })
 
-  test('the newest photo is the banner, and a photo that will not load is dropped', async ({ context, page }) => {
+  test('the newest photo opens the site gallery, and a failed photo is dropped', async ({ context, page }) => {
     await signIn(context, { tables: { fh_job_files: SLAB_PHOTOS } })
     await mockPhotoStorage(context, 'ok')
     await openDesktop(page, '/jobs/c-job1')
     const banner = page.locator('.fh-job-workspace')
-    await expect(banner.locator('img')).toHaveCount(1)
-    await expect(banner.locator('img')).toHaveAttribute('alt', 'Forms and rebar in')
+    await expect(banner.locator('.fh-work-photo img')).toHaveCount(1)
+    await expect(banner.locator('.fh-work-photo img')).toHaveAttribute('alt', 'Forms and rebar in')
+    await expect(banner.getByRole('button', { name: 'Open photos: Forms and rebar in' })).toBeVisible()
     await expect(banner.getByRole('heading', { level: 1, name: 'Slab + trench' })).toBeVisible()
 
     // The same job, the image behind the url gone: no broken image box.
@@ -506,7 +511,7 @@ test.describe('job page on a desktop, redesigned', () => {
       const w = window as unknown as { __captureDetail?: unknown }
       window.addEventListener('fh:open-capture', (e) => { w.__captureDetail = (e as CustomEvent).detail })
     })
-    await page.getByRole('button', { name: 'Add to job', exact: true }).click()
+    await page.getByRole('button', { name: 'Add update', exact: true }).click()
     expect(await page.evaluate(() => (window as unknown as { __captureDetail?: unknown }).__captureDetail)).toEqual({ jobId: 'c-job1' })
     // Capture is a screen (D57), opened on this job.
     await expect(page).toHaveURL(/\/capture\?job=c-job1$/)
@@ -667,7 +672,7 @@ test.describe('job page on a desktop, redesigned', () => {
     await expect(page.getByText('Margin', { exact: true })).toHaveCount(0)
     await expect(page.getByText(/\$33,100/)).toHaveCount(0)
     await expect(page.getByText(/balance/i)).toHaveCount(0)
-    await expect(page.locator('.fhc-btn--primary')).toHaveText('Add to job')
+    await expect(page.locator('.fhc-btn--primary')).toHaveText('Add update')
     await expect(page.getByRole('button', { name: 'Invoice this', exact: true })).toHaveCount(0)
     await expect(page.getByRole('complementary', { name: 'Job facts' })).toBeVisible()
   })

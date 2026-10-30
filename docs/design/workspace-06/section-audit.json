@@ -1,0 +1,106 @@
+{
+  "viewport": 320,
+  "sections": [
+    {
+      "edge": 305,
+      "label": "Activity",
+      "past": []
+    },
+    {
+      "edge": 305,
+      "label": "Daily logs",
+      "past": []
+    },
+    {
+      "edge": 305,
+      "label": "Milestones",
+      "past": []
+    },
+    {
+      "edge": 305,
+      "label": "Tasks",
+      "past": []
+    },
+    {
+      "edge": 305,
+      "label": "Schedule",
+      "past": []
+    },
+    {
+      "edge": 305,
+      "label": "Inspections",
+      "past": []
+    },
+    {
+      "edge": 305,
+      "label": "Selections",
+      "past": []
+    },
+    {
+      "edge": 305,
+      "label": "Materials",
+      "past": [
+        "INPUT.",
+        "INPUT.",
+        "INPUT.",
+        "BUTTON.",
+        "svg.lucide lucide-plus"
+      ]
+    },
+    {
+      "edge": 305,
+      "label": "Contract balance",
+      "past": []
+    },
+    {
+      "edge": 305,
+      "label": "Invoices",
+      "past": []
+    },
+    {
+      "edge": 305,
+      "label": "Expenses",
+      "past": []
+    },
+    {
+      "edge": 305,
+      "label": "Subcontractors",
+      "past": []
+    },
+    {
+      "edge": 305,
+      "label": "Change orders",
+      "past": []
+    },
+    {
+      "edge": 305,
+      "label": "Insurance",
+      "past": []
+    },
+    {
+      "edge": 305,
+      "label": "Photos",
+      "past": []
+    },
+    {
+      "edge": 305,
+      "label": "Files",
+      "past": []
+    },
+    {
+      "edge": 305,
+      "label": "Messages",
+      "past": []
+    },
+    {
+      "edge": 305,
+      "label": "Partner access",
+      "past": []
+    }
+  ],
+  "materialsAfterFix": {
+    "edge": 305,
+    "maximumControlRight": 268,
+    "minimumControlHeight": 50
+  }
+}

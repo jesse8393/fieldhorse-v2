@@ -1,4 +1,4 @@
-import { forwardRef, useState } from 'react'
+import { forwardRef } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronDown, ChevronLeft, MoreHorizontal, Image as ImageIcon, Phone, MessageSquare, Navigation, Camera } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -9,11 +9,10 @@ import { navigateHrefHere } from '../../../lib/todayView.ts'
 import type { JobMoney } from '../lib/spine.ts'
 import type { JobPhotos } from './SpineList.tsx'
 import JobStatus from '../../../components/fh/JobStatus.tsx'
-import JobVisitSummary, { type JobVisit } from '../../../components/fh/JobVisitSummary.tsx'
 import './job-phone.css'
 
-// Mobile job identity, real photography, contextual actions, and visit summary.
-// The full lifecycle and role-filtered finances remain in an inline disclosure.
+// Compact mobile identity with customer actions and role-filtered job details.
+// Tasks, photography, and visits live in the shared overview below navigation.
 
 function photoLabel(count: number) {
   return count === 1 ? '1 photo' : `${count} photos`
@@ -29,14 +28,9 @@ export type JobHeaderPhoneProps = {
   /** Opens the job's More screen; omit to hide the more button. */
   onMore?: () => void
   onOpenPhotos: () => void
-  scheduleItems?: JobVisit[]
-  onOpenSchedule?: () => void
 }
 
-export default function JobHeaderPhone({ contact, photos, money, backLabel, onBack, onMore, onOpenPhotos, scheduleItems, onOpenSchedule }: JobHeaderPhoneProps) {
-  const cover = photos.cover
-  const [failedSrc, setFailedSrc] = useState<string | null>(null)
-  const hasPhoto = !!cover && cover.url !== failedSrc
+export default function JobHeaderPhone({ contact, photos, money, backLabel, onBack, onMore, onOpenPhotos }: JobHeaderPhoneProps) {
 
   const name = String(contact?.name || '').trim()
   const title = String(contact?.job_title || '').trim() || name || 'Untitled job'
@@ -48,7 +42,7 @@ export default function JobHeaderPhone({ contact, photos, money, backLabel, onBa
   const countButton = photos.count > 0 && (
     <button
       type="button"
-      className={cx('fhj-hero__count', hasPhoto && 'is-on-photo')}
+      className="fhj-hero__count"
       onClick={() => { hapticTap(); onOpenPhotos() }}
     >
       <Icon icon={ImageIcon} size={18} />
@@ -66,14 +60,11 @@ export default function JobHeaderPhone({ contact, photos, money, backLabel, onBa
         <h1>{title}</h1>
         {sub && <p>{sub}</p>}
         <JobStatus record={contact} />
-        {hasPhoto && <div className="fh-job-cover">
-          <img src={cover.url} alt={cover.alt} decoding="async" onError={() => setFailedSrc(cover.url)} />
-          {countButton}
-        </div>}
-        {!hasPhoto && countButton}
       </header>
 
-      <div className="fhj-facts">
+      <details className="fhj-facts fh-job-contact-disclosure">
+        <summary>Contact and job details<ChevronDown size={16} aria-hidden="true" /></summary>
+        {countButton}
         <details className="fh-job-finance-disclosure">
           <summary>{money ? 'Job finances & status' : 'Job status'}<ChevronDown size={16} aria-hidden="true" /></summary>
           <StageRail record={contact} aria-label="Stage" className="fhj-rail" />
@@ -127,8 +118,7 @@ export default function JobHeaderPhone({ contact, photos, money, backLabel, onBa
             />
           </li>
         </ul>
-      </div>
-      {onOpenSchedule && <div className="fh-job-phone-visit"><JobVisitSummary visits={scheduleItems} onOpen={onOpenSchedule} /></div>}
+      </details>
     </div>
   )
 }
@@ -202,7 +192,7 @@ export const JobSectionTabs = forwardRef<HTMLDivElement, {
     <div className="fh-job-sections" ref={ref}>
       <label className={cx('fh-job-sections__picker', !inShortcuts && 'is-active')} htmlFor={`${idBase}-select`}>
         <span className="fhc-vh">Job section</span>
-        <span className="fh-job-sections__current" aria-hidden="true">{inShortcuts ? 'More' : tabs.find(tab => tab.id === value)?.label || 'More'}</span>
+        <span className="fh-job-sections__current" aria-hidden="true">{inShortcuts ? 'All tools' : tabs.find(tab => tab.id === value)?.label || 'All tools'}</span>
         <ChevronDown size={15} aria-hidden="true" />
         <select id={`${idBase}-select`} aria-label="Job section" value={value} title="All job sections" onChange={event => { hapticTap(); onChange(event.target.value) }}>
           {groups.map(group => <optgroup key={group.label} label={group.label}>

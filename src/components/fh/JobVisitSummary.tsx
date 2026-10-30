@@ -24,8 +24,8 @@ export default function JobVisitSummary({ visits = [], onOpen }: { visits?: JobV
     ? `${end.toDateString() !== start.toDateString() ? `${end.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · ` : ''}${end.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}` : null
   return <section className="fh-job-visit" aria-label={current ? 'Current job visit' : 'Next job visit'}>
     <div className="fh-job-visit__label"><CalendarDays size={17} aria-hidden="true" />{visit ? current ? 'Current visit' : 'Next visit' : 'Schedule'}</div>
-    <h2>{visit?.title || (visit ? 'Job visit' : 'Plan the next step')}</h2>
-    <p>{visit ? `${dateLabel} · ${timeLabel}${endLabel ? ` – ${endLabel}` : ''}` : 'No upcoming visits scheduled.'}</p>
+    <h2>{visit?.title || (visit ? 'Job visit' : 'Plan your next visit')}</h2>
+    <p>{visit ? `${dateLabel} · ${timeLabel}${endLabel ? ` to ${endLabel}` : ''}` : 'No upcoming visits scheduled.'}</p>
     {onOpen && <button type="button" onClick={onOpen}>{visit ? 'View schedule' : 'Schedule a visit'}<ArrowUpRight size={16} aria-hidden="true" /></button>}
   </section>
 }

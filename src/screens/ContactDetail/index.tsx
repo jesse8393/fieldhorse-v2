@@ -584,6 +584,10 @@ export default function ContactDetail() {
           spineFirst
           inspections={inspections}
           onAddToSpine={() => openCapture({ jobId: contact.id })}
+          photos={jobPhotos}
+          onOpenPhotos={() => openSection('files')}
+          onOpenTasks={() => openSection('tasks')}
+          onOpenSchedule={() => openSection('schedule')}
         />
       )}
       {['details', 'tasks', 'schedule', 'inspections', 'insurance', 'partner'].includes(tab) && (
@@ -754,14 +758,11 @@ export default function ContactDetail() {
               onAddEvent={openEvent}
               primaryAction={stageCta}
               isEditing={isEditing}
-              coverUrl={jobPhotos.cover?.url ?? null}
-              coverAlt={jobPhotos.cover?.alt}
               money={phoneMoney}
               railNotes={deskRailNotes}
               crewIds={deskCrewIds}
               onInvitePartner={openInvite}
               onOpenClient={isOwnerView && contact.client_id ? () => navigate(`/clients/${contact.client_id}`) : undefined}
-              scheduleItems={scheduleItems}
               scheduleStatus={scheduleStatus}
               reportsMissing={reportsMissing}
               billingStatus={canSeeMoney ? billingStatus : null}
@@ -792,8 +793,6 @@ export default function ContactDetail() {
           onBack={() => navigate(detailHome)}
           onMore={() => navigate(`${home}/more`)}
           onOpenPhotos={() => openSection('files')}
-          scheduleItems={scheduleItems}
-          onOpenSchedule={visibleTabs.some(item => item.id === 'schedule') ? () => openSection('schedule') : undefined}
         />
 
         {actionIntentMeta && (

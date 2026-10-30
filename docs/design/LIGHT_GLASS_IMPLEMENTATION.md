@@ -1,3 +1,5 @@
+> Historical iteration. The current implementation and review evidence are in [Workspace 06](WORKSPACE_06_IMPLEMENTATION.md).
+
 # Light glass implementation
 
 Review branch: `redesign/light-glass-2026-10`  

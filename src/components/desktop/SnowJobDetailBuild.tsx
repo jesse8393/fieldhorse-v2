@@ -1,5 +1,4 @@
 // Light glass job workspace. Existing role-filtered sections and action handlers stay in the parent.
-import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { ChevronLeft, MessageSquare, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react'
 import { Button, IconButton, StageRail } from '../fh/index.ts'
@@ -9,7 +8,6 @@ import { openCapture } from '../../lib/captureAttach.ts'
 import { JobSectionTabs } from '../../screens/ContactDetail/phone/JobHeaderPhone.tsx'
 import type { JobMoney } from '../../screens/ContactDetail/lib/spine.ts'
 import JobFactsPanel from './JobFactsPanel.tsx'
-import JobVisitSummary, { type JobVisit } from '../fh/JobVisitSummary.tsx'
 import JobStatus from '../fh/JobStatus.tsx'
 import TopbarWeather from './TopbarWeather.tsx'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu.tsx'
@@ -18,7 +16,6 @@ import './job-desktop.css'
 type Tab = { id: string; label: string }
 
 type Props = {
-  scheduleItems?: JobVisit[]
   contact: any
   client?: any                    // resolved client record if joined
   tabs: Tab[]
@@ -34,9 +31,6 @@ type Props = {
   /** The one gold action, following the stage (Send invoice, Approve quote, Reopen). */
   primaryAction?: { label: string; onClick: () => void } | null
   isEditing?: boolean
-  /** An actual signed job photo. Missing or failed photos leave a compact visit summary. */
-  coverUrl?: string | null
-  coverAlt?: string
   /** Contract, paid, balance and margin, for money roles only; null hides the Balance card. */
   money?: JobMoney | null
   /** One short note per stage rail segment (lib/jobDesktop.ts railNotes). */
@@ -64,12 +58,10 @@ export default function SnowJobDetailBuild(props: Props) {
   const {
     contact, client, tabs, activeTab, onTabChange,
     onBack, backLabel = 'Jobs', onEdit, onDelete, deleteArmed = false, onAddEvent,
-    primaryAction, isEditing, coverUrl, coverAlt, money, railNotes, crewIds = [],
+    primaryAction, isEditing, money, railNotes, crewIds = [],
     onInvitePartner, onOpenClient, scheduleStatus, changeOrderTotals,
-    scheduleItems = [], showMoney = true, children,
+    showMoney = true, children,
   } = props
-  const [failedSrc, setFailedSrc] = useState<string | null>(null)
-  const hasPhoto = !!coverUrl && coverUrl !== failedSrc
   const title = String(contact?.job_title || contact?.name || 'Untitled job').trim()
   const subtitle = [contact?.job_title ? contact?.name : '', contact?.address || contact?.job_address].filter(Boolean).join(' · ')
 
@@ -81,7 +73,7 @@ export default function SnowJobDetailBuild(props: Props) {
           <div className="fh-job-heading__row">
             <div className="fh-job-heading__identity"><div className="fh-job-heading__title"><h1>{title}</h1><JobStatus record={contact} /></div>{subtitle && <p>{subtitle}</p>}<TopbarWeather className="fh-job-weather" /></div>
             <div className="fh-job-heading__actions">
-              <Button variant="primary" icon={Plus} onClick={() => openCapture({ jobId: contact.id })}>Add to job</Button>
+              <Button variant="primary" icon={Plus} onClick={() => openCapture({ jobId: contact.id })}>Add update</Button>
               {(onEdit || onDelete) && <DropdownMenu>
                 <DropdownMenuTrigger asChild><IconButton variant="paper" icon={MoreHorizontal} aria-label="More actions for this job" /></DropdownMenuTrigger>
                 <DropdownMenuContent className="fh-job-action-menu" align="end" sideOffset={8}>
@@ -93,14 +85,10 @@ export default function SnowJobDetailBuild(props: Props) {
             </div>
           </div>
         </header>
-        <div className={cx('fh-job-context', !hasPhoto && 'fh-job-context--no-photo')}>
-          {hasPhoto && <div className="fh-job-cover"><img src={coverUrl as string} alt={coverAlt || 'Newest job photo'} decoding="async" onError={() => setFailedSrc(coverUrl as string)} /></div>}
-          <JobVisitSummary visits={scheduleItems} onOpen={tabs.some(t => t.id === 'schedule') ? () => onTabChange('schedule') : onAddEvent} />
-        </div>
         <div className="fh-job-toolbar">
           <JobSectionTabs tabs={tabs} value={activeTab} onChange={onTabChange} idBase="fh-job-tabs" />
         </div>
-        <div className="fh-job-columns">
+        <div className={cx('fh-job-columns', activeTab === 'overview' && 'fh-job-columns--overview')}>
           <div className="fhd-main">
             <div role="region" aria-label={`${tabs.find(item => item.id === activeTab)?.label || 'Job section'} workspace`} className="fhd-panel fh-build-detail-main">{children}</div>
           </div>

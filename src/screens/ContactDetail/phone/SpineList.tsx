@@ -51,6 +51,8 @@ export type SpineListProps = {
   /** Payments and change orders only reach money roles. */
   canSeeMoney?: boolean
   onAdd: () => void
+  initialCount?: number
+  excludePhotoId?: string
 }
 
 export default function SpineList({
@@ -62,6 +64,8 @@ export default function SpineList({
   stageTransitions = [],
   inspections = [],
   canSeeMoney = false,
+  initialCount = FIRST_PAGE,
+  excludePhotoId,
   onAdd
 }: SpineListProps) {
   const photos = useJobPhotos(contact?.id)
@@ -86,13 +90,13 @@ export default function SpineList({
     }))
     return buildSpine({
       events,
-      photos: photos.rows.map((r) => ({ id: r.id, uploaded_at: r.uploaded_at, caption: r.caption, url: r.url })),
+      photos: photos.rows.filter(r => r.id !== excludePhotoId).map((r) => ({ id: r.id, uploaded_at: r.uploaded_at, caption: r.caption, url: r.url })),
       inspections: inspectionRows,
       now: new Date()
     })
-  }, [contact, notes, payments, scheduleItems, changeOrders, stageTransitions, inspections, canSeeMoney, photos.rows])
+  }, [contact, notes, payments, scheduleItems, changeOrders, stageTransitions, inspections, canSeeMoney, photos.rows, excludePhotoId])
 
-  const shown = showAll ? items : items.slice(0, FIRST_PAGE)
+  const shown = showAll ? items : items.slice(0, initialCount)
   const hidden = items.length - shown.length
 
   return (

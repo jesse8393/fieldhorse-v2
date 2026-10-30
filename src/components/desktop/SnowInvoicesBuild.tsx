@@ -135,7 +135,7 @@ export default function SnowInvoicesBuild({
         <h1 className="fhmd-title" ref={titleRef} tabIndex={-1}>Money</h1>
         <div className="fhmd-toolbar__actions">
           <Button variant="quiet" size="md" to="/analytics">Reports</Button>
-          <Button variant="secondary" size="md" icon={Plus} to="/invoices/new">New invoice</Button>
+          <Button variant="primary" size="md" icon={Plus} to="/invoices/new">New invoice</Button>
         </div>
       </header>
 

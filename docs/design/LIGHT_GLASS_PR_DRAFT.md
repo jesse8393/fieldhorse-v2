@@ -1,3 +1,5 @@
+> Historical iteration. The current implementation and review evidence are in [Workspace 06](WORKSPACE_06_IMPLEMENTATION.md).
+
 # Replace the dark workspace shell with the approved light glass design
 
 The old sidebar and dark job banner competed with the work itself, while phone job navigation repeated the current section and required horizontal scrolling. This change introduces a warm light header, clearer job identity, real-photo and no-photo layouts, a live next-visit summary, and a compact section picker that retains all 18 existing job destinations.

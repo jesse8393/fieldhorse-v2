@@ -224,7 +224,7 @@ export default function MaterialsSection({ jobId, userId }: any) {
   }, [rows])
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 24px 24px' }}>
+    <div className="fh-job-materials" style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 24px 24px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
         <Eyebrow>
           Materials
@@ -245,9 +245,8 @@ export default function MaterialsSection({ jobId, userId }: any) {
       </div>
 
       {/* Inline composer, always visible. Press Enter on Name to add. */}
-      <div style={{
+      <div className="fh-material-composer" style={{
         display: 'grid',
-        gridTemplateColumns: 'minmax(160px, 2fr) 70px 70px minmax(120px, 1fr) 90px auto',
         gap: 8,
         padding: 12,
         borderRadius: 10,
@@ -259,6 +258,7 @@ export default function MaterialsSection({ jobId, userId }: any) {
           onChange={(e) => setDraft({ ...draft, name: e.target.value })}
           onKeyDown={(e) => { if (e.key === 'Enter') addOne() }}
           placeholder="Material (e.g. 2x4 studs)"
+          aria-label="Material name"
           style={inputStyle}
         />
         <input
@@ -268,18 +268,21 @@ export default function MaterialsSection({ jobId, userId }: any) {
           value={draft.qty}
           onChange={(e) => setDraft({ ...draft, qty: e.target.value })}
           placeholder="Qty"
+          aria-label="Quantity"
           style={inputStyle}
         />
         <input
           value={draft.unit}
           onChange={(e) => setDraft({ ...draft, unit: e.target.value })}
           placeholder="EA"
+          aria-label="Unit"
           style={inputStyle}
         />
         <input
           value={draft.supplier}
           onChange={(e) => setDraft({ ...draft, supplier: e.target.value })}
           placeholder="Supplier (optional)"
+          aria-label="Supplier (optional)"
           style={inputStyle}
         />
         <input
@@ -289,15 +292,17 @@ export default function MaterialsSection({ jobId, userId }: any) {
           value={draft.unit_cost}
           onChange={(e) => setDraft({ ...draft, unit_cost: e.target.value })}
           placeholder="$/unit"
+          aria-label="Unit cost"
           style={inputStyle}
         />
         <button
           type="button"
           onClick={addOne}
+          aria-label="Add material"
           disabled={!draft.name.trim()}
           style={primaryBtn(!draft.name.trim())}
         >
-          <Plus size={12} />
+          <Plus size={12} aria-hidden="true" /> Add
         </button>
       </div>
 
@@ -379,6 +384,7 @@ function MaterialCard({
 
   return (
     <motion.li
+      className="fh-material-row"
       layout
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
@@ -386,7 +392,6 @@ function MaterialCard({
       transition={{ duration: 0.16 }}
       style={{
         display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1.6fr) 110px minmax(120px, 1fr) 110px 110px auto',
         gap: 12,
         alignItems: 'center',
         padding: '12px 12px',

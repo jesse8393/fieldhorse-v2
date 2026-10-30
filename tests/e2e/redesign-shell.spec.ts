@@ -67,7 +67,7 @@ test.describe('phone shell', () => {
     await page.getByRole('radio', { name: 'Night' }).check()
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
     expect(await page.evaluate(() => localStorage.getItem('fh:theme-mode'))).toBe('night')
-    await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#171611')
+    await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#171717')
 
     await page.reload({ waitUntil: 'domcontentloaded' })
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
@@ -142,7 +142,7 @@ test.describe('first paint', () => {
     await page.route('**/src/main.tsx', (route) => route.abort())
     await page.goto('/', { waitUntil: 'domcontentloaded' })
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
-    await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#171611')
+    await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#171717')
   })
 })
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Check, Plus, Trash2, Calendar, UserRound } from 'lucide-react'
+import { Check, Plus, Trash2, Calendar, UserRound, ArrowUpRight } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
 import { toastSuccess, toastError, toastUndo } from '../../../lib/toast.ts'
 import { resilientInsert, resilientUpdate } from '../../../lib/outbox.ts'
@@ -21,9 +21,11 @@ import { Eyebrow } from '../../../components/v3'
  *
  * Delete uses toastUndo so a stray tap can be reversed within 6s.
  */
-export default function TodosSection({ jobId, userId }: any) {
+export default function TodosSection({ jobId, userId, compact = false, onOpenTasks, onChanged }: { jobId?: string; userId?: string; compact?: boolean; onOpenTasks?: () => void; onChanged?: () => void }) {
   const [rows, setRows] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
+  const headingRef = useRef<HTMLHeadingElement>(null)
   const [draft, setDraft] = useState('')
   // Optional due date for the new todo being composed. year month day or ''.
   // Converted to a local-end-of-day ISO at insert time via dateInputToTimestamp.
@@ -65,13 +67,14 @@ export default function TodosSection({ jobId, userId }: any) {
     // can drop the legacy `user_id = me` filter and show every task
     // on the job to every teammate. The user_id column stays as
     // provenance ("created by X").
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('fh_job_todos')
       .select('*')
       .eq('job_id', jobId)
       .order('done', { ascending: true })
       .order('created_at', { ascending: false })
-    setRows(data || [])
+    setLoadError(!!error)
+    if (!error) setRows(data || [])
     setLoading(false)
   }, [jobId])
 
@@ -97,6 +100,7 @@ export default function TodosSection({ jobId, userId }: any) {
       setDueDraft('')
       setAssignDraft('')
       fetchRows()
+      onChanged?.()
     } finally {
       savingRef.current = false
       setSaving(false)
@@ -120,7 +124,7 @@ export default function TodosSection({ jobId, userId }: any) {
     if (error || !data?.length) {
       toastError("Couldn't reassign", error?.message || 'This task may have been deleted.')
       fetchRows()
-    }
+    } else onChanged?.()
   }
 
   // Inline edit: tap a row's due chip → native date picker → onChange
@@ -135,11 +139,12 @@ export default function TodosSection({ jobId, userId }: any) {
     if (error || !data?.length) {
       toastError("Couldn't update due date", error?.message || 'This task may have been deleted.')
       fetchRows()
-    }
+    } else onChanged?.()
   }
 
   async function toggle(row: any) {
     hapticTap()
+    if (compact) headingRef.current?.focus({ preventScroll: true })
     const next = !row.done
     // Optimistic
     setRows((rs) => rs.map((r) => r.id === row.id
@@ -157,6 +162,9 @@ export default function TodosSection({ jobId, userId }: any) {
     if (error) {
       toastError("Couldn't update", error.message)
       fetchRows() // rollback to truth
+    } else {
+      onChanged?.()
+      if (next) toastUndo('Task completed', { description: row.text, onUndo: () => toggle({ ...row, done: true }) })
     }
   }
 
@@ -170,6 +178,7 @@ export default function TodosSection({ jobId, userId }: any) {
       fetchRows()
       return
     }
+    onChanged?.()
     toastUndo('Task deleted', {
       description: (snapshot?.text || '').slice(0, 60) || 'Tap Undo to restore',
       onUndo: async () => {
@@ -177,6 +186,7 @@ export default function TodosSection({ jobId, userId }: any) {
         const { error: insErr } = await supabase.from('fh_job_todos').insert(snapshot)
         if (insErr) { toastError("Couldn't undo", insErr.message); return }
         fetchRows()
+        onChanged?.()
         toastSuccess('Restored')
       }
     })
@@ -184,192 +194,75 @@ export default function TodosSection({ jobId, userId }: any) {
 
   const undoneCount = rows.filter((r) => !r.done).length
 
+  if (compact) {
+    const open = rows.filter(row => !row.done).sort((a, b) => {
+      const assigned = Number(b.assigned_to === userId) - Number(a.assigned_to === userId)
+      const due = (Date.parse(a.due_at) || Infinity) - (Date.parse(b.due_at) || Infinity)
+      return assigned || due || 0
+    })
+    return <section className="fh-work-tasks" aria-labelledby="fh-work-tasks-heading">
+      <div className="fh-work-section-head">
+        <h2 id="fh-work-tasks-heading" ref={headingRef} tabIndex={-1}>Open tasks {!loading && !loadError && <span>{undoneCount}</span>}</h2>
+        <button type="button" className="fh-work-link" onClick={onOpenTasks}><Plus size={16} aria-hidden="true" />Add task</button>
+      </div>
+      {loading ? <SkeletonList rows={2} card={false} /> : loadError ? <div className="fh-work-empty" role="status">Tasks could not load.<button className="fh-work-link" type="button" onClick={fetchRows}>Try again</button></div> : open.length ? <ul className="fh-work-task-list">
+        {open.slice(0, 3).map((row, index) => {
+          const due = dueStatus(row.due_at)
+          const assigned = row.assigned_to === userId ? 'You' : memberById[row.assigned_to]?.name || (row.assigned_to ? 'Teammate' : 'Unassigned')
+          return <li key={row.id} className={index === 0 ? 'fh-work-task is-priority' : 'fh-work-task'}>
+            {index === 0 && <p className="fh-work-priority-label">{row.assigned_to === userId ? 'Assigned to you' : 'Next open task'}</p>}
+            <button type="button" className="fh-work-check" role="checkbox" aria-checked={false} aria-label={`Complete ${row.text}`} onClick={() => toggle(row)}><span aria-hidden="true" /></button>
+            <button type="button" className="fh-work-task-open" onClick={onOpenTasks}><span><strong>{row.text}</strong><small>{assigned}{due ? ` · ${due.label}` : ''}</small></span><ArrowUpRight size={16} aria-hidden="true" /></button>
+          </li>
+        })}
+      </ul> : <p className="fh-work-empty">{rows.length ? 'All current tasks complete.' : 'No tasks added yet.'}</p>}
+      {open.length > 3 && <button className="fh-work-link" type="button" onClick={onOpenTasks}>View all {open.length} tasks<ArrowUpRight size={16} aria-hidden="true" /></button>}
+    </section>
+  }
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 24px 24px' }}>
-
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <Eyebrow>
-          Tasks
-        </Eyebrow>
-        {rows.length > 0 && (
-          <span style={{
-            fontFamily: 'var(--font-body)',
-            fontSize: 12,
-            fontWeight: 700,
-            color: undoneCount === 0 ? 'var(--v3-success-text)' : 'var(--v3-primary-text)',
-            fontVariantNumeric: 'tabular-nums'
-          }}>
-            {undoneCount === 0 ? 'All clear' : `${undoneCount} pending`}
-          </span>
-        )}
+    <section className="fh-task-editor" aria-labelledby="fh-task-editor-heading">
+      <div className="fh-work-section-head">
+        <h2 id="fh-task-editor-heading">Tasks</h2>
+        {!loading && !loadError && rows.length > 0 && <span className="fh-task-count">{undoneCount === 0 ? 'All clear' : `${undoneCount} pending`}</span>}
       </div>
-
-      {/* Add row, text + optional due date + Add. Wraps to two rows on
-          narrow viewports so the text input keeps its full width. */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && !saving) add() }}
-          placeholder="Add a task…"
-          style={{
-            flex: '1 1 200px', minWidth: 0,
-            padding: '12px 12px', borderRadius: 10,
-            background: 'var(--v3-surface)', border: '1px solid var(--v3-border)',
-            color: 'var(--v3-text)', fontFamily: 'var(--font-body)',
-            fontSize: 14, outline: 'none'
-          }}
-        />
-        <input
-          type="date"
-          value={dueDraft}
-          onChange={(e) => setDueDraft(e.target.value)}
-          aria-label="Due date (optional)"
-          style={{
-            flex: '0 0 auto',
-            padding: '12px 12px', borderRadius: 10,
-            background: 'var(--v3-surface)', border: '1px solid var(--v3-border)',
-            color: dueDraft ? 'var(--v3-text)' : 'var(--v3-text-muted)',
-            fontFamily: 'var(--font-body)',
-            fontSize: 14, outline: 'none',
-            WebkitTapHighlightColor: 'transparent'
-          }}
-        />
-        {members.length > 1 && (
-          <select
-            value={assignDraft}
-            onChange={(e) => setAssignDraft(e.target.value)}
-            aria-label="Assign to (optional)"
-            style={{
-              flex: '0 0 auto',
-              padding: '12px 12px', borderRadius: 10,
-              background: 'var(--v3-surface)', border: '1px solid var(--v3-border)',
-              color: assignDraft ? 'var(--v3-text)' : 'var(--v3-text-muted)',
-              fontFamily: 'var(--font-body)',
-              fontSize: 14, outline: 'none',
-              cursor: 'pointer',
-            }}
-          >
-            <option value="">Unassigned</option>
-            {members.map((m) => (
-              <option key={m.user_id} value={m.user_id}>
-                {m.is_self ? `${m.name || 'Me'} (me)` : (m.name || m.email || 'Teammate')}
-              </option>
-            ))}
-          </select>
-        )}
-        <motion.button
-          type="button"
-          whileTap={{ scale: 0.96 }}
-          onClick={add}
-          disabled={!draft.trim() || saving}
-          aria-label="Add task"
-          style={{
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            padding: '0 16px', borderRadius: 10, border: 'none',
-            background: 'var(--v3-primary)', color: 'var(--v3-on-primary)',
-            fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-            letterSpacing: 0,
-            cursor: draft.trim() && !saving ? 'pointer' : 'default',
-            opacity: draft.trim() && !saving ? 1 : 0.5,
-            boxShadow: draft.trim() ? '0 6px 18px rgba(201, 150, 58, 0.28)' : 'none',
-            WebkitTapHighlightColor: 'transparent'
-          }}
-        >
-          <Plus size={14} aria-hidden="true" />
-          {saving ? 'Adding…' : 'Add'}
-        </motion.button>
-      </div>
-
-      {loading && <SkeletonList rows={3} card={false} />}
-      {!loading && rows.length === 0 && (
-        <div style={{
-          padding: '24px 16px', borderRadius: 10,
-          background: 'var(--v3-surface)', border: '1px dashed var(--v3-border-strong)',
-          color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)',
-          fontSize: 14, textAlign: 'center'
-        }}>
-          No tasks yet. Field crew gets shorter days when this list is full.
+      <form className="fh-task-composer" onSubmit={(event) => { event.preventDefault(); void add() }}>
+        <label className="fh-task-composer__text">
+          <span>Task description</span>
+          <input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="What needs to happen?" />
+        </label>
+        <div className="fh-task-composer__options">
+          <label>
+            <span>Due date</span>
+            <input type="date" value={dueDraft} onChange={(event) => setDueDraft(event.target.value)} aria-label="Due date (optional)" />
+          </label>
+          {members.length > 1 && <label>
+            <span>Assigned to</span>
+            <select value={assignDraft} onChange={(event) => setAssignDraft(event.target.value)} aria-label="Assign to (optional)">
+              <option value="">Unassigned</option>
+              {members.map(member => <option key={member.user_id} value={member.user_id}>{member.is_self ? `${member.name || 'Me'} (me)` : member.name || member.email || 'Teammate'}</option>)}
+            </select>
+          </label>}
         </div>
-      )}
-
-      {!loading && rows.length > 0 && (
-        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <AnimatePresence>
-            {rows.map((r) => (
-              <motion.li
-                key={r.id}
-                layout
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                transition={{ duration: 0.18, ease: [0.2, 0.8, 0.2, 1] }}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '12px 12px', borderRadius: 10,
-                  background: 'var(--v3-surface)', border: '1px solid var(--v3-border)'
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => toggle(r)}
-                  aria-label={r.done ? 'Mark not done' : 'Mark done'}
-                  style={{
-                    flexShrink: 0, width: 22, height: 22, borderRadius: 10,
-                    border: r.done
-                      ? '1px solid color-mix(in srgb, var(--v3-success-bright) 60%, transparent)'
-                      : '1px solid var(--v3-border-strong)',
-                    background: r.done ? 'rgba(45, 122, 79, 0.18)' : 'transparent',
-                    color: 'var(--v3-success-text)',
-                    cursor: 'pointer',
-                    display: 'grid', placeItems: 'center',
-                    transition: 'background 160ms ease, border-color 160ms ease'
-                  }}
-                >
-                  {r.done && <Check size={13} aria-hidden="true" />}
-                </button>
-                <span style={{
-                  flex: 1, minWidth: 0,
-                  fontFamily: 'var(--font-body)', fontSize: 14,
-                  color: r.done ? 'var(--v3-text-muted)' : 'var(--v3-text)',
-                  textDecoration: r.done ? 'line-through' : 'none',
-                  overflowWrap: 'anywhere'
-                }}>
-                  {r.text}
-                </span>
-                <DueChipButton
-                  iso={r.due_at}
-                  done={r.done}
-                  onChange={(nextIso: any) => updateDueAt(r.id, nextIso)}
-                />
-                {members.length > 1 && (
-                  <AssignChipSelect
-                    members={members}
-                    value={r.assigned_to || ''}
-                    onChange={(next: string) => reassign(r.id, next || null)}
-                    selfId={userId}
-                    memberById={memberById}
-                  />
-                )}
-                <button
-                  type="button"
-                  onClick={() => remove(r.id)}
-                  aria-label="Delete task"
-                  style={{
-                    flexShrink: 0, width: 28, height: 28, borderRadius: 10,
-                    border: 'none', background: 'transparent',
-                    color: 'var(--v3-text-muted)', cursor: 'pointer',
-                    display: 'grid', placeItems: 'center'
-                  }}
-                >
-                  <Trash2 size={13} aria-hidden="true" />
-                </button>
-              </motion.li>
-            ))}
-          </AnimatePresence>
-        </ul>
-      )}
-    </div>
+        <button className="fh-task-add" type="submit" disabled={!draft.trim() || saving} aria-label="Add task"><Plus size={16} aria-hidden="true" />{saving ? 'Adding…' : 'Add task'}</button>
+      </form>
+      {loading && <SkeletonList rows={3} card={false} />}
+      {!loading && loadError && <p role="status">Tasks could not load. <button type="button" className="fh-work-link" onClick={fetchRows}>Try again</button></p>}
+      {!loading && !loadError && rows.length === 0 && <p className="fh-work-empty">No tasks added yet.</p>}
+      {!loading && !loadError && rows.length > 0 && <ul className="fh-task-editor__list">
+        <AnimatePresence>
+          {rows.map(row => <motion.li key={row.id} className={`fh-task-editor__row${row.done ? ' is-done' : ''}`} layout initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.18, ease: [0.2, 0.8, 0.2, 1] }}>
+            <button type="button" className="fh-work-check" role="checkbox" aria-checked={!!row.done} aria-label={`${row.done ? 'Reopen' : 'Complete'} ${row.text}`} onClick={() => toggle(row)}><span>{row.done && <Check size={14} aria-hidden="true" />}</span></button>
+            <span className="fh-task-editor__text">{row.text}</span>
+            <button type="button" className="fh-task-delete" onClick={() => remove(row.id)} aria-label={`Delete task: ${row.text}`}><Trash2 size={16} aria-hidden="true" /></button>
+            <div className="fh-task-editor__meta">
+              <DueChipButton iso={row.due_at} done={row.done} onChange={(nextIso: any) => updateDueAt(row.id, nextIso)} />
+              {members.length > 1 && <AssignChipSelect members={members} value={row.assigned_to || ''} onChange={(next: string) => reassign(row.id, next || null)} selfId={userId} memberById={memberById} />}
+            </div>
+          </motion.li>)}
+        </AnimatePresence>
+      </ul>}
+    </section>
   )
 }
 
@@ -408,7 +301,7 @@ function DueChipButton({ iso, done, onChange }: any) {
   })()
 
   return (
-    <Eyebrow as="label" style={{ position: 'relative', justifyContent: 'center', gap: 4, flexShrink: 0, minWidth: 40, minHeight: 28, padding: status ? '0 8px' : 0, borderRadius: 10, background: palette.bg, border: status ? `1px solid ${palette.border}` : `1px solid transparent`, color: palette.color, whiteSpace: 'nowrap', opacity: done ? 0.5 : 1, cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }} aria-label={status ? `Due ${status.label}` : 'Set due date'}>
+    <Eyebrow as="label" style={{ position: 'relative', justifyContent: 'center', gap: 4, flexShrink: 0, minWidth: 44, minHeight: 44, padding: status ? '0 8px' : 0, borderRadius: 10, background: palette.bg, border: status ? `1px solid ${palette.border}` : `1px solid transparent`, color: palette.color, whiteSpace: 'nowrap', opacity: done ? 0.5 : 1, cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }} aria-label={status ? `Due ${status.label}` : 'Set due date'}>
       <input
         type="date"
         value={dateStr}
@@ -441,6 +334,7 @@ function AssignChipSelect({ members, value, onChange, selfId, memberById }: any)
     <label
       style={{
         flexShrink: 0,
+        minHeight: 44,
         position: 'relative',
         display: 'inline-flex',
         alignItems: 'center',

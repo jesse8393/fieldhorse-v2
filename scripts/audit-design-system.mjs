@@ -10,6 +10,8 @@ const extensions = new Set(['.css', '.html', '.js', '.json', '.jsx', '.ts', '.ts
 // named by the mobile app, the email and document templates, the customer
 // pages and older screens, so they stay until those are rebuilt.
 const allowedColors = new Set([
+  // Workspace 06 neutral and copper palette.
+  '#141414', '#171717', '#202020', '#222222', '#242424', '#262626', '#292929', '#303030', '#352723', '#383838', '#454545', '#4A4A4A', '#545454', '#626262', '#858585', '#923620', '#ABABAB', '#AD4029', '#C9C9C9', '#D4D4D4', '#DEDEDE', '#E3957F', '#EBA58A', '#EEEEEE', '#F5F5F5', '#F6EAE6', '#FFFFFF',
   // Approved light-glass palette. Legacy colors remain for customer documents.
   '#F3F1ED', '#FFFEFC', '#F7F5F1', '#DFDDD8', '#ECEAE6', '#D4D0C9',
   '#202126', '#505158', '#65666D', '#A53D1E', '#BA4824', '#BD4C28',
@@ -55,7 +57,7 @@ function isWordmarkType(file, text, index, value) {
 // and sheets 22, dock 28, pills 999 (spec 5.7).
 const allowedRadius = new Set([7, 10, 12, 14, 18, 22, 28, 999])
 const allowedRgb = new Set([
-  '201,150,58', '186,72,36', '255,254,252', '255,255,255', '51,43,30', '33,31,25',
+  '173,64,41', '32,32,32', '23,23,23', '245,245,245', '201,150,58', '186,72,36', '255,254,252', '255,255,255', '51,43,30', '33,31,25',
   '20,20,20',
   '242,237,228',
   '92,92,92',
