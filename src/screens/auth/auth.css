@@ -160,71 +160,22 @@ html:has(.fha) {
   );
 }
 
-/* ---- Wordmark: FIELD in brushed gold, HORSE in linen, a gold hairline ----
-   One word in Bebas Neue at its natural set, the way the render draws it:
-   68 px puts the capitals at 48 px, within 3 percent of the render's, and
-   the word still fits a 320 px phone. 68 is the one size off the type
-   scale, and the design audit allows it in this rule only. The block is
-   as wide as the word at every width (no cap), so the hairline runs under
-   the letters and no further. Bebas Neue carries air under its baseline,
-   so a short line box and 8 px of padding put the hairline about 15 px
-   under the capitals, as the render has it. */
+/* One identity across sign in, invitations, and the workspace. */
 .fha-wordmark {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 12px;
   width: fit-content;
+  max-width: calc(100% - 16px);
+  height: 40px;
   margin: 0 8px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--fh-gold-line);
-  font-family: var(--fh-font-wordmark);
-  font-size: 68px;
-  line-height: 0.8;
-  font-weight: 400;
-  letter-spacing: 0;
+  font: 750 30px/40px var(--fh-font-body);
+  letter-spacing: -.04em;
   white-space: nowrap;
-  user-select: none;
-  transition: opacity var(--dur-slow) var(--ease);
-}
-
-/* The 68 px word needs a 302 px screen. Below the 320 px phone (a folded
-   phone's 280 px cover screen, for one) it steps down to 52 px. */
-@media (max-width: 319px) {
-  .fha-wordmark {
-    font-size: 52px;
-  }
-}
-
-/* Any fallback face is far wider than Bebas Neue: at 68 px it runs about
-   430 px, off the edge of a phone. So until the face lands the wordmark is
-   clear (AuthShell waits up to 3 seconds), and a face that fails or comes
-   later shows the fallback at 36 px, which fits a 280 px screen. The
-   letters shrink, not the block, so the line box keeps its height and
-   nothing below moves when Bebas Neue takes over. */
-.fha-wordmark--waiting {
-  opacity: 0;
-}
-
-.fha-wordmark--waiting > span,
-.fha-wordmark--fallback > span {
-  font-size: 36px;
-}
-
-.fha-wordmark__field {
-  color: var(--fh-gold);
-}
-
-@supports ((-webkit-background-clip: text) or (background-clip: text)) {
-  .fha-wordmark__field {
-    background: var(--fh-gold-brushed);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    color: transparent;
-  }
-}
-
-.fha-wordmark__horse {
   color: var(--fh-linen);
 }
+.fha-wordmark > svg { width: 32px; height: 32px; flex: none; color: #E3957F; }
+.fha-wordmark__dot { color: #E3957F; }
 
 /* ---- Words ---- */
 .fha-line {

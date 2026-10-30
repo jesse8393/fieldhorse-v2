@@ -108,7 +108,8 @@ test.describe('capture screen', () => {
     // Brushed once there is something to file.
     await screen.getByRole('textbox', { name: 'Or type it' }).fill('Pour moved to Friday')
     await expect(gold).toBeEnabled()
-    expect(await gold.evaluate((el) => getComputedStyle(el).backgroundImage)).toContain('linear-gradient')
+    await expect(gold).toHaveCSS('background-image', 'none')
+    await expect(gold).toHaveCSS('background-color', 'rgb(173, 64, 41)')
     await screen.getByRole('textbox', { name: 'Or type it' }).fill('')
 
     // Done goes back to where the capture started.

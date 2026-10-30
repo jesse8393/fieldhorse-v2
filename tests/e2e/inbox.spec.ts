@@ -222,7 +222,10 @@ test.describe('the Inbox list', () => {
     // The list stays while the conversation opens beside it.
     await expect(list.locator('.fhi-rows > li')).toHaveCount(4)
     const box = await list.boundingBox()
-    expect(box?.x).toBeGreaterThan(200)
+    const detail = (await page.locator('.fhi-split__detail').boundingBox())!
+    expect(box!.x).toBeGreaterThanOrEqual(0)
+    expect(detail.x).toBeGreaterThanOrEqual(box!.x + box!.width - 1)
+    expect(detail.width).toBeGreaterThan(400)
     expect(box?.width).toBeLessThan(480)
   })
 })

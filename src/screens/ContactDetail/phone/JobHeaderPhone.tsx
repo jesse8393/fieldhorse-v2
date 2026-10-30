@@ -55,11 +55,11 @@ export default function JobHeaderPhone({ contact, photos, money, backLabel, onBa
       <header className="fh-job-phone-heading">
         <div className="fh-job-phone-heading__bar">
           <button type="button" className="fh-job-back" onClick={onBack} aria-label={`Back to ${backLabel.toLowerCase()}`}><ChevronLeft size={17} aria-hidden="true" />{backLabel}</button>
+          <JobStatus record={contact} />
           {onMore && <IconButton variant="paper" icon={MoreHorizontal} aria-label="More actions for this job" onClick={onMore} />}
         </div>
         <h1>{title}</h1>
         {sub && <p>{sub}</p>}
-        <JobStatus record={contact} />
       </header>
 
       <details className="fhj-facts fh-job-contact-disclosure">

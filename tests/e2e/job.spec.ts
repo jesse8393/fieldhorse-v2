@@ -95,7 +95,7 @@ test.describe('job page on a phone', () => {
     await open(page, '/jobs/c-job1')
     const hero = page.locator('.fh-job-phone-heading')
     await expect(hero.getByRole('heading', { level: 1, name: 'Slab + trench' })).toBeVisible()
-    await expect(page.locator('.fhj-spine').getByText('2 photos', { exact: true })).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Latest from site', exact: true }).getByRole('button', { name: 'Photos', exact: true })).toBeVisible()
     await expect(hero.locator('img')).toHaveCount(0)
     await expect(page.locator('.fhj-spine img')).toHaveCount(0)
     // The count still opens the photos.
@@ -475,7 +475,7 @@ test.describe('job page on a desktop, redesigned', () => {
     await openDesktop(page, '/jobs/c-job1')
     const banner = page.locator('.fh-job-workspace')
     await expect(banner.getByRole('heading', { level: 1, name: 'Slab + trench' })).toBeVisible()
-    await expect(page.locator('.fhj-spine').getByText('2 photos', { exact: true })).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Latest from site', exact: true }).getByRole('button', { name: 'Photos', exact: true })).toBeVisible()
     await page.waitForLoadState('networkidle')
     await expect(banner.locator('img')).toHaveCount(0)
   })
@@ -594,7 +594,7 @@ test.describe('job page on a desktop, redesigned', () => {
       await page.goBack()
       await expect(page.locator('[data-build-screen="SnowJobDetailBuild"]')).toBeVisible({ timeout: 30_000 })
     }
-    await banner.getByRole('button', { name: 'Invoice this' }).click()
+    await page.locator('.fh-job-secondary-actions').getByRole('button', { name: 'Invoice this', exact: true }).click()
     await expect(page).toHaveURL(/\/invoices\/new\?job=c-job1$/)
     await expect(page.getByRole('dialog')).toHaveCount(0)
   })

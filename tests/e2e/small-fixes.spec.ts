@@ -555,6 +555,7 @@ test.describe('The job header Navigate', () => {
   test('opens Google Maps off Apple devices', async ({ context, page }) => {
     await signIn(context)
     await openJob(page, '/jobs/c-job1')
+    await page.locator('.fh-job-contact-disclosure > summary').click()
     await expect(page.getByRole('link', { name: 'Navigate to 412 Burkitt Station Rd' }))
       .toHaveAttribute('href', 'https://www.google.com/maps/dir/?api=1&destination=412%20Burkitt%20Station%20Rd')
   })
@@ -564,6 +565,7 @@ test.describe('The job header Navigate', () => {
     test('opens Apple Maps', async ({ context, page }) => {
       await signIn(context)
       await openJob(page, '/jobs/c-job1')
+      await page.locator('.fh-job-contact-disclosure > summary').click()
       await expect(page.getByRole('link', { name: 'Navigate to 412 Burkitt Station Rd' }))
         .toHaveAttribute('href', 'https://maps.apple.com/?daddr=412%20Burkitt%20Station%20Rd')
     })
@@ -618,8 +620,8 @@ test.describe('The Spine', () => {
     await openJob(page, '/jobs/c-job1')
     const spine = page.locator('.fhj-spine')
     await expect(spine.getByText('Site note 1', { exact: true })).toBeVisible()
-    await expect(spine.locator('.fhj-spine__list > li')).toHaveCount(10)
-    const more = spine.getByRole('button', { name: 'Show 4 more' })
+    await expect(spine.locator('.fhj-spine__list > li')).toHaveCount(3)
+    const more = spine.getByRole('button', { name: 'Show 11 more' })
     await expect(more).toBeVisible()
     await more.click()
     await expect(spine.locator('.fhj-spine__list > li')).toHaveCount(14)

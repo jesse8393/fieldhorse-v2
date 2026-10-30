@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useQueryClient } from '@tanstack/react-query'
 import {
@@ -640,6 +641,14 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
    ============================================================ */
 
 function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, onSaveCaption, onSaveSectionTag, onDelete, deleteArmed = false }: any) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const overflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    dialogRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
+    return () => { document.body.style.overflow = overflow; previous?.focus({ preventScroll: true }) }
+  }, [])
   const [caption, setCaption] = useState(row.caption || '')
   const [sectionTag, setSectionTag] = useState(row.section_tag || '')
   const [customTag, setCustomTag] = useState('')
@@ -677,7 +686,7 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
     onSaveSectionTag?.('')
   }
 
-  return (
+  return createPortal(
     <>
       <motion.div
         onClick={onClose}
@@ -690,11 +699,24 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
         }}
       />
       <motion.div
+        ref={dialogRef}
+        className="fh-photo-lightbox fh-onyx-scope"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Photo viewer"
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') { event.stopPropagation(); onClose(); return }
+          if (event.key !== 'Tab') return
+          const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]), input, textarea, select, a[href]')).filter(el => el.getClientRects().length)
+          const first = controls[0], last = controls[controls.length - 1]
+          if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
+          else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
+        }}
         initial={{ opacity: 0, scale: 0.96 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.96 }}
         style={{
-          position: 'fixed', inset: 0, zIndex: 91,
+          position: 'fixed', inset: 0, zIndex: 91, overflowY: 'auto',
           display: 'flex', flexDirection: 'column',
           paddingTop: 'env(safe-area-inset-top)',
           paddingBottom: 'env(safe-area-inset-bottom)'
@@ -710,7 +732,7 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
             onClick={onClose}
             aria-label="Close"
             style={{
-              width: 40, height: 40, borderRadius: 10,
+              width: 44, height: 44, borderRadius: 10,
               background: 'var(--v3-border-mid)', border: 'none',
               color: '#F2EDE4', cursor: 'pointer',
               display: 'grid', placeItems: 'center'
@@ -731,7 +753,7 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
             aria-label={deleteArmed ? 'Tap again to delete' : 'Delete photo'}
             aria-pressed={deleteArmed ? true : undefined}
             style={{
-              minWidth: 40, height: 40, borderRadius: 10, padding: deleteArmed ? '0 12px' : 0,
+              minWidth: 44, height: 44, borderRadius: 10, padding: deleteArmed ? '0 12px' : 0,
               background: deleteArmed ? 'rgba(192, 57, 43, 0.5)' : 'rgba(192, 57, 43, 0.18)', border: 'none',
               color: deleteArmed ? '#F2EDE4' : '#C9963A', cursor: 'pointer',
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
@@ -884,6 +906,7 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
             Caption
           </Eyebrow>
           <textarea
+            aria-label="Photo caption"
             value={caption}
             onChange={(e) => setCaption(e.target.value)}
             onBlur={() => onSaveCaption(caption)}
@@ -898,7 +921,8 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
           />
         </div>
       </motion.div>
-    </>
+    </>,
+    document.body
   )
 }
 

@@ -42,9 +42,12 @@ test('job tasks can be completed, undone, and created on a narrow phone', async 
 
 test('a failed task read offers retry without claiming the job has no tasks', async ({ context, page }) => {
   await signIn(context)
-  await context.route(/\/rest\/v1\/fh_job_todos(\?|$)/, route => route.fulfill({
-    status: 503, contentType: 'application/json', body: JSON.stringify({ message: 'Temporary test failure' }),
-  }))
+  let reads = 0
+  await context.route(/\/rest\/v1\/fh_job_todos(\?|$)/, route => {
+    // Let the parent job load, then fail the task section's independent read.
+    if (++reads === 1) return route.fallback()
+    return route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ message: 'Temporary test failure' }) })
+  })
   await page.goto('/jobs/c-job1')
   const tasks = page.getByRole('region', { name: 'Open tasks', exact: true })
   await expect(tasks).toContainText('Tasks could not load.')
@@ -54,7 +57,7 @@ test('a failed task read offers retry without claiming the job has no tasks', as
 
 test('the material composer and existing materials fit a narrow phone', async ({ context, page }) => {
   await signIn(context, { tables: { fh_materials: [{
-    id: 'material-review', job_id: 'c-job1', user_id: 'qa-user-1', name: 'Pressure treated timber',
+    id: 'material-review', contact_id: 'c-job1', user_id: 'qa-user-1', name: 'Pressure treated timber',
     qty_needed: 12, unit: 'EA', unit_cost: 16, supplier: 'Local building supplier', created_at: new Date().toISOString(),
   }] } })
   await page.setViewportSize({ width: 320, height: 844 })

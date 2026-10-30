@@ -241,48 +241,33 @@ test.describe(`a desktop ${WIDTH} px wide`, () => {
     await nothingRunsOffTheSide(page)
   })
 
-  test('the job page: nothing runs off the side, Invoice this is on screen and the facts sit above the composer', async ({ context, page }) => {
+  test('job tasks lead while updates and complete job facts remain reachable at tablet width', async ({ context, page }) => {
     await open(context, page, '/jobs/c-job1')
     await expect(page.locator('[data-build-screen="SnowJobDetailBuild"]')).toBeVisible({ timeout: 30_000 })
-    await expect(page.locator('.fhj-spine').getByText('Inspector confirmed Friday.')).toBeVisible()
-    await onScreenUnscrolled(page, page.locator('.fh-job-secondary-actions').getByRole('button', { name: 'Invoice this' }))
-
-    const strip = page.getByRole('region', { name: 'Job at a glance' })
-    const composer = page.getByRole('button', { name: /Add a note, photos or a task/ })
-    if (WIDTH < 1280) {
-      // Balance, the customer's phone and the address with Navigate, right
-      // under the stage rail and above the composer.
-      await expect(strip.getByText('Balance', { exact: true })).toBeVisible()
-      await expect(strip.getByText('$33,100.00', { exact: true })).toBeVisible()
-      await expect(strip.getByRole('link', { name: /555-0101/ })).toHaveAttribute('href', 'tel:555-0101')
-      await expect(strip.getByText('412 Burkitt Station Rd', { exact: true })).toBeVisible()
-      // The shared navigateHref: Google Maps away from Apple devices.
-      await expect(strip.getByRole('link', { name: /^Navigate/ })).toHaveAttribute(
-        'href',
-        'https://www.google.com/maps/dir/?api=1&destination=412%20Burkitt%20Station%20Rd'
-      )
-      const stripBox = (await strip.boundingBox())!
-      const composerBox = (await composer.boundingBox())!
-      expect(stripBox.y + stripBox.height, 'the strip ends above the composer').toBeLessThanOrEqual(composerBox.y)
-      await onScreenUnscrolled(page, strip)
-    } else {
-      // Two columns: the facts panel stands beside the Spine, so no strip.
-      await expect(strip).toHaveCount(0)
-      const facts = (await page.getByRole('complementary', { name: 'Job facts' }).boundingBox())!
-      const composerBox = (await composer.boundingBox())!
-      expect(facts.x).toBeGreaterThanOrEqual(composerBox.x + composerBox.width)
-    }
+    await onScreenUnscrolled(page, page.getByRole('button', { name: 'Add update', exact: true }))
+    const tasks = page.getByRole('region', { name: /^Open tasks/ })
+    await onScreenUnscrolled(page, tasks)
+    const facts = page.getByRole('complementary', { name: 'Job facts' })
+    await expect(facts.getByText('Contract balance', { exact: true })).toBeVisible()
+    await expect(facts.locator('.fhc-vault__amount')).toHaveText('$33,100.00')
+    await expect(facts.getByRole('link', { name: /555-0101/ })).toHaveAttribute('href', 'tel:555-0101')
+    await expect(facts.getByText('412 Burkitt Station Rd', { exact: true })).toBeVisible()
+    await expect(facts.getByRole('link', { name: /^Navigate/ })).toHaveAttribute('href', 'https://www.google.com/maps/dir/?api=1&destination=412%20Burkitt%20Station%20Rd')
+    const actions = page.locator('.fh-job-secondary-actions')
+    await expect(actions.getByRole('button', { name: 'Invoice this', exact: true })).toBeVisible()
     await nothingRunsOffTheSide(page)
+    await actions.getByRole('button', { name: 'Invoice this', exact: true }).click()
+    await expect(page).toHaveURL(/\/invoices\/new\?job=c-job1$/)
   })
 
-  test('the job page for crew: the strip has the phone and the address but no money', async ({ context, page }) => {
-    test.skip(WIDTH >= 1280, 'The strip shows below 1280 px')
+  test('crew can reach customer contact and directions without financial information', async ({ context, page }) => {
     await open(context, page, '/jobs/c-job1', { role: 'crew' })
-    const strip = page.getByRole('region', { name: 'Job at a glance' })
-    await expect(strip.getByRole('link', { name: /555-0101/ })).toBeVisible({ timeout: 30_000 })
-    await expect(strip.getByRole('link', { name: /^Navigate/ })).toBeVisible()
+    const facts = page.getByRole('complementary', { name: 'Job facts' })
+    await expect(facts.getByRole('link', { name: /555-0101/ })).toBeVisible({ timeout: 30_000 })
+    await expect(facts.getByRole('link', { name: /^Navigate/ })).toBeVisible()
     await expect(page.getByText(/balance/i)).toHaveCount(0)
     await expect(page.getByText(/\$33,100/)).toHaveCount(0)
+    await nothingRunsOffTheSide(page)
   })
 
   test('Schedule: nothing runs off the side and New job is on screen', async ({ context, page }) => {

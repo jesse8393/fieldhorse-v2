@@ -444,8 +444,8 @@ export default function OverviewTab({
             <JobVisitSummary visits={scheduleItems} onOpen={onOpenSchedule || onOpenAddEvent} />
           </div>
           <section className="fh-work-evidence" aria-label="Latest from site">
+            {(showCover || photos?.count > 0) && <div className="fh-work-section-head"><h2>Latest from site</h2><button className="fh-work-link" type="button" onClick={onOpenPhotos}>Photos<ArrowUpRight size={16} aria-hidden="true" /></button></div>}
             {showCover && <>
-              <div className="fh-work-section-head"><h2>Latest from site</h2><button className="fh-work-link" type="button" onClick={onOpenPhotos}>Photos<ArrowUpRight size={16} aria-hidden="true" /></button></div>
               <button className="fh-work-photo" type="button" onClick={onOpenPhotos} aria-label={`Open photos: ${cover.alt}`}>
                 <img src={cover.url} alt={cover.alt} onError={() => setFailedCover(cover.url)} decoding="async" />
                 <span><Camera size={16} aria-hidden="true" />Site photograph<ArrowUpRight size={16} aria-hidden="true" /></span>
