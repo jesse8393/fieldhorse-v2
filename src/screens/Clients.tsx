@@ -41,7 +41,9 @@ export default function Clients() {
   const [searchParams, setSearchParams] = useSearchParams()
   const q = searchParams.get('q') || ''
   const setQ = (value: string) => {
-    const next = new URLSearchParams(searchParams)
+    // History updates before the router renders. Read it so clearing a
+    // search immediately after selecting a filter preserves that filter.
+    const next = new URLSearchParams(window.location.search)
     if (value) next.set('q', value)
     else next.delete('q')
     setSearchParams(next, { replace: true })
@@ -49,7 +51,7 @@ export default function Clients() {
   const urlFilter = searchParams.get('filter')
   const filter = urlFilter === 'active' || urlFilter === 'recent' ? urlFilter : 'all'
   const setFilter = (next: string) => {
-    const sp = new URLSearchParams(searchParams)
+    const sp = new URLSearchParams(window.location.search)
     if (next === 'all') sp.delete('filter')
     else sp.set('filter', next)
     setSearchParams(sp, { replace: true })
@@ -259,7 +261,7 @@ export default function Clients() {
             </Button>
           </div>
 
-          {/* KPI strip, Won contract value | Outstanding (when populated) */}
+          {/* Contract value includes work that has not yet been invoiced. */}
           <div style={{
             display: 'grid',
             gridTemplateColumns: screenStats.outstanding > 0 ? '1fr 1px 1fr' : '1fr',
@@ -279,12 +281,12 @@ export default function Clients() {
               <>
                 <span aria-hidden="true" style={{ background: 'var(--v3-border)', alignSelf: 'stretch' }} />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-                  <Eyebrow>Outstanding</Eyebrow>
+                  <Eyebrow>Contract balance</Eyebrow>
                   <StampNumber size="xl" tone="danger" style={{ display: 'block', lineHeight: 0.95 }}>
                     {money(screenStats.outstanding)}
                   </StampNumber>
                   <Eyebrow as="div" style={{ marginTop: 2 }}>
-                    {screenStats.owesAccounts} {screenStats.owesAccounts === 1 ? 'client owes' : 'clients owe'}
+                    {screenStats.owesAccounts} with a balance
                   </Eyebrow>
                 </div>
               </>
@@ -301,7 +303,7 @@ export default function Clients() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search name, company, phone, email…"
-            style={{ width: '100%', padding: '12px 12px 12px 32px', borderRadius: 10, background: 'var(--v3-surface)', border: '1px solid var(--v3-border-strong)', color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
+            style={{ width: '100%', padding: '12px 12px 12px 32px', borderRadius: 10, background: 'var(--v3-surface)', border: '1px solid var(--v3-border-strong)', color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 16, boxSizing: 'border-box' }}
           />
         </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 10, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }}>

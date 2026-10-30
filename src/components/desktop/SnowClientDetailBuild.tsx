@@ -81,13 +81,13 @@ export default function SnowClientDetailBuild(props: Props) {
   const nextAction = outstanding > 0
     ? { label: 'Review remaining contract balance', tone: 'warn' as const }
     : activeCount === 0
-      ? { label: 'Contact again client', tone: 'neutral' as const }
+      ? { label: 'Reconnect with client', tone: 'neutral' as const }
       : status.tone === 'warn'
         ? { label: 'Follow up on stale jobs', tone: 'warn' as const }
         : { label: 'Review active work', tone: 'neutral' as const }
 
   return (
-    <div className="fh-build-page fh-build-detail" data-build-screen="SnowClientDetailBuild">
+    <div className="fh-build-page fh-build-detail fh-client-workspace" data-build-screen="SnowClientDetailBuild">
       <header className="fh-build-topbar fh-build-topbar--detail">
         <button type="button" className="fh-build-back" onClick={onBack} aria-label="Back to clients">
           <ChevronLeft size={16} /> Clients
@@ -177,7 +177,7 @@ export default function SnowClientDetailBuild(props: Props) {
               </button>
             )}
             {onNewDeal && (
-              <button type="button" className="fh-build-tabs__cta" onClick={onNewDeal} style={onStatement ? undefined : { marginLeft: 'auto' }}>
+              <button type="button" className="fh-build-tabs__cta fh-client-new" onClick={onNewDeal} style={onStatement ? undefined : { marginLeft: 'auto' }}>
                 <Plus size={13} /> New deal
               </button>
             )}
@@ -243,7 +243,7 @@ export default function SnowClientDetailBuild(props: Props) {
               )}
             </section>
 
-            <section className="fh-build-rail-card">
+            {activeTab !== 'overview' && <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Contact info</div>
               <div className="fh-build-contact-list">
                 {client?.phone && (
@@ -269,7 +269,7 @@ export default function SnowClientDetailBuild(props: Props) {
                   </span>
                 )}
               </div>
-            </section>
+            </section>}
           </aside>
         </section>
       </div>

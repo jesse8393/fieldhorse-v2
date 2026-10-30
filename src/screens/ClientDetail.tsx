@@ -250,7 +250,7 @@ export default function ClientDetail() {
 
   return (
     <motion.div
-      className="v3-screen"
+      className="v3-screen fh-client-detail"
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: [0.2, 0.8, 0.2, 1] }}
@@ -298,13 +298,7 @@ export default function ClientDetail() {
 
       {/* COCKPIT, black-glass panel: hero + metrics + action row */}
       <div style={{ padding: '0 24px 12px' }}>
-        <div style={{
-          padding: '12px 12px',
-          borderRadius: 10,
-          background: 'linear-gradient(180deg, var(--v3-bg) 0%, var(--v3-surface) 72%)',
-          border: '1px solid var(--v3-border)',
-          boxShadow: '0 1px 0 rgba(242, 237, 228, 0.06) inset, 0 1px 2px rgba(20, 20, 20, 0.40), 0 8px 22px rgba(20, 20, 20, 0.42), 0 20px 44px rgba(20, 20, 20, 0.28)'
-        }}>
+        <div className="fh-client-detail__hero">
           {/* Hero row, restrained avatar + name + active/company */}
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
             <div aria-hidden="true" style={{
@@ -335,12 +329,12 @@ export default function ClientDetail() {
               </h1>
               <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 {activeCount > 0 ? (
-                  <Eyebrow tone="success" style={{ gap: 4, padding: '4px 8px', borderRadius: 10, background: 'var(--v3-success-soft)', border: '1px solid rgba(45, 122, 79, 0.40)', fontVariantNumeric: 'tabular-nums' }}>
-                    <span aria-hidden="true" style={{ width: 5, height: 5, borderRadius: 10, background: 'var(--v3-success-bright)' }} />
+                  <Eyebrow style={{ gap: 4, fontVariantNumeric: 'tabular-nums' }}>
+                    <span aria-hidden="true" style={{ width: 5, height: 5, borderRadius: '50%', background: 'currentColor' }} />
                     Active
                   </Eyebrow>
                 ) : (
-                  <Eyebrow style={{ gap: 4, padding: '4px 8px', borderRadius: 10, background: 'var(--v3-glass-tint)', border: '1px solid var(--v3-border-strong)' }}>
+                  <Eyebrow style={{ gap: 4 }}>
                     Inactive
                   </Eyebrow>
                 )}
@@ -374,7 +368,7 @@ export default function ClientDetail() {
                 {money(lifetime)}
               </CockpitMetric>
               <CockpitMetric
-                label="Outstanding"
+                label="Contract balance"
                 tone={outstanding > 0 ? 'danger' : 'default'}
                 size="md"
               >
@@ -505,7 +499,7 @@ function IconBtn({ children, onClick, ariaLabel, ariaPressed, tone, disabled }: 
       aria-label={ariaLabel}
       aria-pressed={ariaPressed}
       style={{
-        width: 40, height: 40, borderRadius: 10,
+        width: 44, height: 44, borderRadius: 'var(--fh-r-control)',
         display: 'grid', placeItems: 'center',
         background: p.bg,
         border: `1px solid ${p.border}`,
@@ -595,7 +589,7 @@ function CockpitMetric({ label, tone = 'default', size = 'md', children }: any) 
 
 function OverviewRead({ client, lifetime, outstanding, activeCount, jobs = [], payments = [], onJump }: any) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 0 24px' }}>
+    <div className="fh-client-overview">
 
       <CustomerBlockers clientId={client.id} jobs={jobs} />
 
@@ -605,14 +599,7 @@ function OverviewRead({ client, lifetime, outstanding, activeCount, jobs = [], p
       )}
 
       {/* CONTACT INFO CARD, phone / email / address as separate rows */}
-      <div style={{
-        padding: '8px 0',
-        borderRadius: 10,
-        background: 'var(--v3-surface)',
-        border: '1px solid var(--v3-border-strong)',
-        boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 2px 8px rgba(20, 20, 20, 0.2)',
-        overflow: 'hidden'
-      }}>
+      <section className="fh-client-contact">
         <div style={{ padding: '12px 16px 8px' }}>
           <Eyebrow>
             Contact info
@@ -621,95 +608,25 @@ function OverviewRead({ client, lifetime, outstanding, activeCount, jobs = [], p
         <ContactRow icon={Phone} label="Phone" value={fmtPhone(client.phone)} href={client.phone ? `tel:${client.phone}` : null} />
         <ContactRow icon={Mail} label="Email" value={client.email} href={client.email ? `mailto:${client.email}` : null} />
         <ContactRow icon={MapPin} label="Address" value={client.address} multiline isLast />
-      </div>
+      </section>
 
-      {/* MAP BLOCK, only render when address present */}
       {client.address && (
-        <div style={{
-          borderRadius: 10,
-          overflow: 'hidden',
-          background: 'var(--v3-surface)',
-          border: '1px solid var(--v3-border-strong)',
-          boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 2px 8px rgba(20, 20, 20, 0.2)'
-        }}>
-          <a
-            href={`https://maps.apple.com/?address=${encodeURIComponent(client.address)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => hapticTap()}
-            style={{
-              display: 'block',
-              position: 'relative',
-              height: 160,
-              background: `
-                linear-gradient(180deg, transparent 0%, transparent 60%, rgba(20, 20, 20, 0.7) 100%),
-                repeating-linear-gradient(45deg, var(--v3-glass-tint) 0 16px, transparent 16px 32px),
-                repeating-linear-gradient(-45deg, var(--v3-glass-tint) 0 16px, transparent 16px 32px),
-                var(--v3-surface-2)
-              `,
-              color: 'var(--v3-text)',
-              textDecoration: 'none',
-              cursor: 'pointer',
-              WebkitTapHighlightColor: 'transparent'
-            }}
-          >
-            {/* Center pin */}
-            <div style={{
-              position: 'absolute', left: '50%', top: '50%',
-              transform: 'translate(-50%, -50%)',
-              display: 'flex', flexDirection: 'column', alignItems: 'center',
-              gap: 4
-            }}>
-              <div style={{
-                width: 40, height: 40, borderRadius: 10,
-                background: 'var(--v3-primary)',
-                display: 'grid', placeItems: 'center',
-                color: 'var(--v3-on-primary)',
-                boxShadow: '0 8px 24px rgba(201, 150, 58, 0.45)'
-              }}>
-                <MapPin size={20} aria-hidden="true" />
-              </div>
-              <div aria-hidden="true" style={{
-                width: 8, height: 8,
-                background: 'var(--v3-primary)',
-                clipPath: 'polygon(50% 100%, 0 0, 100% 0)',
-                marginTop: -2
-              }} />
-            </div>
-
-            {/* Bottom address strip */}
-            <div style={{
-              position: 'absolute', left: 0, right: 0, bottom: 0,
-              padding: '12px 16px',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              gap: 12
-            }}>
-              <span style={{
-                fontFamily: 'var(--font-body)',
-                fontSize: 12,
-                fontWeight: 600,
-                color: 'var(--v3-text)',
-                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-              }}>
-                {client.address}
-              </span>
-              <Eyebrow tone="gold" style={{ flexShrink: 0 }}>
-                Open in Maps →
-              </Eyebrow>
-            </div>
-          </a>
-        </div>
+        <a
+          className="fh-client-directions"
+          href={`https://maps.apple.com/?address=${encodeURIComponent(client.address)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => hapticTap()}
+        >
+          <MapPin size={20} aria-hidden="true" />
+          <span>{client.address}</span>
+          <strong>Open in Maps →</strong>
+        </a>
       )}
 
       {/* OPTIONAL, internal notes from the client record */}
       {client.notes && (
-        <div style={{
-          padding: '12px 16px',
-          borderRadius: 10,
-          background: 'var(--v3-surface)',
-          border: '1px solid var(--v3-border-strong)',
-          boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 2px 8px rgba(20, 20, 20, 0.2)'
-        }}>
+        <div className="fh-client-notes">
           <Eyebrow as="div" style={{ marginBottom: 8 }}>
             Internal notes
           </Eyebrow>
@@ -808,7 +725,7 @@ function OverviewEdit({ client, onCommit, onCancel }: any) {
     padding: '12px 12px', borderRadius: 10,
     background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)',
     color: 'var(--v3-text)', fontFamily: 'var(--font-body)',
-    fontSize: 14, outline: 'none'
+    fontSize: 16, minWidth: 0
   }
   const labelStyle: import('react').CSSProperties = {
     fontFamily: 'var(--font-body)',
@@ -837,11 +754,8 @@ function OverviewEdit({ client, onCommit, onCancel }: any) {
   }
   return (
     <div style={{
-      padding: 16,
-      borderRadius: 10,
-      background: 'var(--v3-surface)',
-      border: '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)',
-      boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 4px 12px rgba(20, 20, 20, 0.25)',
+      padding: '16px 0',
+      background: 'transparent',
       display: 'flex', flexDirection: 'column', gap: 12,
       margin: '12px 0 24px'
     }}>
@@ -853,7 +767,7 @@ function OverviewEdit({ client, onCommit, onCancel }: any) {
         <span style={labelStyle}>Company</span>
         <input style={fieldStyle} value={form.company_name || ''} onChange={(e) => set('company_name', e.target.value)} />
       </label>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(200px, 100%), 1fr))', gap: 12 }}>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <span style={labelStyle}>Phone</span>
           <input type="tel" inputMode="tel" style={fieldStyle} value={form.phone || ''} onChange={(e) => set('phone', e.target.value)} />
@@ -930,13 +844,7 @@ function PipelineDistribution({ jobs, payments = [], onJump }: any) {
   const totalActive = visible.reduce((s, r) => s + buckets[r.id].count, 0)
 
   return (
-    <section style={{
-      background: 'var(--v3-surface)',
-      border: '1px solid var(--v3-border-strong)',
-      borderRadius: 10,
-      overflow: 'hidden',
-      boxShadow: 'inset 0 1px 0 var(--v3-glass-tint), 0 2px 8px rgba(20, 20, 20, 0.2)'
-    }}>
+    <section className="fh-client-pipeline">
       <header style={{
         display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
         gap: 8, padding: '12px 16px 8px'
@@ -978,7 +886,7 @@ function PipelineDistribution({ jobs, payments = [], onJump }: any) {
               >
                 <span aria-hidden="true" style={{
                   width: 8, height: 8, borderRadius: 10,
-                  background: c, boxShadow: `0 0 10px ${c}66`
+                  background: c
                 }} />
                 <div style={{ minWidth: 0 }}>
                   <div style={{

@@ -682,11 +682,17 @@
      so the composer runs to the same right edge as the messages. */
   .fhi-thread.is-embedded .fhi-composer {
     position: static;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 760px;
+    margin-inline: auto;
     padding: 8px var(--fh-gutter-desktop) 16px;
   }
 }
 
-.fhi-history-nav { display:flex; flex-wrap:wrap; gap:8px; padding:12px 24px; border-bottom:1px solid var(--v3-border); }
-.fhi-history-nav a { display:inline-flex; align-items:center; min-height:44px; padding:8px 12px; border-radius:var(--fh-r-chip); border:1px solid var(--v3-border); color:var(--v3-text); font-size:14px; font-weight:600; text-decoration:none; }
-.fhi-history-nav a[aria-current="page"] { background:var(--v3-surface-2); border-color:var(--v3-text-muted); }
-.fhi-history-nav a:focus-visible { outline:2px solid var(--v3-primary); outline-offset:3px; }
+.fhi-new { display:grid; place-items:center; flex:none; width:44px; height:44px; border:1px solid var(--fh-edge-strong); border-radius:var(--fh-r-control); color:var(--fh-ink); }
+.fhi-new:hover { background:var(--fh-wash); }
+.fhi-history-nav { display:flex; gap:24px; padding:0 var(--fh-gutter); border-bottom:1px solid var(--fh-hairline); }
+.fhi-history-nav a { display:inline-flex; align-items:center; min-height:44px; padding:8px 0; border-bottom:2px solid transparent; color:var(--fh-ink-2); font-size:14px; font-weight:500; text-decoration:none; }
+.fhi-history-nav a[aria-current="page"] { border-bottom-color:var(--fh-ink); color:var(--fh-ink); font-weight:650; }
+.fhi-history-nav a:focus-visible, .fhi-new:focus-visible { outline:2px solid var(--fh-focus); outline-offset:3px; }

@@ -48,7 +48,7 @@ body:has(.fh-app--glass) .fh-app-header.fh-glass-header {
 .fh-app--glass .fh-build-topbar > .fh-build-icon-btn[aria-label='Activity'] { display: none; }
 .fh-app--glass .fh-build-topbar__meta { margin-right: auto; }
 .fh-app--glass .fh-build-topbar--no-cta:not(:has(.fh-build-topbar__meta > *)) { display: none; }
-.fh-app--glass :is(.fh-build-title, .v3-h1) { letter-spacing: var(--fh-tracking-title); font-weight: 650; }
+.fh-app--glass :is(.fh-build-title, .v3-h1) { letter-spacing: var(--fh-tracking-title); font-weight: 650; text-shadow: none; }
 .fh-app--glass :is(.fh-build-card, .fh-build-rail-card) { border-color: var(--fh-hairline); background: var(--fh-paper); box-shadow: 0 2px 8px var(--fh-wash); }
 .fh-app--glass .fh-build-page .fh-build-main { padding: 24px 32px; }
 /* Job workspace: one title, authentic job photography, a visit summary,
@@ -421,9 +421,12 @@ body:has(.fh-app--glass) .fhj-capsule .fhc-btn { background-image: none; box-sha
 /* Page tools remain reachable beneath shared navigation. */
 .fh-app--glass .fh-build-topbar > .fh-build-search:has(input) { flex: 1 1 240px; max-width: 440px; }
 .fh-app--glass .fh-app__main-inner:has(.fhi--split) { padding: 0; }
+.fh-app--glass .fh-app__main:has(.fhi--split) { padding-bottom: 0; }
 .fh-app--glass .fhi--split { --fhi-chrome: calc(76px + env(safe-area-inset-top, 0px)); }
 .fh-photo-lightbox :is(input, textarea) { background: var(--fh-onyx-2) !important; border-color: var(--fh-edge-strong) !important; color: var(--fh-linen) !important; font-size: 16px !important; }
 .fh-photo-lightbox :is(input, textarea)::placeholder { color: var(--fh-smoke); }
+.fh-photo-lightbox__scope { width: 100%; min-height: 48px; padding: 12px; border: 1px solid #626262; border-radius: var(--fh-r-control); background: #222222; color: #F5F5F5; font: 400 16px/1.4 var(--fh-font-body); color-scheme: dark; }
+.fh-photo-lightbox__scope:focus-visible { outline: 2px solid #E3957F; outline-offset: 2px; }
 .fh-photo-lightbox :is(input, textarea, button):focus-visible { outline: 2px solid var(--fh-focus-on-onyx) !important; outline-offset: 2px; }
 @media (max-width: 899px) {
   body:has(.fh-app--glass .fhi-thread) .fh-app-header.fh-glass-header { display: none !important; }
@@ -448,4 +451,55 @@ body:has(.fh-app--glass) .fhj-capsule .fhc-btn { background-image: none; box-sha
 @media (min-width: 900px) {
   .fh-app--glass .fht-card__frame,
   .fh-app--glass .fht-next .fhc-photo--empty .fhc-photo__overlay { min-height: 84px; }
+}
+
+/* Customer records share the workspace's open, ruled hierarchy. */
+.fh-app--glass .fh-client-workspace .fh-build-topbar { border: 0; box-shadow: none; padding-inline: 32px; }
+.fh-app--glass .fh-client-workspace .fh-build-topbar .fh-build-icon-btn { width: 44px; height: 44px; background: transparent; box-shadow: none; }
+.fh-app--glass .fh-client-workspace .fh-build-hero-row--detail { grid-template-columns: minmax(220px, 1fr) minmax(0, 1.8fr); align-items: start; gap: 32px; margin-bottom: 24px; }
+.fh-app--glass .fh-client-workspace .fh-build-title--name { margin-top: 8px; font-size: 36px; font-weight: 700; line-height: 1.18; letter-spacing: -.045em; }
+.fh-app--glass .fh-client-workspace .fh-build-detail-sub { margin-top: 12px; }
+.fh-app--glass .fh-client-workspace .fh-build-mini-grid--detail { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; padding-top: 0; }
+.fh-app--glass .fh-client-workspace .fh-build-mini { min-height: 0; padding: 0 0 16px; border: 0; border-bottom: 1px solid var(--fh-hairline); border-radius: 0; background: transparent; box-shadow: none; gap: 8px; }
+.fh-app--glass .fh-client-workspace .fh-build-mini strong { font-size: 30px; font-weight: 650; letter-spacing: -.04em; color: var(--fh-ink) !important; }
+.fh-app--glass .fh-client-workspace .fh-build-mini span { color: var(--fh-ink-2); font-size: 13px; line-height: 1.5; }
+.fh-app--glass .fh-client-workspace .fh-build-tabs { padding: 0; margin-bottom: 20px; gap: 8px; }
+.fh-app--glass .fh-client-workspace .fh-build-tab { min-height: 52px; padding-inline: 12px; font-weight: 500; }
+.fh-app--glass .fh-client-workspace .fh-build-tab:first-child { padding-left: 0; }
+.fh-app--glass .fh-client-workspace .fh-build-tab.is-active { color: var(--fh-ink); border-bottom-color: var(--fh-ink); font-weight: 650; }
+.fh-app--glass .fh-client-workspace .fh-build-tabs__cta { min-height: 44px; border-radius: var(--fh-r-control); font-size: 13px; font-weight: 600; background: transparent; border-color: var(--fh-edge-strong); color: var(--fh-ink); }
+.fh-app--glass .fh-client-workspace .fh-build-tabs__cta + .fh-build-tabs__cta { margin-left: 0; }
+.fh-app--glass .fh-client-workspace .fh-client-new { background: var(--fh-gold); color: var(--fh-on-gold); border-color: var(--fh-gold); }
+.fh-app--glass .fh-client-workspace .fh-build-content-grid--detail { grid-template-columns: minmax(0, 1fr) 280px; gap: 32px; }
+.fh-app--glass .fh-client-workspace .fh-build-rail--page { border: 0; border-left: 1px solid var(--fh-hairline); border-radius: 0; background: transparent; box-shadow: none; padding-left: 24px; }
+.fh-app--glass .fh-client-workspace .fh-build-rail--page .fh-build-rail-card { padding: 20px 0; border-radius: 0; background: transparent; }
+.fh-app--glass .fh-client-workspace .fh-build-rail--page .fh-build-rail-card:first-child { padding-top: 0; }
+.fh-app--glass .fh-client-workspace .fh-build-rail-card strong { font-size: 18px; line-height: 1.4; }
+.fh-client-overview { display: flex; flex-direction: column; gap: 28px; padding: 0 0 32px; }
+.fh-client-overview > section { padding: 0 !important; background: transparent !important; border: 0 !important; border-radius: 0 !important; box-shadow: none; }
+.fh-client-overview > section + section { border-top: 1px solid var(--fh-hairline) !important; padding-top: 20px !important; }
+.fh-client-overview .fh-client-contact > div:first-child,
+.fh-client-overview .fh-client-pipeline > header { padding: 0 0 12px !important; }
+.fh-client-pipeline button { min-height: 56px; padding-inline: 0 !important; }
+.fh-client-contact > a > div, .fh-client-contact > div:not(:first-child) { padding-inline: 0 !important; }
+.fh-client-directions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; min-height: 56px; padding: 12px 0; border-top: 1px solid var(--fh-hairline); border-bottom: 1px solid var(--fh-hairline); color: var(--fh-ink-2); text-decoration: none; font-size: 14px; }
+.fh-client-directions > svg { flex-shrink: 0; }
+.fh-client-directions > span { flex: 1 1 160px; overflow-wrap: anywhere; }
+.fh-client-directions > strong { color: var(--fh-gold-ink); font-size: 13px; font-weight: 600; }
+.fh-client-notes { padding-top: 8px; }
+.fh-client-detail__hero { padding: 0 0 12px; }
+.fh-client-detail .fh-client-overview { padding-top: 20px; }
+.fh-app--glass .fh-client-index .fh-build-topbar { border: 0; box-shadow: none; }
+.fh-app--glass .fh-client-index .fh-build-focus { padding: 0; border: 0; background: transparent; box-shadow: none; }
+.fh-app--glass .fh-client-index .fh-build-rail--page { border: 0; border-left: 1px solid var(--fh-hairline); border-radius: 0; background: transparent; box-shadow: none; padding-left: 24px; }
+.fh-app--glass .fh-client-index .fh-build-rail--page .fh-build-rail-card { padding: 20px 0; border-radius: 0; }
+.fh-app--glass .fh-client-index .fh-build-rail--page .fh-build-rail-card:first-child { padding-top: 0; }
+.fh-app--glass .fh-client-index .fh-build-filterbar { gap: 24px; }
+.fh-app--glass .fh-client-index .fh-build-pill { min-height: 44px; padding: 8px 0; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; box-shadow: none; color: var(--fh-ink-2); }
+.fh-app--glass .fh-client-index .fh-build-pill.is-active { border-bottom-color: var(--fh-ink); color: var(--fh-ink); }
+.fh-app--glass .fh-client-index .fh-build-pill__count { background: transparent; color: var(--fh-ink-3); }
+@media (max-width: 1100px) and (min-width: 900px) {
+  .fh-app--glass .fh-client-workspace .fh-build-hero-row--detail { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .fh-app--glass .fh-client-workspace .fh-build-content-grid--detail { grid-template-columns: minmax(0, 1fr) 240px; gap: 24px; }
+  .fh-app--glass .fh-client-workspace .fh-build-rail--page { padding-left: 20px; }
 }

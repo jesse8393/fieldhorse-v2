@@ -733,8 +733,8 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
             aria-label="Close"
             style={{
               width: 44, height: 44, borderRadius: 10,
-              background: 'var(--v3-border-mid)', border: 'none',
-              color: '#F2EDE4', cursor: 'pointer',
+              background: '#303030', border: '1px solid #626262',
+              color: '#F5F5F5', cursor: 'pointer',
               display: 'grid', placeItems: 'center'
             }}
           >
@@ -742,7 +742,7 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
           </button>
           <div style={{
             fontFamily: 'var(--font-body)', fontSize: 12,
-            color: 'rgba(242, 237, 228, 0.7)',
+            color: '#C9C9C9',
             fontVariantNumeric: 'tabular-nums'
           }}>
             {row.filename}
@@ -755,7 +755,7 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
             style={{
               minWidth: 44, height: 44, borderRadius: 10, padding: deleteArmed ? '0 12px' : 0,
               background: deleteArmed ? 'rgba(192, 57, 43, 0.5)' : 'rgba(192, 57, 43, 0.18)', border: 'none',
-              color: deleteArmed ? '#F2EDE4' : '#C9963A', cursor: 'pointer',
+              color: deleteArmed ? '#F5F5F5' : '#E3957F', cursor: 'pointer',
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700
             }}
@@ -767,7 +767,7 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
 
         {/* Image */}
         <div style={{
-          flex: 1, minHeight: 0,
+          flex: 1, minHeight: 160,
           display: 'grid', placeItems: 'center',
           padding: '0 8px', position: 'relative'
         }}>
@@ -780,7 +780,7 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
               }}
             />
           ) : (
-            <div style={{ color: '#F2EDE4', fontFamily: 'var(--font-body)', fontSize: 14 }}>
+            <div style={{ color: '#F5F5F5', fontFamily: 'var(--font-body)', fontSize: 14 }}>
               Loading…
             </div>
           )}
@@ -793,8 +793,8 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
               style={{
                 position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
                 width: 44, height: 44, borderRadius: 10,
-                background: 'var(--v3-border-mid)', border: 'none',
-                color: '#F2EDE4', cursor: 'pointer',
+                background: '#303030', border: '1px solid #626262',
+                color: '#F5F5F5', cursor: 'pointer',
                 display: 'grid', placeItems: 'center'
               }}
             >
@@ -809,8 +809,8 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
               style={{
                 position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
                 width: 44, height: 44, borderRadius: 10,
-                background: 'var(--v3-border-mid)', border: 'none',
-                color: '#F2EDE4', cursor: 'pointer',
+                background: '#303030', border: '1px solid #626262',
+                color: '#F5F5F5', cursor: 'pointer',
                 display: 'grid', placeItems: 'center'
               }}
             >
@@ -832,59 +832,29 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
                 onClick={clearTag}
                 style={{
                   background: 'transparent', border: 'none',
-                  color: 'rgba(242, 237, 228, 0.55)',
+                  color: '#C9C9C9',
                   fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600,
-                  cursor: 'pointer', padding: 0
+                  cursor: 'pointer', padding: '8px 0', minHeight: 44
                 }}
               >
                 Clear
               </button>
             )}
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {SCOPE_SECTIONS.map((opt) => {
-              const on = !showCustom && sectionTag === opt
-              return (
-                <button
-                  key={opt}
-                  type="button"
-                  onClick={() => pickSection(opt)}
-                  style={{
-                    padding: '8px 12px', borderRadius: 10,
-                    background: on
-                      ? 'color-mix(in srgb, var(--v3-primary) 22%, transparent)'
-                      : 'var(--v3-glass-tint-2)',
-                    border: on
-                      ? '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)'
-                      : '1px solid var(--v3-border-mid)',
-                    color: on ? 'var(--v3-primary-bright, #C9963A)' : 'rgba(242, 237, 228, 0.78)',
-                    fontFamily: 'var(--font-body)', fontSize: 12,
-                    fontWeight: on ? 700 : 500,
-                    cursor: 'pointer'
-                  }}
-                >
-                  {opt}
-                </button>
-              )
-            })}
-            <button
-              type="button"
-              onClick={() => pickSection('__custom__')}
-              style={{
-                padding: '8px 12px', borderRadius: 10,
-                background: showCustom ? 'var(--v3-border-mid)' : 'transparent',
-                border: '1px dashed var(--v3-border-strong)',
-                color: 'rgba(242, 237, 228, 0.78)',
-                fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 500,
-                cursor: 'pointer'
-              }}
-            >
-              Other…
-            </button>
-          </div>
+          <select
+            aria-label="Scope section"
+            value={showCustom ? '__custom__' : sectionTag}
+            onChange={(event) => pickSection(event.target.value)}
+            className="fh-photo-lightbox__scope"
+          >
+            <option value="">No section</option>
+            {SCOPE_SECTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+            <option value="__custom__">Other…</option>
+          </select>
           {showCustom && (
             <input
               type="text"
+              aria-label="Custom scope section"
               value={customTag}
               onChange={(e) => setCustomTag(e.target.value)}
               onBlur={commitCustom}
@@ -893,7 +863,7 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
               style={{
                 width: '100%', padding: '8px 12px', borderRadius: 10,
                 background: 'var(--v3-border-mid)', border: '1px solid var(--v3-border-mid)',
-                color: '#F2EDE4', fontFamily: 'var(--font-body)',
+                color: '#F5F5F5', fontFamily: 'var(--font-body)',
                 fontSize: 14, outline: 'none'
               }}
             />
@@ -915,7 +885,7 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
             style={{
               width: '100%', padding: '12px 12px', borderRadius: 10,
               background: 'var(--v3-border-mid)', border: '1px solid var(--v3-border-mid)',
-              color: '#F2EDE4', fontFamily: 'var(--font-body)',
+              color: '#F5F5F5', fontFamily: 'var(--font-body)',
               fontSize: 14, outline: 'none', resize: 'vertical', minHeight: 50
             }}
           />
@@ -997,7 +967,7 @@ function BeforeAfterSlider({ beforeUrl, afterUrl, beforeLabel, afterLabel }: any
         padding: '4px 8px', borderRadius: 10,
         background: 'rgba(20, 20, 20, 0.6)', backdropFilter: 'blur(4px)',
         fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-        letterSpacing: 0, color: '#F2EDE4'
+        letterSpacing: 0, color: '#F5F5F5'
       }}>
         Before
       </div>
@@ -1006,7 +976,7 @@ function BeforeAfterSlider({ beforeUrl, afterUrl, beforeLabel, afterLabel }: any
         padding: '4px 8px', borderRadius: 10,
         background: 'rgba(20, 20, 20, 0.6)', backdropFilter: 'blur(4px)',
         fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-        letterSpacing: 0, color: '#F2EDE4'
+        letterSpacing: 0, color: '#F5F5F5'
       }}>
         After
       </div>

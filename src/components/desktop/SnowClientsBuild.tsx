@@ -203,7 +203,7 @@ export default function SnowClientsBuild(props: Props) {
   }
 
   return (
-    <div className="fh-build-page" data-build-screen="SnowClientsBuild">
+    <div className="fh-build-page fh-client-index" data-build-screen="SnowClientsBuild">
       <header className="fh-build-topbar">
         <div className="fh-build-search">
           <Search size={14} />

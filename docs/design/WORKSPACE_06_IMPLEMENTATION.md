@@ -26,10 +26,25 @@ Manrope replaces the previous mixed type families. Neutral white, charcoal, and 
 | Materials used a fixed six column composer and rows even on a narrow phone | Layout now responds to its container, with labeled inputs and a two column narrow layout |
 | Shared font and palette changes could produce a mismatched first paint | Local font preload and matching theme colors; updated the inline script CSP hash |
 | Money summaries repeated nested cards | Replaced those frames with rules and made New invoice the primary action |
+| A broad chrome selector hid customer search, Edit, and Delete | Narrowed the selector to redundant chrome; real inputs and record actions remain visible |
+| Clearing customer search immediately after a filter could reset that filter | Consecutive updates use the current browser URL, preserving both controls |
+| Money columns clipped long balances and payment actions at middle widths | Reserved amount and action widths and gave age totals their own row when space is tight |
+| Inbox composers could extend below the viewport | Removed duplicated shell padding and the extra phone header while a thread is open |
+| Desktop replies and outgoing messages ended at different horizontal positions | Composer and messages now share a centered width and matching gutters |
+| Inbox navigation looked like three competing actions | Conversations and History use underlined navigation; New message sits beside the page title, with a 44-pixel target |
+| Photo controls sat behind navigation and lacked keyboard containment | Moved the viewer to a document portal, locked background scrolling, trapped focus, and restored focus on close |
+| The photo editor presented thirteen scope buttons at once | Replaced the button wall with a labeled native selector, retaining custom sections and automatic saving |
+| Authentication waited for an obsolete display font | Uses the local Manrope identity immediately, including loading, failed-font, and delayed-font states |
+| Password reset and partner invitations inherited old warm colors | Neutral dark-surface tokens now match sign in and the rest of the workspace |
+| Customer records retained boxed metrics, heavy shadows, and a decorative map | Introduced aligned metric columns and ruled sections, a direct Maps link, one prominent creation action, and 44-pixel record controls |
+| Unbilled customer value was labeled as money owed | Phone customer summaries explicitly say Contract balance; calculations remain unchanged |
+| Review criteria competed with actual customer blockers | Moved criteria into an accessible disclosure while preserving visible overdue invoice and schedule links |
 
 ## Verification
 
-Local TypeScript, ESLint, design audit, RLS audit, production build, and all 1,443 unit tests passed. The browser suite parses 1,516 cases in 50 files, including new regressions for task completion and Undo, task creation after reload, failed task reads, and narrow Materials layouts.
+Local TypeScript, ESLint, design audit, RLS audit, production build, and all 1,443 unit tests passed. The browser suite contains 1,516 cases in 50 files, including regressions for task completion and Undo, task creation after reload, failed task reads, and narrow Materials layouts. CI runs the complete desktop and phone projects in separate jobs on Node 22. No tests were disabled to accommodate the redesign. The [PR checks](https://github.com/jesse8393/fieldhorse-v2/pull/230/checks) record the actual execution outcome for each published commit.
+
+The first full browser run exposed 68 failures. Each was reviewed against its trace or screenshot. The next published run reduced this to seven failures: customer filter state, desktop reply alignment, a login overflow fixture, and two authentication color checks on each viewport. This local repair addresses those findings; its full browser rerun awaits publication. Repairs address hidden controls, overlays, overflow, and loading geometry; outdated brand and layout assertions now check the approved identity and preserved interactions. The task-read failure fixture now lets the parent job load before failing the independent task request, and the Materials fixture uses the real `contact_id` relationship.
 
 The actual compiled React components were reviewed in the browser using an isolated synthetic data fixture. The fixture and its authentication seed are excluded from Git and production builds. No review mutations were sent to a real Supabase project.
 
@@ -39,8 +54,12 @@ Browser review covered:
 - The job overview at 390, 1024, and desktop width. The tablet check found no elements beyond the content boundary.
 - Task completion, focus recovery, Undo, reopening, creation, and reload persistence against the controlled stateful fixture.
 - Desktop Today, Schedule, and Money; day and night appearance for the job workspace.
+- Customer search and the Edit/Delete controls; customer records at desktop and 320 pixels, including individual control bounds. Clearing search after selecting Active preserves the filter. Phone and email fields stack at narrow widths, measuring 257 pixels with 16-pixel text in the 320-pixel review frame.
+- Photo viewer opening above navigation, scope selection, keyboard containment, Escape, and return focus to the originating photo.
+- Signed-out desktop and phone layouts, the real local font, field and button geometry, and sign-out synchronization between the review tabs.
+- Inbox thread headers and composer visibility on desktop and phone, using isolated conversation fixtures. Desktop message and composer columns share 760-pixel widths; document height matches the 936-pixel viewport. History and New message navigation work at 320 pixels without overflowing controls.
 
-Local checks ran on Node 24.22.1. The repository specifies Node 22 and CI uses Node 22. Automated browser execution and the required CI outcome must be assessed on the PR; parsing the test suite is not execution. A real account integration check and field use on physical phones remain release validation, not claims established by these screenshots.
+Local checks ran on Node 24.22.1. The repository specifies Node 22 and CI uses Node 22. Browser screenshots and automated synthetic-data tests do not establish real-account integration or field use on physical phones; those remain release validation.
 
 ## Contrast spot checks
 
@@ -62,6 +81,6 @@ Screenshots show the compiled application with synthetic review records and an i
 
 ![Desktop job workspace](workspace-06/desktop.jpg)
 
-[Phone job workspace](workspace-06/phone.jpg) · [Money workspace](workspace-06/money.jpg) · [Section bounds audit](workspace-06/section-audit.json)
+[Phone job workspace](workspace-06/phone.jpg) · [Money workspace](workspace-06/money.jpg) · [Customer record](workspace-06/customer.jpg) · [Inbox](workspace-06/inbox.jpg) · [Photo viewer](workspace-06/photo.jpg) · [Sign in](workspace-06/login.jpg) · [Section bounds audit](workspace-06/section-audit.json)
 
 Jesse approved publication to draft PR #230 on October 30, 2026. This change has not been merged or released to the Netlify production app. Review the current PR checks before merging.

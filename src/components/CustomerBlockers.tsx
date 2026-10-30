@@ -41,9 +41,12 @@ export default function CustomerBlockers({ clientId, jobs }: { clientId: string;
   return <section aria-label="Delivery and billing review" style={{ padding: 16, border: '1px solid var(--v3-border)', borderRadius: 10, background: 'var(--v3-surface)' }}>
     <h2 style={{ margin: '0 0 8px', fontSize: 18 }}>Delivery and billing review</h2>
     {loading ? <p role="status">Checking linked records…</p> : failed ? <DataErrorState title="Review unavailable" message="Could not check every linked schedule and invoice. No clear status inferred." onRetry={() => { void schedule.refetch(); if (canSeeFinancials) void billing.refetch() }} /> : <>
-      <p style={{ margin: '0 0 12px', fontSize: 14, color: 'var(--v3-text-secondary)', lineHeight: 1.5 }}>{blockers.length ? `${blockers.length} ${blockers.length === 1 ? 'item needs' : 'items need'} review.` : (canSeeFinancials ? 'No overdue invoices or recent schedule overruns found.' : 'No recent schedule overruns found.')} Relationship activity does not measure delivery health.</p>
+      <p style={{ margin: '0 0 12px', fontSize: 14, color: 'var(--v3-text-secondary)', lineHeight: 1.5 }}>{blockers.length ? `${blockers.length} ${blockers.length === 1 ? 'item needs' : 'items need'} review.` : (canSeeFinancials ? 'No overdue invoices or recent schedule overruns found.' : 'No recent schedule overruns found.')}</p>
       {blockers.length > 0 && <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>{blockers.map(b => <li key={b.id} style={{ borderTop: '1px solid var(--v3-border)' }}><Link to={b.to} style={{ display: 'block', padding: 'var(--space-4) 0', minHeight: 44, color: 'var(--v3-text)' }}><strong>{b.label}</strong><span style={{ display: 'block', marginTop: 4, fontSize: 14, lineHeight: 1.5 }}>{b.detail}</span></Link></li>)}</ul>}
-      <p style={{ margin: '12px 0 0', fontSize: 14, color: 'var(--v3-text-secondary)' }}>Scope: active jobs with visits ending in the past 14 days{canSeeFinancials ? ', and all issued invoices with unpaid balances past their due day.' : '. Invoice balances are restricted by your role.'} Unreported site issues require separate review.</p>
+      <details style={{ marginTop: 12, fontSize: 14, color: 'var(--v3-text-secondary)' }}>
+        <summary style={{ minHeight: 44, padding: '12px 0', cursor: 'pointer' }}>What this review covers</summary>
+        <p style={{ margin: '4px 0 0', lineHeight: 1.5 }}>Active jobs with visits ending in the past 14 days{canSeeFinancials ? ', and all issued invoices with unpaid balances past their due day.' : '. Invoice balances are restricted by your role.'} Unreported site issues require separate review. Relationship activity does not measure delivery health.</p>
+      </details>
     </>}
   </section>
 }
