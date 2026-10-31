@@ -329,7 +329,7 @@ export default function Analytics() {
 
   return (
     <motion.div
-      className="v3-screen"
+      className="v3-screen fh-reports-phone"
       variants={stagger}
       initial="hidden"
       animate="show"
@@ -396,17 +396,12 @@ export default function Analytics() {
             className="v3-section"
             style={{ margin: '0 var(--v3-gutter) 14px' }}
           >
-            <SectionHeader label="Owner KPIs" />
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-              gap: 12,
-              marginTop: 4
-            }}>
-              <KPI label="Pipeline"          to={stats.pipeline}         format={fmtMoneyCompact} Icon={TrendingUp} gold />
-              <KPI label="Won YTD"           to={stats.wonYTD}           format={fmtMoneyCompact} Icon={DollarSign} gold />
-              <KPI label="Issued invoices YTD" to={stats.invoiced} format={fmtMoneyCompact} Icon={DollarSign} note="Issued amounts, excluding drafts and voids" />
-              <KPI label="Payments received YTD" to={stats.collected} format={fmtMoneyCompact} Icon={DollarSign} note="Receipts by payment date, including earlier invoices" />
+            <SectionHeader label="Business overview" />
+            <div className="fh-reports-metrics">
+              <KPI label="Payments received YTD" to={stats.collected} format={fmtMoneyCompact} note="Receipts by payment date, including earlier invoices" />
+              <KPI label="Issued invoices YTD" to={stats.invoiced} format={fmtMoneyCompact} note="Issued amounts, excluding drafts and voids" />
+              <KPI label="Pipeline" to={stats.pipeline} format={fmtMoneyCompact} />
+              <KPI label="Won YTD" to={stats.wonYTD} format={fmtMoneyCompact} />
               <KPI label="Tracked profit YTD" to={stats.profitYTD} format={fmtMoneyCompact} Icon={DollarSign} note={stats.profitNote} gold />
               <KPI label="Avg margin"        to={stats.avgMargin}        format={fmtPct}          Icon={Target} note={stats.avgMarginNote} />
               <KPI label="Win rate · 90 days"        to={stats.closeRate}        format={fmtPct}          Icon={Target} note={stats.closeRateNote} />
@@ -811,81 +806,14 @@ function FunnelBar({ label, count, max, note, gold, danger }: any) {
   )
 }
 
-function KPI({ label, to, format, Icon, gold, note }: any) {
+function KPI({ label, to, format, note }: any) {
   return (
-    <div
-      style={{
-        position: 'relative',
-        overflow: 'hidden',
-        padding: '12px 12px 12px',
-        borderRadius: 10,
-        background: 'var(--v3-surface)',
-        border: gold
-          ? '1px solid color-mix(in srgb, var(--v3-primary) 35%, var(--v3-border-strong))'
-          : '1px solid var(--v3-border-strong)',
-        boxShadow: gold
-          ? '0 1px 0 var(--v3-glass-tint-2) inset, 0 4px 12px rgba(20, 20, 20, 0.28), 0 4px 14px rgba(201, 150, 58, 0.10)'
-          : '0 1px 0 var(--v3-glass-tint-2) inset, 0 4px 12px rgba(20, 20, 20, 0.26)',
-        minHeight: 92
-      }}
-    >
-      {/* Top accent, 1px gold gradient stroke for emphasized tiles */}
-      {gold && (
-        <span aria-hidden="true" style={{
-          position: 'absolute',
-          top: 0,
-          left: '14%',
-          right: '14%',
-          height: 1,
-          background: 'linear-gradient(90deg, transparent 0%, rgba(201, 150, 58, 0.55) 50%, transparent 100%)',
-          pointerEvents: 'none'
-        }} />
-      )}
-      {Icon && (
-        <Icon
-          size={14}
-          style={{
-            position: 'absolute',
-            top: 12,
-            right: 12,
-            color: gold ? 'var(--v3-primary-text)' : 'var(--v3-text-muted)',
-            opacity: gold ? 1 : 0.6
-          }}
-        />
-      )}
-      <div className="v3-eyebrow" style={{ paddingRight: 24 }}>{label}</div>
-      <div
-        style={{
-          fontFamily: 'var(--font-display)',
-          fontSize: 24,
-          letterSpacing: 0,
-          lineHeight: 1,
-          marginTop: 10,
-          color: gold ? 'var(--v3-primary-text)' : 'var(--v3-text)',
-          fontVariantNumeric: 'tabular-nums',
-          textShadow: gold ? '0 1px 12px rgba(201, 150, 58, 0.20)' : 'none'
-        }}
-      >
-        {to == null ? (
-          <span style={{ color: 'var(--v3-text-muted)' }}>{' '}</span>
-        ) : (
-          <CountUp to={Number(to || 0)} duration={0.9} formatter={format} />
-        )}
+    <div className={`fh-report-metric${to == null ? ' is-unknown' : ''}`}>
+      <div className="fh-report-metric__label">{label}</div>
+      <div className="fh-report-metric__value">
+        {to == null ? 'Not enough data' : <CountUp to={Number(to || 0)} duration={0.9} formatter={format} />}
       </div>
-      {note && (
-        <div style={{
-          marginTop: 6,
-          fontFamily: 'var(--font-body)',
-          fontSize: 14,
-          fontWeight: 500,
-          letterSpacing: 0,
-          color: to == null ? 'var(--v3-text-muted)' : 'var(--v3-text-muted)',
-          lineHeight: 1.5,
-          opacity: 1
-        }}>
-          {note}
-        </div>
-      )}
+      {note && <p>{note}</p>}
     </div>
   )
 }

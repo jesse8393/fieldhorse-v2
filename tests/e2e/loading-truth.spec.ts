@@ -690,7 +690,7 @@ test.describe('Reports', () => {
   // The mock's active job stages add up to $45,900. Its leads and quotes
   // live in fh_leads and fh_quotes (Task 15), which feed the funnel and the
   // lead and quote counts, not the pipeline money.
-  const PIPELINE = '$46K'
+  const PIPELINE = '$45,900'
 
   test('while the numbers load nothing reads as zero, empty or not connected', async ({ context, page }, testInfo) => {
     await signIn(context)
@@ -703,18 +703,18 @@ test.describe('Reports', () => {
         await expect(page.getByText('Not enough data yet.', { exact: true })).toHaveCount(0)
       })
       read.release()
-      await expect(page.getByText('Owner KPIs', { exact: true })).toBeVisible()
+      await expect(page.getByText('Business overview', { exact: true })).toBeVisible()
       await expect(page.getByText('Not enough data yet.', { exact: true })).toHaveCount(0)
       return
     }
     await open(page, '/analytics', '[data-build-screen="SnowAnalyticsBuild"]')
     await expect.poll(() => read.held.length).toBeGreaterThan(0)
-    const pipeline = page.locator('.fh-build-mini').filter({ hasText: 'Pipeline' })
+    const pipeline = page.getByRole('region', { name: 'Financial overview' }).locator('.fh-build-kpi-cell').filter({ hasText: 'Pipeline' })
     await holds(async () => {
       await expect(page.getByText(/\$0 won/)).toHaveCount(0)
       await expect(pipeline.getByRole('status', inPage)).toHaveCount(1)
       await expect(pipeline).not.toContainText('$0')
-      await expect(page.locator('.fh-build-focus').getByRole('status')).toBeVisible()
+      await expect(page.getByRole('region', { name: 'Business overview' }).getByRole('status').first()).toBeVisible()
       await expect(page.locator('.fh-build-kpi-strip')).not.toContainText('Not connected')
       await expect(page.locator('.fh-build-kpi-strip').getByRole('status').first()).toBeVisible()
       await expect(page.locator('.fh-build-rail-card').filter({ hasText: 'Largest stage' }).getByRole('status')).toBeVisible()
@@ -722,7 +722,7 @@ test.describe('Reports', () => {
     })
     read.release()
     await expect(pipeline.locator('strong')).toHaveText(PIPELINE)
-    await expect(page.locator('.fh-build-focus')).toContainText(' won · ')
+    await expect(page.getByRole('region', { name: 'Financial overview' })).toContainText('Won YTD')
     await expect(page.locator('.fh-build-kpi-strip')).not.toContainText('Not connected')
     await expect(page.locator('[data-build-screen="SnowAnalyticsBuild"]').getByRole('status', inPage)).toHaveCount(0)
   })
@@ -739,9 +739,9 @@ test.describe('Reports', () => {
     await retryFromKeyboard(page, error.getByRole('button', { name: 'Try again' }))
     await expect(error).toHaveCount(0)
     if (isPhone(testInfo.project.name)) {
-      await expect(page.getByText('Owner KPIs', { exact: true })).toBeVisible()
+      await expect(page.getByText('Business overview', { exact: true })).toBeVisible()
     } else {
-      await expect(page.locator('.fh-build-mini').filter({ hasText: 'Pipeline' }).locator('strong')).toHaveText(PIPELINE)
+      await expect(page.getByRole('region', { name: 'Financial overview' }).locator('.fh-build-kpi-cell').filter({ hasText: 'Pipeline' }).locator('strong')).toHaveText(PIPELINE)
     }
     // The whole screen was the error: focus waits on the page's main region.
     await expect(page.locator('#fh-main')).toBeFocused()

@@ -304,7 +304,7 @@ body:has(.fh-app--glass) .fh-app-header.fh-glass-header {
 .fh-job-contact-disclosure > summary::-webkit-details-marker { display: none; }
 .fh-job-contact-disclosure[open] > summary svg { transform: rotate(180deg); }
 .fh-app--glass :is(.fhc-btn--primary, .v3-btn--primary) { background: var(--fh-gold); box-shadow: none; }
-.fh-app--glass .fhc-btn--primary:hover { background: var(--fh-gold-lo); }
+.fh-app--glass .fhc-btn--primary:not(:disabled):not([aria-disabled="true"]):hover { background: var(--fh-gold-lo); }
 .fh-app--glass :is(.fhtd-stage, .fht-stage).fhc-stage--paper,
 .fh-app--glass .fhc-photo--paper { box-shadow: none; background-image: none; }
 body:has(.fh-app--glass) :is(.fhs-dock, .fhj-capsule) { border-radius: var(--fh-r-control); box-shadow: 0 0 0 1px var(--fh-hairline); }
@@ -539,4 +539,76 @@ body:has(.fh-app--glass) .fhj-capsule .fhc-btn { background-image: none; box-sha
   .fh-app--glass .fh-client-workspace .fh-build-hero-row--detail { grid-template-columns: minmax(0, 1fr); gap: 24px; }
   .fh-app--glass .fh-client-workspace .fh-build-content-grid--detail { grid-template-columns: minmax(0, 1fr) 240px; gap: 24px; }
   .fh-app--glass .fh-client-workspace .fh-build-rail--page { padding-left: 20px; }
+}
+
+/* A disabled action must read as unavailable in the glass theme. */
+.fh-app--glass .fhc-btn:is(:disabled, .is-disabled) {
+  background: var(--fh-tray); color: var(--fh-ink-3); border-color: var(--fh-hairline); box-shadow: none;
+}
+/* Today uses the page itself as the reading surface, with actions close by. */
+.fh-app--glass .fht .fht-stage.fhc-stage--paper {
+  padding: 8px 0 20px; border: 0; border-bottom: 1px solid var(--fh-hairline);
+  border-radius: 0; background: transparent; box-shadow: none;
+}
+.fh-app--glass .fht .fht-hero { font-size: 30px; line-height: 1.13; }
+.fh-app--glass .fht .fht-line { font-size: 15px; line-height: 1.5; gap: 8px; }
+
+/* Reports: money first, supporting evidence next, without nested metric cards. */
+.fh-app--glass .fh-reports__header { display: flex; align-items: baseline; justify-content: space-between; gap: 24px; padding: 8px 0 32px; }
+.fh-app--glass .fh-reports__header h1 { font-size: 36px; }
+.fh-reports__header p { color: var(--fh-ink-2); font-size: 15px; margin: 8px 0 0; }
+.fh-app--glass .fh-reports__summary { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 24px; border-block: 1px solid var(--fh-hairline); padding: 24px 0; }
+.fh-app--glass .fh-reports .fh-build-kpi-cell { padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
+.fh-app--glass .fh-reports__summary .fh-build-kpi-cell { display: flex; flex-direction: column-reverse; gap: 12px; }
+.fh-app--glass .fh-reports__summary strong { font-size: 36px; line-height: 1.2; letter-spacing: -.04em; font-weight: 600; color: var(--fh-ink); font-variant-numeric: tabular-nums; }
+.fh-app--glass .fh-reports__summary span { font-size: 14px; color: var(--fh-ink-2); font-weight: 500; }
+.fh-reports__context { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 32px; padding: 24px 0; }
+.fh-reports__context h2 { font-size: 14px; color: var(--fh-ink-2); font-weight: 500; margin: 0 0 8px; }
+.fh-reports__context strong { font-size: 20px; font-weight: 600; }
+.fh-reports__context p { font-size: 14px; line-height: 1.5; margin: 6px 0 0; color: var(--fh-ink-2); }
+.fh-app--glass .fh-reports .fh-build-kpi-strip { grid-template-columns: repeat(4,minmax(0,1fr)); padding: 20px 0; border: 0; border-top: 1px solid var(--fh-hairline); background: transparent; box-shadow: none; border-radius: 0; }
+.fh-app--glass .fh-reports :is(.fh-build-card, .fh-build-rail-card) { border: 0; border-top: 1px solid var(--fh-hairline); border-radius: 0; box-shadow: none; background: transparent; }
+.fh-app--glass .fh-reports .fh-build-chart-card { padding: 16px 0 24px; }
+.fh-app--glass .fh-reports .fh-build-card-head { padding-inline: 0; }
+.fh-app--glass .fh-reports .fh-build-rail-card { padding: 20px 0; }
+.fh-app--glass .fh-reports-phone .v3-section { padding: 20px 0; border: 0; border-top: 1px solid var(--fh-hairline); border-radius: 0; background: transparent; box-shadow: none; }
+.fh-reports-metrics { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); column-gap: 20px; }
+.fh-report-metric { min-width: 0; padding: 16px 0; border-bottom: 1px solid var(--fh-hairline); }
+.fh-report-metric__label { color: var(--fh-ink-2); font-size: 14px; line-height: 1.4; min-height: 40px; }
+.fh-report-metric__value { color: var(--fh-ink); font-size: 30px; line-height: 1.25; letter-spacing: -.03em; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 8px; }
+.fh-report-metric.is-unknown .fh-report-metric__value { font-size: 18px; letter-spacing: 0; }
+.fh-report-metric p { color: var(--fh-ink-2); font-size: 13px; line-height: 1.5; margin: 8px 0 0; }
+.fh-reports-phone [data-funnel] { flex-wrap: wrap; }
+/* Supporting desktop routes share a flat title and form hierarchy. */
+.fh-app--glass .fh-settings .fh-build-topbar { display: none; }
+.fh-app--glass .fh-settings .fh-build-hero-row { display: block; min-height: 0; margin-bottom: 24px; }
+.fh-app--glass .fh-settings .fh-build-focus { padding: 12px 0 0; border: 0; border-radius: 0; background: none; box-shadow: none; max-width: 650px; }
+.fh-app--glass .fh-settings .fh-build-focus > .fh-build-eyebrow { display: none; }
+.fh-app--glass .fh-settings :is(.fh-build-card, .fh-build-rail-card) { border: 0; border-top: 1px solid var(--fh-hairline); border-radius: 0; box-shadow: none; }
+
+/* Complete the shared chrome migration on secondary routes. Search inputs
+   and record actions are retained; only duplicate global utilities are removed. */
+.fh-app--glass .fh-build-page[data-build-screen] .fh-build-topbar { border: 0; box-shadow: none; }
+.fh-app--glass .fh-build-topbar > .fh-build-icon-btn[aria-label="Open activity"] { display: none; }
+.fh-app--glass :is([data-build-screen="SnowNotesBuild"], [data-build-screen="Team"], [data-build-screen="Crew"]) > .fh-build-topbar { display: none; }
+.fh-app--glass .fh-build-page[data-build-screen] :is(.fh-build-card, .fh-build-rail-card) { border-radius: 0; border: 0; border-top: 1px solid var(--fh-hairline); box-shadow: none; }
+.fh-app--glass .fh-build-page[data-build-screen] .fh-build-focus { background: transparent; border: 0; border-radius: 0; box-shadow: none; }
+.fh-app--glass .fh-build-page[data-build-screen] .fh-build-hero-row--page { min-height: 0; align-items: start; margin-bottom: 28px; }
+.fh-app--glass .fh-build-primary-btn:not(:disabled) { background: var(--fh-gold); color: var(--fh-on-gold); border-color: var(--fh-gold); box-shadow: none; min-height: 44px; }
+.fh-app--glass :is(.v3-btn, .fh-build-primary-btn):disabled { background: var(--fh-tray) !important; color: var(--fh-ink-3) !important; border-color: var(--fh-hairline) !important; box-shadow: none !important; opacity: 1; }
+.fh-app--glass .fh-notes-phone .v3-section { background: transparent; border: 0; border-top: 1px solid var(--fh-hairline); border-radius: 0; padding: 20px 0 !important; box-shadow: none !important; }
+.fh-app--glass .fh-notes-phone .fh-notes-intro { border-top: 0; padding-top: 8px !important; }
+.fh-app--glass .fh-notes-intro h1 { font-size: 30px !important; }
+.fh-app--glass .fh-notes-intro .v3-caption { font-size: 15px; line-height: 1.5; }
+.fh-app--glass .fh-notes-intro > div:first-child { flex-wrap: wrap; }
+.fh-app--glass .fh-notes-intro > div:first-child > div { flex-basis: 100% !important; }
+.fh-app--glass .fh-notes-intro button { box-shadow: none !important; }
+
+.fh-app--glass .fh-build-page.fh-reports .fh-build-kpi-strip { box-shadow: none; border-radius: 0; background: transparent; }
+.fh-app--glass .fh-reports-phone h1 { font-size: 30px; line-height: 1.15; }
+
+@media (min-width: 900px) and (max-width: 1100px) { .fh-app--glass .fh-reports__summary strong { font-size: 30px; } }
+
+@media (max-width: 899px) {
+  .fh-app--glass .fhc-btn { min-height: 44px; }
 }

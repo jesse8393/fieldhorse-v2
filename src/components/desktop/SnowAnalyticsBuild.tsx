@@ -5,18 +5,13 @@
 
 import type { ReactNode } from 'react'
 import {
-  Bell,
-  Search,
   TrendingUp,
   TrendingDown,
   Target,
 } from 'lucide-react'
-import { countNoun, money } from '../../lib/format.ts'
-import MiniMetric from '../MiniMetric.tsx'
+import { countNoun, money, moneyFull } from '../../lib/format.ts'
 import { completedMonthComparison } from '../../lib/reportingMetrics.ts'
 import LoadingValue from '../LoadingValue.tsx'
-import TopbarWeather from './TopbarWeather.tsx'
-import PaletteKeyCap, { paletteShortcut } from './PaletteKeyCap.tsx'
 
 type StageRow = {
   id: string
@@ -106,56 +101,25 @@ export default function SnowAnalyticsBuild(props: Props) {
   const railPending = <strong>{pending('Loading', 96)}</strong>
 
   return (
-    <div className="fh-build-page" data-build-screen="SnowAnalyticsBuild">
-      <header className="fh-build-topbar fh-build-topbar--no-cta">
-        <button
-          type="button"
-          className="fh-build-search"
-          onClick={() => window.dispatchEvent(new CustomEvent('fh:open-palette'))}
-          aria-label="Open command palette"
-          aria-keyshortcuts={paletteShortcut().combo}
-        >
-          <Search size={14} />
-          <span>Search reports, KPIs...</span>
-          <PaletteKeyCap />
-        </button>
-        <div className="fh-build-topbar__meta">
-          <span>As of {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-          <TopbarWeather lead />
-        </div>
-        <button className="fh-build-icon-btn" type="button" onClick={() => window.dispatchEvent(new CustomEvent('fh:navigate', { detail: { to: '/activity' } }))} aria-label="Open activity" title="Activity"><Bell size={16} /></button>
-      </header>
-
+    <div className="fh-build-page fh-reports" data-build-screen="SnowAnalyticsBuild">
       <div className="fh-build-main">
-        <section className="fh-build-hero-row fh-build-hero-row--page">
+        <header className="fh-reports__header">
           <div>
-            <div className="fh-build-good">Business</div>
             <h1 className="fh-build-title">Reports</h1>
+            <p>Cash, contracts and the work ahead.</p>
           </div>
-
-          <div className="fh-build-focus">
-            <div className="fh-build-eyebrow">Business overview</div>
-            {loading ? (
-              <p><LoadingValue label="Loading your numbers" width={240} height={14} /></p>
-            ) : (
-              <>
-                <p>
-                  {money(stats.wonYTD || 0)} won · {pct(stats.closeRate)} win rate over 90 days ·
-                  {' '}{pct(stats.avgMargin)} tracked margin
-                </p>
-                {stats.avgMarginNote && <p style={{ marginTop: 6 }}>{stats.avgMarginNote}</p>}
-                {stats.closeRateNote && <p style={{ marginTop: 6 }}>{stats.closeRateNote}</p>}
-                <p style={{ marginTop: 6 }}>Tracked profit YTD: {stats.profitYTD == null ? 'Not enough cost data' : money(stats.profitYTD)}. {stats.profitNote}</p>
-              </>
-            )}
-          </div>
-
-          <div className="fh-build-mini-grid">
-            <MiniMetric label="Pipeline" value={loading ? pending('Loading the pipeline') : money(stats.pipeline || 0)} accent />
-            <MiniMetric label="Won YTD" value={loading ? pending('Loading won this year') : money(stats.wonYTD || 0)} />
-            <MiniMetric label="Win rate · 90 days" value={loading ? pending('Loading the win rate') : pct(stats.closeRate)} />
-            <MiniMetric label="Avg margin" value={loading ? pending('Loading the average margin') : pct(stats.avgMargin)} />
-          </div>
+          <p>As of {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+        </header>
+        <section className="fh-reports__summary" aria-label="Financial overview">
+          <KpiCell label="Collected YTD" value={loading ? pending('Loading collected this year') : stats.collected == null ? 'Not connected' : moneyFull(stats.collected)} />
+          <KpiCell label="Issued invoices YTD" value={loading ? pending('Loading invoiced this year') : stats.invoiced == null ? 'Not connected' : moneyFull(stats.invoiced)} />
+          <KpiCell label="Won YTD" value={loading ? pending('Loading won this year') : moneyFull(stats.wonYTD || 0)} />
+          <KpiCell label="Pipeline" value={loading ? pending('Loading the pipeline') : moneyFull(stats.pipeline || 0)} />
+        </section>
+        <section className="fh-reports__context" aria-label="Business overview">
+          <div><h2>Win rate · 90 days</h2><strong>{loading ? pending('Loading win rate') : pct(stats.closeRate)}</strong>{stats.closeRateNote && <p>{stats.closeRateNote}</p>}</div>
+          <div><h2>Tracked margin</h2><strong>{loading ? pending('Loading margin') : pct(stats.avgMargin)}</strong>{stats.avgMarginNote && <p>{stats.avgMarginNote}</p>}</div>
+          <div><h2>Tracked profit YTD</h2><strong>{loading ? pending('Loading profit') : stats.profitYTD == null ? 'Not enough cost data' : moneyFull(stats.profitYTD)}</strong><p>{stats.profitNote}</p></div>
         </section>
 
         {/* Secondary KPI strip. Invoiced/Collected render "Not
@@ -163,16 +127,6 @@ export default function SnowAnalyticsBuild(props: Props) {
             the screen hasn't loaded an invoices/payments array yet
             (vs. an honest $0 from a user with no activity). */}
         <div className="fh-build-kpi-strip">
-          <KpiCell
-            label="Issued invoices YTD"
-            value={loading ? pending('Loading invoiced this year', 64) : stats.invoiced == null ? 'Not connected' : money(stats.invoiced)}
-            muted={!loading && stats.invoiced == null}
-          />
-          <KpiCell
-            label="Collected YTD"
-            value={loading ? pending('Loading collected this year', 64) : stats.collected == null ? 'Not connected' : money(stats.collected)}
-            muted={!loading && stats.collected == null}
-          />
           <KpiCell label="Active leads" value={loading ? pending('Loading active leads', 40) : String(stats.leads || 0)} />
           <KpiCell label="Quotes out" value={loading ? pending('Loading quotes out', 40) : String(stats.quotes || 0)} />
           <KpiCell label="Miles YTD" value={loading ? pending('Loading miles this year', 48) : Number(stats.milesYTD || 0).toLocaleString()} />

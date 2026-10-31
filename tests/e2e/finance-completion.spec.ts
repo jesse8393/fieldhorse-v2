@@ -5,6 +5,24 @@ const client = { id: 'client-finance', user_id: 'qa-user-1', org_id: 'org-1', na
 const job = { id: 'job-finance', client_id: client.id, user_id: 'qa-user-1', org_id: 'org-1', name: client.name, email: client.email, job_title: 'Foundation repair', stage: 'job', amount: 10000, created_at: '2026-08-01T12:00:00Z', updated_at: '2026-10-01T12:00:00Z', fh_clients: client }
 const invoice = (id: string, amount: number, status = 'sent') => ({ id, user_id: 'qa-user-1', org_id: 'org-1', client_id: client.id, contact_id: job.id, title: 'Progress draw', description: 'Foundation installment', amount, status, sequence_number: 1, due_at: '2026-10-20', created_at: '2026-10-01T12:00:00Z', updated_at: '2026-10-01T12:00:00Z', fh_clients: client })
 const tables = { fh_clients: [client], fh_contacts: [job], fh_invoices: [invoice('issued-finance', 3000), invoice('draft-finance', 2000, 'draft')], fh_payments: [], fh_change_orders: [], fh_quotes: [], fh_leads: [], fh_schedule: [{ id: 'visit-finance', org_id: 'org-1', user_id: 'qa-user-1', contact_id: job.id, start_at: '2026-10-26T15:00:00Z', end_at: '2026-10-26T17:00:00Z', title: 'Foundation visit' }] }
+
+test('payment entry creates a secure intent ID when native randomUUID is unavailable', async ({ context, page }) => {
+  await context.addInitScript(() => Object.defineProperty(crypto, 'randomUUID', { value: undefined, configurable: true }))
+  const ids: string[] = []
+  await context.route('**/rest/v1/fh_payments*', async route => {
+    if (route.request().method() === 'POST') {
+      const payload = route.request().postDataJSON()
+      ids.push((Array.isArray(payload) ? payload[0] : payload).id)
+    }
+    return route.fallback()
+  })
+  await page.goto('/invoices/issued-finance/payment')
+  await expect(page.getByRole('heading', { level: 1, name: 'Collect payment' })).toBeVisible()
+  await page.getByLabel('Amount', { exact: true }).fill('50')
+  await page.getByRole('button', { name: 'Record $50.00', exact: true }).click()
+  await expect.poll(() => ids.length).toBe(1)
+  expect(ids[0]).toMatch(/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/)
+})
 test.beforeEach(async ({ context, page }) => { await signIn(context, { tables }); await page.clock.setFixedTime(new Date('2026-10-27T17:00:00Z')) })
 
 test('billing categories open exact contributing records', async ({ page }, testInfo) => {

@@ -1,3 +1,4 @@
+import { createUuid } from '../lib/uuid.ts'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 // @ts-ignore -- papaparse ships no types
@@ -161,7 +162,7 @@ export default function Importer() {
 
   async function ensureWebhookKey() {
     if (webhookKey) return webhookKey
-    const k = crypto.randomUUID().replace(/-/g, '').slice(0, 24)
+    const k = createUuid().replace(/-/g, '').slice(0, 24)
     await supabase.from('profiles').update({ webhook_key: k }).eq('user_id', user!.id)
     setWebhookKey(k)
     return k

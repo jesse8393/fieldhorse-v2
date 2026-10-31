@@ -419,7 +419,7 @@ export default function Notes() {
 
   return (
     <motion.div
-      className="v3-screen"
+      className="v3-screen fh-notes-phone"
       variants={stagger}
       initial="hidden"
       animate="show"
@@ -431,17 +431,17 @@ export default function Notes() {
           entry. Risks chip turns red when > 0. */}
       <motion.div
         variants={item}
-        className="v3-section v3-section--primary-quiet"
+        className="v3-section v3-section--primary-quiet fh-notes-intro"
         style={{ margin: '12px var(--v3-gutter) 14px', padding: '16px 16px' }}
       >
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <span className="v3-eyebrow" style={{ color: 'var(--v3-primary-text)' }}>Field notes</span>
             <h1 style={{ margin: '6px 0 0', fontSize: 24, lineHeight: 1.1, letterSpacing: 0, fontWeight: 600, color: 'var(--v3-text)' }}>
-              Notes, fast.
+              Notes
             </h1>
             <div className="v3-caption" style={{ marginTop: 6 }}>
-              Speak or type a note. AI organizes it into action items, risks, and materials.
+              Capture what happened. Add AI summaries when you need them.
             </div>
           </div>
           <VoiceButton listening={listening} onStart={startVoice} onStop={stopVoice} />
@@ -493,7 +493,7 @@ export default function Notes() {
           onChange={(e) => setDraft(e.target.value)}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          placeholder={listening ? 'Listening, speak freely…' : 'Capture a note from the jobsite. AI parses it for action items, risks, materials.'}
+          placeholder={listening ? 'Listening, speak freely…' : 'What happened on site?'}
           rows={5}
           style={{
             width: '100%',

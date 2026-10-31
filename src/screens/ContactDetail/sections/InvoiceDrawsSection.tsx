@@ -1,3 +1,4 @@
+import { createUuid } from '../../../lib/uuid.ts'
 // src/screens/ContactDetail/sections/InvoiceDrawsSection.tsx
 //
 // Progress-billing surface. Lists every fh_invoices row (draw) issued
@@ -456,7 +457,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       // Upload to private job-files bucket so the server can fetch
       // with service role + attach to the Resend send.
       const blob = result.doc.output('blob')
-      const rowId = crypto.randomUUID()
+      const rowId = createUuid()
       const path = `${user.id}/${contact.id}/${rowId}.pdf`
       const { error: upErr } = await supabase.storage
         .from('job-files')

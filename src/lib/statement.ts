@@ -1,3 +1,4 @@
+import { createUuid } from './uuid.ts'
 // src/lib/statement.ts
 //
 // Client statement, one rollup of what a client owes across ALL of
@@ -159,7 +160,7 @@ export async function sendStatementEmail({ company, client, data, userId, recipi
 
   const { supabase, authHeaders } = await import('./supabase.ts')
   const blob = result.doc.output('blob')
-  const rowId = crypto.randomUUID()
+  const rowId = createUuid()
   const path = `${userId}/statements/${rowId}.pdf`
   const { error: upErr } = await supabase.storage
     .from('job-files')

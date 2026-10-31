@@ -1,3 +1,4 @@
+import { createUuid } from './uuid.ts'
 // First-class invoices (pipeline v2, D62). One fh_invoices row per invoice:
 // a job's deposit, progress draws and final balance, or a bill that stands
 // on its own against a client with no job. This module is the single home
@@ -368,7 +369,7 @@ export async function sendInvoiceEmail({ invoice, duplicateReviewed = false, con
   if (!result?.doc) return { ok: false, reason: 'error', message: 'PDF generator returned no document' }
 
   const blob = result.doc.output('blob')
-  const rowId = crypto.randomUUID()
+  const rowId = createUuid()
   // Under the sender's own folder either way (the server checks that); a
   // job's PDF sits with the job's files, a client's under its invoice.
   const path = job ? `${userId}/${job.id}/${rowId}.pdf` : `${userId}/invoices/${invoice.id}/${rowId}.pdf`

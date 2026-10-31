@@ -1,3 +1,4 @@
+import { createUuid } from '../../lib/uuid.ts'
 // Mark a job complete, /jobs/:id/complete (Phase 9, Task 13, D57). It took
 // the place of the closeout sheet: the warranty, the customer's approval
 // and a closing note, saved as the fh_closeouts row that moves the job to
@@ -182,7 +183,7 @@ function CompleteForm({ data, userId, goBack, home }: { data: ReturnType<typeof 
       const { generateCertificate, downloadPdf } = await loadPdf()
       const result = await generateCertificate({ company: companyPayload(), contact, closeout: existing })
       const blob = result.doc.output('blob')
-      const rowId = crypto.randomUUID()
+      const rowId = createUuid()
       const path = `${userId}/${contact.id}/${rowId}.pdf`
       const { error: upErr } = await supabase.storage.from('job-files').upload(path, blob, { upsert: false, contentType: 'application/pdf' })
       if (upErr) throw new Error(`Couldn't save the certificate PDF: ${upErr.message}`)

@@ -1,3 +1,4 @@
+import { createUuid } from '../../lib/uuid.ts'
 // Collect payment, /invoices/:id/payment (Phase 9, Task 12, decision D57):
 // the screen that records what the customer paid on one invoice. A receipt
 // log, not a card processor. The amount is prefilled with what the invoice
@@ -94,7 +95,8 @@ export default function InvoicePayment() {
   const [saving, setSaving] = useState(false)
   // One id for this payment, so a retry after a lost answer records it once;
   // a new id when the form changes after a failed try.
-  const paymentId = useRef(crypto.randomUUID())
+  const [initialPaymentId] = useState(createUuid)
+  const paymentId = useRef(initialPaymentId)
   const payloadKey = useRef<string | null>(null)
 
   const shownAmount = amount ?? (figures ? amountInput(figures.due) : '')
@@ -110,7 +112,7 @@ export default function InvoicePayment() {
       return
     }
     const key = JSON.stringify([numeric, method, kind, reference, paidOn])
-    if (payloadKey.current != null && payloadKey.current !== key) paymentId.current = crypto.randomUUID()
+    if (payloadKey.current != null && payloadKey.current !== key) paymentId.current = createUuid()
     payloadKey.current = key
     setSaving(true)
     try {

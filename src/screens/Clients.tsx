@@ -268,7 +268,7 @@ export default function Clients() {
             aria-label="Search customers"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search name, company, phone, email…"
+            placeholder="Search customers"
             style={{ width: '100%', padding: '12px 12px 12px 32px', borderRadius: 10, background: 'var(--v3-surface)', border: '1px solid var(--v3-border-strong)', color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 16, boxSizing: 'border-box' }}
           />
         </div>

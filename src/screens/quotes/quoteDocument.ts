@@ -1,3 +1,4 @@
+import { createUuid } from '../../lib/uuid.ts'
 // The quote's document, out the door (Phase 9, Task 10): the proposal PDF,
 // the email send, the share link and the electronic signature request, for
 // an fh_quotes row. Moved here from the job page's Quote tab, which did the
@@ -127,7 +128,7 @@ export async function downloadQuotePdf(result: any) {
 // keeps it.
 async function uploadQuotePdf(quote: QuoteWithClient, userId: string, result: any): Promise<string> {
   const blob = result.doc.output('blob')
-  const rowId = crypto.randomUUID()
+  const rowId = createUuid()
   const path = `${userId}/quotes/${quote.id}/${rowId}.pdf`
   const { error: upErr } = await supabase.storage
     .from('job-files')

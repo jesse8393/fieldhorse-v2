@@ -1,3 +1,4 @@
+import { createUuid } from '../../../lib/uuid.ts'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -201,7 +202,7 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
           toastError("Couldn't process photo", ex?.message || `${file.name} skipped`)
           continue
         }
-        const rowId = crypto.randomUUID()
+        const rowId = createUuid()
         const path = `${userId}/${jobId}/${rowId}.jpg`
         const row = {
           id: rowId,

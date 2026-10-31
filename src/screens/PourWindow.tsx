@@ -1,7 +1,7 @@
-import { lazy, Suspense, useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ChevronLeft, MapPin, Wind, Droplets, Thermometer, CloudSun, AlertTriangle, Check, X } from 'lucide-react'
+import { ChevronLeft, MapPin, Wind, Droplets, CloudSun, AlertTriangle, Check, X } from 'lucide-react'
 import { useProfile } from '../contexts/ProfileContext.tsx'
 import { getWeather, weatherLabel, reverseGeocode, MURFREESBORO, WEATHER_FRESH_MS } from '../lib/weather.ts'
 import { assessWorkWindow, assessTrade, assessedHourlyStrip } from '../lib/forecastAssessment.ts'
@@ -9,8 +9,6 @@ import ForecastBasis from '../components/ForecastBasis.tsx'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
-import { OnyxStage } from '../components/fh'
-import CountUp from '../components/fx/CountUp.tsx'
 import { Eyebrow } from '../components/v3'
 const SnowForecast = lazy(() => import('../components/desktop/SnowForecastBuild.tsx'))
 
@@ -20,7 +18,7 @@ const SnowForecast = lazy(() => import('../components/desktop/SnowForecastBuild.
 // `fg` paints dots and bars (it must stay hex for the glow alpha suffix);
 // `ink` is the text safe shade for labels in both themes.
 const TONE: Record<string, any> = {
-  go:   { fg: '#2D7A4F', ink: 'var(--v3-success-text)', bg: 'rgba(45,122,79,0.16)',  border: 'rgba(45, 122, 79,0.35)', label: 'Clear to work' },
+  go:   { fg: '#454545', ink: 'var(--v3-text)', bg: 'var(--surface-2)', border: 'var(--rule)', label: 'Within configured limits' },
   warn: { fg: '#C9963A', ink: 'var(--v3-primary-text)', bg: 'rgba(201,150,58,0.14)', border: 'rgba(201,150,58,0.35)', label: 'Tight window' },
   stop: { fg: '#C0392B', ink: 'var(--v3-danger-text)',  bg: 'rgba(192,57,43,0.15)',  border: 'rgba(192,57,43,0.35)',  label: 'Stand down' }
 }
@@ -207,7 +205,7 @@ useEffect(() => {
   }
 
   return (
-    <motion.div className="fh-screen" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 48, position: 'relative' }}>
+    <motion.div className="fh-screen fh-forecast-phone" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 48, position: 'relative' }}>
       {/* HEADER */}
       <motion.div variants={item} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '12px 24px 12px' }}>
         <div style={{ minWidth: 0, flex: 1 }}>
@@ -215,12 +213,12 @@ useEffect(() => {
             type="button"
             onClick={() => { hapticTap(); navigate(-1) }}
             aria-label="Back"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '8px 12px 8px 8px', marginLeft: -6, marginBottom: 4, borderRadius: 10, background: 'transparent', border: 'none', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+            style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, gap: 4, padding: '8px 12px 8px 8px', marginLeft: -8, marginBottom: 4, borderRadius: 10, background: 'transparent', border: 'none', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
           >
             <ChevronLeft size={14} />
-            Home
+            Back
           </button>
-          <h1 className="fh-font-serif" style={{ margin: '0', fontSize: 24, lineHeight: 1.1, letterSpacing: 0, fontWeight: 400, color: 'var(--ink-strong)' }}>
+          <h1 style={{ margin: '0', fontSize: 30, lineHeight: 1.1, letterSpacing: '-.03em', fontWeight: 650, color: 'var(--ink-strong)' }}>
             Forecast
           </h1>
         </div>
@@ -228,7 +226,7 @@ useEffect(() => {
           type="button"
           whileTap={{ scale: 0.96 }}
           onClick={() => { hapticMedium(); pinLocation() }}
-          aria-label={hasCoords ? 'Pin again location' : 'Pin location for weather'}
+          aria-label={hasCoords ? 'Update weather location' : 'Pin location for weather'}
           style={{
             flexShrink: 0,
             width: 44,
@@ -248,7 +246,7 @@ useEffect(() => {
 
       {/* LOCATION / ERROR STRIP */}
       <motion.div variants={item} style={{ padding: '0 24px 12px' }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '4px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600 }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontSize: 14 }}>
           <MapPin size={11} color="var(--field-gold-bright)" />
           {hasCoords
             ? (cityName || `${(profile.location_lat as any).toFixed(2)}, ${(profile.location_lon as any).toFixed(2)}`)
@@ -271,40 +269,25 @@ useEffect(() => {
         )}
       </motion.div>
 
-      <div style={{ margin: '0 20px' }}><ForecastBasis weather={weather} receivedAt={receivedAt} trades={tradeRows.map((r) => r.trade)} /></div>
-      {/* TODAY HERO */}
-      <motion.div variants={item} style={{ margin: '0 20px 14px' }}>
-      <OnyxStage
-        as="header"
-        glow
-        hairline={false}
-        style={{
-          overflow: 'hidden',
-          padding: 24,
-          borderRadius: 14,
-          border: `1px solid ${tone.border}`,
-          // The metric tiles below paint --surface-2, which the onyx scope
-          // does not remap, so give them the onyx wash here.
-          ['--surface-2' as string]: 'var(--fh-wash)'
-        } as CSSProperties}
-      >
+      {/* Current readings lead; source and assessment details follow them. */}
+      <motion.section variants={item} aria-label="Current conditions" className="fh-forecast-current">
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', position: 'relative', gap: 12 }}>
           <div style={{ minWidth: 0, flex: 1 }}>
             <Eyebrow as="div" style={{ color: 'var(--ink-muted)' }}>
               {currentCode == null ? 'Today' : `Today · ${weatherLabel(currentCode)}`}
             </Eyebrow>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 10 }}>
-              <span style={{ fontFamily: 'var(--font-display)', fontSize: 24, letterSpacing: 0, lineHeight: 0.9, color: 'var(--ink-strong)' }}>
-                {loading || currentTemp == null ? '\u2003' : Math.round(currentTemp)}
+              <span style={{ fontFamily: 'var(--font-display)', fontSize: 52, letterSpacing: '-.04em', lineHeight: 1, color: 'var(--ink-strong)' }}>
+                {loading || currentTemp == null ? '—' : Math.round(currentTemp)}
               </span>
               <span style={{ fontFamily: 'var(--font-display)', fontSize: 24, color: 'var(--ink-muted)', marginTop: 6 }}>°F</span>
             </div>
           </div>
           <div
             aria-hidden="true"
-            style={{ flexShrink: 0, width: 56, height: 56, borderRadius: 10, background: 'linear-gradient(135deg, #5C5C5C, #141414)', display: 'grid', placeItems: 'center' }}
+            style={{ flexShrink: 0, width: 56, height: 56, display: 'grid', placeItems: 'center', color: 'var(--ink-muted)' }}
           >
-            <CloudSun size={26} color="#F2EDE4" />
+            <CloudSun size={36} />
           </div>
         </div>
 
@@ -315,16 +298,13 @@ useEffect(() => {
             display: 'flex',
             alignItems: 'center',
             gap: 12,
-            padding: '12px 12px',
-            borderRadius: 10,
-            background: tone.bg,
-            border: `1px solid ${tone.border}`,
+            padding: '12px 0',
             position: 'relative'
           }}
         >
           <span
             aria-hidden="true"
-            style={{ width: 10, height: 10, borderRadius: 10, background: tone.fg, boxShadow: `0 0 12px ${tone.fg}99` }}
+            style={{ width: 8, height: 8, flexShrink: 0, borderRadius: '50%', background: tone.fg }}
           />
           <div style={{ minWidth: 0, flex: 1 }}>
             <Eyebrow as="div" style={{ color: tone.ink }}>
@@ -339,13 +319,13 @@ useEffect(() => {
         </div>
 
         {/* Metric trio */}
-        <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, position: 'relative' }}>
-          <Metric Icon={Wind} label="Wind" value={currentWind != null ? `${Math.round(currentWind)}` : '\u2003'} unit="mph" />
-          <Metric Icon={Droplets} label="Rain now" value={currentRain == null ? '\u2003' : currentRain.toFixed(2)} unit='in/h' />
-          <Metric Icon={Thermometer} label="Humidity" value={currentHumidity != null ? `${Math.round(currentHumidity)}` : '\u2003'} unit="%" />
+        <div className="fh-forecast-readings">
+          <Metric label="Wind" value={currentWind != null ? `${Math.round(currentWind)}` : '—'} unit="mph" />
+          <Metric label="Rain now" value={currentRain == null ? '—' : currentRain.toFixed(2)} unit='in/h' />
+          <Metric label="Humidity" value={currentHumidity != null ? `${Math.round(currentHumidity)}` : '—'} unit="%" />
         </div>
-      </OnyxStage>
-      </motion.div>
+      </motion.section>
+      <div style={{ margin: '0 24px' }}><ForecastBasis weather={weather} receivedAt={receivedAt} trades={tradeRows.map((r) => r.trade)} /></div>
 
       {/* 24-HOUR STRIP */}
       {strip.length > 0 && (
@@ -411,7 +391,7 @@ useEffect(() => {
                   </span>
                   <span
                     aria-hidden="true"
-                    style={{ width: 8, height: 8, borderRadius: 10, background: t.fg, boxShadow: `0 0 8px ${t.fg}99` }}
+                    style={{ width: 8, height: 8, borderRadius: 10, background: t.fg }}
                   />
                   <span style={{ fontFamily: 'var(--font-display)', fontSize: 14, color: 'var(--ink-strong)', letterSpacing: 0 }}>
                     {fmtTemp(h.temp)}
@@ -447,13 +427,14 @@ useEffect(() => {
                     overflow: 'hidden',
                     padding: '12px 16px 12px 24px',
                     borderRadius: 10,
-                    background: 'linear-gradient(180deg, var(--surface-2) 0%, var(--surface-2) 100%)',
-                    border: '1px solid var(--rule)'
+                    background: 'transparent',
+                    border: 'none',
+                    borderBottom: '1px solid var(--rule)'
                   }}
                 >
                   <span
                     aria-hidden="true"
-                    style={{ position: 'absolute', left: 0, top: 10, bottom: 10, width: 3, borderRadius: '0 3px 3px 0', background: t.fg, boxShadow: `0 0 10px ${t.fg}99` }}
+                    style={{ position: 'absolute', left: 0, top: 10, bottom: 10, width: 3, borderRadius: '0 3px 3px 0', background: t.fg }}
                   />
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                     <div style={{ minWidth: 0, flex: 1 }}>
@@ -585,24 +566,20 @@ function dayAggregateStatus(weather: any, services: any, dayIso: any) {
   return !samples || unknown ? 'unknown' : worst
 }
 
-function Metric({ Icon, label, value, unit }: any) {
+function Metric({ label, value, unit }: { label: string; value: string; unit: string }) {
   return (
     <div
       style={{
-        padding: '12px 12px 12px',
-        borderRadius: 10,
-        background: 'var(--surface-2)',
-        border: '1px solid var(--rule)',
+        minWidth: 0,
         display: 'flex',
         flexDirection: 'column',
         gap: 8
       }}
     >
-      <Eyebrow style={{ gap: 4, color: 'var(--ink-muted)' }}>
-        {Icon && <Icon size={10} />}
+      <span style={{ fontSize: 13, color: 'var(--ink-muted)', overflowWrap: 'anywhere' }}>
         {label}
-      </Eyebrow>
-      <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 4 }}>
+      </span>
+      <span style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 4 }}>
         <span style={{ fontFamily: 'var(--font-display)', fontSize: 20, letterSpacing: 0, lineHeight: 1, color: 'var(--ink-strong)' }}>
           {value}
         </span>

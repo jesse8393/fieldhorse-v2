@@ -1,3 +1,4 @@
+import { createUuid } from '../../lib/uuid.ts'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
@@ -467,7 +468,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
 
       // Upload to job-files so the server can pull it with service role.
       const blob = result.doc.output('blob')
-      const rowId = crypto.randomUUID()
+      const rowId = createUuid()
       const path = `${user!.id}/${contact.id}/${rowId}.pdf`
       const { error: upErr } = await supabase.storage
         .from('job-files')

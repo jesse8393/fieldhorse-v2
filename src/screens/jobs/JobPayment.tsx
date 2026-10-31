@@ -1,3 +1,4 @@
+import { createUuid } from '../../lib/uuid.ts'
 // Log a payment on a job, /jobs/:id/payment (Phase 9, Task 13, D57). It
 // took the place of the payment sheet: a receipt log, not a card
 // processor. The amount starts at the balance; one tap on Record writes
@@ -61,7 +62,8 @@ function PaymentForm({ data, goBack, home }: { data: ReturnType<typeof useJobScr
   // One id per payment intent: a retap after a lost response upserts to a
   // no-op, while an edited amount gets a fresh id so the first row is never
   // claimed as the second.
-  const paymentId = useRef(typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : undefined)
+  const [initialPaymentId] = useState(createUuid)
+  const paymentId = useRef(initialPaymentId)
   const paymentKey = useRef<string | null>(null)
 
   const numeric = Number(amount) || 0
@@ -74,8 +76,8 @@ function PaymentForm({ data, goBack, home }: { data: ReturnType<typeof useJobScr
       return
     }
     const key = JSON.stringify([numeric, method, kind, reference, paidOn])
-    if (paymentKey.current != null && paymentKey.current !== key && typeof crypto !== 'undefined' && crypto.randomUUID) {
-      paymentId.current = crypto.randomUUID()
+    if (paymentKey.current != null && paymentKey.current !== key) {
+      paymentId.current = createUuid()
     }
     paymentKey.current = key
     setSaving(true)

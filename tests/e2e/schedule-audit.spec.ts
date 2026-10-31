@@ -1,7 +1,31 @@
 import { expect, test } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
+import { nothingRunsOffTheSide } from './helpers/overflow.ts'
+import { USER } from '../../scripts/qa-mock.mjs'
 
 test.use({ timezoneId: 'America/Chicago' })
+
+test('a narrow phone week keeps full event titles and standalone events editable', async ({ context, page }) => {
+  const title = 'Walk through the entire site with the electrical subcontractor'
+  await signIn(context, { tables: { fh_schedule: [{
+    id: 'agenda-manual', user_id: USER.id, org_id: 'org-1', contact_id: null,
+    title, start_at: '2026-10-31T14:00:00Z', end_at: '2026-10-31T15:00:00Z',
+    status: 'scheduled', assigned_to: null, assigned_user_ids: []
+  }] } })
+  await page.clock.setFixedTime(new Date('2026-10-30T15:00:00Z'))
+  await page.setViewportSize({ width: 320, height: 844 })
+  await page.goto('/schedule?d=2026-10-30')
+  await page.getByRole('tab', { name: 'Week', exact: true }).click()
+  const agenda = page.getByLabel('Weekly agenda')
+  await expect(agenda.getByText(title, { exact: true })).toBeVisible()
+  const row = agenda.getByRole('button', { name: new RegExp(title) })
+  expect((await row.boundingBox())!.width).toBeGreaterThan(220)
+  await expect(agenda.getByText('No visits', { exact: true })).toHaveCount(0)
+  await nothingRunsOffTheSide(page, 'weekly agenda at 320 px')
+  await row.click()
+  await expect(page).toHaveURL(/\/schedule\/agenda-manual\/edit/)
+  await expect(page.getByLabel('Title', { exact: true })).toHaveValue(title)
+})
 
 test('Sunday remains visible and mobile can schedule an unscheduled job', async ({ context, page }) => {
   await signIn(context, { tables: { fh_schedule: [] } })

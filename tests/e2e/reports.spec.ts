@@ -56,7 +56,7 @@ test.describe('Reports read the four records', () => {
     await expect(page.getByText('1 won · 2 lost · last 90 days', { exact: true })).toBeVisible()
 
     if (phone) {
-      await expect(page.getByText('Owner KPIs', { exact: true })).toBeVisible({ timeout: 30_000 })
+      await expect(page.getByText('Business overview', { exact: true })).toBeVisible({ timeout: 30_000 })
       // Active leads counts the open ones (the phone has no Quotes out tile).
       await expect(page.getByText('Active leads', { exact: true }).locator('..')).toContainText('1')
       const funnel = page.locator('.v3-section').filter({ hasText: 'Funnel · last 90 days' })
@@ -89,7 +89,7 @@ test.describe('Reports read the four records', () => {
     await open(page)
     await expect(page.getByText(/1 of 2 won jobs have cost data\. 1 excluded\./)).toBeVisible()
     if (testInfo.project.name.startsWith('desktop')) {
-      await expect(page.locator('.fh-build-focus')).toContainText('Tracked profit YTD: $800')
+      await expect(page.getByRole('heading', { name: 'Tracked profit YTD', exact: true }).locator('..')).toContainText('$800')
       await expect(page.locator('.fh-build-kpi-cell').filter({ hasText: 'Issued invoices YTD' })).toContainText('$0')
     } else {
       await expect(page.getByText('Tracked profit YTD', { exact: true }).locator('..')).toContainText('$800')
