@@ -15,7 +15,7 @@
 // route from foreman/crew is the only role gate, they see their own
 // open tasks on /crew, which is the right surface for those roles.
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   AlertTriangle, Calendar, Check, ChevronRight, ClipboardCheck, Trash2, Plus,
@@ -100,6 +100,7 @@ export default function Tasks() {
   const [filterAssignee, setFilterAssignee] = useState<string>('') // '' = all
   const [allJobs, setAllJobs] = useState<{ id: string; name: string }[]>([])
   const [composerOpen, setComposerOpen] = useState(false)
+  const headingRef = useRef<HTMLHeadingElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -168,16 +169,32 @@ export default function Tasks() {
   }, [filteredTasks])
 
   async function completeTask(rowId: string) {
-    // Optimistic.
+    const snapshot = tasks.find(task => task.id === rowId)
+    if (!snapshot) return
     setTasks((cur) => cur.filter((t) => t.id !== rowId))
-    const { error } = await supabase
+    headingRef.current?.focus({ preventScroll: true })
+    const { data, error } = await supabase
       .from('fh_job_todos')
       .update({ done: true, completed_at: new Date().toISOString() })
       .eq('id', rowId)
-    if (error) {
-      toastError("Couldn't complete", error.message)
-      load()
+      .select('id')
+    if (error || !data?.length) {
+      toastError("Couldn't complete", error?.message || 'This task could not be updated. Refresh and try again.')
+      void load()
+      return
     }
+    toastUndo('Task completed', {
+      description: snapshot.text,
+      onUndo: async () => {
+        const { data: restored, error: restoreError } = await supabase.from('fh_job_todos')
+          .update({ done: snapshot.done, completed_at: snapshot.completed_at }).eq('id', rowId).select('id')
+        if (restoreError || !restored?.length) {
+          toastError("Couldn't undo", restoreError?.message || 'This task could not be restored. Refresh and try again.')
+          return
+        }
+        await load()
+      }
+    })
   }
 
   // Reassign a task to another member (or unassign). Optimistic.
@@ -251,8 +268,8 @@ export default function Tasks() {
   return (
     <div className="fh-tasks" data-build-screen="Tasks" data-build-route="/tasks">
       <header className="fh-tasks-heading">
-        <div><h1>Tasks</h1><p>Open work across your jobs.</p></div>
-        {!composerOpen && <Button type="button" leftIcon={Plus} onClick={() => setComposerOpen(true)}>New task</Button>}
+        <div><h1 ref={headingRef} tabIndex={-1}>Tasks</h1><p>Open work across your jobs.</p></div>
+        {!composerOpen && <Button type="button" leftIcon={Plus} disabled={loading || Boolean(error)} onClick={() => setComposerOpen(true)}>New task</Button>}
       </header>
 
       <dl className="fh-tasks-summary" aria-label="Task summary">

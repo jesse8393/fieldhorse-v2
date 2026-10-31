@@ -128,3 +128,41 @@ test('public entry has clear hierarchy, reachable actions and no founder story',
   await page.getByRole('link', { name: 'Create a free account' }).click()
   await expect(page).toHaveURL(/\/login\?mode=signup$/)
 })
+
+test('task completion gives feedback and Undo restores the same task', async ({ context, page }) => {
+  await signIn(context)
+  let task = { id: 'task-undo', text: 'Confirm site access', job_id: 'c-job1', assigned_to: null, user_id: 'qa-user-1', due_at: null, done: false, completed_at: null as string | null, created_at: new Date().toISOString() }
+  const changes: Record<string, unknown>[] = []
+  await context.route(/\/rest\/v1\/fh_job_todos(?:\?|$)/, async route => {
+    if (route.request().method() === 'PATCH') {
+      const values = route.request().postDataJSON()
+      changes.push(values)
+      task = { ...task, ...values }
+      await route.fulfill({ json: [{ id: task.id }] })
+    } else await route.fulfill({ json: task.done ? [] : [task] })
+  })
+  await page.setViewportSize({ width: 320, height: 844 })
+  await page.goto('/tasks')
+  await page.getByRole('button', { name: 'Complete Confirm site access' }).click()
+  await expect(page.getByText('Task completed', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Tasks', exact: true })).toBeFocused()
+  await page.getByRole('button', { name: 'Undo', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Complete Confirm site access' })).toBeVisible()
+  expect(changes).toHaveLength(2)
+  expect(changes[0]).toMatchObject({ done: true })
+  expect(changes[1]).toEqual({ done: false, completed_at: null })
+})
+
+test('refused task completion restores the row without a success message', async ({ context, page }) => {
+  const task = { id: 'task-refused', text: 'Check delivery access', job_id: 'c-job1', assigned_to: null, user_id: 'qa-user-1', due_at: null, done: false, completed_at: null, created_at: new Date().toISOString() }
+  await signIn(context, { tables: { fh_job_todos: [task] } })
+  await context.route(/\/rest\/v1\/fh_job_todos(?:\?|$)/, async route => {
+    if (route.request().method() === 'PATCH') await route.fulfill({ json: [] })
+    else await route.fallback()
+  })
+  await page.goto('/tasks')
+  await page.getByRole('button', { name: 'Complete Check delivery access' }).click()
+  await expect(page.getByText("Couldn't complete", { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Complete Check delivery access' })).toBeVisible()
+  await expect(page.getByText('Task completed', { exact: true })).toHaveCount(0)
+})

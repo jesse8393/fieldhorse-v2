@@ -8,6 +8,7 @@ October 31, 2026. Scope: interface presentation and interaction. This pass chang
 | --- | --- |
 | Today placed its date and sync status behind the sticky header | Removed the obsolete negative stage offset for Workspace 06 |
 | Tasks retained a five column desktop table on narrow phones; assignment fields collapsed to 18 pixels | Full task text, named job links, labeled assignment controls, clear completion actions, and 44 pixel deletion targets |
+| Completing a dashboard task removed it without feedback or Undo | Completion confirmation, focus recovery, and Undo after a confirmed update; refused writes restore the list |
 | Task summary cards and duplicate utilities displaced the actual work | Compact ruled counts, one heading, one creation action, and one labeled filter |
 | Task composer relied on placeholders and an unlabeled task field | Persistent labels, native form submission, visible required fields, and explicit empty job guidance |
 | A saved assignee missing from the member list displayed as Unassigned | Preserve a visible option for the existing assignee |
@@ -28,6 +29,6 @@ Compiled application reviewed with isolated synthetic records through an interna
 * Verified customer suggestions respond to arrow keys and Enter without submitting the job form.
 * Confirmed Today date starts below the header after correction.
 * All 1,482 unit tests passed. TypeScript, ESLint, design system audit, and production build passed locally.
-* Added six browser regressions, each running in both configured browser projects. They cover narrow geometry, long task text, form error recovery, customer selection, schedule targets, and public entry navigation. GitHub CI reports execution separately from this local review.
+* Added eight browser regressions, each running in both configured browser projects. They cover narrow geometry, long task text, form error recovery, customer selection, schedule targets, completion feedback and Undo, refused update recovery, and public entry navigation. GitHub CI reports execution separately from this local review.
 
 UI review uses synthetic data and browser phone frames. Physical Safari keyboard behavior, touch hardware, real account integration, and previously recorded backend release gaps are not certified by this work. Merge and production deployment remain with the owner.
