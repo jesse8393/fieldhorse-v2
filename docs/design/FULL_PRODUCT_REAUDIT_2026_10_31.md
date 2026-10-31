@@ -7,6 +7,7 @@ This is a review of the compiled React application, not a replacement prototype.
 | Finding | Repair |
 | --- | --- |
 | The phone week planner squeezed visits into seven narrow columns | A full-width agenda shows occupied days, complete visit titles, times, crew counts, and explicit editing/deletion. The date strip still opens any day. |
+| Tablet review exposed faint 28-pixel Day-view controls and a dead tap on standalone visits | Day visits now use readable 44-pixel actions, full-width text, and keyboard-accessible editing for standalone events. A narrow-screen regression covers the actual controls and navigation. |
 | An empty week consumed space before the next useful action | One honest empty state replaces seven empty day panels. |
 | Phone range navigation competed with Today at 320 pixels | Today now sits beside the view controls; range arrows retain 44-pixel targets. |
 | Reports gave small rounded totals precedence over financial evidence | Collected, issued, won, and pipeline amounts lead. Supporting business metrics and their explanations follow in open columns. |

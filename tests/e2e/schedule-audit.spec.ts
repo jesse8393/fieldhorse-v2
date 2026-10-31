@@ -5,6 +5,34 @@ import { USER } from '../../scripts/qa-mock.mjs'
 
 test.use({ timezoneId: 'America/Chicago' })
 
+test('a standalone day visit has readable touch actions and opens with a keyboard', async ({ context, page }) => {
+  const title = 'Review every site access point with the delivery team before the concrete pour'
+  await signIn(context, { tables: { fh_schedule: [{
+    id: 'day-manual', user_id: USER.id, org_id: 'org-1', contact_id: null,
+    title, start_at: '2026-10-31T14:00:00Z', end_at: '2026-10-31T15:00:00Z',
+    status: 'scheduled', assigned_to: null, assigned_user_ids: []
+  }] } })
+  await page.clock.setFixedTime(new Date('2026-10-31T13:00:00Z'))
+  await page.setViewportSize({ width: 320, height: 844 })
+  await page.goto('/schedule?d=2026-10-31')
+  await page.getByRole('tab', { name: 'Day', exact: true }).click()
+  const agenda = page.getByRole('list', { name: 'Daily agenda' })
+  for (const name of ['Edit event', 'Delete event']) {
+    const action = agenda.getByRole('button', { name, exact: true })
+    await expect(action).toBeVisible()
+    await expect(action).toHaveCSS('opacity', '1')
+    const box = await action.boundingBox()
+    expect(box!.height).toBeGreaterThanOrEqual(44)
+    expect(box!.width).toBeGreaterThanOrEqual(44)
+  }
+  await nothingRunsOffTheSide(page, 'daily agenda at 320 px')
+  const visit = agenda.getByRole('button', { name: new RegExp(title) })
+  await expect(visit).toBeEnabled()
+  await visit.press('Enter')
+  await expect(page).toHaveURL(/\/schedule\/day-manual\/edit/)
+  await expect(page.getByLabel('Title', { exact: true })).toHaveValue(title)
+})
+
 test('a narrow phone week keeps full event titles and standalone events editable', async ({ context, page }) => {
   const title = 'Walk through the entire site with the electrical subcontractor'
   await signIn(context, { tables: { fh_schedule: [{

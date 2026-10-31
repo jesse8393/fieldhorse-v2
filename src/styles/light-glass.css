@@ -639,6 +639,20 @@ body:has(.fh-app--glass) .fhj-capsule .fhc-btn { background-image: none; box-sha
 .fh-payment-classification { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
 .fh-payment-classification select { appearance: auto; -webkit-appearance: auto; padding-inline: 12px; }
 
+.fh-app--glass .fhev-day { margin: 0 !important; gap: 0 !important; }
+.fh-app--glass .fhev-day .dispatch-card { margin: 0; background: transparent; border: 0; border-top: 1px solid var(--fh-hairline); border-radius: 0; overflow: visible; }
+.fh-app--glass .fhev-day .dispatch-card__top { padding: 16px 0 8px; }
+.fh-app--glass .fhev-day .dispatch-card__head-row { flex-wrap: wrap; }
+.fh-app--glass .fhev-day .dispatch-card__head-row > div { flex-basis: 100% !important; }
+.fh-app--glass .fhev-day .dispatch-card__title { font-size: 16px; line-height: 1.4; overflow-wrap: anywhere; }
+.fh-app--glass .fhev-day .dispatch-card__sub { white-space: normal; overflow: visible; overflow-wrap: anywhere; }
+.fh-app--glass .fhev-day .dispatch-state-pill { padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--fh-ink-3); }
+.fh-app--glass .fhev-day .dispatch-state-pill::before { box-shadow: none; animation: none; background: currentColor; }
+.fh-app--glass .fhev-day .dispatch-card.is-live .dispatch-card__hr { color: var(--fh-ink); }
+.fhev-day__actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; padding: 0 0 16px; }
+.fh-app--glass .fh-build-banner { background: var(--fh-paper); box-shadow: none; border-radius: 0; border: 0; border-left: 2px solid var(--fh-gold); }
+.fh-app--glass .fh-build-banner__cta { min-height: 44px; flex-shrink: 0; }
+
 .fh-crew-task { display: grid; grid-template-columns: 16px minmax(0,1fr); gap: 8px; min-height: 44px; align-items: center; padding: 12px 0; color: inherit; text-decoration: none; }
 .fh-crew-task .fh-build-rail-list__title { white-space: normal; overflow: visible; overflow-wrap: anywhere; }
 .fh-crew-workspace .fh-crew-visit > strong { min-width: 0; overflow-wrap: anywhere; }

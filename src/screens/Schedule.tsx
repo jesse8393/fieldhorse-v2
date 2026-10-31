@@ -22,7 +22,6 @@ import { useProfile } from '../contexts/ProfileContext.tsx'
 import { getWeather } from '../lib/weather.ts'
 import { assessWorkWindow } from '../lib/forecastAssessment.ts'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
-import { canHover } from '../lib/hover.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { SCHEDULE_WEEK_START, startOfWeek } from '../lib/scheduleDates.ts'
@@ -730,7 +729,7 @@ function DayView({ events, now, onClick, onEdit, onDelete, deleteArmedId, onAdd 
           </div>
         )
       ) : (
-        <ul className="fh-timeline" style={{ listStyle: 'none', padding: 0, margin: '0 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <ul className="fh-timeline fhev-day" aria-label="Daily agenda" style={{ listStyle: 'none', padding: 0, margin: '0 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {filtered.map((e: any, i: any) => {
             const status = deriveStatus(e, now)
             const start = fmtTime(e.start_at)
@@ -752,11 +751,11 @@ function DayView({ events, now, onClick, onEdit, onDelete, deleteArmedId, onAdd 
                 endStr={end}
                 status={status}
                 initial={initial}
-                onClick={() => e.contact_id && onClick(e.contact_id)}
+                onClick={() => e.contact_id ? onClick(e.contact_id) : onEdit?.(e)}
                 onEdit={onEdit ? () => onEdit(e) : undefined}
                 onDelete={onDelete ? () => onDelete(e.id) : undefined}
                 deleteArmed={deleteArmedId === e.id}
-                isClickable={Boolean(e.contact_id)}
+                isClickable={Boolean(e.contact_id || onEdit)}
               />
             )
           })}
@@ -816,14 +815,7 @@ function splitTime(s: any) {
 }
 
 function ScheduleRow({ index, primary, secondary, kind, crewCount, startStr, endStr, status, onClick, onEdit, onDelete, deleteArmed, isClickable }: any) {
-  // 5/17, full visual port of the v3 design's dispatch-card pattern
-  // (replaces the prior glass-row with status spine). Time column on
-  // the left as HR/AM stamp, title + sub on the right, state pill at
-  // the head-row top-right, optional secondary detail line below.
-  // The contact avatar/initial was removed, the design's pattern
-  // drops it (and reserves the bottom of the card for a future crew
-  // row when crews data ships). Delete affordance moves to a top-right
-  // absolute trash button so the card surface stays clean.
+  // Full-width event content and explicit actions remain usable with touch or keyboard.
   const pill = PILL_FOR_STATUS[status] || PILL_FOR_STATUS.Scheduled
   const isLive = pill.variant === 'live'
   const [hrPart, apPart] = splitTime(startStr)
@@ -876,56 +868,14 @@ function ScheduleRow({ index, primary, secondary, kind, crewCount, startStr, end
           </div>
         </div>
       </button>
-      {onEdit && (
-        <button
-          type="button"
-          onClick={(ev) => { ev.stopPropagation(); onEdit() }}
-          aria-label="Edit event"
-          style={{
-            position: 'absolute', bottom: 8, right: 40,
-            width: 28, height: 28, borderRadius: 10,
-            border: 'none', background: 'transparent',
-            color: 'var(--v3-text-muted)',
-            cursor: 'pointer', display: 'grid', placeItems: 'center',
-            opacity: 0.35, WebkitTapHighlightColor: 'transparent',
-            transition: 'opacity 160ms ease, color 160ms ease'
-          }}
-          onMouseEnter={(ev) => { if (!canHover) return; ev.currentTarget.style.opacity = '1'; ev.currentTarget.style.color = 'var(--v3-primary)' }}
-          onMouseLeave={(ev) => { ev.currentTarget.style.opacity = '0.35'; ev.currentTarget.style.color = 'var(--v3-text-muted)' }}
-        >
-          <Pencil size={12} />
-        </button>
-      )}
-      {onDelete && (
-        <button
-          type="button"
-          onClick={(ev) => { ev.stopPropagation(); onDelete() }}
-          aria-label={deleteArmed ? 'Tap again to delete' : 'Delete event'}
-          aria-pressed={deleteArmed ? true : undefined}
-          style={{
-            position: 'absolute',
-            // Bottom-right instead of top-right, top-right is where
-            // the LIVE / UP NEXT status pill lives, and stacking the
-            // trash icon next to it looked crowded.
-            bottom: 8,
-            right: 8,
-            minWidth: 28, height: 28, borderRadius: 10, padding: deleteArmed ? '0 8px' : 0,
-            border: deleteArmed ? '1px solid var(--v3-danger-bright)' : 'none',
-            background: deleteArmed ? 'var(--v3-danger-soft)' : 'transparent',
-            color: deleteArmed ? 'var(--v3-danger-text)' : 'var(--v3-text-muted)',
-            cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-            opacity: deleteArmed ? 1 : 0.35,
-            fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-            WebkitTapHighlightColor: 'transparent',
-            transition: 'opacity 160ms ease, color 160ms ease'
-          }}
-          onMouseEnter={(ev) => { if (!canHover) return; ev.currentTarget.style.opacity = '1'; ev.currentTarget.style.color = 'var(--v3-danger-bright)' }}
-          onMouseLeave={(ev) => { if (deleteArmed) return; ev.currentTarget.style.opacity = '0.35'; ev.currentTarget.style.color = 'var(--v3-text-muted)' }}
-        >
-          <Trash2 size={12} />
-          {deleteArmed && <span>Tap again</span>}
-        </button>
-      )}
+      {(onEdit || onDelete) && <div className="fhev-day__actions">
+        {onEdit && <Button size="mini" variant="quiet" icon={Pencil} onClick={onEdit}>Edit event</Button>}
+        {onDelete && <Button size="mini" variant="destructive" icon={Trash2}
+          onClick={onDelete} aria-label={deleteArmed ? 'Tap again to delete' : 'Delete event'}
+          aria-pressed={deleteArmed ? true : undefined}>
+          {deleteArmed ? 'Tap again' : 'Delete'}
+        </Button>}
+      </div>}
     </motion.li>
   )
 }
