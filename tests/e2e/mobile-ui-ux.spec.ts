@@ -81,7 +81,7 @@ test('task management stays readable and operable with long records', async ({ c
   const form = page.getByRole('form', { name: 'New task' })
   await expect(form.getByLabel('Task', { exact: true })).toBeFocused()
   await form.getByLabel('Task', { exact: true }).fill('Check material delivery')
-  await form.getByLabel('Job', { exact: true }).selectOption('c-job1')
+  await form.getByRole('combobox', { name: 'Job', exact: true }).selectOption('c-job1')
   await expect(form.getByRole('button', { name: 'Add task', exact: true })).toBeEnabled()
   await nothingRunsOffTheSide(page)
   await form.getByRole('button', { name: 'Cancel', exact: true }).click()
