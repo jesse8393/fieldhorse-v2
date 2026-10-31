@@ -59,6 +59,21 @@ test('revoked customer access keeps a job draft instead of saving stale identity
 
 const task = { id: 'task-persistence', org_id: 'org-1', user_id: 'qa-user-1', job_id: 'c-job1', text: 'Confirm site access', done: false, completed_at: null, created_at: '2026-10-31T12:00:00Z' }
 
+test('sign out clears customer creation drafts from a shared device', async ({ context, page }) => {
+  await signIn(context)
+  await page.goto('/workspace')
+  const signOut = page.getByRole('button', { name: 'Sign out', exact: true }).last()
+  await expect(signOut).toBeVisible()
+  await page.evaluate(() => {
+    for (const kind of ['job', 'lead', 'quote']) {
+      localStorage.setItem(`fh:draft:${kind}`, JSON.stringify({ form: { client: 'Private draft customer' }, savedAt: Date.now() }))
+    }
+  })
+  await signOut.click()
+  await expect(page).toHaveURL(/\/login$/)
+  expect(await page.evaluate(() => ['job', 'lead', 'quote'].map(kind => localStorage.getItem(`fh:draft:${kind}`)))).toEqual([null, null, null])
+})
+
 test('Undo after reconnect survives a delayed completion and reload', async ({ context, page }) => {
   await signIn(context)
   let saved = { ...task }

@@ -22,11 +22,17 @@ This pass traces customer selection, job creation, task completion, Undo, offlin
 
 8. Task reads could replace queued completion or creation with older server state. Task reads now overlay this user's pending writes. Queue changes trigger reconciliation. Obsolete reads cannot overwrite a newer job view. Offline completion copy explicitly reports pending synchronization.
 
+9. Sign out cleared an older lead draft key but omitted current creation drafts. Customer names, addresses, and job scope could remain for the next account on a shared device. Current creation draft keys now join account cleanup.
+
 ## Available integration evidence
 
 Connected database inspection used read only catalog and aggregate queries. Customer links, task links, and job schedule links showed no organization mismatches. Existing photo metadata had matching storage objects. Both application file buckets were private. This verifies stored integrity and configuration, not authenticated download access or successful writes.
 
 Customer, job, task, schedule, and photo tables had row security enabled. Invoice and payment restrictions for financial roles were restrictive policies. Crew expense entry remained available by design. Source review confirmed role filtering in job navigation and financial presentation. These checks do not replace owner, manager, crew, partner, and revoked membership sessions through the API.
+
+Financial confidentiality has a confirmed configuration gap. The authenticated role retains SELECT privileges on `fh_contacts.amount` and `fh_contacts.cost`. Its SELECT policy admits all active organization members. `auth_user_org_ids()` does not filter crew or foreman roles. The application also requests `fh_contacts.*` in its detail loader. Consequently, hiding financial controls does not prevent those roles from receiving the underlying job value and cost fields. This conclusion follows from deployed grants, deployed policy definitions, and application source; no real crew account was impersonated for this audit.
+
+Migration 067 protects selected financial writes, not reads. Closing this gap requires a role safe job read surface plus removal of direct financial column access, while preserving crew job, task, schedule, and expense workflows. A blanket restrictive job policy would remove the crew's jobs and is not a safe repair. That schema and client change remains a release blocker. The existing `audit:rls` script only checks selected invite and server table rules; its output now states that scope explicitly.
 
 Only the main Supabase branch was available. Its schedule table lacked `assigned_user_ids`. The pending crew allocation and invoice safeguards remained unapplied. The redesigned scheduling path reads and writes the new assignment column. Release requires migration validation in an isolated Supabase environment before production approval. No compatibility fallback removes those safeguards.
 
@@ -38,8 +44,8 @@ Focused regression tests failed against the original behavior for missing custom
 
 Local TypeScript, ESLint, design audit, RLS source audit, production build, and the unit suite passed. Local database tests passed 98 isolated checks. Those tests cover selected schema fixtures, not the complete historical migration chain. Local Node was 24.22.1; normal CI uses required Node 22 and PostgreSQL 17, including independent connection contention tests.
 
-Six new browser regressions cover customer contact copying, duplicate name draft restoration, revoked customer access, delayed completion plus Undo, refused replay, and UUID fallback task creation. Each runs in desktop and phone CI projects. Their stateful responses remain controlled fixtures. They do not establish real Supabase authentication, real storage authorization, or physical phone behavior.
+Seven new browser regressions cover customer contact copying, duplicate name draft restoration, revoked customer access, sign out cleanup, delayed completion plus Undo, refused replay, and UUID fallback task creation. Each runs in desktop and phone CI projects. Their stateful responses remain controlled fixtures. They do not establish real Supabase authentication, real storage authorization, or physical phone behavior.
 
 Local browser execution could not start because the matching Chromium binary was absent. Its download returned invalid archives. Current CI must execute these tests before this revision receives a browser pass claim. Consult checks for the current commit, never an earlier green revision.
 
-Release remains blocked on authorized preview access, an isolated Supabase integration environment, pending migration validation, actual role sessions, offline and reconnect checks on physical phones, and production approval. PR #230 remains a draft.
+Release remains blocked on financial field confidentiality, authorized preview access, an isolated Supabase integration environment, pending migration validation, actual role sessions, offline and reconnect checks on physical phones, and production approval. PR #230 remains a draft.

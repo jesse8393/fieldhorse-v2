@@ -29,7 +29,7 @@ function settleWithin<T>(work: Promise<T>, ms: number): Promise<T | undefined> {
 // the time clock state (fh:timeclock:<job>:start, hourly rate) and each
 // user's last resolved org (fh:orgScope:<user>, lib/orgScope.ts).
 const USER_STORAGE_KEYS = ['fh:leadDraft', 'fh:timepunch:activeId']
-const USER_STORAGE_PREFIXES = ['fh:timeclock:', 'fh:orgScope:']
+const USER_STORAGE_PREFIXES = ['fh:timeclock:', 'fh:orgScope:', 'fh:draft:']
 
 function clearUserStorage() {
   try {

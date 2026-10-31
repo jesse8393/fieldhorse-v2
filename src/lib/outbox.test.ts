@@ -100,7 +100,7 @@ describe('queueing offline writes', () => {
   beforeEach(() => vi.stubGlobal('navigator', { onLine: false }))
 
   it('keeps PostgreSQL UUID row identities without native randomUUID', async () => {
-    vi.stubGlobal('crypto', { getRandomValues: (bytes: Uint8Array) => webcrypto.getRandomValues(bytes) })
+    vi.stubGlobal('crypto', { getRandomValues: (bytes: Uint8Array<ArrayBuffer>) => webcrypto.getRandomValues(bytes) })
     const result = await outbox.resilientInsert('fh_job_todos', { user_id: 'user-a', text: 'Confirm visit' })
     expect(result.error).toBeNull()
     expect(result.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
