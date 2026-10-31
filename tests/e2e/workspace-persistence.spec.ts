@@ -57,6 +57,42 @@ test('revoked customer access keeps a job draft instead of saving stale identity
   expect(writes).toHaveLength(0)
 })
 
+test('a lost job response followed by reload and retry creates only one job', async ({ context, page }) => {
+  await signIn(context, { tables: { fh_clients: [customer] } })
+  const saved = new Map<string, Record<string, unknown>>()
+  const submitted: string[] = []
+  await context.route(/\/rest\/v1\/fh_contacts(\?|$)/, async route => {
+    const request = route.request()
+    if (request.method() === 'POST') {
+      const row = request.postDataJSON()
+      submitted.push(row.id)
+      const id = row.id || `server-job-${submitted.length}`
+      if (saved.has(id)) return route.fulfill({ status: 409, json: { code: '23505', message: 'duplicate key' } })
+      saved.set(id, { created_at: new Date().toISOString(), ...row, id })
+      // The database committed, but the browser never received its reply.
+      if (submitted.length === 1) return route.abort('failed')
+      return route.fulfill({ json: { id } })
+    }
+    const id = new URL(request.url()).searchParams.get('id')?.replace(/^eq\./, '')
+    if (id && saved.has(id)) return route.fulfill({ json: [saved.get(id)] })
+    return route.fallback()
+  })
+  await page.goto('/jobs/new')
+  await page.getByLabel('Client', { exact: true }).fill(customer.name)
+  await page.getByLabel('Title', { exact: true }).fill('Retry without duplication')
+  await page.getByRole('button', { name: 'Save job', exact: true }).click()
+  await expect(page.getByRole('alert')).toBeVisible()
+  expect(saved.size).toBe(1)
+  await page.reload()
+  await expect(page.getByLabel('Title', { exact: true })).toHaveValue('Retry without duplication')
+  await page.getByRole('button', { name: 'Save job', exact: true }).click()
+  await expect(page).toHaveURL(new RegExp(`/jobs/${submitted[0]}$`))
+  expect(submitted).toHaveLength(2)
+  expect(submitted[0]).toMatch(/^[0-9a-f]{8}-/)
+  expect(submitted[1]).toBe(submitted[0])
+  expect(saved.size).toBe(1)
+})
+
 const task = { id: 'task-persistence', org_id: 'org-1', user_id: 'qa-user-1', job_id: 'c-job1', text: 'Confirm site access', done: false, completed_at: null, created_at: '2026-10-31T12:00:00Z' }
 
 test('sign out clears customer creation drafts from a shared device', async ({ context, page }) => {
@@ -71,7 +107,7 @@ test('sign out clears customer creation drafts from a shared device', async ({ c
   })
   await signOut.click()
   await expect(page).toHaveURL(/\/login$/)
-  expect(await page.evaluate(() => ['job', 'lead', 'quote'].map(kind => localStorage.getItem(`fh:draft:${kind}`)))).toEqual([null, null, null])
+  await expect.poll(() => page.evaluate(() => ['job', 'lead', 'quote'].map(kind => localStorage.getItem(`fh:draft:${kind}`)))).toEqual([null, null, null])
 })
 
 test('Undo after reconnect survives a delayed completion and reload', async ({ context, page }) => {
@@ -101,6 +137,7 @@ test('Undo after reconnect survives a delayed completion and reload', async ({ c
   await page.getByRole('button', { name: 'Undo', exact: true }).click()
   release()
   await expect.poll(() => updates).toEqual([true, false])
+  await expect(complete).toBeVisible()
   await page.reload()
   await expect(complete).toBeVisible()
   expect(saved.done).toBe(false)

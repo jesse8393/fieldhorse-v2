@@ -183,6 +183,7 @@ export default function TodosSection({ jobId, userId, compact = false, onOpenTas
       fetchRows() // rollback to truth
     } else {
       onChanged?.()
+      void fetchRows()
       if (next) toastUndo(queued ? 'Task saved offline' : 'Task completed', { description: queued ? `${row.text}. Waiting to sync.` : row.text, onUndo: () => toggle({ ...row, done: true }) })
       else if (queued) toastSuccess('Saved offline', 'Reopening will sync when signal returns')
     }

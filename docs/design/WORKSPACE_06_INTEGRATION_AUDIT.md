@@ -16,13 +16,15 @@ This pass traces customer selection, job creation, task completion, Undo, offlin
 
 5. An online Undo could reach the server before an earlier offline completion. Replaying the older completion then reversed Undo. Updates now serialize per record within the running app. New updates join pending work in order. A flush requested during another pass schedules another pass for appended edits. Cross tab simultaneous writers remain release validation.
 
-6. Queued inserts and photo metadata without an explicit organization could inherit whichever company was active when replay ran. New entries capture their original workspace before waiting. Explicit organization values remain intact. Previously queued entries without organization metadata cannot establish their original workspace and require review before rollout.
+6. Standalone queued inserts without an explicit organization could inherit whichever company was active when replay ran. New entries capture their original workspace before waiting. Photo queue metadata also retains explicit organization values; the existing database trigger remains authoritative for rows linked to a parent job. Previously queued standalone entries without organization metadata cannot establish their original workspace and require review before rollout.
 
 7. IndexedDB request success preceded transaction commit. An eventual transaction abort could therefore receive a false saved response. Offline writes now await transaction completion. An abort regression confirms failure reaches the caller.
 
 8. Task reads could replace queued completion or creation with older server state. Task reads now overlay this user's pending writes. Queue changes trigger reconciliation. Obsolete reads cannot overwrite a newer job view. Offline completion copy explicitly reports pending synchronization.
 
 9. Sign out cleared an older lead draft key but omitted current creation drafts. Customer names, addresses, and job scope could remain for the next account on a shared device. Current creation draft keys now join account cleanup.
+
+10. New job requests relied on server generated identities. A committed insert with a lost response could create a duplicate on retry. Each draft now retains one secure job ID, persisted before the request. A duplicate response recovers only that same job within its original owner and company. Retries never overwrite an existing job. A synchronous save guard prevents overlapping submissions, and confirmed saves invalidate cached lists.
 
 ## Available integration evidence
 
@@ -44,7 +46,7 @@ Focused regression tests failed against the original behavior for missing custom
 
 Local TypeScript, ESLint, design audit, RLS source audit, production build, and the unit suite passed. Local database tests passed 98 isolated checks. Those tests cover selected schema fixtures, not the complete historical migration chain. Local Node was 24.22.1; normal CI uses required Node 22 and PostgreSQL 17, including independent connection contention tests.
 
-Seven new browser regressions cover customer contact copying, duplicate name draft restoration, revoked customer access, sign out cleanup, delayed completion plus Undo, refused replay, and UUID fallback task creation. Each runs in desktop and phone CI projects. Their stateful responses remain controlled fixtures. They do not establish real Supabase authentication, real storage authorization, or physical phone behavior.
+Eight new browser regressions cover customer contact copying, duplicate name draft restoration, revoked customer access, job retry after a lost response, sign out cleanup, delayed completion plus Undo, refused replay, and UUID fallback task creation. Each runs in desktop and phone CI projects. Their stateful responses remain controlled fixtures. They do not establish real Supabase authentication, real storage authorization, or physical phone behavior.
 
 Local browser execution could not start because the matching Chromium binary was absent. Its download returned invalid archives. Current CI must execute these tests before this revision receives a browser pass claim. Consult checks for the current commit, never an earlier green revision.
 
