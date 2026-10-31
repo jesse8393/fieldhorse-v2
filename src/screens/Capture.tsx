@@ -51,6 +51,7 @@ import Row from '../components/fh/Row.tsx'
 import { formatMoney } from '../components/fh/money.ts'
 import { supabase } from '../lib/supabase.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
+import { useMembership } from '../contexts/MembershipContext.tsx'
 import { hapticTap, hapticSuccess, hapticError } from '../lib/haptics.ts'
 import { toastSuccess, toastError, toastInfo } from '../lib/toast.ts'
 import { ACTIVE_STAGES } from '../lib/stages.ts'
@@ -94,6 +95,7 @@ function rosterFromRecords(rows: LeadRosterRow[] | QuoteRosterRow[], stage: 'lea
 
 export default function Capture() {
   const { user } = useAuth()
+  const { canCreateFinancialDocs, loading: membershipLoading } = useMembership()
   const { canSee } = useNavAccess()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
@@ -101,6 +103,7 @@ export default function Capture() {
   const [phase, setPhase] = useState<Phase>('input')
   const [text, setText] = useState('')
   const [intent, setIntent] = useState<CaptureIntent | null>(null)
+  const [accessNotice, setAccessNotice] = useState('')
   const [contacts, setContacts] = useState<CaptureContact[]>([])
   // The job the screen was opened on (?job=, from openCapture({ jobId })),
   // and its row once loaded. Work past the roster's 100 most recent rows,
@@ -130,30 +133,31 @@ export default function Capture() {
 
   /* ── roster: jobs, leads and quotes for matching, plus the attached record ── */
   useEffect(() => {
-    if (!user) return
+    if (!user || membershipLoading) return
     let alive = true
+    const contactRows = () => canCreateFinancialDocs
+      ? supabase.from('fh_contacts').select(ROSTER_COLUMNS)
+      : supabase.from('fh_contacts').select('id,user_id,name,job_title,stage')
     ;(async () => {
       const [jobsRes, leadsRes, quotesRes] = await Promise.all([
-        supabase
-          .from('fh_contacts')
-          .select(ROSTER_COLUMNS)
+        contactRows()
           .in('stage', JOB_STAGES)
           .order('updated_at', { ascending: false })
           .limit(100),
-        supabase
+        canCreateFinancialDocs ? supabase
           .from('fh_leads')
           .select('id,user_id,origin_contact_id,title,fh_clients(name)')
           .neq('status', 'lost')
           .order('updated_at', { ascending: false })
-          .limit(100),
-        supabase
+          .limit(100) : Promise.resolve({ data: [] }),
+        canCreateFinancialDocs ? supabase
           .from('fh_quotes')
           .select('id,user_id,origin_contact_id,title,amount,fh_clients(name)')
           .not('status', 'in', '("approved","rejected","expired","lost")')
           .order('updated_at', { ascending: false })
-          .limit(100)
+          .limit(100) : Promise.resolve({ data: [] })
       ])
-      const jobs = (jobsRes.data ?? []) as CaptureContact[]
+      const jobs: CaptureContact[] = (jobsRes.data ?? []).map((row) => ({ ...row, amount: 'amount' in row && typeof row.amount === 'number' ? row.amount : null }))
       const leads = rosterFromRecords((leadsRes.data ?? []) as unknown as LeadRosterRow[], 'lead')
       const quotes = rosterFromRecords((quotesRes.data ?? []) as unknown as QuoteRosterRow[], 'quote')
       const list = [...jobs, ...leads, ...quotes]
@@ -161,12 +165,10 @@ export default function Capture() {
       if (attachedJobId) {
         job = list.find((c) => c.id === attachedJobId) ?? null
         if (!job) {
-          const res = await supabase
-            .from('fh_contacts')
-            .select(ROSTER_COLUMNS)
+          const res = await contactRows()
             .eq('id', attachedJobId)
             .maybeSingle()
-          job = (res.data as CaptureContact | null) ?? null
+          job = res.data ? { ...res.data, amount: 'amount' in res.data && typeof res.data.amount === 'number' ? res.data.amount : null } : null
         }
       }
       if (!alive) return
@@ -174,7 +176,7 @@ export default function Capture() {
       setAttachedJob(job)
     })()
     return () => { alive = false }
-  }, [user, attachedJobId])
+  }, [user, attachedJobId, canCreateFinancialDocs, membershipLoading])
 
   // Elapsed time while the microphone is open.
   useEffect(() => {
@@ -199,6 +201,7 @@ export default function Capture() {
     setPhase('input')
     setText('')
     setIntent(null)
+    setAccessNotice('')
     setSource('text')
     setHeardMs(null)
     setEditing(false)
@@ -231,7 +234,13 @@ export default function Capture() {
 
   // The card opens on what still needs the person: a missing amount opens
   // the fields, a payment with no job opens the job select.
-  function enterConfirm(next: CaptureIntent) {
+  function enterConfirm(next: CaptureIntent, originalText = text) {
+    if (!canCreateFinancialDocs && (next.kind === 'payment' || next.kind === 'lead')) {
+      setAccessNotice(`A manager can ${next.kind === 'payment' ? 'record this payment' : 'create this lead'}. You can save your words as a note.`)
+      next = { kind: 'note', summary: 'Save a note', job_id: next.job_id || attachedId, confidence: 1, text: originalText }
+    } else {
+      setAccessNotice('')
+    }
     setIntent(next)
     setAmountDraft(null)
     setEditing((next.kind === 'payment' || next.kind === 'expense') && !next.amount)
@@ -322,7 +331,7 @@ export default function Capture() {
   /* ── parse ─────────────────────────────────────────────────── */
   async function submit(raw?: string, from: Source = 'text') {
     const input = (raw ?? text).trim()
-    if (!input || phase === 'parsing' || phase === 'saving' || !user) return
+    if (!input || phase === 'parsing' || phase === 'saving' || !user || membershipLoading) return
     stopVoice()
 
     if (!navigator.onLine) {
@@ -349,7 +358,7 @@ export default function Capture() {
     try {
       const next = await routeCapture({ text: input, roster })
       if (run !== runRef.current) return
-      enterConfirm(seedJob(next, attachedId))
+      enterConfirm(seedJob(next, attachedId), input)
       hapticTap()
     } catch {
       if (run !== runRef.current) return
@@ -365,7 +374,13 @@ export default function Capture() {
   /* ── commit ────────────────────────────────────────────────── */
   async function save(forced?: CaptureIntent) {
     const it = forced ?? intent
-    if (!it || !user || phase === 'saving') return
+    if (!it || !user || phase === 'saving' || membershipLoading) return
+    // Membership can change while the confirmation is open. The database
+    // remains authoritative; avoid offering a write this role cannot make.
+    if (!canCreateFinancialDocs && (it.kind === 'payment' || it.kind === 'lead')) {
+      enterConfirm(it, text)
+      return
+    }
     setPhase('saving')
     try {
       const result = await commitCapture({ intent: it, userId: user.id, contacts: roster })
@@ -418,7 +433,7 @@ export default function Capture() {
     : listening ? 'Listening' : 'Tap to talk'
   const voiceHint = listening
     ? 'Tap the square to finish.'
-    : 'A payment, task, lead or note.'
+    : canCreateFinancialDocs ? 'A payment, task, lead or note.' : 'A task, expense, visit or note.'
 
   const heardLabel = source === 'voice' ? 'Heard' : source === 'receipt' ? 'Read from the receipt' : 'You typed'
   const heardIcon: LucideIcon = source === 'voice' ? Mic : source === 'receipt' ? ReceiptText : Keyboard
@@ -461,7 +476,7 @@ export default function Capture() {
               label="Or type it"
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder="Got a $2,500.00 deposit check from Henderson."
+              placeholder={canCreateFinancialDocs ? 'Got a $2,500.00 deposit check from Henderson.' : 'The delivery arrived and the north gate is locked.'}
               rows={3}
               disabled={busy || listening}
             />
@@ -476,7 +491,7 @@ export default function Capture() {
               size="lg"
               block
               loading={phase === 'parsing'}
-              disabled={listening || !text.trim()}
+              disabled={listening || !text.trim() || membershipLoading}
             >
               File it
             </Button>
@@ -506,6 +521,7 @@ export default function Capture() {
                 ))}
               </ul>
               {detail && <p className="fh-capture__detail">{detail}</p>}
+              {accessNotice && <p className="fh-capture__detail" role="status">{accessNotice}</p>}
             </div>
 
             {intent.kind !== 'lead' && (
@@ -653,7 +669,7 @@ export default function Capture() {
             )}
 
             <div className="fh-capture__actions">
-              <Button type="submit" variant="primary" size="md" block loading={saving}>
+              <Button type="submit" variant="primary" size="md" block loading={saving} disabled={membershipLoading}>
                 Save
               </Button>
               <Button

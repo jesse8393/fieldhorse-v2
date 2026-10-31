@@ -11,6 +11,7 @@ import { useTheme } from '../../contexts/ThemeContext.tsx'
 import { hapticMedium } from '../../lib/haptics.ts'
 import { prefetchRoute } from '../../lib/routePrefetch.ts'
 import { openCapture } from '../../lib/captureAttach.ts'
+import { browserEnv, desktopShortcut } from '../../lib/shortcutKeys.ts'
 
 // The phone dock (spec 8.1): a floating onyx capsule with Today, Jobs,
 // the brushed gold Capture coin, Money and Schedule. The fifth slot is
@@ -57,6 +58,7 @@ export default function Dock() {
   const right = dockRight(engineEnabled && canSee(INBOX.to)).filter((it) => canSee(it.to))
   const hidden = hiddenByScreen || keyboardOpen
   const night = theme === 'dark'
+  const captureShortcut = desktopShortcut('J', browserEnv())
 
   const dock = (
     <nav
@@ -70,8 +72,9 @@ export default function Dock() {
         <button
           type="button"
           className="fhs-dock__coin"
-          aria-label="Capture a note, photo, lead or payment"
-          title="Capture (⌘J)"
+          aria-label="Capture a note, photo or update"
+          title={`Capture (${captureShortcut.keys})`}
+          aria-keyshortcuts={captureShortcut.combo}
           onClick={() => {
             hapticMedium()
             openCapture()

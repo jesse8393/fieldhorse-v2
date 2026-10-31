@@ -177,7 +177,36 @@ test.describe('capture screen', () => {
     await expect(starts.getByRole('link', { name: /^Time/ })).toBeVisible()
     await expect(starts.getByRole('link', { name: /^Lead/ })).toHaveCount(0)
     await expect(starts.getByRole('link', { name: /^Quote/ })).toHaveCount(0)
+    await expect(page.getByText('A task, expense, visit or note.', { exact: true })).toBeVisible()
   })
+
+  for (const role of ['crew', 'foreman']) {
+    for (const kind of ['payment', 'lead']) {
+      test(`${role} can retain a proposed ${kind} as a note without a restricted write`, async ({ context, page }) => {
+        await signIn(context, { role })
+        await mockModel(page, { kind, summary: 'Review captured information', job_id: 'c-job1', confidence: 0.9, amount: 500, name: 'New customer', title: 'Site visit' })
+        const notes = await keepNotes(page)
+        const restrictedWrites: string[] = []
+        page.on('request', (request) => {
+          if (request.method() === 'POST' && /\/rest\/v1\/(fh_payments|fh_leads|fh_clients)(?:\?|$)/.test(request.url())) restrictedWrites.push(request.url())
+        })
+        await open(page, '/capture?job=c-job1')
+        await expectCaptureOpen(page)
+        await expect(page.getByText('Attached to Slab + trench.', { exact: true })).toBeVisible()
+        const words = kind === 'payment' ? 'The homeowner handed over a check for 500 dollars' : 'A new customer asked about a site visit'
+        await page.getByRole('textbox', { name: 'Or type it' }).fill(words)
+        await page.getByRole('button', { name: 'File it', exact: true }).click()
+        await expect(page.getByRole('status').filter({ hasText: `A manager can ${kind === 'payment' ? 'record this payment' : 'create this lead'}.` })).toBeVisible()
+        await expect(page.getByRole('textbox', { name: 'Amount', exact: true })).toHaveCount(0)
+        expect(notes).toHaveLength(0)
+        await page.getByRole('button', { name: 'Save', exact: true }).click()
+        await expect.poll(() => notes.length).toBe(1)
+        expect(notes[0].text).toBe(words)
+        expect(notes[0].contact_id).toBe('c-job1')
+        expect(restrictedWrites).toEqual([])
+      })
+    }
+  }
 
   test('opened on a job, it files there and nothing writes before Save', async ({ context, page }) => {
     await signIn(context)

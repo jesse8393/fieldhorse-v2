@@ -89,7 +89,7 @@ function fmtMinutes(min: number): string {
 export default function Crew() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { orgId, orgName, role, loading: memLoading } = useMembership()
+  const { orgId, orgName, role, canApproveTimesheets, loading: memLoading } = useMembership()
 
   // The active punch is undefined until a read of it works, and it takes
   // every read of it that works, so a running shift shows even when another
@@ -644,15 +644,15 @@ export default function Crew() {
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Timesheets</div>
-              <strong data-empty>Shifts reviewed weekly</strong>
+              <strong data-empty>Shift review</strong>
               {/* The owner IS the manager, "your manager approves your
                   shifts" read as nonsense on a solo operator's screen. */}
               <span>
-                {role === 'owner' || role === 'admin'
+                {canApproveTimesheets
                   ? 'You review and approve shifts under Timesheets.'
-                  : 'Your manager approves shifts at the end of the week.'}
+                  : 'Your recent shifts are shown above. Your manager reviews and approves them.'}
               </span>
-              <Link className="fh-build-rail-card__action" to="/timesheets">View timesheets <ChevronRight size={13} /></Link>
+              {canApproveTimesheets && <Link className="fh-build-rail-card__action" to="/timesheets">View timesheets <ChevronRight size={13} /></Link>}
             </section>
 
             <section className="fh-build-rail-card">

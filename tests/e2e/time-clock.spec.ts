@@ -15,7 +15,7 @@ const OTHER_OWNER = 'qa-owner-2'
 test('crew visits, completed shifts and task links remain usable at 320 pixels', async ({ context, page }) => {
   await page.clock.setFixedTime(new Date('2026-10-31T17:00:00Z'))
   const task = 'Confirm the complete drainage plan with the homeowner before the next concrete pour'
-  await signIn(context, { tables: {
+  await signIn(context, { role: 'crew', tables: {
     fh_schedule: [{ id: 'crew-visit', org_id: 'org-1', user_id: 'qa-user-1', contact_id: 'c-job1', title: 'Long crew visit with the full site preparation instructions', start_at: '2026-10-31T15:00:00Z', end_at: '2026-10-31T18:00:00Z' }],
     fh_time_punches: [{ ...openPunch(), punch_in_at: '2026-10-30T15:00:00Z', punch_out_at: '2026-10-30T18:00:00Z' }],
     fh_job_todos: [{ id: 'crew-task', user_id: 'qa-user-1', job_id: 'c-job1', text: task, done: false, due_at: '2026-11-01T12:00:00Z' }]
@@ -24,6 +24,8 @@ test('crew visits, completed shifts and task links remain usable at 320 pixels',
   await page.goto('/crew')
   await expect(page.getByRole('region', { name: "Today's schedule" }).getByText('Long crew visit with the full site preparation instructions')).toBeVisible()
   await expect(page.getByRole('region', { name: 'Recent shifts' }).getByText('Pending', { exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: /View timesheets/ })).toHaveCount(0)
+  await expect(page.getByText('Your recent shifts are shown above. Your manager reviews and approves them.', { exact: true })).toBeVisible()
   await nothingRunsOffTheSide(page, 'crew with visits and shift history')
   const link = page.getByRole('link', { name: task, exact: true })
   await expect(link).toBeVisible()
