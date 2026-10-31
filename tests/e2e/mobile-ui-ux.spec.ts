@@ -88,6 +88,16 @@ test('task management stays readable and operable with long records', async ({ c
   await expect(form).toHaveCount(0)
 })
 
+test('an empty task dashboard retains the wide desktop workspace', async ({ context, page }) => {
+  await signIn(context, { tables: { fh_job_todos: [] } })
+  await page.setViewportSize({ width: 2048, height: 1192 })
+  await page.goto('/tasks')
+  await expect(page.getByText('No open tasks.', { exact: true })).toBeVisible()
+  const workspace = await page.locator('[data-build-screen="Tasks"]').boundingBox()
+  expect(workspace!.width).toBeGreaterThanOrEqual(1200)
+  await nothingRunsOffTheSide(page)
+})
+
 test('narrow schedule controls retain touch targets and expose the selected day', async ({ context, page }) => {
   await signIn(context)
   await page.setViewportSize({ width: 320, height: 844 })

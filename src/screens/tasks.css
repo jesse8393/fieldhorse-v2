@@ -1,4 +1,4 @@
-.fh-tasks { max-width: 1320px; margin: 0 auto; padding: 28px 32px 48px; color: var(--fh-ink); }
+.fh-tasks { width: 100%; max-width: 1320px; margin: 0 auto; padding: 28px 32px 48px; color: var(--fh-ink); }
 .fh-tasks-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; }
 .fh-tasks-heading h1 { margin: 0; font-size: 36px; line-height: 1.15; letter-spacing: -.035em; }
 .fh-tasks-heading p { margin: 8px 0 0; color: var(--fh-ink-2); font-size: 15px; }
@@ -29,11 +29,11 @@
 .fh-tasks-error { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 16px 0; color: var(--fh-danger-ink); }
 .fh-tasks-empty { display: grid; justify-items: start; gap: 12px; padding: 32px 0; color: var(--fh-ink-2); }
 .fh-tasks-empty p { margin: 0; }
-.fh-task-composer { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; max-width: 720px; padding: 24px 0; border-block: 1px solid var(--fh-hairline); }
-.fh-task-composer h2 { grid-column: 1/-1; margin: 0; font-size: 20px; }
-.fh-task-composer label { display: grid; gap: 8px; min-width: 0; color: var(--fh-ink-2); font-size: 14px; }
-.fh-task-composer label:first-of-type, .fh-task-composer p { grid-column: 1/-1; }
-.fh-task-composer__actions { grid-column: 1/-1; display: flex; justify-content: flex-end; gap: 12px; }
+.fh-tasks .fh-task-composer { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; max-width: 720px; padding: 24px 0; border-block: 1px solid var(--fh-hairline); }
+.fh-tasks .fh-task-composer h2 { grid-column: 1/-1; margin: 0; font-size: 20px; }
+.fh-tasks .fh-task-composer label { display: grid; gap: 8px; min-width: 0; color: var(--fh-ink-2); font-size: 14px; }
+.fh-tasks .fh-task-composer label:first-of-type, .fh-tasks .fh-task-composer p { grid-column: 1/-1; }
+.fh-tasks .fh-task-composer__actions { grid-column: 1/-1; display: flex; justify-content: flex-end; gap: 12px; }
 @media (max-width: 1100px) {
   .fh-task-row { grid-template-columns: minmax(0,1fr) auto; gap: 8px 16px; }
   .fh-task-row__title, .fh-task-row__job { grid-column: 1/-1; }
@@ -50,5 +50,5 @@
   .fh-task-row__assignee select { max-width: none; }
   .fh-tasks-filter > label { width: 100%; }
   .fh-tasks-filter select { flex: 1; }
-  .fh-task-composer { grid-template-columns: minmax(0,1fr); }
+  .fh-tasks .fh-task-composer { grid-template-columns: minmax(0,1fr); }
 }
