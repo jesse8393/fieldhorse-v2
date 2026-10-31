@@ -1040,9 +1040,11 @@ test.describe('Field reports', () => {
     await open(page, '/notes', '[data-build-screen="SnowNotesBuild"]')
     await expect.poll(() => read.held.length).toBeGreaterThan(0)
     const rail = page.locator('.fh-build-rail--page')
+    const reports = page.getByRole('region', { name: 'Latest reports' })
     await holds(async () => {
-      await expect(page.locator('.fh-build-topbar__meta')).not.toContainText('captured')
-      await expect(page.locator('.fh-build-topbar__meta').getByRole('status')).toBeVisible()
+      await expect(reports).not.toContainText('Report history ·')
+      await expect(reports.getByRole('status')).toBeVisible()
+      await expect(reports.getByRole('status')).toHaveAttribute('aria-busy', 'true')
       await expect(page.locator('.fh-build-focus')).not.toContainText('captured in 24h')
       await expect(page.locator('.fh-build-focus').getByRole('status')).toBeVisible()
       await expect(page.locator('.fh-build-mini-grid').getByRole('status', inPage)).toHaveCount(4)
@@ -1051,7 +1053,8 @@ test.describe('Field reports', () => {
       await expect(rail.getByRole('status')).toHaveCount(4)
     })
     read.release()
-    await expect(page.locator('.fh-build-topbar__meta')).toContainText('1 report captured')
+    await expect(reports).toContainText('Report history · 1 report')
+    await expect(reports.getByRole('status')).toHaveCount(0)
     await expect(rail).toContainText('No risks recorded across report history')
     await expect(rail).toContainText('All reports carry a job link')
     await expect(page.locator('[data-build-screen="SnowNotesBuild"]').getByRole('status', inPage)).toHaveCount(0)
@@ -1075,7 +1078,7 @@ test.describe('Field reports', () => {
       await expect(page.getByText('Inspector confirmed Friday.').first()).toBeVisible()
       await expect(page.getByRole('group', { name: 'Recent activity' })).toBeFocused()
     } else {
-      await expect(page.locator('.fh-build-topbar__meta')).toContainText('1 report captured')
+      await expect(page.getByRole('region', { name: 'Latest reports' })).toContainText('Report history · 1 report')
       await expect(page.getByRole('region', { name: 'Latest reports' })).toBeFocused()
     }
   })
