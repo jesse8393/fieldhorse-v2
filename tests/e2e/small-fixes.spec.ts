@@ -738,14 +738,14 @@ test.describe('Weather without a company location', () => {
   })
 
   test('Set location on the Settings page itself goes to the location card', async ({ context, page }, testInfo) => {
-    test.skip(isPhone(testInfo.project.name), 'Desktop topbar')
+    test.skip(isPhone(testInfo.project.name), 'Desktop profile summary')
     await signIn(context, { tables: { profiles: NO_LOCATION_PROFILE } })
     await watchForecasts(context)
     await page.goto('/settings', { waitUntil: 'domcontentloaded', timeout: 60_000 })
     const card = page.locator('#location')
     await expect(card).toBeAttached({ timeout: 30_000 })
     await expect(card).not.toBeInViewport()
-    await page.locator('.fh-build-topbar').getByRole('link', { name: 'Set location' }).click()
+    await page.getByRole('link', { name: 'Set location', exact: true }).click()
     await expect(page).toHaveURL(/\/settings#location$/)
     await expect(card).toBeInViewport({ timeout: 10_000 })
   })

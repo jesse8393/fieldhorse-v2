@@ -21,7 +21,9 @@ test('workspace pages share readable labels, restrained surfaces and usable prim
         expect(style.lineHeight, route).toBeGreaterThanOrEqual(19)
       }
       const heading = page.locator('.fh-build-title:visible').first()
-      if (await heading.count()) expect(await heading.evaluate((node) => getComputedStyle(node).fontSize)).toBe('30px')
+      // Reports uses the 36px lead heading above its financial overview;
+      // the denser operational pages use the shared 30px page heading.
+      if (await heading.count()) expect(await heading.evaluate((node) => getComputedStyle(node).fontSize), route).toBe(route === '/analytics' ? '36px' : '30px')
     }
   }
   await page.goto('/settings?section=documents')
