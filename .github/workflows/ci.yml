@@ -101,11 +101,11 @@ jobs:
       # bundled Chromium is used.
       # Run persistence regressions first so their result is visible as a
       # separate step before the longer application suite completes.
-      - name: Persistence regression checks
-        run: npx playwright test tests/e2e/workspace-persistence.spec.ts --project=${{ matrix.project }}
+      - name: Persistence and UI regression checks
+        run: npx playwright test tests/e2e/workspace-persistence.spec.ts tests/e2e/mobile-ui-ux.spec.ts --project=${{ matrix.project }}
 
       - name: End to end tests
-        run: npx playwright test --project=${{ matrix.project }} --grep-invert='workspace-persistence.spec.ts'
+        run: npx playwright test --project=${{ matrix.project }} --grep-invert='(workspace-persistence|mobile-ui-ux).spec.ts'
 
       - name: Upload Playwright traces on failure
         if: failure()

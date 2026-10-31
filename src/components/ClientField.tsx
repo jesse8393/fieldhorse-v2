@@ -121,6 +121,8 @@ type Props = {
 export default function ClientField({ userId, value, onChange, label = 'Client', placeholder = 'Type a name', error, autoFocus, onPick }: Props) {
   const orgScope = useOrgScope(userId)
   const [rows, setRows] = useState<ClientPick[]>([])
+  const [activeIndex, setActiveIndex] = useState(-1)
+  const [dismissed, setDismissed] = useState(false)
   const listId = useId()
 
   useEffect(() => {
@@ -137,9 +139,11 @@ export default function ClientField({ userId, value, onChange, label = 'Client',
   const matches = useMemo(() => (value.picked ? [] : matchClients(rows, typed)), [rows, typed, value.picked])
   const exact = useMemo(() => (value.picked ? null : exactClient(rows, typed)), [rows, typed, value.picked])
   const isNew = !value.picked && typed.trim() !== '' && !exact
-  const showList = matches.length > 0
+  const showList = matches.length > 0 && !dismissed
+  const activeClient = showList ? matches[activeIndex] : undefined
 
   function pick(c: ClientPick) {
+    setActiveIndex(-1)
     onChange({ text: c.name, picked: c })
     onPick?.(c)
   }
@@ -155,7 +159,9 @@ export default function ClientField({ userId, value, onChange, label = 'Client',
         : undefined
 
   return (
-    <div className="fhnew-client">
+    <div className="fhnew-client" onBlur={event => {
+      if (!event.currentTarget.contains(event.relatedTarget)) { setDismissed(true); setActiveIndex(-1) }
+    }}>
       <Field
         label={label}
         value={typed}
@@ -169,20 +175,39 @@ export default function ClientField({ userId, value, onChange, label = 'Client',
         aria-expanded={showList}
         aria-controls={showList ? listId : undefined}
         aria-autocomplete="list"
-        onChange={(e) => onChange({ text: e.target.value, picked: null })}
+        aria-activedescendant={activeClient ? `${listId}-${activeClient.id}` : undefined}
+        onFocus={() => setDismissed(false)}
+        onChange={(e) => {
+          setDismissed(false)
+          setActiveIndex(-1)
+          onChange({ text: e.target.value, picked: null })
+        }}
         onKeyDown={(e) => {
-          // Enter on an exact name picks it, so the keyboard never needs a tap.
-          if (e.key === 'Enter' && exact) { e.preventDefault(); pick(exact) }
+          if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            if (!matches.length) return
+            e.preventDefault()
+            setDismissed(false)
+            setActiveIndex(index => e.key === 'ArrowDown'
+              ? (index + 1) % matches.length
+              : (index <= 0 ? matches.length - 1 : index - 1))
+          } else if (e.key === 'Escape' && showList) {
+            e.preventDefault()
+            setDismissed(true)
+            setActiveIndex(-1)
+          } else if (e.key === 'Enter' && !e.nativeEvent.isComposing && showList && (activeClient || exact)) {
+            e.preventDefault()
+            pick(activeClient || exact!)
+          }
         }}
       />
       {showList && (
         <ul id={listId} className="fhnew-client__list" role="listbox" aria-label="Matching clients">
-          {matches.map((c) => (
-            <li key={c.id} className="fhnew-client__item">
-              <button type="button" role="option" aria-selected={false} className="fhnew-client__pick" onClick={() => pick(c)}>
+          {matches.map((c, index) => (
+            <li key={c.id} className="fhnew-client__item" role="presentation">
+              <button id={`${listId}-${c.id}`} type="button" role="option" tabIndex={-1} aria-selected={activeIndex === index} className="fhnew-client__pick" onClick={() => pick(c)}>
                 <span className="fhnew-client__name">{c.name}</span>
-                {(c.company_name || c.phone) && (
-                  <span className="fhnew-client__sub">{c.company_name || c.phone}</span>
+                {(c.company_name || c.phone || c.email || c.address) && (
+                  <span className="fhnew-client__sub">{[c.company_name, c.phone || c.email, c.address].filter(Boolean).join(' · ')}</span>
                 )}
               </button>
             </li>

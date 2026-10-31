@@ -7,7 +7,7 @@
 // fh:draft:<kind> for 24 hours, as the old lead sheet did, so a pocket tap
 // or a dead battery loses nothing. It is cleared the moment a save lands.
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
@@ -95,7 +95,19 @@ type Props = {
 export default function CreateShell({ title, saveLabel, saving = false, error, backTo = '/new', onSave, children }: Props) {
   const navigate = useNavigate()
   const titleRef = useRef<HTMLHeadingElement>(null)
+  const formRef = useRef<HTMLFormElement>(null)
+  const [submitAttempt, setSubmitAttempt] = useState(0)
   useEffect(() => { titleRef.current?.focus({ preventScroll: true }) }, [])
+
+  // Validation often happens above a phone's current scroll position. After
+  // React renders the result, put the first correction back in view.
+  useLayoutEffect(() => {
+    if (!submitAttempt) return
+    const target = formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"], .fhnew-error')
+    if (!target) return
+    target.focus({ preventScroll: true })
+    target.scrollIntoView({ block: 'center', behavior: 'instant' })
+  }, [submitAttempt])
 
   function goBack() {
     hapticTap()
@@ -104,13 +116,15 @@ export default function CreateShell({ title, saveLabel, saving = false, error, b
     else navigate(backTo)
   }
 
-  function submit(e: FormEvent) {
+  async function submit(e: FormEvent) {
     e.preventDefault()
-    if (!saving) void onSave()
+    if (saving) return
+    await onSave()
+    setSubmitAttempt(attempt => attempt + 1)
   }
 
   return (
-    <form className="fhnew" onSubmit={submit} noValidate>
+    <form ref={formRef} className="fhnew" onSubmit={submit} noValidate>
       <header className="fhnew-head">
         <IconButton aria-label="Back" icon={ChevronLeft} variant="plain" size={44} onClick={goBack} />
         <h1 className="fhnew-title" ref={titleRef} tabIndex={-1}>{title}</h1>
@@ -118,7 +132,7 @@ export default function CreateShell({ title, saveLabel, saving = false, error, b
       <div className="fhnew-body">
         {children}
       </div>
-      {error && <p className="fhnew-error" role="alert">{error}</p>}
+      {error && <p className="fhnew-error" role="alert" tabIndex={-1}>{error}</p>}
       <div className="fhnew-save">
         <Button type="submit" variant="primary" size="lg" loading={saving}>{saveLabel}</Button>
       </div>
@@ -133,6 +147,18 @@ export function Choices({ label, options, value, onChange }: {
   value: string
   onChange: (next: string) => void
 }) {
+  const id = useId()
+  // Long lists belong in the phone's native picker, keeping the actual work
+  // fields close together. The empty option retains the existing clear action.
+  if (options.length > 5) return (
+    <div className="fhc-field">
+      <label className="fhc-field__label" htmlFor={id}>{label} <span className="fhnew-optional">Optional</span></label>
+      <select id={id} className="fhc-field__control fhnew-select" value={value} onChange={event => onChange(event.target.value)}>
+        <option value="">Not selected</option>
+        {options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+      </select>
+    </div>
+  )
   return (
     <fieldset className="fhnew-choices">
       <legend className="fhnew-choices__label">{label}</legend>

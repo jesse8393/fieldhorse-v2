@@ -102,7 +102,8 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-.fhnew-client__pick:hover {
+.fhnew-client__pick:hover,
+.fhnew-client__pick[aria-selected="true"] {
   background: var(--fh-wash);
 }
 
@@ -121,6 +122,7 @@
 }
 
 .fhnew-client__sub {
+  overflow-wrap: anywhere;
   font-size: 14px;
   line-height: 18px;
   color: var(--fh-ink-2);
@@ -260,6 +262,10 @@
 .fhnew-save .fhc-btn {
   width: 100%;
 }
+
+.fhnew-select { appearance: auto; -webkit-appearance: auto; margin-bottom: 12px; }
+.fhnew-optional { float: right; font-size: 13px; font-weight: 400; color: var(--fh-ink-3); }
+.fhnew :is(input, textarea, select, .fhnew-error) { scroll-margin-block: 96px; }
 
 /* ---- Desktop: one column, like the phone, in the shell ---- */
 @media (min-width: 900px) {

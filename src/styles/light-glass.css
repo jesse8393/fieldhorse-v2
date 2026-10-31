@@ -247,7 +247,7 @@ body:has(.fh-app--glass) .fh-app-header.fh-glass-header {
 .fh-job-heading__title h1 { font-size: 36px; font-weight: 700; line-height: 1.18; letter-spacing: -.045em; }
 .fh-job-heading__identity { min-width: 0; }
 .fh-job-heading__identity p { font-size: 14px; margin-top: 12px; }
-.fh-job-back { color: var(--fh-ink-3); min-height: 36px; padding-block: 4px; margin-bottom: 4px; }
+.fh-job-back { color: var(--fh-ink-3); min-height: 44px; padding-block: 4px; margin-bottom: 4px; }
 .fh-job-status { background: transparent; color: var(--fh-ink-2); padding: 0; border-radius: 0; font-weight: 500; font-size: 13px; }
 .fh-app--glass .fh-job-sections { justify-content: space-between; gap: 8px; }
 .fh-app--glass .fh-job-sections__picker { max-width: 200px; margin-left: auto; }
@@ -552,6 +552,11 @@ body:has(.fh-app--glass) .fhj-capsule .fhc-btn { background-image: none; box-sha
 }
 .fh-app--glass .fht .fht-hero { font-size: 30px; line-height: 1.13; }
 .fh-app--glass .fht .fht-line { font-size: 15px; line-height: 1.5; gap: 8px; }
+/* The neutral Today surface starts below chrome, unlike the retired stage. */
+.fh-app--glass .fht { margin-top: 0; }
+.fh-app--glass .fhj-page .fh-job-sections__link { min-width: 44px; }
+.fh-app--glass .fhjl-tab { min-width: 44px; }
+.fh-app--glass .fhj-hero__count { min-height: 44px; }
 
 /* Reports: money first, supporting evidence next, without nested metric cards. */
 .fh-app--glass .fh-reports__header { display: flex; align-items: baseline; justify-content: space-between; gap: 24px; padding: 8px 0 32px; }

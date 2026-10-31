@@ -346,7 +346,7 @@ export function tomorrowLine(tomorrow: HomeTodayOnSite[], forecast?: unknown): s
 
 /* ---------------- Needs an answer ---------------- */
 
-export type AnswerAction = 'Remind' | 'Nudge' | 'Reply' | 'Schedule' | 'Close job' | 'Add phone'
+export type AnswerAction = 'Remind' | 'Nudge' | 'Reply' | 'Schedule' | 'Close job' | 'Add phone' | 'Invoice'
 export type AnswerDot = 'danger' | 'neutral' | 'info'
 export type AnswerCopy = { title: string; subline: string; actionLabel: AnswerAction; dot: AnswerDot }
 
@@ -390,7 +390,7 @@ export function answerCopy(action: HomeNextAction, now: Date): AnswerCopy {
       return { title: `${name} invoice is ${days} overdue`, subline: sentence([money, dueOn]), actionLabel: 'Remind', dot }
     }
     case 'invoice':
-      return { title: `${name} is ready to bill`, subline: sentence([money && `${money} still owed`, 'work is done']), actionLabel: 'Remind', dot }
+      return { title: `${name} is ready to bill`, subline: sentence([money && `${money} contract balance`, 'work is done']), actionLabel: 'Invoice', dot }
     case 'followup':
       return { title: `Follow up with ${name}`, subline: sentence([money, `quiet for ${days}`]), actionLabel: 'Nudge', dot }
     case 'followup-due': {
