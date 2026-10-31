@@ -21,6 +21,15 @@ October 31, 2026. Scope: interface presentation and interaction. This pass chang
 | Ready to bill showed Remind and described contract value as money owed | Invoice action label and contract balance wording |
 | Landing heading matched body size; gold frames and gradients conflicted with Workspace 06 | Clear type hierarchy, restrained copper actions, neutral rules, readable sample workspace, and semantic navigation links |
 | Personal founder story remained in public marketing | Entire founder story and attribution removed; no personal founder framing remains in the landing page |
+| Canceling the task composer left focus on the page body | Restore focus to New task after cancellation or a successful creation |
+| Partner filters, message channels, estimate trades, and several job actions measured 18 to 36 pixels high | Larger shared filter controls and 44 pixel targets for the affected job actions |
+| Estimate job type choices consumed several rows; target margin had no accessible name | Native optional job type selector, labeled margin slider, percentage announcement, and keyboard operation |
+| Expanding a selection created a five column form reaching 587 pixels across a 320 pixel phone | Responsive option groups with persistent field labels in both create and edit flows |
+| Daily log fields depended on disappearing placeholders | Persistent labels, standard fields, and wrapping actions |
+| Selection Save issued separate updates, immediately reported success, and closed before results arrived | One confirmed update for title and options, a pending state, and preserved edits with a focused persistent error on refusal |
+| Selection and material prices rounded away cents | Exact currency rendering for option prices, unit costs, and material totals |
+| Job task dates and loading photo tiles lacked reliable accessible names | Task-specific date labels and explicit photo button labels |
+| Closing expanded job forms stranded keyboard focus; financial view tabs lacked arrow navigation | Focus restoration for selections, daily logs and material panels, plus shared tab keyboard behavior |
 
 ## Verification
 
@@ -31,6 +40,9 @@ Compiled application reviewed with isolated synthetic records through an interna
 * Verified customer suggestions respond to arrow keys and Enter without submitting the job form.
 * Confirmed Today date starts below the header after correction.
 * All 1,482 unit tests passed. TypeScript, ESLint, design system audit, and production build passed locally.
-* Added nine browser regressions, each running in both configured browser projects. They cover narrow geometry, long task text, desktop empty-state width, form error recovery, customer selection, schedule targets, completion feedback and Undo, refused update recovery, and public entry navigation. GitHub CI reports execution separately from this local review.
+* Added twelve browser regressions, each running in both configured browser projects. They cover narrow geometry, long task text, desktop empty-state width, form error recovery, customer selection, schedule targets, completion feedback and Undo, refused update recovery, public entry navigation, accessible estimate controls, expanded job forms, and selection save feedback. GitHub CI reports execution separately from this local review.
+* The second review covered the 37 core destinations plus 11 additional forms and 18 job section views. Expanded selection, daily log, material and change order forms were also exercised at 320 pixels. The selection overflow and small controls were reproduced before correction and remeasured afterward.
+* Verified a refused selection save against the compiled application: the entered title remained intact, no success appeared, the editor stayed open, and focus moved to persistent recovery text. Selection and material edits were isolated from real accounts.
+* Full CI on the preceding PR head `50fb32a282fb92b43270855ea115cf32860bc293` passed 1,135 browser cases and 1,482 unit tests. The PR checks identify the results for the follow-up commit; earlier results do not certify later changes.
 
 UI review uses synthetic data and browser phone frames. Physical Safari keyboard behavior, touch hardware, real account integration, and previously recorded backend release gaps are not certified by this work. Merge and production deployment remain with the owner.

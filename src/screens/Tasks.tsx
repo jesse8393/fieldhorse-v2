@@ -101,6 +101,21 @@ export default function Tasks() {
   const [allJobs, setAllJobs] = useState<{ id: string; name: string }[]>([])
   const [composerOpen, setComposerOpen] = useState(false)
   const headingRef = useRef<HTMLHeadingElement>(null)
+  const newTaskRef = useRef<HTMLButtonElement>(null)
+  const restoreComposerFocus = useRef(false)
+
+  function closeComposer() {
+    restoreComposerFocus.current = true
+    headingRef.current?.focus({ preventScroll: true })
+    setComposerOpen(false)
+  }
+
+  useEffect(() => {
+    if (composerOpen || loading || !restoreComposerFocus.current) return
+    restoreComposerFocus.current = false
+    if (error) headingRef.current?.focus()
+    else newTaskRef.current?.focus()
+  }, [composerOpen, loading, error])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -269,7 +284,7 @@ export default function Tasks() {
     <div className="fh-tasks" data-build-screen="Tasks" data-build-route="/tasks">
       <header className="fh-tasks-heading">
         <div><h1 ref={headingRef} tabIndex={-1}>Tasks</h1><p>Open work across your jobs.</p></div>
-        {!composerOpen && <Button type="button" leftIcon={Plus} disabled={loading || Boolean(error)} onClick={() => setComposerOpen(true)}>New task</Button>}
+        {!composerOpen && <Button ref={newTaskRef} type="button" leftIcon={Plus} disabled={loading || Boolean(error)} onClick={() => setComposerOpen(true)}>New task</Button>}
       </header>
 
       <dl className="fh-tasks-summary" aria-label="Task summary">
@@ -289,8 +304,8 @@ export default function Tasks() {
       </div>
 
       {error && <div className="fh-tasks-error" role="alert"><AlertTriangle size={20} /><span>{error}</span><Button type="button" variant="outline" onClick={load}>Retry</Button></div>}
-      {composerOpen && <TaskComposer jobs={allJobs} members={members} onCancel={() => setComposerOpen(false)}
-        onCreate={async input => { const ok = await createTask(input); if (ok) setComposerOpen(false) }} />}
+      {composerOpen && <TaskComposer jobs={allJobs} members={members} onCancel={closeComposer}
+        onCreate={async input => { const ok = await createTask(input); if (ok) closeComposer() }} />}
       {loading && <p role="status">Loading tasks…</p>}
       {!loading && !error && filteredTasks.length === 0 && <div className="fh-tasks-empty">
         <ClipboardCheck size={24} aria-hidden="true" />

@@ -399,6 +399,11 @@ body:has(.fh-app--glass) .fhj-capsule .fhc-btn { background-image: none; box-sha
 .fh-task-delete { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; background: none; border: 0; color: var(--fh-ink-3); cursor: pointer; }
 .fh-task-delete:hover { color: var(--fh-danger); }
 .fh-task-editor__meta { grid-column: 2 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
+.fh-selection-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 12px; }
+.fh-selection-fields > * { min-width: 0; }
+.fh-selection-option { min-width: 0; margin: 0 0 16px; padding: 12px; border: 1px solid var(--fh-edge-strong); border-radius: var(--fh-r-control); }
+.fh-selection-option legend { padding: 0 4px; color: var(--fh-ink-2); font: 600 14px/1.4 var(--fh-font-body); }
+.fh-selection-option > button { margin-top: 8px; }
 .fh-job-materials { container-type: inline-size; container-name: job-materials; }
 .fh-material-composer { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .fh-material-composer > input { width: 100%; min-width: 0; min-height: 48px; font-size: 16px !important; }

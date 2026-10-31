@@ -277,7 +277,7 @@ export default function TodosSection({ jobId, userId, compact = false, onOpenTas
             <span className="fh-task-editor__text">{row.text}</span>
             <button type="button" className="fh-task-delete" onClick={() => remove(row.id)} aria-label={`Delete task: ${row.text}`}><Trash2 size={16} aria-hidden="true" /></button>
             <div className="fh-task-editor__meta">
-              <DueChipButton iso={row.due_at} done={row.done} onChange={(nextIso: any) => updateDueAt(row.id, nextIso)} />
+              <DueChipButton iso={row.due_at} done={row.done} task={row.text} onChange={(nextIso: any) => updateDueAt(row.id, nextIso)} />
               {members.length > 1 && <AssignChipSelect members={members} value={row.assigned_to || ''} onChange={(next: string) => reassign(row.id, next || null)} selfId={userId} memberById={memberById} />}
             </div>
           </motion.li>)}
@@ -294,7 +294,7 @@ export default function TodosSection({ jobId, userId, compact = false, onOpenTas
  * iso is null: a quiet calendar icon serves as the "set due date"
  * affordance, no labeled chip is shown, but the tap target stays.
  */
-function DueChipButton({ iso, done, onChange }: any) {
+function DueChipButton({ iso, done, task, onChange }: any) {
   const status = dueStatus(iso)
   const dateStr = timestampToDateInput(iso)
 
@@ -322,9 +322,10 @@ function DueChipButton({ iso, done, onChange }: any) {
   })()
 
   return (
-    <Eyebrow as="label" style={{ position: 'relative', justifyContent: 'center', gap: 4, flexShrink: 0, minWidth: 44, minHeight: 44, padding: status ? '0 8px' : 0, borderRadius: 10, background: palette.bg, border: status ? `1px solid ${palette.border}` : `1px solid transparent`, color: palette.color, whiteSpace: 'nowrap', opacity: done ? 0.5 : 1, cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }} aria-label={status ? `Due ${status.label}` : 'Set due date'}>
+    <Eyebrow as="label" style={{ position: 'relative', justifyContent: 'center', gap: 4, flexShrink: 0, minWidth: 46, minHeight: 46, padding: status ? '0 8px' : 0, borderRadius: 10, background: palette.bg, border: status ? `1px solid ${palette.border}` : `1px solid transparent`, color: palette.color, whiteSpace: 'nowrap', opacity: done ? 0.5 : 1, cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
       <input
         type="date"
+        aria-label={`Due date: ${task}`}
         value={dateStr}
         onChange={(e) => onChange(dateInputToTimestamp(e.target.value))}
         style={{

@@ -2,6 +2,111 @@ import { expect, test } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 import { nothingRunsOffTheSide } from './helpers/overflow.ts'
 
+const selectionFixture = {
+  id: 'selection-ui', user_id: 'qa-user-1', contact_id: 'c-job1', title: 'Bathroom floor',
+  room: 'Master bath', category: 'Tile', status: 'draft', created_at: '2026-10-31T12:00:00Z',
+  options: [{ id: 'option-ui', label: 'Porcelain tile', brand: 'Sample', sku: 'PT-100', price: 7.25 }]
+}
+
+test('estimate choices and communication filters stay accessible on narrow phones', async ({ context, page }) => {
+  await signIn(context)
+  await page.setViewportSize({ width: 320, height: 844 })
+  await page.goto('/bid')
+  const jobType = page.getByRole('combobox', { name: 'Job type Optional' })
+  await jobType.selectOption('Concrete')
+  await expect(jobType).toHaveValue('Concrete')
+  await jobType.selectOption('')
+  await expect(jobType).toHaveValue('')
+  const margin = page.getByRole('slider', { name: 'Target margin' })
+  await margin.press('ArrowRight')
+  await expect(margin).toHaveAttribute('aria-valuetext', '26%')
+  const trade = page.getByRole('button', { name: 'Concrete', exact: true })
+  await trade.click()
+  await expect(trade).toHaveAttribute('aria-pressed', 'true')
+  for (const control of [trade, margin]) {
+    expect((await control.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+  }
+  await nothingRunsOffTheSide(page)
+  await page.goto('/compose')
+  for (const name of ['SMS channel', 'Email channel', 'Voicemail channel']) {
+    const channel = page.getByRole('button', { name, exact: true })
+    expect((await channel.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+  }
+  await nothingRunsOffTheSide(page)
+  await page.goto('/partners')
+  await page.getByRole('button', { name: /^Pending/ }).click()
+  await expect(page.getByRole('button', { name: /^Pending/ })).toHaveAttribute('aria-pressed', 'true')
+  await nothingRunsOffTheSide(page)
+})
+
+test('expanded job forms keep labels, controls and cancellation within phone reach', async ({ context, page }) => {
+  await signIn(context, { tables: { fh_selections: [selectionFixture] } })
+  await page.setViewportSize({ width: 320, height: 844 })
+  await page.goto('/jobs/c-job1?tab=selections')
+  await page.getByRole('button', { name: '+ New selection', exact: true }).click()
+  await page.getByLabel('Selection title', { exact: true }).fill('Kitchen finish')
+  await page.getByRole('button', { name: 'Add option', exact: true }).click()
+  const option = page.getByRole('group', { name: 'Option 2', exact: true })
+  await option.getByLabel('Option label', { exact: true }).fill('Slate finish')
+  await option.getByLabel('Price ($)', { exact: true }).fill('12.75')
+  await expect(option.getByLabel('Option label', { exact: true })).toHaveValue('Slate finish')
+  await nothingRunsOffTheSide(page)
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await expect(page.getByRole('button', { name: '+ New selection', exact: true })).toBeFocused()
+  await expect(page.getByText('$7.25', { exact: true })).toBeVisible()
+
+  await page.goto('/jobs/c-job1?tab=logs')
+  await page.getByRole('button', { name: '+ New log', exact: true }).click()
+  await page.getByLabel('Site summary', { exact: true }).fill('Site access prepared for tomorrow.')
+  await page.getByLabel('Hours worked (optional)', { exact: true }).fill('7.5')
+  await expect(page.getByLabel('Site summary', { exact: true })).toHaveValue('Site access prepared for tomorrow.')
+  await nothingRunsOffTheSide(page)
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await expect(page.getByRole('button', { name: '+ New log', exact: true })).toBeFocused()
+
+  await page.goto('/jobs/c-job1?tab=materials')
+  await page.getByRole('button', { name: 'Bulk add', exact: true }).click()
+  await page.getByLabel('Materials to add, one per line').fill('4 of 2x4 studs')
+  expect((await page.getByRole('button', { name: 'Close', exact: true }).boundingBox())!.height).toBeGreaterThanOrEqual(44)
+  await nothingRunsOffTheSide(page)
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Bulk add', exact: true })).toBeFocused()
+
+  await page.goto('/jobs/c-job1?tab=change_orders')
+  await page.getByRole('button', { name: 'Add', exact: true }).click()
+  await page.getByRole('button', { name: 'Approved', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Approved', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByLabel('Approved by', { exact: true })).toBeVisible()
+  await nothingRunsOffTheSide(page)
+})
+
+test('selection edits preserve entered work on refusal and report success only after one confirmed save', async ({ context, page }) => {
+  await signIn(context, { tables: { fh_selections: [selectionFixture] } })
+  let refuse = true
+  const changes: Record<string, unknown>[] = []
+  await context.route(/\/rest\/v1\/fh_selections(?:\?|$)/, async route => {
+    if (route.request().method() !== 'PATCH') return route.fallback()
+    changes.push(route.request().postDataJSON())
+    await route.fulfill({ status: refuse ? 403 : 200, contentType: 'application/json', body: JSON.stringify(refuse ? { message: 'Selection update refused' } : { id: selectionFixture.id }) })
+  })
+  await page.goto('/jobs/c-job1?tab=selections')
+  await page.getByRole('button', { name: 'Edit selection', exact: true }).click()
+  await page.getByLabel('Selection title', { exact: true }).fill('Updated bathroom finish')
+  await page.getByRole('group', { name: 'Option 1', exact: true }).getByLabel('Price ($)', { exact: true }).fill('9.50')
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(page.getByText("Couldn't update", { exact: true })).toBeVisible()
+  await expect(page.getByRole('alert').filter({ hasText: 'Changes could not be saved.' })).toBeFocused()
+  await expect(page.getByLabel('Selection title', { exact: true })).toHaveValue('Updated bathroom finish')
+  await expect(page.getByText('Selection updated', { exact: true })).toHaveCount(0)
+  expect(changes).toHaveLength(1)
+  expect(changes[0]).toMatchObject({ title: 'Updated bathroom finish', options: [{ id: 'option-ui', price: 9.5 }] })
+  refuse = false
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(page.getByText('Selection updated', { exact: true })).toBeVisible()
+  await expect(page.getByLabel('Selection title', { exact: true })).toHaveCount(0)
+  expect(changes).toHaveLength(2)
+})
+
 // These are UI checks against controlled records, not real account validation.
 test('Today keeps its date and sync status below the sticky header', async ({ context, page }) => {
   await signIn(context)
@@ -86,6 +191,8 @@ test('task management stays readable and operable with long records', async ({ c
   await nothingRunsOffTheSide(page)
   await form.getByRole('button', { name: 'Cancel', exact: true }).click()
   await expect(form).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'New task', exact: true })).toBeFocused()
+  await expect(page.getByRole('button', { name: 'New task', exact: true })).toBeInViewport()
 })
 
 test('an empty task dashboard retains the wide desktop workspace', async ({ context, page }) => {

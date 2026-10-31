@@ -16,7 +16,7 @@
 //                         into real procurement rows without
 //                         retyping.
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Plus, Trash2, Truck, Check, Sparkles, AlertTriangle, X, ListPlus,
@@ -27,6 +27,7 @@ import { hapticTap } from '../../../lib/haptics.ts'
 import { SkeletonList } from '../../../components/Skeleton.tsx'
 import { useArmedId } from '../../../lib/secondTap.ts'
 import { Eyebrow } from '../../../components/v3'
+import { moneyExact } from '../../../lib/format.ts'
 
 const SkeletonAny = SkeletonList as any
 
@@ -73,7 +74,7 @@ const STATUS_LABEL: Record<Status, string> = {
 
 function fmtMoney(n: number | null | undefined): string {
   if (n == null) return '\u2003'
-  return `$${Math.round(Number(n)).toLocaleString()}`
+  return moneyExact(n)
 }
 
 function fmtQty(n: number | null | undefined, unit?: string | null): string {
@@ -109,7 +110,12 @@ export default function MaterialsSection({ jobId, userId }: any) {
   const [loading, setLoading] = useState(true)
   const [bulkOpen, setBulkOpen] = useState(false)
   const [notesPromptOpen, setNotesPromptOpen] = useState(false)
+  const bulkButtonRef = useRef<HTMLButtonElement>(null)
+  const notesButtonRef = useRef<HTMLButtonElement>(null)
   const [draft, setDraft] = useState({ name: '', qty: '1', unit: 'EA', supplier: '', unit_cost: '' })
+
+  function closeBulk() { setBulkOpen(false); bulkButtonRef.current?.focus() }
+  function closeNotes() { setNotesPromptOpen(false); notesButtonRef.current?.focus() }
 
   const load = useCallback(async () => {
     if (!jobId) return
@@ -168,7 +174,7 @@ export default function MaterialsSection({ jobId, userId }: any) {
     const { error } = await supabase.from('fh_materials').insert(payload as any)
     if (error) { toastError("Couldn't bulk add", error.message); return }
     toastSuccess(`Added ${parsed.length} item${parsed.length === 1 ? '' : 's'}`)
-    setBulkOpen(false)
+    closeBulk()
     load()
   }
 
@@ -235,10 +241,10 @@ export default function MaterialsSection({ jobId, userId }: any) {
           )}
         </Eyebrow>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button type="button" aria-expanded={notesPromptOpen} onClick={() => { setNotesPromptOpen((v) => !v); setBulkOpen(false) }} style={chipBtnGhost}>
+          <button ref={notesButtonRef} type="button" aria-expanded={notesPromptOpen} onClick={() => { setNotesPromptOpen((v) => !v); setBulkOpen(false) }} style={chipBtnGhost}>
             <Sparkles size={11} /> Pull from notes
           </button>
-          <button type="button" aria-expanded={bulkOpen} onClick={() => { setBulkOpen((v) => !v); setNotesPromptOpen(false) }} style={chipBtnGhost}>
+          <button ref={bulkButtonRef} type="button" aria-expanded={bulkOpen} onClick={() => { setBulkOpen((v) => !v); setNotesPromptOpen(false) }} style={chipBtnGhost}>
             <ListPlus size={11} /> Bulk add
           </button>
         </div>
@@ -338,12 +344,12 @@ export default function MaterialsSection({ jobId, userId }: any) {
       )}
 
       {bulkOpen && (
-        <BulkAddDialog onClose={() => setBulkOpen(false)} onAdd={bulkAdd} />
+        <BulkAddDialog onClose={closeBulk} onAdd={bulkAdd} />
       )}
       {notesPromptOpen && (
         <NotesPullDialog
           jobId={jobId}
-          onClose={() => setNotesPromptOpen(false)}
+          onClose={closeNotes}
           onAdd={async (items) => {
             const payload = items.map((it) => ({
               user_id: userId,
@@ -355,7 +361,7 @@ export default function MaterialsSection({ jobId, userId }: any) {
             }))
             const { error } = await supabase.from('fh_materials').insert(payload as any)
             if (error) toastError("Couldn't add", error.message)
-            else { toastSuccess(`Added ${items.length}`); setNotesPromptOpen(false); load() }
+            else { toastSuccess(`Added ${items.length}`); closeNotes(); load() }
           }}
         />
       )}
@@ -481,6 +487,7 @@ function BulkAddDialog({ onClose, onAdd }: { onClose: () => void; onAdd: (lines:
   return (
     <DialogShell title="Bulk add materials" subtitle="One item per line. Leading numbers become qty (e.g. '4 of 2x4 studs')." onClose={onClose}>
       <textarea
+        aria-label="Materials to add, one per line"
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder="4 of 2x4 studs&#10;1 box of #10 screws&#10;Drywall mud (3)&#10;Paint, eggshell white"
@@ -618,7 +625,7 @@ function DialogShell({ title, subtitle, onClose, children }: { title: string; su
             <p style={{ margin: '6px 0 12px', fontSize: 12, color: 'var(--v3-text-muted)' }}>{subtitle}</p>
           )}
         </div>
-        <button type="button" onClick={onClose} aria-label="Close" style={{ background: 'transparent', border: 'none', color: 'var(--v3-text-muted)', cursor: 'pointer' }}>
+        <button type="button" onClick={onClose} aria-label="Close" style={{ minWidth: 44, minHeight: 44, flexShrink: 0, display: 'grid', placeItems: 'center', background: 'transparent', border: 'none', color: 'var(--v3-text-muted)', cursor: 'pointer' }}>
           <X size={18} />
         </button>
       </div>
@@ -633,10 +640,11 @@ const inputStyle: React.CSSProperties = {
   background: 'var(--v3-surface-2, rgba(20, 20, 20,.20))',
   border: '1px solid var(--v3-border)',
   color: 'var(--v3-text)',
-  fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none',
+  fontFamily: 'var(--font-body)', fontSize: 16, outline: 'none',
 }
 
 const primaryBtn = (disabled: boolean): React.CSSProperties => ({
+  minHeight: 44,
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
   padding: '8px 12px', borderRadius: 10, border: 'none',
   background: 'var(--v3-primary)', color: 'var(--v3-on-primary, #141414)',
@@ -645,6 +653,7 @@ const primaryBtn = (disabled: boolean): React.CSSProperties => ({
 })
 
 const secondaryBtn: React.CSSProperties = {
+  minHeight: 44,
   padding: '8px 12px', borderRadius: 10,
   border: '1px solid var(--v3-border)',
   background: 'transparent', color: 'var(--v3-text-muted)',
@@ -652,13 +661,14 @@ const secondaryBtn: React.CSSProperties = {
 }
 
 const iconBtnStyle: React.CSSProperties = {
-  width: 28, height: 28, borderRadius: 10,
+  width: 44, height: 44, borderRadius: 10,
   border: 'none', background: 'transparent',
   color: 'var(--v3-text-muted)', cursor: 'pointer',
   display: 'grid', placeItems: 'center',
 }
 
 const chipBtnGhost: React.CSSProperties = {
+  minHeight: 44,
   display: 'inline-flex', alignItems: 'center', gap: 4,
   padding: '4px 12px', borderRadius: 10,
   background: 'transparent',
