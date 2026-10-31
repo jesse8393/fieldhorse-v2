@@ -709,7 +709,7 @@ test.describe('Reports', () => {
     }
     await open(page, '/analytics', '[data-build-screen="SnowAnalyticsBuild"]')
     await expect.poll(() => read.held.length).toBeGreaterThan(0)
-    const pipeline = page.getByRole('region', { name: 'Financial overview' }).locator('.fh-build-kpi-cell').filter({ hasText: 'Pipeline' })
+    const pipeline = page.getByRole('region', { name: 'Financial overview' }).locator('.fh-build-kpi-cell').filter({ hasText: 'Active job value' })
     await holds(async () => {
       await expect(page.getByText(/\$0 won/)).toHaveCount(0)
       await expect(pipeline.getByRole('status', inPage)).toHaveCount(1)
@@ -741,7 +741,7 @@ test.describe('Reports', () => {
     if (isPhone(testInfo.project.name)) {
       await expect(page.getByText('Business overview', { exact: true })).toBeVisible()
     } else {
-      await expect(page.getByRole('region', { name: 'Financial overview' }).locator('.fh-build-kpi-cell').filter({ hasText: 'Pipeline' }).locator('strong')).toHaveText(PIPELINE)
+      await expect(page.getByRole('region', { name: 'Financial overview' }).locator('.fh-build-kpi-cell').filter({ hasText: 'Active job value' }).locator('strong')).toHaveText(PIPELINE)
     }
     // The whole screen was the error: focus waits on the page's main region.
     await expect(page.locator('#fh-main')).toBeFocused()

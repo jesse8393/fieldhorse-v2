@@ -114,7 +114,7 @@ export default function SnowAnalyticsBuild(props: Props) {
           <KpiCell label="Collected YTD" value={loading ? pending('Loading collected this year') : stats.collected == null ? 'Not connected' : moneyFull(stats.collected)} />
           <KpiCell label="Issued invoices YTD" value={loading ? pending('Loading invoiced this year') : stats.invoiced == null ? 'Not connected' : moneyFull(stats.invoiced)} />
           <KpiCell label="Won YTD" value={loading ? pending('Loading won this year') : moneyFull(stats.wonYTD || 0)} />
-          <KpiCell label="Pipeline" value={loading ? pending('Loading the pipeline') : moneyFull(stats.pipeline || 0)} />
+          <KpiCell label="Active job value" value={loading ? pending('Loading active job value') : moneyFull(stats.pipeline || 0)} />
         </section>
         <section className="fh-reports__context" aria-label="Business overview">
           <div><h2>Win rate · 90 days</h2><strong>{loading ? pending('Loading win rate') : pct(stats.closeRate)}</strong>{stats.closeRateNote && <p>{stats.closeRateNote}</p>}</div>
@@ -137,30 +137,31 @@ export default function SnowAnalyticsBuild(props: Props) {
           <div className="fh-build-analytics-main">
             <section className="fh-build-card fh-build-chart-card">
               <header className="fh-build-card-head">
-                <div className="fh-build-eyebrow">Pipeline by stage</div>
+                <div className="fh-build-eyebrow">Job value by stage</div>
                 <span className="fh-build-rel">{byStage.length} stages</span>
               </header>
               <div className="fh-build-stage-bars">
                 {loading ? (
                   <div className="fh-build-table__empty">Loading…</div>
                 ) : byStage.length === 0 ? (
-                  <div className="fh-build-table__empty">No pipeline data yet.</div>
+                  <div className="fh-build-table__empty">No job data yet.</div>
                 ) : byStage.map((s) => {
                   const width = (s.value / maxStage) * 100
                   return (
                     <div key={s.id} className="fh-build-stage-bar">
                       <div className="fh-build-stage-bar__label">
                         <span>{s.label || s.id}</span>
-                        <span className="fh-build-rel">{s.count} {s.count === 1 ? 'deal' : 'deals'}</span>
+                        <span className="fh-build-rel">{s.count} {countNoun(s.count ?? 0, 'job')}</span>
                       </div>
                       <div className="fh-build-stage-bar__track">
-                        <div className="fh-build-stage-bar__fill" style={{ width: `${Math.max(width, 2)}%`, background: s.color || 'var(--v3-primary, #c9963a)' }} />
+                        <div className="fh-build-stage-bar__fill" style={{ width: `${Math.max(width, 0)}%`, background: s.color || 'var(--v3-primary, #c9963a)' }} />
                       </div>
                       <div className="fh-build-stage-bar__value">{money(s.value)}</div>
                     </div>
                   )
                 })}
               </div>
+              <p className="v3-caption">Current contract amounts by job status, including closed and lost jobs. These are not outstanding invoice balances.</p>
             </section>
 
             <section className="fh-build-card fh-build-chart-card">
@@ -232,7 +233,7 @@ export default function SnowAnalyticsBuild(props: Props) {
                   <strong>{strongestStage ? (strongestStage.label || strongestStage.id) : '\u2003'}</strong>
                   <span>
                     {strongestStage
-                      ? `${money(strongestStage.value)} in ${strongestStage.count} ${countNoun(strongestStage.count, 'deal')}`
+                      ? `${money(strongestStage.value)} in ${strongestStage.count} ${countNoun(strongestStage.count, 'job')}`
                       : 'No data yet'}
                   </span>
                   {strongestStage && <div className="fh-build-spark is-gold" />}
@@ -247,7 +248,7 @@ export default function SnowAnalyticsBuild(props: Props) {
                   <strong>{weakestStage ? (weakestStage.label || weakestStage.id) : ' '}</strong>
                   <span>
                     {weakestStage
-                      ? `${money(weakestStage.value)} in ${weakestStage.count} ${countNoun(weakestStage.count, 'deal')}`
+                      ? `${money(weakestStage.value)} in ${weakestStage.count} ${countNoun(weakestStage.count, 'job')}`
                       : 'No data yet'}
                   </span>
                 </>
