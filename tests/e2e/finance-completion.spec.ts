@@ -39,6 +39,60 @@ test('customer overview reconciles schedule and invoice blockers', async ({ page
   await nothingRunsOffTheSide(page, 'customer blocker review')
 })
 
+test('customer context stays factual and its actions open working destinations', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name.startsWith('mobile'), 'Desktop customer context')
+  await page.goto(`/clients/${client.id}`)
+  await expect(page.getByText('Activity date unavailable', { exact: true })).toBeVisible()
+  await expect(page.getByText('Cooling', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('Remaining contract value', { exact: true })).toHaveCount(1)
+
+  const context = page.getByRole('complementary', { name: 'Customer context' })
+  await context.getByRole('button', { name: 'Review contract balance', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Projects', exact: true })).toHaveAttribute('aria-current', 'page')
+  await expect(page.getByRole('region', { name: /^Jobs / }).getByRole('button', { name: /Foundation repair/ })).toBeVisible()
+  await context.getByRole('link', { name: /Foundation repair/ }).click()
+  await expect(page).toHaveURL(new RegExp(`/jobs/${job.id}$`))
+  await expect(page.getByRole('heading', { level: 1, name: 'Foundation repair', exact: true })).toBeVisible()
+})
+
+test('follow up counts exclude customers without a usable activity date', async ({ context, page }, testInfo) => {
+  test.skip(testInfo.project.name.startsWith('mobile'), 'Desktop customer summary')
+  const stale = { ...client, id: 'client-stale', name: 'Dated activity', last_activity_at: '2026-09-01T12:00:00Z' }
+  await signIn(context, { tables: { ...tables, fh_clients: [client, stale], fh_contacts: [job, { ...job, id: 'job-stale', client_id: stale.id, fh_clients: stale }] } })
+  await page.goto('/clients')
+  const followUps = page.locator('.fh-build-rail-card').filter({ hasText: 'Needs follow up' })
+  await expect(followUps.locator('strong')).toHaveText('1')
+  await expect(page.getByRole('button', { name: /^Rosa Ledger Active/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Dated activity Cooling/ })).toBeVisible()
+})
+
+test('phone customer summaries remain separate and filters stay usable at 320 pixels', async ({ page }, testInfo) => {
+  test.skip(!testInfo.project.name.startsWith('mobile'), 'Phone customer directory')
+  await page.setViewportSize({ width: 320, height: 844 })
+  await page.goto('/clients')
+  const totals = page.getByRole('region', { name: 'Customer totals' })
+  await expect(totals).toBeVisible()
+  // Inspect every summary independently: document overflow alone misses overlapping text.
+  const boxes = await totals.locator('strong').evaluateAll(nodes => nodes.map(node => {
+    const r = node.getBoundingClientRect()
+    return { left: r.left, right: r.right, scroll: node.scrollWidth, width: node.clientWidth }
+  }))
+  expect(boxes).toHaveLength(2)
+  expect(boxes[0].right).toBeLessThanOrEqual(boxes[1].left)
+  for (const box of boxes) expect(box.scroll).toBeLessThanOrEqual(box.width + 1)
+  const row = page.getByRole('button', { name: /^Rosa Ledger/ })
+  await expect(row.getByText('Contract balance $10K', { exact: true })).toBeVisible()
+  const create = page.getByRole('button', { name: 'New customer', exact: true })
+  expect((await create.boundingBox())?.height).toBeGreaterThanOrEqual(44)
+  await nothingRunsOffTheSide(page, 'phone customer directory')
+  await page.getByRole('button', { name: /^Recent/ }).click()
+  await expect(row).toHaveCount(0)
+  await page.getByRole('button', { name: /^All/ }).click()
+  await expect(row).toBeVisible()
+  await create.click()
+  await expect(page).toHaveURL(/\/clients\/new$/)
+})
+
 test('similar drafts require review before a send begins', async ({ context, page }) => {
   await signIn(context, { tables: { ...tables, fh_invoices: [invoice('draft-finance', 2000, 'draft'), invoice('similar-finance', 2000, 'draft')] } })
   let sends = 0

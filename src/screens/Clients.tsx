@@ -12,7 +12,8 @@ import { useAuth } from '../contexts/AuthContext.tsx'
 import { useClientsBundle, useInvalidateClients } from '../lib/queries.ts'
 import { rollupByClient } from '../lib/rollups.ts'
 import { findDuplicateClusters, loadNotDuplicates } from '../lib/clientMerge.ts'
-import { FilterPill, Eyebrow, StampNumber, ScreenCloser } from '../components/v3'
+import { clientActivity } from '../lib/clientActivity.ts'
+import { FilterPill, Eyebrow } from '../components/v3'
 import { Button } from '../components/fh'
 const SnowClients = lazy(() => import('../components/desktop/SnowClientsBuild.tsx'))
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
@@ -113,8 +114,8 @@ export default function Clients() {
     let base = rows
     if (filter === 'active') base = base.filter((r) => rollupFor(r.id).activeCount > 0)
     if (filter === 'recent') {
-      const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000
-      base = base.filter((r) => r.last_activity_at && new Date(r.last_activity_at).getTime() > cutoff)
+      const now = Date.now()
+      base = base.filter((r) => clientActivity(r.last_activity_at, now).state === 'recent')
     }
     if (!needle) return base
     return base.filter((r) =>
@@ -155,11 +156,11 @@ export default function Clients() {
 
   // Per-filter counts so FilterPills can render their badge.
   const filterCounts = useMemo(() => {
-    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000
+    const now = Date.now()
     const all = rows.length
     const active = rows.filter((r) => rollupFor(r.id).activeCount > 0).length
     const recent = rows.filter(
-      (r) => r.last_activity_at && new Date(r.last_activity_at).getTime() > cutoff
+      (r) => clientActivity(r.last_activity_at, now).state === 'recent'
     ).length
     return { all, active, recent }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -239,60 +240,24 @@ export default function Clients() {
 
   return (
     <motion.div className="v3-screen v3-screen--clients" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: 48, position: 'relative', background: 'var(--v3-bg)' }}>
-      {/* COCKPIT, black-glass panel: title eyebrow + state chip + KPI strip */}
-      <motion.div className="fh-clients__cockpit" variants={item} style={{ padding: '8px 24px 12px' }}>
-        <div style={{
-          padding: '12px 16px',
-          borderRadius: 10,
-          background: 'var(--v3-surface)',
-          border: '1px solid var(--v3-border)',
-          boxShadow: 'none'
-        }}>
-          {/* Header row: section eyebrow + state chip */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
-              <Eyebrow as="h1" tone="gold" style={{ margin: 0 }}>Customers</Eyebrow>
-              {!loading && <ClientsStateChip stats={screenStats} totalAccounts={rows.length} />}
-            </div>
-            {/* The add action sits in the header on a phone; the dock coin
-                is the only floating gold action (spec 8.1). */}
-            <Button variant="secondary" size="mini" icon={Plus} onClick={() => { hapticMedium(); openNew() }}>
-              New customer
-            </Button>
+      <motion.div className="fh-clients__cockpit" variants={item}>
+        <header className="fh-customers-heading">
+          <h1>Customers</h1>
+          <p>{loading ? <LoadingValue label="Loading your accounts" width={72} height={16} /> : `${rows.length} ${rows.length === 1 ? 'account' : 'accounts'} on file`}</p>
+          <Button variant="primary" icon={Plus} onClick={() => { hapticMedium(); openNew() }}>
+            New customer
+          </Button>
+        </header>
+        <section className="fh-customers-metrics" aria-label="Customer totals">
+          <div>
+            <span>Won contract value</span>
+            <strong>{loading ? <LoadingValue label="Loading won contract value" width={96} height={28} /> : money(totalLifetime)}</strong>
           </div>
-
-          {/* Contract value includes work that has not yet been invoiced. */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: screenStats.outstanding > 0 ? '1fr 1px 1fr' : '1fr',
-            alignItems: 'end',
-            gap: 12
-          }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-              <Eyebrow tone="gold">Won contract value</Eyebrow>
-              <StampNumber size="2xl" tone="gold" style={{ display: 'block', lineHeight: 0.95 }}>
-                {loading ? <LoadingValue label="Loading won contract value" width={112} height={28} /> : money(totalLifetime)}
-              </StampNumber>
-              <Eyebrow as="div" style={{ marginTop: 2 }}>
-                {loading ? <LoadingValue label="Loading your accounts" width={72} height={12} /> : <>{rows.length} {rows.length === 1 ? 'account' : 'accounts'}</>}
-              </Eyebrow>
-            </div>
-            {screenStats.outstanding > 0 && (
-              <>
-                <span aria-hidden="true" style={{ background: 'var(--v3-border)', alignSelf: 'stretch' }} />
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-                  <Eyebrow>Contract balance</Eyebrow>
-                  <StampNumber size="xl" tone="danger" style={{ display: 'block', lineHeight: 0.95 }}>
-                    {money(screenStats.outstanding)}
-                  </StampNumber>
-                  <Eyebrow as="div" style={{ marginTop: 2 }}>
-                    {screenStats.owesAccounts} with a balance
-                  </Eyebrow>
-                </div>
-              </>
-            )}
+          <div>
+            <span>Contract balance</span>
+            <strong>{loading ? <LoadingValue label="Loading contract balance" width={96} height={28} /> : money(screenStats.outstanding)}</strong>
           </div>
-        </div>
+        </section>
       </motion.div>
 
       {/* Search + filter row, unified gutter, FilterPill primitive */}
@@ -300,13 +265,14 @@ export default function Clients() {
         <div style={{ position: 'relative' }}>
           <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--v3-text-muted)', pointerEvents: 'none' }} />
           <input
+            aria-label="Search customers"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search name, company, phone, email…"
             style={{ width: '100%', padding: '12px 12px 12px 32px', borderRadius: 10, background: 'var(--v3-surface)', border: '1px solid var(--v3-border-strong)', color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 16, boxSizing: 'border-box' }}
           />
         </div>
-        <div style={{ display: 'flex', gap: 8, marginTop: 10, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }}>
+        <div className="fh-customer-filters" aria-label="Customer filters">
           {[
             { id: 'all', label: 'All', count: filterCounts.all },
             { id: 'active', label: 'Active', count: filterCounts.active },
@@ -376,8 +342,7 @@ export default function Clients() {
         </motion.div>
       )}
 
-      {/* GRID LAYOUT, 1/2/3 col responsive (320px min). Each client is a
-          tall vertical tile, not a wide row. */}
+      {/* Open customer rows share one gutter with search and totals. */}
       <motion.div
         className="fh-clients__list"
         variants={item}
@@ -433,90 +398,30 @@ export default function Clients() {
         )}
         {!loading && rows.length > 0 && filtered.length === 0 && (
           <div className="v3-empty">
-            No clients match that search.
+            No customers match these filters.
           </div>
         )}
-        {/* FEATURED TOP CLIENT, gold-rib hero card from design handoff
-            (styles-workflows.css .cl-card--top). Only rendered when the
-            top earner is meaningfully ahead of the pack and we're on the
-            "all" filter so it never competes with an active search/filter. */}
-        {!loading && filter === 'all' && !q.trim() && topClientId && (() => {
-          const top = filtered.find((c) => c.id === topClientId)
-          if (!top) return null
-          const r = rollupFor(top.id)
-          const lastActivity = top.last_activity_at ? new Date(top.last_activity_at) : null
-          const lastRel = lastActivity ? formatRelative(lastActivity) : '\u2003'
-          const initials = (top.name || '·').trim().split(/\s+/).slice(0, 2).map(s => s.charAt(0).toUpperCase()).join('')
-          return (
-            <div className="cl-card cl-card--top">
-              <div className="cl-card__rib">Top client</div>
-              <button type="button" className="cl-card__tap" onClick={() => { hapticTap(); navigate(`/clients/${top.id}`) }}>
-                <div className="cl-card__hdr">
-                  <div className="cl-card__avatar" aria-hidden="true">{initials || '·'}</div>
-                  <div className="cl-card__main">
-                    <div className="cl-card__name">{top.name || 'Unnamed client'}</div>
-                    <div className="cl-card__kind">{top.company_name || 'Lifetime billing leader'}</div>
-                  </div>
-                  <div className="cl-card__amt">
-                    <div className="cl-card__amt-val">{money(r.lifetime)}</div>
-                    <div className="cl-card__amt-lbl">Lifetime</div>
-                  </div>
-                </div>
-                <div className="cl-card__strip">
-                  <div className="cl-strip-cell">
-                    <div className="cl-strip-cell__lbl">Active</div>
-                    <div className={`cl-strip-cell__val${r.activeCount > 0 ? ' cl-strip-cell__val--gold' : ''}`}>
-                      {r.activeCount > 0 ? `${r.activeCount} ${r.activeCount === 1 ? 'job' : 'jobs'}` : '\u2003'}
-                    </div>
-                  </div>
-                  <div className="cl-strip-cell">
-                    <div className="cl-strip-cell__lbl">Owes</div>
-                    <div className={`cl-strip-cell__val${r.outstanding > 0 ? ' cl-strip-cell__val--alert' : ''}`}>
-                      {r.outstanding > 0 ? money(r.outstanding) : '\u2003'}
-                    </div>
-                  </div>
-                  <div className="cl-strip-cell">
-                    <div className="cl-strip-cell__lbl">Last</div>
-                    <div className="cl-strip-cell__val">{lastRel}</div>
-                  </div>
-                </div>
-              </button>
-            </div>
-          )
-        })()}
-        {/* Single black-glass list container with hairline dividers, premium
-            iOS list pattern. Each row is a tap target into /clients/:id;
-            the heavier per-card chrome (lifetime stamp, contact row,
-            stat chips) lives on the detail screen now. */}
         {!loading && filtered.length > 0 && (
           <div
             role="list"
-            style={{
-              borderRadius: 10,
-              background: 'var(--v3-surface)',
-              border: '1px solid var(--v3-border)',
-              boxShadow: 'none',
-              overflow: 'hidden'
-            }}
+            className="fh-customer-list"
           >
-            {visibleClients.map((c, i) => {
+            {visibleClients.map((c) => {
               const r = rollupFor(c.id)
-              const lastActivity = c.last_activity_at ? new Date(c.last_activity_at) : null
-              const lastActivityRel = lastActivity ? formatRelative(lastActivity) : null
+              const lastActivity = clientActivity(c.last_activity_at).lastTouch
+              const lastActivityRel = lastActivity ? formatRelative(new Date(lastActivity)) : null
               return (
                 <ClientRow
                   key={c.id}
                   client={c}
                   rollup={r}
                   lastActivityRel={lastActivityRel}
-                  index={i}
-                  isTop={c.id === topClientId}
-                  isLast={i === visibleClients.length - 1}
+                  isTop={filter === 'all' && !q.trim() && c.id === topClientId}
                   onOpen={() => navigate(`/clients/${c.id}`)}
                 />
               )
             })}
-            <div style={{ padding: 16 }}>
+            <div className="fh-customer-list-footer">
               <p aria-live="polite" style={{ fontSize: 14 }}>Showing {visibleClients.length} of {filtered.length} customers.</p>
               {clientsHasMore && <button type="button" className="fh-build-secondary-btn" style={{ minHeight: 44 }}
                 onClick={() => setVisibleCount(count => count + 40)}>Load more customers</button>}
@@ -525,40 +430,9 @@ export default function Clients() {
         )}
       </motion.div>
 
-      {/* end of grid */}
-
-      <ScreenCloser
-        variant="cta"
-        caption={loading ? undefined : `${rows.length} ${rows.length === 1 ? 'account' : 'accounts'} on file.`}
-        ctaLabel="Add another client"
-        onCta={() => openNew()}
-      />
     </motion.div>
   )
 }
-
-/* ============================================================
-   ClientRow, compact list row inside the rounded black-glass
-   container. ~64px tall. Premium iOS list pattern.
-
-     ┌────────────────────────────────────────────────────┐
-     │ (40 av) Client Name              $LIFETIME       › │
-     │         status subline           N active           │
-     ├────────────────────────────────────────────────────┤  ← hairline
-     │ ...next row...                                        │
-     └─────────────────────────────────────────────────────┘
-
-   Subline is a single synthesized status string, order of preference:
-     1. "Owes $X · N+ days"            (overdue, danger tone)
-     2. "N active jobs · $X outstanding" (active money in motion, gold)
-     3. "N active jobs"                  (work in flight, neutral)
-     4. company_name                     (relationship-only fallback)
-     5. "\u2003"                              (truly empty record)
-
-   Contact actions (call / text / email / map) live on the client
-   detail screen; surfacing them on every list row was clutter the
-   user wouldn't read before tapping anyway.
-   ============================================================ */
 
 function formatRelative(date: any) {
   const ms = Date.now() - date.getTime()
@@ -571,161 +445,25 @@ function formatRelative(date: any) {
   return `${Math.floor(days / 365)}y ago`
 }
 
-function ClientRow({ client: c, rollup: r, lastActivityRel, index, isTop, isLast, onOpen }: any) {
-  const subline = useMemo(() => {
-    if (r.outstanding > 0) {
-      return { text: `Contract balance ${money(r.outstanding)}`, tone: 'gold' }
-    }
-    if (r.activeCount > 0) {
-      return { text: `${r.activeCount} active work ${r.activeCount === 1 ? 'item' : 'items'}`, tone: 'muted' }
-    }
-    if (c.company_name) return { text: c.company_name, tone: 'muted' }
-    return { text: '\u2003', tone: 'muted' }
-  }, [c.company_name, r.activeCount, r.outstanding])
+function ClientRow({ client: c, rollup: r, lastActivityRel, isTop, onOpen }: any) {
+  const subline = r.outstanding > 0
+    ? `Contract balance ${money(r.outstanding)}`
+    : r.activeCount > 0
+      ? `${r.activeCount} active work ${r.activeCount === 1 ? 'item' : 'items'}`
+      : c.company_name || 'No active work'
 
-  const sublineColor =
-    subline.tone === 'danger' ? 'var(--v3-danger-text)' :
-    subline.tone === 'gold'   ? 'var(--v3-primary-text)' :
-                                'var(--v3-text-muted)'
-
-  // Performance: drop per-row entrance animations and whileHover. The
-  // staggered entrance compounds across N rows, the hover doesn't fire
-  // on touch, and AnimatePresence layout cost was a measurable hit on
-  // mid-range iPhones. Plain button + cheap whileTap is enough.
-  // The featured TOP CLIENT card above the list already highlights the
-  // top earner, re-highlighting the same row in the list with gold
-  // background + gold avatar + "TOP" pill made it look like a stuck
-  // "selected" state ("yellow and stuck" per user). All rows now share
-  // the same neutral treatment; the featured card carries the emphasis.
   return (
-    <div role="listitem"><button
-      type="button"
-      onClick={() => { hapticTap(); onOpen() }}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
-        width: '100%',
-        padding: '12px 12px',
-        background: 'transparent',
-        border: 'none',
-        borderBottom: isLast ? 'none' : '1px solid var(--v3-border)',
-        color: 'var(--v3-text)',
-        textAlign: 'left',
-        cursor: 'pointer',
-        WebkitTapHighlightColor: 'transparent',
-        minHeight: 64,
-        boxSizing: 'border-box',
-        transition: 'background 160ms ease'
-      }}
-    >
-      <div aria-hidden="true" style={{
-        flexShrink: 0,
-        width: 40, height: 40,
-        borderRadius: 10,
-        background: 'var(--v3-surface-2)',
-        border: '1px solid var(--v3-border)',
-        display: 'grid', placeItems: 'center',
-        fontFamily: 'var(--font-display)',
-        fontSize: 14,
-        letterSpacing: 0,
-        color: 'var(--v3-text-muted)'
-      }}>
-        {(c.name || '·').trim().charAt(0).toUpperCase()}
-      </div>
-
-      {/* Name + synthesized subline */}
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-          <span style={{
-            fontFamily: 'var(--font-body)',
-            fontSize: 14, fontWeight: 600,
-            color: 'var(--v3-text)',
-            letterSpacing: 0,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            minWidth: 0
-          }}>
-            {c.name || 'Unnamed client'}
-          </span>
-        </div>
-        <span style={{
-          fontFamily: 'var(--font-body)',
-          fontSize: 14,
-          fontWeight: subline.tone === 'muted' ? 500 : 700,
-          color: sublineColor,
-          fontVariantNumeric: 'tabular-nums',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-        }}>
-          {subline.text}
-        </span>
-      </div>
-
-      {/* Right column: lifetime $ + small "N active" or last-activity
-          caption (whichever is more useful). Lifetime stays the
-          primary number; the second line falls back through:
-            1. "N active" if there are active jobs
-            2. last-activity relative time if known (recently-added
-               value from migration 007's last_activity_at column)
-            3. "lifetime" as a quiet label */}
-      <div style={{ flexShrink: 0, textAlign: 'right', opacity: 1 }}>
-        <div style={{
-          fontFamily: 'var(--font-display)',
-          fontSize: 16, lineHeight: 1,
-          color: 'var(--v3-text)',
-          fontVariantNumeric: 'tabular-nums',
-          letterSpacing: 0
-        }}>
-          {money(r.lifetime)}
-        </div>
-        <div style={{
-          marginTop: 4,
-          fontFamily: 'var(--font-body)',
-          fontSize: 14,
-          color: 'var(--v3-text-muted)',
-          fontVariantNumeric: 'tabular-nums'
-        }}>
-          {r.activeCount > 0
-            ? `${r.activeCount} active`
-            : lastActivityRel
-              ? `Last · ${lastActivityRel}`
-              : 'lifetime'}
-        </div>
-      </div>
-
-      <ChevronRight size={14} color="var(--v3-text-muted)" aria-hidden="true" style={{ flexShrink: 0 }} />
-    </button></div>
-  )
-}
-
-/* ============================================================
-   ClientsStateChip, small premium status pill in the cockpit
-   top-right. Mirrors Money Owed's BalanceStateChip pattern.
-     overdue → danger-tinted "N owe balance" (any client overdue)
-     active  → gold-tinted   "N active" (active jobs, no overdue)
-     idle    → muted         "N accounts" (nothing in motion)
-   ============================================================ */
-function ClientsStateChip({ stats, totalAccounts }: any) {
-  const { owesAccounts, activeAccounts } = stats
-  let bg, border, color, label
-  if (owesAccounts > 0) {
-    bg = 'var(--v3-primary-soft)'
-    border = 'var(--v3-border)'
-    color = 'var(--v3-primary-text)'
-    label = `${owesAccounts} with contract balances`
-  } else if (activeAccounts > 0) {
-    bg = 'var(--v3-primary-soft)'
-    border = 'color-mix(in srgb, var(--v3-primary) 35%, transparent)'
-    color = 'var(--v3-primary)'
-    label = `${activeAccounts} active`
-  } else {
-    bg = 'var(--v3-surface-2)'
-    border = 'var(--v3-border-strong)'
-    color = 'var(--v3-text-muted)'
-    label = `${totalAccounts} ${totalAccounts === 1 ? 'account' : 'accounts'}`
-  }
-  return (
-    <Eyebrow style={{ padding: '4px 8px', borderRadius: 10, background: bg, border: `1px solid ${border}`, color, fontVariantNumeric: 'tabular-nums' }}>
-      {label}
-    </Eyebrow>
+    <div role="listitem">
+      <button type="button" className="fh-customer-row" onClick={() => { hapticTap(); onOpen() }}>
+        <span className="fh-customer-row__name">{c.name || 'Unnamed client'}</span>
+        <span className="fh-customer-row__value">{money(r.lifetime)}</span>
+        <ChevronRight size={16} aria-hidden="true" />
+        <span className="fh-customer-row__context">{subline}</span>
+        {isTop && <span className="fh-customer-row__meta">Highest contract value</span>}
+        <span className="fh-customer-row__meta">{r.activeCount > 0 && r.outstanding > 0
+          ? `${r.activeCount} active work ${r.activeCount === 1 ? 'item' : 'items'}`
+          : lastActivityRel ? `Last activity ${lastActivityRel}` : 'Activity date unavailable'}</span>
+      </button>
+    </div>
   )
 }

@@ -1,6 +1,6 @@
 # Workspace 06 implementation
 
-Reviewed October 30, 2026. This is the actual React application adapted to the approved Workspace 06 direction. The separate design prototype is not the production application.
+Reviewed October 31, 2026. This is the actual React application adapted to the approved Workspace 06 direction. The separate design prototype is not the production application.
 
 ## Result
 
@@ -40,11 +40,16 @@ Manrope replaces the previous mixed type families. Neutral white, charcoal, and 
 | Unbilled customer value was labeled as money owed | Phone customer summaries explicitly say Contract balance; calculations remain unchanged |
 | Review criteria competed with actual customer blockers | Moved criteria into an accessible disclosure while preserving visible overdue invoice and schedule links |
 
+| Customer relationship status inferred stale activity from an absent timestamp | Missing, invalid, epoch, and future dates remain unknown; list counts, Recent filtering, exports, and detail status share one date rule |
+| Customer context repeated balances and offered inert suggestions | One full balance in the summary, actionable next steps, and direct links with actual job titles |
+| Phone customer totals overlapped at 320 pixels, while creation competed with a status pill | Open heading, separate metric columns, 48-pixel creation control, underlined filters, and fully readable customer rows |
+| The featured customer repeated an entire record above the directory | Highest contract value remains identified within its existing row |
+
 ## Verification
 
-Local TypeScript, ESLint, design audit, RLS audit, production build, and all 1,443 unit tests passed. The browser suite contains 1,516 cases in 50 files, including regressions for task completion and Undo, task creation after reload, failed task reads, and narrow Materials layouts. CI runs the complete desktop and phone projects in separate jobs on Node 22. No tests were disabled to accommodate the redesign. The [PR checks](https://github.com/jesse8393/fieldhorse-v2/pull/230/checks) record the actual execution outcome for each published commit.
+TypeScript, ESLint, design audit, RLS audit, production build, and all 1,454 unit tests passed locally. Eleven date-boundary cases cover missing and unusable activity evidence. The browser suite contains 1,522 cases in 50 files. Added checks cover customer action destinations, truthful follow-up counts, and non-overlapping 320-pixel summaries with working filters and creation. Platform-specific checks retain explicit desktop or phone scope.
 
-The first full browser run exposed 68 failures. Each was reviewed against its trace or screenshot. The next published run reduced this to seven failures: customer filter state, desktop reply alignment, a login overflow fixture, and two authentication color checks on each viewport. This local repair addresses those findings; its full browser rerun awaits publication. Repairs address hidden controls, overlays, overflow, and loading geometry; outdated brand and layout assertions now check the approved identity and preserved interactions. The task-read failure fixture now lets the parent job load before failing the independent task request, and the Materials fixture uses the real `contact_id` relationship.
+The preceding published commit `3d23984660bc` passed [complete CI](https://github.com/jesse8393/fieldhorse-v2/actions/runs/41141232179): 1,443 unit tests and 1,081 browser tests passed, with 435 existing browser skips and zero failures. CI runs complete desktop and phone projects separately on Node 22. The [PR checks](https://github.com/jesse8393/fieldhorse-v2/pull/230/checks) record execution results for this follow-up commit. No existing test was disabled for this repair.
 
 The actual compiled React components were reviewed in the browser using an isolated synthetic data fixture. The fixture and its authentication seed are excluded from Git and production builds. No review mutations were sent to a real Supabase project.
 
@@ -55,6 +60,7 @@ Browser review covered:
 - Task completion, focus recovery, Undo, reopening, creation, and reload persistence against the controlled stateful fixture.
 - Desktop Today, Schedule, and Money; day and night appearance for the job workspace.
 - Customer search and the Edit/Delete controls; customer records at desktop and 320 pixels, including individual control bounds. Clearing search after selecting Active preserves the filter. Phone and email fields stack at narrow widths, measuring 257 pixels with 16-pixel text in the 320-pixel review frame.
+- Customer next actions opening Projects and recent job links opening their named records. At 1024 pixels, the full balance and sidebar controls remain inside the content boundary. At 320 pixels, customer metric columns remain separate, filters stay inside the viewport, and Recent excludes customers without activity evidence. New customer opens its existing creation screen.
 - Photo viewer opening above navigation, scope selection, keyboard containment, Escape, and return focus to the originating photo.
 - Signed-out desktop and phone layouts, the real local font, field and button geometry, and sign-out synchronization between the review tabs.
 - Inbox thread headers and composer visibility on desktop and phone, using isolated conversation fixtures. Desktop message and composer columns share 760-pixel widths; document height matches the 936-pixel viewport. History and New message navigation work at 320 pixels without overflowing controls.
@@ -77,7 +83,7 @@ The existing text and control contrast thresholds remain unchanged. The tests re
 
 ## Evidence
 
-Screenshots show the compiled application with synthetic review records and an illustrative site photo. They are not screenshots of a deployed customer account.
+Published screenshots show the preceding compiled application with synthetic review records and an illustrative site photo. They are not screenshots of a deployed customer account. Updated customer screenshots accompany the October 31 review separately; screenshot publication awaits explicit approval.
 
 ![Desktop job workspace](workspace-06/desktop.jpg)
 
