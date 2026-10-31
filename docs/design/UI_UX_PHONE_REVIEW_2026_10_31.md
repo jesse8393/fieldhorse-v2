@@ -31,6 +31,7 @@ October 31, 2026. Scope: interface presentation and interaction. This pass chang
 | Selection and material prices rounded away cents | Exact currency rendering for option prices, unit costs, and material totals |
 | Job task dates and loading photo tiles lacked reliable accessible names | Task-specific date labels and explicit photo button labels |
 | Closing expanded job forms stranded keyboard focus; financial view tabs lacked arrow navigation | Focus restoration for selections, daily logs and material panels, plus shared tab keyboard behavior |
+| Crew search showed quote and invoice amounts and customer-directory links despite the job screen hiding money | Phone and desktop search now skip inaccessible record queries, omit job amounts for field roles, wait for membership, and discard results after a workspace or role change |
 
 ## Verification
 
@@ -40,10 +41,12 @@ Compiled application reviewed with isolated synthetic records through an interna
 * Reproduced invalid job submission, verified focus returns to Client and its correction appears below the sticky header.
 * Verified customer suggestions respond to arrow keys and Enter without submitting the job form.
 * Confirmed Today date starts below the header after correction.
-* All 1,482 unit tests passed. TypeScript, ESLint, design system audit, and production build passed locally.
-* Added twelve browser regressions, each running in both configured browser projects. They cover narrow geometry, long task text, desktop empty-state width, form error recovery, customer selection, schedule targets, completion feedback and Undo, refused update recovery, public entry navigation, accessible estimate controls, expanded job forms, and selection save feedback. GitHub CI reports execution separately from this local review.
+* All 1,489 unit tests passed. TypeScript, ESLint, design system audit, and production build passed locally.
+* Added fourteen browser regressions, each running in both configured browser projects. They cover narrow geometry, long task text, desktop empty-state width, form error recovery, customer selection, schedule targets, completion feedback and Undo, refused update recovery, public entry navigation, accessible estimate controls, expanded job forms, selection save feedback, and search permissions during role changes. GitHub CI reports execution separately from this local review.
 * The second review covered the 37 core destinations plus 11 additional forms and 18 job section views. Expanded selection, daily log, material and change order forms were also exercised at 320 pixels. The selection overflow and small controls were reproduced before correction and remeasured afterward.
 * Verified a refused selection save against the compiled application: the entered title remained intact, no success appeared, the editor stayed open, and focus moved to persistent recovery text. Selection and material edits were isolated from real accounts.
+* Day and Night contrast spot checks covered 128 text elements in each theme across seven core views, with no low contrast results among the opaque color pairs measured. This is not a complete WCAG certification. Short-height and landscape forms, photo viewer dismissal, and completion/deletion Undo focus were also checked.
+* Reproduced the search visibility issue with a synthetic crew role. Seven new unit cases cover allowed financial roles, restricted queries, omitted amount columns, missing membership, and search failure. Browser regressions also hold an old financial response while changing role to verify it cannot restore stale results. These tests do not establish actual server-side data disclosure or certify real account RLS.
 * Full CI on the preceding PR head `50fb32a282fb92b43270855ea115cf32860bc293` passed 1,135 browser cases and 1,482 unit tests. The PR checks identify the results for the follow-up commit; earlier results do not certify later changes.
 
 UI review uses synthetic data and browser phone frames. Physical Safari keyboard behavior, touch hardware, real account integration, and previously recorded backend release gaps are not certified by this work. Merge and production deployment remain with the owner.

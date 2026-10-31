@@ -8,6 +8,64 @@ const selectionFixture = {
   options: [{ id: 'option-ui', label: 'Porcelain tile', brand: 'Sample', sku: 'PT-100', price: 7.25 }]
 }
 
+for (const surface of ['phone', 'desktop'] as const) {
+  test(`${surface} search removes restricted results after a role change and rejects late financial responses`, async ({ context, page }) => {
+    await signIn(context)
+    await page.setViewportSize({ width: surface === 'phone' ? 320 : 1440, height: 844 })
+    let currentRole = 'owner'
+    await context.route(/\/rest\/v1\/org_members(?:\?|$)/, route => route.fulfill({
+      status: 200, contentType: 'application/json', body: JSON.stringify([
+        { id: 'm1', org_id: 'org-1', user_id: 'qa-user-1', role: currentRole, revoked_at: null, joined_at: '2026-01-01T00:00:00Z' },
+      ]),
+    }))
+    const fieldReads: URL[] = []
+    let holdFinancial = false
+    let heldFinancial = 0
+    let finishedFinancial = 0
+    let releaseFinancial = () => {}
+    const financialGate = new Promise<void>(resolve => { releaseFinancial = resolve })
+    await context.route(/\/rest\/v1\/(?:fh_contacts|fh_clients|fh_leads|fh_quotes|fh_invoices)(?:\?|$)/, async route => {
+      const url = new URL(route.request().url())
+      const searching = [...url.searchParams.values()].some(value => value.includes('ilike'))
+      if (searching && currentRole !== 'owner') fieldReads.push(url)
+      if (searching && holdFinancial && url.pathname.endsWith('/fh_quotes')) {
+        heldFinancial += 1
+        await financialGate
+        await route.fallback()
+        finishedFinancial += 1
+      } else await route.fallback()
+    })
+    await page.goto(surface === 'phone' ? '/search' : '/schedule')
+    if (surface === 'desktop') await page.getByRole('button', { name: 'Search everything', exact: true }).click()
+    const search = surface === 'phone' ? page.locator('.fhsr') : page.getByRole('dialog', { name: 'Command palette' })
+    const input = surface === 'phone' ? search.getByLabel('Search', { exact: true }) : search.getByRole('combobox')
+    await input.fill('Slab')
+    const invoices = surface === 'phone' ? search.getByRole('heading', { name: 'Invoices', exact: true }) : search.getByRole('group', { name: 'Invoices', exact: true })
+    await expect(invoices).toBeVisible()
+    holdFinancial = true
+    await input.fill('Slab revised')
+    await expect.poll(() => heldFinancial).toBe(2)
+    currentRole = 'crew'
+    await page.evaluate(() => window.dispatchEvent(new Event('online')))
+    const job = surface === 'phone' ? search.getByRole('button', { name: /Plumbing Bellevue/ }).first() : search.getByRole('option', { name: /Slab \+ trench.*Plumbing Bellevue/ })
+    await expect(job).toBeVisible()
+    await expect(invoices).toHaveCount(0)
+    await expect(search).not.toContainText('$')
+    expect(fieldReads.length).toBeGreaterThan(0)
+    for (const url of fieldReads) {
+      expect(url.pathname).toMatch(/\/fh_contacts$/)
+      expect(url.searchParams.get('select')).not.toContain('amount')
+      expect(url.searchParams.get('org_id')).toBe('eq.org-1')
+    }
+    releaseFinancial()
+    await expect.poll(() => finishedFinancial).toBe(2)
+    await expect(invoices).toHaveCount(0)
+    await expect(search).not.toContainText('$')
+    await expect(input).toHaveValue('Slab revised')
+    await nothingRunsOffTheSide(page)
+  })
+}
+
 test('estimate choices and communication filters stay accessible on narrow phones', async ({ context, page }) => {
   await signIn(context)
   await page.setViewportSize({ width: 320, height: 844 })

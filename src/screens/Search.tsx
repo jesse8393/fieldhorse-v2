@@ -14,8 +14,11 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
 import { Briefcase, Calendar, ChevronLeft, ChevronRight, FileText, Paperclip, Receipt, Target, Users } from 'lucide-react'
-import { universalSearch } from '../lib/universalSearch.ts'
+import { universalSearch, type SearchResults } from '../lib/universalSearch.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
+import { useMembership } from '../contexts/MembershipContext.tsx'
+import { useOrgScope, type OrgScope } from '../lib/orgScope.ts'
+import type { OrgRole } from '../lib/permissions.ts'
 import Field from '../components/fh/Field.tsx'
 import Icon from '../components/fh/Icon.tsx'
 import IconButton from '../components/fh/IconButton.tsx'
@@ -42,15 +45,18 @@ const GROUP_TO_KIND: Record<string, string> = {
   leads: 'lead', quotes: 'quote', jobs: 'job', invoices: 'invoice', clients: 'client', notes: 'note', events: 'event', files: 'file'
 }
 
-type Result = { id: string; kind: string; title: string; sub?: string | null; to: string }
-type Results = Record<string, Result[] | number> & { total: number }
-
 export default function Search() {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const orgScope = useOrgScope(user?.id)
+  const { role, canSeeAllJobs, loading: membershipLoading, error: membershipError, refresh: refreshMembership } = useMembership()
   const [query, setQuery] = useState('')
   // null while idle, a result set once a query has been answered.
-  const [results, setResults] = useState<Results | null>(null)
+  const [snapshot, setSnapshot] = useState<{ userId: string; scope: OrgScope; role: OrgRole; query: string; data: SearchResults } | null>(null)
+  // Drop stale rows during the render that changes access or workspace.
+  const results = !membershipLoading && !membershipError && snapshot?.userId === user?.id && snapshot?.scope === orgScope && snapshot?.role === role && snapshot?.query === query.trim()
+    ? snapshot.data
+    : null
   const [searching, setSearching] = useState(false)
   // A failed request is not an empty result: offline on a job site, the
   // old "Nothing matched" made people think the record did not exist.
@@ -62,17 +68,19 @@ export default function Search() {
 
   useEffect(() => {
     const q = query.trim()
-    if (!q) { setResults(null); setSearching(false); setSearchFailed(false); return }
+    if (!q || !user?.id) { setSnapshot(null); setSearching(false); setSearchFailed(false); return }
     setSearching(true)
     setSearchFailed(false)
+    if (membershipLoading || orgScope === undefined) return
+    if (membershipError || !role) { setSnapshot(null); setSearching(false); setSearchFailed(true); return }
     let cancelled = false
     const t = setTimeout(async () => {
       try {
-        const data = await universalSearch(q, user?.id)
-        if (!cancelled) setResults(data as Results)
+        const data = await universalSearch(q, user.id, orgScope, role)
+        if (!cancelled) setSnapshot({ userId: user.id, scope: orgScope, role, query: q, data })
       } catch {
         if (!cancelled) {
-          setResults(null)
+          setSnapshot(null)
           setSearchFailed(true)
         }
       } finally {
@@ -80,7 +88,7 @@ export default function Search() {
       }
     }, DEBOUNCE_MS)
     return () => { cancelled = true; clearTimeout(t) }
-  }, [query, user?.id, retryTick])
+  }, [query, user?.id, orgScope, role, membershipLoading, membershipError, retryTick])
 
   function goBack() {
     hapticTap()
@@ -97,6 +105,7 @@ export default function Search() {
   }
 
   const q = query.trim()
+  const searchSubjects = canSeeAllJobs ? 'jobs, clients, notes, events, and files' : 'jobs, notes, events, and files'
 
   return (
     <div className="fhsr">
@@ -117,19 +126,22 @@ export default function Search() {
           spellCheck={false}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Jobs, clients, notes, events, files"
+          placeholder={canSeeAllJobs ? 'Jobs, clients, notes, events, files' : 'Jobs, notes, events, files'}
         />
       </div>
 
       <div className="fhsr-body">
-        {!q && <p className="fhsr-note">Type to search jobs, clients, notes, events, and files.</p>}
+        {!q && <p className="fhsr-note">Type to search {searchSubjects}.</p>}
         {q && searching && <p className="fhsr-note" aria-live="polite">Searching</p>}
         {q && !searching && searchFailed && (
           <DataErrorState
             compact
             title="Search is unavailable right now."
             message="Check your connection and try again."
-            onRetry={() => setRetryTick((n) => n + 1)}
+            onRetry={() => {
+              if (membershipError || !role) void refreshMembership()
+              setRetryTick((n) => n + 1)
+            }}
           />
         )}
         {q && !searching && !searchFailed && results && results.total === 0 && (
@@ -138,7 +150,7 @@ export default function Search() {
         {q && results && results.total > 0 && (
           <div className="fhsr-groups">
             {GROUP_ORDER.map((groupKey) => {
-              const items = (results[groupKey] as Result[] | undefined) || []
+              const items = results[groupKey as Exclude<keyof SearchResults, 'total'>]
               if (items.length === 0) return null
               const meta = KIND_META[GROUP_TO_KIND[groupKey]]
               return (
