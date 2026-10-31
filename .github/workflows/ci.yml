@@ -99,8 +99,13 @@ jobs:
       # The config starts the Vite dev server itself with mock Supabase
       # credentials; no secrets are needed. PW_CHANNEL stays unset so the
       # bundled Chromium is used.
+      # Run persistence regressions first so their result is visible as a
+      # separate step before the longer application suite completes.
+      - name: Persistence regression checks
+        run: npx playwright test tests/e2e/workspace-persistence.spec.ts --project=${{ matrix.project }}
+
       - name: End to end tests
-        run: npx playwright test --project=${{ matrix.project }}
+        run: npx playwright test --project=${{ matrix.project }} --grep-invert='workspace-persistence.spec.ts'
 
       - name: Upload Playwright traces on failure
         if: failure()
