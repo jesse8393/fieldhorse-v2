@@ -349,11 +349,17 @@ test.describe('command palette', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Capture' })).toBeVisible()
   })
 
-  test('Escape closes it', async ({ context, page }) => {
+  test('Escape closes immediately and restores launcher focus on repeated openings', async ({ context, page }) => {
     await signIn(context)
     await open(page)
-    const palette = await openPalette(page)
-    await page.keyboard.press('Escape')
-    await expect(palette).toBeHidden()
+    const launcher = page.getByRole('button', { name: 'Search everything', exact: true })
+    await launcher.focus()
+    for (let opening = 0; opening < 3; opening += 1) {
+      const palette = await openPalette(page)
+      // Keep the immediate keypress: do not hide a startup race with a delay.
+      await page.keyboard.press('Escape')
+      await expect(palette).toBeHidden()
+      await expect(launcher).toBeFocused()
+    }
   })
 })
