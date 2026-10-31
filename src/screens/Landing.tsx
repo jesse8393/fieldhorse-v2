@@ -418,43 +418,6 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Story */}
-      <section
-        style={{
-          padding: '24px clamp(24px, 6vw, 64px) 64px',
-          maxWidth: 760,
-          width: '100%',
-          margin: '0 auto',
-          textAlign: 'center'
-        }}
-      >
-        <p
-          style={{
-            fontSize: 24,
-            lineHeight: 1.7,
-            color: INK,
-            margin: 0
-          }}
-        >
-          I run Parker Construction in Tennessee. I built Fieldhorse
-          because nothing out there fit a company my size without a
-          sales call and a training week. You are not buying software
-          from a vendor. You are using the same app I run my own jobs
-          on, every day.
-        </p>
-        <p
-          style={{
-            marginTop: 16,
-            fontSize: 14,
-            fontWeight: 800,
-            letterSpacing: 0,
-            color: MUTE
-          }}
-        >
-          Jesse Parker · Founder
-        </p>
-      </section>
-
       {/* Footer */}
       <footer
         style={{
