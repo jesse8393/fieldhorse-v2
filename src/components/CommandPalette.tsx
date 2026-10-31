@@ -197,6 +197,7 @@ export default function CommandPalette() {
   const [searchError, setSearchError] = useState('')
   const [retryTick, setRetryTick] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
+  const returnFocusRef = useRef<HTMLElement | null>(null)
   // The highlighted row's cmdk value, and the job the Actions group is for.
   const [highlight, setHighlight] = useState('')
   const [activeJobId, setActiveJobId] = useState<string | null>(null)
@@ -218,6 +219,13 @@ export default function CommandPalette() {
 
   useEffect(() => {
     function onKey(e: globalThis.KeyboardEvent) {
+      // This listener already exists before the portal mounts. Keep Escape
+      // responsive while Radix registers its dismissal layer, while allowing
+      // a nested dialog or an IME to consume the key first.
+      if (e.key === 'Escape' && !e.defaultPrevented && !e.isComposing) {
+        setOpen(false)
+        return
+      }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
         setOpen((v) => !v)
@@ -390,7 +398,20 @@ export default function CommandPalette() {
     <DialogPrimitive.Root open={open} onOpenChange={setOpen}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fhp-scrim" />
-        <DialogPrimitive.Content className="fhp-panel">
+        <DialogPrimitive.Content
+          className="fhp-panel"
+          onOpenAutoFocus={() => {
+            returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+          }}
+          onCloseAutoFocus={(event) => {
+            // This palette opens from shortcuts and a shell button, not a
+            // Radix Trigger. Restore the actual launcher after dismissal.
+            event.preventDefault()
+            const target = returnFocusRef.current
+            returnFocusRef.current = null
+            if (target?.isConnected) target.focus({ preventScroll: true })
+          }}
+        >
           <DialogPrimitive.Title className="fhc-vh">Command palette</DialogPrimitive.Title>
           <DialogPrimitive.Description className="fhc-vh">
             Search jobs, customers and documents, or run a quick action.
