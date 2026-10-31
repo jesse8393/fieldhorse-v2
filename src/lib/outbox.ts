@@ -26,8 +26,10 @@
 // (wired in AppShell). Successes toast once per drain; rows the server
 // rejects for good are reported with an error toast, never as synced.
 
-import { supabase } from './supabase.ts'
+import { getActiveOrgId, supabase } from './supabase.ts'
 import { toastError, toastSuccess } from './toast.ts'
+import { createUuid } from './uuid.ts'
+import { queryClient } from './queryClient.ts'
 
 // The generated database types reject dynamic table names; the outbox
 // is generic by design, so it talks to PostgREST through an untyped
@@ -90,7 +92,11 @@ function tx<T>(mode: IDBTransactionMode, fn: (store: IDBObjectStore) => IDBReque
       new Promise<T>((resolve, reject) => {
         const t = db.transaction(STORE, mode)
         const req = fn(t.objectStore(STORE))
-        req.onsuccess = () => resolve(req.result)
+        // A request can succeed before its transaction aborts (quota,
+        // shutdown or another request). Only commit means saved offline.
+        t.oncomplete = () => { db.close(); resolve(req.result) }
+        t.onabort = () => { db.close(); reject(t.error || new Error('Offline storage transaction aborted')) }
+        t.onerror = () => { db.close(); reject(t.error || req.error) }
         req.onerror = () => reject(req.error)
       })
   )
@@ -114,7 +120,7 @@ export function setOutboxStoreForTests(next: OutboxStore | null) {
 async function allEntries(): Promise<OutboxEntry[]> {
   try {
     const rows = await store.all()
-    return rows.slice().sort((a, b) => (a.created_at < b.created_at ? -1 : 1))
+    return rows.slice().sort((a, b) => a.created_at.localeCompare(b.created_at))
   } catch {
     return []
   }
@@ -169,6 +175,12 @@ export async function outboxSize(): Promise<number> {
   }
 }
 
+/** Pending edits for a screen's own user. Never expose another account's work. */
+export async function pendingWritesFor(table: string, userId: string | undefined): Promise<OutboxEntry[]> {
+  if (!userId || (await outboxSize()) === 0) return []
+  return (await allEntries()).filter(e => e.table === table && entryOwner(e) === userId)
+}
+
 // ----------------------------------------------------- offline detect
 
 // Supabase-js surfaces transport failures as "TypeError: Failed to
@@ -183,8 +195,34 @@ export function isNetworkError(err: any): boolean {
 }
 
 function newId(): string {
-  return (crypto as any)?.randomUUID?.() ||
-    `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+  return createUuid()
+}
+
+let lastQueuedAt = 0
+function queuedAt(): string {
+  lastQueuedAt = Math.max(Date.now(), lastQueuedAt + 1)
+  return new Date(lastQueuedAt).toISOString()
+}
+
+function withWorkspace(row: Record<string, any>): Record<string, any> {
+  const orgId = getActiveOrgId()
+  return orgId && row.org_id == null ? { ...row, org_id: orgId } : { ...row }
+}
+
+// Keep direct writes and queued replay ordered for one record. A slow
+// completion must not land after its Undo or after a newer field edit.
+const updateLocks = new Map<string, Promise<void>>()
+function writeKey(table: string, match: Record<string, any>): string {
+  return JSON.stringify([table, match.id ?? Object.entries(match).sort(([a], [b]) => a.localeCompare(b))])
+}
+
+function orderedUpdate<T>(table: string, match: Record<string, any>, run: () => Promise<T>): Promise<T> {
+  const key = writeKey(table, match)
+  const result = (updateLocks.get(key) ?? Promise.resolve()).then(run)
+  const tail = result.then(() => {}, () => {})
+  updateLocks.set(key, tail)
+  void tail.then(() => { if (updateLocks.get(key) === tail) updateLocks.delete(key) })
+  return result
 }
 
 // ------------------------------------------------------------ owners
@@ -251,7 +289,7 @@ export async function resilientInsert(
   table: string, row: Record<string, any>, opts: OutboxWriteOptions = {}
 ): Promise<WriteResult> {
   const id = row.id || newId()
-  const withId = { ...row, id }
+  const withId = { ...withWorkspace(row), id }
   if (typeof navigator === 'undefined' || navigator.onLine !== false) {
     const { error } = await db.from(table).insert(withId)
     if (!error) return { queued: false, error: null, id }
@@ -259,7 +297,7 @@ export async function resilientInsert(
   }
   const ok = await putEntry({
     key: newId(), kind: 'insert', table, row: withId,
-    created_at: new Date().toISOString(), attempts: 0,
+    created_at: queuedAt(), attempts: 0,
     userId: await ownerForNewEntry(opts.userId, { row: withId })
   })
   if (!ok) return { queued: false, error: QUEUE_FULL, id }
@@ -270,24 +308,37 @@ export async function resilientInsert(
 export async function resilientUpdate(
   table: string, match: Record<string, any>, patch: Record<string, any>, opts: OutboxWriteOptions = {}
 ): Promise<WriteResult> {
-  if (typeof navigator === 'undefined' || navigator.onLine !== false) {
-    // select('id') so an update that matched nothing (a row a teammate
-    // removed, or one this role cannot change) is reported instead of
-    // looking like a success.
-    const { data, error } = await db.from(table).update(patch).match(match).select('id')
-    if (!error) {
-      if (Array.isArray(data) && data.length === 0) return { queued: false, error: NOTHING_UPDATED, id: String(match.id || '') }
-      return { queued: false, error: null, id: String(match.id || '') }
+  return orderedUpdate(table, match, async () => {
+    const userId = await ownerForNewEntry(opts.userId, { match })
+    // Existing offline work must precede a newer online edit. This also
+    // covers editing a row whose insert has not reached the server yet.
+    const pending = (await outboxSize()) > 0 && (await allEntries()).some(e =>
+      e.table === table && (!userId || belongsToUser(e, userId)) &&
+      ((e.kind === 'update' && e.match && writeKey(table, e.match) === writeKey(table, match)) ||
+        (e.kind === 'insert' && match.id && e.row?.id === match.id))
+    )
+    if (!pending && (typeof navigator === 'undefined' || navigator.onLine !== false)) {
+      // select('id') so an update that matched nothing (a row a teammate
+      // removed, or one this role cannot change) is reported instead of
+      // looking like a success.
+      const { data, error } = await db.from(table).update(patch).match(match).select('id')
+      if (!error) {
+        if (!Array.isArray(data) || data.length === 0) return { queued: false, error: NOTHING_UPDATED, id: String(match.id || '') }
+        return { queued: false, error: null, id: String(match.id || '') }
+      }
+      if (!isNetworkError(error)) return { queued: false, error, id: String(match.id || '') }
     }
-    if (!isNetworkError(error)) return { queued: false, error, id: String(match.id || '') }
-  }
-  const ok = await putEntry({
-    key: newId(), kind: 'update', table, match, patch,
-    created_at: new Date().toISOString(), attempts: 0,
-    userId: await ownerForNewEntry(opts.userId, { match })
+    const ok = await putEntry({
+      key: newId(), kind: 'update', table, match, patch,
+      created_at: queuedAt(), attempts: 0,
+      userId
+    })
+    if (!ok) return { queued: false, error: QUEUE_FULL, id: String(match.id || '') }
+    // A reconnect flush may already be in flight. Ask it to make another
+    // pass so an Undo appended after its snapshot does not wait for focus.
+    if (pending) void flushOutbox()
+    return { queued: true, error: null, id: String(match.id || '') }
   })
-  if (!ok) return { queued: false, error: QUEUE_FULL, id: String(match.id || '') }
-  return { queued: true, error: null, id: String(match.id || '') }
 }
 
 /**
@@ -305,8 +356,8 @@ export async function queuePhoto(args: {
   return putEntry({
     key: newId(), kind: 'photo',
     bucket: args.bucket, path: args.path, blob: args.blob,
-    contentType: args.contentType, row: args.row,
-    created_at: new Date().toISOString(), attempts: 0,
+    contentType: args.contentType, row: withWorkspace(args.row),
+    created_at: queuedAt(), attempts: 0,
     userId: await ownerForNewEntry(args.userId, { row: args.row })
   })
 }
@@ -337,6 +388,7 @@ function outcomeFor(error: unknown): DrainOutcome {
 }
 
 let flushing = false
+let flushRequested = false
 // Bumped by clearOutbox so a drain that is already running stops.
 let generation = 0
 
@@ -348,7 +400,9 @@ async function drainEntry(e: OutboxEntry): Promise<DrainOutcome> {
     return outcomeFor(error)
   }
   if (e.kind === 'update' && e.table && e.match && e.patch) {
-    const { error } = await db.from(e.table).update(e.patch).match(e.match)
+    const { data, error } = await orderedUpdate(e.table, e.match, () =>
+      db.from(e.table).update(e.patch).match(e.match).select('id')) as { data: unknown; error: unknown }
+    if (!error && (!Array.isArray(data) || data.length === 0)) return 'dropped'
     return outcomeFor(error)
   }
   if (e.kind === 'photo' && e.bucket && e.path && e.blob && e.row) {
@@ -456,7 +510,7 @@ export function describeDropped(dropped: OutboxEntry[]): { title: string; descri
  * network failure. Returns how many entries actually landed.
  */
 export async function flushOutbox(): Promise<number> {
-  if (flushing) return 0
+  if (flushing) { flushRequested = true; return 0 }
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return 0
   flushing = true
   const startGeneration = generation
@@ -476,8 +530,13 @@ export async function flushOutbox(): Promise<number> {
   } finally {
     flushing = false
     emit()
+    if (flushRequested) {
+      flushRequested = false
+      queueMicrotask(() => { void flushOutbox() })
+    }
   }
   const { synced, dropped } = result
+  if (synced.length || dropped.length) void queryClient.invalidateQueries()
 
   // Contacts whose cost rollup must be recomputed after draining :
   // an expense/sub that synced from the outbox otherwise leaves

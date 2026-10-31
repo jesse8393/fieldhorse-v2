@@ -1,23 +1,32 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OutboxEntry, OutboxStore } from './outbox.ts'
+import { webcrypto } from 'node:crypto'
 
 // Supabase fake: inserts fail like a dead zone (so writes get queued),
 // upserts and updates answer from `serverAnswers` keyed by row id.
 const serverAnswers = new Map<string, { message: string } | null>()
 const drained: string[] = []
+const invisibleRows = new Set<string>()
 let sessionUser: string | null = 'user-a'
+let activeOrg: string | null = 'org-a'
+const applied: { id: string; patch: Record<string, unknown> }[] = []
 
 function answer(id: string) {
   drained.push(id)
-  return { error: serverAnswers.has(id) ? serverAnswers.get(id) : null }
+  return { data: invisibleRows.has(id) ? [] : [{ id }], error: serverAnswers.has(id) ? serverAnswers.get(id) : null }
 }
 
 vi.mock('./supabase.ts', () => ({
+  getActiveOrgId: () => activeOrg,
   supabase: {
     from: () => ({
       insert: async () => ({ error: { message: 'TypeError: Failed to fetch' } }),
       upsert: async (row: { id: string }) => answer(row.id),
-      update: () => ({ match: async (match: { id: string }) => answer(match.id) }),
+      update: (patch: Record<string, unknown>) => ({ match: (match: { id: string }) => {
+        applied.push({ id: match.id, patch })
+        const result = Promise.resolve(answer(match.id))
+        return Object.assign(result, { select: () => result })
+      } }),
     }),
     storage: {
       from: () => ({ upload: async (path: string) => ({ error: serverAnswers.get(path) ?? null }) }),
@@ -73,8 +82,11 @@ beforeEach(() => {
   store = memoryStore()
   outbox.setOutboxStoreForTests(store)
   serverAnswers.clear()
+  invisibleRows.clear()
   drained.length = 0
   sessionUser = 'user-a'
+  activeOrg = 'org-a'
+  applied.length = 0
   toastSuccess.mockClear()
   toastError.mockClear()
 })
@@ -86,6 +98,65 @@ afterEach(() => {
 
 describe('queueing offline writes', () => {
   beforeEach(() => vi.stubGlobal('navigator', { onLine: false }))
+
+  it('keeps PostgreSQL UUID row identities without native randomUUID', async () => {
+    vi.stubGlobal('crypto', { getRandomValues: (bytes: Uint8Array) => webcrypto.getRandomValues(bytes) })
+    const result = await outbox.resilientInsert('fh_job_todos', { user_id: 'user-a', text: 'Confirm visit' })
+    expect(result.error).toBeNull()
+    expect(result.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+    expect(Array.from(store.rows.values())[0].row?.id).toBe(result.id)
+  })
+
+  it('keeps queued rows in their original workspace after switching companies', async () => {
+    await outbox.resilientInsert('fh_notes', { user_id: 'user-a', text: 'Company A note' })
+    await outbox.queuePhoto({ bucket: 'job-photos', path: 'a.jpg', blob: new Blob(['x']), contentType: 'image/jpeg', row: { id: 'photo-a', user_id: 'user-a' } })
+    activeOrg = 'org-b'
+    expect(Array.from(store.rows.values()).map(e => e.row?.org_id)).toEqual(['org-a', 'org-a'])
+  })
+
+  it('never lets online Undo overtake an older offline completion', async () => {
+    await outbox.resilientUpdate('fh_job_todos', { id: 'todo-order' }, { done: true }, { userId: 'user-a' })
+    vi.stubGlobal('navigator', { onLine: true })
+    await outbox.resilientUpdate('fh_job_todos', { id: 'todo-order' }, { done: false }, { userId: 'user-a' })
+    await outbox.flushOutbox()
+    await vi.waitFor(() => expect(store.rows.size).toBe(0))
+    expect(applied.map(write => write.patch.done)).toEqual([true, false])
+  })
+
+  it('reports a transaction abort even after the IndexedDB put request succeeds', async () => {
+    outbox.setOutboxStoreForTests(null)
+    vi.stubGlobal('indexedDB', {
+      open: () => {
+        const open: any = {}
+        open.result = {
+          close: vi.fn(),
+          transaction: () => {
+            const transaction: any = {}
+            const request = (abort: boolean) => {
+              const req: any = { result: 0 }
+              queueMicrotask(() => {
+                req.onsuccess?.()
+                queueMicrotask(() => {
+                  if (abort) {
+                    transaction.error = new Error('Storage quota exceeded')
+                    transaction.onabort?.()
+                  } else transaction.oncomplete?.()
+                })
+              })
+              return req
+            }
+            transaction.objectStore = () => ({ count: () => request(false), put: () => request(true) })
+            return transaction
+          },
+        }
+        queueMicrotask(() => open.onsuccess?.())
+        return open
+      },
+    })
+    const result = await outbox.resilientInsert('fh_job_todos', { user_id: 'user-a', text: 'Must survive a reload' })
+    expect(result.queued).toBe(false)
+    expect(result.error?.message).toMatch(/didn't save/)
+  })
 
   it('tags each entry with the user who queued it', async () => {
     await outbox.resilientInsert('fh_notes', { user_id: 'user-a', text: 'pour footing' })
@@ -113,6 +184,15 @@ describe('queueing offline writes', () => {
 
 describe('flushOutbox', () => {
   beforeEach(() => vi.stubGlobal('navigator', { onLine: true }))
+
+  it('never counts an update hidden by RLS or removed meanwhile as synced', async () => {
+    const queued = entry({ id: 'revoked-task', userId: 'user-a', kind: 'update', table: 'fh_job_todos', row: undefined, match: { id: 'revoked-task' }, patch: { done: true } })
+    store.rows.set(queued.key, queued)
+    invisibleRows.add('revoked-task')
+    expect(await outbox.flushOutbox()).toBe(0)
+    expect(toastSuccess).not.toHaveBeenCalled()
+    expect(toastError).toHaveBeenCalledTimes(1)
+  })
 
   it("drains only the signed in user's entries and leaves the rest queued", async () => {
     const mine = entry({ id: 'a1', userId: 'user-a' })

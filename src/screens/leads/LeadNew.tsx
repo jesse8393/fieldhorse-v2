@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Field } from '../../components/fh'
-import ClientField, { fetchClientPick, resolveClientId, type ClientFieldValue } from '../../components/ClientField.tsx'
+import ClientField, { fetchClientPick, resolveClientId, restoredClientValue, type ClientFieldValue } from '../../components/ClientField.tsx'
 import CreateShell, { Choices, LEAD_SOURCES, useDraft } from '../new/CreateShell.tsx'
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useMembership } from '../../contexts/MembershipContext.tsx'
@@ -34,7 +34,7 @@ export default function LeadNew() {
   const clientParam = params.get('client')
   const text = params.get('text')
   const { form, set, patch, done } = useDraft<Form>('lead', EMPTY, text ? { notes: text } : null)
-  const [client, setClient] = useState<ClientFieldValue>({ text: form.name, picked: null })
+  const [client, setClient] = useState<ClientFieldValue>(() => restoredClientValue(form.name, form.clientId))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 

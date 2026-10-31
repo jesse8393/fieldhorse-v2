@@ -8,7 +8,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Field } from '../../components/fh'
-import ClientField, { fetchClientPick, resolveClientId, type ClientFieldValue } from '../../components/ClientField.tsx'
+import ClientField, { fetchClientPick, resolveClientId, restoredClientValue, type ClientFieldValue } from '../../components/ClientField.tsx'
 import CreateShell, { Choices, useDraft } from '../new/CreateShell.tsx'
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useMembership } from '../../contexts/MembershipContext.tsx'
@@ -37,7 +37,7 @@ export default function QuoteNew() {
   const leadParam = params.get('lead')
   const text = params.get('text')
   const { form, set, patch, done } = useDraft<Form>('quote', EMPTY, text ? { scope: text } : null)
-  const [client, setClient] = useState<ClientFieldValue>({ text: form.client, picked: null })
+  const [client, setClient] = useState<ClientFieldValue>(() => restoredClientValue(form.client, form.clientId))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 

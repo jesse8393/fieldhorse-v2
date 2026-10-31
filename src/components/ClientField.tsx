@@ -30,6 +30,11 @@ export type ClientFieldValue = {
   picked: ClientPick | null
 }
 
+/** Preserve a draft's selected identity even when customers share a name. */
+export function restoredClientValue(text: string, id: string): ClientFieldValue {
+  return { text, picked: id ? { id, name: text } : null }
+}
+
 const COLUMNS = 'id, name, company_name, phone, email, address'
 const LIMIT = 200
 const SHOWN = 6
@@ -74,10 +79,9 @@ export async function resolveClientId(
   ids: { userId: string; orgId: string | null },
   extra: { phone?: string | null; email?: string | null; address?: string | null; company?: string | null } = {}
 ): Promise<ClientPick | null> {
-  if (value.picked) return value.picked
   const name = value.text.trim()
   if (!name) return null
-  const id = await findOrCreateClient(ids.userId, {
+  const id = value.picked?.id || await findOrCreateClient(ids.userId, {
     name,
     phone: extra.phone?.trim() || null,
     email: extra.email?.trim() || null,
@@ -85,14 +89,13 @@ export async function resolveClientId(
     company: extra.company?.trim() || null
   }, ids.orgId)
   if (!id) throw new Error('Could not save the client. Check your connection and try again.')
-  return {
-    id,
-    name,
-    phone: extra.phone?.trim() || null,
-    email: extra.email?.trim() || null,
-    address: extra.address?.trim() || null,
-    company_name: extra.company?.trim() || null
-  }
+  // Matching a typed name returns an existing id, not the existing contact
+  // details. Read that row before copying it to a job. The same read checks
+  // that a restored selection still belongs to this workspace and is visible.
+  const { data, error } = await clientRows(ids.userId, ids.orgId).eq('id', id).maybeSingle()
+  if (error) throw new Error('Could not load this client. Check your connection and try again.')
+  if (!data) throw new Error('This client no longer belongs to this workspace or cannot be accessed. Choose a client again.')
+  return data as ClientPick
 }
 
 /** Reads one client by id, for a screen opened with ?client=. */

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Check, Plus, Trash2, Calendar, UserRound, ArrowUpRight } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
 import { toastSuccess, toastError, toastUndo } from '../../../lib/toast.ts'
-import { resilientInsert, resilientUpdate } from '../../../lib/outbox.ts'
+import { pendingWritesFor, resilientInsert, resilientUpdate, subscribeOutbox } from '../../../lib/outbox.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { SkeletonList } from '../../../components/Skeleton.tsx'
 import { dateInputToTimestamp, timestampToDateInput, dueStatus } from '../../../lib/dueDate.ts'
@@ -26,6 +26,7 @@ export default function TodosSection({ jobId, userId, compact = false, onOpenTas
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const headingRef = useRef<HTMLHeadingElement>(null)
+  const readVersion = useRef(0)
   const [draft, setDraft] = useState('')
   // Optional due date for the new todo being composed. year month day or ''.
   // Converted to a local-end-of-day ISO at insert time via dateInputToTimestamp.
@@ -61,6 +62,7 @@ export default function TodosSection({ jobId, userId, compact = false, onOpenTas
 
   const fetchRows = useCallback(async () => {
     if (!jobId) return
+    const version = ++readVersion.current
     setLoading(true)
     // Org-scoped RLS (fh_job_todos_own / fh_job_todos_partner) already
     // restricts visibility to teammates and accepted partners, so we
@@ -73,12 +75,29 @@ export default function TodosSection({ jobId, userId, compact = false, onOpenTas
       .eq('job_id', jobId)
       .order('done', { ascending: true })
       .order('created_at', { ascending: false })
+    const pending = await pendingWritesFor('fh_job_todos', userId)
+    if (version !== readVersion.current) return
     setLoadError(!!error)
-    if (!error) setRows(data || [])
+    if (!error) {
+      const merged = new Map((data || []).map(row => [row.id, row as any]))
+      for (const entry of pending) {
+        if (entry.kind === 'insert' && entry.row?.job_id === jobId) {
+          merged.set(entry.row.id, { done: false, created_at: entry.created_at, ...entry.row })
+        } else if (entry.kind === 'update' && merged.has(entry.match?.id)) {
+          merged.set(entry.match?.id, { ...merged.get(entry.match?.id), ...entry.patch })
+        }
+      }
+      setRows(Array.from(merged.values()))
+    }
     setLoading(false)
-  }, [jobId])
+  }, [jobId, userId])
 
-  useEffect(() => { fetchRows() }, [fetchRows])
+  // Queue changes include successful replay and rejected edits. Reconcile
+  // both so a task cannot remain falsely completed after reconnecting.
+  useEffect(() => {
+    const unsubscribe = subscribeOutbox(() => { void fetchRows() })
+    return () => { readVersion.current += 1; unsubscribe() }
+  }, [fetchRows])
 
   async function add() {
     const txt = draft.trim()
@@ -151,7 +170,7 @@ export default function TodosSection({ jobId, userId, compact = false, onOpenTas
       ? { ...r, done: next, completed_at: next ? new Date().toISOString() : null }
       : r
     ))
-    const { error } = await resilientUpdate(
+    const { error, queued } = await resilientUpdate(
       'fh_job_todos',
       { id: row.id },
       { done: next, completed_at: next ? new Date().toISOString() : null },
@@ -164,7 +183,8 @@ export default function TodosSection({ jobId, userId, compact = false, onOpenTas
       fetchRows() // rollback to truth
     } else {
       onChanged?.()
-      if (next) toastUndo('Task completed', { description: row.text, onUndo: () => toggle({ ...row, done: true }) })
+      if (next) toastUndo(queued ? 'Task saved offline' : 'Task completed', { description: queued ? `${row.text}. Waiting to sync.` : row.text, onUndo: () => toggle({ ...row, done: true }) })
+      else if (queued) toastSuccess('Saved offline', 'Reopening will sync when signal returns')
     }
   }
 
