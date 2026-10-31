@@ -17,7 +17,7 @@
 // listener while the palette is closed, so typing "i" in any other text
 // field does nothing. The rule itself is in lib/paletteActions.ts.
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Command } from 'cmdk'
@@ -196,6 +196,7 @@ export default function CommandPalette() {
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState('')
   const [retryTick, setRetryTick] = useState(0)
+  const inputRef = useRef<HTMLInputElement>(null)
   // The highlighted row's cmdk value, and the job the Actions group is for.
   const [highlight, setHighlight] = useState('')
   const [activeJobId, setActiveJobId] = useState<string | null>(null)
@@ -406,6 +407,7 @@ export default function CommandPalette() {
             <div className="fhp-search">
               <Icon icon={Search} size={24} />
               <Command.Input
+                ref={inputRef}
                 className="fhp-input"
                 placeholder="Search jobs, customers, notes and files"
                 value={query}
@@ -420,10 +422,17 @@ export default function CommandPalette() {
                     <div className="fhp-note" role="status">Searching...</div>
                   )}
                   {!searching && searchError && (
-                    <DataErrorState compact title={searchError} onRetry={() => {
-                      if (membershipError || !role) void refreshMembership()
-                      setRetryTick((n) => n + 1)
-                    }} />
+                    <div onKeyDown={(e) => {
+                      // cmdk consumes Enter for option selection. Let Retry
+                      // keep its native button activation instead.
+                      if (e.key === 'Enter' || e.key === ' ') e.stopPropagation()
+                    }}>
+                      <DataErrorState compact title={searchError} message="" onRetry={() => {
+                        inputRef.current?.focus({ preventScroll: true })
+                        if (membershipError || !role) void refreshMembership()
+                        setRetryTick((n) => n + 1)
+                      }} />
+                    </div>
                   )}
                   {!searching && !searchError && !hasResults && (
                     <Command.Empty className="fhp-note">Nothing matched.</Command.Empty>

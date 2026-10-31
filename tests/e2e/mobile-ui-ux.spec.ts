@@ -19,6 +19,7 @@ for (const surface of ['phone', 'desktop'] as const) {
       ]),
     }))
     const fieldReads: URL[] = []
+    let refuseSearchOnce = true
     let holdFinancial = false
     let heldFinancial = 0
     let finishedFinancial = 0
@@ -27,6 +28,10 @@ for (const surface of ['phone', 'desktop'] as const) {
     await context.route(/\/rest\/v1\/(?:fh_contacts|fh_clients|fh_leads|fh_quotes|fh_invoices)(?:\?|$)/, async route => {
       const url = new URL(route.request().url())
       const searching = [...url.searchParams.values()].some(value => value.includes('ilike'))
+      if (searching && refuseSearchOnce && url.pathname.endsWith('/fh_contacts')) {
+        refuseSearchOnce = false
+        return route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ message: 'Search refused' }) })
+      }
       if (searching && currentRole !== 'owner') fieldReads.push(url)
       if (searching && holdFinancial && url.pathname.endsWith('/fh_quotes')) {
         heldFinancial += 1
@@ -40,6 +45,9 @@ for (const surface of ['phone', 'desktop'] as const) {
     const search = surface === 'phone' ? page.locator('.fhsr') : page.getByRole('dialog', { name: 'Command palette' })
     const input = surface === 'phone' ? search.getByLabel('Search', { exact: true }) : search.getByRole('combobox')
     await input.fill('Slab')
+    await search.getByRole('button', { name: 'Retry', exact: true }).press('Enter')
+    await expect(input).toBeFocused()
+    await expect(input).toHaveValue('Slab')
     const invoices = surface === 'phone' ? search.getByRole('heading', { name: 'Invoices', exact: true }) : search.getByRole('group', { name: 'Invoices', exact: true })
     await expect(invoices).toBeVisible()
     holdFinancial = true

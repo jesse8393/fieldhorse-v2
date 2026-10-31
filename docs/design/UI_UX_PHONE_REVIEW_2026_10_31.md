@@ -32,6 +32,7 @@ October 31, 2026. Scope: interface presentation and interaction. This pass chang
 | Job task dates and loading photo tiles lacked reliable accessible names | Task-specific date labels and explicit photo button labels |
 | Closing expanded job forms stranded keyboard focus; financial view tabs lacked arrow navigation | Focus restoration for selections, daily logs and material panels, plus shared tab keyboard behavior |
 | Crew search showed quote and invoice amounts and customer-directory links despite the job screen hiding money | Phone and desktop search now skip inaccessible record queries, omit job amounts for field roles, wait for membership, and discard results after a workspace or role change |
+| Search Retry recovered results but left keyboard focus on the page body | Restore focus to the search field before retrying; retain the query in phone search and the desktop palette |
 
 ## Verification
 

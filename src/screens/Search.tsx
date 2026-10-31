@@ -139,6 +139,7 @@ export default function Search() {
             title="Search is unavailable right now."
             message="Check your connection and try again."
             onRetry={() => {
+              inputRef.current?.focus({ preventScroll: true })
               if (membershipError || !role) void refreshMembership()
               setRetryTick((n) => n + 1)
             }}
