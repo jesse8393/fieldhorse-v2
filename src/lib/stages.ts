@@ -4,6 +4,7 @@ import { todayYmd } from './dates.ts'
 import { crewLaborForContact } from './labor.ts'
 import { moneyExact } from './format.ts'
 import { invoicesPaidInFull } from './invoiceSettlement.ts'
+import { toastError } from './toast.ts'
 import type { Database } from './database.types.ts'
 
 // Only the fields the stage helpers actually read, declared narrowly so
@@ -284,50 +285,72 @@ export async function logPayment(contact: Contact, { id, amount, method, kind, r
 
 export async function recalcCost(contactId: string | undefined, userId: string | undefined) {
   if (!contactId || !userId) return 0
-  // The job OWNER anchors the labor split (lib/labor.ts skips the
-  // owner's punches, their job-screen clock already books through
-  // fh_expenses). Resolve it from the contact rather than assuming the
-  // caller is the owner: when an admin/manager triggered a recalc, the
-  // old code computed a garbage number from the caller's perspective
-  // and then no-op'd the write behind a user_id filter.
-  const { data: contactRow } = await supabase
-    .from('fh_contacts')
-    .select('id, user_id, org_id')
-    .eq('id', contactId)
-    .maybeSingle()
-  const ownerId = contactRow?.user_id || userId
-  // Crew and foreman can read only their own time punches, so a recalc
-  // they trigger (clocking out, logging an expense) would write a cost
-  // missing everyone else's labor. Leave the cached cost alone for them;
-  // the next recalc by an owner, admin or manager (timesheet approval,
-  // expense or sub edits) brings it up to date.
-  if (contactRow?.org_id) {
-    const { data: moneyVisible, error: visErr } = await supabase.rpc('fh_money_visible', { p_org_id: contactRow.org_id })
-    if (!visErr && moneyVisible === false) return null
+  try {
+    // The job OWNER anchors the labor split (lib/labor.ts skips the
+    // owner's punches, their job-screen clock already books through
+    // fh_expenses). Resolve it from the contact rather than assuming the
+    // caller is the owner: when an admin/manager triggered a recalc, the
+    // old code computed a garbage number from the caller's perspective
+    // and then no-op'd the write behind a user_id filter.
+    const { data: contactRow, error: contactError } = await supabase
+      .from('fh_contacts')
+      .select('id, user_id, org_id')
+      .eq('id', contactId)
+      .maybeSingle()
+    if (contactError || !contactRow) throw contactError || new Error('Could not read this job')
+    const ownerId = contactRow?.user_id || userId
+    // Crew and foreman can read only their own time punches, so a recalc
+    // they trigger (clocking out, logging an expense) would write a cost
+    // missing everyone else's labor. Leave the cached cost alone for them;
+    // the next recalc by an owner, admin or manager (timesheet approval,
+    // expense or sub edits) brings it up to date.
+    if (contactRow?.org_id) {
+      const { data: moneyVisible, error: visErr } = await supabase.rpc('fh_money_visible', { p_org_id: contactRow.org_id })
+      if (visErr || moneyVisible == null) throw visErr || new Error('Could not verify cost access')
+      if (moneyVisible !== true) return null
+      // The financial policy also admits accepted outside partners.
+      // Their time reads can be partial, so only this job's financial
+      // team may replace the shared rollup from browser reads.
+      const { data: member, error: memberError } = await supabase.from('org_members')
+        .select('role').eq('org_id', contactRow.org_id).eq('user_id', userId).is('revoked_at', null).maybeSingle()
+      if (memberError) throw memberError
+      if (!member || !['owner', 'admin', 'manager'].includes(member.role)) return null
+    }
+    // No user_id filter on the sums: the job screen shows ALL fh_subs /
+    // fh_expenses rows on the contact (org RLS), so the cached cost must
+    // count them all too, filtering to the caller's own rows dropped
+    // every sub/expense a different org member logged.
+    const [subsResult, expensesResult, crewLabor] = await Promise.all([
+      supabase
+        .from('fh_subs')
+        .select('rate')
+        .eq('contact_id', contactId),
+      supabase
+        .from('fh_expenses')
+        .select('amount')
+        .eq('contact_id', contactId),
+      // Crew clock ins (other org members' completed punches × their
+      // hourly rate). The owner's own job-screen clock already lands in
+      // fh_expenses as category='Labor', see lib/labor.ts for the split.
+      crewLaborForContact(contactId, ownerId, { requireCompleteRead: true })
+    ])
+    if (subsResult.error || !subsResult.data) throw subsResult.error || new Error('Could not read subcontractor costs')
+    if (expensesResult.error || !expensesResult.data) throw expensesResult.error || new Error('Could not read expenses')
+    const subs = subsResult.data
+    const exps = expensesResult.data
+    const subsTotal = (subs || []).reduce((s, r) => s + Number(r.rate || 0), 0)
+    const expsTotal = (exps || []).reduce((s, r) => s + Number(r.amount || 0), 0)
+    const cost = subsTotal + expsTotal + crewLabor.cost
+    if (!Number.isFinite(cost)) throw new Error('Invalid cost total')
+    const { data: updated, error: updateError } = await supabase.from('fh_contacts').update({ cost }).eq('id', contactId).select('id')
+    if (updateError || !updated?.length) throw updateError || new Error('Cost update was not confirmed')
+    return cost
+  } catch {
+    // A failed source read is not zero cost. Keep the previous total,
+    // and don't turn a saved expense into a misleading save failure.
+    toastError('Cost total not refreshed', 'Could not confirm all costs. Check this job before relying on its margin.')
+    return null
   }
-  // No user_id filter on the sums: the job screen shows ALL fh_subs /
-  // fh_expenses rows on the contact (org RLS), so the cached cost must
-  // count them all too, filtering to the caller's own rows dropped
-  // every sub/expense a different org member logged.
-  const [{ data: subs }, { data: exps }, crewLabor] = await Promise.all([
-    supabase
-      .from('fh_subs')
-      .select('rate')
-      .eq('contact_id', contactId),
-    supabase
-      .from('fh_expenses')
-      .select('amount')
-      .eq('contact_id', contactId),
-    // Crew clock ins (other org members' completed punches × their
-    // hourly rate). The owner's own job-screen clock already lands in
-    // fh_expenses as category='Labor', see lib/labor.ts for the split.
-    crewLaborForContact(contactId, ownerId)
-  ])
-  const subsTotal = (subs || []).reduce((s, r) => s + Number(r.rate || 0), 0)
-  const expsTotal = (exps || []).reduce((s, r) => s + Number(r.amount || 0), 0)
-  const cost = subsTotal + expsTotal + crewLabor.cost
-  await supabase.from('fh_contacts').update({ cost }).eq('id', contactId)
-  return cost
 }
 
 export function margin(contact: { amount?: number | null; cost?: number | null } | null | undefined) {
