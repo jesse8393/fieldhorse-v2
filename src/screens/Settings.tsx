@@ -426,15 +426,14 @@ export default function Settings() {
             minHeight: 44,
             padding: '0 16px',
             borderRadius: 10,
-            background: 'var(--fh-gold)',
-            color: 'var(--onyx)',
+            background: saving || !sectionHasChanges ? 'var(--fh-tray)' : 'var(--fh-gold)',
+            color: saving || !sectionHasChanges ? 'var(--fh-ink-2)' : 'var(--fh-on-gold)',
             fontFamily: 'var(--font-body)',
             fontSize: 14,
             letterSpacing: 0,
             border: 'none',
             cursor: saving || !sectionHasChanges ? 'default' : 'pointer',
-            boxShadow: 'var(--fh-shadow-soft)',
-            opacity: saving || !sectionHasChanges ? 0.65 : 1
+            boxShadow: 'none'
           }}
         >
           <UploadIcon size={16} aria-hidden="true" />

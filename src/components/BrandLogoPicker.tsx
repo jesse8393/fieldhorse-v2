@@ -235,15 +235,14 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
               gap: 8,
               padding: '12px 16px',
               borderRadius: 10,
-              border: 'none',
-              background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
-              color: 'var(--onyx)',
+              border: '1px solid var(--fh-edge-strong)',
+              background: 'var(--fh-paper)',
+              color: 'var(--fh-ink)',
               fontFamily: 'var(--font-display)',
               fontSize: 14,
               letterSpacing: 0,
               cursor: busy ? 'default' : 'pointer',
-              boxShadow: '0 6px 16px rgba(201,150,58,0.3)',
-              opacity: busy ? 0.6 : 1
+              boxShadow: 'none'
             }}
           >
             <Upload size={14} />
@@ -312,14 +311,13 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
               padding: '12px 12px',
               borderRadius: 10,
               border: 'none',
-              background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
-              color: 'var(--onyx)',
+              background: busy ? 'var(--fh-tray)' : 'var(--fh-gold)',
+              color: busy ? 'var(--fh-ink-2)' : 'var(--fh-on-gold)',
               fontFamily: 'var(--font-display)',
               fontSize: 14,
               letterSpacing: 0,
               cursor: busy ? 'default' : 'pointer',
-              boxShadow: '0 6px 16px rgba(201,150,58,0.3)',
-              opacity: busy ? 0.6 : 1
+              boxShadow: 'none'
             }}
           >
             <Check size={14} />

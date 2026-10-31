@@ -17,6 +17,9 @@ This is a review of the compiled React application, not a replacement prototype.
 | Activity hid customer and job names in clipped single lines | Entries wrap full titles and context, separated by rules. |
 | Payment entry crashed without native `crypto.randomUUID` | A shared secure UUID helper uses `getRandomValues` when needed. Payment intent IDs remain stable across retry attempts. Other unguarded document/upload/import call sites use the same helper. |
 | Small shared phone buttons offered undersized hit areas | Shared action buttons now have a minimum height of 44 pixels on phones. |
+| A second visual pass found dark text on copper actions despite correct shared tokens | Repaired legacy inline colors in Settings, uploads, imports, bids, tasks, job financial sections, clock-in, invitations, and error recovery. Day and night browser checks now measure Settings action contrast. |
+| Payment method and kind used ten competing pill buttons | Two labeled native selectors retain every option and leave the complete payment form and primary action visible on a narrow phone. The fallback-ID regression also verifies the selected values are actually submitted. |
+| Legacy specificity kept Settings panels and secondary rails boxed | Corrected the actual competing selectors, with underlined Settings navigation, ruled form sections, and open context rails. |
 | The inbox view executed with its owner's access | The view now uses caller permissions so underlying row policies apply. Direct execution of a trigger-only security-definer function was revoked. |
 | Routine CI omitted optional visual baseline checks | A normal-CI 37-route phone guard checks clipping, headings, runtime exceptions, and 16-pixel minimum form text. It does not depend on screenshot-baseline opt-in. |
 | Previous database tests could not exercise overlapping transactions | CI now provisions disposable PostgreSQL 17 databases and tests two separate backends contending for the same billing balance and crew allocation. |
@@ -26,6 +29,7 @@ This is a review of the compiled React application, not a replacement prototype.
 - 1,457 unit tests in 151 files passed locally.
 - TypeScript, ESLint, design-token audit, RLS source audit, and compiled review build passed.
 - 59 billing/schedule checks and 39 inbox security checks passed in local PGlite. Its single connection does not prove simultaneous transaction safety. The PostgreSQL CI step adds two real concurrency checks.
+- CI for `b624096458f3` subsequently passed all 100 PostgreSQL checks, including both independent-backend contention cases, as well as all Node 22 source checks, 1,457 unit tests, and the production build. Follow-up visual/control changes require their own final CI result.
 - Browser geometry review visited 37 phone destinations, including record details, secondary tools, and creation/payment/reminder forms, at a 320-pixel frame width. Activity and Forecast initially failed; both were corrected and rechecked without overflow.
 - Visual review covered the revised Today, Schedule, Reports, Activity, and Forecast hierarchy. Follow-up review and automated results are recorded in the PR checks and description.
 - Browser review uses synthetic records and a simulated session. Review writes do not touch customer data. Local Node is 24.22; CI uses the repository's required Node 22.

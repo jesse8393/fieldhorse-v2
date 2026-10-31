@@ -8,30 +8,13 @@ import { createUuid } from '../../lib/uuid.ts'
 import { useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Field } from '../../components/fh'
-import CreateShell, { Choices, moneyInput } from '../new/CreateShell.tsx'
+import CreateShell, { moneyInput } from '../new/CreateShell.tsx'
+import PaymentClassification, { PAYMENT_METHODS } from '../../components/PaymentClassification.tsx'
 import { logPayment } from '../../lib/pipeline.ts'
 import { toastError, toastSuccess } from '../../lib/toast.ts'
 import { hapticMedium } from '../../lib/haptics.ts'
 import { todayYmd } from '../../lib/dates.ts'
 import { JobScreenFallback, money, useJobScreen } from './jobScreen.tsx'
-
-const METHODS = [
-  { value: 'cash', label: 'Cash' },
-  { value: 'check', label: 'Check' },
-  { value: 'card', label: 'Card' },
-  { value: 'ach', label: 'ACH' },
-  { value: 'other', label: 'Other' }
-]
-
-// Payment kinds (migration 022): the invoice balance calls out deposits
-// and retainage apart from progress money.
-const KINDS = [
-  { value: 'deposit', label: 'Deposit' },
-  { value: 'progress', label: 'Progress' },
-  { value: 'final', label: 'Final' },
-  { value: 'retainage', label: 'Retainage' },
-  { value: 'other', label: 'Other' }
-]
 
 // The balance as typed text without stranding cents: $4,999.50 prefills
 // as 4999.50, a whole amount drops the .00.
@@ -88,7 +71,7 @@ function PaymentForm({ data, goBack, home }: { data: ReturnType<typeof useJobScr
         throw new Error((res as { error?: { message?: string } }).error?.message || 'The payment was not saved.')
       }
       hapticMedium()
-      toastSuccess('Payment recorded', `${money(numeric)}, ${METHODS.find((m) => m.value === method)?.label || 'payment'}`)
+      toastSuccess('Payment recorded', `${money(numeric)}, ${PAYMENT_METHODS.find((m) => m.value === method)?.label || 'payment'}`)
       await data.fetchAll()
       goBack()
     } catch (e) {
@@ -113,24 +96,25 @@ function PaymentForm({ data, goBack, home }: { data: ReturnType<typeof useJobScr
       </p>
       <Field
         label="Amount"
+        disabled={saving}
         inputMode="decimal"
         placeholder="0.00"
         value={amount}
         helper={balance > 0 ? `Balance ${money(balance)}${overage ? ', this is more than the balance' : ''}` : 'No outstanding balance'}
         onChange={(e) => { setAmount(moneyInput(e.target.value)); setError(undefined) }}
       />
-      <Choices label="Method" options={METHODS} value={method} onChange={(v) => setMethod(v || method)} />
-      <Choices label="Kind" options={KINDS} value={kind} onChange={(v) => setKind(v || kind)} />
+      <PaymentClassification method={method} kind={kind} onMethodChange={setMethod} onKindChange={setKind} disabled={saving} />
       {method !== 'cash' && method !== 'other' && (
         <Field
           label={method === 'check' ? 'Check number' : method === 'card' ? 'Last 4 or receipt' : 'Reference'}
           value={reference}
+          disabled={saving}
           placeholder={method === 'check' ? '1234' : 'Optional'}
           autoComplete="off"
           onChange={(e) => setReference(e.target.value)}
         />
       )}
-      <Field label="Paid on" type="date" value={paidOn} onChange={(e) => setPaidOn(e.target.value)} />
+      <Field disabled={saving} label="Paid on" type="date" value={paidOn} onChange={(e) => setPaidOn(e.target.value)} />
     </CreateShell>
   )
 }

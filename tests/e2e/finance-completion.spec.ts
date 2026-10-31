@@ -9,19 +9,25 @@ const tables = { fh_clients: [client], fh_contacts: [job], fh_invoices: [invoice
 test('payment entry creates a secure intent ID when native randomUUID is unavailable', async ({ context, page }) => {
   await context.addInitScript(() => Object.defineProperty(crypto, 'randomUUID', { value: undefined, configurable: true }))
   const ids: string[] = []
+  let recorded: Record<string, unknown> | undefined
   await context.route('**/rest/v1/fh_payments*', async route => {
     if (route.request().method() === 'POST') {
       const payload = route.request().postDataJSON()
-      ids.push((Array.isArray(payload) ? payload[0] : payload).id)
+      recorded = Array.isArray(payload) ? payload[0] : payload
+      ids.push(String(recorded!.id))
     }
     return route.fallback()
   })
   await page.goto('/invoices/issued-finance/payment')
   await expect(page.getByRole('heading', { level: 1, name: 'Collect payment' })).toBeVisible()
   await page.getByLabel('Amount', { exact: true }).fill('50')
+  await page.getByRole('combobox', { name: 'Method', exact: true }).selectOption('cash')
+  await page.getByRole('combobox', { name: 'Kind', exact: true }).selectOption('deposit')
+  await expect(page.getByLabel('Check number', { exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: 'Record $50.00', exact: true }).click()
   await expect.poll(() => ids.length).toBe(1)
   expect(ids[0]).toMatch(/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/)
+  expect(recorded).toMatchObject({ method: 'cash', kind: 'deposit', amount: 50 })
 })
 test.beforeEach(async ({ context, page }) => { await signIn(context, { tables }); await page.clock.setFixedTime(new Date('2026-10-27T17:00:00Z')) })
 

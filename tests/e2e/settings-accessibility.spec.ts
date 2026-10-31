@@ -1,7 +1,42 @@
-import { expect, test, type BrowserContext } from '@playwright/test'
+import { expect, test, type BrowserContext, type Locator } from '@playwright/test'
 import { signIn } from './helpers/signIn'
 
 const trades = ['Concrete', 'Framing', 'Drywall', 'Demo', 'Roofing', 'Electrical', 'Plumbing rough', 'Insulation', 'LVP flooring', 'Paint', 'Permits', 'Outdoor living']
+
+async function readableAction(button: Locator) {
+  const measured = await button.evaluate(element => {
+    const style = getComputedStyle(element)
+    const rgb = (value: string) => (value.match(/[\d.]+/g) || []).map(Number)
+    const luminance = (channels: number[]) => channels.slice(0, 3).map(value => {
+      const s = value / 255
+      return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
+    }).reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0)
+    const foreground = rgb(style.color), background = rgb(style.backgroundColor)
+    const a = luminance(foreground), b = luminance(background)
+    return { ratio: (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05), alpha: background[3] ?? 1, opacity: style.opacity }
+  })
+  expect(measured.alpha).toBe(1)
+  expect(measured.opacity).toBe('1')
+  expect(measured.ratio).toBeGreaterThanOrEqual(4.5)
+}
+
+for (const mode of ['day', 'night'] as const) {
+  test(`settings actions remain readable before and after editing in ${mode} mode`, async ({ page, context, isMobile }) => {
+    await signIn(context, { mode })
+    await page.goto('/settings')
+    const upload = page.getByRole('button', { name: 'Upload logo', exact: true })
+    await expect(upload).toBeVisible()
+    await readableAction(upload)
+    const save = page.getByRole('button', { name: 'Save changes', exact: true })
+    if (!isMobile) {
+      await expect(save).toBeDisabled()
+      await readableAction(save)
+    }
+    await page.getByRole('textbox', { name: 'Company name', exact: true }).fill('Readable actions fixture')
+    await expect(save).toBeEnabled()
+    await readableAction(save)
+  })
+}
 
 // The shared QA mock deliberately acknowledges REST writes without storing them.
 // These two round-trip tests need an isolated, stateful response for only the

@@ -16,6 +16,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
 import { Button, Field, IconButton, SkeletonRows, formatMoney } from '../../components/fh'
+import PaymentClassification, { PAYMENT_METHODS } from '../../components/PaymentClassification.tsx'
 import DataErrorState from '../../components/DataErrorState.tsx'
 import { logInvoicePayment } from '../../lib/invoices.ts'
 import { logPayment } from '../../lib/pipeline.ts'
@@ -31,53 +32,6 @@ import './invoices.css'
 function amountInput(n: number): string {
   if (!(n > 0)) return ''
   return Number.isInteger(n) ? String(n) : n.toFixed(2)
-}
-
-const METHODS = [
-  { value: 'cash', label: 'Cash' },
-  { value: 'check', label: 'Check' },
-  { value: 'card', label: 'Card' },
-  { value: 'ach', label: 'ACH' },
-  { value: 'other', label: 'Other' }
-]
-
-// Payment kinds (migration 022), so the balance can call out a deposit or
-// retainage apart from progress money.
-const KINDS = [
-  { value: 'deposit', label: 'Deposit' },
-  { value: 'progress', label: 'Progress' },
-  { value: 'final', label: 'Final' },
-  { value: 'retainage', label: 'Retainage' },
-  { value: 'other', label: 'Other' }
-]
-
-function Choices({ label, options, value, onChange, disabled }: {
-  label: string
-  options: { value: string; label: string }[]
-  value: string
-  onChange: (next: string) => void
-  disabled: boolean
-}) {
-  return (
-    <fieldset className="fhinv-choices">
-      <legend className="fhinv-choices__label">{label}</legend>
-      <div className="fhinv-choices__row" role="radiogroup" aria-label={label}>
-        {options.map((o) => (
-          <button
-            key={o.value}
-            type="button"
-            role="radio"
-            className="fhinv-choice"
-            aria-checked={value === o.value}
-            disabled={disabled}
-            onClick={() => { hapticTap(); onChange(o.value) }}
-          >
-            {o.label}
-          </button>
-        ))}
-      </div>
-    </fieldset>
-  )
 }
 
 export default function InvoicePayment() {
@@ -121,7 +75,7 @@ export default function InvoicePayment() {
         : await logInvoicePayment(record.invoice, { id: paymentId.current, amount: numeric, method, kind, reference, paid_on: paidOn, priorPayments: record.payments })
       if (res && 'error' in res && res.error) throw new Error((res.error as { message?: string }).message || 'save failed')
       hapticTap()
-      toastSuccess('Payment recorded', `${formatMoney(numeric)}, ${METHODS.find((m) => m.value === method)?.label || 'Payment'}`)
+      toastSuccess('Payment recorded', `${formatMoney(numeric)}, ${PAYMENT_METHODS.find((m) => m.value === method)?.label || 'Payment'}`)
       refresh()
       navigate(`/invoices/${record.invoice.id}`, { replace: true })
     } catch (err) {
@@ -174,8 +128,7 @@ export default function InvoicePayment() {
           helper={figures.due > 0 ? `${formatMoney(figures.due)} still owed on this invoice.` : 'Nothing is owed on this invoice.'}
           onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ''))}
         />
-        <Choices label="Method" options={METHODS} value={method} onChange={setMethod} disabled={saving} />
-        <Choices label="Kind" options={KINDS} value={kind} onChange={setKind} disabled={saving} />
+        <PaymentClassification method={method} kind={kind} onMethodChange={setMethod} onKindChange={setKind} disabled={saving} />
         {method !== 'cash' && method !== 'other' && (
           <Field
             label={method === 'check' ? 'Check number' : method === 'card' ? 'Last 4 or receipt' : 'Reference'}

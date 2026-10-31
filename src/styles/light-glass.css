@@ -612,3 +612,29 @@ body:has(.fh-app--glass) .fhj-capsule .fhc-btn { background-image: none; box-sha
 @media (max-width: 899px) {
   .fh-app--glass .fhc-btn { min-height: 44px; }
 }
+
+.fh-app--glass .fh-build-page[data-build-screen] .fh-build-content-grid > .fh-build-rail--page {
+  border: 0; border-left: 1px solid var(--fh-hairline); border-radius: 0;
+  background: transparent; box-shadow: none; padding-left: 24px; overflow: visible;
+}
+.fh-app--glass .fh-build-page[data-build-screen] .fh-build-rail--page > .fh-build-rail-card {
+  padding: 20px 0; border-radius: 0; background: transparent;
+}
+.fh-app--glass .fh-settings .fh-settings-tools {
+  padding: 0 0 16px; border: 0; border-bottom: 1px solid var(--fh-hairline);
+  border-radius: 0; background: var(--fh-paper); box-shadow: none;
+}
+.fh-app--glass .fh-settings-nav { gap: 8px 24px; }
+.fh-app--glass .fh-settings-nav a {
+  padding: 0; border: 0; border-bottom: 2px solid transparent;
+  border-radius: 0; background: transparent;
+}
+.fh-app--glass .fh-settings-nav a[aria-current='page'] { border-bottom-color: var(--fh-ink); background: transparent; }
+.fh-app--glass .fh-settings .fh-settings-section,
+.fh-app--glass .fh-settings .fh-build-settings-main > .v3-section {
+  padding: 20px 0 !important; border: 0 !important; border-bottom: 1px solid var(--fh-hairline) !important;
+  border-radius: 0 !important; background: transparent !important; box-shadow: none !important;
+}
+
+.fh-payment-classification { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+.fh-payment-classification select { appearance: auto; -webkit-appearance: auto; padding-inline: 12px; }

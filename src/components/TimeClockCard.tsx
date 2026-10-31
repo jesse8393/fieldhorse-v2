@@ -294,7 +294,7 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
           <button
             type="button"
             onClick={handleClockIn}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 12px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))', color: 'var(--onyx)', fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: 0, cursor: 'pointer' }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 12px', borderRadius: 10, border: 'none', minHeight: 44, background: 'var(--fh-gold)', color: 'var(--fh-on-gold)', fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: 0, cursor: 'pointer' }}
           >
             <Play size={12} /> Clock in
           </button>

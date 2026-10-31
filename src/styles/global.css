@@ -865,12 +865,9 @@ a {
   cursor: pointer;
 }
 .fh-btn--primary {
-  background: linear-gradient(180deg, var(--field-gold-bright) 0%, var(--field-gold) 50%, var(--field-gold-deep) 100%);
-  color: var(--onyx);
-  box-shadow:
-    0 2px 0 var(--field-gold-deep),
-    0 8px 24px color-mix(in srgb, var(--v3-primary) 25%, transparent),
-    inset 0 1px 0 var(--v3-border-strong);
+  background: var(--field-gold);
+  color: var(--v3-on-primary);
+  box-shadow: none;
 }
 .fh-btn--primary:hover:not(:disabled) {
   transform: translateY(-1px);
@@ -1129,7 +1126,7 @@ a {
 .fh-svc.is-on .fh-svc__mark {
   background: var(--field-gold);
   border-color: var(--field-gold);
-  color: var(--onyx);
+  color: var(--v3-on-primary);
 }
 .fh-svc.is-on .fh-svc__mark svg { opacity: 1; }
 
@@ -2719,7 +2716,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   font-size: 12px;
   padding: 4px 8px;
   background: var(--field-gold);
-  color: var(--onyx);
+  color: var(--v3-on-primary);
   border-radius: 10px;
   font-weight: 700;
   letter-spacing: 0;

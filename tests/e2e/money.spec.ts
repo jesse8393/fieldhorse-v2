@@ -979,7 +979,7 @@ test.describe('money on a phone', () => {
     await expect(page.getByRole('dialog')).toHaveCount(0)
     await expect(page.getByRole('heading', { level: 1, name: 'Collect payment' })).toBeVisible()
     await expect(page.locator('#fhinv-pay-amount')).toHaveValue('2960')
-    await expect(page.getByRole('radio', { name: 'Check' })).toHaveAttribute('aria-checked', 'true')
+    await expect(page.getByRole('combobox', { name: 'Method', exact: true })).toHaveValue('check')
     // The one gold button records it.
     await expect(page.locator('.fhc-btn--primary')).toHaveCount(1)
     await expect(page.getByRole('button', { name: 'Record $2,960.00' })).toBeEnabled()
