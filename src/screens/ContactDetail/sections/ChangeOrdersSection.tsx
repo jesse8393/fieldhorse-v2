@@ -270,6 +270,7 @@ function SectionHeader({ count, canAdd, onAdd }: any) {
             marginLeft: 'auto',
             display: 'inline-flex', alignItems: 'center', gap: 4,
             padding: '8px 12px',
+            minHeight: 44,
             borderRadius: 10,
             background: 'transparent',
             border: '1px solid var(--v3-border-strong)',
@@ -451,7 +452,7 @@ function Editor({ initial, isNew, onSave, onCancel }: any) {
 
   return (
     <div style={{ padding: 16, background: 'var(--v3-surface-2)', borderTop: isNew ? 'none' : '1px solid var(--v3-border)' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 12 }}>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span style={labelStyle}>Title</span>
           <input
@@ -504,6 +505,7 @@ function Editor({ initial, isNew, onSave, onCancel }: any) {
             <button
               key={s}
               type="button"
+              aria-pressed={form.status === s}
               onClick={() => set('status', s)}
               style={{
                 ...chipStyle,
@@ -516,7 +518,7 @@ function Editor({ initial, isNew, onSave, onCancel }: any) {
         </div>
       )}
       {!locked && form.status === 'approved' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 12, marginTop: 10 }}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <span style={labelStyle}>Approved by</span>
             <input
@@ -581,7 +583,7 @@ function IconBtn({ children, onClick, tone, title, wide = false, ...rest }: any)
       title={title}
       {...rest}
       style={{
-        width: wide ? 'auto' : 26, height: 26, borderRadius: 10,
+        width: wide ? 'auto' : 44, minWidth: 44, height: 44, borderRadius: 10,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         background: 'transparent',
         border: `1px solid ${danger ? 'rgba(192, 57, 43, 0.35)' : 'var(--v3-border-strong)'}`,
@@ -599,16 +601,17 @@ const labelStyle = {
   letterSpacing: 0, color: 'var(--v3-text-muted)'
 }
 const inputStyle: import('react').CSSProperties = {
-  width: '100%', boxSizing: 'border-box',
+  width: '100%', minWidth: 0, minHeight: 48, boxSizing: 'border-box',
   padding: '8px 12px', borderRadius: 10,
   background: 'var(--v3-surface)', border: '1px solid var(--v3-border-strong)',
-  color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none'
+  color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 16, outline: 'none'
 }
 const lockedInputStyle: import('react').CSSProperties = {
   opacity: 0.65,
   cursor: 'not-allowed'
 }
 const chipStyle = {
+  minHeight: 44,
   padding: '8px 12px', borderRadius: 10,
   background: 'transparent', border: '1px solid var(--v3-border-strong)',
   color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600,
@@ -630,6 +633,7 @@ const primaryBtnStyle = {
   letterSpacing: 0, cursor: 'pointer'
 }
 const ghostBtnStyle = {
+  minHeight: 44,
   display: 'inline-flex', alignItems: 'center', gap: 8,
   padding: '8px 12px', borderRadius: 10,
   background: 'transparent', border: '1px solid var(--v3-border-strong)',

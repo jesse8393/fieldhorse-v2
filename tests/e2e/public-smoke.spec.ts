@@ -27,7 +27,7 @@ test.describe('public app shell', () => {
 
     await expect(page.getByRole('main')).toBeVisible()
     await expect(page.getByRole('heading', { name: /run the whole business/i })).toBeVisible()
-    await expect(page.getByRole('button', { name: /create a free account/i })).toBeVisible()
-    await expect(page.getByRole('button', { name: /sign in/i }).first()).toBeVisible()
+    await expect(page.getByRole('link', { name: /create a free account/i })).toBeVisible()
+    await expect(page.getByRole('link', { name: /sign in/i }).first()).toBeVisible()
   })
 })

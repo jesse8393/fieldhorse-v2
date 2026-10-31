@@ -61,6 +61,7 @@ export default function JobNew() {
   }, [clientParam])
 
   function onClient(next: ClientFieldValue) {
+    setErrors(current => ({ ...current, client: undefined }))
     setClient(next)
     patch({ client: next.text, clientId: next.picked?.id || '' })
   }
@@ -111,7 +112,7 @@ export default function JobNew() {
   return (
     <CreateShell title="New job" saveLabel="Save job" saving={saving} error={errors.save} onSave={save}>
       <ClientField userId={user?.id} value={client} onChange={onClient} error={errors.client} autoFocus={!clientParam} onPick={applyPick} />
-      <Field label="Title" placeholder="Driveway replacement" value={form.title} error={errors.title} onChange={(e) => set('title', e.target.value)} />
+      <Field label="Title" placeholder="Driveway replacement" value={form.title} error={errors.title} onChange={(e) => { set('title', e.target.value); setErrors(current => ({ ...current, title: undefined })) }} />
       <Field label="Address" autoComplete="off" helper="From the client. Change it for another site." value={form.address} onChange={(e) => set('address', e.target.value)} />
       <Choices label="Job type" options={JOB_TYPES} value={form.jobType} onChange={(v) => set('jobType', v)} />
       <Field label="Price" inputMode="decimal" placeholder="0.00" value={form.price} onChange={(e) => set('price', moneyInput(e.target.value))} />

@@ -669,21 +669,20 @@ export default function Bid() {
             }}
           />
 
-          {/* Job type chips */}
+          {/* A native selector keeps the optional single choice compact on phones. */}
           <div>
-            <span className="v3-eyebrow" style={{ display: 'block', marginBottom: 8 }}>Job type</span>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            <label htmlFor="estimate-job-type" className="v3-eyebrow" style={{ display: 'block', marginBottom: 8 }}>Job type <span style={{ fontWeight: 400 }}>Optional</span></label>
+            <select
+              id="estimate-job-type"
+              value={jobType}
+              onChange={(e) => setJobType(e.target.value)}
+              style={{ width: '100%', minHeight: 48, padding: '12px', border: '1px solid var(--v3-border-strong)', borderRadius: 10, background: 'var(--v3-surface)', color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 16 }}
+            >
+              <option value="">Not specified</option>
               {JOB_TYPES.map((jt) => (
-                <FilterPill
-                  key={jt.value}
-                  size="sm"
-                  active={jobType === jt.value}
-                  onClick={() => setJobType(jt.value === jobType ? '' : jt.value)}
-                >
-                  {jt.label}
-                </FilterPill>
+                <option key={jt.value} value={jt.value}>{jt.label}</option>
               ))}
-            </div>
+            </select>
           </div>
 
           {/* Trades chips */}
@@ -706,7 +705,7 @@ export default function Bid() {
           {/* Target margin slider */}
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <span className="v3-eyebrow">Target margin</span>
+              <label htmlFor="estimate-target-margin" className="v3-eyebrow">Target margin</label>
               <span style={{
                 fontFamily: 'var(--font-display)',
                 fontSize: 20,
@@ -717,13 +716,15 @@ export default function Bid() {
               </span>
             </div>
             <input
+              id="estimate-target-margin"
               type="range"
               min={10}
               max={50}
               step={1}
               value={marginPct}
+              aria-valuetext={`${marginPct}%`}
               onChange={(e) => setMarginPct(Number(e.target.value))}
-              style={{ width: '100%', accentColor: 'var(--v3-primary)' }}
+              style={{ width: '100%', minHeight: 44, margin: 0, accentColor: 'var(--v3-primary)' }}
             />
             <div style={{
               display: 'flex',

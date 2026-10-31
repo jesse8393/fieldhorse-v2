@@ -547,6 +547,8 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
               <motion.button
                 key={r.id}
                 type="button"
+                aria-label={`${compareMode ? 'Select' : 'Open'} photo: ${r.caption || r.filename || 'Job photo'}`}
+                aria-pressed={compareMode ? selected : undefined}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => handleThumbTap(r)}
                 style={{

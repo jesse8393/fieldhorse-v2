@@ -4,8 +4,7 @@ import { handleTablistKeyDown } from '../../lib/tabs.ts'
  * FilterPill, canonical segmented filter chip with optional count.
  *
  * Replaces 4+ near-identical inline copies in Jobs, Subs, Bid,
- * Invoices. Active state uses the gold gradient + halo + on-primary
- * text pattern that's now consistent app-wide.
+ * Invoices. Active state uses the primary fill and on-primary text.
  *
  * Usage:
  *   <FilterPill
@@ -18,8 +17,7 @@ import { handleTablistKeyDown } from '../../lib/tabs.ts'
  *
  * Notes:
  *   - Count chip is optional. Omit `count` for label-only pills.
- *   - The active state is intentionally bold (gold gradient + halo
- *     ring), this is THE primary affordance for "you are filtering".
+ *   - The selected fill makes the active filter easy to identify.
  */
 type FilterPillProps = import('react').ButtonHTMLAttributes<HTMLButtonElement> & {
   active?: boolean
@@ -55,7 +53,7 @@ export default function FilterPill({
 }: FilterPillProps) {
   const padY = size === 'sm' ? 7 : 9
   const padX = size === 'sm' ? 12 : 16
-  const fontSize = size === 'sm' ? 11 : 12
+  const fontSize = size === 'sm' ? 13 : 14
 
   return (
     <button
@@ -76,14 +74,14 @@ export default function FilterPill({
         display: 'inline-flex',
         alignItems: 'center',
         gap: 8,
+        minWidth: 44,
+        minHeight: 44,
         padding: `${padY}px ${padX}px`,
         borderRadius: 10,
         border: active
           ? '1px solid color-mix(in srgb, var(--v3-primary) 75%, transparent)'
           : '1px solid var(--v3-border-strong)',
-        background: active
-          ? 'linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%)'
-          : 'var(--v3-surface)',
+        background: active ? 'var(--v3-primary)' : 'var(--v3-surface)',
         color: active ? 'var(--v3-on-primary)' : 'var(--v3-text)',
         fontFamily: 'var(--font-body)',
         fontSize,
@@ -91,10 +89,8 @@ export default function FilterPill({
         letterSpacing: 0,
         cursor: 'pointer',
         WebkitTapHighlightColor: 'transparent',
-        boxShadow: active
-          ? '0 0 0 3px rgba(201, 150, 58, 0.18), 0 6px 18px rgba(201, 150, 58, 0.32), 0 1px 0 rgba(242, 237, 228, 0.30) inset'
-          : '0 1px 0 rgba(242, 237, 228, 0.04) inset, 0 2px 8px rgba(20, 20, 20, 0.20)',
-        transition: 'background 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 200ms ease',
+        boxShadow: 'none',
+        transition: 'background 160ms ease, border-color 160ms ease, color 160ms ease',
         ...style
       }}
       {...rest}

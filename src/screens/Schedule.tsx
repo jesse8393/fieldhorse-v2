@@ -73,6 +73,16 @@ export default function Schedule() {
   }, [view])
   const [cursor, setCursor] = useState(initialCursor)
   const isDesktop = useIsDesktop()
+  const weekStripRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const strip = weekStripRef.current
+    const selected = strip?.querySelector<HTMLElement>('[aria-pressed="true"]')
+    if (!strip || !selected) return
+    const frame = strip.getBoundingClientRect()
+    const cell = selected.getBoundingClientRect()
+    if (cell.left < frame.left) strip.scrollLeft -= frame.left - cell.left + 16
+    else if (cell.right > frame.right) strip.scrollLeft += cell.right - frame.right + 16
+  }, [cursor, isDesktop])
 
   // Range bounds for the current day/week/month grid. Only depends on
   // view + cursor; feeds the scheduled-events query below.
@@ -423,7 +433,7 @@ export default function Schedule() {
           ring around today (when not selected). Tap any day to jump. */}
       {/* One week of dates; selecting a date opens its daily agenda. */}
       <motion.div variants={item}>
-        <div className="dispatch-strip fhev-week-strip" aria-label="Selected calendar week">
+        <div ref={weekStripRef} className="dispatch-strip fhev-week-strip" aria-label="Selected calendar week">
           {Array.from({ length: 7 }, (_, i) => {
             const today = startOfDay(new Date())
             const day = addDays(startOfWeek(cursor, SCHEDULE_WEEK_START), i)

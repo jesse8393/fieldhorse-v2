@@ -92,6 +92,8 @@ export default function SegmentedTabs({ value, onChange, tabs, variant = 'underl
               onClick={() => { hapticTap(); onChange(t.id) }}
               style={{
                 flexShrink: 0,
+                minHeight: 44,
+                minWidth: 44,
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 8,
@@ -160,6 +162,7 @@ export default function SegmentedTabs({ value, onChange, tabs, variant = 'underl
               onClick={() => { hapticTap(); onChange(t.id) }}
               style={{
                 flex: '1 1 0',
+                minHeight: 44,
                 minWidth: 'max-content',
                 whiteSpace: 'nowrap',
                 position: 'relative',

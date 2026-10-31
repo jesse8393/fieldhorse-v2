@@ -64,7 +64,7 @@
 .fhev-preview { padding: 12px 16px; margin: 12px 0; background: var(--fh-tray); border-radius: 12px; color: var(--fh-ink-2); }
 .fhev-preview ol { padding-left: 20px; max-height: 240px; overflow-y: auto; }
 .fhev-preview li { padding: 4px 0; }
-.dispatch-strip.fhev-week-strip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; padding: 0 16px; overflow: visible; }
+.dispatch-strip.fhev-week-strip { display: grid; grid-template-columns: repeat(7, minmax(44px, 1fr)); gap: 4px; padding: 0 16px; overflow-x: auto; }
 .fhev-week-strip .dispatch-day { width: 100%; min-width: 0; }
 .fhev-unscheduled { margin: 0 var(--v3-gutter) 20px; padding: 20px 0; border-top: 1px solid var(--fh-hairline); background: transparent; }
 .fhev-unscheduled h2 { font-size: 18px; margin: 0 0 12px; }
@@ -116,3 +116,4 @@
 .fh-app--glass .v3-screen--schedule .fhs-screen-head h1 { font-size: 30px !important; }
 
 .fh-app--glass .v3-screen--schedule .fh-weatherbar__dot { box-shadow: none; }
+.v3-screen--schedule .dispatch-state__opt { min-height: 44px; min-width: 44px; }
