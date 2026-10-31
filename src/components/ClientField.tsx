@@ -159,9 +159,7 @@ export default function ClientField({ userId, value, onChange, label = 'Client',
         : undefined
 
   return (
-    <div className="fhnew-client" onBlur={event => {
-      if (!event.currentTarget.contains(event.relatedTarget)) { setDismissed(true); setActiveIndex(-1) }
-    }}>
+    <div className="fhnew-client">
       <Field
         label={label}
         value={typed}
