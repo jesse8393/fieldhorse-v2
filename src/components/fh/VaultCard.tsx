@@ -18,6 +18,7 @@ export type VaultFact = {
 }
 
 export type VaultCardProps = {
+  tone?: 'onyx' | 'paper'
   label: ReactNode
   /** The big number. A number is money with cents. */
   amount: number | string
@@ -35,6 +36,7 @@ function show(value: number | string): string {
 }
 
 export default function VaultCard({
+  tone = 'onyx',
   label,
   amount,
   facts,
@@ -45,8 +47,8 @@ export default function VaultCard({
   className
 }: VaultCardProps) {
   return (
-    <Tag className={cx('fhc-vault', className)} aria-label={ariaLabel}>
-      <div className="fhc-vault__card fh-onyx-scope fh-grain">
+    <Tag className={cx('fhc-vault', tone === 'paper' && 'fhc-vault--paper', className)} aria-label={ariaLabel}>
+      <div className={cx('fhc-vault__card', tone === 'paper' ? 'fhc-vault__card--paper' : 'fh-onyx-scope fh-grain')}>
         <div className="fhc-vault__head">
           <p className="fhc-vault__label">{label}</p>
           {corner != null && <div className="fhc-vault__corner">{corner}</div>}

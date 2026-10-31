@@ -153,10 +153,10 @@
 .fhnew-choice {
   display: inline-flex;
   align-items: center;
-  min-height: 36px;
+  min-height: 44px;
   padding: 8px 12px;
   border: 1px solid var(--fh-edge-strong);
-  border-radius: 999px;
+  border-radius: var(--fh-r-control);
   background: var(--fh-paper);
   color: var(--fh-ink);
   font-family: var(--fh-font-body);

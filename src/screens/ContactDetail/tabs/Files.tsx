@@ -6,7 +6,7 @@ export default function FilesTab({ section = 'files', contact, notes = [], userI
   const sub = section === 'files' ? 'photos' : section === 'documents' ? 'files' : section
   return (
     <div>
-      <div className="v3-section" data-job-section id={`fh-job-files-panel-${sub}`} tabIndex={-1} style={{ margin: '12px var(--v3-gutter) 24px' }}>
+      <div className="v3-section fh-job-section-frame" data-job-section id={`fh-job-files-panel-${sub}`} tabIndex={-1}>
         {sub === 'photos' && (
           <PhotosSection
             jobId={contact?.id}

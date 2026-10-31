@@ -96,7 +96,8 @@ if (failures.length > 0) {
   process.exit(1)
 }
 
-console.log('RLS audit passed.')
+console.log('RLS source audit passed for invite policies and server table access.')
+console.log('Deployed grants, financial column visibility, and authenticated API behavior require separate verification.')
 console.log(`fh_app_config direct callers: ${configCallers.join(', ')}`)
 console.log(
   `fh_integration_secrets direct callers: ${secretCallers.join(', ') || 'none in application code'}`

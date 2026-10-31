@@ -1,3 +1,4 @@
+import { createUuid } from '../../../lib/uuid.ts'
 // src/screens/ContactDetail/sections/InvoiceDrawsSection.tsx
 //
 // Progress-billing surface. Lists every fh_invoices row (draw) issued
@@ -456,7 +457,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       // Upload to private job-files bucket so the server can fetch
       // with service role + attach to the Resend send.
       const blob = result.doc.output('blob')
-      const rowId = crypto.randomUUID()
+      const rowId = createUuid()
       const path = `${user.id}/${contact.id}/${rowId}.pdf`
       const { error: upErr } = await supabase.storage
         .from('job-files')
@@ -1051,8 +1052,9 @@ const primaryBtnStyle = {
   display: 'inline-flex', alignItems: 'center', gap: 8,
   padding: '8px 12px', borderRadius: 10,
   border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
-  background: 'linear-gradient(180deg, var(--v3-primary-bright) 0%, var(--v3-primary) 100%)',
-  color: '#141414',
+  background: 'var(--v3-primary)',
+    minHeight: 44,
+  color: 'var(--v3-on-primary)',
   fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
   letterSpacing: 0, cursor: 'pointer'
 }

@@ -4,20 +4,23 @@
 // the invoice have them. The address comes from the client and can be
 // changed for a job at another site.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Field } from '../../components/fh'
-import ClientField, { fetchClientPick, resolveClientId, type ClientFieldValue, type ClientPick } from '../../components/ClientField.tsx'
-import CreateShell, { Choices, moneyInput, useDraft } from '../new/CreateShell.tsx'
+import ClientField, { fetchClientPick, resolveClientId, restoredClientValue, type ClientFieldValue, type ClientPick } from '../../components/ClientField.tsx'
+import CreateShell, { Choices, moneyInput, useDraft, writeDraft } from '../new/CreateShell.tsx'
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useMembership } from '../../contexts/MembershipContext.tsx'
-import { supabase } from '../../lib/supabase.ts'
 import type { ContactInsert } from '../../lib/quotes.ts'
+import { createJob } from '../../lib/createJob.ts'
+import { createUuid } from '../../lib/uuid.ts'
 import { JOB_TYPES } from '../../lib/jobTypes.ts'
 import { recordRoute } from '../../lib/records.ts'
 import { hapticMedium } from '../../lib/haptics.ts'
 
 type Form = {
+  requestId: string
   client: string
   clientId: string
   title: string
@@ -27,18 +30,21 @@ type Form = {
   scope: string
 }
 
-const EMPTY: Form = { client: '', clientId: '', title: '', address: '', jobType: '', price: '', scope: '' }
+const EMPTY: Form = { requestId: '', client: '', clientId: '', title: '', address: '', jobType: '', price: '', scope: '' }
 
 export default function JobNew() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const { orgId } = useMembership()
+  const queryClient = useQueryClient()
   const [params] = useSearchParams()
   const clientParam = params.get('client')
   const text = params.get('text')
-  const { form, set, patch, done } = useDraft<Form>('job', EMPTY, text ? { scope: text } : null)
-  const [client, setClient] = useState<ClientFieldValue>({ text: form.client, picked: null })
+  const [requestId] = useState(createUuid)
+  const { form, set, patch, done } = useDraft<Form>('job', { ...EMPTY, requestId }, text ? { scope: text } : null)
+  const [client, setClient] = useState<ClientFieldValue>(() => restoredClientValue(form.client, form.clientId))
   const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
   const [errors, setErrors] = useState<{ client?: string; title?: string; save?: string }>({})
 
   function applyPick(c: ClientPick) {
@@ -60,17 +66,22 @@ export default function JobNew() {
   }
 
   async function save() {
-    if (!user) return
+    if (!user || savingRef.current) return
     const next: typeof errors = {}
     if (!client.text.trim()) next.client = 'Enter a client.'
     if (!form.title.trim()) next.title = 'Enter a title, such as Driveway replacement.'
     if (next.client || next.title) { setErrors(next); return }
+    savingRef.current = true
+    // Save the intent before starting any request, including when a user
+    // submits faster than the usual draft debounce or reloads after failure.
+    writeDraft('job', form)
     setSaving(true)
     setErrors({})
     try {
       const picked = await resolveClientId(client, { userId: user.id, orgId }, { address: form.address })
       if (!picked) throw new Error('Enter a client.')
-      const row: ContactInsert = {
+      const row: ContactInsert & { id: string } = {
+        id: form.requestId,
         stage: 'job',
         user_id: user.id,
         org_id: orgId ?? null,
@@ -85,12 +96,13 @@ export default function JobNew() {
         scope_text: form.scope.trim() || null,
         last_contact: new Date().toISOString()
       }
-      const { data, error } = await supabase.from('fh_contacts').insert(row).select('id').single()
-      if (error) throw new Error(error.message)
+      const saved = await createJob(row)
       done()
+      void queryClient.invalidateQueries()
       hapticMedium()
-      navigate(recordRoute('job', (data as { id: string }).id), { replace: true })
+      navigate(recordRoute('job', saved.id), { replace: true })
     } catch (e) {
+      savingRef.current = false
       setSaving(false)
       setErrors({ save: e instanceof Error && e.message ? e.message : 'Could not save this job. Check your connection and try again.' })
     }

@@ -6,7 +6,8 @@
 // the children unchanged.
 
 import type { ReactNode } from 'react'
-import { Bell, Search, LogOut, CheckCircle2 } from 'lucide-react'
+import { Bell, Search, LogOut, CheckCircle2, MapPin } from 'lucide-react'
+import { Button } from '../fh'
 import MiniMetric from '../MiniMetric.tsx'
 import TopbarWeather from './TopbarWeather.tsx'
 import PaletteKeyCap, { paletteShortcut } from './PaletteKeyCap.tsx'
@@ -66,6 +67,7 @@ export default function SnowSettingsBuild(props: Props) {
               {companyReady ? 'Company profile ready' : 'Add your company name'}
             </p>
             <p className="fh-settings-help">Only your company name is needed to get started. All other details are optional.</p>
+            {!hasLocation && <Button to="/settings#location" variant="quiet" size="mini" icon={MapPin}>Set location</Button>}
           </div>
 
           <div className="fh-build-mini-grid">

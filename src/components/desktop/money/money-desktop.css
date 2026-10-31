@@ -140,6 +140,7 @@
 }
 
 .fhmd-main > .fhmd-aging .fhmd-aging__facts {
+  grid-column: 1 / -1;
   padding-top: 0;
   border-top: 0;
 }
@@ -357,14 +358,14 @@
 .fhmd-col--customer { width: 24%; }
 /* The Job column takes what the others leave. */
 .fhmd-col--job { width: auto; }
-.fhmd-col--amount { width: 14%; }
+.fhmd-col--amount { width: 160px; }
 .fhmd-col--status { width: 20%; }
 /* One mini button: a fixed 96 px, so Remind and Open keep their whole
    label on a narrow window (Task 14). The cell keeps no left padding, which
    leaves the button 84 px; Statement is wider and gets 112. */
 .fhmd-col--action { width: 96px; }
 .fhmd-col--statement { width: 112px; }
-.fhmd-col--wide-action { width: 23%; }
+.fhmd-col--wide-action { width: 148px; }
 
 /* A money figure never breaks inside its digits: "$1,242,500.0" over "0"
    reads wrong, and "$33,10" over "0.00" reads as $33.10. Below 1280 px an
@@ -373,7 +374,7 @@
 .fhmd-table td.fhmd-num { white-space: nowrap; }
 
 @media (max-width: 1279px) {
-  .fhmd-col--amount { width: 128px; }
+  .fhmd-col--amount { width: 156px; }
 }
 
 /* Below 1100 px the tables render without the Job column (and Who owes
@@ -383,7 +384,7 @@
 .fhmd-table--compact .fhmd-col--status { width: 32%; }
 
 .fhmd-table--balances .fhmd-col--status { width: 17%; }
-.fhmd-table--balances .fhmd-col--amount { width: 12%; }
+.fhmd-table--balances .fhmd-col--amount { width: 156px; }
 
 /* Below 1280 px Job balances' columns stop sharing the width by percent:
    each money column holds a seven figure amount, Status holds the age
@@ -393,8 +394,8 @@
 @media (max-width: 1279px) {
   .fhmd-table--balances .fhmd-col--customer { width: auto; }
   .fhmd-table--balances .fhmd-col--status { width: 152px; }
-  .fhmd-table--balances .fhmd-col--amount { width: 120px; }
-  .fhmd-table--balances .fhmd-col--wide-action { width: 120px; }
+  .fhmd-table--balances .fhmd-col--amount { width: 156px; }
+  .fhmd-table--balances .fhmd-col--wide-action { width: 148px; }
   .fhmd-table--balances.fhmd-table--compact .fhmd-col--status { width: 112px; }
 }
 

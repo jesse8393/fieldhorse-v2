@@ -5,6 +5,30 @@ const client = { id: 'client-finance', user_id: 'qa-user-1', org_id: 'org-1', na
 const job = { id: 'job-finance', client_id: client.id, user_id: 'qa-user-1', org_id: 'org-1', name: client.name, email: client.email, job_title: 'Foundation repair', stage: 'job', amount: 10000, created_at: '2026-08-01T12:00:00Z', updated_at: '2026-10-01T12:00:00Z', fh_clients: client }
 const invoice = (id: string, amount: number, status = 'sent') => ({ id, user_id: 'qa-user-1', org_id: 'org-1', client_id: client.id, contact_id: job.id, title: 'Progress draw', description: 'Foundation installment', amount, status, sequence_number: 1, due_at: '2026-10-20', created_at: '2026-10-01T12:00:00Z', updated_at: '2026-10-01T12:00:00Z', fh_clients: client })
 const tables = { fh_clients: [client], fh_contacts: [job], fh_invoices: [invoice('issued-finance', 3000), invoice('draft-finance', 2000, 'draft')], fh_payments: [], fh_change_orders: [], fh_quotes: [], fh_leads: [], fh_schedule: [{ id: 'visit-finance', org_id: 'org-1', user_id: 'qa-user-1', contact_id: job.id, start_at: '2026-10-26T15:00:00Z', end_at: '2026-10-26T17:00:00Z', title: 'Foundation visit' }] }
+
+test('payment entry creates a secure intent ID when native randomUUID is unavailable', async ({ context, page }) => {
+  await context.addInitScript(() => Object.defineProperty(crypto, 'randomUUID', { value: undefined, configurable: true }))
+  const ids: string[] = []
+  let recorded: Record<string, unknown> | undefined
+  await context.route('**/rest/v1/fh_payments*', async route => {
+    if (route.request().method() === 'POST') {
+      const payload = route.request().postDataJSON()
+      recorded = Array.isArray(payload) ? payload[0] : payload
+      ids.push(String(recorded!.id))
+    }
+    return route.fallback()
+  })
+  await page.goto('/invoices/issued-finance/payment')
+  await expect(page.getByRole('heading', { level: 1, name: 'Collect payment' })).toBeVisible()
+  await page.getByLabel('Amount', { exact: true }).fill('50')
+  await page.getByRole('combobox', { name: 'Method', exact: true }).selectOption('cash')
+  await page.getByRole('combobox', { name: 'Kind', exact: true }).selectOption('deposit')
+  await expect(page.getByLabel('Check number', { exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Record $50.00', exact: true }).click()
+  await expect.poll(() => ids.length).toBe(1)
+  expect(ids[0]).toMatch(/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/)
+  expect(recorded).toMatchObject({ method: 'cash', kind: 'deposit', amount: 50 })
+})
 test.beforeEach(async ({ context, page }) => { await signIn(context, { tables }); await page.clock.setFixedTime(new Date('2026-10-27T17:00:00Z')) })
 
 test('billing categories open exact contributing records', async ({ page }, testInfo) => {
@@ -37,6 +61,60 @@ test('customer overview reconciles schedule and invoice blockers', async ({ page
   await expect(review.getByText('Overdue invoice', { exact: true })).toBeVisible()
   await expect(review.locator('a[href="/invoices/issued-finance"]')).toContainText('$3,000.00')
   await nothingRunsOffTheSide(page, 'customer blocker review')
+})
+
+test('customer context stays factual and its actions open working destinations', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name.startsWith('mobile'), 'Desktop customer context')
+  await page.goto(`/clients/${client.id}`)
+  await expect(page.getByText('Activity date unavailable', { exact: true })).toBeVisible()
+  await expect(page.getByText('Cooling', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('Remaining contract value', { exact: true })).toHaveCount(1)
+
+  const context = page.getByRole('complementary', { name: 'Customer context' })
+  await context.getByRole('button', { name: 'Review contract balance', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Projects', exact: true })).toHaveAttribute('aria-current', 'page')
+  await expect(page.getByRole('region', { name: /^Jobs / }).getByRole('button', { name: /Foundation repair/ })).toBeVisible()
+  await context.getByRole('link', { name: /Foundation repair/ }).click()
+  await expect(page).toHaveURL(new RegExp(`/jobs/${job.id}$`))
+  await expect(page.getByRole('heading', { level: 1, name: 'Foundation repair', exact: true })).toBeVisible()
+})
+
+test('follow up counts exclude customers without a usable activity date', async ({ context, page }, testInfo) => {
+  test.skip(testInfo.project.name.startsWith('mobile'), 'Desktop customer summary')
+  const stale = { ...client, id: 'client-stale', name: 'Dated activity', last_activity_at: '2026-09-01T12:00:00Z' }
+  await signIn(context, { tables: { ...tables, fh_clients: [client, stale], fh_contacts: [job, { ...job, id: 'job-stale', client_id: stale.id, fh_clients: stale }] } })
+  await page.goto('/clients')
+  const followUps = page.locator('.fh-build-rail-card').filter({ hasText: 'Needs follow up' })
+  await expect(followUps.locator('strong')).toHaveText('1')
+  await expect(page.getByRole('button', { name: /^Rosa Ledger Active/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Dated activity Cooling/ })).toBeVisible()
+})
+
+test('phone customer summaries remain separate and filters stay usable at 320 pixels', async ({ page }, testInfo) => {
+  test.skip(!testInfo.project.name.startsWith('mobile'), 'Phone customer directory')
+  await page.setViewportSize({ width: 320, height: 844 })
+  await page.goto('/clients')
+  const totals = page.getByRole('region', { name: 'Customer totals' })
+  await expect(totals).toBeVisible()
+  // Inspect every summary independently: document overflow alone misses overlapping text.
+  const boxes = await totals.locator('strong').evaluateAll(nodes => nodes.map(node => {
+    const r = node.getBoundingClientRect()
+    return { left: r.left, right: r.right, scroll: node.scrollWidth, width: node.clientWidth }
+  }))
+  expect(boxes).toHaveLength(2)
+  expect(boxes[0].right).toBeLessThanOrEqual(boxes[1].left)
+  for (const box of boxes) expect(box.scroll).toBeLessThanOrEqual(box.width + 1)
+  const row = page.getByRole('button', { name: /^Rosa Ledger/ })
+  await expect(row.getByText('Contract balance $10K', { exact: true })).toBeVisible()
+  const create = page.getByRole('button', { name: 'New customer', exact: true })
+  expect((await create.boundingBox())?.height).toBeGreaterThanOrEqual(44)
+  await nothingRunsOffTheSide(page, 'phone customer directory')
+  await page.getByRole('button', { name: /^Recent/ }).click()
+  await expect(row).toHaveCount(0)
+  await page.getByRole('button', { name: /^All/ }).click()
+  await expect(row).toBeVisible()
+  await create.click()
+  await expect(page).toHaveURL(/\/clients\/new$/)
 })
 
 test('similar drafts require review before a send begins', async ({ context, page }) => {

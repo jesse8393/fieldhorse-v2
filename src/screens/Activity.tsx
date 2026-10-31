@@ -215,8 +215,9 @@ export default function Activity() {
         </Eyebrow>
         <h1 style={{
           fontFamily: 'var(--font-display)',
-          fontSize: 24,
-          letterSpacing: 0,
+          fontSize: 30,
+          fontWeight: 650,
+          letterSpacing: '-.03em',
           color: 'var(--v3-text)',
           margin: '6px 0 4px',
           lineHeight: 1.05
@@ -305,12 +306,11 @@ function EventRow({ event }: any) {
         to={event.to || (event.contactId ? `/jobs/${event.contactId}` : '/jobs')}
         style={{
           display: 'grid',
-          gridTemplateColumns: '36px 1fr auto',
+          gridTemplateColumns: '36px minmax(0, 1fr) auto',
           gap: 12,
-          padding: '12px 12px',
-          background: 'var(--v3-surface)',
-          border: '1px solid var(--v3-border)',
-          borderRadius: 10,
+          padding: '16px 0',
+          background: 'transparent',
+          borderBottom: '1px solid var(--v3-border)',
           textDecoration: 'none',
           color: 'inherit',
           WebkitTapHighlightColor: 'transparent'
@@ -332,7 +332,7 @@ function EventRow({ event }: any) {
           <div style={{
             fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600,
             color: 'var(--v3-text)', lineHeight: 1.3,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+            overflowWrap: 'anywhere'
           }}>
             {event.title}
           </div>
@@ -340,7 +340,7 @@ function EventRow({ event }: any) {
             marginTop: 3,
             fontFamily: 'var(--font-body)', fontSize: 12,
             color: 'var(--v3-text-muted)', lineHeight: 1.4,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+            overflowWrap: 'anywhere'
           }}>
             <span style={{ color: 'var(--v3-text-secondary)', fontWeight: 600 }}>
               {jobName}

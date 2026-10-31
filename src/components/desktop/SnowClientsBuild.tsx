@@ -29,6 +29,7 @@ import {
 } from '@tanstack/react-table'
 import type { SortingState } from '@tanstack/react-table'
 import { countNoun, money, moneyFull } from '../../lib/format.ts'
+import { clientActivity } from '../../lib/clientActivity.ts'
 import { buildCsv, downloadCsv } from '../../lib/csv.ts'
 import MiniMetric from '../MiniMetric.tsx'
 import LoadingValue from '../LoadingValue.tsx'
@@ -116,7 +117,7 @@ function toCsv(rows: ClientRow[]): string {
     rows.map((r) => [
       r.client.name || 'Unnamed',
       r.status.label,
-      r.client.last_activity_at ? new Date(r.client.last_activity_at).toISOString().slice(0, 10) : '',
+      r.lastTouch ? new Date(r.lastTouch).toISOString().slice(0, 10) : '',
       r.outstanding.toFixed(2),
       r.activeCount,
       r.nextAction,
@@ -150,8 +151,7 @@ export default function SnowClientsBuild(props: Props) {
     for (const r of rows) {
       const created = new Date(r.created_at || 0).getTime()
       if (Number.isFinite(created) && created >= cutoff30) fresh += 1
-      const last = new Date(r.last_activity_at || 0).getTime()
-      if (Number.isFinite(last) && now - last > 30 * 24 * 60 * 60 * 1000 && rollupFor(r.id).activeCount > 0) cooling += 1
+      if (clientActivity(r.last_activity_at, now).state === 'stale' && rollupFor(r.id).activeCount > 0) cooling += 1
     }
     return { newThisMonth: fresh, needsFollowUp: cooling }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -160,9 +160,9 @@ export default function SnowClientsBuild(props: Props) {
   // Enrich once per (filtered|rollup) change; TanStack sorts over this.
   const enriched: ClientRow[] = useMemo(() => filtered.map((r: any) => {
     const ro = rollupFor(r.id)
-    const last = new Date(r.last_activity_at || 0).getTime()
-    const lastTouch = Number.isFinite(last) ? last : 0
-    const stale = lastTouch > 0 && Date.now() - lastTouch > 30 * 24 * 60 * 60 * 1000
+    const activity = clientActivity(r.last_activity_at)
+    const lastTouch = activity.lastTouch ?? 0
+    const stale = activity.state === 'stale'
     const isActive = ro.activeCount > 0
     const status = !isActive
       ? { label: 'Dormant', tone: 'neutral', rank: 0 }
@@ -203,7 +203,7 @@ export default function SnowClientsBuild(props: Props) {
   }
 
   return (
-    <div className="fh-build-page" data-build-screen="SnowClientsBuild">
+    <div className="fh-build-page fh-client-index" data-build-screen="SnowClientsBuild">
       <header className="fh-build-topbar">
         <div className="fh-build-search">
           <Search size={14} />
@@ -326,7 +326,7 @@ export default function SnowClientsBuild(props: Props) {
               <div className="fh-build-table__empty">No clients match. <button type="button" className="fh-build-inline-link" onClick={onNewClient}>+ New client</button>.</div>
             )}
             {!loading && visibleRows.map((tr) => {
-              const { client: r, status, outstanding, activeCount, nextAction } = tr.original
+              const { client: r, status, lastTouch, outstanding, activeCount, nextAction } = tr.original
               return (
                 <button
                   key={r.id}
@@ -336,7 +336,7 @@ export default function SnowClientsBuild(props: Props) {
                 >
                   <strong className="fh-build-truncate" title={r.name}>{r.name || 'Unnamed'}</strong>
                   <span className={`fh-build-dot is-${status.tone}`}>{status.label}</span>
-                  <span className="fh-build-rel">{relTime(r.last_activity_at)}</span>
+                  <span className="fh-build-rel">{relTime(lastTouch)}</span>
                   <span className="fh-build-num" style={{ color: outstanding > 0 ? 'var(--v3-primary-text)' : undefined, fontWeight: outstanding > 0 ? 700 : 500 }}>
                     {outstanding > 0 ? moneyFull(outstanding) : '\u2003'}
                   </span>

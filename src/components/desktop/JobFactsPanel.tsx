@@ -137,6 +137,7 @@ export default function JobFactsPanel({
     <aside className="fhd-facts" aria-label="Job facts">
       {money && (
         <VaultCard
+          tone="paper"
           className="fhd-vault"
           as="div"
           label={preDealLabel ?? 'Contract balance'}

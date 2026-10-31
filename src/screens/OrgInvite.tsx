@@ -207,7 +207,7 @@ function PrimaryBtn({ children, onClick }: { children: React.ReactNode; onClick:
         padding: '12px 16px',
         borderRadius: 10,
         background: 'var(--v3-primary, #C9963A)',
-        color: '#141414',
+        color: 'var(--v3-on-primary)',
         border: 'none',
         fontFamily: 'var(--font-body)',
         fontWeight: 800,

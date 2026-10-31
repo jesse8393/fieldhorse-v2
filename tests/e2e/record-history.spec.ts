@@ -1,6 +1,63 @@
 import { expect, test } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 import { USER } from '../../scripts/qa-mock.mjs'
+import { nothingRunsOffTheSide } from './helpers/overflow.ts'
+
+test('phone note actions fit, support keyboard archive and confirm both delete paths', async ({ context, page }, testInfo) => {
+  test.skip(!testInfo.project.name.startsWith('mobile'), 'Phone report actions')
+  await page.setViewportSize({ width: 320, height: 844 })
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  const notes = ['Visible deletion', 'Swipe deletion', 'Keyboard archive'].map((text, index) => ({
+    id: `action-note-${index}`, user_id: USER.id, text, contact_id: null,
+    created_at: new Date().toISOString(), done: false, parsed: null,
+  }))
+  await signIn(context, { tables: { fh_notes: notes } })
+  const deleted: string[] = []
+  const archived: Record<string, unknown>[] = []
+  page.on('request', request => {
+    if (!request.url().includes('/rest/v1/fh_notes')) return
+    if (request.method() === 'DELETE') deleted.push(request.url())
+    if (request.method() === 'PATCH') archived.push(request.postDataJSON())
+  })
+  await page.goto('/notes')
+  const history = page.getByRole('group', { name: 'Recent activity' })
+  const visibleRow = history.getByRole('article').filter({ hasText: 'Visible deletion' })
+  const deleteButton = visibleRow.getByRole('button', { name: 'Delete note', exact: true })
+  await expect(deleteButton).toBeVisible()
+  const bounds = await deleteButton.boundingBox()
+  expect(bounds?.width).toBeGreaterThanOrEqual(44)
+  expect(bounds?.height).toBeGreaterThanOrEqual(44)
+  await deleteButton.click()
+  await expect(visibleRow.getByRole('button', { name: 'Tap again to delete', exact: true })).toBeVisible()
+  expect(deleted).toHaveLength(0)
+  await nothingRunsOffTheSide(page, 'Armed note deletion at 320 pixels')
+  await visibleRow.getByRole('button', { name: 'Tap again to delete', exact: true }).click()
+  await expect(visibleRow).toHaveCount(0)
+  expect(deleted).toHaveLength(1)
+
+  const swipeRow = history.getByRole('article').filter({ hasText: 'Swipe deletion' })
+  await swipeRow.scrollIntoViewIfNeeded()
+  const swipeBounds = await swipeRow.boundingBox()
+  expect(swipeBounds).not.toBeNull()
+  const startX = swipeBounds!.x + swipeBounds!.width - 70
+  const startY = swipeBounds!.y + 20
+  await page.mouse.move(startX, startY)
+  await page.mouse.down()
+  await page.mouse.move(startX - 120, startY, { steps: 12 })
+  await page.mouse.up()
+  const revealed = swipeRow.locator('..').locator('..').locator('[aria-hidden="false"]')
+  await revealed.getByRole('button', { name: 'Delete note', exact: true }).click()
+  await expect(swipeRow.getByRole('button', { name: 'Tap again to delete', exact: true })).toBeVisible()
+  expect(deleted).toHaveLength(1)
+  await swipeRow.getByRole('button', { name: 'Tap again to delete', exact: true }).click()
+  await expect(swipeRow).toHaveCount(0)
+  expect(deleted).toHaveLength(2)
+
+  const archiveRow = history.getByRole('article').filter({ hasText: 'Keyboard archive' })
+  await archiveRow.getByRole('button', { name: 'Archive note', exact: true }).press('Enter')
+  await expect(archiveRow).toHaveCount(0)
+  expect(archived).toEqual([{ done: true }])
+})
 
 test('desktop customer directory reaches every record while preserving search and filter', async ({ context, page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-chrome', 'Desktop directory formerly capped at 60')

@@ -1,3 +1,4 @@
+import { createUuid } from '../../../lib/uuid.ts'
 import { proposalIssuedAt } from '../../../lib/proposalDate.ts'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
@@ -547,7 +548,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
       // path with service-role privileges. Upload failure aborts the
       // send, without the PDF on storage the email can't carry it.
       const blob = result.doc.output('blob')
-      const rowId = crypto.randomUUID()
+      const rowId = createUuid()
       const path = `${userId}/${contact.id}/${rowId}.pdf`
       const { error: upErr } = await supabase.storage
         .from('job-files')
@@ -634,7 +635,7 @@ export default function QuoteTab({ contact, userId, fetchAll, patch, onOpenAppro
     try {
       const result = await buildPdf()
       const blob = result.doc.output('blob')
-      const rowId = crypto.randomUUID()
+      const rowId = createUuid()
       const path = `${userId}/${contact.id}/${rowId}.pdf`
       const { error: upErr } = await supabase.storage
         .from('job-files')

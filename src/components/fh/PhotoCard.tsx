@@ -13,6 +13,8 @@ import { cx } from './cx.ts'
 // the right, and no empty image box.
 
 type PhotoCardOwnProps = {
+  /** A light fallback when the surrounding workspace uses paper surfaces. */
+  emptyTone?: 'onyx' | 'paper'
   /** Small line above the title, such as "Next stop, 7:30 am". */
   eyebrow?: ReactNode
   title: ReactNode
@@ -45,6 +47,7 @@ export default function PhotoCard({
   ratio = '16 / 9',
   titleAs: Title = 'h3',
   eager = false,
+  emptyTone = 'onyx',
   className
 }: PhotoCardProps) {
   const [loadedSrc, setLoadedSrc] = useState<string | null>(null)
@@ -52,9 +55,9 @@ export default function PhotoCard({
   const hasPhoto = Boolean(src) && src !== failedSrc
 
   return (
-    <div className={cx('fhc-photo', !hasPhoto && 'fhc-photo--empty', className)}>
+    <div className={cx('fhc-photo', !hasPhoto && 'fhc-photo--empty', !hasPhoto && emptyTone === 'paper' && 'fhc-photo--paper', className)}>
       <div
-        className={cx('fhc-photo__frame', !hasPhoto && 'fh-grain')}
+        className={cx('fhc-photo__frame', !hasPhoto && emptyTone === 'onyx' && 'fh-grain')}
         style={hasPhoto ? { aspectRatio: ratio } : undefined}
       >
         {hasPhoto && (
@@ -68,7 +71,7 @@ export default function PhotoCard({
             onError={() => setFailedSrc(src as string)}
           />
         )}
-        <div className="fhc-photo__overlay fh-onyx-scope">
+        <div className={cx('fhc-photo__overlay', (hasPhoto || emptyTone === 'onyx') && 'fh-onyx-scope')}>
           <div className="fhc-photo__text">
             {eyebrow != null && eyebrow !== false && <p className="fhc-photo__eyebrow">{eyebrow}</p>}
             <Title className="fhc-photo__title">{title}</Title>

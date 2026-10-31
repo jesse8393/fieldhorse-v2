@@ -66,7 +66,7 @@
 .fhev-preview li { padding: 4px 0; }
 .dispatch-strip.fhev-week-strip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; padding: 0 16px; overflow: visible; }
 .fhev-week-strip .dispatch-day { width: 100%; min-width: 0; }
-.fhev-unscheduled { margin: 0 var(--v3-gutter) 20px; padding: 16px; border: 1px solid var(--fh-hairline); border-radius: 12px; background: var(--fh-paper); }
+.fhev-unscheduled { margin: 0 var(--v3-gutter) 20px; padding: 20px 0; border-top: 1px solid var(--fh-hairline); background: transparent; }
 .fhev-unscheduled h2 { font-size: 18px; margin: 0 0 12px; }
 .fhev-unscheduled summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; color: var(--fh-ink); }
 .fhev-unscheduled ul { list-style: none; padding: 0; margin: 0; }
@@ -89,3 +89,30 @@
 .fhev-crew__error { margin-top: 12px; border-left: 3px solid var(--v3-danger); padding: 0 12px; }
 .fhev-crew__error button { min-height: 44px; background: var(--fh-tray); color: var(--fh-ink); border: 1px solid var(--fh-edge-strong); padding: 8px 12px; border-radius: var(--fh-r-control); font: inherit; font-size: 14px; }
 .fhev-crew__error li { margin: 8px 0; font-size: 14px; overflow-wrap: anywhere; }
+
+/* A week is an agenda on narrow screens; no text is squeezed into date cells. */
+.fhev-range { padding: 12px 20px; }
+.fhev-range__nav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.fhev-range__arrows { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; align-items: center; gap: 8px; flex: 1 1 230px; }
+.fhev-range__nav > button { min-height: 44px; margin-left: auto; }
+.fhev-agenda { display: grid; gap: 8px; }
+.fhev-agenda__day { min-width: 0; border-top: 1px solid var(--fh-hairline); }
+.fhev-agenda__date { width: 100%; min-height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 12px; background: transparent; border: 0; padding: 12px 0; color: var(--fh-ink); font: 600 15px/1.4 var(--fh-font-body); text-align: left; cursor: pointer; }
+.fhev-agenda__date > span:last-child { color: var(--fh-ink-3); font-size: 13px; font-weight: 400; flex-shrink: 0; }
+.fhev-agenda__events { list-style: none; margin: 0; padding: 0; }
+.fhev-agenda__event { border-left: 2px solid var(--fh-gold); padding: 0 0 8px 12px; margin-bottom: 12px; }
+.fhev-agenda__open { display: grid; gap: 4px; width: 100%; background: transparent; border: 0; padding: 4px 0 8px; text-align: left; color: var(--fh-ink-2); font: 400 14px/1.5 var(--fh-font-body); cursor: pointer; overflow-wrap: anywhere; }
+.fhev-agenda__open strong { font-size: 18px; color: var(--fh-ink); font-weight: 600; }
+.fhev-agenda__time { font-variant-numeric: tabular-nums; }
+.fhev-agenda__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.fhev-agenda__actions .fhc-btn { min-height: 44px; padding-inline: 8px; }
+.fhev-agenda button:focus-visible { outline: 2px solid var(--fh-gold-ink); outline-offset: 3px; }
+.fhev-empty-day { padding: 24px 0; }
+
+.fhev-view-controls { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.fhev-view-controls > button { min-height: 44px; }
+.fh-app--glass .v3-screen--schedule .fh-weatherbar { padding: 8px 0; border: 0; border-bottom: 1px solid var(--fh-hairline); border-radius: 0; background: transparent; box-shadow: none; }
+.fh-app--glass .v3-screen--schedule .dispatch-day { box-shadow: none; border-radius: var(--fh-r-control); }
+.fh-app--glass .v3-screen--schedule .fhs-screen-head h1 { font-size: 30px !important; }
+
+.fh-app--glass .v3-screen--schedule .fh-weatherbar__dot { box-shadow: none; }

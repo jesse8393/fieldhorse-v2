@@ -1,3 +1,4 @@
+import { createUuid } from '../lib/uuid.ts'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 // @ts-ignore -- papaparse ships no types
@@ -161,7 +162,7 @@ export default function Importer() {
 
   async function ensureWebhookKey() {
     if (webhookKey) return webhookKey
-    const k = crypto.randomUUID().replace(/-/g, '').slice(0, 24)
+    const k = createUuid().replace(/-/g, '').slice(0, 24)
     await supabase.from('profiles').update({ webhook_key: k }).eq('user_id', user!.id)
     setWebhookKey(k)
     return k
@@ -632,18 +633,19 @@ export default function Importer() {
                 padding: '12px 16px',
                 borderRadius: 10,
                 border: 'none',
-                background: 'linear-gradient(135deg, var(--field-gold-bright), var(--field-gold-deep))',
-                color: 'var(--onyx)',
+                background: importing || checkingRepeats || toImport.length === 0 ? 'var(--fh-tray)' : 'var(--fh-gold)',
+                minHeight: 44,
+                color: importing || checkingRepeats || toImport.length === 0 ? 'var(--fh-ink-2)' : 'var(--fh-on-gold)',
                 fontFamily: 'var(--font-display)',
                 fontSize: 14,
                 letterSpacing: 0,
                 cursor: importing || checkingRepeats || toImport.length === 0 ? 'default' : 'pointer',
-                boxShadow: '0 8px 20px rgba(201,150,58,0.35)',
+                boxShadow: 'none',
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 8,
-                opacity: importing || checkingRepeats || toImport.length === 0 ? 0.65 : 1
+                opacity: 1
               }}
             >
               <Upload size={16} />

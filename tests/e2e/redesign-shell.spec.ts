@@ -67,7 +67,7 @@ test.describe('phone shell', () => {
     await page.getByRole('radio', { name: 'Night' }).check()
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
     expect(await page.evaluate(() => localStorage.getItem('fh:theme-mode'))).toBe('night')
-    await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#171611')
+    await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#171717')
 
     await page.reload({ waitUntil: 'domcontentloaded' })
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
@@ -122,19 +122,16 @@ test.describe('phone shell', () => {
   })
 })
 
-test.describe('phone header name', () => {
-  test('a long company name wraps to two lines and is never cut off', async ({ context, page }, testInfo) => {
-    test.skip(!testInfo.project.name.startsWith('mobile'), 'Phone header')
+test.describe('workspace identity', () => {
+  test('a long workspace name is available without crowding the header', async ({ context, page }) => {
     const long = 'Parker Construction and Concrete Restoration'
     await signInWith(context, { tables: { organizations: [{ id: 'org-1', name: long }] } })
     await open(page, '/')
-    const name = page.locator('.fhs-header__company')
-    await expect(name).toHaveText(long)
-    const box = await name.evaluate((el) => ({
-      lines: Math.round(el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight)),
-      clipped: el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1
-    }))
-    expect(box).toEqual({ lines: 2, clipped: false })
+    const menu = page.getByRole('button', { name: 'Open workspace menu' })
+    await expect(menu).toHaveAttribute('title', long)
+    await menu.click()
+    await expect(page.locator('.fhws-who__company')).toHaveText(long)
+    await nothingRunsOffTheSide(page, 'workspace identity')
   })
 })
 
@@ -145,7 +142,7 @@ test.describe('first paint', () => {
     await page.route('**/src/main.tsx', (route) => route.abort())
     await page.goto('/', { waitUntil: 'domcontentloaded' })
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
-    await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#171611')
+    await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#171717')
   })
 })
 
@@ -155,22 +152,21 @@ test.describe('desktop shell', () => {
     await signIn(context)
   })
 
-  test('the onyx sidebar carries the main list and the team and office group', async ({ page }) => {
+  test('the header and workspace preserve all primary and office destinations', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await open(page, '/invoices')
-    const sidebar = page.getByRole('complementary', { name: 'Primary navigation' })
-    await expect(sidebar).toBeVisible()
-    expect(Math.round((await sidebar.boundingBox())?.width ?? 0)).toBe(232)
-    for (const label of ['Today', 'Schedule', 'Jobs', 'Money', 'Customers', 'Reports', 'Settings']) {
-      await expect(sidebar.getByRole('button', { name: label, exact: true })).toBeVisible()
+    const nav = page.getByRole('navigation', { name: 'Primary' })
+    for (const label of ['Today', 'Schedule', 'Jobs', 'Money', 'More']) {
+      await expect(nav.getByRole('link', { name: label, exact: true })).toBeVisible()
     }
-    await expect(sidebar.getByRole('button', { name: 'Money', exact: true })).toHaveAttribute('aria-current', 'page')
+    await expect(nav.getByRole('link', { name: 'Money', exact: true })).toHaveAttribute('aria-current', 'page')
     await expect(page.locator('.fhs-dock')).toBeHidden()
-
-    const toggle = sidebar.getByRole('button', { name: 'Team and office' })
-    if ((await toggle.getAttribute('aria-expanded')) === 'false') await toggle.click()
-    await expect(toggle).toHaveAttribute('aria-expanded', 'true')
-    await sidebar.getByRole('button', { name: 'Subs', exact: true }).click()
+    await nav.getByRole('link', { name: 'More', exact: true }).click()
+    const workspace = page.getByRole('navigation', { name: 'Workspace' })
+    for (const label of ['Customers', 'Reports', 'Settings', 'Subs']) {
+      await expect(workspace.getByRole('button', { name: label, exact: true })).toBeVisible()
+    }
+    await workspace.getByRole('button', { name: 'Subs', exact: true }).click()
     await expect(page).toHaveURL(/\/subs/)
   })
 })

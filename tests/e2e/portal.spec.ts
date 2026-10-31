@@ -578,15 +578,15 @@ test('the page ground follows Day and Night from the tokens, with no sign in', a
   await mockPortal(context, proposalPayload())
   await openPortal(page)
   const ground = () => page.locator('.fhp').evaluate((el) => getComputedStyle(el).backgroundColor)
-  // Day plaster, #EDE8DF.
-  expect(await ground()).toBe('rgb(237, 232, 223)')
+  // Day workspace ground.
+  expect(await ground()).toBe('rgb(255, 255, 255)')
 
   const night = await context.newPage()
   await context.addInitScript(() => { try { localStorage.setItem('fh:theme-mode', 'night') } catch { /* private window */ } })
   await night.goto('/p/t1', { waitUntil: 'domcontentloaded' })
   await expect(night.getByRole('heading', { level: 1 })).toBeVisible()
-  // Night plaster, #171611.
-  expect(await night.locator('.fhp').evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(23, 22, 17)')
+  // Night workspace ground.
+  expect(await night.locator('.fhp').evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(23, 23, 23)')
 })
 
 test('nothing scrolls sideways on a phone, even with a long company and job name', async ({ page, context }) => {

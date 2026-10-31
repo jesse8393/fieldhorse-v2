@@ -419,7 +419,7 @@ export default function Notes() {
 
   return (
     <motion.div
-      className="v3-screen"
+      className="v3-screen fh-notes-phone"
       variants={stagger}
       initial="hidden"
       animate="show"
@@ -431,17 +431,17 @@ export default function Notes() {
           entry. Risks chip turns red when > 0. */}
       <motion.div
         variants={item}
-        className="v3-section v3-section--primary-quiet"
+        className="v3-section v3-section--primary-quiet fh-notes-intro"
         style={{ margin: '12px var(--v3-gutter) 14px', padding: '16px 16px' }}
       >
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <span className="v3-eyebrow" style={{ color: 'var(--v3-primary-text)' }}>Field notes</span>
             <h1 style={{ margin: '6px 0 0', fontSize: 24, lineHeight: 1.1, letterSpacing: 0, fontWeight: 600, color: 'var(--v3-text)' }}>
-              Notes, fast.
+              Notes
             </h1>
             <div className="v3-caption" style={{ marginTop: 6 }}>
-              Speak or type a note. AI organizes it into action items, risks, and materials.
+              Capture what happened. Add AI summaries when you need them.
             </div>
           </div>
           <VoiceButton listening={listening} onStart={startVoice} onStop={stopVoice} />
@@ -493,7 +493,7 @@ export default function Notes() {
           onChange={(e) => setDraft(e.target.value)}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          placeholder={listening ? 'Listening, speak freely…' : 'Capture a note from the jobsite. AI parses it for action items, risks, materials.'}
+          placeholder={listening ? 'Listening, speak freely…' : 'What happened on site?'}
           rows={5}
           style={{
             width: '100%',
@@ -899,12 +899,12 @@ function VoiceButton({ listening, onStart, onStop }: any) {
 }
 
 /* ============================================================
-   NoteCard, single note as a card (not a row). Hierarchy:
+   NoteCard, one report with its record actions. Hierarchy:
      1. Title (parsed summary OR first non-empty line, max 80ch)
      2. Body preview (only if distinct from title; 3-line clamp)
      3. Footer metadata: linked job chip / action-item count / time
-   Card has gold spine on the left (slightly stronger if AI-parsed),
-   subtle hover lift, swipe actions for archive/delete on mobile.
+   Risk reports retain a solid marker. All actions are available without
+   swiping; the optional swipe delete uses the same confirmation.
    ============================================================ */
 function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArchive, onDelete }: any) {
   // Delete takes a second tap on the same button (D57).
@@ -925,19 +925,12 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
   const actionCount = note.parsed?.action_items?.length || 0
   const when = formatRelativeTime(note.created_at)
 
-  // Spine color: red if risks, gold if AI-parsed, neutral otherwise
-  const spine = hasRisk
-    ? 'linear-gradient(180deg, var(--v3-danger), color-mix(in srgb, var(--v3-danger) 40%, transparent))'
-    : hasParsed
-      ? 'linear-gradient(180deg, var(--v3-primary), color-mix(in srgb, var(--v3-primary) 35%, transparent))'
-      : 'linear-gradient(180deg, var(--v3-border-strong), var(--v3-glass-tint))'
-
   const swipeActions = [
     {
       icon: <ArchiveIcon size={18} />,
       label: 'Archive note',
-      color: 'rgba(45, 122, 79, 0.18)',
-      fg: 'var(--v3-success-text)',
+      color: 'var(--v3-surface-2)',
+      fg: 'var(--v3-text)',
       onClick: onArchive
     },
     {
@@ -945,7 +938,7 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
       label: 'Delete note',
       color: 'rgba(192, 57, 43, 0.18)',
       fg: 'var(--v3-danger-text)',
-      onClick: onDelete
+      onClick: () => deleteTap.tap(onDelete)
     }
   ]
 
@@ -957,49 +950,24 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -4 }}
         transition={{ duration: 0.22, delay: Math.min(index * 0.04, 0.20), ease: [0.2, 0.8, 0.2, 1] }}
-        whileHover={{ y: -2 }}
         style={{
           position: 'relative',
           overflow: 'hidden',
-          padding: '12px 12px 12px 16px',
-          borderRadius: 10,
-          background: 'var(--v3-surface)',
-          border: '1px solid var(--v3-border-strong)',
-          boxShadow: '0 1px 0 var(--v3-glass-tint-2) inset, 0 4px 14px rgba(20, 20, 20, 0.30)',
-          WebkitTapHighlightColor: 'transparent',
-          transition: 'border-color 200ms ease, box-shadow 200ms ease, background-color 200ms ease'
-        }}
-        onMouseEnter={(e) => {
-          if (!canHover) return
-          e.currentTarget.style.borderColor = 'var(--v3-border-strong)'
-          e.currentTarget.style.background = 'var(--v3-surface-3)'
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.borderColor = 'var(--v3-border-strong)'
-          e.currentTarget.style.background = 'var(--v3-surface)'
+          padding: hasRisk ? '16px 4px 16px 12px' : '16px 4px',
+          background: 'var(--v3-bg)',
+          borderBottom: '1px solid var(--v3-border-strong)',
+          borderLeft: hasRisk ? '2px solid var(--v3-danger)' : undefined,
+          WebkitTapHighlightColor: 'transparent'
         }}
       >
-        {/* Spine, left edge accent */}
-        <span
-          aria-hidden="true"
-          style={{
-            position: 'absolute',
-            left: 0, top: 10, bottom: 10,
-            width: 3,
-            borderRadius: '0 3px 3px 0',
-            background: spine,
-            boxShadow: hasParsed && !hasRisk ? '0 0 8px rgba(201, 150, 58, 0.30)' : 'none'
-          }}
-        />
-
         {/* Header row: title + (AI badge) + timestamp */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-          <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+          <div style={{ minWidth: 0, flex: '1 1 120px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
             <h3
               style={{
                 margin: 0,
                 fontFamily: 'var(--font-body)',
-                fontSize: 14,
+                fontSize: 16,
                 fontWeight: 600,
                 color: 'var(--v3-text)',
                 lineHeight: 1.35,
@@ -1030,18 +998,11 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
                 </span>
               )}
             </h3>
-          </div>
-          <span style={{
-            flexShrink: 0,
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-            whiteSpace: 'nowrap'
-          }}>
             <span style={{
               display: 'inline-flex',
               alignItems: 'center',
               gap: 4,
+              marginTop: 6,
               fontFamily: 'var(--font-body)',
               fontSize: 12,
               color: 'var(--v3-text-muted)'
@@ -1049,49 +1010,50 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
               <Clock size={11} />
               {when}
             </span>
-            {/* Visible delete affordance, the SwipeableRow swipe-left
-                gesture is preserved as the iOS-native power-user path,
-                but a tappable trash icon makes deletion discoverable
-                for users who don't think to swipe. Stops propagation so
-                the row's onTap doesn't fire underneath. */}
-            {onDelete && (
-              <button
-                type="button"
-                onClick={(ev) => {
-                  ev.stopPropagation()
-                  deleteTap.tap(onDelete)
-                }}
-                aria-label={deleteTap.armed ? 'Tap again to delete' : 'Delete note'}
-                title={deleteTap.armed ? 'Tap again to delete this note. This cannot be undone.' : 'Delete note'}
-                style={{
-                  width: deleteTap.armed ? 'auto' : 32, height: 32, padding: deleteTap.armed ? '0 8px' : 0,
-                  fontSize: 14, fontWeight: 700, fontFamily: 'var(--font-body)',
-                  display: 'grid', placeItems: 'center',
-                  borderRadius: 10,
-                  background: 'transparent',
-                  border: '1px solid transparent',
-                  color: 'var(--v3-text-muted)',
-                  cursor: 'pointer',
-                  WebkitTapHighlightColor: 'transparent',
-                  touchAction: 'manipulation',
-                  transition: 'color 160ms ease, background 160ms ease, border-color 160ms ease'
-                }}
-                onMouseEnter={(ev) => {
-                  if (!canHover) return
-                  ev.currentTarget.style.color = 'var(--v3-danger-bright)'
-                  ev.currentTarget.style.background = 'color-mix(in srgb, var(--v3-danger-bright) 10%, transparent)'
-                  ev.currentTarget.style.borderColor = 'color-mix(in srgb, var(--v3-danger-bright) 30%, transparent)'
-                }}
-                onMouseLeave={(ev) => {
-                  ev.currentTarget.style.color = 'var(--v3-text-muted)'
-                  ev.currentTarget.style.background = 'transparent'
-                  ev.currentTarget.style.borderColor = 'transparent'
-                }}
-              >
-                {deleteTap.armed ? 'Tap again to delete' : <Trash2 size={13} aria-hidden="true" />}
-              </button>
-            )}
-          </span>
+          </div>
+          {/* Visible delete affordance, the SwipeableRow swipe-left
+              gesture is preserved as the iOS-native power-user path,
+              but a tappable trash icon makes deletion discoverable
+              for users who don't think to swipe. Stops propagation so
+              the row's onTap doesn't fire underneath. */}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={(ev) => {
+                ev.stopPropagation()
+                deleteTap.tap(onDelete)
+              }}
+              aria-label={deleteTap.armed ? 'Tap again to delete' : 'Delete note'}
+              title={deleteTap.armed ? 'Tap again to delete this note' : 'Delete note'}
+              style={{
+                width: deleteTap.armed ? 'auto' : 44, minHeight: 44, maxWidth: '100%', padding: deleteTap.armed ? '8px 12px' : 0,
+                flexShrink: 0,
+                fontSize: 14, fontWeight: 700, fontFamily: 'var(--font-body)',
+                display: 'grid', placeItems: 'center',
+                borderRadius: 10,
+                background: 'transparent',
+                border: '1px solid transparent',
+                color: 'var(--v3-text-muted)',
+                cursor: 'pointer',
+                WebkitTapHighlightColor: 'transparent',
+                touchAction: 'manipulation',
+                transition: 'color 160ms ease, background 160ms ease, border-color 160ms ease'
+              }}
+              onMouseEnter={(ev) => {
+                if (!canHover) return
+                ev.currentTarget.style.color = 'var(--v3-danger-bright)'
+                ev.currentTarget.style.background = 'color-mix(in srgb, var(--v3-danger-bright) 10%, transparent)'
+                ev.currentTarget.style.borderColor = 'color-mix(in srgb, var(--v3-danger-bright) 30%, transparent)'
+              }}
+              onMouseLeave={(ev) => {
+                ev.currentTarget.style.color = 'var(--v3-text-muted)'
+                ev.currentTarget.style.background = 'transparent'
+                ev.currentTarget.style.borderColor = 'transparent'
+              }}
+            >
+              {deleteTap.armed ? 'Tap again to delete' : <Trash2 size={16} aria-hidden="true" />}
+            </button>
+          )}
         </div>
 
         {/* Body preview, clamped to 3 lines */}
@@ -1118,7 +1080,7 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
         {(!hideJobChip && contact?.name) || actionCount > 0 ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
             {!hideJobChip && contact?.name && (
-              <Eyebrow style={{ gap: 4, padding: '4px 8px', borderRadius: 10, background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)', whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
+              <Eyebrow style={{ gap: 4, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
                 <Briefcase size={10} color="var(--v3-primary)" />
                 {reportJobLabel(contact)}
               </Eyebrow>
@@ -1131,9 +1093,14 @@ function NoteCard({ note, contacts, index = 0, hideJobChip = false, onTap, onArc
             )}
           </div>
         ) : null}
-        {contact && onTap && <button type="button" onClick={onTap} className="v3-section-link" style={{ minHeight: 44, marginTop: 8 }}>
-          Open linked job <ChevronRight size={14} aria-hidden="true" />
-        </button>}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginTop: 8 }}>
+          {contact && onTap && <button type="button" onClick={onTap} className="v3-section-link" style={{ minHeight: 44 }}>
+            Open linked job <ChevronRight size={14} aria-hidden="true" />
+          </button>}
+          {onArchive && <button type="button" onClick={onArchive} aria-label="Archive note" className="v3-section-link" style={{ minHeight: 44 }}>
+            Archive
+          </button>}
+        </div>
       </motion.article>
     </SwipeableRow>
   )

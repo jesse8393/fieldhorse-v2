@@ -328,21 +328,23 @@ test('an alert line never moves the column sideways, even where it makes the pag
 
 test('with the photo, an alert line moves neither the column nor the photo, even where it makes the page scroll', async ({ context, page }) => {
   await stubSignedOut(context)
-  // Short enough that the column starts at its 80 px floor, so even with
-  // room for one line the alert makes the page scroll.
+  // Start near the column's 80 px floor, then size the window to leave
+  // half an alert line. The shorter wordmark no longer overflows at 700.
   await page.setViewportSize({ width: 1280, height: 700 })
   await page.goto('/login')
   await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible()
   await photoShown(page)
   await page.evaluate(() => document.fonts.ready)
+  const shortHeight = Math.ceil((await page.locator('.fha__col').boundingBox())!.height + 18)
+  await page.setViewportSize({ width: 1280, height: shortHeight })
   const scrollbar = await browserScrollbar(page)
 
   const before = await column(page)
-  expect(before.scrollHeight, JSON.stringify(before)).toBeLessThanOrEqual(700)
+  expect(before.scrollHeight, JSON.stringify(before)).toBeLessThanOrEqual(shortHeight)
   await failSignIn(page)
   const after = await column(page)
   const at = JSON.stringify({ before, after })
-  expect(after.scrollHeight, at).toBeGreaterThan(700)
+  expect(after.scrollHeight, at).toBeGreaterThan(shortHeight)
   expect(after.clientWidth, at).toBe(1280 - scrollbar)
   expect(after.wordmarkLeft, at).toBe(before.wordmarkLeft)
   expect(after.signInLeft, at).toBe(before.signInLeft)
@@ -351,7 +353,7 @@ test('with the photo, an alert line moves neither the column nor the photo, even
   // and the stage clips it there, so nothing scrolls sideways.
   expect(after.photo, at).toEqual(before.photo)
   expect(after.scrollWidth, at).toBe(after.clientWidth)
-  expect(after.clientHeight, at).toBe(700)
+  expect(after.clientHeight, at).toBe(shortHeight)
 })
 
 test('an app page keeps its reserved gutter', async ({ context, page }) => {

@@ -5,13 +5,14 @@
 // behavior, delete flows, and tab routing all stay in the parent.
 
 import type { ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Bell, Search, ChevronLeft, ChevronRight, Edit2, Trash2,
-  Phone, Mail, MapPin, AlertTriangle, Plus, ExternalLink, Receipt,
+  Phone, Mail, MapPin, ArrowUpRight, Plus, ExternalLink, Receipt,
 } from 'lucide-react'
 import { money, moneyFull } from '../../lib/format.ts'
+import { clientActivity } from '../../lib/clientActivity.ts'
 import MiniMetric from '../MiniMetric.tsx'
-import TopbarWeather from './TopbarWeather.tsx'
 import PaletteKeyCap, { paletteShortcut } from './PaletteKeyCap.tsx'
 
 type Tab = { id: string; label: string }
@@ -56,11 +57,10 @@ export default function SnowClientDetailBuild(props: Props) {
     onBack, onEdit, onDelete, deleteArmed = false, onNewDeal, onStatement, isEditing, children,
   } = props
 
+  const activity = clientActivity(client?.last_activity_at)
   const status: { label: string; tone: 'good' | 'warn' | 'neutral' } = (() => {
     if (activeCount > 0) {
-      const last = new Date(client?.last_activity_at || 0).getTime()
-      const stale = Number.isFinite(last) && Date.now() - last > 30 * 24 * 60 * 60 * 1000
-      return stale ? { label: 'Cooling', tone: 'warn' } : { label: 'Active', tone: 'good' }
+      return activity.state === 'stale' ? { label: 'Cooling', tone: 'warn' } : { label: 'Active', tone: 'good' }
     }
     return { label: 'Dormant', tone: 'neutral' }
   })()
@@ -77,17 +77,17 @@ export default function SnowClientDetailBuild(props: Props) {
       new Date(a.updated_at || a.created_at || 0).getTime())
     .slice(0, 4)
 
-  // Next action heuristic, honest derivations from data
+  // Each suggestion opens the workspace needed to act on it.
   const nextAction = outstanding > 0
-    ? { label: 'Review remaining contract balance', tone: 'warn' as const }
-    : activeCount === 0
-      ? { label: 'Contact again client', tone: 'neutral' as const }
+    ? { label: 'Review contract balance', detail: 'Includes work not yet invoiced.', run: () => onTabChange('projects') }
+    : activeCount === 0 && onNewDeal
+      ? { label: 'Start new work', detail: 'Carry this customer into a new record.', run: onNewDeal }
       : status.tone === 'warn'
-        ? { label: 'Follow up on stale jobs', tone: 'warn' as const }
-        : { label: 'Review active work', tone: 'neutral' as const }
+        ? { label: 'Review recent activity', detail: 'Last recorded activity exceeds 30 days.', run: () => onTabChange('activity') }
+        : { label: 'Review active work', detail: 'Open linked jobs, quotes, and invoices.', run: () => onTabChange('projects') }
 
   return (
-    <div className="fh-build-page fh-build-detail" data-build-screen="SnowClientDetailBuild">
+    <div className="fh-build-page fh-build-detail fh-client-workspace" data-build-screen="SnowClientDetailBuild">
       <header className="fh-build-topbar fh-build-topbar--detail">
         <button type="button" className="fh-build-back" onClick={onBack} aria-label="Back to clients">
           <ChevronLeft size={16} /> Clients
@@ -103,10 +103,6 @@ export default function SnowClientDetailBuild(props: Props) {
           <span>Search jobs, clients, invoices, notes...</span>
           <PaletteKeyCap />
         </button>
-        <div className="fh-build-topbar__meta">
-          <span>{(client?.name || 'Client').toString()}</span>
-          <TopbarWeather lead />
-        </div>
         <button className="fh-build-icon-btn" type="button" onClick={() => window.dispatchEvent(new CustomEvent('fh:navigate', { detail: { to: '/activity' } }))} aria-label="Open activity" title="Activity"><Bell size={16} /></button>
         {onEdit && (
           <button
@@ -141,12 +137,8 @@ export default function SnowClientDetailBuild(props: Props) {
             <h1 className="fh-build-title fh-build-title--name">{client?.name || 'Unnamed client'}</h1>
             <div className="fh-build-detail-sub">
               <span className={`fh-build-dot is-${status.tone}`}>{status.label}</span>
-              {client?.last_activity_at && (
-                <>
-                  <span className="fh-build-dot-sep">·</span>
-                  <span className="fh-build-rel">Last touch {relTime(client.last_activity_at)}</span>
-                </>
-              )}
+              <span className="fh-build-dot-sep">·</span>
+              <span className="fh-build-rel">{activity.lastTouch ? `Last touch ${relTime(activity.lastTouch)}` : 'Activity date unavailable'}</span>
             </div>
           </div>
 
@@ -154,7 +146,7 @@ export default function SnowClientDetailBuild(props: Props) {
             <MiniMetric label="Lifetime value" value={money(lifetime)} accent />
             <MiniMetric label="Open value" value={openValue > 0 ? money(openValue) : '\u2003'} />
             <MiniMetric label="Active jobs" value={String(activeCount)} />
-            <MiniMetric label="Remaining contract value" value={outstanding > 0 ? money(outstanding) : '\u2003'} tone={outstanding > 0 ? 'warn' : undefined} />
+            <MiniMetric label="Remaining contract value" value={moneyFull(outstanding)} />
           </div>
         </section>
 
@@ -167,6 +159,7 @@ export default function SnowClientDetailBuild(props: Props) {
                 type="button"
                 className={`fh-build-tab${activeTab === t.id ? ' is-active' : ''}`}
                 onClick={() => onTabChange(t.id)}
+                aria-current={activeTab === t.id ? 'page' : undefined}
               >
                 {t.label}
               </button>
@@ -177,7 +170,7 @@ export default function SnowClientDetailBuild(props: Props) {
               </button>
             )}
             {onNewDeal && (
-              <button type="button" className="fh-build-tabs__cta" onClick={onNewDeal} style={onStatement ? undefined : { marginLeft: 'auto' }}>
+              <button type="button" className="fh-build-tabs__cta fh-client-new" onClick={onNewDeal} style={onStatement ? undefined : { marginLeft: 'auto' }}>
                 <Plus size={13} /> New deal
               </button>
             )}
@@ -189,61 +182,35 @@ export default function SnowClientDetailBuild(props: Props) {
             {children}
           </div>
 
-          <aside className="fh-build-rail fh-build-rail--page">
+          <aside className="fh-build-rail fh-build-rail--page" aria-label="Customer context">
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Next action</div>
-              <strong style={{ color: nextAction.tone === 'warn' ? 'var(--v3-primary-text)' : undefined }}>
-                {nextAction.label}
-              </strong>
-              <span>Based on contract balances and activity</span>
+              <button type="button" className="fh-client-next" onClick={nextAction.run}>
+                <span>{nextAction.label}</span><ArrowUpRight size={18} aria-hidden="true" />
+              </button>
+              <span>{nextAction.detail}</span>
             </section>
 
-            {outstanding > 0 && (
-              <section className="fh-build-rail-card">
-                <div className="fh-build-eyebrow">Remaining contract value</div>
-                <strong style={{ color: 'var(--v3-primary-text)' }}>{moneyFull(outstanding)}</strong>
-                <span>Contract value less recorded payments, including unbilled work</span>
-                <div className="fh-build-spark is-gold" />
-              </section>
-            )}
-
             <section className="fh-build-rail-card">
-              <div className="fh-build-eyebrow">Relationship activity</div>
-              {activeCount === 0 ? (
-                <span>No active jobs</span>
-              ) : status.tone === 'warn' ? (
-                <>
-                  <strong style={{ color: 'var(--v3-primary-text)', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                    <AlertTriangle size={14} /> Cooling
-                  </strong>
-                  <span>30+ days since last touch</span>
-                </>
-              ) : (
-                <>
-                  <strong style={{ color: 'var(--v3-success-text)' }}>Recent activity</strong>
-                  <span>Activity recorded within 30 days</span>
-                </>
-              )}
-            </section>
-
-            <p className="fh-build-rel">Delivery and billing review appears in Overview.</p>
-            <section className="fh-build-rail-card">
-              <div className="fh-build-eyebrow">Recent activity</div>
+              <div className="fh-build-eyebrow">Recently updated jobs</div>
               {recent.length === 0 ? (
                 <span>No jobs yet</span>
               ) : (
                 <ul className="fh-build-rail-list" style={{ marginTop: 10 }}>
                   {recent.map((j: any) => (
                     <li key={j.id}>
-                      <span className="fh-build-rail-list__time">{relTime(j.updated_at || j.created_at)}</span>
-                      <span className="fh-build-rail-list__title" title={j.name || ''}>{j.name || 'Untitled'}</span>
+                      <Link className="fh-client-recent" to={`/jobs/${encodeURIComponent(j.id)}`}>
+                        <span className="fh-build-rail-list__time">{relTime(j.updated_at || j.created_at)}</span>
+                        <span className="fh-build-rail-list__title">{j.job_title || j.name || 'Untitled job'}</span>
+                        <ChevronRight size={14} aria-hidden="true" />
+                      </Link>
                     </li>
                   ))}
                 </ul>
               )}
             </section>
 
-            <section className="fh-build-rail-card">
+            {activeTab !== 'overview' && <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Contact info</div>
               <div className="fh-build-contact-list">
                 {client?.phone && (
@@ -269,7 +236,7 @@ export default function SnowClientDetailBuild(props: Props) {
                   </span>
                 )}
               </div>
-            </section>
+            </section>}
           </aside>
         </section>
       </div>

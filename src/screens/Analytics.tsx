@@ -329,7 +329,7 @@ export default function Analytics() {
 
   return (
     <motion.div
-      className="v3-screen"
+      className="v3-screen fh-reports-phone"
       variants={stagger}
       initial="hidden"
       animate="show"
@@ -396,17 +396,12 @@ export default function Analytics() {
             className="v3-section"
             style={{ margin: '0 var(--v3-gutter) 14px' }}
           >
-            <SectionHeader label="Owner KPIs" />
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-              gap: 12,
-              marginTop: 4
-            }}>
-              <KPI label="Pipeline"          to={stats.pipeline}         format={fmtMoneyCompact} Icon={TrendingUp} gold />
-              <KPI label="Won YTD"           to={stats.wonYTD}           format={fmtMoneyCompact} Icon={DollarSign} gold />
-              <KPI label="Issued invoices YTD" to={stats.invoiced} format={fmtMoneyCompact} Icon={DollarSign} note="Issued amounts, excluding drafts and voids" />
-              <KPI label="Payments received YTD" to={stats.collected} format={fmtMoneyCompact} Icon={DollarSign} note="Receipts by payment date, including earlier invoices" />
+            <SectionHeader label="Business overview" />
+            <div className="fh-reports-metrics">
+              <KPI label="Payments received YTD" to={stats.collected} format={fmtMoneyCompact} note="Receipts by payment date, including earlier invoices" />
+              <KPI label="Issued invoices YTD" to={stats.invoiced} format={fmtMoneyCompact} note="Issued amounts, excluding drafts and voids" />
+              <KPI label="Active job value" to={stats.pipeline} format={fmtMoneyCompact} />
+              <KPI label="Won YTD" to={stats.wonYTD} format={fmtMoneyCompact} />
               <KPI label="Tracked profit YTD" to={stats.profitYTD} format={fmtMoneyCompact} Icon={DollarSign} note={stats.profitNote} gold />
               <KPI label="Avg margin"        to={stats.avgMargin}        format={fmtPct}          Icon={Target} note={stats.avgMarginNote} />
               <KPI label="Win rate · 90 days"        to={stats.closeRate}        format={fmtPct}          Icon={Target} note={stats.closeRateNote} />
@@ -458,9 +453,9 @@ export default function Analytics() {
             <div className="v3-section-header">
               <span className="v3-eyebrow" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                 <TrendingUp size={11} color="var(--v3-primary)" />
-                Pipeline trend · 12 wks
+                Active jobs · created week
               </span>
-              <span className="v3-eyebrow" style={{ opacity: 0.65 }}>Active value</span>
+              <span className="v3-eyebrow">12 weeks</span>
             </div>
             <div style={{ height: 120, padding: '8px 0', borderRadius: 10, background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)', position: 'relative' }}>
               {/* Real empty state for low data, was a misleading
@@ -469,48 +464,38 @@ export default function Analytics() {
                   non-zero amounts, render a clear "not enough data" hint. */}
               {trendData.filter((d) => d.amount > 0).length < 4 ? (
                 <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '0 16px', textAlign: 'center' }}>
-                  <div aria-hidden="true" style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 32, opacity: 0.18 }}>
-                    {[16, 22, 18, 28, 24, 34].map((h, i) => (
-                      <span key={i} style={{ width: 5, height: `${h}px`, borderRadius: 10, background: 'var(--field-gold-bright)' }} />
-                    ))}
-                  </div>
                   <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, color: 'var(--v3-text)' }}>Not enough data yet</div>
-                  <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--v3-text-muted)' }}>The trend lights up once you have 4+ weeks of pipeline.</div>
+                  <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--v3-text-muted)' }}>A comparison appears when active jobs span at least four creation weeks.</div>
                 </div>
               ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={trendData} margin={{ top: 8, right: 12, left: 12, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="fhPipelineGold" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#C9963A" stopOpacity={0.55} />
-                      <stop offset="100%" stopColor="#C9963A" stopOpacity={0.02} />
-                    </linearGradient>
-                  </defs>
                   <XAxis dataKey="week" hide />
                   <YAxis hide />
                   <Tooltip
                     contentStyle={{ background: 'var(--surface-1)', border: '1px solid var(--rule-bold)', borderRadius: 10, fontFamily: 'var(--font-body)', fontSize: 14 }}
                     labelStyle={{ color: 'var(--ink-muted)', fontSize: 14, letterSpacing: 0 }}
                     itemStyle={{ color: 'var(--v3-primary-text)', fontWeight: 700 }}
-                    formatter={(v) => [fmtMoneyCompact(v), 'Pipeline']}
+                    formatter={(v) => [fmtMoneyCompact(v), 'Active job value']}
                   />
                   <Area
                     type="monotone"
                     dataKey="amount"
-                    stroke="#C9963A"
+                    stroke="var(--fh-gold)"
                     strokeWidth={2}
-                    fill="url(#fhPipelineGold)"
+                    fill="var(--fh-accent-soft)"
                     dot={false}
-                    activeDot={{ r: 4, fill: '#C9963A', stroke: 'var(--onyx)', strokeWidth: 2 }}
+                    activeDot={{ r: 4, fill: 'var(--fh-gold)', stroke: 'var(--fh-paper)', strokeWidth: 2 }}
                   />
                 </AreaChart>
               </ResponsiveContainer>
               )}
             </div>
+            <p className="v3-caption">Current contract value, grouped by when each active job was created.</p>
           </motion.section>
 
           <motion.section variants={item} className="v3-section" style={{ margin: '0 var(--v3-gutter) 14px' }}>
-            <SectionHeader label="Pipeline by stage" />
+            <SectionHeader label="Job value by stage" />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
               {byStage.map((s, i) => {
                 const widthPct = (s.value / maxStageValue) * 100
@@ -535,7 +520,7 @@ export default function Analytics() {
                         style={{
                           height: '100%',
                           borderRadius: 10,
-                          background: `linear-gradient(90deg, ${s.color}, var(--v3-primary))`
+                          background: s.color
                         }}
                       />
                     </div>
@@ -543,6 +528,7 @@ export default function Analytics() {
                 )
               })}
             </div>
+            <p className="v3-caption">Current contract amounts by job status, including closed and lost jobs. These are not outstanding invoice balances.</p>
           </motion.section>
 
           {/* MILEAGE LOG */}
@@ -811,81 +797,14 @@ function FunnelBar({ label, count, max, note, gold, danger }: any) {
   )
 }
 
-function KPI({ label, to, format, Icon, gold, note }: any) {
+function KPI({ label, to, format, note }: any) {
   return (
-    <div
-      style={{
-        position: 'relative',
-        overflow: 'hidden',
-        padding: '12px 12px 12px',
-        borderRadius: 10,
-        background: 'var(--v3-surface)',
-        border: gold
-          ? '1px solid color-mix(in srgb, var(--v3-primary) 35%, var(--v3-border-strong))'
-          : '1px solid var(--v3-border-strong)',
-        boxShadow: gold
-          ? '0 1px 0 var(--v3-glass-tint-2) inset, 0 4px 12px rgba(20, 20, 20, 0.28), 0 4px 14px rgba(201, 150, 58, 0.10)'
-          : '0 1px 0 var(--v3-glass-tint-2) inset, 0 4px 12px rgba(20, 20, 20, 0.26)',
-        minHeight: 92
-      }}
-    >
-      {/* Top accent, 1px gold gradient stroke for emphasized tiles */}
-      {gold && (
-        <span aria-hidden="true" style={{
-          position: 'absolute',
-          top: 0,
-          left: '14%',
-          right: '14%',
-          height: 1,
-          background: 'linear-gradient(90deg, transparent 0%, rgba(201, 150, 58, 0.55) 50%, transparent 100%)',
-          pointerEvents: 'none'
-        }} />
-      )}
-      {Icon && (
-        <Icon
-          size={14}
-          style={{
-            position: 'absolute',
-            top: 12,
-            right: 12,
-            color: gold ? 'var(--v3-primary-text)' : 'var(--v3-text-muted)',
-            opacity: gold ? 1 : 0.6
-          }}
-        />
-      )}
-      <div className="v3-eyebrow" style={{ paddingRight: 24 }}>{label}</div>
-      <div
-        style={{
-          fontFamily: 'var(--font-display)',
-          fontSize: 24,
-          letterSpacing: 0,
-          lineHeight: 1,
-          marginTop: 10,
-          color: gold ? 'var(--v3-primary-text)' : 'var(--v3-text)',
-          fontVariantNumeric: 'tabular-nums',
-          textShadow: gold ? '0 1px 12px rgba(201, 150, 58, 0.20)' : 'none'
-        }}
-      >
-        {to == null ? (
-          <span style={{ color: 'var(--v3-text-muted)' }}>{' '}</span>
-        ) : (
-          <CountUp to={Number(to || 0)} duration={0.9} formatter={format} />
-        )}
+    <div className={`fh-report-metric${to == null ? ' is-unknown' : ''}`}>
+      <div className="fh-report-metric__label">{label}</div>
+      <div className="fh-report-metric__value">
+        {to == null ? 'Not enough data' : <CountUp to={Number(to || 0)} duration={0.9} formatter={format} />}
       </div>
-      {note && (
-        <div style={{
-          marginTop: 6,
-          fontFamily: 'var(--font-body)',
-          fontSize: 14,
-          fontWeight: 500,
-          letterSpacing: 0,
-          color: to == null ? 'var(--v3-text-muted)' : 'var(--v3-text-muted)',
-          lineHeight: 1.5,
-          opacity: 1
-        }}>
-          {note}
-        </div>
-      )}
+      {note && <p>{note}</p>}
     </div>
   )
 }

@@ -281,12 +281,9 @@ test('uses the full desktop workspace without changing the mobile screens', asyn
     await capture(page, testInfo, `desktop-${route.name}`, true)
   }
 
-  const sidebarOverflow = await page.locator('.fhs-side__nav').evaluate((element) => ({
-    overflowY: getComputedStyle(element).overflowY,
-    scrollbarWidth: getComputedStyle(element).scrollbarWidth,
-  }))
-  expect(sidebarOverflow.overflowY).toBe('auto')
-  expect(sidebarOverflow.scrollbarWidth).toBe('none')
+  const headerOverflow = await page.locator('.fh-glass-header').evaluate(element => element.scrollWidth - element.clientWidth)
+  expect(headerOverflow).toBeLessThanOrEqual(1)
+  await expect(page.locator('.fh-glass-nav').getByRole('link', { name: 'More', exact: true })).toBeVisible()
 
   await page.setViewportSize({ width: 1024, height: 900 })
   const compactDesktopRoutes = [

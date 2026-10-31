@@ -19,7 +19,7 @@ export default function FinancialsTab({
   const sub = !canSeeMoney ? 'expenses' : section === 'financials' ? 'invoice' : section
   return (
     <div>
-      <div className="v3-section" style={{ margin: '12px var(--v3-gutter) 24px' }}>
+      <div className="v3-section fh-job-section-frame">
         {sub === 'subs' && (
           <SubsSection contact={contact} subs={subs} userId={userId} fetchAll={fetchAll} />
         )}

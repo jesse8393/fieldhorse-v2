@@ -127,7 +127,7 @@ export default function SnowHomeBuild({
 
   /* ----- Stage ----- */
   const stage = (
-    <OnyxStage glow className="fhtd-stage" aria-labelledby="fht-title">
+    <OnyxStage tone="paper" className="fhtd-stage" aria-labelledby="fht-title">
       <div className="fht-stage__meta">
         <p className="fht-date">{evening ? eveningDate(now) : longDate(now)}</p>
         <div className="fhtd-stage__tools">
@@ -190,7 +190,7 @@ export default function SnowHomeBuild({
               <>
                 <div className="fht-card" aria-hidden="true">
                   <div className="fht-card__tray">
-                    <div className="fht-card__frame fh-onyx-scope">
+                    <div className="fht-card__frame">
                       <Skeleton width="40%" height={12} />
                       <Skeleton width="64%" height={22} />
                     </div>

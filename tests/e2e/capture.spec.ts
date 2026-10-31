@@ -108,7 +108,8 @@ test.describe('capture screen', () => {
     // Brushed once there is something to file.
     await screen.getByRole('textbox', { name: 'Or type it' }).fill('Pour moved to Friday')
     await expect(gold).toBeEnabled()
-    expect(await gold.evaluate((el) => getComputedStyle(el).backgroundImage)).toContain('linear-gradient')
+    await expect(gold).toHaveCSS('background-image', 'none')
+    await expect(gold).toHaveCSS('background-color', 'rgb(173, 64, 41)')
     await screen.getByRole('textbox', { name: 'Or type it' }).fill('')
 
     // Done goes back to where the capture started.
@@ -176,7 +177,36 @@ test.describe('capture screen', () => {
     await expect(starts.getByRole('link', { name: /^Time/ })).toBeVisible()
     await expect(starts.getByRole('link', { name: /^Lead/ })).toHaveCount(0)
     await expect(starts.getByRole('link', { name: /^Quote/ })).toHaveCount(0)
+    await expect(page.getByText('A task, expense, visit or note.', { exact: true })).toBeVisible()
   })
+
+  for (const role of ['crew', 'foreman']) {
+    for (const kind of ['payment', 'lead']) {
+      test(`${role} can retain a proposed ${kind} as a note without a restricted write`, async ({ context, page }) => {
+        await signIn(context, { role })
+        await mockModel(page, { kind, summary: 'Review captured information', job_id: 'c-job1', confidence: 0.9, amount: 500, name: 'New customer', title: 'Site visit' })
+        const notes = await keepNotes(page)
+        const restrictedWrites: string[] = []
+        page.on('request', (request) => {
+          if (request.method() === 'POST' && /\/rest\/v1\/(fh_payments|fh_leads|fh_clients)(?:\?|$)/.test(request.url())) restrictedWrites.push(request.url())
+        })
+        await open(page, '/capture?job=c-job1')
+        await expectCaptureOpen(page)
+        await expect(page.getByText('Attached to Slab + trench.', { exact: true })).toBeVisible()
+        const words = kind === 'payment' ? 'The homeowner handed over a check for 500 dollars' : 'A new customer asked about a site visit'
+        await page.getByRole('textbox', { name: 'Or type it' }).fill(words)
+        await page.getByRole('button', { name: 'File it', exact: true }).click()
+        await expect(page.getByRole('status').filter({ hasText: `A manager can ${kind === 'payment' ? 'record this payment' : 'create this lead'}.` })).toBeVisible()
+        await expect(page.getByRole('textbox', { name: 'Amount', exact: true })).toHaveCount(0)
+        expect(notes).toHaveLength(0)
+        await page.getByRole('button', { name: 'Save', exact: true }).click()
+        await expect.poll(() => notes.length).toBe(1)
+        expect(notes[0].text).toBe(words)
+        expect(notes[0].contact_id).toBe('c-job1')
+        expect(restrictedWrites).toEqual([])
+      })
+    }
+  }
 
   test('opened on a job, it files there and nothing writes before Save', async ({ context, page }) => {
     await signIn(context)
@@ -329,34 +359,19 @@ test.describe('desktop capture', () => {
       await expect(page.getByRole('button', { name: /^Capture/ })).toHaveCount(1)
     }
 
-    const sidebar = page.getByRole('complementary', { name: 'Primary navigation' })
+    const sidebar = page.locator('.fh-glass-header')
     const search = sidebar.getByRole('button', { name: /^Search everything/ })
     const capture = sidebar.getByRole('button', { name: /^Capture/ })
     await expect(search).toBeVisible()
     await expect(capture).toBeVisible()
 
-    // Under Search and above the main list.
-    const [s, c, t] = await Promise.all([
-      search.boundingBox(),
-      capture.boundingBox(),
-      sidebar.getByRole('button', { name: 'Today', exact: true }).boundingBox()
-    ])
-    expect(c!.y).toBeGreaterThan(s!.y + s!.height - 1)
-    expect(t!.y).toBeGreaterThan(c!.y + c!.height - 1)
-    // A real control: at least 40 px tall like the rows around it, and quiet (no brushed gold).
-    expect(c!.height).toBeGreaterThanOrEqual(40)
-    expect(await capture.evaluate((el) => getComputedStyle(el).backgroundImage)).toBe('none')
-
-    // The key cap prints the platform's modifier and the shortcut is declared.
-    const cap = capture.locator('kbd')
-    await expect(cap).toBeVisible()
+    // The header keeps capture and search visible and keyboard-discoverable.
+    const [searchBox, captureBox] = await Promise.all([search.boundingBox(), capture.boundingBox()])
+    expect(Math.abs(searchBox!.y - captureBox!.y)).toBeLessThanOrEqual(4)
+    expect(captureBox!.height).toBeGreaterThanOrEqual(44)
     const isMac = await page.evaluate(() => /Macintosh/.test(navigator.userAgent))
-    await expect(cap).toHaveText(isMac ? '⌘J' : 'Ctrl J')
     await expect(capture).toHaveAttribute('aria-keyshortcuts', isMac ? 'Meta+J' : 'Control+J')
     await expect(capture).toHaveAccessibleName(isMac ? 'Capture (Command J)' : 'Capture (Control J)')
-    // The Capture cap lines up under the Search cap: the same right edge.
-    const [searchCap, captureCap] = await Promise.all([search.locator('kbd').boundingBox(), cap.boundingBox()])
-    expect(Math.abs((captureCap!.x + captureCap!.width) - (searchCap!.x + searchCap!.width))).toBeLessThanOrEqual(0.5)
 
     // The item opens the same screen the coin does.
     await capture.click()

@@ -690,7 +690,7 @@ test.describe('Reports', () => {
   // The mock's active job stages add up to $45,900. Its leads and quotes
   // live in fh_leads and fh_quotes (Task 15), which feed the funnel and the
   // lead and quote counts, not the pipeline money.
-  const PIPELINE = '$46K'
+  const PIPELINE = '$45,900'
 
   test('while the numbers load nothing reads as zero, empty or not connected', async ({ context, page }, testInfo) => {
     await signIn(context)
@@ -703,18 +703,18 @@ test.describe('Reports', () => {
         await expect(page.getByText('Not enough data yet.', { exact: true })).toHaveCount(0)
       })
       read.release()
-      await expect(page.getByText('Owner KPIs', { exact: true })).toBeVisible()
+      await expect(page.getByText('Business overview', { exact: true })).toBeVisible()
       await expect(page.getByText('Not enough data yet.', { exact: true })).toHaveCount(0)
       return
     }
     await open(page, '/analytics', '[data-build-screen="SnowAnalyticsBuild"]')
     await expect.poll(() => read.held.length).toBeGreaterThan(0)
-    const pipeline = page.locator('.fh-build-mini').filter({ hasText: 'Pipeline' })
+    const pipeline = page.getByRole('region', { name: 'Financial overview' }).locator('.fh-build-kpi-cell').filter({ hasText: 'Active job value' })
     await holds(async () => {
       await expect(page.getByText(/\$0 won/)).toHaveCount(0)
       await expect(pipeline.getByRole('status', inPage)).toHaveCount(1)
       await expect(pipeline).not.toContainText('$0')
-      await expect(page.locator('.fh-build-focus').getByRole('status')).toBeVisible()
+      await expect(page.getByRole('region', { name: 'Business overview' }).getByRole('status').first()).toBeVisible()
       await expect(page.locator('.fh-build-kpi-strip')).not.toContainText('Not connected')
       await expect(page.locator('.fh-build-kpi-strip').getByRole('status').first()).toBeVisible()
       await expect(page.locator('.fh-build-rail-card').filter({ hasText: 'Largest stage' }).getByRole('status')).toBeVisible()
@@ -722,7 +722,7 @@ test.describe('Reports', () => {
     })
     read.release()
     await expect(pipeline.locator('strong')).toHaveText(PIPELINE)
-    await expect(page.locator('.fh-build-focus')).toContainText(' won · ')
+    await expect(page.getByRole('region', { name: 'Financial overview' })).toContainText('Won YTD')
     await expect(page.locator('.fh-build-kpi-strip')).not.toContainText('Not connected')
     await expect(page.locator('[data-build-screen="SnowAnalyticsBuild"]').getByRole('status', inPage)).toHaveCount(0)
   })
@@ -739,9 +739,9 @@ test.describe('Reports', () => {
     await retryFromKeyboard(page, error.getByRole('button', { name: 'Try again' }))
     await expect(error).toHaveCount(0)
     if (isPhone(testInfo.project.name)) {
-      await expect(page.getByText('Owner KPIs', { exact: true })).toBeVisible()
+      await expect(page.getByText('Business overview', { exact: true })).toBeVisible()
     } else {
-      await expect(page.locator('.fh-build-mini').filter({ hasText: 'Pipeline' }).locator('strong')).toHaveText(PIPELINE)
+      await expect(page.getByRole('region', { name: 'Financial overview' }).locator('.fh-build-kpi-cell').filter({ hasText: 'Active job value' }).locator('strong')).toHaveText(PIPELINE)
     }
     // The whole screen was the error: focus waits on the page's main region.
     await expect(page.locator('#fh-main')).toBeFocused()
@@ -1040,9 +1040,11 @@ test.describe('Field reports', () => {
     await open(page, '/notes', '[data-build-screen="SnowNotesBuild"]')
     await expect.poll(() => read.held.length).toBeGreaterThan(0)
     const rail = page.locator('.fh-build-rail--page')
+    const reports = page.getByRole('region', { name: 'Latest reports' })
     await holds(async () => {
-      await expect(page.locator('.fh-build-topbar__meta')).not.toContainText('captured')
-      await expect(page.locator('.fh-build-topbar__meta').getByRole('status')).toBeVisible()
+      await expect(reports).not.toContainText('Report history ·')
+      await expect(reports.getByRole('status')).toBeVisible()
+      await expect(reports.getByRole('status')).toHaveAttribute('aria-busy', 'true')
       await expect(page.locator('.fh-build-focus')).not.toContainText('captured in 24h')
       await expect(page.locator('.fh-build-focus').getByRole('status')).toBeVisible()
       await expect(page.locator('.fh-build-mini-grid').getByRole('status', inPage)).toHaveCount(4)
@@ -1051,7 +1053,8 @@ test.describe('Field reports', () => {
       await expect(rail.getByRole('status')).toHaveCount(4)
     })
     read.release()
-    await expect(page.locator('.fh-build-topbar__meta')).toContainText('1 report captured')
+    await expect(reports).toContainText('Report history · 1 report')
+    await expect(reports.getByRole('status')).toHaveCount(0)
     await expect(rail).toContainText('No risks recorded across report history')
     await expect(rail).toContainText('All reports carry a job link')
     await expect(page.locator('[data-build-screen="SnowNotesBuild"]').getByRole('status', inPage)).toHaveCount(0)
@@ -1075,7 +1078,7 @@ test.describe('Field reports', () => {
       await expect(page.getByText('Inspector confirmed Friday.').first()).toBeVisible()
       await expect(page.getByRole('group', { name: 'Recent activity' })).toBeFocused()
     } else {
-      await expect(page.locator('.fh-build-topbar__meta')).toContainText('1 report captured')
+      await expect(page.getByRole('region', { name: 'Latest reports' })).toContainText('Report history · 1 report')
       await expect(page.getByRole('region', { name: 'Latest reports' })).toBeFocused()
     }
   })

@@ -584,6 +584,10 @@ export default function ContactDetail() {
           spineFirst
           inspections={inspections}
           onAddToSpine={() => openCapture({ jobId: contact.id })}
+          photos={jobPhotos}
+          onOpenPhotos={() => openSection('files')}
+          onOpenTasks={() => openSection('tasks')}
+          onOpenSchedule={() => openSection('schedule')}
         />
       )}
       {['details', 'tasks', 'schedule', 'inspections', 'insurance', 'partner'].includes(tab) && (
@@ -754,8 +758,6 @@ export default function ContactDetail() {
               onAddEvent={openEvent}
               primaryAction={stageCta}
               isEditing={isEditing}
-              coverUrl={jobPhotos.cover?.url ?? null}
-              coverAlt={jobPhotos.cover?.alt}
               money={phoneMoney}
               railNotes={deskRailNotes}
               crewIds={deskCrewIds}

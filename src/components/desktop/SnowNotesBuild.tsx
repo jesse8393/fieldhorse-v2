@@ -285,7 +285,7 @@ export default function SnowNotesBuild(props: Props) {
 
               {failed && readError}
               {loading && (
-                <div className="fh-build-table__empty">Loading reports…</div>
+                <div className="fh-build-table__empty" role="status" aria-busy="true">Loading reports…</div>
               )}
               {!loading && !failed && recent.length === 0 && (
                 <div className="fh-build-table__empty">{historyQuery ? 'No reports match your search. Try another word, job or address.' : 'No reports yet, start one above.'}</div>

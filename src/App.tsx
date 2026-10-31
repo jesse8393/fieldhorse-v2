@@ -156,8 +156,11 @@ function AppLoading({ label }: { label: string }) {
       }}
     >
       <div style={{ display: 'grid', gap: 12, justifyItems: 'center' }}>
-        <div style={{ fontFamily: 'var(--font-wordmark)', fontSize: 24, letterSpacing: 0, lineHeight: 1 }}>
-          <span style={{ color: 'var(--v3-primary, #C9963A)' }}>FIELD</span>HORSE
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontFamily: 'var(--font-body)', fontSize: 24, fontWeight: 750, lineHeight: 1 }}>
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true" style={{ color: 'var(--fh-gold-ink)' }}>
+            <path d="M5 25V4h20M10 25V10h15" stroke="currentColor" strokeWidth="2.5" />
+          </svg>
+          <span>fieldhorse<span style={{ color: 'var(--fh-gold-ink)' }}>.</span></span>
         </div>
         <div style={{ color: 'var(--v3-text-muted, rgba(242,237,228,.55))', fontSize: 14 }}>
           {label}

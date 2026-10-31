@@ -55,7 +55,8 @@ export function punchHours(p: {
 
 export async function crewLaborForContact(
   contactId: string | undefined,
-  ownerUserId: string | undefined
+  ownerUserId: string | undefined,
+  options: { requireCompleteRead?: boolean } = {}
 ): Promise<CrewLabor> {
   const empty: CrewLabor = { cost: 0, hours: 0, unratedHours: 0, punches: 0 }
   if (!contactId || !ownerUserId) return empty
@@ -69,7 +70,10 @@ export async function crewLaborForContact(
     // they must not bill the job while under review. Clearing the flag
     // (or approving via the workflow) puts them back in.
     .eq('flagged', false)
-  if (error || !data) return empty
+  if (error || !data) {
+    if (options.requireCompleteRead) throw error || new Error('Could not read crew time')
+    return empty
+  }
 
   // The punches all belong to one org (the contact's). Scope the rate
   // lookup to that org so a member who also belongs to another org
@@ -96,7 +100,10 @@ export async function crewLaborForContact(
       // membership row must not overwrite the active one.
       .is('revoked_at', null)
     if (punchOrgId) q = q.eq('org_id', punchOrgId)
-    const { data: members } = await q
+    const { data: members, error: membersError } = await q
+    if (options.requireCompleteRead && (membersError || !members)) {
+      throw membersError || new Error('Could not read crew rates')
+    }
     for (const m of (members || []) as any[]) {
       const r = Number(m.default_hourly_rate)
       // Deterministic when >1 row still matches: keep the highest active

@@ -16,15 +16,8 @@ import { ThemeProvider } from './contexts/ThemeContext.tsx'
 import { queryClient } from './lib/queryClient.ts'
 import { shouldPersistMutation, shouldPersistQuery } from './lib/queryPersistence.ts'
 import { isChunkLoadError, reloadOnceForStaleChunk } from './lib/lazyWithRetry.ts'
-// Self hosted fonts (latin subset), so the installed app has its type
-// offline. Barlow for the interface, Barlow Condensed for titles and big
-// numbers, Bebas Neue for the FIELDHORSE wordmark only.
-import '@fontsource/barlow/latin-400.css'
-import '@fontsource/barlow/latin-500.css'
-import '@fontsource/barlow/latin-600.css'
-import '@fontsource/barlow-condensed/latin-500.css'
-import '@fontsource/barlow-condensed/latin-600.css'
-import '@fontsource/bebas-neue/latin-400.css'
+// Self hosted variable type remains available in the installed app.
+import './styles/fonts.css'
 import './styles/tokens.css'
 import './styles/global.css'
 import './styles/fixes-2026-07.css'
@@ -34,6 +27,7 @@ import './styles/redesign.css'
 import './styles/fh-components.css'
 import './styles/fh-shell.css'
 import './styles/page-system.css'
+import './styles/light-glass.css'
 // Loaded LAST so cascade-equal rules win. See file header for context.
 import './styles/mobile-keyboard-fix.css'
 

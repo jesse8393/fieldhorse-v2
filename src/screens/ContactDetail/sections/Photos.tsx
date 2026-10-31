@@ -1,4 +1,6 @@
+import { createUuid } from '../../../lib/uuid.ts'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useQueryClient } from '@tanstack/react-query'
 import {
@@ -200,7 +202,7 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
           toastError("Couldn't process photo", ex?.message || `${file.name} skipped`)
           continue
         }
-        const rowId = crypto.randomUUID()
+        const rowId = createUuid()
         const path = `${userId}/${jobId}/${rowId}.jpg`
         const row = {
           id: rowId,
@@ -640,6 +642,14 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
    ============================================================ */
 
 function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, onSaveCaption, onSaveSectionTag, onDelete, deleteArmed = false }: any) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const overflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    dialogRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
+    return () => { document.body.style.overflow = overflow; previous?.focus({ preventScroll: true }) }
+  }, [])
   const [caption, setCaption] = useState(row.caption || '')
   const [sectionTag, setSectionTag] = useState(row.section_tag || '')
   const [customTag, setCustomTag] = useState('')
@@ -677,7 +687,7 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
     onSaveSectionTag?.('')
   }
 
-  return (
+  return createPortal(
     <>
       <motion.div
         onClick={onClose}
@@ -690,11 +700,24 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
         }}
       />
       <motion.div
+        ref={dialogRef}
+        className="fh-photo-lightbox fh-onyx-scope"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Photo viewer"
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') { event.stopPropagation(); onClose(); return }
+          if (event.key !== 'Tab') return
+          const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]), input, textarea, select, a[href]')).filter(el => el.getClientRects().length)
+          const first = controls[0], last = controls[controls.length - 1]
+          if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
+          else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
+        }}
         initial={{ opacity: 0, scale: 0.96 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.96 }}
         style={{
-          position: 'fixed', inset: 0, zIndex: 91,
+          position: 'fixed', inset: 0, zIndex: 91, overflowY: 'auto',
           display: 'flex', flexDirection: 'column',
           paddingTop: 'env(safe-area-inset-top)',
           paddingBottom: 'env(safe-area-inset-bottom)'
@@ -710,9 +733,9 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
             onClick={onClose}
             aria-label="Close"
             style={{
-              width: 40, height: 40, borderRadius: 10,
-              background: 'var(--v3-border-mid)', border: 'none',
-              color: '#F2EDE4', cursor: 'pointer',
+              width: 44, height: 44, borderRadius: 10,
+              background: '#303030', border: '1px solid #626262',
+              color: '#F5F5F5', cursor: 'pointer',
               display: 'grid', placeItems: 'center'
             }}
           >
@@ -720,7 +743,7 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
           </button>
           <div style={{
             fontFamily: 'var(--font-body)', fontSize: 12,
-            color: 'rgba(242, 237, 228, 0.7)',
+            color: '#C9C9C9',
             fontVariantNumeric: 'tabular-nums'
           }}>
             {row.filename}
@@ -731,9 +754,9 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
             aria-label={deleteArmed ? 'Tap again to delete' : 'Delete photo'}
             aria-pressed={deleteArmed ? true : undefined}
             style={{
-              minWidth: 40, height: 40, borderRadius: 10, padding: deleteArmed ? '0 12px' : 0,
+              minWidth: 44, height: 44, borderRadius: 10, padding: deleteArmed ? '0 12px' : 0,
               background: deleteArmed ? 'rgba(192, 57, 43, 0.5)' : 'rgba(192, 57, 43, 0.18)', border: 'none',
-              color: deleteArmed ? '#F2EDE4' : '#C9963A', cursor: 'pointer',
+              color: deleteArmed ? '#F5F5F5' : '#E3957F', cursor: 'pointer',
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700
             }}
@@ -745,7 +768,7 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
 
         {/* Image */}
         <div style={{
-          flex: 1, minHeight: 0,
+          flex: 1, minHeight: 160,
           display: 'grid', placeItems: 'center',
           padding: '0 8px', position: 'relative'
         }}>
@@ -758,7 +781,7 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
               }}
             />
           ) : (
-            <div style={{ color: '#F2EDE4', fontFamily: 'var(--font-body)', fontSize: 14 }}>
+            <div style={{ color: '#F5F5F5', fontFamily: 'var(--font-body)', fontSize: 14 }}>
               Loading…
             </div>
           )}
@@ -771,8 +794,8 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
               style={{
                 position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
                 width: 44, height: 44, borderRadius: 10,
-                background: 'var(--v3-border-mid)', border: 'none',
-                color: '#F2EDE4', cursor: 'pointer',
+                background: '#303030', border: '1px solid #626262',
+                color: '#F5F5F5', cursor: 'pointer',
                 display: 'grid', placeItems: 'center'
               }}
             >
@@ -787,8 +810,8 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
               style={{
                 position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
                 width: 44, height: 44, borderRadius: 10,
-                background: 'var(--v3-border-mid)', border: 'none',
-                color: '#F2EDE4', cursor: 'pointer',
+                background: '#303030', border: '1px solid #626262',
+                color: '#F5F5F5', cursor: 'pointer',
                 display: 'grid', placeItems: 'center'
               }}
             >
@@ -810,59 +833,29 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
                 onClick={clearTag}
                 style={{
                   background: 'transparent', border: 'none',
-                  color: 'rgba(242, 237, 228, 0.55)',
+                  color: '#C9C9C9',
                   fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 600,
-                  cursor: 'pointer', padding: 0
+                  cursor: 'pointer', padding: '8px 0', minHeight: 44
                 }}
               >
                 Clear
               </button>
             )}
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {SCOPE_SECTIONS.map((opt) => {
-              const on = !showCustom && sectionTag === opt
-              return (
-                <button
-                  key={opt}
-                  type="button"
-                  onClick={() => pickSection(opt)}
-                  style={{
-                    padding: '8px 12px', borderRadius: 10,
-                    background: on
-                      ? 'color-mix(in srgb, var(--v3-primary) 22%, transparent)'
-                      : 'var(--v3-glass-tint-2)',
-                    border: on
-                      ? '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)'
-                      : '1px solid var(--v3-border-mid)',
-                    color: on ? 'var(--v3-primary-bright, #C9963A)' : 'rgba(242, 237, 228, 0.78)',
-                    fontFamily: 'var(--font-body)', fontSize: 12,
-                    fontWeight: on ? 700 : 500,
-                    cursor: 'pointer'
-                  }}
-                >
-                  {opt}
-                </button>
-              )
-            })}
-            <button
-              type="button"
-              onClick={() => pickSection('__custom__')}
-              style={{
-                padding: '8px 12px', borderRadius: 10,
-                background: showCustom ? 'var(--v3-border-mid)' : 'transparent',
-                border: '1px dashed var(--v3-border-strong)',
-                color: 'rgba(242, 237, 228, 0.78)',
-                fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 500,
-                cursor: 'pointer'
-              }}
-            >
-              Other…
-            </button>
-          </div>
+          <select
+            aria-label="Scope section"
+            value={showCustom ? '__custom__' : sectionTag}
+            onChange={(event) => pickSection(event.target.value)}
+            className="fh-photo-lightbox__scope"
+          >
+            <option value="">No section</option>
+            {SCOPE_SECTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+            <option value="__custom__">Other…</option>
+          </select>
           {showCustom && (
             <input
               type="text"
+              aria-label="Custom scope section"
               value={customTag}
               onChange={(e) => setCustomTag(e.target.value)}
               onBlur={commitCustom}
@@ -871,7 +864,7 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
               style={{
                 width: '100%', padding: '8px 12px', borderRadius: 10,
                 background: 'var(--v3-border-mid)', border: '1px solid var(--v3-border-mid)',
-                color: '#F2EDE4', fontFamily: 'var(--font-body)',
+                color: '#F5F5F5', fontFamily: 'var(--font-body)',
                 fontSize: 14, outline: 'none'
               }}
             />
@@ -884,6 +877,7 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
             Caption
           </Eyebrow>
           <textarea
+            aria-label="Photo caption"
             value={caption}
             onChange={(e) => setCaption(e.target.value)}
             onBlur={() => onSaveCaption(caption)}
@@ -892,13 +886,14 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
             style={{
               width: '100%', padding: '12px 12px', borderRadius: 10,
               background: 'var(--v3-border-mid)', border: '1px solid var(--v3-border-mid)',
-              color: '#F2EDE4', fontFamily: 'var(--font-body)',
+              color: '#F5F5F5', fontFamily: 'var(--font-body)',
               fontSize: 14, outline: 'none', resize: 'vertical', minHeight: 50
             }}
           />
         </div>
       </motion.div>
-    </>
+    </>,
+    document.body
   )
 }
 
@@ -973,7 +968,7 @@ function BeforeAfterSlider({ beforeUrl, afterUrl, beforeLabel, afterLabel }: any
         padding: '4px 8px', borderRadius: 10,
         background: 'rgba(20, 20, 20, 0.6)', backdropFilter: 'blur(4px)',
         fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-        letterSpacing: 0, color: '#F2EDE4'
+        letterSpacing: 0, color: '#F5F5F5'
       }}>
         Before
       </div>
@@ -982,7 +977,7 @@ function BeforeAfterSlider({ beforeUrl, afterUrl, beforeLabel, afterLabel }: any
         padding: '4px 8px', borderRadius: 10,
         background: 'rgba(20, 20, 20, 0.6)', backdropFilter: 'blur(4px)',
         fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-        letterSpacing: 0, color: '#F2EDE4'
+        letterSpacing: 0, color: '#F5F5F5'
       }}>
         After
       </div>

@@ -2,6 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <link rel="preload" href="/fonts/manrope-variable.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png?v=2" />
     <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png?v=2" />
     <!-- Pinch-zoom re-enabled (WCAG 1.4.4). user-scalable=no was here to
@@ -9,7 +10,7 @@
          input font-size in global.css) removed the trigger, and iOS 10+
          ignores user-scalable=no anyway, so it only hurt Android users. -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#EDE8DF" />
+    <meta name="theme-color" content="#FFFFFF" />
     <!-- Apply the theme before the first paint (spec section 10). Mirrors
          resolveTheme in src/lib/themeMode.ts: the mode lives in
          fh:theme-mode (auto, day or night; auto when unset), and Auto
@@ -32,7 +33,7 @@
           }
         }
         document.documentElement.setAttribute('data-theme', t)
-        document.querySelector('meta[name="theme-color"]').setAttribute('content', t === 'dark' ? '#171611' : '#EDE8DF')
+        document.querySelector('meta[name="theme-color"]').setAttribute('content', t === 'dark' ? '#171717' : '#FFFFFF')
       } catch (e) {
         document.documentElement.setAttribute('data-theme', 'light')
       }

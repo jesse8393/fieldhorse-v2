@@ -1,5 +1,6 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
+import { nothingRunsOffTheSide } from './helpers/overflow.ts'
 
 // The job page's time clock (TimeClockCard) when the shift it shows was
 // ended somewhere else first. Clock out never moves an ended shift's end
@@ -10,6 +11,27 @@ test.skip(({ isMobile }) => !isMobile, 'the time clock card is checked on a phon
 
 const HOUR = 3600e3
 const OTHER_OWNER = 'qa-owner-2'
+
+test('crew visits, completed shifts and task links remain usable at 320 pixels', async ({ context, page }) => {
+  await page.clock.setFixedTime(new Date('2026-10-31T17:00:00Z'))
+  const task = 'Confirm the complete drainage plan with the homeowner before the next concrete pour'
+  await signIn(context, { role: 'crew', tables: {
+    fh_schedule: [{ id: 'crew-visit', org_id: 'org-1', user_id: 'qa-user-1', contact_id: 'c-job1', title: 'Long crew visit with the full site preparation instructions', start_at: '2026-10-31T15:00:00Z', end_at: '2026-10-31T18:00:00Z' }],
+    fh_time_punches: [{ ...openPunch(), punch_in_at: '2026-10-30T15:00:00Z', punch_out_at: '2026-10-30T18:00:00Z' }],
+    fh_job_todos: [{ id: 'crew-task', user_id: 'qa-user-1', job_id: 'c-job1', text: task, done: false, due_at: '2026-11-01T12:00:00Z' }]
+  } })
+  await page.setViewportSize({ width: 320, height: 844 })
+  await page.goto('/crew')
+  await expect(page.getByRole('region', { name: "Today's schedule" }).getByText('Long crew visit with the full site preparation instructions')).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Recent shifts' }).getByText('Pending', { exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: /View timesheets/ })).toHaveCount(0)
+  await expect(page.getByText('Your recent shifts are shown above. Your manager reviews and approves them.', { exact: true })).toBeVisible()
+  await nothingRunsOffTheSide(page, 'crew with visits and shift history')
+  const link = page.getByRole('link', { name: task, exact: true })
+  await expect(link).toBeVisible()
+  await link.press('Enter')
+  await expect(page).toHaveURL(/\/jobs\/c-job1$/)
+})
 
 function job(ownerId: string) {
   return {

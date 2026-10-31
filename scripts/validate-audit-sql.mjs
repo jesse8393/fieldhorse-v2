@@ -1,15 +1,12 @@
 // Focused, isolated PostgreSQL validation for audit migrations.
 // PGLITE_RUNTIME points at a separately installed @electric-sql/pglite package.
 // Uses real SQL, roles, RLS, triggers and rollback with synthetic data only.
-// PGlite is single-connection: this does NOT test simultaneous transactions.
+// CI uses independent PostgreSQL sessions; the local PGlite fallback is single-connection.
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
-import { pathToFileURL } from 'node:url'
-const runtime = process.env.PGLITE_RUNTIME
-if (!runtime) throw new Error('Set PGLITE_RUNTIME to a scratch installation of @electric-sql/pglite.')
-const { PGlite } = await import(pathToFileURL(`${runtime}/dist/index.js`).href)
-const { btree_gist } = await import(pathToFileURL(`${runtime}/dist/contrib/btree_gist.js`).href)
-const db = await PGlite.create({ extensions: { btree_gist } })
+import { auditDatabase, auditRoles } from './audit-database.mjs'
+import { verifyConcurrency } from './audit-concurrency.mjs'
+const db = await auditDatabase('billing')
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
 const sqlFile = name => readFile(new URL(`../supabase/migrations/${name}`, import.meta.url), 'utf8')
 const results = []
@@ -33,11 +30,9 @@ const visit = (n, start, end, members = [4], options = {}) => db.query(
   [id(n), options.job === null ? null : id(options.job ?? 200), id(options.user ?? 1), options.org == null ? null : id(options.org), start, end, members.map(id), options.legacy == null ? null : id(options.legacy), 'Synthetic visit', options.lead == null ? null : id(options.lead), options.quote == null ? null : id(options.quote)])
 const count = async table => Number((await db.query(`select count(*) as count from ${table}`)).rows[0].count)
 try {
-  console.log(JSON.stringify({ engine: (await db.query('select version()')).rows[0].version, limitations: ['Focused schema, not the complete historical migration chain', 'Supabase auth functions reproduced from JWT GUC semantics', 'One connection; real concurrent transactions and production RLS remain unverified'] }))
+  console.log(JSON.stringify({ engine: (await db.query('select version()')).rows[0].version, limitations: ['Focused schema, not the complete historical migration chain', 'Supabase auth functions reproduced from JWT GUC semantics', ...(db.openSession ? [] : ['PGlite has one connection; simultaneous transactions unverified'])] }))
   await db.exec(`
-    create role anon;
-    create role authenticated;
-    create role service_role bypassrls;
+    ${auditRoles}
     create schema auth; create schema extensions;
     create table auth.users(id uuid primary key);
     create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims',true),''),'{}')::jsonb $$;
@@ -191,7 +186,8 @@ try {
   await db.exec('reset role')
   await test('reservation exclusion constraint independently rejects conflicts', async () => { await rejects('insert into private.fh_schedule_allocations(event_id,scope_id,member_id,during) values($1,$2,$3,tstzrange($4,$5,\'[)\'))','23P01',[id(517),id(100),id(4),'2026-11-02T10:30Z','2026-11-02T10:45Z']) })
   await test('migrations are idempotent without rewriting history', async () => { const invoices=await count('public.fh_invoices'), schedule=await count('public.fh_schedule'); await db.exec(await sqlFile('20261027170408_invoice_billing_safeguards.sql')); await db.exec(await sqlFile('20261027170430_schedule_crew_allocation.sql')); assert.equal(await count('public.fh_invoices'),invoices); assert.equal(await count('public.fh_schedule'),schedule) })
-  console.log(JSON.stringify({ passed:results.length, results, unverified:['Two simultaneous PostgreSQL sessions', 'Complete historical migration replay', 'Live Supabase role and API configuration'] },null,2))
+  if (db.openSession) await verifyConcurrency(db, test)
+  console.log(JSON.stringify({ passed:results.length, results, unverified:[...(db.openSession ? [] : ['Two simultaneous PostgreSQL sessions']), 'Complete historical migration replay', 'Live Supabase role and API configuration'] },null,2))
 } catch(error) {
   console.error(JSON.stringify({ failed:error.testName, message:error.message, code:error.code, detail:error.detail, passed:results.filter(r=>r.result==='passed').length, results },null,2))
   process.exitCode=1

@@ -17,7 +17,7 @@
 import { useEffect, useRef } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import CommunicationHistory from '../../components/CommunicationHistory.tsx'
-import { Inbox as InboxIcon, MessageSquare } from 'lucide-react'
+import { Inbox as InboxIcon, MessageSquare, SquarePen } from 'lucide-react'
 import { Button, Chip, EmptyState, Row, SkeletonRows } from '../../components/fh'
 import DataErrorState from '../../components/DataErrorState.tsx'
 import { useMembership } from '../../contexts/MembershipContext.tsx'
@@ -154,18 +154,18 @@ export default function Inbox() {
   const loading = engine === undefined || (engine === true && inbox.isLoading)
 
   const title = <h1 className="fhi-title" ref={titleRef} tabIndex={-1}>Inbox</h1>
+  const header = <header className="fhi-head">{title}<Link className="fhi-new" to="/compose" aria-label="New message" title="New message"><SquarePen size={20} aria-hidden="true" /></Link></header>
   const navigation = <nav className="fhi-history-nav" aria-label="Messaging views">
     <Link to="/inbox" aria-current={!historyView ? 'page' : undefined}>Conversations</Link>
-    <Link to="/inbox?view=history" aria-current={historyView ? 'page' : undefined}>Communication history</Link>
-    <Link to="/compose">New message</Link>
+    <Link to="/inbox?view=history" aria-label="Communication history" aria-current={historyView ? 'page' : undefined}>History</Link>
   </nav>
 
-  if (historyView) return <div className="fhi"><header className="fhi-head">{title}</header>{navigation}<div style={{ padding: '16px 24px 32px' }}><CommunicationHistory /></div></div>
+  if (historyView) return <div className="fhi">{header}{navigation}<div style={{ padding: '16px 24px 32px' }}><CommunicationHistory /></div></div>
 
   if (engine === false) {
     return (
       <div className="fhi">
-        <header className="fhi-head">{title}</header>{navigation}
+        {header}{navigation}
         <EngineOff />
       </div>
     )
@@ -194,7 +194,7 @@ export default function Inbox() {
     return (
       <div className="fhi fhi--split">
         <aside className="fhi-split__list" aria-label="Conversations">
-          <header className="fhi-head">{title}</header>{navigation}
+          {header}{navigation}
           {list}
         </aside>
         <section className="fhi-split__detail" aria-label="Conversation">
@@ -215,7 +215,7 @@ export default function Inbox() {
 
   return (
     <div className="fhi">
-      <header className="fhi-head">{title}</header>{navigation}
+      {header}{navigation}
       {list}
     </div>
   )

@@ -114,16 +114,16 @@ test.describe('the engine switch on a desktop', () => {
   test('the sidebar lists Inbox after Money only when the engine is on', async ({ context, page }) => {
     await start(context, page, '/', { tables: ENGINE_ON })
     const nav = page.getByRole('navigation', { name: 'Primary' })
-    await expect(nav.getByRole('button', { name: 'Inbox' })).toBeVisible()
-    const labels = await nav.locator('.fhs-side__list').first().locator('li').allInnerTexts()
-    expect(labels.map((l) => l.trim())).toEqual(['Today', 'Schedule', 'Jobs', 'Money', 'Inbox', 'Customers', 'Reports'])
+    await expect(nav.getByRole('link', { name: 'Inbox' })).toBeVisible()
+    const labels = await nav.getByRole('link').allInnerTexts()
+    expect(labels.map((l) => l.trim())).toEqual(['Today', 'Schedule', 'Jobs', 'Money', 'Inbox', 'More'])
   })
 
   test('the sidebar has no Inbox while the engine is off', async ({ context, page }) => {
     await start(context, page, '/')
     const nav = page.getByRole('navigation', { name: 'Primary' })
-    await expect(nav.getByRole('button', { name: 'Today' })).toBeVisible()
-    await expect(nav.getByRole('button', { name: 'Inbox' })).toHaveCount(0)
+    await expect(nav.getByRole('link', { name: 'Today' })).toBeVisible()
+    await expect(nav.getByRole('link', { name: 'Inbox' })).toHaveCount(0)
   })
 })
 
@@ -222,7 +222,10 @@ test.describe('the Inbox list', () => {
     // The list stays while the conversation opens beside it.
     await expect(list.locator('.fhi-rows > li')).toHaveCount(4)
     const box = await list.boundingBox()
-    expect(box?.x).toBeGreaterThan(200)
+    const detail = (await page.locator('.fhi-split__detail').boundingBox())!
+    expect(box!.x).toBeGreaterThanOrEqual(0)
+    expect(detail.x).toBeGreaterThanOrEqual(box!.x + box!.width - 1)
+    expect(detail.width).toBeGreaterThan(400)
     expect(box?.width).toBeLessThan(480)
   })
 })
@@ -484,7 +487,7 @@ test.describe('a thread', () => {
 
     // No capture button floats over a desktop page any more (PHASE8_PLAN.md
     // Task 13, D33): the one Capture control is the sidebar row.
-    const sidebar = page.getByRole('complementary', { name: 'Primary navigation' })
+    const sidebar = page.locator('.fh-glass-header')
     await expect(sidebar.getByRole('button', { name: /^Capture/ })).toBeVisible()
     await expect(page.getByRole('button', { name: /^Capture/ })).toHaveCount(1)
     await expect(page.locator('.fh-fab')).toHaveCount(0)

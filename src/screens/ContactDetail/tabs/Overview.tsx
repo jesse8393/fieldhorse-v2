@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { Plus, Pencil, X as XIcon, ShieldCheck, Receipt, RotateCcw, ChevronDown } from 'lucide-react'
+import { Plus, Pencil, X as XIcon, ShieldCheck, Receipt, RotateCcw, ChevronDown, Camera, ArrowUpRight } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
 import { toYmd } from '../../../lib/dates.ts'
 import { markComplete, reopen } from '../../../lib/pipeline.ts'
@@ -24,6 +24,8 @@ import ClientPicker from '../../../components/ClientPicker.tsx'
 import { money } from '../lib/format.ts'
 import { countNoun } from '../../../lib/format.ts'
 import SpineList from '../phone/SpineList.tsx'
+import TodosSection from '../sections/Todos.tsx'
+import JobVisitSummary from '../../../components/fh/JobVisitSummary.tsx'
 
 /**
  * v3 OVERVIEW tab, the "money screen" of the Job Detail.
@@ -82,10 +84,18 @@ export default function OverviewTab({
   canMoveMoney = false,
   spineFirst = false,
   inspections = [],
-  onAddToSpine
+  onAddToSpine,
+  onOpenTasks,
+  onOpenSchedule,
+  onOpenPhotos,
+  photos
 }: any) {
   const [actionLoading, setActionLoading] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
+  const [failedCover, setFailedCover] = useState<string | null>(null)
+  const cover = photos?.cover
+  const showCover = !!cover?.url && cover.url !== failedCover
+  const coverId = showCover ? photos?.rows.find((photo: { url: string | null }) => photo.url === cover.url)?.id : undefined
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   // Reopen takes a second tap on the same button (D57).
@@ -428,17 +438,34 @@ export default function OverviewTab({
     return (
       <div className="fhj-overview">
         {editCard && <div className="fhj-edit">{editCard}</div>}
-        <SpineList
-          contact={contact}
-          notes={notes}
-          payments={payments}
-          scheduleItems={scheduleItems}
-          changeOrders={changeOrders}
-          stageTransitions={stageTransitions}
-          inspections={inspections}
-          canSeeMoney={canSeeMoney}
-          onAdd={() => onAddToSpine?.()}
-        />
+        <div className="fh-work-overview">
+          <div className="fh-work-execution">
+            <TodosSection jobId={contact.id} userId={userId} compact onOpenTasks={onOpenTasks} onChanged={fetchAll} />
+            <JobVisitSummary visits={scheduleItems} onOpen={onOpenSchedule || onOpenAddEvent} />
+          </div>
+          <section className="fh-work-evidence" aria-label="Latest from site">
+            {(showCover || photos?.count > 0) && <div className="fh-work-section-head"><h2>Latest from site</h2><button className="fh-work-link" type="button" onClick={onOpenPhotos}>Photos<ArrowUpRight size={16} aria-hidden="true" /></button></div>}
+            {showCover && <>
+              <button className="fh-work-photo" type="button" onClick={onOpenPhotos} aria-label={`Open photos: ${cover.alt}`}>
+                <img src={cover.url} alt={cover.alt} onError={() => setFailedCover(cover.url)} decoding="async" />
+                <span><Camera size={16} aria-hidden="true" />Site photograph<ArrowUpRight size={16} aria-hidden="true" /></span>
+              </button>
+            </>}
+            <SpineList
+              initialCount={3}
+              excludePhotoId={coverId}
+              contact={contact}
+              notes={notes}
+              payments={payments}
+              scheduleItems={scheduleItems}
+              changeOrders={changeOrders}
+              stageTransitions={stageTransitions}
+              inspections={inspections}
+              canSeeMoney={canSeeMoney}
+              onAdd={() => onAddToSpine?.()}
+            />
+          </section>
+        </div>
         <div className="fhj-more">
           <button
             type="button"

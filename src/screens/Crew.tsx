@@ -21,7 +21,7 @@
 // load sets state, so a read that lands late never undoes a newer one.
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   Bell, Calendar, Clock, MapPin, PlayCircle, Search, Square,
   ListChecks, AlertTriangle, ChevronRight,
@@ -89,7 +89,7 @@ function fmtMinutes(min: number): string {
 export default function Crew() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { orgId, orgName, role, loading: memLoading } = useMembership()
+  const { orgId, orgName, role, canApproveTimesheets, loading: memLoading } = useMembership()
 
   // The active punch is undefined until a read of it works, and it takes
   // every read of it that works, so a running shift shows even when another
@@ -332,7 +332,7 @@ export default function Crew() {
   )
 
   return (
-    <div className="fh-build-page" data-build-screen="Crew" data-build-route="/crew">
+    <div className="fh-build-page fh-crew-workspace" data-build-screen="Crew" data-build-route="/crew">
       <header className="fh-build-topbar fh-build-topbar--no-cta">
         <button
           type="button"
@@ -450,15 +450,15 @@ export default function Crew() {
                       onChange={(e) => setClockJobId(e.target.value)}
                       disabled={punching}
                       style={{
-                        width: '100%', background: 'rgba(20, 20, 20,.25)', color: 'var(--v3-text)',
+                        width: '100%', minHeight: 48, background: 'var(--fh-paper)', color: 'var(--v3-text)',
                         border: '1px solid var(--v3-border-mid)', borderRadius: 10,
-                        padding: '8px 12px', fontSize: 14, fontWeight: 600,
+                        padding: '8px 12px', fontSize: 16, fontWeight: 500,
                       }}
                     >
                       {todayJobs.map((j) => (
-                        <option key={j.id} value={j.id} style={{ color: '#141414' }}>{j.label}</option>
+                        <option key={j.id} value={j.id}>{j.label}</option>
                       ))}
-                      <option value="" style={{ color: '#141414' }}>No specific job</option>
+                      <option value="">No specific job</option>
                     </select>
                   </label>
                 )}
@@ -489,7 +489,7 @@ export default function Crew() {
         <section className="fh-build-content-grid fh-build-content-grid--schedule">
           <div className="fh-build-detail-main">
             {/* Today's schedule */}
-            <section className="fh-build-card">
+            <section className="fh-build-card" aria-label="Today's schedule">
               <header className="fh-build-card-head">
                 <div className="fh-build-eyebrow">
                   <Calendar size={11} style={{ display: 'inline', marginRight: 6, verticalAlign: '-1px' }} />
@@ -500,7 +500,7 @@ export default function Crew() {
                   onClick={() => navigate('/schedule')}
                   style={{ background: 'transparent', border: 'none', color: 'var(--v3-primary-text)', cursor: 'pointer', fontSize: 12, fontWeight: 700, letterSpacing: 0 }}
                 >
-                  Full schedule →
+                  View all →
                 </button>
               </header>
               {schedule === null ? (
@@ -512,9 +512,10 @@ export default function Crew() {
                   {schedule.map((ev) => (
                     <li
                       key={ev.id}
+                      className="fh-crew-visit"
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: '120px 1fr auto',
+                        gridTemplateColumns: '120px minmax(0,1fr) auto',
                         gap: 16,
                         padding: '12px 24px',
                         borderTop: '1px solid var(--v3-glass-tint-2)',
@@ -546,7 +547,7 @@ export default function Crew() {
             </section>
 
             {/* Recent punches */}
-            <section className="fh-build-card">
+            <section className="fh-build-card" aria-label="Recent shifts">
               <header className="fh-build-card-head">
                 <div className="fh-build-eyebrow">
                   <Clock size={11} style={{ display: 'inline', marginRight: 6, verticalAlign: '-1px' }} />
@@ -564,6 +565,7 @@ export default function Crew() {
                     return (
                       <li
                         key={p.id}
+                        className="fh-crew-shift"
                         style={{
                           display: 'grid',
                           gridTemplateColumns: '130px 110px 1fr 90px',
@@ -623,15 +625,16 @@ export default function Crew() {
                     return (
                       <li
                         key={t.id}
-                        style={{ gridTemplateColumns: 'auto 1fr', cursor: 'pointer' }}
-                        onClick={() => navigate(`/jobs/${t.job_id}`)}
+                        style={{ display: 'block', padding: 0 }}
                       >
-                        <span style={{ color: overdue ? 'var(--v3-danger-text)' : 'var(--v3-primary-text)' }}>
-                          {overdue ? <AlertTriangle size={11} /> : <Clock size={11} />}
-                        </span>
-                        <span className="fh-build-rail-list__title" title={t.text}>
-                          {t.text}
-                        </span>
+                        <Link to={`/jobs/${t.job_id}`} className="fh-crew-task">
+                          <span aria-hidden="true" style={{ color: overdue ? 'var(--v3-danger-text)' : 'var(--v3-primary-text)' }}>
+                            {overdue ? <AlertTriangle size={11} /> : <Clock size={11} />}
+                          </span>
+                          <span className="fh-build-rail-list__title" title={t.text}>
+                            {t.text}
+                          </span>
+                        </Link>
                       </li>
                     )
                   })}
@@ -641,14 +644,15 @@ export default function Crew() {
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Timesheets</div>
-              <strong data-empty>Shifts reviewed weekly</strong>
+              <strong data-empty>Shift review</strong>
               {/* The owner IS the manager, "your manager approves your
                   shifts" read as nonsense on a solo operator's screen. */}
               <span>
-                {role === 'owner' || role === 'admin'
+                {canApproveTimesheets
                   ? 'You review and approve shifts under Timesheets.'
-                  : 'Your manager approves shifts at the end of the week.'}
+                  : 'Your recent shifts are shown above. Your manager reviews and approves them.'}
               </span>
+              {canApproveTimesheets && <Link className="fh-build-rail-card__action" to="/timesheets">View timesheets <ChevronRight size={13} /></Link>}
             </section>
 
             <section className="fh-build-rail-card">

@@ -405,7 +405,7 @@ async function leaveMoneyAndComeBack(page: Page, phone: boolean) {
   await page.evaluate(() => { (window as unknown as { fhSameDocument?: boolean }).fhSameDocument = true })
   const go = (label: string) => phone
     ? page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: label })
-    : page.getByRole('complementary', { name: 'Primary navigation' }).getByRole('button', { name: label, exact: true })
+    : page.locator('.fh-glass-nav').getByRole('link', { name: label, exact: true })
   await go('Today').click()
   await expect(page).not.toHaveURL(/\/invoices/)
   await expect(moneyHeading(page)).toHaveCount(0)
@@ -497,9 +497,8 @@ async function routeFirstSendsHeld(context: BrowserContext): Promise<HeldSend[]>
 // out, and the click made at the moment the button was freed.
 type Landing = { busyTaps: number; freed: number }
 
-// Lets the held email go and keeps tapping its busy button with real input,
-// a finger on a phone and the mouse on a desktop, at the spot where the
-// button sits, while the email lands and the screen leaves (the remind
+// Sends real touch/mouse input while the email is held, then clicks the
+// original button as the email lands and the screen leaves (the remind
 // screen) or the button frees (the invoice screen). The moment the button
 // no longer looks busy, the page also clicks it once, the way a tap landing
 // then would, so every run covers that instant. A tap that lands then must
@@ -537,27 +536,20 @@ async function tapThroughTheLanding(page: Page, phone: boolean, button: Locator,
     if (!hit || !buttonNode.contains(hit)) return 'off'
     return buttonNode.getAttribute('aria-busy') === 'true' ? 'busy' : 'free'
   }, [x, y])
-  // Bind input to this particular button. A page.mouse.click at frozen
-  // coordinates can race the automatic return to Money and activate an
-  // unrelated link underneath it. That is a different action, not another
-  // attempt to send this invoice. Detached buttons end this stress input;
-  // every other input failure still fails the test.
+  // Real input is safe while the response is held. Once released, even an
+  // ElementHandle's forced tap can calculate coordinates before navigation
+  // and dispatch after it, opening an unrelated Money row (CI trace 441).
+  // Bind landing clicks synchronously to the original node so this tests
+  // duplicate-send protection, not accidental input on the next screen.
   const target = await button.elementHandle()
   if (!target) throw new Error('The send button is no longer available')
-  const tap = async () => {
-    try {
-      if (phone) await target.tap({ force: true, timeout: 1_000 })
-      else await target.click({ force: true, timeout: 1_000 })
-    } catch (error) {
-      if (await target.evaluate((node) => !node.isConnected)) return
-      throw error
-    }
-  }
+  const tap = () => target.evaluate((node) => { if (node.isConnected) (node as HTMLElement).click() })
 
   // A few taps while the email is still going out, then on through its landing.
   for (let n = 0; n < 3; n++) {
     expect(await spot()).toBe('busy')
-    await tap()
+    if (phone) await target.tap({ force: true, timeout: 1_000 })
+    else await target.click({ force: true, timeout: 1_000 })
   }
   held.release()
   const until = Date.now() + 15_000
@@ -979,7 +971,7 @@ test.describe('money on a phone', () => {
     await expect(page.getByRole('dialog')).toHaveCount(0)
     await expect(page.getByRole('heading', { level: 1, name: 'Collect payment' })).toBeVisible()
     await expect(page.locator('#fhinv-pay-amount')).toHaveValue('2960')
-    await expect(page.getByRole('radio', { name: 'Check' })).toHaveAttribute('aria-checked', 'true')
+    await expect(page.getByRole('combobox', { name: 'Method', exact: true })).toHaveValue('check')
     // The one gold button records it.
     await expect(page.locator('.fhc-btn--primary')).toHaveCount(1)
     await expect(page.getByRole('button', { name: 'Record $2,960.00' })).toBeEnabled()
@@ -1218,8 +1210,9 @@ test.describe('money on a desktop', () => {
     await expect(paid.getByText('Garage slab, deposit', { exact: true })).toBeVisible()
     await expect(paid.getByText('$6,187.50', { exact: true })).toBeVisible()
 
-    // Nothing gold on the page, and no sheet anywhere.
-    await expect(page.locator('.fhc-btn--primary')).toHaveCount(0)
+    // Creating an invoice is the single primary action; reminders remain contextual.
+    await expect(page.locator('.fhc-btn--primary')).toHaveCount(1)
+    await expect(page.locator('.fhc-btn--primary')).toHaveText('New invoice')
     await expect(page.getByRole('dialog')).toHaveCount(0)
   })
 

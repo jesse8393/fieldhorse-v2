@@ -176,56 +176,6 @@ a.fhinv-hero__job:focus-visible {
 }
 
 /* A set of choices (payment method, kind): chips that act as radios. */
-.fhinv-choices {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  min-width: 0;
-}
-
-.fhinv-choices__label {
-  padding: 0;
-  font-family: var(--fh-font-body);
-  font-size: 14px;
-  line-height: 20px;
-  font-weight: 600;
-  color: var(--fh-ink);
-}
-
-.fhinv-choices__row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.fhinv-choice {
-  min-height: 44px;
-  padding: 0 16px;
-  border-radius: 999px;
-  border: 1px solid var(--fh-edge-strong);
-  background: var(--fh-paper);
-  color: var(--fh-ink);
-  font-family: var(--fh-font-body);
-  font-size: 15px;
-  line-height: 20px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.fhinv-choice[aria-checked="true"] {
-  border-color: var(--fh-gold-ink);
-  background: var(--fh-gold-line);
-  color: var(--fh-gold-ink);
-}
-
-.fhinv-choice:focus-visible {
-  outline: 2px solid var(--fh-focus);
-  outline-offset: 2px;
-}
-
 /* ---- Facts: To, Invoice, Amount on the remind screen ---- */
 .fhinv-facts {
   display: flex;

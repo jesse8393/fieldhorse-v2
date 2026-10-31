@@ -186,8 +186,9 @@ export default function InstallPrompt() {
           onClick={handleInstall}
           style={{
             padding: '8px 12px',
-            background: '#C9963A',
-            color: '#141414',
+            background: 'var(--fh-gold, #AD4029)',
+            color: 'var(--fh-on-gold, #FFFFFF)',
+            minHeight: 44,
             border: 'none',
             borderRadius: 10,
             fontSize: 14,

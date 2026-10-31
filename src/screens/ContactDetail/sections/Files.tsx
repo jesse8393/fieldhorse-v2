@@ -1,3 +1,4 @@
+import { createUuid } from '../../../lib/uuid.ts'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Upload, FileText, Download, Trash2, Paperclip } from 'lucide-react'
@@ -105,7 +106,7 @@ export default function FilesSection({ jobId, userId }: any) {
           continue
         }
         const ext = extensionOf(file.name) || 'bin'
-        const rowId = crypto.randomUUID()
+        const rowId = createUuid()
         const path = `${userId}/${jobId}/${rowId}.${ext}`
         const { error: upErr } = await supabase.storage
           .from(BUCKET)

@@ -241,48 +241,33 @@ test.describe(`a desktop ${WIDTH} px wide`, () => {
     await nothingRunsOffTheSide(page)
   })
 
-  test('the job page: nothing runs off the side, Invoice this is on screen and the facts sit above the composer', async ({ context, page }) => {
+  test('job tasks lead while updates and complete job facts remain reachable at tablet width', async ({ context, page }) => {
     await open(context, page, '/jobs/c-job1')
     await expect(page.locator('[data-build-screen="SnowJobDetailBuild"]')).toBeVisible({ timeout: 30_000 })
-    await expect(page.locator('.fhj-spine').getByText('Inspector confirmed Friday.')).toBeVisible()
-    await onScreenUnscrolled(page, page.locator('.fhd-banner').getByRole('button', { name: 'Invoice this' }))
-
-    const strip = page.getByRole('region', { name: 'Job at a glance' })
-    const composer = page.getByRole('button', { name: /Add a note, photos or a task/ })
-    if (WIDTH < 1280) {
-      // Balance, the customer's phone and the address with Navigate, right
-      // under the stage rail and above the composer.
-      await expect(strip.getByText('Balance', { exact: true })).toBeVisible()
-      await expect(strip.getByText('$33,100.00', { exact: true })).toBeVisible()
-      await expect(strip.getByRole('link', { name: /555-0101/ })).toHaveAttribute('href', 'tel:555-0101')
-      await expect(strip.getByText('412 Burkitt Station Rd', { exact: true })).toBeVisible()
-      // The shared navigateHref: Google Maps away from Apple devices.
-      await expect(strip.getByRole('link', { name: /^Navigate/ })).toHaveAttribute(
-        'href',
-        'https://www.google.com/maps/dir/?api=1&destination=412%20Burkitt%20Station%20Rd'
-      )
-      const stripBox = (await strip.boundingBox())!
-      const composerBox = (await composer.boundingBox())!
-      expect(stripBox.y + stripBox.height, 'the strip ends above the composer').toBeLessThanOrEqual(composerBox.y)
-      await onScreenUnscrolled(page, strip)
-    } else {
-      // Two columns: the facts panel stands beside the Spine, so no strip.
-      await expect(strip).toHaveCount(0)
-      const facts = (await page.getByRole('complementary', { name: 'Job facts' }).boundingBox())!
-      const composerBox = (await composer.boundingBox())!
-      expect(facts.x).toBeGreaterThanOrEqual(composerBox.x + composerBox.width)
-    }
+    await onScreenUnscrolled(page, page.getByRole('button', { name: 'Add update', exact: true }))
+    const tasks = page.getByRole('region', { name: /^Open tasks/ })
+    await onScreenUnscrolled(page, tasks)
+    const facts = page.getByRole('complementary', { name: 'Job facts' })
+    await expect(facts.getByText('Contract balance', { exact: true })).toBeVisible()
+    await expect(facts.locator('.fhc-vault__amount')).toHaveText('$33,100.00')
+    await expect(facts.getByRole('link', { name: /555-0101/ })).toHaveAttribute('href', 'tel:555-0101')
+    await expect(facts.getByText('412 Burkitt Station Rd', { exact: true })).toBeVisible()
+    await expect(facts.getByRole('link', { name: /^Navigate/ })).toHaveAttribute('href', 'https://www.google.com/maps/dir/?api=1&destination=412%20Burkitt%20Station%20Rd')
+    const actions = page.locator('.fh-job-secondary-actions')
+    await expect(actions.getByRole('button', { name: 'Invoice this', exact: true })).toBeVisible()
     await nothingRunsOffTheSide(page)
+    await actions.getByRole('button', { name: 'Invoice this', exact: true }).click()
+    await expect(page).toHaveURL(/\/invoices\/new\?job=c-job1$/)
   })
 
-  test('the job page for crew: the strip has the phone and the address but no money', async ({ context, page }) => {
-    test.skip(WIDTH >= 1280, 'The strip shows below 1280 px')
+  test('crew can reach customer contact and directions without financial information', async ({ context, page }) => {
     await open(context, page, '/jobs/c-job1', { role: 'crew' })
-    const strip = page.getByRole('region', { name: 'Job at a glance' })
-    await expect(strip.getByRole('link', { name: /555-0101/ })).toBeVisible({ timeout: 30_000 })
-    await expect(strip.getByRole('link', { name: /^Navigate/ })).toBeVisible()
+    const facts = page.getByRole('complementary', { name: 'Job facts' })
+    await expect(facts.getByRole('link', { name: /555-0101/ })).toBeVisible({ timeout: 30_000 })
+    await expect(facts.getByRole('link', { name: /^Navigate/ })).toBeVisible()
     await expect(page.getByText(/balance/i)).toHaveCount(0)
     await expect(page.getByText(/\$33,100/)).toHaveCount(0)
+    await nothingRunsOffTheSide(page)
   })
 
   test('Schedule: nothing runs off the side and New job is on screen', async ({ context, page }) => {
@@ -437,55 +422,34 @@ test.describe(`a desktop ${WIDTH} px wide`, () => {
     await expect(sorted('Balance')).not.toHaveAttribute('aria-sort', /./)
   })
 
-  test('the sidebar shows the short company name whole, with the full name as its title', async ({ context, page }) => {
+  test('the workspace title preserves the full company name', async ({ context, page }) => {
     await open(context, page, '/invoices', { tables: MONEY })
-    const name = page.getByRole('complementary', { name: 'Primary navigation' }).locator('.fhs-side__company')
-    await expect(name).toHaveText('Parker Construction')
-    await expect(name).toHaveAttribute('title', 'Parker Construction Company')
-    const state = await lineState(name)
-    expect(state.lines).toBeLessThanOrEqual(2)
-    expect(state, 'no ellipsis').toMatchObject({ clamped: false, cutSideways: false })
+    await expect(page.getByRole('button', { name: 'Open workspace menu' })).toHaveAttribute('title', 'Parker Construction Company')
   })
 
-  test('a long company name wraps to two lines at most, and the title keeps all of it', async ({ context, page }) => {
+  test('a long workspace name stays available in the header title', async ({ context, page }) => {
     const long = 'Parker Construction and Concrete Restoration of Middle Tennessee'
     await open(context, page, '/invoices', { tables: { ...MONEY, organizations: [{ id: 'org-1', name: long }] } })
-    const name = page.getByRole('complementary', { name: 'Primary navigation' }).locator('.fhs-side__company')
-    await expect(name).toHaveText(long)
-    await expect(name).toHaveAttribute('title', long)
-    // Two lines, the rest behind an ellipsis and in the title.
-    expect(await lineState(name)).toEqual({ lines: 2, clamped: true, cutSideways: false })
+    await expect(page.getByRole('button', { name: 'Open workspace menu' })).toHaveAttribute('title', long)
   })
 
-  // "My Company" is the name the server gives a workspace made without one
-  // (migrations 032 and 062). Dropping its legal word would leave "My".
-  test('a workspace still called My Company reads My Company, never My', async ({ context, page }) => {
+  test('My Company keeps its complete name', async ({ context, page }) => {
     await open(context, page, '/invoices', { tables: { ...MONEY, organizations: [{ id: 'org-1', name: 'My Company' }] } })
-    const name = page.getByRole('complementary', { name: 'Primary navigation' }).locator('.fhs-side__company')
-    await expect(name).toHaveText('My Company')
-    await expect(name).toHaveAttribute('title', 'My Company')
+    await expect(page.getByRole('button', { name: 'Open workspace menu' })).toHaveAttribute('title', 'My Company')
   })
 
-  // The profile is the person's, not the workspace's: it holds the city
-  // and logo of the company they run. Jesse runs Shyld Roofing and works
-  // crew at Parker Construction, so in Parker the sidebar shows Parker's
-  // name with its initials, never Shyld's city or logo.
-  test('in a workspace someone else owns, the sidebar has its name and initials, not the city and logo of the company the person runs', async ({ context, page }) => {
+  test('another workspace uses its initials, not the owners unrelated company logo', async ({ context, page }) => {
     await open(context, page, '/', { role: 'crew', tables: { fh_schedule: SCHEDULE, profiles: [SHYLD_PROFILE] } })
-    const brand = page.getByRole('complementary', { name: 'Primary navigation' }).locator('.fhs-side__brand')
-    await expect(brand.locator('.fhs-side__company')).toHaveText('Parker Construction', { timeout: 30_000 })
+    const brand = page.getByRole('button', { name: 'Open workspace menu' })
+    await expect(brand).toHaveAttribute('title', 'Parker Construction', { timeout: 30_000 })
     await expect(brand.locator('.fhc-monogram__initials')).toHaveText('PC')
     await expect(brand.locator('img')).toHaveCount(0)
-    await expect(brand.getByText('Smyrna, TN')).toHaveCount(0)
   })
 
-  // An owner keeps the city and logo in their own workspace, even under a
-  // workspace name that no longer matches the company name in Settings.
-  test('in the workspace the person owns, the sidebar keeps their city and logo', async ({ context, page }) => {
+  test('the owner keeps their company logo in their workspace', async ({ context, page }) => {
     await open(context, page, '/invoices', { tables: { ...MONEY, profiles: [SHYLD_PROFILE] } })
-    const brand = page.getByRole('complementary', { name: 'Primary navigation' }).locator('.fhs-side__brand')
-    await expect(brand.locator('.fhs-side__company')).toHaveText('Parker Construction', { timeout: 30_000 })
-    await expect(brand.locator('.fhs-side__city')).toHaveText('Smyrna, TN')
+    const brand = page.getByRole('button', { name: 'Open workspace menu' })
+    await expect(brand).toHaveAttribute('title', 'Parker Construction', { timeout: 30_000 })
     await expect(brand.locator('img')).toHaveAttribute('src', PIXEL_URL)
   })
 

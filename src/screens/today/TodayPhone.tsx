@@ -111,7 +111,7 @@ export default function TodayPhone({
 
   const stage = (
     <div ref={stageRef} className="fht-stagewrap">
-      <OnyxStage glow className="fht-stage" aria-labelledby="fht-title">
+      <OnyxStage tone="paper" className="fht-stage" aria-labelledby="fht-title">
         <div className="fht-stage__meta">
           <p className="fht-date">{evening ? eveningDate(now) : longDate(now)}</p>
           <SyncPill />
@@ -139,7 +139,7 @@ export default function TodayPhone({
           <>
             <div className="fht-card" aria-hidden="true">
               <div className="fht-card__tray">
-                <div className="fht-card__frame fh-onyx-scope">
+                <div className="fht-card__frame">
                   <Skeleton width="40%" height={12} />
                   <Skeleton width="64%" height={22} />
                 </div>

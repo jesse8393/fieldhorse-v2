@@ -494,7 +494,7 @@ function TaskComposer({ jobs, members, onCancel, onCreate }: any) {
       </div>
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
         <button type="button" onClick={onCancel} disabled={busy} style={{ ...field, cursor: 'pointer', background: 'transparent' }}>Cancel</button>
-        <button type="button" onClick={submit} disabled={!canSave} style={{ ...field, cursor: canSave ? 'pointer' : 'not-allowed', background: 'var(--v3-primary, #C9963A)', color: '#141414', fontWeight: 700, opacity: canSave ? 1 : 0.5, border: 'none' }}>
+        <button type="button" onClick={submit} disabled={!canSave} style={{ ...field, cursor: canSave ? 'pointer' : 'not-allowed', background: 'var(--v3-primary, #C9963A)', color: 'var(--v3-on-primary)', fontWeight: 700, opacity: canSave ? 1 : 0.5, border: 'none' }}>
           {busy ? 'Adding…' : 'Add task'}
         </button>
       </div>

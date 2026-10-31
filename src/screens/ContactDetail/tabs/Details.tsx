@@ -22,12 +22,12 @@ export default function DetailsTab({
   if (sub === 'insurance' && !canSeeMoney) return null
   return (
     <div>
-      <div className="v3-section" style={{ margin: '12px var(--v3-gutter) 24px' }}>
+      <div className="v3-section fh-job-section-frame">
         {sub === 'milestones' && (
           <MilestonesSection contact={contact} patch={patch} />
         )}
         {sub === 'todos' && (
-          <TodosSection jobId={contact?.id} userId={userId} />
+          <TodosSection jobId={contact?.id} userId={userId} onChanged={fetchAll} />
         )}
         {sub === 'scheduled' && (
           <ScheduledSection

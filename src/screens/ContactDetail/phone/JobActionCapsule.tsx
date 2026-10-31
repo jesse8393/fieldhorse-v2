@@ -57,7 +57,7 @@ export default function JobActionCapsule(props: JobActionCapsuleProps) {
     const { total, action } = props
     return createPortal(
       <div
-        className={cx('fhj-capsule fhj-capsule--total fh-onyx-scope', keyboardOpen && 'is-hidden')}
+        className={cx('fhj-capsule fhj-capsule--total', keyboardOpen && 'is-hidden')}
         role="group"
         aria-label="Quote total and send"
       >
@@ -87,7 +87,7 @@ export default function JobActionCapsule(props: JobActionCapsuleProps) {
 
   const { action, onPhotos, onVoice } = props
   return createPortal(
-    <div className={cx('fhj-capsule fh-onyx-scope', !action && 'is-compact', keyboardOpen && 'is-hidden')} role="group" aria-label="Job actions">
+    <div className={cx('fhj-capsule', !action && 'is-compact', keyboardOpen && 'is-hidden')} role="group" aria-label="Job actions">
       <IconButton
         variant="paper"
         icon={Camera}

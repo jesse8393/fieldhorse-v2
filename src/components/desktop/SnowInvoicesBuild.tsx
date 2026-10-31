@@ -135,7 +135,7 @@ export default function SnowInvoicesBuild({
         <h1 className="fhmd-title" ref={titleRef} tabIndex={-1}>Money</h1>
         <div className="fhmd-toolbar__actions">
           <Button variant="quiet" size="md" to="/analytics">Reports</Button>
-          <Button variant="secondary" size="md" icon={Plus} to="/invoices/new">New invoice</Button>
+          <Button variant="primary" size="md" icon={Plus} to="/invoices/new">New invoice</Button>
         </div>
       </header>
 
@@ -146,6 +146,7 @@ export default function SnowInvoicesBuild({
               <Skeleton shape="block" height={222} className="fhmd-vault__skel" />
             ) : (
               <VaultCard
+                tone="paper"
                 label="Collected this week"
                 amount={view.collectedThisWeek}
                 facts={[
