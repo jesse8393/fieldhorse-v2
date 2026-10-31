@@ -102,10 +102,10 @@ jobs:
       # Run persistence and affected entry/UI checks first so their result
       # is visible before the longer application suite completes.
       - name: Persistence and UI regression checks
-        run: npx playwright test tests/e2e/workspace-persistence.spec.ts tests/e2e/mobile-ui-ux.spec.ts tests/e2e/login.spec.ts tests/e2e/public-smoke.spec.ts tests/e2e/desktop-route-audit.spec.ts --project=${{ matrix.project }}
+        run: npx playwright test tests/e2e/workspace-persistence.spec.ts tests/e2e/workspace-tasks.spec.ts tests/e2e/mobile-ui-ux.spec.ts tests/e2e/login.spec.ts tests/e2e/public-smoke.spec.ts tests/e2e/desktop-route-audit.spec.ts --project=${{ matrix.project }}
 
       - name: End to end tests
-        run: npx playwright test --project=${{ matrix.project }} --grep-invert='(workspace-persistence|mobile-ui-ux|login|public-smoke|desktop-route-audit).spec.ts'
+        run: npx playwright test --project=${{ matrix.project }} --grep-invert='(workspace-persistence|workspace-tasks|mobile-ui-ux|login|public-smoke|desktop-route-audit).spec.ts'
 
       - name: Upload Playwright traces on failure
         if: failure()
