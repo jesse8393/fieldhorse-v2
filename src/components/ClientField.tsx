@@ -8,8 +8,8 @@
 // The company's clients are read once (the newest active first) and
 // matched here, so the list answers every keystroke without a request.
 
-import { useEffect, useId, useMemo, useState } from 'react'
-import { Field } from './fh'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { Button, Field } from './fh'
 import { supabase } from '../lib/supabase.ts'
 import { useOrgScope } from '../lib/orgScope.ts'
 import { findOrCreateClient } from '../lib/clients.ts'
@@ -120,7 +120,12 @@ type Props = {
 
 export default function ClientField({ userId, value, onChange, label = 'Client', placeholder = 'Type a name', error, autoFocus, onPick }: Props) {
   const orgScope = useOrgScope(userId)
-  const [rows, setRows] = useState<ClientPick[]>([])
+  const scope = JSON.stringify([userId, orgScope])
+  const [read, setRead] = useState<{ scope: string; retry: number; rows: ClientPick[]; failed: boolean } | null>(null)
+  const [retry, setRetry] = useState(0)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const current = read?.scope === scope && read.retry === retry ? read : null
+  const rows = current?.rows
   const [activeIndex, setActiveIndex] = useState(-1)
   const [dismissed, setDismissed] = useState(false)
   const listId = useId()
@@ -128,16 +133,21 @@ export default function ClientField({ userId, value, onChange, label = 'Client',
   useEffect(() => {
     if (!userId || orgScope === undefined) return
     let alive = true
-    clientRows(userId, orgScope)
-      .order('last_activity_at', { ascending: false, nullsFirst: false })
-      .limit(LIMIT)
-      .then(({ data }) => { if (alive) setRows((data || []) as ClientPick[]) })
+    void (async () => {
+      try {
+        const { data, error } = await clientRows(userId, orgScope)
+          .order('last_activity_at', { ascending: false, nullsFirst: false }).limit(LIMIT)
+        if (alive) setRead({ scope, retry, rows: (data || []) as ClientPick[], failed: !!error })
+      } catch {
+        if (alive) setRead({ scope, retry, rows: [], failed: true })
+      }
+    })()
     return () => { alive = false }
-  }, [userId, orgScope])
+  }, [userId, orgScope, scope, retry])
 
   const typed = value.text
-  const matches = useMemo(() => (value.picked ? [] : matchClients(rows, typed)), [rows, typed, value.picked])
-  const exact = useMemo(() => (value.picked ? null : exactClient(rows, typed)), [rows, typed, value.picked])
+  const matches = useMemo(() => (value.picked ? [] : matchClients(rows || [], typed)), [rows, typed, value.picked])
+  const exact = useMemo(() => (value.picked ? null : exactClient(rows || [], typed)), [rows, typed, value.picked])
   const isNew = !value.picked && typed.trim() !== '' && !exact
   const showList = matches.length > 0 && !dismissed
   const activeClient = showList ? matches[activeIndex] : undefined
@@ -153,14 +163,15 @@ export default function ClientField({ userId, value, onChange, label = 'Client',
   const helper = value.picked
     ? `Saves to ${value.picked.name}.`
     : isNew && !showList
-      ? `Saves ${typed.trim()} as a new client.`
+      ? 'Checks for an existing client when saving. Adds a client only if no match exists.'
       : isNew && showList
-        ? `Pick one below, or keep ${typed.trim()} as a new client.`
+        ? 'Pick a matching client below, or keep typing. Existing clients are checked when saving.'
         : undefined
 
   return (
     <div className="fhnew-client">
       <Field
+        ref={inputRef}
         label={label}
         value={typed}
         placeholder={placeholder}
@@ -198,6 +209,13 @@ export default function ClientField({ userId, value, onChange, label = 'Client',
           }
         }}
       />
+      {current?.failed && <div role="alert">
+        <p>Client suggestions could not load. Retry, or type a name to check when saving.</p>
+        <Button type="button" variant="secondary" onClick={() => {
+          inputRef.current?.focus({ preventScroll: true })
+          setRetry(attempt => attempt + 1)
+        }}>Retry client suggestions</Button>
+      </div>}
       {showList && (
         <ul id={listId} className="fhnew-client__list" role="listbox" aria-label="Matching clients">
           {matches.map((c, index) => (
