@@ -21,6 +21,7 @@ import { useArmedId } from '../../../lib/secondTap.ts'
 import { compressImageToBlob } from '../../../lib/docIntelligence.ts'
 import { todayYmd } from '../../../lib/dates.ts'
 import { Eyebrow } from '../../../components/v3'
+import Field from '../../../components/fh/Field.tsx'
 
 const SkeletonAny = SkeletonList as any
 const PHOTO_BUCKET = 'job-photos'
@@ -78,6 +79,12 @@ export default function DailyLogsSection({ jobId, userId }: any) {
   const [rows, setRows] = useState<LogRow[]>([])
   const [loading, setLoading] = useState(true)
   const [composing, setComposing] = useState(false)
+  const addButtonRef = useRef<HTMLButtonElement>(null)
+  const wasComposing = useRef(false)
+  useEffect(() => {
+    if (!composing && wasComposing.current) addButtonRef.current?.focus()
+    wasComposing.current = composing
+  }, [composing])
   // Non-null when the compose form is editing an existing log rather
   // than posting a new one. save() branches on this.
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -373,9 +380,11 @@ export default function DailyLogsSection({ jobId, userId }: any) {
         </Eyebrow>
         {!composing && (
           <button
+            ref={addButtonRef}
             type="button"
             onClick={() => setComposing(true)}
             style={{
+              minHeight: 44,
               padding: '8px 12px',
               borderRadius: 10,
               border: 'none',
@@ -401,68 +410,45 @@ export default function DailyLogsSection({ jobId, userId }: any) {
             background: 'var(--v3-surface)', border: '1px solid var(--v3-border)',
           }}
         >
-          <textarea
+          <Field
+            label="Site summary"
+            multiline
             value={summary}
             onChange={(e) => setSummary(e.target.value)}
             placeholder="What happened on site today?"
             rows={3}
             autoFocus
-            style={{
-              width: '100%',
-              padding: '12px 12px',
-              borderRadius: 10,
-              border: '1px solid var(--v3-border)',
-              background: 'var(--v3-surface-2, rgba(20, 20, 20,.20))',
-              color: 'var(--v3-text)',
-              fontFamily: 'var(--font-body)',
-              fontSize: 14,
-              outline: 'none',
-              resize: 'vertical',
-              minHeight: 80,
-            }}
           />
-          <textarea
+          <Field
+            label="Next steps (optional)"
+            multiline
             value={nextSteps}
             onChange={(e) => setNextSteps(e.target.value)}
             placeholder="What's next? (optional)"
             rows={2}
-            style={{
-              width: '100%',
-              padding: '12px 12px',
-              borderRadius: 10,
-              border: '1px solid var(--v3-border)',
-              background: 'var(--v3-surface-2, rgba(20, 20, 20,.20))',
-              color: 'var(--v3-text)',
-              fontFamily: 'var(--font-body)',
-              fontSize: 14,
-              outline: 'none',
-              resize: 'vertical',
-              minHeight: 56,
-            }}
           />
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <input
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))', gap: 12 }}>
+            <Field
+              label="Weather (optional)"
               value={weatherText}
               onChange={(e) => setWeatherText(e.target.value)}
-              placeholder="Weather (e.g. 72°, light wind)"
-              style={inputStyle}
+              placeholder="72°, light wind"
             />
-            <input
+            <Field
+              label="Crew on site (optional)"
               type="number"
               min="0"
               value={crewCount}
               onChange={(e) => setCrewCount(e.target.value)}
-              placeholder="Crew on site"
-              style={{ ...inputStyle, maxWidth: 130 }}
             />
-            <input
+            <Field
+              label="Hours worked (optional)"
               type="number"
+              inputMode="decimal"
               min="0"
               step="0.25"
               value={hoursWorked}
               onChange={(e) => setHoursWorked(e.target.value)}
-              placeholder="Hours"
-              style={{ ...inputStyle, maxWidth: 100 }}
             />
           </div>
 
@@ -495,7 +481,7 @@ export default function DailyLogsSection({ jobId, userId }: any) {
                       aria-label="Remove photo"
                       style={{
                         position: 'absolute', top: 2, right: 2,
-                        width: 22, height: 22, borderRadius: 10,
+                        width: 44, height: 44, borderRadius: 10,
                         border: 'none', background: 'rgba(20, 20, 20,.65)',
                         color: '#F2EDE4', cursor: 'pointer',
                         display: 'grid', placeItems: 'center',
@@ -509,7 +495,7 @@ export default function DailyLogsSection({ jobId, userId }: any) {
             </div>
           )}
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
             <input
               ref={fileInputRef}
               type="file"
@@ -600,7 +586,7 @@ export default function DailyLogsSection({ jobId, userId }: any) {
                         aria-label="Edit log"
                         title="Edit"
                         style={{
-                          width: 28, height: 28, borderRadius: 10,
+                          width: 44, height: 44, borderRadius: 10,
                           border: 'none', background: 'transparent',
                           color: 'var(--v3-text-muted)', cursor: 'pointer',
                           display: 'grid', placeItems: 'center',
@@ -614,7 +600,7 @@ export default function DailyLogsSection({ jobId, userId }: any) {
                         aria-label={deleteTap.armedId === r.id ? 'Tap again to delete' : 'Delete log'}
                         title={deleteTap.armedId === r.id ? 'Tap again to delete this log. This cannot be undone.' : 'Delete'}
                         style={{
-                          width: deleteTap.armedId === r.id ? 'auto' : 28, height: 28, borderRadius: 10, padding: deleteTap.armedId === r.id ? '0 8px' : 0,
+                          width: deleteTap.armedId === r.id ? 'auto' : 44, minWidth: 44, height: 44, borderRadius: 10, padding: deleteTap.armedId === r.id ? '0 8px' : 0,
                           border: 'none', background: 'transparent',
                           color: deleteTap.armedId === r.id ? 'var(--v3-danger-text)' : 'var(--v3-text-muted)', cursor: 'pointer',
                           display: 'grid', placeItems: 'center',
@@ -699,19 +685,8 @@ export default function DailyLogsSection({ jobId, userId }: any) {
   )
 }
 
-const inputStyle: React.CSSProperties = {
-  flex: '1 1 180px',
-  padding: '12px 12px',
-  borderRadius: 10,
-  border: '1px solid var(--v3-border)',
-  background: 'var(--v3-surface-2, rgba(20, 20, 20,.20))',
-  color: 'var(--v3-text)',
-  fontFamily: 'var(--font-body)',
-  fontSize: 14,
-  outline: 'none',
-}
-
 const primaryBtn = (disabled: boolean): React.CSSProperties => ({
+  minHeight: 44,
   padding: '8px 16px',
   borderRadius: 10,
   border: 'none',
@@ -726,6 +701,7 @@ const primaryBtn = (disabled: boolean): React.CSSProperties => ({
 })
 
 const secondaryBtn: React.CSSProperties = {
+  minHeight: 44,
   padding: '8px 12px',
   borderRadius: 10,
   border: '1px solid var(--v3-border)',

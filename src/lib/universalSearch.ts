@@ -26,6 +26,7 @@ import { escapeLikeText, ilikeAnyOf } from './searchFilter.ts'
 import { lastKnownOrg } from './orgScope.ts'
 import { recordRoute } from './records.ts'
 import type { PaletteJob } from './paletteActions.ts'
+import { canSeeFinancials, canViewRoute, type OrgRole } from './permissions.ts'
 
 const PER_KIND = 6
 
@@ -99,9 +100,14 @@ export async function universalSearch(
   query: string | null | undefined,
   userId: string | undefined,
   orgId?: string | null,
+  role: OrgRole | null = null,
 ): Promise<SearchResults> {
   const q = String(query || '').trim()
-  if (!q || !userId) return NO_RESULTS
+  if (!q || !userId || !role) return NO_RESULTS
+  // Match navigation permissions before issuing a query. RLS remains the
+  // server boundary; field-role search must also omit prices and dead links.
+  const showMoney = canSeeFinancials(role)
+  const skipped = { data: [], error: null }
 
   // Search the active company's book, like every list screen does
   // (lib/orgScope.ts), so teammates' jobs, clients, events and files show
@@ -144,18 +150,18 @@ export async function universalSearch(
   ] = await Promise.all([
     scoped(supabase
       .from('fh_contacts')
-      .select('id, name, job_title, job_type, stage, amount, phone, address'))
+      .select(`id, name, job_title, job_type, stage, phone, address${showMoney ? ', amount' : ''}`))
       .not('stage', 'in', MOVED_STAGE_FILTER)
       .or(ilikeAnyOf(['name', 'job_title', 'job_type', 'phone', 'email', 'address'], q))
       .order('updated_at', { ascending: false })
       .limit(PER_KIND),
 
-    scoped(supabase
+    canViewRoute(role, '/clients') ? scoped(supabase
       .from('fh_clients')
       .select('id, name, company_name, phone, email, active_jobs_count'))
       .or(ilikeAnyOf(['name', 'company_name', 'phone', 'email'], q))
       .order('last_activity_at', { ascending: false, nullsFirst: false })
-      .limit(PER_KIND),
+      .limit(PER_KIND) : skipped,
 
     supabase
       .from('fh_notes')
@@ -179,12 +185,12 @@ export async function universalSearch(
       .order('uploaded_at', { ascending: false })
       .limit(PER_KIND),
 
-    byTitle('fh_leads', LEAD_COLUMNS),
-    byClient('fh_leads', LEAD_COLUMNS),
-    byTitle('fh_quotes', QUOTE_COLUMNS),
-    byClient('fh_quotes', QUOTE_COLUMNS),
-    byTitle('fh_invoices', INVOICE_COLUMNS),
-    byClient('fh_invoices', INVOICE_COLUMNS)
+    canViewRoute(role, '/leads') ? byTitle('fh_leads', LEAD_COLUMNS) : skipped,
+    canViewRoute(role, '/leads') ? byClient('fh_leads', LEAD_COLUMNS) : skipped,
+    canViewRoute(role, '/quotes') ? byTitle('fh_quotes', QUOTE_COLUMNS) : skipped,
+    canViewRoute(role, '/quotes') ? byClient('fh_quotes', QUOTE_COLUMNS) : skipped,
+    canViewRoute(role, '/invoices') ? byTitle('fh_invoices', INVOICE_COLUMNS) : skipped,
+    canViewRoute(role, '/invoices') ? byClient('fh_invoices', INVOICE_COLUMNS) : skipped
   ])
 
   // A failed group used to come back as an empty list, so a broken query
@@ -229,7 +235,7 @@ export async function universalSearch(
     id: `job:${j.id}`,
     kind: 'job',
     title: j.name || 'Untitled',
-    sub: [j.job_title || j.job_type, j.stage ? stageLabel(String(j.stage)) : null, j.amount ? `$${Math.round(j.amount).toLocaleString()}` : null].filter(Boolean).join(' · '),
+    sub: [j.job_title || j.job_type, j.stage ? stageLabel(String(j.stage)) : null, showMoney ? fmtMoney(j.amount) : null].filter(Boolean).join(' · '),
     to: contactRoute(j),
     job: {
       id: String(j.id),

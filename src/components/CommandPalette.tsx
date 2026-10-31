@@ -17,7 +17,7 @@
 // listener while the palette is closed, so typing "i" in any other text
 // field does nothing. The rule itself is in lib/paletteActions.ts.
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Command } from 'cmdk'
@@ -63,6 +63,8 @@ import { stageLabel } from '../lib/stages.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { useOrgScope, type OrgScope } from '../lib/orgScope.ts'
+import type { OrgRole } from '../lib/permissions.ts'
+import DataErrorState from './DataErrorState.tsx'
 import '../styles/command-palette.css'
 
 type NavEntry = {
@@ -190,21 +192,23 @@ function PaletteRow({ value, icon, title, sub, chevron, keys, shortcut, onSelect
 export default function CommandPalette() {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
-  const [resultSnapshot, setResultSnapshot] = useState<{ userId: string; scope: OrgScope; data: SearchResults } | null>(null)
+  const [resultSnapshot, setResultSnapshot] = useState<{ userId: string; scope: OrgScope; role: OrgRole; query: string; data: SearchResults } | null>(null)
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState('')
+  const [retryTick, setRetryTick] = useState(0)
+  const inputRef = useRef<HTMLInputElement>(null)
   // The highlighted row's cmdk value, and the job the Actions group is for.
   const [highlight, setHighlight] = useState('')
   const [activeJobId, setActiveJobId] = useState<string | null>(null)
   const navigate = useNavigate()
   const { user } = useAuth()
   const orgScope = useOrgScope(user?.id)
+  const { canViewRoute, canCreateFinancialDocs, role, loading: membershipLoading, error: membershipError, refresh: refreshMembership } = useMembership()
   // Old-company rows disappear in the render that changes workspace, before
   // the next request starts. Late answers are also rejected by effect cleanup.
-  const results = resultSnapshot && resultSnapshot.userId === user?.id && resultSnapshot.scope === orgScope
+  const results = !membershipLoading && !membershipError && resultSnapshot && resultSnapshot.userId === user?.id && resultSnapshot.scope === orgScope && resultSnapshot.role === role && resultSnapshot.query === query.trim()
     ? resultSnapshot.data
     : EMPTY_RESULTS
-  const { canViewRoute, canCreateFinancialDocs, role, loading: membershipLoading } = useMembership()
 
   const env = useMemo(
     () => (typeof navigator === 'undefined' ? {} : { userAgent: navigator.userAgent, maxTouchPoints: navigator.maxTouchPoints }),
@@ -253,12 +257,18 @@ export default function CommandPalette() {
     setSearching(true)
     setSearchError('')
     // Do not issue an owner-scoped search while the company is unresolved.
-    if (orgScope === undefined) return
+    if (membershipLoading || orgScope === undefined) return
+    if (membershipError || !role) {
+      setResultSnapshot(null)
+      setSearching(false)
+      setSearchError('Workspace access could not be confirmed.')
+      return
+    }
     let cancelled = false
     const t = setTimeout(async () => {
       try {
-        const data = await universalSearch(q, user.id, orgScope)
-        if (!cancelled) setResultSnapshot({ userId: user.id, scope: orgScope, data })
+        const data = await universalSearch(q, user.id, orgScope, role)
+        if (!cancelled) setResultSnapshot({ userId: user.id, scope: orgScope, role, query: q, data })
       } catch (e: unknown) {
         if (!cancelled) {
           setResultSnapshot(null)
@@ -272,7 +282,7 @@ export default function CommandPalette() {
       cancelled = true
       clearTimeout(t)
     }
-  }, [query, open, user?.id, orgScope])
+  }, [query, open, user?.id, orgScope, role, membershipLoading, membershipError, retryTick])
 
   function go(to: string) {
     setOpen(false)
@@ -298,7 +308,7 @@ export default function CommandPalette() {
     if (it.event) return true
     if (!it.to) return true
     const path = it.to.split('?')[0].split('#')[0]
-    if (membershipLoading) return true
+    if (membershipLoading || membershipError) return false
     if (role) return path === '/sub-portal' || canViewRoute(path)
     return path === '/sub-portal'
   }
@@ -397,6 +407,7 @@ export default function CommandPalette() {
             <div className="fhp-search">
               <Icon icon={Search} size={24} />
               <Command.Input
+                ref={inputRef}
                 className="fhp-input"
                 placeholder="Search jobs, customers, notes and files"
                 value={query}
@@ -410,7 +421,19 @@ export default function CommandPalette() {
                   {searching && !hasResults && (
                     <div className="fhp-note" role="status">Searching...</div>
                   )}
-                  {!searching && searchError && <Command.Empty className="fhp-note">{searchError}</Command.Empty>}
+                  {!searching && searchError && (
+                    <div onKeyDown={(e) => {
+                      // cmdk consumes Enter for option selection. Let Retry
+                      // keep its native button activation instead.
+                      if (e.key === 'Enter' || e.key === ' ') e.stopPropagation()
+                    }}>
+                      <DataErrorState compact title={searchError} message="" onRetry={() => {
+                        inputRef.current?.focus({ preventScroll: true })
+                        if (membershipError || !role) void refreshMembership()
+                        setRetryTick((n) => n + 1)
+                      }} />
+                    </div>
+                  )}
                   {!searching && !searchError && !hasResults && (
                     <Command.Empty className="fhp-note">Nothing matched.</Command.Empty>
                   )}

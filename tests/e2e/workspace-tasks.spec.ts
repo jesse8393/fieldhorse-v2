@@ -10,10 +10,20 @@ test('job tasks can be completed, undone, and created on a narrow phone', async 
     text: 'Confirm arrival time with the homeowner', done: false,
     created_at: new Date().toISOString(), due_at: null,
   }]
+  let undoStarted = false
+  let releaseUndo = () => {}
+  const undoGate = new Promise<void>(resolve => { releaseUndo = resolve })
   await context.route(/\/rest\/v1\/fh_job_todos(\?|$)/, async route => {
     const request = route.request()
     const id = new URL(request.url()).searchParams.get('id')?.replace(/^eq\./, '')
-    if (request.method() === 'PATCH') rows = rows.map(row => row.id === id ? { ...row, ...request.postDataJSON() } : row)
+    if (request.method() === 'PATCH') {
+      const patch = request.postDataJSON()
+      if (patch.done === false) {
+        undoStarted = true
+        await undoGate
+      }
+      rows = rows.map(row => row.id === id ? { ...row, ...patch } : row)
+    }
     if (request.method() === 'POST') rows.push({ id: 'todo-created', done: false, created_at: new Date().toISOString(), ...request.postDataJSON() })
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(id ? rows.filter(row => row.id === id) : rows) })
   })
@@ -27,9 +37,21 @@ test('job tasks can be completed, undone, and created on a narrow phone', async 
   await complete.click()
   await expect(page.getByText('All current tasks complete.', { exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Open tasks 0' })).toBeFocused()
+  const undoResponse = page.waitForResponse(response =>
+    response.url().includes('/rest/v1/fh_job_todos') &&
+    response.request().method() === 'PATCH' && response.request().postDataJSON().done === false)
   await page.getByRole('button', { name: 'Undo', exact: true }).click()
+  try {
+    // Undo restores the row optimistically. A visible checkbox does not
+    // establish persistence while the asynchronous update remains pending.
+    await expect(complete).toBeVisible()
+    await expect.poll(() => undoStarted).toBe(true)
+    expect(rows[0].done).toBe(true)
+  } finally { releaseUndo() }
+  expect((await undoResponse).status()).toBe(200)
+  await expect.poll(() => rows[0].done).toBe(false)
+  await page.reload()
   await expect(complete).toBeVisible()
-  expect(rows[0].done).toBe(false)
 
   await page.getByRole('button', { name: 'Add task', exact: true }).click()
   await page.getByRole('textbox', { name: 'Task description' }).fill('Review field measurements')

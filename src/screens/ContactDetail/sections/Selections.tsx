@@ -11,7 +11,7 @@
 // Lives inside the Job Detail tab strip alongside the new
 // 'selections' tab id from stageWorkspace.
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Check, Plus, Trash2, Send, Edit2, X, AlertTriangle, Palette,
@@ -23,6 +23,8 @@ import { hapticTap } from '../../../lib/haptics.ts'
 import { SkeletonList } from '../../../components/Skeleton.tsx'
 import { useArmedId } from '../../../lib/secondTap.ts'
 import { Eyebrow } from '../../../components/v3'
+import Field from '../../../components/fh/Field.tsx'
+import { moneyExact } from '../../../lib/format.ts'
 
 const SkeletonAny = SkeletonList as any
 
@@ -80,7 +82,7 @@ function fmtDate(iso: string | null): string {
 
 function fmtMoney(n: number | null | undefined): string {
   if (n == null) return ''
-  return `$${Math.round(Number(n)).toLocaleString()}`
+  return moneyExact(n)
 }
 
 function rid(): string {
@@ -94,7 +96,14 @@ export default function SelectionsSection({ jobId, userId, clientId }: any) {
   const [rows, setRows] = useState<SelectionRow[]>([])
   const [loading, setLoading] = useState(true)
   const [composing, setComposing] = useState(false)
+  const addButtonRef = useRef<HTMLButtonElement>(null)
+  const wasComposing = useRef(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!composing && wasComposing.current) addButtonRef.current?.focus()
+    wasComposing.current = composing
+  }, [composing])
 
   const load = useCallback(async () => {
     if (!jobId) return
@@ -142,11 +151,13 @@ export default function SelectionsSection({ jobId, userId, clientId }: any) {
   async function updateRow(id: string, patch: Partial<SelectionRow>) {
     const before = rows
     setRows((rs) => rs.map((r) => r.id === id ? { ...r, ...(patch as any) } : r))
-    const { error } = await supabase.from('fh_selections').update(patch as any).eq('id', id)
-    if (error) {
-      toastError("Couldn't update", error.message)
+    const { data, error } = await supabase.from('fh_selections').update(patch as any).eq('id', id).select('id').single()
+    if (error || !data) {
+      toastError("Couldn't update", error?.message || 'No selection was updated. Try again.')
       setRows(before)
+      return false
     }
+    return true
   }
 
   async function setStatus(id: string, next: SelectionRow['status']) {
@@ -178,7 +189,7 @@ export default function SelectionsSection({ jobId, userId, clientId }: any) {
   const approvedCount = rows.filter((r) => r.status === 'approved' || r.status === 'installed').length
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 24px 24px' }}>
+    <div className="fh-job-selections" style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 24px 24px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <Eyebrow>
           Selections
@@ -190,9 +201,11 @@ export default function SelectionsSection({ jobId, userId, clientId }: any) {
         </Eyebrow>
         {!composing && (
           <button
+            ref={addButtonRef}
             type="button"
             onClick={() => setComposing(true)}
             style={{
+              minHeight: 44,
               padding: '8px 12px', borderRadius: 10, border: 'none',
               background: 'var(--v3-primary)', color: 'var(--v3-on-primary, #141414)',
               fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
@@ -261,11 +274,13 @@ function SelectionCard({
   onEditToggle: () => void
   onSetStatus: (s: SelectionRow['status']) => void
   onPick: (optId: string, by?: string | null) => void
-  onPatch: (patch: Partial<SelectionRow>) => void
+  onPatch: (patch: Partial<SelectionRow>) => Promise<boolean>
   onDelete: () => void
   /** Delete was tapped once; the next tap deletes (D57). */
   deleteArmed?: boolean
 }) {
+  const editButtonRef = useRef<HTMLButtonElement>(null)
+  function closeEditor() { onEditToggle(); editButtonRef.current?.focus() }
   const opts = row.options || []
   const picked = opts.find((o) => o.id === row.selected_option_id) || null
   const tone = STATUS_TONE[row.status]
@@ -315,7 +330,7 @@ function SelectionCard({
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span className={`fh-build-dot is-${tone}`}>{STATUS_LABEL[row.status]}</span>
-          <button type="button" onClick={onEditToggle} aria-label="Edit selection" style={iconBtnStyle}>
+          <button ref={editButtonRef} type="button" onClick={onEditToggle} aria-label="Edit selection" style={iconBtnStyle}>
             {editing ? <X size={13} /> : <Edit2 size={13} />}
           </button>
           <button
@@ -332,7 +347,7 @@ function SelectionCard({
       {/* Options grid */}
       {opts.length > 0 && (
         <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 8,
+          display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 180px), 1fr))', gap: 8,
         }}>
           {opts.map((o) => {
             const isPicked = o.id === row.selected_option_id
@@ -364,17 +379,17 @@ function SelectionCard({
                   )}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
-                  <strong style={{ fontSize: 12, fontWeight: 700, color: 'var(--v3-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <strong style={{ minWidth: 0, fontSize: 14, fontWeight: 700, color: 'var(--v3-text)', overflowWrap: 'anywhere' }}>
                     {o.label}
                   </strong>
                   {o.price != null && (
-                    <span style={{ fontSize: 12, color: 'var(--v3-primary-text)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                    <span style={{ flexShrink: 0, fontSize: 14, color: 'var(--v3-primary-text)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
                       {fmtMoney(o.price)}
                     </span>
                   )}
                 </div>
                 {(o.brand || o.sku) && (
-                  <div style={{ fontSize: 12, color: 'var(--v3-text-muted)' }}>
+                  <div style={{ fontSize: 12, color: 'var(--v3-text-muted)', overflowWrap: 'anywhere' }}>
                     {[o.brand, o.sku].filter(Boolean).join(' · ')}
                   </div>
                 )}
@@ -384,6 +399,7 @@ function SelectionCard({
                     onClick={() => onPick(o.id)}
                     style={{
                       marginTop: 2,
+                      minHeight: 44,
                       padding: '8px 12px', borderRadius: 10, border: 'none',
                       background: 'var(--v3-primary)', color: 'var(--v3-on-primary, #141414)',
                       fontSize: 12, fontWeight: 700, letterSpacing: 0,
@@ -432,9 +448,8 @@ function SelectionCard({
       {editing && (
         <OptionsEditor
           row={row}
-          onSave={(opts) => onPatch({ options: opts as any })}
-          onTitlePatch={(patch) => onPatch(patch)}
-          onCancel={onEditToggle}
+          onSave={onPatch}
+          onCancel={closeEditor}
         />
       )}
     </motion.li>
@@ -456,7 +471,7 @@ function SelectionComposer({
   onCancel, onCreate,
 }: {
   onCancel: () => void
-  onCreate: (d: SelectionDraft) => void
+  onCreate: (d: SelectionDraft) => Promise<void>
 }) {
   const [title, setTitle] = useState('')
   const [room, setRoom] = useState('')
@@ -464,6 +479,7 @@ function SelectionComposer({
   const [description, setDescription] = useState('')
   const [due_at, setDueAt] = useState('')
   const [options, setOptions] = useState<Option[]>([{ id: rid(), label: '', price: null, brand: '', sku: '', image_url: '', notes: '' }])
+  const [saving, setSaving] = useState(false)
 
   function setOpt(idx: number, patch: Partial<Option>) {
     setOptions((cur) => cur.map((o, i) => i === idx ? { ...o, ...patch } : o))
@@ -471,13 +487,16 @@ function SelectionComposer({
   function addOpt() { setOptions((cur) => [...cur, { id: rid(), label: '', price: null, brand: '', sku: '', image_url: '', notes: '' }]) }
   function removeOpt(idx: number) { setOptions((cur) => cur.filter((_, i) => i !== idx)) }
 
-  function submit() {
+  async function submit() {
+    if (saving) return
     if (!title.trim()) { toastError('Title required'); return }
     const cleaned = options
       .map((o) => ({ ...o, label: o.label.trim() }))
       .filter((o) => o.label.length > 0)
     if (cleaned.length === 0) { toastError('Add at least one option'); return }
-    onCreate({ title, room, category, description, due_at, options: cleaned })
+    setSaving(true)
+    try { await onCreate({ title, room, category, description, due_at, options: cleaned }) }
+    finally { setSaving(false) }
   }
 
   return (
@@ -486,24 +505,25 @@ function SelectionComposer({
       padding: 12, borderRadius: 10,
       background: 'var(--v3-surface)', border: '1px solid var(--v3-border)',
     }}>
-      <input
+      <Field
+        label="Selection title"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder="Selection title (e.g. Master Bath Floor Tile)"
         autoFocus
-        style={inputStyle}
       />
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <input value={room} onChange={(e) => setRoom(e.target.value)} placeholder="Room (optional)" style={{ ...inputStyle, flex: '1 1 160px', maxWidth: 220 }} />
-        <input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Category (tile, paint, fixture…)" style={{ ...inputStyle, flex: '1 1 200px' }} />
-        <input type="date" value={due_at} onChange={(e) => setDueAt(e.target.value)} aria-label="Decision deadline" style={{ ...inputStyle, flex: '0 0 auto', color: due_at ? 'var(--v3-text)' : 'var(--v3-text-muted)' }} />
+      <div className="fh-selection-fields">
+        <Field label="Room (optional)" value={room} onChange={(e) => setRoom(e.target.value)} placeholder="Master bath" />
+        <Field label="Category (optional)" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Tile, paint, fixture…" />
+        <Field label="Decision deadline (optional)" type="date" value={due_at} onChange={(e) => setDueAt(e.target.value)} />
       </div>
-      <textarea
+      <Field
+        label="Notes for client (optional)"
+        multiline
         value={description}
         onChange={(e) => setDescription(e.target.value)}
         placeholder="Notes for the client (optional)"
         rows={2}
-        style={{ ...inputStyle, resize: 'vertical', minHeight: 56 }}
       />
 
       <div style={{ borderTop: '1px solid var(--v3-glass-tint-2)', paddingTop: 12, marginTop: 4 }}>
@@ -512,25 +532,13 @@ function SelectionComposer({
           <button type="button" onClick={addOpt} style={chipBtnGhost}><Plus size={11} /> Add option</button>
         </div>
         {options.map((o, idx) => (
-          <div key={o.id} style={{
-            display: 'grid',
-            gridTemplateColumns: 'minmax(160px, 2fr) minmax(110px, 1fr) minmax(120px, 1fr) 100px auto',
-            gap: 8, marginBottom: 8,
-          }}>
-            <input value={o.label} onChange={(e) => setOpt(idx, { label: e.target.value })} placeholder="Option label" style={inputStyle} />
-            <input value={o.brand || ''} onChange={(e) => setOpt(idx, { brand: e.target.value })} placeholder="Brand" style={inputStyle} />
-            <input value={o.sku || ''} onChange={(e) => setOpt(idx, { sku: e.target.value })} placeholder="SKU / model" style={inputStyle} />
-            <input type="number" value={o.price ?? ''} onChange={(e) => setOpt(idx, { price: e.target.value === '' ? null : Number(e.target.value) })} placeholder="$" style={inputStyle} />
-            <button type="button" onClick={() => removeOpt(idx)} disabled={options.length === 1} aria-label="Remove option" style={{ ...iconBtnStyle, color: options.length === 1 ? 'var(--v3-text-muted)' : 'var(--v3-danger-text)' }}>
-              <X size={13} />
-            </button>
-          </div>
+          <SelectionOptionFields key={o.id} option={o} index={idx} onChange={(patch) => setOpt(idx, patch)} onRemove={() => removeOpt(idx)} canRemove={options.length > 1} />
         ))}
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-        <button type="button" onClick={onCancel} style={secondaryBtn}>Cancel</button>
-        <button type="button" onClick={submit} style={primaryBtn(!title.trim())}>Create selection</button>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
+        <button type="button" onClick={onCancel} disabled={saving} style={secondaryBtn}>Cancel</button>
+        <button type="button" onClick={submit} disabled={saving || !title.trim()} style={primaryBtn(saving || !title.trim())}>{saving ? 'Creating…' : 'Create selection'}</button>
       </div>
     </div>
   )
@@ -539,17 +547,22 @@ function SelectionComposer({
 // ─── inline options editor (edit mode) ─────────────────────────────
 
 function OptionsEditor({
-  row, onSave, onTitlePatch, onCancel,
+  row, onSave, onCancel,
 }: {
   row: SelectionRow
-  onSave: (opts: Option[]) => void
-  onTitlePatch: (patch: Partial<SelectionRow>) => void
+  onSave: (patch: Partial<SelectionRow>) => Promise<boolean>
   onCancel: () => void
 }) {
   const [opts, setOpts] = useState<Option[]>(row.options || [])
   const [title, setTitle] = useState(row.title)
   const [room, setRoom] = useState(row.room || '')
   const [category, setCategory] = useState(row.category || '')
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState(false)
+  const errorRef = useRef<HTMLParagraphElement>(null)
+  useEffect(() => {
+    if (!saving && saveError) errorRef.current?.focus()
+  }, [saving, saveError])
 
   function setOpt(idx: number, patch: Partial<Option>) {
     setOpts((cur) => cur.map((o, i) => i === idx ? { ...o, ...patch } : o))
@@ -558,14 +571,20 @@ function OptionsEditor({
   function removeOpt(idx: number) { setOpts((cur) => cur.filter((_, i) => i !== idx)) }
 
   async function save() {
+    if (saving) return
     const cleaned = opts
       .map((o) => ({ ...o, label: o.label.trim() }))
       .filter((o) => o.label.length > 0)
     if (cleaned.length === 0) { toastError('Need at least one option'); return }
-    onTitlePatch({ title: title.trim() || row.title, room: room.trim() || null, category: category.trim() || null })
-    onSave(cleaned)
-    toastSuccess('Selection updated')
-    onCancel()
+    setSaving(true)
+    setSaveError(false)
+    try {
+      const saved = await onSave({ title: title.trim() || row.title, room: room.trim() || null, category: category.trim() || null, options: cleaned })
+      if (saved) {
+        toastSuccess('Selection updated')
+        onCancel()
+      } else setSaveError(true)
+    } finally { setSaving(false) }
   }
 
   return (
@@ -574,48 +593,50 @@ function OptionsEditor({
       marginTop: 4, padding: 12, borderRadius: 10,
       background: 'rgba(20, 20, 20,.20)', border: '1px solid var(--v3-border)',
     }}>
-      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" style={inputStyle} />
-      <div style={{ display: 'flex', gap: 8 }}>
-        <input value={room} onChange={(e) => setRoom(e.target.value)} placeholder="Room" style={{ ...inputStyle, flex: 1 }} />
-        <input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Category" style={{ ...inputStyle, flex: 1 }} />
+      <Field label="Selection title" autoFocus value={title} onChange={(e) => setTitle(e.target.value)} />
+      <div className="fh-selection-fields">
+        <Field label="Room (optional)" value={room} onChange={(e) => setRoom(e.target.value)} />
+        <Field label="Category (optional)" value={category} onChange={(e) => setCategory(e.target.value)} />
       </div>
       <div className="fh-build-eyebrow" style={{ color: 'var(--v3-primary-text)' }}>Options</div>
       {opts.map((o, idx) => (
-        <div key={o.id} style={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(160px, 2fr) minmax(110px, 1fr) minmax(110px, 1fr) 90px auto',
-          gap: 8,
-        }}>
-          <input value={o.label} onChange={(e) => setOpt(idx, { label: e.target.value })} placeholder="Option label" style={inputStyle} />
-          <input value={o.brand || ''} onChange={(e) => setOpt(idx, { brand: e.target.value })} placeholder="Brand" style={inputStyle} />
-          <input value={o.sku || ''} onChange={(e) => setOpt(idx, { sku: e.target.value })} placeholder="SKU" style={inputStyle} />
-          <input type="number" value={o.price ?? ''} onChange={(e) => setOpt(idx, { price: e.target.value === '' ? null : Number(e.target.value) })} placeholder="$" style={inputStyle} />
-          <button type="button" onClick={() => removeOpt(idx)} disabled={opts.length === 1} aria-label="Remove option" style={{ ...iconBtnStyle, color: opts.length === 1 ? 'var(--v3-text-muted)' : 'var(--v3-danger-text)' }}>
-            <X size={13} />
-          </button>
-        </div>
+        <SelectionOptionFields key={o.id} option={o} index={idx} onChange={(patch) => setOpt(idx, patch)} onRemove={() => removeOpt(idx)} canRemove={opts.length > 1} />
       ))}
       <button type="button" onClick={addOpt} style={chipBtnGhost}><Plus size={11} /> Add option</button>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-        <button type="button" onClick={onCancel} style={secondaryBtn}>Cancel</button>
-        <button type="button" onClick={save} style={primaryBtn(false)}>Save</button>
+      {saveError && <p ref={errorRef} role="alert" tabIndex={-1} style={{ margin: 0, color: 'var(--v3-danger-text)', scrollMarginBlock: '100px' }}>Changes could not be saved. Your edits remain here. Try again.</p>}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
+        <button type="button" onClick={onCancel} disabled={saving} style={secondaryBtn}>Cancel</button>
+        <button type="button" onClick={save} disabled={saving} style={primaryBtn(saving)}>{saving ? 'Saving…' : 'Save'}</button>
       </div>
     </div>
   )
 }
 
-// ─── styles ────────────────────────────────────────────────────────
-
-const inputStyle: React.CSSProperties = {
-  flex: '1 1 200px', minWidth: 0,
-  padding: '12px 12px', borderRadius: 10,
-  background: 'var(--v3-surface-2, rgba(20, 20, 20,.20))',
-  border: '1px solid var(--v3-border)',
-  color: 'var(--v3-text)',
-  fontFamily: 'var(--font-body)', fontSize: 14, outline: 'none',
+function SelectionOptionFields({ option, index, onChange, onRemove, canRemove }: {
+  option: Option
+  index: number
+  onChange: (patch: Partial<Option>) => void
+  onRemove: () => void
+  canRemove: boolean
+}) {
+  return (
+    <fieldset className="fh-selection-option">
+      <legend>Option {index + 1}</legend>
+      <div className="fh-selection-fields">
+        <Field label="Option label" value={option.label} onChange={(e) => onChange({ label: e.target.value })} placeholder="Porcelain tile" />
+        <Field label="Brand" value={option.brand || ''} onChange={(e) => onChange({ brand: e.target.value })} />
+        <Field label="SKU / model" value={option.sku || ''} onChange={(e) => onChange({ sku: e.target.value })} />
+        <Field label="Price ($)" type="number" inputMode="decimal" step="0.01" value={option.price ?? ''} onChange={(e) => onChange({ price: e.target.value === '' ? null : Number(e.target.value) })} />
+      </div>
+      <button type="button" onClick={onRemove} disabled={!canRemove} aria-label={`Remove option ${index + 1}`} style={{ ...chipBtnGhost, color: canRemove ? 'var(--v3-danger-text)' : 'var(--v3-text-muted)' }}><X size={16} aria-hidden="true" />Remove option</button>
+    </fieldset>
+  )
 }
 
+// ─── styles ────────────────────────────────────────────────────────
+
 const primaryBtn = (disabled: boolean): React.CSSProperties => ({
+  minHeight: 44,
   padding: '8px 16px', borderRadius: 10, border: 'none',
   background: 'var(--v3-primary)', color: 'var(--v3-on-primary, #141414)',
   fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, letterSpacing: 0,
@@ -623,6 +644,7 @@ const primaryBtn = (disabled: boolean): React.CSSProperties => ({
 })
 
 const secondaryBtn: React.CSSProperties = {
+  minHeight: 44,
   padding: '8px 12px', borderRadius: 10,
   border: '1px solid var(--v3-border)',
   background: 'transparent', color: 'var(--v3-text-muted)',
@@ -630,13 +652,14 @@ const secondaryBtn: React.CSSProperties = {
 }
 
 const iconBtnStyle: React.CSSProperties = {
-  width: 28, height: 28, borderRadius: 10,
+  width: 44, height: 44, borderRadius: 10,
   border: 'none', background: 'transparent',
   color: 'var(--v3-text-muted)', cursor: 'pointer',
   display: 'grid', placeItems: 'center',
 }
 
 const chipBtn: React.CSSProperties = {
+  minHeight: 44,
   display: 'inline-flex', alignItems: 'center', gap: 4,
   padding: '4px 12px', borderRadius: 10,
   background: 'color-mix(in srgb, var(--v3-primary) 12%, transparent)',
@@ -646,6 +669,7 @@ const chipBtn: React.CSSProperties = {
 }
 
 const chipBtnGhost: React.CSSProperties = {
+  minHeight: 44,
   display: 'inline-flex', alignItems: 'center', gap: 4,
   padding: '4px 12px', borderRadius: 10,
   background: 'transparent',

@@ -15,19 +15,18 @@
 // route from foreman/crew is the only role gate, they see their own
 // open tasks on /crew, which is the right surface for those roles.
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import {
-  AlertTriangle, Bell, Calendar, Check, ChevronRight, ClipboardCheck, Clock, Search, UserRound, Trash2, Plus,
+  AlertTriangle, Calendar, Check, ChevronRight, ClipboardCheck, Trash2, Plus,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { supabase } from '../lib/supabase.ts'
 import { orgMembersList, type OrgMember } from '../lib/orgApi.ts'
 import { toastError, toastSuccess, toastUndo } from '../lib/toast.ts'
-import MiniMetric from '../components/MiniMetric.tsx'
 import { Button } from '../ui/index.ts'
-import PaletteKeyCap, { paletteShortcut } from '../components/desktop/PaletteKeyCap.tsx'
+import './tasks.css'
 
 type TaskRow = {
   id: string
@@ -91,7 +90,7 @@ const BUCKETS: { key: Bucket; label: string; tone: 'bad' | 'warn' | 'good' | 'ne
 export default function Tasks() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { orgName, loading: memLoading, canSeeAllJobs, role } = useMembership()
+  const { loading: memLoading, canSeeAllJobs, role } = useMembership()
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -101,6 +100,22 @@ export default function Tasks() {
   const [filterAssignee, setFilterAssignee] = useState<string>('') // '' = all
   const [allJobs, setAllJobs] = useState<{ id: string; name: string }[]>([])
   const [composerOpen, setComposerOpen] = useState(false)
+  const headingRef = useRef<HTMLHeadingElement>(null)
+  const newTaskRef = useRef<HTMLButtonElement>(null)
+  const restoreComposerFocus = useRef(false)
+
+  function closeComposer() {
+    restoreComposerFocus.current = true
+    headingRef.current?.focus({ preventScroll: true })
+    setComposerOpen(false)
+  }
+
+  useEffect(() => {
+    if (composerOpen || loading || !restoreComposerFocus.current) return
+    restoreComposerFocus.current = false
+    if (error) headingRef.current?.focus()
+    else newTaskRef.current?.focus()
+  }, [composerOpen, loading, error])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -169,16 +184,32 @@ export default function Tasks() {
   }, [filteredTasks])
 
   async function completeTask(rowId: string) {
-    // Optimistic.
+    const snapshot = tasks.find(task => task.id === rowId)
+    if (!snapshot) return
     setTasks((cur) => cur.filter((t) => t.id !== rowId))
-    const { error } = await supabase
+    headingRef.current?.focus({ preventScroll: true })
+    const { data, error } = await supabase
       .from('fh_job_todos')
       .update({ done: true, completed_at: new Date().toISOString() })
       .eq('id', rowId)
-    if (error) {
-      toastError("Couldn't complete", error.message)
-      load()
+      .select('id')
+    if (error || !data?.length) {
+      toastError("Couldn't complete", error?.message || 'This task could not be updated. Refresh and try again.')
+      void load()
+      return
     }
+    toastUndo('Task completed', {
+      description: snapshot.text,
+      onUndo: async () => {
+        const { data: restored, error: restoreError } = await supabase.from('fh_job_todos')
+          .update({ done: snapshot.done, completed_at: snapshot.completed_at }).eq('id', rowId).select('id')
+        if (restoreError || !restored?.length) {
+          toastError("Couldn't undo", restoreError?.message || 'This task could not be restored. Refresh and try again.')
+          return
+        }
+        await load()
+      }
+    })
   }
 
   // Reassign a task to another member (or unassign). Optimistic.
@@ -192,6 +223,7 @@ export default function Tasks() {
   async function deleteTask(rowId: string) {
     const snapshot = tasks.find((t) => t.id === rowId)
     setTasks((cur) => cur.filter((t) => t.id !== rowId))
+    headingRef.current?.focus({ preventScroll: true })
     const { error } = await supabase.from('fh_job_todos').delete().eq('id', rowId)
     if (error) { toastError("Couldn't delete", error.message); load(); return }
     toastUndo('Task deleted', {
@@ -250,257 +282,118 @@ export default function Tasks() {
   }
 
   return (
-    <div className="fh-build-page" data-build-screen="Tasks" data-build-route="/tasks">
-      <header className="fh-build-topbar fh-build-topbar--no-cta">
-        <button
-          type="button"
-          className="fh-build-search"
-          onClick={() => window.dispatchEvent(new CustomEvent('fh:open-palette'))}
-          aria-label="Open command palette"
-          aria-keyshortcuts={paletteShortcut().combo}
-        >
-          <Search size={14} />
-          <span>Search jobs, clients, invoices, notes...</span>
-          <PaletteKeyCap />
-        </button>
-        <div className="fh-build-topbar__meta">
-          <span>{orgName || 'Your team'}</span>
-          <span className="fh-build-vline" />
-          <span style={{ opacity: 0.6 }}>Weather not set</span>
-        </div>
-        <button
-          className="fh-build-icon-btn"
-          type="button"
-          onClick={() => navigate('/activity')}
-          aria-label="Open activity"
-          title="Activity"
-        >
-          <Bell size={16} />
-        </button>
+    <div className="fh-tasks" data-build-screen="Tasks" data-build-route="/tasks">
+      <header className="fh-tasks-heading">
+        <div><h1 ref={headingRef} tabIndex={-1}>Tasks</h1><p>Open work across your jobs.</p></div>
+        {!composerOpen && <Button ref={newTaskRef} type="button" leftIcon={Plus} disabled={loading || Boolean(error)} onClick={() => setComposerOpen(true)}>New task</Button>}
       </header>
 
-      <div className="fh-build-main">
-        <section className="fh-build-hero-row fh-build-hero-row--page">
-          <div>
-            <div className="fh-build-good">Team</div>
-            <h1 className="fh-build-title">Tasks</h1>
-          </div>
+      <dl className="fh-tasks-summary" aria-label="Task summary">
+        {[
+          ['Total open', kpi.total], ['Overdue', kpi.overdue],
+          ['Due today', kpi.today], ['Unassigned', kpi.unassigned]
+        ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{loading ? '…' : value}</dd></div>)}
+      </dl>
 
-          <div className="fh-build-focus">
-            <div className="fh-build-eyebrow">Assignee</div>
-            <select
-              className="fh-build-select"
-              value={filterAssignee}
-              onChange={(e) => setFilterAssignee(e.target.value)}
-            >
-              <option value="">Everyone ({tasks.length})</option>
-              <option value="__mine__">Just mine</option>
-              <option value="__unassigned__">Unassigned</option>
-              {members.map((m) => (
-                <option key={m.user_id} value={m.user_id}>
-                  {m.is_self ? `${m.name || 'Me'} (me)` : (m.name || m.email || 'Teammate')}
-                </option>
-              ))}
-            </select>
-            <p>
-              {filteredTasks.length} {filteredTasks.length === 1 ? 'task' : 'tasks'} after filter
-            </p>
-          </div>
-
-          <div className="fh-build-mini-grid">
-            <MiniMetric label="Total open" value={loading ? '\u2003' : String(kpi.total)} accent />
-            <MiniMetric label="Overdue" value={loading ? '\u2003' : String(kpi.overdue)} tone={!loading && kpi.overdue > 0 ? 'bad' : undefined} />
-            <MiniMetric label="Due today" value={loading ? '\u2003' : String(kpi.today)} tone={!loading && kpi.today > 0 ? 'warn' : undefined} />
-            <MiniMetric label="Unassigned" value={loading ? '\u2003' : String(kpi.unassigned)} tone={!loading && kpi.unassigned > 0 ? 'warn' : undefined} />
-          </div>
-        </section>
-
-        {error && (
-          <div className="fh-build-banner is-warn">
-            <AlertTriangle size={14} />
-            <span>{error}</span>
-            <button type="button" className="fh-build-banner__cta" onClick={load} style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer' }}>Retry →</button>
-          </div>
-        )}
-
-        {!loading && !composerOpen && filteredTasks.length > 0 && (
-          <div className="fh-build-toolbar-row">
-            <Button type="button" variant="outline" leftIcon={Plus} onClick={() => setComposerOpen(true)}>
-              New task
-            </Button>
-          </div>
-        )}
-
-        {!loading && composerOpen && (
-          <div className="fh-build-composer-wrap">
-            <TaskComposer
-              jobs={allJobs}
-              members={members}
-              onCancel={() => setComposerOpen(false)}
-              onCreate={async (input: any) => { const ok = await createTask(input); if (ok) setComposerOpen(false) }}
-            />
-          </div>
-        )}
-
-        {loading && (
-          <div className="fh-build-table__empty">Loading tasks…</div>
-        )}
-
-        {!loading && filteredTasks.length === 0 && (
-          <div className="fh-build-table__empty fh-build-table__empty--action">
-            <ClipboardCheck size={20} aria-hidden="true" />
-            <span>{tasks.length === 0 ? 'No open tasks.' : 'No tasks match this assignee.'}</span>
-            {tasks.length === 0 ? (
-              <Button type="button" leftIcon={Plus} onClick={() => setComposerOpen(true)}>
-                New task
-              </Button>
-            ) : (
-              <Button type="button" variant="outline" onClick={() => setFilterAssignee('')}>
-                Clear filter
-              </Button>
-            )}
-          </div>
-        )}
-
-        {!loading && BUCKETS.map((b) => {
-          const rows = grouped[b.key]
-          if (rows.length === 0) return null
-          return (
-            <section key={b.key} className="fh-build-card" style={{ marginBottom: 18 }}>
-              <header className="fh-build-card-head">
-                <div className="fh-build-eyebrow">
-                  <span className={`fh-build-dot is-${b.tone}`} style={{ marginRight: 8 }}>{b.label}</span>
-                  · {rows.length}
-                </div>
-              </header>
-
-              <div className="fh-build-table__head is-tasks">
-                <span>Task</span>
-                <span>Job</span>
-                <span>Assignee</span>
-                <span>Due</span>
-                <span />
-              </div>
-
-              {rows.map((t) => {
-                const assignee = t.assigned_to ? memberById[t.assigned_to] : null
-                const assigneeLabel = !t.assigned_to
-                  ? 'Unassigned'
-                  : assignee
-                    ? (assignee.is_self ? 'You' : assignee.name || assignee.email || 'Teammate')
-                    : 'Teammate'
-                return (
-                  <div key={t.id} className="fh-build-table__row is-tasks">
-                    <strong className="fh-build-truncate" title={t.text}>{t.text}</strong>
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/jobs/${t.job_id}`)}
-                      className="fh-build-truncate"
-                      style={{ background: 'transparent', border: 'none', color: 'var(--v3-text)', textAlign: 'left', cursor: 'pointer', padding: 0, fontFamily: 'inherit', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                    >
-                      {jobNames[t.job_id] || 'Open job'} <ChevronRight size={11} />
-                    </button>
-                    {canSeeAllJobs ? (
-                      <select
-                        value={t.assigned_to || ''}
-                        onChange={(e) => reassignTask(t.id, e.target.value || null)}
-                        className="fh-build-select"
-                        style={{ fontSize: 12, padding: '4px 8px', maxWidth: 140 }}
-                        aria-label="Assign to"
-                        title={assigneeLabel}
-                      >
-                        <option value="">Unassigned</option>
-                        {members.map((m) => (
-                          <option key={m.user_id} value={m.user_id}>{m.is_self ? 'You' : (m.name || m.email || 'Teammate')}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <span className={`fh-build-dot is-${t.assigned_to ? 'good' : 'warn'}`}>
-                        <UserRound size={11} aria-hidden="true" style={{ marginRight: 4 }} />
-                        {assigneeLabel}
-                      </span>
-                    )}
-                    <span className={b.key === 'overdue' ? 'fh-build-num' : 'fh-build-rel'} style={{ color: b.key === 'overdue' ? 'var(--v3-danger-text)' : undefined, fontWeight: b.key === 'overdue' ? 700 : undefined }}>
-                      {t.due_at ? <><Calendar size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />{fmtDue(t.due_at)}</> : '\u2003'}
-                    </span>
-                    <span style={{ display: 'inline-flex', gap: 4 }}>
-                      <button
-                        type="button"
-                        className="fh-build-icon-action"
-                        onClick={() => completeTask(t.id)}
-                        title="Mark done"
-                        aria-label="Mark done"
-                      >
-                        <Check size={14} />
-                      </button>
-                      <button
-                        type="button"
-                        className="fh-build-icon-action"
-                        onClick={() => deleteTask(t.id)}
-                        title="Delete task"
-                        aria-label="Delete task"
-                        style={{ color: 'var(--v3-danger-text)' }}
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </span>
-                  </div>
-                )
-              })}
-            </section>
-          )
-        })}
+      <div className="fh-tasks-filter">
+        <label htmlFor="task-assignee-filter">Show tasks for</label>
+        <select id="task-assignee-filter" value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)}>
+          <option value="">Everyone</option><option value="__mine__">Just mine</option><option value="__unassigned__">Unassigned</option>
+          {members.map(m => <option key={m.user_id} value={m.user_id}>{m.is_self ? 'You' : (m.name || m.email || 'Teammate')}</option>)}
+        </select>
+        {!loading && <span role="status">{filteredTasks.length} {filteredTasks.length === 1 ? 'task' : 'tasks'}</span>}
       </div>
+
+      {error && <div className="fh-tasks-error" role="alert"><AlertTriangle size={20} /><span>{error}</span><Button type="button" variant="outline" onClick={load}>Retry</Button></div>}
+      {composerOpen && <TaskComposer jobs={allJobs} members={members} onCancel={closeComposer}
+        onCreate={async input => { const ok = await createTask(input); if (ok) closeComposer() }} />}
+      {loading && <p role="status">Loading tasks…</p>}
+      {!loading && !error && filteredTasks.length === 0 && <div className="fh-tasks-empty">
+        <ClipboardCheck size={24} aria-hidden="true" />
+        <p>{tasks.length === 0 ? 'No open tasks.' : 'No tasks match this assignee.'}</p>
+        {tasks.length > 0 && <Button type="button" variant="outline" onClick={() => setFilterAssignee('')}>Clear filter</Button>}
+      </div>}
+
+      {!loading && BUCKETS.map(bucket => {
+        const rows = grouped[bucket.key]
+        if (!rows.length) return null
+        return <section key={bucket.key} className="fh-tasks-group" aria-labelledby={`tasks-${bucket.key}`}>
+          <h2 id={`tasks-${bucket.key}`}>{bucket.label} <span>{rows.length}</span></h2>
+          <ul className="fh-tasks-list">
+            {rows.map(task => {
+              const member = task.assigned_to ? memberById[task.assigned_to] : null
+              return <li key={task.id} className="fh-task-row">
+                <strong className="fh-task-row__title">{task.text}</strong>
+                <Link className="fh-task-row__job" to={`/jobs/${task.job_id}`}>
+                  {jobNames[task.job_id] || 'Open job'}<ChevronRight size={16} aria-hidden="true" />
+                </Link>
+                <label className="fh-task-row__assignee"><span>Assigned to</span>
+                  <select value={task.assigned_to || ''} onChange={e => reassignTask(task.id, e.target.value || null)} aria-label={`Assign ${task.text}`}>
+                    <option value="">Unassigned</option>
+                    {task.assigned_to && !member && <option value={task.assigned_to}>{task.assigned_to === user?.id ? 'You' : 'Teammate'}</option>}
+                    {members.map(m => <option key={m.user_id} value={m.user_id}>{m.is_self ? 'You' : (m.name || m.email || 'Teammate')}</option>)}
+                  </select>
+                </label>
+                <span className={`fh-task-row__due${bucket.key === 'overdue' ? ' is-overdue' : ''}`}>
+                  <Calendar size={16} aria-hidden="true" />{task.due_at ? fmtDue(task.due_at) : 'No due date'}
+                </span>
+                <div className="fh-task-row__actions">
+                  <Button type="button" variant="outline" leftIcon={Check} onClick={() => completeTask(task.id)} aria-label={`Complete ${task.text}`}>Complete</Button>
+                  <button type="button" className="fh-task-row__delete" onClick={() => deleteTask(task.id)} aria-label={`Delete ${task.text}`} title="Delete task"><Trash2 size={18} aria-hidden="true" /></button>
+                </div>
+              </li>
+            })}
+          </ul>
+        </section>
+      })}
     </div>
   )
 }
 
 /* Inline new-task composer, text + job (required) + optional assignee
    and due date. */
-function TaskComposer({ jobs, members, onCancel, onCreate }: any) {
+type TaskInput = { text: string; jobId: string; assignedTo: string | null; dueAt: string | null }
+
+function TaskComposer({ jobs, members, onCancel, onCreate }: {
+  jobs: { id: string; name: string }[]
+  members: OrgMember[]
+  onCancel: () => void
+  onCreate: (input: TaskInput) => Promise<void>
+}) {
   const [text, setText] = useState('')
   const [jobId, setJobId] = useState('')
   const [assignedTo, setAssignedTo] = useState('')
   const [due, setDue] = useState('')
   const [busy, setBusy] = useState(false)
-  const canSave = text.trim() && jobId && !busy
+  const canSave = Boolean(text.trim() && jobId && !busy)
 
-  async function submit() {
+  async function submit(event: React.FormEvent) {
+    event.preventDefault()
     if (!canSave) return
     setBusy(true)
-    await onCreate({
-      text,
-      jobId,
-      assignedTo: assignedTo || null,
-      dueAt: due ? new Date(`${due}T12:00:00`).toISOString() : null
-    })
-    setBusy(false)
+    try {
+      await onCreate({ text, jobId, assignedTo: assignedTo || null, dueAt: due ? new Date(`${due}T12:00:00`).toISOString() : null })
+    } finally { setBusy(false) }
   }
 
-  const field: import('react').CSSProperties = { padding: '8px 12px', borderRadius: 10, background: 'var(--v3-glass-tint)', border: '1px solid var(--v3-border-mid)', color: 'var(--v3-text)', fontFamily: 'inherit', fontSize: 14, outline: 'none' }
   return (
-    <div className="fh-build-card" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <input type="text" value={text} onChange={(e) => setText(e.target.value)} placeholder="What needs doing?" style={field} autoFocus />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
-        <select value={jobId} onChange={(e) => setJobId(e.target.value)} style={field} aria-label="Job">
-          <option value="">Choose a job…</option>
-          {jobs.map((j: any) => <option key={j.id} value={j.id}>{j.name}</option>)}
-        </select>
-        <select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)} style={field} aria-label="Assign to">
-          <option value="">Unassigned</option>
-          {members.map((m: any) => <option key={m.user_id} value={m.user_id}>{m.is_self ? 'You' : (m.name || m.email || 'Teammate')}</option>)}
-        </select>
-        <input type="date" value={due} onChange={(e) => setDue(e.target.value)} style={field} aria-label="Due date" />
+    <form className="fh-task-composer" onSubmit={submit} aria-label="New task">
+      <h2>New task</h2>
+      <label>Task<input type="text" value={text} onChange={e => setText(e.target.value)} placeholder="What needs doing?" required autoFocus /></label>
+      <label>Job<select value={jobId} onChange={e => setJobId(e.target.value)} required>
+        <option value="">Choose a job</option>
+        {jobs.map(job => <option key={job.id} value={job.id}>{job.name}</option>)}
+      </select></label>
+      <label>Assigned to<select value={assignedTo} onChange={e => setAssignedTo(e.target.value)}>
+        <option value="">Unassigned</option>
+        {members.map(member => <option key={member.user_id} value={member.user_id}>{member.is_self ? 'You' : (member.name || member.email || 'Teammate')}</option>)}
+      </select></label>
+      <label>Due date<input type="date" value={due} onChange={e => setDue(e.target.value)} /></label>
+      {!jobs.length && <p>Add a job before creating tasks. <Link to="/jobs/new">New job</Link></p>}
+      <div className="fh-task-composer__actions">
+        <Button type="button" variant="outline" onClick={onCancel} disabled={busy}>Cancel</Button>
+        <Button type="submit" disabled={!canSave}>{busy ? 'Adding…' : 'Add task'}</Button>
       </div>
-      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-        <button type="button" onClick={onCancel} disabled={busy} style={{ ...field, cursor: 'pointer', background: 'transparent' }}>Cancel</button>
-        <button type="button" onClick={submit} disabled={!canSave} style={{ ...field, cursor: canSave ? 'pointer' : 'not-allowed', background: 'var(--v3-primary, #C9963A)', color: 'var(--v3-on-primary)', fontWeight: 700, opacity: canSave ? 1 : 0.5, border: 'none' }}>
-          {busy ? 'Adding…' : 'Add task'}
-        </button>
-      </div>
-    </div>
+    </form>
   )
 }
-
-// Quiet the unused import in IDEs.
-void Clock

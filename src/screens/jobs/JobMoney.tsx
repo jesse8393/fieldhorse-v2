@@ -29,6 +29,7 @@ async function loadPdf(): Promise<any> {
 import { toastSuccess, toastError } from '../../lib/toast.ts'
 import { mintPublicLink } from '../../lib/publicLink.ts'
 import { hapticTap } from '../../lib/haptics.ts'
+import { handleTablistKeyDown } from '../../lib/tabs.ts'
 import { useMediaQuery } from '../../lib/useMediaQuery.ts'
 import { useFhMotion } from '../../lib/motion.ts'
 import { Eyebrow, StampNumber } from '../../components/v3'
@@ -1106,10 +1107,12 @@ function ViewModeToggle({ value, onChange }: any) {
             type="button"
             role="tab"
             aria-selected={on}
+            tabIndex={on ? 0 : -1}
+            onKeyDown={handleTablistKeyDown}
             onClick={() => { if (!on) { hapticTap(); onChange(o.v) } }}
             style={{
               padding: '8px 12px',
-              minHeight: 32,
+              minHeight: 44,
               borderRadius: 10,
               border: 0,
               background: on ? 'var(--v3-primary-soft)' : 'transparent',

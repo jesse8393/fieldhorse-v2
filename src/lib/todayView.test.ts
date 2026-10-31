@@ -603,7 +603,7 @@ describe('answerCopy', () => {
   it('maps every kind to one of the mini actions and every tone to a dot', () => {
     const labels = (['followup', 'followup-due', 'viewed-quiet', 'quote-changes', 'co-unsigned', 'reschedule', 'invoice', 'inv-overdue'] as const)
       .map((kind) => answerCopy(action(4, { kind }), now).actionLabel)
-    expect(labels).toEqual(['Nudge', 'Nudge', 'Nudge', 'Reply', 'Nudge', 'Schedule', 'Remind', 'Remind'])
+    expect(labels).toEqual(['Nudge', 'Nudge', 'Nudge', 'Reply', 'Nudge', 'Schedule', 'Invoice', 'Remind'])
     expect(answerCopy(action(5, { urgencyTone: 'success' }), now).dot).toBe('info')
     expect(answerCopy(action(5, { urgencyTone: 'danger' }), now).dot).toBe('danger')
     expect(answerCopy(action(5, { urgencyTone: 'warn' }), now).dot).toBe('neutral')

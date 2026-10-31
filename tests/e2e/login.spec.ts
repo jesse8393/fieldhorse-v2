@@ -476,7 +476,7 @@ test.describe('The wordmark on a screen that mounts while Manrope loads', () => 
     const font = await holdWordmarkFont(context)
     await holdScreenCode(context, 'Landing', font.requested)
     await page.goto('/', { waitUntil: 'domcontentloaded' })
-    await page.getByRole('button', { name: 'Sign in' }).first().click()
+    await page.getByRole('link', { name: 'Sign in', exact: true }).first().click()
     await expect(page.getByRole('heading', { level: 1, name: 'Run every job like a captain.' })).toBeVisible()
     const wordmark = page.getByRole('img', { name: 'Fieldhorse' })
 
