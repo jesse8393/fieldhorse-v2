@@ -223,6 +223,7 @@ export default function Tasks() {
   async function deleteTask(rowId: string) {
     const snapshot = tasks.find((t) => t.id === rowId)
     setTasks((cur) => cur.filter((t) => t.id !== rowId))
+    headingRef.current?.focus({ preventScroll: true })
     const { error } = await supabase.from('fh_job_todos').delete().eq('id', rowId)
     if (error) { toastError("Couldn't delete", error.message); load(); return }
     toastUndo('Task deleted', {

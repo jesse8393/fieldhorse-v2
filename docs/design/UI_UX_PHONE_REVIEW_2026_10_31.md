@@ -22,6 +22,7 @@ October 31, 2026. Scope: interface presentation and interaction. This pass chang
 | Landing heading matched body size; gold frames and gradients conflicted with Workspace 06 | Clear type hierarchy, restrained copper actions, neutral rules, readable sample workspace, and semantic navigation links |
 | Personal founder story remained in public marketing | Entire founder story and attribution removed; no personal founder framing remains in the landing page |
 | Canceling the task composer left focus on the page body | Restore focus to New task after cancellation or a successful creation |
+| Deleting a task left keyboard focus on the page body, including after Undo | Move focus to the task heading so Undo restores a stable place in the workspace |
 | Partner filters, message channels, estimate trades, and several job actions measured 18 to 36 pixels high | Larger shared filter controls and 44 pixel targets for the affected job actions |
 | Estimate job type choices consumed several rows; target margin had no accessible name | Native optional job type selector, labeled margin slider, percentage announcement, and keyboard operation |
 | Expanding a selection created a five column form reaching 587 pixels across a 320 pixel phone | Responsive option groups with persistent field labels in both create and edit flows |

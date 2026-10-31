@@ -30,7 +30,8 @@ test('estimate choices and communication filters stay accessible on narrow phone
   await page.goto('/compose')
   for (const name of ['SMS channel', 'Email channel', 'Voicemail channel']) {
     const channel = page.getByRole('button', { name, exact: true })
-    expect((await channel.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+    // Animated ancestors can report 43.99998 for a 44 CSS pixel target.
+    expect((await channel.boundingBox())!.height).toBeGreaterThanOrEqual(43.99)
   }
   await nothingRunsOffTheSide(page)
   await page.goto('/partners')
@@ -246,17 +247,25 @@ test('public entry has clear hierarchy, reachable actions and no founder story',
   await expect(page).toHaveURL(/\/login\?mode=signup$/)
 })
 
-test('task completion gives feedback and Undo restores the same task', async ({ context, page }) => {
+test('task completion and deletion keep focus and Undo restores the same task', async ({ context, page }) => {
   await signIn(context)
   let task = { id: 'task-undo', text: 'Confirm site access', job_id: 'c-job1', assigned_to: null, user_id: 'qa-user-1', due_at: null, done: false, completed_at: null as string | null, created_at: new Date().toISOString() }
   const changes: Record<string, unknown>[] = []
+  let deleted = false
   await context.route(/\/rest\/v1\/fh_job_todos(?:\?|$)/, async route => {
     if (route.request().method() === 'PATCH') {
       const values = route.request().postDataJSON()
       changes.push(values)
       task = { ...task, ...values }
       await route.fulfill({ json: [{ id: task.id }] })
-    } else await route.fulfill({ json: task.done ? [] : [task] })
+    } else if (route.request().method() === 'DELETE') {
+      deleted = true
+      await route.fulfill({ json: [] })
+    } else if (route.request().method() === 'POST') {
+      task = route.request().postDataJSON()
+      deleted = false
+      await route.fulfill({ json: [task] })
+    } else await route.fulfill({ json: task.done || deleted ? [] : [task] })
   })
   await page.setViewportSize({ width: 320, height: 844 })
   await page.goto('/tasks')
@@ -268,6 +277,16 @@ test('task completion gives feedback and Undo restores the same task', async ({ 
   expect(changes).toHaveLength(2)
   expect(changes[0]).toMatchObject({ done: true })
   expect(changes[1]).toEqual({ done: false, completed_at: null })
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Tasks', exact: true })).toBeFocused()
+  await page.getByRole('button', { name: 'Delete Confirm site access', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Tasks', exact: true })).toBeFocused()
+  await expect(page.getByText('Task deleted', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Undo', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Complete Confirm site access' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Tasks', exact: true })).toBeFocused()
+  expect(task).toMatchObject({ id: 'task-undo', text: 'Confirm site access', done: false })
 })
 
 test('refused task completion restores the row without a success message', async ({ context, page }) => {
