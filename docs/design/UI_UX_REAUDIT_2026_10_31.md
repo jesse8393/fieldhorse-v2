@@ -33,6 +33,8 @@ Two additional mobile UI regression scenarios cover missing subcontractor profil
 
 A further regression visits five missing-record routes, checking their explanatory message, absent unnamed controls, idle disabled submission, and phone bounds.
 
+The full phone suite also exposed a gesture-targeting defect in the existing note test: after deleting the preceding row, the attempted swipe started at y=20 beneath the fixed header and hit Notifications. The test now centers the note and verifies its actual pointer hit target before dragging. Both deletion confirmations and the keyboard archive assertions remain intact. Record-history checks also run in the early regression step.
+
 ## Deployment and remaining limits
 
 The public page at `https://animated-kheer-db7c2c.netlify.app/` reported `fh-build` as `0d1866bf2ccd · 2026-10-31T22:35:11.892Z`, including after one reload. That observation identifies the PR #231 build, not merged PR #232 or this follow-up. Founder content remained absent. Do not equate a merge or a ready preview notification with production publication.

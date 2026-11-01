@@ -36,11 +36,16 @@ test('phone note actions fit, support keyboard archive and confirm both delete p
   expect(deleted).toHaveLength(1)
 
   const swipeRow = history.getByRole('article').filter({ hasText: 'Swipe deletion' })
-  await swipeRow.scrollIntoViewIfNeeded()
+  // Removing the preceding row can leave this one underneath the fixed
+  // header. A fully intersecting row is not necessarily pointer-accessible.
+  await swipeRow.evaluate(row => row.scrollIntoView({ block: 'center', behavior: 'instant' }))
   const swipeBounds = await swipeRow.boundingBox()
   expect(swipeBounds).not.toBeNull()
   const startX = swipeBounds!.x + swipeBounds!.width - 70
   const startY = swipeBounds!.y + 20
+  await expect.poll(() => swipeRow.evaluate((row, point) =>
+    row.contains(document.elementFromPoint(point.x, point.y)),
+  { x: startX, y: startY })).toBe(true)
   await page.mouse.move(startX, startY)
   await page.mouse.down()
   await page.mouse.move(startX - 120, startY, { steps: 12 })
