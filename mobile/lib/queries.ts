@@ -12,6 +12,8 @@ import { useEffect } from 'react'
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { supabase } from './supabase'
 import { getWeather } from './weather'
+import { assertReadResults } from './readResult'
+import { confirmMutation } from './mutationResult'
 import { claudeVision, claudeText } from './anthropic'
 import type { Database } from './database.types'
 
@@ -30,7 +32,7 @@ export const queryKeys = {
 async function fetchJobs(): Promise<JobRow[]> {
   const { data, error } = await supabase
     .from('fh_contacts')
-    .select('*, fh_clients(name, phone, email)')
+    .select('*, fh_clients!fh_contacts_client_id_fkey(name, phone, email)')
     .order('updated_at', { ascending: false })
   if (error) throw error
   return (data ?? []) as JobRow[]
@@ -72,6 +74,7 @@ async function fetchClientsBundle(userId: string): Promise<ClientsBundle> {
     supabase.from('fh_contacts').select('id, client_id, amount, stage').eq('user_id', userId),
     supabase.from('fh_payments').select('contact_id, amount, paid_on').eq('user_id', userId)
   ])
+  assertReadResults(clientsRes, jobsRes, paymentsRes)
   if (clientsRes.error) throw clientsRes.error
   return {
     clients: (clientsRes.data ?? []) as Client[],
@@ -101,6 +104,7 @@ async function fetchClientDetail(id: string): Promise<ClientDetail> {
     supabase.from('fh_contacts').select('id, name, job_title, job_type, amount, stage')
       .eq('client_id', id).order('updated_at', { ascending: false })
   ])
+  assertReadResults(c, j)
   return {
     client: (c.data ?? null) as Client | null,
     jobs: (j.data ?? []) as ClientDetail['jobs']
@@ -163,9 +167,9 @@ export function useUpdateClient() {
     if (input.email !== undefined) patch.email = input.email
     if (input.address !== undefined) patch.address = input.address
     if (input.notes !== undefined) patch.notes = input.notes
-    const { error } = await supabase.from('fh_clients')
+    const { error } = await confirmMutation(supabase.from('fh_clients')
       .update(patch as any)
-      .eq('id', input.clientId)
+      .eq('id', input.clientId).select('id'))
     if (!error) {
       client.invalidateQueries({ queryKey: ['clientDetail', input.clientId] })
       client.invalidateQueries({ queryKey: ['clients', input.userId] })
@@ -246,6 +250,7 @@ async function fetchJobDetail(id: string): Promise<JobDetail> {
     supabase.from('fh_inspections').select('*').eq('contact_id', id).order('created_at', { ascending: false }),
     supabase.from('fh_insurance_claims').select('*').eq('contact_id', id).maybeSingle()
   ])
+  assertReadResults(c, p, sch, s, e, t, n, inv, co, mi, insp, ins)
   return {
     contact: (c.data ?? null) as Contact | null,
     payments: (p.data ?? []) as Payment[],
@@ -298,9 +303,9 @@ export function useLogPayment() {
 export function useUpdateStage() {
   const client = useQueryClient()
   return async (input: { contactId: string; stage: string }) => {
-    const { error } = await supabase.from('fh_contacts')
+    const { error } = await confirmMutation(supabase.from('fh_contacts')
       .update({ stage: input.stage } as any)
-      .eq('id', input.contactId)
+      .eq('id', input.contactId).select('id'))
     if (!error) {
       client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
       client.invalidateQueries({ queryKey: queryKeys.jobs })
@@ -342,9 +347,9 @@ export function useUpdateJob() {
     if (input.exclusionsText !== undefined) patch.exclusions_text = input.exclusionsText
     if (input.termsText !== undefined) patch.terms_text = input.termsText
     if (input.quoteExpiresAt !== undefined) patch.quote_expires_at = input.quoteExpiresAt
-    const { error } = await supabase.from('fh_contacts')
+    const { error } = await confirmMutation(supabase.from('fh_contacts')
       .update(patch as any)
-      .eq('id', input.contactId)
+      .eq('id', input.contactId).select('id'))
     if (!error) {
       client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
       client.invalidateQueries({ queryKey: queryKeys.jobs })
@@ -383,7 +388,7 @@ export function useAddSub() {
 export function useDeleteSub() {
   const client = useQueryClient()
   return async (input: { id: string; contactId: string }) => {
-    const { error } = await supabase.from('fh_subs').delete().eq('id', input.id)
+    const { error } = await confirmMutation(supabase.from('fh_subs').delete().eq('id', input.id).select('id'))
     if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
     return { error }
   }
@@ -405,12 +410,17 @@ async function fetchJobPhotos(jobId: string): Promise<JobPhoto[]> {
     .eq('job_id', jobId)
     .eq('kind', 'photo')
     .order('uploaded_at', { ascending: false })
-  if (error || !rows || rows.length === 0) return []
+  if (error) throw error
+  if (!rows || rows.length === 0) return []
   const paths = rows.map((r) => r.storage_path)
-  const { data: signed } = await supabase.storage.from(PHOTO_BUCKET).createSignedUrls(paths, PHOTO_SIGN_TTL)
+  const { data: signed , error: readError } = await supabase.storage.from(PHOTO_BUCKET).createSignedUrls(paths, PHOTO_SIGN_TTL)
+  assertReadResults({ error: readError })
   const urlByPath = new Map<string, string>()
   for (const s of signed ?? []) {
     if (s?.path && s.signedUrl && !s.error) urlByPath.set(s.path, s.signedUrl)
+  }
+  if (paths.some(path => !urlByPath.has(path))) {
+    throw new Error('Some photos could not load. Try again.')
   }
   return rows
     .map((r) => ({ id: r.id, path: r.storage_path, url: urlByPath.get(r.storage_path) || '', uploadedAt: r.uploaded_at, caption: (r as any).caption ?? null }))
@@ -466,7 +476,7 @@ export function useCaptionPhoto() {
       })
       const caption = claudeText(res).trim().replace(/^["']|["']$/g, '').slice(0, 120)
       if (!caption) return
-      const { error } = await supabase.from('fh_job_files').update({ caption } as any).eq('id', input.rowId)
+      const { error } = await confirmMutation(supabase.from('fh_job_files').update({ caption } as any).eq('id', input.rowId).select('id'))
       if (!error) client.invalidateQueries({ queryKey: ['jobPhotos', input.jobId] })
     } catch { /* silent, caption is best-effort */ }
   }
@@ -475,8 +485,9 @@ export function useCaptionPhoto() {
 export function useDeletePhoto() {
   const client = useQueryClient()
   return async (input: { id: string; path: string; jobId: string }) => {
-    await supabase.storage.from(PHOTO_BUCKET).remove([input.path])
-    const { error } = await supabase.from('fh_job_files').delete().eq('id', input.id)
+    const { error: storageError } = await supabase.storage.from(PHOTO_BUCKET).remove([input.path])
+    if (storageError) return { error: storageError }
+    const { error } = await confirmMutation(supabase.from('fh_job_files').delete().eq('id', input.id).select('id'))
     if (!error) client.invalidateQueries({ queryKey: ['jobPhotos', input.jobId] })
     return { error }
   }
@@ -500,7 +511,7 @@ async function fetchJobFiles(jobId: string): Promise<JobFile[]> {
     .eq('job_id', jobId)
     .eq('kind', 'file')
     .order('uploaded_at', { ascending: false })
-  if (error) return []
+  if (error) throw error
   return (data ?? []) as JobFile[]
 }
 
@@ -545,8 +556,9 @@ export function useUploadFile() {
 export function useDeleteFile() {
   const client = useQueryClient()
   return async (input: { id: string; path: string; jobId: string }) => {
-    await supabase.storage.from(FILE_BUCKET).remove([input.path])
-    const { error } = await supabase.from('fh_job_files').delete().eq('id', input.id)
+    const { error: storageError } = await supabase.storage.from(FILE_BUCKET).remove([input.path])
+    if (storageError) return { error: storageError }
+    const { error } = await confirmMutation(supabase.from('fh_job_files').delete().eq('id', input.id).select('id'))
     if (!error) client.invalidateQueries({ queryKey: ['jobFiles', input.jobId] })
     return { error }
   }
@@ -683,7 +695,7 @@ export function useAddExpense() {
 export function useDeleteJob() {
   const client = useQueryClient()
   return async (contactId: string) => {
-    const { error } = await supabase.from('fh_contacts').delete().eq('id', contactId)
+    const { error } = await confirmMutation(supabase.from('fh_contacts').delete().eq('id', contactId).select('id'))
     if (!error) client.invalidateQueries({ queryKey: queryKeys.jobs })
     return { error }
   }
@@ -692,7 +704,7 @@ export function useDeleteJob() {
 export function useDeleteEvent() {
   const client = useQueryClient()
   return async (input: { id: string; userId: string }) => {
-    const { error } = await supabase.from('fh_schedule').delete().eq('id', input.id)
+    const { error } = await confirmMutation(supabase.from('fh_schedule').delete().eq('id', input.id).select('id'))
     if (!error) client.invalidateQueries({ queryKey: ['scheduleUpcoming', input.userId] })
     return { error }
   }
@@ -705,7 +717,7 @@ export function useUpdateEvent() {
     if (input.title !== undefined) patch.title = input.title
     if (input.startAt !== undefined) patch.start_at = input.startAt
     if (input.contactId !== undefined) patch.contact_id = input.contactId
-    const { error } = await supabase.from('fh_schedule').update(patch as any).eq('id', input.id)
+    const { error } = await confirmMutation(supabase.from('fh_schedule').update(patch as any).eq('id', input.id).select('id'))
     if (!error) client.invalidateQueries({ queryKey: ['scheduleUpcoming', input.userId] })
     return { error }
   }
@@ -714,7 +726,7 @@ export function useUpdateEvent() {
 export function useDeletePayment() {
   const client = useQueryClient()
   return async (input: { id: string; contactId: string }) => {
-    const { error } = await supabase.from('fh_payments').delete().eq('id', input.id)
+    const { error } = await confirmMutation(supabase.from('fh_payments').delete().eq('id', input.id).select('id'))
     if (!error) {
       client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
       client.invalidateQueries({ queryKey: queryKeys.jobs })
@@ -726,7 +738,7 @@ export function useDeletePayment() {
 export function useDeleteExpense() {
   const client = useQueryClient()
   return async (input: { id: string; contactId: string }) => {
-    const { error } = await supabase.from('fh_expenses').delete().eq('id', input.id)
+    const { error } = await confirmMutation(supabase.from('fh_expenses').delete().eq('id', input.id).select('id'))
     if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
     return { error }
   }
@@ -735,7 +747,7 @@ export function useDeleteExpense() {
 export function useDeleteClient() {
   const client = useQueryClient()
   return async (input: { id: string; userId: string }) => {
-    const { error } = await supabase.from('fh_clients').delete().eq('id', input.id)
+    const { error } = await confirmMutation(supabase.from('fh_clients').delete().eq('id', input.id).select('id'))
     if (!error) {
       client.invalidateQueries({ queryKey: ['clients', input.userId] })
       client.invalidateQueries({ queryKey: queryKeys.jobs })
@@ -759,9 +771,9 @@ export function useAddTodo() {
 export function useToggleTodo() {
   const client = useQueryClient()
   return async (input: { id: string; jobId: string; done: boolean }) => {
-    const { error } = await supabase.from('fh_job_todos')
+    const { error } = await confirmMutation(supabase.from('fh_job_todos')
       .update({ done: input.done, completed_at: input.done ? new Date().toISOString() : null } as any)
-      .eq('id', input.id)
+      .eq('id', input.id).select('id'))
     if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.jobId] })
     return { error }
   }
@@ -770,7 +782,7 @@ export function useToggleTodo() {
 export function useDeleteTodo() {
   const client = useQueryClient()
   return async (input: { id: string; jobId: string }) => {
-    const { error } = await supabase.from('fh_job_todos').delete().eq('id', input.id)
+    const { error } = await confirmMutation(supabase.from('fh_job_todos').delete().eq('id', input.id).select('id'))
     if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.jobId] })
     return { error }
   }
@@ -791,7 +803,7 @@ export function useAddNote() {
 export function useDeleteNote() {
   const client = useQueryClient()
   return async (input: { id: string; contactId: string }) => {
-    const { error } = await supabase.from('fh_notes').delete().eq('id', input.id)
+    const { error } = await confirmMutation(supabase.from('fh_notes').delete().eq('id', input.id).select('id'))
     if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
     return { error }
   }
@@ -818,9 +830,9 @@ export function useCreateInvoice() {
 export function useUpdateInvoiceStatus() {
   const client = useQueryClient()
   return async (input: { id: string; contactId: string; status: string }) => {
-    const { error } = await supabase.from('fh_invoices')
+    const { error } = await confirmMutation(supabase.from('fh_invoices')
       .update({ status: input.status } as any)
-      .eq('id', input.id)
+      .eq('id', input.id).select('id'))
     if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
     return { error }
   }
@@ -829,25 +841,25 @@ export function useUpdateInvoiceStatus() {
 export function useDeleteInvoice() {
   const client = useQueryClient()
   return async (input: { id: string; contactId: string }) => {
-    const { error } = await supabase.from('fh_invoices').delete().eq('id', input.id)
+    const { error } = await confirmMutation(supabase.from('fh_invoices').delete().eq('id', input.id).select('id'))
     if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
     return { error }
   }
 }
 
 // ---- Progress billing / draws ----
-// Each fh_invoices row is one draw against the contract. sequence_number
-// is assigned by a BEFORE INSERT trigger (migration 021), so we insert
-// sequentially when generating from terms to keep 1/2/3 deterministic.
+// Insert the entire schedule in one request so a rejected draw rolls back
+// all draws. The existing trigger assigns their sequence numbers.
 export function useInvoiceDraws(contactId: string | undefined) {
   return useQuery({
     queryKey: ['invoiceDraws', contactId],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data , error: readError } = await supabase
         .from('fh_invoices')
         .select('*')
         .eq('contact_id', contactId as string)
         .order('sequence_number', { ascending: true })
+      assertReadResults({ error: readError })
       return (data ?? []) as Invoice[]
     },
     enabled: !!contactId
@@ -870,6 +882,7 @@ export function useGenerateDraws() {
     // splitByPercents in src/lib/paymentSchedule.ts).
     const totalCents = Math.round(input.contractTotal * 100)
     let allocatedCents = 0
+    const rows = []
     for (let i = 0; i < DEFAULT_DRAW_SCHEDULE.length; i++) {
       const s = DEFAULT_DRAW_SCHEDULE[i]
       const cents = i === DEFAULT_DRAW_SCHEDULE.length - 1
@@ -877,7 +890,7 @@ export function useGenerateDraws() {
         : Math.round(totalCents * (s.pct / 100))
       allocatedCents += cents
       const amount = cents / 100
-      const { error } = await supabase.from('fh_invoices').insert({
+      rows.push({
         user_id: input.userId,
         contact_id: input.contactId,
         amount,
@@ -885,9 +898,10 @@ export function useGenerateDraws() {
         status: 'draft',
         issued_at: new Date().toISOString(),
         sequence_number: 0
-      } as any)
-      if (error) return { error }
+      })
     }
+    const { error } = await confirmMutation(supabase.from('fh_invoices').insert(rows).select('id'), rows.length)
+    if (error) return { error }
     client.invalidateQueries({ queryKey: ['invoiceDraws', input.contactId] })
     client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
     return { error: null }
@@ -901,10 +915,11 @@ export function useQuoteItems(jobId: string | undefined) {
   return useQuery({
     queryKey: ['quoteItems', jobId],
     queryFn: async () => {
-      const { data } = await supabase.from('fh_quote_items').select('*')
+      const { data , error: readError } = await supabase.from('fh_quote_items').select('*')
         .eq('contact_id', jobId as string)
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: true })
+      assertReadResults({ error: readError })
       return (data ?? []) as QuoteItem[]
     },
     enabled: !!jobId
@@ -927,11 +942,12 @@ export function useAddQuoteItem() {
     const { item } = input
     // Append after the last line. Every insert used to get the default
     // sort_order, so reordering lines with equal positions did nothing.
-    const { data: last } = await supabase.from('fh_quote_items')
+    const { data: last , error: readError } = await supabase.from('fh_quote_items')
       .select('sort_order')
       .eq('contact_id', input.jobId)
       .order('sort_order', { ascending: false })
       .limit(1)
+    if (readError) return { error: readError }
     const nextSort = Number((last as any)?.[0]?.sort_order ?? -1) + 1
     const { error } = await supabase.from('fh_quote_items').insert({
       user_id: input.userId,
@@ -955,7 +971,7 @@ export function useUpdateQuoteItem() {
   const client = useQueryClient()
   return async (input: { id: string; jobId: string; item: QuoteItemInput }) => {
     const { item } = input
-    const { error } = await supabase.from('fh_quote_items').update({
+    const { error } = await confirmMutation(supabase.from('fh_quote_items').update({
       description: item.description,
       qty: item.qty,
       rate: item.rate,
@@ -964,7 +980,7 @@ export function useUpdateQuoteItem() {
       section: item.section || null,
       is_optional: item.isOptional ?? false,
       is_excluded: item.isExcluded ?? false
-    } as any).eq('id', input.id)
+    } as any).eq('id', input.id).select('id'))
     if (!error) client.invalidateQueries({ queryKey: ['quoteItems', input.jobId] })
     return { error }
   }
@@ -973,7 +989,7 @@ export function useUpdateQuoteItem() {
 export function useDeleteQuoteItem() {
   const client = useQueryClient()
   return async (input: { id: string; jobId: string }) => {
-    const { error } = await supabase.from('fh_quote_items').delete().eq('id', input.id)
+    const { error } = await confirmMutation(supabase.from('fh_quote_items').delete().eq('id', input.id).select('id'))
     if (!error) client.invalidateQueries({ queryKey: ['quoteItems', input.jobId] })
     return { error }
   }
@@ -983,9 +999,9 @@ export function useDeleteQuoteItem() {
 export function useApplyQuoteTotal() {
   const client = useQueryClient()
   return async (input: { jobId: string; amount: number }) => {
-    const { error } = await supabase.from('fh_contacts')
+    const { error } = await confirmMutation(supabase.from('fh_contacts')
       .update({ amount: input.amount } as any)
-      .eq('id', input.jobId)
+      .eq('id', input.jobId).select('id'))
     if (!error) {
       client.invalidateQueries({ queryKey: ['jobDetail', input.jobId] })
       client.invalidateQueries({ queryKey: queryKeys.jobs })
@@ -1001,7 +1017,8 @@ export function useProfile(userId: string | undefined) {
   return useQuery({
     queryKey: ['profile', userId],
     queryFn: async () => {
-      const { data } = await supabase.from('profiles').select('*').eq('user_id', userId as string).maybeSingle()
+      const { data , error: readError } = await supabase.from('profiles').select('*').eq('user_id', userId as string).maybeSingle()
+      assertReadResults({ error: readError })
       return (data ?? null) as Profile | null
     },
     enabled: !!userId
@@ -1042,9 +1059,9 @@ export function useUpdateProfile() {
     if (input.warrantyDefault !== undefined) patch.warranty_default = input.warrantyDefault
     if (input.estimateTemplate !== undefined) patch.estimate_template = input.estimateTemplate
     if (input.preferences !== undefined) patch.preferences = input.preferences
-    const { error } = await supabase.from('profiles')
+    const { error } = await confirmMutation(supabase.from('profiles')
       .update(patch as any)
-      .eq('user_id', input.userId)
+      .eq('user_id', input.userId).select('user_id'))
     if (!error) client.invalidateQueries({ queryKey: ['profile', input.userId] })
     return { error }
   }
@@ -1133,13 +1150,13 @@ export function useUpdateChangeOrderStatus() {
   const client = useQueryClient()
   return async (input: { id: string; contactId: string; status: string; approvedByName?: string | null }) => {
     const approving = input.status === 'approved'
-    const { error } = await supabase.from('fh_change_orders')
+    const { error } = await confirmMutation(supabase.from('fh_change_orders')
       .update({
         status: input.status,
         approved_at: approving ? new Date().toISOString() : null,
         approved_by_name: approving ? (input.approvedByName || null) : null
       } as any)
-      .eq('id', input.id)
+      .eq('id', input.id).select('id'))
     if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
     return { error }
   }
@@ -1148,7 +1165,7 @@ export function useUpdateChangeOrderStatus() {
 export function useDeleteChangeOrder() {
   const client = useQueryClient()
   return async (input: { id: string; contactId: string }) => {
-    const { error } = await supabase.from('fh_change_orders').delete().eq('id', input.id)
+    const { error } = await confirmMutation(supabase.from('fh_change_orders').delete().eq('id', input.id).select('id'))
     if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
     return { error }
   }
@@ -1173,7 +1190,7 @@ export function useAddMileage() {
 export function useDeleteMileage() {
   const client = useQueryClient()
   return async (input: { id: string; contactId: string }) => {
-    const { error } = await supabase.from('fh_mileage').delete().eq('id', input.id)
+    const { error } = await confirmMutation(supabase.from('fh_mileage').delete().eq('id', input.id).select('id'))
     if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
     return { error }
   }
@@ -1198,9 +1215,9 @@ export function useAddInspection() {
 export function useUpdateInspectionResult() {
   const client = useQueryClient()
   return async (input: { id: string; contactId: string; result: string }) => {
-    const { error } = await supabase.from('fh_inspections')
+    const { error } = await confirmMutation(supabase.from('fh_inspections')
       .update({ result: input.result } as any)
-      .eq('id', input.id)
+      .eq('id', input.id).select('id'))
     if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
     return { error }
   }
@@ -1209,7 +1226,7 @@ export function useUpdateInspectionResult() {
 export function useDeleteInspection() {
   const client = useQueryClient()
   return async (input: { id: string; contactId: string }) => {
-    const { error } = await supabase.from('fh_inspections').delete().eq('id', input.id)
+    const { error } = await confirmMutation(supabase.from('fh_inspections').delete().eq('id', input.id).select('id'))
     if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
     return { error }
   }
@@ -1222,10 +1239,11 @@ export function useNotifications(userId: string | undefined) {
   return useQuery({
     queryKey: ['notifications', userId],
     queryFn: async () => {
-      const { data } = await supabase.from('fh_notifications').select('*')
+      const { data , error: readError } = await supabase.from('fh_notifications').select('*')
         .eq('user_id', userId as string)
         .order('created_at', { ascending: false })
         .limit(100)
+      assertReadResults({ error: readError })
       return (data ?? []) as Notification[]
     },
     enabled: !!userId
@@ -1235,9 +1253,9 @@ export function useNotifications(userId: string | undefined) {
 export function useMarkNotificationRead() {
   const client = useQueryClient()
   return async (input: { id: string; userId: string }) => {
-    const { error } = await supabase.from('fh_notifications')
+    const { error } = await confirmMutation(supabase.from('fh_notifications')
       .update({ read_at: new Date().toISOString() } as any)
-      .eq('id', input.id)
+      .eq('id', input.id).select('id'))
     if (!error) client.invalidateQueries({ queryKey: ['notifications', input.userId] })
     return { error }
   }
@@ -1268,12 +1286,13 @@ export function useRecentActivity(userId: string | undefined) {
   return useQuery({
     queryKey: ['recentActivity', userId],
     queryFn: async (): Promise<ActivityItem[]> => {
-      const { data } = await supabase
+      const { data , error: readError } = await supabase
         .from('fh_payments')
         .select('id, amount, paid_on, created_at, kind, fh_contacts(name)')
         .eq('user_id', userId as string)
         .order('created_at', { ascending: false })
         .limit(6)
+      assertReadResults({ error: readError })
       return ((data ?? []) as any[]).map((p) => ({
         id: p.id,
         amount: Number(p.amount || 0),
@@ -1298,7 +1317,7 @@ export function useAgenda(userId: string | undefined) {
       const startToday = new Date(now); startToday.setHours(0, 0, 0, 0)
       const endToday = new Date(now); endToday.setHours(23, 59, 59, 999)
       const from = new Date(now); from.setDate(from.getDate() - 45)
-      const { data } = await supabase
+      const { data , error: readError } = await supabase
         .from('fh_schedule')
         .select('*, fh_contacts(name, stage)')
         .eq('user_id', userId as string)
@@ -1306,6 +1325,7 @@ export function useAgenda(userId: string | undefined) {
         .lte('start_at', endToday.toISOString())
         .order('start_at', { ascending: true })
         .limit(100)
+      assertReadResults({ error: readError })
       const rows = (data ?? []) as AgendaEvent[]
       const today: AgendaEvent[] = []
       const overdue: AgendaEvent[] = []
@@ -1329,12 +1349,13 @@ export function useCoverPhotos(userId: string | undefined) {
   return useQuery({
     queryKey: ['coverPhotos', userId],
     queryFn: async (): Promise<Record<string, string>> => {
-      const { data: photos } = await supabase
+      const { data: photos , error: readError } = await supabase
         .from('fh_job_files')
         .select('job_id, storage_path, uploaded_at')
         .eq('user_id', userId as string)
         .eq('kind', 'photo')
         .order('uploaded_at', { ascending: false })
+      assertReadResults({ error: readError })
       if (!photos || photos.length === 0) return {}
       const pathByJob = new Map<string, string>()
       for (const p of photos as any[]) {
@@ -1342,7 +1363,8 @@ export function useCoverPhotos(userId: string | undefined) {
       }
       const uniquePaths = Array.from(new Set(pathByJob.values()))
       if (uniquePaths.length === 0) return {}
-      const { data: signed } = await supabase.storage.from('job-photos').createSignedUrls(uniquePaths, 3600)
+      const { data: signed, error: signError } = await supabase.storage.from('job-photos').createSignedUrls(uniquePaths, 3600)
+      assertReadResults({ error: signError })
       const urlByPath = new Map<string, string>()
       for (const s of signed ?? []) { if (s?.path && s.signedUrl && !s.error) urlByPath.set(s.path, s.signedUrl) }
       const out: Record<string, string> = {}
@@ -1385,6 +1407,7 @@ export function useInvoicesOverview(userId: string | undefined) {
         supabase.from('fh_invoices').select('id, contact_id, amount, status, issued_at, due_at, sequence_number, fh_contacts(name, email)').eq('user_id', userId as string).order('issued_at', { ascending: false }),
         supabase.from('fh_payments').select('amount, paid_on').eq('user_id', userId as string)
       ])
+      assertReadResults(invRes, payRes)
       const now = Date.now()
       const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
       const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - weekStart.getDay()); weekStart.setHours(0, 0, 0, 0)
@@ -1456,7 +1479,7 @@ export function useMarkInvoicePaid() {
       } as any)
       if (payErr) return { error: payErr }
     }
-    const { error } = await supabase.from('fh_invoices').update({ status: 'paid' } as any).eq('id', input.id)
+    const { error } = await confirmMutation(supabase.from('fh_invoices').update({ status: 'paid' } as any).eq('id', input.id).select('id'))
     if (!error) {
       client.invalidateQueries({ queryKey: ['invoicesOverview', input.userId] })
       client.invalidateQueries({ queryKey: ['jobDetail', row.contact_id] })
@@ -1493,6 +1516,7 @@ export function useActivityFeed(userId: string | undefined) {
         supabase.from('fh_change_orders').select('id, amount, title, status, created_at, contact_id, fh_contacts(name)').eq('user_id', uid).order('created_at', { ascending: false }).limit(25),
         supabase.from('fh_notes').select('id, text, created_at, contact_id, fh_contacts(name)').eq('user_id', uid).order('created_at', { ascending: false }).limit(25)
       ])
+      assertReadResults(pays, leads, invs, cos, notes)
       const items: FeedItem[] = []
       for (const p of (pays.data ?? []) as any[]) items.push({
         id: `pay-${p.id}`, kind: 'payment', title: 'Payment received', sub: p.kind ? String(p.kind).replace(/_/g, ' ') : null,
@@ -1534,11 +1558,12 @@ export function usePartners(userId: string | undefined) {
   return useQuery({
     queryKey: ['partners', userId],
     queryFn: async (): Promise<PartnerEntry[]> => {
-      const { data } = await supabase
+      const { data , error: readError } = await supabase
         .from('fh_job_partners')
         .select('id, partner_email, partner_name, partner_role, status, accepted_at, job_id, fh_contacts(name)')
         .eq('invited_by_user_id', userId as string)
         .order('invited_at', { ascending: false })
+      assertReadResults({ error: readError })
       const map = new Map<string, PartnerEntry>()
       for (const r of (data ?? []) as any[]) {
         const key = (r.partner_email || '').toLowerCase()
@@ -1581,11 +1606,12 @@ export function useEstimates(userId: string | undefined) {
   return useQuery({
     queryKey: ['estimates', userId],
     queryFn: async (): Promise<EstimatesBundle> => {
-      const { data } = await supabase
+      const { data , error: readError } = await supabase
         .from('fh_contacts')
         .select('id, name, amount, proposal_status, quote_sent_at, quote_expires_at')
         .eq('user_id', userId as string)
         .order('quote_sent_at', { ascending: false, nullsFirst: false })
+      assertReadResults({ error: readError })
       const now = Date.now()
       const rows: EstimateRow[] = ((data ?? []) as any[])
         .filter((c) => c.proposal_status || c.quote_sent_at)
@@ -1630,6 +1656,7 @@ export function useNotesScreen(userId: string | undefined) {
         supabase.from('fh_notes').select('id, text, contact_id, created_at, category, action, when_text, done').eq('user_id', uid).order('created_at', { ascending: false }).limit(200),
         supabase.from('fh_contacts').select('id, name').eq('user_id', uid).order('name', { ascending: true })
       ])
+      assertReadResults(nRes, cRes)
       const notes: NoteRow[] = ((nRes.data ?? []) as any[])
         .filter((n) => !n.done)
         .map((n) => ({ id: n.id, text: n.text, contactId: n.contact_id, createdAt: n.created_at, category: n.category, action: n.action, whenText: n.when_text }))
@@ -1660,7 +1687,7 @@ export function useSaveNote() {
 export function useArchiveNote() {
   const client = useQueryClient()
   return async (input: { id: string; userId: string }) => {
-    const { error } = await supabase.from('fh_notes').update({ done: true } as any).eq('id', input.id)
+    const { error } = await confirmMutation(supabase.from('fh_notes').update({ done: true } as any).eq('id', input.id).select('id'))
     if (!error) client.invalidateQueries({ queryKey: ['notesScreen', input.userId] })
     return { error }
   }
@@ -1669,7 +1696,7 @@ export function useArchiveNote() {
 export function useDeleteNoteGlobal() {
   const client = useQueryClient()
   return async (input: { id: string; userId: string }) => {
-    const { error } = await supabase.from('fh_notes').delete().eq('id', input.id)
+    const { error } = await confirmMutation(supabase.from('fh_notes').delete().eq('id', input.id).select('id'))
     if (!error) {
       client.invalidateQueries({ queryKey: ['notesScreen', input.userId] })
       client.invalidateQueries({ queryKey: ['activityFeed', input.userId] })
@@ -1703,6 +1730,7 @@ export function useSubsRoster(userId: string | undefined) {
         supabase.from('fh_subs').select('id, name, trade, phone, rate, status, contact_id, created_at').eq('user_id', uid).order('created_at', { ascending: false }),
         supabase.from('fh_contacts').select('id, name, job_title').eq('user_id', uid)
       ])
+      assertReadResults(sRes, cRes)
       const subs: SubRowRaw[] = ((sRes.data ?? []) as any[]).map((s) => ({
         id: s.id, name: s.name, trade: s.trade, phone: s.phone, rate: s.rate, status: s.status, contactId: s.contact_id, createdAt: s.created_at
       }))
@@ -1745,6 +1773,7 @@ export function useInvoiceDetail(id: string | undefined) {
         supabase.from('fh_contacts').select('id, name, job_title, stage, amount, email, phone, created_at').eq('id', cid).single(),
         supabase.from('fh_payments').select('id, amount, method, reference, paid_on').eq('contact_id', cid).order('paid_on', { ascending: false })
       ])
+      assertReadResults(cRes, pRes)
       if (!cRes.data) return null
       const c = cRes.data as any
       const payments = ((pRes.data ?? []) as any[]).map((p) => ({ id: p.id, amount: Number(p.amount || 0), method: p.method, reference: p.reference, paidOn: p.paid_on }))
@@ -1805,6 +1834,7 @@ export function useSubDetail(key: string | undefined, userId: string | undefined
         supabase.from('fh_subs').select('id, name, phone, trade, rate, status, contact_id, created_at').eq('user_id', uid),
         supabase.from('fh_sub_profiles').select('*').eq('user_id', uid)
       ])
+      assertReadResults(sRes, pRes)
       const allSubs = (sRes.data ?? []) as any[]
       const subRows = allSubs.filter((r) => ((r.phone || r.name || '').trim().toLowerCase()) === norm)
       const profile = ((pRes.data ?? []) as any[]).find((p) => ((p.phone || p.name || '').trim().toLowerCase()) === norm) ?? null
@@ -1853,7 +1883,7 @@ export function useCreateSubProfile() {
 export function useUpdateSubProfile() {
   const client = useQueryClient()
   return async (input: { id: string; userId: string; key: string; patch: Partial<Omit<SubProfile, 'id'>> }) => {
-    const { error } = await supabase.from('fh_sub_profiles').update(input.patch as any).eq('id', input.id)
+    const { error } = await confirmMutation(supabase.from('fh_sub_profiles').update(input.patch as any).eq('id', input.id).select('id'))
     if (!error) {
       client.invalidateQueries({ queryKey: ['subDetail', input.key] })
       client.invalidateQueries({ queryKey: ['subsRoster', input.userId] })
@@ -1899,9 +1929,9 @@ export function useDeleteAccount() {
 export function useSaveLocation() {
   const client = useQueryClient()
   return async (input: { userId: string; lat: number; lon: number }) => {
-    const { error } = await supabase.from('profiles')
+    const { error } = await confirmMutation(supabase.from('profiles')
       .update({ location_lat: input.lat, location_lon: input.lon } as any)
-      .eq('user_id', input.userId)
+      .eq('user_id', input.userId).select('user_id'))
     if (!error) client.invalidateQueries({ queryKey: ['profile', input.userId] })
     return { error }
   }
@@ -1919,7 +1949,7 @@ export function useUpsertInsurance() {
   return async (input: { contactId: string; userId: string; existingId?: string | null; patch: InsurancePatch }) => {
     let error
     if (input.existingId) {
-      ({ error } = await supabase.from('fh_insurance_claims').update(input.patch as any).eq('id', input.existingId))
+      ({ error } = await confirmMutation(supabase.from('fh_insurance_claims').update(input.patch as any).eq('id', input.existingId).select('id')))
     } else {
       ({ error } = await supabase.from('fh_insurance_claims').insert({ contact_id: input.contactId, user_id: input.userId, ...input.patch } as any))
     }
@@ -1931,7 +1961,7 @@ export function useUpsertInsurance() {
 export function useDeleteInsurance() {
   const client = useQueryClient()
   return async (input: { id: string; contactId: string }) => {
-    const { error } = await supabase.from('fh_insurance_claims').delete().eq('id', input.id)
+    const { error } = await confirmMutation(supabase.from('fh_insurance_claims').delete().eq('id', input.id).select('id'))
     if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
     return { error }
   }
@@ -1942,7 +1972,7 @@ export type Milestone = { label: string; done: boolean; created_at: string }
 export function useSaveMilestones() {
   const client = useQueryClient()
   return async (input: { contactId: string; milestones: Milestone[] }) => {
-    const { error } = await supabase.from('fh_contacts').update({ milestones: input.milestones } as any).eq('id', input.contactId)
+    const { error } = await confirmMutation(supabase.from('fh_contacts').update({ milestones: input.milestones } as any).eq('id', input.contactId).select('id'))
     if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
     return { error }
   }

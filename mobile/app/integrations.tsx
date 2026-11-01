@@ -44,7 +44,14 @@ export default function IntegrationsScreen() {
     if (!user) return
     Alert.alert(`Disconnect ${p.name}?`, 'You can reconnect at any time.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Disconnect', style: 'destructive', onPress: () => disconnect({ userId: user.id, provider: p.id }) }
+      { text: 'Disconnect', style: 'destructive', onPress: async () => {
+        try {
+          const { error } = await disconnect({ userId: user.id, provider: p.id })
+          if (error) Alert.alert('Disconnect failed', error.message)
+        } catch {
+          Alert.alert('Disconnect failed', 'Check your connection and try again.')
+        }
+      } }
     ])
   }
 

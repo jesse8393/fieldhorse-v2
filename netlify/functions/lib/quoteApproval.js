@@ -31,7 +31,9 @@ export async function loadQuoteForLink(supabase, link) {
     .from('fh_clients')
     .select('id, name, company_name, phone, email, address, org_id')
     .eq('id', quote.client_id)
+    .match(linkScope(quote))
     .maybeSingle()
+  if (!client) return { quote: null, client: null }
   return { quote, client: client || null }
 }
 

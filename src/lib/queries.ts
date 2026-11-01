@@ -127,7 +127,7 @@ async function fetchJobs(): Promise<JobRow[]> {
   // pipeline dedupe in screens/Home.tsx.
   const { data, error } = await supabase
     .from('fh_contacts')
-    .select(`${JOB_LIST_COLUMNS}, fh_clients(name, phone, email)`)
+    .select(`${JOB_LIST_COLUMNS}, fh_clients!fh_contacts_client_id_fkey(name, phone, email)`)
     .not('stage', 'in', MOVED_STAGE_FILTER)
     .order('updated_at', { ascending: false })
     // Sanity ceiling: 2000 most-recently-touched deals is far beyond what
@@ -257,7 +257,7 @@ export function useJobSearch(term: string) {
         .join(',')
       const { data, error } = await supabase
         .from('fh_contacts')
-        .select(`${JOB_LIST_COLUMNS}, fh_clients(name, phone, email)`)
+        .select(`${JOB_LIST_COLUMNS}, fh_clients!fh_contacts_client_id_fkey(name, phone, email)`)
         .not('stage', 'in', MOVED_STAGE_FILTER)
         .or(orExpr)
         .order('updated_at', { ascending: false })
@@ -754,7 +754,7 @@ export async function fetchInvoicesBundle(userId: string, orgId?: string | null)
     fetchAllRows<InvoiceJob>((from, to) =>
       scoped(supabase
         .from('fh_contacts')
-        .select(`${INVOICE_JOB_COLUMNS}, fh_clients(name, email, phone, address)`), userId, orgId)
+        .select(`${INVOICE_JOB_COLUMNS}, fh_clients!fh_contacts_client_id_fkey(name, email, phone, address)`), userId, orgId)
         .in('stage', ['job', 'invoice', 'closed'])
         .order('created_at', { ascending: false })
         .order('id', { ascending: true })
@@ -887,7 +887,7 @@ export async function fetchInvoiceRecord(id: string): Promise<InvoiceRecordBundl
   }
 
   const [jobRes, payRes, coRes, insRes, invRes] = await Promise.all([
-    supabase.from('fh_contacts').select(`${INVOICE_JOB_COLUMNS}, fh_clients(name, email, phone, address)`).eq('id', jobId).maybeSingle(),
+    supabase.from('fh_contacts').select(`${INVOICE_JOB_COLUMNS}, fh_clients!fh_contacts_client_id_fkey(name, email, phone, address)`).eq('id', jobId).maybeSingle(),
     supabase.from('fh_payments').select('*').eq('contact_id', jobId).order('paid_on', { ascending: false }),
     fetchAllRows<InvoiceRecordBundle['changeOrders'][number]>((from, to) => supabase.from('fh_change_orders').select('*').eq('contact_id', jobId).eq('status', 'approved').order('sequence_number', { ascending: true }).order('id').range(from, to)).then(data => ({ data, error: null })),
     supabase.from('fh_insurance_claims').select('*').eq('contact_id', jobId).maybeSingle(),
@@ -1365,7 +1365,7 @@ async function fetchInvoiceDetail(id: string): Promise<InvoiceDetailBundle> {
   const [cRes, psRes, insRes, coRes] = await Promise.all([
     supabase
       .from('fh_contacts')
-      .select('*, fh_clients(name, email, phone, address)')
+      .select('*, fh_clients!fh_contacts_client_id_fkey(name, email, phone, address)')
       .eq('id', id)
       .maybeSingle(),
     supabase.from('fh_payments').select('*').eq('contact_id', id).order('paid_on', { ascending: false }),
@@ -1532,7 +1532,8 @@ export type LeadClient = Pick<Client, 'id' | 'name' | 'phone' | 'email' | 'addre
 export type LeadRow = Database['public']['Tables']['fh_leads']['Row'] & { fh_clients: LeadClient | null }
 export type QuoteRow = Database['public']['Tables']['fh_quotes']['Row'] & { fh_clients: LeadClient | null }
 
-const RECORD_CLIENT = 'fh_clients(id, name, phone, email, address)'
+const LEAD_CLIENT = 'fh_clients!fh_leads_client_id_fkey(id, name, phone, email, address)'
+const QUOTE_CLIENT = 'fh_clients!fh_quotes_client_id_fkey(id, name, phone, email, address)'
 
 export const leadsKey = (orgId: string | null | undefined) => ['leads', orgId ?? null] as const
 export const leadKey = (id: string | undefined) => ['lead', id] as const
@@ -1541,7 +1542,7 @@ export const quoteKey = (id: string | undefined) => ['quote', id] as const
 
 async function fetchLeads(userId: string, orgId: string | null | undefined): Promise<LeadRow[]> {
   return fetchAllRows<LeadRow>((from, to) =>
-    scoped(supabase.from('fh_leads').select(`*, ${RECORD_CLIENT}`), userId, orgId)
+    scoped(supabase.from('fh_leads').select(`*, ${LEAD_CLIENT}`), userId, orgId)
       .order('created_at', { ascending: false })
       .order('id', { ascending: true })
       .range(from, to)
@@ -1559,7 +1560,7 @@ export function useLeads(userId: string | undefined) {
 }
 
 async function fetchLead(id: string): Promise<LeadRow | null> {
-  const { data, error } = await supabase.from('fh_leads').select(`*, ${RECORD_CLIENT}`).eq('id', id).maybeSingle()
+  const { data, error } = await supabase.from('fh_leads').select(`*, ${LEAD_CLIENT}`).eq('id', id).maybeSingle()
   if (error) throw error
   return (data as LeadRow | null) ?? null
 }
@@ -1575,7 +1576,7 @@ export function useLead(id: string | undefined, userId: string | undefined) {
 
 async function fetchQuotes(userId: string, orgId: string | null | undefined): Promise<QuoteRow[]> {
   return fetchAllRows<QuoteRow>((from, to) =>
-    scoped(supabase.from('fh_quotes').select(`*, ${RECORD_CLIENT}`), userId, orgId)
+    scoped(supabase.from('fh_quotes').select(`*, ${QUOTE_CLIENT}`), userId, orgId)
       .order('updated_at', { ascending: false })
       .order('id', { ascending: true })
       .range(from, to)
@@ -1593,7 +1594,7 @@ export function useQuotes(userId: string | undefined) {
 }
 
 async function fetchQuote(id: string): Promise<QuoteRow | null> {
-  const { data, error } = await supabase.from('fh_quotes').select(`*, ${RECORD_CLIENT}`).eq('id', id).maybeSingle()
+  const { data, error } = await supabase.from('fh_quotes').select(`*, ${QUOTE_CLIENT}`).eq('id', id).maybeSingle()
   if (error) throw error
   return (data as QuoteRow | null) ?? null
 }

@@ -697,10 +697,10 @@ const CONTACT_COLUMNS =
 
 const INVOICE_COLUMNS = 'id, contact_id, title, amount, due_at, status, sequence_number, created_at'
 
-const LEAD_COLUMNS = 'id, client_id, title, status, follow_up_on, last_contact, created_at, updated_at, fh_clients(name, phone)'
+const LEAD_COLUMNS = 'id, client_id, title, status, follow_up_on, last_contact, created_at, updated_at, fh_clients!fh_leads_client_id_fkey(name, phone)'
 
 const QUOTE_COLUMNS =
-  'id, client_id, title, status, amount, job_id, sent_at, change_request_note, change_requested_at, created_at, updated_at, fh_clients(name)'
+  'id, client_id, title, status, amount, job_id, sent_at, change_request_note, change_requested_at, created_at, updated_at, fh_clients!fh_quotes_client_id_fkey(name)'
 
 // Visits with the job they belong to, for Today's next stop and day list.
 const SCHEDULE_COLUMNS = 'id, contact_id, start_at, end_at, title, fh_contacts(name, stage, address, job_title)'

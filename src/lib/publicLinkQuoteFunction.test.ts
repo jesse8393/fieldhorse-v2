@@ -191,6 +191,15 @@ describe('a proposal link with quote_id', () => {
     expect(currentFake.rpcCalls.map((c) => c.name)).toContain('fh_record_public_link_view')
   })
 
+  it('refuses a quote pointing at another company customer', async () => {
+    currentFake = fakeSupabase(quoteTables({}, {
+      fh_clients: [{ id: 'cl-1', org_id: 'org-foreign', name: 'Private customer', email: 'private@example.test' }]
+    }))
+    const response = await getLink()
+    expect(response.status).toBe(404)
+    expect(await response.text()).not.toContain('Private customer')
+  })
+
   it('maps the quote status to a stage the portal already reads', () => {
     expect(quoteStage({ status: 'sent', job_id: null }, null)).toBe('quote')
     expect(quoteStage({ status: 'lost', job_id: null }, null)).toBe('lost')

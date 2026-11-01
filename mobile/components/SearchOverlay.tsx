@@ -22,7 +22,7 @@ export function SearchOverlay({ open, onClose, userId }: { open: boolean; onClos
   const router = useRouter()
   const { data: jobs = [], isLoading: jobsLoading } = useJobs()
   const { data: bundle } = useClientsBundle(userId)
-  const clients = bundle?.clients ?? []
+  const clients = useMemo(() => bundle?.clients ?? [], [bundle?.clients])
   const [q, setQ] = useState('')
 
   const query = q.trim().toLowerCase()

@@ -35,7 +35,7 @@ export default function ClientDetailScreen() {
   const deleteClient = useDeleteClient()
 
   const client = data?.client ?? null
-  const jobs = data?.jobs ?? []
+  const jobs = useMemo(() => data?.jobs ?? [], [data?.jobs])
 
   const [editOpen, setEditOpen] = useState(false)
   const [eName, setEName] = useState('')

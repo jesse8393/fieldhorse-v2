@@ -127,12 +127,12 @@ export async function universalSearch(
   // matching clients' rows come back). PostgREST takes an embedded column
   // in its own filter, not inside or(), hence two reads per table.
   const byTitle = (table: 'fh_leads' | 'fh_quotes' | 'fh_invoices', columns: string) =>
-    scoped(supabase.from(table).select(`${columns}, fh_clients(name)`))
+    scoped(supabase.from(table).select(`${columns}, fh_clients!${table}_client_id_fkey(name)`))
       .ilike('title', like)
       .order('updated_at', { ascending: false })
       .limit(PER_KIND)
   const byClient = (table: 'fh_leads' | 'fh_quotes' | 'fh_invoices', columns: string) =>
-    scoped(supabase.from(table).select(`${columns}, fh_clients!inner(name)`))
+    scoped(supabase.from(table).select(`${columns}, fh_clients!${table}_client_id_fkey!inner(name)`))
       .ilike('fh_clients.name', like)
       .order('updated_at', { ascending: false })
       .limit(PER_KIND)

@@ -9,6 +9,8 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
+import { queryClient } from '../lib/queryClient'
+import { createSessionBoundary } from '../lib/sessionBoundary'
 
 type AuthContextValue = {
   session: Session | null
@@ -28,22 +30,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true
+    let authEvents = 0
+    const accountChanged = createSessionBoundary(queryClient)
     void supabase.auth.getSession()
       .then(({ data, error }) => {
-        if (!mounted) return
+        if (!mounted || authEvents) return
         if (error) console.warn('[fieldhorse] Could not restore the saved session:', error.message)
+        accountChanged(data.session?.user.id ?? null)
         setSession(data.session)
       })
       .catch((error) => {
-        if (!mounted) return
+        if (!mounted || authEvents) return
         console.warn('[fieldhorse] Could not read the saved session:', error)
+        accountChanged(null, true)
         setSession(null)
       })
       .finally(() => {
         if (mounted) setLoading(false)
       })
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
+      if (!mounted) return
+      authEvents++
+      accountChanged(s?.user.id ?? null, event === 'SIGNED_OUT')
       setSession(s)
+      setLoading(false)
     })
     return () => {
       mounted = false
@@ -60,7 +70,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: error ? { message: error.message } : null }
     },
     signOut: async () => {
-      await supabase.auth.signOut()
+      const { error } = await supabase.auth.signOut({ scope: 'local' })
+      if (error) throw error
     },
     resetPassword: async (email) => {
       const { error } = await supabase.auth.resetPasswordForEmail(email)

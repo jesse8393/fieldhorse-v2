@@ -2,6 +2,38 @@ import { expect, test } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 import { nothingRunsOffTheSide } from './helpers/overflow.ts'
 
+test('task deletion does not report success when the server changed no rows', async ({ context, page }) => {
+  await signIn(context)
+  const task = { id: 'task-denied-delete', job_id: 'c-job1', user_id: 'qa-user-1', assigned_to: null,
+    text: 'Keep this task when deletion is denied', done: false, completed_at: null, due_at: null, created_at: new Date().toISOString() }
+  await context.route(/\/rest\/v1\/fh_job_todos(\?|$)/, route => route.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify(route.request().method() === 'DELETE' ? [] : [task])
+  }))
+  await page.goto('/tasks')
+  await page.getByRole('button', { name: `Delete ${task.text}`, exact: true }).click()
+  await expect(page.getByText("Couldn't delete", { exact: true })).toBeVisible()
+  await expect(page.getByText(task.text, { exact: true })).toBeVisible()
+  await expect(page.getByText('Task deleted', { exact: true })).toHaveCount(0)
+})
+
+test('task dashboard reads every page for the selected company', async ({ context, page }) => {
+  await signIn(context)
+  const tasks = Array.from({ length: 1001 }, (_, index) => ({ id: `task-page-${index}`, job_id: 'c-job1', user_id: 'qa-user-1',
+    org_id: 'org-1', assigned_to: null, text: `Paged task ${index}`, done: false, completed_at: null, due_at: null, created_at: new Date().toISOString() }))
+  const pages: number[] = []
+  await context.route(/\/rest\/v1\/fh_job_todos(\?|$)/, route => {
+    const query = new URL(route.request().url()).searchParams
+    expect(query.get('org_id')).toBe('eq.org-1')
+    const offset = Number(query.get('offset') || 0)
+    pages.push(offset)
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(tasks.slice(offset, offset + Number(query.get('limit') || 1000))) })
+  })
+  await page.goto('/tasks')
+  await expect(page.getByRole('status').filter({ hasText: '1001 tasks' })).toBeVisible()
+  expect(pages).toContain(1000)
+  await expect(page.getByText('Paged task 1000', { exact: true })).toHaveCount(1)
+})
+
 test('job tasks can be completed, undone, and created on a narrow phone', async ({ context, page }) => {
   await signIn(context)
   await page.setViewportSize({ width: 320, height: 844 })

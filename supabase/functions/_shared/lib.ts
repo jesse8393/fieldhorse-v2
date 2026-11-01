@@ -21,7 +21,7 @@ export function json(body: unknown, status = 200, extra: Record<string, string> 
 }
 
 export function text(body: string, status = 200, contentType = "text/plain; charset=utf-8"): Response {
-  return new Response(body, { status, headers: { "Content-Type": contentType, ...CORS } });
+  return new Response([204, 205, 304].includes(status) ? null : body, { status, headers: { "Content-Type": contentType, ...CORS } });
 }
 
 export function twiml(inner: string): Response {
@@ -121,13 +121,20 @@ export async function svixSignatureOk(req: Request, raw: string, secret: string 
   if (!secret) return false;
   const id = req.headers.get("svix-id") ?? "";
   const ts = req.headers.get("svix-timestamp") ?? "";
-  const sigs = (req.headers.get("svix-signature") ?? "").split(" ").map((s) => s.split(",")[1] ?? "");
-  if (!id || !ts || !sigs.length) return false;
+  const sigs = (req.headers.get("svix-signature") ?? "").split(/\s+/)
+    .filter((s) => s.startsWith("v1,")).map((s) => s.slice(3));
+  // Signatures authenticate the timestamp as well as the body. Reject replayed
+  // requests and future timestamps before decoding the secret or touching data.
+  if (!id || !/^\d+$/.test(ts) || !sigs.length || Math.abs(Date.now() / 1000 - Number(ts)) > 300) return false;
   const keyB64 = secret.startsWith("whsec_") ? secret.slice(6) : secret;
-  const keyBytes = Uint8Array.from(atob(keyB64), (c) => c.charCodeAt(0));
-  const k = await crypto.subtle.importKey("raw", keyBytes, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const expected = b64(await crypto.subtle.sign("HMAC", k, new TextEncoder().encode(`${id}.${ts}.${raw}`)));
-  return sigs.some((s) => timingSafeEqual(s, expected));
+  try {
+    const keyBytes = Uint8Array.from(atob(keyB64), (c) => c.charCodeAt(0));
+    const k = await crypto.subtle.importKey("raw", keyBytes, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const expected = b64(await crypto.subtle.sign("HMAC", k, new TextEncoder().encode(`${id}.${ts}.${raw}`)));
+    return sigs.some((s) => timingSafeEqual(s, expected));
+  } catch {
+    return false;
+  }
 }
 
 export function e164(raw: unknown): string | null {
@@ -184,4 +191,13 @@ export function anthropicConfigured(): boolean {
 /** Nudge the engine right away instead of waiting for the next cron minute. Never throws. */
 export async function tick(db: SupabaseClient): Promise<void> {
   try { await db.rpc("fh_automation_tick"); } catch { /* cron will pick it up */ }
+}
+
+/** Jobber webhook HMAC over the unmodified request body. */
+export async function jobberSignatureOk(req: Request, raw: string, clientSecret: string | undefined): Promise<boolean> {
+  if (!clientSecret) return false;
+  const sig = (req.headers.get("x-jobber-hmac-sha256") ?? "").trim();
+  if (!sig) return false;
+  const expected = b64(await hmac("SHA-256", clientSecret, raw));
+  return timingSafeEqual(expected, sig);
 }

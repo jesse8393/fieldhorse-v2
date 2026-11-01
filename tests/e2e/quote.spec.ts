@@ -548,36 +548,23 @@ test.describe('the quote screen', () => {
   test('Make this a job lands on the new job', async ({ context, page }) => {
     await signIn(context, { tables: { fh_quote_items: ITEMS } })
     const calls = await watchSends(context)
-    // The mock answers an insert with the first row of the table, which is
-    // a moved row here; answer with the job the database would make.
-    const inserted: Record<string, unknown>[] = []
-    await context.route((url) => url.pathname.endsWith('/rest/v1/fh_contacts'), (route) => {
-      const request = route.request()
-      if (request.method() !== 'POST') return route.fallback()
-      inserted.push(request.postDataJSON())
-      return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ id: 'job-new', ...request.postDataJSON() }) })
+    // SQL regression tests exercise the atomic copy, tenant checks and rollback.
+    // Here verify the UI waits for acknowledgement and sends one RPC only.
+    const requests: unknown[] = []
+    let acknowledge: (() => void) | undefined
+    const waiting = new Promise<void>(resolve => { acknowledge = resolve })
+    await context.route((url) => url.pathname.endsWith('/rest/v1/rpc/fh_make_job_from_quote'), async route => {
+      requests.push(route.request().postDataJSON())
+      await waiting
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify('job-new') })
     })
-    const copies: Record<string, unknown>[][] = []
-    await context.route((url) => url.pathname.endsWith('/rest/v1/fh_quote_items'), (route) => {
-      const request = route.request()
-      if (request.method() !== 'POST') return route.fallback()
-      copies.push(request.postDataJSON())
-      return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(request.postDataJSON()) })
-    })
-    const linked = page.waitForRequest((r) => r.method() === 'PATCH' && r.url().includes('/rest/v1/fh_quotes'))
     await openQuote(page)
-
     await page.getByRole('button', { name: 'Make this a job' }).click()
+    await expect.poll(() => requests.length).toBe(1)
+    await expect(page).toHaveURL(/\/quotes\/q-quote$/)
+    acknowledge!()
     await expect(page).toHaveURL(/\/jobs\/job-new$/, { timeout: 30_000 })
-
-    // The job copies the quote's client, title, scope and the base price (D61).
-    expect(inserted).toHaveLength(1)
-    expect(inserted[0]).toMatchObject({ stage: 'job', client_id: 'cl-1', name: 'Jeff Roy', job_title: 'Parking lot repour', amount: 3150 })
-    // Every line goes onto the job, and the quote points at the job.
-    expect(copies).toHaveLength(1)
-    expect(copies[0]).toHaveLength(3)
-    for (const row of copies[0]) expect(row).toMatchObject({ contact_id: 'job-new', quote_id: null })
-    expect((await linked).postDataJSON()).toEqual({ job_id: 'job-new' })
+    expect(requests).toEqual([{ p_quote_id: 'q-quote' }])
     expect(calls.send).toEqual([])
   })
 

@@ -40,8 +40,8 @@ export default function NotesScreen() {
   const [parsing, setParsing] = useState(false)
   const [parsed, setParsed] = useState<{ category: string | null; action: string | null; whenText: string | null } | null>(null)
 
-  const notes = data?.notes ?? []
-  const contacts = data?.contacts ?? []
+  const notes = useMemo(() => data?.notes ?? [], [data?.notes])
+  const contacts = useMemo(() => data?.contacts ?? [], [data?.contacts])
   const recent = useMemo(() => notes.slice(0, 8), [notes])
   const linkedName = contacts.find((c) => c.id === contactId)?.name
 

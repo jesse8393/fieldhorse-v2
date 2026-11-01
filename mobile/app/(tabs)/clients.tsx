@@ -31,9 +31,9 @@ export default function ClientsScreen() {
   const [search, setSearch] = useState('')
   const [addOpen, setAddOpen] = useState(false)
 
-  const clients = bundle?.clients ?? []
-  const jobs = bundle?.jobs ?? []
-  const payments = bundle?.payments ?? []
+  const clients = useMemo(() => bundle?.clients ?? [], [bundle?.clients])
+  const jobs = useMemo(() => bundle?.jobs ?? [], [bundle?.jobs])
+  const payments = useMemo(() => bundle?.payments ?? [], [bundle?.payments])
 
   const kpis = useMemo(() => {
     const paidByJob = new Map<string, number>()

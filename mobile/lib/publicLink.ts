@@ -7,19 +7,17 @@
 // browser, no app required.
 
 import { supabase } from './supabase'
+import { confirmMutation } from './mutationResult'
+import { getRandomBytesAsync } from 'expo-crypto'
 
 const TOKEN_ALPHABET = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 const TOKEN_LEN = 24
 const WEB_BASE = (process.env.EXPO_PUBLIC_API_BASE_URL || 'https://fieldhorse.io').replace(/\/+$/, '')
 
-function randomToken(): string {
-  const g: any = globalThis as any
-  const bytes = new Uint8Array(TOKEN_LEN)
-  if (g.crypto?.getRandomValues) {
-    g.crypto.getRandomValues(bytes)
-  } else {
-    for (let i = 0; i < TOKEN_LEN; i++) bytes[i] = Math.floor(Math.random() * 256)
-  }
+async function randomToken(): Promise<string> {
+  // Native Hermes does not guarantee global Web Crypto. Use the native CSPRNG
+  // and fail closed if it is unavailable; these tokens grant document access.
+  const bytes = await getRandomBytesAsync(TOKEN_LEN)
   let out = ''
   for (const b of bytes) out += TOKEN_ALPHABET[b % TOKEN_ALPHABET.length]
   return out
@@ -38,7 +36,7 @@ export async function mintPublicLink({ contactId, userId, kind, expiresAt = null
   expiresAt?: Date | null
 }): Promise<{ token: string; url: string }> {
   if (!contactId || !userId || !kind) throw new Error('contactId, userId, kind required')
-  const token = randomToken()
+  const token = await randomToken()
   const { error } = await supabase.from('fh_public_links').insert({
     user_id: userId,
     contact_id: contactId,
@@ -52,20 +50,22 @@ export async function mintPublicLink({ contactId, userId, kind, expiresAt = null
 
 export async function listPublicLinks(contactId: string | undefined) {
   if (!contactId) return []
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('fh_public_links')
     .select('*')
     .eq('contact_id', contactId)
     .is('revoked_at', null)
     .order('created_at', { ascending: false })
+  if (error) throw error
   return data || []
 }
 
 export async function revokePublicLink(linkId: string | undefined): Promise<boolean> {
   if (!linkId) return false
-  const { error } = await supabase
+  const { error } = await confirmMutation(supabase
     .from('fh_public_links')
     .update({ revoked_at: new Date().toISOString() } as any)
     .eq('id', linkId)
+    .select('id'))
   return !error
 }

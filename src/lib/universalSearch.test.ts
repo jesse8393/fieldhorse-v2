@@ -54,6 +54,16 @@ describe('search role boundaries', () => {
     expect(result.clients).toHaveLength(role === 'manager' ? 0 : 1)
   })
 
+  it('keeps title and customer searches unambiguous when company foreign keys coexist', async () => {
+    await universalSearch('Site', 'user-1', 'org-1', 'owner')
+    for (const table of ['fh_leads', 'fh_quotes', 'fh_invoices']) {
+      const queries = db.reads.filter(read => read.table === table)
+      expect(queries).toHaveLength(2)
+      expect(queries[0].columns).toContain(`fh_clients!${table}_client_id_fkey(name)`)
+      expect(queries[1].columns).toContain(`fh_clients!${table}_client_id_fkey!inner(name)`)
+    }
+  })
+
   it('waits for a confirmed role instead of defaulting to owner access', async () => {
     expect((await universalSearch('Site', 'user-1', 'org-1')).total).toBe(0)
     expect(db.reads).toEqual([])

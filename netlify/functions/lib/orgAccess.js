@@ -9,11 +9,12 @@
 // the row's creator could send anything; an admin or manager opening a job
 // a teammate created got 403 forbidden_or_not_found on every send.
 //
-// Rule: the caller may act on a row when they created it, or when they are
-// an active owner, admin or manager of the row's org (the same roles that
+// Rule: company rows require active owner, admin or manager membership,
+// including when the caller originally created the row (the same roles that
 // src/lib/permissions.ts allows to create financial documents and talk to
 // clients). Crew and foreman members are refused, matching the money table
-// policies in migration 064.
+// policies in migration 064). Only legacy rows without an org fall back to
+// creator ownership. Revocation or demotion must take effect for all rows.
 
 export const SENDER_ROLES = ['owner', 'admin', 'manager']
 
@@ -23,8 +24,8 @@ export const SENDER_ROLES = ['owner', 'admin', 'manager']
  */
 export function canActOnRow(row, callerId, membership, roles = SENDER_ROLES) {
   if (!row || !callerId) return false
-  if (row.user_id && row.user_id === callerId) return true
-  if (!row.org_id || !membership) return false
+  if (!row.org_id) return row.user_id === callerId
+  if (!membership || membership.revoked_at) return false
   return roles.includes(String(membership.role || ''))
 }
 
@@ -47,15 +48,18 @@ export async function loadAccessibleRow(supabase, { table, id, callerId, select,
     return { error: 'lookup_failed' }
   }
   if (!row) return { error: 'forbidden_or_not_found' }
-  if (row.user_id === callerId) return { row }
-  if (!row.org_id) return { error: 'forbidden_or_not_found' }
-  const { data: membership } = await supabase
+  if (!row.org_id) return canActOnRow(row, callerId, null, roles) ? { row } : { error: 'forbidden_or_not_found' }
+  const { data: membership, error: membershipError } = await supabase
     .from('org_members')
     .select('role')
     .eq('org_id', row.org_id)
     .eq('user_id', callerId)
     .is('revoked_at', null)
     .maybeSingle()
+  if (membershipError) {
+    console.error('[orgAccess] membership lookup failed', membershipError)
+    return { error: 'lookup_failed' }
+  }
   return canActOnRow(row, callerId, membership, roles) ? { row } : { error: 'forbidden_or_not_found' }
 }
 

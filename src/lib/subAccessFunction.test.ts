@@ -15,6 +15,7 @@ function fakeClient(tables: Record<string, any[]>) {
       const api: any = {
         select: () => api,
         eq: (col: string, v: any) => { filters.push((r) => r[col] === v); return api },
+        is: (col: string, v: any) => { filters.push((r) => (r[col] ?? null) === v); return api },
         in: (col: string, vs: any[]) => { filters.push((r) => vs.includes(r[col])); return api },
         limit: () => api,
         then: (resolve: any) => resolve({ data: (tables[table] || []).filter((r) => filters.every((f) => f(r))), error: null }),
@@ -31,12 +32,14 @@ describe('sub portal binding', () => {
       { job_id: 'job-b', partner_user_id: 'sub-1', status: 'pending' },
       { job_id: 'job-c', partner_user_id: 'sub-1', status: 'revoked' },
       { job_id: 'job-d', partner_user_id: 'someone-else', status: 'accepted' },
+      { job_id: 'job-e', partner_user_id: 'sub-1', status: 'accepted', deleted_by_partner_at: '2026-11-01' },
     ],
     fh_contacts: [
       { id: 'job-a', org_id: 'org-a' },
       { id: 'job-b', org_id: 'org-b' },
       { id: 'job-c', org_id: 'org-c' },
       { id: 'job-d', org_id: 'org-d' },
+      { id: 'job-e', org_id: 'org-e' },
     ],
   }
 
@@ -71,6 +74,9 @@ describe('sub profile patch', () => {
 
   it('rejects impossible dates, non text values and oversized text', () => {
     expect(sanitizeSubProfilePatch({ insurance_expires_on: '2026-02-30' }).error).toBe('invalid_expires')
+    for (const value of ['2026-13-01', '2026-00-01', '2026-12-31junk', '2026-12-31T12:00:00Z']) {
+      expect(sanitizeSubProfilePatch({ insurance_expires_on: value }).error).toBe('invalid_expires')
+    }
     expect(sanitizeSubProfilePatch({ phone: 12345 }).error).toBe('invalid_field')
     expect(sanitizeSubProfilePatch({ phone: { $gt: '' } }).error).toBe('invalid_field')
     expect(sanitizeSubProfilePatch({ address: 'x'.repeat(301) }).error).toBe('invalid_field')

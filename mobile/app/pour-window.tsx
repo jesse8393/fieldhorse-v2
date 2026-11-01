@@ -59,7 +59,7 @@ export default function PourWindowScreen() {
   const [pinning, setPinning] = useState(false)
 
   const hasCoords = profile?.location_lat != null && profile?.location_lon != null
-  const services = (profile?.services as string[]) || []
+  const services = useMemo(() => profile?.services ?? [], [profile?.services])
   const lat = profile?.location_lat ?? MURFREESBORO.lat
   const lon = profile?.location_lon ?? MURFREESBORO.lon
 
@@ -78,7 +78,8 @@ export default function PourWindowScreen() {
       const { status } = await Location.requestForegroundPermissionsAsync()
       if (status !== 'granted') { setErr('Location permission denied'); return }
       const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low })
-      await saveLocation({ userId: user.id, lat: pos.coords.latitude, lon: pos.coords.longitude })
+      const { error } = await saveLocation({ userId: user.id, lat: pos.coords.latitude, lon: pos.coords.longitude })
+      if (error) throw error
     } catch {
       Alert.alert('Location unavailable', "Couldn't read your location.")
     } finally { setPinning(false) }

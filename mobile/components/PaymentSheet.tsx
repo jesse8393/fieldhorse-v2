@@ -1,14 +1,15 @@
 // mobile/components/PaymentSheet.tsx, record a payment against a job.
 // Mirrors web src/components/V3PaymentSheet.tsx: amount, method
 // (cash/check/ACH/card), and date. Used by invoice detail and job detail.
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { View, Text, Pressable } from 'react-native'
 import { useLogPayment } from '../lib/queries'
 import { BottomSheet, SheetField, GoldButton, theme } from './ui'
+import { paymentAmount, localDate, isCalendarDate } from '../lib/paymentInput'
 
 const METHODS = ['cash', 'check', 'ach', 'card']
 
-function today() { return new Date().toISOString().slice(0, 10) }
+const today = localDate
 
 type Props = {
   open: boolean; onClose: () => void; userId: string; contactId: string
@@ -21,31 +22,35 @@ export function PaymentSheet({ open, onClose, userId, contactId, balance, onLogg
   const [method, setMethod] = useState('check')
   const [date, setDate] = useState(today())
   const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
   const [err, setErr] = useState<string | null>(null)
 
   useEffect(() => {
     if (!open) return
-    setAmount(balance && balance > 0 ? String(Math.round(balance)) : '')
+    setAmount(balance && balance > 0 ? balance.toFixed(2) : '')
     setMethod('check'); setDate(today()); setErr(null)
   }, [open, balance])
 
   async function submit() {
-    if (saving) return
-    const amt = Number(amount.replace(/[^0-9.]/g, ''))
-    if (!amt || isNaN(amt) || amt <= 0) { setErr('Enter a payment amount.'); return }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date.trim())) { setErr('Use date year month day.'); return }
+    if (savingRef.current) return
+    const amt = paymentAmount(amount)
+    if (amt == null) { setErr('Enter a positive payment amount with up to two decimal places.'); return }
+    if (!isCalendarDate(date.trim())) { setErr('Enter a valid date as YYYY-MM-DD.'); return }
+    savingRef.current = true
     setSaving(true); setErr(null)
-    const { error } = await logPayment({ contactId, userId, amount: amt, method, paidOn: date.trim() })
-    setSaving(false)
-    if (error) { setErr(error.message); return }
-    onClose()
-    onLogged?.()
+    try {
+      const { error } = await logPayment({ contactId, userId, amount: amt, method, paidOn: date.trim() })
+      if (error) { setErr(error.message); return }
+      onClose()
+      onLogged?.()
+    } catch { setErr("Couldn't save the payment. Check your connection and try again.") }
+    finally { savingRef.current = false; setSaving(false) }
   }
 
   return (
     <BottomSheet open={open} onClose={onClose} title="Record payment">
       {balance != null && balance > 0 ? (
-        <Text style={{ color: theme.inkMuted, fontSize: 14, marginBottom: 14 }}>Balance: ${Math.round(balance).toLocaleString()}</Text>
+        <Text style={{ color: theme.inkMuted, fontSize: 14, marginBottom: 14 }}>Balance: ${balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
       ) : null}
       <SheetField label="Amount ($)" value={amount} onChange={setAmount} keyboardType="numeric" placeholder="0" autoFocus />
 

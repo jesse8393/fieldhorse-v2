@@ -1,0 +1,167 @@
+{
+  "date": "2026-11-01",
+  "branch": "fix/full-app-audit-20261101",
+  "base_commit": "48676ff542dc6cd0d7a479e49c61715edcc0dfb3",
+  "prior_local_audit_commit": "107d4586e1344f796d4edb5f377e7ec1dc740759",
+  "source_digest": {
+    "algorithm": "sha256 of sorted relative path, NUL, then raw sha256 file digest",
+    "scope": "All tracked and proposed paths except docs/; includes tests, configuration and recovered SQL",
+    "file_count": 1115,
+    "sha256": "ed3a32e85cac1fc83fa204b03bf407f21616cd6d193300c2a3cded19272bde6b"
+  },
+  "checks": [
+    {
+      "check": "web_typescript",
+      "command": "npm run typecheck",
+      "result": "passed",
+      "exit_code": 0,
+      "evidence_log_sha256": "1108e0fb032c1ba3d15dfc3c9c89c7e577bd288de47fa969b43de79df659b706"
+    },
+    {
+      "check": "lint",
+      "command": "npm run lint",
+      "result": "passed",
+      "exit_code": 0,
+      "evidence_log_sha256": "06efcb535d28cbb68f459f03f4f81f17c483657bfdadad1e52cf5c88dd63cbd8",
+      "details": {
+        "errors": 0,
+        "warnings": 0
+      }
+    },
+    {
+      "check": "web_server_units",
+      "command": "npm test",
+      "result": "passed",
+      "exit_code": 0,
+      "evidence_log_sha256": "08bf2276040b3c3a2c334f2ed340469c8e6089fb6db36bd60c901f9c9e44e68e",
+      "details": {
+        "files": 159,
+        "passed": 1537
+      }
+    },
+    {
+      "check": "web_build",
+      "command": "npm run build",
+      "result": "passed",
+      "exit_code": 0,
+      "evidence_log_sha256": "a891bc372e6418810f2c90e12852d3f30a9623c432c97532410826cb8963f417"
+    },
+    {
+      "check": "native_typescript",
+      "command": "npm run typecheck --prefix mobile",
+      "result": "passed",
+      "exit_code": 0,
+      "evidence_log_sha256": "a6feb4dc575c22d361dcbac2702e3ef2133a3817fd97d0a7cc80b469a81bd3cd"
+    },
+    {
+      "check": "native_units",
+      "command": "npm run test:mobile",
+      "result": "passed",
+      "exit_code": 0,
+      "evidence_log_sha256": "20401984a9280b348fd22811d04c5925f0833dc0847af695837632ae2ff71c4c",
+      "details": {
+        "files": 5,
+        "passed": 39
+      }
+    },
+    {
+      "check": "native_bundles",
+      "command": "expo export --platform ios --platform android",
+      "result": "passed",
+      "exit_code": 0,
+      "evidence_log_sha256": "175c5b9007d956547749621bdfa7e9155444b43431f455e32dfe39eecc0f9a13",
+      "details": {
+        "platforms": [
+          "ios",
+          "android"
+        ],
+        "signed_binaries": false
+      }
+    },
+    {
+      "check": "design_source",
+      "command": "npm run audit:design",
+      "result": "passed",
+      "exit_code": 0,
+      "evidence_log_sha256": "fa8a07af58af48dc191c0ea2d11aaab0ae5747916751d73d107c126f4bc4856f"
+    },
+    {
+      "check": "rls_source",
+      "command": "npm run audit:rls",
+      "result": "passed",
+      "exit_code": 0,
+      "evidence_log_sha256": "5c22c3836b74c77d1337f8e752084f0feee70f9bcef957a1a58107e8fe2682ee"
+    },
+    {
+      "check": "isolated_sql",
+      "command": "npm run test:db",
+      "result": "passed",
+      "exit_code": 0,
+      "evidence_log_sha256": "6e0caea2621be443fd63d3a6cbf4f3cd0f615e440f875e9304904a685144ae5f",
+      "details": {
+        "passed": 192,
+        "billing_schedule": 59,
+        "inbox": 39,
+        "growth": 29,
+        "authorization_transitions": 30,
+        "quote_conversion": 20,
+        "record_relationships": 15,
+        "engine": "PGlite 0.5.12, PostgreSQL 18.6",
+        "independent_concurrency": "skipped; requires PostgreSQL sessions"
+      }
+    }
+  ],
+  "credential_scan": {
+    "result": "no signature matches",
+    "scope": "tracked and proposed decodable text",
+    "patterns": [
+      "private key headers",
+      "JWT",
+      "AWS access key IDs",
+      "Stripe live keys",
+      "GitHub token prefixes",
+      "OpenAI secret key prefixes"
+    ],
+    "limitation": "Not exhaustive secret detection"
+  },
+  "not_established": [
+    "Every-line manual source review",
+    "Independent database-session concurrency",
+    "Complete historical migration replay",
+    "Browser desktop and phone suites on this branch",
+    "Full Deno Edge typechecking",
+    "Physical native devices or signed binaries",
+    "Authenticated real-account/provider workflows",
+    "Financial column confidentiality",
+    "Transactional DocuSign completion and immutable sent snapshots",
+    "Compatibility of older native/PWA clients with composite FK migrations"
+  ],
+  "publication": {
+    "published": false,
+    "pr_created": false,
+    "reason": "Automatic approval review rejected branch publication; explicit user authorization requested only after concrete local work is ready"
+  },
+  "production_changes": false,
+  "coverage": {
+    "files": 1293,
+    "source_review": {
+      "not_individually_reviewed": 1197,
+      "targeted": 96
+    },
+    "category": {
+      "config/assets": 35,
+      "docs": 178,
+      "mobile": 81,
+      "server": 45,
+      "scripts": 25,
+      "web": 638,
+      "database": 123,
+      "tests": 168
+    }
+  },
+  "release_decision": "Not ready for unconditional sign-off",
+  "whitespace_check": {
+    "authored_source": "passed",
+    "recovered_sql": "16 original trailing blank lines preserved to keep captured-source checksums; no other diff --check findings"
+  }
+}

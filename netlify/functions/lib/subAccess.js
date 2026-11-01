@@ -30,6 +30,7 @@ export async function boundSubOrgIds(admin, userId) {
     .select('job_id')
     .eq('partner_user_id', userId)
     .eq('status', 'accepted')
+    .is('deleted_by_partner_at', null)
     .limit(MAX_PARTNER_ROWS)
   if (partnerErr) return { error: partnerErr }
 
@@ -94,9 +95,9 @@ export function sanitizeSubProfilePatch(fields) {
       return { error: 'invalid_field', detail: `${key} is too long.` }
     }
     if (key === 'insurance_expires_on' && v !== null) {
-      const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(v)
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v)
       const d = m ? new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))) : null
-      if (!d || !Number.isFinite(d.getTime()) || d.getUTCDate() !== Number(m[3])) {
+      if (!d || !Number.isFinite(d.getTime()) || d.getUTCFullYear() !== Number(m[1]) || d.getUTCMonth() + 1 !== Number(m[2]) || d.getUTCDate() !== Number(m[3])) {
         return { error: 'invalid_expires', detail: 'Insurance expiry must be a valid date.' }
       }
       v = `${m[1]}-${m[2]}-${m[3]}`

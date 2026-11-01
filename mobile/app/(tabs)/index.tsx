@@ -95,7 +95,7 @@ export default function HomeScreen() {
     [...jobs].filter((j) => ACTIVE.has(j.stage ?? '')).sort((a, b) => Number(b.amount || 0) - Number(a.amount || 0)).slice(0, 3)
   , [jobs])
 
-  const overdue = agenda?.overdue ?? []
+  const overdue = useMemo(() => agenda?.overdue ?? [], [agenda?.overdue])
   const todayEvents = agenda?.today ?? []
 
   const priorities = useMemo(() => ({
@@ -167,7 +167,8 @@ export default function HomeScreen() {
       const { status } = await Location.requestForegroundPermissionsAsync()
       if (status !== 'granted') { Alert.alert('Location needed', 'Enable location to show your local forecast.'); return }
       const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low })
-      await saveLocation({ userId: user.id, lat: pos.coords.latitude, lon: pos.coords.longitude })
+      const { error } = await saveLocation({ userId: user.id, lat: pos.coords.latitude, lon: pos.coords.longitude })
+      if (error) throw error
     } catch {
       Alert.alert('Could not get location', 'Try again outdoors or check permissions.')
     } finally {

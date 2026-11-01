@@ -2,7 +2,7 @@
 // :key is encodeURIComponent(phone||name lowercased). Create-on-demand
 // fh_sub_profiles, edit contact / insurance / business / payment / notes,
 // insurance-expiry badge, and read-only job history. Doc uploads defer.
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { View, Text, ScrollView, Pressable, ActivityIndicator, TextInput, Alert, Linking } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
@@ -50,7 +50,14 @@ export default function SubDetailScreen() {
   const [saving, setSaving] = useState(false)
   const profile = data?.profile ?? null
 
-  useEffect(() => { setForm(seed(profile)) }, [profile?.id])
+  const seededProfileId = useRef<string | null>(null)
+  useEffect(() => {
+    const profileId = profile?.id ?? null
+    if (seededProfileId.current === profileId) return
+    seededProfileId.current = profileId
+    // A background refresh of the same vendor must preserve unsaved edits.
+    setForm(seed(profile))
+  }, [profile])
 
   const dirty = useMemo(() => profile && JSON.stringify(form) !== JSON.stringify(seed(profile)), [form, profile])
   const set = (k: keyof Form) => (v: string) => setForm((f) => ({ ...f, [k]: v }))

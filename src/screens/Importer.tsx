@@ -131,7 +131,7 @@ export default function Importer() {
     fetchAllRows<ExistingLead>((from, to) =>
       supabase
         .from('fh_leads')
-        .select('id, title, fh_clients(name, phone, email)')
+        .select('id, title, fh_clients!fh_leads_client_id_fkey(name, phone, email)')
         .order('id', { ascending: true })
         .range(from, to)
     )
