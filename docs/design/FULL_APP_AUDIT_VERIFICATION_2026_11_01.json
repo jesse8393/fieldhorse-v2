@@ -5,7 +5,7 @@
   "prior_local_audit_commit": "107d4586e1344f796d4edb5f377e7ec1dc740759",
   "source_digest": {
     "algorithm": "sha256 of sorted relative path, NUL, then raw sha256 file digest",
-    "scope": "All tracked and proposed paths except docs/; includes tests, configuration and recovered SQL",
+    "scope": "Initial published audit tree, commit 223eb0d18defab9ad20fd0bd71ff6649ab393d49, before the CI dependency resolution followup. All tracked paths except docs/.",
     "file_count": 1115,
     "sha256": "ed3a32e85cac1fc83fa204b03bf407f21616cd6d193300c2a3cded19272bde6b"
   },
@@ -137,9 +137,14 @@
     "Compatibility of older native/PWA clients with composite FK migrations"
   ],
   "publication": {
-    "published": false,
-    "pr_created": false,
-    "reason": "Automatic approval review rejected branch publication; explicit user authorization requested only after concrete local work is ready"
+    "published": true,
+    "pr_created": true,
+    "pr_number": 234,
+    "pr_url": "https://github.com/jesse8393/fieldhorse-v2/pull/234",
+    "draft": true,
+    "approved_by_user": true,
+    "initial_published_sha": "223eb0d18defab9ad20fd0bd71ff6649ab393d49",
+    "initial_tree_matches_local": true
   },
   "production_changes": false,
   "coverage": {
@@ -163,5 +168,12 @@
   "whitespace_check": {
     "authored_source": "passed",
     "recovered_sql": "16 original trailing blank lines preserved to keep captured-source checksums; no other diff --check findings"
+  },
+  "local_baseline_commit": "223eb0d18defab9ad20fd0bd71ff6649ab393d49",
+  "ci_followup": {
+    "initial_run_id": 41340960775,
+    "initial_edge_failure": "Deno inherited manual node_modules resolution; transitive OpenAI types missing",
+    "correction": "Resolve Edge npm dependencies through Deno global cache using node-modules-dir=none",
+    "verification": "pending new CI run"
   }
 }

@@ -57,7 +57,7 @@ Sixteen original migration records covering growth 070–079 and the six Jobber 
 
 ## Verification at this checkpoint
 
-The accompanying machine-readable verification record ties the following results to a digest of the audited source tree. All checks are local. The branch is not published and no new PR or CI result exists. Automatic approval review rejected publishing it, including after the remote repository was verified. No alternative publication path was attempted.
+The accompanying machine-readable verification record ties the local results below to the initial published source tree. After explicit user approval, the branch was published as draft PR #234 with a tree matching the verified local files. CI run 41340960775 started. Its first Edge check exposed inherited manual npm resolution, which prevented loading transitive OpenAI types. The CI command now uses Deno global dependency resolution; a new run must verify that correction. Earlier publication rejection is resolved.
 
 | Check | Evidence | Limit |
 | --- | --- | --- |
@@ -90,4 +90,4 @@ Additional reviewed risks needing follow-up include invited-member re-entry afte
 
 ## Release sequence
 
-The branch is local. After explicit publication approval, open a draft PR and keep it in draft while blockers remain. Obtain a reproducible staging schema, resolve financial column access and native/data workflow blockers, run final-head CI, validate migrations and provider behavior against authorized test accounts, and perform physical-phone checks. Only then approve a production merge/deployment. This branch does not authorize or perform that release.
+Draft PR #234 is open after explicit publication approval. Keep it in draft while blockers remain. Obtain a reproducible staging schema, resolve financial column access and native/data workflow blockers, run final-head CI, validate migrations and provider behavior against authorized test accounts, and perform physical-phone checks. Only then approve a production merge/deployment. This branch does not authorize or perform that release.
