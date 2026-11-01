@@ -4,8 +4,14 @@ import { canActOnRow, loadAccessibleRow, brandingUserIdFor, SENDER_ROLES } from 
 const ORG = 'org-1'
 
 describe('send access rule', () => {
-  it('lets the row creator act without a membership lookup', () => {
-    expect(canActOnRow({ user_id: 'u1', org_id: ORG }, 'u1', null)).toBe(true)
+  it('allows creator ownership only for legacy rows without a company', () => {
+    expect(canActOnRow({ user_id: 'u1', org_id: null }, 'u1', null)).toBe(true)
+    expect(canActOnRow({ user_id: 'u1', org_id: ORG }, 'u1', null)).toBe(false)
+  })
+
+  it('refuses revoked or demoted creators of company records', () => {
+    for (const role of ['crew', 'foreman']) expect(canActOnRow({ user_id: 'u1', org_id: ORG }, 'u1', { role })).toBe(false)
+    expect(canActOnRow({ user_id: 'u1', org_id: ORG }, 'u1', { role: 'owner', revoked_at: '2026-11-01' })).toBe(false)
   })
 
   it('lets owners, admins and managers of the row org act', () => {
@@ -79,6 +85,21 @@ describe('loadAccessibleRow', () => {
   it('refuses a missing row', async () => {
     const res = await loadAccessibleRow(fakeClient(tables), { table: 'fh_contacts', id: 'nope', callerId: 'creator', select: 'name' })
     expect(res.error).toBe('forbidden_or_not_found')
+  })
+
+  it('cannot bypass membership revocation by being the original creator', async () => {
+    for (const membership of [null, { role: 'crew', revoked_at: null }, { role: 'owner', revoked_at: '2026-11-01' }]) {
+      const db = fakeClient({ ...tables, org_members: membership ? [{ ...membership, user_id: 'creator', org_id: ORG }] : [] })
+      const result = await loadAccessibleRow(db, { table: 'fh_contacts', id: 'job-1', callerId: 'creator', select: 'name' })
+      expect(result.error).toBe('forbidden_or_not_found')
+    }
+  })
+
+  it('keeps an active manager creator and a legacy solo creator working', async () => {
+    const db = fakeClient({ ...tables, org_members: [{ role: 'manager', revoked_at: null, user_id: 'creator', org_id: ORG }] })
+    expect((await loadAccessibleRow(db, { table: 'fh_contacts', id: 'job-1', callerId: 'creator', select: 'name' })).row?.id).toBe('job-1')
+    const solo = fakeClient({ fh_contacts: [{ id: 'solo-job', user_id: 'solo', org_id: null }] })
+    expect((await loadAccessibleRow(solo, { table: 'fh_contacts', id: 'solo-job', callerId: 'solo', select: 'name' })).row?.id).toBe('solo-job')
   })
 
   it('brands documents with the earliest active owner', async () => {

@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { planAccountDeletion, TEAM_TABLES } from '../../netlify/functions/delete-account.js'
+import { describe, expect, it, vi } from 'vitest'
+import { planAccountDeletion, retainedPathsForSharedOrgs, listAllObjects, TEAM_TABLES } from '../../netlify/functions/delete-account.js'
 
 const ORG_A = 'org-a'
 const ORG_B = 'org-b'
@@ -76,8 +76,47 @@ describe('account deletion plan', () => {
     for (const personal of ['fh_time_punches', 'fh_push_subscriptions', 'fh_notifications', 'profiles']) {
       expect(TEAM_TABLES).not.toContain(personal)
     }
-    for (const team of ['fh_contacts', 'fh_clients', 'fh_invoices', 'fh_payments', 'fh_job_files']) {
+    for (const team of ['fh_contacts', 'fh_clients', 'fh_leads', 'fh_quotes', 'fh_invoices', 'fh_payments', 'fh_job_files']) {
       expect(TEAM_TABLES).toContain(team)
     }
+  })
+
+  it('preserves a revoked member’s records with the current owner and blocks an unowned former company', () => {
+    const memberships = [{ org_id: ORG_A, role: 'crew', revoked_at: '2026-11-01' }]
+    expect(planAccountDeletion({ memberships, teammates: [{ org_id: ORG_A, user_id: 'owner', role: 'owner' }] }).handoffs).toEqual([{ orgId: ORG_A, successorId: 'owner' }])
+    const blocked = planAccountDeletion({ memberships, teammates: [] })
+    expect(blocked.soloOrgIds).toEqual([])
+    expect(blocked.blocked).toHaveLength(1)
+  })
+})
+
+describe('shared file preservation during account deletion', () => {
+  function db(failTable?: string) {
+    const tables: Record<string, any[]> = {
+      fh_job_files: Array.from({ length: 501 }, (_, i) => ({ id: String(i), user_id: 'successor', storage_path: `departing/job/file-${i}` })),
+      fh_daily_logs: [{ id: 'log', photos: [{ storage_path: 'departing/job/photo' }] }],
+      fh_sub_profiles: [{ id: 'sub', coi_path: 'departing/sub/coi', w9_path: 'departing/sub/w9' }],
+    }
+    return { from(table: string) {
+      const query: any = { select: () => query, in: () => query, order: () => query, range: async (from: number, to: number) =>
+        ({ data: tables[table].slice(from, to + 1), error: table === failTable ? new Error('lookup failed') : null }) }
+      return query
+    } }
+  }
+  it('keeps every page, including files reassigned on a previous attempt and vendor documents', async () => {
+    const paths = await retainedPathsForSharedOrgs(db(), 'departing', [ORG_A])
+    expect(paths.size).toBe(504)
+    expect(paths.has('departing/job/file-500')).toBe(true)
+    expect(paths.has('departing/sub/w9')).toBe(true)
+  })
+  it.each(['fh_job_files', 'fh_daily_logs', 'fh_sub_profiles'])('stops when %s retention cannot be verified', async table => {
+    await expect(retainedPathsForSharedOrgs(db(table), 'departing', [ORG_A])).rejects.toThrow('lookup failed')
+  })
+  it('lists past the storage API page limit', async () => {
+    const entries = Array.from({ length: 1001 }, (_, i) => ({ id: String(i), name: `file-${i}` }))
+    const list = vi.fn(async (_: string, opts: { offset: number; limit: number }) => ({ data: entries.slice(opts.offset, opts.offset + opts.limit), error: null }))
+    const objects = await listAllObjects({ storage: { from: () => ({ list }) } }, 'job-files', 'departing')
+    expect(objects).toHaveLength(1001)
+    expect(list).toHaveBeenCalledTimes(2)
   })
 })

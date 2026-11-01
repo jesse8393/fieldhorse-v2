@@ -68,6 +68,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Typecheck native app before building
+        run: npm run typecheck
+
       # Tag pushes -> production iOS build + auto-submit.
       # Manual runs -> use the chosen platform/profile, submit if requested.
       - name: Build (tag release)

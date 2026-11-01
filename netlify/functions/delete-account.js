@@ -38,13 +38,14 @@
 //   SUPABASE_SERVICE_ROLE_KEY   — server-only; bypasses RLS + enables auth admin
 
 import { createClient } from '@supabase/supabase-js'
+import { readAllRows } from './lib/pagedRows.js'
 
 // Tables whose rows belong to the company's book of business. In a shared
 // company, rows the caller created here are reassigned to the successor.
 // Every one has user_id with ON DELETE CASCADE to auth.users, so anything
 // not reassigned is removed with the account.
 export const TEAM_TABLES = [
-  'fh_contacts', 'fh_clients', 'fh_quote_items', 'fh_quote_versions',
+  'fh_contacts', 'fh_clients', 'fh_leads', 'fh_quotes', 'fh_quote_items', 'fh_quote_versions',
   'fh_change_orders', 'fh_invoices', 'fh_payments', 'fh_expenses',
   'fh_mileage', 'fh_inspections', 'fh_insurance_claims', 'fh_closeouts',
   'fh_esign_envelopes', 'fh_public_links', 'fh_public_link_events',
@@ -64,14 +65,14 @@ const USER_BUCKETS = ['job-files', 'job-photos', 'sub-docs', 'logos', 'company-l
  * Decide, per company, what happens when `userId` deletes their account.
  * Pure so it can be unit tested.
  *
- * memberships: the caller's active org_members rows [{ org_id, role }]
+ * memberships: all caller org_members rows, including revoked memberships.
  * teammates:   other active members of those orgs [{ org_id, user_id, role, joined_at }]
  * orgNames:    { [org_id]: name } for error messages
  *
  * Returns { soloOrgIds, handoffs: [{ orgId, successorId }], blocked: [{ orgId, orgName }] }
  *
  * @param {{
- *   memberships?: Array<{ org_id: string, role: string }>,
+ *   memberships?: Array<{ org_id: string, role: string, revoked_at?: string | null }>,
  *   teammates?: Array<{ org_id: string, user_id: string, role: string, joined_at?: string | null }>,
  *   orgNames?: Record<string, string>,
  * }} input
@@ -91,6 +92,12 @@ export function planAccountDeletion({ memberships = [], teammates = [], orgNames
         return String(a.joined_at || '').localeCompare(String(b.joined_at || ''))
       })
     if (others.length === 0) {
+      // A former member has no authority to erase a company with no active
+      // successor. Resolve its records before allowing the auth-user cascade.
+      if (m.revoked_at) {
+        blocked.push({ orgId: m.org_id, orgName: orgNames[m.org_id] || 'your former company' })
+        continue
+      }
       soloOrgIds.push(m.org_id)
       continue
     }
@@ -113,20 +120,20 @@ export function planAccountDeletion({ memberships = [], teammates = [], orgNames
 // storage list API is one directory deep and returns nested folders as
 // entries whose `id` is null, so we recurse into those. Best-effort: on any
 // error we return what we have so a partial listing still gets cleaned up.
-async function listAllObjects(supabase, bucket, prefix) {
+export async function listAllObjects(supabase, bucket, prefix) {
   const out = []
   const stack = [prefix]
   while (stack.length > 0) {
     const dir = stack.pop()
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .list(dir, { limit: 1000 })
-    if (error || !Array.isArray(data)) continue
-    for (const entry of data) {
-      const full = dir ? `${dir}/${entry.name}` : entry.name
-      // A null id marks a folder; a real id marks a file object.
-      if (entry.id === null || entry.id === undefined) stack.push(full)
-      else out.push({ bucket, path: full })
+    for (let offset = 0; ; offset += 1000) {
+      const { data, error } = await supabase.storage.from(bucket).list(dir, { limit: 1000, offset, sortBy: { column: 'name', order: 'asc' } })
+      if (error) throw error
+      for (const entry of data || []) {
+        const full = dir ? `${dir}/${entry.name}` : entry.name
+        if (entry.id === null || entry.id === undefined) stack.push(full)
+        else out.push({ bucket, path: full })
+      }
+      if ((data || []).length < 1000) break
     }
   }
   return out
@@ -135,24 +142,28 @@ async function listAllObjects(supabase, bucket, prefix) {
 // Paths in shared companies that teammates still need after the caller
 // leaves: job files and daily log photos the caller uploaded there. Their
 // rows are reassigned, so the objects must survive the storage purge.
-async function retainedPathsForSharedOrgs(supabase, userId, sharedOrgIds) {
+export async function retainedPathsForSharedOrgs(supabase, userId, sharedOrgIds) {
   const keep = new Set()
   if (sharedOrgIds.length === 0) return keep
-  const { data: files } = await supabase
-    .from('fh_job_files')
-    .select('storage_path')
-    .eq('user_id', userId)
-    .in('org_id', sharedOrgIds)
-  for (const f of files || []) if (f?.storage_path) keep.add(f.storage_path)
-  const { data: logs } = await supabase
-    .from('fh_daily_logs')
-    .select('photos')
-    .eq('user_id', userId)
-    .in('org_id', sharedOrgIds)
+  const load = async (table, fields) => {
+    // Include rows handed off by an earlier attempt: storage paths still use
+    // the departing user's prefix after their row's user_id changes.
+    const result = await readAllRows((from, to) => supabase.from(table).select(fields).in('org_id', sharedOrgIds).order('id').range(from, to))
+    if (result.error) throw result.error
+    return result.data || []
+  }
+  const files = await load('fh_job_files', 'id, storage_path')
+  for (const f of files) if (f?.storage_path) keep.add(f.storage_path)
+  const logs = await load('fh_daily_logs', 'id, photos')
   for (const log of logs || []) {
     for (const p of Array.isArray(log?.photos) ? log.photos : []) {
       if (p && typeof p.storage_path === 'string') keep.add(p.storage_path)
     }
+  }
+  const subs = await load('fh_sub_profiles', 'id, coi_path, w9_path')
+  for (const sub of subs) {
+    if (sub.coi_path) keep.add(sub.coi_path)
+    if (sub.w9_path) keep.add(sub.w9_path)
   }
   return keep
 }
@@ -189,11 +200,10 @@ export default async (request) => {
   const userId = userData.user.id
 
   // 1. Work out what happens to each company before touching anything.
-  const { data: memberships, error: memErr } = await supabase
-    .from('org_members')
-    .select('org_id, role')
-    .eq('user_id', userId)
-    .is('revoked_at', null)
+  // Revocation does not remove user_id cascade references. Former company
+  // records require the same handoff before deleting the auth account.
+  const { data: memberships, error: memErr } = await readAllRows((from, to) => supabase
+    .from('org_members').select('org_id, role, revoked_at').eq('user_id', userId).order('org_id').range(from, to))
   if (memErr) {
     console.error('[delete-account] membership lookup failed', memErr)
     return json({ error: 'lookup_failed', message: 'Could not load your company memberships. Try again.' }, 500)
@@ -203,12 +213,12 @@ export default async (request) => {
   let orgNames = {}
   if (orgIds.length > 0) {
     const [{ data: others, error: othersErr }, { data: orgs }] = await Promise.all([
-      supabase
+      readAllRows((from, to) => supabase
         .from('org_members')
         .select('org_id, user_id, role, joined_at')
         .in('org_id', orgIds)
         .is('revoked_at', null)
-        .neq('user_id', userId),
+        .neq('user_id', userId).order('org_id').order('user_id').range(from, to)),
       supabase.from('organizations').select('id, name').in('id', orgIds)
     ])
     if (othersErr) {
@@ -224,7 +234,7 @@ export default async (request) => {
     const names = plan.blocked.map((b) => b.orgName).join(', ')
     return json({
       error: 'transfer_ownership_required',
-      message: `You are the only owner of ${names}. Make another team member an owner in Team settings first, so the company and its records stay with your team.`,
+      message: `The records in ${names} need an active owner before your account can be deleted. Arrange an ownership handoff with the company or support, so its records stay with the team.`,
       orgs: plan.blocked
     }, 409)
   }
@@ -248,7 +258,7 @@ export default async (request) => {
         .update({ user_id: successorId })
         .eq('user_id', userId)
         .eq('org_id', orgId)
-      if (error && error.code !== '42703' && error.code !== '42P01') {
+      if (error && error.code !== '42P01') {
         handoffWarnings.push({ table, message: error.message })
       }
     }
@@ -302,7 +312,8 @@ export default async (request) => {
   }
 
   // 7. Storage, skipping files teammates still reference.
-  const toRemove = objects.filter((o) => !retained.has(o.path))
+  // Shared approved documents can still reference the departing user's logo.
+  const toRemove = objects.filter((o) => !retained.has(o.path) && !(sharedOrgIds.length && ['logos', 'company-logos'].includes(o.bucket)))
   const byBucket = new Map()
   for (const o of toRemove) {
     if (!byBucket.has(o.bucket)) byBucket.set(o.bucket, [])

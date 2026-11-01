@@ -9,6 +9,7 @@
     "tests/e2e",
     "playwright.config.ts",
     "playwright.workflow.config.ts",
-    "vitest.config.ts"
+    "vitest.config.ts",
+    "vitest.mobile.config.ts"
   ]
 }

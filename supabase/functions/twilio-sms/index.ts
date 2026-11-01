@@ -12,8 +12,7 @@ Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return text("ok");
   const { data: p } = await readBody(req);
   const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
-  const validate = (Deno.env.get("TWILIO_VALIDATE_SIGNATURE") ?? "true") !== "false";
-  if (validate && !(await twilioSignatureOk(req, p, authToken))) {
+  if (!(await twilioSignatureOk(req, p, authToken))) {
     log("twilio-sms", "bad signature", { url: req.url });
     return text("forbidden", 403);
   }

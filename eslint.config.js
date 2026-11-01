@@ -45,7 +45,9 @@ export default [
       'dev-dist/**',
       'node_modules/**',
       'public/**',
-      'mobile/**',
+      'mobile/node_modules/**',
+      'mobile/dist/**',
+      'mobile/.expo/**',
       'supabase/migrations/**',
       'test_out/**',
       '_reference/**',
@@ -60,6 +62,11 @@ export default [
     ],
   },
   js.configs.recommended,
+  {
+    files: ['mobile/*.js'],
+    languageOptions: { sourceType: 'commonjs', globals: { ...globals.node } },
+    rules: { 'no-undef': 'error' },
+  },
   {
     languageOptions: {
       ecmaVersion: 'latest',

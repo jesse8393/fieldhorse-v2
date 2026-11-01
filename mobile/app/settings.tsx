@@ -167,7 +167,10 @@ export default function SettingsScreen() {
   function confirmSignOut() {
     Alert.alert('Sign out?', 'You will need to sign in again.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign out', style: 'destructive', onPress: () => signOut() }
+      { text: 'Sign out', style: 'destructive', onPress: async () => {
+        try { await signOut() }
+        catch { Alert.alert("Couldn't sign out", 'Check your connection and try again.') }
+      } }
     ])
   }
 

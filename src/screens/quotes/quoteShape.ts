@@ -20,7 +20,7 @@ export type QuoteClientRow = {
 /** An fh_quotes row with the client the mock and the live read embed. */
 export type QuoteWithClient = QuoteRow & { fh_clients?: QuoteClientRow | null }
 
-export const QUOTE_SELECT = '*, fh_clients(id, name, phone, email, address)'
+export const QUOTE_SELECT = '*, fh_clients!fh_quotes_client_id_fkey(id, name, phone, email, address)'
 
 /**
  * The contact shaped object DocumentPreviewPane, generateQuote and

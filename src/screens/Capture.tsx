@@ -146,13 +146,13 @@ export default function Capture() {
           .limit(100),
         canCreateFinancialDocs ? supabase
           .from('fh_leads')
-          .select('id,user_id,origin_contact_id,title,fh_clients(name)')
+          .select('id,user_id,origin_contact_id,title,fh_clients!fh_leads_client_id_fkey(name)')
           .neq('status', 'lost')
           .order('updated_at', { ascending: false })
           .limit(100) : Promise.resolve({ data: [] }),
         canCreateFinancialDocs ? supabase
           .from('fh_quotes')
-          .select('id,user_id,origin_contact_id,title,amount,fh_clients(name)')
+          .select('id,user_id,origin_contact_id,title,amount,fh_clients!fh_quotes_client_id_fkey(name)')
           .not('status', 'in', '("approved","rejected","expired","lost")')
           .order('updated_at', { ascending: false })
           .limit(100) : Promise.resolve({ data: [] })

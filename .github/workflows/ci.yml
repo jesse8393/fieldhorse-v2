@@ -1,5 +1,5 @@
-# Web app CI. Guards the web app (root package.json); the separate
-# eas-build.yml owns the mobile/ Expo app.
+# Web, database and native source checks. Store signing/submission remains
+# in the manually triggered eas-build.yml; this workflow does not deploy.
 #
 # Every check a contributor can run locally runs here too: lint, the two
 # repo audits, typecheck, unit tests, production build, and the Playwright
@@ -20,6 +20,56 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  edge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.6
+      - name: Typecheck every Supabase Edge Function
+        working-directory: supabase/functions
+        run: deno check --node-modules-dir=none --lock=deno.lock */index.ts
+      - name: Preserve resolved Edge Function dependencies
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: edge-dependency-lock
+          path: supabase/functions/deno.lock
+          if-no-files-found: ignore
+          retention-days: 7
+
+  mobile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            mobile/package-lock.json
+      - name: Install test tools
+        run: npm ci
+      - name: Install native dependencies
+        run: npm ci --prefix mobile
+      - name: Native TypeScript
+        run: npm run typecheck --prefix mobile
+      - name: Native data and session regressions
+        run: npm run test:mobile
+      - name: Export iOS and Android JavaScript bundles
+        working-directory: mobile
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: synthetic_ci_key
+          EXPO_NO_DOTENV: 1
+        run: npx expo export --platform ios --platform android
+
   check:
     runs-on: ubuntu-latest
     services:

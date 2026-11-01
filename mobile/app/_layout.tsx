@@ -15,6 +15,7 @@ import { StatusBar } from 'expo-status-bar'
 import { queryClient } from '../lib/queryClient'
 import { AuthProvider, useAuth } from '../contexts/AuthContext'
 import { useProfile } from '../lib/queries'
+import { DataLoadBoundary } from '../components/DataLoadBoundary'
 
 // Redirect gate: keeps the user on /login until there's a session, routes
 // signed-in-but-unonboarded users to /onboarding, and otherwise lands them
@@ -41,7 +42,7 @@ function useAuthGate() {
     } else if (onLogin || onOnboarding) {
       router.replace('/')
     }
-  }, [session, user?.id, profile?.onboarded_at, profilePending, loading, segments])
+  }, [session, user?.id, profile?.onboarded_at, profilePending, loading, segments, router])
 }
 
 function RootNavigator() {
@@ -89,6 +90,12 @@ function RootNavigator() {
   )
 }
 
+function SessionNavigator() {
+  const { user } = useAuth()
+  // Discard form state and mounted observers when another account signs in.
+  return <RootNavigator key={user?.id ?? 'signed-out'} />
+}
+
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#141414' }}>
@@ -96,7 +103,7 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <StatusBar style="light" />
-            <RootNavigator />
+            <DataLoadBoundary><SessionNavigator /></DataLoadBoundary>
           </AuthProvider>
         </QueryClientProvider>
       </SafeAreaProvider>

@@ -1,0 +1,103 @@
+{
+  "source": "Supabase migration history, read only on 2026-11-01",
+  "contains_customer_rows": false,
+  "active_migration_directory": false,
+  "files": [
+    {
+      "path": "supabase/reference/deployed_migrations/20260920200841_070_growth_core.sql",
+      "sha256": "be768b063cba2e0954640986a7d90d8a66329c4ecee95fbb1c6a6ecf3815b222",
+      "bytes": 31121,
+      "review": "captured original source; credential-pattern scan only; not individually reviewed"
+    },
+    {
+      "path": "supabase/reference/deployed_migrations/20260920201417_071_growth_automation.sql",
+      "sha256": "a1ce84b9897ce9eef024b35b232d612ae26fab9862bbef321d22d680501a8638",
+      "bytes": 91178,
+      "review": "captured original source; credential-pattern scan only; not individually reviewed"
+    },
+    {
+      "path": "supabase/reference/deployed_migrations/20260920201615_072_growth_event_triggers.sql",
+      "sha256": "7740f65dd8b287f157282048f7e2537e4ecfffa571b25bad5a6fb0068bd8b502",
+      "bytes": 9191,
+      "review": "captured original source; credential-pattern scan only; not individually reviewed"
+    },
+    {
+      "path": "supabase/reference/deployed_migrations/20260920202322_073_growth_capture_booking_campaigns.sql",
+      "sha256": "240d0088d126ba12a2d61209a1c21f552dff552d85153ff536323c6959ce4c74",
+      "bytes": 52208,
+      "review": "captured original source; credential-pattern scan; selected segment/campaign authorization paths reviewed"
+    },
+    {
+      "path": "supabase/reference/deployed_migrations/20260920202552_074_growth_snapshots_seeds.sql",
+      "sha256": "cdcfe534d8088b2ca08d56f1c5d07a242de1c8942452c846e3b6632717870fdb",
+      "bytes": 15870,
+      "review": "captured original source; credential-pattern scan only; not individually reviewed"
+    },
+    {
+      "path": "supabase/reference/deployed_migrations/20260920203722_075_growth_schedule.sql",
+      "sha256": "93367ddf8efdbb33acded90004f3f89abed8372d0a4bc4588fd08ac6c0a61ac4",
+      "bytes": 1608,
+      "review": "captured original source; credential-pattern scan only; not individually reviewed"
+    },
+    {
+      "path": "supabase/reference/deployed_migrations/20260920204815_076_growth_hardening.sql",
+      "sha256": "07decd229a33a650a1f46507ee3b7eb123abb308b9fafcd36df733fefc113e19",
+      "bytes": 8869,
+      "review": "captured original source; credential-pattern scan only; not individually reviewed"
+    },
+    {
+      "path": "supabase/reference/deployed_migrations/20260920205959_077_growth_messenger.sql",
+      "sha256": "e8c0cc1144acaa8bbaee9966292b725af8d4e477aee8d8d58fc24f77e905e82e",
+      "bytes": 11710,
+      "review": "captured original source; credential-pattern scan only; not individually reviewed"
+    },
+    {
+      "path": "supabase/reference/deployed_migrations/20260921000714_078_growth_app_surface.sql",
+      "sha256": "f3e35ab9d2c13e5c6d4287056c05866de450530fd0d9f29747eca599b5b297fc",
+      "bytes": 3364,
+      "review": "captured original source; credential-pattern scan only; not individually reviewed"
+    },
+    {
+      "path": "supabase/reference/deployed_migrations/20260921011143_079_growth_corrections.sql",
+      "sha256": "25676d192c73dc059ecc472ccdecc61b5ce79b8acf853602debddbfb417a446f",
+      "bytes": 16458,
+      "review": "captured original source; credential-pattern scan; selected segment/campaign authorization paths reviewed"
+    },
+    {
+      "path": "supabase/reference/deployed_migrations/20260921233757_080_jobber_sync_part1_tables_helpers.sql",
+      "sha256": "ed887964a2a8263b3de4fa52a7bcbc3c6b0f44b1ea91512dc6773fa7e012d047",
+      "bytes": 12998,
+      "review": "captured original source; credential-pattern scan only; not individually reviewed"
+    },
+    {
+      "path": "supabase/reference/deployed_migrations/20260921233840_080_jobber_sync_part2_client_request.sql",
+      "sha256": "9b360e4b0ac7f9d25be6b41c0bf533e84f1ab95db2dd36b18716c935ef0b7981",
+      "bytes": 10151,
+      "review": "captured original source; credential-pattern scan only; not individually reviewed"
+    },
+    {
+      "path": "supabase/reference/deployed_migrations/20260921233928_080_jobber_sync_part3_quote_job.sql",
+      "sha256": "124f8251d5e35348bc3b816959d889749bb9384e7060999d7e952d8664f820bf",
+      "bytes": 10769,
+      "review": "captured original source; credential-pattern scan only; not individually reviewed"
+    },
+    {
+      "path": "supabase/reference/deployed_migrations/20260921234013_080_jobber_sync_part4_invoice_visit_dispatch.sql",
+      "sha256": "e02d4f4895ebabd2e633cd47c28ffc6f97813ef1c4321c64d9aecdd3734dbf59",
+      "bytes": 10727,
+      "review": "captured original source; credential-pattern scan only; not individually reviewed"
+    },
+    {
+      "path": "supabase/reference/deployed_migrations/20260921234129_080_jobber_sync_part5_connection_events_sync.sql",
+      "sha256": "64cef225f460f2e2c0e0b92a106c128c9c0b3db37065403baeea9fee34fbc334",
+      "bytes": 20493,
+      "review": "captured original source; credential-pattern scan only; not individually reviewed"
+    },
+    {
+      "path": "supabase/reference/deployed_migrations/20260921234153_080_jobber_sync_part6_sweep_grants.sql",
+      "sha256": "20adb27f9fd23741265038322bc82c293e4c054430bed938723cecc6b1457a38",
+      "bytes": 4594,
+      "review": "captured original source; credential-pattern scan only; not individually reviewed"
+    }
+  ]
+}

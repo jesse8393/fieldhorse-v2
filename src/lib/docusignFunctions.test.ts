@@ -187,3 +187,49 @@ describe('DocuSign completion records the approval', () => {
     currentFake = null
   })
 })
+
+describe('DocuSign webhook authentication and malformed events', () => {
+  beforeEach(() => {
+    vi.stubEnv('SUPABASE_URL', 'https://example.supabase.co')
+    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'synthetic_service')
+    vi.stubEnv('DOCUSIGN_CONNECT_HMAC_KEY', '')
+    vi.stubEnv('DOCUSIGN_REQUIRE_HMAC', '')
+  })
+  afterEach(() => { vi.unstubAllEnvs(); currentFake = null })
+  it('legacy unsigned configuration cannot approve an envelope', async () => {
+    vi.stubEnv('DOCUSIGN_ALLOW_UNSIGNED', '1')
+    const res = await webhookHandler(new Request('https://example.test/api/docusign-webhook', {
+      method: 'POST', body: JSON.stringify({ envelopeId: 'unknown', status: 'completed' })
+    }))
+    expect(res.status).toBe(401)
+    expect(await res.text()).toBe('hmac_not_configured')
+  })
+  it('bad signatures cannot reach persistence', async () => {
+    vi.stubEnv('DOCUSIGN_CONNECT_HMAC_KEY', 'synthetic_hmac')
+    const res = await webhookHandler(new Request('https://example.test/api/docusign-webhook', {
+      method: 'POST', headers: { 'x-docusign-signature-1': 'invalid' }, body: '{}'
+    }))
+    expect(res.status).toBe(401)
+  })
+  it('a signed malformed status returns a controlled error', async () => {
+    vi.stubEnv('DOCUSIGN_CONNECT_HMAC_KEY', 'synthetic_hmac')
+    const raw = JSON.stringify({ envelopeId: 'envelope', status: { completed: true } })
+    const signature = crypto.createHmac('sha256','synthetic_hmac').update(raw).digest('base64')
+    const res = await webhookHandler(new Request('https://example.test/api/docusign-webhook', {
+      method: 'POST', headers: { 'x-docusign-signature-1': signature }, body: raw
+    }))
+    expect(res.status).toBe(400)
+  })
+  it('database lookup failures remain retryable', async () => {
+    vi.stubEnv('DOCUSIGN_CONNECT_HMAC_KEY', 'synthetic_hmac')
+    const chain: any = new Proxy({}, { get: (_,key) => key === 'maybeSingle'
+      ? async () => ({ data: null, error: { message: 'Database unavailable' } }) : () => chain })
+    currentFake = { from: () => chain } as any
+    const raw = JSON.stringify({ envelopeId: 'envelope', status: 'completed' })
+    const signature = crypto.createHmac('sha256','synthetic_hmac').update(raw).digest('base64')
+    const res = await webhookHandler(new Request('https://example.test/api/docusign-webhook', {
+      method: 'POST', headers: { 'x-docusign-signature-1': signature }, body: raw
+    }))
+    expect(res.status).toBe(503)
+  })
+})

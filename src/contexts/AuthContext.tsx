@@ -9,6 +9,7 @@ import { flushOutbox, clearOutbox } from '../lib/outbox.ts'
 import { flushOutbox as flushCaptureOutbox, clearCaptureOutbox } from '../lib/captureOutbox.ts'
 import { disablePush, unsubscribePushLocally } from '../lib/push.ts'
 import { toastError } from '../lib/toast.ts'
+import { createAuthSessionBoundary } from '../lib/authSessionBoundary.ts'
 
 // How long sign out waits for queued offline work to sync, and for this
 // device's push subscription to be removed, before carrying on.
@@ -83,43 +84,28 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
-  // Tracks whether a session was ever established, so we can purge on a
-  // session→null transition without firing on the initial null.
-  const hadSessionRef = useRef(false)
+  const boundaryRef = useRef<ReturnType<typeof createAuthSessionBoundary<Session>> | null>(null)
 
   useEffect(() => {
-    let mounted = true
-    void supabase.auth.getSession()
+    const boundary = createAuthSessionBoundary<Session>({
+      purge: purgeLocalData,
+      hold: () => { setSession(null); setLoading(true) },
+      publish: (next) => { setSession(next); setLoading(false) },
+    })
+    boundaryRef.current = boundary
+    void boundary.restore(supabase.auth.getSession()
       .then(({ data, error }) => {
-        if (!mounted) return
         if (error) console.warn('[fieldhorse] Could not restore the saved session:', error.message)
-        setSession(data.session)
-        hadSessionRef.current = !!data.session
+        return error ? null : data.session
       })
       .catch((error) => {
-        if (!mounted) return
         console.warn('[fieldhorse] Could not read the saved session:', error)
-        setSession(null)
-        hadSessionRef.current = false
-      })
-      .finally(() => {
-        if (mounted) setLoading(false)
-      })
-    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
-      setSession(s)
-      // A SIGNED_OUT event (token expiry, remote revocation, sign-out in
-      // another tab), or any transition from an established session to
-      // null, must purge the local book too, not just the app's own
-      // signOut(). Guard the initial null so we never purge before anyone
-      // signed in. Best-effort + async-safe (purgeLocalData swallows its
-      // own errors).
-      if (event === 'SIGNED_OUT' || (hadSessionRef.current && !s)) {
-        void purgeLocalData()
-      }
-      hadSessionRef.current = !!s
-    })
+        return null
+      }))
+    const { data: sub } = supabase.auth.onAuthStateChange((event, next) => boundary.update(event, next))
     return () => {
-      mounted = false
+      boundary.dispose()
+      boundaryRef.current = null
       sub.subscription.unsubscribe()
     }
   }, [])
@@ -171,8 +157,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         toastError("Couldn't sign out", 'Check your connection and try again.')
         return res
       }
-      // 4. Purge everything this account left on the device.
-      await purgeLocalData()
+      // SIGNED_OUT starts cleanup synchronously. Await that same boundary so
+      // a second purge cannot race with the next account signing in.
+      await boundaryRef.current?.flush()
       return res
     },
     sendPasswordReset: (email) =>

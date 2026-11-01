@@ -13,6 +13,7 @@
 
 import * as Print from 'expo-print'
 import { supabase } from './supabase'
+import { confirmMutation } from './mutationResult'
 
 const API_BASE = (process.env.EXPO_PUBLIC_API_BASE_URL || 'https://fieldhorse.io').replace(/\/+$/, '')
 
@@ -37,8 +38,8 @@ async function uploadPdf(html: string, userId: string, contactId: string, filena
     .from('job-files')
     .upload(path, arrayBuffer, { contentType: 'application/pdf', upsert: false })
   if (upErr) throw new Error(`Couldn't save the PDF: ${upErr.message}`)
-  // Index it in the Files list (best-effort, send still works if this misses).
-  await supabase.from('fh_job_files').insert({
+  // Stop before sending when the saved document cannot be indexed.
+  const { error: indexError } = await confirmMutation(supabase.from('fh_job_files').insert({
     user_id: userId,
     job_id: contactId,
     filename,
@@ -46,7 +47,8 @@ async function uploadPdf(html: string, userId: string, contactId: string, filena
     mime_type: 'application/pdf',
     size_bytes: (arrayBuffer as ArrayBuffer).byteLength,
     kind: 'file'
-  } as any)
+  } as any).select('id'))
+  if (indexError) throw new Error(`PDF indexing failed. ${indexError.message}`)
   return path
 }
 

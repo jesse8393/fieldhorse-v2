@@ -23,6 +23,7 @@ import {
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { supabase } from '../lib/supabase.ts'
+import { fetchAllRows, chunkIds, scoped } from '../lib/queries.ts'
 import { orgMembersList, type OrgMember } from '../lib/orgApi.ts'
 import { toastError, toastSuccess, toastUndo } from '../lib/toast.ts'
 import { Button } from '../ui/index.ts'
@@ -90,7 +91,7 @@ const BUCKETS: { key: Bucket; label: string; tone: 'bad' | 'warn' | 'good' | 'ne
 export default function Tasks() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { loading: memLoading, canSeeAllJobs, role } = useMembership()
+  const { loading: memLoading, canSeeAllJobs, role, orgId } = useMembership()
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -103,6 +104,7 @@ export default function Tasks() {
   const headingRef = useRef<HTMLHeadingElement>(null)
   const newTaskRef = useRef<HTMLButtonElement>(null)
   const restoreComposerFocus = useRef(false)
+  const loadRevision = useRef(0)
 
   function closeComposer() {
     restoreComposerFocus.current = true
@@ -118,50 +120,45 @@ export default function Tasks() {
   }, [composerOpen, loading, error])
 
   const load = useCallback(async () => {
+    if (!user?.id || memLoading || !canSeeAllJobs) return
+    const revision = ++loadRevision.current
     setLoading(true)
     setError(null)
     try {
-      const [taskRes, membersRes] = await Promise.all([
-        supabase
-          .from('fh_job_todos')
-          .select('id, text, job_id, assigned_to, user_id, due_at, done, completed_at, created_at')
-          .eq('done', false)
-          .order('due_at', { ascending: true, nullsFirst: false })
-          .limit(500),
-        orgMembersList().catch(() => ({ members: [] as OrgMember[] })),
+      const [list, membersRes, activeJobs] = await Promise.all([
+        fetchAllRows<TaskRow>((from, to) => scoped(supabase.from('fh_job_todos')
+          .select('id, text, job_id, assigned_to, user_id, due_at, done, completed_at, created_at'), user.id, orgId)
+          .eq('done', false).order('due_at', { ascending: true, nullsFirst: false }).order('id').range(from, to)),
+        orgMembersList(),
+        fetchAllRows<{ id: string; name: string; job_title: string | null }>((from, to) => scoped(supabase.from('fh_contacts')
+          .select('id, name, job_title'), user.id, orgId).in('stage', ['quote', 'job', 'invoice'])
+          .order('updated_at', { ascending: false }).order('id').range(from, to)),
       ])
-      if (taskRes.error) throw new Error(taskRes.error.message)
-      const list = (taskRes.data || []) as TaskRow[]
-      setTasks(list)
-      setMembers((membersRes as any).members || [])
-
-      // Hydrate job names in one batch.
-      const jobIds = Array.from(new Set(list.map((t) => t.job_id).filter(Boolean)))
-      if (jobIds.length > 0) {
-        const { data: jobs } = await supabase
-          .from('fh_contacts')
-          .select('id, name')
-          .in('id', jobIds)
-        const map: Record<string, string> = {}
-        for (const j of (jobs || [])) map[j.id] = (j as any).name || 'Untitled job'
-        setJobNames(map)
+      const jobNames: Record<string, string> = {}
+      const jobIds = Array.from(new Set(list.map(t => t.job_id).filter(Boolean)))
+      for (const ids of chunkIds(jobIds)) {
+        const { data, error } = await scoped(supabase.from('fh_contacts').select('id, name'), user.id, orgId).in('id', ids)
+        if (error) throw error
+        for (const job of data || []) jobNames[job.id] = job.name || 'Untitled job'
       }
-      // Active jobs for the "New task" job picker (a todo needs a job).
-      const { data: aj } = await supabase
-        .from('fh_contacts')
-        .select('id, name, job_title')
-        .in('stage', ['quote', 'job', 'invoice'])
-        .order('updated_at', { ascending: false })
-        .limit(200)
-      setAllJobs((aj || []).map((j: any) => ({ id: j.id, name: j.job_title || j.name || 'Untitled job' })))
-    } catch (e: any) {
-      setError(e?.message || 'Could not load tasks.')
+      if (revision !== loadRevision.current) return
+      setTasks(list)
+      setMembers(membersRes.members || [])
+      setJobNames(jobNames)
+      setAllJobs(activeJobs.map(job => ({ id: job.id, name: job.job_title || job.name || 'Untitled job' })))
+    } catch (error: any) {
+      if (revision === loadRevision.current) setError(error?.message || 'Could not load tasks.')
     } finally {
-      setLoading(false)
+      if (revision === loadRevision.current) setLoading(false)
     }
-  }, [])
+  }, [user?.id, orgId, memLoading, canSeeAllJobs])
 
-  useEffect(() => { if (!memLoading) load() }, [memLoading, load])
+  useEffect(() => {
+    const revision = loadRevision
+    if (!memLoading) void load()
+    // Invalidate every outstanding load when the company or route changes.
+    return () => { revision.current++ }
+  }, [memLoading, load])
 
   const memberById = useMemo(() => {
     const m: Record<string, OrgMember> = {}
@@ -215,17 +212,18 @@ export default function Tasks() {
   // Reassign a task to another member (or unassign). Optimistic.
   async function reassignTask(rowId: string, assignee: string | null) {
     setTasks((cur) => cur.map((t) => t.id === rowId ? { ...t, assigned_to: assignee } : t))
-    const { error } = await supabase.from('fh_job_todos').update({ assigned_to: assignee }).eq('id', rowId)
-    if (error) { toastError("Couldn't reassign", error.message); load() }
+    const { data, error } = await supabase.from('fh_job_todos').update({ assigned_to: assignee }).eq('id', rowId).select('id')
+    if (error || !data?.length) { toastError("Couldn't reassign", error?.message || 'This task could not be updated. Refresh and try again.'); void load() }
   }
 
   // Delete a task with Undo.
   async function deleteTask(rowId: string) {
-    const snapshot = tasks.find((t) => t.id === rowId)
+    if (!tasks.some((t) => t.id === rowId)) return
     setTasks((cur) => cur.filter((t) => t.id !== rowId))
     headingRef.current?.focus({ preventScroll: true })
-    const { error } = await supabase.from('fh_job_todos').delete().eq('id', rowId)
-    if (error) { toastError("Couldn't delete", error.message); load(); return }
+    const { data, error } = await supabase.from('fh_job_todos').delete().eq('id', rowId).select('*')
+    if (error || !data?.length) { toastError("Couldn't delete", error?.message || 'This task could not be deleted. Refresh and try again.'); void load(); return }
+    const snapshot = data[0]
     toastUndo('Task deleted', {
       description: snapshot?.text || 'Tap Undo to restore',
       onUndo: async () => {
@@ -292,7 +290,7 @@ export default function Tasks() {
         {[
           ['Total open', kpi.total], ['Overdue', kpi.overdue],
           ['Due today', kpi.today], ['Unassigned', kpi.unassigned]
-        ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{loading ? '…' : value}</dd></div>)}
+        ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{loading ? '…' : error ? '—' : value}</dd></div>)}
       </dl>
 
       <div className="fh-tasks-filter">
@@ -301,7 +299,7 @@ export default function Tasks() {
           <option value="">Everyone</option><option value="__mine__">Just mine</option><option value="__unassigned__">Unassigned</option>
           {members.map(m => <option key={m.user_id} value={m.user_id}>{m.is_self ? 'You' : (m.name || m.email || 'Teammate')}</option>)}
         </select>
-        {!loading && <span role="status">{filteredTasks.length} {filteredTasks.length === 1 ? 'task' : 'tasks'}</span>}
+        {!loading && !error && <span role="status">{filteredTasks.length} {filteredTasks.length === 1 ? 'task' : 'tasks'}</span>}
       </div>
 
       {error && <div className="fh-tasks-error" role="alert"><AlertTriangle size={20} /><span>{error}</span><Button type="button" variant="outline" onClick={load}>Retry</Button></div>}
@@ -314,7 +312,7 @@ export default function Tasks() {
         {tasks.length > 0 && <Button type="button" variant="outline" onClick={() => setFilterAssignee('')}>Clear filter</Button>}
       </div>}
 
-      {!loading && BUCKETS.map(bucket => {
+      {!loading && !error && BUCKETS.map(bucket => {
         const rows = grouped[bucket.key]
         if (!rows.length) return null
         return <section key={bucket.key} className="fh-tasks-group" aria-labelledby={`tasks-${bucket.key}`}>

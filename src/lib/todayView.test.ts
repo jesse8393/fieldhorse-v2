@@ -365,7 +365,7 @@ describe('Today past six, read through the dashboard queries', () => {
     expect(reads.length).toBeGreaterThan(0)
     for (const read of reads) {
       expect(read.calls).toContainEqual(['eq', [column, value]])
-      expect(read.calls.some(([method, args]) => method === 'select' && String(args[0]).includes('fh_clients(name, phone)'))).toBe(true)
+      expect(read.calls.some(([method, args]) => method === 'select' && String(args[0]).includes('fh_clients!fh_leads_client_id_fkey(name, phone)'))).toBe(true)
     }
   })
 

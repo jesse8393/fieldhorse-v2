@@ -1219,6 +1219,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "fh_contacts_client_company_fk"
+            columns: ["client_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "fh_clients"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
             foreignKeyName: "fh_contacts_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -2653,6 +2660,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fh_leads_client_company_fk"
+            columns: ["client_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "fh_clients"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
             foreignKeyName: "fh_leads_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -2672,6 +2686,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "fh_contacts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fh_leads_quote_company_fk"
+            columns: ["quote_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "fh_quotes"
+            referencedColumns: ["id", "org_id"]
           },
           {
             foreignKeyName: "fh_leads_quote_id_fkey"
@@ -4062,6 +4083,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "fh_quotes_client_company_fk"
+            columns: ["client_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "fh_clients"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
             foreignKeyName: "fh_quotes_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -4069,11 +4097,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "fh_quotes_job_company_fk"
+            columns: ["job_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "fh_contacts"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
             foreignKeyName: "fh_quotes_job_id_fkey"
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "fh_contacts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fh_quotes_lead_company_fk"
+            columns: ["lead_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "fh_leads"
+            referencedColumns: ["id", "org_id"]
           },
           {
             foreignKeyName: "fh_quotes_lead_id_fkey"
@@ -5605,6 +5647,10 @@ export type Database = {
       }
     }
     Functions: {
+      fh_make_job_from_quote: {
+        Args: { p_quote_id: string }
+        Returns: string
+      }
       auth_user_org_ids: { Args: never; Returns: string[] }
       create_own_org: { Args: { p_name: string }; Returns: string }
       fh_advance_run: {

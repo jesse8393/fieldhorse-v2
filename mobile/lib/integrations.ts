@@ -10,6 +10,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from './supabase'
+import { confirmMutation } from './mutationResult'
 
 export type ProviderId =
   | 'quickbooks' | 'stripe' | 'jobber' | 'google_calendar' | 'gohighlevel'
@@ -80,8 +81,7 @@ async function fetchIntegrations(userId: string): Promise<IntegrationRow[]> {
     .from('fh_integrations' as any)
     .select('id, provider, status, display_name, external_account_id, last_synced_at, last_error')
     .eq('user_id', userId)
-  // Table may not exist yet (migration not applied), treat as none connected.
-  if (error) return []
+  if (error) throw error
   return (data ?? []) as unknown as IntegrationRow[]
 }
 
@@ -96,11 +96,12 @@ export function useIntegrations(userId: string | undefined) {
 export function useDisconnectIntegration() {
   const client = useQueryClient()
   return async (input: { userId: string; provider: ProviderId }) => {
-    const { error } = await supabase
+    const { error } = await confirmMutation(supabase
       .from('fh_integrations' as any)
       .update({ status: 'disconnected' } as any)
       .eq('user_id', input.userId)
       .eq('provider', input.provider)
+      .select('id'))
     if (!error) client.invalidateQueries({ queryKey: ['integrations', input.userId] })
     return { error }
   }

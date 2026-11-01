@@ -86,7 +86,7 @@ export default function Compose() {
     setContactsError('')
     const base = supabase
       .from('fh_contacts')
-      .select('id, client_id, name, phone, email, job_title, job_type, address, stage, amount, fh_clients(name,phone,email,address)')
+      .select('id, client_id, name, phone, email, job_title, job_type, address, stage, amount, fh_clients!fh_contacts_client_id_fkey(name,phone,email,address)')
     ;(orgScope ? base.eq('org_id', orgScope) : base.eq('user_id', user.id))
       .not('stage', 'in', MOVED_STAGE_FILTER)
       .order('updated_at', { ascending: false })

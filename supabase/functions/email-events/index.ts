@@ -7,15 +7,14 @@ import { admin, readBody, json, text, svixSignatureOk, rpc, log, timingSafeEqual
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return text("ok");
   const { data: p, raw } = await readBody(req);
-  const db = admin();
   const url = new URL(req.url);
   const provider = url.searchParams.get("provider") ?? "resend";
 
   if (provider === "postmark") {
     const expected = Deno.env.get("POSTMARK_INBOUND_TOKEN");
     const given = url.searchParams.get("token") ?? "";
-    if (expected && !timingSafeEqual(expected, given)) return text("forbidden", 403);
-    return await inboundEmail(db, {
+    if (!expected || !timingSafeEqual(expected, given)) return text("forbidden", 403);
+    return await inboundEmail(admin(), {
       from_email: String((p as any).FromFull?.Email ?? p.From ?? ""), from_name: String((p as any).FromFull?.Name ?? ""),
       to: ((p as any).ToFull ?? []).map((t: any) => String(t.Email ?? "")).concat(String(p.To ?? "").split(",")),
       subject: String(p.Subject ?? ""), textBody: String(p.TextBody ?? p.StrippedTextReply ?? ""), html: String(p.HtmlBody ?? ""),
@@ -24,11 +23,11 @@ Deno.serve(async (req: Request) => {
   }
 
   const secret = Deno.env.get("RESEND_WEBHOOK_SECRET");
-  const validate = (Deno.env.get("RESEND_VALIDATE_SIGNATURE") ?? "true") !== "false";
-  if (validate && !(await svixSignatureOk(req, raw, secret))) {
+  if (!(await svixSignatureOk(req, raw, secret))) {
     log("email-events", "bad signature");
     return text("forbidden", 403);
   }
+  const db = admin();
 
   const type = String(p.type ?? "");
   const data = (p.data ?? {}) as Record<string, any>;

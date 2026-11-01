@@ -16,8 +16,7 @@ Deno.serve(async (req: Request) => {
   }
   if (req.method !== "POST") return text("ok");
   const { data: p, raw } = await readBody(req);
-  const validate = (Deno.env.get("META_VALIDATE_SIGNATURE") ?? "true") !== "false";
-  if (validate && !(await metaSignatureOk(req, raw, Deno.env.get("META_APP_SECRET")))) {
+  if (!(await metaSignatureOk(req, raw, Deno.env.get("META_APP_SECRET")))) {
     log("meta-leads", "bad signature");
     return text("forbidden", 403);
   }

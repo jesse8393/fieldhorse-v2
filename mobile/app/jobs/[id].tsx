@@ -194,14 +194,14 @@ export default function JobDetailScreen() {
   }
 
   const contact = data?.contact ?? null
-  const payments = data?.payments ?? []
-  const expenses = data?.expenses ?? []
+  const payments = useMemo(() => data?.payments ?? [], [data?.payments])
+  const expenses = useMemo(() => data?.expenses ?? [], [data?.expenses])
   const schedule = data?.schedule ?? []
   const subs = data?.subs ?? []
   const todos = data?.todos ?? []
   const notes = data?.notes ?? []
-  const invoices = data?.invoices ?? []
-  const changeOrders = data?.changeOrders ?? []
+  const invoices = useMemo(() => data?.invoices ?? [], [data?.invoices])
+  const changeOrders = useMemo(() => data?.changeOrders ?? [], [data?.changeOrders])
   const mileage = data?.mileage ?? []
   const inspections = data?.inspections ?? []
   const insurance = data?.insurance ?? null

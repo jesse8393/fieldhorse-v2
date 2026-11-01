@@ -15,15 +15,10 @@
 //   * Key not set: events are rejected by default with 401
 //     hmac_not_configured. Without a signature, anyone who knows an
 //     envelope id could post a forged "completed" event.
-//   * DOCUSIGN_ALLOW_UNSIGNED=1 opts out while Connect HMAC is not set up
-//     yet: unsigned events are accepted and a warning is logged. Events
-//     can then be forged, so set the key as soon as possible.
-//   * DOCUSIGN_REQUIRE_HMAC=1 turns a missing key into 500
-//     hmac_key_missing, even when DOCUSIGN_ALLOW_UNSIGNED=1 is set.
+//   * Legacy unsigned configuration never bypasses verification.
 //
 // Env: SUPABASE_URL (or VITE_SUPABASE_URL), SUPABASE_SERVICE_ROLE_KEY,
 //      DOCUSIGN_CONNECT_HMAC_KEY (needed to accept events),
-//      DOCUSIGN_ALLOW_UNSIGNED (optional, not recommended),
 //      DOCUSIGN_REQUIRE_HMAC (optional)
 
 import crypto from 'node:crypto'
@@ -341,19 +336,11 @@ export default async (request) => {
     // DOCUSIGN_CONNECT_HMAC_KEY too.
     console.error('[docusign-webhook] DOCUSIGN_REQUIRE_HMAC=1 but DOCUSIGN_CONNECT_HMAC_KEY is missing, rejecting')
     return new Response('hmac_key_missing', { status: 500 })
-  } else if (process.env.DOCUSIGN_ALLOW_UNSIGNED === '1') {
-    // Explicit opt-out for deployments that haven't provisioned DocuSign
-    // Connect HMAC yet. Forged-event risk remains — set
-    // DOCUSIGN_CONNECT_HMAC_KEY as soon as possible.
-    console.warn('[docusign-webhook] accepting UNSIGNED payload (DOCUSIGN_ALLOW_UNSIGNED=1)', {
-      context: process.env.CONTEXT || 'unknown'
-    })
   } else {
     // Fail-closed default: without a configured HMAC key, an attacker who
     // knows an envelopeId could POST a forged "completed" event and flip a
-    // proposal to approved. Reject until Connect HMAC is configured (or the
-    // operator explicitly sets DOCUSIGN_ALLOW_UNSIGNED=1).
-    console.error('[docusign-webhook] rejecting UNSIGNED payload. Set DOCUSIGN_CONNECT_HMAC_KEY, or DOCUSIGN_ALLOW_UNSIGNED=1 to opt out.')
+    // proposal to approved. Reject until Connect HMAC is configured.
+    console.error('[docusign-webhook] rejecting UNSIGNED payload. Set DOCUSIGN_CONNECT_HMAC_KEY.')
     return new Response('hmac_not_configured', { status: 401 })
   }
 
@@ -362,16 +349,19 @@ export default async (request) => {
 
   // DocuSign JSON SIM payload shape: { event, data: { envelopeId, envelopeSummary: { status } } }
   const envelopeId = payload?.data?.envelopeId || payload?.envelopeId
-  const rawStatus = (payload?.data?.envelopeSummary?.status || payload?.status || '').toLowerCase()
-  if (!envelopeId) return new Response('no_envelope_id', { status: 400 })
+  const statusValue = payload?.data?.envelopeSummary?.status || payload?.status || ''
+  if (typeof envelopeId !== 'string' || !envelopeId.trim()) return new Response('no_envelope_id', { status: 400 })
+  if (typeof statusValue !== 'string') return new Response('invalid_status', { status: 400 })
+  const rawStatus = statusValue.toLowerCase()
 
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } })
 
-  const { data: env } = await supabase
+  const { data: env, error: lookupError } = await supabase
     .from('fh_esign_envelopes')
     .select('id, user_id, contact_id, quote_id, recipient_name, recipient_email, status, sent_at')
     .eq('envelope_id', envelopeId)
     .maybeSingle()
+  if (lookupError) return new Response('envelope_lookup_failed', { status: 503 })
   if (!env) {
     // Ack so DocuSign stops retrying, but log: if envelopes routinely
     // arrive for IDs we don't have on file, docusign-send.js audit
