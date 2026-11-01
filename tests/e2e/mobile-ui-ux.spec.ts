@@ -226,7 +226,15 @@ test('selection edits preserve entered work on refusal and report success only a
 
 // These are UI checks against controlled records, not real account validation.
 test('Today keeps its date and sync status below the sticky header', async ({ context, page }) => {
-  await signIn(context)
+  // Keep this layout fixture clear of the five-calendar-day billing cutoff.
+  // The shared mock subtracts 24-hour days, which crosses that cutoff when
+  // Chicago leaves daylight saving time and a calendar day lasts 25 hours.
+  await page.clock.setFixedTime(new Date('2026-11-01T18:00:00Z'))
+  await signIn(context, { tables: { fh_contacts: [{
+    id: 'job-ready-to-bill', user_id: 'qa-user-1', org_id: 'org-1', client_id: 'cl-1',
+    name: 'Ready customer', stage: 'invoice', amount: 1500,
+    created_at: '2026-10-01T12:00:00Z', updated_at: '2026-10-01T12:00:00Z',
+  }] } })
   for (const width of [320, 390]) {
     await page.setViewportSize({ width, height: 844 })
     await page.goto('/')
@@ -368,6 +376,7 @@ test('task completion and deletion keep focus and Undo restores the same task', 
   let task = { id: 'task-undo', text: 'Confirm site access', job_id: 'c-job1', assigned_to: null, user_id: 'qa-user-1', due_at: null, done: false, completed_at: null as string | null, created_at: new Date().toISOString() }
   const changes: Record<string, unknown>[] = []
   let deleted = false
+  let deletedTask: typeof task | null = null
   await context.route(/\/rest\/v1\/fh_job_todos(?:\?|$)/, async route => {
     if (route.request().method() === 'PATCH') {
       const values = route.request().postDataJSON()
@@ -376,7 +385,11 @@ test('task completion and deletion keep focus and Undo restores the same task', 
       await route.fulfill({ json: [{ id: task.id }] })
     } else if (route.request().method() === 'DELETE') {
       deleted = true
-      await route.fulfill({ json: [] })
+      expect(route.request().headers().prefer).toContain('return=representation')
+      // PostgREST returns the deleted row. Use a server value that differs
+      // from the displayed row to prove Undo restores the confirmed snapshot.
+      deletedTask = { ...task, created_at: '2026-10-01T12:00:00Z' }
+      await route.fulfill({ json: [deletedTask] })
     } else if (route.request().method() === 'POST') {
       task = route.request().postDataJSON()
       deleted = false
@@ -403,6 +416,7 @@ test('task completion and deletion keep focus and Undo restores the same task', 
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toHaveCount(0)
   await expect(page.getByRole('heading', { name: 'Tasks', exact: true })).toBeFocused()
   expect(task).toMatchObject({ id: 'task-undo', text: 'Confirm site access', done: false })
+  expect(task).toEqual(deletedTask)
 })
 
 test('refused task completion restores the row without a success message', async ({ context, page }) => {

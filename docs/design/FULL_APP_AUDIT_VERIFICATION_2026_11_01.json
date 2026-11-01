@@ -126,10 +126,8 @@
   },
   "not_established": [
     "Every-line manual source review",
-    "Independent database-session concurrency",
     "Complete historical migration replay",
     "Browser desktop and phone suites on this branch",
-    "Full Deno Edge typechecking",
     "Physical native devices or signed binaries",
     "Authenticated real-account/provider workflows",
     "Financial column confidentiality",
@@ -141,10 +139,14 @@
     "pr_created": true,
     "pr_number": 234,
     "pr_url": "https://github.com/jesse8393/fieldhorse-v2/pull/234",
-    "draft": true,
+    "draft": false,
     "approved_by_user": true,
     "initial_published_sha": "223eb0d18defab9ad20fd0bd71ff6649ab393d49",
-    "initial_tree_matches_local": true
+    "initial_tree_matches_local": true,
+    "merged": true,
+    "merge_commit": "6078a1186a6ade265db54580968b4cd04aa01666",
+    "merged_at": "2026-11-01T19:29:03Z",
+    "final_pr_head": "8da8a1be4bab29cb0e2db844c864b56a2e97e32c"
   },
   "production_changes": false,
   "coverage": {
@@ -174,6 +176,68 @@
     "initial_run_id": 41340960775,
     "initial_edge_failure": "Deno inherited manual node_modules resolution; transitive OpenAI types missing",
     "correction": "Resolve Edge npm dependencies through Deno global cache using node-modules-dir=none",
-    "verification": "pending new CI run"
+    "verification": "passed",
+    "verified_run_id": 41341161664,
+    "merged_run_id": 41341954207
+  },
+  "ci_checkpoint": {
+    "merged_head": "6078a1186a6ade265db54580968b4cd04aa01666",
+    "run_id": 41341954207,
+    "web_database": "passed",
+    "native": "passed",
+    "edge": "passed",
+    "postgresql_checks": {
+      "total": 197,
+      "billing_schedule": 61,
+      "inbox": 39,
+      "growth": 29,
+      "authorization": 32,
+      "quote_conversion": 21,
+      "record_relationships": 15,
+      "independent_concurrency": 5
+    },
+    "browser": {
+      "desktop": {
+        "passed": 88,
+        "failed": 2,
+        "skipped": 2
+      },
+      "mobile": {
+        "passed": 71,
+        "failed": 2,
+        "skipped": 19
+      },
+      "remaining_suite": "not run after targeted step failed",
+      "causes": [
+        "Today invoice fixture crosses calendar-day cutoff on daylight-saving transition",
+        "Task DELETE success fixture omitted returned representation"
+      ]
+    }
+  },
+  "observed_production": {
+    "url": "https://animated-kheer-db7c2c.netlify.app/",
+    "build_sha": "6078a1186a6a",
+    "build_at": "2026-11-01T19:29:22.528Z",
+    "quote_conversion_caller": true,
+    "quote_conversion_rpc_installed": false,
+    "composite_company_relationship_constraints": 0,
+    "database_writes_by_audit": false,
+    "repair_migration": "supabase/migrations/20261101184536_atomic_quote_conversion.sql",
+    "repair_applied": false
+  },
+  "followup_verification": {
+    "browser": "44 passed across both affected test files on desktop and phone",
+    "chromium": "153.0.8010.0",
+    "limits": [
+      "CI uses Chromium 149; separate verification required",
+      "Mocked Supabase records",
+      "No real-account or physical-device validation"
+    ],
+    "test_files": [
+      "tests/e2e/mobile-ui-ux.spec.ts",
+      "tests/e2e/workspace-tasks.spec.ts"
+    ],
+    "passed": 44,
+    "evidence_log_sha256": "7d15be068760ee2929caa904a8f45ca33031356580d885820f068aa7922da095"
   }
 }
