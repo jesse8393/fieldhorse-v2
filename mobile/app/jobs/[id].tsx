@@ -35,6 +35,9 @@ import { ScreenBackground } from '../../components/ui'
 import { MarkCompleteSheet } from '../../components/MarkCompleteSheet'
 import { PaymentSheet } from '../../components/PaymentSheet'
 import { parseExpenseFromImage } from '../../lib/docIntelligence'
+import { useMutationFeedback } from '../../lib/useMutationFeedback'
+import { moneyAmount, paymentAmount } from '../../lib/paymentInput'
+import { jobMoney } from '../../lib/jobMoney'
 
 const INVOICE_TINT: Record<string, string> = {
   draft: '#5C5C5C', sent: '#5C5C5C', paid: '#2D7A4F', overdue: '#C0392B', void: '#5C5C5C'
@@ -56,7 +59,7 @@ const STAGE_TINT: Record<string, string> = {
 const STAGES = ['lead', 'quote', 'job', 'invoice', 'closed', 'lost'] as const
 
 function money(n: number) {
-  return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
+  return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 export default function JobDetailScreen() {
@@ -65,6 +68,7 @@ export default function JobDetailScreen() {
   const { user } = useAuth()
   const { id } = useLocalSearchParams<{ id: string }>()
   const { data, isPending } = useJobDetail(id)
+  const { run, pending } = useMutationFeedback()
   const updateStage = useUpdateStage()
   const updateJob = useUpdateJob()
   const addExpense = useAddExpense()
@@ -101,43 +105,43 @@ export default function JobDetailScreen() {
   const deleteFile = useDeleteFile()
   const { data: clientsBundle } = useClientsBundle(user?.id)
 
-  const [photoBusy, setPhotoBusy] = useState(false)
+  const photoBusy = pending.has('photo')
   const [todoText, setTodoText] = useState('')
   const [noteOpen, setNoteOpen] = useState(false)
   const [noteText, setNoteText] = useState('')
-  const [noteSaving, setNoteSaving] = useState(false)
+  const noteSaving = pending.has('note')
   const [invOpen, setInvOpen] = useState(false)
   const [invTitle, setInvTitle] = useState('')
   const [invAmount, setInvAmount] = useState('')
-  const [invSaving, setInvSaving] = useState(false)
+  const invSaving = pending.has('invoice')
   const [coOpen, setCoOpen] = useState(false)
   const [coTitle, setCoTitle] = useState('')
   const [coAmount, setCoAmount] = useState('')
   const [coDesc, setCoDesc] = useState('')
-  const [coSaving, setCoSaving] = useState(false)
+  const coSaving = pending.has('change-order')
   const [milesOpen, setMilesOpen] = useState(false)
   const [milesVal, setMilesVal] = useState('')
   const [milesPurpose, setMilesPurpose] = useState('')
-  const [milesSaving, setMilesSaving] = useState(false)
+  const milesSaving = pending.has('mileage')
   const [inspOpen, setInspOpen] = useState(false)
   const [inspTrade, setInspTrade] = useState('')
   const [inspInspector, setInspInspector] = useState('')
-  const [inspSaving, setInspSaving] = useState(false)
+  const inspSaving = pending.has('inspection')
 
   const [subOpen, setSubOpen] = useState(false)
   const [subName, setSubName] = useState('')
   const [subTrade, setSubTrade] = useState('')
   const [subPhone, setSubPhone] = useState('')
   const [subRate, setSubRate] = useState('')
-  const [subSaving, setSubSaving] = useState(false)
+  const subSaving = pending.has('sub')
 
   const [milestoneText, setMilestoneText] = useState('')
   const [insOpen, setInsOpen] = useState(false)
   const [insForm, setInsForm] = useState({ claim_number: '', carrier: '', adjuster: '', deductible: '', rcv: '', acv: '', depreciation: '', supplement_amount: '', mortgage_company: '' })
-  const [insSaving, setInsSaving] = useState(false)
+  const insSaving = pending.has('insurance')
   const [qtOpen, setQtOpen] = useState(false)
   const [qtForm, setQtForm] = useState({ scope: '', exclusions: '', terms: '' })
-  const [qtSaving, setQtSaving] = useState(false)
+  const qtSaving = pending.has('quote-terms')
 
   const [clientPickOpen, setClientPickOpen] = useState(false)
 
@@ -150,7 +154,7 @@ export default function JobDetailScreen() {
   const [expCategory, setExpCategory] = useState('')
   const [expDesc, setExpDesc] = useState('')
   const [expDate, setExpDate] = useState<string | null>(null)
-  const [expSaving, setExpSaving] = useState(false)
+  const expSaving = pending.has('expense')
   const [expScanning, setExpScanning] = useState(false)
 
   const [editOpen, setEditOpen] = useState(false)
@@ -161,7 +165,7 @@ export default function JobDetailScreen() {
   const [editAmount, setEditAmount] = useState('')
   const [editNotes, setEditNotes] = useState('')
   const [editAddress, setEditAddress] = useState('')
-  const [editSaving, setEditSaving] = useState(false)
+  const editSaving = pending.has('edit')
 
   function openEdit() {
     if (!contact) return
@@ -177,9 +181,9 @@ export default function JobDetailScreen() {
 
   async function submitEdit() {
     if (!contact || editSaving) return
-    setEditSaving(true)
-    const amt = editAmount.trim() === '' ? null : Number(editAmount.replace(/[^0-9.]/g, ''))
-    const { error } = await updateJob({
+    const amt = editAmount.trim() === '' ? null : moneyAmount(editAmount, { allowZero: true })
+    if (editAmount.trim() && amt === null) { Alert.alert('Check contract amount', 'Enter a valid nonnegative amount.'); return }
+    const saved = await run('edit', "Couldn't save job", () => updateJob({
       contactId: contact.id,
       name: editName.trim(),
       jobTitle: editTitle.trim() || null,
@@ -188,9 +192,8 @@ export default function JobDetailScreen() {
       amount: amt,
       notes: editNotes.trim() || null,
       address: editAddress.trim() || null
-    })
-    setEditSaving(false)
-    if (!error) setEditOpen(false)
+    }))
+    if (saved) setEditOpen(false)
   }
 
   const contact = data?.contact ?? null
@@ -210,16 +213,16 @@ export default function JobDetailScreen() {
   async function addMilestone() {
     const txt = milestoneText.trim()
     if (!txt || !contact) return
-    setMilestoneText('')
-    await saveMilestones({ contactId: contact.id, milestones: [...milestones, { label: txt, done: false, created_at: new Date().toISOString() }] })
+    const saved = await run('milestones', "Couldn't add milestone", () => saveMilestones({ contactId: contact.id, milestones: [...milestones, { label: txt, done: false, created_at: new Date().toISOString() }] }))
+    if (saved) setMilestoneText(current => current.trim() === txt ? '' : current)
   }
   async function toggleMilestone(i: number) {
     if (!contact) return
-    await saveMilestones({ contactId: contact.id, milestones: milestones.map((m, idx) => (idx === i ? { ...m, done: !m.done } : m)) })
+    await run('milestones', "Couldn't update milestone", () => saveMilestones({ contactId: contact.id, milestones: milestones.map((m, idx) => (idx === i ? { ...m, done: !m.done } : m)) }))
   }
   async function removeMilestone(i: number) {
     if (!contact) return
-    await saveMilestones({ contactId: contact.id, milestones: milestones.filter((_, idx) => idx !== i) })
+    await run('milestones', "Couldn't remove milestone", () => saveMilestones({ contactId: contact.id, milestones: milestones.filter((_, idx) => idx !== i) }))
   }
   function openInsurance() {
     setInsForm({
@@ -232,18 +235,20 @@ export default function JobDetailScreen() {
   }
   async function saveInsurance() {
     if (!contact || !user) return
-    setInsSaving(true)
-    const num = (v: string) => { const n = parseFloat(v.replace(/[^0-9.]/g, '')); return isNaN(n) ? null : n }
-    const { error } = await upsertInsurance({
+    const num = (v: string) => v.trim() ? moneyAmount(v, { allowZero: true }) : null
+    if ([insForm.deductible, insForm.rcv, insForm.acv, insForm.depreciation, insForm.supplement_amount].some(v => v.trim() && num(v) === null)) {
+      Alert.alert('Check insurance amounts', 'Enter valid nonnegative amounts.')
+      return
+    }
+    const saved = await run('insurance', "Couldn't save insurance", () => upsertInsurance({
       contactId: contact.id, userId: user.id, existingId: insurance?.id,
       patch: {
         claim_number: insForm.claim_number.trim() || null, carrier: insForm.carrier.trim() || null, adjuster: insForm.adjuster.trim() || null,
         deductible: num(insForm.deductible), rcv: num(insForm.rcv), acv: num(insForm.acv), depreciation: num(insForm.depreciation),
         supplement_amount: num(insForm.supplement_amount), mortgage_company: insForm.mortgage_company.trim() || null
       }
-    })
-    setInsSaving(false)
-    if (error) { Alert.alert("Couldn't save insurance", error.message); return }
+    }))
+    if (!saved) return
     setInsOpen(false)
   }
   function openQuoteTerms() {
@@ -252,15 +257,13 @@ export default function JobDetailScreen() {
   }
   async function saveQuoteTerms() {
     if (!contact) return
-    setQtSaving(true)
-    const { error } = await updateJob({
+    const saved = await run('quote-terms', "Couldn't save quote terms", () => updateJob({
       contactId: contact.id,
       scopeText: qtForm.scope.trim() || null,
       exclusionsText: qtForm.exclusions.trim() || null,
       termsText: qtForm.terms.trim() || null
-    })
-    setQtSaving(false)
-    if (error) { Alert.alert("Couldn't save quote terms", error.message); return }
+    }))
+    if (!saved) return
     setQtOpen(false)
   }
   const clients = clientsBundle?.clients ?? []
@@ -269,57 +272,66 @@ export default function JobDetailScreen() {
   async function submitTodo() {
     const text = todoText.trim()
     if (!text || !contact || !user) return
-    setTodoText('')
-    await addTodo({ userId: user.id, jobId: contact.id, text })
+    const saved = await run('task', "Couldn't add task", () => addTodo({ userId: user.id, jobId: contact.id, text }))
+    if (saved) setTodoText(current => current.trim() === text ? '' : current)
+  }
+
+  function confirmDeleteTodo(taskId: string) {
+    if (!contact) return
+    Alert.alert('Delete task?', 'This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => run(`task:${taskId}`, "Couldn't delete task", () => deleteTodo({ id: taskId, jobId: contact.id })) },
+    ])
   }
 
   async function submitNote() {
     if (!noteText.trim() || !contact || !user || noteSaving) return
-    setNoteSaving(true)
-    const { error } = await addNote({ userId: user.id, contactId: contact.id, text: noteText.trim() })
-    setNoteSaving(false)
-    if (!error) { setNoteOpen(false); setNoteText('') }
+    const saved = await run('note', "Couldn't save note", () => addNote({ userId: user.id, contactId: contact.id, text: noteText.trim() }))
+    if (saved) { setNoteOpen(false); setNoteText('') }
   }
 
   function confirmDeleteNote(nid: string) {
     if (!contact) return
     Alert.alert('Delete note?', 'This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deleteNote({ id: nid, contactId: contact.id }) }
+      { text: 'Delete', style: 'destructive', onPress: () => run("note:" + nid, "Couldn't delete note", () => deleteNote({ id: nid, contactId: contact.id })) }
     ])
   }
 
   async function submitInvoice() {
-    const amt = Number(invAmount.replace(/[^0-9.]/g, ''))
-    if (!amt || !contact || !user || invSaving) return
-    setInvSaving(true)
-    const { error } = await createInvoice({ userId: user.id, contactId: contact.id, amount: amt, title: invTitle.trim() || undefined })
-    setInvSaving(false)
-    if (!error) { setInvOpen(false); setInvTitle(''); setInvAmount('') }
+    if (!contact || !user || invSaving) return
+    const amt = paymentAmount(invAmount)
+    if (amt === null) { Alert.alert('Check invoice amount', 'Enter a valid positive amount.'); return }
+    const saved = await run('invoice', "Couldn't create invoice", () => createInvoice({ userId: user.id, contactId: contact.id, amount: amt, title: invTitle.trim() || undefined }))
+    if (saved) { setInvOpen(false); setInvTitle(''); setInvAmount('') }
   }
 
   function cycleInvoiceStatus(inv: { id: string; status: string }) {
-    if (!contact) return
-    const order = ['draft', 'sent', 'paid']
-    const next = order[(order.indexOf(inv.status) + 1) % order.length]
-    updateInvoiceStatus({ id: inv.id, contactId: contact.id, status: next })
+    if (!contact || !user) return
+    if (inv.status === 'paid' || inv.status === 'void') return
+    const next = inv.status === 'draft' ? 'sent' : 'paid'
+    const save = () => run(`invoice:${inv.id}`, "Couldn't update invoice", () => updateInvoiceStatus({ id: inv.id, contactId: contact.id, status: next, userId: user.id }))
+    if (next === 'paid') {
+      Alert.alert('Record remaining payment?', 'Confirm you received the outstanding amount. This records a payment and marks the invoice paid.', [
+        { text: 'Cancel', style: 'cancel' }, { text: 'Payment received', onPress: () => { void save() } }
+      ])
+    } else void save()
   }
 
   function confirmDeleteInvoice(iid: string) {
     if (!contact) return
     Alert.alert('Delete invoice?', 'This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deleteInvoice({ id: iid, contactId: contact.id }) }
+      { text: 'Delete', style: 'destructive', onPress: () => run("invoice:" + iid, "Couldn't delete invoice", () => deleteInvoice({ id: iid, contactId: contact.id })) }
     ])
   }
 
   async function submitChangeOrder() {
-    const amt = Number(coAmount.replace(/[^0-9.]/g, ''))
     if (!coTitle.trim() || !contact || !user || coSaving) return
-    setCoSaving(true)
-    const { error } = await addChangeOrder({ userId: user.id, contactId: contact.id, title: coTitle.trim(), amount: amt, description: coDesc.trim() || undefined })
-    setCoSaving(false)
-    if (!error) { setCoOpen(false); setCoTitle(''); setCoAmount(''); setCoDesc('') }
+    const amt = moneyAmount(coAmount, { allowZero: true, allowNegative: true })
+    if (amt === null) { Alert.alert('Check change order amount', 'Enter a valid amount.'); return }
+    const saved = await run('change-order', "Couldn't save change order", () => addChangeOrder({ userId: user.id, contactId: contact.id, title: coTitle.trim(), amount: amt, description: coDesc.trim() || undefined }))
+    if (saved) { setCoOpen(false); setCoTitle(''); setCoAmount(''); setCoDesc('') }
   }
 
   function cycleChangeOrder(co: { id: string; status: string }) {
@@ -327,45 +339,42 @@ export default function JobDetailScreen() {
     const order = ['draft', 'approved', 'rejected']
     const idx = order.indexOf(co.status)
     const next = order[(idx === -1 ? 0 : idx + 1) % order.length]
-    updateChangeOrderStatus({
+    void run(`change-order:${co.id}`, "Couldn't update change order", () => updateChangeOrderStatus({
       id: co.id,
       contactId: contact.id,
       status: next,
       approvedByName: next === 'approved' ? (contact.name || null) : null
-    })
+    }))
   }
 
   function confirmDeleteChangeOrder(cid: string) {
     if (!contact) return
     Alert.alert('Delete change order?', 'This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deleteChangeOrder({ id: cid, contactId: contact.id }) }
+      { text: 'Delete', style: 'destructive', onPress: () => run("change-order:" + cid, "Couldn't delete change order", () => deleteChangeOrder({ id: cid, contactId: contact.id })) }
     ])
   }
 
   async function submitMileage() {
-    const m = Number(milesVal.replace(/[^0-9.]/g, ''))
-    if (!m || !contact || !user || milesSaving) return
-    setMilesSaving(true)
-    const { error } = await addMileage({ userId: user.id, contactId: contact.id, miles: m, purpose: milesPurpose.trim() || undefined })
-    setMilesSaving(false)
-    if (!error) { setMilesOpen(false); setMilesVal(''); setMilesPurpose('') }
+    if (!contact || !user || milesSaving) return
+    const m = paymentAmount(milesVal)
+    if (m === null) { Alert.alert('Check trip mileage', 'Enter valid positive mileage.'); return }
+    const saved = await run('mileage', "Couldn't save trip", () => addMileage({ userId: user.id, contactId: contact.id, miles: m, purpose: milesPurpose.trim() || undefined }))
+    if (saved) { setMilesOpen(false); setMilesVal(''); setMilesPurpose('') }
   }
 
   function confirmDeleteMileage(mid: string) {
     if (!contact) return
     Alert.alert('Delete trip?', 'This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deleteMileage({ id: mid, contactId: contact.id }) }
+      { text: 'Delete', style: 'destructive', onPress: () => run("mileage:" + mid, "Couldn't delete trip", () => deleteMileage({ id: mid, contactId: contact.id })) }
     ])
   }
 
   async function submitInspection() {
     if (!inspTrade.trim() || !contact || !user || inspSaving) return
-    setInspSaving(true)
-    const { error } = await addInspection({ userId: user.id, contactId: contact.id, trade: inspTrade.trim(), inspector: inspInspector.trim() || undefined })
-    setInspSaving(false)
-    if (!error) { setInspOpen(false); setInspTrade(''); setInspInspector('') }
+    const saved = await run('inspection', "Couldn't save inspection", () => addInspection({ userId: user.id, contactId: contact.id, trade: inspTrade.trim(), inspector: inspInspector.trim() || undefined }))
+    if (saved) { setInspOpen(false); setInspTrade(''); setInspInspector('') }
   }
 
   function cycleInspection(insp: { id: string; result: string | null }) {
@@ -373,14 +382,14 @@ export default function JobDetailScreen() {
     const order = ['pending', 'pass', 'fail']
     const cur = insp.result || 'pending'
     const next = order[(order.indexOf(cur) + 1) % order.length]
-    updateInspectionResult({ id: insp.id, contactId: contact.id, result: next })
+    void run(`inspection:${insp.id}`, "Couldn't update inspection", () => updateInspectionResult({ id: insp.id, contactId: contact.id, result: next }))
   }
 
   function confirmDeleteInspection(iid: string) {
     if (!contact) return
     Alert.alert('Delete inspection?', 'This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deleteInspection({ id: iid, contactId: contact.id }) }
+      { text: 'Delete', style: 'destructive', onPress: () => run("inspection:" + iid, "Couldn't delete inspection", () => deleteInspection({ id: iid, contactId: contact.id })) }
     ])
   }
 
@@ -388,14 +397,13 @@ export default function JobDetailScreen() {
 
   async function submitSub() {
     if (!subName.trim() || !contact || !user || subSaving) return
-    setSubSaving(true)
-    const rate = subRate.trim() === '' ? undefined : Number(subRate.replace(/[^0-9.]/g, ''))
-    const { error } = await addSub({
+    const rate = subRate.trim() === '' ? undefined : moneyAmount(subRate, { allowZero: true })
+    if (rate === null) { Alert.alert('Check subcontractor rate', 'Enter a valid nonnegative rate.'); return }
+    const saved = await run('sub', "Couldn't add subcontractor", () => addSub({
       userId: user.id, contactId: contact.id, name: subName.trim(),
       trade: subTrade.trim() || undefined, phone: subPhone.trim() || undefined, rate
-    })
-    setSubSaving(false)
-    if (!error) {
+    }))
+    if (saved) {
       setSubOpen(false)
       setSubName(''); setSubTrade(''); setSubPhone(''); setSubRate('')
     }
@@ -405,37 +413,28 @@ export default function JobDetailScreen() {
     if (!contact) return
     Alert.alert('Remove sub?', 'This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => deleteSub({ id: sid, contactId: contact.id }) }
+      { text: 'Remove', style: 'destructive', onPress: () => run("sub:" + sid, "Couldn't remove subcontractor", () => deleteSub({ id: sid, contactId: contact.id })) }
     ])
   }
 
   async function linkClient(clientId: string | null) {
     if (!contact) return
-    setClientPickOpen(false)
-    await updateJob({ contactId: contact.id, clientId })
+    const saved = await run('client', "Couldn't link customer", () => updateJob({ contactId: contact.id, clientId }))
+    if (saved) setClientPickOpen(false)
   }
 
-  const totals = useMemo(() => {
-    const amount = Number(contact?.amount || 0)
-    const paid = payments.reduce((s, p) => s + Number(p.amount || 0), 0)
-    const spent = expenses.reduce((s, e) => s + Number(e.amount || 0), 0)
-    const approvedCO = changeOrders.reduce((s, co) => s + (co.status === 'approved' ? Number(co.amount || 0) : 0), 0)
-    const contractTotal = amount + approvedCO
-    const invoiced = invoices.reduce((s, inv) => s + (inv.status === 'void' ? 0 : Number(inv.amount || 0)), 0)
-    return { amount, paid, balance: Math.max(0, amount - paid), spent, contractTotal, approvedCO, invoiced }
-  }, [contact, payments, expenses, changeOrders, invoices])
+  const totals = useMemo(() => jobMoney({ amount: contact?.amount, payments, expenses, changeOrders, invoices }), [contact?.amount, payments, expenses, changeOrders, invoices])
 
   async function submitExpense() {
-    const amt = Number(expAmount.replace(/[^0-9.]/g, ''))
-    if (!amt || !contact || !user || expSaving) return
-    setExpSaving(true)
-    const { error } = await addExpense({
+    if (!contact || !user || expSaving) return
+    const amt = paymentAmount(expAmount)
+    if (amt === null) { Alert.alert('Check expense amount', 'Enter a valid positive amount.'); return }
+    const saved = await run('expense', "Couldn't save expense", () => addExpense({
       userId: user.id, contactId: contact.id, amount: amt,
       category: expCategory.trim() || undefined, description: expDesc.trim() || undefined,
       expenseDate: expDate || undefined
-    })
-    setExpSaving(false)
-    if (!error) {
+    }))
+    if (saved) {
       setExpOpen(false)
       setExpAmount(''); setExpCategory(''); setExpDesc(''); setExpDate(null)
     }
@@ -473,61 +472,58 @@ export default function JobDetailScreen() {
     ])
   }
 
-  async function runPhotoUpload(uri: string, base64?: string | null) {
+  async function pickPhoto(fromCamera: boolean) {
     if (!contact || !user) return
-    setPhotoBusy(true)
-    const { error, id } = await uploadPhoto({ userId: user.id, jobId: contact.id, uri })
-    setPhotoBusy(false)
-    if (error) { Alert.alert("Couldn't upload photo", error.message); return }
-    // Auto-caption in the background, never blocks the upload.
-    if (id && base64) {
-      captionPhoto({ rowId: id, jobId: contact.id, imageBase64: base64, mediaType: 'image/jpeg' })
+    const saved = await run('photo', "Couldn't attach photo", async () => {
+      const perm = fromCamera
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync()
+      if (!perm.granted) return { error: new Error(`Allow ${fromCamera ? 'camera' : 'photo'} access in Settings.`), id: null }
+      const res = fromCamera
+        ? await ImagePicker.launchCameraAsync({ quality: 0.6, base64: true })
+        : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.6, base64: true })
+      if (res.canceled || !res.assets[0]) return { error: null, id: null }
+      const asset = res.assets[0]
+      const result = await uploadPhoto({ userId: user.id, jobId: contact.id, uri: asset.uri, mimeType: asset.mimeType })
+      return { ...result, base64: asset.base64, mediaType: asset.mimeType || 'image/jpeg' }
+    })
+    // Optional caption failure does not change a confirmed upload.
+    if (saved?.id && 'base64' in saved && saved.base64) {
+      void captionPhoto({ rowId: saved.id, jobId: contact.id, imageBase64: saved.base64, mediaType: saved.mediaType })
     }
-  }
-
-  async function pickFromLibrary() {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
-    if (!perm.granted) { Alert.alert('Permission needed', 'Allow photo access in Settings to attach photos.'); return }
-    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.6, base64: true })
-    if (!res.canceled && res.assets[0]) await runPhotoUpload(res.assets[0].uri, res.assets[0].base64)
-  }
-
-  async function takePhoto() {
-    const perm = await ImagePicker.requestCameraPermissionsAsync()
-    if (!perm.granted) { Alert.alert('Permission needed', 'Allow camera access in Settings to capture photos.'); return }
-    const res = await ImagePicker.launchCameraAsync({ quality: 0.6, base64: true })
-    if (!res.canceled && res.assets[0]) await runPhotoUpload(res.assets[0].uri, res.assets[0].base64)
   }
 
   function addPhoto() {
     Alert.alert('Add photo', undefined, [
-      { text: 'Take photo', onPress: takePhoto },
-      { text: 'Choose from library', onPress: pickFromLibrary },
+      { text: 'Take photo', onPress: () => pickPhoto(true) },
+      { text: 'Choose from library', onPress: () => pickPhoto(false) },
       { text: 'Cancel', style: 'cancel' }
     ])
   }
 
-  const [fileBusy, setFileBusy] = useState(false)
+  const fileBusy = pending.has('file')
   async function pickFile() {
     if (!contact || !user) return
-    const res = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true, multiple: false })
-    if (res.canceled || !res.assets?.[0]) return
-    const a = res.assets[0]
-    setFileBusy(true)
-    const { error } = await uploadFile({ userId: user.id, jobId: contact.id, uri: a.uri, name: a.name, mimeType: a.mimeType, size: a.size })
-    setFileBusy(false)
-    if (error) Alert.alert("Couldn't upload file", error.message)
+    await run('file', "Couldn't attach file", async () => {
+      const res = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true, multiple: false })
+      if (res.canceled || !res.assets?.[0]) return { error: null }
+      const a = res.assets[0]
+      return uploadFile({ userId: user.id, jobId: contact.id, uri: a.uri, name: a.name, mimeType: a.mimeType, size: a.size })
+    })
   }
   async function openFile(f: JobFile) {
-    const url = await signJobFileUrl(f.storage_path)
-    if (!url) { Alert.alert("Couldn't open file", 'The signed link could not be created.'); return }
-    Linking.openURL(url)
+    await run(`open-file:${f.id}`, "Couldn't open file", async () => {
+      const url = await signJobFileUrl(f.storage_path)
+      if (!url) return { error: new Error('The signed link could not be created.') }
+      await Linking.openURL(url)
+      return { error: null }
+    })
   }
   function confirmDeleteFile(f: JobFile) {
     if (!contact) return
     Alert.alert('Delete file?', `Removing ${f.filename || 'this file'} from storage. This cannot be undone.`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deleteFile({ id: f.id, path: f.storage_path, jobId: contact.id }) }
+      { text: 'Delete', style: 'destructive', onPress: () => run("file:" + f.id, "Couldn't delete file", () => deleteFile({ id: f.id, path: f.storage_path, jobId: contact.id })) }
     ])
   }
 
@@ -535,7 +531,7 @@ export default function JobDetailScreen() {
     if (!contact) return
     Alert.alert('Delete photo?', 'This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deletePhoto({ id: photoId, path, jobId: contact.id }) }
+      { text: 'Delete', style: 'destructive', onPress: () => run("photo:" + photoId, "Couldn't delete photo", () => deletePhoto({ id: photoId, path, jobId: contact.id })) }
     ])
   }
 
@@ -543,7 +539,7 @@ export default function JobDetailScreen() {
     if (!contact) return
     Alert.alert('Delete payment?', 'This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deletePayment({ id: pid, contactId: contact.id }) }
+      { text: 'Delete', style: 'destructive', onPress: () => run("payment:" + pid, "Couldn't delete payment", () => deletePayment({ id: pid, contactId: contact.id })) }
     ])
   }
 
@@ -551,7 +547,7 @@ export default function JobDetailScreen() {
     if (!contact) return
     Alert.alert('Delete expense?', 'This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deleteExpense({ id: eid, contactId: contact.id }) }
+      { text: 'Delete', style: 'destructive', onPress: () => run("expense:" + eid, "Couldn't delete expense", () => deleteExpense({ id: eid, contactId: contact.id })) }
     ])
   }
 
@@ -562,8 +558,8 @@ export default function JobDetailScreen() {
       {
         text: 'Delete', style: 'destructive',
         onPress: async () => {
-          const { error } = await deleteJob(contact.id)
-          if (!error) { setEditOpen(false); router.back() }
+          const saved = await run('delete-job', "Couldn't delete job", () => deleteJob(contact.id))
+          if (saved) { setEditOpen(false); router.back() }
         }
       }
     ])
@@ -572,7 +568,7 @@ export default function JobDetailScreen() {
   async function changeStage(next: string) {
     if (!contact || next === contact.stage || stageSaving) return
     setStageSaving(next)
-    await updateStage({ contactId: contact.id, stage: next })
+    await run('stage', "Couldn't update stage", () => updateStage({ contactId: contact.id, stage: next }))
     setStageSaving(null)
   }
 
@@ -615,7 +611,7 @@ export default function JobDetailScreen() {
 
         {/* Money summary */}
         <View className="flex-row mt-5" style={{ gap: 12 }}>
-          <Stat label="Contract" value={money(totals.amount)} />
+          <Stat label="Contract" value={money(totals.contractTotal)} />
           <Stat label="Paid" value={money(totals.paid)} tone="#2D7A4F" />
           <Stat label="Balance" value={money(totals.balance)} tone="#C9963A" />
         </View>
@@ -709,8 +705,9 @@ export default function JobDetailScreen() {
             {todos.map((t) => (
               <Pressable
                 key={t.id}
-                onPress={() => contact && toggleTodo({ id: t.id, jobId: contact.id, done: !t.done })}
-                onLongPress={() => contact && deleteTodo({ id: t.id, jobId: contact.id })}
+                onPress={() => contact && run("task:" + t.id, "Couldn't update task", () => toggleTodo({ id: t.id, jobId: contact.id, done: !t.done }))}
+                onLongPress={() => confirmDeleteTodo(t.id)}
+                disabled={pending.has(`task:${t.id}`)}
                 delayLongPress={350}
                 className="bg-[rgba(20, 20, 20,0.6)] rounded-[10px] p-3 border border-[rgba(201, 150, 58,0.12)] flex-row items-center"
                 style={{ gap: 12 }}
@@ -1207,9 +1204,9 @@ export default function JobDetailScreen() {
       </ScrollView>
 
       {/* Edit job modal */}
-      <Modal visible={editOpen} transparent animationType="slide" onRequestClose={() => setEditOpen(false)}>
+      <Modal visible={editOpen} transparent animationType="slide" onRequestClose={() => !editSaving && setEditOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
-          <Pressable className="flex-1" onPress={() => setEditOpen(false)} />
+          <Pressable className="flex-1" onPress={() => !editSaving && setEditOpen(false)} />
           <ScrollView
             className="bg-surface rounded-t-[10px] border-t border-[rgba(242, 237, 228,0.10)]"
             contentContainerStyle={{ padding: 24, paddingBottom: insets.bottom + 24 }}
@@ -1217,7 +1214,7 @@ export default function JobDetailScreen() {
           >
             <Text className="text-ink text-xl font-bold mb-5">Edit job</Text>
             <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Name</Text>
-            <TextInput
+            <TextInput editable={!editSaving}
               value={editName}
               onChangeText={setEditName}
               placeholder="Homeowner or company"
@@ -1225,7 +1222,7 @@ export default function JobDetailScreen() {
               className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-4"
             />
             <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Job title</Text>
-            <TextInput
+            <TextInput editable={!editSaving}
               value={editTitle}
               onChangeText={setEditTitle}
               placeholder="Kitchen remodel, roof…"
@@ -1235,7 +1232,7 @@ export default function JobDetailScreen() {
             <View className="flex-row mb-4" style={{ gap: 12 }}>
               <View className="flex-1">
                 <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Phone</Text>
-                <TextInput
+                <TextInput editable={!editSaving}
                   value={editPhone}
                   onChangeText={setEditPhone}
                   keyboardType="phone-pad"
@@ -1246,7 +1243,7 @@ export default function JobDetailScreen() {
               </View>
               <View className="flex-1">
                 <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Value</Text>
-                <TextInput
+                <TextInput editable={!editSaving}
                   value={editAmount}
                   onChangeText={setEditAmount}
                   keyboardType="decimal-pad"
@@ -1257,7 +1254,7 @@ export default function JobDetailScreen() {
               </View>
             </View>
             <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Email</Text>
-            <TextInput
+            <TextInput editable={!editSaving}
               value={editEmail}
               onChangeText={setEditEmail}
               keyboardType="email-address"
@@ -1267,7 +1264,7 @@ export default function JobDetailScreen() {
               className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-4"
             />
             <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Address</Text>
-            <TextInput
+            <TextInput editable={!editSaving}
               value={editAddress}
               onChangeText={setEditAddress}
               placeholder="Job site address"
@@ -1275,7 +1272,7 @@ export default function JobDetailScreen() {
               className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-4"
             />
             <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Notes</Text>
-            <TextInput
+            <TextInput editable={!editSaving}
               value={editNotes}
               onChangeText={setEditNotes}
               multiline
@@ -1305,13 +1302,13 @@ export default function JobDetailScreen() {
       </Modal>
 
       {/* Add sub modal */}
-      <Modal visible={subOpen} transparent animationType="slide" onRequestClose={() => setSubOpen(false)}>
+      <Modal visible={subOpen} transparent animationType="slide" onRequestClose={() => !subSaving && setSubOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
-          <Pressable className="flex-1" onPress={() => setSubOpen(false)} />
+          <Pressable className="flex-1" onPress={() => !subSaving && setSubOpen(false)} />
           <View className="bg-surface rounded-t-[10px] p-6 border-t border-[rgba(242, 237, 228,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
             <Text className="text-ink text-xl font-bold mb-5">Add subcontractor</Text>
             <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Name</Text>
-            <TextInput
+            <TextInput editable={!subSaving}
               value={subName} onChangeText={setSubName} autoFocus
               placeholder="Sub or company" placeholderTextColor="rgba(242,237,228,0.4)"
               className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-4"
@@ -1319,7 +1316,7 @@ export default function JobDetailScreen() {
             <View className="flex-row mb-4" style={{ gap: 12 }}>
               <View className="flex-1">
                 <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Trade</Text>
-                <TextInput
+                <TextInput editable={!subSaving}
                   value={subTrade} onChangeText={setSubTrade}
                   placeholder="Electrical, framing…" placeholderTextColor="rgba(242,237,228,0.4)"
                   className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink"
@@ -1327,7 +1324,7 @@ export default function JobDetailScreen() {
               </View>
               <View style={{ width: 110 }}>
                 <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Rate</Text>
-                <TextInput
+                <TextInput editable={!subSaving}
                   value={subRate} onChangeText={setSubRate} keyboardType="decimal-pad"
                   placeholder="$0" placeholderTextColor="rgba(242,237,228,0.4)"
                   className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink"
@@ -1335,7 +1332,7 @@ export default function JobDetailScreen() {
               </View>
             </View>
             <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Phone</Text>
-            <TextInput
+            <TextInput editable={!subSaving}
               value={subPhone} onChangeText={setSubPhone} keyboardType="phone-pad"
               placeholder="(555) 555-5555" placeholderTextColor="rgba(242,237,228,0.4)"
               className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-5"
@@ -1388,12 +1385,12 @@ export default function JobDetailScreen() {
       </Modal>
 
       {/* Add note modal */}
-      <Modal visible={noteOpen} transparent animationType="slide" onRequestClose={() => setNoteOpen(false)}>
+      <Modal visible={noteOpen} transparent animationType="slide" onRequestClose={() => !noteSaving && setNoteOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
-          <Pressable className="flex-1" onPress={() => setNoteOpen(false)} />
+          <Pressable className="flex-1" onPress={() => !noteSaving && setNoteOpen(false)} />
           <View className="bg-surface rounded-t-[10px] p-6 border-t border-[rgba(242, 237, 228,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
             <Text className="text-ink text-xl font-bold mb-5">Add note</Text>
-            <TextInput
+            <TextInput editable={!noteSaving}
               value={noteText}
               onChangeText={setNoteText}
               multiline
@@ -1416,14 +1413,14 @@ export default function JobDetailScreen() {
       </Modal>
 
       {/* New invoice modal */}
-      <Modal visible={invOpen} transparent animationType="slide" onRequestClose={() => setInvOpen(false)}>
+      <Modal visible={invOpen} transparent animationType="slide" onRequestClose={() => !invSaving && setInvOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
-          <Pressable className="flex-1" onPress={() => setInvOpen(false)} />
+          <Pressable className="flex-1" onPress={() => !invSaving && setInvOpen(false)} />
           <View className="bg-surface rounded-t-[10px] p-6 border-t border-[rgba(242, 237, 228,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
             <Text className="text-ink text-xl font-bold mb-1">New invoice</Text>
             <Text className="text-ink-muted text-sm mb-5">Balance on this job: {money(totals.balance)}</Text>
             <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Title (optional)</Text>
-            <TextInput
+            <TextInput editable={!invSaving}
               value={invTitle}
               onChangeText={setInvTitle}
               placeholder="Deposit, progress draw, final…"
@@ -1431,7 +1428,7 @@ export default function JobDetailScreen() {
               className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-4"
             />
             <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Amount</Text>
-            <TextInput
+            <TextInput editable={!invSaving}
               value={invAmount}
               onChangeText={setInvAmount}
               keyboardType="decimal-pad"
@@ -1452,25 +1449,25 @@ export default function JobDetailScreen() {
       </Modal>
 
       {/* New change order modal */}
-      <Modal visible={coOpen} transparent animationType="slide" onRequestClose={() => setCoOpen(false)}>
+      <Modal visible={coOpen} transparent animationType="slide" onRequestClose={() => !coSaving && setCoOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
-          <Pressable className="flex-1" onPress={() => setCoOpen(false)} />
+          <Pressable className="flex-1" onPress={() => !coSaving && setCoOpen(false)} />
           <View className="bg-surface rounded-t-[10px] p-6 border-t border-[rgba(242, 237, 228,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
             <Text className="text-ink text-xl font-bold mb-5">New change order</Text>
             <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Title</Text>
-            <TextInput
+            <TextInput editable={!coSaving}
               value={coTitle} onChangeText={setCoTitle} autoFocus
               placeholder="Added scope, upgrade…" placeholderTextColor="rgba(242,237,228,0.4)"
               className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-4"
             />
             <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Amount</Text>
-            <TextInput
+            <TextInput editable={!coSaving}
               value={coAmount} onChangeText={setCoAmount} keyboardType="decimal-pad"
               placeholder="$0" placeholderTextColor="rgba(242,237,228,0.4)"
               className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink text-2xl font-bold mb-4"
             />
             <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Description (optional)</Text>
-            <TextInput
+            <TextInput editable={!coSaving}
               value={coDesc} onChangeText={setCoDesc} multiline
               placeholder="What changed and why" placeholderTextColor="rgba(242,237,228,0.4)"
               className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-5"
@@ -1484,19 +1481,19 @@ export default function JobDetailScreen() {
       </Modal>
 
       {/* Log mileage modal */}
-      <Modal visible={milesOpen} transparent animationType="slide" onRequestClose={() => setMilesOpen(false)}>
+      <Modal visible={milesOpen} transparent animationType="slide" onRequestClose={() => !milesSaving && setMilesOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
-          <Pressable className="flex-1" onPress={() => setMilesOpen(false)} />
+          <Pressable className="flex-1" onPress={() => !milesSaving && setMilesOpen(false)} />
           <View className="bg-surface rounded-t-[10px] p-6 border-t border-[rgba(242, 237, 228,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
             <Text className="text-ink text-xl font-bold mb-5">Log mileage</Text>
             <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Miles</Text>
-            <TextInput
+            <TextInput editable={!milesSaving}
               value={milesVal} onChangeText={setMilesVal} keyboardType="decimal-pad" autoFocus
               placeholder="0" placeholderTextColor="rgba(242,237,228,0.4)"
               className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink text-2xl font-bold mb-4"
             />
             <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Purpose (optional)</Text>
-            <TextInput
+            <TextInput editable={!milesSaving}
               value={milesPurpose} onChangeText={setMilesPurpose}
               placeholder="Supply run, site visit…" placeholderTextColor="rgba(242,237,228,0.4)"
               className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-5"
@@ -1509,19 +1506,19 @@ export default function JobDetailScreen() {
       </Modal>
 
       {/* Add inspection modal */}
-      <Modal visible={inspOpen} transparent animationType="slide" onRequestClose={() => setInspOpen(false)}>
+      <Modal visible={inspOpen} transparent animationType="slide" onRequestClose={() => !inspSaving && setInspOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
-          <Pressable className="flex-1" onPress={() => setInspOpen(false)} />
+          <Pressable className="flex-1" onPress={() => !inspSaving && setInspOpen(false)} />
           <View className="bg-surface rounded-t-[10px] p-6 border-t border-[rgba(242, 237, 228,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
             <Text className="text-ink text-xl font-bold mb-5">Add inspection</Text>
             <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Trade / type</Text>
-            <TextInput
+            <TextInput editable={!inspSaving}
               value={inspTrade} onChangeText={setInspTrade} autoFocus
               placeholder="Framing, electrical, final…" placeholderTextColor="rgba(242,237,228,0.4)"
               className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-4"
             />
             <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Inspector (optional)</Text>
-            <TextInput
+            <TextInput editable={!inspSaving}
               value={inspInspector} onChangeText={setInspInspector}
               placeholder="Name or agency" placeholderTextColor="rgba(242,237,228,0.4)"
               className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-5"
@@ -1534,9 +1531,9 @@ export default function JobDetailScreen() {
       </Modal>
 
       {/* Add expense modal */}
-      <Modal visible={expOpen} transparent animationType="slide" onRequestClose={() => setExpOpen(false)}>
+      <Modal visible={expOpen} transparent animationType="slide" onRequestClose={() => !expSaving && setExpOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
-          <Pressable className="flex-1" onPress={() => setExpOpen(false)} />
+          <Pressable className="flex-1" onPress={() => !expSaving && setExpOpen(false)} />
           <View className="bg-surface rounded-t-[10px] p-6 border-t border-[rgba(242, 237, 228,0.10)]" style={{ paddingBottom: insets.bottom + 24 }}>
             <Text className="text-ink text-xl font-bold mb-4">Log an expense</Text>
             <Pressable
@@ -1554,7 +1551,7 @@ export default function JobDetailScreen() {
               </View>
             </Pressable>
             <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Amount</Text>
-            <TextInput
+            <TextInput editable={!expSaving}
               value={expAmount}
               onChangeText={setExpAmount}
               keyboardType="decimal-pad"
@@ -1564,7 +1561,7 @@ export default function JobDetailScreen() {
               className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink text-2xl font-bold mb-4"
             />
             <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Category</Text>
-            <TextInput
+            <TextInput editable={!expSaving}
               value={expCategory}
               onChangeText={setExpCategory}
               placeholder="Materials, fuel, permit…"
@@ -1572,7 +1569,7 @@ export default function JobDetailScreen() {
               className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-4"
             />
             <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Note (optional)</Text>
-            <TextInput
+            <TextInput editable={!expSaving}
               value={expDesc}
               onChangeText={setExpDesc}
               placeholder="What was it for?"
@@ -1592,14 +1589,14 @@ export default function JobDetailScreen() {
       </Modal>
 
       {/* Insurance modal */}
-      <Modal visible={insOpen} transparent animationType="slide" onRequestClose={() => setInsOpen(false)}>
+      <Modal visible={insOpen} transparent animationType="slide" onRequestClose={() => !insSaving && setInsOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
-          <Pressable className="flex-1" onPress={() => setInsOpen(false)} />
+          <Pressable className="flex-1" onPress={() => !insSaving && setInsOpen(false)} />
           <View className="bg-surface rounded-t-[10px] border-t border-[rgba(242, 237, 228,0.10)]" style={{ maxHeight: '85%', paddingBottom: insets.bottom + 16 }}>
             <View className="flex-row items-center justify-between px-6 pt-6 pb-3">
               <Text className="text-ink text-xl font-bold">Insurance claim</Text>
               {insurance ? (
-                <Pressable onPress={() => { Alert.alert('Remove claim?', 'This deletes the insurance details for this job.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: async () => { if (contact) { await deleteInsurance({ id: insurance.id, contactId: contact.id }); setInsOpen(false) } } }]) }} hitSlop={8}>
+                <Pressable onPress={() => { Alert.alert('Remove claim?', 'This deletes the insurance details for this job.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: async () => { if (contact) { const saved = await run("insurance:" + insurance.id, "Couldn't remove insurance", () => deleteInsurance({ id: insurance.id, contactId: contact.id })); if (saved) !insSaving && setInsOpen(false) } } }]) }} hitSlop={8}>
                   <Trash2 color="#C9963A" size={18} />
                 </Pressable>
               ) : null}
@@ -1618,7 +1615,7 @@ export default function JobDetailScreen() {
               ] as const).map(([key, label, ph, kb]) => (
                 <View key={key}>
                   <Text className="text-ink-muted text-xs font-bold tracking-[1.5px] uppercase mb-1.5">{label}</Text>
-                  <TextInput
+                  <TextInput editable={!insSaving}
                     value={(insForm as any)[key]}
                     onChangeText={(v) => setInsForm((f) => ({ ...f, [key]: v }))}
                     keyboardType={kb as any}
@@ -1642,9 +1639,9 @@ export default function JobDetailScreen() {
       </Modal>
 
       {/* Quote terms modal */}
-      <Modal visible={qtOpen} transparent animationType="slide" onRequestClose={() => setQtOpen(false)}>
+      <Modal visible={qtOpen} transparent animationType="slide" onRequestClose={() => !qtSaving && setQtOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
-          <Pressable className="flex-1" onPress={() => setQtOpen(false)} />
+          <Pressable className="flex-1" onPress={() => !qtSaving && setQtOpen(false)} />
           <View className="bg-surface rounded-t-[10px] border-t border-[rgba(242, 237, 228,0.10)]" style={{ maxHeight: '85%', paddingBottom: insets.bottom + 16 }}>
             <Text className="text-ink text-xl font-bold px-6 pt-6 pb-3">Quote terms</Text>
             <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 16, gap: 12 }} keyboardShouldPersistTaps="handled">
@@ -1656,7 +1653,7 @@ export default function JobDetailScreen() {
                 <View key={key}>
                   <Text className="text-ink-muted text-xs font-bold tracking-[1.5px] uppercase mb-1">{label}</Text>
                   <Text className="text-ink-muted text-xs mb-2">{hint}</Text>
-                  <TextInput
+                  <TextInput editable={!qtSaving}
                     value={(qtForm as any)[key]}
                     onChangeText={(v) => setQtForm((f) => ({ ...f, [key]: v }))}
                     multiline

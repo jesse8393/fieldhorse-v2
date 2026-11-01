@@ -9,6 +9,7 @@ import { Bell } from 'lucide-react-native'
 import { useNotifications, useMarkNotificationRead, useMarkAllNotificationsRead, type Notification } from '../lib/queries'
 import { useAuth } from '../contexts/AuthContext'
 import { ScreenBackground, Card, ScreenHeader, theme } from '../components/ui'
+import { useMutationFeedback } from '../lib/useMutationFeedback'
 
 function timeAgo(iso: string) {
   const diff = Date.now() - new Date(iso).getTime()
@@ -29,12 +30,13 @@ export default function NotificationsScreen() {
   const { data: items = [], isLoading } = useNotifications(user?.id)
   const markRead = useMarkNotificationRead()
   const markAll = useMarkAllNotificationsRead()
+  const { run, pending } = useMutationFeedback()
 
   const unread = items.filter((n) => !n.read_at).length
 
-  function onPress(n: Notification) {
+  async function onPress(n: Notification) {
     if (!user) return
-    if (!n.read_at) markRead({ id: n.id, userId: user.id })
+    if (!n.read_at && !await run('notifications', "Couldn't mark notification read", () => markRead({ id: n.id, userId: user.id }))) return
     if (n.link && n.link.startsWith('/')) router.push(n.link as any)
   }
 
@@ -45,7 +47,7 @@ export default function NotificationsScreen() {
         <ScreenHeader
           backLabel="More" onBack={() => router.back()} eyebrow="Notifications" title="Activity"
           right={unread > 0 ? (
-            <Pressable onPress={() => user && markAll(user.id)} hitSlop={8}>
+            <Pressable disabled={pending.has('notifications')} onPress={() => user && run('notifications', "Couldn't mark notifications read", () => markAll(user.id))} hitSlop={8}>
               <Text style={{ color: theme.goldBright, fontSize: 14, fontWeight: '700' }}>Mark all read</Text>
             </Pressable>
           ) : undefined}

@@ -17,8 +17,10 @@ import { buildInvoiceHtml } from '../../lib/invoiceHtml'
 import { shareProposalPdf } from '../../lib/quotePdf'
 import { sendInvoiceEmail } from '../../lib/sendDocs'
 import { mintPublicLink } from '../../lib/publicLink'
+import { useMutationFeedback } from '../../lib/useMutationFeedback'
+import { jobMoney } from '../../lib/jobMoney'
 
-function money(n: number) { return `$${Math.round(n).toLocaleString()}` }
+function money(n: number) { return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 
 export default function InvoiceDetailScreen() {
   const insets = useSafeAreaInsets()
@@ -30,11 +32,12 @@ export default function InvoiceDetailScreen() {
   const { data: draws = [] } = useInvoiceDraws(id)
   const generateDraws = useGenerateDraws()
   const updateDrawStatus = useUpdateInvoiceStatus()
+  const { run, pending } = useMutationFeedback()
   const queryClient = useQueryClient()
   const [payOpen, setPayOpen] = useState(false)
   const [previewHtml, setPreviewHtml] = useState<string | null>(null)
   const [sharing, setSharing] = useState(false)
-  const [busy, setBusy] = useState<null | 'send' | 'link' | 'draws'>(null)
+  const [busy, setBusy] = useState<null | 'send' | 'link'>(null)
 
   if (isPending) {
     return <View style={{ flex: 1 }}><ScreenBackground /><ActivityIndicator color={theme.goldBright} style={{ marginTop: insets.top + 80 }} /></View>
@@ -52,7 +55,7 @@ export default function InvoiceDetailScreen() {
 
   const { contact, payments, amount: total, paid, balance, pctPaid, ageDays } = data
   const isClosed = (contact.stage || '').toLowerCase() === 'closed'
-  const isPaid = balance < 0.5 && total > 0
+  const isPaid = balance === 0 && total > 0
   const status = isClosed ? { label: 'CLOSED', tint: theme.inkMuted }
     : isPaid ? { label: 'PAID', tint: theme.success }
     : ageDays > 60 ? { label: 'OVERDUE', tint: theme.danger }
@@ -98,20 +101,22 @@ export default function InvoiceDetailScreen() {
     finally { setBusy(null) }
   }
 
-  const drawsIssued = draws.reduce((s: number, d: any) => s + Number(d.amount || 0), 0)
-  const unbilled = Math.max(0, total - drawsIssued)
+  const drawsIssued = jobMoney({ invoices: draws }).invoiced
+  const unbilled = Math.max(0, Math.round(total * 100) - Math.round(drawsIssued * 100)) / 100
   async function onGenerateDraws() {
     if (busy || !user) return
     if (draws.length) { Alert.alert('Draws already exist', 'Delete them first to regenerate from terms.'); return }
-    setBusy('draws')
-    const { error } = await generateDraws({ userId: user.id, contactId: contact.id, contractTotal: total })
-    setBusy(null)
-    if (error) Alert.alert("Couldn't generate draws", error.message)
+    await run('draws', "Couldn't generate draws", () => generateDraws({ userId: user.id, contactId: contact.id, contractTotal: total }))
   }
   async function cycleDraw(d: any) {
-    const next = d.status === 'draft' ? 'sent' : d.status === 'sent' ? 'paid' : 'draft'
-    await updateDrawStatus({ id: d.id, contactId: contact.id, status: next })
-    queryClient.invalidateQueries({ queryKey: ['invoiceDraws', id] })
+    if (!user || d.status === 'paid' || d.status === 'void') return
+    const next = d.status === 'draft' ? 'sent' : 'paid'
+    const save = () => run(`draw:${d.id}`, "Couldn't update draw", () => updateDrawStatus({ id: d.id, contactId: contact.id, status: next, userId: user.id }))
+    if (next === 'paid') {
+      Alert.alert('Record remaining payment?', 'Confirm you received the outstanding amount. This records a payment and marks the draw paid.', [
+        { text: 'Cancel', style: 'cancel' }, { text: 'Payment received', onPress: () => { void save() } }
+      ])
+    } else await save()
   }
   const drawTint = (s: string) => s === 'paid' ? theme.success : s === 'sent' ? theme.goldBright : theme.inkMuted
 
@@ -155,8 +160,8 @@ export default function InvoiceDetailScreen() {
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
           <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '800', letterSpacing: 0, textTransform: 'uppercase' }}>Progress draws{draws.length ? ` · ${draws.length}` : ''}</Text>
           {draws.length === 0 && total > 0 ? (
-            <Pressable onPress={onGenerateDraws} disabled={busy === 'draws'}>
-              {busy === 'draws' ? <ActivityIndicator color={theme.goldBright} /> : <Text style={{ color: theme.goldBright, fontSize: 12, fontWeight: '700' }}>Generate 50/40/10</Text>}
+            <Pressable onPress={onGenerateDraws} disabled={pending.has('draws')}>
+              {pending.has('draws') ? <ActivityIndicator color={theme.goldBright} /> : <Text style={{ color: theme.goldBright, fontSize: 12, fontWeight: '700' }}>Generate 50/40/10</Text>}
             </Pressable>
           ) : null}
         </View>
