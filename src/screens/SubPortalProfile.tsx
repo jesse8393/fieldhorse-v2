@@ -15,6 +15,7 @@ import { useMembership } from '../contexts/MembershipContext.tsx'
 import { mergedProfile, subPortalContext, subProfileUpdate, type SubProfile, type SubProfileUpdate } from '../lib/subApi.ts'
 import { toastSuccess } from '../lib/toast.ts'
 import { hapticMedium } from '../lib/haptics.ts'
+import { keepFocusOnRetry } from '../lib/retryFocus.ts'
 
 const FIELDS: Array<keyof SubProfileUpdate> = [
   'phone', 'address', 'ein', 'insurance_carrier', 'insurance_policy', 'insurance_expires_on', 'license_number', 'payment_handle', 'payment_method'
@@ -70,7 +71,7 @@ export default function SubPortalProfile() {
   }
 
   async function save() {
-    if (saving || !initial) return
+    if (saving || loading || loadError || !initial) return
     const norm = (v: unknown) => (v == null ? '' : String(v).trim())
     const changed: SubProfileUpdate = {}
     for (const key of FIELDS) {
@@ -98,7 +99,7 @@ export default function SubPortalProfile() {
   const text = (key: keyof SubProfileUpdate) => (form[key] == null ? '' : String(form[key]))
 
   return (
-    <CreateShell title="Edit profile" saveLabel="Save changes" saving={saving || loading || !initial} error={error} backTo="/sub-portal" onSave={save}>
+    <CreateShell title="Edit profile" saveLabel="Save changes" saving={saving} saveDisabled={loading || !!loadError || !initial} error={error} backTo="/sub-portal" onSave={save}>
       <p className="fhnew-lede">
         Updates apply to every contractor that has you on file. They can't change your name, company or email; those stay under each GC's control.
       </p>
@@ -107,11 +108,11 @@ export default function SubPortalProfile() {
         <DataErrorState
           title={loadError ? "Couldn't load your profile" : 'No profile yet'}
           message={loadError || 'When a contractor adds you to a job, your profile shows up here.'}
-          actionLabel={loadError ? 'Try again' : ''}
-          onRetry={() => setTick((n) => n + 1)}
+          actionLabel="Try again"
+          onRetry={loadError ? () => { keepFocusOnRetry(); setTick((n) => n + 1) } : undefined}
         />
       )}
-      {!loading && initial && (
+      {!loading && !loadError && initial && (
         <>
           <Field label="Phone" type="tel" inputMode="tel" value={text('phone')} onChange={(e) => set('phone', e.target.value)} />
           <Field label="Address" value={text('address')} onChange={(e) => set('address', e.target.value)} />

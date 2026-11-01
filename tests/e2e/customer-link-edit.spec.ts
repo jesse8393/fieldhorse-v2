@@ -39,6 +39,12 @@ test('customer replacement and unlink persist without overwriting typed job deta
   const { writes } = await savedJob(context)
   await page.setViewportSize({ width: 320, height: 844 })
   let form = await edit(page)
+  for (const width of [320, 844]) {
+    await page.setViewportSize({ width, height: 844 })
+    expect(await form.getByLabel('Name', { exact: true }).evaluate(el => parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(16)
+    await nothingRunsOffTheSide(page)
+  }
+  await page.setViewportSize({ width: 320, height: 844 })
   await form.getByLabel('Name', { exact: true }).fill('Keep this typed name')
   const unlink = form.getByRole('button', { name: 'Unlink client', exact: true })
   expect((await unlink.boundingBox())!.width).toBeGreaterThanOrEqual(44)
@@ -104,7 +110,8 @@ test('failed client reads never masquerade as an empty customer book or offer cr
 })
 
 test('a delayed original client response cannot undo manual replacement', async ({ context, page }) => {
-  await signIn(context, { tables: { fh_clients: [original, replacement] } })
+  // Empty contact fields may hydrate; existing job contact details must stay.
+  await signIn(context, { tables: { fh_contacts: [job], fh_clients: [original, replacement] } })
   let held = false
   let finished = false
   let release = () => {}
@@ -133,6 +140,20 @@ test('exact matching searches beyond recent customers before offering a new reco
   const oldCustomer = { ...replacement, last_activity_at: '2020-01-01T12:00:00Z' }
   const recent = Array.from({ length: 65 }, (_, i) => ({ ...original, id: `recent-${i}`, name: `Recent customer ${i}`, last_activity_at: '2026-10-30T12:00:00Z' }))
   await signIn(context, { tables: { fh_clients: [original, ...recent, oldCustomer] } })
+  // The shared fixture implements order/limit but deliberately ignores LIKE
+  // filters. Model their server response here, while retaining the real
+  // recent-page limit and asserting a scoped whole-book lookup was issued.
+  const searches: URL[] = []
+  await context.route(/\/rest\/v1\/fh_clients(?:\?|$)/, route => {
+    const url = new URL(route.request().url())
+    if (url.searchParams.has('or') || url.searchParams.get('name')?.startsWith('ilike.')) {
+      searches.push(url)
+      expect(url.searchParams.get('org_id')).toBe('eq.org-1')
+      expect(url.searchParams.get('or') || url.searchParams.get('name')).toContain(replacement.name)
+      return route.fulfill({ json: [oldCustomer] })
+    }
+    return route.fallback()
+  })
   const form = await edit(page)
   await form.getByRole('button', { name: 'Unlink client', exact: true }).click()
   const input = form.getByRole('combobox', { name: 'Linked client', exact: true })
@@ -141,6 +162,7 @@ test('exact matching searches beyond recent customers before offering a new reco
   await expect(form.getByRole('button', { name: /^Create “/ })).toHaveCount(0)
   await input.press('Enter')
   await expect(form.getByRole('group', { name: 'Linked client', exact: true })).toContainText(replacement.name)
+  expect(searches.some(url => url.searchParams.get('name') === `ilike.${replacement.name}`)).toBe(true)
 })
 
 test('job save refusal retains edits and focus across retry without premature success', async ({ context, page }) => {

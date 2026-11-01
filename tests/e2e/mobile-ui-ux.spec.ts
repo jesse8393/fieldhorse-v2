@@ -8,6 +8,36 @@ const selectionFixture = {
   options: [{ id: 'option-ui', label: 'Porcelain tile', brand: 'Sample', sku: 'PT-100', price: 7.25 }]
 }
 
+test('missing subcontractor profile has no endless saving state or unnamed retry button', async ({ context, page }) => {
+  await signIn(context)
+  await page.setViewportSize({ width: 320, height: 844 })
+  await page.goto('/sub-portal/profile')
+  await expect(page.getByText('No profile yet', { exact: true })).toBeVisible()
+  const save = page.getByRole('button', { name: 'Save changes', exact: true })
+  await expect(save).toBeDisabled()
+  await expect(save).not.toHaveAttribute('aria-busy', 'true')
+  await expect(page.getByRole('button', { name: '', exact: true })).toHaveCount(0)
+  await nothingRunsOffTheSide(page)
+})
+
+test('failed subcontractor profile loading recovers through a named keyboard retry', async ({ context, page }) => {
+  await signIn(context)
+  let refuse = true
+  await context.route('**/api/sub-portal-context', route => refuse
+    ? route.fulfill({ status: 503, json: { error: 'Profile unavailable' } })
+    : route.fulfill({ json: { matched_profiles: [{ id: 'sub-profile', name: 'Test subcontractor', phone: '6155550182' }] } }))
+  await page.goto('/sub-portal/profile')
+  await expect(page.getByText("Couldn't load your profile", { exact: true })).toBeVisible()
+  const save = page.getByRole('button', { name: 'Save changes', exact: true })
+  await expect(save).toBeDisabled()
+  await expect(save).not.toHaveAttribute('aria-busy', 'true')
+  refuse = false
+  await page.getByRole('button', { name: 'Try again', exact: true }).press('Enter')
+  await expect(page.getByLabel('Phone', { exact: true })).toHaveValue('6155550182')
+  await expect(save).toBeEnabled()
+  await expect(page.getByRole('main')).toBeFocused()
+})
+
 for (const surface of ['phone', 'desktop'] as const) {
   test(`${surface} search removes restricted results after a role change and rejects late financial responses`, async ({ context, page }) => {
     await signIn(context)

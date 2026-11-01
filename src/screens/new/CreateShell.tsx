@@ -85,6 +85,8 @@ type Props = {
   /** The gold button's label, such as "Save lead". */
   saveLabel: string
   saving?: boolean
+  /** Block submission without presenting a save as already in progress. */
+  saveDisabled?: boolean
   error?: string
   /** Where Back goes when there is no history, such as the New screen. */
   backTo?: string
@@ -92,7 +94,7 @@ type Props = {
   children: ReactNode
 }
 
-export default function CreateShell({ title, saveLabel, saving = false, error, backTo = '/new', onSave, children }: Props) {
+export default function CreateShell({ title, saveLabel, saving = false, saveDisabled = false, error, backTo = '/new', onSave, children }: Props) {
   const navigate = useNavigate()
   const titleRef = useRef<HTMLHeadingElement>(null)
   const formRef = useRef<HTMLFormElement>(null)
@@ -118,7 +120,7 @@ export default function CreateShell({ title, saveLabel, saving = false, error, b
 
   async function submit(e: FormEvent) {
     e.preventDefault()
-    if (saving) return
+    if (saving || saveDisabled) return
     await onSave()
     setSubmitAttempt(attempt => attempt + 1)
   }
@@ -134,7 +136,7 @@ export default function CreateShell({ title, saveLabel, saving = false, error, b
       </div>
       {error && <p className="fhnew-error" role="alert" tabIndex={-1}>{error}</p>}
       <div className="fhnew-save">
-        <Button type="submit" variant="primary" size="lg" loading={saving}>{saveLabel}</Button>
+        <Button type="submit" variant="primary" size="lg" loading={saving} disabled={saveDisabled}>{saveLabel}</Button>
       </div>
     </form>
   )

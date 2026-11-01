@@ -877,7 +877,7 @@ function EditField({ label, value, onChange, kind, placeholder, spanFull }: any)
     padding: '12px 12px', borderRadius: 10,
     background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)',
     color: 'var(--v3-text)',
-    fontFamily: 'var(--font-body)', fontSize: 14,
+    fontFamily: 'var(--font-body)', fontSize: 16,
     outline: 'none'
   }
   return (
