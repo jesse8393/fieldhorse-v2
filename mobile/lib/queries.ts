@@ -12,8 +12,10 @@ import { useEffect } from 'react'
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { supabase } from './supabase'
 import { getWeather } from './weather'
-import { assertReadResults } from './readResult'
+import { assertReadResults, readAllRows } from './readResult'
 import { confirmMutation } from './mutationResult'
+import { jobMoney } from './jobMoney'
+import { allocateInvoiceDue, knownContractTotal } from '../../src/lib/invoiceSettlement'
 import { claudeVision, claudeText } from './anthropic'
 import type { Database } from './database.types'
 
@@ -238,16 +240,16 @@ export type JobDetail = {
 async function fetchJobDetail(id: string): Promise<JobDetail> {
   const [c, p, sch, s, e, t, n, inv, co, mi, insp, ins] = await Promise.all([
     supabase.from('fh_contacts').select('*').eq('id', id).maybeSingle(),
-    supabase.from('fh_payments').select('*').eq('contact_id', id).order('paid_on', { ascending: false }),
-    supabase.from('fh_schedule').select('*').eq('contact_id', id).order('start_at', { ascending: true }),
-    supabase.from('fh_subs').select('*').eq('contact_id', id).order('created_at', { ascending: false }),
-    supabase.from('fh_expenses').select('*').eq('contact_id', id).order('expense_date', { ascending: false }),
-    supabase.from('fh_job_todos').select('*').eq('job_id', id).order('done', { ascending: true }).order('created_at', { ascending: true }),
-    supabase.from('fh_notes').select('*').eq('contact_id', id).order('created_at', { ascending: false }),
-    supabase.from('fh_invoices').select('*').eq('contact_id', id).order('created_at', { ascending: false }),
-    supabase.from('fh_change_orders').select('*').eq('contact_id', id).order('created_at', { ascending: false }),
-    supabase.from('fh_mileage').select('*').eq('contact_id', id).order('drove_on', { ascending: false }),
-    supabase.from('fh_inspections').select('*').eq('contact_id', id).order('created_at', { ascending: false }),
+    readAllRows((from, to) => supabase.from('fh_payments').select('*').eq('contact_id', id).order('paid_on', { ascending: false }).order('id', { ascending: true }).range(from, to)),
+    readAllRows((from, to) => supabase.from('fh_schedule').select('*').eq('contact_id', id).order('start_at', { ascending: true }).order('id', { ascending: true }).range(from, to)),
+    readAllRows((from, to) => supabase.from('fh_subs').select('*').eq('contact_id', id).order('created_at', { ascending: false }).order('id', { ascending: true }).range(from, to)),
+    readAllRows((from, to) => supabase.from('fh_expenses').select('*').eq('contact_id', id).order('expense_date', { ascending: false }).order('id', { ascending: true }).range(from, to)),
+    readAllRows((from, to) => supabase.from('fh_job_todos').select('*').eq('job_id', id).order('done', { ascending: true }).order('created_at', { ascending: true }).order('id', { ascending: true }).range(from, to)),
+    readAllRows((from, to) => supabase.from('fh_notes').select('*').eq('contact_id', id).order('created_at', { ascending: false }).order('id', { ascending: true }).range(from, to)),
+    readAllRows((from, to) => supabase.from('fh_invoices').select('*').eq('contact_id', id).order('created_at', { ascending: false }).order('id', { ascending: true }).range(from, to)),
+    readAllRows((from, to) => supabase.from('fh_change_orders').select('*').eq('contact_id', id).order('created_at', { ascending: false }).order('id', { ascending: true }).range(from, to)),
+    readAllRows((from, to) => supabase.from('fh_mileage').select('*').eq('contact_id', id).order('drove_on', { ascending: false }).order('id', { ascending: true }).range(from, to)),
+    readAllRows((from, to) => supabase.from('fh_inspections').select('*').eq('contact_id', id).order('created_at', { ascending: false }).order('id', { ascending: true }).range(from, to)),
     supabase.from('fh_insurance_claims').select('*').eq('contact_id', id).maybeSingle()
   ])
   assertReadResults(c, p, sch, s, e, t, n, inv, co, mi, insp, ins)
@@ -279,22 +281,37 @@ export function useJobDetail(id: string | undefined) {
 // balances refresh everywhere. Returns the supabase error (or null).
 export function useLogPayment() {
   const client = useQueryClient()
-  return async (input: { contactId: string; userId: string; amount: number; method?: string; paidOn?: string }) => {
-    const { error } = await supabase.from('fh_payments').insert({
+  return async (input: { id: string; contactId: string; userId: string; amount: number; method?: string; paidOn?: string }) => {
+    const cents = input.amount * 100
+    if (!Number.isFinite(cents) || !Number.isSafeInteger(Math.round(cents)) || cents <= 0 || Math.abs(cents - Math.round(cents)) > 0.000001) {
+      return { error: new Error('Enter a positive payment amount with up to two decimal places.') }
+    }
+    const payload = {
+      id: input.id,
       user_id: input.userId,
       contact_id: input.contactId,
       amount: input.amount,
       method: input.method || 'check',
       paid_on: input.paidOn || localYmd()
-    } as any)
-    if (!error) {
-      client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
-      client.invalidateQueries({ queryKey: ['invoiceDetail', input.contactId] })
-      client.invalidateQueries({ queryKey: ['invoicesOverview', input.userId] })
-      client.invalidateQueries({ queryKey: ['activityFeed', input.userId] })
-      client.invalidateQueries({ queryKey: queryKeys.jobs })
     }
-    return { error }
+    // A retry of the same sheet attempt reuses its UUID. Verify the stored
+    // payload too: ignoreDuplicates alone could accept changed form values.
+    const { error } = await supabase.from('fh_payments').upsert(payload, { onConflict: 'id', ignoreDuplicates: true })
+    if (error) return { error }
+    const { data: saved, error: readError } = await supabase.from('fh_payments')
+      .select('id, user_id, contact_id, amount, method, paid_on').eq('id', input.id).maybeSingle()
+    if (readError) return { error: readError }
+    if (!saved) return { error: new Error('Payment could not be confirmed. Retry this payment before starting another.') }
+    if (saved.user_id !== payload.user_id || saved.contact_id !== payload.contact_id
+      || Number(saved.amount) !== payload.amount || saved.method !== payload.method || saved.paid_on !== payload.paid_on) {
+      return { error: new Error('This payment attempt already saved different details. Review payment history before recording another payment.') }
+    }
+    client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
+    client.invalidateQueries({ queryKey: ['invoiceDetail', input.contactId] })
+    client.invalidateQueries({ queryKey: ['invoicesOverview', input.userId] })
+    client.invalidateQueries({ queryKey: ['activityFeed', input.userId] })
+    client.invalidateQueries({ queryKey: queryKeys.jobs })
+    return { error: null }
   }
 }
 
@@ -329,6 +346,7 @@ export type UpdateJobInput = {
   exclusionsText?: string | null
   termsText?: string | null
   quoteExpiresAt?: string | null
+  completedAt?: string | null
 }
 
 export function useUpdateJob() {
@@ -347,6 +365,7 @@ export function useUpdateJob() {
     if (input.exclusionsText !== undefined) patch.exclusions_text = input.exclusionsText
     if (input.termsText !== undefined) patch.terms_text = input.termsText
     if (input.quoteExpiresAt !== undefined) patch.quote_expires_at = input.quoteExpiresAt
+    if (input.completedAt !== undefined) patch.completed_at = input.completedAt
     const { error } = await confirmMutation(supabase.from('fh_contacts')
       .update(patch as any)
       .eq('id', input.contactId).select('id'))
@@ -437,20 +456,23 @@ export function useJobPhotos(jobId: string | undefined) {
 
 export function useUploadPhoto() {
   const client = useQueryClient()
-  return async (input: { userId: string; jobId: string; uri: string }) => {
+  return async (input: { userId: string; jobId: string; uri: string; mimeType?: string | null }) => {
     const pathId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-    const path = `${input.userId}/${input.jobId}/${pathId}.jpg`
+    const mimeType = input.mimeType || 'image/jpeg'
+    const extension = ({ 'image/png': 'png', 'image/webp': 'webp', 'image/heic': 'heic', 'image/heif': 'heif' } as Record<string, string>)[mimeType] || 'jpg'
+    const filename = `${pathId}.${extension}`
+    const path = `${input.userId}/${input.jobId}/${filename}`
     const arrayBuffer = await fetch(input.uri).then((r) => r.arrayBuffer())
     const { error: upErr } = await supabase.storage
       .from(PHOTO_BUCKET)
-      .upload(path, arrayBuffer, { contentType: 'image/jpeg', upsert: false })
+      .upload(path, arrayBuffer, { contentType: mimeType, upsert: false })
     if (upErr) return { error: upErr, id: null }
     const { data: row, error: insErr } = await supabase.from('fh_job_files').insert({
       user_id: input.userId,
       job_id: input.jobId,
-      filename: `${pathId}.jpg`,
+      filename,
       storage_path: path,
-      mime_type: 'image/jpeg',
+      mime_type: mimeType,
       size_bytes: (arrayBuffer as ArrayBuffer).byteLength,
       kind: 'photo'
     } as any).select('id').single()
@@ -829,11 +851,20 @@ export function useCreateInvoice() {
 
 export function useUpdateInvoiceStatus() {
   const client = useQueryClient()
-  return async (input: { id: string; contactId: string; status: string }) => {
+  const markPaid = useMarkInvoicePaid()
+  return async (input: { id: string; contactId: string; status: string; userId?: string }) => {
+    if (input.status === 'paid') {
+      if (!input.userId) return { error: new Error('Sign in before recording payment.') }
+      return markPaid({ id: input.id, userId: input.userId })
+    }
     const { error } = await confirmMutation(supabase.from('fh_invoices')
       .update({ status: input.status } as any)
       .eq('id', input.id).select('id'))
-    if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
+    if (!error) {
+      client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
+      client.invalidateQueries({ queryKey: ['invoiceDraws', input.contactId] })
+      client.invalidateQueries({ queryKey: ['invoicesOverview'] })
+    }
     return { error }
   }
 }
@@ -854,12 +885,12 @@ export function useInvoiceDraws(contactId: string | undefined) {
   return useQuery({
     queryKey: ['invoiceDraws', contactId],
     queryFn: async () => {
-      const { data , error: readError } = await supabase
+      const { data } = await readAllRows((from, to) => supabase
         .from('fh_invoices')
         .select('*')
         .eq('contact_id', contactId as string)
         .order('sequence_number', { ascending: true })
-      assertReadResults({ error: readError })
+        .order('id', { ascending: true }).range(from, to))
       return (data ?? []) as Invoice[]
     },
     enabled: !!contactId
@@ -1450,8 +1481,9 @@ function localYmd(d: Date = new Date()): string {
 }
 
 // Marking an invoice paid also records the money against it, so the job
-// balance, the web app and the customer statement agree. Only the part not
-// already paid against this invoice is logged.
+// balance, the web app and the customer statement agree. Re-read the full
+// allocation, including unlinked job payments and approved change orders.
+// Cross-device settlement still requires a transactional database operation.
 export function useMarkInvoicePaid() {
   const client = useQueryClient()
   return async (input: { id: string; userId: string }) => {
@@ -1462,12 +1494,37 @@ export function useMarkInvoicePaid() {
     if (invErr || !inv) return { error: invErr || new Error('Invoice not found.') }
     const row = inv as any
     if (row.status === 'paid') return { error: null }
-    const { data: linked, error: linkErr } = await supabase.from('fh_payments')
-      .select('amount')
-      .eq('invoice_id', input.id)
-    if (linkErr) return { error: linkErr }
-    const already = (linked ?? []).reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0)
-    const remainder = Math.round((Number(row.amount || 0) - already) * 100) / 100
+    if (row.status === 'void') return { error: new Error('A void invoice cannot receive payment.') }
+    let remainder: number
+    try {
+      const [payments, invoices, contact, changes] = await Promise.all([
+        readAllRows((from, to) => {
+          const q = supabase.from('fh_payments').select('amount, invoice_id')
+          return (row.contact_id ? q.eq('contact_id', row.contact_id) : q.eq('invoice_id', input.id)).order('id').range(from, to)
+        }),
+        row.contact_id
+          ? readAllRows((from, to) => supabase.from('fh_invoices').select('id, amount, status, sequence_number, due_at, created_at').eq('contact_id', row.contact_id).order('id').range(from, to))
+          : Promise.resolve({ data: [row], error: null }),
+        row.contact_id
+          ? supabase.from('fh_contacts').select('amount').eq('id', row.contact_id).single()
+          : Promise.resolve({ data: null, error: null }),
+        row.contact_id
+          ? readAllRows((from, to) => supabase.from('fh_change_orders').select('amount, status').eq('contact_id', row.contact_id).eq('status', 'approved').order('id').range(from, to))
+          : Promise.resolve({ data: [], error: null }),
+      ])
+      assertReadResults(payments, invoices, contact, changes)
+      const current = invoices.data.find((invoice: { id: string }) => invoice.id === input.id)
+      if (!current || current.status === 'void') return { error: new Error('Invoice changed. Reload before recording payment.') }
+      if (current.status === 'paid') return { error: null }
+      const due = allocateInvoiceDue({
+        invoices: invoices.data.map((invoice: any) => invoice.id === input.id ? { ...invoice, status: 'sent' } : invoice),
+        payments: payments.data,
+        contractTotal: row.contact_id ? knownContractTotal({ amount: contact.data?.amount, changeOrders: changes.data }) : Number(row.amount),
+      })
+      remainder = due.get(input.id) ?? 0
+    } catch (error) {
+      return { error: error instanceof Error ? error : new Error('Payment history could not be verified.') }
+    }
     if (remainder > 0) {
       const { error: payErr } = await supabase.from('fh_payments').insert({
         user_id: input.userId,
@@ -1484,6 +1541,7 @@ export function useMarkInvoicePaid() {
       client.invalidateQueries({ queryKey: ['invoicesOverview', input.userId] })
       client.invalidateQueries({ queryKey: ['jobDetail', row.contact_id] })
       client.invalidateQueries({ queryKey: ['invoiceDetail', row.contact_id] })
+      client.invalidateQueries({ queryKey: ['invoiceDraws', row.contact_id] })
       client.invalidateQueries({ queryKey: ['activityFeed', input.userId] })
       client.invalidateQueries({ queryKey: queryKeys.jobs })
     }
@@ -1769,17 +1827,16 @@ export function useInvoiceDetail(id: string | undefined) {
     queryKey: ['invoiceDetail', id],
     queryFn: async (): Promise<InvoiceDetailData | null> => {
       const cid = id as string
-      const [cRes, pRes] = await Promise.all([
+      const [cRes, pRes, changesRes] = await Promise.all([
         supabase.from('fh_contacts').select('id, name, job_title, stage, amount, email, phone, created_at').eq('id', cid).single(),
-        supabase.from('fh_payments').select('id, amount, method, reference, paid_on').eq('contact_id', cid).order('paid_on', { ascending: false })
+        readAllRows((from, to) => supabase.from('fh_payments').select('id, amount, method, reference, paid_on').eq('contact_id', cid).order('paid_on', { ascending: false }).order('id', { ascending: true }).range(from, to)),
+        readAllRows((from, to) => supabase.from('fh_change_orders').select('amount, status').eq('contact_id', cid).eq('status', 'approved').order('id', { ascending: true }).range(from, to))
       ])
-      assertReadResults(cRes, pRes)
+      assertReadResults(cRes, pRes, changesRes)
       if (!cRes.data) return null
       const c = cRes.data as any
       const payments = ((pRes.data ?? []) as any[]).map((p) => ({ id: p.id, amount: Number(p.amount || 0), method: p.method, reference: p.reference, paidOn: p.paid_on }))
-      const amount = Number(c.amount || 0)
-      const paid = payments.reduce((s, p) => s + p.amount, 0)
-      const balance = Math.max(0, amount - paid)
+      const { contractTotal: amount, paid, balance } = jobMoney({ amount: c.amount, payments, changeOrders: changesRes.data || [] })
       const ageDays = c.created_at ? Math.floor((Date.now() - new Date(c.created_at).getTime()) / 86400000) : 0
       return {
         contact: { id: c.id, name: c.name, jobTitle: c.job_title, stage: c.stage, amount, email: c.email, phone: c.phone, createdAt: c.created_at },

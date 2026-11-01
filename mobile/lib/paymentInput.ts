@@ -1,8 +1,16 @@
-export function paymentAmount(value: string): number | null {
-  const clean = value.trim().replace(/[$,\s]/g, '')
-  if (!/^(?:\d+(?:\.\d{1,2})?|\.\d{1,2})$/.test(clean)) return null
+export function moneyAmount(value: string, options: { allowZero?: boolean; allowNegative?: boolean } = {}): number | null {
+  const formatted = value.trim()
+  if (!/^-?\$?(?:(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?|\.\d{1,2})$/.test(formatted)) return null
+  const clean = formatted.replace(/[$,]/g, '')
   const amount = Number(clean)
-  return Number.isFinite(amount) && amount > 0 && Number.isSafeInteger(Math.round(amount * 100)) ? amount : null
+  if (!Number.isFinite(amount) || !Number.isSafeInteger(Math.round(amount * 100))) return null
+  if (amount < 0 && !options.allowNegative) return null
+  if (amount === 0 && !options.allowZero) return null
+  return amount
+}
+
+export function paymentAmount(value: string): number | null {
+  return moneyAmount(value)
 }
 
 export function localDate(now = new Date()): string {
