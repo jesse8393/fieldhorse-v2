@@ -559,6 +559,8 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId, canEditAmount = fa
   // refetch mid edit never wipes what the operator typed.
   const [form, setForm] = useState(() => buildForm(contact))
   const [saving, setSaving] = useState(false)
+  const [clientCreating, setClientCreating] = useState(false)
+  const clientCreatingRef = useRef(false)
   const [saveError, setSaveError] = useState('')
   const [saveAttempt, setSaveAttempt] = useState(0)
   const savingRef = useRef(false)
@@ -669,7 +671,7 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId, canEditAmount = fa
   })()
 
   async function commit() {
-    if (savingRef.current) return
+    if (savingRef.current || clientCreatingRef.current) return
     setSaveError('')
     // Diff: only patch keys whose value differs from the contact row.
     const diff: Record<string, any> = {}
@@ -784,6 +786,10 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId, canEditAmount = fa
           userId={userId}
           value={pendingClientId === null ? linkedClient || (contact?.client_id ? { id: contact.client_id, name: '' } : null) : linkedClient}
           onChange={handleClientLink}
+          onCreatingChange={creating => {
+            clientCreatingRef.current = creating
+            setClientCreating(creating)
+          }}
         />
         <span style={{
           fontFamily: 'var(--font-body)', fontSize: 12,
@@ -794,6 +800,7 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId, canEditAmount = fa
       </div>}
 
       {saveError && <div ref={errorRef} tabIndex={-1} role="alert" style={{ borderLeft: '3px solid var(--v3-danger)', padding: '8px 12px', scrollMarginTop: 96 }}>{saveError}</div>}
+      {clientCreating && <p role="status" style={{ margin: 0 }}>Adding client. Save changes will be available when this finishes.</p>}
 
       <div className="v3-edit-grid">
         {fields.map((f) => (
@@ -825,7 +832,7 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId, canEditAmount = fa
         <motion.button
           type="submit"
           whileTap={{ scale: 0.98 }}
-          disabled={saving}
+          disabled={saving || clientCreating}
           style={{
             padding: '12px', borderRadius: 10, border: 'none',
             background: 'var(--v3-primary)',

@@ -249,6 +249,7 @@ test('native validation blocks malformed email while cents and Enter remain vali
 
 test('inline client creation exposes retryable failure and prevents duplicate activation', async ({ context, page }) => {
   await signIn(context, { tables: { fh_clients: [original] } })
+  const { writes } = await savedJob(context)
   let attempts = 0
   let release = () => {}
   const gate = new Promise<void>(resolve => { release = resolve })
@@ -270,11 +271,20 @@ test('inline client creation exposes retryable failure and prevents duplicate ac
   await input.click()
   await form.getByRole('button', { name: 'Create “New customer”', exact: true }).click()
   await expect(input).toBeDisabled()
+  await expect(form.getByRole('button', { name: 'Save changes', exact: true })).toBeDisabled()
+  await expect(form.getByRole('status')).toContainText('Adding client.')
+  await form.getByLabel('Name', { exact: true }).press('Enter')
+  expect(writes).toHaveLength(0)
+  await expect(form).toBeVisible()
   await expect.poll(() => attempts).toBe(2)
   release()
   await expect(form.getByRole('group', { name: 'Linked client', exact: true })).toContainText('New customer')
   await expect(form.getByRole('button', { name: 'Unlink client', exact: true })).toBeFocused()
   expect(attempts).toBe(2)
+  await form.getByRole('button', { name: 'Save changes', exact: true }).click()
+  await expect(form).toHaveCount(0)
+  expect(writes).toHaveLength(1)
+  expect(writes[0]).toMatchObject({ client_id: replacement.id })
 })
 
 for (const role of ['crew', 'foreman']) {

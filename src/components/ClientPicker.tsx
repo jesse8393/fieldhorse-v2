@@ -17,7 +17,12 @@ type Client = {
 }
 type Read = { scope: string; retry: number; rows: Client[]; failed: boolean }
 type SearchRead = Read & { term: string }
-type Props = { userId: string | undefined; value: Client | null; onChange: (value: Client | null) => void }
+type Props = {
+  userId: string | undefined
+  value: Client | null
+  onChange: (value: Client | null) => void
+  onCreatingChange?: (creating: boolean) => void
+}
 
 const CLIENT_COLUMNS = 'id, name, company_name, phone, email, address, active_jobs_count'
 const SEARCH_COLUMNS = ['name', 'company_name', 'email', 'phone']
@@ -30,7 +35,7 @@ function sameName(name: string | null | undefined, typed: string) {
 }
 
 /** A controlled customer link with an accessible search and confirmed creation. */
-export default function ClientPicker({ userId, value, onChange }: Props) {
+export default function ClientPicker({ userId, value, onChange, onCreatingChange }: Props) {
   const [q, setQ] = useState('')
   const [open, setOpen] = useState(false)
   const [recent, setRecent] = useState<Read | null>(null)
@@ -151,6 +156,7 @@ export default function ClientPicker({ userId, value, onChange }: Props) {
     if (!canCreate || !userId || orgScope === undefined || creatingRef.current) return
     creatingRef.current = true
     setCreating(true)
+    onCreatingChange?.(true)
     setCreateError('')
     try {
       const { data, error } = await supabase.from('fh_clients')
@@ -165,6 +171,7 @@ export default function ClientPicker({ userId, value, onChange }: Props) {
     } finally {
       creatingRef.current = false
       setCreating(false)
+      onCreatingChange?.(false)
       setCreateAttempt(attempt => attempt + 1)
     }
   }
