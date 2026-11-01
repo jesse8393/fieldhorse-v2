@@ -38,6 +38,26 @@ test('failed subcontractor profile loading recovers through a named keyboard ret
   await expect(page.getByRole('main')).toBeFocused()
 })
 
+test('missing records have no unnamed retry controls or endless saving indicators', async ({ context, page }) => {
+  await signIn(context)
+  await page.setViewportSize({ width: 320, height: 844 })
+  for (const [path, message] of [
+    ['/jobs/missing-job/payment', 'This job is gone'],
+    ['/jobs/missing-job/more', 'This job is gone'],
+    ['/schedule/missing-event/edit', 'This event is gone.'],
+    ['/clients/missing-client/statement', 'This customer is gone'],
+    ['/quotes/missing-quote/terms', 'This quote is gone.'],
+  ]) {
+    await page.goto(path)
+    await expect(page.getByText(message, { exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: '', exact: true })).toHaveCount(0)
+    await expect(page.locator('button[aria-busy="true"]')).toHaveCount(0)
+    if (path.endsWith('/payment')) await expect(page.getByRole('button', { name: 'Record payment', exact: true })).toBeDisabled()
+    if (path.endsWith('/edit')) await expect(page.getByRole('button', { name: 'Save changes', exact: true })).toBeDisabled()
+    await nothingRunsOffTheSide(page)
+  }
+})
+
 for (const surface of ['phone', 'desktop'] as const) {
   test(`${surface} search removes restricted results after a role change and rejects late financial responses`, async ({ context, page }) => {
     await signIn(context)

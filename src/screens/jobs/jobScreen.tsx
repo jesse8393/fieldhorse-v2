@@ -44,7 +44,7 @@ export function JobScreenFallback({ title, saveLabel, data, home }: { title: str
     />
   )
   return (
-    <CreateShell title={title} saveLabel={saveLabel} saving backTo={home} onSave={() => {}}>
+    <CreateShell title={title} saveLabel={saveLabel} saveDisabled backTo={home} onSave={() => {}}>
       {body}
     </CreateShell>
   )

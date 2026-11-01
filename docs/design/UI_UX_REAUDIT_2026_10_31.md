@@ -17,6 +17,7 @@ This pass continues the phone review in `UI_UX_PHONE_REVIEW_2026_10_31.md`. It r
 | Field-role edit | Customer-book controls could be offered to roles without customer-book access. | Use existing route permissions for customer linking and hydration; preserve existing financial permissions. |
 | Creation suggestions | A failed or limited recent-client read could claim a typed customer was new. | Honest save-time matching copy; visible retryable suggestion errors; scoped read snapshots. |
 | Subcontractor profile | Missing or failed profile reads left Save in an endless busy state; the empty state included an unnamed retry button. | Separate disabled and saving states, remove the empty retry control, and retain a named keyboard retry for actual read failures. |
+| Missing records | Missing job, event, customer-statement, and quote-term pages repeated the unnamed retry control. Job/event fallbacks also showed saving despite having no record. | Suppress empty retry labels centrally and use disabled submission while a record is unavailable. |
 
 ## Verification
 
@@ -29,6 +30,8 @@ The fresh route pass covered 56 page states at 320px, including creation forms, 
 The new file runs in the early CI regression step. The remaining application suite still runs in full; only the already-executed files are excluded from the second step. Final CI status and exact counts belong to the pull request and must be checked against its current head, not an older notification.
 
 Two additional mobile UI regression scenarios cover missing subcontractor profiles and failed-read recovery. Both run in each browser profile.
+
+A further regression visits five missing-record routes, checking their explanatory message, absent unnamed controls, idle disabled submission, and phone bounds.
 
 ## Deployment and remaining limits
 

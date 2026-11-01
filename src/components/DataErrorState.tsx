@@ -29,7 +29,7 @@ export default function DataErrorState({
         <strong>{title}</strong>
         {message && <span>{message}</span>}
       </div>
-      {onRetry && (
+      {onRetry && actionLabel.trim() && (
         <button type="button" className="fh-data-error__retry" onClick={onRetry}>
           <RefreshCw size={13} aria-hidden="true" />
           <span>{actionLabel}</span>
