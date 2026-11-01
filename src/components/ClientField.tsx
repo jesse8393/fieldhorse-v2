@@ -120,7 +120,7 @@ type Props = {
 
 export default function ClientField({ userId, value, onChange, label = 'Client', placeholder = 'Type a name', error, autoFocus, onPick }: Props) {
   const orgScope = useOrgScope(userId)
-  const scope = JSON.stringify([userId, orgScope])
+  const scope = JSON.stringify([userId, orgScope === undefined ? 'unresolved' : orgScope])
   const [read, setRead] = useState<{ scope: string; retry: number; rows: ClientPick[]; failed: boolean } | null>(null)
   const [retry, setRetry] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
