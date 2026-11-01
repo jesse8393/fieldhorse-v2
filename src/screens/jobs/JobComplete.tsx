@@ -220,7 +220,7 @@ function CompleteForm({ data, userId, goBack, home }: { data: ReturnType<typeof 
 
   if (loading) {
     return (
-      <CreateShell title="Mark complete" saveLabel="Mark complete" saving backTo={home} onSave={() => {}}>
+      <CreateShell title="Mark complete" saveLabel="Mark complete" saveDisabled backTo={home} onSave={() => {}}>
         <SkeletonRows rows={4} label="Loading the closeout" />
       </CreateShell>
     )

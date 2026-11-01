@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { Plus, Pencil, X as XIcon, ShieldCheck, Receipt, RotateCcw, ChevronDown, Camera, ArrowUpRight } from 'lucide-react'
+import { Plus, X as XIcon, ShieldCheck, Receipt, RotateCcw, ChevronDown, Camera, ArrowUpRight } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
 import { toYmd } from '../../../lib/dates.ts'
 import { markComplete, reopen } from '../../../lib/pipeline.ts'
@@ -26,6 +26,7 @@ import { countNoun } from '../../../lib/format.ts'
 import SpineList from '../phone/SpineList.tsx'
 import TodosSection from '../sections/Todos.tsx'
 import JobVisitSummary from '../../../components/fh/JobVisitSummary.tsx'
+import { useMembership } from '../../../contexts/MembershipContext.tsx'
 
 /**
  * v3 OVERVIEW tab, the "money screen" of the Job Detail.
@@ -558,6 +559,15 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId, canEditAmount = fa
   // refetch mid edit never wipes what the operator typed.
   const [form, setForm] = useState(() => buildForm(contact))
   const [saving, setSaving] = useState(false)
+  const [clientCreating, setClientCreating] = useState(false)
+  const clientCreatingRef = useRef(false)
+  const [saveError, setSaveError] = useState('')
+  const [saveAttempt, setSaveAttempt] = useState(0)
+  const savingRef = useRef(false)
+  const errorRef = useRef<HTMLDivElement>(null)
+  const headingRef = useRef<HTMLHeadingElement>(null)
+  const { canViewRoute } = useMembership()
+  const canLinkClients = canViewRoute('/clients')
   // The contract amount is money: field roles edit everything else.
   const fields = canEditAmount ? EDITABLE_FIELDS : EDITABLE_FIELDS.filter((f) => f.key !== 'amount')
   const recordNoun = contact?.stage === 'lead' ? 'lead'
@@ -573,21 +583,47 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId, canEditAmount = fa
   // shape. null = no change, '' = explicit unlink, uuid = new link.
   const [pendingClientId, setPendingClientId] = useState<any>(null)
 
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      headingRef.current?.focus({ preventScroll: true })
+      headingRef.current?.scrollIntoView({ block: 'start' })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [])
+
+  useEffect(() => { if (saveError) errorRef.current?.focus() }, [saveError, saveAttempt])
+
+  function exitEdit() {
+    onExitEdit?.()
+    requestAnimationFrame(() => {
+      const heading = document.querySelector<HTMLElement>('main h1')
+      if (heading) { heading.tabIndex = -1; heading.focus() }
+    })
+  }
+
   // Lazy-load the linked client when present. Skips silently when the
   // contact has no client link or RLS denies (partner viewer).
   useEffect(() => {
     let cancelled = false
+    // A late read of the original customer must never replace a manual
+    // unlink or a newly selected customer while this form remains open.
+    if (!canLinkClients) { setLinkedClient(null); return }
+    if (pendingClientId !== null) return
     if (!contact?.client_id || !userId) { setLinkedClient(null); return }
     ;(async () => {
-      const { data } = await supabase
-        .from('fh_clients')
-        .select('id, name, company_name, phone, email, address')
-        .eq('id', contact.client_id)
-        .maybeSingle()
-      if (!cancelled) setLinkedClient(data || null)
+      try {
+        const { data } = await supabase
+          .from('fh_clients')
+          .select('id, name, company_name, phone, email, address')
+          .eq('id', contact.client_id)
+          .maybeSingle()
+        if (!cancelled) setLinkedClient(data || null)
+      } catch {
+        if (!cancelled) setLinkedClient(null)
+      }
     })()
     return () => { cancelled = true }
-  }, [contact?.client_id, userId])
+  }, [contact?.client_id, userId, pendingClientId, canLinkClients])
 
   function set(key: any, value: any) {
     setForm((f) => ({ ...f, [key]: value }))
@@ -597,7 +633,7 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId, canEditAmount = fa
   // client's values. Never clobbers anything the user has typed on
   // the form. Surfaces only when there's at least one field to fill.
   function hydrateFromClient() {
-    if (!linkedClient) return
+    if (!canLinkClients || !linkedClient) return
     setHydrating(true)
     setForm((prev) => {
       const next = { ...prev }
@@ -619,7 +655,7 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId, canEditAmount = fa
   // Which fields would actually change if the user tapped "Pull from
   // client"? Drives whether the button surfaces at all.
   const fieldsToFill = (() => {
-    if (!linkedClient) return []
+    if (!canLinkClients || !linkedClient) return []
     const fields = []
     const checks = [
       ['name',    linkedClient.name],
@@ -635,7 +671,8 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId, canEditAmount = fa
   })()
 
   async function commit() {
-    if (saving) return
+    if (savingRef.current || clientCreatingRef.current) return
+    setSaveError('')
     // Diff: only patch keys whose value differs from the contact row.
     const diff: Record<string, any> = {}
     for (const f of fields) {
@@ -646,21 +683,30 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId, canEditAmount = fa
       if (normalizedNext !== normalizedCur) diff[f.key] = next
     }
     // Client link change rides the same diff. Sentinel "" → null (unlink).
-    if (pendingClientId !== null) {
+    if (canLinkClients && pendingClientId !== null) {
       const cleaned = pendingClientId || null
       if (cleaned !== (contact.client_id || null)) diff.client_id = cleaned
     }
     if (Object.keys(diff).length === 0) {
-      onExitEdit?.()
+      exitEdit()
       return
     }
+    savingRef.current = true
     setSaving(true)
-    const res = await patch(diff)
-    setSaving(false)
-    // On failure patch has already said why; keep the form open with
-    // the typed values so the operator can retry instead of losing them.
-    if (res?.error) return
-    onExitEdit?.()
+    try {
+      const res = await patch(diff)
+      if (res?.error) {
+        setSaveError('Changes could not be saved. Your edits remain here.')
+        return
+      }
+      exitEdit()
+    } catch {
+      setSaveError('Changes could not be saved. Your edits remain here.')
+    } finally {
+      savingRef.current = false
+      setSaving(false)
+      setSaveAttempt(attempt => attempt + 1)
+    }
   }
 
   // Called when the operator picks (or clears) a client via the
@@ -685,19 +731,17 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId, canEditAmount = fa
   }
 
   return (
-    <div style={{
+    <form aria-label={`Edit ${recordNoun} details`} onSubmit={event => { event.preventDefault(); void commit() }} style={{
       padding: '16px 16px 16px',
       borderRadius: 10,
       background: 'var(--v3-surface)',
       border: '1px solid color-mix(in srgb, var(--v3-primary) 35%, transparent)',
       display: 'flex', flexDirection: 'column', gap: 12
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <Eyebrow as="div" tone="gold">
-          <Pencil size={12} aria-hidden="true" />
-          Editing {recordNoun} fields
-        </Eyebrow>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+      <fieldset disabled={saving} style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0, padding: 0, margin: 0, border: 0 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <h2 ref={headingRef} tabIndex={-1} style={{ margin: 0, fontSize: 20, lineHeight: 1.4, scrollMarginTop: 96 }}>Edit {recordNoun} details</h2>
+        <div style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
           {fieldsToFill.length > 0 && (
             <button
               type="button"
@@ -706,7 +750,7 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId, canEditAmount = fa
               title={`Fill ${fieldsToFill.length} empty field${fieldsToFill.length === 1 ? '' : 's'} from the linked client (${linkedClient?.name || 'client'})`}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4,
-                padding: '8px 12px', borderRadius: 10,
+                minHeight: 44, padding: '8px 12px', borderRadius: 10,
                 background: 'color-mix(in srgb, var(--v3-primary) 14%, transparent)',
                 border: '1px solid color-mix(in srgb, var(--v3-primary) 55%, transparent)',
                 color: 'var(--v3-primary-text)',
@@ -719,10 +763,10 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId, canEditAmount = fa
           )}
           <button
             type="button"
-            onClick={onExitEdit}
+            onClick={exitEdit}
             aria-label="Cancel edit"
             style={{
-              width: 32, height: 32, borderRadius: 10,
+              width: 44, height: 44, borderRadius: 10,
               background: 'transparent', border: '1px solid var(--v3-border)',
               color: 'var(--v3-text-muted)', cursor: 'pointer',
               display: 'grid', placeItems: 'center'
@@ -737,12 +781,15 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId, canEditAmount = fa
           empty fields on the form (same merge policy as the lead screen)
           and commit the new client_id alongside the regular field
           diff. Clearing the picker queues an unlink. */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <Eyebrow>Linked client</Eyebrow>
+      {canLinkClients && <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <ClientPicker
           userId={userId}
-          value={linkedClient || (contact?.client_id ? { id: contact.client_id, name: '' } : null)}
+          value={pendingClientId === null ? linkedClient || (contact?.client_id ? { id: contact.client_id, name: '' } : null) : linkedClient}
           onChange={handleClientLink}
+          onCreatingChange={creating => {
+            clientCreatingRef.current = creating
+            setClientCreating(creating)
+          }}
         />
         <span style={{
           fontFamily: 'var(--font-body)', fontSize: 12,
@@ -750,7 +797,10 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId, canEditAmount = fa
         }}>
           Picking a client fills any empty fields below. Your typed values are preserved.
         </span>
-      </div>
+      </div>}
+
+      {saveError && <div ref={errorRef} tabIndex={-1} role="alert" style={{ borderLeft: '3px solid var(--v3-danger)', padding: '8px 12px', scrollMarginTop: 96 }}>{saveError}</div>}
+      {clientCreating && <p role="status" style={{ margin: 0 }}>Adding client. Save changes will be available when this finishes.</p>}
 
       <div className="v3-edit-grid">
         {fields.map((f) => (
@@ -769,7 +819,7 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId, canEditAmount = fa
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: 8, marginTop: 4 }}>
         <button
           type="button"
-          onClick={onExitEdit}
+          onClick={exitEdit}
           style={{
             padding: '12px', borderRadius: 10,
             background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)',
@@ -780,10 +830,9 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId, canEditAmount = fa
           Cancel
         </button>
         <motion.button
-          type="button"
+          type="submit"
           whileTap={{ scale: 0.98 }}
-          onClick={commit}
-          disabled={saving}
+          disabled={saving || clientCreating}
           style={{
             padding: '12px', borderRadius: 10, border: 'none',
             background: 'var(--v3-primary)',
@@ -798,6 +847,7 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId, canEditAmount = fa
           {saving ? 'Saving…' : 'Save changes'}
         </motion.button>
       </div>
+      </fieldset>
 
       <style>{`
         .v3-edit-grid {
@@ -814,7 +864,7 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId, canEditAmount = fa
           }
         }
       `}</style>
-    </div>
+    </form>
   )
 }
 
@@ -834,7 +884,7 @@ function EditField({ label, value, onChange, kind, placeholder, spanFull }: any)
     padding: '12px 12px', borderRadius: 10,
     background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)',
     color: 'var(--v3-text)',
-    fontFamily: 'var(--font-body)', fontSize: 14,
+    fontFamily: 'var(--font-body)', fontSize: 16,
     outline: 'none'
   }
   return (
@@ -851,6 +901,7 @@ function EditField({ label, value, onChange, kind, placeholder, spanFull }: any)
       ) : (
         <input
           type={kind === 'number' ? 'number' : kind === 'tel' ? 'tel' : kind === 'email' ? 'email' : 'text'}
+          step={kind === 'number' ? 'any' : undefined}
           inputMode={kind === 'number' ? 'decimal' : undefined}
           value={value}
           onChange={(e) => onChange(e.target.value)}

@@ -106,7 +106,7 @@ export default function EventNew() {
 
   if (eventId && eventState.status !== 'ready') {
     return (
-      <CreateShell title="Edit event" saveLabel="Save changes" backTo="/schedule" saving onSave={() => {}}>
+      <CreateShell title="Edit event" saveLabel="Save changes" backTo="/schedule" saveDisabled onSave={() => {}}>
         {eventState.status === 'loading' ? (
           <SkeletonRows rows={4} label="Loading the event" />
         ) : (
