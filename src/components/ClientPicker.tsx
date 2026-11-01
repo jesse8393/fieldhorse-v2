@@ -126,9 +126,18 @@ export default function ClientPicker({ userId, value, onChange }: Props) {
   }, [recentRead, searched, trimmed])
   const exact = trimmed ? filtered.find(row => sameName(row.name, trimmed)) : undefined
   const active = open ? filtered[activeIndex] : undefined
+
   const pending = orgScope === undefined || (trimmed ? !searched : !recentRead)
   const failed = trimmed ? searched?.failed : recentRead?.failed
   const canCreate = !!userId && orgScope !== undefined && !!trimmed && !!searched && !searched.failed && !exact
+
+  useEffect(() => {
+    if (!open) return
+    // Keep the popup above fixed phone actions, then reveal its active row.
+    // The combobox retains focus while arrows move the visual selection.
+    rootRef.current?.querySelector('.fh-client-picker__popup')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    if (active) document.getElementById(`${id}-${active.id}`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [active, id, open, filtered.length, pending, failed, canCreate])
 
   function pick(client: Client) {
     onChange(client)

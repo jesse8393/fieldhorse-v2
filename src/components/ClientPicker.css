@@ -12,6 +12,7 @@
 .fh-client-picker input:focus-visible, .fh-client-picker button:focus-visible, .fh-client-picker [tabindex="-1"]:focus { outline: 2px solid var(--fh-focus); outline-offset: 2px; }
 .fh-client-picker__popup { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 60; max-height: min(46dvh, 300px); overflow-y: auto; overscroll-behavior: contain; padding: 4px; background: var(--fh-paper); border: 1px solid var(--fh-edge-strong); border-radius: var(--fh-r-control); box-shadow: var(--fh-shadow-overlay); }
 .fh-client-picker__popup ul { padding: 0; margin: 0; list-style: none; }
+.fh-client-picker__popup { scroll-margin-top: 80px; scroll-margin-bottom: calc(var(--fh-dock-gap) + 88px); }
 .fh-client-picker__popup p { margin: 0; padding: 12px; color: var(--fh-ink-2); font: 400 14px/1.5 var(--fh-font-body); }
 .fh-client-picker__option { display: grid; gap: 4px; width: 100%; padding: 12px; border: 0; border-radius: var(--fh-r-control); background: transparent; color: var(--fh-ink); text-align: left; overflow-wrap: anywhere; }
 .fh-client-picker__option[aria-selected="true"], .fh-client-picker__option:focus-visible { background: var(--fh-tray); }

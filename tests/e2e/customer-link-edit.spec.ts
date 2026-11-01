@@ -78,6 +78,36 @@ test('customer replacement and unlink persist without overwriting typed job deta
   await expect(page.getByRole('heading', { level: 1, name: job.job_title })).toBeFocused()
 })
 
+test('keyboard customer selection stays visible through a long list and wraps without losing focus', async ({ context, page }) => {
+  const clients = Array.from({ length: 20 }, (_, index) => ({
+    ...original, id: `keyboard-client-${index}`, name: `Customer ${String(index + 1).padStart(2, '0')}`,
+    last_activity_at: new Date(Date.UTC(2026, 9, 31, 12, 0, 20 - index)).toISOString(),
+  }))
+  await signIn(context, { tables: { fh_clients: clients } })
+  await page.setViewportSize({ width: 320, height: 480 })
+  const form = await edit(page)
+  await form.getByRole('button', { name: 'Unlink client', exact: true }).press('Enter')
+  const input = form.getByRole('combobox', { name: 'Linked client', exact: true })
+  const choices = form.getByRole('listbox', { name: 'Matching clients' })
+  await expect(choices.getByRole('option')).toHaveCount(20)
+  const active = choices.getByRole('option', { selected: true })
+  for (const [key, name] of [['ArrowUp', 'Customer 20'], ['ArrowDown', 'Customer 01'], ['ArrowUp', 'Customer 20']]) {
+    await input.press(key)
+    await expect(active).toContainText(name)
+    await expect(input).toBeFocused()
+    // toBeVisible does not account for clipping by the scrollable popup.
+    await expect.poll(() => active.evaluate(option => {
+      const bounds = option.getBoundingClientRect()
+      const popup = option.closest('.fh-client-picker__popup')!.getBoundingClientRect()
+      const hit = document.elementFromPoint(bounds.left + bounds.width / 2, bounds.top + bounds.height / 2)
+      return bounds.top >= popup.top && bounds.bottom <= popup.bottom + 1 && option.contains(hit)
+    })).toBe(true)
+  }
+  await input.press('Enter')
+  await expect(form.getByRole('group', { name: 'Linked client', exact: true })).toContainText('Customer 20')
+  await expect(form.getByRole('button', { name: 'Unlink client', exact: true })).toBeFocused()
+})
+
 test('failed client reads never masquerade as an empty customer book or offer creation', async ({ context, page }) => {
   await signIn(context, { tables: { fh_clients: [original, replacement] } })
   let refuse = true

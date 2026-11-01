@@ -10,6 +10,7 @@ This pass continues the phone review in `UI_UX_PHONE_REVIEW_2026_10_31.md`. It r
 | --- | --- | --- |
 | Edit a job's linked customer | Enter did nothing on Unlink. Pointer activation retained the old customer pill, preventing replacement. | Native button activation; explicit unlinked state; focus moves into search and returns to the selected customer control. |
 | Customer selection | Unlink measured 28 × 28 CSS pixels. Selection and errors lacked a consistent keyboard path. | 44 × 44 unlink, 16px input, labelled combobox, arrow/Enter/Escape selection, readable customer details and wrapping names. |
+| Long customer lists | Arrow-key selection could move to a customer clipped below the dropdown. | Scroll the active option into view while retaining input focus, including wraparound in a 320 × 480 layout. |
 | Customer lookup failure | Failed reads could appear empty, and failed search could still offer Create. | Distinct error and loading states, keyboard-accessible Retry, and no creation until the full lookup succeeds. |
 | Delayed reads | The original customer request could overwrite a subsequent unlink or replacement. | Cancel stale reads; scope suggestions to the current user/workspace and retry generation. |
 | Edit save failure | Only a transient toast described refusal. | Persistent focused error; preserve typed fields; lock controls during the confirmed save; restore heading focus on save/cancel. |
@@ -25,7 +26,7 @@ Compiled phone checks reproduced the old unlink failures, then confirmed keyboar
 
 The fresh route pass covered 56 page states at 320px, including creation forms, job and invoice actions, quote documents, customer statements, and the subcontractor profile. It checked actual element bounds rather than relying on document width, which global clipping can conceal. All 18 job sections were opened after their loading state cleared. Short-phone, landscape, and desktop edit views were also inspected. Landscape exposed 14px job-edit fields; these now stay at 16px across widths.
 
-`customer-link-edit.spec.ts` adds ten browser scenarios in each desktop/phone CI profile. They cover replacement and unlink after reload, preserved typed details, refused reads and writes, repeated retry focus, zero-row update refusal, delayed original-customer reads, matching beyond the recent list, decimal/email validation, creation pending/error states, crew/foreman restrictions, and creation suggestion recovery. Stateful fixtures verify submitted payloads and read-after-reload behavior.
+`customer-link-edit.spec.ts` adds eleven browser scenarios in each desktop/phone CI profile. They cover replacement and unlink after reload, preserved typed details, refused reads and writes, repeated retry focus, zero-row update refusal, delayed original-customer reads, matching beyond the recent list, visible keyboard selection through long lists, decimal/email validation, creation pending/error states, crew/foreman restrictions, and creation suggestion recovery. Stateful fixtures verify submitted payloads and read-after-reload behavior.
 
 The new file runs in the early CI regression step. The remaining application suite still runs in full; only the already-executed files are excluded from the second step. Final CI status and exact counts belong to the pull request and must be checked against its current head, not an older notification.
 
