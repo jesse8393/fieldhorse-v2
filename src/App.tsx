@@ -50,6 +50,7 @@ const Partners       = lazy(() => import('./screens/Partners.tsx'))
 const SubDetail      = lazy(() => import('./screens/SubDetail.tsx'))
 const Invoices       = lazy(() => import('./screens/Invoices.tsx'))
 const Landing        = lazy(() => import('./screens/Landing.tsx'))
+const Learn          = lazy(() => import('./screens/Learn.tsx'))
 // The invoice screens (Phase 9, D57, D62): /invoices/:id is an fh_invoices
 // row; its payment, edit and remind flows are routes of their own. A job's
 // money lives at /jobs/:id?tab=financials (JobMoney).
@@ -279,6 +280,7 @@ export default function App() {
         <Route path="/p/:token" element={<PublicDoc />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
+        <Route path="/learn" element={<Learn />} />
         {DesignSheet && <Route path="/design" element={<DesignSheet />} />}
         <Route
           path="/onboarding"

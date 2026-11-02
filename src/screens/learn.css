@@ -1,0 +1,31 @@
+.fh-learn-intro { max-width: 1200px; margin: auto; padding: 48px 0 32px; }
+.fh-learn-intro h1 { font-size: 52px; }
+.fh-learn-intro > p:last-child { max-width: 540px; margin-top: 24px; color: var(--fh-ink-2); line-height: 1.7; font-size: 17px; }
+.fh-guide-nav { max-width: 1200px; margin: 0 auto 40px; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); border: 1px solid var(--fh-hairline); border-radius: 12px; overflow: hidden; }
+.fh-guide-nav button { display: flex; align-items: center; text-align: left; min-height: 80px; gap: 16px; padding: 20px; color: var(--fh-ink); background: var(--fh-paper); border: 0; font: 600 14px/1.4 var(--fh-font-body); cursor: pointer; }
+.fh-guide-nav button + button { border-left: 1px solid var(--fh-hairline); }
+.fh-guide-nav button > span { color: var(--fh-ink-3); font-variant-numeric: tabular-nums; }
+.fh-guide-nav button > svg { margin-left: auto; flex: none; }
+.fh-guide-nav button[aria-current] { background: var(--fh-onyx); color: var(--fh-linen); }
+.fh-guide-nav button[aria-current] > span { color: var(--fh-gold-line); }
+.fh-guide-nav button:focus-visible { outline-offset: -4px; }
+.fh-guide-nav button[aria-current]:focus-visible { outline-color: var(--fh-linen); }
+.fh-guide-detail { max-width: 1000px; margin: 0 auto 80px; display: grid; grid-template-columns: minmax(0,.85fr) minmax(0,1.15fr); gap: 48px; align-items: start; }
+.fh-guide-recording { background: var(--fh-tray); border: 1px solid var(--fh-hairline); padding: 20px 20px 0; border-radius: var(--fh-r-card); }
+.fh-guide-recording > p { text-align: center; font-size: 12px; color: var(--fh-ink-3); padding: 12px 0; margin: 0; }
+.fh-guide-player { aspect-ratio: 9/16; overflow: hidden; border: 1px solid var(--fh-hairline); border-radius: 12px; background: var(--fh-onyx); position: relative; }
+.fh-guide-player :is(video,img,button) { width: 100%; height: 100%; display: block; object-fit: contain; }
+.fh-guide-player > button { border: 0; padding: 0; position: relative; cursor: pointer; }
+.fh-guide-player > button:focus-visible { outline-offset: -5px; }
+.fh-guide-player__play { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); display: inline-flex; align-items: center; gap: 12px; padding: 16px 20px; border-radius: 999px; color: var(--fh-linen); background: var(--fh-onyx); font: 600 15px/1.4 var(--fh-font-body); white-space: nowrap; box-shadow: 0 4px 24px rgba(20,20,20,.12); }
+.fh-guide-player > p { position: absolute; inset: auto 12px 12px; padding: 12px; background: var(--fh-onyx); color: var(--fh-linen); font-size: 13px; }
+.fh-guide-copy { padding-top: 20px; }
+.fh-guide-copy h2 { font: 650 38px/1.15 var(--fh-font-body); letter-spacing: -.04em; margin: 0 0 20px; }
+.fh-guide-copy > p { color: var(--fh-ink-2); line-height: 1.6; }
+.fh-guide-steps { list-style: none; padding: 0; margin: 28px 0; }
+.fh-guide-steps li { display: flex; gap: 20px; border-top: 1px solid var(--fh-hairline); padding: 20px 0; }
+.fh-guide-steps li > span { font-size: 12px; font-weight: 650; color: var(--fh-gold-ink); padding-top: 4px; }
+.fh-guide-steps h3 { font-size: 17px; margin: 0 0 8px; font-weight: 650; }
+.fh-guide-steps p { font-size: 14px; color: var(--fh-ink-2); line-height: 1.65; margin: 0; }
+.fh-guide-copy .fh-guide-access-note { font-size: 12px; margin-top: 14px; }
+@media(max-width: 700px) { .fh-guide-nav { grid-template-columns: 1fr; } .fh-guide-nav button { min-height: 60px; padding: 16px; } .fh-guide-nav button + button { border-left: 0; border-top: 1px solid var(--fh-hairline); } .fh-guide-detail { grid-template-columns: 1fr; gap: 20px; margin-bottom: 48px; } .fh-guide-recording { max-width: 340px; width: 100%; justify-self: center; } .fh-learn-intro { padding-block: 32px 24px; } .fh-learn .fh-landing-header .fh-landing-secondary { font-size: 12px; padding-inline: 8px; } }

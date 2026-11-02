@@ -560,3 +560,16 @@
   .fh-job-sections__link.is-active { background: var(--v3-primary-soft); color: var(--v3-primary-text); font-weight: 700; }
   .fh-job-sections__link:focus-visible, .fh-job-sections__picker select:focus-visible { outline: 2px solid var(--v3-primary-text); outline-offset: 2px; }
 }
+
+/* Keep everyday contact actions visible without opening job disclosures. */
+.fh-job-contact-actions { padding: 0 20px; }
+.fh-job-contact-actions .fhj-quick { border-top: 0; padding: 12px 0 16px; gap: 8px; }
+.fh-job-contact-actions .fhj-quick__action { border: 1px solid var(--fh-hairline); border-radius: 10px; padding: 12px 4px; gap: 8px; min-height: 70px; }
+.fh-job-contact-actions .fhj-quick__disc { width: 24px; height: 24px; background: transparent; box-shadow: none; border-radius: 0; }
+.fh-job-contact-actions .fhj-quick__disc svg { width: 20px; height: 20px; }
+.fh-job-contact-actions .fhj-quick__label { font-size: 12px; line-height: 16px; font-weight: 600; }
+.fh-job-contact-actions .fhj-quick__action:hover { background: var(--fh-tray); }
+.fh-job-contact-actions .fhj-quick__action:disabled { border-color: var(--fh-hairline-soft); }
+.fh-job-contact-actions .fhj-quick__action:disabled .fhj-quick__disc { box-shadow: none; }
+.fhj-head > .fh-job-contact-disclosure { padding-top: 0; }
+@media (prefers-reduced-motion: reduce) { .fh-job-contact-actions * { transition: none; } }

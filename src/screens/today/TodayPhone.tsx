@@ -11,6 +11,7 @@ import {
   SyncPill
 } from '../../components/fh/index.ts'
 import DataErrorState from '../../components/DataErrorState.tsx'
+import TodayQuickActions from '../../components/experience/TodayQuickActions.tsx'
 import type { HomeTodayOnSite } from '../../lib/homeDashboard.ts'
 import { buildTodayView, todayWeather } from '../../lib/todayView.ts'
 import type { TodayScreenProps } from './todayParts.tsx'
@@ -233,6 +234,7 @@ export default function TodayPhone({
         {error && (
           <DataErrorState compact title="Today could not refresh" message={error} onRetry={onRetry} />
         )}
+        <TodayQuickActions />
         {answersSection}
         {daySections}
       </div>

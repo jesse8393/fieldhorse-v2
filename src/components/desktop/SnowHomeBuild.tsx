@@ -18,6 +18,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { CalendarPlus, Plus } from 'lucide-react'
 import { Button, EmptyState, OnyxStage, Skeleton, SkeletonRows, SyncPill } from '../fh/index.ts'
 import DataErrorState from '../DataErrorState.tsx'
+import TodayQuickActions from '../experience/TodayQuickActions.tsx'
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useScheduleEvents } from '../../lib/queries.ts'
 import { weekRangeLabel } from '../../lib/scheduleBoard.ts'
@@ -176,6 +177,7 @@ export default function SnowHomeBuild({
     <div className="fhtd-side">
       {answersSection}
       <WeekSection now={now} />
+      {view && <TodayQuickActions showNewJob={false} />}
     </div>
   )
 
