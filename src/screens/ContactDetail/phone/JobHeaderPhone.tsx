@@ -62,6 +62,34 @@ export default function JobHeaderPhone({ contact, photos, money, backLabel, onBa
         {sub && <p>{sub}</p>}
       </header>
 
+      <div className="fh-job-contact-actions">
+        <ul className="fhj-quick" aria-label="Quick actions">
+          <li>
+            <QuickAction icon={Phone} label="Call" href={phone ? `tel:${phone}` : undefined} aria-label={phone ? `Call ${who}` : 'Call, no phone on file'} />
+          </li>
+          <li>
+            <QuickAction icon={MessageSquare} label="Message" href={`/compose?contact=${encodeURIComponent(contact.id)}&channel=${contact?.email || !phone ? 'email' : 'sms'}`} aria-label={`Message ${who}`} />
+          </li>
+          <li>
+            <QuickAction
+              icon={Navigation}
+              label="Navigate"
+              href={address ? navigateHrefHere(address) : undefined}
+              external
+              aria-label={address ? `Navigate to ${address}` : 'Navigate, no address on file'}
+            />
+          </li>
+          <li>
+            <QuickAction
+              icon={Camera}
+              label={photos.count > 0 ? `Photos ${photos.count}` : 'Photos'}
+              onClick={onOpenPhotos}
+              aria-label={photos.count > 0 ? `Open ${photoLabel(photos.count)}` : 'Open photos'}
+            />
+          </li>
+        </ul>
+      </div>
+
       <details className="fhj-facts fh-job-contact-disclosure">
         <summary>Contact and job details<ChevronDown size={16} aria-hidden="true" /></summary>
         {countButton}
@@ -92,32 +120,6 @@ export default function JobHeaderPhone({ contact, photos, money, backLabel, onBa
         )}
 
         </details>
-
-        <ul className="fhj-quick" aria-label="Quick actions">
-          <li>
-            <QuickAction icon={Phone} label="Call" href={phone ? `tel:${phone}` : undefined} aria-label={phone ? `Call ${who}` : 'Call, no phone on file'} />
-          </li>
-          <li>
-            <QuickAction icon={MessageSquare} label="Message" href={`/compose?contact=${encodeURIComponent(contact.id)}&channel=${contact?.email || !phone ? 'email' : 'sms'}`} aria-label={`Message ${who}`} />
-          </li>
-          <li>
-            <QuickAction
-              icon={Navigation}
-              label="Navigate"
-              href={address ? navigateHrefHere(address) : undefined}
-              external
-              aria-label={address ? `Navigate to ${address}` : 'Navigate, no address on file'}
-            />
-          </li>
-          <li>
-            <QuickAction
-              icon={Camera}
-              label={photos.count > 0 ? `Photos ${photos.count}` : 'Photos'}
-              onClick={onOpenPhotos}
-              aria-label={photos.count > 0 ? `Open ${photoLabel(photos.count)}` : 'Open photos'}
-            />
-          </li>
-        </ul>
       </details>
     </div>
   )
