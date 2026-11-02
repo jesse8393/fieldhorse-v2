@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 
@@ -102,6 +103,32 @@ test('phone date navigation can return directly to today', async ({ context, pag
   await expect(page.locator('.fhs-screen-head').locator('..')).toHaveCSS('opacity', '1')
   await page.getByRole('button', { name: 'Today', exact: true }).click()
   await expect(page.locator('.fhev-week-strip button[aria-pressed="true"]')).toContainText('2')
+})
+
+test('next stop photos keep project text and actions readable', async ({ context, page }, testInfo) => {
+  await signIn(context, { tables: { fh_schedule: [{ id: 'photo-visit', user_id: 'qa-user-1', org_id: 'org-1', contact_id: 'c-job1', title: 'Framing review', start_at: '2026-11-02T15:30:00Z', end_at: '2026-11-02T16:30:00Z' }] } })
+  await page.clock.setFixedTime(new Date(NOW))
+  await context.route('**/rest/v1/fh_contacts?*', route => {
+    if (!new URL(route.request().url()).searchParams.get('select')?.includes('fh_job_files')) return route.fallback()
+    return route.fulfill({ json: [{ id: 'c-job1', fh_job_files: [{ storage_path: 'qa/site.webp', uploaded_at: NOW }] }] })
+  })
+  await context.route('**/storage/v1/object/sign/job-photos', route => route.fulfill({ json: [{ path: 'qa/site.webp', signedURL: '/object/sign/job-photos/qa/site.webp?token=sample', error: null }] }))
+  await context.route('**/storage/v1/object/sign/job-photos/qa/site.webp?*', route => route.fulfill({ contentType: 'image/webp', body: readFileSync('public/media/fieldhorse-craft.webp') }))
+  await page.goto('/')
+  const card = page.getByRole('region', { name: 'Next stop' })
+  await expect.poll(() => card.locator('img').evaluate(img => (img as HTMLImageElement).naturalWidth)).toBeGreaterThan(0)
+  const text = await card.locator('.fhc-photo__text').boundingBox()
+  expect(text!.width).toBeGreaterThan(150)
+  for (const name of ['Open job', 'Navigate']) {
+    const button = card.getByRole('link', { name, exact: true })
+    await expect(button).toBeVisible()
+    const box = await button.boundingBox()
+    expect(box!.x).toBeGreaterThanOrEqual(0)
+    expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width)
+  }
+  await card.screenshot({ path: testInfo.outputPath('next-stop-photo.png') })
+  await card.getByRole('link', { name: 'Open job', exact: true }).click()
+  await expect(page).toHaveURL(/\/jobs\/c-job1$/)
 })
 
 test('photo batch feedback tracks actual processing and confirmed writes', async ({ context, page }) => {

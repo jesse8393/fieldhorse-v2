@@ -267,7 +267,7 @@ test.describe('today on a phone', () => {
     expect(await page.locator('main .fhc-btn--primary').count()).toBeLessThanOrEqual(1)
   })
 
-  test('the next stop with no photo is a compact band, not an empty picture', async ({ context, page }) => {
+  test('the next stop without a photo fits project context and both actions', async ({ context, page }) => {
     await setUp(context, page, { at: MORNING })
     const nextStop = page.getByRole('region', { name: 'Next stop' })
     await expect(nextStop.getByText('Next stop, 7:30 am')).toBeVisible()
@@ -276,7 +276,8 @@ test.describe('today on a phone', () => {
     await page.waitForLoadState('networkidle')
     await expect(nextStop.locator('img')).toHaveCount(0)
     const box = await nextStop.boundingBox()
-    expect(box!.height).toBeLessThanOrEqual(120)
+    expect(box!.height).toBeLessThanOrEqual(240)
+    await expect(nextStop.getByRole('link', { name: 'Open job', exact: true })).toBeVisible()
   })
 
   test('the loading card is the size of the band, so the next stop does not jump when it lands', async ({ context, page }) => {
@@ -369,7 +370,7 @@ test.describe('today on a desktop', () => {
     await expect(day.getByText('Final slab inspection')).toHaveCount(0)
   })
 
-  test('the next stop with no photo is a compact band, not an empty picture', async ({ context, page }) => {
+  test('the next stop without a photo fits project context and both actions', async ({ context, page }) => {
     await setUp(context, page, { at: MORNING })
     const nextStop = page.getByRole('region', { name: 'Next stop' })
     await expect(nextStop.getByText('Next stop, 7:30 am')).toBeVisible()
@@ -378,7 +379,8 @@ test.describe('today on a desktop', () => {
     await page.waitForLoadState('networkidle')
     await expect(nextStop.locator('img')).toHaveCount(0)
     const box = await nextStop.boundingBox()
-    expect(box!.height).toBeLessThanOrEqual(120)
+    expect(box!.height).toBeLessThanOrEqual(240)
+    await expect(nextStop.getByRole('link', { name: 'Open job', exact: true })).toBeVisible()
   })
 
   test('the loading card is the size of the band, so the next stop does not jump when it lands', async ({ context, page }) => {
@@ -454,12 +456,13 @@ test.describe('today on a desktop', () => {
     expect(await page.locator('.fh-build-page').innerText()).not.toMatch(/[\u2013\u2014]/)
   })
 
-  test('the quick actions stay reachable and the page has no brushed gold action on a full day', async ({ context, page }) => {
+  test('the quick actions stay reachable with one primary next job action', async ({ context, page }) => {
     await setUp(context, page, { at: MORNING })
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(/stops?\./)
     await expect(page.getByRole('link', { name: 'New lead' })).toHaveAttribute('href', '/leads/new')
     await expect(page.getByRole('link', { name: 'New job' })).toHaveAttribute('href', '/jobs/new')
-    await expect(page.locator('main .fhc-btn--primary')).toHaveCount(0)
+    await expect(page.locator('main .fhc-btn--primary')).toHaveCount(1)
+    await expect(page.getByRole('link', { name: 'Open job', exact: true })).toHaveAttribute('href', '/jobs/c-job1')
   })
 
   test('empty day', async ({ context, page }) => {

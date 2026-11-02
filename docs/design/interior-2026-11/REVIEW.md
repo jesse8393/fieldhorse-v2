@@ -15,7 +15,7 @@ Generated sample progress, project photos, financial values, and alternate brand
 
 | Area | Result |
 | --- | --- |
-| Today | Next stop includes project context and address. Open job and Navigate stay within reach. Attention items and week planning have clearer grouping. |
+| Today | Next stop includes project context and address. Open job and Navigate stay within reach. Loading reserves matching space, and photo overlays keep text readable. Attention items and week planning have clearer grouping. |
 | Jobs | Visible New job action, grouped pipeline records, useful empty state, contextual help. |
 | Job detail | Contact actions remain visible. One disclosure reveals scope, stage, and permitted financial details. |
 | Schedule | New event becomes the primary action. Today sits beside date navigation. Phone content renders immediately without an entrance fade. |
@@ -37,7 +37,7 @@ MP4 exports use H.264, 720 by 1280, fast start, and no audio. Each has an optimi
 
 - Lint, both TypeScript configurations, design audit, and production build passed locally.
 - Full unit run: 161 files, 1,542 tests passed.
-- New browser coverage exercises quote search/filter recovery, saved record checklists, setup keyboard focus, role restrictions, creation entry points, date reset, actual photo writes, and 320px day/night controls.
+- New browser coverage exercises quote search/filter recovery, saved record checklists, setup keyboard focus, role restrictions, creation entry points, date reset, actual photo writes, loaded photo card geometry, matching loading placeholders, and 320px day/night controls.
 - Existing Jobs, Job, Customers, Quotes, Schedule, Money, invoice PDF, delivery, and guide workflows were exercised on desktop and phone profiles. Updated legacy assertions reflect the single job disclosure, white document surface, and primary New invoice action. Browser CI remains the canonical result for the published commit.
 - Visual inspection covered Today, Jobs, Job, Schedule, Money, Quotes, Customers, Learn, and Proposal preview at 390px, 1440px, 390px night, and 320px. Setup received separate day/night/320px inspection. The narrow schedule week strip intentionally scrolls horizontally to retain date targets.
 - A real PDF download from the sample proposal was rendered and checked across both pages. Amount, customer, line item, terms, and exclusions survived export. HTML preview and PDF use separate existing layout renderers; this change does not claim pixel identical exports.
