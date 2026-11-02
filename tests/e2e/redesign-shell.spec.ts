@@ -90,34 +90,42 @@ test.describe('phone shell', () => {
   test('last item clears the dock', async ({ page }) => {
     for (const path of ['/invoices', '/clients']) {
       await open(page, path)
-      // Money's rows are links now (Phase 9, D62), Customers still has buttons.
-      await expect(page.locator('main').locator('a, button').first()).toBeVisible()
-      // Scroll to the very bottom; long lists render more rows as they
-      // near the end, so repeat until the page stops growing.
-      let height = 0
-      for (let i = 0; i < 6; i++) {
-        const next = await page.evaluate(() => document.documentElement.scrollHeight)
-        if (next === height) break
-        height = next
-        await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }))
-        await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
-      }
-      const { lastBottom, dockTop } = await page.evaluate(() => {
-        const inFlow = (el: Element) => {
-          for (let node: Element | null = el; node; node = node.parentElement) {
-            const { position } = getComputedStyle(node)
-            if (position === 'fixed' || position === 'sticky') return false
-          }
-          return true
+      // Measure the loaded records, not the immediately available header action.
+      await expect(path === '/invoices' ? page.getByRole('navigation', { name: 'More on money' }) : page.locator('.fh-customer-list')).toBeVisible()
+      for (const expanded of [false, true]) {
+        if (expanded) {
+          await page.locator('.fh-workspace-help > summary').click()
+          await expect(page.getByRole('link', { name: 'Open quick guide' })).toBeVisible()
         }
-        const controls = [...document.querySelectorAll('main a, main button, main input, main [role="button"]')]
-          .filter((el) => inFlow(el) && (el as HTMLElement).offsetParent !== null)
-        const lastBottom = Math.max(...controls.map((el) => el.getBoundingClientRect().bottom))
-        const capsule = document.querySelector('.fhs-dock')!.getBoundingClientRect()
-        const coin = document.querySelector('.fhs-dock__coin')!.getBoundingClientRect()
-        return { lastBottom, dockTop: Math.min(capsule.top, coin.top) }
-      })
-      expect(lastBottom, `${path}: last control ends at ${lastBottom}, dock starts at ${dockTop}`).toBeLessThanOrEqual(dockTop)
+        // Scroll to the very bottom; long lists render more rows as they
+        // near the end, so repeat until the page stops growing.
+        let height = 0
+        for (let i = 0; i < 6; i++) {
+          const next = await page.evaluate(() => document.documentElement.scrollHeight)
+          if (next === height) break
+          height = next
+          await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }))
+          await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+        }
+        const { lastBottom, dockTop } = await page.evaluate(() => {
+          const inFlow = (el: Element) => {
+            for (let node: Element | null = el; node; node = node.parentElement) {
+              const { position } = getComputedStyle(node)
+              if (position === 'fixed' || position === 'sticky') return false
+              // Chromium can retain layout boxes inside closed details.
+              if (node instanceof HTMLDetailsElement && !node.open && !node.querySelector(':scope > summary')?.contains(el)) return false
+            }
+            return true
+          }
+          const controls = [...document.querySelectorAll('main a, main button, main input, main [role="button"], main summary')]
+            .filter((el) => inFlow(el) && (el as HTMLElement).offsetParent !== null)
+          const lastBottom = Math.max(...controls.map((el) => el.getBoundingClientRect().bottom))
+          const capsule = document.querySelector('.fhs-dock')!.getBoundingClientRect()
+          const coin = document.querySelector('.fhs-dock__coin')!.getBoundingClientRect()
+          return { lastBottom, dockTop: Math.min(capsule.top, coin.top) }
+        })
+        expect(lastBottom, `${path}, help ${expanded ? 'open' : 'closed'}: last control ends at ${lastBottom}, dock starts at ${dockTop}`).toBeLessThanOrEqual(dockTop)
+      }
     }
   })
 })
