@@ -3,6 +3,7 @@
 // (cash/check/ACH/card), and date. Used by invoice detail and job detail.
 import { useEffect, useRef, useState } from 'react'
 import { View, Text, Pressable } from 'react-native'
+import { randomUUID } from 'expo-crypto'
 import { useLogPayment } from '../lib/queries'
 import { BottomSheet, SheetField, GoldButton, theme } from './ui'
 import { paymentAmount, localDate, isCalendarDate } from '../lib/paymentInput'
@@ -23,13 +24,18 @@ export function PaymentSheet({ open, onClose, userId, contactId, balance, onLogg
   const [date, setDate] = useState(today())
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
+  const openedFor = useRef<string | null>(null)
+  const paymentId = useRef<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!open) return
+    if (!open) { openedFor.current = null; return }
+    if (openedFor.current === contactId) return
+    openedFor.current = contactId
+    paymentId.current = null
     setAmount(balance && balance > 0 ? balance.toFixed(2) : '')
     setMethod('check'); setDate(today()); setErr(null)
-  }, [open, balance])
+  }, [open, contactId, balance])
 
   async function submit() {
     if (savingRef.current) return
@@ -39,7 +45,8 @@ export function PaymentSheet({ open, onClose, userId, contactId, balance, onLogg
     savingRef.current = true
     setSaving(true); setErr(null)
     try {
-      const { error } = await logPayment({ contactId, userId, amount: amt, method, paidOn: date.trim() })
+      paymentId.current ||= randomUUID()
+      const { error } = await logPayment({ id: paymentId.current, contactId, userId, amount: amt, method, paidOn: date.trim() })
       if (error) { setErr(error.message); return }
       onClose()
       onLogged?.()
@@ -48,25 +55,25 @@ export function PaymentSheet({ open, onClose, userId, contactId, balance, onLogg
   }
 
   return (
-    <BottomSheet open={open} onClose={onClose} title="Record payment">
+    <BottomSheet open={open} onClose={() => { if (!savingRef.current) onClose() }} title="Record payment">
       {balance != null && balance > 0 ? (
         <Text style={{ color: theme.inkMuted, fontSize: 14, marginBottom: 14 }}>Balance: ${balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
       ) : null}
-      <SheetField label="Amount ($)" value={amount} onChange={setAmount} keyboardType="numeric" placeholder="0" autoFocus />
+      <SheetField label="Amount ($)" value={amount} onChange={setAmount} editable={!saving} keyboardType="numeric" placeholder="0" autoFocus />
 
       <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '800', letterSpacing: 0, textTransform: 'uppercase', marginBottom: 8 }}>Method</Text>
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
         {METHODS.map((m) => {
           const on = method === m
           return (
-            <Pressable key={m} onPress={() => setMethod(m)} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: on ? theme.goldBright : theme.borderMid, backgroundColor: on ? `${theme.goldBright}26` : theme.bg }}>
+            <Pressable key={m} disabled={saving} onPress={() => setMethod(m)} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: on ? theme.goldBright : theme.borderMid, backgroundColor: on ? `${theme.goldBright}26` : theme.bg }}>
               <Text style={{ color: on ? theme.goldBright : theme.inkMuted, fontSize: 14, fontWeight: '700', textTransform: 'uppercase' }}>{m}</Text>
             </Pressable>
           )
         })}
       </View>
 
-      <SheetField label="Date" value={date} onChange={setDate} placeholder="year month day" />
+      <SheetField label="Date" value={date} onChange={setDate} editable={!saving} placeholder="year month day" />
 
       {err ? <Text style={{ color: theme.danger, fontSize: 14, marginBottom: 12 }}>{err}</Text> : null}
       <GoldButton label="Save payment" onPress={submit} loading={saving} />

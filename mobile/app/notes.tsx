@@ -1,6 +1,6 @@
 // mobile/app/notes.tsx, field notes: capture, link to a job, feed,
 // and notes grouped by job. Mirrors the web Notes hub (persistent core).
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { View, Text, ScrollView, Pressable, TextInput, ActivityIndicator, Alert, Modal } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
@@ -9,6 +9,7 @@ import { useNotesScreen, useSaveNote, useArchiveNote, useDeleteNoteGlobal, type 
 import { claudeMessage, claudeText } from '../lib/anthropic'
 import { useAuth } from '../contexts/AuthContext'
 import { ScreenBackground, Card, ScreenHeader, theme } from '../components/ui'
+import { useMutationFeedback } from '../lib/useMutationFeedback'
 
 function relTime(iso: string | null) {
   if (!iso) return ''
@@ -32,10 +33,12 @@ export default function NotesScreen() {
   const saveNote = useSaveNote()
   const archiveNote = useArchiveNote()
   const deleteNote = useDeleteNoteGlobal()
+  const { run, pending } = useMutationFeedback()
 
   const [draft, setDraft] = useState('')
+  const draftRevision = useRef(0)
   const [contactId, setContactId] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
+  const saving = pending.has('note')
   const [pickOpen, setPickOpen] = useState(false)
   const [parsing, setParsing] = useState(false)
   const [parsed, setParsed] = useState<{ category: string | null; action: string | null; whenText: string | null } | null>(null)
@@ -59,7 +62,8 @@ export default function NotesScreen() {
   }, [notes, contacts])
 
   async function parseDraft() {
-    if (!draft.trim() || parsing) return
+    if (!draft.trim() || parsing || saving) return
+    const revision = draftRevision.current
     setParsing(true)
     try {
       const res = await claudeMessage({
@@ -68,7 +72,7 @@ export default function NotesScreen() {
         maxTokens: 300
       })
       const m = claudeText(res).match(/\{[\s\S]*\}/)
-      if (m) {
+      if (m && draftRevision.current === revision) {
         const p = JSON.parse(m[0])
         setParsed({ category: p.category || null, action: p.action || null, whenText: p.when_text || null })
       }
@@ -80,21 +84,20 @@ export default function NotesScreen() {
   }
 
   async function onSave() {
-    if (!draft.trim() || !user) return
-    setSaving(true)
-    const { error } = await saveNote({
+    if (!draft.trim() || !user || saving) return
+    draftRevision.current++
+    const saved = await run('note', "Couldn't save note", () => saveNote({
       userId: user.id, text: draft.trim(), contactId,
       category: parsed?.category, action: parsed?.action, whenText: parsed?.whenText
-    })
-    setSaving(false)
-    if (error) { Alert.alert("Couldn't save", error.message); return }
+    }))
+    if (!saved) return
     setDraft(''); setContactId(null); setParsed(null)
   }
 
   function confirmDelete(id: string) {
     Alert.alert('Delete note?', 'This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => user && deleteNote({ id, userId: user.id }) }
+      { text: 'Delete', style: 'destructive', onPress: () => user && run(`note:${id}`, "Couldn't delete note", () => deleteNote({ id, userId: user.id })) }
     ])
   }
 
@@ -108,8 +111,9 @@ export default function NotesScreen() {
         <Card glow style={{ marginTop: 16, marginBottom: 18 }}>
           <View style={{ padding: 16 }}>
             <TextInput
+              editable={!saving}
               value={draft}
-              onChangeText={setDraft}
+              onChangeText={(value) => { draftRevision.current++; setDraft(value); setParsed(null) }}
               placeholder="Capture a note from the jobsite…"
               placeholderTextColor={theme.inkMuted}
               multiline
@@ -123,11 +127,11 @@ export default function NotesScreen() {
               </View>
             ) : null}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: theme.border }}>
-              <Pressable onPress={() => setPickOpen(true)} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: theme.borderMid }}>
+              <Pressable disabled={saving} onPress={() => setPickOpen(true)} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: theme.borderMid }}>
                 <Briefcase color={contactId ? theme.goldBright : theme.inkMuted} size={14} />
                 <Text style={{ color: contactId ? theme.ink : theme.inkMuted, fontSize: 14, fontWeight: '600', flex: 1 }} numberOfLines={1}>{linkedName || 'No job link'}</Text>
               </Pressable>
-              <Pressable onPress={parseDraft} disabled={!draft.trim() || parsing} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: theme.borderGold, backgroundColor: `${theme.goldBright}14`, opacity: !draft.trim() || parsing ? 0.5 : 1 }}>
+              <Pressable onPress={parseDraft} disabled={!draft.trim() || parsing || saving} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: theme.borderGold, backgroundColor: `${theme.goldBright}14`, opacity: !draft.trim() || parsing || saving ? 0.5 : 1 }}>
                 {parsing ? <ActivityIndicator color={theme.goldBright} size="small" /> : <Sparkles color={theme.goldBright} size={14} />}
                 <Text style={{ color: theme.goldBright, fontSize: 14, fontWeight: '800' }}>AI</Text>
               </Pressable>
@@ -161,7 +165,7 @@ export default function NotesScreen() {
                 {recent.map((n) => (
                   <NoteCard key={n.id} note={n} contactName={contacts.find((c) => c.id === n.contactId)?.name ?? null}
                     onTap={() => n.contactId && router.push(`/jobs/${n.contactId}`)}
-                    onArchive={() => user && archiveNote({ id: n.id, userId: user.id })}
+                    onArchive={() => user && run(`note:${n.id}`, "Couldn't archive note", () => archiveNote({ id: n.id, userId: user.id }))}
                     onDelete={() => confirmDelete(n.id)} />
                 ))}
               </View>
@@ -185,7 +189,7 @@ export default function NotesScreen() {
                         {g.items.slice(0, 3).map((n) => (
                           <NoteCard key={n.id} note={n} contactName={null} hideJobChip
                             onTap={() => router.push(`/jobs/${g.id}`)}
-                            onArchive={() => user && archiveNote({ id: n.id, userId: user.id })}
+                            onArchive={() => user && run(`note:${n.id}`, "Couldn't archive note", () => archiveNote({ id: n.id, userId: user.id }))}
                             onDelete={() => confirmDelete(n.id)} />
                         ))}
                       </View>

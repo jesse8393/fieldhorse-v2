@@ -27,9 +27,11 @@ import { mintPublicLink } from '../../lib/publicLink'
 import { approveQuoteVersion, type ApprovalMethod } from '../../lib/approveQuote'
 import { supabase } from '../../lib/supabase'
 import { formatFollowUpDate, quoteFollowUpDate } from '../../lib/quoteFollowUp'
+import { useMutationFeedback } from '../../lib/useMutationFeedback'
+import { moneyAmount } from '../../lib/paymentInput'
 
 function money(n: number) {
-  return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
+  return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 export default function QuoteScreen() {
@@ -44,6 +46,7 @@ export default function QuoteScreen() {
   const updateItem = useUpdateQuoteItem()
   const deleteItem = useDeleteQuoteItem()
   const applyTotal = useApplyQuoteTotal()
+  const { run, pending } = useMutationFeedback()
 
   const queryClient = useQueryClient()
   const [previewHtml, setPreviewHtml] = useState<string | null>(null)
@@ -195,7 +198,7 @@ export default function QuoteScreen() {
   const [section, setSection] = useState('')
   const [optional, setOptional] = useState(false)
   const [excluded, setExcluded] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const saving = pending.has('quote-item')
 
   const totals = useMemo(() => {
     let base = 0, optionalTotal = 0
@@ -237,32 +240,34 @@ export default function QuoteScreen() {
 
   async function submit() {
     if (!desc.trim() || !user || saving) return
-    const q = Number(qty.replace(/[^0-9.]/g, '')) || 0
-    const r = Number(rate.replace(/[^0-9.]/g, '')) || 0
+    const q = /^(?:\d+(?:\.\d+)?|\.\d+)$/.test(qty.trim()) ? Number(qty.trim()) : NaN
+    const r = moneyAmount(rate, { allowZero: true, allowNegative: true })
+    if (!Number.isFinite(q) || r === null || !Number.isSafeInteger(Math.round(q * r * 100))) {
+      Alert.alert('Check quantity and rate', 'Enter valid numeric values.')
+      return
+    }
     const payload = {
       description: desc.trim(), qty: q, rate: r,
       unit: unit.trim() || undefined, section: section.trim() || undefined,
       isOptional: optional, isExcluded: excluded
     }
-    setSaving(true)
-    const { error } = editing
-      ? await updateItem({ id: editing.id, jobId: id as string, item: payload })
-      : await addItem({ userId: user.id, jobId: id as string, item: payload })
-    setSaving(false)
-    if (!error) setOpen(false)
+    const saved = await run('quote-item', "Couldn't save line item", () => editing
+      ? updateItem({ id: editing.id, jobId: id as string, item: payload })
+      : addItem({ userId: user.id, jobId: id as string, item: payload }))
+    if (saved) setOpen(false)
   }
 
   function confirmDelete(itemId: string) {
     Alert.alert('Delete line item?', 'This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => deleteItem({ id: itemId, jobId: id as string }) }
+      { text: 'Delete', style: 'destructive', onPress: () => run('quote-item', "Couldn't delete line item", () => deleteItem({ id: itemId, jobId: id as string })) }
     ])
   }
 
   function applyToContract() {
     Alert.alert('Set contract amount?', `This sets the job's contract value to ${money(totals.base)} (base total).`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Set', onPress: () => applyTotal({ jobId: id as string, amount: totals.base }) }
+      { text: 'Set', onPress: () => run('quote-item', "Couldn't set contract amount", () => applyTotal({ jobId: id as string, amount: totals.base })) }
     ])
   }
 
@@ -422,9 +427,9 @@ export default function QuoteScreen() {
       </View>
 
       {/* Add/edit line item modal */}
-      <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
+      <Modal visible={open} transparent animationType="slide" onRequestClose={() => !saving && setOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
-          <Pressable className="flex-1" onPress={() => setOpen(false)} />
+          <Pressable className="flex-1" onPress={() => !saving && setOpen(false)} />
           <ScrollView
             className="bg-surface rounded-t-[10px] border-t border-[rgba(242, 237, 228,0.10)]"
             contentContainerStyle={{ padding: 24, paddingBottom: insets.bottom + 24 }}
@@ -432,7 +437,7 @@ export default function QuoteScreen() {
           >
             <Text className="text-ink text-xl font-bold mb-5">{editing ? 'Edit line item' : 'New line item'}</Text>
             <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Description</Text>
-            <TextInput
+            <TextInput editable={!saving}
               value={desc} onChangeText={setDesc} autoFocus={!editing}
               placeholder="Demo and hauling, framing labor…" placeholderTextColor="rgba(242,237,228,0.4)"
               className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-4"
@@ -440,7 +445,7 @@ export default function QuoteScreen() {
             <View className="flex-row mb-4" style={{ gap: 12 }}>
               <View className="flex-1">
                 <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Qty</Text>
-                <TextInput
+                <TextInput editable={!saving}
                   value={qty} onChangeText={setQty} keyboardType="decimal-pad"
                   placeholder="1" placeholderTextColor="rgba(242,237,228,0.4)"
                   className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink"
@@ -448,7 +453,7 @@ export default function QuoteScreen() {
               </View>
               <View className="flex-1">
                 <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Rate</Text>
-                <TextInput
+                <TextInput editable={!saving}
                   value={rate} onChangeText={setRate} keyboardType="decimal-pad"
                   placeholder="$0" placeholderTextColor="rgba(242,237,228,0.4)"
                   className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink"
@@ -456,7 +461,7 @@ export default function QuoteScreen() {
               </View>
               <View style={{ width: 80 }}>
                 <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Unit</Text>
-                <TextInput
+                <TextInput editable={!saving}
                   value={unit} onChangeText={setUnit}
                   placeholder="ea, sf" placeholderTextColor="rgba(242,237,228,0.4)"
                   className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink"
@@ -464,18 +469,18 @@ export default function QuoteScreen() {
               </View>
             </View>
             <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Section</Text>
-            <TextInput
+            <TextInput editable={!saving}
               value={section} onChangeText={setSection}
               placeholder="Scope of work, Upgrades…" placeholderTextColor="rgba(242,237,228,0.4)"
               className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-4"
             />
             <View className="flex-row items-center justify-between py-2">
               <Text className="text-ink text-sm font-semibold">Optional upgrade</Text>
-              <Switch value={optional} onValueChange={setOptional} trackColor={{ true: '#C9963A', false: '#141414' }} />
+              <Switch disabled={saving} value={optional} onValueChange={setOptional} trackColor={{ true: '#C9963A', false: '#141414' }} />
             </View>
             <View className="flex-row items-center justify-between py-2 mb-4">
               <Text className="text-ink text-sm font-semibold">Excluded (not in total)</Text>
-              <Switch value={excluded} onValueChange={setExcluded} trackColor={{ true: '#C9963A', false: '#141414' }} />
+              <Switch disabled={saving} value={excluded} onValueChange={setExcluded} trackColor={{ true: '#C9963A', false: '#141414' }} />
             </View>
             <Pressable
               onPress={submit}
@@ -518,9 +523,9 @@ export default function QuoteScreen() {
       </Modal>
 
       {/* Approve quote */}
-      <Modal visible={approveOpen} transparent animationType="slide" onRequestClose={() => setApproveOpen(false)}>
+      <Modal visible={approveOpen} transparent animationType="slide" onRequestClose={() => !approving && setApproveOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
-          <Pressable className="flex-1" onPress={() => setApproveOpen(false)} />
+          <Pressable className="flex-1" onPress={() => !approving && setApproveOpen(false)} />
           <ScrollView className="bg-surface rounded-t-[10px] border-t border-[rgba(242, 237, 228,0.10)]" contentContainerStyle={{ padding: 24, paddingBottom: insets.bottom + 24 }} style={{ maxHeight: '90%' }}>
             <Text className="text-ink text-xl font-bold mb-1">Approve quote</Text>
             <Text className="text-ink-muted text-sm mb-5">Saves a locked, signed version as the approved baseline the job inherits.</Text>
@@ -538,20 +543,20 @@ export default function QuoteScreen() {
             </View>
 
             <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Approved by</Text>
-            <TextInput value={apprName} onChangeText={setApprName} placeholder="Customer name" placeholderTextColor="rgba(242,237,228,0.4)" className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-4" />
+            <TextInput editable={!approving} value={apprName} onChangeText={setApprName} placeholder="Customer name" placeholderTextColor="rgba(242,237,228,0.4)" className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-4" />
 
             <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Email (optional)</Text>
-            <TextInput value={apprEmail} onChangeText={setApprEmail} autoCapitalize="none" keyboardType="email-address" placeholder="customer@email.com" placeholderTextColor="rgba(242,237,228,0.4)" className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-4" />
+            <TextInput editable={!approving} value={apprEmail} onChangeText={setApprEmail} autoCapitalize="none" keyboardType="email-address" placeholder="customer@email.com" placeholderTextColor="rgba(242,237,228,0.4)" className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-4" />
 
             {apprMethod === 'signature_typed' ? (
               <>
                 <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Typed signature</Text>
-                <TextInput value={apprSig} onChangeText={setApprSig} placeholder="Type full name as signature" placeholderTextColor="rgba(242,237,228,0.4)" className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-4" style={{ fontStyle: 'italic' }} />
+                <TextInput editable={!approving} value={apprSig} onChangeText={setApprSig} placeholder="Type full name as signature" placeholderTextColor="rgba(242,237,228,0.4)" className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-4" style={{ fontStyle: 'italic' }} />
               </>
             ) : null}
 
             <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Note (optional)</Text>
-            <TextInput value={apprNote} onChangeText={setApprNote} placeholder="Anything to record about the approval" placeholderTextColor="rgba(242,237,228,0.4)" multiline className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-5" style={{ minHeight: 64, textAlignVertical: 'top' }} />
+            <TextInput editable={!approving} value={apprNote} onChangeText={setApprNote} placeholder="Anything to record about the approval" placeholderTextColor="rgba(242,237,228,0.4)" multiline className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-5" style={{ minHeight: 64, textAlignVertical: 'top' }} />
 
             <Pressable onPress={onApprove} disabled={approving} className="rounded-[10px] py-4 flex-row items-center justify-center" style={{ gap: 8, backgroundColor: approving ? 'rgba(45, 122, 79,0.5)' : '#2D7A4F' }}>
               {approving ? <ActivityIndicator color="#F2EDE4" /> : <><ShieldCheck color="#F2EDE4" size={18} /><Text style={{ color: '#F2EDE4', fontWeight: '800' }}>Approve & lock</Text></>}

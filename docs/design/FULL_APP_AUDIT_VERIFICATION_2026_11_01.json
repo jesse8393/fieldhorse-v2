@@ -126,40 +126,42 @@
   },
   "not_established": [
     "Every-line manual source review",
-    "Independent database-session concurrency",
     "Complete historical migration replay",
-    "Browser desktop and phone suites on this branch",
-    "Full Deno Edge typechecking",
     "Physical native devices or signed binaries",
     "Authenticated real-account/provider workflows",
     "Financial column confidentiality",
     "Transactional DocuSign completion and immutable sent snapshots",
-    "Compatibility of older native/PWA clients with composite FK migrations"
+    "Compatibility of older native/PWA clients with composite FK migrations",
+    "Browser CI for the new native/pagination followup; d45a832 suites passed"
   ],
   "publication": {
     "published": true,
     "pr_created": true,
     "pr_number": 234,
     "pr_url": "https://github.com/jesse8393/fieldhorse-v2/pull/234",
-    "draft": true,
+    "draft": false,
     "approved_by_user": true,
     "initial_published_sha": "223eb0d18defab9ad20fd0bd71ff6649ab393d49",
-    "initial_tree_matches_local": true
+    "initial_tree_matches_local": true,
+    "merged": true,
+    "merge_commit": "6078a1186a6ade265db54580968b4cd04aa01666",
+    "merged_at": "2026-11-01T19:29:03Z",
+    "final_pr_head": "8da8a1be4bab29cb0e2db844c864b56a2e97e32c"
   },
   "production_changes": false,
   "coverage": {
-    "files": 1293,
+    "files": 1300,
     "source_review": {
-      "not_individually_reviewed": 1197,
-      "targeted": 96
+      "not_individually_reviewed": 1187,
+      "targeted": 113
     },
     "category": {
       "config/assets": 35,
       "docs": 178,
-      "mobile": 81,
+      "mobile": 86,
       "server": 45,
       "scripts": 25,
-      "web": 638,
+      "web": 640,
       "database": 123,
       "tests": 168
     }
@@ -174,6 +176,178 @@
     "initial_run_id": 41340960775,
     "initial_edge_failure": "Deno inherited manual node_modules resolution; transitive OpenAI types missing",
     "correction": "Resolve Edge npm dependencies through Deno global cache using node-modules-dir=none",
-    "verification": "pending new CI run"
+    "verification": "passed",
+    "verified_run_id": 41341161664,
+    "merged_run_id": 41341954207
+  },
+  "ci_checkpoint": {
+    "merged_head": "6078a1186a6ade265db54580968b4cd04aa01666",
+    "run_id": 41341954207,
+    "web_database": "passed",
+    "native": "passed",
+    "edge": "passed",
+    "postgresql_checks": {
+      "total": 197,
+      "billing_schedule": 61,
+      "inbox": 39,
+      "growth": 29,
+      "authorization": 32,
+      "quote_conversion": 21,
+      "record_relationships": 15,
+      "independent_concurrency": 5
+    },
+    "browser": {
+      "desktop": {
+        "passed": 88,
+        "failed": 2,
+        "skipped": 2
+      },
+      "mobile": {
+        "passed": 71,
+        "failed": 2,
+        "skipped": 19
+      },
+      "remaining_suite": "not run after targeted step failed",
+      "causes": [
+        "Today invoice fixture crosses calendar-day cutoff on daylight-saving transition",
+        "Task DELETE success fixture omitted returned representation"
+      ]
+    }
+  },
+  "observed_production": {
+    "url": "https://animated-kheer-db7c2c.netlify.app/",
+    "build_sha": "6078a1186a6a",
+    "build_at": "2026-11-01T19:29:22.528Z",
+    "quote_conversion_caller": true,
+    "quote_conversion_rpc_installed": false,
+    "composite_company_relationship_constraints": 0,
+    "database_writes_by_audit": false,
+    "repair_migration": "supabase/migrations/20261101184536_atomic_quote_conversion.sql",
+    "repair_applied": false
+  },
+  "followup_verification": {
+    "browser": "44 passed across both affected test files on desktop and phone",
+    "chromium": "153.0.8010.0",
+    "limits": [
+      "CI uses Chromium 149; separate verification required",
+      "Mocked Supabase records",
+      "No real-account or physical-device validation"
+    ],
+    "test_files": [
+      "tests/e2e/mobile-ui-ux.spec.ts",
+      "tests/e2e/workspace-tasks.spec.ts"
+    ],
+    "passed": 44,
+    "evidence_log_sha256": "7d15be068760ee2929caa904a8f45ca33031356580d885820f068aa7922da095"
+  },
+  "native_followup": {
+    "branch": "fix/audit-merge-followup-20261101",
+    "parent_commit": "d45a832379ab6738fd75ae768c9a120fe2f4a3f8",
+    "source_digest": {
+      "algorithm": "sha256 of sorted relative path, NUL, then raw sha256 file digest",
+      "scope": "Tracked and proposed paths except docs/",
+      "file_count": 1122,
+      "sha256": "57cdcc592f19844c96d7ca027887ee7131c565989c53c232a99af3d9195d5068"
+    },
+    "checks": [
+      {
+        "check": "web_units",
+        "passed": 1539,
+        "files": 160,
+        "result": "passed"
+      },
+      {
+        "check": "native_units",
+        "passed": 56,
+        "files": 7,
+        "result": "passed"
+      },
+      {
+        "check": "web_and_native_typescript",
+        "result": "passed"
+      },
+      {
+        "check": "eslint",
+        "result": "passed",
+        "errors": 0,
+        "warnings": 0
+      },
+      {
+        "check": "web_production_build",
+        "result": "passed"
+      },
+      {
+        "check": "native_exports",
+        "result": "passed",
+        "platforms": [
+          "ios",
+          "android"
+        ],
+        "signed_binaries": false,
+        "synthetic_environment": true
+      },
+      {
+        "check": "design_and_rls_source_audits",
+        "result": "passed"
+      },
+      {
+        "check": "changed_file_credential_signatures",
+        "result": "no matches",
+        "limitation": "Not exhaustive secret detection"
+      },
+      {
+        "check": "diff_whitespace",
+        "result": "passed"
+      }
+    ],
+    "resolved_export_failure": "Metro could not see shared pure helpers outside mobile/. Added src/lib to watchFolders; repeated iOS and Android exports passed.",
+    "remaining": [
+      "Native overview/analytics still use legacy stages and creator filters",
+      "Settlement is not atomic across devices",
+      "Payment attempt IDs survive retries within an open sheet, not application restarts or a new sheet attempt",
+      "Storage object/index reconciliation",
+      "Native UI, physical devices and real provider accounts not exercised"
+    ],
+    "production_database_writes": false,
+    "ci": "Pending publication of this source tree",
+    "publication": {
+      "state": "approved_for_publication",
+      "destination": "https://github.com/jesse8393/fieldhorse-v2/pull/235",
+      "files": 27,
+      "repository_identity_verified": true,
+      "explicit_user_approval": true,
+      "prior_rejection_resolved": true
+    }
+  },
+  "browser_followup_ci": {
+    "commit": "d45a832379ab6738fd75ae768c9a120fe2f4a3f8",
+    "run_id": 41343214465,
+    "result": "success",
+    "web_database": "passed",
+    "native": "passed",
+    "edge": "passed",
+    "desktop": {
+      "job_id": 124957893773,
+      "targeted": {
+        "passed": 90,
+        "skipped": 2
+      },
+      "remaining": {
+        "passed": 524,
+        "skipped": 195
+      }
+    },
+    "mobile": {
+      "job_id": 124957893605,
+      "targeted": {
+        "passed": 73,
+        "skipped": 19
+      },
+      "remaining": {
+        "passed": 490,
+        "skipped": 229
+      }
+    },
+    "limits": "Existing suite skips remain. Browser viewport tests do not establish physical/native phone behavior. This run predates the native followup."
   }
 }

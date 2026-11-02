@@ -9,8 +9,9 @@ import { Send, DollarSign } from 'lucide-react-native'
 import { useInvoicesOverview, useMarkInvoicePaid, type InvoiceRow } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
 import { ScreenBackground, Card, ScreenHeader, theme } from '../../components/ui'
+import { useMutationFeedback } from '../../lib/useMutationFeedback'
 
-function full(n: number) { return `$${Math.round(n).toLocaleString()}` }
+function full(n: number) { return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 function ageLabel(inv: InvoiceRow) {
   if (inv.status === 'paid') return { txt: 'PAID', tint: theme.success }
   if (inv.ageDays > 60) return { txt: `${inv.ageDays}D · OVERDUE`, tint: theme.danger }
@@ -24,6 +25,7 @@ export default function InvoicesScreen() {
   const { user } = useAuth()
   const { data, isLoading } = useInvoicesOverview(user?.id)
   const markPaid = useMarkInvoicePaid()
+  const { run, pending } = useMutationFeedback()
   const [tab, setTab] = useState<'outstanding' | 'all'>('outstanding')
 
   const all = data?.invoices ?? []
@@ -116,7 +118,7 @@ export default function InvoicesScreen() {
                                 <Text style={{ color: theme.ink, fontWeight: '700', fontSize: 14 }}>Email</Text>
                               </Pressable>
                             ) : null}
-                            <Pressable onPress={() => user && markPaid({ id: inv.id, userId: user.id })} style={{ flex: 1, borderRadius: 10, overflow: 'hidden' }}>
+                            <Pressable disabled={pending.has(`invoice:${inv.id}`)} onPress={() => user && run(`invoice:${inv.id}`, "Couldn't mark invoice paid", () => markPaid({ id: inv.id, userId: user.id }))} style={{ flex: 1, borderRadius: 10, overflow: 'hidden' }}>
                               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, backgroundColor: theme.goldBright }}>
                                 <DollarSign color={theme.onGold} size={14} />
                                 <Text style={{ color: theme.onGold, fontWeight: '800', fontSize: 14 }}>Mark Paid</Text>

@@ -14,6 +14,7 @@ import { ChevronLeft, Phone, Mail, Pencil, Trash2, MessageSquare, MapPin } from 
 import { useClientDetail, useUpdateClient, useDeleteClient } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
 import { ScreenBackground, Card, GoldButton, StagePill, theme } from '../../components/ui'
+import { useMutationFeedback } from '../../lib/useMutationFeedback'
 
 const STAGE_TINT: Record<string, string> = {
   lead: '#5C5C5C', quote: '#C9963A', job: '#2D7A4F',
@@ -22,7 +23,7 @@ const STAGE_TINT: Record<string, string> = {
 const ACTIVE = new Set(['lead', 'quote', 'job', 'invoice'])
 
 function money(n: number) {
-  return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
+  return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 export default function ClientDetailScreen() {
@@ -33,6 +34,7 @@ export default function ClientDetailScreen() {
   const { data, isPending } = useClientDetail(id)
   const updateClient = useUpdateClient()
   const deleteClient = useDeleteClient()
+  const { run, pending } = useMutationFeedback()
 
   const client = data?.client ?? null
   const jobs = useMemo(() => data?.jobs ?? [], [data?.jobs])
@@ -44,7 +46,7 @@ export default function ClientDetailScreen() {
   const [eEmail, setEEmail] = useState('')
   const [eAddress, setEAddress] = useState('')
   const [eNotes, setENotes] = useState('')
-  const [eSaving, setESaving] = useState(false)
+  const eSaving = pending.has('client')
 
   function openEdit() {
     if (!client) return
@@ -59,15 +61,14 @@ export default function ClientDetailScreen() {
 
   async function submitEdit() {
     if (!client || !user || eSaving) return
-    setESaving(true)
-    const { error } = await updateClient({
+    if (!eName.trim()) { Alert.alert('Customer name required', 'Enter a customer name.'); return }
+    const saved = await run('client', "Couldn't save customer", () => updateClient({
       clientId: client.id, userId: user.id,
       name: eName.trim(), companyName: eCompany.trim() || null,
       phone: ePhone.trim() || null, email: eEmail.trim() || null,
       address: eAddress.trim() || null, notes: eNotes.trim() || null
-    })
-    setESaving(false)
-    if (!error) setEditOpen(false)
+    }))
+    if (saved) setEditOpen(false)
   }
 
   function confirmDelete() {
@@ -77,8 +78,8 @@ export default function ClientDetailScreen() {
       {
         text: 'Delete', style: 'destructive',
         onPress: async () => {
-          const { error } = await deleteClient({ id: client.id, userId: user.id })
-          if (!error) { setEditOpen(false); router.back() }
+          const saved = await run('client', "Couldn't delete customer", () => deleteClient({ id: client.id, userId: user.id }))
+          if (saved) { setEditOpen(false); router.back() }
         }
       }
     ])
@@ -189,9 +190,9 @@ export default function ClientDetailScreen() {
       </ScrollView>
 
       {/* Edit client modal */}
-      <Modal visible={editOpen} transparent animationType="slide" onRequestClose={() => setEditOpen(false)}>
+      <Modal visible={editOpen} transparent animationType="slide" onRequestClose={() => !eSaving && setEditOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
-          <Pressable className="flex-1" onPress={() => setEditOpen(false)} />
+          <Pressable className="flex-1" onPress={() => !eSaving && setEditOpen(false)} />
           <ScrollView
             className="bg-surface rounded-t-[10px] border-t border-[rgba(242, 237, 228,0.10)]"
             contentContainerStyle={{ padding: 24, paddingBottom: insets.bottom + 24 }}
@@ -199,13 +200,13 @@ export default function ClientDetailScreen() {
           >
             <Text className="text-ink text-xl font-bold mb-5">Edit client</Text>
             <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Name</Text>
-            <TextInput
+            <TextInput editable={!eSaving}
               value={eName} onChangeText={setEName}
               placeholder="Client name" placeholderTextColor="rgba(242,237,228,0.4)"
               className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-4"
             />
             <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Company</Text>
-            <TextInput
+            <TextInput editable={!eSaving}
               value={eCompany} onChangeText={setECompany}
               placeholder="Company (optional)" placeholderTextColor="rgba(242,237,228,0.4)"
               className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-4"
@@ -213,7 +214,7 @@ export default function ClientDetailScreen() {
             <View className="flex-row mb-4" style={{ gap: 12 }}>
               <View className="flex-1">
                 <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Phone</Text>
-                <TextInput
+                <TextInput editable={!eSaving}
                   value={ePhone} onChangeText={setEPhone} keyboardType="phone-pad"
                   placeholder="(555) 555-5555" placeholderTextColor="rgba(242,237,228,0.4)"
                   className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink"
@@ -221,19 +222,19 @@ export default function ClientDetailScreen() {
               </View>
             </View>
             <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Email</Text>
-            <TextInput
+            <TextInput editable={!eSaving}
               value={eEmail} onChangeText={setEEmail} keyboardType="email-address" autoCapitalize="none"
               placeholder="name@email.com" placeholderTextColor="rgba(242,237,228,0.4)"
               className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-4"
             />
             <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Address</Text>
-            <TextInput
+            <TextInput editable={!eSaving}
               value={eAddress} onChangeText={setEAddress}
               placeholder="Job site or billing address" placeholderTextColor="rgba(242,237,228,0.4)"
               className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-4"
             />
             <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-2">Notes</Text>
-            <TextInput
+            <TextInput editable={!eSaving}
               value={eNotes} onChangeText={setENotes} multiline
               placeholder="Anything worth remembering" placeholderTextColor="rgba(242,237,228,0.4)"
               className="bg-bg border border-[rgba(242, 237, 228,0.12)] rounded-[10px] px-4 py-3 text-ink mb-5"
