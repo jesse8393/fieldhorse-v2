@@ -815,8 +815,9 @@ test.describe('money on a phone', () => {
     await expect(paid.getByText('Paid Sep 30', { exact: true })).toBeVisible()
     await expect(paid.getByText('Garage slab, deposit', { exact: true })).toBeVisible()
     await expect(paid.getByText('$6,187.50', { exact: true })).toBeVisible()
-    // Nothing gold here: the Money screen has no primary button of its own.
-    await expect(page.locator('.fhc-btn--primary')).toHaveCount(0)
+    // Billing starts from the visible primary action.
+    await expect(page.locator('.fhc-btn--primary')).toHaveCount(1)
+    await expect(page.locator('.fhc-btn--primary')).toHaveAttribute('href', '/invoices/new')
     await expect(page.getByRole('dialog')).toHaveCount(0)
   })
 

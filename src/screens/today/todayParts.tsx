@@ -197,17 +197,11 @@ export function NextStopCard({ next, maps, ratio }: { next: TodayNextStop; maps:
     titleAs: 'p' as const,
     eager: true,
     ...(ratio ? { ratio } : {}),
-    action: next.address ? (
-      <Button
-        variant="secondary"
-        href={maps(next.address)}
-        target="_blank"
-        rel="noopener noreferrer"
-        trailingIcon={ArrowRight}
-      >
-        Navigate
-      </Button>
-    ) : undefined
+    detail: [next.jobTitle, next.address].filter(Boolean).join(' · ') || undefined,
+    action: <div className="fh-next-actions">
+      <Button variant="primary" to={`/jobs/${next.jobId}`} trailingIcon={ArrowRight}>Open job</Button>
+      {next.address && <Button variant="secondary" href={maps(next.address)} target="_blank" rel="noopener noreferrer">Navigate</Button>}
+    </div>
   }
   return (
     <section className="fht-card fht-next" aria-label="Next stop">

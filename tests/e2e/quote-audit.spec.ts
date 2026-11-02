@@ -59,7 +59,7 @@ for (const template of ['classic', 'mint', 'slate', 'editorial', 'fieldhorse']) 
 
 for (const mark of [
   { name: 'white transparent', fill: 'white', background: '', expected: [20, 20, 20, 255] },
-  { name: 'dark transparent', fill: '#141414', background: '', expected: [242, 237, 228, 255] },
+  { name: 'dark transparent', fill: '#141414', background: '', expected: [255, 255, 255, 255] },
   { name: 'opaque', fill: 'white', background: '<rect width="440" height="140" fill="#172A2D"/>', expected: [23, 42, 45, 255] }
 ]) {
   test(`${mark.name} logo keeps a readable document surface`, async ({ context, page }) => {

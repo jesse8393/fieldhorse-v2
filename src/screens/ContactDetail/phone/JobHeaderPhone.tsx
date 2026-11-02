@@ -92,9 +92,9 @@ export default function JobHeaderPhone({ contact, photos, money, backLabel, onBa
 
       <details className="fhj-facts fh-job-contact-disclosure">
         <summary>Contact and job details<ChevronDown size={16} aria-hidden="true" /></summary>
+        {contact.scope_text?.trim() && <section className="fh-job-scope" aria-label="Project scope"><h2>Scope</h2><p>{contact.scope_text}</p></section>}
         {countButton}
-        <details className="fh-job-finance-disclosure">
-          <summary>{money ? 'Job finances & status' : 'Job status'}<ChevronDown size={16} aria-hidden="true" /></summary>
+        <div className="fh-job-finance-disclosure">
           <StageRail record={contact} aria-label="Stage" className="fhj-rail" />
 
         {money && (
@@ -119,7 +119,7 @@ export default function JobHeaderPhone({ contact, photos, money, backLabel, onBa
           </div>
         )}
 
-        </details>
+        </div>
       </details>
     </div>
   )

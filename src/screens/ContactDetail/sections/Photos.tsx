@@ -75,6 +75,7 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
   // The latest read failed. Photos an earlier read brought stay on screen.
   const [failed, setFailed] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 })
   const [captioningIds, setCaptioningIds] = useState(() => new Set())
   // Destructive-confirm sheet state for delete photo.
   // Delete asks with a second tap on the same button (D57).
@@ -182,10 +183,12 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
     const files: any[] = picked
     if (files.length === 0) return
     setUploading(true)
+    setUploadProgress({ current: 1, total: files.length })
     const newPhotoIds: any[] = []
     let queuedCount = 0
     try {
-      for (const file of files) {
+      for (const [index, file] of files.entries()) {
+        setUploadProgress({ current: index + 1, total: files.length })
         if (file.size > MAX_BYTES) {
           toastError('Photo too large', `${file.name} exceeds 10 MB`)
           continue
@@ -262,6 +265,7 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
       toastError('Upload failed', ex?.message || 'Try again')
     } finally {
       setUploading(false)
+      setUploadProgress({ current: 0, total: 0 })
       if (inputRef.current) inputRef.current.value = ''
     }
   }
@@ -423,6 +427,11 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
   return (
     <div ref={rootRef} style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 24px 24px' }}>
 
+      {uploading && <div className="fh-photo-upload" role="status">
+        <p>Processing photo {uploadProgress.current} of {uploadProgress.total}</p>
+        <progress aria-label="Photo batch progress" value={Math.max(0, uploadProgress.current - 1)} max={uploadProgress.total || 1} />
+        <small>Keep this screen open while uploading.</small>
+      </div>}
       {/* Header row */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         {loaded ? (

@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Play } from 'lucide-react'
+import WorkspaceChecklist from '../components/experience/WorkspaceChecklist.tsx'
 import BrandMark from '../components/experience/BrandMark.tsx'
 import { QUICK_GUIDES, quickGuide } from '../lib/quickGuides.ts'
+import { useMembership } from '../contexts/MembershipContext.tsx'
 import './landing.css'
 import './learn.css'
 
@@ -31,19 +33,24 @@ export default function Learn() {
   const [params, setParams] = useSearchParams()
   const guide = quickGuide(params.get('guide'))
   const headingRef = useRef<HTMLHeadingElement>(null)
-  const firstGuide = useRef(guide.id)
+  const { loading: membershipLoading } = useMembership()
+  const detailRef = useRef<HTMLElement>(null)
+  const requested = params.has('guide')
   useEffect(() => {
-    if (firstGuide.current !== guide.id) headingRef.current?.focus({ preventScroll: true })
-    firstGuide.current = guide.id
-  }, [guide.id])
+    if (!requested || membershipLoading) return
+    headingRef.current?.focus({ preventScroll: true })
+    detailRef.current?.scrollIntoView({ block: 'start' })
+  }, [guide.id, requested, membershipLoading])
   return <main className="fh-landing fh-learn">
     <a className="fh-experience-skip" href="#guide-title">Skip to guide</a>
     <header className="fh-landing-header"><BrandMark /><Link className="fh-landing-secondary" to="/"><ArrowLeft size={16} aria-hidden="true" />Back to FieldHorse</Link></header>
-    <div className="fh-learn-intro"><p className="fh-landing-eyebrow">Make yourself at home</p><h1>Small steps.<br /><span>A confident start.</span></h1><p>Three quick guides through actual FieldHorse screens. Follow at your own pace.</p></div>
+    <div className="fh-learn-intro"><p className="fh-landing-eyebrow">Make yourself at home</p><h1>Small steps.<br /><span>A confident start.</span></h1><p>Practical guides for everyday work. Follow at your own pace.</p></div>
+    <WorkspaceChecklist />
     <nav className="fh-guide-nav" aria-label="Quick guides">{QUICK_GUIDES.map((item, index) => <button key={item.id} type="button" aria-current={item.id === guide.id ? 'page' : undefined} onClick={() => setParams({ guide: item.id })}><span>0{index + 1}</span>{item.title}<ArrowRight size={18} aria-hidden="true" /></button>)}</nav>
-    <section className="fh-guide-detail" aria-labelledby="guide-title">
-      <div className="fh-guide-recording"><GuidePlayer key={guide.id} id={guide.id} title={guide.title} /><p>Recorded with sample records.</p></div>
-      <div className="fh-guide-copy"><p className="fh-landing-eyebrow">Your quick guide</p><h2 id="guide-title" ref={headingRef} tabIndex={-1}>{guide.title}</h2><p>{guide.description}</p>
+    <section ref={detailRef} className={`fh-guide-detail${guide.recording ? '' : ' fh-guide-detail--written'}`} aria-labelledby="guide-title">
+      <div className="fh-guide-detail__heading"><p className="fh-landing-eyebrow">Your quick guide</p><h2 id="guide-title" ref={headingRef} tabIndex={-1}>{guide.title}</h2><p>{guide.description}</p></div>
+      {guide.recording && <div className="fh-guide-recording"><GuidePlayer key={guide.id} id={guide.id} title={guide.title} /><p>Recorded with sample records.</p></div>}
+      <div className="fh-guide-copy">
         <ol className="fh-guide-steps">{guide.steps.map((step, index) => <li key={step.title}><span aria-hidden="true">0{index + 1}</span><div><h3>{step.title}</h3><p>{step.detail}</p></div></li>)}</ol>
         <Link className="fh-landing-primary" to={guide.href}>{guide.action}<ArrowRight size={18} aria-hidden="true" /></Link><p className="fh-guide-access-note">Your role determines available tools.</p>
       </div>

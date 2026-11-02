@@ -7,7 +7,8 @@ import { toastSuccess, toastError } from '../lib/toast.ts'
 import { hapticTap, hapticMedium, hapticSuccess } from '../lib/haptics.ts'
 import { supabase } from '../lib/supabase.ts'
 import { seedDemoData } from '../lib/demoSeed.ts'
-import Wordmark from '../components/Wordmark.tsx'
+import SetupProgress from '../components/experience/SetupProgress.tsx'
+import BrandMark from '../components/experience/BrandMark.tsx'
 import LogoUploader from '../components/LogoUploader.tsx'
 import { countNoun } from '../lib/format.ts'
 
@@ -316,7 +317,7 @@ export default function Onboarding() {
     return (
       <main className="fh-onb">
         <header className="fh-onb__top">
-          <Wordmark size="1.6rem" />
+          <BrandMark />
         </header>
 
         <section className="fh-onb__hero" style={{ animationDelay: '40ms' }}>
@@ -371,7 +372,7 @@ export default function Onboarding() {
   return (
     <main className="fh-onb">
       <header className="fh-onb__top">
-        <Wordmark size="1.6rem" />
+        <BrandMark />
         <div className="fh-onb__spec">
           <span className="fh-onb__spec-k">Setup</span>
         </div>
@@ -384,7 +385,7 @@ export default function Onboarding() {
           shop.
         </h1>
         <p className="fh-onb__lede">
-          Three things to lock in before the work day starts.
+          Your company. Your trades. Your next chapter.
         </p>
         {/* Plain words, not cockpit jargon, "COORDS PENDING · NO LOCK ·
             NEW OPERATOR" read like a video game to a contractor filling
@@ -400,8 +401,9 @@ export default function Onboarding() {
         </p>
       </section>
 
+      <SetupProgress company={companyName.trim().length >= 2} services={services.length > 0} location={Boolean(coords)} />
       <form className="fh-onb__form" onSubmit={onSubmit} noValidate>
-        <section className="fh-onb__section" style={{ animationDelay: '120ms' }}>
+        <section id="setup-company" tabIndex={-1} className="fh-onb__section" style={{ animationDelay: '120ms' }}>
           <div className="fh-onb__section-head">
             <h2 className="fh-onb__section-title fh-font-serif" style={{ fontWeight: 400 }}>
               Your company.
@@ -412,7 +414,7 @@ export default function Onboarding() {
             <div className="fh-onb__logo-slot">
               <span className="fh-onb__logo-label">Logo</span>
               <LogoUploader
-                logoUrl={null}
+                logoUrl={profile?.logo_url ?? null}
                 companyName={companyName}
                 onUpload={async (url: any) => { await upsertProfile({ logo_url: url }) }}
                 size="lg"
@@ -435,7 +437,7 @@ export default function Onboarding() {
           </div>
         </section>
 
-        <section className="fh-onb__section" style={{ animationDelay: '200ms' }}>
+        <section id="setup-services" tabIndex={-1} className="fh-onb__section" style={{ animationDelay: '200ms' }}>
           <div className="fh-onb__section-head">
             <h2 className="fh-onb__section-title fh-font-serif" style={{ fontWeight: 400 }}>
               What you run.
@@ -480,10 +482,10 @@ export default function Onboarding() {
           )}
         </section>
 
-        <section className="fh-onb__section" style={{ animationDelay: '280ms' }}>
+        <section id="setup-location" tabIndex={-1} className="fh-onb__section" style={{ animationDelay: '280ms' }}>
           <div className="fh-onb__section-head">
             <h2 className="fh-onb__section-title fh-font-serif" style={{ fontWeight: 400 }}>
-              Lock your location.
+              Add your location.
             </h2>
             <span className="fh-onb__section-hint">Weather and pour windows anchor to this point.</span>
           </div>
@@ -496,8 +498,8 @@ export default function Onboarding() {
             >
               <span className="fh-loc__dot" aria-hidden="true" />
               {locStatus === 'idle' && 'Use my current location'}
-              {locStatus === 'requesting' && 'Sighting…'}
-              {locStatus === 'ok' && 'Location locked'}
+              {locStatus === 'requesting' && 'Finding your location'}
+              {locStatus === 'ok' && 'Location added'}
               {locStatus === 'error' && 'Location denied · tap to retry'}
             </button>
             {coords && (

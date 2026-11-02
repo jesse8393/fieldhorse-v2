@@ -1,3 +1,4 @@
+import WorkspaceHelp from '../experience/WorkspaceHelp.tsx'
 // SnowScheduleBuild, desktop /schedule (spec 9.10, render
 // base/desktop-schedule.jpg, decision D10).
 //
@@ -445,7 +446,8 @@ export default function SnowScheduleBuild(props: Props) {
           ))}
         </div>
         <div className="fhsch-toolbar__actions">
-          <Button variant="primary" size="md" icon={Plus} onClick={() => onNewJob?.()}>New job</Button>
+          {onNewJob && <Button variant="secondary" size="md" onClick={onNewJob}>New job</Button>}
+          <Button variant="primary" size="md" icon={Plus} onClick={onAddEvent}>New event</Button>
         </div>
       </header>
 
@@ -513,6 +515,7 @@ export default function SnowScheduleBuild(props: Props) {
           ) : null}
         </DragOverlay>
       </DndContext>
+      <WorkspaceHelp topic="schedule" />
     </div>
   )
 }

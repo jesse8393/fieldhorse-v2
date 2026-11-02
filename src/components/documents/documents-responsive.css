@@ -36,6 +36,7 @@
 }
 
 @container fh-document (max-width: 560px) {
+  .fh-doc-signatures { grid-template-columns: minmax(0, 1fr) !important; }
   .fh-doc-content {
     --fh-doc-padding: 20px;
     padding: 24px 20px 32px !important;
@@ -90,3 +91,10 @@
   }
   .fh-doc-items tr:not(.fh-doc-item-row) { display: table; table-layout: fixed; width: 100%; }
 }
+
+.fh-doc-project-lead { border-top: 1px solid var(--fh-hairline, #DEDEDE); padding-top: 24px; }
+.fh-doc-project-lead p { margin: 0 0 8px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; font-weight: 700; }
+.fh-doc-project-lead h2 { margin: 0; font-size: 34px; font-weight: 600; letter-spacing: -.035em; line-height: 1.15; }
+.fh-doc-project-lead span { display: block; margin-top: 8px; font-size: 14px; line-height: 1.5; }
+@container fh-document (max-width: 560px) { .fh-doc-project-lead h2 { font-size: 24px; } }
+@media print { .fh-doc-shell { box-shadow: none !important; } .fh-doc-project-lead { break-inside: avoid; } }

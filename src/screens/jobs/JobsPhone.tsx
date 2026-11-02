@@ -1,3 +1,4 @@
+import WorkspaceHelp from '../../components/experience/WorkspaceHelp.tsx'
 // Jobs on a phone (spec 9.3, render base/jobs.jpg). Below 900 px Work.tsx
 // renders this in place of the deal cards: a condensed "Jobs" title with
 // New lead (for the roles that sell, never crew or a foreman), search and
@@ -248,7 +249,8 @@ export default function JobsPhone({
         <EmptyState
           icon={HardHat}
           title={EMPTY_TAB.all}
-          action={canSee('/import') ? <Button variant="secondary" size="md" to="/import">Import from Jobber</Button> : undefined}
+          sub="Start with a customer and clear scope."
+          action={<div className="fh-empty-actions">{canSee('/jobs/new') && <Button variant="primary" size="md" to="/jobs/new">Create a job</Button>}{canSee('/import') && <Button variant="secondary" size="md" to="/import">Import from Jobber</Button>}</div>}
         />
       )
     }
@@ -288,6 +290,7 @@ export default function JobsPhone({
       <div className="fhjl-head">
         <h1 className="fhjl-title">Jobs</h1>
         <div className="fhjl-head__actions">
+          {canSee('/jobs/new') && <Button variant="primary" size="mini" icon={Plus} to="/jobs/new">New job</Button>}
           {onNewLead && (
             <Button variant="secondary" size="mini" icon={Plus} onClick={onNewLead}>
               New lead
@@ -304,6 +307,7 @@ export default function JobsPhone({
         </div>
       </div>
 
+      <p className="fh-workspace-note">Your work, from first conversation to completion.</p>
       {/* The filter and the sort are chips under the title (D57): lost
           jobs show at the end of the list and never count toward the tabs;
           sorting by amount is offered only to roles that may see money. */}
@@ -394,6 +398,7 @@ export default function JobsPhone({
         {hasRows ? body : <div className="fhjl-state">{body}</div>}
       </div>
 
+      <WorkspaceHelp topic="jobs" />
     </div>
   )
 }

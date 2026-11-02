@@ -110,10 +110,11 @@ export default function DocumentShell({
         </header>
 
         {/* ─── Hero summary band (template-owned) ─────────── */}
+        {project?.title && <section className="fh-doc-project-lead"><p>Project</p><h2>{project.title}</h2>{project.address && <span>{project.address}</span>}</section>}
         {hero}
 
         {/* ─── Parties ─────────────────────────────────────── */}
-        <PartiesRow recipient={recipient} recipientLabel={recipientLabel} project={project} />
+        <PartiesRow recipient={recipient} recipientLabel={recipientLabel} project={project?.title ? null : project} />
 
         {/* ─── Body ────────────────────────────────────────── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
