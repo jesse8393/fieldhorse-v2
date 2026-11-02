@@ -12,17 +12,19 @@ export type EmptyStateProps = {
   /** The one line, such as "No jobs yet." */
   title: ReactNode
   /** The one action that fills the list: a Button. */
+  sub?: ReactNode
   action?: ReactNode
   className?: string
 }
 
-export default function EmptyState({ icon, title, action, className }: EmptyStateProps) {
+export default function EmptyState({ icon, title, sub, action, className }: EmptyStateProps) {
   return (
     <div className={cx('fhc-empty', className)}>
       <span className="fhc-empty__icon" aria-hidden="true">
         <Icon icon={icon} size={24} />
       </span>
       <p className="fhc-empty__title">{title}</p>
+      {sub && <p className="fhc-empty__sub">{sub}</p>}
       {action != null && <div className="fhc-empty__action">{action}</div>}
     </div>
   )

@@ -1,3 +1,4 @@
+import WorkspaceHelp from '../components/experience/WorkspaceHelp.tsx'
 import { eventAssignees } from '../lib/scheduleAllocation.ts'
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -343,7 +344,7 @@ export default function Schedule() {
   }
 
   return (
-    <motion.div className="v3-screen v3-screen--schedule" variants={stagger} initial="hidden" animate="show" style={{ position: 'relative', background: 'var(--v3-bg)' }}>
+    <motion.div className="v3-screen v3-screen--schedule" variants={stagger} initial={false} animate="show" style={{ position: 'relative', background: 'var(--v3-bg)' }}>
       {/* COMPACT HEADER, matches design's app-head--titled pattern.
           Eyebrow gives context ("Tue · May 20 · 4 visits"), h1 anchors
           the screen. Stats live inline under the eyebrow instead of
@@ -366,7 +367,7 @@ export default function Schedule() {
           }}>
             Schedule
           </h1>
-          <Button variant="secondary" size="mini" icon={Plus} onClick={() => openNewEvent()}>
+          <Button variant="primary" size="mini" icon={Plus} onClick={() => openNewEvent()}>
             New event
           </Button>
         </div>
@@ -426,6 +427,7 @@ export default function Schedule() {
             </button>
           </div>
 
+          <Button className="fh-schedule-today" variant="secondary" size="mini" onClick={() => setCursor(startOfDay(new Date()))}>Today</Button>
         </div>
       </motion.div>
 
@@ -504,22 +506,6 @@ export default function Schedule() {
             )
           })}
         </div>
-          <button
-            type="button"
-            onClick={() => setCursor(startOfDay(new Date()))}
-            style={{
-              padding: '8px 12px', borderRadius: 10,
-              border: '1px solid var(--v3-border-strong)',
-              background: 'var(--v3-surface)',
-              color: 'var(--v3-text)',
-              fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
-              letterSpacing: 0,
-              cursor: 'pointer',
-              WebkitTapHighlightColor: 'transparent'
-            }}
-          >
-            Today
-          </button>
       </motion.div>
 
       {/* Swipe-detector wraps the per-view body. Horizontal pointer drag
@@ -580,6 +566,7 @@ export default function Schedule() {
 
       <MobileUnscheduledJobs onSchedule={(job) => openNewEvent({ contactId: job.id, title: jobLabel(job) })} />
       <ScreenCloser caption="Tap a day above to plan the week ahead." />
+      <div style={{ margin: '0 20px' }}><WorkspaceHelp topic="schedule" /></div>
     </motion.div>
   )
 }

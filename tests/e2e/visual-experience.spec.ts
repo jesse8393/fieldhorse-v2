@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 
-const titles = ['Give every job a home.', 'Build a day that works.', 'Keep everyone in context.']
+const titles = ['Give every job a home.', 'Build a day that works.', 'Keep everyone in context.', 'Put clear scope in writing.', 'Make every payment clear.']
 
 for (const mode of ['day', 'night']) {
   test(`public pages fit a narrow phone in ${mode}`, async ({ context, page }) => {
@@ -51,7 +51,7 @@ test('failed film keeps a useful still and retries without trapping the user', a
 test('guides play captioned recordings and switching stops the previous guide', async ({ page }) => {
   await page.goto('/learn?guide=job')
   await expect(page.locator('video')).toHaveCount(0)
-  for (const [index, id] of ['job', 'day', 'update'].entries()) {
+  for (const [index, id] of ['job', 'day', 'update', 'quote', 'billing'].entries()) {
     if (index) await page.getByRole('navigation', { name: 'Quick guides' }).getByRole('button', { name: new RegExp(titles[index]) }).click()
     await expect(page).toHaveURL(new RegExp(`guide=${id}$`))
     await expect(page.locator('video')).toHaveCount(0)

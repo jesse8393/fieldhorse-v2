@@ -1,3 +1,4 @@
+import WorkspaceHelp from '../experience/WorkspaceHelp.tsx'
 // SnowHomeBuild, desktop Today (spec 9.2 and the Phase 4 plan, Task 4.5).
 // There is no desktop render; it is the phone Today laid out for a wide
 // screen, from the same buildTodayView.
@@ -177,7 +178,7 @@ export default function SnowHomeBuild({
     <div className="fhtd-side">
       {answersSection}
       <WeekSection now={now} />
-      {view && <TodayQuickActions showNewJob={false} />}
+      {view && <><TodayQuickActions showNewJob={false} /><WorkspaceHelp topic="today" /></>}
     </div>
   )
 

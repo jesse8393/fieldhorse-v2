@@ -57,8 +57,8 @@ export function quoteAsContact(quote: QuoteWithClient, email?: string | null) {
 export type QuoteStatusView = { label: string; tone: string; sub: string | null }
 
 /** The status label, tone and short line the quote screen and the list show. */
-export function quoteStatusView(quote: QuoteWithClient): QuoteStatusView {
-  return deriveStatus(quoteAsContact(quote), false)
+export function quoteStatusView(quote: QuoteWithClient, now = Date.now()): QuoteStatusView {
+  return deriveStatus(quoteAsContact(quote), false, now)
 }
 
 /** What the screen calls the quote when it has no title. */

@@ -1,26 +1,14 @@
 // src/components/documents/tokens.ts
 //
-// Shared design tokens for FieldHorse document templates (HTML preview
-// + jsPDF export). One palette + one type scale that both the in-app
-// previews and the exported PDFs read from, so the customer never sees
-// a layout mismatch between what the contractor approves on-screen and
-// what lands in their inbox.
-//
-// White-label rule: the gold accent below is the *default* brand
-// color. Per-company overrides come through profile.brand_accent_hex
-// (validated `#RRGGBB`) and flow into every template via the
-// `resolveBrandGold(company)` helper. The default never leaks into a
-// customer facing document when the contractor has set their own.
-//
-// Design direction: editorial / Linear / Stripe / high-end architect's
-// proposal. Black, paper, slate, restrained warm gold. No saturated
-// gradients, no badge soup.
+// Shared colors and sizing for customer document previews and PDF export.
+// HTML uses Manrope. PDF typography follows the existing export renderer.
+// GOLD remains the compatibility name for the default copper accent.
+// A validated profile.brand_accent_hex keeps each company's own accent.
+// Selectable proposal themes retain their established layouts.
 
-// The six locked palette colors (scripts/audit-design-system.mjs). Every
-// document color is one of these or a mix of two of them.
-const GOLD = '#C9963A'
+const GOLD = '#AD4029'
 const INK = '#141414'
-const PAPER = '#F2EDE4'
+const PAPER = '#FFFFFF'
 const MUTED = '#5C5C5C'
 const RED = '#C0392B'
 const GREEN = '#2D7A4F'
@@ -82,7 +70,7 @@ export type ThemePalette = {
   mid: string          // body copy in the supporting sections
   muted: string        // secondary text
   rule: string         // row dividers
-  paper: string | null // page color; null keeps the default page (cream on screen, white in the PDF)
+  paper: string | null // page color; null keeps the default white page
 }
 
 // Colors for the selectable estimate themes (Settings, Estimate template).
@@ -99,17 +87,16 @@ export const THEME_PALETTES: Record<'slate' | 'mint' | 'editorial', ThemePalette
     ink: INK, mid: INK, muted: MUTED, rule: DOC_COLORS.rule, paper: null
   },
   editorial: {
-    accent: GOLD, accentSoft: mixHex(GOLD, PAPER, 0.16), onAccent: INK,
+    accent: GOLD, accentSoft: mixHex(GOLD, PAPER, 0.16), onAccent: PAPER,
     ink: INK, mid: MUTED, muted: MUTED, rule: mixHex(GOLD, PAPER, 0.25), paper: PAPER
   }
 }
 
 export const DOC_FONTS: Record<string, string> = {
-  display:  "'Bebas Neue', 'Helvetica Neue', sans-serif",
-  // Two-family brand: the serif slot maps to the body family so legacy
-  // template call sites keep working without shipping a third font.
-  serif:    "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-  body:     "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+  display:  "'Manrope', 'Helvetica Neue', sans-serif",
+  // Legacy font slots share Manrope without adding another download.
+  serif:    "'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  body:     "'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
 }
 
 type DocTypeScale = {

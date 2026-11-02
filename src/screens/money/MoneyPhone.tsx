@@ -1,3 +1,4 @@
+import WorkspaceHelp from '../../components/experience/WorkspaceHelp.tsx'
 // Money on a phone (spec 9.7, decision D6, render glamor/g-money.jpg).
 // Below 900 px Invoices.tsx renders this in place of the old cockpit and
 // cards: a condensed "Money" title with a Reports link, a vault card with
@@ -188,7 +189,7 @@ export default function MoneyPhone({
     <div className="v3-screen fhm">
       <header className="fhm-head">
         <h1 className="fhm-title" ref={titleRef} tabIndex={-1}>Money</h1>
-        <Button variant="quiet" size="mini" to="/analytics">Reports</Button>
+        <div className="fhm-head__actions"><Button variant="primary" size="mini" to="/invoices/new">New invoice</Button><Button variant="quiet" size="mini" to="/quotes">Quotes</Button><Button variant="quiet" size="mini" to="/analytics">Reports</Button></div>
       </header>
 
       <div className="fhm-vault">
@@ -216,7 +217,6 @@ export default function MoneyPhone({
       ) : (
         <>
           <p className="fhm-quiet">{view.marginNote}. Untracked costs excluded.</p>
-          <ReconciliationLinks groups={reconciliation} />
           {view.overdue.length > 0 && (
             <Group
               id="overdue"
@@ -263,6 +263,7 @@ export default function MoneyPhone({
             <Group id="paid" title="Paid" note="Last 10 days" rows={view.paid} />
           )}
 
+          <ReconciliationLinks groups={reconciliation} />
           <nav className="fhm-more" aria-label="More on money">
             <Link className="fhm-link" to={panelHref('statements')} onClick={() => { hapticTap(); openPanel() }}>
               <span className="fhm-link__label">Statements</span>
@@ -284,6 +285,7 @@ export default function MoneyPhone({
           </nav>
         </>
       )}
+      <WorkspaceHelp topic="money" />
     </div>
   )
 }

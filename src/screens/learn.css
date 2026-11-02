@@ -20,7 +20,7 @@
 .fh-guide-player__play { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); display: inline-flex; align-items: center; gap: 12px; padding: 16px 20px; border-radius: 999px; color: var(--fh-linen); background: var(--fh-onyx); font: 600 15px/1.4 var(--fh-font-body); white-space: nowrap; box-shadow: 0 4px 24px rgba(20,20,20,.12); }
 .fh-guide-player > p { position: absolute; inset: auto 12px 12px; padding: 12px; background: var(--fh-onyx); color: var(--fh-linen); font-size: 13px; }
 .fh-guide-copy { padding-top: 20px; }
-.fh-guide-copy h2 { font: 650 38px/1.15 var(--fh-font-body); letter-spacing: -.04em; margin: 0 0 20px; }
+.fh-guide-detail__heading h2 { font: 650 38px/1.15 var(--fh-font-body); letter-spacing: -.04em; margin: 0 0 20px; }
 .fh-guide-copy > p { color: var(--fh-ink-2); line-height: 1.6; }
 .fh-guide-steps { list-style: none; padding: 0; margin: 28px 0; }
 .fh-guide-steps li { display: flex; gap: 20px; border-top: 1px solid var(--fh-hairline); padding: 20px 0; }
@@ -29,3 +29,11 @@
 .fh-guide-steps p { font-size: 14px; color: var(--fh-ink-2); line-height: 1.65; margin: 0; }
 .fh-guide-copy .fh-guide-access-note { font-size: 12px; margin-top: 14px; }
 @media(max-width: 700px) { .fh-guide-nav { grid-template-columns: 1fr; } .fh-guide-nav button { min-height: 60px; padding: 16px; } .fh-guide-nav button + button { border-left: 0; border-top: 1px solid var(--fh-hairline); } .fh-guide-detail { grid-template-columns: 1fr; gap: 20px; margin-bottom: 48px; } .fh-guide-recording { max-width: 340px; width: 100%; justify-self: center; } .fh-learn-intro { padding-block: 32px 24px; } .fh-learn .fh-landing-header .fh-landing-secondary { font-size: 12px; padding-inline: 8px; } }
+
+.fh-guide-detail--written { grid-template-columns: minmax(0, 760px); justify-content: center; }
+.fh-guide-detail--written .fh-guide-copy { padding-top: 0; }
+.fh-guide-nav { grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); }
+
+.fh-guide-detail__heading { grid-column: 1 / -1; }
+.fh-guide-detail { scroll-margin-top: 24px; }
+.fh-guide-detail__heading > p:last-child { color: var(--fh-ink-2); line-height: 1.6; margin-bottom: 0; }

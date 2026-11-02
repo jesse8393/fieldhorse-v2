@@ -1,3 +1,4 @@
+import WorkspaceHelp from '../experience/WorkspaceHelp.tsx'
 // SnowScheduleBuild, desktop /schedule (spec 9.10, render
 // base/desktop-schedule.jpg, decision D10).
 //
@@ -6,7 +7,7 @@
 // Month, and the screen's one brushed gold action, New job), a paper board
 // of hourly slots, and a right rail: the Unscheduled tray (jobs in the job
 // stage with no visit from today on), Crew this week when visits carry
-// assigned_to, and Up next with New event. Dragging a tray card onto a
+// assigned_to, and Up next. The toolbar starts new events. Dragging a tray card onto a
 // slot schedules the job there; the card's Schedule button is the
 // keyboard and touch way in.
 //
@@ -445,7 +446,8 @@ export default function SnowScheduleBuild(props: Props) {
           ))}
         </div>
         <div className="fhsch-toolbar__actions">
-          <Button variant="primary" size="md" icon={Plus} onClick={() => onNewJob?.()}>New job</Button>
+          {onNewJob && <Button variant="secondary" size="md" onClick={onNewJob}>New job</Button>}
+          <Button variant="primary" size="md" icon={Plus} onClick={onAddEvent}>New event</Button>
         </div>
       </header>
 
@@ -500,7 +502,6 @@ export default function SnowScheduleBuild(props: Props) {
               failed={upcomingFailed}
               onRetry={() => onRetryUpcoming?.()}
               onOpenEvent={onOpenEvent}
-              onAddEvent={onAddEvent}
             />
           </aside>
         </div>
@@ -513,6 +514,7 @@ export default function SnowScheduleBuild(props: Props) {
           ) : null}
         </DragOverlay>
       </DndContext>
+      <WorkspaceHelp topic="schedule" />
     </div>
   )
 }

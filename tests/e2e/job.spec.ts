@@ -47,7 +47,8 @@ test.describe('job page on a phone', () => {
     expect(clientBox!.y).toBeGreaterThan(titleBox!.y)
 
     await page.locator('.fh-job-contact-disclosure > summary').click()
-    await page.locator('.fh-job-finance-disclosure summary').click()
+    // One disclosure reveals both project and financial details.
+    await expect(page.locator('.fh-job-finance-disclosure')).toBeVisible()
     const current = page.getByRole('list', { name: 'Stage' }).locator('[aria-current="step"]')
     await expect(current).toHaveText(/^Job/)
 
@@ -335,7 +336,7 @@ test.describe('job page on a phone', () => {
     await signIn(context)
     await open(page, '/jobs/c-lost')
     await page.locator('.fh-job-contact-disclosure > summary').click()
-    await page.locator('.fh-job-finance-disclosure summary').click()
+    await expect(page.locator('.fh-job-finance-disclosure')).toBeVisible()
     const rail = page.locator('.fhc-rail')
     await expect(rail.getByText('Lost', { exact: true })).toBeVisible()
     await expect(page.getByRole('list', { name: 'Stage' }).locator('[aria-current="step"]')).toHaveCount(0)

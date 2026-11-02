@@ -18,6 +18,7 @@ type PhotoCardOwnProps = {
   /** Small line above the title, such as "Next stop, 7:30 am". */
   eyebrow?: ReactNode
   title: ReactNode
+  detail?: ReactNode
   /** One control at the bottom right, such as a Navigate Button. */
   action?: ReactNode
   /** CSS aspect ratio of the photo box. Without a photo the band is compact and ignores it. */
@@ -43,6 +44,7 @@ export default function PhotoCard({
   alt,
   eyebrow,
   title,
+  detail,
   action,
   ratio = '16 / 9',
   titleAs: Title = 'h3',
@@ -75,6 +77,7 @@ export default function PhotoCard({
           <div className="fhc-photo__text">
             {eyebrow != null && eyebrow !== false && <p className="fhc-photo__eyebrow">{eyebrow}</p>}
             <Title className="fhc-photo__title">{title}</Title>
+            {detail && <p className="fhc-photo__detail">{detail}</p>}
           </div>
           {action != null && <div className="fhc-photo__action">{action}</div>}
         </div>

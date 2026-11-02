@@ -20,6 +20,7 @@ export type TodayWeather = { tempF: number | null; code: number | null; window: 
 export type TodayNextStop = {
   jobId: string
   title: string
+  jobTitle?: string
   startAt: string
   address: string | null
   photoUrl: string | null
@@ -132,6 +133,7 @@ export function buildTodayView({ bundle, now, lat, lon, weather }: TodayViewInpu
     ? {
         jobId: next.contactId as string,
         title: next.clientName || next.title,
+        ...(next.jobTitle ? { jobTitle: next.jobTitle } : {}),
         startAt: next.startAt as string,
         address: next.address ?? null,
         photoUrl: bundle.photoUrlByJob?.[next.contactId as string] ?? null

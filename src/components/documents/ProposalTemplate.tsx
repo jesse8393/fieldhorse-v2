@@ -525,7 +525,7 @@ function ApprovalLines({ company, contact, approval, status }: any) {
       <p style={{ margin: '0 0 20px', fontFamily: DOC_FONTS.body, fontSize: 12, lineHeight: 1.55, color: DOC_COLORS.inkMid, maxWidth: '64ch' }}>
         Signing below (or approving through the secure link this estimate was delivered with) authorizes {company?.name || 'the contractor'} to perform the work described above and forms a binding agreement under the stated terms.
       </p>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+      <div className="fh-doc-signatures" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
         <SigLine
           label="Customer"
           name={stamped ? (approval?.clientName || contact?.name) : null}

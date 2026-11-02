@@ -1,3 +1,4 @@
+import WorkspaceHelp from '../../components/experience/WorkspaceHelp.tsx'
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode, RefObject } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -237,6 +238,7 @@ export default function TodayPhone({
         <TodayQuickActions />
         {answersSection}
         {daySections}
+        <WorkspaceHelp topic="today" />
       </div>
     </div>
   )

@@ -1,3 +1,4 @@
+import WorkspaceHelp from '../components/experience/WorkspaceHelp.tsx'
 import { lazy, Suspense, useCallback, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -260,6 +261,7 @@ export default function Clients() {
         </section>
       </motion.div>
 
+      <div style={{ margin: '0 24px 20px' }}><WorkspaceHelp topic="customers" /></div>
       {/* Search + filter row, unified gutter, FilterPill primitive */}
       <motion.div className="fh-clients__filters" variants={item} style={{ padding: '0 24px 12px' }}>
         <div style={{ position: 'relative' }}>

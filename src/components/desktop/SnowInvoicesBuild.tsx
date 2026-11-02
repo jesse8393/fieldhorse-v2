@@ -1,3 +1,4 @@
+import WorkspaceHelp from '../experience/WorkspaceHelp.tsx'
 // SnowInvoicesBuild, desktop /invoices (spec 9.7, plan task 4.6).
 //
 // The entry for Money at 900 px and wider. Same numbers and same rows as
@@ -261,6 +262,7 @@ export default function SnowInvoicesBuild({
           </>
         )}
       </div>
+      <WorkspaceHelp topic="money" />
     </div>
   )
 }

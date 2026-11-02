@@ -12,12 +12,11 @@ import { formatFollowUpDate } from '../../../lib/quoteFollowUp.ts'
    takes precedence over status when expired so the operator
    sees the urgent state regardless of how the row was last saved.
    ============================================================ */
-export function deriveStatus(contact: any, pastQuote = false) {
+export function deriveStatus(contact: any, pastQuote = false, now = Date.now()) {
   const raw = (contact?.proposal_status || 'draft').toLowerCase()
   const sentIso = contact?.quote_sent_at || null
   const expIso = contact?.quote_expires_at || null
 
-  const now = Date.now()
   const expMs = expIso ? new Date(expIso).getTime() : null
   const isExpired = expMs != null && Number.isFinite(expMs) && expMs < now
 
