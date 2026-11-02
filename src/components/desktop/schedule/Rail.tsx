@@ -5,7 +5,7 @@
 
 import { useLayoutEffect, useRef, useState } from 'react'
 import { useDraggable } from '@dnd-kit/core'
-import { GripVertical, Plus } from 'lucide-react'
+import { GripVertical } from 'lucide-react'
 import { Button, Icon, SkeletonRows } from '../../fh'
 import { capTray, hoursLabel, jobLabel, jobSubline, timeLabel, TRAY_LIMIT, WEEKDAYS } from '../../../lib/scheduleBoard.ts'
 import type { JobRow } from '../../../lib/queries.ts'
@@ -200,8 +200,7 @@ export function UpNext({
   loading,
   failed,
   onRetry,
-  onOpenEvent,
-  onAddEvent
+  onOpenEvent
 }: {
   /** Null until the first read is in. */
   events: BoardEvent[] | null
@@ -211,14 +210,12 @@ export function UpNext({
   failed: boolean
   onRetry: () => void
   onOpenEvent?: (event: BoardEvent) => void
-  onAddEvent: () => void
 }) {
   const sectionRef = useRef<HTMLElement>(null)
   return (
     <section ref={sectionRef} className="fhsch-rail__section" aria-label="Up next" tabIndex={-1}>
       <div className="fhsch-rail__head">
         <h2 className="fhsch-rail__title">Up next</h2>
-        <Button variant="secondary" size="mini" icon={Plus} onClick={onAddEvent}>New event</Button>
       </div>
       {loading ? (
         <SkeletonRows rows={2} label="Loading what is up next" />

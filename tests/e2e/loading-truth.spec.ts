@@ -912,7 +912,10 @@ test.describe('Job Files tab', () => {
         await expect(shown(first)).toBeVisible()
         await expect(shown(second)).toBeVisible()
         await expect(counted(2)).toBeVisible()
-        await expect(panel(page, name).getByRole('status')).toHaveCount(0)
+        // Batch progress may remain while its final reread is pending;
+        // the saved gallery must never return to loading placeholders.
+        await expect(panel(page, name).locator('[role="status"][aria-busy="true"]')).toHaveCount(0)
+        if (kind === 'photo') await expect(panel(page, name).getByRole('progressbar', { name: 'Photo batch progress' })).toBeVisible()
       })
       release()
       // The mock keeps no upload, so the reread brings the same two back.

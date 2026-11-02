@@ -7,7 +7,7 @@ import WorkspaceHelp from '../experience/WorkspaceHelp.tsx'
 // Month, and the screen's one brushed gold action, New job), a paper board
 // of hourly slots, and a right rail: the Unscheduled tray (jobs in the job
 // stage with no visit from today on), Crew this week when visits carry
-// assigned_to, and Up next with New event. Dragging a tray card onto a
+// assigned_to, and Up next. The toolbar starts new events. Dragging a tray card onto a
 // slot schedules the job there; the card's Schedule button is the
 // keyboard and touch way in.
 //
@@ -502,7 +502,6 @@ export default function SnowScheduleBuild(props: Props) {
               failed={upcomingFailed}
               onRetry={() => onRetryUpcoming?.()}
               onOpenEvent={onOpenEvent}
-              onAddEvent={onAddEvent}
             />
           </aside>
         </div>
