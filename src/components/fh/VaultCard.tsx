@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { formatMoney } from './money.ts'
 import { cx } from './cx.ts'
 
@@ -47,6 +47,7 @@ export default function VaultCard({
   'aria-label': ariaLabel,
   className
 }: VaultCardProps) {
+  const amountText = show(amount)
   return (
     <Tag className={cx('fhc-vault', tone === 'paper' && 'fhc-vault--paper', className)} aria-label={ariaLabel}>
       <div className={cx('fhc-vault__card', tone === 'paper' ? 'fhc-vault__card--paper' : 'fh-onyx-scope fh-grain')}>
@@ -54,7 +55,7 @@ export default function VaultCard({
           <p className="fhc-vault__label">{label}</p>
           {corner != null && <div className="fhc-vault__corner">{corner}</div>}
         </div>
-        <p className="fhc-vault__amount">{show(amount)}</p>
+        <p className="fhc-vault__amount" style={{ '--fhc-amount-characters': Math.max(1, amountText.length) } as CSSProperties}>{amountText}</p>
         {facts && facts.length > 0 && (
           <>
             <span className="fhc-vault__rule" aria-hidden="true" />

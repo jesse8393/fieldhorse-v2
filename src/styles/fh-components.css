@@ -1140,10 +1140,11 @@
 }
 
 .fhc-vault__card {
+  --fhc-vault-padding: 20px;
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  padding: 20px;
+  padding: var(--fhc-vault-padding);
   border-radius: 22px;
   background: var(--fh-stage);
   box-shadow: inset 0 0 0 1px var(--fh-stage-edge);
@@ -1174,13 +1175,15 @@
 .fhc-vault__amount {
   margin: 8px 0 0;
   font-family: var(--fh-font-display);
-  font-size: 52px;
-  line-height: 54px;
+  /* Scale complete amounts to the available card width. Exact cents
+     must stay attached to the total, even for seven digit receipts. */
+  font-size: min(52px, calc((100cqi - 2 * var(--fhc-vault-padding)) / (var(--fhc-amount-characters, 12) * 0.67)));
+  line-height: 1.04;
   font-weight: 600;
   letter-spacing: 0;
   font-variant-numeric: tabular-nums;
   color: var(--fh-ink);
-  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
 
 .fhc-vault__rule {
@@ -1302,7 +1305,7 @@
 
 @container (min-width: 420px) {
   .fhc-vault__card {
-    padding: 24px;
+    --fhc-vault-padding: 24px;
   }
   .fhc-vault__facts--columns dd {
     font-size: 24px;
@@ -1313,11 +1316,7 @@
 /* A 320 px phone. */
 @container (max-width: 320px) {
   .fhc-vault__card {
-    padding: 16px;
-  }
-  .fhc-vault__amount {
-    font-size: 38px;
-    line-height: 40px;
+    --fhc-vault-padding: 16px;
   }
   .fhc-vault__facts--columns dd {
     font-size: 18px;

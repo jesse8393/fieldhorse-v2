@@ -8,12 +8,12 @@ const common = { user_id: USER.id, org_id: 'org-1', client_id: client.id, create
 const tables = {
   fh_contacts: [
     { ...common, id: 'audit-job', name: client.name, stage: 'job', amount: 500000, cost: 100000, job_title: 'Exterior entrance painting and sidewalk restoration across multiple buildings' },
-    { ...common, id: 'paid-job', name: 'Completed Project', stage: 'closed', amount: 930019.2, cost: 300000, completed_at: '2026-11-09T15:00:00Z', job_title: 'Workshop addition' }
+    { ...common, id: 'paid-job', name: 'Completed Project', stage: 'closed', amount: 9930019.2, cost: 300000, completed_at: '2026-11-09T15:00:00Z', job_title: 'Workshop addition' }
   ],
   fh_clients: [client],
   fh_quotes: [],
   fh_invoices: [{ ...common, id: 'audit-invoice', contact_id: 'audit-job', title: 'Progress draw', amount: 153535.25, status: 'sent', sequence_number: 1, issued_at: '2026-10-01T12:00:00Z', due_at: '2026-10-14' }],
-  fh_payments: [{ ...common, id: 'audit-payment', contact_id: 'paid-job', invoice_id: null, amount: 930019.2, paid_on: '2026-11-09', method: 'check' }]
+  fh_payments: [{ ...common, id: 'audit-payment', contact_id: 'paid-job', invoice_id: null, amount: 9930019.2, paid_on: '2026-11-09', method: 'check' }]
 }
 
 test('an available app update preserves an unfinished visit', async ({ context, page }) => {
@@ -49,6 +49,16 @@ for (const width of [320, 390, 430]) {
     const vault = page.locator('.fhc-vault')
     await expect(vault.getByText('$153,535.25', { exact: true })).toBeVisible()
     await expect(vault.getByText('Includes overdue invoices', { exact: true })).toBeVisible()
+    const amount = vault.locator('.fhc-vault__amount')
+    await expect(amount).toHaveText('$9,930,019.20')
+    const amountLayout = await amount.evaluate(el => {
+      const range = document.createRange()
+      range.selectNodeContents(el)
+      const text = range.getBoundingClientRect()
+      const box = el.getBoundingClientRect()
+      return { lines: range.getClientRects().length, fits: text.left >= box.left - 1 && text.right <= box.right + 1 }
+    })
+    expect(amountLayout).toEqual({ lines: 1, fits: true })
     const collisions = await vault.locator('.fhc-vault__fact').evaluateAll(facts => facts.filter(fact => {
       const label = fact.querySelector('dt')!.getBoundingClientRect()
       const value = fact.querySelector('dd')!.getBoundingClientRect()
