@@ -123,7 +123,7 @@ begin
   end if;
   return new;
 end
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public.fh_inherit_org_from_contact()
  RETURNS trigger
@@ -149,7 +149,7 @@ begin
   if v_org is not null then new.org_id := v_org; end if;
   return new;
 end
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public.fn_recalc_contact_amount_from_items()
  RETURNS trigger
@@ -179,7 +179,7 @@ begin
   update public.fh_contacts set amount = new_total where id = target_contact;
   return coalesce(new, old);
 end;
-$function$
+$function$;
 
     create trigger fh_contacts_guard_money_fields
       before delete or update of stage, amount, completed_at, proposal_status on public.fh_contacts
