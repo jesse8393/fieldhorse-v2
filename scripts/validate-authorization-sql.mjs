@@ -81,7 +81,7 @@ begin
   end if;
   return new;
 end
-$function$
+$function$;
 
     create trigger fh_contacts_guard_money_fields
       before delete or update of stage, amount, completed_at, proposal_status on public.fh_contacts
