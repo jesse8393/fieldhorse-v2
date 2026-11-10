@@ -9,6 +9,12 @@ describe('DocuSign envelope status only moves forward', () => {
     expect(nextEnvelopeStatus(null, 'sent')).toBe('sent')
   })
 
+  it('keeps a viewed envelope ahead of older events', () => {
+    expect(nextEnvelopeStatus('viewed', 'sent')).toBeNull()
+    expect(nextEnvelopeStatus('viewed', 'delivered')).toBeNull()
+    expect(nextEnvelopeStatus('viewed', 'completed')).toBe('completed')
+  })
+
   it('never regresses a terminal envelope', () => {
     expect(nextEnvelopeStatus('completed', 'sent')).toBeNull()
     expect(nextEnvelopeStatus('completed', 'delivered')).toBeNull()
