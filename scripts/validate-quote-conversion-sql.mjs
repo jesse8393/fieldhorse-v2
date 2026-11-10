@@ -48,13 +48,14 @@ try {
     insert into public.fh_quotes(id,user_id,org_id,client_id,title,job_type,scope_text,terms_text,exclusions_text,status)
       select '${id(20)}'::uuid, '${id(4)}','${id(100)}','${id(10)}','Deck','deck','Build deck','Deposit','Permits','approved';
   `)
-  for (const n of [21,22,23,24,25,26]) {
+  for (const n of [21,22,23,24,25,26,27,28,29,30,31]) {
     await db.query('insert into public.fh_quotes select $1,user_id,org_id,client_id,null,title,job_type,scope_text,terms_text,exclusions_text,status from public.fh_quotes where id=$2', [id(n),id(20)])
   }
   await db.query('update public.fh_quotes set client_id=$1 where id=$2', [id(11),id(21)])
   for (const [n,amount,opt,excluded] of [[30,1000.25,false,false],[31,250,true,false],[32,75,false,true],[33,500.5,false,false]]) {
     await db.query('insert into public.fh_quote_items(id,user_id,org_id,quote_id,description,qty,rate,amount,is_optional,is_excluded,sort_order) values($1,$2,$3,$4,$5,1,$6,$6,$7,$8,$9)',[id(n),id(4),id(100),id(20),`Fixture ${n}`,amount,opt,excluded,n])
   }
+  await db.exec('alter table public.fh_quotes add column origin_contact_id uuid references public.fh_contacts(id); alter table public.fh_quotes add column amount numeric not null default 0; alter table public.fh_contacts add column completed_at timestamptz, add column proposal_status text')
   const migration = await readFile(new URL('../supabase/migrations/20261101184536_atomic_quote_conversion.sql',import.meta.url),'utf8')
   await db.exec(migration); await db.exec(migration)
   await scope(2)
@@ -76,6 +77,132 @@ try {
   await scope(6)
   const emptyJob = await convert(22)
   equal(Number((await db.query('select amount from public.fh_contacts where id=$1',[emptyJob])).rows[0].amount),0,'empty quote converts with zero base amount')
+  await db.exec('reset role')
+  // Reproduce moved quote rows without exposing real customer records.
+  await db.exec(`
+    insert into public.fh_contacts(id,user_id,org_id,client_id,stage) values
+      ('${id(50)}','${id(1)}','${id(100)}','${id(10)}','moved_quote'),
+      ('${id(51)}','${id(1)}','${id(100)}','${id(10)}','moved_quote'),
+      ('${id(52)}','${id(1)}','${id(200)}','${id(11)}','moved_quote'),
+      ('${id(53)}','${id(1)}','${id(100)}','${id(10)}','job');
+    update public.fh_quotes set origin_contact_id='${id(50)}' where id in ('${id(27)}','${id(28)}','${id(31)}');
+    update public.fh_quotes set origin_contact_id='${id(52)}' where id='${id(29)}';
+    update public.fh_quotes set origin_contact_id='${id(53)}' where id='${id(30)}';
+    insert into public.fh_quote_items(id,user_id,org_id,contact_id,quote_id,description,qty,rate,amount,is_optional,is_excluded,sort_order) values
+      ('${id(60)}','${id(1)}','${id(100)}','${id(50)}','${id(27)}','Legacy item',1,199.25,199.25,false,false,1),
+      ('${id(61)}','${id(1)}','${id(100)}',null,'${id(27)}','Optional item',1,80,80,true,false,2),
+      ('${id(62)}','${id(1)}','${id(100)}','${id(51)}','${id(28)}','Wrong origin',1,10,10,false,false,1),
+      ('${id(63)}','${id(1)}','${id(100)}','${id(52)}','${id(29)}','Foreign origin',1,10,10,false,false,1),
+      ('${id(64)}','${id(1)}','${id(100)}','${id(53)}','${id(30)}','Wrong stage',1,10,10,false,false,1),
+      ('${id(65)}','${id(1)}','${id(200)}','${id(50)}','${id(31)}','Foreign line',1,10,10,false,false,1);
+  `)
+  // Selected live trigger definitions captured from catalog on November 10.
+  // This fixture does not reproduce the complete production trigger chain.
+  await db.exec(`
+CREATE OR REPLACE FUNCTION public.fh_contacts_guard_money_fields()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'pg_catalog', 'public'
+AS $function$
+begin
+  if auth.uid() is null or old.org_id is null or pg_trigger_depth() > 1 then
+    return coalesce(new, old);
+  end if;
+  if public.fh_money_visible(old.org_id) then
+    return coalesce(new, old);
+  end if;
+  if tg_op = 'DELETE' then
+    raise exception 'Your role cannot delete jobs.' using errcode = '42501';
+  end if;
+  if new.stage is distinct from old.stage
+     or new.amount is distinct from old.amount
+     or new.completed_at is distinct from old.completed_at
+     or new.proposal_status is distinct from old.proposal_status then
+    raise exception 'Your role cannot change a job''s stage, value, approval or completion.' using errcode = '42501';
+  end if;
+  return new;
+end
+$function$;
+
+CREATE OR REPLACE FUNCTION public.fh_inherit_org_from_contact()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'pg_catalog', 'public'
+AS $function$
+declare
+  v_row    jsonb := to_jsonb(new);
+  v_parent uuid;
+  v_org    uuid;
+begin
+  v_parent := coalesce(nullif(v_row ->> 'contact_id', '')::uuid, nullif(v_row ->> 'job_id', '')::uuid);
+  if v_parent is not null then
+    select c.org_id into v_org from public.fh_contacts c where c.id = v_parent;
+  end if;
+  if v_org is null and nullif(v_row ->> 'quote_id', '') is not null then
+    select q.org_id into v_org from public.fh_quotes q where q.id = (v_row ->> 'quote_id')::uuid;
+  end if;
+  if v_org is null and nullif(v_row ->> 'lead_id', '') is not null then
+    select l.org_id into v_org from public.fh_leads l where l.id = (v_row ->> 'lead_id')::uuid;
+  end if;
+  if v_org is not null then new.org_id := v_org; end if;
+  return new;
+end
+$function$;
+
+CREATE OR REPLACE FUNCTION public.fn_recalc_contact_amount_from_items()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'pg_catalog', 'public'
+AS $function$
+declare
+  target_contact uuid;
+  target_quote   uuid;
+  has_items boolean;
+  new_total numeric;
+begin
+  target_quote := coalesce(new.quote_id, old.quote_id);
+  if target_quote is not null then
+    select coalesce(sum(amount), 0) into new_total from public.fh_quote_items
+      where quote_id = target_quote and is_optional = false and is_excluded = false;
+    update public.fh_quotes set amount = new_total where id = target_quote;
+    return coalesce(new, old);
+  end if;
+  target_contact := coalesce(new.contact_id, old.contact_id);
+  if target_contact is null then return coalesce(new, old); end if;
+  select count(*) > 0 into has_items from public.fh_quote_items where contact_id = target_contact;
+  if not has_items then return coalesce(new, old); end if;
+  select coalesce(sum(amount), 0) into new_total from public.fh_quote_items
+    where contact_id = target_contact and is_optional = false and is_excluded = false;
+  update public.fh_contacts set amount = new_total where id = target_contact;
+  return coalesce(new, old);
+end;
+$function$;
+
+    create trigger fh_contacts_guard_money_fields
+      before delete or update of stage, amount, completed_at, proposal_status on public.fh_contacts
+      for each row execute function public.fh_contacts_guard_money_fields();
+    create trigger zz_inherit_org_from_contact
+      before insert or update of contact_id, org_id on public.fh_quote_items
+      for each row execute function public.fh_inherit_org_from_contact();
+    create trigger trg_quote_items_recalc
+      after insert or delete or update on public.fh_quote_items
+      for each row execute function public.fn_recalc_contact_amount_from_items();
+  `)
+  await scope(1)
+  const legacyJob = await convert(27)
+  equal(await convert(27),legacyJob,'legacy conversion retry returns the same job')
+  equal(Number((await db.query('select amount from public.fh_contacts where id=$1',[legacyJob])).rows[0].amount),199.25,'legacy conversion preserves exact base total')
+  equal((await db.query('select count(*)::int n from public.fh_quote_items where contact_id=$1 and quote_id is null',[legacyJob])).rows[0].n,2,'legacy and optional lines copy to the new job')
+  equal((await db.query('select count(*)::int n from public.fh_quote_items where contact_id=$1 and quote_id=$2',[id(50),id(27)])).rows[0].n,1,'legacy quote retains its original line')
+  for (const [quote,label] of [[28,'another origin'],[29,'foreign origin'],[30,'non migrated origin'],[31,'foreign line']]) {
+    const countBefore = await countJobs()
+    await scope(1)
+    await denied(()=>convert(quote),`rejects ${label}`)
+    equal(await countJobs(),countBefore,`${label} creates no partial job`)
+  }
   await db.exec('reset role')
   await db.exec(`
     insert into public.fh_quote_items(user_id,org_id,quote_id,description,qty,rate,amount) values('${id(1)}','${id(100)}','${id(23)}','blocked copy',1,10,10);

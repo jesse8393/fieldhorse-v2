@@ -10,6 +10,7 @@ declare
   v_quote public.fh_quotes;
   v_client public.fh_clients;
   v_job public.fh_contacts;
+  v_origin public.fh_contacts;
   v_items jsonb;
   v_total numeric;
   v_count integer;
@@ -50,8 +51,22 @@ begin
     into v_items
     from (select * from public.fh_quote_items where quote_id = p_quote_id for share) i;
   if exists(select 1 from jsonb_populate_recordset(null::public.fh_quote_items, v_items) i
-    where i.org_id is distinct from v_quote.org_id or i.contact_id is not null) then
+    where i.org_id is distinct from v_quote.org_id
+      or (i.contact_id is not null and i.contact_id is distinct from v_quote.origin_contact_id)) then
     raise exception 'Quote contains invalid line associations' using errcode = '42501';
+  end if;
+
+  -- Older quotes retain their original contact on each moved quote line.
+  -- Accept that legacy link only when its locked origin still matches.
+  if exists(select 1 from jsonb_populate_recordset(null::public.fh_quote_items, v_items) i
+    where i.contact_id is not null) then
+    select * into v_origin from public.fh_contacts where id = v_quote.origin_contact_id for share;
+    if not found or v_origin.org_id is distinct from v_quote.org_id
+      or v_origin.client_id is distinct from v_quote.client_id
+      or v_origin.stage is distinct from 'moved_quote'
+      or (v_quote.org_id is null and v_origin.user_id is distinct from auth.uid()) then
+      raise exception 'Original quote record unavailable in this company' using errcode = '42501';
+    end if;
   end if;
   select coalesce(sum(i.amount), 0) into v_total
     from jsonb_populate_recordset(null::public.fh_quote_items, v_items) i
