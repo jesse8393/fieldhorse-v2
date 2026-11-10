@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
-import { installMock, session } from '../../scripts/qa-mock.mjs'
+import { installMock, restResponse, session } from '../../scripts/qa-mock.mjs'
 import { nothingRunsOffTheSide } from './helpers/overflow.ts'
 import { signIn } from './helpers/signIn.ts'
 
@@ -151,8 +151,35 @@ function shedDeposit(status = 'sent') {
   }
 }
 
+async function installShedInvoice(context: BrowserContext, status = 'sent') {
+  let invoice = { org_id: 'org-1', ...shedDeposit(status) }
+  await signIn(context, { tables: { fh_contacts: [shedJob()], fh_invoices: [invoice], fh_payments: [] } })
+  // The shared fixture only acknowledges writes. This fixture persists
+  // the row before returning it, like PostgREST, so reload and revision
+  // assertions test confirmed storage rather than an optimistic cache.
+  await context.route('**/rest/v1/fh_invoices*', async (route) => {
+    const request = route.request()
+    if (request.method() === 'PATCH') {
+      const params = new URL(request.url()).searchParams
+      const matched = params.get('id') === `eq.${invoice.id}` &&
+        (!params.has('status') || params.get('status') === `eq.${invoice.status}`)
+      const single = request.headers().accept?.includes('vnd.pgrst.object')
+      if (!matched) {
+        await route.fulfill({ status: single ? 406 : 200, json: single ? { code: 'PGRST116', message: 'No matching invoice' } : [] })
+        return
+      }
+      const patch = request.postDataJSON()
+      invoice = { ...invoice, ...patch, updated_at: patch.updated_at || '2026-11-10T20:45:00.000Z' }
+      await route.fulfill({ status: 200, json: single ? invoice : [invoice] })
+      return
+    }
+    const response = restResponse(request.url(), { method: request.method(), headers: request.headers(), tables: { fh_invoices: [invoice] } })
+    await route.fulfill({ status: response.status, body: response.body, contentType: 'application/json', headers: response.headers })
+  })
+}
+
 test("the Description field holds the invoice's own description, not the job title", async ({ page, context }) => {
-  await signIn(context, { tables: { fh_contacts: [shedJob()], fh_invoices: [shedDeposit()], fh_payments: [] } })
+  await installShedInvoice(context)
   await openInvoice(page, 'inv-1')
   const field = page.getByLabel('Description, shows on the invoice')
   await expect(field).toHaveValue('Deposit for the shed slab')
@@ -160,7 +187,7 @@ test("the Description field holds the invoice's own description, not the job tit
 })
 
 test('the Description field edits in place and shows in the PDF text', async ({ page, context }) => {
-  await signIn(context, { tables: { fh_contacts: [shedJob()], fh_invoices: [shedDeposit()], fh_payments: [] } })
+  await installShedInvoice(context)
   const saves: string[] = []
   await context.route('**/rest/v1/fh_invoices*', async (route) => {
     if (route.request().method() === 'PATCH') saves.push(route.request().postData() || '')
@@ -185,7 +212,7 @@ test('the Description field edits in place and shows in the PDF text', async ({ 
 })
 
 test('PDF waits for a pending description save and downloads the saved words', async ({ page, context }) => {
-  await signIn(context, { tables: { fh_contacts: [shedJob()], fh_invoices: [shedDeposit()], fh_payments: [] } })
+  await installShedInvoice(context)
   let release = () => {}
   const held = new Promise<void>((resolve) => { release = resolve })
   let saves = 0
@@ -221,7 +248,7 @@ test('PDF waits for a pending description save and downloads the saved words', a
 })
 
 test('new description edits survive an older save and persist in order', async ({ page, context }) => {
-  await signIn(context, { tables: { fh_contacts: [shedJob()], fh_invoices: [shedDeposit()], fh_payments: [] } })
+  await installShedInvoice(context)
   let release = () => {}
   const held = new Promise<void>((resolve) => { release = resolve })
   const saves: string[] = []
@@ -254,7 +281,7 @@ test('new description edits survive an older save and persist in order', async (
 })
 
 test('Resend waits for the saved description and uses its returned revision', async ({ page, context }) => {
-  await signIn(context, { tables: { fh_contacts: [shedJob()], fh_invoices: [shedDeposit()], fh_payments: [] } })
+  await installShedInvoice(context)
   let release = () => {}
   const held = new Promise<void>((resolve) => { release = resolve })
   let saves = 0
@@ -301,7 +328,7 @@ test('Resend waits for the saved description and uses its returned revision', as
 
 for (const name of ['PDF', 'Resend', 'Share link']) {
   test(`${name} stops after a failed description save and keeps an explicit retry`, async ({ page, context }) => {
-    await signIn(context, { tables: { fh_contacts: [shedJob()], fh_invoices: [shedDeposit()], fh_payments: [] } })
+    await installShedInvoice(context)
     let release = () => {}
     const held = new Promise<void>((resolve) => { release = resolve })
     let fail = true
@@ -358,7 +385,7 @@ for (const name of ['PDF', 'Resend', 'Share link']) {
 }
 
 test('an update returning no row keeps the description unsaved', async ({ page, context }) => {
-  await signIn(context, { tables: { fh_contacts: [shedJob()], fh_invoices: [shedDeposit()], fh_payments: [] } })
+  await installShedInvoice(context)
   await context.route('**/rest/v1/fh_invoices*', async (route) => {
     if (route.request().method() === 'PATCH') {
       await route.fulfill({ status: 200, json: null })
@@ -383,7 +410,7 @@ test('an update returning no row keeps the description unsaved', async ({ page, 
 // balance when no draw is open, so a paid deposit's description must not
 // stand in for it: the job title prints instead.
 test('with no open draw the job money view shows the job title, not a paid draw\'s description', async ({ page, context }) => {
-  await signIn(context, { tables: { fh_contacts: [shedJob()], fh_invoices: [shedDeposit('paid')], fh_payments: [] } })
+  await installShedInvoice(context, 'paid')
   await page.goto('/jobs/c-job1?tab=financials', { waitUntil: 'domcontentloaded', timeout: 20_000 })
   const service = page.locator('.fh-invoice-detail__service')
   await expect(service).toBeVisible({ timeout: 30_000 })
