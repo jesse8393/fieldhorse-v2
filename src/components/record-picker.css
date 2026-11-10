@@ -1,4 +1,4 @@
-.fh-record-picker { position: relative; display: grid; gap: 8px; width: 100%; min-width: 0; flex: 1 1 200px; font-family: var(--fh-font-body); }
+.fh-record-picker { position: relative; display: grid; align-content: start; gap: 8px; width: 100%; min-width: 0; flex: 1 1 auto; font-family: var(--fh-font-body); }
 .fh-record-picker > label { color: var(--fh-ink-2); font-size: 14px; font-weight: 600; }
 .fh-record-picker__field { display: flex; align-items: center; position: relative; }
 .fh-record-picker__field > svg { position: absolute; right: var(--space-4); pointer-events: none; color: var(--fh-ink-2); }

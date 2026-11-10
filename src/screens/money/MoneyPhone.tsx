@@ -201,7 +201,7 @@ export default function MoneyPhone({
             label="Collected this week"
             amount={view.collectedThisWeek}
             facts={[
-              { label: 'Due this week', value: view.dueThisWeek },
+              { label: 'Due by Saturday', hint: 'Includes overdue invoices', value: view.dueThisWeek },
               { label: `${month} so far`, value: view.monthToDate },
               { label: 'Tracked margin', value: view.marginPct == null ? 'None yet' : `${view.marginPct.toFixed(1)}%` }
             ]}

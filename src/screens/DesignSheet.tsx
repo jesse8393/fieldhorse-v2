@@ -691,7 +691,7 @@ function Board({ theme, photos }: { theme: Theme; photos: SamplePhotos | null })
             amount={9620}
             corner={<span className="fhc-ds__monogram" aria-hidden="true">PC</span>}
             facts={[
-              { label: 'Due this week', value: 7090 },
+              { label: 'Due by Saturday', hint: 'Includes overdue invoices', value: 7090 },
               { label: 'October so far', value: 31480 },
               { label: 'Margin', value: '27.4%' }
             ]}

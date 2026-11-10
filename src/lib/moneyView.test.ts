@@ -108,6 +108,15 @@ const build = (b: InvoicesBundle, quotes: QuoteRow[] = []) => buildMoneyView({ b
 const DASH = /[-–—]/
 
 describe('week and month totals', () => {
+  it('shows a project name once when a paid invoice repeats it', () => {
+    const view = build(bundle({
+      jobs: [job({ id: 'j1', job_title: 'Driveway replacement' })],
+      invoices: [invoice({ id: 'i1', title: 'Driveway replacement', status: 'paid' })],
+      payments: [payment({ id: 'p1', invoice_id: 'i1' })]
+    }))
+    expect(view.paid[0].subline).toBe('Driveway replacement')
+  })
+
   it('counts a payment on Sunday Oct 4 toward the week and one on Saturday Oct 3 not', () => {
     const view = build(bundle({
       payments: [

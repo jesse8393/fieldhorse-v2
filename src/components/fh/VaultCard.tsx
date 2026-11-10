@@ -13,6 +13,7 @@ import { cx } from './cx.ts'
 
 export type VaultFact = {
   label: ReactNode
+  hint?: string
   /** A number is money with cents. A string prints as given. */
   value: number | string
 }
@@ -60,7 +61,7 @@ export default function VaultCard({
             <dl className={cx('fhc-vault__facts', `fhc-vault__facts--${factsLayout}`)}>
               {facts.map((fact, i) => (
                 <div key={i} className="fhc-vault__fact">
-                  <dt>{fact.label}</dt>
+                  <dt><span>{fact.label}</span>{fact.hint && <span className="fhc-vault__hint">{fact.hint}</span>}</dt>
                   <dd>{show(fact.value)}</dd>
                 </div>
               ))}
