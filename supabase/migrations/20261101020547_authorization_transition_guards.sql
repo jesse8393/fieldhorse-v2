@@ -118,3 +118,37 @@ $function$;
 revoke all on function public.fh_sub_profile_ids_for_caller() from public, anon;
 grant execute on function public.fh_sub_profile_ids_for_caller() to authenticated, service_role;
 
+
+-- Apply the existing financial role guard to job costs as well.
+CREATE OR REPLACE FUNCTION public.fh_contacts_guard_money_fields()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'pg_catalog', 'public'
+AS $function$
+begin
+  if auth.uid() is null or old.org_id is null or pg_trigger_depth() > 1 then
+    return coalesce(new, old);
+  end if;
+  if public.fh_money_visible(old.org_id) then
+    return coalesce(new, old);
+  end if;
+  if tg_op = 'DELETE' then
+    raise exception 'Your role cannot delete jobs.' using errcode = '42501';
+  end if;
+  if new.stage is distinct from old.stage
+     or new.amount is distinct from old.amount
+     or new.cost is distinct from old.cost
+     or new.completed_at is distinct from old.completed_at
+     or new.proposal_status is distinct from old.proposal_status then
+    raise exception 'Your role cannot change a job''s stage, value, approval or completion.' using errcode = '42501';
+  end if;
+  return new;
+end
+$function$
+
+drop trigger if exists fh_contacts_guard_money_fields on public.fh_contacts;
+create trigger fh_contacts_guard_money_fields
+  before delete or update of stage, amount, cost, completed_at, proposal_status on public.fh_contacts
+  for each row execute function public.fh_contacts_guard_money_fields();
+revoke execute on function public.fh_contacts_guard_money_fields() from public, anon, authenticated;
