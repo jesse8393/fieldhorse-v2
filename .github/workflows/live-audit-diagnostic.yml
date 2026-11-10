@@ -1,0 +1,25 @@
+name: Live audit failure context
+on:
+  push:
+    branches: [test/live-audit-diagnostics-20261110]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  context:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download retained browser failure
+        uses: actions/download-artifact@v4
+        with:
+          name: playwright-report-desktop-chrome
+          run-id: 42906412922
+          github-token: ${{ github.token }}
+          path: diagnostics
+      - name: Read synthetic browser error context
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          for path in Path('diagnostics').rglob('error-context.md'):
+              print(path.read_text())
+          PY
