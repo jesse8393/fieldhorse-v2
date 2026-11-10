@@ -380,14 +380,20 @@ export default async (request) => {
   const completedAt = new Date()
   const patch = { status }
   if (status === 'completed') patch.completed_at = completedAt.toISOString()
-  const { error: envUpdErr } = await supabase
+  // A conditional update prevents overlapping events from moving the
+  // envelope backwards. Return a retryable error if no row was saved.
+  const { data: updatedEnv, error: envUpdErr } = await supabase
     .from('fh_esign_envelopes')
     .update(patch)
     .eq('id', env.id)
-  if (envUpdErr) {
+    .eq('status', env.status)
+    .select('id')
+    .maybeSingle()
+  if (envUpdErr || !updatedEnv) {
     console.error('[docusign-webhook] fh_esign_envelopes update failed', {
       envelope_row: env.id, status, error: envUpdErr
     })
+    return new Response('envelope_update_failed', { status: 503 })
   }
 
   if (status === 'completed' && env.status !== 'completed') {
