@@ -104,11 +104,19 @@ export default function EventNew() {
     return () => { alive = false }
   }, [eventId, attempt, user?.id, orgScope])
 
-  if (eventId && eventState.status !== 'ready') {
+  // Do not mount a writable form under a temporary personal scope. Its
+  // workspace key would change when membership resolves and erase input.
+  if (orgScope === undefined || (eventId && eventState.status !== 'ready')) {
     return (
-      <CreateShell title="Edit event" saveLabel="Save changes" backTo="/schedule" saveDisabled onSave={() => {}}>
-        {eventState.status === 'loading' ? (
-          <SkeletonRows rows={4} label="Loading the event" />
+      <CreateShell
+        title={eventId ? 'Edit event' : 'Add event'}
+        saveLabel={eventId ? 'Save changes' : 'Save event'}
+        backTo="/schedule"
+        saveDisabled
+        onSave={() => {}}
+      >
+        {orgScope === undefined || eventState.status === 'loading' ? (
+          <SkeletonRows rows={4} label={orgScope === undefined ? 'Loading your workspace' : 'Loading the event'} />
         ) : (
           <DataErrorState
             title="Couldn't load the event"
