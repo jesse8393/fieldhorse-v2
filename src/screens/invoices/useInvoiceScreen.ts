@@ -143,11 +143,15 @@ export function useInvoiceScreen(id: string | undefined) {
     return () => { off(); if (timer) clearTimeout(timer) }
   }, [id])
 
-  // A saved edit shows at once, from what was typed: the write's answer is
-  // not waited for, and a stale read cannot put the old words back.
+  // Keep the invoice and its sibling entry on the same saved revision.
+  // Actions queued behind a save read this cache before building a PDF.
   const patchInvoice = useCallback((patch: Partial<InvoiceRecord>) => {
     queryClient.setQueryData<InvoiceRecordBundle>(invoiceRecordKey(id), (old) =>
-      old ? { ...old, invoice: { ...old.invoice, ...patch } } : old
+      old ? {
+        ...old,
+        invoice: { ...old.invoice, ...patch },
+        jobInvoices: old.jobInvoices.map((invoice) => invoice.id === id ? { ...invoice, ...patch } : invoice)
+      } : old
     )
   }, [queryClient, id])
 
@@ -156,32 +160,35 @@ export function useInvoiceScreen(id: string | undefined) {
   // Resolves true once the email has gone out. A tap while this invoice's
   // email is already going out, from any screen, sends nothing.
   const send = useCallback(async (options: { reminder?: boolean; duplicateReviewed?: boolean } = {}): Promise<boolean> => {
-    if (!record || !user || !figures) return false
+    const current = queryClient.getQueryData<InvoiceRecordBundle>(invoiceRecordKey(id)) ?? record
+    if (!current || !user) return false
     if (settling.current) return false
-    if (record.invoice.status === 'draft' && billingReview) {
-      if (billingReview.excess > 0) { toastError('Review contract billing', 'Invoices and drafts exceed approved scope. Reduce or void unused drafts before sending.'); return false }
-      if (billingReview.duplicates.length && !options.duplicateReviewed) { toastError('Review similar invoices', 'Confirm this bills a separate installment before sending.'); return false }
+    const currentFigures = describeInvoice(current, now)
+    if (current.invoice.status === 'draft') {
+      const review = reviewInvoice({ invoice: current.invoice, invoices: current.jobInvoices, contractTotal: current.job ? knownContractTotal({ amount: current.job.amount, changeOrders: current.changeOrders }) : null })
+      if (review.excess > 0) { toastError('Review contract billing', 'Invoices and drafts exceed approved scope. Reduce or void unused drafts before sending.'); return false }
+      if (review.duplicates.length && !options.duplicateReviewed) { toastError('Review similar invoices', 'Confirm this bills a separate installment before sending.'); return false }
     }
-    if (!figures.to.email) {
-      toastError('Add a client email first', `Open the linked client to add an email for ${figures.to.name || 'this client'}.`)
+    if (!currentFigures.to.email) {
+      toastError('Add a client email first', `Open the linked client to add an email for ${currentFigures.to.name || 'this client'}.`)
       return false
     }
-    const finish = startInvoiceSend(record.invoice.id, { reminder: !!options.reminder })
+    const finish = startInvoiceSend(current.invoice.id, { reminder: !!options.reminder })
     if (!finish) return false
     let sent = false
     try {
       const res = await sendInvoiceEmail({
-        invoice: record.invoice,
+        invoice: current.invoice,
         duplicateReviewed: !!options.duplicateReviewed,
-        contact: record.job,
-        client: record.client,
+        contact: current.job,
+        client: current.client,
         company,
         userId: user.id,
-        recipientEmail: figures.to.email,
-        payments: record.payments,
-        changeOrders: record.changeOrders,
-        invoices: record.jobInvoices,
-        insurance: record.insurance
+        recipientEmail: currentFigures.to.email,
+        payments: current.payments,
+        changeOrders: current.changeOrders,
+        invoices: current.jobInvoices,
+        insurance: current.insurance
       })
       if (res.ok) {
         toastSuccess(`${options.reminder ? 'Reminder' : 'Invoice'} sent to ${res.recipient}`, res.filename)
@@ -198,7 +205,7 @@ export function useInvoiceScreen(id: string | undefined) {
       finish(sent)
     }
     return sent
-  }, [record, user, figures, company, refresh, billingReview])
+  }, [record, user, company, refresh, queryClient, id, now])
 
   return { user, query, record, figures, billingReview, company, now, sending, refresh, patchInvoice, send }
 }
