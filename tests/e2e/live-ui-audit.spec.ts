@@ -84,6 +84,26 @@ for (const width of [320, 390, 430]) {
   })
 }
 
+test('a large job balance fits its desktop side panel', async ({ context, page }) => {
+  await signIn(context, { tables: {
+    ...tables,
+    fh_contacts: tables.fh_contacts.map(job => job.id === 'audit-job' ? { ...job, amount: 99930019.2 } : job)
+  } })
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/jobs/audit-job')
+  const amount = page.getByRole('complementary', { name: 'Job facts' }).locator('.fhc-vault__amount')
+  await expect(amount).toHaveText('$99,930,019.20')
+  const layout = await amount.evaluate(el => {
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    const text = range.getBoundingClientRect()
+    const box = el.getBoundingClientRect()
+    return { lines: range.getClientRects().length, fits: text.left >= box.left - 1 && text.right <= box.right + 1 }
+  })
+  expect(layout).toEqual({ lines: 1, fits: true })
+  await nothingRunsOffTheSide(page, 'large job balance')
+})
+
 for (const width of [320, 390, 1440]) {
   test(`event fields stay compact and separate at ${width}px`, async ({ context, page }, testInfo) => {
     await signIn(context)

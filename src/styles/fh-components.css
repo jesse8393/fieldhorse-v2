@@ -1177,7 +1177,7 @@
   font-family: var(--fh-font-display);
   /* Scale complete amounts to the available card width. Exact cents
      must stay attached to the total, even for seven digit receipts. */
-  font-size: min(52px, calc((100cqi - 2 * var(--fhc-vault-padding)) / (var(--fhc-amount-characters, 12) * 0.67)));
+  font-size: min(var(--fhc-amount-max, 52px), calc((100cqi - 2 * var(--fhc-vault-padding)) / (var(--fhc-amount-characters, 12) * 0.67)));
   line-height: 1.04;
   font-weight: 600;
   letter-spacing: 0;
