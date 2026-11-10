@@ -41,7 +41,7 @@ const STATUS_MAP = {
 // deliver events out of order, and it sends event types this function does
 // not map; the old code wrote 'sent' for anything unknown, so a late or
 // retried event could regress a completed envelope back to 'sent'.
-const STATUS_RANK = { sent: 1, delivered: 2, completed: 3, declined: 3, voided: 3 }
+const STATUS_RANK = { sent: 1, delivered: 2, viewed: 2, completed: 3, declined: 3, voided: 3 }
 
 /** Returns the status to store, or null when the event must not change it. */
 export function nextEnvelopeStatus(currentStatus, rawStatus) {
