@@ -145,7 +145,7 @@ begin
   end if;
   return new;
 end
-$function$
+$function$;
 
 drop trigger if exists fh_contacts_guard_money_fields on public.fh_contacts;
 create trigger fh_contacts_guard_money_fields
