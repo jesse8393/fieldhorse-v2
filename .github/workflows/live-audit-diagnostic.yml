@@ -1,25 +1,52 @@
-name: Live audit failure context
+name: Live audit Safari verification
 on:
   push:
     branches: [test/live-audit-diagnostics-20261110]
 permissions:
   contents: read
-  actions: read
 jobs:
-  context:
+  safari:
     runs-on: ubuntu-latest
     steps:
-      - name: Download retained browser failure
-        uses: actions/download-artifact@v4
+      - name: Checkout reviewed application
+        uses: actions/checkout@v4
         with:
-          name: playwright-report-desktop-chrome
-          run-id: 42906412922
-          github-token: ${{ github.token }}
-          path: diagnostics
-      - name: Read synthetic browser error context
+          ref: b1ab3cd3b135a9df638346c544658a39b34e0166
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install WebKit
+        run: npx playwright install --with-deps webkit
+      - name: Configure iPhone browser
+        run: |
+          cat > playwright.safari.config.ts <<'CONFIG'
+          import { defineConfig, devices } from '@playwright/test'
+          import base from './playwright.config.ts'
+          export default defineConfig({
+            ...base,
+            projects: [{ name: 'mobile-safari', use: { ...devices['iPhone 13'] } }]
+          })
+          CONFIG
+      - name: Verify phone layouts and event persistence
+        run: npx playwright test tests/e2e/live-ui-audit.spec.ts tests/e2e/schedule-allocation.spec.ts --config=playwright.safari.config.ts
+      - name: Read synthetic failure context
+        if: failure()
         run: |
           python - <<'PY'
           from pathlib import Path
-          for path in Path('diagnostics').rglob('error-context.md'):
+          for path in Path('test-results').rglob('error-context.md'):
               print(path.read_text())
           PY
+      - name: Preserve audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-audit-safari
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
