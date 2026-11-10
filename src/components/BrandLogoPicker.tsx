@@ -172,10 +172,12 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
 
       {/* Simulated dark header preview */}
       <div
+        aria-label="Company header preview"
         style={{
           padding: '12px 16px',
           borderRadius: 10,
-          background: 'var(--v3-surface-2)',
+          background: 'var(--fh-onyx)',
+          color: 'var(--fh-linen)',
           border: '1px solid var(--rule)',
           display: 'flex',
           alignItems: 'center',
@@ -187,24 +189,24 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
         }}
       >
         <span style={{ width: 26, height: 26, borderRadius: 10, background: 'rgba(201,150,58,0.08)', border: '1px solid rgba(201,150,58,0.35)', color: 'var(--v3-primary-text)', display: 'grid', placeItems: 'center', fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: 0, opacity: 0.72 }}>FH</span>
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 36 }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 36 }}>
           {displayedLogo ? (
             <img loading="lazy"src={displayedLogo}
               alt={companyName || 'Company logo preview'}
               style={{ maxHeight: 36, maxWidth: '70%', objectFit: 'contain' }}
             />
           ) : companyName ? (
-            <span style={{ fontFamily: 'var(--font-display)', fontSize: 20, letterSpacing: 0, color: 'var(--v3-primary-text)' }}>{companyName}</span>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: 20, letterSpacing: 0, color: 'inherit', overflowWrap: 'anywhere' }}>{companyName}</span>
           ) : fullName ? (
-            <span style={{ fontFamily: 'var(--font-display)', fontSize: 20, letterSpacing: 0, color: 'var(--ink-strong)' }}>{fullName}</span>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: 20, letterSpacing: 0, color: 'inherit', overflowWrap: 'anywhere' }}>{fullName}</span>
           ) : (
             <span style={{ fontFamily: 'var(--font-wordmark)', fontSize: 16, letterSpacing: 0 }}>
               <span style={{ color: 'var(--field-gold)' }}>FIELD</span>
-              <span style={{ color: 'var(--ink-strong)' }}>HORSE</span>
+              <span style={{ color: 'inherit' }}>HORSE</span>
             </span>
           )}
         </div>
-        <span style={{ width: 28, height: 28, borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)' }} />
+        <span aria-hidden="true" style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 10, background: 'var(--fh-onyx-2)', border: '1px solid var(--fh-smoke)' }} />
       </div>
 
       <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', lineHeight: 1.45 }}>
