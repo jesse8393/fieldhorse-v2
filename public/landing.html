@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Fieldhorse. Field Ops For Contractors.</title>
+<meta name="description" content="Fieldhorse runs your contracting business from your phone. Jobs, crew schedule, proposals, invoices, payments. Built for the truck, not the back office." />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --gold: #C9963A;
+    --gold-hot: #E4BE6F;
+    --gold-deep: #8C6F30;
+    --onyx: #0B0B0B;
+    --onyx-2: #141414;
+    --card: #161616;
+    --line: rgba(242, 237, 228, 0.1);
+    --line-gold: rgba(201, 150, 58, 0.35);
+    --linen: #F2EDE4;
+    --steel: #8B8782;
+    --steel-lt: #C4BFB8;
+    --green: #4F8C5E;
+    --red: #C0392B;
+    --stage-lead: #6B7CA8;
+    --stage-quote: #B07A4A;
+    --display: 'Bebas Neue', 'Arial Narrow', sans-serif;
+    --body: 'DM Sans', system-ui, sans-serif;
+    --maxw: 1240px;
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: var(--body);
+    background: var(--onyx);
+    color: var(--linen);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  /* Blueprint grid + warm glow, fixed behind everything */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(1100px 600px at 75% -10%, rgba(201, 150, 58, 0.1), transparent 60%),
+      linear-gradient(rgba(242,237,228,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(242,237,228,0.025) 1px, transparent 1px);
+    background-size: auto, 56px 56px, 56px 56px;
+  }
+  main, header, footer { position: relative; z-index: 1; }
+
+  a { color: inherit; text-decoration: none; }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 28px; }
+
+  .display {
+    font-family: var(--display);
+    font-weight: 400;
+    letter-spacing: 0.01em;
+    line-height: 0.92;
+    text-transform: uppercase;
+  }
+  .num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+  .outline {
+    color: transparent;
+    -webkit-text-stroke: 2px var(--gold);
+  }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    font-family: var(--display);
+    font-size: 19px;
+    letter-spacing: 0.09em;
+    padding: 16px 32px 13px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: transform 0.22s var(--ease), box-shadow 0.22s var(--ease), background 0.22s, border-color 0.22s, color 0.22s;
+    white-space: nowrap;
+  }
+  .btn-gold {
+    background: var(--gold);
+    color: var(--onyx);
+  }
+  .btn-gold:hover { background: var(--gold-hot); transform: translateY(-2px); box-shadow: 0 14px 34px -12px rgba(201,150,58,0.6); }
+  .btn-line { border-color: rgba(242,237,228,0.3); color: var(--linen); background: transparent; }
+  .btn-line:hover { border-color: var(--gold); color: var(--gold-hot); transform: translateY(-2px); }
+
+  /* Nav */
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    backdrop-filter: blur(12px);
+    background: rgba(11, 11, 11, 0.78);
+    border-bottom: 1px solid var(--line);
+  }
+  nav { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+  .wordmark { font-family: var(--display); font-size: 25px; letter-spacing: 0.1em; }
+  .wordmark b { color: var(--gold); font-weight: 400; }
+  .nav-links { display: flex; gap: 26px; font-size: 13.5px; font-weight: 500; letter-spacing: 0.04em; color: var(--steel-lt); }
+  .nav-links a:hover { color: var(--gold-hot); }
+  .nav-cta .btn { font-size: 16px; padding: 11px 22px 9px; }
+
+  /* ============ HERO ============ */
+  .hero { padding: 78px 0 0; overflow: hidden; }
+  .kicker {
+    display: flex; align-items: center; gap: 14px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.24em; text-transform: uppercase;
+    color: var(--gold); margin-bottom: 30px;
+  }
+  .kicker::before { content: ""; width: 44px; height: 1px; background: var(--gold); }
+  .hero h1 { font-size: clamp(64px, 11.5vw, 168px); }
+  .hero h1 span { display: block; }
+  .hero h1 .ln2 { color: var(--gold); }
+  .hero-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+    gap: 48px;
+    align-items: end;
+    margin-top: 36px;
+    padding-bottom: 64px;
+  }
+  .lead { font-size: clamp(16px, 1.6vw, 19px); color: var(--steel-lt); max-width: 480px; }
+  .lead b { color: var(--linen); font-weight: 600; }
+  .hero-actions { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 28px; }
+  .hero-note { font-size: 13px; color: var(--steel); margin-top: 18px; display: flex; gap: 18px; flex-wrap: wrap; }
+  .hero-note .check { color: var(--green); font-weight: 700; margin-right: 6px; }
+
+  /* Hero ops card */
+  .ops {
+    background: linear-gradient(170deg, #1B1B1A, #121211);
+    border: 1px solid var(--line);
+    border-top: 2px solid var(--gold);
+    box-shadow: 0 40px 80px -40px rgba(0,0,0,0.9);
+    padding: 22px 22px 18px;
+  }
+  .ops-head { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid var(--line); padding-bottom: 12px; margin-bottom: 14px; }
+  .ops-head .display { font-size: 24px; letter-spacing: 0.06em; }
+  .ops-head .d { font-size: 12px; color: var(--steel); }
+  .ops-row { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px dashed rgba(242,237,228,0.08); }
+  .ops-row:last-of-type { border-bottom: 0; }
+  .ops-time { font-family: var(--display); font-size: 19px; color: var(--steel-lt); width: 64px; flex-shrink: 0; }
+  .ops-job { min-width: 0; }
+  .ops-job .t { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ops-job .m { font-size: 12px; color: var(--steel); }
+  .ops-pill {
+    margin-left: auto; flex-shrink: 0;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 4px 10px; border-radius: 999px;
+  }
+  .p-job { background: rgba(79,140,94,0.16); color: #7FB08C; }
+  .p-quote { background: rgba(176,122,74,0.18); color: #CE9A6B; }
+  .p-lead { background: rgba(107,124,168,0.18); color: #93A3C8; }
+  .ops-paid {
+    margin-top: 14px;
+    display: flex; justify-content: space-between; align-items: center;
+    background: rgba(79,140,94,0.1);
+    border: 1px solid rgba(79,140,94,0.35);
+    padding: 12px 14px;
+  }
+  .ops-paid .k { font-size: 10.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--green); }
+  .ops-paid .v { font-family: var(--display); font-size: 26px; }
+  .ops-paid .m { font-size: 11.5px; color: var(--steel); }
+
+  /* Marquee */
+  .marquee {
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    overflow: hidden;
+    padding: 16px 0;
+    background: rgba(20,20,20,0.6);
+  }
+  .marquee-track {
+    display: flex;
+    gap: 0;
+    width: max-content;
+    animation: scroll 36s linear infinite;
+  }
+  .marquee span {
+    font-family: var(--display);
+    font-size: 22px;
+    letter-spacing: 0.14em;
+    color: var(--steel);
+    padding: 0 26px;
+    white-space: nowrap;
+  }
+  .marquee span i { font-style: normal; color: var(--gold); padding-right: 52px; }
+  @keyframes scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+  /* Stat band */
+  .band { padding: 64px 0; border-bottom: 1px solid var(--line); }
+  .band-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px; }
+  .bstat { border-left: 1px solid var(--line-gold); padding-left: 22px; }
+  .bstat .v { font-family: var(--display); font-size: clamp(44px, 5vw, 68px); line-height: 1; color: var(--linen); }
+  .bstat .v em { font-style: normal; color: var(--gold); }
+  .bstat .k { font-size: 13px; color: var(--steel); margin-top: 8px; max-width: 200px; line-height: 1.45; }
+
+  /* ============ SECTIONS ============ */
+  section { padding: 96px 0; }
+  .sec-mark { display: flex; align-items: baseline; gap: 18px; border-bottom: 1px solid var(--line); padding-bottom: 22px; margin-bottom: 48px; }
+  .sec-mark .no { font-family: var(--display); font-size: 19px; color: var(--gold); letter-spacing: 0.08em; }
+  .sec-mark h2 { font-size: clamp(42px, 6vw, 84px); }
+  .sec-mark .side { margin-left: auto; max-width: 320px; font-size: 14.5px; color: var(--steel-lt); align-self: flex-end; padding-bottom: 8px; }
+
+  /* Chart */
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-top: 2px solid var(--gold);
+    padding: 30px;
+    box-shadow: 0 40px 90px -50px rgba(0,0,0,0.9);
+  }
+  .panel-top { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 22px; }
+  .panel-top h3 { font-family: var(--display); font-size: 26px; letter-spacing: 0.06em; display: flex; align-items: center; gap: 12px; }
+  .live-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); box-shadow: 0 0 12px var(--green); animation: pulse 1.6s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+  .legend { display: flex; gap: 20px; flex-wrap: wrap; font-size: 13px; color: var(--steel-lt); align-items: center; }
+  .legend i { display: inline-block; width: 20px; height: 3px; margin-right: 8px; vertical-align: middle; }
+  canvas { display: block; width: 100%; height: auto; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); margin-top: 26px; }
+  .stat { background: var(--onyx-2); padding: 18px 20px; }
+  .stat .k { font-size: 11px; color: var(--steel); text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; }
+  .stat .v { font-family: var(--display); font-size: 34px; margin-top: 6px; line-height: 1; }
+  .stat .v small { font-size: 13px; color: var(--steel); font-family: var(--body); font-weight: 500; }
+  .v-gold { color: var(--gold-hot); }
+  .v-green { color: #7FB08C; }
+
+  /* Feature ledger rows */
+  .ledger { border-top: 1px solid var(--line); }
+  .lrow {
+    display: grid;
+    grid-template-columns: 90px 1fr 1.2fr;
+    gap: 28px;
+    align-items: baseline;
+    padding: 30px 6px;
+    border-bottom: 1px solid var(--line);
+    transition: background 0.25s, padding-left 0.25s var(--ease);
+  }
+  .lrow:hover { background: rgba(201,150,58,0.04); padding-left: 18px; }
+  .lrow .no { font-family: var(--display); font-size: 22px; color: var(--gold); }
+  .lrow h3 { font-family: var(--display); font-size: clamp(26px, 3vw, 38px); letter-spacing: 0.03em; line-height: 1; }
+  .lrow p { color: var(--steel-lt); font-size: 15px; max-width: 520px; }
+
+  /* Testimonials */
+  .t-feature {
+    border-left: 2px solid var(--gold);
+    padding: 8px 0 8px 36px;
+    margin-bottom: 56px;
+  }
+  .t-feature blockquote { font-family: var(--display); font-size: clamp(30px, 4.4vw, 58px); line-height: 1.04; letter-spacing: 0.015em; text-transform: uppercase; }
+  .t-feature blockquote em { font-style: normal; color: var(--gold); }
+  .t-feature .who { margin-top: 22px; font-size: 14.5px; color: var(--steel-lt); }
+  .t-feature .who b { color: var(--linen); }
+  .t-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); }
+  .t-cell { background: var(--card); padding: 30px; }
+  .t-cell .stars { color: var(--gold); letter-spacing: 3px; font-size: 14px; margin-bottom: 14px; }
+  .t-cell p { font-size: 15.5px; line-height: 1.65; }
+  .t-cell .who { margin-top: 18px; font-size: 13.5px; color: var(--steel); }
+  .t-cell .who b { color: var(--steel-lt); }
+
+  /* Pricing */
+  .toggle-row { display: flex; align-items: center; gap: 14px; margin-bottom: 40px; font-size: 14.5px; color: var(--steel-lt); }
+  .switch { position: relative; width: 52px; height: 28px; }
+  .switch input { display: none; }
+  .slider { position: absolute; inset: 0; background: var(--card); border: 1px solid rgba(242,237,228,0.25); border-radius: 999px; cursor: pointer; transition: 0.3s; }
+  .slider::before { content: ""; position: absolute; width: 20px; height: 20px; left: 3px; top: 3px; border-radius: 50%; background: var(--gold); transition: 0.3s var(--ease); }
+  .switch input:checked + .slider::before { transform: translateX(24px); }
+  .save-badge { color: var(--green); border: 1px solid rgba(79,140,94,0.45); padding: 3px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+
+  .pricing { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); align-items: stretch; }
+  .plan { background: var(--onyx-2); padding: 38px 32px; display: flex; flex-direction: column; position: relative; }
+  .plan.featured { background: linear-gradient(180deg, rgba(201,150,58,0.12), rgba(201,150,58,0.02)), var(--onyx-2); box-shadow: inset 0 2px 0 var(--gold); }
+  .plan .pop { font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold); margin-bottom: 14px; }
+  .plan h3 { font-family: var(--display); font-size: 30px; letter-spacing: 0.05em; }
+  .plan .desc { color: var(--steel); font-size: 14px; margin-top: 4px; min-height: 44px; }
+  .price { display: flex; align-items: baseline; gap: 5px; margin: 22px 0 2px; }
+  .price .cur { font-family: var(--display); font-size: 28px; color: var(--steel-lt); }
+  .price .amt { font-family: var(--display); font-size: 84px; line-height: 0.85; }
+  .price .per { color: var(--steel); font-size: 13.5px; }
+  .seats { font-size: 12.5px; color: var(--steel); letter-spacing: 0.06em; text-transform: uppercase; font-weight: 700; }
+  .plan ul { list-style: none; margin: 24px 0 28px; display: flex; flex-direction: column; gap: 12px; }
+  .plan li { display: flex; gap: 11px; align-items: flex-start; font-size: 14.5px; color: var(--steel-lt); line-height: 1.45; }
+  .plan li::before { content: "▸"; color: var(--gold); flex-shrink: 0; }
+  .plan .btn { width: 100%; margin-top: auto; }
+
+  /* FAQ */
+  .faq-grid { display: grid; grid-template-columns: 0.85fr 1.15fr; gap: 56px; align-items: start; }
+  .faq-intro h2 { font-size: clamp(42px, 5vw, 72px); }
+  .faq-intro p { color: var(--steel-lt); font-size: 15.5px; margin-top: 18px; max-width: 380px; }
+  .faq-intro .btn { margin-top: 26px; }
+  .qa { border-bottom: 1px solid var(--line); }
+  .qa:first-child { border-top: 1px solid var(--line); }
+  .qa button {
+    width: 100%; background: none; border: 0; color: var(--linen);
+    text-align: left; padding: 21px 4px;
+    font-size: 16px; font-weight: 600; cursor: pointer;
+    display: flex; justify-content: space-between; align-items: center; gap: 20px;
+    font-family: var(--body);
+  }
+  .qa .ico { flex-shrink: 0; transition: transform 0.3s var(--ease); color: var(--gold); font-size: 22px; line-height: 1; }
+  .qa.open .ico { transform: rotate(45deg); }
+  .qa .ans { max-height: 0; overflow: hidden; transition: max-height 0.4s var(--ease); }
+  .qa .ans p { color: var(--steel-lt); font-size: 14.5px; padding: 0 4px 21px; }
+
+  /* CTA */
+  .cta { padding: 110px 0 120px; text-align: center; border-top: 1px solid var(--line); }
+  .cta h2 { font-size: clamp(54px, 9vw, 130px); }
+  .cta h2 em { font-style: normal; color: var(--gold); }
+  .cta p { color: var(--steel-lt); font-size: 17px; max-width: 480px; margin: 22px auto 32px; }
+  .cta .hero-actions { justify-content: center; }
+
+  /* Footer */
+  footer { border-top: 1px solid var(--line); padding: 44px 0; }
+  .foot { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 18px; }
+  .foot .links { display: flex; gap: 24px; font-size: 13.5px; color: var(--steel-lt); flex-wrap: wrap; }
+  .foot .links a:hover { color: var(--gold-hot); }
+  .foot .copy { font-size: 13px; color: var(--steel); }
+
+  /* Reveal: JS-gated so no-JS (and broken-JS) still shows everything */
+  .js .reveal { opacity: 0; transform: translateY(22px); transition: opacity 0.65s var(--ease), transform 0.65s var(--ease); }
+  .js .reveal.in { opacity: 1; transform: none; }
+
+  /* Responsive */
+  @media (max-width: 980px) {
+    .hero-row { grid-template-columns: 1fr; gap: 44px; align-items: start; }
+    .band-grid { grid-template-columns: 1fr 1fr; gap: 28px; }
+    .lrow { grid-template-columns: 56px 1fr; }
+    .lrow p { grid-column: 2; }
+    .t-grid { grid-template-columns: 1fr; }
+    .pricing { grid-template-columns: 1fr; }
+    .faq-grid { grid-template-columns: 1fr; gap: 36px; }
+    .stats { grid-template-columns: 1fr 1fr; }
+    .nav-links { display: none; }
+    .sec-mark { flex-wrap: wrap; }
+    .sec-mark .side { margin-left: 0; max-width: none; }
+  }
+  @media (max-width: 520px) {
+    section { padding: 64px 0; }
+    .band-grid { grid-template-columns: 1fr; }
+    .price .amt { font-size: 64px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    .js .reveal { opacity: 1; transform: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <nav>
+      <a href="#top" class="wordmark">FIELD<b>HORSE</b></a>
+      <div class="nav-links">
+        <a href="#books">Live books</a>
+        <a href="#work">What it does</a>
+        <a href="#crews">Crews</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#faq">FAQ</a>
+      </div>
+      <div class="nav-cta">
+        <a href="#pricing" class="btn btn-gold">Start free</a>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+
+<!-- HERO -->
+<section class="hero">
+  <div class="wrap">
+    <div class="kicker">Field ops for contractors</div>
+    <h1 class="display">
+      <span>Run the job.</span>
+      <span class="ln2">Win the quote.</span>
+      <span class="outline">Get paid.</span>
+    </h1>
+    <div class="hero-row">
+      <div>
+        <p class="lead">Fieldhorse puts your whole operation on your phone: every lead, every crew day, every invoice. <b>Quote from the truck, schedule from the diner, get paid from the punch-out walk.</b> No laptop. No Sunday paperwork.</p>
+        <div class="hero-actions">
+          <a href="#pricing" class="btn btn-gold">Start 14-day free trial</a>
+          <a href="#books" class="btn btn-line">See the live books</a>
+        </div>
+        <div class="hero-note">
+          <span><span class="check">✓</span>No card required</span>
+          <span><span class="check">✓</span>Works offline on site</span>
+          <span><span class="check">✓</span>Set up in 10 minutes</span>
+        </div>
+      </div>
+      <div class="ops" aria-label="Example of the Fieldhorse daily schedule screen">
+        <div class="ops-head">
+          <div class="display">Today</div>
+          <div class="d num">Wed, Jun 10 · ☀️ 74° · Pour day ✓</div>
+        </div>
+        <div class="ops-row">
+          <div class="ops-time num">7:00</div>
+          <div class="ops-job"><div class="t">Hendricks Addition</div><div class="m num">Crew A · Framing, day 4 of 9</div></div>
+          <span class="ops-pill p-job">Active</span>
+        </div>
+        <div class="ops-row">
+          <div class="ops-time num">11:30</div>
+          <div class="ops-job"><div class="t">Whitfield Kitchen Remodel</div><div class="m">Walkthrough + measure</div></div>
+          <span class="ops-pill p-quote">Quote</span>
+        </div>
+        <div class="ops-row">
+          <div class="ops-time num">4:00</div>
+          <div class="ops-job"><div class="t">Ortega Deck + Pergola</div><div class="m">First call, referral</div></div>
+          <span class="ops-pill p-lead">Lead</span>
+        </div>
+        <div class="ops-paid">
+          <div>
+            <div class="k">Payment received</div>
+            <div class="m num">Invoice #214 · Maddox Garage Build</div>
+          </div>
+          <div class="v num">$6,800</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MARQUEE -->
+<div class="marquee" aria-hidden="true">
+  <div class="marquee-track" id="marquee">
+    <span>Framing <i>·</i></span><span>Concrete <i>·</i></span><span>Roofing <i>·</i></span><span>Remodels <i>·</i></span><span>Decks <i>·</i></span><span>Electrical <i>·</i></span><span>Plumbing <i>·</i></span><span>Excavation <i>·</i></span><span>Masonry <i>·</i></span><span>Painting <i>·</i></span><span>HVAC <i>·</i></span><span>Custom builds <i>·</i></span>
+  </div>
+</div>
+
+<!-- STAT BAND -->
+<section class="band">
+  <div class="wrap">
+    <div class="band-grid">
+      <div class="bstat"><div class="v num" data-count="4" data-prefix="" data-suffix=" days">4 days</div><div class="k">Average time from final invoice to money in the bank</div></div>
+      <div class="bstat"><div class="v num"><em>64</em>%</div><div class="k">Average quote win rate for crews sending AI proposals same-day</div></div>
+      <div class="bstat"><div class="v num">6<em>+</em> hrs</div><div class="k">Of weekly paperwork moved from the kitchen table to the truck</div></div>
+      <div class="bstat"><div class="v num"><em>0</em></div><div class="k">Leads lost in a text thread, a glovebox notepad, or your memory</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- LIVE CHART -->
+<section id="books">
+  <div class="wrap">
+    <div class="sec-mark reveal">
+      <span class="no num">01</span>
+      <h2 class="display">The live books</h2>
+      <div class="side">A simulated month in Fieldhorse. Gold is what you invoiced. Green is what actually landed. Fieldhorse closes the gap with payment links your clients open from a text.</div>
+    </div>
+
+    <div class="panel reveal">
+      <div class="panel-top">
+        <h3><span class="live-dot"></span> JUNE CASH FLOW <span id="liveClock" class="num" style="color:var(--steel);font-family:var(--body);font-size:13px;font-weight:500;"></span></h3>
+        <div class="legend">
+          <span><i style="background:var(--gold)"></i>Invoiced</span>
+          <span><i style="background:var(--green)"></i>Collected</span>
+          <span><i style="background:var(--red); width:10px; height:10px; border-radius:50%"></i>Overdue flagged</span>
+        </div>
+      </div>
+      <canvas id="cashChart" width="1080" height="360" role="img" aria-label="Live animated cash flow chart for one month, showing cumulative invoiced and collected dollars converging as payments land, with one overdue invoice flagged."></canvas>
+      <div class="stats">
+        <div class="stat"><div class="k">Invoiced (June)</div><div class="v num v-gold" id="stInv">$0</div></div>
+        <div class="stat"><div class="k">Collected (June)</div><div class="v num v-green" id="stCol">$0</div></div>
+        <div class="stat"><div class="k">Outstanding</div><div class="v num" id="stOut">$0</div></div>
+        <div class="stat"><div class="k">Quote win rate</div><div class="v num">64<small> %</small></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES LEDGER -->
+<section id="work">
+  <div class="wrap">
+    <div class="sec-mark reveal">
+      <span class="no num">02</span>
+      <h2 class="display">Everything between the handshake and the check</h2>
+    </div>
+    <div class="ledger">
+      <div class="lrow reveal">
+        <span class="no num">/01</span>
+        <h3>One pipeline, five stages</h3>
+        <p>Lead, quote, job, invoice, closed. Drag a card forward and the paperwork follows. Nothing falls through the cracks between a phone call and a contract.</p>
+      </div>
+      <div class="lrow reveal">
+        <span class="no num">/02</span>
+        <h3>AI proposals from a voice note</h3>
+        <p>Walk the site, talk the scope. Fieldhorse drafts a line-itemed proposal in your voice with your pricing. Review, tweak, send before you leave the driveway.</p>
+      </div>
+      <div class="lrow reveal">
+        <span class="no num">/03</span>
+        <h3>Crew schedule that holds up</h3>
+        <p>Assign crews by the day, catch conflicts before they happen, and shuffle a rain delay across the week in two taps. Everyone gets the update on their phone.</p>
+      </div>
+      <div class="lrow reveal">
+        <span class="no num">/04</span>
+        <h3>Get paid from a text</h3>
+        <p>Every invoice carries a payment link your client can pay in under a minute. Deposits, progress draws, finals. All of it tracked against the job.</p>
+      </div>
+      <div class="lrow reveal">
+        <span class="no num">/05</span>
+        <h3>Weather on every job card</h3>
+        <p>Hourly forecasts ride along with each scheduled job. Pour days, paint days, and roof days get flagged before you load the truck for nothing.</p>
+      </div>
+      <div class="lrow reveal">
+        <span class="no num">/06</span>
+        <h3>Job notes that stick</h3>
+        <p>Photos, change orders, gate codes, and the thing the client said on Tuesday. Pinned to the job, searchable forever, shareable with the builder when you need cover.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TESTIMONIALS -->
+<section id="crews">
+  <div class="wrap">
+    <div class="sec-mark reveal">
+      <span class="no num">03</span>
+      <h2 class="display">From the field</h2>
+    </div>
+    <div class="t-feature reveal">
+      <blockquote>"I got my weekends back and my time-to-paid dropped from <em>two weeks to four days.</em>"</blockquote>
+      <div class="who"><b>Ray Maddox</b> · Maddox Custom Builds, general contractor</div>
+    </div>
+    <div class="t-grid reveal">
+      <div class="t-cell">
+        <div class="stars">★★★★★</div>
+        <p>"The AI proposal thing sounded like a gimmick until I tried it. I talked through a deck job for ninety seconds and it handed me a proposal that looked like I'd spent an hour on it. Client signed that night."</p>
+        <div class="who"><b>Dana Caldwell</b> · Caldwell &amp; Sons Remodeling</div>
+      </div>
+      <div class="t-cell">
+        <div class="stars">★★★★★</div>
+        <p>"Three crews, two towns, one phone. The schedule alone is worth it. When rain pushed a pour last month I rebuilt the whole week from the diner without calling anybody twice."</p>
+        <div class="who"><b>Luis Peña</b> · Bluff City Concrete, owner</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing">
+  <div class="wrap">
+    <div class="sec-mark reveal">
+      <span class="no num">04</span>
+      <h2 class="display">Costs less than one lost lead</h2>
+      <div class="side">Every plan has the full pipeline, proposals, invoicing, and payments. Pick the size of your outfit. Cancel whenever.</div>
+    </div>
+
+    <div class="toggle-row reveal">
+      <span id="lblMonthly" style="color:var(--linen)">Monthly</span>
+      <label class="switch"><input type="checkbox" id="billToggle"><span class="slider"></span></label>
+      <span id="lblYearly">Yearly</span>
+      <span class="save-badge">2 months free</span>
+    </div>
+
+    <div class="pricing reveal">
+      <div class="plan">
+        <h3>Solo</h3>
+        <div class="desc">One operator doing it all. Welcome home.</div>
+        <div class="price"><span class="cur">$</span><span class="amt num" id="pSolo">29</span><span class="per" id="perSolo">/month</span></div>
+        <div class="seats">1 seat</div>
+        <ul>
+          <li>Full pipeline: lead to paid</li>
+          <li>Unlimited jobs, quotes &amp; invoices</li>
+          <li>Payment links &amp; deposit tracking</li>
+          <li>Weather on every job card</li>
+          <li>Works offline on site</li>
+        </ul>
+        <a href="mailto:hello@fieldhorse.io?subject=Start%20my%20Fieldhorse%20trial" class="btn btn-line">Start free trial</a>
+      </div>
+
+      <div class="plan featured">
+        <div class="pop">Most crews pick this</div>
+        <h3>Crew</h3>
+        <div class="desc">For outfits running real crews on real schedules.</div>
+        <div class="price"><span class="cur">$</span><span class="amt num" id="pCrew">59</span><span class="per" id="perCrew">/month</span></div>
+        <div class="seats">Up to 10 seats</div>
+        <ul>
+          <li>Everything in Solo</li>
+          <li>Crew scheduling &amp; day assignments</li>
+          <li>AI proposals from voice notes</li>
+          <li>Builder &amp; client shared job views</li>
+          <li>Overdue invoice auto-reminders</li>
+        </ul>
+        <a href="mailto:hello@fieldhorse.io?subject=Start%20my%20Fieldhorse%20trial" class="btn btn-gold">Start free trial</a>
+      </div>
+
+      <div class="plan">
+        <h3>Company</h3>
+        <div class="desc">Multiple crews, multiple towns, one set of books.</div>
+        <div class="price"><span class="cur">$</span><span class="amt num" id="pCo">119</span><span class="per" id="perCo">/month</span></div>
+        <div class="seats">Unlimited seats</div>
+        <ul>
+          <li>Everything in Crew</li>
+          <li>Cash flow &amp; win-rate analytics</li>
+          <li>Quote-to-paid reporting by crew</li>
+          <li>Priority support from real humans</li>
+          <li>Data export anytime</li>
+        </ul>
+        <a href="mailto:hello@fieldhorse.io?subject=Start%20my%20Fieldhorse%20trial" class="btn btn-line">Start free trial</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section id="faq">
+  <div class="wrap">
+    <div class="faq-grid">
+      <div class="faq-intro reveal">
+        <span class="no num" style="font-family:var(--display);font-size:19px;color:var(--gold);letter-spacing:0.08em;">05</span>
+        <h2 class="display">Straight answers</h2>
+        <p>The six questions we get on every demo call, answered the way we'd answer them on a jobsite.</p>
+        <a href="mailto:hello@fieldhorse.io" class="btn btn-line">Ask something else</a>
+      </div>
+      <div class="faq reveal">
+        <div class="qa">
+          <button>Does it work with no signal on site?<span class="ico">+</span></button>
+          <div class="ans"><p>Yes. Fieldhorse is built offline-first. Job notes, photos, schedule changes, and quotes you draft in a dead zone are saved on your phone and sync the moment you're back on signal. You'll never lose work to a basement or a back forty.</p></div>
+        </div>
+        <div class="qa">
+          <button>Does it replace QuickBooks?<span class="ico">+</span></button>
+          <div class="ans"><p>It replaces the parts you hate doing in the field: quoting, invoicing, payment collection, and knowing who owes you what. Plenty of crews run Fieldhorse as their whole money system. If your accountant lives in QuickBooks, export everything as CSV at tax time and they'll be happy.</p></div>
+        </div>
+        <div class="qa">
+          <button>What does the AI actually do?<span class="ico">+</span></button>
+          <div class="ans"><p>Two things, both practical. It drafts proposals from your voice notes using your own past pricing and phrasing, and it summarizes long job threads so you can catch up on a project in thirty seconds. It never sends anything without you reading and tapping send.</p></div>
+        </div>
+        <div class="qa">
+          <button>How do payments work and what are the fees?<span class="ico">+</span></button>
+          <div class="ans"><p>Every invoice includes a secure payment link your client can open from a text or email. Card payments carry standard processing of 2.9% + 30¢; ACH bank transfers are 1% capped at $10, which most contractors steer clients toward on big draws. Fieldhorse takes no extra cut.</p></div>
+        </div>
+        <div class="qa">
+          <button>Can my crew see jobs without seeing my numbers?<span class="ico">+</span></button>
+          <div class="ans"><p>Yes. Crew seats see the schedule, job details, notes, and photos they need to do the work. Quotes, margins, invoices, and your books stay visible only to owner and admin seats. You decide who sees money.</p></div>
+        </div>
+        <div class="qa">
+          <button>What happens to my data if I cancel?<span class="ico">+</span></button>
+          <div class="ans"><p>It's yours. Export every contact, job, quote, invoice, note, and photo at any time, on any plan, including during the free trial. Cancel and we keep your account readable for 90 days in case you change your mind, then delete it permanently on request or automatically.</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta">
+  <div class="wrap">
+    <h2 class="display">Knock off <em>on time.</em></h2>
+    <p>Start your 14-day trial today. No card, no sales call, no onboarding webinar. Just your jobs, organized by lunch.</p>
+    <div class="hero-actions">
+      <a href="mailto:hello@fieldhorse.io?subject=Start%20my%20Fieldhorse%20trial" class="btn btn-gold">Start free trial</a>
+      <a href="#books" class="btn btn-line">Watch the live books</a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <a href="#top" class="wordmark">FIELD<b>HORSE</b></a>
+      <div class="links">
+        <a href="#books">Live books</a>
+        <a href="#work">What it does</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#faq">FAQ</a>
+        <a href="mailto:hello@fieldhorse.io">hello@fieldhorse.io</a>
+      </div>
+      <div class="copy num">© 2026 Fieldhorse. Built for the people who build.</div>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  // Gate reveal animations on JS so the page is never blank without it.
+  document.documentElement.classList.add("js");
+
+  /* ---------- Cash flow data: one month, cumulative dollars ---------- */
+  var DAYS = 30;
+  var invoiceEvents = { 1: 4800, 3: 2400, 5: 7200, 8: 3600, 10: 9800, 13: 2900, 15: 6800, 18: 5400, 20: 4200, 23: 8600, 26: 3800, 28: 7400 };
+  var collectEvents = { 2: 4800, 6: 2400, 7: 7200, 11: 3600, 12: 9800, 16: 6800, 19: 2900, 22: 5400, 24: 4200, 27: 8600, 29: 3800 };
+  var overdueDay = 17; // the day-13 invoice ran late; flagged here, paid day 19
+
+  function cumulate(events) {
+    var arr = [0], total = 0;
+    for (var d = 1; d <= DAYS; d++) { total += events[d] || 0; arr.push(total); }
+    return arr;
+  }
+  var inv = cumulate(invoiceEvents);
+  var col = cumulate(collectEvents);
+  var maxV = inv[DAYS] * 1.08;
+
+  var canvas = document.getElementById("cashChart");
+  var ctx = canvas.getContext("2d");
+
+  function setupHiDPI() {
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var cssW = canvas.clientWidth || 1080;
+    var cssH = cssW * (360 / 1080);
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    canvas.style.height = cssH + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { w: cssW, h: cssH };
+  }
+  var dims = setupHiDPI();
+
+  var fmt = function (n) {
+    return "$" + Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  };
+
+  var progress = 0, lastT = 0;
+  var statInv = document.getElementById("stInv");
+  var statCol = document.getElementById("stCol");
+  var statOut = document.getElementById("stOut");
+
+  function valueAt(arr, t) {
+    var i = Math.floor(t), f = t - i;
+    if (i >= DAYS) return arr[DAYS];
+    return arr[i] + (arr[i + 1] - arr[i]) * f;
+  }
+
+  function draw(ts) {
+    if (!lastT) lastT = ts;
+    var dt = ts - lastT;
+    lastT = ts;
+
+    var w = dims.w, h = dims.h;
+    var padL = 56, padR = 16, padT = 22, padB = 30;
+    var plotW = w - padL - padR, plotH = h - padT - padB;
+
+    ctx.clearRect(0, 0, w, h);
+
+    if (progress < DAYS) {
+      progress += (dt / 1000) * (DAYS / 7);
+      if (progress > DAYS) progress = DAYS;
+    }
+
+    function x(d) { return padL + (d / DAYS) * plotW; }
+    function y(v) { return padT + plotH - (v / maxV) * plotH; }
+
+    ctx.font = "500 11px 'DM Sans', sans-serif";
+    ctx.fillStyle = "rgba(139,135,130,0.8)";
+    ctx.textAlign = "right";
+    for (var g = 0; g <= 4; g++) {
+      var gv = (maxV / 4) * g;
+      var gy = y(gv);
+      ctx.strokeStyle = "rgba(242,237,228,0.06)";
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(padL, gy); ctx.lineTo(w - padR, gy); ctx.stroke();
+      ctx.fillText(g === 0 ? "$0" : "$" + Math.round(gv / 1000) + "k", padL - 8, gy + 4);
+    }
+    ctx.textAlign = "center";
+    [1, 10, 20, 30].forEach(function (d) { ctx.fillText("Jun " + d, x(d), h - 8); });
+
+    function drawSeries(arr, color, fill) {
+      var t = progress;
+      if (fill) {
+        ctx.beginPath();
+        ctx.moveTo(x(0), y(arr[0]));
+        for (var i = 1; i <= Math.floor(t); i++) ctx.lineTo(x(i), y(arr[i]));
+        if (t < DAYS) ctx.lineTo(x(t), y(valueAt(arr, t)));
+        ctx.lineTo(x(Math.min(t, DAYS)), y(0));
+        ctx.lineTo(x(0), y(0));
+        ctx.closePath();
+        var fg = ctx.createLinearGradient(0, padT, 0, padT + plotH);
+        fg.addColorStop(0, fill);
+        fg.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = fg;
+        ctx.fill();
+      }
+      ctx.beginPath();
+      ctx.moveTo(x(0), y(arr[0]));
+      for (var j = 1; j <= Math.floor(t); j++) ctx.lineTo(x(j), y(arr[j]));
+      if (t < DAYS) ctx.lineTo(x(t), y(valueAt(arr, t)));
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2.6;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      ctx.stroke();
+      var hx = x(Math.min(progress, DAYS)), hy = y(valueAt(arr, progress));
+      ctx.beginPath();
+      ctx.arc(hx, hy, 4 + Math.sin(ts / 240) * 1.2, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+    }
+
+    drawSeries(inv, "#C9963A", "rgba(201,150,58,0.13)");
+    drawSeries(col, "#4F8C5E", "rgba(79,140,94,0.11)");
+
+    if (progress >= overdueDay) {
+      var ox = x(overdueDay), oy = y(valueAt(col, overdueDay));
+      var halo = 6 + Math.sin(ts / 300) * 2;
+      ctx.beginPath();
+      ctx.arc(ox, oy, halo + 4, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(192,57,43,0.18)";
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(ox, oy, 4.5, 0, Math.PI * 2);
+      ctx.fillStyle = "#C0392B";
+      ctx.fill();
+      ctx.font = "700 11px 'DM Sans', sans-serif";
+      ctx.fillStyle = "rgba(242,237,228,0.9)";
+      ctx.textAlign = "center";
+      ctx.fillText("Overdue. Reminder sent ✓", ox, oy - 14);
+    }
+
+    if (progress >= 4 && progress < DAYS) {
+      var gi = valueAt(inv, progress), gc = valueAt(col, progress);
+      if (gi - gc > 1500) {
+        ctx.font = "600 11px 'DM Sans', sans-serif";
+        ctx.fillStyle = "rgba(196,191,184,0.85)";
+        ctx.textAlign = "right";
+        ctx.fillText(fmt(gi - gc) + " out", x(progress) - 10, (y(gi) + y(gc)) / 2 + 4);
+      }
+    }
+
+    statInv.textContent = fmt(valueAt(inv, progress));
+    statCol.textContent = fmt(valueAt(col, progress));
+    statOut.textContent = fmt(Math.max(0, valueAt(inv, progress) - valueAt(col, progress)));
+
+    requestAnimationFrame(draw);
+  }
+
+  /* ---------- Live clock ---------- */
+  var clockEl = document.getElementById("liveClock");
+  function tickClock() {
+    var d = new Date();
+    var hh = d.getHours(), mm = String(d.getMinutes()).padStart(2, "0");
+    var ss = String(d.getSeconds()).padStart(2, "0");
+    var ampm = hh >= 12 ? "PM" : "AM";
+    clockEl.textContent = "live " + (hh % 12 || 12) + ":" + mm + ":" + ss + " " + ampm;
+  }
+  setInterval(tickClock, 1000);
+  tickClock();
+
+  /* ---------- Marquee: duplicate content for seamless loop ---------- */
+  var mq = document.getElementById("marquee");
+  mq.innerHTML += mq.innerHTML;
+
+  /* ---------- Pricing toggle ---------- */
+  var toggle = document.getElementById("billToggle");
+  var prices = { pSolo: [29, 24], pCrew: [59, 49], pCo: [119, 99] };
+  var pers = ["perSolo", "perCrew", "perCo"];
+  var lblM = document.getElementById("lblMonthly");
+  var lblY = document.getElementById("lblYearly");
+  toggle.addEventListener("change", function () {
+    var yearly = toggle.checked;
+    Object.keys(prices).forEach(function (id) {
+      document.getElementById(id).textContent = prices[id][yearly ? 1 : 0];
+    });
+    pers.forEach(function (id) {
+      document.getElementById(id).textContent = yearly ? "/mo billed yearly" : "/month";
+    });
+    lblM.style.color = yearly ? "var(--steel-lt)" : "var(--linen)";
+    lblY.style.color = yearly ? "var(--linen)" : "var(--steel-lt)";
+  });
+
+  /* ---------- FAQ accordion ---------- */
+  document.querySelectorAll(".qa button").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var qa = btn.parentElement;
+      var ans = qa.querySelector(".ans");
+      var isOpen = qa.classList.contains("open");
+      document.querySelectorAll(".qa").forEach(function (other) {
+        other.classList.remove("open");
+        other.querySelector(".ans").style.maxHeight = null;
+      });
+      if (!isOpen) {
+        qa.classList.add("open");
+        ans.style.maxHeight = ans.scrollHeight + "px";
+      }
+    });
+  });
+
+  /* ---------- Scroll reveal (with safety net) ---------- */
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
+    });
+  }, { threshold: 0.1, rootMargin: "0px 0px -5% 0px" });
+  document.querySelectorAll(".reveal").forEach(function (el) { io.observe(el); });
+  // Belt and suspenders: nothing stays hidden longer than 3s after load.
+  setTimeout(function () {
+    document.querySelectorAll(".reveal:not(.in)").forEach(function (el) { el.classList.add("in"); });
+  }, 3000);
+
+  /* ---------- Resize ---------- */
+  var resizeTimer;
+  window.addEventListener("resize", function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function () { dims = setupHiDPI(); }, 180);
+  });
+
+  requestAnimationFrame(draw);
+})();
+</script>
+</body>
+</html>
