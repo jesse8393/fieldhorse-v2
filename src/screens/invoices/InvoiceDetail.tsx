@@ -32,6 +32,7 @@ import { supabase } from '../../lib/supabase.ts'
 import { hapticTap } from '../../lib/haptics.ts'
 import { toastError, toastSuccess } from '../../lib/toast.ts'
 import { parseDateOnly } from '../../lib/dates.ts'
+import type { InvoiceRecord } from '../../lib/queries.ts'
 import { goBackFrom, shortDate, useInvoiceScreen } from './useInvoiceScreen.ts'
 import './invoices.css'
 
@@ -59,6 +60,10 @@ function statusChip(standing: { status: string; daysLate: number }): { label: st
 
 export default function InvoiceDetail() {
   const { id } = useParams()
+  return <InvoiceDetailScreen key={id} id={id} />
+}
+
+function InvoiceDetailScreen({ id }: { id: string | undefined }) {
   const navigate = useNavigate()
   const { user, query, record, figures, billingReview, company, now, sending, refresh, patchInvoice, send } = useInvoiceScreen(id)
   const waitId = useId()
@@ -69,6 +74,9 @@ export default function InvoiceDetail() {
   useEffect(() => { setDuplicateReviewed(false) }, [id, record])
   const [downloading, setDownloading] = useState(false)
   const [sharing, setSharing] = useState(false)
+  const [preparingSend, setPreparingSend] = useState(false)
+  const preparingSendRef = useRef(false)
+  const sendingBusy = sending || preparingSend
   const [voidArmed, setVoidArmed] = useState(false)
   const [voiding, setVoiding] = useState(false)
   const voidTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -76,23 +84,65 @@ export default function InvoiceDetail() {
 
   // The description as typed; saved when the field loses focus.
   const [description, setDescription] = useState<string | null>(null)
+  const descriptionDraft = useRef<string | null>(null)
+  const descriptionSave = useRef<Promise<InvoiceRecord | null> | null>(null)
   const [savingDescription, setSavingDescription] = useState(false)
+  const [descriptionError, setDescriptionError] = useState('')
   const invoice = record?.invoice ?? null
   const shownDescription = description ?? invoice?.description ?? ''
 
-  async function saveDescription() {
-    if (!invoice || description === null) return
-    const next = description.trim() || null
-    if (next === (invoice.description ?? null)) { setDescription(null); return }
+  function saveDescription(): Promise<InvoiceRecord | null> {
+    // Blur and an action tap share one save. Later edits wait their turn,
+    // so a slow response cannot erase newer words or win out of order.
+    if (descriptionSave.current) return descriptionSave.current
+    if (!invoice || descriptionDraft.current === null) return Promise.resolve(invoice)
     setSavingDescription(true)
-    const { error } = await supabase.from('fh_invoices').update({ description: next }).eq('id', invoice.id)
-    setSavingDescription(false)
-    if (error) {
-      toastError("Couldn't save the description", error.message || 'Try again')
-      return
+    setDescriptionError('')
+    const task = (async () => {
+      let saved = invoice
+      try {
+        while (descriptionDraft.current !== null) {
+          const draft = descriptionDraft.current
+          const next = draft.trim() || null
+          if (next !== (saved.description ?? null)) {
+            const { data, error } = await supabase.from('fh_invoices')
+              .update({ description: next }).eq('id', saved.id).eq('status', saved.status)
+              .select('*').single()
+            if (error || !data) throw new Error(error?.message || 'Invoice changed. Refresh and try again.')
+            saved = { ...saved, ...data }
+            // Preserve updated_at too: sending checks the saved revision.
+            patchInvoice(data)
+          }
+          if (descriptionDraft.current === draft) {
+            descriptionDraft.current = null
+            setDescription(null)
+          }
+        }
+        return saved
+      } catch (e) {
+        setDescriptionError('Description unsaved. Try again before continuing.')
+        toastError("Couldn't save description", (e as Error)?.message || 'Try again')
+        return null
+      }
+    })()
+    descriptionSave.current = task
+    void task.finally(() => {
+      descriptionSave.current = null
+      setSavingDescription(false)
+    })
+    return task
+  }
+
+  async function handleSend() {
+    if (sending || preparingSendRef.current) return
+    preparingSendRef.current = true
+    setPreparingSend(true)
+    try {
+      if (await saveDescription()) await send({ duplicateReviewed })
+    } finally {
+      preparingSendRef.current = false
+      setPreparingSend(false)
     }
-    patchInvoice({ description: next })
-    setDescription(null)
   }
 
   async function handleDownload() {
@@ -100,8 +150,10 @@ export default function InvoiceDetail() {
     hapticTap()
     setDownloading(true)
     try {
+      const savedInvoice = await saveDescription()
+      if (!savedInvoice) return
       const result = await buildInvoicePdf({
-        invoice: record.invoice, contact: record.job, client: record.client, company,
+        invoice: savedInvoice, contact: record.job, client: record.client, company,
         payments: record.payments, changeOrders: record.changeOrders, insurance: record.insurance,
         invoices: record.jobInvoices, amountDue: figures.due
       })
@@ -126,6 +178,7 @@ export default function InvoiceDetail() {
     hapticTap()
     setSharing(true)
     try {
+      if (!await saveDescription()) return
       const link = await mintPublicLink({
         contactId: record.job?.id ?? null,
         clientId: record.job ? null : record.invoice.client_id || record.client?.id || null,
@@ -148,7 +201,7 @@ export default function InvoiceDetail() {
   // Void asks with a second tap on the same button (D57): the first arms
   // it for 4 seconds, the second voids.
   async function handleVoid() {
-    if (!invoice || voiding || sending) return
+    if (!invoice || voiding || sendingBusy) return
     hapticTap()
     if (!voidArmed) {
       setVoidArmed(true)
@@ -246,12 +299,17 @@ export default function InvoiceDetail() {
           multiline
           label="Description, shows on the invoice"
           helper={savingDescription ? 'Saving' : 'Prints in the PDF Description column and in the email.'}
+          error={descriptionError || undefined}
           placeholder={record.job?.job_title || 'What this invoice is for'}
           value={shownDescription}
-          readOnly={settled}
-          onChange={(e) => setDescription(e.target.value)}
+          readOnly={settled || sendingBusy || downloading || sharing}
+          onChange={(e) => {
+            descriptionDraft.current = e.target.value
+            setDescription(e.target.value)
+          }}
           onBlur={() => void saveDescription()}
         />
+        {descriptionError && <Button variant="quiet" size="mini" loading={savingDescription} onClick={() => void saveDescription()}>Try again</Button>}
       </section>
 
       <div className="fhinv-actions">
@@ -262,14 +320,14 @@ export default function InvoiceDetail() {
             block
             icon={DollarSign}
             to={`/invoices/${invoice.id}/payment`}
-            disabled={sending}
-            aria-describedby={sending ? waitId : undefined}
+            disabled={sendingBusy}
+            aria-describedby={sendingBusy ? waitId : undefined}
           >
             Collect payment
           </Button>
         )}
         {!settled && (
-          <Button variant="secondary" size="md" block icon={Send} loading={sending} onClick={() => void send({ duplicateReviewed })}>
+          <Button variant="secondary" size="md" block icon={Send} loading={sendingBusy} onClick={() => void handleSend()}>
             {isDraft ? 'Send' : 'Resend'}
           </Button>
         )}
@@ -291,8 +349,8 @@ export default function InvoiceDetail() {
             size="md"
             block
             loading={voiding}
-            disabled={sending}
-            aria-describedby={sending ? waitId : undefined}
+            disabled={sendingBusy}
+            aria-describedby={sendingBusy ? waitId : undefined}
             onClick={() => void handleVoid()}
           >
             {voidLabel}
@@ -300,8 +358,8 @@ export default function InvoiceDetail() {
         )}
         {/* Under the buttons, so none of them moves when it comes and goes
             under a finger that is still tapping. */}
-        {!settled && sending && (
-          <p className="fhinv-helper" id={waitId}>Collect payment and Void are paused while the email goes out.</p>
+        {!settled && sendingBusy && (
+          <p className="fhinv-helper" id={waitId}>{sending ? 'Collect payment and Void are paused while the email goes out.' : 'Saving description before sending.'}</p>
         )}
       </div>
 

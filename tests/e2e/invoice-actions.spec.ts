@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
-import { installMock, session } from '../../scripts/qa-mock.mjs'
+import { installMock, restResponse, session } from '../../scripts/qa-mock.mjs'
 import { nothingRunsOffTheSide } from './helpers/overflow.ts'
 import { signIn } from './helpers/signIn.ts'
 
@@ -151,8 +151,35 @@ function shedDeposit(status = 'sent') {
   }
 }
 
+async function installShedInvoice(context: BrowserContext, status = 'sent') {
+  let invoice = { org_id: 'org-1', ...shedDeposit(status) }
+  await signIn(context, { tables: { fh_contacts: [shedJob()], fh_invoices: [invoice], fh_payments: [] } })
+  // The shared fixture only acknowledges writes. This fixture persists
+  // the row before returning it, like PostgREST, so reload and revision
+  // assertions test confirmed storage rather than an optimistic cache.
+  await context.route('**/rest/v1/fh_invoices*', async (route) => {
+    const request = route.request()
+    if (request.method() === 'PATCH') {
+      const params = new URL(request.url()).searchParams
+      const matched = params.get('id') === `eq.${invoice.id}` &&
+        (!params.has('status') || params.get('status') === `eq.${invoice.status}`)
+      const single = request.headers().accept?.includes('vnd.pgrst.object')
+      if (!matched) {
+        await route.fulfill({ status: single ? 406 : 200, json: single ? { code: 'PGRST116', message: 'No matching invoice' } : [] })
+        return
+      }
+      const patch = request.postDataJSON()
+      invoice = { ...invoice, ...patch, updated_at: patch.updated_at || '2026-11-10T20:45:00.000Z' }
+      await route.fulfill({ status: 200, json: single ? invoice : [invoice] })
+      return
+    }
+    const response = restResponse(request.url(), { method: request.method(), headers: request.headers(), tables: { fh_invoices: [invoice] } })
+    await route.fulfill({ status: response.status, body: response.body, contentType: 'application/json', headers: response.headers })
+  })
+}
+
 test("the Description field holds the invoice's own description, not the job title", async ({ page, context }) => {
-  await signIn(context, { tables: { fh_contacts: [shedJob()], fh_invoices: [shedDeposit()], fh_payments: [] } })
+  await installShedInvoice(context)
   await openInvoice(page, 'inv-1')
   const field = page.getByLabel('Description, shows on the invoice')
   await expect(field).toHaveValue('Deposit for the shed slab')
@@ -160,7 +187,7 @@ test("the Description field holds the invoice's own description, not the job tit
 })
 
 test('the Description field edits in place and shows in the PDF text', async ({ page, context }) => {
-  await signIn(context, { tables: { fh_contacts: [shedJob()], fh_invoices: [shedDeposit()], fh_payments: [] } })
+  await installShedInvoice(context)
   const saves: string[] = []
   await context.route('**/rest/v1/fh_invoices*', async (route) => {
     if (route.request().method() === 'PATCH') saves.push(route.request().postData() || '')
@@ -184,11 +211,206 @@ test('the Description field edits in place and shows in the PDF text', async ({ 
   expect(text).not.toContain('Deposit for the shed slab')
 })
 
+test('PDF waits for a pending description save and downloads the saved words', async ({ page, context }) => {
+  await installShedInvoice(context)
+  let release = () => {}
+  const held = new Promise<void>((resolve) => { release = resolve })
+  let saves = 0
+  await context.route('**/rest/v1/fh_invoices*', async (route) => {
+    if (route.request().method() === 'PATCH' && 'description' in route.request().postDataJSON()) {
+      saves++
+      await held
+    }
+    await route.fallback()
+  })
+  const downloads: string[] = []
+  page.on('download', (file) => downloads.push(file.suggestedFilename()))
+  await openInvoice(page, 'inv-1')
+  const field = page.getByLabel('Description, shows on the invoice')
+  await field.fill('Gravel base for the shed pad')
+  await action(page, 'PDF').click()
+  const download = page.waitForEvent('download')
+  try {
+    await expect.poll(() => saves).toBe(1)
+    await expect(page.getByText('Saving', { exact: true })).toBeVisible()
+    await expect(action(page, 'PDF')).toHaveAttribute('aria-busy', 'true')
+    expect(downloads).toEqual([])
+  } finally {
+    release()
+  }
+  const file = await download
+  const text = readFileSync((await file.path()) as string, 'latin1')
+  expect(text).toContain('Gravel base for the shed pad')
+  expect(text).not.toContain('Deposit for the shed slab')
+  expect(saves).toBe(1)
+  await page.reload()
+  await expect(field).toHaveValue('Gravel base for the shed pad')
+})
+
+test('new description edits survive an older save and persist in order', async ({ page, context }) => {
+  await installShedInvoice(context)
+  let release = () => {}
+  const held = new Promise<void>((resolve) => { release = resolve })
+  const saves: string[] = []
+  await context.route('**/rest/v1/fh_invoices*', async (route) => {
+    if (route.request().method() === 'PATCH' && 'description' in route.request().postDataJSON()) {
+      saves.push(route.request().postDataJSON().description)
+      if (saves.length === 1) await held
+    }
+    await route.fallback()
+  })
+  await openInvoice(page, 'inv-1')
+  const field = page.getByLabel('Description, shows on the invoice')
+  await field.fill('First revision')
+  await field.blur()
+  try {
+    await expect.poll(() => saves).toEqual(['First revision'])
+    await field.fill('Latest revision with drainage')
+    await field.blur()
+    // The second blur joins the pending save rather than racing it.
+    expect(saves).toEqual(['First revision'])
+    await expect(field).toHaveValue('Latest revision with drainage')
+  } finally {
+    release()
+  }
+  await expect.poll(() => saves).toEqual(['First revision', 'Latest revision with drainage'])
+  await expect(page.getByText('Saving', { exact: true })).toHaveCount(0)
+  await expect(field).toHaveValue('Latest revision with drainage')
+  await page.reload()
+  await expect(field).toHaveValue('Latest revision with drainage')
+})
+
+test('Resend waits for the saved description and uses its returned revision', async ({ page, context }) => {
+  await installShedInvoice(context)
+  let release = () => {}
+  const held = new Promise<void>((resolve) => { release = resolve })
+  let saves = 0
+  const revision = '2026-11-10T20:30:00.000Z'
+  await context.route('**/rest/v1/fh_invoices*', async (route) => {
+    const body = route.request().postDataJSON()
+    if (route.request().method() === 'PATCH' && body && 'description' in body) {
+      saves++
+      await held
+      await route.fallback({ postData: JSON.stringify({ ...body, updated_at: revision }) })
+      return
+    }
+    await route.fallback()
+  })
+  const uploads: string[] = []
+  await context.route('**/storage/v1/object/**', async (route) => {
+    uploads.push(route.request().postDataBuffer()?.toString('latin1') || '')
+    await route.fulfill({ status: 200, json: { Key: 'job-files/qa-invoice.pdf' } })
+  })
+  const sends: Array<{ description: string; invoice_updated_at: string }> = []
+  await context.route('**/api/send-invoice', async (route) => {
+    sends.push(route.request().postDataJSON())
+    await route.fulfill({ status: 200, json: { ok: true } })
+  })
+  await openInvoice(page, 'inv-1')
+  await page.getByLabel('Description, shows on the invoice').fill('Gravel base and drainage')
+  await action(page, 'Resend').click()
+  try {
+    await expect.poll(() => saves).toBe(1)
+    await expect(action(page, 'Resend')).toHaveAttribute('aria-busy', 'true')
+    await expect(page.getByText('Saving', { exact: true })).toBeVisible()
+    expect(uploads).toEqual([])
+    expect(sends).toEqual([])
+  } finally {
+    release()
+  }
+  await expect.poll(() => sends.length).toBe(1)
+  expect(sends[0]).toMatchObject({ description: 'Gravel base and drainage', invoice_updated_at: revision })
+  expect(uploads).toHaveLength(1)
+  expect(uploads[0]).toContain('Gravel base and drainage')
+  expect(uploads[0]).not.toContain('Deposit for the shed slab')
+  expect(saves).toBe(1)
+})
+
+for (const name of ['PDF', 'Resend', 'Share link']) {
+  test(`${name} stops after a failed description save and keeps an explicit retry`, async ({ page, context }) => {
+    await installShedInvoice(context)
+    let release = () => {}
+    const held = new Promise<void>((resolve) => { release = resolve })
+    let fail = true
+    let saves = 0
+    await context.route('**/rest/v1/fh_invoices*', async (route) => {
+      if (route.request().method() === 'PATCH' && 'description' in route.request().postDataJSON()) {
+        saves++
+        if (fail) {
+          await held
+          await route.fulfill({ status: 403, json: { message: 'Description write rejected' } })
+          return
+        }
+      }
+      await route.fallback()
+    })
+    let outputs = 0
+    page.on('download', () => outputs++)
+    await context.route('**/storage/v1/object/**', async (route) => {
+      outputs++
+      await route.fulfill({ status: 200, json: { Key: 'job-files/qa-invoice.pdf' } })
+    })
+    await context.route('**/api/send-invoice', async (route) => {
+      outputs++
+      await route.fulfill({ status: 200, json: { ok: true } })
+    })
+    await context.route('**/rest/v1/fh_public_links*', async (route) => {
+      if (route.request().method() === 'POST') outputs++
+      await route.fallback()
+    })
+    await openInvoice(page, 'inv-1')
+    const field = page.getByLabel('Description, shows on the invoice')
+    await field.fill('Keep these unsaved words')
+    await action(page, name).click()
+    try {
+      await expect.poll(() => saves).toBe(1)
+      await expect(action(page, name)).toHaveAttribute('aria-busy', 'true')
+      expect(outputs).toBe(0)
+    } finally {
+      release()
+    }
+    await expect(field).toHaveAttribute('aria-invalid', 'true')
+    await expect(field).toHaveValue('Keep these unsaved words')
+    await expect(action(page, name)).not.toHaveAttribute('aria-busy', 'true')
+    expect(outputs).toBe(0)
+    fail = false
+    await page.getByRole('button', { name: 'Try again', exact: true }).click()
+    await expect(field).not.toHaveAttribute('aria-invalid', 'true')
+    await expect(page.getByText('Saving', { exact: true })).toHaveCount(0)
+    expect(saves).toBe(2)
+    expect(outputs).toBe(0)
+    await page.reload()
+    await expect(field).toHaveValue('Keep these unsaved words')
+  })
+}
+
+test('an update returning no row keeps the description unsaved', async ({ page, context }) => {
+  await installShedInvoice(context)
+  await context.route('**/rest/v1/fh_invoices*', async (route) => {
+    if (route.request().method() === 'PATCH') {
+      await route.fulfill({ status: 200, json: null })
+      return
+    }
+    await route.fallback()
+  })
+  let downloads = 0
+  page.on('download', () => downloads++)
+  await openInvoice(page, 'inv-1')
+  const field = page.getByLabel('Description, shows on the invoice')
+  await field.fill('Do not report this saved')
+  await field.blur()
+  await expect(field).toHaveAttribute('aria-invalid', 'true')
+  await action(page, 'PDF').click()
+  await expect(action(page, 'PDF')).not.toHaveAttribute('aria-busy', 'true')
+  await expect(field).toHaveValue('Do not report this saved')
+  expect(downloads).toBe(0)
+})
+
 // The job's money view (JobMoney, /jobs/:id?tab=financials) bills the whole
 // balance when no draw is open, so a paid deposit's description must not
 // stand in for it: the job title prints instead.
 test('with no open draw the job money view shows the job title, not a paid draw\'s description', async ({ page, context }) => {
-  await signIn(context, { tables: { fh_contacts: [shedJob()], fh_invoices: [shedDeposit('paid')], fh_payments: [] } })
+  await installShedInvoice(context, 'paid')
   await page.goto('/jobs/c-job1?tab=financials', { waitUntil: 'domcontentloaded', timeout: 20_000 })
   const service = page.locator('.fh-invoice-detail__service')
   await expect(service).toBeVisible({ timeout: 30_000 })
