@@ -4,7 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 // In memory stand in for the supabase-js query builder: enough of select,
 // insert, update and the filters these functions use.
 type Row = Record<string, any>
-function fakeSupabase(tables: Record<string, Row[]>) {
+function fakeSupabase(tables: Record<string, Row[]>, controls: {
+  beforeUpdate?: (table: string) => void
+  failUpdate?: (table: string) => boolean
+} = {}) {
   let nextId = 1
   const matchOr = (row: Row, expr: string) => expr.split(',').some((part) => {
     const [col, op, ...rest] = part.split('.')
@@ -30,6 +33,8 @@ function fakeSupabase(tables: Record<string, Row[]>) {
         return { data: inserted, error: null }
       }
       if (mode === 'update') {
+        controls.beforeUpdate?.(table)
+        if (controls.failUpdate?.(table)) return { data: null, error: { message: 'Synthetic update failure' } }
         const hit = matching()
         hit.forEach((r) => Object.assign(r, payload))
         return { data: returning ? hit.map((r) => ({ ...r })) : null, error: null }
@@ -133,6 +138,73 @@ describe('docusign-send request validation', () => {
 
 describe('DocuSign completion records the approval', () => {
   const env = { id: 'env-row', user_id: 'teammate', contact_id: 'job-1', recipient_name: 'Jane Customer', recipient_email: 'jane@example.com', status: 'delivered', sent_at: '2026-10-01T00:00:00Z' }
+
+  afterEach(() => { vi.unstubAllEnvs(); currentFake = null })
+
+  it('retries a failed envelope update before recording approval', async () => {
+    vi.stubEnv('SUPABASE_URL', 'https://example.supabase.co')
+    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'service')
+    vi.stubEnv('DOCUSIGN_CONNECT_HMAC_KEY', 'hmac-secret')
+    let rejectEnvelopeUpdate = true
+    const fake = fakeSupabase({
+      ...jobTables(),
+      fh_esign_envelopes: [{ ...env, envelope_id: 'ENV-123' }],
+      fh_notifications: []
+    }, { failUpdate: (table) => table === 'fh_esign_envelopes' && rejectEnvelopeUpdate })
+    currentFake = fake
+    const raw = JSON.stringify({ envelopeId: 'ENV-123', status: 'completed' })
+    const sig = crypto.createHmac('sha256', 'hmac-secret').update(raw).digest('base64')
+    const event = () => new Request('https://example.test/api/docusign-webhook', {
+      method: 'POST', headers: { 'x-docusign-signature-1': sig }, body: raw
+    })
+
+    const failed = await webhookHandler(event())
+    expect(failed.status).toBe(503)
+    expect(await failed.text()).toBe('envelope_update_failed')
+    expect(fake.tables.fh_esign_envelopes[0].status).toBe('delivered')
+    expect(fake.tables.fh_contacts[0].proposal_status).toBe('sent')
+    expect(fake.tables.fh_quote_versions).toHaveLength(1)
+    expect(fake.tables.fh_notifications).toHaveLength(0)
+
+    rejectEnvelopeUpdate = false
+    expect((await webhookHandler(event())).status).toBe(200)
+    expect(fake.tables.fh_esign_envelopes[0].status).toBe('completed')
+    expect(fake.tables.fh_contacts[0].proposal_status).toBe('approved')
+    expect(fake.tables.fh_quote_versions.filter((v) => v.status === 'approved')).toHaveLength(1)
+    expect(fake.tables.fh_notifications).toHaveLength(1)
+    expect((await webhookHandler(event())).status).toBe(200)
+    expect(fake.tables.fh_notifications).toHaveLength(1)
+  })
+
+  it('does not let a late delivery overwrite a completed envelope', async () => {
+    vi.stubEnv('SUPABASE_URL', 'https://example.supabase.co')
+    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'service')
+    vi.stubEnv('DOCUSIGN_CONNECT_HMAC_KEY', 'hmac-secret')
+    let race = true
+    const tables = {
+      ...jobTables(),
+      fh_esign_envelopes: [{ ...env, status: 'sent', envelope_id: 'ENV-123' }],
+      fh_notifications: []
+    }
+    const fake = fakeSupabase(tables, { beforeUpdate: (table) => {
+      if (table === 'fh_esign_envelopes' && race) {
+        race = false
+        tables.fh_esign_envelopes[0].status = 'completed'
+      }
+    } })
+    currentFake = fake
+    const raw = JSON.stringify({ envelopeId: 'ENV-123', status: 'delivered' })
+    const sig = crypto.createHmac('sha256', 'hmac-secret').update(raw).digest('base64')
+    const event = () => new Request('https://example.test/api/docusign-webhook', {
+      method: 'POST', headers: { 'x-docusign-signature-1': sig }, body: raw
+    })
+
+    expect((await webhookHandler(event())).status).toBe(503)
+    expect(fake.tables.fh_esign_envelopes[0].status).toBe('completed')
+    expect((await webhookHandler(event())).status).toBe(200)
+    expect(fake.tables.fh_esign_envelopes[0].status).toBe('completed')
+    expect(fake.tables.fh_notifications).toHaveLength(0)
+  })
 
   it('snapshots items and totals, supersedes the old version and points the job at the new one', async () => {
     const fake = fakeSupabase(jobTables())
