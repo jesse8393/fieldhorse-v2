@@ -48,13 +48,14 @@ try {
     insert into public.fh_quotes(id,user_id,org_id,client_id,title,job_type,scope_text,terms_text,exclusions_text,status)
       select '${id(20)}'::uuid, '${id(4)}','${id(100)}','${id(10)}','Deck','deck','Build deck','Deposit','Permits','approved';
   `)
-  for (const n of [21,22,23,24,25,26]) {
+  for (const n of [21,22,23,24,25,26,27,28,29,30,31]) {
     await db.query('insert into public.fh_quotes select $1,user_id,org_id,client_id,null,title,job_type,scope_text,terms_text,exclusions_text,status from public.fh_quotes where id=$2', [id(n),id(20)])
   }
   await db.query('update public.fh_quotes set client_id=$1 where id=$2', [id(11),id(21)])
   for (const [n,amount,opt,excluded] of [[30,1000.25,false,false],[31,250,true,false],[32,75,false,true],[33,500.5,false,false]]) {
     await db.query('insert into public.fh_quote_items(id,user_id,org_id,quote_id,description,qty,rate,amount,is_optional,is_excluded,sort_order) values($1,$2,$3,$4,$5,1,$6,$6,$7,$8,$9)',[id(n),id(4),id(100),id(20),`Fixture ${n}`,amount,opt,excluded,n])
   }
+  await db.exec('alter table public.fh_quotes add column origin_contact_id uuid references public.fh_contacts(id)')
   const migration = await readFile(new URL('../supabase/migrations/20261101184536_atomic_quote_conversion.sql',import.meta.url),'utf8')
   await db.exec(migration); await db.exec(migration)
   await scope(2)
@@ -76,6 +77,37 @@ try {
   await scope(6)
   const emptyJob = await convert(22)
   equal(Number((await db.query('select amount from public.fh_contacts where id=$1',[emptyJob])).rows[0].amount),0,'empty quote converts with zero base amount')
+  await db.exec('reset role')
+  // Reproduce moved quote rows without exposing real customer records.
+  await db.exec(`
+    insert into public.fh_contacts(id,user_id,org_id,client_id,stage) values
+      ('${id(50)}','${id(1)}','${id(100)}','${id(10)}','moved_quote'),
+      ('${id(51)}','${id(1)}','${id(100)}','${id(10)}','moved_quote'),
+      ('${id(52)}','${id(1)}','${id(200)}','${id(11)}','moved_quote'),
+      ('${id(53)}','${id(1)}','${id(100)}','${id(10)}','job');
+    update public.fh_quotes set origin_contact_id='${id(50)}' where id in ('${id(27)}','${id(28)}','${id(31)}');
+    update public.fh_quotes set origin_contact_id='${id(52)}' where id='${id(29)}';
+    update public.fh_quotes set origin_contact_id='${id(53)}' where id='${id(30)}';
+    insert into public.fh_quote_items(id,user_id,org_id,contact_id,quote_id,description,qty,rate,amount,is_optional,is_excluded,sort_order) values
+      ('${id(60)}','${id(1)}','${id(100)}','${id(50)}','${id(27)}','Legacy item',1,199.25,199.25,false,false,1),
+      ('${id(61)}','${id(1)}','${id(100)}',null,'${id(27)}','Optional item',1,80,80,true,false,2),
+      ('${id(62)}','${id(1)}','${id(100)}','${id(51)}','${id(28)}','Wrong origin',1,10,10,false,false,1),
+      ('${id(63)}','${id(1)}','${id(100)}','${id(52)}','${id(29)}','Foreign origin',1,10,10,false,false,1),
+      ('${id(64)}','${id(1)}','${id(100)}','${id(53)}','${id(30)}','Wrong stage',1,10,10,false,false,1),
+      ('${id(65)}','${id(1)}','${id(200)}','${id(50)}','${id(31)}','Foreign line',1,10,10,false,false,1);
+  `)
+  await scope(1)
+  const legacyJob = await convert(27)
+  equal(await convert(27),legacyJob,'legacy conversion retry returns the same job')
+  equal(Number((await db.query('select amount from public.fh_contacts where id=$1',[legacyJob])).rows[0].amount),199.25,'legacy conversion preserves exact base total')
+  equal((await db.query('select count(*)::int n from public.fh_quote_items where contact_id=$1 and quote_id is null',[legacyJob])).rows[0].n,2,'legacy and optional lines copy to the new job')
+  equal((await db.query('select count(*)::int n from public.fh_quote_items where contact_id=$1 and quote_id=$2',[id(50),id(27)])).rows[0].n,1,'legacy quote retains its original line')
+  for (const [quote,label] of [[28,'another origin'],[29,'foreign origin'],[30,'non migrated origin'],[31,'foreign line']]) {
+    const countBefore = await countJobs()
+    await scope(1)
+    await denied(()=>convert(quote),`rejects ${label}`)
+    equal(await countJobs(),countBefore,`${label} creates no partial job`)
+  }
   await db.exec('reset role')
   await db.exec(`
     insert into public.fh_quote_items(user_id,org_id,quote_id,description,qty,rate,amount) values('${id(1)}','${id(100)}','${id(23)}','blocked copy',1,10,10);
