@@ -9,7 +9,7 @@ const read = path => readFile(new URL(`../supabase/${path}`, import.meta.url), '
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
 let checks = 0
 const equal = (actual, expected, message) => { assert.deepEqual(actual, expected, message); checks++; console.log(`PASS ${message}`) }
-const denied = async (work, message) => { await assert.rejects(work, /unauthorized|does not belong|status must be/); checks++; console.log(`PASS ${message}`) }
+const denied = async (work, message) => { await assert.rejects(work, /unauthorized|does not belong|status must be|cannot change a job/); checks++; console.log(`PASS ${message}`) }
 const scope = async (user = 1, session = db) => {
   await session.query('reset role')
   await session.query("select set_config('request.jwt.claim.sub',$1,false)", [id(user)])
@@ -27,7 +27,7 @@ try {
     create table public.org_members(org_id uuid,user_id uuid,role text,revoked_at timestamptz);
     create function public.fh_is_org_member(org uuid) returns boolean language sql stable security definer as $$ select exists(select 1 from public.org_members where org_id=org and user_id=auth.uid() and revoked_at is null) $$;
     create function public.fh_money_visible(org uuid) returns boolean language sql stable security definer as $$ select not exists(select 1 from public.org_members where org_id=org and user_id=auth.uid() and revoked_at is null and role in ('crew','foreman')) $$;
-    create table public.fh_contacts(id uuid primary key,user_id uuid,org_id uuid,approved_quote_version_id uuid,proposal_status text);
+    create table public.fh_contacts(id uuid primary key,user_id uuid,org_id uuid,approved_quote_version_id uuid,proposal_status text,stage text,amount numeric,cost numeric,completed_at timestamptz,job_title text);
     create table public.fh_quotes(id uuid primary key,user_id uuid,org_id uuid,approved_version_id uuid,status text);
     create table public.fh_job_partners(job_id uuid,partner_user_id uuid,status text,deleted_by_partner_at timestamptz);
     create table public.fh_quote_versions(id uuid primary key default gen_random_uuid(),user_id uuid,org_id uuid,contact_id uuid,quote_id uuid,version_number integer,status text,snapshot jsonb,base_total numeric,optional_total numeric,excluded_count integer,approval_method text,approved_by_name text,approved_by_email text,approval_note text,signature_kind text,signature_data text,superseded_at timestamptz,superseded_by uuid);
@@ -36,6 +36,10 @@ try {
     create table public.fh_notifications(id uuid primary key,user_id uuid,org_id uuid,title text,link text,read_at timestamptz);
     create table public.fh_follow_ups(id uuid primary key,user_id uuid,org_id uuid,contact_id uuid,lead_id uuid,quote_id uuid,headline text,status text,completed_at timestamptz,completed_by uuid);
     grant usage on schema public,auth to authenticated;
+    alter table public.fh_contacts enable row level security;
+    create policy contact_member on public.fh_contacts to authenticated
+      using(public.fh_is_org_member(org_id)) with check(public.fh_is_org_member(org_id));
+    grant select,update on public.fh_contacts to authenticated;
     alter table public.fh_follow_ups enable row level security;
     create policy tenant on public.fh_follow_ups to authenticated using(public.fh_is_org_member(org_id));
     grant select on public.fh_follow_ups to authenticated;
@@ -51,6 +55,42 @@ try {
     insert into public.fh_notifications values ('${id(30)}','${id(1)}','${id(100)}','Fixture reminder','/jobs/${id(11)}',null),('${id(31)}','${id(1)}','${id(100)}','Fixture reminder','/jobs/${id(10)}',null),('${id(32)}','${id(4)}','${id(100)}','Fixture reminder','/jobs/${id(10)}',null);
     insert into public.fh_follow_ups(id,user_id,org_id,contact_id,headline,status) values ('${id(40)}','${id(5)}','${id(200)}','${id(11)}','Fixture reminder','queued'),('${id(41)}','${id(1)}','${id(100)}','${id(10)}','Fixture reminder','queued');
   `)
+  // Existing production guard, including its omission of cost.
+  await db.exec(`
+CREATE OR REPLACE FUNCTION public.fh_contacts_guard_money_fields()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'pg_catalog', 'public'
+AS $function$
+begin
+  if auth.uid() is null or old.org_id is null or pg_trigger_depth() > 1 then
+    return coalesce(new, old);
+  end if;
+  if public.fh_money_visible(old.org_id) then
+    return coalesce(new, old);
+  end if;
+  if tg_op = 'DELETE' then
+    raise exception 'Your role cannot delete jobs.' using errcode = '42501';
+  end if;
+  if new.stage is distinct from old.stage
+     or new.amount is distinct from old.amount
+     or new.completed_at is distinct from old.completed_at
+     or new.proposal_status is distinct from old.proposal_status then
+    raise exception 'Your role cannot change a job''s stage, value, approval or completion.' using errcode = '42501';
+  end if;
+  return new;
+end
+$function$
+
+    create trigger fh_contacts_guard_money_fields
+      before delete or update of stage, amount, completed_at, proposal_status on public.fh_contacts
+      for each row execute function public.fh_contacts_guard_money_fields();
+  `)
+  await scope(3)
+  equal(Number((await db.query('update public.fh_contacts set cost=42.5 where id=$1 returning cost',[id(10)])).rows[0].cost),42.5,'baseline crew can change job cost')
+  await db.exec('reset role')
+  await db.query('update public.fh_contacts set cost=0 where id=$1',[id(10)])
   await db.exec(await read('tests/fixtures/authorization_transition_baseline.sql'))
   await scope(1)
   equal((await db.query('select id from public.fh_follow_ups')).rows.map(r => r.id), [id(41)], 'direct RLS denies the foreign reminder')
@@ -65,6 +105,17 @@ try {
   const migration = await read('migrations/20261101020547_authorization_transition_guards.sql')
   await db.exec(migration)
   await db.exec(migration)
+  for (const user of [3,8]) {
+    await scope(user)
+    await denied(() => db.query('update public.fh_contacts set cost=42.5 where id=$1',[id(10)]),`restricted role ${user} cannot change job cost`)
+    equal(Number((await db.query('select cost from public.fh_contacts where id=$1',[id(10)])).rows[0].cost),0,'denied cost remains unchanged')
+  }
+  await scope(3)
+  equal((await db.query("update public.fh_contacts set job_title='Fixture' where id=$1 returning job_title",[id(10)])).rows[0].job_title,'Fixture','crew can still update ordinary job details')
+  for (const user of [1,2,7]) {
+    await scope(user)
+    equal(Number((await db.query('update public.fh_contacts set cost=$1 where id=$2 returning cost',[user,id(10)])).rows[0].cost),user,`authorized role ${user} can change job cost`)
+  }
   await scope(1)
   await db.query('select public.fh_follow_up_set_status($1,$2)', [id(30), 'done'])
   await db.exec('reset role')
