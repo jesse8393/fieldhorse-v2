@@ -1,99 +1,24 @@
-name: Live audit worker update verification
+name: Generate cost guard migration
 on:
   push:
     branches: [test/live-audit-diagnostics-20261110]
 permissions:
   contents: read
 jobs:
-  worker:
+  generate:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout reviewed application
+      - name: Checkout current production source
         uses: actions/checkout@v4
         with:
-          ref: b1ab3cd3b135a9df638346c544658a39b34e0166
+          ref: c6877c9285a13516f409506c7310f340a01e4a3c
           persist-credentials: false
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - name: Install dependencies
-        run: npm ci
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
-      - name: Build synthetic audit application
-        env:
-          VITE_SUPABASE_URL: https://qa-mock.supabase.co
-          VITE_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlhdCI6MTcxMDAwMDAwMCwiZXhwIjoyMDAwMDAwMDAwfQ.qa-signature
-        run: npm run build
-      - name: Configure real service worker check
+      - name: Generate local migration
         run: |
-          cat > playwright.worker.config.ts <<'CONFIG'
-          import { defineConfig, devices } from '@playwright/test'
-          import base from './playwright.config.ts'
-          export default defineConfig({
-            ...base,
-            timeout: 90000,
-            use: { ...base.use, serviceWorkers: 'allow' },
-            projects: [{ name: 'desktop-chrome', use: { ...devices['Desktop Chrome'] } }],
-            webServer: {
-              command: 'npx vite preview --host 127.0.0.1 --port 5173',
-              url: 'http://127.0.0.1:5173',
-              timeout: 90000
-            }
-          })
-          CONFIG
-          cat > tests/e2e/real-worker-audit.spec.ts <<'TEST'
-          import { expect, test } from '@playwright/test'
-          import { readFile, writeFile } from 'node:fs/promises'
-          import { signIn } from './helpers/signIn.ts'
-          
-          test('a real replacement worker preserves an unfinished event', async ({ context, page }) => {
-            await signIn(context)
-            await context.addInitScript(() => localStorage.setItem('fh-sw-killed-v2', '1'))
-            await page.goto('/schedule/new')
-            await page.evaluate(async () => { await navigator.serviceWorker.ready })
-            await page.waitForFunction(() => navigator.serviceWorker.controller !== null)
-            await expect(page.getByRole('status').filter({ hasText: 'Update ready' })).toHaveCount(0)
-            await page.getByLabel('Title', { exact: true }).fill('Keep this inspection draft')
-            const workerPath = 'dist/sw.js'
-            const original = await readFile(workerPath, 'utf8')
-            try {
-              await writeFile(workerPath, original + '\n// Synthetic audit replacement worker\n')
-              await page.evaluate(async () => {
-                const registration = await navigator.serviceWorker.getRegistration()
-                if (!registration) throw new Error('Worker registration missing')
-                await registration.update()
-              })
-              await expect(page.getByRole('status').filter({ hasText: 'Update ready' })).toBeVisible({ timeout: 30000 })
-              await expect(page.getByLabel('Title', { exact: true })).toHaveValue('Keep this inspection draft')
-              await expect(page).toHaveURL(/\/schedule\/new$/)
-              await page.screenshot({ path: test.info().outputPath('real-update-notice.png'), fullPage: true })
-              await page.getByRole('button', { name: 'Reload app', exact: true }).click()
-              await page.waitForLoadState('domcontentloaded')
-              await expect(page.getByLabel('Title', { exact: true })).toBeVisible()
-              await expect(page.getByRole('status').filter({ hasText: 'Update ready' })).toHaveCount(0)
-            } finally {
-              await writeFile(workerPath, original)
-            }
-          })
-          TEST
-      - name: Verify cached session update
-        run: npx playwright test tests/e2e/real-worker-audit.spec.ts --config=playwright.worker.config.ts
-      - name: Read synthetic failure context
-        if: failure()
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          for path in Path('test-results').rglob('error-context.md'):
-              print(path.read_text())
-          PY
-      - name: Preserve audit evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: live-audit-worker
-          path: test-results/
-          if-no-files-found: ignore
-          retention-days: 7
+          npx --yes supabase@2.81.3 migration new --help
+          npx --yes supabase@2.81.3 migration new guard_job_cost_updates
+          find supabase/migrations -name '*_guard_job_cost_updates.sql' -print
