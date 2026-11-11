@@ -121,6 +121,26 @@
   list-style: none;
 }
 
+/* Keep project descriptions readable when a reminder sits beside a bill.
+   The invoice and reminder remain separate keyboard and touch targets. */
+.fhm-rows .fhc-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  padding-block: 8px;
+}
+.fhm-rows .fhc-row__main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 12px;
+  margin-right: -12px;
+}
+.fhm-rows .fhc-row__body { display: contents; }
+.fhm-rows .fhc-row__title { grid-column: 1; grid-row: 1; }
+.fhm-rows .fhc-row__sub { grid-column: 1 / -1; grid-row: 2; }
+.fhm-rows .fhc-row__end { grid-column: 2; grid-row: 1; max-width: 100%; }
+.fhm-rows .fhc-row__action { justify-self: end; padding-bottom: 4px; }
+
 /* ---- Quiet links to the lists behind Money ---- */
 .fhm-more {
   display: flex;

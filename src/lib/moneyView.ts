@@ -319,7 +319,7 @@ function paidRow(p: Payment, day: Date, ctx: Context, invoices: Map<string, Invo
   return {
     id: p.id,
     title: customerName(job),
-    subline: jobTitle && what ? `${jobTitle}, ${what}` : jobTitle || what,
+    subline: jobTitle && what && jobTitle.toLocaleLowerCase() !== what.toLocaleLowerCase() ? `${jobTitle}, ${what}` : jobTitle || what,
     amount: Number(p.amount) || 0,
     note: '',
     chip: { label: `Paid ${shortDate(day, ctx.now)}`, tone: 'success' },

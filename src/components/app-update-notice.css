@@ -1,0 +1,16 @@
+.fh-app-update {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px var(--fh-gutter);
+  padding: 16px;
+  border: 1px solid var(--fh-edge-strong);
+  border-radius: var(--fh-r-control);
+  background: var(--fh-paper);
+  color: var(--fh-ink);
+  font: 400 14px/1.5 var(--fh-font-body);
+}
+.fh-app-update strong { font-size: 16px; font-weight: 600; }
+.fh-app-update p { margin: 4px 0 0; color: var(--fh-ink-2); }

@@ -9,7 +9,10 @@
 // is already installed (the contractor's own device) still controls these
 // pages as before.
 if ('serviceWorker' in navigator && !/^\/p\//.test(location.pathname)) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js', { scope: '/' })
-  })
+  const register = () => {
+    navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' })
+      .catch(() => { /* Keep the app usable when workers are blocked or offline. */ })
+  }
+  if (document.readyState === 'complete') register()
+  else window.addEventListener('load', register, { once: true })
 }

@@ -46,6 +46,49 @@ test('crew assignment saves every selected member on every recurring visit', asy
   expect(written.every((row) => row.assigned_to === 'crew-alice' && row.org_id === 'org-1')).toBe(true)
 })
 
+
+test('slow workspace loading cannot erase a new event draft', async ({ context, page }) => {
+  await signIn(context, { role: 'manager', tables: { fh_schedule: [] } })
+  let releaseMembership = () => {}
+  const membershipReady = new Promise<void>((resolve) => { releaseMembership = resolve })
+  await context.route('**/rest/v1/org_members*', async (route) => {
+    await membershipReady
+    return route.fallback()
+  })
+  await context.route('**/api/org-members-list', (route) => route.fulfill({
+    json: { ok: true, org_id: 'org-1', members: roster, invites: [], caller_role: 'manager' }
+  }))
+  let written: any[] = []
+  await context.route('**/rest/v1/fh_schedule*', async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback()
+    written = route.request().postDataJSON()
+    return route.fulfill({ status: 201, json: written.map((_, index) => ({ id: `saved-${index}` })) })
+  })
+
+  try {
+    await page.goto('/schedule/new')
+    await expect(page.getByRole('status').filter({ hasText: 'Loading your workspace' })).toBeVisible()
+    await expect(page.getByLabel('Title', { exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Save event', exact: true })).toBeDisabled()
+  } finally {
+    releaseMembership()
+  }
+
+  await page.getByLabel('Title', { exact: true }).fill('Foundation pour')
+  await page.getByLabel('Where', { exact: true }).fill('North entrance')
+  await page.getByLabel('Date', { exact: true }).fill('2026-10-28')
+  await page.getByLabel('Time', { exact: true }).fill('08:00')
+  await page.getByRole('checkbox', { name: /Alice Crew/ }).check()
+  await page.getByRole('checkbox', { name: /Riley Foreman/ }).check()
+  await page.getByRole('button', { name: 'Recurring series' }).click()
+  await page.getByLabel('Total visits').fill('3')
+  await page.getByRole('button', { name: 'Save event', exact: true }).click()
+
+  await expect.poll(() => written.length).toBe(3)
+  expect(written.every((row) => row.title === 'Foundation pour' && row.description === 'North entrance')).toBe(true)
+  expect(written.every((row) => row.org_id === 'org-1' && row.assigned_user_ids.join(',') === 'crew-alice,crew-riley')).toBe(true)
+})
+
 test('a new conflict found while saving prevents all writes', async ({ context, page }) => {
   await setup(context, page)
   await page.getByRole('checkbox', { name: /Alice Crew/ }).check()

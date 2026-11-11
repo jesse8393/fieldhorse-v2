@@ -4,6 +4,7 @@ import AppHeader from './AppHeader.tsx'
 import Dock from './fh/Dock.tsx'
 import CommandPalette from './CommandPalette.tsx'
 import InstallPrompt from './InstallPrompt.tsx'
+import AppUpdateNotice from './AppUpdateNotice.tsx'
 import RouteErrorBoundary from './RouteErrorBoundary.tsx'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { startOutboxSync } from '../lib/outbox.ts'
@@ -260,6 +261,7 @@ export default function AppShell() {
         style={{ position: 'relative', zIndex: 1 }}
       >
         <div className="fh-app__main-inner">
+          <AppUpdateNotice />
           <Suspense fallback={<RouteFallback />}>
             <RouteErrorBoundary resetKey={location.key}>
               {redirectTo ? <Navigate to={redirectTo} replace /> : <Outlet />}

@@ -779,7 +779,7 @@ test.describe('money on a phone', () => {
     await expect(vault.getByText('Collected this week', { exact: true })).toBeVisible()
     // Sunday $620.00 and Tuesday $3,000.00 fall in the week.
     await expect(vault.getByText('$3,620.00', { exact: true }).first()).toBeVisible()
-    await expect(vault.getByText('Due this week', { exact: true })).toBeVisible()
+    await expect(vault.getByText('Due by Saturday', { exact: true })).toBeVisible()
     // Rosa $1,240.00 (overdue, counts by Saturday) and Lorraine $4,850.00.
     await expect(vault.getByText('$6,090.00', { exact: true })).toBeVisible()
     await expect(vault.getByText('October so far', { exact: true })).toBeVisible()
@@ -892,7 +892,7 @@ test.describe('money on a phone', () => {
     const sends = await routeSends(context)
 
     const vault = page.locator('.fhc-vault')
-    await expect(vault.getByText('Due this week', { exact: true })).toBeVisible()
+    await expect(vault.getByText('Due by Saturday', { exact: true })).toBeVisible()
     await expect(vault.getByText('$8,000.00', { exact: true })).toBeVisible()
     const overdue = page.getByRole('region', { name: 'Overdue' })
     await expect(overdue.getByText('$3,000.00', { exact: true })).toBeVisible()
@@ -1158,7 +1158,7 @@ test.describe('money on a desktop', () => {
     const vault = page.locator('.fhc-vault')
     await expect(vault.getByText('Collected this week', { exact: true })).toBeVisible()
     await expect(vault.getByText('$3,620.00', { exact: true }).first()).toBeVisible()
-    await expect(vault.getByText('Due this week', { exact: true })).toBeVisible()
+    await expect(vault.getByText('Due by Saturday', { exact: true })).toBeVisible()
     await expect(vault.getByText('$6,090.00', { exact: true })).toBeVisible()
     await expect(vault.getByText('October so far', { exact: true })).toBeVisible()
     await expect(vault.getByText('$4,620.50', { exact: true })).toBeVisible()

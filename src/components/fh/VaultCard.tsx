@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { formatMoney } from './money.ts'
 import { cx } from './cx.ts'
 
@@ -13,6 +13,7 @@ import { cx } from './cx.ts'
 
 export type VaultFact = {
   label: ReactNode
+  hint?: string
   /** A number is money with cents. A string prints as given. */
   value: number | string
 }
@@ -46,6 +47,7 @@ export default function VaultCard({
   'aria-label': ariaLabel,
   className
 }: VaultCardProps) {
+  const amountText = show(amount)
   return (
     <Tag className={cx('fhc-vault', tone === 'paper' && 'fhc-vault--paper', className)} aria-label={ariaLabel}>
       <div className={cx('fhc-vault__card', tone === 'paper' ? 'fhc-vault__card--paper' : 'fh-onyx-scope fh-grain')}>
@@ -53,14 +55,14 @@ export default function VaultCard({
           <p className="fhc-vault__label">{label}</p>
           {corner != null && <div className="fhc-vault__corner">{corner}</div>}
         </div>
-        <p className="fhc-vault__amount">{show(amount)}</p>
+        <p className="fhc-vault__amount" style={{ '--fhc-amount-characters': Math.max(1, amountText.length) } as CSSProperties}>{amountText}</p>
         {facts && facts.length > 0 && (
           <>
             <span className="fhc-vault__rule" aria-hidden="true" />
             <dl className={cx('fhc-vault__facts', `fhc-vault__facts--${factsLayout}`)}>
               {facts.map((fact, i) => (
                 <div key={i} className="fhc-vault__fact">
-                  <dt>{fact.label}</dt>
+                  <dt><span>{fact.label}</span>{fact.hint && <span className="fhc-vault__hint">{fact.hint}</span>}</dt>
                   <dd>{show(fact.value)}</dd>
                 </div>
               ))}
