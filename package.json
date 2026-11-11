@@ -20,7 +20,7 @@
     "audit:design": "node scripts/audit-design-system.mjs",
     "audit:rls": "node scripts/audit-rls-policies.mjs",
     "test:all": "npm run lint && npm run typecheck && npm run test && npm run e2e && npm run build",
-    "test:db": "node scripts/validate-audit-sql.mjs && node scripts/validate-inbox-sql.mjs && node scripts/validate-growth-context-sql.mjs && node scripts/validate-authorization-sql.mjs && node scripts/validate-quote-conversion-sql.mjs && node scripts/validate-record-relationships-sql.mjs"
+    "test:db": "node scripts/validate-audit-sql.mjs && node scripts/validate-inbox-sql.mjs && node scripts/validate-growth-context-sql.mjs && node scripts/validate-authorization-sql.mjs && node scripts/validate-quote-conversion-sql.mjs && node scripts/validate-record-relationships-sql.mjs && node scripts/validate-job-cost-sql.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
