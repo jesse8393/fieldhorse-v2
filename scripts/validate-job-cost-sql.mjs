@@ -98,8 +98,16 @@ try {
     assert.equal(Number(result.rows[0]?.cost), 300)
   })
 
+  // Isolate the existing production-bound guard from the broader migration.
+  // The full migration is exercised separately by validate-authorization-sql.
+  const pending = await sqlFile('20261101020547_authorization_transition_guards.sql')
+  const guardStart = pending.indexOf('CREATE OR REPLACE FUNCTION public.fh_contacts_guard_money_fields()')
+  const guardEndMarker = 'revoke execute on function public.fh_contacts_guard_money_fields() from public, anon, authenticated;'
+  const guardEnd = pending.indexOf(guardEndMarker, guardStart)
+  assert(guardStart >= 0 && guardEnd >= guardStart)
+  const guard = pending.slice(guardStart, guardEnd + guardEndMarker.length)
   await db.exec('reset role')
-  await db.exec(await sqlFile('20261111195709_guard_job_cost_updates.sql'))
+  await db.exec(guard)
 
   for (const [user, role] of [[4, 'crew'], [5, 'foreman']]) {
     await as(user)
@@ -159,9 +167,9 @@ try {
     await denied('update public.fh_contacts set cost=0 where id=$1', [id(200)])
   })
   await as(null, 'service_role')
-  await test('the migration can be applied twice safely', async () => {
+  await test('the pending guard can be installed twice safely', async () => {
     await db.exec('reset role')
-    await db.exec(await sqlFile('20261111195709_guard_job_cost_updates.sql'))
+    await db.exec(guard)
     await as(5)
     await denied('update public.fh_contacts set cost=0 where id=$1', [id(200)])
   })
