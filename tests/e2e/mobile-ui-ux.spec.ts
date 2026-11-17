@@ -803,6 +803,64 @@ test.describe('large text and zoom', () => {
       }
     })
   }
+
+  // big-text-1 and big-text-7 carried to every big figure: a money amount
+  // never breaks inside the number and never runs off the screen or out of
+  // the card that clips it ("$1,345,679.0" cut at the card edge, a quote
+  // line's "$1,234,567./89").
+  for (const percent of [100, 150]) {
+    test(`every money figure stays whole on one line and on screen, text at ${percent} percent`, async ({ context, page }) => {
+      await textSize(context, percent)
+      await openBig(context, page, '/invoices')
+      for (const path of ['/invoices', '/invoices/i-big', '/quotes/q-big', '/jobs/c-big']) {
+        if (path !== '/invoices') {
+          await page.goto(path)
+          await bigReady(page)
+        }
+        for (const width of [412, 360]) {
+          await page.setViewportSize({ width, height: 800 })
+          await page.waitForTimeout(250)
+          const problems = await page.evaluate(() => {
+            const vw = document.documentElement.clientWidth
+            const found: string[] = []
+            const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
+            for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+              const host = node.parentElement
+              if (!host || host.closest('[aria-hidden="true"], script, style')) continue
+              const style = getComputedStyle(host)
+              if (style.visibility !== 'visible' || host.getClientRects().length === 0) continue
+              for (const m of (node.textContent || '').matchAll(/-?\$\d[\d,]*(\.\d+)?[KM]?/g)) {
+                const range = document.createRange()
+                range.setStart(node, m.index!)
+                range.setEnd(node, m.index! + m[0].length)
+                const rects = [...range.getClientRects()].filter((r) => r.width > 0 && r.height > 0)
+                if (rects.length === 0) continue
+                const left = Math.min(...rects.map((r) => r.left))
+                const right = Math.max(...rects.map((r) => r.right))
+                // Visually hidden text (a 1 px clipped box) is for screen readers.
+                if (right - left < 2) continue
+                const where = `${m[0]} in .${host.className.toString().split(' ')[0]}`
+                if (new Set(rects.map((r) => Math.round(r.top))).size > 1) found.push(`${where} broken across lines`)
+                if (left < -0.5 || right > vw + 0.5) found.push(`${where} spans ${Math.round(left)}..${Math.round(right)} in a ${vw} px window`)
+                for (let el: Element | null = host; el && el !== document.body; el = el.parentElement) {
+                  const s = getComputedStyle(el)
+                  if (s.overflowX !== 'hidden' && s.overflowX !== 'clip') continue
+                  const box = el.getBoundingClientRect()
+                  if (box.width < 2) break
+                  if (left < box.left - 0.5 || right > box.right + 0.5) {
+                    found.push(`${where} spans ${Math.round(left)}..${Math.round(right)}, clipped by .${el.className.toString().split(' ')[0]} at ${Math.round(box.left)}..${Math.round(box.right)}`)
+                  }
+                  break
+                }
+              }
+            }
+            return found
+          })
+          expect.soft(problems, `${path} at ${width} px`).toEqual([])
+        }
+      }
+    })
+  }
 })
 
 // big-text-3 on a desktop window at 200 percent zoom (640 px wide).

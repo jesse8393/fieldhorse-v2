@@ -34,6 +34,7 @@ import { toastError, toastSuccess } from '../../lib/toast.ts'
 import { parseDateOnly } from '../../lib/dates.ts'
 import type { InvoiceRecord } from '../../lib/queries.ts'
 import { goBackFrom, shortDate, useInvoiceScreen } from './useInvoiceScreen.ts'
+import { useFitWidth } from '../../lib/useFitWidth.ts'
 import './invoices.css'
 
 // pdf.js pulls in jspdf. Load it on the first PDF tap only.
@@ -230,6 +231,11 @@ function InvoiceDetailScreen({ id }: { id: string | undefined }) {
 
   const back = () => goBackFrom(navigate, '/invoices')
 
+  // The amount due stays whole on one line, scaled down to fit when the
+  // phone's text is big or the screen is narrow.
+  const heroAmount = !figures ? '' : figures.standing.status === 'paid' ? 'Paid' : figures.standing.status === 'void' ? 'Void' : formatMoney(figures.due)
+  const heroAmountRef = useFitWidth<HTMLParagraphElement>(heroAmount)
+
   if (query.isError) {
     return (
       <div className="v3-screen fhinv">
@@ -263,7 +269,7 @@ function InvoiceDetailScreen({ id }: { id: string | undefined }) {
     )
   }
 
-  const { to, due, standing, settled, isDraft, linkedPayments, dates } = figures
+  const { to, standing, settled, isDraft, linkedPayments, dates } = figures
   const chip = statusChip(standing)
   const paidOnIt = linkedPayments.reduce((s, p) => s + Number(p.amount || 0), 0)
   const canRemind = standing.issued && !settled
@@ -286,8 +292,8 @@ function InvoiceDetailScreen({ id }: { id: string | undefined }) {
         ) : record.client?.company_name ? (
           <p className="fhinv-hero__job">{record.client.company_name}</p>
         ) : null}
-        <p className={`fhinv-hero__amount${settled ? ' is-settled' : ''}`}>
-          {standing.status === 'paid' ? 'Paid' : standing.status === 'void' ? 'Void' : formatMoney(due)}
+        <p className={`fhinv-hero__amount${settled ? ' is-settled' : ''}`} ref={heroAmountRef}>
+          {heroAmount}
         </p>
         <div className="fhinv-hero__status">
           <Chip label={chip.label} tone={chip.tone} />

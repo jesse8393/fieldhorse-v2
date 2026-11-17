@@ -1200,8 +1200,10 @@
   margin: 8px 0 0;
   font-family: var(--fh-font-display);
   /* Scale complete amounts to the available card width. Exact cents
-     must stay attached to the total, even for seven digit receipts. */
-  font-size: min(var(--fhc-amount-max, 52px), calc((100cqi - 2 * var(--fhc-vault-padding)) / (var(--fhc-amount-characters, 12) * 0.67)));
+     must stay attached to the total, even for seven digit receipts.
+     Chrome on Android scales container units up again with the phone's
+     text size, so useFitWidth (the --fh-fit factor) finishes the fit. */
+  font-size: calc(min(var(--fhc-amount-max, 52px), calc((100cqi - 2 * var(--fhc-vault-padding)) / (var(--fhc-amount-characters, 12) * 0.67))) * var(--fh-fit, 1));
   line-height: 1.04;
   font-weight: 600;
   letter-spacing: 0;

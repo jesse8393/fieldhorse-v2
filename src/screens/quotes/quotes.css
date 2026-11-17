@@ -409,6 +409,11 @@
   overflow-wrap: anywhere;
 }
 
+/* A money figure inside a line's detail stays whole on one line. */
+.fhqt-figure {
+  white-space: nowrap;
+}
+
 /* The shadcn Switch, drawn from the tokens: a 52 by 32 track outlined in
    --fh-edge-strong (a light track off, an ink track on), a paper thumb, a
    44 px tall hit area. Tailwind's classes sit in its layer, so these

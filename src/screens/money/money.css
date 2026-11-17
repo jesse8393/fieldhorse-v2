@@ -84,6 +84,9 @@
 
 .fhm-group__head {
   display: flex;
+  /* A note too wide to sit beside the title (a seven figure total with
+     the phone's text made bigger) moves under it, at the right. */
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
@@ -103,8 +106,8 @@
 }
 
 .fhm-group__note {
-  min-width: 0;
-  margin: 0;
+  min-width: min-content;
+  margin: 0 0 0 auto;
   font-family: var(--fh-font-body);
   font-size: 15px;
   line-height: 20px;
