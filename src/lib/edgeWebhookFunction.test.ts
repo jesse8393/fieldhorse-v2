@@ -126,3 +126,51 @@ describe('inbound text keywords', () => {
       expect(messages).toHaveLength(1)
     })
 })
+
+// FN-12. Consent was any field whose name contained text, sms or consent with
+// an answer containing yes, true, ok or agree, so "No, I do not agree" and a
+// project_context answer both counted as consent to text.
+describe('Meta lead form consent', () => {
+  const APP_SECRET = 'test-only-meta-app-secret'
+  const body = JSON.stringify({ entry: [{ id: 'page-1', changes: [{ field: 'leadgen', value: { leadgen_id: 'lead-1', form_id: 'form-1' } }] }] })
+
+  async function capture(fieldData: Array<{ name: string; values: string[] }>) {
+    const state = newState({ fh_channels: [{ id: 'ch-1', org_id: 'org-meta', kind: 'messenger', external_id: 'page-1', status: 'active', config: { page_token: 'test-page-token' } }] })
+    state.rpc = { fh_lead_capture: () => ({ ok: true }), fh_automation_tick: () => null }
+    const graph = async () => new Response(JSON.stringify({ field_data: [{ name: 'full_name', values: ['Pat Lee'] }, { name: 'phone_number', values: ['+15125550101'] }, ...fieldData] }), { status: 200 })
+    const app = runtime({ META_APP_SECRET: APP_SECRET }, { fetch: graph })
+    app.createClient.mockImplementation(() => fakeClient(state) as any)
+    const signature = 'sha256=' + createHmac('sha256', APP_SECRET).update(body).digest('hex')
+    const response = await app.endpoint('meta-leads')(new Request('https://example.test/functions/v1/meta-leads', {
+      method: 'POST', body, headers: { 'content-type': 'application/json', 'x-hub-signature-256': signature }
+    }))
+    expect(response.status).toBe(200)
+    const call = state.log.find((l) => l.op === 'rpc' && l.fn === 'fh_lead_capture')
+    expect(call).toBeTruthy()
+    return call!.payload.p_sms_consent
+  }
+
+  it.each([
+    [{ name: 'sms_consent', values: ['No, I do not agree'] }],
+    [{ name: 'text_consent', values: ['Not ok'] }],
+    [{ name: 'sms_consent', values: ['No'] }],
+    [{ name: 'project_context', values: ['broken slab, please look soon'] }],
+    [{ name: 'project_context', values: ['Yes'] }],
+  ])('does not read %j as consent', async (field) => {
+    expect(await capture([field])).toBe(false)
+  })
+
+  it.each([
+    [{ name: 'sms_consent', values: ['Yes'] }],
+    [{ name: 'text_consent', values: [' yes. '] }],
+    [{ name: 'can_we_text_you?', values: ['Yes, I agree'] }],
+    [{ name: 'consent', values: ['I agree'] }],
+    [{ name: 'sms_opt_in', values: ['true'] }],
+  ])('reads the explicit yes %j as consent', async (field) => {
+    expect(await capture([field])).toBe(true)
+  })
+
+  it('reads no consent when the form asks nothing about texts', async () => {
+    expect(await capture([{ name: 'what_do_you_need', values: ['A new driveway, yes'] }])).toBe(false)
+  })
+})
