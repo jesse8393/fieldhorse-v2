@@ -367,5 +367,14 @@ $function$;
   equal(await canRun('service_role', 'fh_fixture_after'), true, 'a new function stays executable by the service role')
   equal(await canRun('anon', 'fh_fixture_before'), true, 'existing function grants are left as they are')
 
+  // DB-15: tables the app listens to are in the realtime publication.
+  await db.exec('create publication supabase_realtime for table public.fh_notifications')
+  const published = async () => (await rows("select tablename from pg_publication_tables where pubname='supabase_realtime' order by 1")).map(r => r.tablename)
+  equal(await published(), ['fh_notifications'], 'baseline: job, quote and invoice changes are not published')
+  const realtime = await read('migrations/20261117110400_realtime_publication.sql')
+  assert(!/drop|delete|truncate/i.test(realtime))
+  await db.exec(realtime); await db.exec(realtime)
+  equal(await published(), ['fh_change_orders', 'fh_contacts', 'fh_invoices', 'fh_notifications', 'fh_quotes'], 'present app tables join the publication once, and missing ones are passed over')
+
   console.log(`${checks} authorization transition checks passed.`)
 } finally { await db.close() }
