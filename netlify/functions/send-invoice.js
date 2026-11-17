@@ -36,7 +36,7 @@
 
 import { reviewInvoice } from '../../src/lib/invoiceReview.js'
 import { createClient } from '@supabase/supabase-js'
-import { renderPayBlock as payBlock, formatFromHeader, renderParagraphs, textField } from './lib/email.js'
+import { renderPayBlock as payBlock, formatFromHeader, renderParagraphs, textField, idempotencyKey, sendViaResend, sendFailure } from './lib/email.js'
 import { loadAccessibleRow, brandingUserIdFor } from './lib/orgAccess.js'
 import { hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
 
@@ -149,7 +149,7 @@ export default async (request) => {
   if (invoice_id) {
     const access = await loadAccessibleRow(supabase, {
       table: 'fh_invoices', id: invoice_id, callerId: sender_user_id,
-      select: 'contact_id, client_id, title, description, amount, status, due_at, updated_at, sequence_number'
+      select: 'contact_id, client_id, title, description, amount, status, due_at, updated_at, sequence_number, issued_at'
     })
     if (access.error === 'lookup_failed') return json({ error: 'billing_review_unavailable', message: 'Could not verify current billing. Try again.' }, 503)
     const invoice = access.row
@@ -293,28 +293,42 @@ export default async (request) => {
     resendPayload.reply_to = replyTo
   }
 
-  const resendRes = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${RESEND_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(resendPayload)
+  const sent = await sendViaResend({
+    apiKey: RESEND_API_KEY,
+    payload: resendPayload,
+    key: idempotencyKey('send-invoice', `invoice:${invoice_id}`, storage_path, normalizedEmail)
   })
-  const resendBody = await resendRes.json().catch(() => ({}))
-
-  if (!resendRes.ok) {
-    return json({
-      error: 'send_failed',
-      provider_status: resendRes.status,
-      detail: resendBody?.message || resendBody?.error || 'Email provider rejected the send.'
-    }, 502)
+  if (!sent.ok) {
+    return json(sendFailure(sent), 502)
   }
 
-  const emailId = resendBody?.id || null
+  const emailId = sent.body?.id || null
   const sentAtIso = new Date().toISOString()
 
-  // 6. Log activity on the job. Best-effort, never blocks the success
+  // 6. Mark the invoice sent here, as send-quote does for a quote, instead
+  // of leaving it to the browser after the response. Only a row still in
+  // the status read above moves, so a void or a payment recorded while the
+  // email went out stays, and a paid invoice is never demoted. A failed
+  // write answers an error; trying again is safe, the idempotency key
+  // keeps the provider from mailing the customer twice.
+  if (invoiceRow && invoiceRow.status !== 'paid') {
+    const { error: statusErr } = await supabase
+      .from('fh_invoices')
+      .update({ status: 'sent', issued_at: invoiceRow.issued_at || sentAtIso })
+      .eq('id', invoice_id)
+      .eq('status', invoiceRow.status)
+    if (statusErr) {
+      console.error('[send-invoice] sent status write failed', statusErr)
+      return json({
+        error: 'status_not_saved',
+        email_sent: true,
+        email_id: emailId,
+        message: 'The invoice was sent, but it could not be marked as sent. Try again to record it. The customer will not get a second email.'
+      }, 500)
+    }
+  }
+
+  // 7. Log activity on the job. Best-effort, never blocks the success
   // response. fh_contacts has no invoice_sent_at column today, so the
   // activity log is the source of truth for "did we email this invoice".
   // An invoice with no job has no job note to write; its row's status

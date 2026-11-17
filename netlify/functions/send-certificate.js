@@ -18,7 +18,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { loadAccessibleRow, brandingUserIdFor } from './lib/orgAccess.js'
 import { hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
-import { formatFromHeader, renderParagraphs, textField } from './lib/email.js'
+import { formatFromHeader, renderParagraphs, textField, idempotencyKey, sendViaResend, sendFailure } from './lib/email.js'
 
 export default async (request) => {
   if (request.method === 'OPTIONS') {
@@ -197,25 +197,16 @@ export default async (request) => {
     resendPayload.reply_to = replyTo
   }
 
-  const resendRes = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${RESEND_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(resendPayload)
+  const sent = await sendViaResend({
+    apiKey: RESEND_API_KEY,
+    payload: resendPayload,
+    key: idempotencyKey('send-certificate', `job:${contact_id}`, storage_path, normalizedEmail)
   })
-  const resendBody = await resendRes.json().catch(() => ({}))
-
-  if (!resendRes.ok) {
-    return json({
-      error: 'send_failed',
-      provider_status: resendRes.status,
-      detail: resendBody?.message || resendBody?.error || 'Email provider rejected the send.'
-    }, 502)
+  if (!sent.ok) {
+    return json(sendFailure(sent), 502)
   }
 
-  const emailId = resendBody?.id || null
+  const emailId = sent.body?.id || null
   const sentAtIso = new Date().toISOString()
 
   // 6. Activity log — best-effort. Bumps fh_closeouts.updated_at via the

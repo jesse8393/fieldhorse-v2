@@ -12,6 +12,7 @@ import { supabaseServiceConfig } from './lib/serviceConfig.js'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'node:crypto'
 import { resolveCallerMembership } from './lib/membership.js'
+import { idempotencyKey, sendViaResend } from './lib/email.js'
 
 const VALID_ROLES = ['owner', 'admin', 'manager', 'foreman', 'crew']
 
@@ -142,29 +143,25 @@ export default async (request) => {
         </div>
       `.trim()
 
-      const res = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${RESEND_API_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+      const res = await sendViaResend({
+        apiKey: RESEND_API_KEY,
+        payload: {
           from: SEND_EMAIL_FROM,
           to: [email],
           subject,
           text,
           html,
-        })
+        },
+        key: idempotencyKey('org-invite', `invite:${inviteRow.id}`, email)
       })
-      const respBody = await res.json().catch(() => ({}))
       if (res.ok) {
-        emailResult = { sent: true, email_id: respBody?.id || null }
+        emailResult = { sent: true, email_id: res.body?.id || null }
       } else {
         emailResult = {
           sent: false,
-          reason: 'provider_rejected',
-          provider_status: res.status,
-          detail: respBody?.message || respBody?.error || null,
+          reason: res.status ? 'provider_rejected' : 'send_threw',
+          provider_status: res.status || null,
+          detail: res.detail || res.body?.message || res.body?.error || null,
         }
       }
     } catch (e) {

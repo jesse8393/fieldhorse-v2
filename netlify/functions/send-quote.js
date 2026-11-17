@@ -36,7 +36,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { loadAccessibleRow, brandingUserIdFor } from './lib/orgAccess.js'
 import { hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
-import { formatFromHeader, renderParagraphs, textField } from './lib/email.js'
+import { formatFromHeader, renderParagraphs, textField, idempotencyKey, sendViaResend, sendFailure } from './lib/email.js'
 
 export default async (request) => {
   if (request.method === 'OPTIONS') {
@@ -243,36 +243,31 @@ export default async (request) => {
     resendPayload.reply_to = replyTo
   }
 
-  const resendRes = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${RESEND_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(resendPayload)
+  const sent = await sendViaResend({
+    apiKey: RESEND_API_KEY,
+    payload: resendPayload,
+    key: idempotencyKey('send-quote', isQuote ? `quote:${quote_id}` : `job:${contact_id}`, storage_path, normalizedEmail)
   })
-  const resendBody = await resendRes.json().catch(() => ({}))
-
-  if (!resendRes.ok) {
+  if (!sent.ok) {
     // Do NOT update quote_sent_at / proposal_status. Sending failed.
-    return json({
-      error: 'send_failed',
-      provider_status: resendRes.status,
-      detail: resendBody?.message || resendBody?.error || 'Email provider rejected the send.'
-    }, 502)
+    return json(sendFailure(sent), 502)
   }
 
-  const emailId = resendBody?.id || null
+  const emailId = sent.body?.id || null
   const sentAtIso = new Date().toISOString()
 
   // 6. Update the contact row + log activity. Only flip status to 'sent'
   // if the quote isn't already past 'sent' (approved/closed shouldn't
   // be demoted). The CHECK constraint from migration 014 enforces the
   // legal value set.
+  // A failed write answers an error: the quote would otherwise still read
+  // Draft after the customer has the email. Trying again is safe, the
+  // idempotency key keeps the provider from mailing the customer twice.
   let scheduledFollowUpOn = null
+  let statusWrite
   if (isQuote) {
     // fh_quotes keeps its own status and sent_at; it has no follow up date.
-    await supabase
+    statusWrite = await supabase
       .from('fh_quotes')
       .update(buildQuoteSendPatch({ status: contact.status, sentAtIso }))
       .eq('id', quote_id)
@@ -287,10 +282,19 @@ export default async (request) => {
     scheduledFollowUpOn = tracking.scheduledFollowUpOn
     // Access was established above; scope by id only so a teammate's send
     // records the same tracking state as the creator's.
-    await supabase
+    statusWrite = await supabase
       .from('fh_contacts')
       .update(tracking.contactPatch)
       .eq('id', contact_id)
+  }
+  if (statusWrite?.error) {
+    console.error('[send-quote] sent status write failed', statusWrite.error)
+    return json({
+      error: 'status_not_saved',
+      email_sent: true,
+      email_id: emailId,
+      message: 'The proposal was sent, but it could not be marked as sent. Try again to record it. The customer will not get a second email.'
+    }, 500)
   }
 
   // Activity log row — best effort, never blocks the success response.

@@ -2,6 +2,63 @@
 //
 // Shared email-rendering helpers for the send-* functions.
 
+import crypto from 'node:crypto'
+
+// How long one call to the mail provider may take. Netlify stops a
+// synchronous function after 10 seconds, so the send gives up first and
+// the handler can still answer with a plain error.
+export const PROVIDER_TIMEOUT_MS = 8000
+
+// Idempotency key for a send: the kind of email plus a hash of the record
+// and the attachment path (or, with no attachment, the message itself). A
+// second tap after a lost response repeats the same request, gets the same
+// key, and the provider sends nothing new for 24 hours. A new document is
+// uploaded under a new path, so a deliberate resend gets a new key.
+export function idempotencyKey(kind, ...parts) {
+  const digest = crypto.createHash('sha256').update(parts.map((p) => String(p ?? '')).join('\n')).digest('hex').slice(0, 40)
+  return `${kind}/${digest}`
+}
+
+// POST one email to Resend with an idempotency key and a time limit. Never
+// throws: a network error or a timeout comes back as { ok: false,
+// status: 0 } with a plain detail, so the handler answers JSON instead of
+// a crash.
+export async function sendViaResend({ apiKey, payload, key, timeoutMs = PROVIDER_TIMEOUT_MS }) {
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        ...(key ? { 'Idempotency-Key': key } : {})
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(timeoutMs)
+    })
+    const body = await res.json().catch(() => ({}))
+    return { ok: res.ok, status: res.status, body }
+  } catch (e) {
+    const timedOut = e?.name === 'TimeoutError' || e?.name === 'AbortError'
+    return {
+      ok: false,
+      status: 0,
+      body: {},
+      detail: timedOut
+        ? 'The email provider did not answer in time. Try again in a minute.'
+        : 'Could not reach the email provider. Try again in a minute.'
+    }
+  }
+}
+
+// The handler's error body for a send that did not go out.
+export function sendFailure(result) {
+  return {
+    error: 'send_failed',
+    provider_status: result.status || null,
+    detail: result.detail || result.body?.message || result.body?.error || 'Email provider rejected the send.'
+  }
+}
+
 // RFC 5322 From header with the display name as a quoted string. Company
 // names such as `Smith & Sons, LLC` or `J. "Bud" Parker` broke the
 // unquoted `${name} <${address}>` form (the comma splits an address list,

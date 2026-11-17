@@ -14,7 +14,7 @@
 //   Reply-To: company_email || sender's auth email
 
 import { createClient } from '@supabase/supabase-js'
-import { renderPayBlock, formatFromHeader, textField } from './lib/email.js'
+import { renderPayBlock, formatFromHeader, textField, idempotencyKey, sendViaResend, sendFailure } from './lib/email.js'
 import { loadAccessibleRow, brandingUserIdFor } from './lib/orgAccess.js'
 import { hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
 
@@ -172,21 +172,14 @@ export default async (request) => {
     resendPayload.reply_to = replyTo
   }
 
-  const resendRes = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(resendPayload)
+  const sent = await sendViaResend({
+    apiKey: RESEND_API_KEY,
+    payload: resendPayload,
+    key: idempotencyKey('send-statement', `client:${client_id}`, storage_path, normalizedEmail)
   })
-  const resendBody = await resendRes.json().catch(() => ({}))
-  if (!resendRes.ok) {
-    return json({
-      error: 'send_failed',
-      provider_status: resendRes.status,
-      detail: resendBody?.message || resendBody?.error || 'Email provider rejected the send.'
-    }, 502)
-  }
+  if (!sent.ok) return json(sendFailure(sent), 502)
 
-  return json({ ok: true, email_id: resendBody?.id || null, sent_at: new Date().toISOString() })
+  return json({ ok: true, email_id: sent.body?.id || null, sent_at: new Date().toISOString() })
 }
 
 function formatMoneyLabel(n) {
