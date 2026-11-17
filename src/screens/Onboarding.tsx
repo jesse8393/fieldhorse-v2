@@ -11,6 +11,7 @@ import SetupProgress from '../components/experience/SetupProgress.tsx'
 import BrandMark from '../components/experience/BrandMark.tsx'
 import LogoUploader from '../components/LogoUploader.tsx'
 import { countNoun } from '../lib/format.ts'
+import { plainError } from '../lib/serviceErrors.ts'
 
 const SERVICES = [
   {
@@ -240,7 +241,7 @@ export default function Onboarding() {
     })
     if (orgErr || !ownOrgId) {
       setBusy(false)
-      setError(orgErr?.message || 'Could not create your workspace')
+      setError(plainError(orgErr, 'Your workspace was not made yet. Tap Start again.', { kept: true }))
       return
     }
     // Membership context fetched before the org existed, refresh it so
@@ -262,7 +263,7 @@ export default function Onboarding() {
     })
     if (profErr) {
       setBusy(false)
-      setError(profErr.message || 'Could not save profile')
+      setError(plainError(profErr, 'Your company details did not save. Tap Start again.', { kept: true }))
       return
     }
     if (withSeed && user?.id) {
@@ -275,7 +276,7 @@ export default function Onboarding() {
         )
       } catch (ex: any) {
         // Don't block the user, they still have a clean account, just no demo
-        toastError("Couldn't seed sample data", ex?.message || 'Continuing with empty workspace.')
+        toastError("Couldn't load sample data", plainError(ex, 'Your workspace is ready without the samples.'))
       }
     } else {
       toastSuccess('Welcome aboard', 'Your workspace is ready')
@@ -302,7 +303,7 @@ export default function Onboarding() {
     })
     setBusy(false)
     if (profErr) {
-      setError(profErr.message || 'Could not save your profile')
+      setError(plainError(profErr, 'Your details did not save. Try again.', { kept: true }))
       return
     }
     navigate('/', { replace: true })
