@@ -362,8 +362,25 @@ type LineEditorProps = {
   canMoveDown?: boolean
 }
 
+// A confirming tap this soon after the arming one is the same double tap.
+const CONFIRM_AFTER_MS = 500
+
 function LineEditor({ row, defaultSection, suggestions, onSave, onClose, onDelete, onMove, canMoveUp = false, canMoveDown = false }: LineEditorProps) {
   const adding = !row
+  // Delete line asks with a second tap on the same button (rule 2, S18).
+  const [deleteArmed, setDeleteArmed] = useState(false)
+  const deleteArmedAt = useRef(0)
+  useEffect(() => {
+    if (!deleteArmed) return
+    const t = window.setTimeout(() => setDeleteArmed(false), 4000)
+    return () => window.clearTimeout(t)
+  }, [deleteArmed])
+  function tapDelete() {
+    if (!onDelete) return
+    if (!deleteArmed) { hapticTap(); deleteArmedAt.current = Date.now(); setDeleteArmed(true); return }
+    if (Date.now() - deleteArmedAt.current < CONFIRM_AFTER_MS) return
+    onDelete()
+  }
   const [draft, setDraft] = useState<LineDraft>(() => (row ? seedFromRow(row) : { ...emptyDraft(), section: defaultSection }))
   const [errors, setErrors] = useState<LineErrors>({})
   const [saving, setSaving] = useState(false)
@@ -550,7 +567,7 @@ function LineEditor({ row, defaultSection, suggestions, onSave, onClose, onDelet
                 </div>
               )}
               {onDelete && (
-                <Button variant="destructive" block onClick={onDelete}>Delete line</Button>
+                <Button variant="destructive" block onClick={tapDelete}>{deleteArmed ? 'Tap again to delete line' : 'Delete line'}</Button>
               )}
             </>
           )}

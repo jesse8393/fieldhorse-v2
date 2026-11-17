@@ -803,3 +803,25 @@ test.describe('the quotes list after a change', () => {
 
 })
 
+// Phone sales audit findings S18, S03 and S25 on the quote screen.
+test.describe('taps on the quote screen', () => {
+  test('Delete line asks with a second tap (S18)', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS } })
+    const deletes: string[] = []
+    page.on('request', (req) => { if (req.method() === 'DELETE' && req.url().includes('/rest/v1/fh_quote_items')) deletes.push(req.url()) })
+    await openQuote(page)
+    await lines(page).getByRole('button', { name: /Pump truck/ }).click()
+    const editor = page.getByRole('form', { name: 'Edit line' })
+    await editor.getByRole('button', { name: 'Delete line' }).click()
+    await expect(editor.getByRole('button', { name: 'Tap again to delete line' })).toBeVisible()
+    await editor.getByRole('button', { name: 'Tap again to delete line' }).click()
+    expect(deletes).toEqual([])
+    await page.waitForTimeout(600)
+    await editor.getByRole('button', { name: 'Tap again to delete line' }).click()
+    await expect.poll(() => deletes.length).toBe(1)
+    expect(deletes[0]).toContain('id=eq.qi2')
+  })
+
+
+})
+
