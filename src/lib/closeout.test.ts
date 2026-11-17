@@ -48,6 +48,12 @@ describe('closeoutBalance', () => {
     expect(closeoutBalance('10000', '2000', '4000')).toBe(8000)
   })
 
+  // M-11: the float sum of the three draws is a hair under the contract.
+  it('is exactly zero when cents payments add up to the contract', () => {
+    expect(closeoutBalance(1000.07, 0, 500.04 + 400.03 + 100)).toBe(0)
+    expect(closeoutBalance(1000.07, 0, 1000.06)).toBe(0.01)
+  })
+
   it('never goes below zero and treats blanks as zero', () => {
     expect(closeoutBalance(10000, 0, 12000)).toBe(0)
     expect(closeoutBalance(null, undefined, null)).toBe(0)

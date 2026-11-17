@@ -71,6 +71,8 @@ supabase gen types typescript --project-id pnmhblvslftdzfcdezbw > src/lib/databa
 
 Migration 066 (nightly purge of expired rate limit rows and old link events) is written but not applied yet.
 
+`src/lib/database.types.ts` has been edited by hand since it was last generated, so it describes the repo's migrations rather than production. `npm run check:schema` compares every function, table and column the code uses with it, and with production when `SUPABASE_DB_URL`, or `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, are set.
+
 ## 5. Check before you ship
 
 ```bash
@@ -78,6 +80,7 @@ npm run lint
 npm run audit:rls
 npm run audit:design
 npm run typecheck
+npm run check:schema   # database names the code uses; production too with the keys above
 npm test
 npm run build
 npm run e2e        # Playwright with mocked data
@@ -93,14 +96,14 @@ Netlify builds and deploys from GitHub: merging to `main` publishes production, 
 netlify deploy --build --prod
 ```
 
-On 2026-10-09 the Netlify site did not answer at all, which points to a problem at the team or account level (billing, a paused team or a removed site). Restore it in the Netlify dashboard before relying on either path.
+Netlify publishes every push to `main` without waiting for CI, and migrations and edge functions are applied by hand. So apply a migration before merging the code that needs it, and check `npm run check:schema` against production (section 4) when a change calls a new database function, table or column.
 
 ## 7. After a deploy
 
 `DEPLOY_CHECKLIST.md` has the short smoke test. The lead webhook can be checked with:
 
 ```bash
-curl -X POST "https://fieldhorse.io/api/webhook-lead?key=<webhook key from the Import screen>" \
+curl -X POST "https://<live site>/api/webhook-lead?key=<webhook key from the Import screen>" \
   -H "Content-Type: application/json" \
   -d '{"name":"Test Lead","phone":"555-0199","job_title":"Test job","amount":5000}'
 ```

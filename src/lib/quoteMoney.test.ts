@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { companyShortName, quoteMoney, stepsAfterApproval, type MoneyChangeOrder, type MoneyItem, type QuoteMoneyInput } from './quoteMoney.ts'
+import { amountFollowsRate, companyShortName, lineTotal, quoteMoney, roundCents, stepsAfterApproval, type MoneyChangeOrder, type MoneyItem, type QuoteMoneyInput } from './quoteMoney.ts'
 
 // One quote total and one deposit for the Quote tab capsule, the in app
 // preview and the customer page (PHASE8_PLAN.md Task 9, decision D31).
@@ -280,5 +280,60 @@ describe('stepsAfterApproval', () => {
 
   it('keeps the company name the open steps use', () => {
     expect(stepsAfterApproval(money({ companyName: 'The Concrete Guys' }).steps, false)[0]).toBe('The Concrete Guys sends you a start date.')
+  })
+})
+
+// Audit findings M-10, M-09 and M-22: a line's money in whole cents.
+describe('a line amount from quantity and rate', () => {
+  it('rounds a half cent up, as a calculator and Postgres numeric do (M-10)', () => {
+    expect(lineTotal(2.5, 4.33)).toBe(10.83)
+    expect(lineTotal('2.5', '4.33')).toBe(10.83)
+    expect(lineTotal(1.5, 0.15)).toBe(0.23)
+    expect(lineTotal(0.5, 2.05)).toBe(1.03)
+  })
+
+  it('keeps exact products exact', () => {
+    expect(lineTotal(1100, 9.875)).toBe(10862.5)
+    expect(lineTotal(3, 333.33)).toBe(999.99)
+    expect(lineTotal(0.1, 3)).toBe(0.3)
+    expect(lineTotal(0, 950)).toBe(0)
+  })
+
+  it('agrees with integer arithmetic on every half and quarter quantity', () => {
+    for (let q4 = 1; q4 <= 40; q4++) {
+      for (let rc = 1; rc <= 2000; rc += 7) {
+        const exact = q4 * rc                       // quantity x 4, rate in cents
+        const cents = Math.floor((exact * 2 + 4) / 8) // (exact / 4) rounded half up, in cents
+        expect(lineTotal(q4 / 4, rc / 100)).toBe(cents / 100)
+      }
+    }
+  })
+
+  it('gives 0 for anything that is not a number', () => {
+    expect(lineTotal('', 5)).toBe(0)
+    expect(lineTotal('abc', 5)).toBe(0)
+  })
+})
+
+describe('an amount stored to the cent (M-22)', () => {
+  it('rounds half up to two decimals', () => {
+    expect(roundCents(1.005)).toBe(1.01)
+    expect(roundCents('33.335')).toBe(33.34)
+    expect(roundCents(10.825)).toBe(10.83)
+    expect(roundCents(12500)).toBe(12500)
+  })
+})
+
+describe('a saved line whose amount follows its quantity and rate (M-09)', () => {
+  it('an estimator line saved as 3 at $333.33 for $1,000.00 follows', () => {
+    expect(amountFollowsRate({ qty: 3, rate: 333.33, amount: 1000 })).toBe(true)
+  })
+  it('an exact product follows', () => {
+    expect(amountFollowsRate({ qty: 1100, rate: 2, amount: 2200 })).toBe(true)
+    expect(amountFollowsRate({ qty: 2.5, rate: 4.33, amount: 10.83 })).toBe(true)
+  })
+  it('a lump sum typed by hand does not', () => {
+    expect(amountFollowsRate({ qty: 1, rate: 2000, amount: 12500 })).toBe(false)
+    expect(amountFollowsRate({ qty: 3, rate: 125, amount: 300 })).toBe(false)
   })
 })

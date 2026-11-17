@@ -108,4 +108,32 @@ describe('fetchHomeDashboard', () => {
     expect(bundle.nextActions.filter((a) => a.kind === 'inv-overdue')).toEqual([])
     expect(mock.requests.filter((u) => u.includes('/rest/v1/fh_invoices') && u.includes('draft'))).toEqual([])
   })
+
+  // OPS-09: a job is behind only when its visits are all in the past.
+  it('calls a job behind only when it has past visits and none from today on', async () => {
+    mock.requests = []
+    const visit = (id: string, contact_id: string, start: Date, hours = 2) => ({
+      id, org_id: ORG, user_id: 'qa-user-1', contact_id, title: 'Visit',
+      start_at: start.toISOString(), end_at: new Date(start.getTime() + hours * 3600e3).toISOString()
+    })
+    mock.tables = {
+      fh_contacts: [contactRow('c-split'), contactRow('c-late'), contactRow('c-today')],
+      fh_payments: [],
+      fh_invoices: [],
+      fh_change_orders: [],
+      fh_schedule: [
+        // This morning, done, and another tomorrow: on track.
+        visit('s1', 'c-split', new Date(2026, 9, 8, 7, 0, 0)),
+        visit('s2', 'c-split', new Date(2026, 9, 9, 8, 0, 0)),
+        // Three days ago and nothing since: behind.
+        visit('s3', 'c-late', new Date(2026, 9, 5, 8, 0, 0)),
+        // Only this morning: today counts, so not behind.
+        visit('s4', 'c-today', new Date(2026, 9, 8, 7, 0, 0))
+      ],
+      fh_public_links: []
+    }
+    const bundle = await fetchHomeDashboard('qa-user-1', NOW, ORG)
+    expect(bundle.jobsBehind).toBe(1)
+    expect(bundle.nextActions.filter((a) => a.kind === 'reschedule').map((a) => a.contactId)).toEqual(['c-late'])
+  })
 })

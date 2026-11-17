@@ -19,8 +19,9 @@
     "qa:workflow": "playwright test --config playwright.workflow.config.ts",
     "audit:design": "node scripts/audit-design-system.mjs",
     "audit:rls": "node scripts/audit-rls-policies.mjs",
+    "check:schema": "node scripts/check-schema-refs.mjs",
     "test:all": "npm run lint && npm run typecheck && npm run test && npm run e2e && npm run build",
-    "test:db": "node scripts/validate-audit-sql.mjs && node scripts/validate-inbox-sql.mjs && node scripts/validate-growth-context-sql.mjs && node scripts/validate-authorization-sql.mjs && node scripts/validate-quote-conversion-sql.mjs && node scripts/validate-record-relationships-sql.mjs && node scripts/validate-job-cost-sql.mjs"
+    "test:db": "node scripts/validate-audit-sql.mjs && node scripts/validate-inbox-sql.mjs && node scripts/validate-growth-context-sql.mjs && node scripts/validate-authorization-sql.mjs && node scripts/validate-quote-conversion-sql.mjs && node scripts/validate-record-relationships-sql.mjs && node scripts/validate-job-cost-sql.mjs && node scripts/validate-follow-ups-sql.mjs && node scripts/validate-parent-org-sql.mjs && node scripts/validate-client-merge-sql.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

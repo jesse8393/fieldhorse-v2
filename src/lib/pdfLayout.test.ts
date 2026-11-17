@@ -7,7 +7,7 @@
 // DocuSign anchors on the customer signature line.
 
 import { describe, it, expect, vi } from 'vitest'
-import { generateInvoice, generateQuote, generateStatement, ESIGN_SIGN_ANCHOR, ESIGN_DATE_ANCHOR } from './pdf.js'
+import { generateInvoice, generateQuote, generateStatement, generateCertificate, ESIGN_SIGN_ANCHOR, ESIGN_DATE_ANCHOR } from './pdf.js'
 import { SIGN_ANCHOR, DATE_ANCHOR } from '../../netlify/functions/docusign-send.js'
 
 // Photos load through a browser canvas; hand back a tiny embedded PNG so
@@ -308,3 +308,77 @@ describe('proposal issue date parity', () => {
     expect(text).toContain(result.number)
   })
 })
+
+// PT-18: a long company name wraps instead of running under the document
+// label and off the page.
+describe('a long company name', () => {
+  it('stays left of the estimate label and on the page', async () => {
+    const name = 'Parker Concrete, Masonry, Excavation, Drainage and General Construction Services of Middle Tennessee'
+    const r: any = await generateQuote({ company: { ...company, name }, contact, items: [{ description: 'Pour', qty: 1, rate: 100, amount: 100 }], quoteId: 'q-1' } as any)
+    const doc = r.doc
+    const runs = textRuns(doc).filter((x) => x.page === 1)
+    const label = runs.find((x) => x.text === 'ESTIMATE')!
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(15)
+    const nameRuns = runs.filter((x) => x.y < label.y + 30 && name.includes(x.text.trim()) && x.text.trim().length > 3)
+    expect(squash(nameRuns.map((x) => x.text).join(' '))).toBe(name)
+    for (const x of nameRuns) {
+      expect(x.x + doc.getTextWidth(x.text), `"${x.text}" runs under the label`).toBeLessThan(label.x - 2)
+    }
+  })
+})
+
+// PT-19: certificate and invoice layout.
+describe('certificate and invoice layout', () => {
+  // The audit's company: an address, a phone, an email and a website.
+  const fullCompany = { ...company, name: 'Parker Concrete & Construction', address: '88 Quarry Rd, La Vergne, TN 37086', email: 'office@parkerconcrete.example', website: 'parkerconcrete.example' }
+  const closeout = { warranty_months: 24, warranty_start_date: '2026-11-07', notes: 'Final walkthrough done with Dana. Sealer applied.', signoff_name: "Dana O'Brien", signoff_method: 'verbal', signoff_at: '2026-11-07T15:00:00Z', closed_at: '2026-11-07T15:00:00Z', final_amount: 12800, paid_at_close: 12800 }
+  const longAddressJob = { id: 'j', name: "Dana O'Brien", job_title: 'Driveway replacement', address: '1150 Cherry Blossom Lane, Building 4, Unit 210, La Vergne, Tennessee 37086' }
+
+  it('prints the day without a leading zero', async () => {
+    const r: any = await generateCertificate({ company, contact: longAddressJob, closeout } as any)
+    const text = textRuns(r.doc).map((x) => x.text).join(' ')
+    expect(text).not.toMatch(/November 07/)
+    expect(text).toMatch(/November 7, 2026/)
+  })
+
+  it('keeps the certificate ISSUED label clear of its date', async () => {
+    const r: any = await generateCertificate({ company, contact: longAddressJob, closeout: { ...closeout, closed_at: '2026-12-28T15:00:00Z' } } as any)
+    const doc = r.doc
+    const runs = textRuns(doc)
+    const issued = runs.find((x) => x.text === 'ISSUED')!
+    const date = runs.find((x) => x.y === issued.y && x.text !== 'ISSUED')!
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(7)
+    const issuedRight = issued.x + doc.getTextWidth('ISSUED') + 5 * 0.7
+    expect(issuedRight).toBeLessThan(date.x - 1)
+  })
+
+  it('keeps the signature lines on the page with one line of closing notes', async () => {
+    const r: any = await generateCertificate({ company: fullCompany, contact: longAddressJob, closeout } as any)
+    expect(r.doc.internal.getNumberOfPages()).toBe(1)
+    const runs = textRuns(r.doc)
+    const lastFigure = Math.max(...runs.filter((x) => x.text === 'Paid in full').map((x) => x.y))
+    const signature = runs.find((x) => x.text === 'CUSTOMER SIGNATURE')!
+    expect(signature.y - lastFigure).toBeGreaterThan(8)
+  })
+
+  it('never leaves How to pay alone on a page', async () => {
+    const payCompany = { ...fullCompany, payment_link: 'https://pay.example.com/parker', payment_instructions: 'Zelle to pay@parkerconcrete.example, or mail a check to 88 Quarry Rd.' }
+    const r: any = await generateInvoice({
+      company: payCompany,
+      contact: { id: 'j', name: "Dana O'Brien", address: '1150 Cherry Blossom Ln, La Vergne, TN 37086', phone: '(615) 555-0142', email: 'dana@example.com', job_title: 'Deposit, Garage slab' },
+      lineItems: [{ description: 'Deposit', notes: 'Deposit for the garage slab: forms, rebar and the first pour.', qty: 1, rate: 5000, amount: 5000 }],
+      notes: 'Thank you for your business. Make checks payable to Parker Concrete & Construction.',
+      invoiceId: 'j', currentInvoice: { id: 'i1', sequence_number: 1, amount: 5000, status: 'sent', issued_at: '2026-11-06T15:00:00Z', due_at: '2026-11-21T15:00:00Z' },
+      invoices: [{ id: 'i1', sequence_number: 1, amount: 5000, status: 'sent', title: 'Deposit', due_at: '2026-11-21T15:00:00Z' }],
+      payments: [{ amount: 2000 }], contractTotal: 10000, previouslyPaid: 2000, amountDue: 3000, changeOrders: []
+    } as any)
+    const runs = textRuns(r.doc)
+    const pay = runs.find((x) => x.text === 'HOW TO PAY')!
+    const footer = squash(INVOICE_DISCLAIMER)
+    const others = runs.filter((x) => x.page === pay.page && x.y < pay.y && !footer.includes(squash(x.text)) && x.text.trim())
+    expect(others.length, 'How to pay has company on its page').toBeGreaterThan(0)
+  })
+})
+

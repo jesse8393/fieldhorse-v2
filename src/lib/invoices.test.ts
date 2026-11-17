@@ -142,17 +142,25 @@ describe('invoiceAmountDue', () => {
   // Review of task 5: a job billed without a recorded contract amount has
   // no balance to cap at, so the invoice asks for its face less payments
   // instead of nothing.
+  // M-23: a void invoice asks for nothing, so its payment screen offers nothing.
+  it('is zero on a void invoice, with or without a job', () => {
+    const v = { id: 'v', amount: 500, status: 'void', sequence_number: 1 }
+    expect(invoiceAmountDue({ invoice: v, contact: null, payments: [] })).toBe(0)
+    expect(invoiceAmountDue({ invoice: v, contact: { amount: 10000 } as any, payments: [], invoices: [v] })).toBe(0)
+  })
+
   it('asks for the invoice less its payments when the job has no contract amount', () => {
     const i1 = { id: 'i1', amount: 5000, status: 'overdue', sequence_number: 1, due_at: '2026-10-02' }
     const payments = [{ amount: 2000, invoice_id: 'i1' }]
     expect(invoiceAmountDue({ invoice: i1, contact: { amount: null } as any, payments, invoices: [i1] })).toBe(3000)
     expect(invoiceAmountDue({ invoice: i1, contact: { amount: null } as any, payments })).toBe(3000)
     expect(invoiceAmountDue({ invoice: i1, contact: {} as any, payments: [] })).toBe(5000)
-    // An approved change order makes the contract known again.
+    // An approved change order on a job with no price is not the whole
+    // contract (M-14): the invoice still asks for its own amount.
     expect(invoiceAmountDue({
       invoice: i1, contact: { amount: null } as any, payments: [],
       changeOrders: [{ amount: 1200, status: 'approved' }]
-    })).toBe(1200)
+    })).toBe(5000)
   })
 })
 

@@ -318,12 +318,16 @@ function paidRow(p: Payment, day: Date, ctx: Context, invoices: Map<string, Invo
   const jobTitle = (job?.job_title || '').trim()
   return {
     id: p.id,
-    title: customerName(job),
+    // A payment on an invoice that bills the client directly (no job)
+    // names that client and opens the invoice, not an empty job route.
+    title: customerName(job, invoice?.fh_clients),
     subline: jobTitle && what && jobTitle.toLocaleLowerCase() !== what.toLocaleLowerCase() ? `${jobTitle}, ${what}` : jobTitle || what,
     amount: Number(p.amount) || 0,
     note: '',
     chip: { label: `Paid ${shortDate(day, ctx.now)}`, tone: 'success' },
-    to: job ? detailRoute(job, { financials: true }) : `/jobs/${p.contact_id ?? ''}?tab=financials`,
+    to: job
+      ? detailRoute(job, { financials: true })
+      : invoice && !p.contact_id ? `/invoices/${invoice.id}` : `/jobs/${p.contact_id ?? ''}?tab=financials`,
     invoiceId: null,
     canRemind: false
   }

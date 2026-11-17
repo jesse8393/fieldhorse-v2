@@ -410,6 +410,20 @@ test.describe('the quote screen', () => {
     await expect(lines(page).getByRole('button', { name: /Excavate and grade/ })).toBeVisible()
   })
 
+  // Audit finding M-09: the estimator saves 3 at $333.33 for $1,000.00.
+  test('a line from the estimator follows a new quantity', async ({ context, page }) => {
+    const estimated = item('qi-est', 'Form and pour', { qty: 3, unit: 'ea', rate: 333.33, amount: 1000, sort_order: 0 })
+    await signIn(context, { tables: { fh_quote_items: [estimated] } })
+    await openQuote(page)
+    await lines(page).getByRole('button', { name: /Form and pour/ }).click()
+    const editor = page.getByRole('form', { name: 'Edit line' })
+    await editor.getByLabel('Quantity').fill('4')
+    await expect(editor.getByLabel('Amount')).toHaveValue('1333.32')
+    const saved = page.waitForRequest((r) => r.method() === 'PATCH' && r.url().includes('/rest/v1/fh_quote_items'))
+    await editor.getByRole('button', { name: 'Save changes' }).click()
+    expect((await saved).postDataJSON()).toMatchObject({ qty: 4, rate: 333.33, amount: 1333.32 })
+  })
+
   test('add a line', async ({ context, page }) => {
     await signIn(context, { tables: { fh_quote_items: ITEMS } })
     // The mock answers an insert with the first row; echo the new one back instead.
@@ -457,6 +471,29 @@ test.describe('the quote screen', () => {
     await expect(lines(page).getByText('Haul off spoils')).toBeVisible()
     await expect(lines(page).getByText('2 loads at $390.00')).toBeVisible()
     await expect(total(page).getByText('$3,930.00', { exact: true })).toBeVisible()
+  })
+
+  // Audit findings DATA-23 and S12: a failed add keeps what was typed.
+  test('a line that fails to save stays in the editor with what was typed', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS } })
+    await context.route((url) => url.pathname.includes('/rest/v1/fh_quote_items'), (route) => {
+      if (route.request().method() !== 'POST') return route.fallback()
+      return route.abort('internetdisconnected')
+    })
+    await openQuote(page)
+    await page.getByRole('button', { name: 'Add a line' }).click()
+    const editor = page.getByRole('form', { name: 'Add a line' })
+    await editor.getByLabel('Description').fill('Haul off spoils')
+    await editor.getByLabel('Quantity').fill('2')
+    await editor.getByLabel('Rate').fill('390')
+    await editor.getByRole('button', { name: 'Add line', exact: true }).click()
+    await expect(page.getByText("Couldn't add the line")).toBeVisible()
+    await expect(page.getByText(/TypeError|Failed to fetch/)).toHaveCount(0)
+    await expect(editor).toBeVisible()
+    await expect(editor.getByLabel('Description')).toHaveValue('Haul off spoils')
+    await expect(editor.getByLabel('Amount')).toHaveValue('780')
+    await expect(lines(page).getByText('Haul off spoils')).toHaveCount(0)
+    await expect(total(page).getByText('$3,150.00', { exact: true })).toBeVisible()
   })
 
   test('a new quote lands with its first line open', async ({ context, page }) => {
@@ -526,10 +563,15 @@ test.describe('the quote screen', () => {
     await expect(page.getByRole('dialog')).toHaveCount(0)
     await expect(page.getByRole('alertdialog')).toHaveCount(0)
     expect(writes).toEqual([])
+    // A tap that follows the arming one at once is the same double tap, not a decision (S04).
+    await page.getByRole('button', { name: 'Tap again to delete' }).click()
+    await expect(page.getByRole('button', { name: 'Tap again to delete' })).toBeVisible()
+    expect(writes).toEqual([])
+    await page.waitForTimeout(600) // a second tap within 500 ms is ignored (OPS-02)
     await page.getByRole('button', { name: 'Tap again to delete' }).click()
     await expect(page).toHaveURL(/\/quotes$/, { timeout: 15_000 })
-    expect(writes).toContain('/rest/v1/fh_quote_items')
-    expect(writes).toContain('/rest/v1/fh_quotes')
+    // One delete of the quote; its lines go with it in the database (DATA-19).
+    expect(writes).toEqual(['/rest/v1/fh_quotes'])
 
     // The approved quote opens in a fresh browser context, so no cache from
     // the draft can stand in for it.
@@ -539,7 +581,7 @@ test.describe('the quote screen', () => {
       await signIn(approvedContext, { tables: { fh_quote_items: ITEMS, fh_quotes: [quoteRow({ status: 'approved' })] } })
       await openQuote(approved)
       await expect(approved.getByRole('button', { name: 'Delete draft quote' })).toHaveCount(0)
-      await expect(approved.getByText('Approved quotes cannot be deleted. Create a revision instead.')).toBeVisible()
+      await expect(approved.getByText('Approved quotes cannot be deleted.', { exact: true })).toBeVisible()
     } finally {
       await approvedContext.close()
     }
@@ -566,6 +608,95 @@ test.describe('the quote screen', () => {
     await expect(page).toHaveURL(/\/jobs\/job-new$/, { timeout: 30_000 })
     expect(requests).toEqual([{ p_quote_id: 'q-quote' }])
     expect(calls.send).toEqual([])
+  })
+
+  // Audit finding M-03: what the customer approved stays what it was.
+  test('an approved quote keeps its lines locked until Revise quote is tapped twice', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS, fh_quotes: [quoteRow({ status: 'approved' })] } })
+    const patches: { url: string; body: any }[] = []
+    await context.route((url) => url.pathname.endsWith('/rest/v1/fh_quotes'), (route) => {
+      const request = route.request()
+      if (request.method() !== 'PATCH') return route.fallback()
+      patches.push({ url: request.url(), body: request.postDataJSON() })
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 'q-quote' }) })
+    })
+    const lineWrites: string[] = []
+    page.on('request', (req) => {
+      if (req.method() !== 'GET' && req.url().includes('/rest/v1/fh_quote_items')) lineWrites.push(req.method())
+    })
+    await openQuote(page)
+
+    // The lines read, with their money, but none opens an editor and none can be added.
+    await expect(lines(page).getByText('Pump truck')).toBeVisible()
+    await expect(lines(page).getByText('$950.00', { exact: true })).toBeVisible()
+    await expect(lines(page).getByRole('button')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Add a line' })).toHaveCount(0)
+    await expect(page.getByRole('switch', { name: /Include Stamped ashlar/ })).toBeDisabled()
+    await expect(page.getByRole('form', { name: 'Edit line' })).toHaveCount(0)
+    // The screen says what is true, and names the one way to change the quote.
+    const panel = page.locator('.fhqt-panel').filter({ hasText: 'Quote approved' })
+    await expect(panel).toContainText('The lines are locked at what the customer agreed to.')
+    await expect(page.getByText('Later edits to lines, scope or terms do not change what the customer agreed to.')).toHaveCount(0)
+
+    // One tap arms, the second sets the quote back to a draft. No dialog.
+    await panel.getByRole('button', { name: 'Revise quote' }).click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    expect(patches).toEqual([])
+    await page.waitForTimeout(600)
+    await panel.getByRole('button', { name: 'Tap again to revise' }).click()
+    await expect.poll(() => patches.length).toBe(1)
+    expect(patches[0].body).toEqual({ status: 'draft' })
+    expect(patches[0].url).toContain('id=eq.q-quote')
+    expect(patches[0].url).toContain('status=eq.approved')
+    expect(lineWrites).toEqual([])
+  })
+
+  test('a quote set back to draft can be edited again', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS, fh_quotes: [quoteRow({ status: 'draft', approved_version_id: 'v-1' })] } })
+    await openQuote(page)
+    await lines(page).getByRole('button', { name: /Pump truck/ }).click()
+    await expect(page.getByRole('form', { name: 'Edit line' })).toBeVisible()
+  })
+
+  // Audit finding DATA-04: nothing may go out while a line is still saving.
+  test('send, approve, the PDF and Make this a job wait for a line that is still saving', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS } })
+    let release: (() => void) | undefined
+    const held = new Promise<void>((resolve) => { release = resolve })
+    await context.route((url) => url.pathname.includes('/rest/v1/fh_quote_items'), async (route) => {
+      const request = route.request()
+      if (request.method() !== 'POST') return route.fallback()
+      await held
+      return route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({ id: 'qi-new', created_at: iso(NOW), updated_at: iso(NOW), ...request.postDataJSON() })
+      })
+    })
+    await openQuote(page)
+    await page.getByRole('button', { name: 'Add a line' }).click()
+    const editor = page.getByRole('form', { name: 'Add a line' })
+    await editor.getByLabel('Description').fill('Pour 6 inch slab')
+    await editor.getByLabel('Rate').fill('14000')
+    const posted = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes('/rest/v1/fh_quote_items'))
+    await editor.getByRole('button', { name: 'Add line', exact: true }).click()
+    await posted
+
+    // The insert has not been answered: everything that reads the saved lines waits.
+    const share = page.getByRole('list', { name: 'Share or download' })
+    await expect(total(page).getByRole('button', { name: 'Send for approval' })).toBeDisabled()
+    await expect(page.getByRole('button', { name: 'Make this a job' })).toBeDisabled()
+    await expect(page.getByRole('link', { name: /approve quote/i })).toHaveCount(0)
+    for (const name of ['Open the PDF', 'Download the PDF', 'Copy a share link', 'Send for electronic signature']) {
+      await expect(share.getByRole('button', { name: new RegExp(name) })).toBeDisabled()
+    }
+    await expect(total(page).getByText('Saving a line')).toBeVisible()
+
+    release!()
+    await expect(total(page).getByRole('button', { name: 'Send for approval' })).toBeEnabled()
+    await expect(page.getByRole('button', { name: 'Make this a job' })).toBeEnabled()
+    await expect(page.getByRole('link', { name: /approve quote/i })).toHaveCount(1)
+    await expect(total(page).getByText('$17,150.00', { exact: true })).toBeVisible()
   })
 
   test('an approved quote still offers Make this a job', async ({ context, page }) => {
@@ -598,3 +729,234 @@ test.describe('the quotes list', () => {
     await expect(page.locator('.fhqt-page')).toBeVisible({ timeout: 30_000 })
   })
 })
+
+// Audit finding DATA-18: a write that changed no row is never reported as saved.
+test.describe('a write that finds nothing to change', () => {
+  test('a line edit that matched no line says so and keeps the editor', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS } })
+    await context.route((url) => url.pathname.endsWith('/rest/v1/fh_quote_items'), (route) => {
+      if (route.request().method() !== 'PATCH') return route.fallback()
+      return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+    })
+    await openQuote(page)
+    await lines(page).getByRole('button', { name: /Pump truck/ }).click()
+    const editor = page.getByRole('form', { name: 'Edit line' })
+    await editor.getByLabel('Rate').fill('1000')
+    await editor.getByRole('button', { name: 'Save changes' }).click()
+    await expect(page.getByText("Couldn't update the line")).toBeVisible()
+    await expect(editor).toBeVisible()
+  })
+
+  test('scope and terms that matched no quote say so and stay on the form', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS } })
+    await context.route((url) => url.pathname.endsWith('/rest/v1/fh_quotes'), (route) => {
+      if (route.request().method() !== 'PATCH') return route.fallback()
+      return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+    })
+    await openQuote(page, '/quotes/q-quote/terms')
+    await page.getByLabel('Scope of work').fill('Remove and repour the lot')
+    await page.getByRole('button', { name: 'Save terms' }).click()
+    await expect(page.getByText("Couldn't save the quote")).toBeVisible()
+    await expect(page).toHaveURL(/\/quotes\/q-quote\/terms$/)
+  })
+
+  test('a delete that matched no quote does not say deleted', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS, fh_quotes: [quoteRow({ status: 'draft', sent_at: null })] } })
+    await context.route((url) => url.pathname.endsWith('/rest/v1/fh_quotes'), (route) => {
+      if (route.request().method() !== 'DELETE') return route.fallback()
+      return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+    })
+    await openQuote(page)
+    await page.getByRole('button', { name: 'Delete draft quote' }).click()
+    await page.waitForTimeout(600)
+    await page.getByRole('button', { name: 'Tap again to delete' }).click()
+    await expect(page.getByText("Couldn't delete the quote")).toBeVisible()
+    await expect(page.getByText('Draft quote deleted')).toHaveCount(0)
+    await expect(page).toHaveURL(/\/quotes\/q-quote$/)
+  })
+})
+
+// Audit finding DATA-13: the list shows what was just done to a quote.
+test.describe('the quotes list after a change', () => {
+  test('a deleted quote leaves the list at once', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS, fh_quotes: [quoteRow({ status: 'draft', sent_at: null })] } })
+    // The mock keeps no writes: once the delete is sent, reads find no quotes.
+    let deleted = false
+    await context.route((url) => url.pathname.endsWith('/rest/v1/fh_quotes'), (route) => {
+      const method = route.request().method()
+      if (method === 'DELETE') deleted = true
+      if (method === 'GET' && deleted) return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+      return route.fallback()
+    })
+    await page.goto('/quotes', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    const rows = page.getByRole('list', { name: 'Quotes' })
+    await expect(rows.getByText('Parking lot repour')).toBeVisible({ timeout: 30_000 })
+    await rows.getByRole('link', { name: /Parking lot repour/ }).click()
+    await expect(page.locator('.fhqt-page')).toBeVisible({ timeout: 30_000 })
+    await page.getByRole('button', { name: 'Delete draft quote' }).click()
+    await page.waitForTimeout(600)
+    await page.getByRole('button', { name: 'Tap again to delete' }).click()
+    await expect(page).toHaveURL(/\/quotes$/, { timeout: 15_000 })
+    await expect(page.getByRole('heading', { level: 1, name: 'Quotes' })).toBeVisible()
+    await expect(page.getByText('Parking lot repour')).toHaveCount(0)
+  })
+
+})
+
+// Phone sales audit findings S18, S03 and S25 on the quote screen.
+test.describe('taps on the quote screen', () => {
+  test('Delete line asks with a second tap (S18)', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS } })
+    const deletes: string[] = []
+    page.on('request', (req) => { if (req.method() === 'DELETE' && req.url().includes('/rest/v1/fh_quote_items')) deletes.push(req.url()) })
+    await openQuote(page)
+    await lines(page).getByRole('button', { name: /Pump truck/ }).click()
+    const editor = page.getByRole('form', { name: 'Edit line' })
+    await editor.getByRole('button', { name: 'Delete line' }).click()
+    await expect(editor.getByRole('button', { name: 'Tap again to delete line' })).toBeVisible()
+    await editor.getByRole('button', { name: 'Tap again to delete line' }).click()
+    expect(deletes).toEqual([])
+    await page.waitForTimeout(600)
+    await editor.getByRole('button', { name: 'Tap again to delete line' }).click()
+    await expect.poll(() => deletes.length).toBe(1)
+    expect(deletes[0]).toContain('id=eq.qi2')
+  })
+
+  test('a tap right after the line editor closes does not land on an action row (S03)', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS, fh_quotes: [quoteRow({ status: 'draft', sent_at: null })] } })
+    const quoteWrites: string[] = []
+    page.on('request', (req) => { if (req.method() === 'PATCH' && req.url().includes('/rest/v1/fh_quotes')) quoteWrites.push(req.url()) })
+    await openQuote(page)
+    await lines(page).getByRole('button', { name: /Pump truck/ }).click()
+    const editor = page.getByRole('form', { name: 'Edit line' })
+    await editor.getByRole('button', { name: 'Save changes' }).click()
+    await expect(editor).toBeHidden()
+    await page.getByRole('button', { name: /Mark as sent/ }).click()
+    await page.waitForTimeout(300)
+    expect(quoteWrites).toEqual([])
+    // A deliberate tap a moment later works.
+    await page.waitForTimeout(400)
+    await page.getByRole('button', { name: /Mark as sent/ }).click()
+    await expect.poll(() => quoteWrites.length).toBe(1)
+  })
+
+  test('the total goes to $0.00 after the last line is deleted (S25)', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: [ITEMS[1]] } })
+    // The database keeps the quote amount equal to its lines; the mock does not.
+    let gone = false
+    await context.route((url) => url.pathname.endsWith('/rest/v1/fh_quote_items'), (route) => {
+      if (route.request().method() === 'DELETE') gone = true
+      if (route.request().method() === 'GET' && gone) return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+      return route.fallback()
+    })
+    await context.route((url) => url.pathname.endsWith('/rest/v1/fh_quotes'), (route) => {
+      if (route.request().method() !== 'GET' || !gone) return route.fallback()
+      const row = quoteRow({ amount: 0 })
+      const single = (route.request().headers()['accept'] || '').includes('vnd.pgrst.object')
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(single ? row : [row]) })
+    })
+    await openQuote(page)
+    await expect(total(page).getByText('$950.00', { exact: true })).toBeVisible()
+    await lines(page).getByRole('button', { name: /Pump truck/ }).click()
+    const editor = page.getByRole('form', { name: 'Edit line' })
+    await editor.getByRole('button', { name: 'Delete line' }).click()
+    await page.waitForTimeout(600)
+    await editor.getByRole('button', { name: 'Tap again to delete line' }).click()
+    await expect(total(page).getByText('$0.00', { exact: true })).toBeVisible()
+  })
+})
+
+// Phone sales audit finding S22: the quote screens speak in plain sentences.
+test.describe('errors on the quote screens', () => {
+  test('a share link that fails offline says so in words', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS } })
+    await context.route((url) => url.pathname.includes('/rest/v1/fh_public_links'), (route) => route.abort('internetdisconnected'))
+    await openQuote(page)
+    await page.getByRole('list', { name: 'Share or download' }).getByRole('button', { name: /Copy a share link/ }).click()
+    await expect(page.getByText('Check your connection and try again.')).toBeVisible()
+    await expect(page.getByText(/TypeError|Failed to fetch/)).toHaveCount(0)
+  })
+
+  test('a negative rate gets the form\'s own message, not the browser bubble', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS } })
+    await openQuote(page)
+    await page.getByRole('button', { name: 'Add a line' }).click()
+    const editor = page.getByRole('form', { name: 'Add a line' })
+    await editor.getByLabel('Description').fill('Credit')
+    await editor.getByLabel('Rate').fill('-5')
+    await editor.getByRole('button', { name: 'Add line', exact: true }).click()
+    await expect(editor.getByText('Enter a number, 0 or more.').first()).toBeVisible()
+  })
+
+  test('New quote offline says so in words', async ({ context, page }) => {
+    await signIn(context)
+    await context.route(/\/rest\/v1\/fh_quotes(\?|$)/, (route) =>
+      route.request().method() === 'POST' ? route.abort('internetdisconnected') : route.fallback())
+    await page.goto('/quotes/new?client=cl-1', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    await expect(page.getByLabel('Client')).toHaveValue('Jeff Roy', { timeout: 30_000 })
+    await page.getByRole('button', { name: 'Save quote' }).click()
+    await expect(page.getByText('Could not save this quote. Check your connection and try again.')).toBeVisible()
+    await expect(page.getByText(/TypeError|Failed to fetch/)).toHaveCount(0)
+  })
+})
+
+// Phone sales audit finding S13, the quote half: a quote can be closed as
+// lost and opened again, and a lost quote does not offer Send.
+test.describe('a lost quote', () => {
+  async function watchQuotePatches(context: BrowserContext) {
+    const patches: { url: string; body: any }[] = []
+    await context.route((url) => url.pathname.endsWith('/rest/v1/fh_quotes'), (route) => {
+      const request = route.request()
+      if (request.method() !== 'PATCH') return route.fallback()
+      patches.push({ url: request.url(), body: request.postDataJSON() })
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 'q-quote' }) })
+    })
+    return patches
+  }
+
+  test('Mark as lost asks with a second tap', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS } })
+    const patches = await watchQuotePatches(context)
+    await openQuote(page)
+    await page.getByRole('button', { name: 'Mark as lost' }).click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    expect(patches).toEqual([])
+    await page.waitForTimeout(600)
+    await page.getByRole('button', { name: 'Tap again to mark lost' }).click()
+    await expect.poll(() => patches.length).toBe(1)
+    expect(patches[0].body).toEqual({ status: 'lost' })
+    expect(patches[0].url).toContain('status=eq.sent')
+  })
+
+  test('a lost quote cannot be sent and can be reopened', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS, fh_quotes: [quoteRow({ status: 'lost' })] } })
+    const patches = await watchQuotePatches(context)
+    await openQuote(page)
+    await expect(total(page).getByRole('button', { name: 'Send for approval' })).toBeDisabled()
+    await expect(total(page).getByText('Reopen the quote to send it')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Mark as lost' })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Reopen quote' }).click()
+    await page.waitForTimeout(600)
+    await page.getByRole('button', { name: 'Tap again to reopen' }).click()
+    await expect.poll(() => patches.length).toBe(1)
+    expect(patches[0].body).toEqual({ status: 'draft' })
+    expect(patches[0].url).toContain('status=eq.lost')
+  })
+})
+
+// Phone sales audit finding S09: an id that is no quote and no older record
+// says the quote is gone, not "Contact not found".
+test('an unknown quote id shows the quote gone screen', async ({ context, page }) => {
+  await signIn(context)
+  await page.goto('/quotes/q-nothing-here', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText('This quote is gone')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText(/Contact not found/i)).toHaveCount(0)
+})
+
+test('an older record id still opens through the quote address', async ({ context, page }) => {
+  await signIn(context)
+  await page.goto('/quotes/c-job1', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText('This quote is gone')).toHaveCount(0)
+  await expect(page.getByText(/Contact not found/i)).toHaveCount(0)
+})
+

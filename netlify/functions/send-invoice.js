@@ -36,9 +36,9 @@
 
 import { reviewInvoice } from '../../src/lib/invoiceReview.js'
 import { createClient } from '@supabase/supabase-js'
-import { renderPayBlock as payBlock, formatFromHeader, renderParagraphs, textField } from './lib/email.js'
+import { renderPayBlock as payBlock, formatFromHeader, renderParagraphs, textField, idempotencyKey, sendViaResend, sendFailure, greetingFor, EMAIL_HEAD } from './lib/email.js'
 import { loadAccessibleRow, brandingUserIdFor } from './lib/orgAccess.js'
-import { hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
+import { hashIdentifier, checkRateLimit, checkDailySendCap, DAILY_SEND_LIMIT_MESSAGE } from './lib/rateLimit.js'
 import { isOwnedStoragePath } from './lib/storagePath.js'
 
 export default async (request) => {
@@ -128,6 +128,11 @@ export default async (request) => {
     return json({ error: 'rate_limited', message: 'Too many emails sent in a short time. Try again in a few minutes.' }, 429)
   }
 
+  const dayOk = await checkDailySendCap(supabase, sender_user_id)
+  if (!dayOk) {
+    return json({ error: 'rate_limited', message: DAILY_SEND_LIMIT_MESSAGE }, 429)
+  }
+
   // 1. Verify the caller may act on the record: the job when the invoice
   // bills one, else the invoice itself, whose client stands in for the
   // job's name. Either way: its creator, or an owner, admin or manager of
@@ -144,13 +149,17 @@ export default async (request) => {
 
   // Re-read the actual invoice and its obligations immediately before delivery.
   // The request cannot attach an invoice from a different job or company.
+  // The row is kept: the email is written from it (title, number,
+  // Description), not from what the browser happened to send.
+  let invoiceRow = null
   if (invoice_id) {
     const access = await loadAccessibleRow(supabase, {
       table: 'fh_invoices', id: invoice_id, callerId: sender_user_id,
-      select: 'contact_id, client_id, title, description, amount, status, due_at, updated_at'
+      select: 'contact_id, client_id, title, description, amount, status, due_at, updated_at, sequence_number, issued_at'
     })
     if (access.error === 'lookup_failed') return json({ error: 'billing_review_unavailable', message: 'Could not verify current billing. Try again.' }, 503)
     const invoice = access.row
+    invoiceRow = invoice
     if (!invoice || (invoice.contact_id || null) !== (contact_id || null)) return json({ error: 'invoice_mismatch', message: 'This invoice does not belong to the selected record.' }, 403)
     if (invoice.updated_at && body.invoice_updated_at !== invoice.updated_at) return json({ error: 'invoice_changed', message: 'This invoice changed after it was opened. Refresh and review before sending.' }, 409)
     if (!Number.isFinite(Number(invoice.amount)) || Number(invoice.amount) <= 0) return json({ error: 'invalid_invoice_amount', message: 'Enter a positive invoice amount before sending.' }, 409)
@@ -230,15 +239,23 @@ export default async (request) => {
   // empty (incomplete profile).
   const fromName = companyName || SEND_EMAIL_FROM_NAME
   const fromHeader = formatFromHeader(fromName, SEND_EMAIL_FROM)
-  // What the invoice is for: the invoice's own description when the client
-  // sent one (the same words its PDF prints), else the job title as before.
-  const jobTitle = textField(description).slice(0, 200) || contact.job_title || 'your project'
+  // What the invoice is for: the stored invoice's Description (the same
+  // words its PDF prints), else what the request sent. The job page sends
+  // none, so reading the request first mailed the job title instead (FN-09).
+  // The Description is printed whole as its own paragraph; the subject is
+  // built from the invoice's title or number, so a long Description no
+  // longer runs into the subject cut mid word (PT-09).
+  const jobTitle = contact.job_title || 'your project'
+  const invoiceDescription = textField(invoiceRow?.description) || textField(description)
   const amountLabel = formatMoneyLabel(amount_due ?? contact.amount)
-  const subject = `Invoice for ${jobTitle}${amountLabel ? ` (${amountLabel})` : ''}`
+  const subject = invoiceSubject({ invoice: invoiceRow, jobTitle, amountLabel })
+  const descriptionText = describesMore(invoiceDescription, [jobTitle, invoiceRow?.title])
+    ? invoiceDescription.replace(/\r\n?/g, '\n')
+    : ''
   // Optional fields read through textField so a non string value from a
   // malformed client falls back to the default instead of throwing.
   const safeRecipientName = textField(recipient_name) || textField(contact.name)
-  const greeting = safeRecipientName ? `Hi ${safeRecipientName.split(/\s+/)[0]},` : 'Hi,'
+  const greeting = greetingFor(safeRecipientName)
   const senderLine = companyName || 'Your contractor'
   const customMessage = textField(sender_message)
   // Bring-your-own pay link — rendered as a button when present.
@@ -249,6 +266,7 @@ export default async (request) => {
     greeting,
     '',
     customMessage || `Your invoice for ${jobTitle} is attached.${amountLabel ? ` Amount due: ${amountLabel}.` : ''}`,
+    ...(descriptionText ? ['', descriptionText] : []),
     ...(payLink ? ['', `Pay online: ${payLink}`] : []),
     ...(payInstructions ? ['', payInstructions] : []),
     '',
@@ -261,6 +279,7 @@ export default async (request) => {
     greeting,
     customMessage,
     jobTitle,
+    descriptionText,
     amountLabel,
     senderLine,
     companyName,
@@ -283,28 +302,42 @@ export default async (request) => {
     resendPayload.reply_to = replyTo
   }
 
-  const resendRes = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${RESEND_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(resendPayload)
+  const sent = await sendViaResend({
+    apiKey: RESEND_API_KEY,
+    payload: resendPayload,
+    key: idempotencyKey('send-invoice', `invoice:${invoice_id}`, storage_path, normalizedEmail)
   })
-  const resendBody = await resendRes.json().catch(() => ({}))
-
-  if (!resendRes.ok) {
-    return json({
-      error: 'send_failed',
-      provider_status: resendRes.status,
-      detail: resendBody?.message || resendBody?.error || 'Email provider rejected the send.'
-    }, 502)
+  if (!sent.ok) {
+    return json(sendFailure(sent), 502)
   }
 
-  const emailId = resendBody?.id || null
+  const emailId = sent.body?.id || null
   const sentAtIso = new Date().toISOString()
 
-  // 6. Log activity on the job. Best-effort, never blocks the success
+  // 6. Mark the invoice sent here, as send-quote does for a quote, instead
+  // of leaving it to the browser after the response. Only a row still in
+  // the status read above moves, so a void or a payment recorded while the
+  // email went out stays, and a paid invoice is never demoted. A failed
+  // write answers an error; trying again is safe, the idempotency key
+  // keeps the provider from mailing the customer twice.
+  if (invoiceRow && invoiceRow.status !== 'paid') {
+    const { error: statusErr } = await supabase
+      .from('fh_invoices')
+      .update({ status: 'sent', issued_at: invoiceRow.issued_at || sentAtIso })
+      .eq('id', invoice_id)
+      .eq('status', invoiceRow.status)
+    if (statusErr) {
+      console.error('[send-invoice] sent status write failed', statusErr)
+      return json({
+        error: 'status_not_saved',
+        email_sent: true,
+        email_id: emailId,
+        message: 'The invoice was sent, but it could not be marked as sent. Try again to record it. The customer will not get a second email.'
+      }, 500)
+    }
+  }
+
+  // 7. Log activity on the job. Best-effort, never blocks the success
   // response. fh_contacts has no invoice_sent_at column today, so the
   // activity log is the source of truth for "did we email this invoice".
   // An invoice with no job has no job note to write; its row's status
@@ -380,7 +413,29 @@ function formatMoneyLabel(n) {
   return `$${v.toLocaleString('en-US', { minimumFractionDigits: hasCents ? 2 : 0, maximumFractionDigits: hasCents ? 2 : 0 })}`
 }
 
-function renderInvoiceHtml({ greeting, customMessage, jobTitle, amountLabel, senderLine, companyName, payLink, payInstructions }) {
+// Subject line: the invoice's title, else its number and the job, else the
+// job alone, then the amount. One line, whitespace collapsed, kept short.
+export function invoiceSubject({ invoice, jobTitle, amountLabel }) {
+  const oneLine = (s) => String(s || '').replace(/\s+/g, ' ').trim()
+  const short = (s) => (s.length > 80 ? `${s.slice(0, 80).replace(/\s+\S*$/, '')}...` : s)
+  const title = oneLine(invoice?.title)
+  const job = short(oneLine(jobTitle) || 'your project')
+  const number = Number(invoice?.sequence_number)
+  const name = title
+    ? `Invoice: ${short(title)}`
+    : Number.isInteger(number) && number > 0 ? `Invoice ${number} for ${job}` : `Invoice for ${job}`
+  return `${name}${amountLabel ? ` (${amountLabel})` : ''}`
+}
+
+// A Description worth its own paragraph: not empty and not a repeat of the
+// title or job name already in the sentence above it.
+function describesMore(text, names) {
+  const norm = (s) => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase()
+  const t = norm(text)
+  return Boolean(t) && !names.some((n) => norm(n) === t)
+}
+
+function renderInvoiceHtml({ greeting, customMessage, jobTitle, descriptionText, amountLabel, senderLine, companyName, payLink, payInstructions }) {
   const safe = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   }[c]))
@@ -388,18 +443,23 @@ function renderInvoiceHtml({ greeting, customMessage, jobTitle, amountLabel, sen
   const msg = customMessage
     ? renderParagraphs(customMessage, safe)
     : `<p style="margin:0;">Your invoice for <strong>${safe(jobTitle)}</strong> is attached.${amountLabel ? ` Amount due: <strong>${safe(amountLabel)}</strong>.` : ''}</p>`
+  // The Description keeps its own line breaks and paragraphs, escaped.
+  const describedAs = descriptionText
+    ? `<div style="margin:14px 0 0;font-size:16px;color:#141414;">${renderParagraphs(descriptionText, safe)}</div>`
+    : ''
   return `<!doctype html>
 <html lang="en">
+${EMAIL_HEAD}
 <body style="margin:0;padding:0;background:#F2EDE4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#141414;line-height:1.55;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#F2EDE4;padding:32px 16px;">
     <tr><td align="center">
-      <table role="presentation" width="560" cellspacing="0" cellpadding="0" style="max-width:560px;background:#F2EDE4;border-radius:10px;border:1px solid #5C5C5C;overflow:hidden;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;max-width:560px;background:#F2EDE4;border-radius:10px;border:1px solid #5C5C5C;overflow:hidden;">
         <tr><td style="padding:32px 32px 8px;">
-          <p style="margin:0;font-size:12px;letter-spacing:0;text-transform:uppercase;color:#5C5C5C;">Invoice</p>
+          <p style="margin:0;font-size:12px;letter-spacing:0;color:#5C5C5C;">Invoice</p>
           <p style="margin:8px 0 0;font-size:16px;color:#141414;">${safe(greeting)}</p>
         </td></tr>
         <tr><td style="padding:8px 32px 16px;">
-          <div style="font-size:16px;color:#141414;">${msg}</div>
+          <div style="font-size:16px;color:#141414;">${msg}</div>${describedAs}
         </td></tr>
         ${payBlock(payLink, payInstructions, amountLabel, safe)}
         <tr><td style="padding:8px 32px 24px;">
@@ -409,7 +469,7 @@ function renderInvoiceHtml({ greeting, customMessage, jobTitle, amountLabel, sen
           <p style="margin:0;font-size:14px;color:#141414;">From ${safe(senderLine)}</p>
         </td></tr>
       </table>
-      ${companyName ? `<p style="margin:16px 0 0;font-size:12px;color:#5C5C5C;letter-spacing:0;text-transform:uppercase;">Sent on behalf of ${safe(companyName)}</p>` : ''}
+      ${companyName ? `<p style="margin:16px 0 0;font-size:12px;color:#5C5C5C;letter-spacing:0;">Sent on behalf of ${safe(companyName)}</p>` : ''}
     </td></tr>
   </table>
 </body>

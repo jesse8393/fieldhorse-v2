@@ -55,4 +55,31 @@ describe('org api workspace', () => {
     await api.orgInviteAccept('tok')
     expect(sentBody(fetchMock)).toEqual({ token: 'tok' })
   })
+
+  it('reads every page of a long timesheet list instead of stopping at the first', async () => {
+    const page = (ids: string[], more: boolean, next: number | null) =>
+      new Response(JSON.stringify({ ok: true, caller_role: 'owner', org_id: 'org-a', punches: ids.map((id) => ({ id })), has_more: more, next_offset: next }), { status: 200 })
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(page(['p1', 'p2'], true, 2))
+      .mockResolvedValueOnce(page(['p3'], false, null))
+    vi.stubGlobal('fetch', fetchMock)
+    const res = await api.orgTimesheetsList({ from: '2026-10-05T00:00:00.000Z' })
+    expect(res.punches.map((p) => p.id)).toEqual(['p1', 'p2', 'p3'])
+    expect(res.has_more).toBe(false)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ from: '2026-10-05T00:00:00.000Z' })
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ from: '2026-10-05T00:00:00.000Z', offset: 2 })
+  })
+
+  it('stops asking and says more exist when a list never ends', async () => {
+    const fetchMock = vi.fn(async (_url: string, init: any) => {
+      const offset = JSON.parse(init.body).offset || 0
+      return new Response(JSON.stringify({ ok: true, punches: [{ id: `p${offset}` }], has_more: true, next_offset: offset + 1 }), { status: 200 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const res = await api.orgTimesheetsList()
+    expect(fetchMock).toHaveBeenCalledTimes(20)
+    expect(res.punches).toHaveLength(20)
+    expect(res.has_more).toBe(true)
+  })
 })

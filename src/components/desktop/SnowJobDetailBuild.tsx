@@ -1,6 +1,6 @@
 // Light glass job workspace. Existing role-filtered sections and action handlers stay in the parent.
 import type { ReactNode } from 'react'
-import { ChevronLeft, MessageSquare, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react'
+import { ChevronLeft, MessageSquare, MoreHorizontal, Plus } from 'lucide-react'
 import { Button, IconButton, StageRail } from '../fh/index.ts'
 import type { StageRailProps } from '../fh/index.ts'
 import { cx } from '../fh/cx.ts'
@@ -10,7 +10,6 @@ import type { JobMoney } from '../../screens/ContactDetail/lib/spine.ts'
 import JobFactsPanel from './JobFactsPanel.tsx'
 import JobStatus from '../fh/JobStatus.tsx'
 import TopbarWeather from './TopbarWeather.tsx'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu.tsx'
 import './job-desktop.css'
 
 type Tab = { id: string; label: string }
@@ -24,8 +23,9 @@ type Props = {
   onBack: () => void
   backLabel?: string
   onEdit?: () => void
+  /** Whether this viewer may delete the job; Delete lives on the More screen. */
   onDelete?: () => void
-  /** True while Delete waits for its second tap (D57); the button says so. */
+  /** Kept for callers; Delete asks for its second tap on the More screen. */
   deleteArmed?: boolean
   onAddEvent?: () => void
   /** The one gold action, following the stage (Send invoice, Approve quote, Reopen). */
@@ -57,8 +57,8 @@ type Props = {
 export default function SnowJobDetailBuild(props: Props) {
   const {
     contact, client, tabs, activeTab, onTabChange,
-    onBack, backLabel = 'Jobs', onEdit, onDelete, deleteArmed = false, onAddEvent,
-    primaryAction, isEditing, money, railNotes, crewIds = [],
+    onBack, backLabel = 'Jobs', onEdit, onDelete, onAddEvent,
+    primaryAction, money, railNotes, crewIds = [],
     onInvitePartner, onOpenClient, scheduleStatus, changeOrderTotals,
     showMoney = true, children,
   } = props
@@ -74,14 +74,9 @@ export default function SnowJobDetailBuild(props: Props) {
             <div className="fh-job-heading__identity"><div className="fh-job-heading__title"><h1>{title}</h1><JobStatus record={contact} /></div>{subtitle && <p>{subtitle}</p>}<TopbarWeather className="fh-job-weather" /></div>
             <div className="fh-job-heading__actions">
               <Button variant="primary" icon={Plus} onClick={() => openCapture({ jobId: contact.id })}>Add update</Button>
-              {(onEdit || onDelete) && <DropdownMenu>
-                <DropdownMenuTrigger asChild><IconButton variant="paper" icon={MoreHorizontal} aria-label="More actions for this job" /></DropdownMenuTrigger>
-                <DropdownMenuContent className="fh-job-action-menu" align="end" sideOffset={8}>
-                  {onEdit && <DropdownMenuItem onSelect={onEdit}><Pencil size={16} aria-hidden="true" />{isEditing ? 'Stop editing' : 'Edit job details'}</DropdownMenuItem>}
-                  {onDelete && <DropdownMenuItem variant="destructive" onSelect={(event: Event) => { event.preventDefault(); onDelete() }}><Trash2 size={16} aria-hidden="true" />{deleteArmed ? 'Tap again to delete' : 'Delete this job'}</DropdownMenuItem>}
-                  {deleteArmed && <p role="status">Permanently removes this job and its attached records. Select again to delete.</p>}
-                </DropdownMenuContent>
-              </DropdownMenu>}
+              {/* The job's More screen holds Edit, follow up and Delete (with
+                  its second tap), the same route the phone uses (D57). */}
+              {(onEdit || onDelete) && <IconButton variant="paper" icon={MoreHorizontal} aria-label="More actions for this job" to={`/jobs/${encodeURIComponent(contact.id)}/more`} />}
             </div>
           </div>
         </header>

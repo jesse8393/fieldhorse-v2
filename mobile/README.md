@@ -47,7 +47,10 @@ The `.env` points at the same project as the web app. The anon key is safe to sh
 ```
 EXPO_PUBLIC_SUPABASE_URL=https://pnmhblvslftdzfcdezbw.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=<the same key as the web VITE_SUPABASE_ANON_KEY>
+EXPO_PUBLIC_API_BASE_URL=https://animated-kheer-db7c2c.netlify.app
 ```
+
+`EXPO_PUBLIC_API_BASE_URL` is the live web site. The app sends quotes, invoices, messages, AI requests and account deletion to its `/api` functions, and customer links, privacy and terms open there. Without it the app uses that same live site.
 
 The key is in the Supabase dashboard under Project Settings, API, anon public. If `npm install` complains about native versions, run `npx expo install --fix`.
 
@@ -68,7 +71,7 @@ eas init                      # links the project and writes its id into app.jso
 
 `.github/workflows/eas-build.yml` builds on a `mobile-v*` tag and runs without prompts, so commit the project id that `eas init` writes, or that workflow cannot run. The Apple ID in `eas.json` is better kept out of the repo: set it as the `EXPO_APPLE_ID` secret instead.
 
-Give production builds their Supabase keys, since EAS cloud builds do not read your local `.env`:
+Give production builds their Supabase keys, since EAS cloud builds do not read your local `.env`. The site address, `EXPO_PUBLIC_API_BASE_URL`, is not secret and is set in every build profile in `eas.json`; change it there to point a build at another site:
 
 ```bash
 eas env:create --environment production --name EXPO_PUBLIC_SUPABASE_URL --value "https://pnmhblvslftdzfcdezbw.supabase.co"

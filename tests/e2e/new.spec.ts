@@ -150,3 +150,248 @@ test('typing a new name on Quote creates the client', async ({ context, page }) 
   expect(clientInserts).toHaveLength(1)
   expect(clientInserts[0]).toMatchObject({ name: 'Dana Whitfield' })
 })
+
+// Audit finding DATA-12: a save whose answer is lost, tapped again, must
+// address the same quote, so the database cannot hold it twice.
+test('saving a quote again after a lost answer sends the same id', async ({ context, page }) => {
+  await signIn(context)
+  const inserts: Record<string, unknown>[] = []
+  await context.route(/\/rest\/v1\/fh_quotes(\?|$)/, async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback()
+    inserts.push(route.request().postDataJSON())
+    if (inserts.length === 1) return route.abort('connectionreset')
+    return route.fallback()
+  })
+  await open(page, '/quotes/new?client=cl-1')
+  await expect(page.getByRole('heading', { level: 1, name: 'New quote' })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByLabel('Client')).toHaveValue('Jeff Roy')
+  await page.getByRole('button', { name: 'Save quote' }).click()
+  await expect.poll(() => inserts.length).toBe(1)
+  await expect(page).toHaveURL(/\/quotes\/new/)
+  await page.getByRole('button', { name: 'Save quote' }).click()
+  await expect(page).toHaveURL(/\/quotes\/q-quote/, { timeout: 30_000 })
+  expect(inserts).toHaveLength(2)
+  expect(typeof inserts[0].id).toBe('string')
+  expect(inserts[1].id).toBe(inserts[0].id)
+})
+
+const LEAD_WITH_NOTES = {
+  id: 'l-notes', user_id: 'qa-user-1', client_id: 'cl-1', status: 'open', title: 'Backyard drainage', job_type: 'Drainage',
+  notes: 'Husband says no more than 5k. Dog bites. Gate code 4411.', last_contact: null, quote_id: null, follow_up_on: null,
+  source: 'Google', referred_by: null, origin_contact_id: null, created_at: NOW, updated_at: NOW,
+  fh_clients: { id: 'cl-1', name: 'Jeff Roy', phone: '555-0101', email: 'jeff@roy.com' }
+}
+
+// Phone sales audit finding S11: lead notes are internal and never become
+// the scope of work the customer reads.
+test('Quote this keeps the lead notes off the scope of work', async ({ context, page }) => {
+  await signIn(context, { tables: { fh_leads: [LEAD_WITH_NOTES] } })
+  await open(page, '/quotes/new?lead=l-notes')
+  await expect(page.getByLabel('Title')).toHaveValue('Backyard drainage', { timeout: 30_000 })
+  await expect(page.getByLabel('Client')).toHaveValue('Jeff Roy')
+  await expect(page.getByLabel('Scope')).toHaveValue('')
+})
+
+// Phone sales audit finding S21: a Quote this visit never becomes the next
+// New quote's draft.
+test('backing out of Quote this leaves the next New quote blank', async ({ context, page }) => {
+  await signIn(context, { tables: { fh_leads: [LEAD_WITH_NOTES] } })
+  await open(page, '/quotes/new?lead=l-notes')
+  await expect(page.getByLabel('Title')).toHaveValue('Backyard drainage', { timeout: 30_000 })
+  await page.waitForTimeout(800)
+  await open(page, '/quotes/new')
+  await expect(page.getByRole('heading', { level: 1, name: 'New quote' })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByLabel('Title')).toHaveValue('')
+  await expect(page.getByLabel('Client')).toHaveValue('')
+})
+
+// The client field read only the 200 most recently active clients, so an
+// older client was never suggested and Save made a duplicate (DATA-09).
+test('the client field finds a client outside the 200 most recently active', async ({ context, page }) => {
+  const recent = Array.from({ length: 200 }, (_, i) => ({
+    id: `cl-r${i}`, user_id: 'qa-user-1', name: `Recent Client ${i}`, phone: null, email: null, address: null,
+    company_name: null, last_activity_at: new Date(Date.parse(NOW) - i * 60_000).toISOString(), created_at: NOW
+  }))
+  const zelda = {
+    id: 'cl-zelda', user_id: 'qa-user-1', name: 'Zelda Oldcustomer & Family', phone: '615.555.0199', email: null,
+    address: '9 Old Mill Rd', company_name: null, last_activity_at: '2024-01-01T00:00:00.000Z', created_at: '2023-01-01T00:00:00.000Z'
+  }
+  await signIn(context, { tables: { fh_clients: [...recent, zelda] } })
+  // The mock ignores or= and ilike filters, so answer the search here the
+  // way the database would: name, company, email or phone contains the text.
+  await page.route(/\/rest\/v1\/fh_clients\?.*or=/, async (route) => {
+    const params = new URL(route.request().url()).searchParams
+    const typed = (params.get('or') || '').match(/name\.ilike\."%(.*?)%"/)?.[1]?.toLowerCase() || ''
+    const rows = [...recent, zelda].filter((c) => c.name.toLowerCase().includes(typed))
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(rows.slice(0, 25)) })
+  })
+  const writes: string[] = []
+  page.on('request', (req) => { if (req.method() === 'POST' && req.url().includes('/rest/v1/')) writes.push(new URL(req.url()).pathname.split('/rest/v1/')[1]) })
+  await open(page, '/leads/new')
+  await expect(page.getByRole('heading', { level: 1, name: 'New lead' })).toBeVisible({ timeout: 30_000 })
+  await page.getByLabel('Name').fill('Zelda Old')
+  const option = page.getByRole('option', { name: /Zelda Oldcustomer & Family/ })
+  await expect(option).toBeVisible()
+  await option.click()
+  await expect(page.getByText('Saves to Zelda Oldcustomer & Family.')).toBeVisible()
+  await page.getByRole('button', { name: 'Save lead' }).click()
+  await expect(page).toHaveURL(/\/leads\/l-lead1$/, { timeout: 30_000 })
+  expect(writes).not.toContain('fh_clients')
+  expect(writes).toContain('fh_leads')
+})
+
+/**
+ * Answers the first insert into `table` with a dropped connection after
+ * recording it, the way a weak signal loses the answer to a save the
+ * server made. Returns every insert body sent.
+ */
+async function loseFirstAnswer(page: Page, table: string): Promise<string[]> {
+  const bodies: string[] = []
+  await page.route(new RegExp(`/rest/v1/${table}(\\?|$)`), async (route) => {
+    const req = route.request()
+    if (req.method() !== 'POST') return route.fallback()
+    bodies.push(req.postData() ?? '')
+    if (bodies.length === 1) return route.abort('connectionreset')
+    return route.fallback()
+  })
+  return bodies
+}
+
+const rowId = (body: string) => {
+  const j = JSON.parse(body)
+  return (Array.isArray(j) ? j[0] : j).id ?? null
+}
+
+test('a lead save whose answer was lost is retried on the same row (DATA-12)', async ({ context, page }) => {
+  await signIn(context)
+  const bodies = await loseFirstAnswer(page, 'fh_leads')
+  await open(page, '/leads/new')
+  await page.getByLabel('Name').fill('Jeff')
+  await page.locator('.fhnew-client__pick').first().click()
+  await page.getByRole('button', { name: 'Save lead' }).click()
+  await expect(page.locator('.fhnew-error')).toBeVisible()
+  await page.getByRole('button', { name: 'Save lead' }).click()
+  await expect(page).toHaveURL(/\/leads\/l-lead1$/, { timeout: 30_000 })
+  expect(bodies).toHaveLength(2)
+  expect(rowId(bodies[0])).toBeTruthy()
+  expect(rowId(bodies[1])).toBe(rowId(bodies[0]))
+})
+
+test('a client save whose answer was lost is retried on the same row (DATA-12)', async ({ context, page }) => {
+  await signIn(context)
+  const bodies = await loseFirstAnswer(page, 'fh_clients')
+  await open(page, '/clients/new')
+  await page.getByLabel('Name').fill('Mike Salas')
+  await page.getByRole('button', { name: 'Save client' }).click()
+  await expect(page.locator('.fhnew-error')).toBeVisible()
+  await page.getByRole('button', { name: 'Save client' }).click()
+  await expect(page).toHaveURL(/\/clients\/cl-1$/, { timeout: 30_000 })
+  expect(bodies).toHaveLength(2)
+  expect(rowId(bodies[0])).toBeTruthy()
+  expect(rowId(bodies[1])).toBe(rowId(bodies[0]))
+})
+
+test('a lost connection on New lead and New client reads as a plain sentence (DATA-22)', async ({ context, page }) => {
+  await signIn(context)
+  await page.route(/\/rest\/v1\/fh_(leads|clients)(\?|$)/, (route) => route.request().method() === 'POST' ? route.abort('failed') : route.fallback())
+  await open(page, '/leads/new')
+  await page.getByLabel('Name').fill('Jeff')
+  await page.locator('.fhnew-client__pick').first().click()
+  await page.getByRole('button', { name: 'Save lead' }).click()
+  await expect(page.locator('.fhnew-error')).toHaveText('Could not save this lead. Check your connection and try again.')
+
+  await open(page, '/clients/new')
+  await page.getByLabel('Name').fill('Mike Salas')
+  await page.getByRole('button', { name: 'Save client' }).click()
+  await expect(page.locator('.fhnew-error')).toHaveText('Could not save this client. Check your connection and try again.')
+})
+
+test('a new lead shows in Leads when the person goes back (DATA-13)', async ({ context, page }) => {
+  await signIn(context)
+  let leadReads = 0
+  page.on('request', (req) => { if (req.method() === 'GET' && /\/rest\/v1\/fh_leads\?/.test(req.url())) leadReads++ })
+  await open(page, '/leads')
+  await expect(page.getByRole('heading', { level: 1, name: 'Leads' })).toBeVisible({ timeout: 30_000 })
+  await page.getByRole('link', { name: 'New lead' }).click()
+  await page.getByLabel('Name').fill('Jeff')
+  await page.locator('.fhnew-client__pick').first().click()
+  const before = leadReads
+  await page.getByRole('button', { name: 'Save lead' }).click()
+  await expect(page).toHaveURL(/\/leads\/l-lead1$/, { timeout: 30_000 })
+  await page.getByRole('button', { name: 'Back' }).first().click()
+  await expect(page).toHaveURL(/\/leads$/)
+  // The list read again after the save instead of showing its old copy.
+  await expect.poll(() => leadReads - before, { timeout: 5000 }).toBeGreaterThan(0)
+})
+
+test('the first field keeps its focus on New lead and New client (S20)', async ({ context, page }) => {
+  await signIn(context)
+  await open(page, '/leads/new')
+  await expect(page.getByLabel('Name')).toBeFocused({ timeout: 30_000 })
+  await open(page, '/clients/new')
+  await expect(page.getByLabel('Name')).toBeFocused({ timeout: 30_000 })
+})
+
+test('New client points to a client who already exists before making a second one (S25)', async ({ context, page }) => {
+  await signIn(context)
+  const posts: string[] = []
+  page.on('request', (req) => { if (req.method() === 'POST' && req.url().includes('/rest/v1/fh_clients')) posts.push(req.postData() ?? '') })
+  await open(page, '/clients/new')
+  await page.getByLabel('Name').fill('Jeff Roy')
+  await page.getByRole('button', { name: 'Save client' }).click()
+  await expect(page.getByText('Jeff Roy is already a client.', { exact: false })).toBeVisible()
+  await page.waitForTimeout(300)
+  expect(posts).toEqual([])
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Open Jeff Roy' }).click()
+  await expect(page).toHaveURL(/\/clients\/cl-1$/)
+  expect(posts).toEqual([])
+})
+
+test('New client saves a second client with the same name only when asked (S25)', async ({ context, page }) => {
+  await signIn(context)
+  const posts: string[] = []
+  page.on('request', (req) => { if (req.method() === 'POST' && req.url().includes('/rest/v1/fh_clients')) posts.push(req.postData() ?? '') })
+  await open(page, '/clients/new')
+  await page.getByLabel('Name').fill('Jeff Roy')
+  await page.getByRole('button', { name: 'Save client' }).click()
+  await page.getByRole('button', { name: 'Save a new client' }).click()
+  await expect(page).toHaveURL(/\/clients\/cl-1$/, { timeout: 30_000 })
+  expect(posts).toHaveLength(1)
+})
+
+test('New client refuses an email that is not one (S25)', async ({ context, page }) => {
+  await signIn(context)
+  const posts: string[] = []
+  page.on('request', (req) => { if (req.method() === 'POST' && req.url().includes('/rest/v1/')) posts.push(req.url()) })
+  await open(page, '/clients/new')
+  await page.getByLabel('Name').fill('Maria Lopez')
+  for (const bad of ['Not-An-Email', 'MARIA@@bad']) {
+    await page.getByLabel('Email').fill(bad)
+    await page.getByRole('button', { name: 'Save client' }).click()
+    await expect(page.getByText('Enter an email like name@example.com.')).toBeVisible()
+  }
+  await page.waitForTimeout(300)
+  expect(posts).toEqual([])
+})
+
+// D14: on a wide screen the create forms sit in the middle like New does,
+// so the column does not jump sideways from New to the form it opens.
+test('create forms are centred on desktop, in line with New', async ({ context, page }, testInfo) => {
+  test.skip(!testInfo.project.name.startsWith('desktop'), 'Desktop width')
+  await signIn(context)
+  await page.setViewportSize({ width: 1440, height: 900 })
+  const centre = async (path: string) => {
+    await open(page, path)
+    await expect(page.locator('.fhnew').first()).toBeVisible({ timeout: 30_000 })
+    return page.evaluate(() => {
+      const r = document.querySelector('.fhnew')!.getBoundingClientRect()
+      const main = document.querySelector('#fh-main')!.getBoundingClientRect()
+      return { mid: Math.round(r.left + r.width / 2), mainMid: Math.round(main.left + main.width / 2) }
+    })
+  }
+  const quote = await centre('/quotes/new')
+  expect(Math.abs(quote.mid - quote.mainMid)).toBeLessThanOrEqual(2)
+  const lead = await centre('/leads/new')
+  expect(Math.abs(lead.mid - lead.mainMid)).toBeLessThanOrEqual(2)
+})

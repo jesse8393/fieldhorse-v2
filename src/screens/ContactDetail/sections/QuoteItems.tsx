@@ -11,6 +11,7 @@ import { loadUserRateCard } from '../../../lib/rateCard.ts'
 import { Eyebrow } from '../../../components/v3'
 import { planReorder } from './quoteItemOrder.ts'
 import { keepFocusOnRetry } from '../../../lib/retryFocus.ts'
+import { lineTotal, roundCents } from '../../../lib/quoteMoney.ts'
 
 /**
  * Quote items section, fh_quote_items CRUD editor.
@@ -158,6 +159,14 @@ export function emptyDraft() {
   }
 }
 
+// What a failed line write says on screen: a plain sentence, never the
+// browser's or the database's own text ("TypeError: Failed to fetch").
+export function writeFailure(error: { message?: string } | null | undefined): string {
+  const message = String(error?.message || '')
+  if (/fetch|network|load failed|timeout|offline/i.test(message)) return 'Check your connection and try again.'
+  return 'It was not saved. Try again.'
+}
+
 export function draftFromRow(row: any) {
   // amountOverridden seeds true on edit so changing qty/rate does not
   // silently overwrite an intentionally-set amount on an existing row.
@@ -203,13 +212,17 @@ export function normalizeForDB(d: any) {
     : d?.is_optional
       ? 'optional'
       : 'base'
+  const qty = Number(d.qty)
+  const amount = roundCents(d.amount)
   return {
     section: d.section?.trim() || null,
     description: d.description.trim(),
-    qty: Number(d.qty),
+    qty,
     unit: d.unit?.trim() || null,
-    rate: Number(d.rate),
-    amount: Number(d.amount),
+    // A quantity 1 line costs its amount, so a typed lump sum is its rate
+    // too, and the proposal's unit price multiplies to the amount (M-17).
+    rate: qty === 1 ? amount : Number(d.rate),
+    amount,
     notes: d.notes?.trim() || null,
     is_optional: kind === 'optional',
     is_excluded: kind === 'excluded'
@@ -240,7 +253,7 @@ export function patchDraft(setter: any, key: any, value: any) {
         const qty = Number(key === 'qty' ? value : d.qty)
         const rate = Number(key === 'rate' ? value : d.rate)
         if (Number.isFinite(qty) && Number.isFinite(rate)) {
-          next.amount = String(+(qty * rate).toFixed(2))
+          next.amount = String(lineTotal(key === 'qty' ? value : d.qty, key === 'rate' ? value : d.rate))
         }
       }
     }
@@ -272,7 +285,7 @@ export function applySuggestion(setter: any, s: ItemSuggestion) {
   hapticTap()
   setter((d: any) => {
     const qty = Number(d.qty)
-    const amount = Number.isFinite(qty) ? +(qty * s.rate).toFixed(2) : s.rate
+    const amount = Number.isFinite(qty) ? lineTotal(d.qty, s.rate) : s.rate
     return {
       ...d,
       description: s.description,
@@ -431,9 +444,10 @@ export function useQuoteItems({ jobId, quoteId, userId, onContactRefresh, onLoad
       .select()
       .single()
     if (error) {
-      // Roll the optimistic row back out and tell the operator.
+      // Roll the optimistic row back out and tell the operator, in words,
+      // once the write has answered. The editor keeps what was typed.
       setRows((rs) => rs.filter((r) => r.id !== tempId))
-      toastError("Couldn't add item", error.message)
+      toastError("Couldn't add the line", writeFailure(error))
       return null
     }
     // Swap the temp row for the persisted one (real id + server defaults).
@@ -444,12 +458,20 @@ export function useQuoteItems({ jobId, quoteId, userId, onContactRefresh, onLoad
 
   async function updateItem(id: any, patch: any) {
     if (!id || !userId) return false
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('fh_quote_items')
       .update(patch)
       .eq('id', id)
+      .select('id')
     if (error) {
-      toastError("Couldn't update item", error.message)
+      toastError("Couldn't update the line", writeFailure(error))
+      return false
+    }
+    // An update that matched no row saved nothing: the line was deleted or
+    // changed elsewhere. Say so and read the lines again.
+    if (!data || data.length === 0) {
+      toastError("Couldn't update the line", 'It changed on another device. The lines are read again.')
+      void fetchRows({ silent: true })
       return false
     }
     await fetchRows({ silent: true })

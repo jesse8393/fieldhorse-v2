@@ -38,6 +38,8 @@ import { parseExpenseFromImage } from '../../lib/docIntelligence'
 import { useMutationFeedback } from '../../lib/useMutationFeedback'
 import { moneyAmount, paymentAmount } from '../../lib/paymentInput'
 import { jobMoney } from '../../lib/jobMoney'
+import { JOB_STAGE_CHOICES } from '../../lib/stages'
+import { parseDateOnly } from '../../../src/lib/dates'
 
 const INVOICE_TINT: Record<string, string> = {
   draft: '#5C5C5C', sent: '#5C5C5C', paid: '#2D7A4F', overdue: '#C0392B', void: '#5C5C5C'
@@ -56,7 +58,6 @@ const STAGE_TINT: Record<string, string> = {
   invoice: '#C9963A', closed: '#5C5C5C', lost: '#C0392B'
 }
 
-const STAGES = ['lead', 'quote', 'job', 'invoice', 'closed', 'lost'] as const
 
 function money(n: number) {
   return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -629,7 +630,7 @@ export default function JobDetailScreen() {
         {/* Stage progression */}
         <Text className="text-ink-muted text-xs font-bold tracking-[2px] uppercase mt-6 mb-2">Stage</Text>
         <View className="flex-row flex-wrap" style={{ gap: 8 }}>
-          {STAGES.map((s) => {
+          {JOB_STAGE_CHOICES.map((s) => {
             const active = contact.stage === s
             const chipTint = STAGE_TINT[s]
             return (
@@ -821,7 +822,7 @@ export default function JobDetailScreen() {
                 className="bg-[rgba(20, 20, 20,0.6)] rounded-[10px] p-3 border border-[rgba(201, 150, 58,0.12)] flex-row justify-between items-center"
               >
                 <Text className="text-ink-muted text-sm">
-                  {p.paid_on ? new Date(p.paid_on).toLocaleDateString() : '\u2003'} · {p.method || 'payment'}
+                  {parseDateOnly(p.paid_on)?.toLocaleDateString() ?? '\u2003'} · {p.method || 'payment'}
                 </Text>
                 <Text className="text-ink font-bold">{money(Number(p.amount || 0))}</Text>
               </Pressable>
@@ -856,7 +857,7 @@ export default function JobDetailScreen() {
                     {e.category || e.description || 'Expense'}
                   </Text>
                   <Text className="text-ink-muted text-xs mt-0.5">
-                    {e.expense_date ? new Date(e.expense_date).toLocaleDateString() : '\u2003'}
+                    {parseDateOnly(e.expense_date)?.toLocaleDateString() ?? '\u2003'}
                   </Text>
                 </View>
                 <Text className="text-ink font-bold">{money(Number(e.amount || 0))}</Text>
@@ -1008,7 +1009,7 @@ export default function JobDetailScreen() {
                 <View className="flex-1 pr-3">
                   <Text className="text-ink text-sm font-semibold">{m.miles} mi</Text>
                   <Text className="text-ink-muted text-xs mt-0.5" numberOfLines={1}>
-                    {m.drove_on ? new Date(m.drove_on).toLocaleDateString() : '\u2003'}{m.purpose ? ` · ${m.purpose}` : ''}
+                    {parseDateOnly(m.drove_on)?.toLocaleDateString() ?? '\u2003'}{m.purpose ? ` · ${m.purpose}` : ''}
                   </Text>
                 </View>
               </Pressable>

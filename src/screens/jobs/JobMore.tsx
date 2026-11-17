@@ -87,7 +87,8 @@ export default function JobMore() {
       ) : (
         <>
           <ul className="fhja-rows" aria-label="More actions">
-            <Row as="li" title="Edit job details" to={`${home}?edit=1`} />
+            {/* Editing a job shows its price, and the partner invite promises job pricing. */}
+            {canMoveMoney && <Row as="li" title="Edit job details" to={`${home}?edit=1`} />}
             {stage !== 'lost' && stage !== 'closed' && (
               <Row as="li" title="Set follow up" subline={followUp?.label} to={`${home}/follow-up`} />
             )}
@@ -95,7 +96,7 @@ export default function JobMore() {
               <Row as="li" title="Open the client" subline={data.clientSummary?.name || undefined} to={recordRoute('client', contact.client_id)} />
             )}
             <Row as="li" title="Schedule an event" to={`/schedule/new?job=${encodeURIComponent(contact.id)}`} />
-            <Row as="li" title="Invite a partner" to={`${home}/partner`} />
+            {!membership.loading && membership.canManageSubs && <Row as="li" title="Invite a partner" to={`${home}/partner`} />}
             {canMoveMoney && stage !== 'lost' && stage !== 'closed' && (
               <Row as="li" title="Invoice this" subline="A new invoice with the balance" to={newRecordRoute('invoice', { job: contact.id })} />
             )}
@@ -112,11 +113,10 @@ export default function JobMore() {
                   <Button variant="destructive" block onClick={() => deleteTap.tap(() => { void remove() })}>
                     {deleteTap.armed ? 'Tap again to delete' : 'Delete job'}
                   </Button>
-                  {deleteTap.armed && (
-                    <p className="fhja-danger__why">
-                      Removing {contact.name || 'this job'} takes its {data.subs.length} subs, {data.expenses.length} expenses, {data.payments.length} payments, {data.inspections.length} inspections and {data.scheduleCount} schedule items with it, and archives its {data.notes.length} notes. This cannot be undone.
-                    </p>
-                  )}
+                  {/* Shown before the first tap, so the warning is read before the decision. */}
+                  <p className="fhja-danger__why">
+                    Removing {contact.name || 'this job'} takes its {data.subs.length} subs, {data.expenses.length} expenses, {data.payments.length} payments, {data.inspections.length} inspections and {data.scheduleCount} schedule items with it, and archives its {data.notes.length} notes. This cannot be undone.
+                  </p>
                 </>
               )}
             </div>

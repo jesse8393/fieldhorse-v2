@@ -6,8 +6,10 @@
 // the latest read sets anything (decision D49).
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase.ts'
 import { toastError } from '../../lib/toast.ts'
+import { invalidateAfterQuoteWrite } from '../../lib/quotes.ts'
 import { QUOTE_SELECT, type QuoteWithClient } from './quoteShape.ts'
 import type { Database } from '../../lib/database.types.ts'
 
@@ -23,6 +25,7 @@ export type QuoteState =
 export function useQuote(id: string | undefined) {
   const [state, setState] = useState<QuoteState>({ status: 'loading', quote: null })
   const seq = useRef(0)
+  const queryClient = useQueryClient()
 
   const load = useCallback(async () => {
     if (!id) { setState({ status: 'missing', quote: null }); return }
@@ -55,15 +58,20 @@ export function useQuote(id: string | undefined) {
       before = s.quote
       return { ...s, quote: { ...s.quote, ...updates } as QuoteWithClient }
     })
-    const { error } = await supabase.from('fh_quotes').update(updates).eq('id', id)
-    if (error) {
+    const { data, error } = await supabase.from('fh_quotes').update(updates).eq('id', id).select('id')
+    // A write that matched no row saved nothing: the quote was deleted or
+    // changed elsewhere, so it is never reported as saved.
+    const message = error ? error.message : !data || data.length === 0 ? 'This quote changed on another device. Check it and try again.' : null
+    if (message) {
       const saved = before
       if (saved) setState((s) => (s.quote ? { ...s, quote: saved } : s))
-      toastError("Couldn't save the quote", error.message)
-      return { error: { message: error.message } }
+      toastError("Couldn't save the quote", message)
+      return { error: { message } }
     }
+    const saved = before as QuoteWithClient | null
+    invalidateAfterQuoteWrite(queryClient, { quoteId: id, leadId: saved?.lead_id, clientId: saved?.client_id })
     return { error: null }
-  }, [id])
+  }, [id, queryClient])
 
   return { ...state, refresh: load, patch }
 }

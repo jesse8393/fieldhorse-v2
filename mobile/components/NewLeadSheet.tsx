@@ -1,9 +1,12 @@
 // mobile/components/NewLeadSheet.tsx, full add-lead flow in a bottom sheet.
 // Mirrors web src/components/NewLeadSheet.tsx: captures name/phone/email/
-// address/job_title/job_type/stage/amount/notes/referred_by, remembers the
+// address/job_title/job_type/amount/notes/referred_by, remembers the
 // last job_type, and offers a doc-intake button (camera or library photo of
 // an estimate / lead card) that calls Claude vision to autofill the form.
-// Rendered by both the Home "New lead" tile and the Jobs FAB.
+// Rendered by both the Home "New lead" tile and the Jobs FAB. It only makes
+// leads: quotes and jobs are their own records, never created here. On save
+// it hands back the client the lead belongs to, since native has no lead
+// screen yet.
 import { useEffect, useState } from 'react'
 import { View, Text, Pressable, ScrollView, ActivityIndicator, Alert } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
@@ -15,13 +18,8 @@ import { parseLeadFromImage } from '../lib/docIntelligence'
 import { BottomSheet, SheetField, GoldButton, theme } from './ui'
 
 const LAST_JOB_TYPE_KEY = 'fh:lastJobType'
-const STAGES = [
-  { value: 'lead', label: 'Lead' },
-  { value: 'quote', label: 'Quote' },
-  { value: 'job', label: 'Job' }
-]
 
-type Props = { open: boolean; onClose: () => void; userId: string; onCreated?: (id: string) => void }
+type Props = { open: boolean; onClose: () => void; userId: string; onCreated?: (clientId: string) => void }
 
 export function NewLeadSheet({ open, onClose, userId, onCreated }: Props) {
   const createLead = useCreateLead()
@@ -31,7 +29,6 @@ export function NewLeadSheet({ open, onClose, userId, onCreated }: Props) {
   const [address, setAddress] = useState('')
   const [jobTitle, setJobTitle] = useState('')
   const [jobType, setJobType] = useState<string>('')
-  const [stage, setStage] = useState('lead')
   const [amount, setAmount] = useState('')
   const [notes, setNotes] = useState('')
   const [referredBy, setReferredBy] = useState('')
@@ -45,7 +42,7 @@ export function NewLeadSheet({ open, onClose, userId, onCreated }: Props) {
 
   function reset() {
     setName(''); setPhone(''); setEmail(''); setAddress(''); setJobTitle('')
-    setStage('lead'); setAmount(''); setNotes(''); setReferredBy(''); setErr(null)
+    setAmount(''); setNotes(''); setReferredBy(''); setErr(null)
   }
 
   async function pickImage(fromCamera: boolean) {
@@ -88,7 +85,7 @@ export function NewLeadSheet({ open, onClose, userId, onCreated }: Props) {
     if (!name.trim() || saving) { if (!name.trim()) setErr('A name is required.'); return }
     setSaving(true); setErr(null)
     const amt = amount.trim() ? Number(amount.replace(/[^0-9.]/g, '')) : undefined
-    const { id, error } = await createLead({
+    const { clientId, error } = await createLead({
       userId,
       name: name.trim(),
       phone: phone.trim() || undefined,
@@ -97,7 +94,6 @@ export function NewLeadSheet({ open, onClose, userId, onCreated }: Props) {
       jobTitle: jobTitle.trim() || undefined,
       jobType: jobType || undefined,
       amount: amt && !isNaN(amt) ? amt : undefined,
-      stage,
       notes: notes.trim() || undefined,
       referredBy: referredBy.trim() || undefined
     })
@@ -106,7 +102,7 @@ export function NewLeadSheet({ open, onClose, userId, onCreated }: Props) {
     if (jobType) AsyncStorage.setItem(LAST_JOB_TYPE_KEY, jobType)
     reset()
     onClose()
-    if (id) onCreated?.(id)
+    if (clientId) onCreated?.(clientId)
   }
 
   return (
@@ -146,18 +142,6 @@ export function NewLeadSheet({ open, onClose, userId, onCreated }: Props) {
           )
         })}
       </ScrollView>
-
-      <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '800', letterSpacing: 0, textTransform: 'uppercase', marginBottom: 8 }}>Stage</Text>
-      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
-        {STAGES.map((s) => {
-          const on = stage === s.value
-          return (
-            <Pressable key={s.value} onPress={() => setStage(s.value)} style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: on ? theme.goldBright : theme.borderMid, backgroundColor: on ? `${theme.goldBright}26` : theme.bg }}>
-              <Text style={{ color: on ? theme.goldBright : theme.inkMuted, fontSize: 14, fontWeight: '700' }}>{s.label}</Text>
-            </Pressable>
-          )
-        })}
-      </View>
 
       <SheetField label="Value ($)" value={amount} onChange={setAmount} keyboardType="numeric" placeholder="42000" />
       <SheetField label="Notes" value={notes} onChange={setNotes} multiline placeholder="Scope, timeline, materials, special asks…" />

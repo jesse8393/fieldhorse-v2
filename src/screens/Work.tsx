@@ -1,26 +1,22 @@
 // One inventory for every viewport. Desktop may add job quick actions,
 // but membership, filters, counts and source records stay shared.
-import { lazy, Suspense, memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { Phone as PhoneIcon, MessageSquare as MsgIcon, CalendarClock, CalendarDays, Trophy, XCircle, MoreHorizontal, RotateCcw } from 'lucide-react'
+import { Phone as PhoneIcon, MessageSquare as MsgIcon, CalendarClock, MoreHorizontal, RotateCcw } from 'lucide-react'
 import SwipeableRow from '../components/SwipeableRow.tsx'
 import { StatusPill } from '../components/v3'
 import JobsPhone from './jobs/JobsPhone.tsx'
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
-import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
-const Calendar = lazy(() => import('@/components/ui/calendar').then((m) => ({ default: m.Calendar })))
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
-import { supabase } from '../lib/supabase.ts'
-import { markLost, reopen, reopenQuestion } from '../lib/pipeline.ts'
+import { reopen, reopenQuestion } from '../lib/pipeline.ts'
 import { useSecondTap } from '../lib/secondTap.ts'
 import { detailRoute, LIST_STAGE_META as STAGE_META } from '../lib/stages.ts'
 import { moneyCents as money } from '../lib/format.ts'
 import { prefetchJobDetail } from './ContactDetail/hooks/useJobData.ts'
-import { hapticTap, hapticMedium } from '../lib/haptics.ts'
-import { toastSuccess, toastError } from '../lib/toast.ts'
+import { hapticTap } from '../lib/haptics.ts'
+import { toastError } from '../lib/toast.ts'
 import { canHover } from '../lib/hover.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { useJobs, useJobsRealtime, useJobSearch, jobsKey, type JobRow } from '../lib/queries.ts'
@@ -49,7 +45,18 @@ export default function Work() {
   const isMoneyRole = !membershipLoading && canCreateFinancialDocs
   const showMoney = !membershipLoading && canSeeFinancials
   const isDesktop = useIsDesktop()
-  const [search, setSearch] = useState('')
+  // The search lives in ?q= (D18), so Back from a job and a reload keep it.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [search, setSearchState] = useState(() => searchParams.get('q') ?? '')
+  const setSearch = useCallback((value: string) => {
+    setSearchState(value)
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (value) next.set('q', value)
+      else next.delete('q')
+      return next
+    }, { replace: true })
+  }, [setSearchParams])
   const [debouncedSearch, setDebouncedSearch] = useState('')
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300)
@@ -98,62 +105,18 @@ export default function Work() {
     }
   }, [patchJobsCache, refresh])
 
-  // Accepts a preset offset in days, an exact Date from the calendar
-  // picker, or null to clear.
-  const setFollowUp = useCallback(async (c: JobRow, when: number | Date | null) => {
-    // Format a Date to a LOCAL year month day. toISOString would render the
-    // UTC day, shifting the stored date for anyone not on UTC, which
-    // made "Follow up tomorrow" land two days out for evening US users.
-    const localYmd = (d: Date) =>
-      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-    let value: string | null
-    if (when === null) {
-      value = null
-    } else if (when instanceof Date) {
-      value = localYmd(when)
-    } else {
-      // Preset offset: add the days to LOCAL midnight, then format local :
-      // so the result is always exactly `when` calendar days from today.
-      const d = new Date()
-      d.setHours(0, 0, 0, 0)
-      d.setDate(d.getDate() + when)
-      value = localYmd(d)
-    }
-    patchJobsCache(c.id, { follow_up_on: value } as Partial<JobRow>)
-    toastSuccess(value ? 'Follow up set' : 'Follow up cleared', value ? `${c.name || 'Deal'} · ${followUpMeta({ follow_up_on: value })?.label || value}` : '')
-    const { error } = await supabase
-      .from('fh_contacts')
-      .update({ follow_up_on: value })
-      .eq('id', c.id)
-      .eq('user_id', c.user_id)
-    if (error) {
-      toastError("Couldn't set follow up", error.message)
-    }
-    await refresh()
-  }, [patchJobsCache, refresh])
-
   // Stable per-row handlers (take the contact as an arg instead of
   // closing over it inline) so DealCard's props keep referential identity
   // across search keystrokes and React.memo can skip re-rendering the ~40
   // mounted cards.
   const handleOpen = useCallback((c: JobRow) => navigate(detailRoute(c)), [navigate])
   const handleHover = useCallback((c: JobRow) => { if (canHover) prefetchJobDetail(queryClient, c.id, user?.id) }, [queryClient, user?.id])
-  // Won is no longer a stage move (Phase 9, D54, D61): the quote screen's
-  // Make this a job makes the job, so Won opens the record.
-  const handleWon = useCallback((c: JobRow) => {
-    if (c.proposal_status === 'changes_requested') {
-      toastError('Review changes first', 'Send the revised quote before making it a job.')
-    }
-    navigate(detailRoute(c))
-  }, [navigate])
-  const handleLost = useCallback((c: JobRow) => run(c, markLost, { stage: 'lost' } as Partial<JobRow>, "Couldn't mark lost"), [run])
   // Reopen asks first, like Mark lost on the job page: the card arms a
   // "Tap again to reopen" button when Reopen is picked from its menu, and
   // this runs on that second tap (D57).
   const handleReopen = useCallback(async (c: JobRow) => {
     await run(c, reopen, null, "Couldn't reopen")
   }, [run])
-  const handleFollowUp = useCallback((c: JobRow, when: number | Date | null) => setFollowUp(c, when), [setFollowUp])
 
   return (
     <JobsPhone
@@ -173,8 +136,7 @@ export default function Work() {
         const contact = contactsById.get(row.id)
         if (!contact || row.to !== detailRoute(contact)) return null
         return <DealCard contact={contact} busy={busyId === contact.id} canSell={isMoneyRole} showMoney={showMoney}
-          onOpen={handleOpen} onHover={handleHover} onWon={handleWon} onLost={handleLost}
-          onReopen={handleReopen} onFollowUp={handleFollowUp} />
+          onOpen={handleOpen} onHover={handleHover} onReopen={handleReopen} />
       } : undefined}
     />
   )
@@ -186,7 +148,8 @@ export default function Work() {
              Job title · via source      [Stage pill]
              [follow-up chip when due]              [⋯]
    Tap anywhere → detail (where the single big stage CTA lives).
-   Swipe → call / text. ⋯ → follow-ups, Won, Lost, Reopen.
+   Swipe → call / text. ⋯ → the job's More screen (follow up, mark
+   lost, delete), or Reopen with a second tap on a closed or lost job.
    ============================================================ */
 type DealCardProps = {
   contact: JobRow
@@ -201,26 +164,17 @@ type DealCardProps = {
   // lets React.memo below skip the untouched cards on every keystroke.
   onOpen: (c: JobRow) => void
   onHover: (c: JobRow) => void
-  onWon: (c: JobRow) => void
-  onLost: (c: JobRow) => void
   onReopen: (c: JobRow) => void
-  onFollowUp: (c: JobRow, when: number | Date | null) => void
 }
 
 // React.memo, DealCard used to re-render all ~40 mounted cards on every
 // search keystroke because the parent passed fresh inline-arrow callbacks
 // each render. With stable handlers (above) + memo, only cards whose own
 // props (contact ref / isNew / busy / canSell) actually change re-render.
-const DealCard = memo(function DealCard({ contact: c, isNew = false, busy, canSell: mayMoveStage, showMoney, onOpen, onHover, onWon, onLost, onReopen, onFollowUp }: DealCardProps) {
-  // Calendar popover for "Pick a date…", anchored to the ⋯ button so
-  // it opens exactly where the menu just closed.
-  const [dateOpen, setDateOpen] = useState(false)
-  // Reopen asks first (D57): picking it in the menu arms a "Tap again to
-  // reopen" button on the card, which runs the move on the second tap and
-  // goes back to resting on its own. The menu item only leaves the ask
-  // here, and it is run once the menu has gone and focus is back on the ⋯
-  // button, so the armed button can take focus from there.
-  const askAfterMenuRef = useRef<(() => void) | null>(null)
+const DealCard = memo(function DealCard({ contact: c, isNew = false, busy, canSell: mayMoveStage, showMoney, onOpen, onHover, onReopen }: DealCardProps) {
+  // Reopen asks first (D57): the card's Reopen button arms a "Tap again
+  // to reopen" button, which runs the move on the second tap and goes
+  // back to resting on its own.
   const reopenTap = useSecondTap()
   const reopenAgainRef = useRef<HTMLButtonElement>(null)
   useEffect(() => {
@@ -231,15 +185,8 @@ const DealCard = memo(function DealCard({ contact: c, isNew = false, busy, canSe
   const phone = c.phone || c.fh_clients?.phone || ''
   const est = showMoney && c.amount != null ? money(c.amount) : null
   const isTerminal = c.stage === 'lost' || c.stage === 'closed'
-  // Sell actions require both a sellable stage AND a money role.
-  const canSell = mayMoveStage && (c.stage === 'lead' || c.stage === 'quote')
-  const canMarkWon = canSell && c.proposal_status !== 'changes_requested'
-  // Reopen also moves a stage, money roles only.
+  // Reopen moves a stage, money roles only.
   const canReopen = mayMoveStage && isTerminal
-  // Follow up actions show on any non-terminal deal (all roles). If a
-  // terminal deal offers no reopen (field role), the ⋯ menu is empty :
-  // hide the trigger entirely rather than open an empty sheet.
-  const hasActions = !isTerminal || canReopen
   const pillLabel = c.stage === 'quote' && c.proposal_status === 'changes_requested'
     ? 'Changes requested'
     : c.stage === 'quote' && (c.proposal_status === 'sent' || c.proposal_status === 'viewed')
@@ -342,8 +289,8 @@ const DealCard = memo(function DealCard({ contact: c, isNew = false, busy, canSe
           )}
         </button>
 
-        {/* Reopen was picked in the menu: the second tap moves the deal
-            back to Leads (or a closed job back to Jobs). */}
+        {/* Reopen was tapped: the second tap moves the deal back to
+            Leads (or a closed job back to Jobs). */}
         {reopenTap.armed && (
           <div style={{ flex: '1 1 100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
             <span style={{ fontSize: 12, color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)' }}>
@@ -366,104 +313,37 @@ const DealCard = memo(function DealCard({ contact: c, isNew = false, busy, canSe
           </div>
         )}
 
-        {/* ⋯, the only control on the card. The calendar Popover and
-            the dropdown share this button: PopoverAnchor→Trigger→button
-            composes via asChild (the ui/ wrappers forward refs), so the
-            calendar opens exactly where the menu just closed. */}
-        <Popover open={dateOpen} onOpenChange={setDateOpen}>
-        <DropdownMenu>
-          <PopoverAnchor asChild>
-            <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              aria-label={`Actions for ${c.name || c.job_title || 'job'}`}
-              hidden={!hasActions}
-              disabled={busy || !hasActions}
-              style={{
-                flexShrink: 0, width: 44, height: 44, borderRadius: 10,
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                background: 'transparent', border: '1px solid var(--v3-border)',
-                color: 'var(--v3-text-muted)', cursor: busy ? 'wait' : 'pointer',
-                WebkitTapHighlightColor: 'transparent'
-              }}
-            >
-              <MoreHorizontal size={15} aria-hidden="true" />
-            </button>
-            </DropdownMenuTrigger>
-          </PopoverAnchor>
-          <DropdownMenuContent
-            side="bottom"
-            align="end"
-            sideOffset={6}
-            collisionPadding={20}
-            onCloseAutoFocus={() => {
-              const ask = askAfterMenuRef.current
-              if (!ask) return
-              askAfterMenuRef.current = null
-              // The menu puts focus back on its button right after this
-              // handler; ask once it has.
-              window.setTimeout(ask, 0)
+        {/* ⋯ opens the job's More screen (D57: a route, not a menu). A
+            closed or lost job offers Reopen instead, asked with a second tap. */}
+        {!isTerminal ? (
+          <Link
+            to={`/jobs/${encodeURIComponent(c.id)}/more`}
+            aria-label={`Actions for ${c.name || c.job_title || 'job'}`}
+            style={{
+              flexShrink: 0, width: 44, height: 44, borderRadius: 10,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              background: 'transparent', border: '1px solid var(--v3-border)',
+              color: 'var(--v3-text-muted)', WebkitTapHighlightColor: 'transparent'
             }}
           >
-            {!isTerminal && (
-              <>
-                <DropdownMenuItem onSelect={() => onFollowUp(c, 1)}>
-                  <CalendarClock size={13} /> Follow up tomorrow
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => onFollowUp(c, 3)}>
-                  <CalendarClock size={13} /> Follow up in 3 days
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => onFollowUp(c, 7)}>
-                  <CalendarClock size={13} /> Follow up next week
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => {
-                  // Let the menu finish closing before the popover
-                  // grabs focus, or the menu's focus-restore wins.
-                  setTimeout(() => setDateOpen(true), 0)
-                }}>
-                  <CalendarDays size={13} /> Pick a date…
-                </DropdownMenuItem>
-                {c.follow_up_on && (
-                  <DropdownMenuItem onSelect={() => onFollowUp(c, null)}>
-                    Clear follow up
-                  </DropdownMenuItem>
-                )}
-              </>
-            )}
-            {canSell && (
-              <>
-                <DropdownMenuSeparator />
-                {canMarkWon && (
-                  <DropdownMenuItem onSelect={() => { hapticMedium(); onWon(c) }}>
-                    <Trophy size={13} /> Mark won
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem variant="destructive" onSelect={() => onLost(c)}>
-                  <XCircle size={13} /> Mark lost
-                </DropdownMenuItem>
-              </>
-            )}
-            {canReopen && (
-              <DropdownMenuItem onSelect={() => { askAfterMenuRef.current = () => reopenTap.tap(() => onReopen(c)) }}>
-                <RotateCcw size={13} /> Reopen
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <PopoverContent side="bottom" align="end" sideOffset={6} collisionPadding={12} className="ui:w-auto ui:p-0">
-          <Suspense fallback={<div style={{ width: 250, height: 293 }} />}>
-          <Calendar
-            mode="single"
-            selected={c.follow_up_on ? new Date(c.follow_up_on + 'T00:00:00') : undefined}
-            disabled={{ before: new Date() }}
-            onSelect={(d: Date | undefined) => {
-              if (d) onFollowUp(c, d)
-              setDateOpen(false)
+            <MoreHorizontal size={15} aria-hidden="true" />
+          </Link>
+        ) : canReopen && !reopenTap.armed ? (
+          <button
+            type="button"
+            onClick={() => reopenTap.tap(() => onReopen(c))}
+            disabled={busy}
+            style={{
+              flexShrink: 0, minHeight: 44, padding: '0 12px', borderRadius: 10,
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              background: 'transparent', border: '1px solid var(--v3-border)',
+              color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
+              cursor: busy ? 'wait' : 'pointer', WebkitTapHighlightColor: 'transparent'
             }}
-          />
-          </Suspense>
-        </PopoverContent>
-        </Popover>
+          >
+            <RotateCcw size={13} aria-hidden="true" /> Reopen
+          </button>
+        ) : null}
       </motion.article>
     </SwipeableRow>
   )

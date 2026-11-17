@@ -78,10 +78,6 @@ export async function saveFollowUp(
   const value = followUpOnFor(when)
   const before = job.follow_up_on ?? null
   patchCaches(queryClient, job.id, userId, value)
-  toastSuccess(
-    value ? 'Follow up set' : 'Follow up cleared',
-    value ? `${job.name || 'This job'}, ${followUpMeta(value)?.label || value}` : ''
-  )
   // By id only: teammates set follow ups on shared jobs and RLS scopes
   // the org. .select() so a zero row update counts as a failure.
   const { data, error } = await supabase
@@ -93,6 +89,12 @@ export async function saveFollowUp(
   if (failure) {
     patchCaches(queryClient, job.id, userId, before)
     toastError("Couldn't set follow up", failure.message || 'Try again')
+  } else {
+    // Said once the write worked, never beside a failure (OPS-21).
+    toastSuccess(
+      value ? 'Follow up set' : 'Follow up cleared',
+      value ? `${job.name || 'This job'}, ${followUpMeta(value)?.label || value}` : ''
+    )
   }
   void queryClient.invalidateQueries({ queryKey: ['jobDetail', job.id] })
   void queryClient.invalidateQueries({ queryKey: ['jobs'] })

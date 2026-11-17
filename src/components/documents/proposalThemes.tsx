@@ -493,13 +493,6 @@ export function EditorialProposal({ view }: { view: ProposalView }) {
         </div>
       </div>
 
-      {view.scopeText && view.scopeText.trim() && (
-        <section style={{ marginBottom: 26 }}>
-          <div style={{ fontFamily: DOC_FONTS.serif, fontSize: 20, color: tan, marginBottom: 8, letterSpacing: 0 }}>SCOPE OF WORK</div>
-          <p style={{ margin: 0, fontSize: 12, lineHeight: 1.7, color: pal.mid, whiteSpace: 'pre-wrap' }}>{view.scopeText.trim()}</p>
-        </section>
-      )}
-
       <div style={{ fontFamily: DOC_FONTS.serif, fontSize: 20, color: tan, marginBottom: 8, letterSpacing: 0 }}>COST BREAKDOWN</div>
       <table className="fh-doc-items" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
         <thead>

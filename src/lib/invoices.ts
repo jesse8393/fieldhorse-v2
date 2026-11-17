@@ -6,7 +6,9 @@ import { createUuid } from './uuid.ts'
 // tab and Money all drive the same plumbing.
 
 import { supabase, authHeaders } from './supabase.ts'
-import { allocateInvoiceDue, knownContractTotal, type DueInvoice } from './invoiceSettlement.ts'
+import { allocateInvoiceDue, invoicesPaidInFull, knownContractTotal, type DueInvoice } from './invoiceSettlement.ts'
+import { toCents, sumCents } from './cents.ts'
+import { todayYmd } from './dates.ts'
 import type { Database } from './database.types.ts'
 
 // pdf.js pulls in jspdf (~390KB). Load it lazily at call time so merely
@@ -87,6 +89,8 @@ export function invoiceAmountDue({ invoice, contact, payments = [], changeOrders
 }) {
   const amount = Number(invoice?.amount || 0)
   if (!Number.isFinite(amount) || amount <= 0) return 0
+  // A void invoice asks for nothing (M-23).
+  if (String(invoice?.status || '').toLowerCase() === 'void') return 0
   const id = invoice?.id || 'this-invoice'
   const self: DueInvoice = { ...invoice, id, status: 'sent' }
   // An invoice with no job is a contract of its own amount: every payment
@@ -104,6 +108,18 @@ export function invoiceAmountDue({ invoice, contact, payments = [], changeOrders
     applyUnlinked: invoices != null
   })
   return Math.round((due.get(id) ?? 0) * 100) / 100
+}
+
+/**
+ * Runs a status write and, when it fails, runs it once more (DATA-17). A
+ * payment or an email has already happened by the time its invoice status
+ * is written, so a dropped connection here must not pass silently: the
+ * caller reports what is still returned as an error.
+ */
+export async function retryOnce<T extends { error: unknown }>(run: () => PromiseLike<T>): Promise<T> {
+  const first = await run()
+  if (!first.error) return first
+  return run()
 }
 
 export async function fetchInvoicesForContact(contactId: string) {
@@ -199,6 +215,11 @@ export async function logInvoicePayment(invoice: Pick<InvoiceRow, 'id' | 'user_i
   /** Payments already linked to the invoice, so the paid flip counts them. */
   priorPayments?: { amount?: number | string | null }[]
 }) {
+  // A void invoice takes no money (M-23): the address bar or a stale tab
+  // can still reach its payment screen.
+  if (String(invoice.status || '').toLowerCase() === 'void') {
+    return { error: new Error('This invoice is void, so it cannot take a payment.'), paid: false }
+  }
   const amount = Number(input.amount) || 0
   const kind = ['deposit', 'progress', 'final', 'retainage', 'other'].includes(input.kind ?? '') ? (input.kind as string) : 'other'
   const payload: Record<string, unknown> = {
@@ -210,16 +231,61 @@ export async function logInvoicePayment(invoice: Pick<InvoiceRow, 'id' | 'user_i
     method: input.method || 'check',
     kind,
     reference: input.reference || null,
-    paid_on: input.paid_on || new Date().toISOString().slice(0, 10)
+    // The local calendar day (OPS-16): the UTC day is tomorrow in an evening.
+    paid_on: input.paid_on || todayYmd()
   }
-  const { error } = await supabase.from('fh_payments').upsert(payload as any, { onConflict: 'id', ignoreDuplicates: true })
+  const { error } = await supabase.from('fh_payments').upsert(payload as any, { onConflict: 'id' })
   if (error) return { error, paid: false }
-  const prior = (input.priorPayments || []).reduce((s, p) => s + Number(p.amount || 0), 0)
-  const paid = prior + amount >= Number(invoice.amount || 0) - 0.005
+  const paid = sumCents(input.priorPayments || [], (p) => p.amount) + toCents(amount) >= toCents(invoice.amount)
+  let statusError: unknown = null
   if (paid && invoice.status !== 'paid' && invoice.status !== 'void') {
-    await supabase.from('fh_invoices').update({ status: 'paid' }).eq('id', invoice.id)
+    const { error: flipErr } = await retryOnce(() => supabase.from('fh_invoices').update({ status: 'paid' }).eq('id', invoice.id))
+    if (flipErr) {
+      console.error('[fieldhorse] logInvoicePayment status update failed', flipErr)
+      statusError = flipErr
+    }
   }
-  return { error: null, paid }
+  return { error: null, paid, statusError }
+}
+
+/**
+ * After an invoice's amount is edited, mark it paid when the payments
+ * already recorded now cover it (M-24). A $1,000.00 invoice with $500.00
+ * collected, corrected to $500.00, used to stay Sent with $0.00 owed. An
+ * invoice with no job counts the payments linked to it; a job's invoice is
+ * settled the way Log payment settles it, from all of the job's payments
+ * against its known contract.
+ */
+export async function settleInvoiceAfterEdit(invoice: Pick<InvoiceRow, 'id' | 'contact_id' | 'amount' | 'status'>) {
+  const status = String(invoice.status || '').toLowerCase()
+  if (!['draft', 'sent', 'overdue', 'viewed'].includes(status) || toCents(invoice.amount) <= 0) return { paid: false, error: null }
+  let covered = false
+  if (!invoice.contact_id) {
+    const { data, error } = await supabase.from('fh_payments').select('amount').eq('invoice_id', invoice.id)
+    if (error) return { paid: false, error }
+    covered = sumCents(data || [], (p: { amount?: number | null }) => p.amount) >= toCents(invoice.amount)
+  } else {
+    const jobId = invoice.contact_id
+    const [paysRes, invsRes, cosRes, jobRes] = await Promise.all([
+      supabase.from('fh_payments').select('amount, invoice_id').eq('contact_id', jobId),
+      supabase.from('fh_invoices').select('id, amount, status, sequence_number').eq('contact_id', jobId),
+      supabase.from('fh_change_orders').select('amount, status').eq('contact_id', jobId).eq('status', 'approved'),
+      supabase.from('fh_contacts').select('amount').eq('id', jobId).maybeSingle()
+    ])
+    const readErr = paysRes.error || invsRes.error || cosRes.error || jobRes.error
+    if (readErr) return { paid: false, error: readErr }
+    const contractTotal = knownContractTotal({ amount: (jobRes.data as { amount?: number | null } | null)?.amount, changeOrders: cosRes.data || [] })
+    covered = invoicesPaidInFull({ invoices: invsRes.data || [], payments: paysRes.data || [], contractTotal }).includes(invoice.id)
+  }
+  if (!covered) return { paid: false, error: null }
+  const { data: moved, error } = await supabase
+    .from('fh_invoices')
+    .update({ status: 'paid' })
+    .eq('id', invoice.id)
+    .in('status', ['draft', 'sent', 'overdue', 'viewed'])
+    .select('id')
+  if (error) return { paid: false, error }
+  return { paid: (moved?.length ?? 0) > 0, error: null }
 }
 
 export async function setInvoiceStatus(invoice: Pick<InvoiceRow, 'id'>, status: InvoiceStatus, extra: Partial<InvoiceRow> = {}) {
@@ -335,7 +401,8 @@ export async function buildInvoicePdf(args: InvoicePdfArgs) {
 }
 
 export type SendInvoiceResult =
-  | { ok: true; filename: string; recipient: string }
+  /** statusError: the email went, but the invoice could not be marked sent. */
+  | { ok: true; filename: string; recipient: string; statusError?: unknown }
   | { ok: false; reason: 'no_email' | 'sender_not_configured' | 'error'; message?: string }
 
 // Email an invoice: build PDF → upload to the private job-files bucket
@@ -433,14 +500,20 @@ export async function sendInvoiceEmail({ invoice, duplicateReviewed = false, con
   // can take seconds on a weak signal: only a row still in that status
   // moves to sent, so a void or a payment recorded meanwhile stays
   // (review of Phase 8, task 6).
+  let statusError: unknown = null
   if (invoice.status !== 'paid') {
-    await supabase
+    const issuedAt = invoice.issued_at || new Date().toISOString()
+    const { error: flipErr } = await retryOnce(() => supabase
       .from('fh_invoices')
-      .update({ status: 'sent', issued_at: invoice.issued_at || new Date().toISOString() })
+      .update({ status: 'sent', issued_at: issuedAt })
       .eq('id', invoice.id)
-      .eq('status', invoice.status)
+      .eq('status', invoice.status))
+    if (flipErr) {
+      console.error('[fieldhorse] sendInvoiceEmail status update failed', flipErr)
+      statusError = flipErr
+    }
   }
-  return { ok: true, filename: result.filename, recipient }
+  return { ok: true, filename: result.filename, recipient, statusError }
 }
 
 // Suggested next invoice for a job, drives the new invoice screen's

@@ -110,8 +110,44 @@ test.describe('Reports read the four records', () => {
     await open(page)
     const chart = page.locator('.fh-build-chart-card').filter({ hasText: 'Revenue received' })
     await expect(chart).toContainText('September 2026 versus August 2026')
-    await expect(chart).toContainText('$47K less')
+    await expect(chart).toContainText('$47,000 less')
     await expect(chart).toContainText('Oct · so far')
     await expect(page.getByText('collection rate YTD', { exact: true })).toHaveCount(0)
   })
+
+  // D20: amounts read in full dollars, a month with nothing received
+  // draws no bar, and the client list says it covers the last 90 days.
+  test('report amounts are not rounded to thousands, and empty months draw no bar', async ({ context, page }, testInfo) => {
+    test.skip(!testInfo.project.name.startsWith('desktop'), 'The desktop report')
+    await page.clock.setFixedTime(new Date('2026-10-27T15:00:00Z'))
+    await signIn(context, { tables: {
+      fh_payments: [
+        { id: 'aug', user_id: USER.id, contact_id: 'c-job1', amount: 4500, paid_on: '2026-08-15' },
+        { id: 'oct', user_id: USER.id, contact_id: 'c-job1', amount: 1200, paid_on: '2026-10-15' }
+      ]
+    } })
+    await open(page)
+    const chart = page.locator('.fh-build-chart-card').filter({ hasText: 'Revenue received' })
+    await expect(chart).toContainText('$4,500')
+    await expect(chart).not.toContainText('$5K')
+    const september = chart.locator('.fh-build-trend-col').filter({ hasText: /^Sep/ })
+    await expect(september).toHaveCount(1)
+    await expect(september.locator('.fh-build-trend-col__bar')).toHaveCount(0)
+    await expect(page.locator('.fh-build-eyebrow', { hasText: 'Top clients' })).toContainText('last 90 days')
+  })
+})
+
+// OPS-07: Log miles showed and used $0.67, the 2024 rate. It now uses the
+// rate for the date the drive happened, from the same table Reports reads.
+test('log miles shows and computes the IRS rate for the drive date', async ({ context, page }) => {
+  await page.clock.setFixedTime(new Date('2026-11-16T18:00:00Z'))
+  await signIn(context)
+  await page.goto('/miles/new')
+  await expect(page.getByText(/on this date is \$0\.76 deducted/)).toBeVisible()
+  await expect(page.getByText(/\$0\.67/)).toHaveCount(0)
+  await page.getByLabel('Miles', { exact: true }).fill('100')
+  await expect(page.getByText('Deduction $76.00', { exact: true })).toBeVisible()
+  await page.getByLabel('Date', { exact: true }).fill('2026-03-02')
+  await expect(page.getByText(/on this date is \$0\.725 deducted/)).toBeVisible()
+  await expect(page.getByText('Deduction $72.50', { exact: true })).toBeVisible()
 })

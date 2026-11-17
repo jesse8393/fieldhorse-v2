@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canViewRoute } from './permissions.ts'
+import { canViewRoute, permissionRouteForPath } from './permissions.ts'
 
 describe('canViewRoute', () => {
   it('keeps Lead Desk with revenue operators', () => {
@@ -46,5 +46,39 @@ describe('canViewRoute', () => {
     for (const route of ['/', '/crew', '/work', '/jobs', '/notes', '/schedule', '/activity', '/team', '/pour-window']) {
       expect(canViewRoute('crew', route)).toBe(true)
     }
+  })
+
+  // OPS-05 and D01: the bell and the header + must open for the roles that see them.
+  it('lets every role open Notifications and money roles open New', () => {
+    for (const role of ['owner', 'admin', 'manager', 'foreman', 'crew']) expect(canViewRoute(role, '/notifications')).toBe(true)
+    for (const role of ['owner', 'admin', 'manager']) expect(canViewRoute(role, '/new')).toBe(true)
+    for (const role of ['foreman', 'crew']) expect(canViewRoute(role, '/new')).toBe(false)
+  })
+
+  // OPS-06 and D02: the job money screens and the partner invite follow their own gates.
+  it('keeps job payment, completion, new job and partner invite away from field roles', () => {
+    const gate = (role: string, path: string) => canViewRoute(role, permissionRouteForPath(path))
+    for (const path of ['/jobs/c-job1/payment', '/jobs/c-job1/complete', '/jobs/new', '/jobs/c-job1/partner']) {
+      for (const role of ['owner', 'admin', 'manager']) expect(gate(role, path)).toBe(true)
+      for (const role of ['foreman', 'crew']) expect(gate(role, path)).toBe(false)
+    }
+    for (const role of ['owner', 'admin', 'manager', 'foreman', 'crew']) {
+      expect(gate(role, '/jobs/c-job1')).toBe(true)
+      expect(gate(role, '/jobs/c-job1/more')).toBe(true)
+    }
+  })
+
+  // D03: Money links every customer to the client page and its statement.
+  it('lets roles that see money open a client and its statement, but not the client list', () => {
+    const gate = (role: string, path: string) => canViewRoute(role, permissionRouteForPath(path))
+    expect(gate('manager', '/clients/cl-1')).toBe(true)
+    expect(gate('manager', '/clients/cl-1/statement')).toBe(true)
+    expect(gate('manager', '/clients')).toBe(false)
+    for (const role of ['foreman', 'crew']) {
+      expect(gate(role, '/clients/cl-1')).toBe(false)
+      expect(gate(role, '/clients/cl-1/statement')).toBe(false)
+    }
+    expect(gate('owner', '/clients/merge')).toBe(true)
+    expect(gate('manager', '/clients/merge')).toBe(false)
   })
 })

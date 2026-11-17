@@ -777,7 +777,7 @@ export default function Bid() {
             ) : (
               <Sparkles size={16} />
             )}
-            {generating ? 'Generating estimate…' : 'Generate Estimate'}
+            {generating ? 'Generating estimate…' : 'Generate estimate'}
           </motion.button>
 
           {/* Error block, graceful degradation */}
@@ -1109,7 +1109,7 @@ export default function Bid() {
                 Your estimate will appear here.
               </div>
               <div style={{ fontSize: 12, lineHeight: 1.5 }}>
-                Describe the scope above, pick a job type and trades, then tap <strong style={{ color: 'var(--v3-primary-text)' }}>Generate Estimate</strong>.
+                Describe the scope above, pick a job type and trades, then tap <strong style={{ color: 'var(--v3-primary-text)' }}>Generate estimate</strong>.
               </div>
             </div>
           </motion.div>

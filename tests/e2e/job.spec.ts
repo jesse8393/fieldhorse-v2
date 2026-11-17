@@ -297,6 +297,7 @@ test.describe('job page on a phone', () => {
     const again = page.getByRole('button', { name: 'Tap again to delete' })
     await expect(again).toBeVisible()
     expect(deletes).toEqual([])
+    await page.waitForTimeout(600) // a second tap within 500 ms is ignored (OPS-02)
     await again.click()
     await expect.poll(() => deletes.length).toBe(1)
     expect(deletes[0]).toMatch(/id=eq\.c-job1/)
@@ -452,10 +453,12 @@ test.describe('job page on a desktop, redesigned', () => {
     // Shortcuts only fire inside the command palette, so the button draws no key cap.
     await expect(banner.locator('kbd')).toHaveCount(0)
 
-    await banner.getByRole('button', { name: 'More actions for this job' }).click()
-    await expect(page.getByRole('menuitem', { name: 'Edit job details' })).toBeVisible()
-    await expect(page.getByRole('menuitem', { name: 'Delete this job' })).toBeVisible()
-    await page.keyboard.press('Escape')
+    // More is the job's More screen at every width (D08), not a menu.
+    await banner.getByRole('link', { name: 'More actions for this job' }).click()
+    await expect(page).toHaveURL(/\/jobs\/c-job1\/more$/)
+    await expect(page.getByRole('menu')).toHaveCount(0)
+    await expect(page.getByRole('link', { name: /Edit job details/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Delete job' })).toBeVisible()
   })
 
   test('job without photos keeps a compact visit summary', async ({ context, page }) => {
@@ -608,12 +611,14 @@ test.describe('job page on a desktop, redesigned', () => {
     })
     await openDesktop(page, '/jobs/c-job1')
     const banner = page.locator('.fh-job-workspace')
-    await banner.getByRole('button', { name: 'More actions for this job' }).click()
-    await page.getByRole('menuitem', { name: 'Delete this job' }).click()
+    await banner.getByRole('link', { name: 'More actions for this job' }).click()
+    await expect(page).toHaveURL(/\/jobs\/c-job1\/more$/)
+    await page.getByRole('button', { name: 'Delete job' }).click()
     await expect(page.getByRole('dialog')).toHaveCount(0)
-    const again = page.getByRole('menuitem', { name: 'Tap again to delete' })
+    const again = page.getByRole('button', { name: 'Tap again to delete' })
     await expect(again).toBeVisible()
     expect(deletes).toEqual([])
+    await page.waitForTimeout(600) // a second tap within 500 ms is ignored (OPS-02)
     await again.click()
     await expect.poll(() => deletes.length).toBe(1)
     expect(deletes[0]).toMatch(/id=eq\.c-job1/)
@@ -677,4 +682,82 @@ test.describe('job page on a desktop, redesigned', () => {
     await expect(page.getByRole('button', { name: 'Invoice this', exact: true })).toHaveCount(0)
     await expect(page.getByRole('complementary', { name: 'Job facts' })).toBeVisible()
   })
+})
+
+// M-20 and OPS-08: Log payment keeps cents on the balance, the button and
+// the one toast it shows.
+test('Log payment shows cents and one toast', async ({ context, page }) => {
+  const job = {
+    id: 'c-cents', stage: 'job', name: 'Whitcomb', job_title: 'Garage slab', amount: 10000,
+    user_id: 'qa-user-1', client_id: null, phone: '615 555 0148', email: 'd@w.com', address: '2210 Ridgecrest Dr',
+    created_at: '2026-09-23T15:00:00.000Z', updated_at: '2026-10-09T15:00:00.000Z', completed_at: null,
+    proposal_status: 'approved', milestones: [], follow_up_on: null, notes: null, scope_text: null
+  }
+  await signIn(context, {
+    tables: {
+      fh_contacts: [job], fh_clients: [], fh_invoices: [], fh_change_orders: [],
+      fh_payments: [{ id: 'p1', user_id: 'qa-user-1', contact_id: 'c-cents', amount: 5000.5, method: 'check', reference: '1', paid_on: '2026-09-30', created_at: '2026-09-30T15:00:00.000Z' }]
+    }
+  })
+  await page.goto('/jobs/c-cents/payment', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByText('Balance $4,999.50')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('button', { name: 'Record $4,999.50' })).toBeVisible()
+  const amount = page.getByLabel('Amount')
+  await amount.fill('1234.50')
+  const record = page.getByRole('button', { name: 'Record $1,234.50' })
+  await expect(record).toBeVisible()
+  await record.click()
+  await expect(page.getByText(/\$1,234\.50/).first()).toBeVisible()
+  await expect(page.getByText(/\$1,235\b/)).toHaveCount(0)
+  await expect(page.locator('[data-sonner-toast]').filter({ hasText: /payment/i })).toHaveCount(1)
+})
+
+// M-15: the job page measures margin and health against the contract
+// with its approved change orders.
+test('margin and health count an approved change order', async ({ context, page }, testInfo) => {
+  test.skip(!testInfo.project.name.startsWith('mobile'), 'the money strip is the phone layout')
+  const job = {
+    id: 'c-co', stage: 'job', name: 'Whitcomb', job_title: 'Garage slab', amount: 10000, cost: 12000,
+    user_id: 'qa-user-1', client_id: null, phone: '615 555 0148', email: 'd@w.com', address: '2210 Ridgecrest Dr',
+    created_at: '2026-09-23T15:00:00.000Z', updated_at: '2026-10-09T15:00:00.000Z', completed_at: null,
+    proposal_status: 'approved', milestones: [], follow_up_on: null, notes: null, scope_text: null
+  }
+  await signIn(context, {
+    tables: {
+      fh_contacts: [job], fh_clients: [], fh_invoices: [], fh_schedule: [],
+      fh_change_orders: [{ id: 'co1', user_id: 'qa-user-1', contact_id: 'c-co', sequence_number: 1, title: 'Extra footing', amount: 5000, status: 'approved', created_at: '2026-10-01T15:00:00.000Z' }],
+      fh_payments: [{ id: 'p1', user_id: 'qa-user-1', contact_id: 'c-co', amount: 12000, method: 'check', reference: '1', paid_on: '2026-09-30', created_at: '2026-09-30T15:00:00.000Z' }]
+    }
+  })
+  await open(page, '/jobs/c-co')
+  await openMoreAboutJob(page)
+  await expect(page.getByText('80% collected').filter({ visible: true }).first()).toBeVisible({ timeout: 30_000 })
+  // The margin chip sits in the header strip, which this layout keeps in
+  // the page but out of view.
+  await expect(page.getByText('20.0% margin').first()).toBeAttached()
+  await expect(page.getByText('20.0% loss')).toHaveCount(0)
+  await expect(page.getByText('Overpaid')).toHaveCount(0)
+})
+
+// Mark complete writes the closeout record and moves the job to Closed.
+// Before this test nothing submitted the screen.
+test('Mark complete saves the closeout and closes the job', async ({ context, page }) => {
+  await signIn(context)
+  const writes: { method: string; url: string; body: any }[] = []
+  page.on('request', (req) => {
+    if (req.method() !== 'GET' && req.url().includes('/rest/v1/')) writes.push({ method: req.method(), url: req.url(), body: req.postDataJSON() })
+  })
+  await page.goto('/jobs/c-job1/complete', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText('Mark this job complete', { exact: true }).first()).toBeVisible({ timeout: 30_000 })
+  const save = page.getByRole('button', { name: 'Mark complete', exact: true })
+  await expect(save).toBeEnabled()
+  await save.click()
+
+  await expect.poll(() => writes.some((w) => w.method === 'PATCH' && w.url.includes('/fh_contacts'))).toBe(true)
+  const closeout = writes.find((w) => w.method === 'POST' && w.url.includes('/fh_closeouts'))
+  expect(closeout?.url).toContain('on_conflict=contact_id')
+  expect(closeout?.body).toMatchObject({ user_id: 'qa-user-1', contact_id: 'c-job1', signoff_method: 'verbal', warranty_months: 12, final_amount: 33100 })
+  const stage = writes.find((w) => w.method === 'PATCH' && w.url.includes('/fh_contacts'))
+  expect(stage?.url).toContain('id=eq.c-job1')
+  expect(stage?.body).toEqual({ stage: 'closed' })
 })

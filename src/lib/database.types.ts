@@ -1,3 +1,11 @@
+// This file describes the schema the repo's migrations build, not what
+// production has. It has been edited by hand (fh_make_job_from_quote sits
+// out of the generator's order, and assigned_user_ids was added for the
+// crew allocation migration before production had it), so a clean
+// typecheck only proves the code and the migrations agree. Run
+// `npm run check:schema` to compare what the code uses with these types,
+// and with production when the run can read it (see that script's header).
+
 export type Json =
   | string
   | number
@@ -6121,6 +6129,28 @@ export type Database = {
         Returns: string
       }
       fh_money_visible: { Args: { p_org_id: string }; Returns: boolean }
+      fh_my_open_reminders: {
+        Args: never
+        Returns: {
+          channel: string | null
+          client_email: string | null
+          client_id: string | null
+          client_name: string | null
+          client_phone: string | null
+          created_at: string
+          days_quiet: number | null
+          draft_body: string | null
+          due_on: string | null
+          follow_up_id: string
+          headline: string | null
+          kind: string
+          link: string | null
+          notification_id: string
+          read_at: string | null
+          record_id: string | null
+          record_kind: string
+        }[]
+      }
       fh_next_local_time: {
         Args: {
           p_after?: string

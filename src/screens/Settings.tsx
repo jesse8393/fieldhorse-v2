@@ -251,6 +251,35 @@ export default function Settings() {
 
   useEffect(() => { seedForm(profile) }, [profile, seedForm])
 
+  // Unsaved section edits live in sessionStorage too (D21), so leaving
+  // Settings from the header and coming back keeps them. They come back
+  // once the profile has seeded the form, and only then are they written.
+  const draftKey = user?.id ? `fh:settings-draft:v1:${user.id}` : null
+  const [draftReady, setDraftReady] = useState(false)
+  useEffect(() => {
+    if (draftReady || !profile || !draftKey) return
+    const setters: Record<string, (value: any) => void> = {
+      displayName: setDisplayName, companyName: setCompanyName, companyPhone: setCompanyPhone,
+      companyEmail: setCompanyEmail, companyWebsite: setCompanyWebsite, companyAddress: setCompanyAddress,
+      licenseNumber: setLicenseNumber, insuredText: setInsuredText, warrantyDefault: setWarrantyDefault,
+      paymentLink: setPaymentLink, paymentInstructions: setPaymentInstructions, brandAccentHex: setBrandAccentHex,
+      estimateTemplate: setEstimateTemplate, quoteFollowUpEnabled: setQuoteFollowUpEnabled,
+      quoteFollowUpDays: setQuoteFollowUpDays, services: setServices,
+    }
+    try {
+      const draft: unknown = JSON.parse(sessionStorage.getItem(draftKey) || 'null')
+      if (draft && typeof draft === 'object' && !Array.isArray(draft)) {
+        const seeded = formFromProfile(profile) as Record<string, unknown>
+        for (const [key, value] of Object.entries(draft)) {
+          // Only a value of the same kind as the field's own goes back in.
+          const same = Array.isArray(seeded[key]) ? Array.isArray(value) : typeof value === typeof seeded[key]
+          if (setters[key] && same) setters[key](value)
+        }
+      }
+    } catch { /* Storage can be disabled; the form still works. */ }
+    setDraftReady(true)
+  }, [draftReady, profile, draftKey])
+
   const currentForm = {
     displayName, companyName, companyPhone, companyEmail, companyWebsite, companyAddress,
     licenseNumber, insuredText, warrantyDefault, paymentLink, paymentInstructions,
@@ -261,6 +290,17 @@ export default function Settings() {
   const hasUnsavedChanges = dirtySections.length > 0
   const sectionHasChanges = dirtySections.some((section) => section.id === activeSection)
   const sectionHasProfileFields = !['rates', 'account'].includes(activeSection)
+
+  const draftJson = JSON.stringify(Object.fromEntries(
+    Object.entries(currentForm).filter(([key, value]) => !sameFormValue(value, (storedForm as Record<string, unknown>)[key]))
+  ))
+  useEffect(() => {
+    if (!draftReady || !draftKey || !profile) return
+    try {
+      if (draftJson === '{}') sessionStorage.removeItem(draftKey)
+      else sessionStorage.setItem(draftKey, draftJson)
+    } catch { /* Optional: the draft just will not survive leaving. */ }
+  }, [draftReady, draftKey, profile, draftJson])
 
   useEffect(() => {
     if (!hasUnsavedChanges) return
@@ -307,11 +347,19 @@ export default function Settings() {
   }
 
   async function pinLocation() {
-    if (!('geolocation' in navigator)) return
+    if (!('geolocation' in navigator)) {
+      toastError("Couldn't get your location", 'This browser does not share a location.')
+      return
+    }
     navigator.geolocation.getCurrentPosition(async (pos) => {
       await upsertProfile({ location_lat: pos.coords.latitude, location_lon: pos.coords.longitude })
       refresh()
-    })
+    }, (err) => {
+      // A refusal or a timeout used to do nothing at all.
+      toastError("Couldn't get your location", err.code === 1
+        ? 'Allow location for this site in your browser settings, then tap Pin location again.'
+        : 'Try again outside, or in a moment.')
+    }, { timeout: 15_000 })
   }
 
   // Reverse-geocode the saved coords so the Settings location card

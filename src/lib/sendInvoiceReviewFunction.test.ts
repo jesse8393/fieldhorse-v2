@@ -14,7 +14,7 @@ vi.mock('../../netlify/functions/lib/orgAccess.js', () => ({
   loadAccessibleRow: async (_db: unknown, args: any) => ({ row: args.table === 'fh_contacts' ? { id: 'job', org_id: 'org', user_id: 'sender', amount: 10000 } : current }),
   brandingUserIdFor: async () => 'sender'
 }))
-vi.mock('../../netlify/functions/lib/rateLimit.js', () => ({ hashIdentifier: (s: string) => s, checkRateLimit: async () => true }))
+vi.mock('../../netlify/functions/lib/rateLimit.js', () => ({ hashIdentifier: (s: string) => s, checkRateLimit: async () => true, checkDailySendCap: async () => true, DAILY_SEND_LIMIT_MESSAGE: 'daily' }))
 const { default: handler } = await import('../../netlify/functions/send-invoice.js')
 const request = (extra = {}) => new Request('https://example.test/api/send-invoice', { method: 'POST', headers: { authorization: 'Bearer synthetic-token', 'content-type': 'application/json' }, body: JSON.stringify({ contact_id: 'job', invoice_id: 'new', sender_user_id: 'sender', recipient_email: 'customer@example.test', storage_path: 'sender/job/test.pdf', amount_due: 5000, ...extra }) })
 beforeEach(() => {

@@ -20,7 +20,14 @@ type JobRow = {
 }
 type PaymentRow = {
   contact_id?: string | null
+  invoice_id?: string | null
   amount?: number | string | null
+}
+type InvoiceRow = {
+  id?: string | null
+  contact_id?: string | null
+  amount?: number | string | null
+  status?: string | null
 }
 type ChangeOrderRow = {
   contact_id?: string | null
@@ -89,10 +96,21 @@ function paidByContact(payments: PaymentRow[] | null | undefined) {
 // wonCount   , count of won deals: stage in (job, closed), plus the
 //               legacy 'invoice' alias.
 // paidTotal  , sum of all payments received against these jobs.
+//
+// `invoices` (the client's fh_invoices rows) cover the money a contract
+// does not (M-13). An issued invoice (not draft, not void) billed straight
+// to the client with no job counts in lifetime, and what its own payments
+// leave unpaid counts in outstanding. A job saved with no price has no
+// contract to measure, so its issued invoices stand in for one. A job
+// with a price keeps its contract, whatever its invoices say.
+const cents = (n: number) => Math.round(n * 100) / 100
+const issued = (inv: InvoiceRow) => inv.status !== 'draft' && inv.status !== 'void'
+
 export function rollupJobs(
   jobs: JobRow[] | null | undefined,
   payments: PaymentRow[] | null | undefined,
-  changeOrders: ChangeOrderRow[] | null | undefined = []
+  changeOrders: ChangeOrderRow[] | null | undefined = [],
+  invoices: InvoiceRow[] | null | undefined = []
 ): JobRollup {
   const paidMap = paidByContact(payments)
   const coMap = coByContact(changeOrders)
@@ -101,19 +119,38 @@ export function rollupJobs(
   let activeCount = 0
   let wonCount = 0
   let paidTotal = 0
+  const billedByJob = new Map<string, number>()
+  for (const inv of invoices || []) {
+    if (!inv.contact_id || !issued(inv)) continue
+    billedByJob.set(inv.contact_id, (billedByJob.get(inv.contact_id) || 0) + Number(inv.amount || 0))
+  }
   for (const j of jobs || []) {
     const amount = Number(j.amount || 0)
     const stage = j.stage || ''
+    // No price and no approved change orders: what was invoiced is the contract.
+    const contract = amount + (coMap.get(j.id || '') || 0)
+    const value = contract > 0 ? contract : (billedByJob.get(j.id || '') || 0)
     if (ACTIVE_PIPELINE_STAGES.has(stage)) activeCount += 1
     if (WON_STAGES.has(stage)) {
       wonCount += 1
-      lifetime += amount + (coMap.get(j.id || '') || 0)
+      lifetime += value
     }
     if (BILLING_STAGES.has(stage)) {
-      const contract = amount + (coMap.get(j.id || '') || 0)
-      const bal = contract - (paidMap.get(j.id || '') || 0)
+      const bal = value - (paidMap.get(j.id || '') || 0)
       if (bal > 0.5) outstanding += bal
     }
+  }
+  // Invoices billed straight to the client, with no job.
+  const paidByInvoice = new Map<string, number>()
+  for (const p of payments || []) {
+    if (p.invoice_id) paidByInvoice.set(p.invoice_id, (paidByInvoice.get(p.invoice_id) || 0) + Number(p.amount || 0))
+  }
+  for (const inv of invoices || []) {
+    if (inv.contact_id || !issued(inv)) continue
+    const amount = Number(inv.amount || 0)
+    lifetime += amount
+    const owed = cents(amount - (paidByInvoice.get(inv.id || '') || 0))
+    if (owed > 0) outstanding += owed
   }
   for (const p of payments || []) paidTotal += Number(p.amount || 0)
   return { lifetime, outstanding, activeCount, wonCount, paidTotal }

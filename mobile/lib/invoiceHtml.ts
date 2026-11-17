@@ -6,6 +6,7 @@
 // react-native-webview (preview) and expo-print (PDF / share / email).
 
 import type { ProposalCompany } from './proposalHtml'
+import { parseDateOnly } from '../../src/lib/dates'
 
 export type InvoicePayment = { method?: string | null; amount?: number | null; paidOn?: string | null; reference?: string | null }
 export type InvoiceData = {
@@ -31,8 +32,8 @@ function money(n: unknown): string {
 }
 function fmtDate(d?: Date | string | null): string {
   if (!d) return new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
-  const dt = d instanceof Date ? d : new Date(d)
-  if (Number.isNaN(dt.getTime())) return ''
+  const dt = parseDateOnly(d)
+  if (!dt) return ''
   return dt.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
 }
 function field(c: ProposalCompany, a: keyof ProposalCompany, b: keyof ProposalCompany): string {

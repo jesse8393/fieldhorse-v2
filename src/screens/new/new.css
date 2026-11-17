@@ -271,6 +271,7 @@
 @media (min-width: 900px) {
   .fhnew {
     max-width: 640px;
+    margin-inline: auto;
     padding-bottom: 32px;
   }
 
@@ -286,4 +287,25 @@
     padding-left: var(--fh-gutter-desktop);
     padding-right: var(--fh-gutter-desktop);
   }
+}
+
+/* New lead: a typed phone or name that matches another client (S06). */
+.fhnew-match {
+  margin: 0 0 16px;
+  padding: 12px;
+  border: 1px solid var(--fh-edge);
+  border-radius: 12px;
+  background: var(--fh-wash);
+}
+
+.fhnew-match__text {
+  margin: 0 0 12px;
+  font-size: 15px;
+  line-height: 20px;
+}
+
+.fhnew-match__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }

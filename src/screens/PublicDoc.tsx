@@ -37,8 +37,22 @@ import '../components/documents/fieldhorse-proposal.css'
 import { safePayUrl } from '../lib/payLink.ts'
 import { buildPortalView, portalStatus, quoteFingerprint, type PublicDocPayload } from '../lib/portalView.ts'
 import { gatherStatement } from '../lib/statement.ts'
+import { publicInvoiceView } from '../components/public/invoiceView.ts'
+import { money } from '../components/documents/format.ts'
 
-type PublicDocState = { loading: boolean; data: PublicDocPayload | null; error: string | null }
+// `error` is what the customer reads when there is no document to show;
+// `retry` is set when the read failed (no answer, a server error) rather
+// than the link being refused, so the page offers Try again; `contractor`
+// is who to call about a refused link, when the server names them.
+type PublicDocState = {
+  loading: boolean
+  data: PublicDocPayload | null
+  error: string | null
+  retry?: boolean
+  contractor?: { name: string; phone: string } | null
+}
+
+const READ_FAILED = 'We could not load this document just now. Please try again.'
 
 // The Fieldhorse theme draws its own approve capsule and fills the page;
 // every other template keeps the classic page and bar.
@@ -49,15 +63,47 @@ function isFieldhorse(payload: PublicDocPayload): boolean {
 
 // Whether the page drawn from this payload offers the approve bar. The
 // render and the check before an approval posts both ask this, so nothing
-// posts from a page that, once redrawn, no longer offers approval. The
-// Fieldhorse page offers it while the quote is open (PortalView.open); the
-// classic page unless it is approved or has changes requested, as it
-// always did (D24).
+// posts from a page that, once redrawn, no longer offers approval. Every
+// theme offers it only while the quote is open (PortalView.open: not
+// approved, no changes requested, not past its valid until date, not lost
+// or closed), and never for a declined proposal or one never sent, which
+// the server refuses too (FN-18).
 function approvable(payload: PublicDocPayload, now: Date): boolean {
   if (payload.kind !== 'proposal') return false
-  if (isFieldhorse(payload)) return buildPortalView(payload, now).open
   const status = portalStatus(payload)
-  return status !== 'approved' && status !== 'changes_requested'
+  if (status === 'rejected' || status === 'draft') return false
+  return buildPortalView(payload, now).open
+}
+
+// The status chip the classic letter shows the customer: where the quote
+// stands for them, never an internal state (Draft, Viewed) or a Sent chip
+// on a quote that is no longer open.
+function customerStatus(payload: PublicDocPayload, now: Date): string {
+  const status = portalStatus(payload)
+  if (status === 'approved' || status === 'changes_requested') return status
+  const pv = buildPortalView(payload, now)
+  if (pv.expired) return 'expired'
+  if (status === 'rejected') return 'rejected'
+  if (pv.closed || status === 'draft') return 'closed'
+  return 'sent'
+}
+
+// What the customer is agreeing to, posted with an approval so the server
+// records it only for the document the page showed (FN-18): the base
+// total of the lines, counted as the approval snapshot counts it (neither
+// optional nor excluded lines; qty times rate when a line has no amount),
+// in whole cents, and the quote's version.
+function shownProposal(payload: PublicDocPayload) {
+  let totalCents = 0
+  for (const i of payload.items || []) {
+    if (i?.is_optional || i?.is_excluded) continue
+    const amount = i?.amount != null ? Number(i.amount || 0) : Number(i?.qty || 0) * Number(i?.rate || 0)
+    totalCents += Math.round(amount * 100)
+  }
+  return {
+    expected_total: totalCents / 100,
+    expected_updated_at: (payload as { updated_at?: string | null }).updated_at ?? null
+  }
 }
 
 // "Ask about this" on an optional item opens the request changes form with
@@ -98,14 +144,24 @@ export default function PublicDoc() {
   // approval never replaces the thank you with an error.
   const load = useCallback(async (): Promise<LinkRead> => {
     if (!token) return { ok: false, refused: null }
-    const keepOrFail = (message: string) => {
-      setState((prev) => (prev.data ? prev : { loading: false, data: null, error: message }))
+    const keepOrFail = (message: string, more: Pick<PublicDocState, 'retry' | 'contractor'> = {}) => {
+      setState((prev) => (prev.data ? prev : { loading: false, data: null, error: message, ...more }))
     }
     try {
       const res = await fetch(`/api/public-link?token=${encodeURIComponent(token)}`)
       const body = await res.json().catch(() => ({}))
       if (!res.ok || !body?.ok) {
-        keepOrFail(body?.message || 'This link is no longer available.')
+        const isRefusal = res.status === 404 || res.status === 410
+        const company = body?.company
+        keepOrFail(
+          isRefusal ? (body?.message || 'This link is no longer available.') : (body?.message || READ_FAILED),
+          {
+            retry: !isRefusal,
+            contractor: isRefusal && typeof company?.name === 'string' && company.name
+              ? { name: company.name, phone: typeof company.phone === 'string' ? company.phone : '' }
+              : null
+          }
+        )
         const refused = res.status === 404 || res.status === 410
           ? {
               error: typeof body?.error === 'string' ? body.error : null,
@@ -123,7 +179,7 @@ export default function PublicDoc() {
       document.title = `${co}${proj ? `, ${proj}` : ''}`
       return { ok: true, payload: body as PublicDocPayload }
     } catch {
-      keepOrFail('Could not load this document. Check the link and try again.')
+      keepOrFail(READ_FAILED, { retry: true })
       return { ok: false, refused: null }
     }
   }, [token])
@@ -163,6 +219,10 @@ export default function PublicDoc() {
     return 'ok'
   }, [load])
 
+  // Until the document names its sender, the tab names no one: never the
+  // app, on a page that belongs to the contractor.
+  useEffect(() => { document.title = 'Document' }, [token])
+
   useEffect(() => {
     let cancelled = false
     ;(async () => {
@@ -173,6 +233,10 @@ export default function PublicDoc() {
   }, [load])
 
   const { loading, data, error } = state
+  const retryRead = () => {
+    setState({ loading: true, data: null, error: null })
+    void load()
+  }
   const proposalStatus = data ? portalStatus(data) : ''
 
   if (!loading && data && isFieldhorse(data)) {
@@ -191,7 +255,7 @@ export default function PublicDoc() {
           portal={{
             payload: data,
             onAsk: canAsk ? onAsk : undefined,
-            approveBar: pv.open ? (
+            approveBar: approvable(data, new Date()) ? (
               <ApproveProposalBar
                 skin="fieldhorse"
                 token={token}
@@ -204,7 +268,11 @@ export default function PublicDoc() {
                 onStale={reload}
                 requestSeed={ask}
                 canAsk={canAsk}
+                expected={shownProposal(data)}
               />
+            ) : pv.open ? (
+              // Open by its dates, but declined or never sent.
+              <NotOpenNote companyName={data.company?.name} phone={data.company?.phone} docLabel="quote" />
             ) : null
           }}
         />
@@ -222,7 +290,9 @@ export default function PublicDoc() {
       }}
     >
       {loading && <Loading />}
-      {!loading && error && <ErrorState message={error} />}
+      {!loading && error && (
+        <ErrorState message={error} onRetry={state.retry ? retryRead : undefined} contractor={state.contractor} />
+      )}
       {!loading && data && data.kind === 'proposal' && (
         <>
           <ProposalView data={data} />
@@ -236,10 +306,19 @@ export default function PublicDoc() {
               onBeforeApprove={checkBeforeApprove}
               onApproved={reload}
               onStale={reload}
+              expected={shownProposal(data)}
             />
           )}
           {proposalStatus === 'approved' && (
             <ApprovedNote companyName={data.company?.name} />
+          )}
+          {proposalStatus !== 'approved' && proposalStatus !== 'changes_requested' && !approvable(data, new Date()) && (
+            <NotOpenNote
+              companyName={data.company?.name}
+              phone={data.company?.phone}
+              docLabel="proposal"
+              expired={buildPortalView(data, new Date()).expired}
+            />
           )}
           {proposalStatus === 'changes_requested' && (
             <ChangesRequestedNote
@@ -277,11 +356,15 @@ function ChangeOrderView({ data, token, onApproved }: any) {
   const priorApproved = (changeOrders || [])
     .filter((c: any) => c.status === 'approved' && c.id !== co.id)
     .reduce((s: number, c: any) => s + Number(c.amount || 0), 0)
-  const contractBefore = Number(contact?.amount || 0) + priorApproved
+  // In whole cents, so $25,200 plus $1,250.50 is $26,450.50 exactly.
+  const contractBefore = Math.round((Number(contact?.amount || 0) + priorApproved) * 100) / 100
   const delta = Number(co.amount || 0)
-  const contractAfter = contractBefore + delta
+  const contractAfter = Math.round((contractBefore + delta) * 100) / 100
   const isCredit = delta < 0
   const approved = co.status === 'approved'
+  // Only a sent change order takes a signature (public-co-approve); a void,
+  // declined or draft one shows that it is not open.
+  const open = co.status === 'sent'
 
   return (
     <>
@@ -352,7 +435,10 @@ function ChangeOrderView({ data, token, onApproved }: any) {
         </div>
       </div>
 
-      {!approved && (
+      {!approved && !open && (
+        <NotOpenNote companyName={company?.name} phone={company?.phone} docLabel="change order" />
+      )}
+      {open && (
         <ApproveProposalBar
           token={token}
           variant="change_order"
@@ -361,6 +447,8 @@ function ChangeOrderView({ data, token, onApproved }: any) {
           contractTotal={contractAfter}
           initialName={contact?.name || ''}
           onApproved={onApproved}
+          onStale={onApproved}
+          expected={{ expected_amount: delta, expected_updated_at: co.updated_at ?? null }}
         />
       )}
       {approved && (
@@ -370,7 +458,7 @@ function ChangeOrderView({ data, token, onApproved }: any) {
           border: '1px solid rgba(45, 122, 79, 0.40)',
           fontFamily: 'var(--font-body)', color: '#141414', textAlign: 'center'
         }}>
-          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, color: 'color-mix(in srgb, var(--v3-success-text) 75%, #141414 25%)', marginBottom: 6 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, color: '#1D5536', marginBottom: 6 }}>
             Change order approved
           </div>
           <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5 }}>
@@ -382,7 +470,7 @@ function ChangeOrderView({ data, token, onApproved }: any) {
   )
 }
 
-function MoneyRow({ label, value, strong, accent }: any) {
+function MoneyRow({ label, value, strong, accent, testId }: any) {
   return (
     <div style={{
       display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12,
@@ -391,7 +479,7 @@ function MoneyRow({ label, value, strong, accent }: any) {
       <span style={{ fontSize: strong ? 13 : 12.5, fontWeight: strong ? 700 : 500, color: strong ? '#141414' : '#5C5C5C' }}>
         {label}
       </span>
-      <span style={{
+      <span data-testid={testId} style={{
         fontFamily: "'Cormorant Garamond', Georgia, serif",
         fontSize: strong ? 22 : 17, fontWeight: 600,
         color: accent || '#141414'
@@ -402,10 +490,9 @@ function MoneyRow({ label, value, strong, accent }: any) {
   )
 }
 
+// Every amount a customer reads on this page keeps its cents.
 function moneyFmt(n: any) {
-  return Number(n || 0).toLocaleString(undefined, {
-    style: 'currency', currency: 'USD', maximumFractionDigits: 0
-  })
+  return money(n, { cents: true })
 }
 
 function ApprovedNote({ companyName }: any) {
@@ -425,7 +512,7 @@ function ApprovedNote({ companyName }: any) {
     >
       <div style={{
         fontSize: 12, fontWeight: 700, letterSpacing: 0,
-        color: 'color-mix(in srgb, var(--v3-success-text) 75%, #141414 25%)', marginBottom: 6
+        color: '#1D5536', marginBottom: 6
       }}>
         Proposal approved
       </div>
@@ -455,7 +542,7 @@ function ChangesRequestedNote({ companyName, requestedNote, requestedAt }: any) 
         fontSize: 12,
         fontWeight: 700,
         letterSpacing: 0,
-        color: 'color-mix(in srgb, var(--v3-primary-text) 54%, #141414 46%)',
+        color: '#7A5A1F',
         marginBottom: 8
       }}>
         Changes requested
@@ -481,6 +568,37 @@ function ChangesRequestedNote({ companyName, requestedNote, requestedAt }: any) 
   )
 }
 
+// A document the customer can read but no longer approve: expired,
+// declined, lost, never sent, or a change order that is void or a draft.
+function NotOpenNote({ companyName, phone, docLabel, expired = false }: {
+  companyName?: string | null
+  phone?: string | null
+  docLabel: string
+  expired?: boolean
+}) {
+  const who = companyName || 'the contractor'
+  const tel = String(phone || '').replace(/[^0-9+]/g, '')
+  return (
+    <section
+      aria-label={expired ? `This ${docLabel} has expired` : `This ${docLabel} is not open`}
+      style={{
+        maxWidth: 760, margin: '24px auto 0', padding: '24px 24px', borderRadius: 10,
+        background: '#FFFFFF', border: '1px solid rgba(20, 20, 20, 0.16)',
+        fontFamily: 'var(--font-body)', color: '#141414', textAlign: 'center'
+      }}
+    >
+      <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5 }}>
+        {expired ? `This ${docLabel} has expired.` : `This ${docLabel} is not open for approval.`} Ask {who} for an updated one.
+      </p>
+      {tel && (
+        <a href={`tel:${tel}`} style={{ display: 'inline-block', marginTop: 12, minHeight: 44, lineHeight: '44px', fontSize: 14, fontWeight: 700, color: '#141414' }}>
+          Call {who}
+        </a>
+      )}
+    </section>
+  )
+}
+
 function Loading() {
   return (
     <div
@@ -496,7 +614,12 @@ function Loading() {
   )
 }
 
-function ErrorState({ message }: any) {
+function ErrorState({ message, onRetry, contractor }: {
+  message: string
+  onRetry?: () => void
+  contractor?: { name: string; phone: string } | null
+}) {
+  const tel = String(contractor?.phone || '').replace(/[^0-9+]/g, '')
   return (
     <div
       style={{
@@ -508,13 +631,36 @@ function ErrorState({ message }: any) {
     >
       <div style={{
         fontSize: 12, fontWeight: 700, letterSpacing: 0,
-        color: 'color-mix(in srgb, var(--v3-primary-text) 54%, #141414 46%)', marginBottom: 10
+        color: '#7A5A1F', marginBottom: 10
       }}>
-        Unavailable
+        {onRetry ? 'Could not load' : 'Unavailable'}
       </div>
       <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, color: '#141414' }}>
         {message}
       </p>
+      {contractor && (
+        <p style={{ margin: '12px 0 0', fontSize: 14, lineHeight: 1.5, color: '#141414' }}>
+          Questions? Ask {contractor.name}.
+        </p>
+      )}
+      {contractor && tel && (
+        <a href={`tel:${tel}`} style={{ display: 'inline-block', marginTop: 8, minHeight: 44, lineHeight: '44px', fontSize: 14, fontWeight: 700, color: '#141414' }}>
+          Call {contractor.name}
+        </a>
+      )}
+      {onRetry && (
+        <button
+          type="button"
+          onClick={onRetry}
+          style={{
+            marginTop: 16, minHeight: 44, padding: '0 24px', borderRadius: 10,
+            border: '1px solid #141414', background: '#FFFFFF', color: '#141414',
+            fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, cursor: 'pointer'
+          }}
+        >
+          Try again
+        </button>
+      )}
     </div>
   )
 }
@@ -555,7 +701,7 @@ function ProposalView({ data, portal }: { data: PublicDocPayload; portal?: Propo
         issuedAt: proposalIssuedAt(contact || {}),
         expiresAt: contact?.quote_expires_at || null
       }}
-      status={portalStatus(data) || 'sent'}
+      status={portal ? (portalStatus(data) || 'sent') : customerStatus(data, new Date())}
       portal={portal}
     />
   )
@@ -563,54 +709,51 @@ function ProposalView({ data, portal }: { data: PublicDocPayload; portal?: Propo
 
 function InvoiceView({ data }: any) {
   const { contact, company, payments, changeOrders, insurance, photos } = data
-  const paid = (payments || []).reduce((s: any, p: any) => s + Number(p.amount || 0), 0)
-  // Raw contract amount, passed to InvoiceTemplate, which folds in approved
-  // COs itself. The customer facing balance MUST include approved COs too,
-  // or the link shows "PAID" while change order money is still owed.
-  const contractTotal = Number(contact?.amount || 0)
-  const approvedCO = (changeOrders || [])
-    .filter((co: any) => co?.status === 'approved')
-    .reduce((s: any, co: any) => s + Number(co?.amount || 0), 0)
-  const balance = Math.max(0, contractTotal + approvedCO - paid)
-  // The specific draw this link bills: the oldest still-open invoice
-  // row. Gives the document a real sequence number, issue date, and
-  // due date instead of anonymous whole-job math. Absent rows (legacy
-  // jobs) degrade to the whole-job presentation.
-  //
-  // Only ISSUED draws are shown to the customer, draft (never-sent)
-  // and void rows must never leak into the public billing schedule or
-  // be selected as "this invoice" (a draft's amount/due date is not a
-  // real bill). Customer-visible statuses: sent, paid, overdue.
-  const VISIBLE = new Set(['sent', 'paid', 'overdue'])
-  const invoiceRows = (data.invoices || []).filter((inv: any) => inv && VISIBLE.has(String(inv.status || '').toLowerCase()))
-  const currentInvoice = invoiceRows.find((inv: any) => String(inv.status || '').toLowerCase() !== 'paid') || null
-  const thisInvoiceAmount = currentInvoice ? Math.min(balance, Number(currentInvoice.amount || 0)) : balance
+  // Every figure on this page comes from publicInvoiceView: what the open
+  // invoice still owes by the allocator the app, the PDF and the email
+  // use, in whole cents. A job that has invoice rows is never asked for
+  // its contract balance, and once every issued invoice is settled the
+  // page keeps the number and dates of the last bill and asks for nothing.
+  const view = publicInvoiceView({ contact, payments, changeOrders, invoices: data.invoices })
+  const shown = view.shown
+  // What this invoice is for (the invoice Description must show) and the
+  // note the contractor wrote on it, as the PDF prints them.
+  const lineItems = shown
+    ? [{
+        id: shown.id,
+        description: String(shown.title || '').trim() || `Invoice #${shown.sequence_number}`,
+        notes: String(shown.description || '').trim() || contact?.job_title || '',
+        qty: 1,
+        rate: shown.amount,
+        amount: shown.amount
+      }]
+    : undefined
   return (
     <>
-    {/* The Pay button quotes THE SAME number as the page's "Amount due"
-        hero, it used to quote the whole remaining balance while the
-        hero showed the current draw, so a $2,500 deposit page carried a
-        "Pay $10,000 now" button. */}
-    {balance > 0.5 && <PayNowBar company={company} amount={thisInvoiceAmount} />}
+    {/* The Pay button quotes the same number as the page's "Amount due". */}
+    {view.amountDue > 0 && <PayNowBar company={company} amount={view.amountDue} />}
     <InvoiceTemplate
       company={company}
       contact={contact}
       project={{
-        title: contact?.job_title || 'Construction services',
+        title: contact?.job_title || (view.showContractPosition ? 'Construction services' : ''),
         address: contact?.address || ''
       }}
-      contractTotal={contractTotal}
+      lineItems={lineItems}
+      notes={String(shown?.notes || '').trim() || undefined}
+      contractTotal={view.contractTotal}
+      showContractPosition={view.showContractPosition}
       payments={payments}
-      previouslyPaid={paid}
-      thisInvoice={thisInvoiceAmount}
-      balanceRemaining={balance}
-      invoices={invoiceRows}
-      currentInvoice={currentInvoice}
+      previouslyPaid={view.paid}
+      thisInvoice={view.amountDue}
+      balanceRemaining={view.balance}
+      invoices={view.rows}
+      currentInvoice={shown}
       meta={{
-        issuedAt: currentInvoice?.issued_at || contact?.created_at,
-        dueDate: currentInvoice?.due_at || null
+        issuedAt: shown?.issued_at || contact?.created_at,
+        dueDate: view.current?.due_at || null
       }}
-      status={balance < 0.5 ? 'paid' : 'outstanding'}
+      status={view.status}
       insurance={insurance}
       changeOrders={changeOrders}
       photos={photos || []}
@@ -619,20 +762,25 @@ function InvoiceView({ data }: any) {
   )
 }
 
-/* Customer facing statement, one letterhead page rolling up every
-   open job for this client. Uses the same gatherStatement rollup the
-   in-app sheet + emailed PDF use, so the web view always agrees with
-   what the contractor sent. */
+/* Customer facing statement, one letterhead page rolling up what the
+   client owes on sent invoices. Uses the same gatherStatement rollup the
+   in app statement and the emailed PDF use, so the web view agrees with
+   what the contractor sent. Contract money not yet invoiced is listed
+   apart and is not part of Total due. A payload from before the server
+   sent invoices keeps the older contract less paid rollup. */
 function StatementView({ data }: any) {
   const { client, company, jobs, payments, changeOrders } = data
   const brand = resolveBrandGold(company)
-  const rolled = gatherStatement(jobs || [], payments || [], changeOrders || [])
+  const rolled = gatherStatement(
+    jobs || [], payments || [], changeOrders || [],
+    Array.isArray(data.invoices) ? { invoices: data.invoices } : {}
+  )
   const who = client?.company_name || client?.name || 'Customer'
   const today = new Date().toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
 
   return (
     <>
-      {rolled.totalDue > 0.5 && <PayNowBar company={company} amount={rolled.totalDue} />}
+      {rolled.totalDue > 0 && <PayNowBar company={company} amount={rolled.totalDue} />}
       <div style={{
         maxWidth: 760, margin: '0 auto',
         padding: '32px 24px 24px',
@@ -677,7 +825,7 @@ function StatementView({ data }: any) {
         {/* Per-property lines */}
         {rolled.lines.length === 0 ? (
           <div style={{ marginTop: 20, padding: '24px 0', textAlign: 'center', color: '#5C5C5C', fontSize: 14, borderTop: '1px solid #F2EDE4' }}>
-            Nothing outstanding right now, every project is paid in full. Thank you.
+            Nothing is owed on sent invoices right now. Thank you.
           </div>
         ) : (
           <div style={{ marginTop: 20, borderTop: '1px solid #F2EDE4' }}>
@@ -699,8 +847,22 @@ function StatementView({ data }: any) {
                 </span>
               </div>
             ))}
-            <MoneyRow label="Total due" value={moneyFmt(rolled.totalDue)} strong accent={brand} />
+            <MoneyRow label="Total due" value={moneyFmt(rolled.totalDue)} strong accent={brand} testId="statement-total-due" />
           </div>
+        )}
+
+        {rolled.notInvoiced.length > 0 && (
+          <section aria-labelledby="stmt-not-invoiced" style={{ marginTop: 24 }}>
+            <div id="stmt-not-invoiced" style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, color: '#5C5C5C' }}>
+              Not yet invoiced
+            </div>
+            <p style={{ margin: '4px 0 0', fontSize: 12, lineHeight: 1.5, color: '#5C5C5C' }}>
+              Contract amounts still to be billed. They are not part of the total due.
+            </p>
+            {rolled.notInvoiced.map((l: any) => (
+              <MoneyRow key={l.contactId} label={l.property} value={moneyFmt(l.balance)} />
+            ))}
+          </section>
         )}
       </div>
     </>
@@ -719,9 +881,7 @@ function PayNowBar({ company, amount }: any) {
   // Allow-list the scheme so a pasted `javascript:`/`data:` link can
   // never become an href on this customer facing page.
   const url = safePayUrl(link)
-  const amountLabel = amount > 0
-    ? Number(amount).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
-    : ''
+  const amountLabel = amount > 0 ? money(amount, { cents: true }) : ''
   return (
     <div style={{
       maxWidth: 760, margin: '0 auto 16px',

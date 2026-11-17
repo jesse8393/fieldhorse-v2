@@ -19,6 +19,7 @@
 
 import { DOC_COLORS, DOC_FONTS } from './tokens.ts'
 import { money } from './format.ts'
+import { lineTotal, roundCents } from '../../lib/quoteMoney.ts'
 
 export default function LineItemsTable({
   rows = [],
@@ -162,6 +163,20 @@ function itemAmount(it: any) {
   return Number(it.amount != null ? it.amount : Number(it.qty || 1) * Number(it.rate || 0))
 }
 
+// The unit price a line can print: its rate, only when quantity times that
+// rate is the line's amount to the cent (M-17). A lump sum saved with rate
+// 0, or an amount edited away from quantity times rate, prints none rather
+// than a figure that does not multiply out. A rate finer than a cent, such
+// as $9.875, prints in full so it still multiplies to the amount.
+export function unitPriceText(item: any): string {
+  const qty = Number(item.qty || 1)
+  const rate = Number(item.rate || 0)
+  const amount = itemAmount(item)
+  if (!(rate > 0) || !(qty > 0) || lineTotal(qty, rate) !== roundCents(amount)) return ''
+  if (roundCents(rate) === rate) return money(rate, { cents: true })
+  return rate.toLocaleString(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 4 })
+}
+
 function HeadRow({ showQty, amountHeading }: any) {
   return (
     <tr>
@@ -176,7 +191,6 @@ function HeadRow({ showQty, amountHeading }: any) {
 function ItemRow({ item, showQty }: any) {
   const qty = Number(item.qty || 1)
   const unit = (item.unit || '').trim()
-  const rate = Number(item.rate || 0)
   const amount = itemAmount(item)
   const detailLines = item.detailLines || []
   return (
@@ -195,7 +209,7 @@ function ItemRow({ item, showQty }: any) {
         </Td>
       )}
       {showQty && (
-        <Td label="Unit price" align="right" mono muted>{money(rate, { cents: true })}</Td>
+        <Td label="Unit price" align="right" mono muted>{unitPriceText(item)}</Td>
       )}
       <Td label="Amount" align="right" mono bold>{money(amount, { cents: true })}</Td>
     </tr>

@@ -24,6 +24,7 @@ import { Switch } from '@/components/ui/switch'
 import { keepFocusOnRetry } from '../../lib/retryFocus.ts'
 import { hapticTap } from '../../lib/haptics.ts'
 import { buildQuoteView, type QuoteTerms } from '../../lib/quoteView.ts'
+import { amountFollowsRate } from '../../lib/quoteMoney.ts'
 import {
   applySuggestion,
   draftFromRow,
@@ -46,6 +47,8 @@ export type QuoteLinesChange = {
   effective: any[]
   /** A switch save is out: Send, Approve and the share rows wait for it. */
   switchSaving: boolean
+  /** A line is still being added and is not in the database yet. */
+  lineSaving?: boolean
 }
 
 export type QuoteLinesProps = {
@@ -59,12 +62,16 @@ export type QuoteLinesProps = {
   focusRef?: React.RefObject<HTMLElement | null>
   /** Start with the add editor open (the create screen lands here with ?lines=new). */
   startAdding?: boolean
+  /** The quote is approved: the lines read, and nothing opens an editor. */
+  locked?: boolean
+  /** The line editor just closed: the rows below it move under the thumb. */
+  onEditorClosed?: () => void
   onChange?: (change: QuoteLinesChange) => void
 }
 
 type Editing = { key: number; id: string | null }
 
-export default function QuoteLines({ items, userId, who, money, focusRef, startAdding = false, onChange }: QuoteLinesProps) {
+export default function QuoteLines({ items, userId, who, money, focusRef, startAdding = false, locked = false, onEditorClosed, onChange }: QuoteLinesProps) {
   const { rows, loading, loaded, failed, fetchRows, addItem, updateItem, removeItem, reorderItem } = items
   // No read of the lines has worked yet and the last one failed: the lines
   // are unknown, so nothing may say there are none.
@@ -112,12 +119,14 @@ export default function QuoteLines({ items, userId, who, money, focusRef, startA
   const [switchSaves, setSwitchSaves] = useState<ReadonlySet<string>>(() => new Set())
   const switchSaving = switchSaves.size > 0
 
+  const lineSaving = rows.some((r) => r._pending)
+
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
-  useEffect(() => { onChangeRef.current?.({ effective, switchSaving }) }, [effective, switchSaving])
+  useEffect(() => { onChangeRef.current?.({ effective, switchSaving, lineSaving }) }, [effective, switchSaving, lineSaving])
 
   function toggleOptional(id: string, include: boolean) {
-    if (switchSavesRef.current.has(id)) return
+    if (locked || switchSavesRef.current.has(id)) return
     switchSavesRef.current.add(id)
     setSwitchSaves(new Set(switchSavesRef.current))
     hapticTap()
@@ -139,7 +148,9 @@ export default function QuoteLines({ items, userId, who, money, focusRef, startA
 
   // One editor at a time. It remounts on every opening (a new key), so each
   // starts from what is saved and a cancelled edit never leaks into the next.
-  const [editing, setEditing] = useState<Editing | null>(startAdding ? { key: 0, id: null } : null)
+  const [editing, setEditing] = useState<Editing | null>(startAdding && !locked ? { key: 0, id: null } : null)
+  // An approval that lands while an editor is open closes it.
+  useEffect(() => { if (locked) setEditing(null) }, [locked])
   const editKey = useRef(0)
   const root = useRef<HTMLDivElement>(null)
   const lastSection = useRef('')
@@ -148,6 +159,7 @@ export default function QuoteLines({ items, userId, who, money, focusRef, startA
   // keyboard user lands where they were and not at the top of the page.
   const opener = useRef<HTMLElement | null>(null)
   function open(id: string | null) {
+    if (locked) return
     hapticTap()
     opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
     editKey.current += 1
@@ -155,6 +167,7 @@ export default function QuoteLines({ items, userId, who, money, focusRef, startA
   }
   const close = () => {
     setEditing(null)
+    onEditorClosed?.()
     const back = opener.current
     opener.current = null
     // The plus row leaves while the add editor is open, so when it comes
@@ -162,6 +175,7 @@ export default function QuoteLines({ items, userId, who, money, focusRef, startA
     requestAnimationFrame(() => {
       const target = back && back.isConnected ? back : root.current?.querySelector<HTMLElement>('.fhqt-add')
       target?.focus({ preventScroll: true })
+      target?.scrollIntoView?.({ block: 'nearest' })
     })
   }
   const editRow = editing?.id ? effective.find((r) => r.id === editing.id) ?? null : null
@@ -172,8 +186,9 @@ export default function QuoteLines({ items, userId, who, money, focusRef, startA
     if (!editing) return false
     if (!editing.id) {
       lastSection.current = values.section || ''
-      void addItem(values)
-      return true
+      // Wait for the insert: a line that fails stays in the editor as typed.
+      const row = await addItem(values)
+      return Boolean(row)
     }
     const id = editing.id
     const ok = await updateItem(id, values)
@@ -185,7 +200,7 @@ export default function QuoteLines({ items, userId, who, money, focusRef, startA
     return ok
   }
 
-  const editor = editing ? (
+  const editor = editing && !locked ? (
     <LineEditor
       key={editing.key}
       row={editRow}
@@ -222,28 +237,32 @@ export default function QuoteLines({ items, userId, who, money, focusRef, startA
         <EmptyState
           icon={Receipt}
           title="No lines yet."
-          action={<Button variant="secondary" icon={Plus} onClick={() => open(null)}>Add a line</Button>}
+          action={locked ? undefined : <Button variant="secondary" icon={Plus} onClick={() => open(null)}>Add a line</Button>}
         />
       ) : (
         <>
           <ul className="fhqt-list" aria-label="Line items">
             {lines.map((line) => (
               editorFor(line.id) ?? (
-                <Row
-                  key={line.id}
-                  as="li"
-                  title={line.title}
-                  subline={line.detail || undefined}
-                  money={line.amount}
-                  next={pending(line.id) ? 'Saving' : undefined}
-                  disabled={pending(line.id)}
-                  onClick={() => open(line.id)}
-                />
+                locked ? (
+                  <Row key={line.id} as="li" title={line.title} subline={line.detail || undefined} money={line.amount} />
+                ) : (
+                  <Row
+                    key={line.id}
+                    as="li"
+                    title={line.title}
+                    subline={line.detail || undefined}
+                    money={line.amount}
+                    next={pending(line.id) ? 'Saving' : undefined}
+                    disabled={pending(line.id)}
+                    onClick={() => open(line.id)}
+                  />
+                )
               )
             ))}
             {adding && editor}
           </ul>
-          {!adding && (
+          {!adding && !locked && (
             <Button variant="quiet" icon={Plus} className="fhqt-add" onClick={() => open(null)}>Add a line</Button>
           )}
         </>
@@ -262,7 +281,7 @@ export default function QuoteLines({ items, userId, who, money, focusRef, startA
               const showDetail = line.detail && line.detail !== formatMoney(line.amount)
               return (
                 <li className="fhqt-opt" key={r.id}>
-                  <button type="button" className="fhqt-opt__main" onClick={() => open(r.id)} disabled={pending(r.id)}>
+                  <button type="button" className="fhqt-opt__main" onClick={() => open(r.id)} disabled={locked || pending(r.id)}>
                     <span className="fhqt-opt__title">{line.title}</span>
                     {showDetail && <span className="fhqt-opt__sub">{line.detail}</span>}
                     <span className="fhqt-opt__sub">Adds {formatMoney(line.amount)}</span>
@@ -270,7 +289,7 @@ export default function QuoteLines({ items, userId, who, money, focusRef, startA
                   <Switch
                     className="fhqt-switch"
                     checked={included}
-                    disabled={pending(r.id)}
+                    disabled={locked || pending(r.id)}
                     aria-disabled={switchSaves.has(r.id) || undefined}
                     aria-label={`Include ${line.title} in the total`}
                     onCheckedChange={(on: boolean) => toggleOptional(r.id, on)}
@@ -288,14 +307,18 @@ export default function QuoteLines({ items, userId, who, money, focusRef, startA
           <ul className="fhqt-list" aria-label="Lines that are not included">
             {live.excluded.map((line) => (
               editorFor(line.id) ?? (
-                <Row
-                  key={line.id}
-                  as="li"
-                  title={line.title}
-                  subline={line.detail || undefined}
-                  money={line.amount}
-                  onClick={() => open(line.id)}
-                />
+                locked ? (
+                  <Row key={line.id} as="li" title={line.title} subline={line.detail || undefined} money={line.amount} />
+                ) : (
+                  <Row
+                    key={line.id}
+                    as="li"
+                    title={line.title}
+                    subline={line.detail || undefined}
+                    money={line.amount}
+                    onClick={() => open(line.id)}
+                  />
+                )
               )
             ))}
           </ul>
@@ -314,11 +337,12 @@ type LineValues = ReturnType<typeof normalizeForDB>
 type LineErrors = Partial<Record<'description' | 'qty' | 'rate' | 'amount', string>>
 
 // An edit keeps an amount that was set by hand (it is not quantity times
-// rate), and otherwise lets the amount follow quantity and rate.
+// rate), and otherwise lets the amount follow quantity and rate. A rate
+// rounded to the cent still counts as quantity times rate: the estimator
+// saves 3 at $333.33 for $1,000.00 (M-09).
 function seedFromRow(row: any): LineDraft {
   const draft = draftFromRow(row)
-  const product = Number(row.qty) * Number(row.rate)
-  return { ...draft, amountOverridden: !(Math.abs(Number(row.amount) - product) < 0.005) }
+  return { ...draft, amountOverridden: !amountFollowsRate(row) }
 }
 
 const KINDS = [
@@ -342,8 +366,25 @@ type LineEditorProps = {
   canMoveDown?: boolean
 }
 
+// A confirming tap this soon after the arming one is the same double tap.
+const CONFIRM_AFTER_MS = 500
+
 function LineEditor({ row, defaultSection, suggestions, onSave, onClose, onDelete, onMove, canMoveUp = false, canMoveDown = false }: LineEditorProps) {
   const adding = !row
+  // Delete line asks with a second tap on the same button (rule 2, S18).
+  const [deleteArmed, setDeleteArmed] = useState(false)
+  const deleteArmedAt = useRef(0)
+  useEffect(() => {
+    if (!deleteArmed) return
+    const t = window.setTimeout(() => setDeleteArmed(false), 4000)
+    return () => window.clearTimeout(t)
+  }, [deleteArmed])
+  function tapDelete() {
+    if (!onDelete) return
+    if (!deleteArmed) { hapticTap(); deleteArmedAt.current = Date.now(); setDeleteArmed(true); return }
+    if (Date.now() - deleteArmedAt.current < CONFIRM_AFTER_MS) return
+    onDelete()
+  }
   const [draft, setDraft] = useState<LineDraft>(() => (row ? seedFromRow(row) : { ...emptyDraft(), section: defaultSection }))
   const [errors, setErrors] = useState<LineErrors>({})
   const [saving, setSaving] = useState(false)
@@ -394,7 +435,7 @@ function LineEditor({ row, defaultSection, suggestions, onSave, onClose, onDelet
 
   return (
     <li className="fhqt-edit">
-      <form aria-label={title} className="fhqt-form" onKeyDown={onKeyDown} onSubmit={(e) => { e.preventDefault(); void submit(false) }}>
+      <form aria-label={title} className="fhqt-form" noValidate onKeyDown={onKeyDown} onSubmit={(e) => { e.preventDefault(); void submit(false) }}>
         <h3 className="fhqt-form__title">{title}</h3>
         <div className="fhqt-form__suggest">
           <Field
@@ -530,7 +571,7 @@ function LineEditor({ row, defaultSection, suggestions, onSave, onClose, onDelet
                 </div>
               )}
               {onDelete && (
-                <Button variant="destructive" block onClick={onDelete}>Delete line</Button>
+                <Button variant="destructive" block onClick={tapDelete}>{deleteArmed ? 'Tap again to delete line' : 'Delete line'}</Button>
               )}
             </>
           )}

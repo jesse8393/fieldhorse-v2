@@ -188,3 +188,44 @@ describe('computeFunnel', () => {
     })
   })
 })
+
+// M-13: a client billed directly (invoices with no job), and a job saved
+// with no price that is billed by invoice, read $0 lifetime and $0 owed.
+describe('rollupJobs with the client\'s invoices (M-13)', () => {
+  it('counts a paid direct invoice in Lifetime and an unpaid one in Outstanding', () => {
+    const invoices = [
+      { id: 'inv-a', contact_id: null, amount: 800, status: 'paid' },
+      { id: 'inv-b', contact_id: null, amount: 500, status: 'sent' }
+    ]
+    const payments = [{ contact_id: null, invoice_id: 'inv-a', amount: 800 }]
+    const roll = rollupJobs([], payments, [], invoices)
+    expect({ lifetime: roll.lifetime, outstanding: roll.outstanding, paidTotal: roll.paidTotal })
+      .toEqual({ lifetime: 1300, outstanding: 500, paidTotal: 800 })
+  })
+
+  it('counts the issued invoices of a job with no price', () => {
+    const jobs = [{ id: 'j1', amount: 0, stage: 'job' }]
+    const invoices = [
+      { id: 'i1', contact_id: 'j1', amount: 500, status: 'paid' },
+      { id: 'i2', contact_id: 'j1', amount: 500, status: 'sent' },
+      { id: 'i3', contact_id: 'j1', amount: 900, status: 'draft' },
+      { id: 'i4', contact_id: 'j1', amount: 700, status: 'void' }
+    ]
+    const payments = [{ contact_id: 'j1', invoice_id: 'i1', amount: 500 }]
+    const roll = rollupJobs(jobs, payments, [], invoices)
+    expect({ lifetime: roll.lifetime, outstanding: roll.outstanding }).toEqual({ lifetime: 1000, outstanding: 500 })
+  })
+
+  it('leaves a priced job to its contract, whatever its invoices say', () => {
+    const jobs = [{ id: 'j1', amount: 10000, stage: 'job' }]
+    const invoices = [{ id: 'i1', contact_id: 'j1', amount: 5000, status: 'sent' }]
+    const roll = rollupJobs(jobs, [{ contact_id: 'j1', amount: 5000 }], [], invoices)
+    expect({ lifetime: roll.lifetime, outstanding: roll.outstanding }).toEqual({ lifetime: 10000, outstanding: 5000 })
+  })
+
+  it('does not count a direct invoice payment twice when it also names a job', () => {
+    const invoices = [{ id: 'inv-a', contact_id: null, amount: 800, status: 'sent' }]
+    const roll = rollupJobs([], [{ contact_id: null, invoice_id: 'inv-a', amount: 300 }], [], invoices)
+    expect(roll.outstanding).toBe(500)
+  })
+})

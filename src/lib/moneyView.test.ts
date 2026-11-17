@@ -117,6 +117,15 @@ describe('week and month totals', () => {
     expect(view.paid[0].subline).toBe('Driveway replacement')
   })
 
+  // D05: a payment on an invoice that bills the client directly.
+  it('names the client of an invoice with no job and opens that invoice', () => {
+    const view = build(bundle({
+      invoices: [invoice({ id: 'i9', contact_id: null, client_id: 'cl-9', title: 'Consulting', status: 'paid', fh_clients: { name: 'Charlie Co', email: null, phone: null, address: null } } as any)],
+      payments: [payment({ id: 'p9', contact_id: null, invoice_id: 'i9', amount: 300 })]
+    }))
+    expect({ title: view.paid[0].title, subline: view.paid[0].subline, to: view.paid[0].to }).toEqual({ title: 'Charlie Co', subline: 'consulting', to: '/invoices/i9' })
+  })
+
   it('counts a payment on Sunday Oct 4 toward the week and one on Saturday Oct 3 not', () => {
     const view = build(bundle({
       payments: [
@@ -666,5 +675,28 @@ describe('classifyInvoice', () => {
     expect(classifyInvoice({ status: 'sent', due_at: '2026-10-08', amount: 900 }, 900, NOW).status).toBe('sent')
     const late = classifyInvoice({ status: 'sent', due_at: '2026-10-07', amount: 900 }, 600, NOW)
     expect(late).toMatchObject({ status: 'overdue', daysLate: 1, owed: 600 })
+  })
+})
+
+// M-18: "Contract value not yet issued" leaves out money already collected.
+describe('Contract value not yet issued', () => {
+  it('leaves out a closed job paid in full through Log payment', async () => {
+    const { buildMoneyReconciliation } = await import('./moneyReconciliation.ts')
+    const groups = buildMoneyReconciliation(bundle({
+      jobs: [job({ id: 'j1', stage: 'closed', amount: 9600 })],
+      payments: [payment({ id: 'p1', contact_id: 'j1', amount: 9600 })]
+    }), [], NOW)
+    const unbilled = groups.find((g) => g.id === 'unbilled')!
+    expect({ total: unbilled.total, rows: unbilled.rows.length }).toEqual({ total: 0, rows: 0 })
+  })
+
+  it('counts money collected with no invoice once, beside the invoices issued', async () => {
+    const { buildMoneyReconciliation } = await import('./moneyReconciliation.ts')
+    const groups = buildMoneyReconciliation(bundle({
+      jobs: [job({ id: 'j1', amount: 10000.5 })],
+      invoices: [invoice({ id: 'i1', amount: 5000, status: 'paid' })],
+      payments: [payment({ id: 'p1', invoice_id: 'i1', amount: 5000 }), payment({ id: 'p2', amount: 2000.25 })]
+    }), [], NOW)
+    expect(groups.find((g) => g.id === 'unbilled')!.total).toBe(3000.25)
   })
 })

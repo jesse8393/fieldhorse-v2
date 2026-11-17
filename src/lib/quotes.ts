@@ -3,6 +3,7 @@
 // scope, price and terms into a new fh_contacts row at stage job and
 // sets fh_quotes.job_id; the quote itself keeps its status (D54).
 
+import type { QueryClient } from '@tanstack/react-query'
 import { supabase } from './supabase.ts'
 import { proposalNumber } from '../components/documents/numbers.ts'
 import type { Database } from './database.types.ts'
@@ -20,7 +21,10 @@ const clean = (s: string | null | undefined) => {
   return t ? t : null
 }
 
+// The form mints `id` once (QuoteNew), so a save whose answer was lost and
+// is tapped again addresses the same quote instead of making a second one.
 export async function createQuote(input: {
+  id?: string
   userId: string
   orgId: string | null
   clientId: string
@@ -31,6 +35,7 @@ export async function createQuote(input: {
   jobType?: string | null
 }): Promise<QuoteRow> {
   const row: QuoteInsert = {
+    ...(input.id ? { id: input.id } : {}),
     user_id: input.userId,
     org_id: input.orgId ?? null,
     client_id: input.clientId,
@@ -46,8 +51,49 @@ export async function createQuote(input: {
     .insert(row)
     .select('*')
     .single()
-  if (error) throw new Error(error.message)
-  return data as QuoteRow
+  if (!error && data) return data as QuoteRow
+  if (input.id && (error as { code?: string } | null)?.code === '23505') {
+    // The first try saved and its answer was lost. Read that quote back,
+    // only when it is this person's in this company; never overwrite it.
+    let query = supabase.from('fh_quotes').select('*').eq('id', input.id).eq('user_id', input.userId)
+    query = input.orgId ? query.eq('org_id', input.orgId) : query.is('org_id', null)
+    const existing = await query.maybeSingle()
+    if (!existing.error && existing.data) return existing.data as QuoteRow
+  }
+  throw new Error(error?.message || 'Could not confirm this quote was saved. Try again.')
+}
+
+/**
+ * After a quote is created, edited, deleted or made a job, the screens that
+ * show it read again: the quotes list, the quote, the lead it came from
+ * (its quote link), the client page and, once a job exists, the jobs list.
+ */
+export function invalidateAfterQuoteWrite(
+  client: Pick<QueryClient, 'invalidateQueries'>,
+  { quoteId, leadId, clientId, jobMade = false }: { quoteId?: string | null; leadId?: string | null; clientId?: string | null; jobMade?: boolean }
+) {
+  void client.invalidateQueries({ queryKey: ['quotes'] })
+  if (quoteId) void client.invalidateQueries({ queryKey: ['quote', quoteId] })
+  if (leadId) {
+    void client.invalidateQueries({ queryKey: ['leads'] })
+    void client.invalidateQueries({ queryKey: ['lead', leadId] })
+  }
+  if (clientId) void client.invalidateQueries({ queryKey: ['clientDetail', clientId] })
+  if (jobMade) void client.invalidateQueries({ queryKey: ['jobs'] })
+}
+
+/**
+ * What a failed quote action says on screen: the app's own sentence, never
+ * the browser's or a server's code ("TypeError: Failed to fetch",
+ * "send_failed"). A lost connection says so; a bare code says `fallback`.
+ */
+export function plainQuoteError(error: unknown, fallback = 'Try again.'): string {
+  const message = typeof error === 'string'
+    ? error
+    : error && typeof (error as { message?: unknown }).message === 'string' ? (error as { message: string }).message : ''
+  if (/fetch|network|load failed|timed? ?out|offline|internet/i.test(message)) return 'Check your connection and try again.'
+  if (!message.trim() || /^[a-z0-9_.:-]+$/i.test(message.trim()) || /^[A-Z][a-zA-Z]*Error\b/.test(message)) return fallback
+  return message
 }
 
 // The server atomically copies and links the quote. Repeated requests

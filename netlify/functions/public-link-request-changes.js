@@ -7,7 +7,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { clientIp, hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
-import { sendPushToUser } from './lib/push.js'
+import { alertLinkRecipients } from './lib/linkAlerts.js'
 import { linkScope } from './lib/linkScope.js'
 import { loadQuoteForLink } from './lib/quoteApproval.js'
 
@@ -172,25 +172,22 @@ export default async function handler(request) {
   }
 
   const project = contact.job_title || contact.name || 'Quote'
-  try {
-    await supabase.from('fh_notifications').insert({
-      user_id: link.user_id,
-      org_id: contact.org_id || link.org_id || null,
+  // Best effort: the status and activity row remain the durable record.
+  await alertLinkRecipients(supabase, {
+    orgId: contact.org_id || link.org_id || null,
+    creatorId: link.user_id,
+    notification: {
       kind: 'quote_changes_requested',
       title: 'Quote changes requested',
       body: `${requesterName} requested changes for ${project}: ${requestText}`,
       link: `/quotes/${contact.id}?tab=quote`
-    })
-  } catch {
-    // Notification delivery is best effort. The status and activity row
-    // remain the durable workflow record.
-  }
-
-  await sendPushToUser(supabase, link.user_id, {
-    title: 'Quote changes requested',
-    body: `${requesterName} left feedback for ${project}.`,
-    link: `/quotes/${contact.id}?tab=quote`,
-    tag: `quote-changes-${contact.id}`
+    },
+    push: {
+      title: 'Quote changes requested',
+      body: `${requesterName} left feedback for ${project}.`,
+      link: `/quotes/${contact.id}?tab=quote`,
+      tag: `quote-changes-${contact.id}`
+    }
   })
 
   return json({
@@ -256,25 +253,22 @@ async function requestQuoteChanges(supabase, link, { requesterName, requestText 
   }
 
   const project = quote.title || client?.name || 'Quote'
-  try {
-    await supabase.from('fh_notifications').insert({
-      user_id: link.user_id,
-      org_id: quote.org_id || link.org_id || null,
+  // Best effort: the status and activity row remain the durable record.
+  await alertLinkRecipients(supabase, {
+    orgId: quote.org_id || link.org_id || null,
+    creatorId: link.user_id,
+    notification: {
       kind: 'quote_changes_requested',
       title: 'Quote changes requested',
       body: `${requesterName} requested changes for ${project}: ${requestText}`,
       link: `/quotes/${quote.id}`
-    })
-  } catch {
-    // Notification delivery is best effort. The status and activity row
-    // remain the durable workflow record.
-  }
-
-  await sendPushToUser(supabase, link.user_id, {
-    title: 'Quote changes requested',
-    body: `${requesterName} left feedback for ${project}.`,
-    link: `/quotes/${quote.id}`,
-    tag: `quote-changes-${quote.id}`
+    },
+    push: {
+      title: 'Quote changes requested',
+      body: `${requesterName} left feedback for ${project}.`,
+      link: `/quotes/${quote.id}`,
+      tag: `quote-changes-${quote.id}`
+    }
   })
 
   return json({

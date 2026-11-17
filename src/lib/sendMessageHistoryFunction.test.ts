@@ -8,7 +8,7 @@ vi.mock('@supabase/supabase-js', () => ({ createClient: () => ({
     select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: table === 'profiles' ? { company_name: 'Contractor' } : null }) }) }),
   }),
 }) }))
-vi.mock('../../netlify/functions/lib/rateLimit.js', () => ({ hashIdentifier: (value: string) => value, checkRateLimit: async () => true }))
+vi.mock('../../netlify/functions/lib/rateLimit.js', () => ({ hashIdentifier: (value: string) => value, checkRateLimit: async () => true, checkDailySendCap: async () => true, DAILY_SEND_LIMIT_MESSAGE: 'daily' }))
 vi.mock('../../netlify/functions/lib/orgAccess.js', () => ({
   loadAccessibleRow: async () => ({ row: { id: 'job', user_id: 'sender', org_id: 'company', name: 'Customer', job_title: 'Kitchen' } }),
   brandingUserIdFor: async () => 'sender',

@@ -56,8 +56,19 @@ try {
     await db.query('insert into public.fh_quote_items(id,user_id,org_id,quote_id,description,qty,rate,amount,is_optional,is_excluded,sort_order) values($1,$2,$3,$4,$5,1,$6,$6,$7,$8,$9)',[id(n),id(4),id(100),id(20),`Fixture ${n}`,amount,opt,excluded,n])
   }
   await db.exec('alter table public.fh_quotes add column origin_contact_id uuid references public.fh_contacts(id); alter table public.fh_quotes add column amount numeric not null default 0; alter table public.fh_contacts add column completed_at timestamptz, add column proposal_status text')
+  // The approved version a quote points at (migrations 013, 092 and 094).
+  await db.exec(`
+    create table public.fh_quote_versions(id uuid primary key,user_id uuid,org_id uuid,quote_id uuid references public.fh_quotes,status text,snapshot jsonb not null,base_total numeric not null default 0);
+    alter table public.fh_quotes add column approved_version_id uuid references public.fh_quote_versions(id);
+    grant select on public.fh_quote_versions to authenticated;
+    alter table public.fh_quote_versions enable row level security;
+    create policy money on public.fh_quote_versions to authenticated using(public.fh_is_org_member(org_id) and public.fh_money_visible(org_id));
+  `)
   const migration = await readFile(new URL('../supabase/migrations/20261101184536_atomic_quote_conversion.sql',import.meta.url),'utf8')
   await db.exec(migration); await db.exec(migration)
+  // The body that replaces it: every case below runs against this one.
+  const approvedMigration = await readFile(new URL('../supabase/migrations/20261117090000_quote_job_from_approved_version.sql',import.meta.url),'utf8')
+  await db.exec(approvedMigration); await db.exec(approvedMigration)
   await scope(2)
   const job = await convert()
   equal(await convert(),job,'retry returns one existing job')
@@ -227,6 +238,45 @@ $function$;
       equal(second,first,'independent concurrent conversions return identical jobs')
     } finally { await a.end(); await b.end() }
   } else console.log('SKIP independent conversion concurrency: requires PostgreSQL sessions.')
+  // M-03: an approved quote becomes a job at what the customer approved,
+  // whatever happened to its lines afterwards.
+  await db.exec('reset role')
+  await db.exec(`
+    insert into public.fh_quotes(id,user_id,org_id,client_id,title,status) values
+      ('${id(40)}','${id(1)}','${id(100)}','${id(10)}','Approved then edited','approved'),
+      ('${id(41)}','${id(1)}','${id(100)}','${id(10)}','Revised after approval','draft'),
+      ('${id(42)}','${id(1)}','${id(100)}','${id(10)}','Approved by hand, no version','approved');
+    insert into public.fh_quote_versions(id,user_id,org_id,quote_id,status,snapshot,base_total) values
+      ('${id(70)}','${id(1)}','${id(100)}','${id(40)}','approved','{"items":[
+        {"section":"Concrete","description":"Pour","qty":1,"unit":"ea","rate":2000,"amount":2000,"notes":"Broom finish","is_optional":false,"is_excluded":false,"sort_order":1},
+        {"section":null,"description":"Prep","qty":1,"unit":null,"rate":1000,"amount":1000,"notes":null,"is_optional":false,"is_excluded":false,"sort_order":0},
+        {"section":null,"description":"Sealer","qty":1,"unit":null,"rate":400,"amount":400,"notes":null,"is_optional":true,"is_excluded":false,"sort_order":2}]}',3000),
+      ('${id(71)}','${id(1)}','${id(100)}','${id(41)}','approved','{"items":[{"description":"Pour","qty":1,"rate":3000,"amount":3000,"is_optional":false,"is_excluded":false,"sort_order":0}]}',3000);
+    update public.fh_quotes set approved_version_id='${id(70)}' where id='${id(40)}';
+    update public.fh_quotes set approved_version_id='${id(71)}' where id='${id(41)}';
+    insert into public.fh_quote_items(user_id,org_id,quote_id,description,qty,rate,amount,is_optional,sort_order) values
+      ('${id(1)}','${id(100)}','${id(40)}','Prep',1,1000,1000,false,0),
+      ('${id(1)}','${id(100)}','${id(40)}','Pour, edited after approval',1,2000,12500,false,1),
+      ('${id(1)}','${id(100)}','${id(40)}','Sealer',1,400,400,true,2),
+      ('${id(1)}','${id(100)}','${id(41)}','Pour, revised',1,4500,4500,false,0),
+      ('${id(1)}','${id(100)}','${id(42)}','Pour',1,900,900,false,0);
+  `)
+  await scope(2)
+  const approvedJob = await convert(40)
+  await db.exec('reset role')
+  equal(Number((await db.query('select amount from public.fh_contacts where id=$1',[approvedJob])).rows[0].amount),3000,'approved 3000 then edited to 12500 becomes a job at 3000')
+  equal((await db.query('select description,amount::float8 as amount,section,unit,notes,is_optional from public.fh_quote_items where contact_id=$1 order by sort_order',[approvedJob])).rows,[
+    {description:'Prep',amount:1000,section:null,unit:null,notes:null,is_optional:false},
+    {description:'Pour',amount:2000,section:'Concrete',unit:'ea',notes:'Broom finish',is_optional:false},
+    {description:'Sealer',amount:400,section:null,unit:null,notes:null,is_optional:true}
+  ],'the job carries the approved lines, not the edited ones')
+  equal((await db.query('select count(*)::int n, sum(amount)::float8 total from public.fh_quote_items where quote_id=$1',[id(40)])).rows[0],{n:3,total:13900},'the quote keeps its own lines untouched')
+  await scope(2)
+  const revisedJob = await convert(41)
+  const handJob = await convert(42)
+  await db.exec('reset role')
+  equal(Number((await db.query('select amount from public.fh_contacts where id=$1',[revisedJob])).rows[0].amount),4500,'a quote set back to draft converts from its live lines')
+  equal(Number((await db.query('select amount from public.fh_contacts where id=$1',[handJob])).rows[0].amount),900,'an approved quote with no saved version converts from its live lines')
   await db.exec('reset role')
   equal((await db.query("select prosecdef from pg_proc where oid='public.fh_make_job_from_quote(uuid)'::regprocedure")).rows[0].prosecdef,false,'conversion retains invoker RLS')
   console.log(`${checks} quote conversion checks passed.`)

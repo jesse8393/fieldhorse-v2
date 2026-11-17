@@ -2,6 +2,7 @@ import type { InvoicesBundle } from './queries.ts'
 import type { JobBalanceRow } from '../screens/money/types.ts'
 import { knownInvoices, classifyInvoice } from './moneyView.ts'
 import { amountsDueByInvoice, knownContractTotal } from './invoiceSettlement.ts'
+import { toCents, fromCents, sumCents } from './cents.ts'
 import { invoiceReference } from './invoiceReference.ts'
 
 export type ReconciliationRow = { id: string; title: string; detail: string; amount: number; to: string }
@@ -45,8 +46,13 @@ export function buildMoneyReconciliation(bundle: InvoicesBundle, balances: JobBa
     if (job.stage === 'lost') continue
     const contract = knownContractTotal({ amount: job.amount, changeOrders: bundle.changeOrders.filter(c => c.contact_id === job.id) })
     if (contract == null) continue
-    const issuedCents = invoices.filter(i => i.contact_id === job.id && !['draft', 'void'].includes(String(i.status))).reduce((sum, i) => sum + cents(Number(i.amount) || 0), 0)
-    const unissued = Math.max(0, cents(contract) - issuedCents) / 100
+    const issuedCents = sumCents(invoices.filter(i => i.contact_id === job.id && !['draft', 'void'].includes(String(i.status))), i => i.amount)
+    // Money collected counts as billed too (M-18): a job paid in full
+    // through Log payment, with no invoice rows, has nothing left to
+    // issue. Payments mostly pay the issued invoices, so the larger of the
+    // two is what the customer has already been billed for.
+    const collectedCents = sumCents(bundle.payments.filter(p => p.contact_id === job.id), p => p.amount)
+    const unissued = fromCents(Math.max(0, toCents(contract) - Math.max(issuedCents, collectedCents)))
     if (unissued > 0) byId.get('unbilled')!.rows.push({ id: job.id, title: job.name || 'Job', detail: job.job_title || 'Contract value not yet issued', amount: unissued, to: `/jobs/${job.id}?tab=financials` })
   }
   for (const group of groups) group.total = group.rows.reduce((sum, row) => sum + cents(row.amount), 0) / 100

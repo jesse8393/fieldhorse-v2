@@ -1,6 +1,6 @@
 import { supabaseServiceConfig } from './lib/serviceConfig.js'
 // Netlify Function — List pending timesheets for approval.
-// POST /api/org-timesheets-list  { from?: iso, to?: iso, org_id? }
+// POST /api/org-timesheets-list  { from?: iso, to?: iso, offset?: number, org_id? }
 // Authorization: Bearer <supabase access token>
 //
 // Caller must be owner/admin/manager. Returns punches in the caller's
@@ -11,11 +11,21 @@ import { supabaseServiceConfig } from './lib/serviceConfig.js'
 // The acting org comes from lib/membership.js. is_self marks the
 // caller's own punches: org-punch-approve skips those unless the
 // caller is an owner.
+//
+// Pay rates and cost are for owners and admins only, the same rule the
+// roster (org-members-list) applies. A manager approves hours and gets
+// hourly_rate and cost as null, with rates_visible false.
+//
+// One answer holds at most 500 punches, oldest first. has_more says
+// whether more are waiting, and next_offset is the offset to send for
+// the next page (null on the last one).
 
 import { createClient } from '@supabase/supabase-js'
 import { emailsForUsers } from './lib/authEmails.js'
 import { resolveCallerMembership } from './lib/membership.js'
 import { netPunchMinutes } from './lib/punches.js'
+
+const PAGE_SIZE = 500
 
 export default async (request) => {
   if (request.method === 'OPTIONS') {
@@ -38,6 +48,7 @@ export default async (request) => {
   try { body = (await request.json()) || {} } catch { /* allow empty */ }
   const from = typeof body.from === 'string' ? body.from : null
   const to   = typeof body.to   === 'string' ? body.to   : null
+  const offset = Number.isInteger(body.offset) && body.offset > 0 ? body.offset : 0
 
   const authClient = createClient(SUPABASE_URL, ANON_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
@@ -67,15 +78,20 @@ export default async (request) => {
     .is('approved_at', null)
     .not('punch_out_at', 'is', null)
     .order('punch_in_at', { ascending: true })
+    // The id settles ties so a page boundary never repeats or drops a row.
+    .order('id', { ascending: true })
 
   if (from) query = query.gte('punch_in_at', from)
   if (to)   query = query.lt('punch_in_at', to)
 
-  const { data: punches, error: pErr } = await query.limit(500)
+  // One row past the page tells us whether more exist.
+  const { data: fetched, error: pErr } = await query.range(offset, offset + PAGE_SIZE)
   if (pErr) {
     console.error('[org-timesheets-list] punch lookup failed', pErr)
     return json({ error: 'punches_lookup_failed', message: 'Could not load timesheets. Try again shortly.' }, 500)
   }
+  const hasMore = (fetched || []).length > PAGE_SIZE
+  const punches = (fetched || []).slice(0, PAGE_SIZE)
 
   // Decorate with puncher info + linked-job names.
   const userIds = Array.from(new Set((punches || []).map((p) => p.user_id)))
@@ -109,6 +125,8 @@ export default async (request) => {
   // fallback lib/labor.ts uses to charge these hours to job cost.
   // Without it, unrated crew punches showed cost "—/$0" on the approval
   // screen while the approval itself booked real dollars to the job.
+  // Removed members are included: time they worked before the removal is
+  // still owed at the rate they had.
   let defaultRateByUser = {}
   if (userIds.length > 0) {
     const { data: members } = await admin
@@ -116,16 +134,17 @@ export default async (request) => {
       .select('user_id, default_hourly_rate')
       .eq('org_id', myMember.org_id)
       .in('user_id', userIds)
-      .is('revoked_at', null)
     for (const m of members || []) {
       const r = Number(m.default_hourly_rate)
       if (Number.isFinite(r) && r > 0) defaultRateByUser[m.user_id] = r
     }
   }
 
+  const canSeeRates = myMember.role === 'owner' || myMember.role === 'admin'
   const decorated = (punches || []).map((p) => {
     const minutes = netPunchMinutes(p)
-    const rate = p.hourly_rate != null ? Number(p.hourly_rate) : (defaultRateByUser[p.user_id] ?? null)
+    const rate = !canSeeRates ? null
+      : p.hourly_rate != null ? Number(p.hourly_rate) : (defaultRateByUser[p.user_id] ?? null)
     return {
       id: p.id,
       // Zero-length shifts (in == out, or out before in) are not valid
@@ -151,7 +170,15 @@ export default async (request) => {
     }
   })
 
-  return json({ ok: true, caller_role: myMember.role, org_id: myMember.org_id, punches: decorated })
+  return json({
+    ok: true,
+    caller_role: myMember.role,
+    org_id: myMember.org_id,
+    punches: decorated,
+    rates_visible: canSeeRates,
+    has_more: hasMore,
+    next_offset: hasMore ? offset + PAGE_SIZE : null,
+  })
 }
 
 function corsHeaders() {

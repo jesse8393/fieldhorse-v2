@@ -99,7 +99,13 @@ export default function CreateShell({ title, saveLabel, saving = false, saveDisa
   const titleRef = useRef<HTMLHeadingElement>(null)
   const formRef = useRef<HTMLFormElement>(null)
   const [submitAttempt, setSubmitAttempt] = useState(0)
-  useEffect(() => { titleRef.current?.focus({ preventScroll: true }) }, [])
+  // The heading takes focus only when no field asked for it: a screen's
+  // autoFocus field (the name on New lead) keeps it, so typing starts at
+  // once (S20).
+  useEffect(() => {
+    if (formRef.current?.contains(document.activeElement)) return
+    titleRef.current?.focus({ preventScroll: true })
+  }, [])
 
   // Validation often happens above a phone's current scroll position. After
   // React renders the result, put the first correction back in view.

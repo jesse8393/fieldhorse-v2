@@ -16,6 +16,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { ChevronRight } from 'lucide-react'
 import { Button, Chip, Icon, Row, SkeletonRows } from '../../components/fh'
 import DataErrorState from '../../components/DataErrorState.tsx'
@@ -24,7 +25,7 @@ import { useProfile } from '../../contexts/ProfileContext.tsx'
 import { supabase } from '../../lib/supabase.ts'
 import { useLinkedClientEmail } from '../../lib/queries.ts'
 import { customerEmail } from '../../lib/customerEmail.ts'
-import { makeJobFromQuote, quoteNumber } from '../../lib/quotes.ts'
+import { invalidateAfterQuoteWrite, makeJobFromQuote, plainQuoteError, quoteNumber } from '../../lib/quotes.ts'
 import { recordRoute } from '../../lib/records.ts'
 import { buildQuoteView, previewAsLabel, previewAsName, quoteCapsule } from '../../lib/quoteView.ts'
 import { hapticTap } from '../../lib/haptics.ts'
@@ -46,13 +47,38 @@ import './quotes.css'
 const LINES_FAILED = "We couldn't load the lines."
 const NEEDS_A_LINE = 'Add at least one line.'
 
-type Busy = 'send' | 'mark' | 'share' | 'pdf' | 'download' | 'esign' | 'job' | 'delete' | null
+type Busy = 'send' | 'mark' | 'share' | 'pdf' | 'download' | 'esign' | 'job' | 'delete' | 'revise' | 'lost' | 'reopen' | null
+
+// A confirming tap that lands this soon after the arming one is the same
+// double tap, not a decision, so it is ignored.
+const CONFIRM_AFTER_MS = 500
+// How long an armed button waits for its second tap.
+const ARMED_MS = 4000
+
+/** A button that runs on a second, deliberate tap within four seconds (D57). */
+function useConfirmTap() {
+  const [armed, setArmed] = useState(false)
+  const armedAt = useRef(0)
+  useEffect(() => {
+    if (!armed) return
+    const t = window.setTimeout(() => setArmed(false), ARMED_MS)
+    return () => window.clearTimeout(t)
+  }, [armed])
+  /** True when this tap confirms; the first tap arms and returns false. */
+  function confirm(): boolean {
+    if (!armed) { hapticTap(); armedAt.current = Date.now(); setArmed(true); return false }
+    if (Date.now() - armedAt.current < CONFIRM_AFTER_MS) return false
+    setArmed(false)
+    return true
+  }
+  return { armed, confirm }
+}
 
 export default function QuoteDetail({ fallback }: { fallback?: ReactNode }) {
   const { id = '' } = useParams()
   const state = useQuote(id)
 
-  if (state.status === 'missing') return <>{fallback ?? <QuoteGone />}</>
+  if (state.status === 'missing') return fallback ? <OlderRecordOr id={id} fallback={fallback} /> : <QuoteGone />
   if (state.status === 'loading' || (state.status === 'failed' && !state.quote)) {
     return (
       <div className="fhqt-page">
@@ -71,6 +97,31 @@ export default function QuoteDetail({ fallback }: { fallback?: ReactNode }) {
     )
   }
   return <QuoteScreen quote={state.quote as QuoteWithClient} refresh={state.refresh} />
+}
+
+// An id that is no quote may be an older record (D56), which the fallback
+// opens. When it is neither, the quote is gone: say so here instead of
+// handing a deleted quote's id to the older screen ("Contact not found").
+function OlderRecordOr({ id, fallback }: { id: string; fallback: ReactNode }) {
+  const [older, setOlder] = useState<'checking' | 'yes' | 'no'>('checking')
+  useEffect(() => {
+    let alive = true
+    setOlder('checking')
+    void supabase.from('fh_contacts').select('id').eq('id', id).maybeSingle().then(({ data, error }) => {
+      // A failed check hands over to the older screen, which has its own errors.
+      if (alive) setOlder(error || data ? 'yes' : 'no')
+    })
+    return () => { alive = false }
+  }, [id])
+  if (older === 'checking') {
+    return (
+      <div className="fhqt-page">
+        <QuoteHeader kicker="Quote" home="/quotes" />
+        <div className="fhqt-loading"><SkeletonRows rows={5} label="Loading the quote" /></div>
+      </div>
+    )
+  }
+  return older === 'yes' ? <>{fallback}</> : <QuoteGone />
 }
 
 function QuoteGone() {
@@ -104,14 +155,32 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
     setSearchParams(next, { replace: true })
   }, [searchParams, setSearchParams])
 
-  const items = useQuoteItems({ quoteId: quote.id, userId })
-  const [lines, setLines] = useState<QuoteLinesChange>({ effective: [], switchSaving: false })
+  // After a write, the lists and screens that show this quote read again
+  // (the quotes list, its lead, the client page, and the jobs list once a
+  // job is made).
+  const queryClient = useQueryClient()
+  const refreshLists = (jobMade = false) =>
+    invalidateAfterQuoteWrite(queryClient, { quoteId: quote.id, leadId: quote.lead_id, clientId: quote.client_id, jobMade })
+
+  // A line write changes the quote's amount in the database, which the total
+  // falls back to when no line is priced, so the quote is read again too.
+  const items = useQuoteItems({ quoteId: quote.id, userId, onContactRefresh: () => { refreshLists(); void refresh() } })
+
+  // When the line editor closes, the rows below it move up under the thumb.
+  // A tap that lands within half a second is the same burst of taps, not a
+  // choice, so the action rows ignore it (S03).
+  const quietUntil = useRef(0)
+  const onEditorClosed = () => { quietUntil.current = Date.now() + 500 }
+  const settling = () => Date.now() < quietUntil.current
+  const [lines, setLines] = useState<QuoteLinesChange>({ effective: [], switchSaving: false, lineSaving: false })
   const linesFailed = !items.loading && items.failed && !items.loaded
 
   const status = useMemo(() => quoteStatusView(quote), [quote])
   const chip = statusChip(status)
   const approved = status.label === 'Approved'
   const changesRequested = status.label === 'Changes requested'
+  // Closed without a yes: nothing goes out until the quote is reopened (S13).
+  const lost = ['lost', 'rejected'].includes(String(quote.status || '').toLowerCase())
   const client = quote.fh_clients ?? null
   const who = previewAsName(client?.name)
   const company = useMemo(() => companyFromProfile(profile), [profile])
@@ -137,10 +206,19 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
   const sendLabel = emailKnown && !hasEmail ? 'Copy approval link' : approved ? 'Send again' : 'Send for approval'
 
   const [busy, setBusy] = useState<Busy>(null)
-  const waiting = items.loading || busy !== null || lines.switchSaving
+  // The same busy flag, read at once: two taps in one frame both saw null.
+  const busyRef = useRef<Busy>(null)
+  // A line still being added is not in the database the document, the
+  // approval and the job are built from, so they all wait for it.
+  const lineSaving = Boolean(lines.lineSaving)
+  const waiting = items.loading || busy !== null || lines.switchSaving || lineSaving
   const needsLines = !items.loading && !live.canSend
   const linesLine = linesFailed ? LINES_FAILED : NEEDS_A_LINE
-  const sendHint = needsLines
+  const sendHint = lost
+    ? 'Reopen the quote to send it'
+    : lineSaving
+    ? 'Saving a line'
+    : needsLines
     ? (linesFailed ? LINES_FAILED : 'Add at least one line')
     : emailFailed
       ? "Couldn't check the email"
@@ -149,15 +227,16 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
   const build = () => buildQuotePdf({ quote, company, userId: userId as string, recipientEmail: hasEmail ? recipientEmail : null })
 
   function failed(title: string, e: unknown) {
-    const message = e instanceof NoLinesError ? e.message : (e as Error)?.message || 'Try again.'
+    const message = e instanceof NoLinesError ? e.message : plainQuoteError(e)
     toastError(title, message)
   }
 
   async function run(kind: Exclude<Busy, null>, work: () => Promise<void>, title: string) {
-    if (!userId || busy) return
+    if (!userId || busyRef.current || settling()) return
     hapticTap()
+    busyRef.current = kind
     setBusy(kind)
-    try { await work() } catch (e) { failed(title, e) } finally { setBusy(null) }
+    try { await work() } catch (e) { failed(title, e) } finally { busyRef.current = null; setBusy(null) }
   }
 
   const onSend = () => run('send', async () => {
@@ -168,6 +247,7 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
       return
     }
     await refresh()
+    refreshLists()
     toastSuccess(`Proposal sent to ${recipientEmail}`)
   }, "Couldn't send proposal")
 
@@ -194,7 +274,7 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
         toastSuccess('Share link ready', url)
       }
     }
-  }, "Couldn't mint share link")
+  }, "Couldn't make the share link")
 
   const onMarkSent = () => run('mark', async () => {
     if (!canMarkSent(quote.status) || quote.job_id) return
@@ -205,10 +285,12 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
       throw error
     }
     await refresh()
+    refreshLists()
     toastSuccess('Quote marked as sent', 'Recorded that you shared the proposal with the customer.')
   }, "Couldn't update the quote")
 
   const onOpenPdf = () => {
+    if (settling()) return
     // Open the tab now, inside the tap: building the PDF takes seconds, and
     // Safari drops a window.open that runs after that much async work.
     const win = window.open('', '_blank')
@@ -244,6 +326,7 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
       return
     }
     await refresh()
+    refreshLists()
     toastSuccess(`Sent to ${recipientEmail} for signature`, 'DocuSign will email the signing request.')
   }, "Couldn't send for electronic signature")
 
@@ -251,26 +334,91 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
   // price and terms; the quote keeps its status and points at the job.
   const onMakeJob = () => run('job', async () => {
     const { jobId } = await makeJobFromQuote(quote.id)
+    refreshLists(true)
     toastSuccess('Job created', 'The quote now points at it.')
     navigate(recordRoute('job', jobId))
   }, "Couldn't make the job")
 
+  // Revise quote (M-03): an approved quote's lines are locked at what the
+  // customer agreed to. To change them the quote goes back to a draft, with
+  // a second tap on the same button, and needs a new approval. The approved
+  // version stays on record. Only an approved quote is set back, so a
+  // change made elsewhere meanwhile is not overwritten.
+  const revise = useConfirmTap()
+  const onRevise = () => {
+    if (!revise.confirm()) return
+    void run('revise', async () => {
+      const { data, error } = await supabase
+        .from('fh_quotes')
+        .update({ status: 'draft' })
+        .eq('id', quote.id)
+        .eq('status', 'approved')
+        .select('id')
+        .maybeSingle()
+      if (error) throw new Error(error.message)
+      if (!data) {
+        await refresh()
+        throw new Error('This quote changed on another device. Check it and try again.')
+      }
+      await refresh()
+      refreshLists()
+      toastSuccess('Quote ready to revise', 'Edit the lines, then send it or approve it again.')
+    }, "Couldn't revise the quote")
+  }
+
+  // Mark as lost and Reopen (S13), each on a second tap of the same button.
+  // The write applies only while the quote still has the status on screen.
+  async function setStatus(from: string | null, to: 'lost' | 'draft') {
+    const { data, error } = await supabase
+      .from('fh_quotes')
+      .update({ status: to })
+      .eq('id', quote.id)
+      .eq('status', String(from || ''))
+      .select('id')
+      .maybeSingle()
+    if (error) throw new Error(error.message)
+    if (!data) {
+      await refresh()
+      throw new Error('This quote changed on another device. Check it and try again.')
+    }
+    await refresh()
+    refreshLists()
+  }
+  const markLost = useConfirmTap()
+  const onMarkLost = () => {
+    if (!markLost.confirm()) return
+    void run('lost', async () => {
+      await setStatus(quote.status, 'lost')
+      toastSuccess('Quote marked as lost', 'Reopen it any time to send it again.')
+    }, "Couldn't mark the quote lost")
+  }
+  const reopen = useConfirmTap()
+  const onReopen = () => {
+    if (!reopen.confirm()) return
+    void run('reopen', async () => {
+      await setStatus(quote.status, 'draft')
+      toastSuccess('Quote reopened', 'It is a draft again.')
+    }, "Couldn't reopen the quote")
+  }
+
   // Delete asks with a second tap on the same button (D57), for four seconds.
-  const [armed, setArmed] = useState(false)
-  useEffect(() => {
-    if (!armed) return
-    const t = window.setTimeout(() => setArmed(false), 4000)
-    return () => window.clearTimeout(t)
-  }, [armed])
+  const del = useConfirmTap()
+  const armed = del.armed
   // Approved quotes are the record of what the customer agreed to, so they stay.
   const deletable = !approved
   const onDelete = () => {
-    if (!armed) { hapticTap(); setArmed(true); return }
+    if (!del.confirm()) return
     void run('delete', async () => {
-      const lines = await supabase.from('fh_quote_items').delete().eq('quote_id', quote.id)
-      if (lines.error) throw new Error(lines.error.message)
-      const row = await supabase.from('fh_quotes').delete().eq('id', quote.id)
+      // One delete: the lines go with the quote in the database (their
+      // quote_id cascades), so a failure never leaves an empty quote.
+      // A delete that matched no row did not delete anything.
+      const row = await supabase.from('fh_quotes').delete().eq('id', quote.id).select('id')
       if (row.error) throw new Error(row.error.message)
+      if (!row.data || row.data.length === 0) {
+        await refresh()
+        throw new Error('This quote changed on another device. Check it and try again.')
+      }
+      refreshLists()
       toastSuccess(quote.status === 'draft' ? 'Draft quote deleted' : 'Quote deleted')
       navigate('/quotes', { replace: true })
     }, "Couldn't delete the quote")
@@ -328,14 +476,26 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
         </section>
       )}
 
-      <QuoteLines items={items} userId={userId} who={who} money={terms} focusRef={titleRef} startAdding={startAdding} onChange={setLines} />
+      <QuoteLines items={items} userId={userId} who={who} money={terms} focusRef={titleRef} startAdding={startAdding} locked={approved} onEditorClosed={onEditorClosed} onChange={setLines} />
 
       {approved && (
         <section className="fhqt-panel" aria-labelledby="fhqt-approved-title">
           <h2 className="fhqt-panel__title" id="fhqt-approved-title">Quote approved</h2>
           <p className="fhqt-panel__body">
-            Approval saved{quote.updated_at ? `, ${shortDate(quote.updated_at)}` : ''}. Later edits to lines, scope or terms do not change what the customer agreed to.
+            Approval saved{quote.updated_at ? `, ${shortDate(quote.updated_at)}` : ''}. The lines are locked at what the customer agreed to.
           </p>
+          <p className="fhqt-panel__note">
+            {quote.job_id
+              ? 'This quote is already a job. Change the price on the job with a change order.'
+              : 'To change the price, revise the quote. It goes back to a draft and needs a new approval.'}
+          </p>
+          {!quote.job_id && (
+            <div className="fhqt-panel__action">
+              <Button variant="secondary" disabled={busy !== null} loading={busy === 'revise'} onClick={onRevise}>
+                {revise.armed ? 'Tap again to revise' : 'Revise quote'}
+              </Button>
+            </div>
+          )}
         </section>
       )}
 
@@ -349,7 +509,7 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
           variant="primary"
           size="lg"
           block
-          disabled={waiting || !live.canSend || !emailKnown}
+          disabled={waiting || lost || !live.canSend || !emailKnown}
           loading={busy === 'send' || busy === 'share'}
           onClick={hasEmail ? onSend : onShare}
         >
@@ -407,7 +567,7 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
         {quote.job_id ? (
           <Button variant="secondary" size="lg" block to={recordRoute('job', quote.job_id)}>Open the job</Button>
         ) : (
-          <Button variant="secondary" size="lg" block loading={busy === 'job'} disabled={busy !== null && busy !== 'job'} onClick={onMakeJob}>
+          <Button variant="secondary" size="lg" block loading={busy === 'job'} disabled={(busy !== null && busy !== 'job') || items.loading || lines.switchSaving || lineSaving} onClick={onMakeJob}>
             Make this a job
           </Button>
         )}
@@ -418,6 +578,20 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
         </p>
       </div>
 
+      {!approved && !quote.job_id && (
+        <div className="fhqt-danger">
+          {lost ? (
+            <Button variant="secondary" disabled={busy !== null} loading={busy === 'reopen'} onClick={onReopen}>
+              {reopen.armed ? 'Tap again to reopen' : 'Reopen quote'}
+            </Button>
+          ) : (
+            <Button variant="secondary" disabled={busy !== null} loading={busy === 'lost'} onClick={onMarkLost}>
+              {markLost.armed ? 'Tap again to mark lost' : 'Mark as lost'}
+            </Button>
+          )}
+        </div>
+      )}
+
       {deletable ? (
         <div className="fhqt-danger">
           <Button variant="destructive" disabled={busy !== null} loading={busy === 'delete'} onClick={onDelete}>
@@ -425,7 +599,7 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
           </Button>
         </div>
       ) : approved ? (
-        <p className="fhqt-danger-note">Approved quotes cannot be deleted. Create a revision instead.</p>
+        <p className="fhqt-danger-note">Approved quotes cannot be deleted.</p>
       ) : null}
     </div>
   )

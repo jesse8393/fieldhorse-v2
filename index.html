@@ -46,19 +46,20 @@
 
     <!-- SEO + social link previews. Fieldhorse is auth-gated so crawlers
          only ever see the login screen; these meta tags make sure that
-         when someone shares fieldhorse.io they get a proper card preview
-         instead of a bare URL. -->
+         when someone shares a link they get a proper card preview
+         instead of a bare URL. The image is served by whichever host
+         serves the page, and no fixed page address is set, so a customer link never
+         points its preview at another address. -->
     <meta name="description" content="Field operations for contractors. Run jobs, schedule crews, send proposals, and collect payments, all on your phone." />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Fieldhorse" />
     <meta property="og:title" content="Fieldhorse" />
     <meta property="og:description" content="Field operations for contractors. Run jobs, schedule crews, send proposals, and collect payments, all on your phone." />
-    <meta property="og:image" content="https://fieldhorse.io/icon-512.png" />
-    <meta property="og:url" content="https://fieldhorse.io" />
+    <meta property="og:image" content="/icon-512.png" />
     <meta name="twitter:card" content="summary" />
     <meta name="twitter:title" content="Fieldhorse" />
     <meta name="twitter:description" content="Field operations for contractors. Run jobs, schedule crews, send proposals, and collect payments, all on your phone." />
-    <meta name="twitter:image" content="https://fieldhorse.io/icon-512.png" />
+    <meta name="twitter:image" content="/icon-512.png" />
     <!-- Supabase project origin: open TCP+TLS in parallel with HTML parse
          so the first auth + bootstrap query lands ~150-300ms sooner on
          cold visits. `crossorigin` matches the fetch credentials mode

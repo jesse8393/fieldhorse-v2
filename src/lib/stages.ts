@@ -3,8 +3,10 @@ import { supabase } from './supabase.ts'
 import { todayYmd } from './dates.ts'
 import { crewLaborForContact } from './labor.ts'
 import { moneyExact } from './format.ts'
-import { invoicesPaidInFull } from './invoiceSettlement.ts'
+import { invoicesPaidInFull, knownContractTotal } from './invoiceSettlement.ts'
+import { toCents, fromCents, sumCents } from './cents.ts'
 import { toastError } from './toast.ts'
+import { retryOnce } from './invoices.ts'
 import type { Database } from './database.types.ts'
 
 // Only the fields the stage helpers actually read, declared narrowly so
@@ -127,9 +129,10 @@ export async function logPayment(contact: Contact, { id, amount, method, kind, r
   const normalizedAmount = Number(amount) || 0
   const normalizedKind = ['deposit','progress','final','retainage','other'].includes(kind ?? '') ? (kind as string) : 'other'
   // Client-minted id makes the write idempotent: if the request commits but
-  // the response is lost and the operator retaps, the sheet passes the SAME
-  // id and the upsert no-ops instead of double-recording the payment (which
-  // would inflate the balance and wrongly auto-close the job). Callers that
+  // the response is lost and the operator retaps, the screen passes the SAME
+  // id and the upsert updates that row (with any field changed since)
+  // instead of double-recording the payment (which would inflate the
+  // balance and wrongly auto-close the job). Callers that
   // don't pass an id get a fresh one, safe, just not retry-dedup'd.
   const paymentId = id
     || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : undefined)
@@ -151,7 +154,7 @@ export async function logPayment(contact: Contact, { id, amount, method, kind, r
   }
   const { error: insErr } = await supabase
     .from('fh_payments')
-    .upsert(payload as any, { onConflict: 'id', ignoreDuplicates: true })
+    .upsert(payload as any, { onConflict: 'id' })
   if (insErr) return { error: insErr }
 
   // Write a notification for the contractor's own inbox so the bell
@@ -217,7 +220,9 @@ export async function logPayment(contact: Contact, { id, amount, method, kind, r
       .maybeSingle()
   ])
   const pays = paysRes.data || []
-  const total = pays.reduce((s, p) => s + Number(p.amount || 0), 0)
+  // Whole cents: three draws of a $1,000.07 contract sum to
+  // 1000.0699999999999 as floats and the job never closed.
+  const total = fromCents(sumCents(pays, (p) => p.amount))
   const coErr = cosRes.error
   const freshContact = freshRes.data
   const baseAmount = Number((freshContact?.amount ?? contact.amount) || 0)
@@ -225,9 +230,12 @@ export async function logPayment(contact: Contact, { id, amount, method, kind, r
   // If the CO fetch fails we can't know the true contract, so fail safe:
   // skip the auto-close rather than treat a failed fetch as "no COs" and
   // prematurely close a job that still owes change order money.
+  // A job with no price has no known contract either, whatever its change
+  // orders: an approved $500 change order must not close a job that has
+  // $2,000 of invoices out.
   const contractAmount = coErr
     ? null
-    : baseAmount + (cosRes.data || []).reduce((s, c) => s + Number(c.amount || 0), 0)
+    : knownContractTotal({ amount: baseAmount, changeOrders: cosRes.data || [] })
 
   // Settle the job's invoices from its payments. A payment linked to an
   // invoice pays that one first; a payment logged against the job pays
@@ -237,32 +245,38 @@ export async function logPayment(contact: Contact, { id, amount, method, kind, r
   // actually COVER it: partial pay is an explicit feature and must leave
   // a residual balance. Best-effort: the payment rows remain the source
   // of truth for money math either way.
+  let statusError: unknown = null
   if (paysRes.error || invsRes.error) {
     console.error('[fieldhorse] logPayment invoice settle skipped', paysRes.error || invsRes.error)
+    statusError = paysRes.error || invsRes.error
   } else {
     const invs = invsRes.data || []
     const paidIds = invoicesPaidInFull({ invoices: invs, payments: pays, contractTotal: contractAmount })
     if (paidIds.length > 0) {
-      const { error: paidErr } = await supabase
+      // Checked and tried once more (DATA-17): the payment is saved, so a
+      // dropped status write would leave a paid bill reading as owed.
+      const { error: paidErr } = await retryOnce(() => supabase
         .from('fh_invoices')
         .update({ status: 'paid' })
         .in('id', paidIds)
-        .in('status', ['draft', 'sent', 'overdue'])
+        .in('status', ['draft', 'sent', 'overdue']))
       if (paidErr) {
         console.error('[fieldhorse] logPayment invoice status update failed', paidErr)
+        statusError = paidErr
       }
     }
     // A partial payment against a draft means the bill went out: it reads
     // 'sent' with a residual balance from here on.
     const target = invoice_id ? invs.find((inv) => inv.id === invoice_id) : null
     if (target && target.status === 'draft' && !paidIds.includes(target.id)) {
-      const { error: sentErr } = await supabase
+      const { error: sentErr } = await retryOnce(() => supabase
         .from('fh_invoices')
         .update({ status: 'sent' })
         .eq('id', target.id)
-        .eq('status', 'draft')
+        .eq('status', 'draft'))
       if (sentErr) {
         console.error('[fieldhorse] logPayment invoice status update failed', sentErr)
+        statusError = statusError || sentErr
       }
     }
   }
@@ -272,15 +286,102 @@ export async function logPayment(contact: Contact, { id, amount, method, kind, r
   // freshly created quick invoice before line items set the total) from
   // auto-closing on its first payment, `total >= 0` is otherwise always true.
   let closed = false
-  if (contractAmount != null) {
-    if (contractAmount > 0 && total >= contractAmount && currentStage !== 'closed') {
+  if (!coErr) {
+    if (contractAmount != null && toCents(contractAmount) > 0 && toCents(total) >= toCents(contractAmount) && currentStage !== 'closed') {
       const { error: closeErr } = await supabase.from('fh_contacts').update({ stage: 'closed' }).eq('id', contact.id).eq('user_id', contact.user_id)
       closed = !closeErr
     }
   } else {
     console.error('[fieldhorse] logPayment approved-CO fetch failed; skipping auto-close', coErr)
   }
-  return { total, closed }
+  return { total, closed, statusError }
+}
+
+/**
+ * Deletes one payment on a job and undoes what it settled (M-08, DATA-03).
+ *
+ * The row is deleted by its id on this job, not by the signed in user: a
+ * payment carries the job creator's id, so a teammate's delete matched
+ * nothing and still reported success. The delete asks for the id back and
+ * an empty answer is an error.
+ *
+ * Then, from the payments that remain: an invoice those payments no longer
+ * cover goes back to sent, but only one the job's payments covered before
+ * the delete (an invoice someone marked paid by hand stays paid). A job
+ * the payments had closed goes back to job when they no longer cover its
+ * contract; a job closed out on the Complete job screen stays closed.
+ */
+export async function deletePayment(contact: Contact, paymentId: string) {
+  const [paysRes, invsRes, cosRes, freshRes] = await Promise.all([
+    supabase.from('fh_payments').select('id, amount, invoice_id').eq('contact_id', contact.id),
+    supabase.from('fh_invoices').select('id, amount, status, sequence_number').eq('contact_id', contact.id),
+    supabase.from('fh_change_orders').select('amount, status').eq('contact_id', contact.id).eq('status', 'approved'),
+    supabase.from('fh_contacts').select('amount, stage').eq('id', contact.id).maybeSingle()
+  ])
+
+  const { data: deleted, error: delErr } = await supabase
+    .from('fh_payments')
+    .delete()
+    .eq('id', paymentId)
+    .eq('contact_id', contact.id)
+    .select('id')
+  if (delErr) return { error: delErr, reopenedInvoices: [] as string[], reopenedJob: false }
+  if (!deleted?.length) {
+    return { error: new Error('This payment was not deleted. It may have been removed already, or you may not have access to it.'), reopenedInvoices: [] as string[], reopenedJob: false }
+  }
+
+  // Without a full picture of the job's money, leave every status alone:
+  // the payment is gone either way, and a guess could reopen a paid bill.
+  if (paysRes.error || invsRes.error || cosRes.error || freshRes.error) {
+    console.error('[fieldhorse] deletePayment status check skipped', paysRes.error || invsRes.error || cosRes.error || freshRes.error)
+    return { error: null, reopenedInvoices: [] as string[], reopenedJob: false, statusUnchecked: true }
+  }
+
+  const before = paysRes.data || []
+  const after = before.filter((p) => p.id !== paymentId)
+  const invs = invsRes.data || []
+  const contractAmount = knownContractTotal({ amount: freshRes.data?.amount ?? contact.amount, changeOrders: cosRes.data || [] })
+
+  // Ask which bills each set of payments covers, reading a paid bill as
+  // open so it can be counted either way.
+  const asOpen = invs.map((inv) => (inv.status === 'paid' ? { ...inv, status: 'sent' } : inv))
+  const coveredBefore = new Set(invoicesPaidInFull({ invoices: asOpen, payments: before, contractTotal: contractAmount }))
+  const coveredAfter = new Set(invoicesPaidInFull({ invoices: asOpen, payments: after, contractTotal: contractAmount }))
+  const reopen = invs
+    .filter((inv) => inv.status === 'paid' && coveredBefore.has(inv.id) && !coveredAfter.has(inv.id))
+    .map((inv) => inv.id)
+
+  let statusError: unknown = null
+  const reopenedInvoices: string[] = []
+  if (reopen.length > 0) {
+    const { data: reopened, error } = await supabase
+      .from('fh_invoices')
+      .update({ status: 'sent' })
+      .in('id', reopen)
+      .eq('status', 'paid')
+      .select('id')
+    if (error) statusError = error
+    else reopenedInvoices.push(...(reopened || []).map((r: { id: string }) => r.id))
+  }
+
+  let reopenedJob = false
+  const stage = freshRes.data?.stage ?? contact.stage
+  const contractCents = toCents(contractAmount)
+  if (stage === 'closed' && contractAmount != null && contractCents > 0
+    && sumCents(before, (p) => p.amount) >= contractCents
+    && sumCents(after, (p) => p.amount) < contractCents) {
+    const { data: closeout, error: closeoutErr } = await supabase
+      .from('fh_closeouts').select('id').eq('contact_id', contact.id).maybeSingle()
+    if (closeoutErr) statusError = statusError || closeoutErr
+    else if (!closeout) {
+      const { data: moved, error } = await supabase
+        .from('fh_contacts').update({ stage: 'job' }).eq('id', contact.id).eq('stage', 'closed').select('id')
+      if (error) statusError = statusError || error
+      else reopenedJob = !!moved?.length
+    }
+  }
+  if (statusError) console.error('[fieldhorse] deletePayment status update failed', statusError)
+  return { error: null, reopenedInvoices, reopenedJob, statusError }
 }
 
 export async function recalcCost(contactId: string | undefined, userId: string | undefined) {
@@ -353,11 +454,20 @@ export async function recalcCost(contactId: string | undefined, userId: string |
   }
 }
 
-export function margin(contact: { amount?: number | null; cost?: number | null } | null | undefined) {
-  const amt = Number(contact?.amount || 0)
-  const cost = Number(contact?.cost || 0)
-  if (!amt) return 0
-  return ((amt - cost) / amt) * 100
+/**
+ * Margin as a percentage of the contract. Pass the job's change orders:
+ * the contract is the job amount plus the approved ones (M-15), so a
+ * $10,000 job with a $5,000 approved change order and $12,000 of cost is a
+ * 20% margin, not a 20% loss. A job with no amount has no margin.
+ */
+export function margin(
+  contact: { amount?: number | null; cost?: number | null } | null | undefined,
+  changeOrders: readonly { amount?: number | string | null; status?: string | null }[] = []
+) {
+  const contract = knownContractTotal({ amount: contact?.amount, changeOrders })
+  if (contract == null || toCents(contract) === 0) return 0
+  const cost = toCents(contact?.cost)
+  return ((toCents(contract) - cost) / toCents(contract)) * 100
 }
 
 export function marginTier(pct: number) {

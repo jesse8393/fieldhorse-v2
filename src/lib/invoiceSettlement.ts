@@ -8,6 +8,7 @@
 // flip or mints a one cent invoice.
 
 import { parseDateOnly } from './dates.ts'
+import { toCents, fromCents, sumCents } from './cents.ts'
 
 export type SettleInvoice = {
   id: string
@@ -26,11 +27,6 @@ export type SettlePayment = {
 // Statuses that still ask the customer for money: a bill not yet sent
 // (draft) or one the customer has (sent, viewed, overdue).
 const OPEN_STATUSES = new Set(['draft', 'sent', 'viewed', 'overdue'])
-
-function toCents(n: unknown): number {
-  const v = Math.round(Number(n || 0) * 100)
-  return Number.isFinite(v) ? v : 0
-}
 
 function statusOf(inv: { status?: string | null } | null | undefined): string {
   return String(inv?.status || '').toLowerCase()
@@ -189,18 +185,20 @@ export function isOpenInvoice(inv: { status?: string | null } | null | undefined
 /**
  * The job's contract for the allocator's cap, in dollars: the job amount
  * plus approved change orders, or null when it is unknown. A job billed
- * without a recorded amount (and no approved change order) has nothing to
- * cap at, so its invoices ask for their face less payments instead of
- * nothing. Money, Today and the reminder email all read this.
+ * without a recorded amount has nothing to cap at, whatever its change
+ * orders: a $500 change order on a job with no price is not the whole
+ * contract, and reading it as one made $2,000 of issued invoices owe $500.
+ * Its invoices ask for their face less payments. Money, Today and the
+ * reminder email all read this.
  */
 export function knownContractTotal({ amount, changeOrders }: {
   amount: number | string | null | undefined
   changeOrders?: readonly { amount?: number | string | null; status?: string | null }[] | null
 }): number | null {
+  const base = toCents(amount)
+  if (!base) return null
   const approved = (changeOrders || []).filter((co) => co?.status === 'approved')
-  const base = Number(amount || 0)
-  if (!base && approved.length === 0) return null
-  return base + approved.reduce((sum, co) => sum + Number(co.amount || 0), 0)
+  return fromCents(base + sumCents(approved, (co) => co.amount))
 }
 
 export type DueInvoice = SettleInvoice & {

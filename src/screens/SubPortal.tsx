@@ -193,7 +193,7 @@ export default function SubPortal() {
             </p>
             <p>
               {orgId
-                ? 'You also belong to an organization. Use the main sidebar for your owner / crew tools.'
+                ? 'You also belong to a company. Open Today or Jobs from the menu for its work.'
                 : 'Manage your insurance, W9, and payments across every contractor that has you on file.'}
             </p>
           </div>

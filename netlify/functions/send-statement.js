@@ -14,9 +14,9 @@
 //   Reply-To: company_email || sender's auth email
 
 import { createClient } from '@supabase/supabase-js'
-import { renderPayBlock, formatFromHeader, textField } from './lib/email.js'
+import { renderPayBlock, formatFromHeader, textField, idempotencyKey, sendViaResend, sendFailure, greetingFor, EMAIL_HEAD } from './lib/email.js'
 import { loadAccessibleRow, brandingUserIdFor } from './lib/orgAccess.js'
-import { hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
+import { hashIdentifier, checkRateLimit, checkDailySendCap, DAILY_SEND_LIMIT_MESSAGE } from './lib/rateLimit.js'
 import { isOwnedStoragePath } from './lib/storagePath.js'
 
 export default async (request) => {
@@ -87,6 +87,11 @@ export default async (request) => {
     return json({ error: 'rate_limited', message: 'Too many emails sent in a short time. Try again in a few minutes.' }, 429)
   }
 
+  const dayOk = await checkDailySendCap(supabase, sender_user_id)
+  if (!dayOk) {
+    return json({ error: 'rate_limited', message: DAILY_SEND_LIMIT_MESSAGE }, 429)
+  }
+
   // 1. Verify the caller may act on the client: its creator, or an owner,
   // admin or manager of its company.
   const access = await loadAccessibleRow(supabase, {
@@ -143,7 +148,7 @@ export default async (request) => {
   // Optional fields read through textField so a non string value from a
   // malformed client falls back to the default instead of throwing.
   const safeRecipientName = textField(recipient_name) || textField(client.company_name) || textField(client.name)
-  const greeting = safeRecipientName ? `Hi ${safeRecipientName.split(/\s+/)[0]},` : 'Hi,'
+  const greeting = greetingFor(safeRecipientName)
   const senderLine = companyName || 'Your contractor'
   const payLink = (profile?.payment_link || '').trim()
   const payInstructions = (profile?.payment_instructions || '').trim()
@@ -176,21 +181,14 @@ export default async (request) => {
     resendPayload.reply_to = replyTo
   }
 
-  const resendRes = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(resendPayload)
+  const sent = await sendViaResend({
+    apiKey: RESEND_API_KEY,
+    payload: resendPayload,
+    key: idempotencyKey('send-statement', `client:${client_id}`, storage_path, normalizedEmail)
   })
-  const resendBody = await resendRes.json().catch(() => ({}))
-  if (!resendRes.ok) {
-    return json({
-      error: 'send_failed',
-      provider_status: resendRes.status,
-      detail: resendBody?.message || resendBody?.error || 'Email provider rejected the send.'
-    }, 502)
-  }
+  if (!sent.ok) return json(sendFailure(sent), 502)
 
-  return json({ ok: true, email_id: resendBody?.id || null, sent_at: new Date().toISOString() })
+  return json({ ok: true, email_id: sent.body?.id || null, sent_at: new Date().toISOString() })
 }
 
 function formatMoneyLabel(n) {
@@ -209,6 +207,7 @@ function renderStatementHtml({ greeting, clientLabel, amountLabel, senderLine, p
   const payRow = renderPayBlock(payLink, payInstructions, amountLabel, safe)
   return `<!doctype html>
 <html lang="en">
+${EMAIL_HEAD}
 <body style="margin:0;padding:0;background:#F2EDE4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#141414;line-height:1.55;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#F2EDE4;padding:32px 16px;">
     <tr><td align="center">

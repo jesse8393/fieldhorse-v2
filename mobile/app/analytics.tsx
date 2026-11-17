@@ -9,6 +9,8 @@ import { useRouter } from 'expo-router'
 import { useJobs, useClientsBundle } from '../lib/queries'
 import { useAuth } from '../contexts/AuthContext'
 import { ScreenBackground, Card, ScreenHeader, SectionLabel, theme } from '../components/ui'
+import { parseDateOnly } from '../../src/lib/dates'
+import { useMembership, moneyVisible } from '../lib/membership'
 
 const STAGE_TINT: Record<string, string> = {
   lead: '#5C5C5C', quote: '#C9963A', job: '#2D7A4F', invoice: '#C9963A', closed: '#5C5C5C', lost: '#C0392B'
@@ -28,6 +30,9 @@ export default function AnalyticsScreen() {
   const { user } = useAuth()
   const { data: jobs = [], isLoading } = useJobs()
   const { data: bundle } = useClientsBundle(user?.id)
+  // Every figure here is money, which foreman and crew do not see.
+  const membership = useMembership(user?.id)
+  const showMoney = moneyVisible(membership.data)
 
   const stats = useMemo(() => {
     let pipeline = 0, won = 0, active = 0, wonCount = 0, lostCount = 0
@@ -66,9 +71,8 @@ export default function AnalyticsScreen() {
       monthly.push({ label: d.toLocaleDateString(undefined, { month: 'short' }), value: 0 })
     }
     for (const p of bundle?.payments ?? []) {
-      if (!p.paid_on) continue
-      const d = new Date(p.paid_on)
-      if (Number.isNaN(d.getTime())) continue
+      const d = parseDateOnly(p.paid_on)
+      if (!d) continue
       const idx = monthIdx.get(`${d.getFullYear()}-${d.getMonth()}`)
       if (idx != null) monthly[idx].value += Number(p.amount || 0)
     }
@@ -107,8 +111,10 @@ export default function AnalyticsScreen() {
       <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: insets.bottom + 24, paddingHorizontal: 24 }}>
         <ScreenHeader backLabel="More" onBack={() => router.back()} eyebrow="Analytics" title="Business snapshot" />
 
-        {isLoading ? (
+        {isLoading || membership.isPending ? (
           <ActivityIndicator color={theme.goldBright} style={{ marginTop: 24 }} />
+        ) : !showMoney ? (
+          <Text style={{ color: theme.inkMuted, fontSize: 14, marginTop: 20 }}>Your role does not include money figures, so analytics is hidden.</Text>
         ) : (
           <>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 20 }}>

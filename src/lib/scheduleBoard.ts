@@ -304,6 +304,28 @@ export function parseSlotId(id: unknown): { day: Date; hour: number } | null {
   return { day: new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])), hour: Number(m[4]) }
 }
 
+/** When a visit ends: its end, or an hour after it starts when the end is missing or not after the start. */
+function visitEnd(start: Date, endAt: string | null | undefined): Date {
+  const end = endAt ? new Date(endAt) : null
+  return end && end.getTime() > start.getTime() ? end : new Date(start.getTime() + 3_600_000)
+}
+
+/**
+ * The visits that touch one day: those that start on it, and those that
+ * started earlier and are still running after its midnight, so a pour
+ * from 10 pm to 2 am shows on both days.
+ */
+export function eventsOnDay<E extends BoardEventTimes>(day: Date, events: E[]): E[] {
+  const dayStart = new Date(day.getFullYear(), day.getMonth(), day.getDate()).getTime()
+  const dayEnd = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1).getTime()
+  return events.filter((e) => {
+    if (!e.start_at) return false
+    const start = new Date(e.start_at)
+    if (start.getTime() >= dayStart) return start.getTime() < dayEnd
+    return visitEnd(start, e.end_at).getTime() > dayStart
+  })
+}
+
 const DEFAULT_FIRST_HOUR = 7
 const DEFAULT_LAST_HOUR = 18
 
@@ -320,16 +342,17 @@ export function boardHours(
 ): { first: number; last: number } {
   let lo = first
   let hi = last
-  const keys = new Set(days.map(ymdKey))
-  for (const e of events) {
-    if (!e.start_at) continue
-    const start = new Date(e.start_at)
-    if (!keys.has(ymdKey(start))) continue
-    lo = Math.min(lo, start.getHours())
-    const end = e.end_at && Date.parse(e.end_at) > start.getTime() ? new Date(e.end_at) : new Date(start.getTime() + 3_600_000)
-    // A visit that runs past midnight stops at the bottom of its day.
-    const endHour = ymdKey(end) === ymdKey(start) ? end.getHours() + (end.getMinutes() > 0 ? 1 : 0) : 24
-    hi = Math.max(hi, endHour)
+  for (const day of days) {
+    const key = ymdKey(day)
+    for (const e of eventsOnDay(day, events)) {
+      const start = new Date(e.start_at as string)
+      const end = visitEnd(start, e.end_at)
+      // The rest of a visit from the day before starts at midnight.
+      lo = Math.min(lo, ymdKey(start) === key ? start.getHours() : 0)
+      // A visit that runs past midnight stops at the bottom of this day.
+      const endHour = ymdKey(end) === key ? end.getHours() + (end.getMinutes() > 0 ? 1 : 0) : 24
+      hi = Math.max(hi, endHour)
+    }
   }
   return { first: Math.max(0, lo), last: Math.min(24, hi) }
 }
@@ -352,12 +375,12 @@ export function dayLayout(
 ): DayItem[] {
   const key = ymdKey(day)
   const rows: { id: string; start: Date; end: Date; startMin: number; endMin: number }[] = []
-  for (const e of events) {
-    if (!e.start_at) continue
-    const start = new Date(e.start_at)
-    if (ymdKey(start) !== key) continue
-    const rawEnd = e.end_at ? new Date(e.end_at) : null
-    const end = rawEnd && rawEnd.getTime() > start.getTime() ? rawEnd : new Date(start.getTime() + 3_600_000)
+  const midnight = new Date(day.getFullYear(), day.getMonth(), day.getDate())
+  for (const e of eventsOnDay(day, events)) {
+    const realStart = new Date(e.start_at as string)
+    const end = visitEnd(realStart, e.end_at)
+    // The rest of a visit from the day before is drawn from midnight.
+    const start = ymdKey(realStart) === key ? realStart : midnight
     const startMin = start.getHours() * 60 + start.getMinutes()
     const endMin = ymdKey(end) === key ? end.getHours() * 60 + end.getMinutes() : 24 * 60
     const drawnEnd = Math.max(endMin, startMin + minMinutes)
@@ -371,6 +394,39 @@ export function dayLayout(
     column: packed[i].column,
     columns: packed[i].columns
   }))
+}
+
+export type MoreLink = { top: number; count: number; ids: string[] }
+
+/**
+ * Keeps at most `max` visits side by side so each stays readable; the
+ * rest of an overlapping group fold into one "+N more" link, placed at
+ * the first hidden visit's start, which opens the day view.
+ */
+export function capDayColumns(items: DayItem[], max = 2): { shown: DayItem[]; more: MoreLink[] } {
+  if (items.every((i) => i.columns <= max)) return { shown: items, more: [] }
+  const shown: DayItem[] = []
+  const hidden: DayItem[] = []
+  for (const item of items) {
+    if (item.columns <= max) shown.push(item)
+    else if (item.column < max) shown.push({ ...item, columns: max })
+    else hidden.push(item)
+  }
+  // Hidden visits that overlap one another share one link.
+  const sorted = [...hidden].sort((a, b) => a.top - b.top)
+  const more: MoreLink[] = []
+  let bottom = -Infinity
+  for (const item of sorted) {
+    const last = more[more.length - 1]
+    if (last && item.top < bottom) {
+      last.count += 1
+      last.ids.push(item.id)
+    } else {
+      more.push({ top: item.top, count: 1, ids: [item.id] })
+    }
+    bottom = Math.max(bottom, item.top + item.height)
+  }
+  return { shown, more }
 }
 
 type JobNames = {

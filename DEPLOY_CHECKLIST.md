@@ -5,7 +5,7 @@ The short list for every release. `SHIP.md` has the full setup, the environment 
 ## Before you merge
 
 * CI is green on the pull request: lint, the two audits, typecheck, unit tests, build and the Playwright job.
-* Any new migration is applied in Supabase and the regenerated `src/lib/database.types.ts` is in the same pull request.
+* Any new migration is applied in Supabase before the code that needs it is merged. `src/lib/database.types.ts` describes the repo's migrations, not production, and has been edited by hand, so a green typecheck does not prove production has what the code calls. Run `npm run check:schema` with `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` set to compare with production; the daily Production schema check workflow does the same once those two repository secrets exist.
 * New environment variables are set in Netlify before the merge, not after. `VITE_` variables only take effect on the next build.
 * Nothing in the diff adds a `public/_redirects`. All redirects live in `netlify.toml`; a `_redirects` file would be read first and its catch all would hide the asset rule.
 
@@ -15,7 +15,7 @@ The short list for every release. `SHIP.md` has the full setup, the environment 
 
 ## Smoke test after it goes live
 
-Use a real account on https://fieldhorse.io, on a phone and on a desktop browser.
+Use a real account on the live site, on a phone and on a desktop browser. Take its address from Netlify (Site configuration, Domain management); fieldhorse.io is not attached to the site and does not answer.
 
 1. Sign in. Home loads with the pipeline total and Next actions, and no error banner.
 2. Open Work, then a job. The tabs load and the job's money shows for an owner or admin.

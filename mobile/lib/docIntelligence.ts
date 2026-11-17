@@ -2,7 +2,7 @@
 // Mirrors the web src/lib/docIntelligence.ts LEAD flow. Takes a base64 data
 // URL (from expo-image-picker), asks Claude to OCR + extract a single lead,
 // and normalizes the result so it slots cleanly into the NewLeadSheet form.
-import { claudeVision } from './anthropic'
+import { claudeVision, claudeText } from './anthropic'
 import { JOB_TYPES } from './jobTypes'
 
 const LEAD_SYSTEM = `You are an OCR + extraction engine for a contractor's CRM. You will be shown a single image, usually a handwritten estimate, a scanned printed contract, a business card, a screenshot of an email or text, or a phone photo of a paper bid. Your job is to extract a single contractor lead.
@@ -97,7 +97,7 @@ export async function parseExpenseFromImage(dataUrl: string): Promise<ParsedExpe
     imageData: dataUrl,
     maxTokens: 500
   })
-  const text = res?.content?.[0]?.text || ''
+  const text = claudeText(res)
   const parsed = extractJson(text)
   if (!parsed) throw new Error("Couldn't read that receipt. Try a clearer photo.")
   const CATS = ['Materials', 'Fuel', 'Permits', 'Equipment', 'Other']
@@ -116,7 +116,7 @@ export async function parseLeadFromImage(dataUrl: string): Promise<ParsedLead> {
     imageData: dataUrl,
     maxTokens: 800
   })
-  const text = res?.content?.[0]?.text || ''
+  const text = claudeText(res)
   const parsed = extractJson(text)
   if (!parsed) throw new Error("Couldn't read that image. Try a clearer photo.")
   return normalizeLead(parsed)

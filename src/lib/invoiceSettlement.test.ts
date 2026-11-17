@@ -392,3 +392,29 @@ describe('amountsDueByInvoice', () => {
     expect(due.get('b1')).toBe(5000)
   })
 })
+
+// M-14: a job saved with no price has no known contract, whatever its
+// change orders.
+describe('a job with no price and an approved change order', () => {
+  it('knownContractTotal is null with or without change orders', async () => {
+    const { knownContractTotal } = await import('./invoiceSettlement.ts')
+    expect(knownContractTotal({ amount: 0, changeOrders: [] })).toBeNull()
+    expect(knownContractTotal({ amount: null, changeOrders: [{ amount: 500, status: 'approved' }] })).toBeNull()
+    expect(knownContractTotal({ amount: 10000.4, changeOrders: [{ amount: 1250.5, status: 'approved' }, { amount: 99, status: 'sent' }] })).toBe(11250.9)
+  })
+
+  it('still asks for both issued invoices after the change order is approved', async () => {
+    const { amountsDueByInvoice, knownContractTotal } = await import('./invoiceSettlement.ts')
+    const invoices = [
+      { id: 'a', contact_id: 'j1', amount: 1000, status: 'sent', sequence_number: 1 },
+      { id: 'b', contact_id: 'j1', amount: 1000, status: 'sent', sequence_number: 2 }
+    ]
+    const owed = (changeOrders: any[]) => {
+      const due = amountsDueByInvoice({ invoices, payments: [], contractFor: () => knownContractTotal({ amount: 0, changeOrders }) })
+      return [due.get('a'), due.get('b')]
+    }
+    expect(owed([])).toEqual([1000, 1000])
+    expect(owed([{ amount: 500, status: 'approved' }])).toEqual([1000, 1000])
+  })
+})
+

@@ -40,3 +40,44 @@ describe('splitByPercents', () => {
     expect(splitByPercents(1000, [])).toEqual([])
   })
 })
+
+// M-16: Generate from terms follows the deposit the approved terms name.
+describe('drawsFromTerms', () => {
+  it('uses 50 / 40 / 10 only when the terms are blank', async () => {
+    const { drawsFromTerms } = await import('./paymentSchedule.ts')
+    const plan = drawsFromTerms({ total: 10000, termsText: '   ', deposit: { kind: 'percent', pct: 50, amount: 5000 } })
+    expect(plan?.map((d) => d.amount)).toEqual([5000, 4000, 1000])
+    expect(plan?.map((d) => d.pct)).toEqual([50, 40, 10])
+  })
+
+  it('takes a percent deposit, then the balance', async () => {
+    const { drawsFromTerms } = await import('./paymentSchedule.ts')
+    const plan = drawsFromTerms({ total: 10000, termsText: '25% deposit due at signing. Balance due on completion.', deposit: { kind: 'percent', pct: 25, amount: 2500 } })
+    expect(plan?.map((d) => [d.title, d.amount])).toEqual([['25%, Deposit', 2500], ['75%, Balance due on completion', 7500]])
+  })
+
+  it('takes a dollar deposit to the cent, then the balance', async () => {
+    const { drawsFromTerms } = await import('./paymentSchedule.ts')
+    const plan = drawsFromTerms({ total: 10000.07, termsText: '$2,500 deposit', deposit: { kind: 'amount', pct: null, amount: 2500 } })
+    expect(plan?.map((d) => [d.title, d.amount])).toEqual([['Deposit', 2500], ['Balance due on completion', 7500.07]])
+  })
+
+  it('bills the whole contract once when the terms say no deposit', async () => {
+    const { drawsFromTerms } = await import('./paymentSchedule.ts')
+    const plan = drawsFromTerms({ total: 10000, termsText: 'No deposit. Net 30 on completion.', deposit: { kind: 'none', pct: 0, amount: 0 } })
+    expect(plan?.map((d) => [d.title, d.amount])).toEqual([['Balance due on completion', 10000]])
+  })
+
+  it('makes nothing up when the terms name no deposit it can read', async () => {
+    const { drawsFromTerms } = await import('./paymentSchedule.ts')
+    expect(drawsFromTerms({ total: 10000, termsText: 'Paid in three parts as agreed.', deposit: { kind: 'per_terms', pct: null, amount: 0 } })).toBeNull()
+  })
+
+  it('agrees with what the customer link asks for as the deposit', async () => {
+    const { drawsFromTerms } = await import('./paymentSchedule.ts')
+    const { quoteMoney } = await import('./quoteMoney.ts')
+    const termsText = '25% deposit due at signing. Balance due on completion.'
+    const money = quoteMoney({ items: [], changeOrders: [], contactAmount: 10000, termsText, companyName: 'Parker' })
+    expect(drawsFromTerms({ total: 10000, termsText, deposit: money.deposit })?.[0].amount).toBe(money.deposit.amount)
+  })
+})

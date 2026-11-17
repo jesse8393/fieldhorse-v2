@@ -6,96 +6,7 @@
 // a table of their own.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-// In memory stand in for the supabase-js query builder, the same pattern
-// docusignFunctions.test.ts uses, plus in, match, rpc and storage.
-type Row = Record<string, any>
-
-// Splits a PostgREST or() expression on the commas between clauses, not
-// the ones inside an in.(a,b) list.
-function orClauses(expr: string): string[] {
-  const out: string[] = []
-  let depth = 0
-  let cur = ''
-  for (const ch of expr) {
-    if (ch === '(') depth += 1
-    if (ch === ')') depth -= 1
-    if (ch === ',' && depth === 0) { out.push(cur); cur = '' } else cur += ch
-  }
-  if (cur) out.push(cur)
-  return out
-}
-
-function fakeSupabase(tables: Record<string, Row[]>) {
-  let nextId = 1
-  const matchOr = (row: Row, expr: string) => orClauses(expr).some((part) => {
-    const [col, op, ...rest] = part.split('.')
-    const value = rest.join('.')
-    if (op === 'is') return value === 'null' ? row[col] == null : row[col] === value
-    if (op === 'neq') return row[col] !== value
-    if (op === 'eq') return row[col] === value
-    if (op === 'in') return value.replace(/^\(|\)$/g, '').split(',').includes(String(row[col]))
-    return false
-  })
-  function from(table: string) {
-    const rows = (tables[table] ||= [])
-    const filters: Array<(r: Row) => boolean> = []
-    let mode: 'select' | 'update' | 'insert' | 'delete' = 'select'
-    let payload: any = null
-    let returning = false
-    let order: { col: string; asc: boolean } | null = null
-    let limit = Infinity
-    const matching = () => rows.filter((r) => filters.every((f) => f(r)))
-    const run = (): { data: any; error: any } => {
-      if (mode === 'insert') {
-        const inserted = (Array.isArray(payload) ? payload : [payload]).map((p) => ({ id: `row-${nextId++}`, created_at: new Date().toISOString(), ...p }))
-        rows.push(...inserted)
-        return { data: inserted, error: null }
-      }
-      if (mode === 'update') {
-        const hit = matching()
-        hit.forEach((r) => Object.assign(r, payload))
-        return { data: returning ? hit.map((r) => ({ ...r })) : null, error: null }
-      }
-      if (mode === 'delete') {
-        const hit = matching()
-        tables[table] = rows.filter((r) => !hit.includes(r))
-        return { data: null, error: null }
-      }
-      let out = matching()
-      if (order) {
-        const { col, asc } = order
-        out = [...out].sort((a, b) => (a[col] < b[col] ? -1 : a[col] > b[col] ? 1 : 0) * (asc ? 1 : -1))
-      }
-      return { data: out.slice(0, limit).map((r) => ({ ...r })), error: null }
-    }
-    const api: any = {
-      select: () => { returning = true; return api },
-      insert: (p: any) => { mode = 'insert'; payload = p; return api },
-      update: (p: any) => { mode = 'update'; payload = p; return api },
-      delete: () => { mode = 'delete'; return api },
-      eq: (col: string, v: any) => { filters.push((r) => r[col] === v); return api },
-      neq: (col: string, v: any) => { filters.push((r) => r[col] !== v); return api },
-      is: (col: string, v: any) => { filters.push((r) => (r[col] ?? null) === v); return api },
-      in: (col: string, vs: any[]) => { filters.push((r) => vs.includes(r[col])); return api },
-      match: (obj: Row) => { filters.push((r) => Object.entries(obj).every(([k, v]) => r[k] === v)); return api },
-      or: (expr: string) => { filters.push((r) => matchOr(r, expr)); return api },
-      order: (col: string, o: any) => { order = { col, asc: o?.ascending !== false }; return api },
-      limit: (n: number) => { limit = n; return api },
-      maybeSingle: async () => { const { data, error } = run(); return { data: data?.[0] ?? null, error } },
-      single: async () => { const { data, error } = run(); return { data: data?.[0] ?? null, error: data?.[0] ? error : { message: 'no rows' } } },
-      then: (resolve: any, reject: any) => Promise.resolve(run()).then(resolve, reject)
-    }
-    return api
-  }
-  const rpcCalls: Array<{ name: string; params: any }> = []
-  const rpc = async (name: string, params: any) => {
-    rpcCalls.push({ name, params })
-    if (name === 'fh_increment_rate_limit') return { data: [{ request_count: 1, allowed: true }], error: null }
-    return { data: null, error: null }
-  }
-  const storage = { from: () => ({ createSignedUrls: async () => ({ data: [], error: null }) }) }
-  return { from, rpc, storage, tables, rpcCalls }
-}
+import { fakeSupabase, type Row } from './publicLinkTestDb.ts'
 
 let currentFake: ReturnType<typeof fakeSupabase> | null = null
 vi.mock('@supabase/supabase-js', () => ({ createClient: () => currentFake }))
@@ -232,7 +143,7 @@ describe('a proposal link with quote_id', () => {
 describe('approving a quote through its link', () => {
   it('writes fh_quotes.status and approved_version_id', async () => {
     currentFake = fakeSupabase(quoteTables())
-    const res = await postApprove({ token: 't1', signature_name: 'Marco Castellanos' })
+    const res = await postApprove({ token: 't1', signature_name: 'Marco Castellanos', expected_total: 3000 })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body).toMatchObject({ ok: true, version_number: 1, signed_by: 'Marco Castellanos' })
@@ -251,7 +162,7 @@ describe('approving a quote through its link', () => {
 
   it('the quote number uses the quote id', async () => {
     currentFake = fakeSupabase(quoteTables())
-    await postApprove({ token: 't1', signature_name: 'Marco Castellanos' })
+    await postApprove({ token: 't1', signature_name: 'Marco Castellanos', expected_total: 3000 })
     const snapshot = currentFake.tables.fh_quote_versions[0].snapshot
     expect(snapshot.quote_number).toBe('PC-2026-RTAL')
     expect(snapshot.quote.id).toBe(QUOTE_ID)
@@ -286,7 +197,7 @@ describe('approving a quote through its link', () => {
       { status: 'changes_requested' },
       { fh_quote_versions: [{ id: 'v-old', quote_id: QUOTE_ID, version_number: 3, status: 'approved' }] }
     ))
-    const res = await postApprove({ token: 't1', signature_name: 'Marco' })
+    const res = await postApprove({ token: 't1', signature_name: 'Marco', expected_total: 3000 })
     expect(res.status).toBe(200)
     const versions = currentFake.tables.fh_quote_versions
     const created = versions.find((v) => v.id !== 'v-old')!

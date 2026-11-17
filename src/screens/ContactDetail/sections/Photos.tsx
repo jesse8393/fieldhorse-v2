@@ -3,9 +3,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useQueryClient } from '@tanstack/react-query'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Upload, GitCompareArrows, ChevronLeft, ChevronRight,
-  X, Trash2, Sparkles, Image as ImageIcon
+  Trash2, Sparkles, Image as ImageIcon
 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
 import { isSignedUrlFresh, signedUrlEntriesFor, signedUrlsFor } from '../../../lib/signedUrls.ts'
@@ -61,7 +62,7 @@ const SCOPE_SECTIONS = [
  *   - Lightbox with swipe-between + caption editor.
  *   - Compare mode: select 2 photos, drag the before/after slider.
  *   - incomingFiles: photos the phone Job page's camera took; they upload
- *     once, exactly as if picked with Add Photos.
+ *     once, exactly as if picked with Add photos.
  */
 export default function PhotosSection({ jobId, userId, incomingFiles = null, onIncomingHandled }: any) {
   const queryClient = useQueryClient()
@@ -82,7 +83,14 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
   const deleteTap = useArmedId()
   const [deleting, setDeleting] = useState(false)
 
-  const [lightboxIdx, setLightboxIdx] = useState(-1)
+  // The open photo lives in the URL (?photo=<id>), so the full screen view
+  // is a screen of its own: browser Back and the Back control close it,
+  // and a reload keeps it open (D57, no modal viewer).
+  const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const openPhotoId = searchParams.get('photo')
+  const lightboxIdx = openPhotoId ? rows.findIndex((r) => r.id === openPhotoId) : -1
   const [lightboxUrl, setLightboxUrl] = useState('')
 
   const [compareMode, setCompareMode] = useState(false)
@@ -375,27 +383,45 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
     return byPath.get(row.storage_path) || ''
   }
 
-  async function openLightbox(idx: any) {
+  function showPhoto(id: string | null, push: boolean) {
+    const next = new URLSearchParams(searchParams)
+    if (id) next.set('photo', id)
+    else next.delete('photo')
+    if (push) navigate({ search: `?${next}` }, { state: { photoFromGrid: true } })
+    else setSearchParams(next, { replace: true, state: location.state })
+  }
+
+  function openLightbox(idx: any) {
     const row = rows[idx]
-    if (!row) return
-    setLightboxIdx(idx)
-    const url = await urlFor(row)
-    setLightboxUrl(url)
+    if (row) showPhoto(row.id, true)
   }
 
   function closeLightbox() {
-    setLightboxIdx(-1)
-    setLightboxUrl('')
+    // Opened from the grid: step back to the entry it came from. Arrived
+    // straight at the photo's address: drop the photo from it.
+    if ((location.state as { photoFromGrid?: boolean } | null)?.photoFromGrid) navigate(-1)
+    else showPhoto(null, false)
   }
 
-  async function goLightbox(delta: any) {
+  function goLightbox(delta: any) {
     const next = lightboxIdx + delta
     if (next < 0 || next >= rows.length) return
-    setLightboxUrl('')
-    setLightboxIdx(next)
-    const url = await urlFor(rows[next])
-    setLightboxUrl(url)
+    showPhoto(rows[next].id, false)
   }
+
+  // Sign the open photo's address whenever the photo changes.
+  const lightboxRowId = lightboxIdx >= 0 ? rows[lightboxIdx]?.id : null
+  useEffect(() => {
+    setLightboxUrl('')
+    if (!lightboxRowId) return
+    const row = rows.find((r) => r.id === lightboxRowId)
+    if (!row) return
+    let cancelled = false
+    void urlFor(row).then((url) => { if (!cancelled) setLightboxUrl(url) })
+    return () => { cancelled = true }
+    // urlFor reads the latest thumbnails; re-sign only when the photo changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lightboxRowId])
 
   async function handleThumbTap(row: any) {
     hapticTap()
@@ -480,7 +506,7 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
             }}
           >
             <Upload size={12} aria-hidden="true" />
-            {uploading ? 'Uploading…' : 'Add Photos'}
+            {uploading ? 'Uploading…' : 'Add photos'}
           </motion.button>
         </div>
       </div>
@@ -538,7 +564,7 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12
         }}>
           <ImageIcon size={28} aria-hidden="true" color="var(--v3-text-muted)" />
-          <div>Photos tell the story. Tap <strong>Add Photos</strong> above to start.</div>
+          <div>Photos tell the story. Tap <strong>Add photos</strong> above to start.</div>
         </div>
       )}
 
@@ -701,7 +727,7 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
   return createPortal(
     <>
       <motion.div
-        onClick={onClose}
+        aria-hidden="true"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -713,8 +739,7 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
       <motion.div
         ref={dialogRef}
         className="fh-photo-lightbox fh-onyx-scope"
-        role="dialog"
-        aria-modal="true"
+        role="region"
         aria-label="Photo viewer"
         onKeyDown={(event) => {
           if (event.key === 'Escape') { event.stopPropagation(); onClose(); return }
@@ -742,7 +767,7 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label="Back to photos"
             style={{
               width: 44, height: 44, borderRadius: 10,
               background: '#303030', border: '1px solid #626262',
@@ -750,7 +775,7 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
               display: 'grid', placeItems: 'center'
             }}
           >
-            <X size={20} aria-hidden="true" />
+            <ChevronLeft size={20} aria-hidden="true" />
           </button>
           <div style={{
             fontFamily: 'var(--font-body)', fontSize: 12,

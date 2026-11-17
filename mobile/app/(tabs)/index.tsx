@@ -25,6 +25,7 @@ import { ScreenBackground, Card, SectionLabel, theme } from '../../components/ui
 import { NewLeadSheet } from '../../components/NewLeadSheet'
 import { SearchOverlay } from '../../components/SearchOverlay'
 import { DailyBriefCard } from '../../components/DailyBriefCard'
+import { useMoneyVisible } from '../../lib/membership'
 
 const ACTIVE = new Set(['lead', 'quote', 'job', 'invoice'])
 const STAGE_TINT: Record<string, string> = { lead: '#5C5C5C', quote: '#C9963A', job: '#2D7A4F', invoice: '#C9963A', closed: '#5C5C5C', lost: '#C0392B' }
@@ -60,6 +61,8 @@ export default function HomeScreen() {
   const { data: invoices } = useInvoicesOverview(user?.id)
   const { data: notifications = [] } = useNotifications(user?.id)
   const saveLocation = useSaveLocation()
+  // Foreman and crew see no amounts (fh_money_visible), as on the web.
+  const showMoney = useMoneyVisible(user?.id)
 
   const [now, setNow] = useState(() => new Date())
   const [pinning, setPinning] = useState(false)
@@ -130,31 +133,33 @@ export default function HomeScreen() {
       })
     }
     // 3. Invoices unpaid 5+ days
-    for (const inv of invoices?.invoices ?? []) {
+    for (const inv of showMoney ? invoices?.invoices ?? [] : []) {
       if (inv.status === 'paid' || inv.status === 'void' || inv.ageDays < 5) continue
       out.push({
         id: `i-${inv.id}`, overdue: false, sort: inv.ageDays,
         title: `Chase invoice for ${inv.name || 'client'}`,
         sub: `Unpaid · ${inv.ageDays}d`, tone: theme.success, label: 'Invoice',
-        onPress: () => inv.contactId && router.push(`/invoices/${inv.contactId}`)
+        onPress: () => inv.contactId && router.push(`/invoices/${inv.contactId}?invoice=${inv.id}`)
       })
     }
     out.sort((a, b) => (b.overdue ? 1 : 0) - (a.overdue ? 1 : 0) || b.sort - a.sort)
     return out.slice(0, 5)
-  }, [overdue, jobs, invoices?.invoices, router])
+  }, [overdue, jobs, invoices?.invoices, router, showMoney])
 
   const briefContext = useMemo(() => {
     const parts = [
-      `Pipeline $${Math.round(stats.pipeline).toLocaleString()} across ${stats.active} active deals (7 day trend ${stats.trend >= 0 ? '+' : ''}${stats.trend}%).`,
+      showMoney
+        ? `Pipeline $${Math.round(stats.pipeline).toLocaleString()} across ${stats.active} active deals (7 day trend ${stats.trend >= 0 ? '+' : ''}${stats.trend}%).`
+        : `${stats.active} active jobs.`,
       `${stats.lead} leads, ${todayEvents.length} jobs on site today.`,
       `${priorities.followUps} cold follow ups, ${priorities.quotes} open quotes.`,
-      invoices ? `$${Math.round(invoices.totalOutstanding).toLocaleString()} outstanding across ${invoices.outstandingCount} invoices; $${Math.round(priorities.collectedWeek).toLocaleString()} collected this week.` : '',
+      invoices && showMoney ? `$${Math.round(invoices.totalOutstanding).toLocaleString()} outstanding across ${invoices.outstandingCount} invoices; $${Math.round(priorities.collectedWeek).toLocaleString()} collected this week.` : '',
       overdue.length ? `${overdue.length} jobs behind schedule.` : '',
       weather?.current ? `Weather: ${Math.round(weather.current.temperature_2m)}°F, ${weatherLabel(weather.current.weather_code)}.` : '',
       nextActions.length ? `Top actions: ${nextActions.map((a) => a.title).slice(0, 5).join('; ')}.` : ''
     ]
     return parts.filter(Boolean).join(' ')
-  }, [stats, todayEvents.length, priorities, invoices, overdue.length, weather, nextActions])
+  }, [stats, todayEvents.length, priorities, invoices, overdue.length, weather, nextActions, showMoney])
 
   const name = (user?.email?.split('@')[0] || 'there')
   const display = name.charAt(0).toUpperCase() + name.slice(1)
@@ -234,6 +239,7 @@ export default function HomeScreen() {
             {/* Hero revenue card */}
             <Card glow style={{ marginBottom: 22 }}>
               <View style={{ padding: 24 }}>
+                {showMoney ? (<>
                 <SectionLabel>Today's revenue opportunity</SectionLabel>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
@@ -259,6 +265,7 @@ export default function HomeScreen() {
                     <Circle cx={320} cy={8} r={3} fill="#C9963A" />
                   </Svg>
                 </View>
+                </>) : <SectionLabel>Your work</SectionLabel>}
 
                 {/* breakdown */}
                 <View style={{ flexDirection: 'row', marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: theme.border }}>
@@ -276,13 +283,13 @@ export default function HomeScreen() {
             <SectionLabel style={{ marginBottom: 10 }}>Quick actions</SectionLabel>
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 24 }}>
               <QuickAction icon={<Plus color={theme.onGold} size={20} strokeWidth={2.6} />} label="New lead" primary onPress={() => setLeadOpen(true)} />
-              <QuickAction icon={<Sparkles color={theme.goldBright} size={20} />} label="Estimate" onPress={() => router.push('/bid')} />
+              {showMoney ? <QuickAction icon={<Sparkles color={theme.goldBright} size={20} />} label="Estimate" onPress={() => router.push('/bid')} /> : null}
               <QuickAction icon={<MessageSquare color={theme.goldBright} size={20} />} label="AI Compose" onPress={() => router.push('/compose')} />
               <QuickAction icon={<Calendar color={theme.goldBright} size={20} />} label="Schedule" onPress={() => router.push('/schedule')} />
             </View>
 
             {/* Recent activity */}
-            {activity.length > 0 ? (
+            {showMoney && activity.length > 0 ? (
               <>
                 <SectionLabel style={{ marginBottom: 10 }}>Recent activity</SectionLabel>
                 <Card style={{ marginBottom: 24 }}>
@@ -336,7 +343,7 @@ export default function HomeScreen() {
             <View style={{ flexDirection: 'row', gap: 12, marginBottom: 24 }}>
               <Priority icon={<Phone color={theme.success} size={16} />} value={String(priorities.followUps)} label="Follow ups" sub="Leads gone cold" tint={theme.success} />
               <Priority icon={<FileText color="#5C5C5C" size={16} />} value={String(priorities.quotes)} label="Quotes" sub="Need attention" tint="#5C5C5C" />
-              <Priority icon={<DollarSign color={theme.goldBright} size={16} />} value={money(priorities.collectedWeek)} label="Invoicing" sub="Collected this week" tint={theme.goldBright} />
+              {showMoney ? <Priority icon={<DollarSign color={theme.goldBright} size={16} />} value={money(priorities.collectedWeek)} label="Invoicing" sub="Collected this week" tint={theme.goldBright} /> : null}
             </View>
 
             {/* Today on site */}
@@ -400,7 +407,7 @@ export default function HomeScreen() {
                             <Text style={{ color: theme.ink, fontSize: 16, fontWeight: '700' }} numberOfLines={1}>{j.name || 'Untitled'}</Text>
                             <Text style={{ color: tint, fontSize: 12, fontWeight: '800', letterSpacing: 0, textTransform: 'uppercase', marginTop: 3 }}>{j.stage}</Text>
                           </View>
-                          <Text style={{ color: theme.goldBright, fontSize: 20, fontWeight: '800' }}>{money(Number(j.amount || 0))}</Text>
+                          {showMoney ? <Text style={{ color: theme.goldBright, fontSize: 20, fontWeight: '800' }}>{money(Number(j.amount || 0))}</Text> : null}
                         </View>
                       </Card>
                     </Pressable>
@@ -412,7 +419,7 @@ export default function HomeScreen() {
         )}
       </ScrollView>
       {user ? (
-        <NewLeadSheet open={leadOpen} onClose={() => setLeadOpen(false)} userId={user.id} onCreated={(id) => router.push(`/jobs/${id}`)} />
+        <NewLeadSheet open={leadOpen} onClose={() => setLeadOpen(false)} userId={user.id} onCreated={(clientId) => router.push(`/clients/${clientId}?saved=lead`)} />
       ) : null}
       <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} userId={user?.id} />
     </View>

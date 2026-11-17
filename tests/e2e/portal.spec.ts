@@ -289,7 +289,7 @@ test('the approve bar is on the page and posts only when approving is tapped', a
 
   await approve.click()
   await expect.poll(() => spies.approve.length).toBe(1)
-  expect(spies.approve[0]).toEqual({ token: 't1', signature_name: 'Marco Castellanos', note: null })
+  expect(spies.approve[0]).toEqual({ token: 't1', signature_name: 'Marco Castellanos', note: null, expected_total: 18458, expected_updated_at: null })
 
   // The page reloads the proposal: approved, so the bar is gone.
   await expect(page.getByText('Approved', { exact: true })).toBeVisible()
@@ -725,10 +725,9 @@ test('after approval the deposit note and the pay button stay past the valid unt
 })
 
 test('on the classic page an approval on the stated day still reaches the server', async ({ page, context }) => {
-  // Valid until October 9 (end of day, Central); the customer approves at
-  // 9 in the morning on October 10. The server allows the whole next day,
-  // so the approval posts and the server decides, as it always did.
-  await page.clock.setFixedTime(new Date('2026-10-10T14:00:00.000Z'))
+  // Valid until October 9 (stored as the end of that day, Central); the
+  // customer approves at 9 in the morning on October 9, so it posts.
+  await page.clock.setFixedTime(new Date('2026-10-09T14:00:00.000Z'))
   const spies = await mockPortal(context, proposalPayload({
     company: { estimate_template: 'classic' },
     contact: { quote_expires_at: '2026-10-10T04:59:59.999Z' }
@@ -742,10 +741,24 @@ test('on the classic page an approval on the stated day still reaches the server
   await approve.click()
 
   await expect.poll(() => spies.approve.length).toBe(1)
-  expect(spies.approve[0]).toEqual({ token: 't1', signature_name: 'Marco Castellanos', note: null })
+  expect(spies.approve[0]).toEqual({ token: 't1', signature_name: 'Marco Castellanos', note: null, expected_total: 18458, expected_updated_at: null })
   await expect(page.getByText('Proposal approved')).toBeVisible()
   await expect(page.getByRole('alert')).toHaveCount(0)
   expect(spies.stray).toEqual([])
+})
+
+test('on the classic page the day after the valid until date shows the expired note and posts nothing (M-21)', async ({ page, context }) => {
+  // The same quote the next morning: the server no longer adds a day to a
+  // date stored as the end of the day, and the page offers no approval.
+  await page.clock.setFixedTime(new Date('2026-10-10T14:00:00.000Z'))
+  const spies = await mockPortal(context, proposalPayload({
+    company: { estimate_template: 'classic' },
+    contact: { quote_expires_at: '2026-10-10T04:59:59.999Z' }
+  }))
+  await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByText('This proposal has expired. Ask Parker Construction for an updated one.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Approve & notify contractor' })).toHaveCount(0)
+  expect(spies.approve).toHaveLength(0)
 })
 
 test('a quote with changes requested shows the request and no way to approve or ask', async ({ page, context }) => {
@@ -796,7 +809,7 @@ test('a total that changed since the page loaded stops the approval and shows th
   // Reviewed: the next tap approves the new total.
   await page.getByRole('button', { name: 'Approve this quote' }).click()
   await expect.poll(() => spies.approve.length).toBe(1)
-  expect(spies.approve[0]).toEqual({ token: 't1', signature_name: 'Marco Castellanos', note: null })
+  expect(spies.approve[0]).toEqual({ token: 't1', signature_name: 'Marco Castellanos', note: null, expected_total: 19458, expected_updated_at: null })
   await expect(page.getByText('Approved', { exact: true })).toBeVisible()
   expect(spies.stray).toEqual([])
 })
@@ -1037,8 +1050,8 @@ test('a question sent after the quote was declined reads the link again and leav
   await expect(page.getByRole('button', { name: /Ask about this/ })).toHaveCount(1)
 
   // The contractor marks the quote declined while the customer reads. The
-  // request changes endpoint refuses a question for it; the approve
-  // endpoint still takes an approval.
+  // request changes endpoint refuses a question for it, and so does the
+  // approve endpoint.
   spies.setPayload(proposalPayload({ contact: { proposal_status: 'rejected' } }))
   spies.setRequestReply({ status: 410, body: { ok: false, error: 'gone' } })
   const reads = spies.reads
@@ -1046,16 +1059,14 @@ test('a question sent after the quote was declined reads the link again and leav
 
   await expect.poll(() => spies.requestChanges.length).toBe(1)
   await expect.poll(() => spies.reads).toBeGreaterThan(reads)
-  // The question form closes on the reason, and nothing offers to ask again.
-  const alert = page.getByRole('alert')
-  await expect(alert).toHaveText('This proposal is no longer open for changes.')
-  await expect(alert).toBeFocused()
+  // The page now shows the quote as declined: not open, nothing to ask or
+  // approve (a declined quote takes no approval, FN-18).
+  await expect(page.getByText('This quote is not open for approval.')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Send request' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: /Ask about this/ })).toHaveCount(0)
   await expect(page.getByRole('button', { name: /question first/ })).toHaveCount(0)
   await expect(page.getByText('Stamped ashlar pattern', { exact: true })).toBeVisible()
-  // A declined quote can still be approved.
-  await expect(page.getByRole('button', { name: 'Approve this quote' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Approve this quote' })).toHaveCount(0)
   expect(spies.requestChanges).toHaveLength(1)
   expect(spies.approve).toHaveLength(0)
   expect(spies.stray).toEqual([])
@@ -1204,12 +1215,14 @@ test('a quote marked lost says it is no longer open, with no way to approve or a
   expect(spies.stray).toEqual([])
 })
 
-test('a declined quote, or one already moved to a job, can still be approved but offers no question', async ({ page, context }) => {
-  // The approve endpoint accepts both; the request changes endpoint refuses
-  // both (410), so neither Ask button may show.
+test('a declined quote cannot be approved; one already moved to a job can, but offers no question', async ({ page, context }) => {
+  // The approve endpoint refuses a declined proposal (FN-18) and accepts
+  // one whose job has started; the request changes endpoint refuses both
+  // (410), so no Ask button may show for either.
   const spies = await mockPortal(context, proposalPayload({ contact: { proposal_status: 'rejected' } }))
   await openPortal(page)
-  await expect(page.getByRole('button', { name: 'Approve this quote' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Approve this quote' })).toHaveCount(0)
+  await expect(page.getByText('This quote is not open for approval.')).toBeVisible()
   await expect(page.getByText('Stamped ashlar pattern', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: /Ask about this/ })).toHaveCount(0)
   await expect(page.getByRole('button', { name: /question first/ })).toHaveCount(0)
@@ -1415,4 +1428,405 @@ test('the header text stays readable over a bright cover photo', async ({ page, 
     const ratio = contrastRatio(luminanceOf(...rgbOf(line.color)), ground.brightest)
     expect(ratio, `${ground.sel} over the brightest pixel under it`).toBeGreaterThanOrEqual(4.5)
   }
+})
+
+/* ---- The invoice link (audit 2026-11-16: PT-01, PT-02, PT-05, PT-07, PT-17, M-01, M-02, M-25) ---- */
+
+// An invoice link payload, as /api/public-link serves it for a job.
+function invoicePayload({ contact = {}, company = {}, invoices = [], payments = [], changeOrders = [] }: {
+  contact?: Record<string, unknown>
+  company?: Record<string, unknown>
+  invoices?: Array<Record<string, unknown>>
+  payments?: Array<Record<string, unknown>>
+  changeOrders?: Array<Record<string, unknown>>
+} = {}): Payload {
+  return {
+    ok: true,
+    kind: 'invoice',
+    change_order_id: null,
+    contact: {
+      id: 'job-linked-0003', name: 'Dana O’Brien', address: '1150 Cherry Blossom Ln, La Vergne', phone: '615 555 0142',
+      email: 'dana@example.com', job_title: 'Garage slab', stage: 'job', amount: 10000, created_at: '2026-10-16T12:00:00.000Z',
+      ...contact
+    },
+    company: {
+      name: 'Parker Concrete & Construction', phone: '615 555 0100', email: 'office@parker.co', logo_url: null,
+      estimate_template: 'classic', payment_link: 'https://pay.example.com/parker', payment_instructions: '',
+      ...company
+    },
+    items: [],
+    payments,
+    changeOrders,
+    insurance: null,
+    invoices,
+    photos: []
+  } as unknown as Payload
+}
+
+const draw = (id: string, seq: number, amount: number, status: string, extra: Record<string, unknown> = {}) => ({
+  id, contact_id: 'job-linked-0003', sequence_number: seq, title: `Draw ${seq}`, amount, status,
+  issued_at: '2026-11-06T12:00:00.000Z', due_at: '2099-11-21', description: null, ...extra
+})
+
+async function openInvoice(page: Page) {
+  await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByText('Billed to')).toBeVisible()
+}
+
+test('an invoice for a client with no job asks for the open invoice, whatever an earlier paid one took in', async ({ page, context }) => {
+  await mockPortal(context, invoicePayload({
+    contact: { id: 'cl-0009', job_title: null, stage: null, amount: 1000 },
+    invoices: [
+      draw('inv-n1', 1, 500, 'paid', { contact_id: null, client_id: 'cl-0009' }),
+      draw('inv-n2', 2, 1000, 'sent', { contact_id: null, client_id: 'cl-0009' })
+    ],
+    payments: [{ id: 'pay-n1', contact_id: null, invoice_id: 'inv-n1', amount: 500, paid_on: '2026-10-07', method: 'cash', kind: 'other' }]
+  }))
+  await openInvoice(page)
+
+  await expect(page.getByTestId('invoice-amount-due')).toHaveText('$1,000.00')
+  await expect(page.getByRole('link', { name: 'Pay $1,000.00 now' })).toBeVisible()
+  await expect(page.getByText('Paid in full')).toHaveCount(0)
+})
+
+test('a part payment on the open invoice comes off the amount the link asks for', async ({ page, context }) => {
+  await mockPortal(context, invoicePayload({
+    invoices: [draw('inv-l1', 1, 5000, 'sent')],
+    payments: [{ id: 'pay-l1', contact_id: 'job-linked-0003', invoice_id: 'inv-l1', amount: 2000, paid_on: '2026-11-13', method: 'zelle', kind: 'deposit' }]
+  }))
+  await openInvoice(page)
+
+  await expect(page.getByTestId('invoice-amount-due')).toHaveText('$3,000.00')
+  await expect(page.getByRole('link', { name: 'Pay $3,000.00 now' })).toBeVisible()
+})
+
+test('the invoice link uses the amount the server worked out for the invoice', async ({ page, context }) => {
+  // A deposit logged against the job paid an unsent draft the link never
+  // carries, so only the server knows this draw still owes all of itself.
+  await mockPortal(context, invoicePayload({
+    invoices: [draw('inv-2', 2, 5000, 'sent', { amount_due: 5000 })],
+    payments: [{ id: 'pay-1', contact_id: 'job-linked-0003', invoice_id: null, amount: 2500, paid_on: '2026-11-01', method: 'check', kind: 'deposit' }]
+  }))
+  await openInvoice(page)
+  await expect(page.getByTestId('invoice-amount-due')).toHaveText('$5,000.00')
+})
+
+test('the amount due and the pay button keep their cents', async ({ page, context }) => {
+  await mockPortal(context, invoicePayload({ contact: { amount: 2499.5 }, invoices: [draw('inv-c1', 1, 2499.5, 'sent')] }))
+  await openInvoice(page)
+
+  await expect(page.getByTestId('invoice-amount-due')).toHaveText('$2,499.50')
+  await expect(page.getByRole('link', { name: 'Pay $2,499.50 now' })).toBeVisible()
+})
+
+test('a sent invoice on a job saved with no price is owed, and 49 cents short is not paid in full', async ({ page, context }) => {
+  const spies = await mockPortal(context, invoicePayload({ contact: { amount: null }, invoices: [draw('inv-z1', 1, 500, 'sent')] }))
+  await openInvoice(page)
+  await expect(page.getByTestId('invoice-amount-due')).toHaveText('$500.00')
+  await expect(page.getByText('Paid in full')).toHaveCount(0)
+  await expect(page.getByRole('link', { name: 'Pay $500.00 now' })).toBeVisible()
+
+  spies.setPayload(invoicePayload({
+    contact: { amount: 5000 },
+    invoices: [draw('inv-z2', 1, 5000, 'sent')],
+    payments: [{ id: 'pay-z', contact_id: 'job-linked-0003', invoice_id: 'inv-z2', amount: 4999.51, paid_on: '2026-11-13', method: 'check', kind: 'final' }]
+  }))
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await expect(page.getByTestId('invoice-amount-due')).toHaveText('$0.49')
+  await expect(page.getByText('Paid in full')).toHaveCount(0)
+})
+
+test('once every issued invoice is paid the link keeps its number and asks for nothing that was not invoiced', async ({ page, context }) => {
+  await mockPortal(context, invoicePayload({
+    invoices: [draw('inv-p1', 1, 5000, 'paid', { issued_at: '2026-11-02T12:00:00.000Z' })],
+    payments: [{ id: 'pay-p1', contact_id: 'job-linked-0003', invoice_id: 'inv-p1', amount: 5000, paid_on: '2026-11-10', method: 'ach', kind: 'deposit' }]
+  }))
+  await openInvoice(page)
+
+  // The bill the customer was sent, not a number made up from the job.
+  await expect(page.getByText('PCC-0003-01').first()).toBeVisible()
+  await expect(page.getByText(/PCC-INV-/)).toHaveCount(0)
+  await expect(page.getByText('November 2, 2026')).toBeVisible()
+  await expect(page.getByTestId('invoice-amount-due')).toHaveText('Paid in full')
+  await expect(page.getByRole('link', { name: /^Pay / })).toHaveCount(0)
+  // The other half of the contract is not invoiced yet, and the page says so.
+  await expect(page.getByText('$5,000.00').last()).toBeVisible()
+})
+
+test('the invoice link shows the invoice description and its notes', async ({ page, context }) => {
+  await mockPortal(context, invoicePayload({
+    invoices: [draw('inv-d1', 1, 5000, 'sent', {
+      title: 'Deposit',
+      description: 'Deposit for the garage slab.\nForms and rebar are set once this is in.',
+      notes: 'Gate code is 4410. Please keep the dog inside on pour day.'
+    })]
+  }))
+  await openInvoice(page)
+
+  await expect(page.getByText('Deposit for the garage slab.')).toBeVisible()
+  await expect(page.getByText('Forms and rebar are set once this is in.')).toBeVisible()
+  await expect(page.getByText('Gate code is 4410. Please keep the dog inside on pour day.')).toBeVisible()
+})
+
+test('an invoice due yesterday reads past due today, as it does in the app', async ({ page, context }) => {
+  // Yesterday on the browser's calendar (the config pins Central time),
+  // stored as the end of that day, the way the app saves a due date.
+  await page.clock.install({ time: new Date('2026-11-17T18:00:00-06:00') })
+  const dueAt = '2026-11-16T23:59:59-06:00'
+  await mockPortal(context, invoicePayload({ invoices: [draw('inv-o1', 1, 5000, 'sent', { due_at: dueAt })] }))
+  await openInvoice(page)
+  await expect(page.getByText('Past due', { exact: true })).toBeVisible()
+})
+
+/* ---- Cents on the change order and the approve sentence (PT-04, PT-05, M-05) ---- */
+
+function changeOrderPayload({ co = {}, contact = {}, others = [] }: {
+  co?: Record<string, unknown>
+  contact?: Record<string, unknown>
+  others?: Array<Record<string, unknown>>
+} = {}): Payload {
+  return {
+    ok: true,
+    kind: 'change_order',
+    change_order_id: 'co-1',
+    contact: { id: 'job-co-0001', name: 'Marco Castellanos', address: '1150 Cherry Blossom Ln', job_title: 'Pool deck pour', stage: 'job', amount: 25200, ...contact },
+    company: { name: 'Parker Construction', phone: '615 555 0100', email: 'office@parker.co', logo_url: null, estimate_template: 'classic' },
+    items: [],
+    payments: [],
+    changeOrders: [
+      ...others,
+      { id: 'co-1', sequence_number: 2, title: 'Extra footing', description: 'Deeper footing at the north wall.', amount: 1250.5, status: 'sent', updated_at: '2026-11-10T15:00:00.000Z', ...co }
+    ],
+    insurance: null,
+    invoices: [],
+    photos: []
+  } as unknown as Payload
+}
+
+test('the change order page and its approve sentence keep the cents', async ({ page, context }) => {
+  await mockPortal(context, changeOrderPayload())
+  await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+
+  await expect(page.getByText('+$1,250.50')).toBeVisible()
+  await expect(page.getByText('$25,200.00')).toBeVisible()
+  await expect(page.getByText('$26,450.50').first()).toBeVisible()
+  await expect(page.getByText('The updated contract total is $26,450.50.')).toBeVisible()
+})
+
+test('the classic approve sentence keeps the cents of the total', async ({ page, context }) => {
+  await mockPortal(context, proposalPayload({ contact: { amount: 18458.5 }, company: { estimate_template: 'classic' } }))
+  await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByText('The approved contract total is $18,458.50.')).toBeVisible()
+})
+
+/* ---- The statement link (PT-06, M-13, S05) ---- */
+
+function statementPayload(): Payload {
+  const j = (id: string, title: string, amount: number) => ({ id, name: 'Jeff Roy', job_title: title, stage: 'job', amount, created_at: '2026-09-01T00:00:00.000Z' })
+  const inv = (id: string, contact: string | null, seq: number, amount: number, status: string, extra: Record<string, unknown> = {}) => ({ id, contact_id: contact, client_id: 'cl-1', sequence_number: seq, title: `Draw ${seq}`, amount, status, ...extra })
+  return {
+    ok: true,
+    kind: 'statement',
+    client: { id: 'cl-1', name: 'Jeff Roy', company_name: null, email: 'jeff@roy.com', address: '412 Burkitt Station Rd' },
+    company: { name: 'Parker Construction', phone: '615 555 0100', email: 'office@parker.co', logo_url: null, payment_link: 'https://pay.example.com/parker' },
+    jobs: [j('j-a', 'Front walk', 2499.5), j('j-b', 'Side steps', 100.5), j('j-c', 'Back steps', 100.5), j('j-d', 'Garage slab', 33100)],
+    invoices: [
+      inv('i-a', 'j-a', 1, 2499.5, 'sent', { amount_due: 2499.5 }),
+      inv('i-b', 'j-b', 1, 100.5, 'sent', { amount_due: 100.5 }),
+      inv('i-c', 'j-c', 1, 100.5, 'overdue', { amount_due: 100.5 }),
+      inv('i-d', null, 1, 500.25, 'sent', { amount_due: 400.25, title: 'Sealing' })
+    ],
+    payments: [{ id: 'p-d', contact_id: null, invoice_id: 'i-d', amount: 100 }],
+    changeOrders: []
+  } as unknown as Payload
+}
+
+test('the statement link totals what is owed on sent invoices, to the cent, and keeps the unbilled contract apart', async ({ page, context }) => {
+  await mockPortal(context, statementPayload())
+  await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+
+  await expect(page.getByText('Statement for')).toBeVisible()
+  await expect(page.getByText('$2,499.50', { exact: true })).toBeVisible()
+  await expect(page.getByText('$400.25', { exact: true })).toBeVisible()
+  await expect(page.getByTestId('statement-total-due')).toHaveText('$3,100.75')
+  await expect(page.getByRole('link', { name: 'Pay $3,100.75 now' })).toBeVisible()
+  // Nothing invoiced on the garage slab yet: listed apart, not asked for.
+  const apart = page.getByRole('region', { name: 'Not yet invoiced' })
+  await expect(apart.getByText('Garage slab')).toBeVisible()
+  await expect(apart.getByText('$33,100.00')).toBeVisible()
+})
+
+/* ---- Approval tied to what the customer saw (FN-04, FN-18, M-07) ---- */
+
+test('a change order approval posts the amount and version shown, and a change since then reloads the page with a plain message', async ({ page, context }) => {
+  const spies = await mockPortal(context, changeOrderPayload())
+  const posts: Array<Record<string, unknown>> = []
+  await context.route('**/api/public-co-approve', async (route) => {
+    posts.push(route.request().postDataJSON())
+    // The contractor raised it to $2,100 while the page was open.
+    spies.setPayload(changeOrderPayload({ co: { amount: 2100, updated_at: '2026-11-10T16:00:00.000Z' } }))
+    await route.fulfill({
+      status: 409,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'document_changed', message: 'This change order changed since you opened it. Please look it over again before approving.' })
+    })
+  })
+  await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByText('+$1,250.50')).toBeVisible()
+
+  await page.getByLabel('Your full name').fill('Marco Castellanos')
+  await page.getByRole('checkbox').check()
+  await page.getByRole('button', { name: 'Approve & notify contractor' }).click()
+
+  await expect.poll(() => posts.length).toBe(1)
+  expect(posts[0]).toMatchObject({ expected_amount: 1250.5, expected_updated_at: '2026-11-10T15:00:00.000Z' })
+  await expect(page.getByText('This change order changed since you opened it. Please look it over again before approving.')).toBeVisible()
+  await expect(page.getByText('+$2,100.00')).toBeVisible()
+})
+
+test('a proposal approval posts the total of the lines shown and the version of the quote', async ({ page, context }) => {
+  const payload = proposalPayload({ company: { estimate_template: 'classic' } }) as Payload & Record<string, unknown>
+  payload.updated_at = '2026-10-02T12:00:00.000Z'
+  const spies = await mockPortal(context, payload)
+  await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+  await page.getByLabel('Your full name').fill('Marco Castellanos')
+  await page.getByRole('checkbox').check()
+  await page.getByRole('button', { name: 'Approve & notify contractor' }).click()
+  await expect.poll(() => spies.approve.length).toBe(1)
+  // Excavate 2,200 + rebar 2,860 + slab 9,350 + joints 4,048; the optional and the excluded lines are not in it.
+  expect(spies.approve[0]).toMatchObject({ expected_total: 18458, expected_updated_at: '2026-10-02T12:00:00.000Z' })
+})
+
+/* ---- Closed documents show no live approve form (PT-13, PT-14, M-21, FN-18) ---- */
+
+for (const status of ['void', 'rejected', 'draft']) {
+  test(`a ${status} change order shows that it is not open, with no approve form`, async ({ page, context }) => {
+    const spies = await mockPortal(context, changeOrderPayload({ co: { status } }))
+    await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+    await expect(page.getByText('Extra footing')).toBeVisible()
+    await expect(page.getByText('This change order is not open for approval.')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Approve & notify contractor' })).toHaveCount(0)
+    await expect(page.getByLabel('Your full name')).toHaveCount(0)
+    expect(spies.stray).toEqual([])
+  })
+}
+
+test('on the classic page an expired, lost, declined or unsent quote shows no approve form and no internal status', async ({ page, context }) => {
+  await page.clock.setFixedTime(new Date('2026-10-10T14:00:00.000Z'))
+  const classic = { estimate_template: 'classic' }
+  const spies = await mockPortal(context, proposalPayload({ company: classic, contact: { quote_expires_at: '2026-10-06T04:59:59.999Z' } }))
+  await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByText('This proposal has expired. Ask Parker Construction for an updated one.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Approve & notify contractor' })).toHaveCount(0)
+  await expect(page.getByText('Expired', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('Sent', { exact: true })).toHaveCount(0)
+
+  for (const contact of [{ stage: 'lost' }, { proposal_status: 'rejected' }, { proposal_status: 'draft' }]) {
+    spies.setPayload(proposalPayload({ company: classic, contact }))
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    await expect(page.getByText('This proposal is not open for approval. Ask Parker Construction for an updated one.')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Approve & notify contractor' })).toHaveCount(0)
+    await expect(page.getByText('Draft', { exact: true })).toHaveCount(0)
+    await expect(page.getByText('Sent', { exact: true })).toHaveCount(0)
+  }
+  expect(spies.approve).toHaveLength(0)
+})
+
+
+/* ---- A failed read is not a gone link (PT-15) ---- */
+
+test('a failed read says so and offers Try again, which loads the document', async ({ page, context }) => {
+  const spies = await mockPortal(context, proposalPayload())
+  spies.setLinkFailure({ status: 503, body: { ok: false, error: 'read_failed', message: 'We could not load this document just now. Please try again.' } })
+  await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByText('We could not load this document just now. Please try again.')).toBeVisible()
+  await expect(page.getByText('This link is no longer available.')).toHaveCount(0)
+
+  spies.setLinkFailure(null)
+  await page.getByRole('button', { name: 'Try again' }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+})
+
+test('a page that gets no answer at all offers Try again too', async ({ page, context }) => {
+  const spies = await mockPortal(context, proposalPayload())
+  spies.setLinkFailure('abort')
+  await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible()
+})
+
+test('a revoked link names the contractor and offers to call them', async ({ page, context }) => {
+  const spies = await mockPortal(context, proposalPayload())
+  spies.setLinkFailure({ status: 404, body: { ok: false, error: 'revoked', message: 'This link has been revoked by the sender.', company: { name: 'Parker Construction', phone: '615 555 0100' } } })
+  await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByText('This link has been revoked by the sender.')).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Call Parker Construction' })).toHaveAttribute('href', 'tel:6155550100')
+  await expect(page.getByRole('button', { name: 'Try again' })).toHaveCount(0)
+})
+
+/* ---- Fixed ink on the light panels at night (PT-16) ---- */
+
+// Computed colors come back as rgb() or, for color-mix, as color(srgb r g b).
+function inkOf(css: string): [number, number, number] {
+  const m = /color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)/.exec(css)
+  if (m) return [Number(m[1]) * 255, Number(m[2]) * 255, Number(m[3]) * 255]
+  return rgbOf(css)
+}
+
+test('at night the approval note and the approve error keep readable ink on their light panels', async ({ page, context }) => {
+  await setThemeMode(context, 'night')
+  const classic = { estimate_template: 'classic' }
+  const spies = await mockPortal(context, proposalPayload({ company: classic, contact: { proposal_status: 'approved' } }))
+  await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+  const cream = luminanceOf(242, 237, 228)
+  const label = page.getByText('Proposal approved', { exact: true })
+  await expect(label).toBeVisible()
+  expect(contrastRatio(luminanceOf(...inkOf(await label.evaluate((el) => getComputedStyle(el).color))), cream)).toBeGreaterThanOrEqual(4.5)
+
+  spies.setPayload(proposalPayload({ company: classic }))
+  spies.setApproveReply({ status: 500, body: { ok: false, error: 'approve_failed', message: 'We could not record your approval. Please try again.' } })
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.getByRole('checkbox', { name: /I have the authority to approve this proposal/ }).check()
+  await page.getByRole('button', { name: 'Approve & notify contractor' }).click()
+  const error = page.getByText('We could not record your approval. Please try again.')
+  await expect(error).toBeVisible()
+  expect(contrastRatio(luminanceOf(...inkOf(await error.evaluate((el) => getComputedStyle(el).color))), cream)).toBeGreaterThanOrEqual(4.5)
+})
+
+test('the tab names no app while a customer link loads or fails (PT-11)', async ({ page, context }) => {
+  const spies = await mockPortal(context, proposalPayload())
+  spies.setLinkFailure('abort')
+  await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible()
+  expect(await page.title()).toBe('Document')
+})
+
+
+/* ---- Smaller defects on the customer pages (PT-24) ---- */
+
+test('on a phone the billing schedule shows every amount and status without sideways scrolling', async ({ page, context }) => {
+  await mockPortal(context, invoicePayload({
+    invoices: [draw('inv-s1', 1, 2500, 'paid'), draw('inv-s2', 2, 5000, 'sent'), draw('inv-s3', 3, 2500, 'sent')],
+    payments: [{ id: 'p-s1', contact_id: 'job-linked-0003', invoice_id: 'inv-s1', amount: 2500, paid_on: '2026-11-01', method: 'check', kind: 'deposit' }]
+  }))
+  await openInvoice(page)
+  const width = page.viewportSize()!.width
+  for (const text of ['$5,000.00', 'Paid']) {
+    const box = await page.getByText(text, { exact: true }).first().boundingBox()
+    expect(box).not.toBeNull()
+    expect(box!.x + box!.width).toBeLessThanOrEqual(width)
+  }
+})
+
+test('the classic approve button is at least 44 px tall, and no sentence offers to approve an option it cannot', async ({ page, context }) => {
+  await mockPortal(context, proposalPayload({ company: { estimate_template: 'classic' } }))
+  await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+  const box = await page.getByRole('button', { name: 'Approve & notify contractor' }).boundingBox()
+  expect(box!.height).toBeGreaterThanOrEqual(44)
+  await expect(page.getByText(/Approve any option/)).toHaveCount(0)
+})
+
+test('the editorial theme prints the scope of work once', async ({ page, context }) => {
+  await mockPortal(context, proposalPayload({ company: { estimate_template: 'editorial' }, contact: { scope_text: 'Pour a 4 inch slab with a broom finish.' } }))
+  await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByText('Pour a 4 inch slab with a broom finish.')).toHaveCount(1)
 })

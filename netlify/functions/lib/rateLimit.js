@@ -81,3 +81,14 @@ export async function checkRateLimit(supabase, { scope, identifier, limit = 60, 
     return true
   }
 }
+
+// Per account daily cap shared by every email sender (send-quote,
+// send-invoice, send-statement, send-certificate, send-message and team
+// invites), so a signed in account cannot use the platform mailbox as a
+// bulk relay. Generous for real use; a day is a UTC day.
+export const DAILY_SEND_LIMIT = 300
+export const DAILY_SEND_LIMIT_MESSAGE = 'You have sent as many emails as you can today. Sending opens again tomorrow.'
+
+export function checkDailySendCap(supabase, userId, { scope = 'send-email-day', limit = DAILY_SEND_LIMIT } = {}) {
+  return checkRateLimit(supabase, { scope, identifier: hashIdentifier(userId), limit, windowSeconds: 86400 })
+}

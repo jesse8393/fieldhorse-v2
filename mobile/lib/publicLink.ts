@@ -2,17 +2,17 @@
 //
 // Mint / list / revoke fh_public_links rows from the app (quote +
 // invoice surfaces). Mirrors src/lib/publicLink.ts on the web. The
-// public viewer page lives on the web origin (fieldhorse.io), so the
+// public viewer page lives on the web origin (see apiBase.ts), so the
 // shared URL points there, the customer opens /p/{token} in a
 // browser, no app required.
 
 import { supabase } from './supabase'
 import { confirmMutation } from './mutationResult'
 import { getRandomBytesAsync } from 'expo-crypto'
+import { API_BASE as WEB_BASE } from './apiBase'
 
 const TOKEN_ALPHABET = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 const TOKEN_LEN = 24
-const WEB_BASE = (process.env.EXPO_PUBLIC_API_BASE_URL || 'https://fieldhorse.io').replace(/\/+$/, '')
 
 async function randomToken(): Promise<string> {
   // Native Hermes does not guarantee global Web Crypto. Use the native CSPRNG

@@ -1,0 +1,48 @@
+# Daily check that production has every database function, table and column
+# the code on main uses. Two weeks before this was added the live app called
+# a function production did not have, and nothing noticed.
+#
+# Setup (once): add two repository secrets under Settings, Secrets and
+# variables, Actions:
+#   SUPABASE_URL               the project URL, https://<ref>.supabase.co
+#   SUPABASE_SERVICE_ROLE_KEY  the service role key (or a secret key). It is
+#                              used only to read the PostgREST schema
+#                              document; the check writes nothing.
+# The anon key is not enough: the schema document leaves out every function
+# revoked from anon, so they would read as missing.
+#
+# Until both secrets exist the run passes with a warning that production
+# was not checked. A missing object fails the run and lists file and line,
+# and GitHub emails the failure to the repository's watchers.
+name: Production schema check
+
+on:
+  schedule:
+    - cron: '17 11 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  schema:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compare what the code uses with production
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npm run check:schema

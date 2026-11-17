@@ -16,6 +16,10 @@ import { supabaseServiceConfig } from './lib/serviceConfig.js'
 //   self_skipped: the caller's own punches when the caller is not an
 //                 owner, so a manager or admin cannot sign off their own
 //                 hours
+//   unrated_skipped: punches with no rate stamped and no rate on the
+//                 member, so approval can never freeze time that prices
+//                 at nothing. When that leaves nothing to approve the
+//                 answer is 409 rate_required with a plain message.
 
 import { createClient } from '@supabase/supabase-js'
 import { resolveCallerMembership } from './lib/membership.js'
@@ -81,9 +85,8 @@ export default async (request) => {
     callerId: authUserId,
     callerRole: myMember.role,
   })
-  const approvableIds = approvable.map((p) => p.id)
-  if (approvableIds.length === 0) {
-    return json({ ok: true, approved_count: 0, approved_ids: [], skipped_ids: invalidIds, self_skipped: selfIds })
+  if (approvable.length === 0) {
+    return json({ ok: true, approved_count: 0, approved_ids: [], skipped_ids: invalidIds, self_skipped: selfIds, unrated_skipped: [] })
   }
 
   // Freeze the rate on approval: any punch still missing an
@@ -93,7 +96,11 @@ export default async (request) => {
   // when job cost is next computed — a raise months later silently
   // repriced already-approved (even closed-job) shifts. Service role
   // is exempt from the 054 one-time-set guard, but we only fill NULLs.
+  //
+  // Removed members are included on purpose: a week worked before the
+  // removal and approved after it is still owed at the rate they had.
   const unrated = approvable.filter((p) => p.hourly_rate == null)
+  const unratedIds = []
   if (unrated.length) {
     const userIds = [...new Set(unrated.map((p) => p.user_id).filter(Boolean))]
     const { data: members } = await admin
@@ -101,21 +108,41 @@ export default async (request) => {
       .select('user_id, default_hourly_rate')
       .eq('org_id', myMember.org_id)
       .in('user_id', userIds)
-      .is('revoked_at', null)
     const rateByUser = new Map()
     for (const m of members || []) {
       const r = Number(m.default_hourly_rate)
       if (Number.isFinite(r) && r > 0) rateByUser.set(m.user_id, r)
     }
-    await Promise.all(unrated.map((p) => {
+    await Promise.all(unrated.map(async (p) => {
       const rate = rateByUser.get(p.user_id)
-      if (!rate) return null
-      return admin
+      if (!rate) {
+        unratedIds.push(p.id)
+        return
+      }
+      const { error: rateErr } = await admin
         .from('fh_time_punches')
         .update({ hourly_rate: rate })
         .eq('id', p.id)
         .is('hourly_rate', null)
-    }).filter(Boolean))
+      if (rateErr) {
+        console.error('[org-punch-approve] rate stamp failed', rateErr)
+        unratedIds.push(p.id)
+      }
+    }))
+  }
+  // A punch that still has no rate stays pending rather than being
+  // approved, and so frozen, at no cost.
+  const approvableIds = approvable.map((p) => p.id).filter((id) => !unratedIds.includes(id))
+  if (approvableIds.length === 0) {
+    return json({
+      error: 'rate_required',
+      message: unratedIds.length === 1
+        ? 'This punch has no hourly rate, so it was not approved. Set a rate for the worker on the Team screen, then approve again.'
+        : 'These punches have no hourly rate, so they were not approved. Set a rate for each worker on the Team screen, then approve again.',
+      skipped_ids: invalidIds,
+      self_skipped: selfIds,
+      unrated_skipped: unratedIds,
+    }, 409)
   }
 
   // Only approve punches that are (a) in the caller's org, (b) not
@@ -145,6 +172,7 @@ export default async (request) => {
     approved_ids: (updated || []).map((r) => r.id),
     skipped_ids: invalidIds,
     self_skipped: selfIds,
+    unrated_skipped: unratedIds,
   })
 }
 
