@@ -117,6 +117,15 @@ describe('week and month totals', () => {
     expect(view.paid[0].subline).toBe('Driveway replacement')
   })
 
+  // D05: a payment on an invoice that bills the client directly.
+  it('names the client of an invoice with no job and opens that invoice', () => {
+    const view = build(bundle({
+      invoices: [invoice({ id: 'i9', contact_id: null, client_id: 'cl-9', title: 'Consulting', status: 'paid', fh_clients: { name: 'Charlie Co', email: null, phone: null, address: null } } as any)],
+      payments: [payment({ id: 'p9', contact_id: null, invoice_id: 'i9', amount: 300 })]
+    }))
+    expect({ title: view.paid[0].title, subline: view.paid[0].subline, to: view.paid[0].to }).toEqual({ title: 'Charlie Co', subline: 'consulting', to: '/invoices/i9' })
+  })
+
   it('counts a payment on Sunday Oct 4 toward the week and one on Saturday Oct 3 not', () => {
     const view = build(bundle({
       payments: [
