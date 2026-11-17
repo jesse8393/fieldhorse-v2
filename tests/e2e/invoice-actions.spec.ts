@@ -432,8 +432,26 @@ async function tapDeletePayment(page: Page) {
   const del = page.getByRole('button', { name: /delete the \$6,400(\.00)? payment/i }).first()
   await expect(del).toBeVisible({ timeout: 30_000 })
   await del.click()
+  await page.waitForTimeout(600) // a second tap within 500 ms is ignored (OPS-02)
   await page.getByRole('button', { name: /tap again to delete/i }).first().click()
 }
+
+// OPS-02: a fast double tap on a payment's delete must not delete it. A
+// second tap within half a second of arming is ignored; a later one deletes.
+test('a fast double tap on a payment delete does not delete the payment', async ({ page, context }) => {
+  await signIn(context, { tables: teammatePaymentTables() })
+  const deletes: string[] = []
+  page.on('request', (r) => { if (r.method() === 'DELETE' && r.url().includes('/fh_payments')) deletes.push(r.url()) })
+  await page.goto('/jobs/c-team?tab=financials', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+  const del = page.getByRole('button', { name: /delete the \$6,400(\.00)? payment/i }).first()
+  await expect(del).toBeVisible({ timeout: 30_000 })
+  await del.click()
+  await page.getByRole('button', { name: /tap again to delete/i }).first().click({ delay: 0 })
+  await page.waitForTimeout(700)
+  expect(deletes).toEqual([])
+  await page.getByRole('button', { name: /tap again to delete/i }).first().click()
+  await expect.poll(() => deletes.length).toBe(1)
+})
 
 test("deleting a teammate's payment deletes it by id", async ({ page, context }) => {
   await signIn(context, { tables: teammatePaymentTables() })
