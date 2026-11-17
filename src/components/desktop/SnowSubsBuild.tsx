@@ -10,7 +10,7 @@ import {
   Plus,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { countNoun, money } from '../../lib/format.ts'
+import { countNoun, money, moneyCents } from '../../lib/format.ts'
 import MiniMetric from '../MiniMetric.tsx'
 
 type Sub = {
@@ -209,7 +209,7 @@ export default function SnowSubsBuild(props: Props) {
                   <span className="fh-build-num">{s.jobsCount || 0}</span>
                   <span className={`fh-build-dot is-${ins.tone}`}>{ins.label}</span>
                   <span className="fh-build-rel">{relDate(s.lastWorked)}</span>
-                  <span className="fh-build-num">{money(s.totalRate || 0)}</span>
+                  <span className="fh-build-num">{moneyCents(s.totalRate || 0)}</span>
                   <ChevronRight size={13} />
                 </button>
               )

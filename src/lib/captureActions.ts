@@ -13,8 +13,11 @@ import { createLead } from './leads.ts'
 import { lastKnownOrg } from './orgScope.ts'
 import { logPayment, recalcCost } from './stages.ts'
 import type { CaptureIntent } from './captureIntelligence.ts'
+import { moneyCents } from './format.ts'
 
-const formatMoney = (n: number) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 2 })
+// Saved into the lead's notes, so it is written the way the app prints
+// money: "$1,000.50", never "$1,000.5" (formats-7).
+const formatMoney = (n: number) => moneyCents(n)
 
 // The slice of fh_contacts the capture flow loads for matching +
 // payment logging. logPayment() needs user_id/amount/stage off the row.

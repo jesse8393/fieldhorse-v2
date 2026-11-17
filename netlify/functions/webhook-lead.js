@@ -19,6 +19,7 @@ import { supabaseServiceConfig } from './lib/serviceConfig.js'
 import { createHash } from 'node:crypto'
 import { sendPushToUser } from './lib/push.js'
 import { logError, requestId } from './lib/logError.js'
+import { moneyCents } from './lib/money.js'
 
 const REQUIRED_FIELDS = ['name']
 const MAX_BODY_BYTES = 64 * 1024
@@ -287,7 +288,8 @@ async function findRecentIdenticalLead(supabase, { orgId, clientId, title, sourc
 export function leadNotes(notes, amount) {
   const parts = []
   if (notes) parts.push(String(notes).slice(0, 2000))
-  if (amount > 0) parts.push(`Estimated amount $${amount.toLocaleString('en-US', { maximumFractionDigits: 2 })}`)
+  // Written the way the app prints money: "$1,000.50", never "$1,000.5".
+  if (amount > 0) parts.push(`Estimated amount ${moneyCents(amount)}`)
   return parts.length ? parts.join('\n') : null
 }
 

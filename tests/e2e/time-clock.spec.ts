@@ -159,3 +159,28 @@ test('the job clock buttons are at least 44 pixels high', async ({ context, page
     expect(box!.height, name).toBeGreaterThanOrEqual(44)
   }
 })
+
+// formats-7: a 3 hour shift at $42.50 an hour reads as money everywhere the
+// card writes it, and the labor cost row it saves keeps that wording.
+test('the owner clocking out at $42.50 an hour sees and books money with cents', async ({ context, page }) => {
+  const now = new Date('2026-11-17T20:30:00Z')
+  await page.clock.setFixedTime(now)
+  const started = new Date(now.getTime() - 3 * HOUR).toISOString()
+  await signIn(context, { tables: { fh_contacts: [job('qa-user-1')], fh_time_punches: [{ ...openPunch(), punch_in_at: started, created_at: started, updated_at: started }], fh_expenses: [] } })
+  const posted: Array<Record<string, unknown>> = []
+  await context.route((url) => url.pathname === '/rest/v1/fh_expenses', (route) => {
+    if (route.request().method() === 'POST') {
+      const body = route.request().postDataJSON()
+      posted.push(Array.isArray(body) ? body[0] : body)
+    }
+    return route.fallback()
+  })
+  await (await openClock(page)).click()
+  await page.getByLabel(/Hourly rate/i).fill('42.50')
+  await expect(page.getByText('$127.50', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Log time', exact: true }).click()
+  const toast = page.getByText('Time logged', { exact: true }).locator('xpath=..')
+  await expect(toast).toContainText('3.00 hrs · $127.50')
+  await expect.poll(() => posted.length).toBe(1)
+  expect(posted[0].description).toBe('Labor, 3.00 hrs @ $42.50/hr')
+})

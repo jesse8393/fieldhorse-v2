@@ -104,4 +104,21 @@ describe('commitCapture lead', () => {
     expect(result.link).toBe('/leads/lead-1')
     expect(result.toast).toBe('Lead created')
   })
+
+  // formats-7: the amount saved in the lead's notes is written as money,
+  // "$1,000.50", never "$1,000.5", because the note stays in the record.
+  it('writes the spoken amount into the notes with cents', async () => {
+    for (const [amount, text] of [[1000.5, 'Estimated amount $1,000.50'], [4500, 'Estimated amount $4,500.00']] as const) {
+      db.responses.length = 0
+      db.builders.length = 0
+      db.responses.push({ data: { id: 'lead-1', client_id: 'client-1', status: 'open' }, error: null })
+      await commitCapture({
+        userId: 'user-a',
+        contacts: [],
+        intent: { kind: 'lead', summary: 'New lead', confidence: 0.9, job_id: null, name: 'Ana Ruiz', title: 'Deck rebuild', amount } as any,
+      })
+      const insert = db.builders[0].find((c) => c[0] === 'insert')?.[1] as Record<string, unknown>
+      expect(insert.notes).toBe(text)
+    }
+  })
 })

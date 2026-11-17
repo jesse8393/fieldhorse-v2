@@ -189,6 +189,9 @@ test('log miles shows and computes the IRS rate for the drive date', async ({ co
   await page.getByLabel('Date', { exact: true }).fill('2026-03-02')
   await expect(page.getByText(/on this date is \$0\.725 deducted/)).toBeVisible()
   await expect(page.getByText('Deduction $72.50', { exact: true })).toBeVisible()
+  // formats-7: a deduction over a thousand dollars keeps its comma.
+  await page.getByLabel('Miles', { exact: true }).fill('2000')
+  await expect(page.getByText('Deduction $1,450.00', { exact: true })).toBeVisible()
 })
 
 // formats-4: a client's payments in Top clients read to the cent, the
