@@ -132,3 +132,18 @@ test('a crew member clocking out on the job page books their own set rate and se
   await expect.poll(() => patch).not.toBeNull()
   expect(patch!.hourly_rate).toBe(28)
 })
+
+// OPS-18: a failed clock in on Crew home showed the database's own words.
+test('a failed clock in on Crew home says so in plain words', async ({ context, page }) => {
+  await signIn(context, { role: 'crew', tables: { fh_time_punches: [] } })
+  await context.route((url) => url.pathname === '/rest/v1/fh_time_punches', (route) => {
+    if (route.request().method() !== 'POST') return route.fallback()
+    return route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ code: '42501', message: 'new row violates row-level security policy for table "fh_time_punches"' }) })
+  })
+  await page.goto('/crew')
+  await page.getByRole('button', { name: /Clock in/ }).first().click()
+  const toaster = page.locator('[data-sonner-toaster]')
+  await expect(toaster).toContainText('Clock in failed')
+  await expect(toaster).toContainText('Check your connection and try again.')
+  await expect(toaster).not.toContainText('row-level security')
+})

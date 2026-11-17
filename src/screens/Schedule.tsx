@@ -7,6 +7,7 @@ import { motion } from 'framer-motion'
 import { Plus, Calendar as CalendarIcon, Clock, MapPin, ChevronLeft, ChevronRight, Trash2, Pencil } from 'lucide-react'
 import { toast, toastSuccess, toastUndo, toastError } from '../lib/toast.ts'
 import { SkeletonList } from '../components/Skeleton.tsx'
+import DataErrorState from '../components/DataErrorState.tsx'
 import { ScreenCloser, Eyebrow } from '../components/v3'
 import { Button, Chip, EmptyState } from '../components/fh'
 import { useArmedId } from '../lib/secondTap.ts'
@@ -577,6 +578,15 @@ export default function Schedule() {
       <SwipeShell onShift={shift}>
         <motion.div variants={item} style={{ padding: '0 var(--v3-gutter) 24px' }}>
           {loading && events == null && <SkeletonList rows={5} card={false} />}
+          {/* A failed first read says so, never a blank day (OPS-18). */}
+          {eventsFailed && events == null && (
+            <DataErrorState
+              title="Couldn't load the schedule"
+              message="Check your connection and try again."
+              actionLabel="Try again"
+              onRetry={() => { void refetchEvents() }}
+            />
+          )}
           {events != null && view === 'day' && (
             <DayView
               events={events}

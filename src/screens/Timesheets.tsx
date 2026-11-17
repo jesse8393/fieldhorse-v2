@@ -82,8 +82,9 @@ export default function Timesheets() {
       }
       const res = await orgTimesheetsList(opts)
       setPunches(res.punches || [])
-    } catch (e: any) {
-      setError(e?.detail || e?.message || 'Could not load timesheets.')
+    } catch {
+      // Plain words, never the server's code or message (OPS-18).
+      setError('Could not load timesheets. Check your connection and try again.')
     } finally {
       setLoading(false)
     }
@@ -308,7 +309,7 @@ export default function Timesheets() {
           <div className="fh-build-table__empty">Loading timesheets…</div>
         )}
 
-        {!loading && groups.length === 0 && (
+        {!loading && !error && groups.length === 0 && (
           <div className="fh-build-table__empty fh-build-table__empty--action">
             <CircleCheckBig size={20} aria-hidden="true" />
             <span>No timesheets are waiting for approval.</span>

@@ -119,6 +119,7 @@ test('deleting one visit of a recurring series deletes only that visit, and the 
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{ id: 'series-a' }]) })
   })
   await page.clock.setFixedTime(new Date('2026-10-31T13:00:00Z'))
+  await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/schedule?d=2026-10-31')
   await page.getByRole('tab', { name: 'Day', exact: true }).click()
   const agenda = page.getByRole('list', { name: 'Daily agenda' })
@@ -136,7 +137,8 @@ for (const role of ['crew', 'foreman']) {
   test(`a ${role} sees the day's visits without New event, Edit or Delete`, async ({ context, page }) => {
     await signIn(context, { role, tables: { fh_schedule: [seriesVisit('series-a', '2026-10-31T14:00:00Z')] } })
     await page.clock.setFixedTime(new Date('2026-10-31T13:00:00Z'))
-    await page.goto('/schedule?d=2026-10-31')
+    await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/schedule?d=2026-10-31')
     await page.getByRole('tab', { name: 'Day', exact: true }).click()
     const agenda = page.getByRole('list', { name: 'Daily agenda' })
     await expect(agenda.getByText('Weekly cure check')).toBeVisible()
@@ -151,6 +153,7 @@ for (const role of ['crew', 'foreman']) {
 test('New event starts on the day picked, at a time still ahead, titled after the job', async ({ context, page }) => {
   await signIn(context, { tables: { fh_schedule: [] } })
   await page.clock.setFixedTime(new Date('2026-10-28T14:10:00Z'))
+  await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/schedule?d=2026-10-28')
   await page.getByRole('button', { name: 'Thursday, October 29' }).click()
   await page.getByRole('button', { name: 'New event' }).first().click()
@@ -174,6 +177,7 @@ test("tapping a lead's estimate on the Schedule opens the lead", async ({ contex
     start_at: '2026-10-31T14:00:00Z', end_at: '2026-10-31T15:00:00Z', status: 'scheduled', assigned_to: null, assigned_user_ids: []
   }] } })
   await page.clock.setFixedTime(new Date('2026-10-31T13:00:00Z'))
+  await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/schedule?d=2026-10-31')
   await page.getByRole('tab', { name: 'Day', exact: true }).click()
   await page.getByRole('list', { name: 'Daily agenda' }).getByRole('button', { name: /Estimate/ }).first().click()
@@ -234,4 +238,36 @@ test('retrying a visit save after a lost answer sends the same visit ids as an u
   expect(attempts[0].ids.every(Boolean)).toBe(true)
   expect(attempts[1].ids).toEqual(attempts[0].ids)
   expect(attempts[1].prefer).toContain('merge-duplicates')
+})
+
+// OPS-18: with the visits read failing, the phone Schedule showed nothing
+// under the day and offered no way to retry.
+test('a failed read of the day says so with Try again on a phone', async ({ context, page }) => {
+  await signIn(context, { tables: { fh_schedule: [] } })
+  let failing = true
+  await context.route('**/rest/v1/fh_schedule*', (route) => {
+    if (failing && route.request().method() === 'GET') return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'upstream request timeout' }) })
+    return route.fallback()
+  })
+  await page.clock.setFixedTime(new Date('2026-10-31T13:00:00Z'))
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/schedule?d=2026-10-31')
+  await page.getByRole('tab', { name: 'Day', exact: true }).click()
+  const error = page.getByRole('alert').filter({ hasText: "Couldn't load the schedule" })
+  await expect(error).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText('upstream request timeout')).toHaveCount(0)
+  failing = false
+  await error.getByRole('button', { name: 'Try again', exact: true }).click()
+  await expect(page.getByText('Day’s clear.')).toBeVisible()
+})
+
+// OPS-18: a failed Timesheets read showed the server's code beside "No
+// timesheets are waiting for approval."
+test('a failed timesheets read shows plain words and no empty line', async ({ context, page }) => {
+  await signIn(context)
+  await context.route('**/api/org-timesheets-list', (route) => route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'server_error' }) }))
+  await page.goto('/timesheets')
+  await expect(page.getByText(/Could not load timesheets/)).toBeVisible()
+  await expect(page.getByText('server_error')).toHaveCount(0)
+  await expect(page.getByText('No timesheets are waiting for approval.')).toHaveCount(0)
 })
