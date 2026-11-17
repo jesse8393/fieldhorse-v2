@@ -691,6 +691,47 @@ test.describe('large text and zoom', () => {
       }
     })
   }
+
+  // big-text-8: a client's three figures sat in equal thirds, so on a
+  // narrow phone "$3.72M" ran into "$3.47M" and read as one number.
+  for (const percent of [100, 150]) {
+    test(`a client's lifetime, balance and active figures never run into each other, text at ${percent} percent`, async ({ context, page }) => {
+      await textSize(context, percent)
+      await openBig(context, page, '/clients/cl-big')
+      const widths = percent === 100 ? [412, 360, 340, 320, 206, 180] : [412, 360]
+      for (const width of widths) {
+        await page.setViewportSize({ width, height: 800 })
+        await page.waitForTimeout(200)
+        const figures = await page.locator('#fh-main .fh-eyebrow', { hasText: /^Lifetime$/ }).first().evaluate((eyebrow) => {
+          const row = eyebrow.parentElement!.parentElement!
+          return [...row.children].map((metric) => {
+            const number = metric.lastElementChild!
+            const range = document.createRange()
+            range.selectNodeContents(number)
+            const rects = [...range.getClientRects()]
+            return {
+              text: number.textContent,
+              left: Math.min(...rects.map((r) => r.left)), right: Math.max(...rects.map((r) => r.right)),
+              top: Math.min(...rects.map((r) => r.top)), bottom: Math.max(...rects.map((r) => r.bottom)),
+              lines: new Set(rects.map((r) => Math.round(r.top))).size
+            }
+          })
+        })
+        const vw = await page.evaluate(() => document.documentElement.clientWidth)
+        const at = `${width} px: ${JSON.stringify(figures)}`
+        expect(figures.length, at).toBe(3)
+        for (const [n, a] of figures.entries()) {
+          expect(a.lines, at).toBe(1)
+          expect(a.left, at).toBeGreaterThanOrEqual(0)
+          expect(a.right, at).toBeLessThanOrEqual(vw)
+          for (const b of figures.slice(n + 1)) {
+            const apart = a.right + 4 <= b.left || b.right + 4 <= a.left || a.bottom <= b.top || b.bottom <= a.top
+            expect(apart, `${a.text} and ${b.text} at ${at}`).toBe(true)
+          }
+        }
+      }
+    })
+  }
 })
 
 // big-text-3 on a desktop window at 200 percent zoom (640 px wide).
