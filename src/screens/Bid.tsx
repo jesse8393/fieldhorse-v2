@@ -794,7 +794,7 @@ export default function Bid() {
             }}>
               <div style={{ fontWeight: 700, color: 'var(--v3-danger-text)', marginBottom: 4 }}>AI unavailable</div>
               <div style={{ color: 'var(--v3-text-muted)', marginBottom: 10 }}>
-                {err}, your scope is preserved. Fill in line items manually if you need this estimate out the door.
+                {err}{/[.!?]$/.test(err) ? '' : '.'} Your scope is preserved. Fill in line items manually if you need this estimate out the door.
               </div>
               <button
                 type="button"

@@ -139,6 +139,7 @@ describe('no comma splice left where a dash was swapped out', () => {
     ['lib/captureActions.ts', 'Task saved, will sync'],
     ['lib/captureActions.ts', "'Saved, will sync'"],
     ['lib/outbox.ts', "storage is full, this didn't save"],
+    ['screens/Bid.tsx', '{err}, your scope'],
     ['screens/Activity.tsx', 'approved, ${co.title'],
     ['screens/Activity.tsx', 'added, ${co.title'],
     ['screens/Activity.tsx', '`, ${inv.title}`'],
