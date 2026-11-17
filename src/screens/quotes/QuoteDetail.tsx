@@ -130,7 +130,7 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
   }, [searchParams, setSearchParams])
 
   const items = useQuoteItems({ quoteId: quote.id, userId })
-  const [lines, setLines] = useState<QuoteLinesChange>({ effective: [], switchSaving: false })
+  const [lines, setLines] = useState<QuoteLinesChange>({ effective: [], switchSaving: false, lineSaving: false })
   const linesFailed = !items.loading && items.failed && !items.loaded
 
   const status = useMemo(() => quoteStatusView(quote), [quote])
@@ -164,10 +164,15 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
   const [busy, setBusy] = useState<Busy>(null)
   // The same busy flag, read at once: two taps in one frame both saw null.
   const busyRef = useRef<Busy>(null)
-  const waiting = items.loading || busy !== null || lines.switchSaving
+  // A line still being added is not in the database the document, the
+  // approval and the job are built from, so they all wait for it.
+  const lineSaving = Boolean(lines.lineSaving)
+  const waiting = items.loading || busy !== null || lines.switchSaving || lineSaving
   const needsLines = !items.loading && !live.canSend
   const linesLine = linesFailed ? LINES_FAILED : NEEDS_A_LINE
-  const sendHint = needsLines
+  const sendHint = lineSaving
+    ? 'Saving a line'
+    : needsLines
     ? (linesFailed ? LINES_FAILED : 'Add at least one line')
     : emailFailed
       ? "Couldn't check the email"
@@ -469,7 +474,7 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
         {quote.job_id ? (
           <Button variant="secondary" size="lg" block to={recordRoute('job', quote.job_id)}>Open the job</Button>
         ) : (
-          <Button variant="secondary" size="lg" block loading={busy === 'job'} disabled={busy !== null && busy !== 'job'} onClick={onMakeJob}>
+          <Button variant="secondary" size="lg" block loading={busy === 'job'} disabled={(busy !== null && busy !== 'job') || items.loading || lines.switchSaving || lineSaving} onClick={onMakeJob}>
             Make this a job
           </Button>
         )}

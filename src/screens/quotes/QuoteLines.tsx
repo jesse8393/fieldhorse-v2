@@ -47,6 +47,8 @@ export type QuoteLinesChange = {
   effective: any[]
   /** A switch save is out: Send, Approve and the share rows wait for it. */
   switchSaving: boolean
+  /** A line is still being added and is not in the database yet. */
+  lineSaving?: boolean
 }
 
 export type QuoteLinesProps = {
@@ -115,9 +117,11 @@ export default function QuoteLines({ items, userId, who, money, focusRef, startA
   const [switchSaves, setSwitchSaves] = useState<ReadonlySet<string>>(() => new Set())
   const switchSaving = switchSaves.size > 0
 
+  const lineSaving = rows.some((r) => r._pending)
+
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
-  useEffect(() => { onChangeRef.current?.({ effective, switchSaving }) }, [effective, switchSaving])
+  useEffect(() => { onChangeRef.current?.({ effective, switchSaving, lineSaving }) }, [effective, switchSaving, lineSaving])
 
   function toggleOptional(id: string, include: boolean) {
     if (locked || switchSavesRef.current.has(id)) return

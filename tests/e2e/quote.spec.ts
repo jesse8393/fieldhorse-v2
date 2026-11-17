@@ -635,6 +635,47 @@ test.describe('the quote screen', () => {
     await expect(page.getByRole('form', { name: 'Edit line' })).toBeVisible()
   })
 
+  // Audit finding DATA-04: nothing may go out while a line is still saving.
+  test('send, approve, the PDF and Make this a job wait for a line that is still saving', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS } })
+    let release: (() => void) | undefined
+    const held = new Promise<void>((resolve) => { release = resolve })
+    await context.route((url) => url.pathname.includes('/rest/v1/fh_quote_items'), async (route) => {
+      const request = route.request()
+      if (request.method() !== 'POST') return route.fallback()
+      await held
+      return route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({ id: 'qi-new', created_at: iso(NOW), updated_at: iso(NOW), ...request.postDataJSON() })
+      })
+    })
+    await openQuote(page)
+    await page.getByRole('button', { name: 'Add a line' }).click()
+    const editor = page.getByRole('form', { name: 'Add a line' })
+    await editor.getByLabel('Description').fill('Pour 6 inch slab')
+    await editor.getByLabel('Rate').fill('14000')
+    const posted = page.waitForRequest((r) => r.method() === 'POST' && r.url().includes('/rest/v1/fh_quote_items'))
+    await editor.getByRole('button', { name: 'Add line', exact: true }).click()
+    await posted
+
+    // The insert has not been answered: everything that reads the saved lines waits.
+    const share = page.getByRole('list', { name: 'Share or download' })
+    await expect(total(page).getByRole('button', { name: 'Send for approval' })).toBeDisabled()
+    await expect(page.getByRole('button', { name: 'Make this a job' })).toBeDisabled()
+    await expect(page.getByRole('link', { name: /approve quote/i })).toHaveCount(0)
+    for (const name of ['Open the PDF', 'Download the PDF', 'Copy a share link', 'Send for electronic signature']) {
+      await expect(share.getByRole('button', { name: new RegExp(name) })).toBeDisabled()
+    }
+    await expect(total(page).getByText('Saving a line')).toBeVisible()
+
+    release!()
+    await expect(total(page).getByRole('button', { name: 'Send for approval' })).toBeEnabled()
+    await expect(page.getByRole('button', { name: 'Make this a job' })).toBeEnabled()
+    await expect(page.getByRole('link', { name: /approve quote/i })).toHaveCount(1)
+    await expect(total(page).getByText('$17,150.00', { exact: true })).toBeVisible()
+  })
+
   test('an approved quote still offers Make this a job', async ({ context, page }) => {
     await signIn(context, { tables: { fh_quote_items: ITEMS, fh_quotes: [quoteRow({ status: 'approved' })] } })
     await openQuote(page)
