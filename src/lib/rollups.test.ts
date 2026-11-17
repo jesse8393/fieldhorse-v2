@@ -103,6 +103,18 @@ describe('avgMargin', () => {
     expect(avgMargin([])).toBe(0)
     expect(avgMargin([{ stage: 'closed', amount: 0 }])).toBe(0)
   })
+  // M-15: a $10,000 job with a $5,000 approved change order and $12,000
+  // of cost is a 20% margin, not a 20% loss.
+  it('measures each job against its contract with approved change orders', () => {
+    const won = [{ id: 'j', stage: 'job', amount: 10000, cost: 12000 }]
+    const changeOrders = [
+      { contact_id: 'j', amount: 5000, status: 'approved' },
+      { contact_id: 'j', amount: 900, status: 'sent' },
+      { contact_id: 'other', amount: 99999, status: 'approved' }
+    ]
+    expect(avgMargin(won, changeOrders)).toBeCloseTo(0.2, 10)
+    expect(avgMargin(won)).toBeCloseTo(-0.2, 10)
+  })
 })
 
 describe('wonYTD / profitYTD', () => {

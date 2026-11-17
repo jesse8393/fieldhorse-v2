@@ -1599,3 +1599,18 @@ test('each contract balance link names its age bucket', async ({ context, page }
   expect(new Set(names).size, names.join(' | ')).toBe(3)
   expect(names[1]).toMatch(/^31 to 60 days, \$/)
 })
+
+// M-15: Tracked margin measures a job against its contract with its
+// approved change orders. Darnell's $9,600.00 slab with a $2,400.00
+// approved change order is a $12,000.00 contract; $6,960.00 of cost is a
+// 42.0% margin, not 27.5%. The sent change order does not count.
+test('tracked margin counts an approved change order', async ({ context, page }) => {
+  await openMoney(context, page, { tables: { fh_change_orders: [
+    { id: 'co-1', user_id: 'qa-user-1', contact_id: 'c-darnell', sequence_number: 1, title: 'Thicker slab', amount: 2400, status: 'approved', created_at: '2026-09-20T12:00:00Z' },
+    { id: 'co-2', user_id: 'qa-user-1', contact_id: 'c-darnell', sequence_number: 2, title: 'Sealer', amount: 900, status: 'sent', created_at: '2026-09-21T12:00:00Z' }
+  ] } })
+  const vault = page.locator('.fhc-vault')
+  await expect(vault.getByText('Tracked margin', { exact: true })).toBeVisible()
+  await expect(vault.getByText('42.0%', { exact: true })).toBeVisible()
+  await expect(vault.getByText('27.5%', { exact: true })).toHaveCount(0)
+})

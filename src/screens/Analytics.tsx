@@ -12,7 +12,7 @@ import CountUp from '../components/fx/CountUp.tsx'
 import { useAnalyticsBundle, useInvalidateAnalytics } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { STAGES, ACTIVE_STAGES } from '../lib/stages.ts'
-import { wonYTD as wonYTDFn, profitCoverageYTD, computeFunnel } from '../lib/rollups.ts'
+import { wonYTD as wonYTDFn, profitCoverageYTD, computeFunnel, avgMargin as avgMarginFn } from '../lib/rollups.ts'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
@@ -51,7 +51,7 @@ export default function Analytics() {
   const mileage = useMemo(() => bundle?.mileage ?? [], [bundle])
   const payments = useMemo(() => bundle?.payments ?? [], [bundle])
   const invoices = useMemo(() => bundle?.invoices ?? [], [bundle])
-  const changeOrders = bundle?.changeOrders ?? []
+  const changeOrders = useMemo(() => bundle?.changeOrders ?? [], [bundle])
   const clients = useMemo(() => bundle?.clients ?? [], [bundle])
   const stageTransitions = useMemo(() => bundle?.stageTransitions ?? [], [bundle])
 
@@ -123,13 +123,10 @@ export default function Analytics() {
     )
     // Preserve actual recorded losses. Cost coverage remains explicit,
     // and amounts are never silently capped to make a ratio look normal.
+    // Each job is measured against its contract with its approved change
+    // orders (M-15), through the same rollup Money's Tracked margin uses.
     const avgMargin = winsWithCost.length >= 1
-      ? (winsWithCost.reduce((s, c) => {
-          const a = Number(c.amount || 0)
-          const k = Number(c.cost || 0)
-          const m = (a - k) / a
-          return s + m
-        }, 0) / winsWithCost.length) * 100
+      ? avgMarginFn(winsWithCost, changeOrders) * 100
       : null
     // The "won job" qualifier is misleading without context, the
     // operator sees "Across 1 won job" while Win Rate reads "4/4"
@@ -163,7 +160,7 @@ export default function Analytics() {
       milesYTD, mileageDeduction, mileageNote: mileageSummary.missingRates ? mileageRateNote(new Date().getFullYear()) : 'Estimated from business rates by drive date',
       invoiced, collected,
     }
-  }, [contacts, leadRows, quoteRows, mileage, invoices, payments, stageTransitions, funnel])
+  }, [contacts, leadRows, quoteRows, mileage, invoices, payments, changeOrders, stageTransitions, funnel])
 
   const byStage = useMemo(() => {
     // Legacy 'invoice'-stage rows count under 'job' (their v2 home).

@@ -137,6 +137,25 @@ test.describe('Reports read the four records', () => {
   })
 })
 
+// M-15: the margin measures each job against its contract with its
+// approved change orders. A $10,000 job with a $5,000 approved change
+// order and $12,000 of cost is a 20% margin, not a 20% loss.
+test('the margin counts an approved change order', async ({ context, page }, testInfo) => {
+  await signIn(context, { tables: {
+    fh_contacts: [{ id: 'c-co', user_id: USER.id, stage: 'job', name: 'Whitcomb', amount: 10000, cost: 12000, updated_at: iso(NOW), created_at: iso(NOW) }],
+    fh_change_orders: [
+      { id: 'co-1', user_id: USER.id, contact_id: 'c-co', sequence_number: 1, title: 'Extra footing', amount: 5000, status: 'approved', created_at: iso(NOW) },
+      { id: 'co-2', user_id: USER.id, contact_id: 'c-co', sequence_number: 2, title: 'Sealer', amount: 900, status: 'sent', created_at: iso(NOW) }
+    ],
+    fh_stage_transitions: [], fh_invoices: [], fh_payments: []
+  } })
+  await open(page)
+  const value = testInfo.project.name.startsWith('desktop')
+    ? page.getByRole('heading', { name: 'Tracked margin', exact: true }).locator('..').locator('strong')
+    : page.locator('.fh-report-metric').filter({ hasText: 'Avg margin' }).locator('.fh-report-metric__value')
+  await expect(value).toHaveText('20%')
+})
+
 // OPS-07: Log miles showed and used $0.67, the 2024 rate. It now uses the
 // rate for the date the drive happened, from the same table Reports reads.
 test('log miles shows and computes the IRS rate for the drive date', async ({ context, page }) => {
