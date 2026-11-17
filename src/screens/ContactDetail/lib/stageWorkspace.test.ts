@@ -65,6 +65,20 @@ describe('stageCta', () => {
     expect(stageCta('job', null)).toEqual({ label: 'Mark complete', action: 'complete' })
   })
 
+  // OPS-19: with the whole contract invoiced and money still owed, a new
+  // invoice has nothing left to bill, so the main action moves the job on.
+  it('is Mark complete once everything is invoiced, even with money still owed', () => {
+    expect(stageCta('job', 6400, 0)).toEqual({ label: 'Mark complete', action: 'complete' })
+    expect(stageCta('invoice', 6400, 0.001)).toEqual({ label: 'Mark complete', action: 'complete' })
+  })
+
+  it('stays Invoice this while part of the contract is still to invoice, or that is not known yet', () => {
+    expect(stageCta('job', 6400, 1200)).toEqual({ label: 'Invoice this', action: 'invoice' })
+    expect(stageCta('job', 6400, 0.01)).toEqual({ label: 'Invoice this', action: 'invoice' })
+    expect(stageCta('job', 6400, null)).toEqual({ label: 'Invoice this', action: 'invoice' })
+    expect(stageCta('job', 6400)).toEqual({ label: 'Invoice this', action: 'invoice' })
+  })
+
   it('is Reopen on a closed or lost job, whatever the balance', () => {
     expect(stageCta('closed', 0)).toEqual({ label: 'Reopen', action: 'reopen' })
     expect(stageCta('lost', 5000)).toEqual({ label: 'Reopen', action: 'reopen' })
