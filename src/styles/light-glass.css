@@ -11,6 +11,14 @@
 .fh-app--glass.fh-app--layout-mobile-frame .fh-app__main-inner { max-width: 720px; }
 .fh-app--glass .v3-screen { background: transparent; }
 .fh-app--glass .fh-build-page { background: transparent; border: 0; box-shadow: none; }
+/* A control focused from the keyboard scrolls into view clear of the
+   sticky header (about 76 px, 64 on a phone) and, on a phone, clear of the
+   dock or the job page's capsule that takes its place (WCAG 2.4.11). The
+   offset sits on the screen's own focused control, not on the page: page
+   scroll padding also moved the page when a sticky header button took
+   focus. */
+.fh-app--glass #fh-main :focus-visible { scroll-margin-top: calc(88px + env(safe-area-inset-top, 0px)); }
+body:has(:is(.fhs-dock:not(.is-hidden), .fhj-capsule)) .fh-app--glass #fh-main :focus-visible { scroll-margin-bottom: calc(var(--fh-mobile-dock-height) + 12px); }
 body:has(.fh-app--glass) .fh-app-header.fh-glass-header {
   display: flex !important;
   position: sticky;
