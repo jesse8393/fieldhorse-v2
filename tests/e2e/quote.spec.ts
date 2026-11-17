@@ -410,6 +410,20 @@ test.describe('the quote screen', () => {
     await expect(lines(page).getByRole('button', { name: /Excavate and grade/ })).toBeVisible()
   })
 
+  // Audit finding M-09: the estimator saves 3 at $333.33 for $1,000.00.
+  test('a line from the estimator follows a new quantity', async ({ context, page }) => {
+    const estimated = item('qi-est', 'Form and pour', { qty: 3, unit: 'ea', rate: 333.33, amount: 1000, sort_order: 0 })
+    await signIn(context, { tables: { fh_quote_items: [estimated] } })
+    await openQuote(page)
+    await lines(page).getByRole('button', { name: /Form and pour/ }).click()
+    const editor = page.getByRole('form', { name: 'Edit line' })
+    await editor.getByLabel('Quantity').fill('4')
+    await expect(editor.getByLabel('Amount')).toHaveValue('1333.32')
+    const saved = page.waitForRequest((r) => r.method() === 'PATCH' && r.url().includes('/rest/v1/fh_quote_items'))
+    await editor.getByRole('button', { name: 'Save changes' }).click()
+    expect((await saved).postDataJSON()).toMatchObject({ qty: 4, rate: 333.33, amount: 1333.32 })
+  })
+
   test('add a line', async ({ context, page }) => {
     await signIn(context, { tables: { fh_quote_items: ITEMS } })
     // The mock answers an insert with the first row; echo the new one back instead.

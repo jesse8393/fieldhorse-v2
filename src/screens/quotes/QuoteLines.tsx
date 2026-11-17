@@ -24,6 +24,7 @@ import { Switch } from '@/components/ui/switch'
 import { keepFocusOnRetry } from '../../lib/retryFocus.ts'
 import { hapticTap } from '../../lib/haptics.ts'
 import { buildQuoteView, type QuoteTerms } from '../../lib/quoteView.ts'
+import { amountFollowsRate } from '../../lib/quoteMoney.ts'
 import {
   applySuggestion,
   draftFromRow,
@@ -314,12 +315,14 @@ type LineValues = ReturnType<typeof normalizeForDB>
 type LineErrors = Partial<Record<'description' | 'qty' | 'rate' | 'amount', string>>
 
 // An edit keeps an amount that was set by hand (it is not quantity times
-// rate), and otherwise lets the amount follow quantity and rate.
+// rate), and otherwise lets the amount follow quantity and rate. A rate
+// rounded to the cent still counts as quantity times rate: the estimator
+// saves 3 at $333.33 for $1,000.00 (M-09).
 function seedFromRow(row: any): LineDraft {
   const draft = draftFromRow(row)
-  const product = Number(row.qty) * Number(row.rate)
-  return { ...draft, amountOverridden: !(Math.abs(Number(row.amount) - product) < 0.005) }
+  return { ...draft, amountOverridden: !amountFollowsRate(row) }
 }
+
 
 const KINDS = [
   { id: 'base', label: 'In the total' },

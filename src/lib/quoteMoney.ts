@@ -123,6 +123,21 @@ export function roundCents(value: unknown): number {
   return d ? centsOf(d.digits, d.places) / 100 : 0
 }
 
+/**
+ * A saved line whose amount is quantity times rate, so an edit to either
+ * should move it: the exact product to the cent, or a rate that is the
+ * amount divided by quantity, rounded to the cent (the estimator saves 3 at
+ * $333.33 for $1,000.00). Any other amount was typed by hand and stays.
+ */
+export function amountFollowsRate(row: { qty?: unknown; rate?: unknown; amount?: unknown }): boolean {
+  const qty = Number(row.qty)
+  const rate = Number(row.rate)
+  const amount = Number(row.amount)
+  if (![qty, rate, amount].every(Number.isFinite)) return false
+  if (roundCents(amount) === lineTotal(row.qty, row.rate)) return true
+  return qty > 0 && roundCents(amount / qty) === roundCents(rate)
+}
+
 /** A line's price: its amount, else quantity times rate. */
 export function lineAmount(item: MoneyItem): number {
   const raw = item.amount != null && item.amount !== ''

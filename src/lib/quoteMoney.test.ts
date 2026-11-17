@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { companyShortName, lineTotal, quoteMoney, roundCents, stepsAfterApproval, type MoneyChangeOrder, type MoneyItem, type QuoteMoneyInput } from './quoteMoney.ts'
+import { amountFollowsRate, companyShortName, lineTotal, quoteMoney, roundCents, stepsAfterApproval, type MoneyChangeOrder, type MoneyItem, type QuoteMoneyInput } from './quoteMoney.ts'
 
 // One quote total and one deposit for the Quote tab capsule, the in app
 // preview and the customer page (PHASE8_PLAN.md Task 9, decision D31).
@@ -324,3 +324,16 @@ describe('an amount stored to the cent (M-22)', () => {
   })
 })
 
+describe('a saved line whose amount follows its quantity and rate (M-09)', () => {
+  it('an estimator line saved as 3 at $333.33 for $1,000.00 follows', () => {
+    expect(amountFollowsRate({ qty: 3, rate: 333.33, amount: 1000 })).toBe(true)
+  })
+  it('an exact product follows', () => {
+    expect(amountFollowsRate({ qty: 1100, rate: 2, amount: 2200 })).toBe(true)
+    expect(amountFollowsRate({ qty: 2.5, rate: 4.33, amount: 10.83 })).toBe(true)
+  })
+  it('a lump sum typed by hand does not', () => {
+    expect(amountFollowsRate({ qty: 1, rate: 2000, amount: 12500 })).toBe(false)
+    expect(amountFollowsRate({ qty: 3, rate: 125, amount: 300 })).toBe(false)
+  })
+})
