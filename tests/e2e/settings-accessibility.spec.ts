@@ -231,3 +231,33 @@ test('authenticated workspaces retain only the shell main landmark', async ({ pa
     await expect(page.getByRole('main')).toHaveCount(1)
   }
 })
+
+// D21: a draft in one section survives leaving Settings and coming
+// back, and Pin location says why it could not get a location.
+test('a settings draft survives leaving and coming back', async ({ page, context }) => {
+  await signIn(context)
+  await page.goto('/settings?section=documents')
+  const license = page.getByRole('textbox', { name: /License number/ })
+  await expect(license).toBeVisible({ timeout: 30_000 })
+  await license.fill('GC-777')
+  await page.goto('/jobs')
+  await expect(page.getByRole('heading', { level: 1, name: 'Jobs' })).toBeVisible({ timeout: 30_000 })
+  await page.goBack()
+  await expect(page.getByRole('textbox', { name: /License number/ })).toHaveValue('GC-777', { timeout: 30_000 })
+})
+
+test('Pin location says so when the browser refuses the location', async ({ page, context }) => {
+  await signIn(context)
+  await context.clearPermissions()
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'geolocation', {
+      configurable: true,
+      value: { getCurrentPosition: (_ok: unknown, fail: (e: { code: number; message: string }) => void) => fail({ code: 1, message: 'User denied Geolocation' }) }
+    })
+  })
+  await page.goto('/settings?section=business')
+  const pin = page.getByRole('button', { name: /^(Repin|Pin location)$/ })
+  await expect(pin).toBeVisible({ timeout: 30_000 })
+  await pin.click()
+  await expect(page.getByText("Couldn't get your location", { exact: true })).toBeVisible()
+})

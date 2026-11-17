@@ -19,6 +19,11 @@ describe('independent settings sections', () => {
     expect(() => settingsSectionPatch('payments', { ...form, paymentLink: 'not a link' }, {})).toThrow('web address')
     expect(settingsSectionPatch('payments', form, {})).toEqual({ payment_link: 'https://venmo.com/u/parker', payment_instructions: 'Pay by check' })
   })
+  it('refuses a blank company name and a company email that is not an email (D21)', () => {
+    expect(() => settingsSectionPatch('business', { ...form, companyName: '   ' }, {})).toThrow('company name')
+    expect(() => settingsSectionPatch('documents', { ...form, companyEmail: 'office at example' }, {})).toThrow('email')
+    expect(settingsSectionPatch('documents', { ...form, companyEmail: '' }, {})).toMatchObject({ company_email: null })
+  })
   it('preserves unrelated preferences when saving quote reminders', () => {
     const patch = settingsSectionPatch('preferences', form, { theme: 'dark', example: true })
     expect(patch).toEqual({ preferences: { theme: 'dark', example: true, quote_follow_up: { enabled: true, days: 7 } } })
