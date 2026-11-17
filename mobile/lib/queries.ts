@@ -1453,6 +1453,8 @@ export function useCoverPhotos(userId: string | undefined) {
       for (const [jobId, path] of pathByJob.entries()) { const u = urlByPath.get(path); if (u) out[jobId] = u }
       return out
     },
+    // Optional: the list shows without cover photos when they cannot load.
+    throwOnError: false,
     enabled: !!userId
   })
 }
@@ -2000,6 +2002,9 @@ export function useWeather(lat?: number | null, lon?: number | null) {
   return useQuery({
     queryKey: ['weather', lat ?? 'default', lon ?? 'default'],
     queryFn: () => getWeather(lat ?? undefined, lon ?? undefined),
+    // Optional: no forecast (no signal, rate limit) hides the weather pill
+    // instead of replacing the whole app with the retry screen.
+    throwOnError: false,
     staleTime: 1000 * 60 * 30,
     refetchInterval: 1000 * 60 * 30
   })
