@@ -37,7 +37,7 @@ describe('DocuSign envelope status only moves forward', () => {
 
 describe('customer viewed notifications', () => {
   it('labels change order views as change orders, not proposals', () => {
-    expect(viewedLabelFor({ kind: 'change_order', contact_id: 'j1' })).toEqual({ kindLabel: 'change order', detailLink: '/jobs/j1?tab=quote' })
+    expect(viewedLabelFor({ kind: 'change_order', contact_id: 'j1' })).toEqual({ kindLabel: 'change order', detailLink: '/jobs/j1?tab=change_orders' })
     expect(viewedLabelFor({ kind: 'invoice', contact_id: 'j1' })).toEqual({ kindLabel: 'invoice', detailLink: '/jobs/j1?tab=financials' })
     expect(viewedLabelFor({ kind: 'proposal', contact_id: 'j1' })).toEqual({ kindLabel: 'proposal', detailLink: '/quotes/j1?tab=quote' })
   })
