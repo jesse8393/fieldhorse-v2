@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 import { nothingRunsOffTheSide } from './helpers/overflow.ts'
-import { ink, openBigPortal, textSize } from './helpers/bigText.ts'
+import { bigReady, ink, openBig, openBigPortal, textSize } from './helpers/bigText.ts'
 
 const selectionFixture = {
   id: 'selection-ui', user_id: 'qa-user-1', contact_id: 'c-job1', title: 'Bathroom floor',
@@ -495,4 +495,47 @@ test.describe('large text and zoom', () => {
       }
     })
   }
+
+  // big-text-3: a 44 px tap target made with negative margins let a client
+  // name or a job title on two lines spill over the line next to it.
+  for (const percent of [100, 150]) {
+    test(`a two line client name or job title keeps clear of the line next to it, text at ${percent} percent`, async ({ context, page }) => {
+      await textSize(context, percent)
+      await openBig(context, page, '/quotes/q-big')
+      for (const width of [412, 390, 360, 320]) {
+        await page.setViewportSize({ width, height: 800 })
+        await page.waitForTimeout(150)
+        const name = await ink(page.locator('a.fhqt-client__link'))
+        const number = await ink(page.locator('.fhqt-client__number'))
+        const title = await ink(page.locator('h1.fhqt-title'))
+        const at = `quote at ${width} px: ${JSON.stringify({ title, name, number })}`
+        expect(name.top, at).toBeGreaterThanOrEqual(title.bottom - 1)
+        if (number.top > name.top + 1) expect(number.top, at).toBeGreaterThanOrEqual(name.bottom - 1)
+        expect(await page.locator('a.fhqt-client__link').evaluate((el) => el.getBoundingClientRect().height), at).toBeGreaterThanOrEqual(44)
+      }
+      await page.goto('/invoices/i-big')
+      await bigReady(page)
+      for (const width of [412, 390, 360, 320]) {
+        await page.setViewportSize({ width, height: 800 })
+        await page.waitForTimeout(150)
+        const who = await ink(page.locator('.fhinv-hero__who'))
+        const job = await ink(page.locator('a.fhinv-hero__job'))
+        const amount = await ink(page.locator('.fhinv-hero__amount'))
+        const at = `invoice at ${width} px: ${JSON.stringify({ who, job, amount })}`
+        expect(job.top, at).toBeGreaterThanOrEqual(who.bottom - 1)
+        expect(amount.top, at).toBeGreaterThanOrEqual(job.bottom - 1)
+        expect(await page.locator('a.fhinv-hero__job').evaluate((el) => el.getBoundingClientRect().height), at).toBeGreaterThanOrEqual(44)
+      }
+    })
+  }
+})
+
+// big-text-3 on a desktop window at 200 percent zoom (640 px wide).
+test('a two line job title keeps clear of the client name on a zoomed desktop invoice', async ({ context, page }, testInfo) => {
+  test.skip(testInfo.project.name.startsWith('mobile'), 'Desktop window')
+  await page.setViewportSize({ width: 640, height: 450 })
+  await openBig(context, page, '/invoices/i-big')
+  const who = await ink(page.locator('.fhinv-hero__who'))
+  const job = await ink(page.locator('a.fhinv-hero__job'))
+  expect(job.top, JSON.stringify({ who, job })).toBeGreaterThanOrEqual(who.bottom - 1)
 })

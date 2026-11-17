@@ -76,12 +76,13 @@
   font-weight: 600;
   text-decoration: none;
   border-radius: 7px;
-  /* A 44 px target for a thumb; the negative margin keeps the line where
-     it was. */
+  /* A 44 px target for a thumb: the padding adds the height around the
+     text and the negative margin takes it back, so the line stays where it
+     was and a name on two lines keeps its own height. */
   display: inline-flex;
   align-items: center;
-  min-height: 44px;
-  margin-block: -12px;
+  padding-block: 11px;
+  margin-block: -11px;
 }
 
 .fhqt-client__link:hover {
