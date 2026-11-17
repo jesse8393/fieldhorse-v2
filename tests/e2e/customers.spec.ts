@@ -217,7 +217,7 @@ test.describe('the customer page', () => {
     await expect(page.locator('.fhcs-total__amount')).toHaveText('$6,900.25')
     const apart = page.getByRole('list', { name: 'Not yet invoiced' })
     await expect(apart.getByText('Garage slab')).toBeVisible()
-    await expect(apart.getByText('$33,100', { exact: true })).toBeVisible()
+    await expect(apart.getByText('$33,100.00', { exact: true })).toBeVisible()
 
     await page.getByRole('button', { name: 'Email statement' }).click()
     await expect.poll(() => posted.length).toBe(1)
