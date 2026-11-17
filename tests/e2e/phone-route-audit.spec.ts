@@ -38,3 +38,19 @@ test('every phone workspace and core form stays usable at 320 px', async ({ cont
   }
   expect(errors).toEqual([])
 })
+
+// A11Y-10: the small text links a thumb has to hit are at least 44 px
+// tall (WCAG 2.5.8 asks for 24): the quote's client, the invoice's job and
+// the header wordmark.
+test('small text links are tall enough to tap', async ({ context, page }) => {
+  await signIn(context)
+  const heightOf = async (link: import('@playwright/test').Locator) => {
+    await expect(link).toBeVisible({ timeout: 30_000 })
+    return link.evaluate(el => el.getBoundingClientRect().height)
+  }
+  await page.goto('/quotes/q-quote')
+  expect(await heightOf(page.locator('a.fhqt-client__link'))).toBeGreaterThanOrEqual(44)
+  expect(await heightOf(page.getByRole('link', { name: 'Fieldhorse home' }))).toBeGreaterThanOrEqual(44)
+  await page.goto('/invoices/inv1')
+  expect(await heightOf(page.locator('a.fhinv-hero__job'))).toBeGreaterThanOrEqual(44)
+})

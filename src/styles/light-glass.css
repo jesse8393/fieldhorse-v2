@@ -35,7 +35,7 @@ body:has(.fh-app--glass) .fh-app-header.fh-glass-header {
   backdrop-filter: var(--fh-glass-blur) !important;
   -webkit-backdrop-filter: var(--fh-glass-blur) !important;
 }
-.fh-glass-wordmark { color: var(--fh-ink); text-decoration: none; font: 750 27px/1 var(--fh-font-body); letter-spacing: var(--fh-tracking-title); white-space: nowrap; }
+.fh-glass-wordmark { display: inline-flex; align-items: center; min-height: 44px; color: var(--fh-ink); text-decoration: none; font: 750 27px/1 var(--fh-font-body); letter-spacing: var(--fh-tracking-title); white-space: nowrap; }
 .fh-glass-wordmark span { color: var(--fh-gold); }
 .fh-glass-nav { display: flex; align-items: center; gap: 4px; margin-inline: auto; height: 50px; }
 .fh-glass-nav a { display: grid; place-items: center; position: relative; padding: 12px 20px; min-height: 44px; color: var(--fh-ink-2); text-decoration: none; font-size: 15px; border-radius: var(--fh-r-control); }

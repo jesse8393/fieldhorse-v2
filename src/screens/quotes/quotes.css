@@ -76,6 +76,12 @@
   font-weight: 600;
   text-decoration: none;
   border-radius: 7px;
+  /* A 44 px target for a thumb; the negative margin keeps the line where
+     it was. */
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-block: -12px;
 }
 
 .fhqt-client__link:hover {
