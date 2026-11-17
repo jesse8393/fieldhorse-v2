@@ -35,6 +35,7 @@ import { useActiveCompany, useQuotes } from '../../lib/queries.ts'
 import { buildInvoiceList, buildMoneyView, type MoneyRow } from '../../lib/moneyView.ts'
 import { hapticTap } from '../../lib/haptics.ts'
 import { marginPercent } from '../../lib/format.ts'
+import { useDocumentCompanyName } from '../../lib/companyBranding.ts'
 import {
   BalancesPanel,
   InvoicesPanel,
@@ -135,16 +136,17 @@ export default function MoneyPhone({
   const { profile } = useProfile()
   const { user } = useAuth()
   const company = useActiveCompany()
+  const companyName = useDocumentCompanyName(company?.orgId)
   const quotesQuery = useQuotes(user?.id)
   const { panel, titleRef, panelHref, openPanel, closePanel } = useMoneyPanel()
 
   const waiting = loading || quotesQuery.isPending || !company
   const view = useMemo(
-    () => (bundle ? buildMoneyView({ bundle, quotes: quotesQuery.data ?? [], company, now }) : null),
-    [bundle, quotesQuery.data, company, now]
+    () => (bundle ? buildMoneyView({ bundle, quotes: quotesQuery.data ?? [], company, now, companyName }) : null),
+    [bundle, quotesQuery.data, company, now, companyName]
   )
-  const invoiceList = useMemo(() => (bundle ? buildInvoiceList({ bundle, now }) : []), [bundle, now])
-  const reconciliation = useMemo(() => bundle ? buildMoneyReconciliation(bundle, jobBalances, now) : [], [bundle, jobBalances, now])
+  const invoiceList = useMemo(() => (bundle ? buildInvoiceList({ bundle, now, companyName }) : []), [bundle, now, companyName])
+  const reconciliation = useMemo(() => bundle ? buildMoneyReconciliation(bundle, jobBalances, now, companyName) : [], [bundle, jobBalances, now, companyName])
   const openInvoiceCount = useMemo(
     () => invoiceList.filter((r) => r.status === 'draft' || r.status === 'sent' || r.status === 'overdue').length,
     [invoiceList]

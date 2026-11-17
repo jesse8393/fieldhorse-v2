@@ -26,6 +26,7 @@ import WorkspaceHelp from '../experience/WorkspaceHelp.tsx'
 import { useMemo } from 'react'
 import { buildMoneyReconciliation } from '../../lib/moneyReconciliation.ts'
 import { marginPercent } from '../../lib/format.ts'
+import { useDocumentCompanyName } from '../../lib/companyBranding.ts'
 import { ReconciliationLinks, ReconciliationPanel } from '../../screens/money/Reconciliation.tsx'
 import { Link, useNavigate } from 'react-router-dom'
 import { ChevronRight, Plus, Receipt } from 'lucide-react'
@@ -67,16 +68,17 @@ export default function SnowInvoicesBuild({
   const { user } = useAuth()
   const navigate = useNavigate()
   const company = useActiveCompany()
+  const companyName = useDocumentCompanyName(company?.orgId)
   const quotesQuery = useQuotes(user?.id)
   const { panel, titleRef, panelHref, openPanel, closePanel } = useMoneyPanel()
 
   const waiting = loading || quotesQuery.isPending || !company
   const view = useMemo(
-    () => (bundle ? buildMoneyView({ bundle, quotes: quotesQuery.data ?? [], company, now }) : null),
-    [bundle, quotesQuery.data, company, now]
+    () => (bundle ? buildMoneyView({ bundle, quotes: quotesQuery.data ?? [], company, now, companyName }) : null),
+    [bundle, quotesQuery.data, company, now, companyName]
   )
-  const invoiceList = useMemo(() => (bundle ? buildInvoiceList({ bundle, now }) : []), [bundle, now])
-  const reconciliation = useMemo(() => bundle ? buildMoneyReconciliation(bundle, jobBalances, now) : [], [bundle, jobBalances, now])
+  const invoiceList = useMemo(() => (bundle ? buildInvoiceList({ bundle, now, companyName }) : []), [bundle, now, companyName])
+  const reconciliation = useMemo(() => bundle ? buildMoneyReconciliation(bundle, jobBalances, now, companyName) : [], [bundle, jobBalances, now, companyName])
   const openInvoiceCount = useMemo(
     () => invoiceList.filter((r) => r.status === 'draft' || r.status === 'sent' || r.status === 'overdue').length,
     [invoiceList]

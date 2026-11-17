@@ -632,7 +632,7 @@ async function fetchActivity(userId: string, pageSize: number, orgId?: string | 
       .select('id, contact_id, sequence_number, title, amount, status, approved_at, created_at, user_id'), userId, orgId)
       .order('created_at', { ascending: false }).limit(pageSize),
     scoped(supabase.from('fh_invoices')
-      .select('id, contact_id, sequence_number, title, amount, status, issued_at, created_at, user_id'), userId, orgId)
+      .select('id, contact_id, client_id, sequence_number, title, amount, status, issued_at, created_at, user_id'), userId, orgId)
       .order('created_at', { ascending: false }).limit(pageSize)
   ])
   for (const result of [transitions, payments, changeOrders, invoices]) {

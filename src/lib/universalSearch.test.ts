@@ -97,3 +97,19 @@ describe('search money', () => {
     expect(result.invoices[0].sub).toContain('$4,200.00')
   })
 })
+
+// formats-1: Search shows an invoice by the number its PDF prints, and a
+// typed number finds the invoice it names.
+describe('search by invoice number', () => {
+  it('shows the printed number and finds an invoice by it', async () => {
+    const result = await universalSearch('PCC-RD-01', 'user-1', 'org-1', 'owner', 'Parker Construction Company')
+    const numberRead = db.reads.filter((r) => r.table === 'fh_invoices').find((r) => r.filters.some(([column]) => column === 'sequence_number'))
+    expect(numberRead?.filters).toContainEqual(['sequence_number', 1 as unknown as string])
+    expect(result.invoices[0].sub).toContain('PCC-')
+  })
+
+  it('a text that is not a number reads no invoice by sequence', async () => {
+    await universalSearch('Harold', 'user-1', 'org-1', 'owner', 'Parker Construction Company')
+    expect(db.reads.some((r) => r.filters.some(([column]) => column === 'sequence_number'))).toBe(false)
+  })
+})

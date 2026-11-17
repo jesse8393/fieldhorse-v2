@@ -66,7 +66,7 @@ export default function InvoiceDetail() {
 
 function InvoiceDetailScreen({ id }: { id: string | undefined }) {
   const navigate = useNavigate()
-  const { user, query, record, figures, billingReview, loadCompany, now, sending, refresh, patchInvoice, send } = useInvoiceScreen(id)
+  const { user, query, record, figures, billingReview, loadCompany, companyName, now, sending, refresh, patchInvoice, send } = useInvoiceScreen(id)
   const waitId = useId()
   const titleRef = useRef<HTMLHeadingElement>(null)
   useEffect(() => { titleRef.current?.focus({ preventScroll: true }) }, [])
@@ -279,7 +279,7 @@ function InvoiceDetailScreen({ id }: { id: string | undefined }) {
       </header>
 
       <section className="fhinv-hero" aria-label="Invoice summary">
-        <p className="fhinv-hero__facts" title={invoice.id}>{invoiceReference(invoice)}</p>
+        <p className="fhinv-hero__facts" title={invoice.id}>{invoiceReference(invoice, companyName)}</p>
         <p className="fhinv-hero__who">{to.name || 'Customer'}</p>
         {record.job ? (
           <Link className="fhinv-hero__job" to={`/jobs/${record.job.id}?tab=financials`}>{jobTitle || 'Open job'}</Link>
@@ -299,7 +299,7 @@ function InvoiceDetailScreen({ id }: { id: string | undefined }) {
         </p>
       </section>
 
-      {isDraft && billingReview && <InvoiceBillingReview review={billingReview} acknowledged={duplicateReviewed} onAcknowledge={setDuplicateReviewed} />}
+      {isDraft && billingReview && <InvoiceBillingReview review={billingReview} companyName={companyName} acknowledged={duplicateReviewed} onAcknowledge={setDuplicateReviewed} />}
       <section className="fhinv-section" aria-label="Description">
         <Field
           multiline

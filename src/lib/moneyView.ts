@@ -158,6 +158,8 @@ type Context = {
   jobs: Map<string, InvoiceJob>
   /** What each open invoice still owes (allocateInvoiceDue), by invoice id. */
   owed: Map<string, number>
+  /** The company the invoices are printed under, for their numbers (formats-1). */
+  companyName?: string | null
 }
 
 /**
@@ -185,11 +187,12 @@ function contractOf(job: InvoiceJob | undefined, changeOrders: ChangeOrder[]): n
   return job ? knownContractTotal({ amount: job.amount, changeOrders }) : null
 }
 
-function contextFor(bundle: InvoicesBundle, now: Date): Context {
+function contextFor(bundle: InvoicesBundle, now: Date, companyName?: string | null): Context {
   const jobs = new Map(bundle.jobs.map((j) => [j.id, j]))
   const changeOrdersByJob = groupBy(bundle.changeOrders, (c) => c.contact_id)
   return {
     now,
+    companyName,
     today: startOfDay(now),
     jobs,
     // A bill whose job left the list has no known contract, so no cap.
@@ -286,7 +289,7 @@ function classify(inv: Invoice, ctx: Context): Classified {
   const row: MoneyInvoiceRow = {
     id: inv.id,
     title: customerName(job, client),
-    subline: `${job?.job_title ? `${job.job_title}, ${lowerFirst(title)}` : title} · ${invoiceReference(inv)}`,
+    subline: `${job?.job_title ? `${job.job_title}, ${lowerFirst(title)}` : title} · ${invoiceReference(inv, ctx.companyName)}`,
     amount: owed,
     note,
     chip,
@@ -376,9 +379,9 @@ function marginPct(jobs: InvoiceJob[], changeOrders: InvoicesBundle['changeOrder
   return Math.round(avgMargin(costed, changeOrders) * 1000) / 10
 }
 
-export function buildMoneyView(input: { bundle: InvoicesBundle; quotes: QuoteRow[]; now: Date; company?: ActiveCompany | null }): MoneyView {
+export function buildMoneyView(input: { bundle: InvoicesBundle; quotes: QuoteRow[]; now: Date; company?: ActiveCompany | null; companyName?: string | null }): MoneyView {
   const { bundle, quotes, now, company } = input
-  const ctx = contextFor(bundle, now)
+  const ctx = contextFor(bundle, now, input.companyName)
   const week = weekBounds(now)
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
   const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
@@ -437,8 +440,8 @@ export function buildMoneyView(input: { bundle: InvoicesBundle; quotes: QuoteRow
  * list behind the Money screen's "All invoices": drafts, invoices due
  * later than a week out, and settled ones, which the four groups leave out.
  */
-export function buildInvoiceList(input: { bundle: InvoicesBundle; now: Date }): MoneyInvoiceRow[] {
-  const ctx = contextFor(input.bundle, input.now)
+export function buildInvoiceList(input: { bundle: InvoicesBundle; now: Date; companyName?: string | null }): MoneyInvoiceRow[] {
+  const ctx = contextFor(input.bundle, input.now, input.companyName)
   return input.bundle.invoices.map((inv) => classify(inv, ctx).row)
 }
 

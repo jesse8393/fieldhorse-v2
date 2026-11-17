@@ -3,6 +3,7 @@ import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { installMock, restResponse, session } from '../../scripts/qa-mock.mjs'
 import { nothingRunsOffTheSide } from './helpers/overflow.ts'
 import { signIn } from './helpers/signIn.ts'
+import { NOW as FORMATS_NOW, TABLES as FORMATS_TABLES, contact as formatsContact, invoice as formatsInvoice } from './helpers/formatsSeed.ts'
 
 // The invoice screen's actions (Phase 9, Task 12, decisions D57 and D62):
 // the gold Collect payment, then Resend (Send on a draft), PDF and Share
@@ -815,4 +816,27 @@ test('the remind screen keeps its intro and facts in the centred column', async 
     .map((sel) => Math.round(document.querySelector(sel)!.getBoundingClientRect().left)))
   expect(lefts[0]).toBe(lefts[2])
   expect(lefts[1]).toBe(lefts[2])
+})
+
+// formats-1: the app names an invoice by the number its PDF and customer
+// link print, PCC-2D3E-01, on the invoice page, the job's Invoices tab,
+// Activity and Search, and typing that number in Search finds it.
+test('the app names an invoice by the number the customer sees', async ({ context, page }) => {
+  const OWING = '1c8d2e3f-4051-4b6c-9d7e-8f9a0b1c2d3e'
+  const INV = '7c9e6679-7425-40de-944b-e07fc1f90ae7'
+  const job = formatsContact({ id: OWING, stage: 'job', name: 'Harold Wickham', job_title: 'Back patio', amount: 4200.75 })
+  const bill = formatsInvoice({ id: INV, contact_id: OWING, title: 'Final', amount: 4200.75, status: 'sent', sequence_number: 1, issued_at: '2026-11-10T05:30:00Z', created_at: '2026-11-10T05:30:00Z', due_at: '2026-11-25T05:59:59.999Z' })
+  await signIn(context, { tables: { ...FORMATS_TABLES, fh_contacts: [job], fh_invoices: [bill], fh_payments: [] } })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  await page.goto(`/invoices/${INV}`, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText('PCC-2D3E-01', { exact: true })).toBeVisible({ timeout: 30_000 })
+  await page.goto(`/jobs/${OWING}?tab=draws`, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText('PCC-2D3E-01', { exact: true }).filter({ visible: true }).first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText(/Draw #1/)).toHaveCount(0)
+  await page.goto('/activity', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText(/PCC-2D3E-01 sent, Final/).first()).toBeVisible({ timeout: 30_000 })
+  await page.goto('/search', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await page.getByPlaceholder(/Jobs, clients/).fill('PCC-2D3E-01')
+  await expect(page.getByText(/PCC-2D3E-01/).first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText('Final', { exact: true }).first()).toBeVisible()
 })

@@ -122,8 +122,10 @@ export function useInvoiceScreen(id: string | undefined) {
   const billingReview = useMemo(() => record ? reviewInvoice({ invoice: record.invoice, invoices: record.jobInvoices, contractTotal: record.job ? knownContractTotal({ amount: record.job.amount, changeOrders: record.changeOrders }) : null }) : null, [record])
   // The company block of the invoice's own company, read again for each
   // document so it is current, whoever builds it (DATA-06).
-  const { load: loadDocumentProfile } = useDocumentProfile(record?.invoice.org_id)
+  const { profile: documentProfileNow, load: loadDocumentProfile } = useDocumentProfile(record?.invoice.org_id)
   const loadCompany = useCallback(async () => companyFromProfile(await loadDocumentProfile()), [loadDocumentProfile])
+  // The name the invoice's number is built from, as on its PDF (formats-1).
+  const companyName = companyFromProfile(documentProfileNow).name
   const sending = !!id && sendingIds.has(id)
 
   const refresh = useCallback(() => invalidate(id), [invalidate, id])
@@ -209,5 +211,5 @@ export function useInvoiceScreen(id: string | undefined) {
     return sent
   }, [record, user, loadCompany, refresh, queryClient, id, now])
 
-  return { user, query, record, figures, billingReview, loadCompany, now, sending, refresh, patchInvoice, send }
+  return { user, query, record, figures, billingReview, loadCompany, companyName, now, sending, refresh, patchInvoice, send }
 }

@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { useClientDetail } from '../lib/queries.ts'
 import { useOrgScope } from '../lib/orgScope.ts'
+import { useDocumentCompanyName } from '../lib/companyBranding.ts'
 import { useNow } from '../lib/useNow.ts'
 import { supabase } from '../lib/supabase.ts'
 import { clientBillingBundle, customerBlockers } from '../lib/customerBlockers.ts'
@@ -13,6 +14,7 @@ export default function CustomerBlockers({ clientId, jobs }: { clientId: string;
   const { user } = useAuth()
   const { canSeeFinancials } = useMembership()
   const orgId = useOrgScope(user?.id)
+  const companyName = useDocumentCompanyName(orgId)
   // The customer screen's own read (same query, so no new request): this
   // customer's invoices and payments, never the whole company's billing.
   const billing = useClientDetail(canSeeFinancials ? clientId : undefined, user?.id)
@@ -39,7 +41,7 @@ export default function CustomerBlockers({ clientId, jobs }: { clientId: string;
   })
   const loading = schedule.isPending || canSeeFinancials && billing.isPending
   const failed = schedule.isError || canSeeFinancials && billing.isError
-  const blockers = customerBlockers({ clientId, jobs, schedules: schedule.data ?? [], billing: canSeeFinancials && billing.data ? clientBillingBundle(clientId, billing.data) : null, now })
+  const blockers = customerBlockers({ clientId, jobs, schedules: schedule.data ?? [], billing: canSeeFinancials && billing.data ? clientBillingBundle(clientId, billing.data) : null, now, companyName })
   return <section aria-label="Delivery and billing review" style={{ padding: 16, border: '1px solid var(--v3-border)', borderRadius: 10, background: 'var(--v3-surface)' }}>
     <h2 style={{ margin: '0 0 8px', fontSize: 18 }}>Delivery and billing review</h2>
     {loading ? <p role="status">Checking linked records…</p> : failed ? <DataErrorState title="Review unavailable" message="Could not check every linked schedule and invoice. No clear status inferred." onRetry={() => { void schedule.refetch(); if (canSeeFinancials) void billing.refetch() }} /> : <>

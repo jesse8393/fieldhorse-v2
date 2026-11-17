@@ -36,6 +36,7 @@ import { toastSuccess, toastError } from '../../../lib/toast.ts'
 // them, so a generated $1,249.75 draw never reads "$1,250".
 import { money } from '../../../components/documents/format.ts'
 import { useArmedId } from '../../../lib/secondTap.ts'
+import { invoiceReference } from '../../../lib/invoiceReference.ts'
 import { Eyebrow } from '../../../components/v3'
 import { countNoun } from '../../../lib/format.ts'
 import { fetchInvoiceReviewContext } from '../../../lib/invoiceReviewContext.ts'
@@ -185,7 +186,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
           .single()
       }
       if (res.error) throw res.error
-      toastSuccess(payload.id ? 'Draw updated' : 'Draw added', `Draw #${res.data?.sequence_number || ''}`.trim())
+      toastSuccess(payload.id ? 'Draw updated' : 'Draw added', res.data?.sequence_number ? drawNumber(res.data) : '')
       await fetchDraws()
       return true
     } catch (e: any) {
@@ -287,7 +288,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
         .update({ status: 'paid' })
         .eq('id', draw.id)
       if (error) throw error
-      toastSuccess('Marked paid', `Draw #${draw.sequence_number} is covered by payments already logged`)
+      toastSuccess('Marked paid', `${drawNumber(draw)} is covered by payments already logged`)
       await fetchDraws()
     } catch (e: any) {
       toastError("Couldn't update", e?.message || 'Try again.')
@@ -310,7 +311,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
         .update({ status: 'void' })
         .eq('id', draw.id)
       if (error) throw error
-      toastSuccess('Draw voided', `Draw #${draw.sequence_number}`)
+      toastSuccess('Draw voided', drawNumber(draw))
       await fetchDraws()
     } catch (e: any) {
       toastError("Couldn't void", e?.message || 'Try again.')
@@ -355,6 +356,9 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
     license_number: profile?.license_number || '',
     insured_text: profile?.insured_text || ''
   })
+  // Each draw by the number its PDF and customer link print, PCC-2D3E-01,
+  // never a "Draw #1" the customer has never seen (formats-1).
+  const drawNumber = (draw: any) => invoiceReference({ ...draw, contact_id: draw?.contact_id || contact?.id }, companyOf(documentProfile.profile).name)
 
   // What Money asks for on this draw: the job's other draws let money
   // logged against the job count toward the oldest open one. The PDF hero
@@ -579,7 +583,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       <Shell>
         <Header count={draws.length} canAdd={false} />
         <Summary contractTotal={contractTotal} drawsIssued={drawsIssued} previouslyPaid={previouslyPaid} unbilled={unbilled} />
-        <List draws={draws} readOnly />
+        <List draws={draws} drawNumber={drawNumber} readOnly />
       </Shell>
     )
   }
@@ -626,6 +630,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       ) : (
         <List
           draws={draws}
+          drawNumber={drawNumber}
           editingId={editingId}
           busyId={busyId}
           onEdit={(id: any) => setEditingId(id)}
@@ -761,7 +766,7 @@ function Summary({ contractTotal, drawsIssued, previouslyPaid, unbilled }: any) 
   )
 }
 
-function List({ draws, editingId, busyId, readOnly, armedKey, onEdit, onCancelEdit, onSave, onMarkPaid, onVoid, onDelete, onDownload, onSend }: any) {
+function List({ draws, drawNumber, editingId, busyId, readOnly, armedKey, onEdit, onCancelEdit, onSave, onMarkPaid, onVoid, onDelete, onDownload, onSend }: any) {
   if (draws.length === 0) {
     return (
       <div style={{
@@ -782,6 +787,7 @@ function List({ draws, editingId, busyId, readOnly, armedKey, onEdit, onCancelEd
           ) : (
             <Row
               draw={d}
+              number={drawNumber(d)}
               busy={busyId === d.id}
               readOnly={readOnly}
               onEdit={() => onEdit?.(d.id)}
@@ -800,7 +806,7 @@ function List({ draws, editingId, busyId, readOnly, armedKey, onEdit, onCancelEd
   )
 }
 
-function Row({ draw, busy, readOnly, onEdit, onDownload, onSend, onMarkPaid, onVoid, onDelete, voidArmed = false, deleteArmed = false }: any) {
+function Row({ draw, number, busy, readOnly, onEdit, onDownload, onSend, onMarkPaid, onVoid, onDelete, voidArmed = false, deleteArmed = false }: any) {
   const isPaid = draw.status === 'paid'
   const isVoid = draw.status === 'void'
   const isOverdue = draw.status === 'overdue'
@@ -845,13 +851,13 @@ function Row({ draw, busy, readOnly, onEdit, onDownload, onSend, onMarkPaid, onV
   )
 
   return (
-    <div className="fh-draws-row" style={{ display: 'grid', gridTemplateColumns: narrow ? '64px minmax(0, 1fr) auto' : '72px 1fr auto', gap: narrow ? 8 : 12, padding: '12px 16px', alignItems: 'flex-start' }}>
+    <div className="fh-draws-row" style={{ display: 'grid', gridTemplateColumns: narrow ? 'max-content minmax(0, 1fr) auto' : 'max-content 1fr auto', gap: narrow ? 8 : 12, padding: '12px 16px', alignItems: 'flex-start' }}>
       <div style={{
         fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
         letterSpacing: 0, color: 'var(--v3-primary-text)',
-        fontVariantNumeric: 'tabular-nums', paddingTop: 4
+        fontVariantNumeric: 'tabular-nums', paddingTop: 4, whiteSpace: 'nowrap'
       }}>
-        Draw #{draw.sequence_number}
+        {number}
       </div>
       <div style={{ minWidth: 0 }}>
         <div style={{
