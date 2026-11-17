@@ -1,4 +1,4 @@
-import { expect, test, type BrowserContext, type Page } from '@playwright/test'
+import { expect, test, type BrowserContext, type Page, type Route } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 import { installMock, session } from '../../scripts/qa-mock.mjs'
 
@@ -109,6 +109,69 @@ test('sign out clears customer creation drafts from a shared device', async ({ c
   await signOut.click()
   await expect(page).toHaveURL(/\/login$/)
   await expect.poll(() => page.evaluate(() => ['job', 'lead', 'quote'].map(kind => localStorage.getItem(`fh:draft:${kind}`)))).toEqual([null, null, null])
+})
+
+// settings-wiped-3: a session that ends without the person choosing Sign
+// out (a refused refresh token) keeps their half typed work for them, and
+// only for them.
+async function expireOnNextLoad(context: BrowserContext) {
+  await context.addInitScript((saved) => {
+    if (sessionStorage.getItem('e2e:expire') !== '1') return
+    const expired = { ...saved, expires_at: Math.floor(Date.now() / 1000) - 3600, expires_in: -3600 }
+    localStorage.setItem('sb-qa-mock-auth-token', JSON.stringify(expired))
+    localStorage.setItem('sb-pnmhblvslftdzfcdezbw-auth-token', JSON.stringify(expired))
+  }, session)
+}
+
+test('a session that ends on its own keeps the half typed quote for the same person', async ({ context, page }) => {
+  await signIn(context)
+  await expireOnNextLoad(context)
+  await page.goto('/quotes/new')
+  const title = page.getByLabel('Title', { exact: true })
+  await expect(title).toBeVisible()
+  await title.fill('Hughes driveway, 6 inch, fiber mesh')
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('fh:draft:quote') || '{}').form?.title)).toBe('Hughes driveway, 6 inch, fiber mesh')
+  // The refresh token was revoked elsewhere, so the stored session ends.
+  const refused = (route: Route) => route.fulfill({ status: 400, json: { code: 'refresh_token_not_found', error: 'invalid_grant', error_description: 'Invalid Refresh Token: Refresh Token Not Found' } })
+  await context.route('**/auth/v1/token**', refused)
+  await page.evaluate(() => sessionStorage.setItem('e2e:expire', '1'))
+  await page.reload()
+  await expect(page).toHaveURL(/\/login/)
+  expect(await page.evaluate(() => localStorage.getItem('fh:draft:quote'))).not.toBeNull()
+  // The same person signs in again and finds the quote as they left it.
+  await context.unroute('**/auth/v1/token**', refused)
+  await page.evaluate(() => sessionStorage.removeItem('e2e:expire'))
+  await page.goto('/quotes/new')
+  await expect(page.getByLabel('Title', { exact: true })).toHaveValue('Hughes driveway, 6 inch, fiber mesh')
+})
+
+test('a draft another person typed on this device is never shown and is removed', async ({ context, page }) => {
+  await signIn(context)
+  await context.addInitScript(() => {
+    if (localStorage.getItem('e2e:other-draft')) return
+    localStorage.setItem('e2e:other-draft', '1')
+    localStorage.setItem('fh:draft:quote', JSON.stringify({ form: { title: 'Someone else private quote' }, savedAt: Date.now(), userId: 'qa-user-2' }))
+  })
+  await page.goto('/quotes/new')
+  const title = page.getByLabel('Title', { exact: true })
+  await expect(title).toBeVisible()
+  await expect(title).toHaveValue('')
+  await expect.poll(() => page.evaluate(() => Object.values(localStorage).some((value) => value.includes('Someone else private quote')))).toBe(false)
+})
+
+test('a chosen Sign out clears the drafts tagged with the person too', async ({ context, page }) => {
+  await signIn(context)
+  await page.goto('/workspace')
+  const signOut = page.getByRole('button', { name: 'Sign out', exact: true }).last()
+  await expect(signOut).toBeVisible()
+  await page.evaluate(() => {
+    for (const kind of ['quote', 'edit:quote-terms:q-quote']) {
+      localStorage.setItem(`fh:draft:${kind}`, JSON.stringify({ form: { title: 'Private draft customer' }, savedAt: Date.now(), userId: 'qa-user-1' }))
+    }
+  })
+  await signOut.click()
+  await expect(page).toHaveURL(/\/login$/)
+  await expect.poll(() => page.evaluate(() => Object.keys(localStorage).filter(key => key.startsWith('fh:draft:')))).toEqual([])
 })
 
 test('Undo after reconnect survives a delayed completion and reload', async ({ context, page }) => {
