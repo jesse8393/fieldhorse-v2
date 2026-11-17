@@ -190,3 +190,37 @@ for (const screen of ['job', 'invoice'] as const) {
     expect(posts[1].prefer).toContain('merge-duplicates')
   })
 }
+
+// DATA-19: Generate from terms writes its draws in one request, and after a
+// failed request it reads the draws again before a retry is offered, so a
+// retry never adds a second deposit.
+test('Generate from terms writes its draws in one request and re-reads after a failure', async ({ context, page }) => {
+  const job = {
+    id: 'c-gen', stage: 'job', name: 'Marco', job_title: 'Patio', amount: 10000, terms_text: null,
+    user_id: 'qa-user-1', client_id: null, phone: null, email: 'm@x.com', address: '1 Elm St',
+    created_at: '2026-09-23T15:00:00.000Z', updated_at: '2026-10-09T15:00:00.000Z', completed_at: null,
+    proposal_status: 'approved', milestones: [], follow_up_on: null, notes: null, scope_text: null
+  }
+  await signIn(context, { tables: { fh_contacts: [job], fh_invoices: [], fh_payments: [], fh_change_orders: [] } })
+  const events: string[] = []
+  await context.route('**/rest/v1/fh_invoices*', async (route) => {
+    const req = route.request()
+    if (req.method() === 'POST') {
+      const body = req.postDataJSON()
+      events.push(`POST ${Array.isArray(body) ? body.length : 1}`)
+      return route.abort('connectionreset')
+    }
+    if (req.method() === 'GET' && req.url().includes('contact_id=eq.c-gen')) events.push('GET')
+    return route.fallback()
+  })
+  await page.goto('/jobs/c-gen?tab=draws', { waitUntil: 'domcontentloaded' })
+  const generate = page.getByRole('button', { name: 'Generate from terms' })
+  await expect(generate).toBeVisible({ timeout: 30_000 })
+  await expect.poll(() => events.includes('GET')).toBe(true)
+  const before = events.length
+  await generate.click()
+  await expect.poll(() => events.slice(before).filter((e) => e.startsWith('POST')).length).toBe(1)
+  expect(events.slice(before).find((e) => e.startsWith('POST'))).toBe('POST 3')
+  // The draws are read again after the failed write.
+  await expect.poll(() => events.slice(before).indexOf('GET') > events.slice(before).indexOf('POST 3')).toBe(true)
+})

@@ -226,34 +226,33 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
     }
     setBusyId('__generate__')
     try {
-      // Build N rows + insert sequentially so the BEFORE INSERT trigger
-      // assigns sequence_numbers 1, 2, 3 deterministically. Batch insert
-      // would race the sequence assignment.
+      // One request for every draw (DATA-19), so a dropped connection
+      // leaves all of them or none. The BEFORE INSERT trigger numbers the
+      // rows of one statement in order (each row sees the ones before it).
       //
       // drawsFromTerms splits in cents, so the draws add up to exactly the
       // contract, with the same deposit the customer's link asks for.
-      let createdCount = 0
-      for (let i = 0; i < schedule.length; i++) {
-        const row = schedule[i]
-        const { error } = await supabase.from('fh_invoices').insert({
-          contact_id: contact.id,
-          user_id: userId,
-          sequence_number: 0, // trigger assigns next
-          title: row.title,
-          amount: row.amount,
-          status: 'draft',
-          notes: row.notes
-        })
-        if (error) throw error
-        createdCount++
-      }
+      const { error } = await supabase.from('fh_invoices').insert(schedule.map((row) => ({
+        contact_id: contact.id,
+        user_id: userId,
+        sequence_number: 0, // trigger assigns next
+        title: row.title,
+        amount: row.amount,
+        status: 'draft',
+        notes: row.notes
+      })))
+      if (error) throw error
       toastSuccess(
-        `Generated ${createdCount} ${countNoun(createdCount, 'draw')}`,
+        `Generated ${schedule.length} ${countNoun(schedule.length, 'draw')}`,
         `Filled from the payment terms: ${schedule.map((d) => money(d.amount)).join(', ')}`
       )
       await fetchDraws()
     } catch (e: any) {
       toastError("Couldn't generate draws", e?.message || 'Try again.')
+      // The write may have reached the server with its answer lost. Read
+      // the draws again before Generate is offered, so a retry cannot add
+      // a second set.
+      await fetchDraws()
     } finally {
       setBusyId(null)
     }
