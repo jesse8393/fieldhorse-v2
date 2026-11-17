@@ -287,6 +287,26 @@ describe('buildHomeDashboardBundle', () => {
     expect(action?.detail).toBe('$5,000 owed')
   })
 
+  // M-20: the owed line keeps the cents.
+  it('says what is owed to the cent', () => {
+    const bundle = buildHomeDashboardBundle(baseSource({
+      contacts: [{
+        id: 'job-1',
+        name: 'Deck build',
+        amount: 25000,
+        stage: 'job',
+        created_at: '2026-05-01T12:00:00.000Z',
+        updated_at: '2026-06-01T12:00:00.000Z',
+        completed_at: '2026-05-20T12:00:00.000Z',
+        follow_up_on: null,
+        proposal_status: null,
+      }],
+      payments: [{ contact_id: 'job-1', amount: 20000.5, created_at: '2026-05-21T12:00:00.000Z', paid_on: '2026-05-21' }],
+    }))
+    const action = bundle.nextActions.find((row) => row.kind === 'invoice')
+    expect(action?.detail).toBe('$4,999.50 owed')
+  })
+
   it('counts weekly collections by paid_on, and only within the current week', () => {
     const bundle = buildHomeDashboardBundle(baseSource({
       // now = Thursday 2026-06-18; week starts Sunday 2026-06-14.

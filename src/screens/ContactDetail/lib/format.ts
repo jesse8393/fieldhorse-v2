@@ -6,12 +6,12 @@
  * redeclaring.
  */
 
+import { moneyExact } from '../../../lib/format.ts'
+
+// Exact to the cent (M-20): the Overview's contract card read "$5,001
+// collected" and "$5,000 remaining" on a $10,000 job paid $5,000.50.
 export function money(n: number | string | null | undefined) {
-  return Number(n || 0).toLocaleString(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0
-  })
+  return moneyExact(n)
 }
 
 export function fmtSize(n: number | null | undefined) {

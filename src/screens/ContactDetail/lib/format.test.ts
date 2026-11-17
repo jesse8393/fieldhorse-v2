@@ -14,9 +14,12 @@ describe('money', () => {
     expect(money('' as any)).toBe('$0')
   })
 
-  it('accepts numeric strings and rounds (no fractional dollars)', () => {
-    expect(money('1234.56')).toBe('$1,235')
-    expect(money('1234.49')).toBe('$1,234')
+  // M-20: job money is exact to the cent. A $4,999.50 balance read
+  // "$5,000", so this used to expect whole dollars.
+  it('accepts numeric strings and keeps the cents', () => {
+    expect(money('1234.56')).toBe('$1,234.56')
+    expect(money('1234.49')).toBe('$1,234.49')
+    expect(money(4999.5)).toBe('$4,999.50')
   })
 
   it('keeps the sign for credits / negative amounts', () => {

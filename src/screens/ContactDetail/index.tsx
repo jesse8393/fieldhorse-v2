@@ -38,6 +38,7 @@ import { useIsDesktop } from '../../lib/useMediaQuery.ts'
 import { useHideDock } from '../../lib/dockVisibility.ts'
 import { openCapture } from '../../lib/captureAttach.ts'
 import { jobMoney } from './lib/spine.ts'
+import { money } from './lib/format.ts'
 import { assignedCrewIds, railNotes } from './lib/jobDesktop.ts'
 import JobHeaderPhone, { JobSectionTabs } from './phone/JobHeaderPhone.tsx'
 import JobActionCapsule from './phone/JobActionCapsule.tsx'
@@ -141,12 +142,6 @@ function readJobActionIntent(raw: string | null): JobActionIntent | null {
   return Object.prototype.hasOwnProperty.call(JOB_ACTION_INTENTS, raw)
     ? (raw as JobActionIntent)
     : null
-}
-
-function money(n: any) {
-  return Number(n || 0).toLocaleString(undefined, {
-    style: 'currency', currency: 'USD', maximumFractionDigits: 0
-  })
 }
 
 function ActionIntentBanner({

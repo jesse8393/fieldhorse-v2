@@ -811,3 +811,29 @@ test('the desktop job page has one control named Schedule', async ({ context, pa
   const named = page.locator('#fh-main').locator('button, [role="tab"], a').filter({ hasText: /^Schedule$/ })
   await expect(named).toHaveCount(1)
 })
+
+// M-20: the Overview's contract card keeps cents on what was collected
+// and what remains, as Log payment does.
+test('the contract card shows cents', async ({ context, page }) => {
+  const job = {
+    id: 'c-card', stage: 'job', name: 'Whitcomb', job_title: 'Garage slab', amount: 10000,
+    user_id: 'qa-user-1', client_id: null, phone: '615 555 0148', email: 'd@w.com', address: '2210 Ridgecrest Dr',
+    created_at: '2026-09-23T15:00:00.000Z', updated_at: '2026-10-09T15:00:00.000Z', completed_at: null,
+    proposal_status: 'approved', milestones: [], follow_up_on: null, notes: null, scope_text: null
+  }
+  await signIn(context, {
+    tables: {
+      fh_contacts: [job], fh_clients: [], fh_invoices: [], fh_schedule: [], fh_change_orders: [],
+      fh_payments: [{ id: 'p1', user_id: 'qa-user-1', contact_id: 'c-card', amount: 5000.5, method: 'check', reference: '1', paid_on: '2026-09-30', created_at: '2026-09-30T15:00:00.000Z' }]
+    }
+  })
+  // The phone page and the desktop build both carry the Overview.
+  await page.goto('/jobs/c-card', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByRole('button', { name: 'More about this job' })).toBeVisible({ timeout: 30_000 })
+  await openMoreAboutJob(page)
+  const card = page.locator('.cockpit-headline')
+  await expect(card).toBeVisible({ timeout: 30_000 })
+  await expect(card.locator('.cockpit-headline__amt')).toHaveText('$10,000')
+  await expect(card.locator('.cockpit-headline__bar-meta')).toContainText('$5,000.50 collected')
+  await expect(card.locator('.cockpit-headline__bar-meta')).toContainText('$4,999.50 remaining')
+})

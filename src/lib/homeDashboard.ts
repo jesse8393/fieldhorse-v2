@@ -7,6 +7,7 @@ import { chunkIds, fetchAllRows } from './queries.ts'
 import { useOrgScope } from './orgScope.ts'
 import { OPEN_INVOICE_STATUSES, amountsDueByInvoice, knownContractTotal } from './invoiceSettlement.ts'
 import { classifyInvoice } from './moneyView.ts'
+import { moneyExact } from './format.ts'
 import type { RecordKind } from './records.ts'
 import type { Database } from './database.types.ts'
 
@@ -426,7 +427,7 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
       title: `Chase invoice for ${contact.name || 'job'}`,
       // The remaining balance, not the full contract, a $25K job with
       // $20K collected is owed $5K, and that's the number to chase.
-      detail: `$${Math.round(owed).toLocaleString()} owed`,
+      detail: `${moneyExact(owed)} owed`,
       urgencyLabel: 'Invoice pending',
       urgencyTone: 'success',
       urgency: updated.getTime(),
