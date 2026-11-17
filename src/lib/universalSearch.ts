@@ -27,6 +27,7 @@ import { lastKnownOrg } from './orgScope.ts'
 import { recordRoute } from './records.ts'
 import type { PaletteJob } from './paletteActions.ts'
 import { canSeeFinancials, canViewRoute, type OrgRole } from './permissions.ts'
+import { moneyCents } from './format.ts'
 
 const PER_KIND = 6
 
@@ -59,9 +60,10 @@ function fmtDateShort(iso: string | null | undefined) {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
+// A record's amount to the cent, the figure the record shows (formats-3).
 function fmtMoney(amount: unknown) {
   const n = Number(amount || 0)
-  return n ? `$${Math.round(n).toLocaleString()}` : null
+  return n ? moneyCents(n) : null
 }
 
 /** 'changes_requested' as 'Changes requested'. */

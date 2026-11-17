@@ -13,6 +13,7 @@ import BuildTopbar from './BuildTopbar.tsx'
 import MiniMetric from '../MiniMetric.tsx'
 import { SkeletonList } from '../Skeleton.tsx'
 import { activityBucketLabel } from '../../lib/activityTime.ts'
+import { moneyCents } from '../../lib/format.ts'
 
 type ActivityEvent = {
   id: string
@@ -46,14 +47,8 @@ const FILTERS = [
   { id: 'change', label: 'Changes', match: (event: ActivityEvent) => event.kind.startsWith('co_') },
 ]
 
-function money(value: number) {
-  return Number(value || 0).toLocaleString(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  })
-}
+// Collected to the cent, like the payments it adds up (formats-3).
+const money = moneyCents
 
 function eventType(event: ActivityEvent) {
   if (event.kind === 'payment') return 'Payment'

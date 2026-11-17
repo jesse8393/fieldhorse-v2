@@ -29,16 +29,12 @@ import { Eyebrow } from '../components/v3'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { activityBucketLabel, paymentEventTime } from '../lib/activityTime.ts'
 import SnowActivityBuild from '../components/desktop/SnowActivityBuild.tsx'
+import { moneyCents } from '../lib/format.ts'
 
 const PAGE_SIZE = 60
 
-function money(n: any) {
-  const v = Number(n || 0)
-  return v.toLocaleString(undefined, {
-    style: 'currency', currency: 'USD',
-    minimumFractionDigits: 0, maximumFractionDigits: 0
-  })
-}
+// A record's amount to the cent, the figure the invoice shows (formats-3).
+const money = moneyCents
 
 function capitalize(s: any) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : '' }
 

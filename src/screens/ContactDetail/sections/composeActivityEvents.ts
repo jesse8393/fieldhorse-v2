@@ -14,6 +14,7 @@
 // insertion order (kind precedence).
 
 import { parseDateOnly, todayYmd } from '../../../lib/dates.ts'
+import { moneyCents } from '../../../lib/format.ts'
 
 export type ActivityEvent = {
   id: string
@@ -39,13 +40,8 @@ function kindLabel(k: string | null | undefined) {
   return map[k] || ''
 }
 
-function money(n: number | string | null | undefined) {
-  const v = Number(n || 0)
-  return v.toLocaleString(undefined, {
-    style: 'currency', currency: 'USD',
-    minimumFractionDigits: 0, maximumFractionDigits: 0
-  })
-}
+// A payment or change order to the cent, the figure its row shows (formats-3).
+const money = moneyCents
 
 // When a payment happened. paid_on is a date only column, and
 // new Date('2026-06-01') parses as UTC midnight, the previous evening in

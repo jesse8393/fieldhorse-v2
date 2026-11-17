@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 import { USER } from '../../scripts/qa-mock.mjs'
 import { nothingRunsOffTheSide } from './helpers/overflow.ts'
+import { NOW as FORMATS_NOW, TABLES as FORMATS_TABLES } from './helpers/formatsSeed.ts'
 
 test('phone note actions fit, support keyboard archive and confirm both delete paths', async ({ context, page }, testInfo) => {
   test.skip(!testInfo.project.name.startsWith('mobile'), 'Phone report actions')
@@ -242,4 +243,19 @@ test('failed job lookup does not classify every report as an unavailable job', a
   await page.getByRole('button', { name: 'Retry job lookup', exact: true }).click()
   await expect(page.getByRole('combobox', { name: 'History job', exact: true })).toBeEnabled()
   await expect(history.locator('details')).toHaveCount(0)
+})
+
+// formats-3: Activity and Search name a record's amount to the cent, the
+// figure the invoice and the payment row show.
+test('Activity and Search keep the cents', async ({ context, page }) => {
+  await signIn(context, { tables: FORMATS_TABLES })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  await page.goto('/activity', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText('$1,000.50 received').first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText('$1,001 received')).toHaveCount(0)
+  await page.goto('/search', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await page.getByPlaceholder(/Jobs, clients/).fill('Harold')
+  await expect(page.getByText(/\$12,345\.50/).first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText(/\$4,115\.17/).first()).toBeVisible()
+  await expect(page.getByText(/\$12,346\b/)).toHaveCount(0)
 })

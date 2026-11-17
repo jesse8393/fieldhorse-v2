@@ -5,6 +5,7 @@ import type { OrgRole } from './permissions.ts'
 const db = vi.hoisted(() => ({
   reads: [] as { table: string; columns: string; filters: [string, string][] }[],
   failedTable: '',
+  amount: 12345 as number,
 }))
 
 vi.mock('./orgScope.ts', () => ({ lastKnownOrg: () => 'org-1' }))
@@ -22,7 +23,7 @@ vi.mock('./supabase.ts', () => ({ supabase: { from: (table: string) => {
       // Deliberately include amount even when omitted from select, proving
       // display filtering as well as the actual requested columns.
       return {
-        data: [{ id: 'record-1', name: 'Assigned job', title: 'Site work', stage: 'job', amount: 12345, text: 'Site note', filename: 'Plan.pdf' }],
+        data: [{ id: 'record-1', name: 'Assigned job', title: 'Site work', stage: 'job', amount: db.amount, text: 'Site note', filename: 'Plan.pdf' }],
         error: table === db.failedTable ? { message: 'Read refused' } : null,
       }
     },
@@ -30,7 +31,7 @@ vi.mock('./supabase.ts', () => ({ supabase: { from: (table: string) => {
   return builder
 } } }))
 
-beforeEach(() => { db.reads = []; db.failedTable = '' })
+beforeEach(() => { db.reads = []; db.failedTable = ''; db.amount = 12345 })
 
 describe('search role boundaries', () => {
   it.each<OrgRole>(['crew', 'foreman'])('keeps %s search useful without requesting restricted records or amounts', async role => {
@@ -75,5 +76,24 @@ describe('search role boundaries', () => {
     try {
       await expect(universalSearch('Site', 'user-1', 'org-1', 'owner')).rejects.toThrow("Search isn't working right now")
     } finally { warning.mockRestore() }
+  })
+})
+
+// formats-3: Search names a record's amount to the cent, the figure the
+// record itself shows, never rounded to whole dollars.
+describe('search money', () => {
+  it('keeps the cents on jobs, quotes and invoices', async () => {
+    db.amount = 12345.5
+    const result = await universalSearch('Site', 'user-1', 'org-1', 'owner')
+    expect(result.jobs[0].sub).toContain('$12,345.50')
+    expect(result.quotes[0].sub).toContain('$12,345.50')
+    expect(result.invoices[0].sub).toContain('$12,345.50')
+    expect(result.jobs[0].sub).not.toContain('$12,346')
+  })
+
+  it('prints a whole amount with .00', async () => {
+    db.amount = 4200
+    const result = await universalSearch('Site', 'user-1', 'org-1', 'owner')
+    expect(result.invoices[0].sub).toContain('$4,200.00')
   })
 })
