@@ -115,3 +115,18 @@ test.describe('Reports read the four records', () => {
     await expect(page.getByText('collection rate YTD', { exact: true })).toHaveCount(0)
   })
 })
+
+// OPS-07: Log miles showed and used $0.67, the 2024 rate. It now uses the
+// rate for the date the drive happened, from the same table Reports reads.
+test('log miles shows and computes the IRS rate for the drive date', async ({ context, page }) => {
+  await page.clock.setFixedTime(new Date('2026-11-16T18:00:00Z'))
+  await signIn(context)
+  await page.goto('/miles/new')
+  await expect(page.getByText(/on this date is \$0\.76 deducted/)).toBeVisible()
+  await expect(page.getByText(/\$0\.67/)).toHaveCount(0)
+  await page.getByLabel('Miles', { exact: true }).fill('100')
+  await expect(page.getByText('Deduction $76.00', { exact: true })).toBeVisible()
+  await page.getByLabel('Date', { exact: true }).fill('2026-03-02')
+  await expect(page.getByText(/on this date is \$0\.725 deducted/)).toBeVisible()
+  await expect(page.getByText('Deduction $72.50', { exact: true })).toBeVisible()
+})

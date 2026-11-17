@@ -34,7 +34,7 @@ export default function NextActionCard({
   title,
   date,
   dueIso,
-  cta = 'Mark Complete',
+  cta = 'Mark complete',
   onComplete,
   onSchedule,
   loading

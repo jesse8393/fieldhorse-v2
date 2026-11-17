@@ -3,7 +3,7 @@ import { Clock, Play, Square, AlertTriangle } from 'lucide-react'
 import { supabase } from '../lib/supabase.ts'
 import { todayYmd } from '../lib/dates.ts'
 import { recalcCost } from '../lib/stages.ts'
-import { ALREADY_CLOCKED_OUT, getActivePunchForContact, punchIn as dbPunchIn, punchOut as dbPunchOut } from '../lib/timePunches.ts'
+import { ALREADY_CLOCKED_OUT, fetchMyDefaultRate, getActivePunchForContact, punchIn as dbPunchIn, punchOut as dbPunchOut } from '../lib/timePunches.ts'
 import { laborBooksAsExpense } from '../lib/labor.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { hapticTap, hapticSuccess } from '../lib/haptics.ts'
@@ -216,10 +216,13 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
         let id = punchId
         if (!id) id = (await getActivePunchForContact(userId, contact.id))?.id || null
         if (!id) throw new Error('No open shift found on this job. Refresh and try again.')
+        // The rate is the one the member's manager set, as the /crew clock
+        // stamps it, never one typed here (OPS-01).
+        const memberRate = await fetchMyDefaultRate(userId, contact.org_id).catch(() => null)
         try {
           await dbPunchOut({
             punchId: id,
-            hourlyRate: rate,
+            hourlyRate: memberRate ?? undefined,
             notes: note.trim() || null,
           })
         } catch (punchErr: any) {
@@ -236,7 +239,7 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
           return
         }
       }
-      writePreferredRate(rate)
+      if (bookAsExpense) writePreferredRate(rate)
       writeActiveStart(contact.id, null)
       setStart(null)
       setPunchId(null)
@@ -245,7 +248,7 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
       hapticSuccess()
       toastSuccess(
         'Time logged',
-        `${hours.toFixed(2)} ${countNoun(hours, 'hr')} · $${billable.toLocaleString()}`
+        `${hours.toFixed(2)} ${countNoun(hours, 'hr')}${bookAsExpense ? ` · $${billable.toLocaleString()}` : ''}`
           + (endedElsewhere ? '. The shift had already been clocked out elsewhere, so its end time stays as it was.' : '')
       )
       // Refresh job cost / margin
@@ -303,7 +306,7 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
           <button
             type="button"
             onClick={handleStopRequest}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 12px', borderRadius: 10, border: 'none', background: 'var(--alert-red)', color: '#F2EDE4', fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: 0, cursor: 'pointer' }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 12px', borderRadius: 10, border: 'none', minHeight: 44, background: 'var(--alert-red)', color: '#F2EDE4', fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: 0, cursor: 'pointer' }}
           >
             <Square size={12} /> Clock out
           </button>
@@ -315,7 +318,9 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
           <div style={{ fontSize: 12, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)' }}>
             Logging <strong style={{ color: 'var(--ink-strong)' }}>{fmtElapsed(elapsedMs)}</strong> {bookAsExpense ? 'as a Labor expense' : 'as crew time'} on this job.
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          {/* Only the job's owner books labor at a rate typed here. Anyone
+              else's shift is priced at the rate their manager set. */}
+          {bookAsExpense && <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <Eyebrow style={{ color: 'var(--ink-muted)' }}>Hourly rate</Eyebrow>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -337,7 +342,7 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
                 ${billablePreview.toLocaleString(undefined, { maximumFractionDigits: 2 })}
               </span>
             </div>
-          </div>
+          </div>}
           <input
             type="text"
             value={note}
@@ -355,15 +360,15 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
               type="button"
               onClick={handleCancel}
               disabled={saving}
-              style={{ padding: '8px 12px', borderRadius: 10, border: '1px solid var(--rule)', background: 'transparent', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 12, cursor: 'pointer' }}
+              style={{ padding: '8px 12px', minHeight: 44, borderRadius: 10, border: '1px solid var(--rule)', background: 'transparent', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 12, cursor: 'pointer' }}
             >
               Keep running
             </button>
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={saving || rate <= 0}
-              style={{ padding: '8px 12px', borderRadius: 10, border: 'none', background: saving ? 'rgba(45, 122, 79,0.5)' : 'var(--signal-green)', color: '#F2EDE4', fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: 0, cursor: saving ? 'default' : 'pointer' }}
+              disabled={saving || (bookAsExpense && rate <= 0)}
+              style={{ padding: '8px 12px', minHeight: 44, borderRadius: 10, border: 'none', background: saving ? 'rgba(45, 122, 79,0.5)' : 'var(--signal-green)', color: '#F2EDE4', fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: 0, cursor: saving ? 'default' : 'pointer' }}
             >
               {saving ? 'Logging…' : 'Log time'}
             </button>

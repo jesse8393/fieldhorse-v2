@@ -991,10 +991,12 @@ test.describe('Job Files tab', () => {
       if (kind === 'photo') {
         await shown(second).click()
         await page.getByRole('button', { name: 'Delete photo', exact: true }).click()
+        await page.waitForTimeout(600) // a second tap within 500 ms is ignored (OPS-02)
         await page.getByRole('button', { name: 'Tap again to delete', exact: true }).click()
       } else {
         const row = panel(page, name).getByRole('listitem').filter({ hasText: second })
         await row.getByRole('button', { name: 'Delete file' }).click()
+        await page.waitForTimeout(600) // a second tap within 500 ms is ignored (OPS-02)
         await row.getByRole('button', { name: 'Tap again to delete' }).click()
       }
       await expect(page.getByRole('dialog')).toHaveCount(0)

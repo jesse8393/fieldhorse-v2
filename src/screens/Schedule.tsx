@@ -1,20 +1,23 @@
 import WorkspaceHelp from '../components/experience/WorkspaceHelp.tsx'
-import { eventAssignees } from '../lib/scheduleAllocation.ts'
+import { eventAssignees, canAllocateCrew } from '../lib/scheduleAllocation.ts'
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { Plus, Calendar as CalendarIcon, Clock, MapPin, ChevronLeft, ChevronRight, Trash2, Pencil } from 'lucide-react'
 import { toast, toastSuccess, toastUndo, toastError } from '../lib/toast.ts'
 import { SkeletonList } from '../components/Skeleton.tsx'
+import DataErrorState from '../components/DataErrorState.tsx'
 import { ScreenCloser, Eyebrow } from '../components/v3'
 import { Button, Chip, EmptyState } from '../components/fh'
 import { useArmedId } from '../lib/secondTap.ts'
 import { supabase } from '../lib/supabase.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
+import { useMembership } from '../contexts/MembershipContext.tsx'
+import { invalidateVisitReads } from '../lib/scheduleWrite.ts'
 import {
   useScheduleEvents,
   useUpcomingEvents,
-  useInvalidateSchedule,
   useDropScheduleEvent,
   useBookedVisits,
   useCompanyJobs
@@ -125,7 +128,8 @@ export default function Schedule() {
   // is scheduled only after a read that found nothing.
   const upcomingQuery = useUpcomingEvents(user?.id)
   const upcoming = upcomingQuery.data ?? []
-  const invalidateSchedule = useInvalidateSchedule()
+  const queryClient = useQueryClient()
+  const invalidateSchedule = () => invalidateVisitReads(queryClient)
   const dropScheduleEvent = useDropScheduleEvent()
   const loading = eventsPending
   // The desktop board also waits while a new week or day loads: until then
@@ -141,8 +145,16 @@ export default function Schedule() {
   // Adding and editing a visit are screens of their own (Phase 9, Task 13,
   // D57): /schedule/new, with ?job= and ?title= when the desktop tray's
   // Schedule button names the visit after its job, and /schedule/:id/edit.
+  // Only the roles that plan crew add, change or remove visits (OPS-04).
+  // Crew and foremen see the schedule and open the work.
+  const membership = useMembership()
+  const mayPlan = canAllocateCrew(membership.role)
+  const mayOpenSales = membership.canSeeFinancials
+
   function openNewEvent(preset?: { contactId: string; title: string }) {
     const sp = new URLSearchParams()
+    // The day picked on the Schedule (OPS-10).
+    sp.set('date', dayKey(cursor))
     if (preset) {
       sp.set('job', preset.contactId)
       if (preset.title) sp.set('title', preset.title)
@@ -153,6 +165,20 @@ export default function Schedule() {
   function openEditEvent(event: any) {
     if (event?.id) navigate(`/schedule/${encodeURIComponent(event.id)}/edit`)
   }
+  // A visit opens what it is for: the job, the lead or the quote (OPS-17).
+  // A visit for nothing opens its own edit screen for those who plan.
+  function recordRouteFor(event: any): string | null {
+    if (event?.contact_id) return `/jobs/${encodeURIComponent(event.contact_id)}`
+    if (event?.lead_id && mayOpenSales) return `/leads/${encodeURIComponent(event.lead_id)}`
+    if (event?.quote_id && mayOpenSales) return `/quotes/${encodeURIComponent(event.quote_id)}`
+    return null
+  }
+  function openVisit(event: any) {
+    const to = recordRouteFor(event)
+    if (to) navigate(to)
+    else if (mayPlan) openEditEvent(event)
+  }
+  const canOpenVisit = (event: any) => !!recordRouteFor(event) || mayPlan
   // Delete asks with a second tap on the row's own button (D57).
   const deleteTap = useArmedId()
 
@@ -173,21 +199,22 @@ export default function Schedule() {
     if (!evtId) return
     deleteTap.tap(String(evtId), () => { void deleteEvent(evtId) })
   }
+  // A whole recurring series is removed only from its own, separately
+  // labelled button (OPS-03).
+  function requestDeleteSeries(seriesId: any) {
+    if (!seriesId) return
+    deleteTap.tap(`series:${seriesId}`, () => { void deleteSeries(seriesId) })
+  }
 
-  async function deleteEvent(evtId: any) {
-    if (!evtId) return
-    // Snapshot before deletion so Undo can re-insert. Strip generated
-    // fields and the joined relation; only re-insert the source row.
-    const snapshot = (events || []).find((e: any) => e.id === evtId) || (upcoming || []).find((e: any) => e.id === evtId)
-
-    // Recurring series: delete every occurrence sharing the series id
-    // (stored in `recurring`) so we don't orphan the other rows, and
-    // restore the whole series on Undo.
+  async function deleteSeries(seriesId: any) {
+    if (!seriesId) return
+    const snapshot = (events || []).find((e: any) => e.recurring === seriesId) || (upcoming || []).find((e: any) => e.recurring === seriesId)
+    // Every occurrence sharing the series id (stored in `recurring`), and
+    // Undo restores the whole series.
     // No user_id filter: the schedule is company wide (RLS scopes the
     // org), so a teammate's event must delete too. .select('id') turns a
     // zero row delete into a visible failure instead of a false success.
-    const seriesId = (snapshot as any)?.recurring
-    if (seriesId) {
+    {
       const { data: seriesRows } = await supabase
         .from('fh_schedule').select('*').eq('recurring', seriesId)
       const { data: removed, error: serr } = await supabase
@@ -196,7 +223,7 @@ export default function Schedule() {
       if (!removed?.length) { toastError("Couldn't delete", 'This series was not removed. Refresh and try again.'); return }
       for (const r of removed) dropScheduleEvent((r as any).id)
       const n = removed.length
-      toastUndo(`Series deleted · ${n} event${n === 1 ? '' : 's'}`, {
+      toastUndo(`Series deleted, ${n} ${n === 1 ? 'visit' : 'visits'}`, {
         description: snapshot?.title || 'Tap Undo to restore',
         onUndo: async () => {
           // eslint-disable-next-line no-unused-vars
@@ -209,9 +236,15 @@ export default function Schedule() {
           toastSuccess('Restored', snapshot?.title || '')
         }
       })
-      return
     }
+  }
 
+  async function deleteEvent(evtId: any) {
+    if (!evtId) return
+    // Snapshot before deletion so Undo can re-insert. Strip generated
+    // fields and the joined relation; only re-insert the source row.
+    // One visit of a series is removed alone, by its id.
+    const snapshot = (events || []).find((e: any) => e.id === evtId) || (upcoming || []).find((e: any) => e.id === evtId)
     const { data: removed, error } = await supabase.from('fh_schedule').delete().eq('id', evtId).select('id')
     if (error) {
       toastError("Couldn't delete", error.message)
@@ -238,6 +271,23 @@ export default function Schedule() {
       }
     })
   }
+
+  // How many visits each recurring series on screen has, for the
+  // "Delete all N visits" button. Under the schedule key, so every visit
+  // write refreshes it.
+  const seriesIds = useMemo(() => [...new Set((events || []).map((e: any) => e.recurring).filter(Boolean))].sort() as string[], [events])
+  const seriesCountsQuery = useQuery({
+    queryKey: ['schedule', 'seriesCounts', seriesIds],
+    enabled: mayPlan && seriesIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('fh_schedule').select('id, recurring').in('recurring', seriesIds)
+      if (error) throw error
+      const counts: Record<string, number> = {}
+      for (const row of (data ?? []) as { recurring: string | null }[]) if (row.recurring) counts[row.recurring] = (counts[row.recurring] || 0) + 1
+      return counts
+    }
+  })
+  const seriesCounts = seriesCountsQuery.data ?? {}
 
   const hasCoords = profile?.location_lat != null && profile?.location_lon != null
 
@@ -367,9 +417,11 @@ export default function Schedule() {
           }}>
             Schedule
           </h1>
-          <Button variant="primary" size="mini" icon={Plus} onClick={() => openNewEvent()}>
-            New event
-          </Button>
+          {mayPlan && (
+            <Button variant="primary" size="mini" icon={Plus} onClick={() => openNewEvent()}>
+              New event
+            </Button>
+          )}
         </div>
         {upcoming.length > 0 && (
           <div style={{
@@ -526,25 +578,40 @@ export default function Schedule() {
       <SwipeShell onShift={shift}>
         <motion.div variants={item} style={{ padding: '0 var(--v3-gutter) 24px' }}>
           {loading && events == null && <SkeletonList rows={5} card={false} />}
+          {/* A failed first read says so, never a blank day (OPS-18). */}
+          {eventsFailed && events == null && (
+            <DataErrorState
+              title="Couldn't load the schedule"
+              message="Check your connection and try again."
+              actionLabel="Try again"
+              onRetry={() => { void refetchEvents() }}
+            />
+          )}
           {events != null && view === 'day' && (
             <DayView
               events={events}
               now={new Date()}
-              onClick={(id: any) => navigate(`/jobs/${id}`)}
-              onEdit={openEditEvent}
-              onDelete={requestDeleteEvent}
+              onOpen={openVisit}
+              canOpen={canOpenVisit}
+              onEdit={mayPlan ? openEditEvent : undefined}
+              onDelete={mayPlan ? requestDeleteEvent : undefined}
+              onDeleteSeries={mayPlan ? requestDeleteSeries : undefined}
+              seriesCounts={seriesCounts}
               deleteArmedId={deleteTap.armedId}
-              onAdd={() => openNewEvent()}
+              onAdd={mayPlan ? () => openNewEvent() : undefined}
             />
           )}
           {events != null && view === 'week' && (
             <WeekView
               start={range.start}
               events={events}
-              onClick={(id: any) => navigate(`/jobs/${id}`)}
-              onEdit={openEditEvent}
+              onOpen={openVisit}
+              canOpen={canOpenVisit}
+              onEdit={mayPlan ? openEditEvent : undefined}
               onDay={(day: Date) => { setCursor(startOfDay(day)); setView('day') }}
-              onDelete={requestDeleteEvent}
+              onDelete={mayPlan ? requestDeleteEvent : undefined}
+              onDeleteSeries={mayPlan ? requestDeleteSeries : undefined}
+              seriesCounts={seriesCounts}
               deleteArmedId={deleteTap.armedId}
             />
           )}
@@ -564,7 +631,7 @@ export default function Schedule() {
         </motion.div>
       </SwipeShell>
 
-      <MobileUnscheduledJobs onSchedule={(job) => openNewEvent({ contactId: job.id, title: jobLabel(job) })} />
+      {mayPlan && <MobileUnscheduledJobs onSchedule={(job) => openNewEvent({ contactId: job.id, title: jobLabel(job) })} />}
       <ScreenCloser caption="Tap a day above to plan the week ahead." />
       <div style={{ margin: '0 20px' }}><WorkspaceHelp topic="schedule" /></div>
     </motion.div>
@@ -651,7 +718,7 @@ const chevBtnStyle = {
   WebkitTapHighlightColor: 'transparent'
 }
 
-function DayView({ events, now, onClick, onEdit, onDelete, deleteArmedId, onAdd }: any) {
+function DayView({ events, now, onOpen, canOpen, onEdit, onDelete, onDeleteSeries, seriesCounts, deleteArmedId, onAdd }: any) {
   // Per-status counts, drive the All/Live/Upcoming/Done toggle badges
   // and let the filter persist even when zero of a bucket exists today.
   const [stateFilter, setStateFilter] = useState('all')
@@ -665,6 +732,13 @@ function DayView({ events, now, onClick, onEdit, onDelete, deleteArmedId, onAdd 
       else c.upcoming++
     }
     return c
+  }, [events, now])
+
+  // The one visit still to come today that starts first.
+  const nextId = useMemo(() => {
+    const later = events.filter((e: any) => deriveStatus(e, now) === 'Upcoming')
+      .sort((a: any, b: any) => Date.parse(a.start_at) - Date.parse(b.start_at))
+    return later[0]?.id ?? null
   }, [events, now])
 
   const filtered = useMemo(() => {
@@ -709,7 +783,7 @@ function DayView({ events, now, onClick, onEdit, onDelete, deleteArmedId, onAdd 
             className="fhev-empty-day"
             icon={CalendarIcon}
             title="Day’s clear."
-            action={<Button icon={Plus} onClick={() => { hapticTap(); onAdd?.() }}>New event</Button>}
+            action={onAdd ? <Button icon={Plus} onClick={() => { hapticTap(); onAdd() }}>New event</Button> : undefined}
           />
         ) : (
           // Filtered-empty (events exist, just none in this bucket).
@@ -729,6 +803,7 @@ function DayView({ events, now, onClick, onEdit, onDelete, deleteArmedId, onAdd 
         <ul className="fh-timeline fhev-day" aria-label="Daily agenda" style={{ listStyle: 'none', padding: 0, margin: '0 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {filtered.map((e: any, i: any) => {
             const status = deriveStatus(e, now)
+            const isNext = status === 'Upcoming' && e.id === nextId
             const start = fmtTime(e.start_at)
             const end = e.end_at ? fmtTime(e.end_at) : null
             const primary = e.fh_contacts?.name || e.title || 'Untitled'
@@ -747,12 +822,16 @@ function DayView({ events, now, onClick, onEdit, onDelete, deleteArmedId, onAdd 
                 startStr={start}
                 endStr={end}
                 status={status}
+                upNext={isNext}
                 initial={initial}
-                onClick={() => e.contact_id ? onClick(e.contact_id) : onEdit?.(e)}
+                onClick={() => onOpen(e)}
                 onEdit={onEdit ? () => onEdit(e) : undefined}
                 onDelete={onDelete ? () => onDelete(e.id) : undefined}
                 deleteArmed={deleteArmedId === e.id}
-                isClickable={Boolean(e.contact_id || onEdit)}
+                seriesCount={e.recurring ? seriesCounts?.[e.recurring] : undefined}
+                onDeleteSeries={onDeleteSeries && e.recurring ? () => onDeleteSeries(e.recurring) : undefined}
+                seriesArmed={!!e.recurring && deleteArmedId === `series:${e.recurring}`}
+                isClickable={canOpen(e)}
               />
             )
           })}
@@ -796,7 +875,8 @@ function deriveStatus(e: any, now: any) {
 const PILL_FOR_STATUS: Record<string, any> = {
   'On Site':     { variant: 'live',    label: 'Live' },
   'In Progress': { variant: 'live',    label: 'Live' },
-  'Upcoming':    { variant: 'up',      label: 'Up next' },
+  // Later today. Only the first of these is the next visit (OPS-21).
+  'Upcoming':    { variant: 'up',      label: 'Later today' },
   'Scheduled':   { variant: 'default', label: 'Upcoming' },
   'Done':        { variant: 'done',    label: 'Done' }
 }
@@ -811,9 +891,9 @@ function splitTime(s: any) {
   return [s.slice(0, idx), s.slice(idx + 1)]
 }
 
-function ScheduleRow({ index, primary, secondary, kind, crewCount, startStr, endStr, status, onClick, onEdit, onDelete, deleteArmed, isClickable }: any) {
+function ScheduleRow({ upNext, index, primary, secondary, kind, crewCount, startStr, endStr, status, onClick, onEdit, onDelete, deleteArmed, onDeleteSeries, seriesCount, seriesArmed, isClickable }: any) {
   // Full-width event content and explicit actions remain usable with touch or keyboard.
-  const pill = PILL_FOR_STATUS[status] || PILL_FOR_STATUS.Scheduled
+  const pill = upNext ? { variant: 'up', label: 'Up next' } : (PILL_FOR_STATUS[status] || PILL_FOR_STATUS.Scheduled)
   const isLive = pill.variant === 'live'
   const [hrPart, apPart] = splitTime(startStr)
 
@@ -872,6 +952,7 @@ function ScheduleRow({ index, primary, secondary, kind, crewCount, startStr, end
           aria-pressed={deleteArmed ? true : undefined}>
           {deleteArmed ? 'Tap again' : 'Delete'}
         </Button>}
+        {onDeleteSeries && <SeriesDelete count={seriesCount} armed={seriesArmed} onTap={onDeleteSeries} />}
       </div>}
     </motion.li>
   )
@@ -879,7 +960,7 @@ function ScheduleRow({ index, primary, secondary, kind, crewCount, startStr, end
 
 // On a phone, event titles need the full reading width. A week grid
 // reduced each appointment to 30 px and left manual events with a dead tap.
-function WeekView({ start, events, onClick, onEdit, onDay, onDelete, deleteArmedId }: any) {
+function WeekView({ start, events, onOpen, canOpen, onEdit, onDay, onDelete, onDeleteSeries, seriesCounts, deleteArmedId }: any) {
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i))
     .filter(day => events.some((event: any) => sameDay(new Date(event.start_at), day)))
   if (!days.length) return <EmptyState icon={CalendarIcon} title="No visits this week. Choose a day above to plan one." />
@@ -899,19 +980,20 @@ function WeekView({ start, events, onClick, onEdit, onDay, onDelete, deleteArmed
             {dayEvents.length > 0 && <ul className="fhev-agenda__events">
               {dayEvents.map((event: any) => (
                 <li key={event.id} className="fhev-agenda__event">
-                  <button type="button" className="fhev-agenda__open" onClick={() => event.contact_id ? onClick(event.contact_id) : onEdit(event)}>
-                    <span className="fhev-agenda__time">{fmtTime(event.start_at)}{event.end_at ? ` – ${fmtTime(event.end_at)}` : ''}</span>
+                  <button type="button" className="fhev-agenda__open" disabled={!canOpen(event)} onClick={() => onOpen(event)}>
+                    <span className="fhev-agenda__time">{fmtTime(event.start_at)}{event.end_at ? ` to ${fmtTime(event.end_at)}` : ''}</span>
                     <strong>{event.title || event.fh_contacts?.name || 'Untitled event'}</strong>
                     {event.fh_contacts?.name && event.title !== event.fh_contacts.name && <span>{event.fh_contacts.name}</span>}
                     {eventAssignees(event).length > 0 && <span>{eventAssignees(event).length} crew assigned</span>}
                   </button>
-                  <div className="fhev-agenda__actions">
-                    <Button size="mini" variant="quiet" icon={Pencil} onClick={() => onEdit(event)}>Edit event</Button>
+                  {(onEdit || onDelete) && <div className="fhev-agenda__actions">
+                    {onEdit && <Button size="mini" variant="quiet" icon={Pencil} onClick={() => onEdit(event)}>Edit event</Button>}
                     {onDelete && <Button size="mini" variant="destructive" icon={Trash2}
                       aria-label={deleteArmedId === event.id ? 'Tap again to delete' : 'Delete event'}
                       aria-pressed={deleteArmedId === event.id || undefined}
                       onClick={() => onDelete(event.id)}>{deleteArmedId === event.id ? 'Tap again to delete' : 'Delete'}</Button>}
-                  </div>
+                    {onDeleteSeries && event.recurring && <SeriesDelete count={seriesCounts?.[event.recurring]} armed={deleteArmedId === `series:${event.recurring}`} onTap={() => onDeleteSeries(event.recurring)} />}
+                  </div>}
                 </li>
               ))}
             </ul>}
@@ -919,6 +1001,19 @@ function WeekView({ start, events, onClick, onEdit, onDay, onDelete, deleteArmed
         )
       })}
     </div>
+  )
+}
+
+// Removes every visit of a recurring series. Its own label says how many,
+// before the first tap, so it is never mistaken for deleting one visit.
+function SeriesDelete({ count, armed, onTap }: { count?: number; armed: boolean; onTap: () => void }) {
+  const what = count && count > 1 ? `all ${count} visits` : 'every visit in this series'
+  return (
+    <Button size="mini" variant="destructive" icon={Trash2} onClick={onTap}
+      aria-label={armed ? `Tap again to delete ${what}` : `Delete ${what}`}
+      aria-pressed={armed || undefined}>
+      {armed ? `Tap again to delete ${what}` : `Delete ${what}`}
+    </Button>
   )
 }
 

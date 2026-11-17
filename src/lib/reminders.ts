@@ -73,7 +73,8 @@ export function contactLinkFor(row: OpenReminder): { label: 'Call' | 'Text' | 'E
   return null
 }
 
-async function countUnread(userId: string, withoutReminders: boolean) {
+// The unread count, or null when it could not be read (never a false 0).
+async function countUnread(userId: string, withoutReminders: boolean): Promise<number | null> {
   let query = supabase
     .from('fh_notifications')
     .select('id', { count: 'exact', head: true })
@@ -81,7 +82,7 @@ async function countUnread(userId: string, withoutReminders: boolean) {
     .is('read_at', null)
   if (withoutReminders) query = query.not('kind', 'in', `(${REMINDER_KINDS.join(',')})`)
   const { count, error } = await query
-  if (error) return 0
+  if (error) return null
   return count || 0
 }
 
@@ -89,12 +90,14 @@ async function countUnread(userId: string, withoutReminders: boolean) {
  * What the bell shows: the clients with an open reminder plus the other
  * unread notifications, which is what the notifications screen lists. While
  * the reminder function is missing or fails, every unread notification, as
- * before. Never throws.
+ * before. Never throws. Null when the unread count could not be read, so
+ * the bell keeps its last count rather than showing a false 0.
  */
-export async function notificationBadgeCount(userId: string | undefined) {
+export async function notificationBadgeCount(userId: string | undefined): Promise<number | null> {
   if (!userId) return 0
   let reminders: OpenReminder[] | null = null
   try { reminders = await fetchOpenReminders() } catch { reminders = null }
   if (reminders === null) return countUnread(userId, false)
-  return groupRemindersByClient(reminders).length + await countUnread(userId, true)
+  const others = await countUnread(userId, true)
+  return others === null ? null : groupRemindersByClient(reminders).length + others
 }

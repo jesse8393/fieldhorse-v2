@@ -567,7 +567,7 @@ test.describe('the quote screen', () => {
     await page.getByRole('button', { name: 'Tap again to delete' }).click()
     await expect(page.getByRole('button', { name: 'Tap again to delete' })).toBeVisible()
     expect(writes).toEqual([])
-    await page.waitForTimeout(600)
+    await page.waitForTimeout(600) // a second tap within 500 ms is ignored (OPS-02)
     await page.getByRole('button', { name: 'Tap again to delete' }).click()
     await expect(page).toHaveURL(/\/quotes$/, { timeout: 15_000 })
     // One delete of the quote; its lines go with it in the database (DATA-19).

@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 let rpcAnswer: { data: unknown; error: { code?: string; message: string } | null } = { data: [], error: null }
 const counts: { filters: string[]; count: number }[] = []
 let nextCount = 0
+let countError: { message: string } | null = null
 
 vi.mock('./supabase.ts', () => ({
   supabase: {
@@ -18,7 +19,7 @@ vi.mock('./supabase.ts', () => ({
         not: (col: string, op: string, v: string) => { filters.push(`${col}=not.${op}.${v}`); return chain },
         then: (resolve: (r: unknown) => void) => {
           counts.push({ filters, count: nextCount })
-          resolve({ count: nextCount, error: null })
+          resolve(countError ? { count: null, error: countError } : { count: nextCount, error: null })
         }
       }
       return chain
@@ -43,6 +44,7 @@ beforeEach(() => {
   rpcAnswer = { data: [], error: null }
   counts.length = 0
   nextCount = 0
+  countError = null
 })
 
 describe('groupRemindersByClient', () => {
@@ -131,5 +133,13 @@ describe('notificationBadgeCount', () => {
     rpcAnswer = { data: null, error: { code: '500', message: 'Server error' } }
     nextCount = 2
     expect(await notificationBadgeCount('u1')).toBe(2)
+  })
+
+  it('answers null when the unread count cannot be read, so the bell keeps its last count', async () => {
+    countError = { message: 'Server error' }
+    rpcAnswer = { data: [reminder('Ann', 'day3', '2026-11-01')], error: null }
+    expect(await notificationBadgeCount('u1')).toBeNull()
+    rpcAnswer = { data: null, error: { code: 'PGRST202', message: 'Could not find the function' } }
+    expect(await notificationBadgeCount('u1')).toBeNull()
   })
 })

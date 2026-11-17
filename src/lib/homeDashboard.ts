@@ -202,6 +202,11 @@ export type HomeDashboardSource = {
   now: Date
   contacts: ContactRow[]
   overdueSchedules: Pick<ScheduleRow, 'contact_id'>[]
+  /**
+   * The jobs among those with a past visit that also have a visit from
+   * today on. Such a job is on track, not behind (OPS-09).
+   */
+  laterVisitContactIds?: string[]
   // ALL payments for the scope, not just this week's, paid state,
   // "chase invoice", and job-health outstanding need full history.
   payments: PaymentRow[]
@@ -312,7 +317,10 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
   const changedQuotes = openQuotes.filter((quote) => quote.status === 'changes_requested')
   const riskValue = [...quietQuotes, ...changedQuotes].reduce((sum, quote) => sum + Number(quote.amount || 0), 0)
 
-  const overdueContactIds = new Set(source.overdueSchedules.map((row) => row.contact_id).filter(Boolean) as string[])
+  // Behind means the job's visits are all in the past: a visit this
+  // morning with another tomorrow is on track.
+  const laterVisit = new Set(source.laterVisitContactIds ?? [])
+  const overdueContactIds = new Set((source.overdueSchedules.map((row) => row.contact_id).filter(Boolean) as string[]).filter((id) => !laterVisit.has(id)))
   const behind = contacts.filter((contact) => contact.stage === 'job' && overdueContactIds.has(contact.id))
 
   // All time paid per contact. The dashboard used to fetch ONLY this
@@ -867,10 +875,23 @@ export async function fetchHomeDashboard(
   assertOk('today schedule', todaySchedRes)
   assertOk('tomorrow schedule', tomorrowSchedRes)
 
+  // Of the jobs with a past visit, the ones that also have a visit from
+  // today on are on track. Read only for those jobs.
+  const pastJobIds = [...new Set(((overdueSchedRes.data ?? []) as Pick<ScheduleRow, 'contact_id'>[]).map((row) => row.contact_id).filter((id): id is string => !!id))]
+  const laterParts = await Promise.all(chunkIds(pastJobIds).map(async (chunk) => {
+    const res = await (orgId
+      ? supabase.from('fh_schedule').select('contact_id').eq('org_id', orgId)
+      : supabase.from('fh_schedule').select('contact_id').eq('user_id', userId)
+    ).in('contact_id', chunk).gte('start_at', todayStart.toISOString())
+    assertOk('later schedule', res)
+    return ((res.data ?? []) as Pick<ScheduleRow, 'contact_id'>[]).map((row) => row.contact_id).filter((id): id is string => !!id)
+  }))
+
   return buildHomeDashboardBundle({
     now,
     contacts,
     overdueSchedules: (overdueSchedRes.data ?? []) as Pick<ScheduleRow, 'contact_id'>[],
+    laterVisitContactIds: [...new Set(laterParts.flat())],
     payments,
     todaySchedules: (todaySchedRes.data ?? []) as unknown as ScheduleWithContact[],
     tomorrowSchedules: (tomorrowSchedRes.data ?? []) as unknown as ScheduleWithContact[],

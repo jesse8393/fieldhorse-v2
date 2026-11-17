@@ -4,10 +4,27 @@
 // (migration 035). A visit belongs to one record (SPEC D53, D60): a job
 // through contact_id, a lead through lead_id or a quote through quote_id.
 
+import type { QueryClient } from '@tanstack/react-query'
 import { supabase } from './supabase.ts'
 import { allocationWriteError } from './scheduleAllocation.ts'
 
+/**
+ * Every read that shows visits: the Schedule's own lists, a lead's next
+ * estimate visit and the Leads list chips, and Today. Call after any
+ * visit is saved, moved or removed, so the next screen shows it.
+ */
+export function invalidateVisitReads(client: Pick<QueryClient, 'invalidateQueries'>) {
+  for (const key of ['schedule', 'scheduleUpcoming', 'scheduleBooked', 'scheduleJobVisits', 'leadVisits', 'leadNextVisit', 'homeDashboard']) {
+    void client.invalidateQueries({ queryKey: [key] })
+  }
+}
+
 export type ScheduleEventInput = {
+  /**
+   * An id the form minted once, so a retry after a lost answer updates the
+   * same row instead of inserting it twice.
+   */
+  id?: string
   userId: string
   /** The company the visit belongs to. Null when the person has none. */
   orgId: string | null
@@ -32,6 +49,7 @@ export type CreateScheduleEventsResult = { ids: string[] } | { error: string }
 
 function row(input: ScheduleEventInput) {
   return {
+    ...(input.id ? { id: input.id } : {}),
     // Like findOrCreateClient: send the company when it is known, and
     // leave it out otherwise so the insert trigger can fill it.
     ...(input.orgId ? { org_id: input.orgId } : {}),
@@ -56,7 +74,14 @@ export async function createScheduleEvents(inputs: ScheduleEventInput[]): Promis
   if (inputs.some((i) => !i.title.trim())) return { error: 'Give the event a title.' }
   if (inputs.length === 0) return { ids: [] }
   try {
-    const { data, error } = await supabase.from('fh_schedule').insert(inputs.map(row)).select('id')
+    // With the form's own ids, write as an upsert on id: the retry of a
+    // save that reached the server lands on the same rows.
+    const rows = inputs.map(row)
+    const table = supabase.from('fh_schedule')
+    const { data, error } = await (inputs.every((i) => i.id)
+      ? table.upsert(rows, { onConflict: 'id' })
+      : table.insert(rows)
+    ).select('id')
     if (error) return { error: allocationWriteError(error) }
     const ids = ((data ?? []) as { id: string }[]).map((r) => r.id)
     if (ids.length === 0) return { error: 'The event was not saved. Try again.' }

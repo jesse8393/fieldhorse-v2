@@ -6,44 +6,89 @@
 
 import { supabase } from './supabase.ts'
 
-export async function fetchInbox(limit = 30, userId?: string) {
+/**
+ * One page of the inbox, newest first. Pass the created_at of the last
+ * row shown as `before` for the next page.
+ */
+export async function fetchInbox(limit = 30, userId?: string, before?: string | null) {
   if (!userId) return []
-  const { data, error } = await supabase
+  let query = supabase
     .from('fh_notifications')
     .select('id, kind, title, body, link, read_at, created_at, actor_user_id')
     .eq('user_id', userId)
+  if (before) query = query.lt('created_at', before)
+  const { data, error } = await query
     .order('created_at', { ascending: false })
     .limit(limit)
   if (error) throw error
   return data || []
 }
 
-export async function unreadCount(userId?: string) {
+/** The unread count, or null when it could not be read (never a false 0). */
+export async function unreadCount(userId?: string): Promise<number | null> {
   if (!userId) return 0
   const { count, error } = await supabase
     .from('fh_notifications')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId)
     .is('read_at', null)
-  if (error) return 0
+  if (error) return null
   return count || 0
 }
 
-// Both throw when the write fails, so the screen can put the rows back.
+// The bell listens for this so its count follows a read on the
+// notifications screen without waiting for a realtime event, which a
+// phone with a dropped socket never gets (OPS-12).
+export const NOTIFICATIONS_CHANGED = 'fh:notifications-changed'
+
+function announceChange() {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED))
+}
+
+// Each throws when the write fails, so the screen can put the rows back
+// and say so (AUTO-18, OPS-13), and each tells the bell to count again.
 export async function markRead(id: string | undefined, userId: string | undefined) {
   if (!id || !userId) return
-  const { error } = await supabase.from('fh_notifications').update({ read_at: new Date().toISOString() }).eq('id', id).eq('user_id', userId)
-  if (error) throw error
+  try {
+    const { error } = await supabase.from('fh_notifications').update({ read_at: new Date().toISOString() }).eq('id', id).eq('user_id', userId)
+    if (error) throw error
+  } finally {
+    announceChange()
+  }
 }
 
 export async function markAllRead(userId: string | undefined) {
   if (!userId) return
-  const { error } = await supabase
-    .from('fh_notifications')
-    .update({ read_at: new Date().toISOString() })
-    .eq('user_id', userId)
-    .is('read_at', null)
-  if (error) throw error
+  try {
+    const { error } = await supabase
+      .from('fh_notifications')
+      .update({ read_at: new Date().toISOString() })
+      .eq('user_id', userId)
+      .is('read_at', null)
+    if (error) throw error
+  } finally {
+    announceChange()
+  }
+}
+
+/**
+ * Mark the given notifications read: the rows on screen, never ones the
+ * person has not seen (DATA-16). The notifications screen's Mark all read
+ * uses this, not markAllRead.
+ */
+export async function markIdsRead(ids: string[], userId: string | undefined) {
+  if (!userId || ids.length === 0) return
+  try {
+    const { error } = await supabase
+      .from('fh_notifications')
+      .update({ read_at: new Date().toISOString() })
+      .eq('user_id', userId)
+      .in('id', ids)
+      .is('read_at', null)
+    if (error) throw error
+  } finally {
+    announceChange()
+  }
 }
 
 // Insert a notification for the CURRENT user. Used for self-notifications

@@ -7,7 +7,8 @@
 // client's name and address. Saving goes back to where the person came
 // from, the Schedule when there is nowhere to go back to.
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Field, SkeletonRows } from '../../components/fh'
 import CreateShell, { Choices } from '../new/CreateShell.tsx'
@@ -19,8 +20,8 @@ import { eventAssignees, canAllocateCrew, allocationConflicts, fetchAllocationEv
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { supabase } from '../../lib/supabase.ts'
 import { useOrgScope } from '../../lib/orgScope.ts'
-import { useInvalidateSchedule, useCompanyJobs, useLeads, useQuotes, type JobRow, type LeadRow, type QuoteRow } from '../../lib/queries.ts'
-import { createScheduleEvents } from '../../lib/scheduleWrite.ts'
+import { useCompanyJobs, useLeads, useQuotes, type JobRow, type LeadRow, type QuoteRow } from '../../lib/queries.ts'
+import { createScheduleEvents, invalidateVisitReads } from '../../lib/scheduleWrite.ts'
 import { toastError, toastSuccess } from '../../lib/toast.ts'
 import { todayYmd, toYmd } from '../../lib/dates.ts'
 import { localDateTimeMs, eventDurationMs, scheduleOccurrences } from '../../lib/scheduleDates.ts'
@@ -28,6 +29,7 @@ import { isMovedStage } from '../../lib/stages.ts'
 import { jobLabel } from '../../lib/scheduleBoard.ts'
 import { leadName, leadNeed } from '../../lib/leadsView.ts'
 import { hapticMedium } from '../../lib/haptics.ts'
+import { countNoun } from '../../lib/format.ts'
 import './schedule-event.css'
 
 type Kind = 'job' | 'lead' | 'quote'
@@ -132,6 +134,30 @@ export default function EventNew() {
   return <EventForm key={`${orgScope || 'personal'}:${eventState.row?.id ?? 'new'}`} event={eventState.row} />
 }
 
+function newId(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
+  // Older browsers: a version 4 shaped id from Math.random.
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16)
+  })
+}
+
+/** Where a new visit starts: the picked day at 8:00, or today at the next whole hour. */
+function newVisitStart(picked: string | null): { date: string; time: string } {
+  const today = todayYmd()
+  const day = picked && /^\d{4}-\d{2}-\d{2}$/.test(picked) && picked >= today ? picked : today
+  if (day !== today) return { date: day, time: '08:00' }
+  const now = new Date()
+  const next = now.getHours() + 1
+  if (next < 8) return { date: today, time: '08:00' }
+  if (next > 23) {
+    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+    return { date: toYmd(tomorrow), time: '08:00' }
+  }
+  return { date: today, time: `${String(next).padStart(2, '0')}:00` }
+}
+
 function EventForm({ event }: { event: EventRow | null }) {
   const editing = !!event
   const navigate = useNavigate()
@@ -140,7 +166,8 @@ function EventForm({ event }: { event: EventRow | null }) {
   const orgScope = useOrgScope(user?.id)
   const membership = useMembership()
   const mayAllocate = canAllocateCrew(membership.role)
-  const invalidateSchedule = useInvalidateSchedule()
+  const queryClient = useQueryClient()
+  const invalidateSchedule = () => invalidateVisitReads(queryClient)
 
   // The three kinds of record a visit can belong to (D53).
   const jobsQuery = useCompanyJobs()
@@ -166,9 +193,15 @@ function EventForm({ event }: { event: EventRow | null }) {
 
   const start = event?.start_at ? new Date(event.start_at) : null
   const [title, setTitle] = useState(() => event?.title || params.get('title') || (presetLink?.kind === 'lead' ? 'Estimate' : ''))
+  // A title the person typed, or one that came with the event or the link,
+  // is never replaced by the linked job's name.
+  const [titleTyped, setTitleTyped] = useState(() => !!(event?.title || params.get('title')))
   const [where, setWhere] = useState(event?.description || '')
-  const [date, setDate] = useState(() => (start ? toYmd(start) : todayYmd()))
-  const [time, setTime] = useState(() => (start ? start.toTimeString().slice(0, 5) : '08:00'))
+  // A new visit starts on the day picked on the Schedule (?date=), and on
+  // today at the next whole hour rather than a time already gone (OPS-10).
+  const [initialWhen] = useState(() => start ? { date: toYmd(start), time: start.toTimeString().slice(0, 5) } : newVisitStart(params.get('date')))
+  const [date, setDate] = useState(initialWhen.date)
+  const [time, setTime] = useState(initialWhen.time)
   const [link, setLink] = useState<Link>(presetLink)
   const [repeat, setRepeat] = useState<'once' | 'series'>('once')
   const [every, setEvery] = useState('7')
@@ -179,6 +212,13 @@ function EventForm({ event }: { event: EventRow | null }) {
   const [errors, setErrors] = useState<{ title?: string; when?: string; duration?: string; recurrence?: string; save?: string }>({})
   // The where line follows the linked record until the person types one.
   const [whereTyped, setWhereTyped] = useState(!!event?.description)
+
+  // A visit linked to a job is named after the job until a title is typed.
+  useEffect(() => {
+    if (titleTyped || link?.kind !== 'job') return
+    const job = jobs.find((j) => j.id === link.id)
+    if (job) setTitle(jobLabel(job))
+  }, [link, jobs, titleTyped])
 
   // A lead's estimate carries the client's name and address (D60); a job
   // or a quote fills the same line from its client when nothing is typed.
@@ -199,6 +239,11 @@ function EventForm({ event }: { event: EventRow | null }) {
   }, [link, leads, quotes, jobs, whereTyped])
 
   const listsLoading = jobsQuery.isPending || (membership.canSeeFinancials && (leadsQuery.isPending || quotesQuery.isPending))
+
+  // One id per visit for the life of the form, so a retry after a save
+  // whose answer was lost writes the same rows instead of new ones.
+  const visitIds = useRef<string[]>([])
+  const idFor = (index: number) => (visitIds.current[index] ||= newId())
 
   const visitPreview = useMemo(() => scheduleOccurrences(date, time, Number(duration), repeat === 'series' ? Number(every) : 7, repeat === 'series' ? Number(occurrences) : 1), [date, time, duration, repeat, every, occurrences])
 
@@ -248,7 +293,8 @@ function EventForm({ event }: { event: EventRow | null }) {
       // A series shares one id in the recurring column, so the Schedule can
       // remove the whole run at once.
       const seriesId = repeat === 'series' ? (crypto.randomUUID?.() || `series-${startMs}`) : null
-      const row = (visit: { start_at: string; end_at: string }) => ({
+      const row = (visit: { start_at: string; end_at: string }, index: number) => ({
+        id: idFor(index),
         userId: user?.id as string,
         orgId: orgScope ?? null,
         contactId: link?.kind === 'job' ? link.id : null,
@@ -305,7 +351,7 @@ function EventForm({ event }: { event: EventRow | null }) {
         placeholder="Pour foundation, inspection, estimate"
         autoComplete="off"
         error={errors.title}
-        onChange={(e) => { setTitle(e.target.value); if (errors.title) setErrors({ ...errors, title: undefined }) }}
+        onChange={(e) => { setTitle(e.target.value); setTitleTyped(true); if (errors.title) setErrors({ ...errors, title: undefined }) }}
       />
       <div className="fhev-when">
         <Field label="Date" type="date" value={date} error={errors.when ? ' ' : undefined} onChange={(e) => setDate(e.target.value)} />
@@ -340,7 +386,7 @@ function EventForm({ event }: { event: EventRow | null }) {
                 <Field label="Total visits" type="number" inputMode="numeric" min={2} max={52} step={1} value={occurrences} error={errors.recurrence} onChange={(e) => setOccurrences(e.target.value)} />
               </div>
               <section className="fhev-preview" aria-label="Recurring visit preview">
-                <p>{visitPreview.length} visits total, including this date. Every {every || '?'} days.</p>
+                <p>{visitPreview.length} {countNoun(visitPreview.length, 'visit')} in all, including this date. Every {every || '?'} days.</p>
                 <ol>{visitPreview.map((visit) => <li key={visit.start_at}>{new Date(visit.start_at).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} until {new Date(visit.end_at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</li>)}</ol>
               </section>
             </>

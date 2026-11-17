@@ -29,7 +29,7 @@ import DataErrorState from '../components/DataErrorState.tsx'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { supabase } from '../lib/supabase.ts'
 import {
-  completeFollowUp, dismissFollowUp, fetchInbox, fmtAge, markAllRead, markRead
+  completeFollowUp, dismissFollowUp, fetchInbox, fmtAge, markIdsRead
 } from '../lib/notifications.ts'
 import { countNoun } from '../lib/format.ts'
 import { hapticTap } from '../lib/haptics.ts'
@@ -73,6 +73,10 @@ export function isReminder(kind: string | null | undefined) {
   return !!kind && REMINDER_KINDS.has(kind)
 }
 
+// The list reads a page at a time, so nothing past the newest 100 is out
+// of reach (DATA-16).
+const PAGE = 100
+
 export default function Notifications() {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -84,6 +88,11 @@ export default function Notifications() {
   const [busy, setBusy] = useState<Set<string>>(() => new Set())
   // Only the latest read decides what the screen says (D49).
   const readSeq = useRef(0)
+  // How many rows are on screen, so a refresh reads them all again, and
+  // whether an older page may exist.
+  const shown = useRef(PAGE)
+  const [hasOlder, setHasOlder] = useState(false)
+  const [loadingOlder, setLoadingOlder] = useState(false)
 
   const titleRef = useRef<HTMLHeadingElement>(null)
   useEffect(() => { titleRef.current?.focus({ preventScroll: true }) }, [])
@@ -92,17 +101,25 @@ export default function Notifications() {
   // With the Reminders section, the list below leaves out the reminder kinds.
   const listed = useMemo(() => (reminders === null ? rows : rows.filter((r) => !isReminder(r.kind))), [rows, reminders])
   const unread = useMemo(() => listed.filter((r) => !r.read_at).length, [listed])
-  const anyUnread = useMemo(() => rows.some((r) => !r.read_at), [rows])
+  // Every unread notification on screen: the list's rows and the reminders
+  // behind the Reminders section. Mark all read marks these and no others.
+  const unreadIds = useMemo(() => [...new Set([
+    ...listed.filter((r) => !r.read_at).map((r) => r.id),
+    ...(reminders ?? []).filter((r) => !r.read_at).map((r) => r.notification_id)
+  ])], [listed, reminders])
+  const anyUnread = unreadIds.length > 0
 
   const load = useCallback(async (first: boolean) => {
     if (!user) return
     const seq = ++readSeq.current
     if (first) setStatus('loading')
     try {
-      const [list, open] = await Promise.all([fetchInbox(100, user.id) as Promise<Notification[]>, fetchOpenReminders()])
+      const limit = Math.max(PAGE, shown.current)
+      const [list, open] = await Promise.all([fetchInbox(limit, user.id) as Promise<Notification[]>, fetchOpenReminders()])
       if (seq !== readSeq.current) return
       setRows(list)
       setReminders(open)
+      setHasOlder(list.length === limit)
       setStatus('ready')
     } catch {
       if (seq !== readSeq.current) return
@@ -135,48 +152,58 @@ export default function Notifications() {
     else navigate('/')
   }
 
+  useEffect(() => { shown.current = Math.max(PAGE, rows.length) }, [rows.length])
+
+  async function loadOlder() {
+    if (!user || loadingOlder || rows.length === 0) return
+    setLoadingOlder(true)
+    try {
+      const older = (await fetchInbox(PAGE, user.id, rows[rows.length - 1].created_at)) as Notification[]
+      setRows((prev) => [...prev, ...older.filter((o) => !prev.some((p) => p.id === o.id))])
+      setHasOlder(older.length === PAGE)
+    } catch {
+      toastError("Couldn't load older notifications", 'Check your connection and try again.')
+    } finally {
+      setLoadingOlder(false)
+    }
+  }
+
+  // Mark notifications read on screen at once, in the list and in the
+  // Reminders section, and put them back if the write fails, saying so
+  // (AUTO-18, OPS-13), so the screen and the bell agree.
+  async function markOnScreen(ids: string[], failTitle: string) {
+    if (!user || ids.length === 0) return
+    const at = new Date().toISOString()
+    const marked = new Set(ids)
+    setRows((prev) => prev.map((r) => (marked.has(r.id) && !r.read_at ? { ...r, read_at: at } : r)))
+    setReminders((prev) => prev && prev.map((r) => (marked.has(r.notification_id) && !r.read_at ? { ...r, read_at: at } : r)))
+    try {
+      await markIdsRead(ids, user.id)
+    } catch {
+      setRows((prev) => prev.map((r) => (marked.has(r.id) && r.read_at === at ? { ...r, read_at: null } : r)))
+      setReminders((prev) => prev && prev.map((r) => (marked.has(r.notification_id) && r.read_at === at ? { ...r, read_at: null } : r)))
+      toastError(failTitle, 'Check your connection and try again.')
+    }
+  }
+
   async function handleOpen(row: Notification) {
     hapticTap()
-    if (!row.read_at && user) {
-      setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, read_at: new Date().toISOString() } : r)))
-      // A write that fails puts the row back, so the screen and the bell agree.
-      markRead(row.id, user.id).catch(() => {
-        setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, read_at: null } : r)))
-      })
-    }
+    if (!row.read_at) void markOnScreen([row.id], "Couldn't mark the notification read")
     if (row.link) navigate(row.link)
   }
 
   async function handleMarkAll() {
     hapticTap()
-    if (!user || !anyUnread) return
-    const wereUnread = new Set(rows.filter((r) => !r.read_at).map((r) => r.id))
-    const now = new Date().toISOString()
-    setRows((prev) => prev.map((r) => (r.read_at ? r : { ...r, read_at: now })))
-    setReminders((prev) => prev && prev.map((r) => (r.read_at ? r : { ...r, read_at: now })))
-    try {
-      await markAllRead(user.id)
-    } catch {
-      setRows((prev) => prev.map((r) => (wereUnread.has(r.id) ? { ...r, read_at: null } : r)))
-      setReminders((prev) => prev && prev.map((r) => (wereUnread.has(r.notification_id) ? { ...r, read_at: null } : r)))
-      toastError('Could not mark your notifications read.')
-    }
+    if (!user || unreadIds.length === 0) return
+    // Only what is on screen: never ones the person has not seen (DATA-16).
+    await markOnScreen(unreadIds, "Couldn't mark the notifications read")
   }
 
   // Tapping a client's reminder row opens the newest reminder's record and
   // marks that client's reminders read; a failed write puts them back.
   function handleOpenGroup(group: ReminderGroup) {
     hapticTap()
-    const ids = new Set(group.reminders.filter((r) => !r.read_at).map((r) => r.notification_id))
-    if (ids.size > 0 && user) {
-      const now = new Date().toISOString()
-      const setRead = (readAt: string | null) => {
-        setReminders((prev) => prev && prev.map((r) => (ids.has(r.notification_id) ? { ...r, read_at: readAt } : r)))
-        setRows((prev) => prev.map((r) => (ids.has(r.id) ? { ...r, read_at: readAt } : r)))
-      }
-      setRead(now)
-      Promise.all([...ids].map((id) => markRead(id, user.id))).catch(() => setRead(null))
-    }
+    void markOnScreen(group.reminders.filter((r) => !r.read_at).map((r) => r.notification_id), "Couldn't mark the reminders read")
     if (group.newest.link) navigate(group.newest.link)
   }
 
@@ -296,6 +323,11 @@ export default function Notifications() {
           </section>
           )}
           </>
+        )}
+        {status === 'ready' && hasOlder && (
+          <Button variant="secondary" block loading={loadingOlder} onClick={() => void loadOlder()}>
+            Show older notifications
+          </Button>
         )}
       </div>
     </div>

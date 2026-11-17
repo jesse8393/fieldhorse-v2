@@ -83,6 +83,32 @@ export const canDoFieldWork     = (r: MaybeRole) =>
  * link, the database RLS policies are the real gate. These helpers
  * just hide things that would otherwise be a dead navigation.
  */
+/**
+ * The rule a full path is checked under. Most detail screens follow their
+ * list; the job screens that show or move money, the partner invite and a
+ * single client (which Money links to) have rules of their own.
+ */
+export function permissionRouteForPath(pathname: string): string {
+  if (pathname.startsWith('/schedule/')) return '/schedule'
+  if (pathname.startsWith('/leads/')) return '/leads'
+  if (pathname.startsWith('/quotes/')) return '/quotes'
+  if (pathname === '/jobs/new') return '/jobs/new'
+  if (pathname.startsWith('/jobs/')) {
+    const action = pathname.split('/')[3]
+    if (action === 'payment' || action === 'complete' || action === 'partner') return `/jobs/:id/${action}`
+    return '/jobs'
+  }
+  if (pathname.startsWith('/clients/')) {
+    const [, , id, sub] = pathname.split('/')
+    if (id && id !== 'new' && id !== 'merge' && (!sub || sub === 'statement')) return '/clients/:id'
+    return '/clients'
+  }
+  if (pathname.startsWith('/subs/')) return '/subs'
+  if (pathname.startsWith('/invoices/')) return '/invoices'
+  if (pathname.startsWith('/sub-portal/')) return '/sub-portal'
+  return pathname
+}
+
 export function canViewRoute(role: MaybeRole, route: string): boolean {
   if (!role) return false
   // An open conversation (/inbox/:id) follows the Inbox itself.
@@ -96,6 +122,13 @@ export function canViewRoute(role: MaybeRole, route: string): boolean {
     case '/quotes':         return canCreateFinancialDocs(role)    // proposal workflow, same revenue gate as leads
     case '/jobs':           return true                            // role-filtered in-view
     case '/clients':        return canSeeAllJobs(role)             // crew/foreman don't browse the client list
+    case '/clients/:id':    return canSeeFinancials(role)          // one client and its statement, linked from Money
+    case '/jobs/new':       return canCreateFinancialDocs(role)    // carries the contract price
+    case '/jobs/:id/payment':  return canCreateFinancialDocs(role) // shows the balance and records money
+    case '/jobs/:id/complete': return canCreateFinancialDocs(role) // shows contract, paid and balance
+    case '/jobs/:id/partner':  return canManageSubs(role)          // the invite promises job pricing
+    case '/notifications':  return true                            // the bell shows for every role
+    case '/new':            return canCreateFinancialDocs(role)    // the header +: leads, quotes, jobs, invoices
     case '/notes':          return true                            // field reports, everyone can read+write their own
     case '/schedule':       return true                            // role-filtered in-view
     case '/activity':       return true                            // notifications hub

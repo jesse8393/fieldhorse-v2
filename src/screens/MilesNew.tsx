@@ -15,9 +15,13 @@ import { useInvalidateAnalytics } from '../lib/queries.ts'
 import { todayYmd } from '../lib/dates.ts'
 import { toastError, toastSuccess } from '../lib/toast.ts'
 import { hapticMedium } from '../lib/haptics.ts'
+import { businessMileageRate, mileageRateNote } from '../lib/mileageRates.ts'
 
-// The IRS standard mileage rate for 2026, per mile.
-const IRS_RATE = 0.67
+// The IRS rate depends on the date of the drive, from the same table
+// Reports reads, so the screen and the yearly total always agree.
+function rateText(rate: number) {
+  return `$${rate.toFixed(Math.round(rate * 1000) % 10 ? 3 : 2)}`
+}
 
 export default function MilesNew() {
   const { user } = useAuth()
@@ -46,7 +50,9 @@ export default function MilesNew() {
   }, [user?.id])
 
   const milesNum = Number(miles) || 0
-  const deduction = milesNum * IRS_RATE
+  const rate = businessMileageRate(droveOn)
+  const deduction = rate == null ? null : Math.round(milesNum * rate * 100) / 100
+  const year = Number(droveOn.slice(0, 4)) || new Date().getFullYear()
 
   async function save() {
     if (saving || !user?.id) return
@@ -86,7 +92,12 @@ export default function MilesNew() {
       backTo="/analytics"
       onSave={save}
     >
-      <p className="fhnew-lede">Every mile is ${IRS_RATE.toFixed(2)} deducted at tax time (IRS 2026 rate).</p>
+      <p className="fhnew-lede">
+        {rate == null
+          ? 'There is no IRS rate on file for this date yet, so the deduction is not worked out.'
+          : `Every mile on this date is ${rateText(rate)} deducted at tax time.`}
+      </p>
+      <p className="fhnew-lede">{mileageRateNote(year)}</p>
       <Field label="Date" type="date" value={droveOn} onChange={(e) => setDroveOn(e.target.value)} />
       <Field
         label="Miles"
@@ -96,7 +107,7 @@ export default function MilesNew() {
         min="0"
         placeholder="0"
         value={miles}
-        helper={milesNum > 0 ? `Deduction $${deduction.toFixed(2)}` : undefined}
+        helper={milesNum > 0 && deduction != null ? `Deduction $${deduction.toFixed(2)}` : undefined}
         onChange={(e) => { setMiles(e.target.value); setError(undefined) }}
       />
       <Field

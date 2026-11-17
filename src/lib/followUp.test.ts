@@ -106,6 +106,7 @@ describe('saveFollowUp', () => {
     expect(res.error).toEqual({ message: 'offline' })
     expect((queryClient.getQueryData(['jobDetail', 'c1']) as any).contact.follow_up_on).toBe('2026-10-01')
     expect((queryClient.getQueryData(jobsKey('u1')) as any[])[0].follow_up_on).toBe('2026-10-01')
-    expect(toasts).toEqual(['Follow up set', "Couldn't set follow up"])
+    // Only the failure is said: never "Follow up set" beside it (OPS-21).
+    expect(toasts).toEqual(["Couldn't set follow up"])
   })
 })

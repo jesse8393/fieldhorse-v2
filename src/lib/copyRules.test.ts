@@ -28,4 +28,31 @@ describe('copy rules', () => {
     const hits = files.filter((file) => /general contractor/i.test(withoutComments(readFileSync(file, 'utf8'))))
     expect(hits.map((f) => f.slice(srcDir.length + 1))).toEqual([])
   })
+
+  // OPS-21: the strings the phone audit found in the schedule, Today and
+  // follow up files. Sentence case, and no dash standing in for a word.
+  const OPS_FILES = [
+    'screens/Schedule.tsx', 'screens/schedule/EventNew.tsx', 'screens/schedule/CrewAllocation.tsx',
+    'components/v3/NextActionCard.tsx', 'lib/followUp.ts', 'screens/Notifications.tsx',
+    'components/NotificationsBell.tsx', 'components/TimeClockCard.tsx', 'screens/MilesNew.tsx'
+  ]
+  const opsSource = (file: string) => withoutComments(readFileSync(join(srcDir, file), 'utf8'))
+
+  it('uses no en or em dash as punctuation in the schedule, Today and follow up screens', () => {
+    const hits = OPS_FILES.filter((file) => /[\u2013\u2014]/.test(opsSource(file)))
+    expect(hits).toEqual([])
+  })
+
+  it('says Mark complete in sentence case', () => {
+    expect(opsSource('components/v3/NextActionCard.tsx')).not.toMatch(/Mark Complete/)
+  })
+
+  it('counts recurring visits with the right noun', () => {
+    expect(opsSource('screens/schedule/EventNew.tsx')).not.toMatch(/\{visitPreview\.length\} visits total/)
+  })
+
+  it('calls only the next visit of the day Up next', () => {
+    const schedule = opsSource('screens/Schedule.tsx')
+    expect(schedule).not.toMatch(/'Upcoming':\s*\{ variant: 'up',\s*label: 'Up next' \}/)
+  })
 })

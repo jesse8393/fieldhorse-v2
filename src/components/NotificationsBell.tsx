@@ -4,6 +4,7 @@ import { Bell } from 'lucide-react'
 import Icon from './fh/Icon.tsx'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { supabase } from '../lib/supabase.ts'
+import { NOTIFICATIONS_CHANGED } from '../lib/notifications.ts'
 import { notificationBadgeCount } from '../lib/reminders.ts'
 import { hapticTap } from '../lib/haptics.ts'
 
@@ -21,11 +22,27 @@ export default function NotificationsBell() {
 
   const refresh = useCallback(async () => {
     if (!user) { setUnread(0); return }
-    // notificationBadgeCount never throws, so the bell never does.
-    setUnread(await notificationBadgeCount(user.id))
+    // notificationBadgeCount never throws, so the bell never does. A failed
+    // read answers null and keeps the last count rather than a false 0.
+    const count = await notificationBadgeCount(user.id)
+    if (count != null) setUnread(count)
   }, [user])
 
   useEffect(() => { refresh() }, [refresh])
+
+  // Follow reads made on the notifications screen, and catch up when the
+  // app comes back to the front, since a phone's realtime socket can drop
+  // without a word (OPS-12).
+  useEffect(() => {
+    const onChange = () => { void refresh() }
+    const onVisible = () => { if (document.visibilityState === 'visible') void refresh() }
+    window.addEventListener(NOTIFICATIONS_CHANGED, onChange)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      window.removeEventListener(NOTIFICATIONS_CHANGED, onChange)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [refresh])
 
   useEffect(() => {
     if (!user) return

@@ -129,7 +129,7 @@ test.describe('the lead screen', () => {
     await expect(again).toBeVisible()
     expect(patches).toEqual([])
     // A confirm is a second, separate tap: one this soon after arming is
-    // the rest of a double tap and does nothing (S04).
+    // the rest of a double tap and does nothing (S04, OPS-02).
     await page.waitForTimeout(600)
     await again.click()
     await expect.poll(() => patches.length).toBe(1)

@@ -108,3 +108,54 @@ test("the job's owner still logs the meter, and is told the shift had already en
   expect(writes.punches).toBe(1)
   expect(writes.expenses).toBe(1)
 })
+
+// OPS-01: crew clocking out on the job page used to type their own pay
+// rate (prefilled at $65). Anyone who is not the job's owner now books the
+// rate their manager set, as the /crew clock does, and sees no money.
+test('a crew member clocking out on the job page books their own set rate and sees no pay fields', async ({ context, page }) => {
+  await signIn(context, { role: 'crew', tables: {
+    fh_contacts: [job(OTHER_OWNER)],
+    fh_time_punches: [openPunch()],
+    org_members: [{ id: 'm1', org_id: 'org-1', user_id: 'qa-user-1', role: 'crew', revoked_at: null, joined_at: '2026-08-01T00:00:00Z', default_hourly_rate: 28, status: 'active' }]
+  } })
+  let patch: Record<string, unknown> | null = null
+  await context.route((url) => url.pathname === '/rest/v1/fh_time_punches', (route) => {
+    if (route.request().method() !== 'PATCH') return route.fallback()
+    patch = route.request().postDataJSON()
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{ ...openPunch(), ...patch }]) })
+  })
+  await (await openClock(page)).click()
+  await expect(page.getByRole('button', { name: 'Log time', exact: true })).toBeVisible()
+  await expect(page.getByText('Hourly rate', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('Billable', { exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Log time', exact: true }).click()
+  await expect.poll(() => patch).not.toBeNull()
+  expect(patch!.hourly_rate).toBe(28)
+})
+
+// OPS-18: a failed clock in on Crew home showed the database's own words.
+test('a failed clock in on Crew home says so in plain words', async ({ context, page }) => {
+  await signIn(context, { role: 'crew', tables: { fh_time_punches: [] } })
+  await context.route((url) => url.pathname === '/rest/v1/fh_time_punches', (route) => {
+    if (route.request().method() !== 'POST') return route.fallback()
+    return route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ code: '42501', message: 'new row violates row-level security policy for table "fh_time_punches"' }) })
+  })
+  await page.goto('/crew')
+  await page.getByRole('button', { name: /Clock in/ }).first().click()
+  const toaster = page.locator('[data-sonner-toaster]')
+  await expect(toaster).toContainText('Clock in failed')
+  await expect(toaster).toContainText('Check your connection and try again.')
+  await expect(toaster).not.toContainText('row-level security')
+})
+
+// OPS-22: Log time and Keep running were 36 pixels high.
+test('the job clock buttons are at least 44 pixels high', async ({ context, page }) => {
+  await signIn(context, { tables: { fh_contacts: [job('qa-user-1')], fh_time_punches: [openPunch()] } })
+  const clockOut = await openClock(page)
+  expect((await clockOut.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+  await clockOut.click()
+  for (const name of ['Log time', 'Keep running']) {
+    const box = await page.getByRole('button', { name, exact: true }).boundingBox()
+    expect(box!.height, name).toBeGreaterThanOrEqual(44)
+  }
+})

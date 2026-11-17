@@ -244,7 +244,8 @@ export default function Crew() {
         toastError('Already clocked in', 'Refresh to see the active shift.')
         await load()
       } else {
-        toastError('Clock in failed', msg || '')
+        // Plain words, never the database's own message (OPS-18).
+        toastError('Clock in failed', 'Check your connection and try again.')
       }
     } finally {
       setPunching(false)
@@ -278,7 +279,7 @@ export default function Crew() {
         toastError('Already clocked out', 'This shift had already ended. Its time stays as it was.')
         await load()
       } else {
-        toastError('Clock out failed', e?.message || '')
+        toastError('Clock out failed', 'Check your connection and try again.')
       }
     } finally {
       setPunching(false)

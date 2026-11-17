@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
-vi.mock('./supabase.ts', () => ({ supabase: {} }))
-import { allocationConflicts, allocationWriteError, canAllocateCrew, eventAssignees } from './scheduleAllocation.ts'
+const readResult = vi.hoisted(() => ({ value: { data: [] as unknown[], error: null as null | { code?: string; message?: string } } }))
+vi.mock('./supabase.ts', () => {
+  const query: Record<string, unknown> = {}
+  for (const method of ['select', 'eq', 'lt', 'or', 'order']) query[method] = () => query
+  query.range = async () => readResult.value
+  return { supabase: { from: () => query } }
+})
+import { CrewAssignmentUnavailableError, fetchAllocationEvents, allocationConflicts, allocationWriteError, canAllocateCrew, eventAssignees } from './scheduleAllocation.ts'
 
 const visit = { start_at: '2026-10-28T13:00:00Z', end_at: '2026-10-28T14:00:00Z' }
 const event = { id: 'event-1', title: 'Foundation', ...visit, assigned_to: 'alice' }
@@ -38,5 +44,13 @@ describe('crew allocation', () => {
     expect(allocationWriteError({ code: '23P01', message: 'private constraint details' })).toContain('Refresh availability')
     expect(allocationWriteError({ message: 'schedule_allocation_permission' })).toContain('owner, admin or manager')
     expect(allocationWriteError({ message: 'schedule_allocation_member' })).toContain('no longer belongs')
+  })
+  it('tells a database without the crew columns apart from a read that failed', async () => {
+    readResult.value = { data: [], error: { code: '42703', message: 'column fh_schedule.assigned_user_ids does not exist' } }
+    await expect(fetchAllocationEvents('org-1', [visit])).rejects.toBeInstanceOf(CrewAssignmentUnavailableError)
+    readResult.value = { data: [], error: { code: '57014', message: 'upstream request timeout' } }
+    const failed = await fetchAllocationEvents('org-1', [visit]).catch((error) => error)
+    expect(failed).toBeInstanceOf(Error)
+    expect(failed).not.toBeInstanceOf(CrewAssignmentUnavailableError)
   })
 })

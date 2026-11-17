@@ -57,6 +57,7 @@ test.describe('duplicates are reviewed on a screen', () => {
     expect(writes).toEqual([])
 
     // The second tap merges: the duplicate is deleted and the cluster is done.
+    await page.waitForTimeout(600) // a second tap within 500 ms is ignored (OPS-02)
     await again.click()
     await expect.poll(() => writes.some((w) => w.startsWith('DELETE fh_clients'))).toBe(true)
     await expect(page.getByText('All clean.')).toBeVisible()
@@ -361,6 +362,7 @@ test.describe('the customer page', () => {
     expect(writes).toEqual([])
 
     await del.click()
+    await page.waitForTimeout(600) // a second tap within 500 ms is ignored (OPS-02)
     await page.getByRole('button', { name: 'Tap again to delete' }).click()
     await expect.poll(() => writes.filter((w) => w.startsWith('DELETE fh_clients')).length).toBe(1)
   })

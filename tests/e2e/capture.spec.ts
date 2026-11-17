@@ -134,6 +134,7 @@ test.describe('capture screen', () => {
     await expectCaptureOpen(page)
     await expect(screen.getByText('What you said or typed is not saved yet.')).toBeVisible()
     await expect(page.getByRole('alertdialog')).toHaveCount(0)
+    await page.waitForTimeout(600) // a second tap within 500 ms is ignored (OPS-02)
     await screen.getByRole('button', { name: 'Tap again to discard' }).click()
     await expect(page).toHaveURL(/\/$/)
   })
