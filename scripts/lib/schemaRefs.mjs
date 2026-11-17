@@ -320,12 +320,21 @@ export function collectRefs(files) {
     const text = stripComments(raw)
     const at = (offset) => ({ file: path, line: lineOf(text, offset) })
 
-    for (const m of text.matchAll(/\.rpc\(\s*(['"`])([A-Za-z_0-9]+)\1/g)) {
+    // A function name held in a constant (const FUNCTION = 'fh_x') counts
+    // too, also when the call goes through a bound rpc(FUNCTION, ...). A
+    // name the file sets to more than one string is not guessed.
+    const constants = new Map()
+    for (const m of text.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=\n]+)?=\s*(['"`])([A-Za-z_0-9]+)\2/g)) {
+      constants.set(m[1], constants.has(m[1]) && constants.get(m[1]) !== m[3] ? null : m[3])
+    }
+    for (const m of text.matchAll(/\brpc\(\s*(?:(['"`])([A-Za-z_0-9]+)\1|([A-Za-z_$][\w$]*)\s*[,)])/g)) {
+      const name = m[2] ?? constants.get(m[3])
+      if (!name) continue
       const open = m.index + m[0].indexOf('(')
       const args = splitTop(text.slice(open + 1, readBalanced(text, open) - 1))
       let argNames = []
       if (args.length > 1) argNames = objectKeys(args[1])
-      refs.rpcs.push({ name: m[2], args: argNames, ...at(m.index) })
+      refs.rpcs.push({ name, args: argNames, ...at(m.index) })
     }
     for (const m of text.matchAll(/\/rest\/v1\/rpc\/([a-z_0-9]+)/g)) {
       refs.rpcs.push({ name: m[1], args: null, ...at(m.index) })

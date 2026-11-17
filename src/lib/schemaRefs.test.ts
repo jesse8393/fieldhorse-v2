@@ -134,6 +134,24 @@ describe('collectRefs and compareRefs', () => {
     expect(problems(`fetch(base + '/rest/v1/rpc/fh_gone', { method: 'POST' })`)).toEqual(['rpc fh_gone'])
   })
 
+  // fh_company_branding and fh_merge_client_into were missing from the
+  // types and the check said ok, because both name the function in a
+  // constant and call a bound rpc (vibe audit console-4).
+  it('reads a function named in a constant, also through a bound rpc', () => {
+    const bound = `
+      const FUNCTION = 'fh_company_branding'
+      const rpc = supabase.rpc.bind(supabase) as unknown as (name: string, args: Record<string, unknown>) => PromiseLike<unknown>
+      const { data } = await rpc(FUNCTION, { p_org_id: orgId })
+    `
+    expect(problems(bound)).toEqual(['rpc fh_company_branding'])
+    expect(problems(`const MERGE_FUNCTION = 'fh_gone'\nawait supabase.rpc(MERGE_FUNCTION, { p_id: 1 })`)).toEqual(['rpc fh_gone'])
+    expect(problems(`const F = 'fh_make_job_from_quote'\nawait rpc(F, { p_quote_id: id })`)).toEqual([])
+    expect(problems(`const F = 'fh_make_job_from_quote'\nawait rpc(F, { quote_id: id })`)).toEqual(['rpc-args fh_make_job_from_quote'])
+    expect(problems(`await rpc('fh_gone_too', { p_id: 1 })`)).toEqual(['rpc fh_gone_too'])
+    // A name the file does not pin to one string is not guessed.
+    expect(problems(`await supabase.rpc(name, args)`)).toEqual([])
+  })
+
   it('reports a call whose arguments no version of the function takes', () => {
     expect(problems(`await supabase.rpc('fh_make_job_from_quote', { quote_id: id })`)).toEqual(['rpc-args fh_make_job_from_quote'])
     expect(problems(`await supabase.rpc('fh_advance_run', { p_max_steps: 2 })`)).toEqual(['rpc-args fh_advance_run'])

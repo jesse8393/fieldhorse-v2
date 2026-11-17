@@ -755,6 +755,20 @@ test.describe('the quote screen', () => {
   })
 })
 
+// The quote screen reads the company's details for its document. The mock
+// once lacked that function and answered 404, which hid any new failure
+// (vibe audit console-4).
+test('opening a quote gets no error from the database', async ({ context, page }) => {
+  await signIn(context)
+  const failed: string[] = []
+  page.on('response', (r) => { if (r.status() >= 400 && r.url().includes('qa-mock.supabase.co')) failed.push(`${r.status()} ${new URL(r.url()).pathname}`) })
+  const branding = page.waitForResponse((r) => r.url().includes('/rest/v1/rpc/fh_company_branding'), { timeout: 30_000 })
+  await page.goto('/quotes/q-quote', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  expect((await branding).status()).toBe(200)
+  await page.waitForLoadState('networkidle')
+  expect(failed).toEqual([])
+})
+
 test.describe('the quotes list', () => {
   test('lists every quote and opens one', async ({ context, page }) => {
     await signIn(context)

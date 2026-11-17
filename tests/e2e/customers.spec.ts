@@ -82,6 +82,9 @@ test.describe('duplicates are reviewed on a screen', () => {
         fh_invoices: [{ id: 'inv-dup', user_id: USER.id, client_id: 'cl-dup', contact_id: null, amount: 500, status: 'sent', created_at: iso(NOW - DAY) }]
       }
     })
+    // The mock's database merge would move them in one call, so this
+    // company has not installed it yet and the app moves them itself.
+    await context.route('**/rest/v1/rpc/fh_merge_client_into', (route) => route.fulfill({ status: 404, json: { code: 'PGRST202', message: 'Could not find the function public.fh_merge_client_into(p_duplicates, p_survivor) in the schema cache' } }))
     const writes = watchWrites(page)
     await open(page, '/clients/merge')
     await expect(page.getByText('Leads, quotes, jobs, invoices and notes move to the kept client.', { exact: false })).toBeVisible()

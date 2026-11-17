@@ -51,9 +51,7 @@ function functionMissing(error: { code?: string; message?: string }) {
  * the read fails.
  */
 export async function fetchCompanyBranding(orgId: string): Promise<CompanyBranding | null> {
-  // The generated types do not list the function until its migration is applied.
-  const rpc = supabase.rpc.bind(supabase) as unknown as (name: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { code?: string; message?: string } | null }>
-  const { data, error } = await rpc(FUNCTION, { p_org_id: orgId })
+  const { data, error } = await supabase.rpc(FUNCTION, { p_org_id: orgId })
   if (error) {
     if (functionMissing(error)) return null
     throw Object.assign(new Error(error.message || "Couldn't read the company details."), { code: error.code })
