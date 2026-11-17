@@ -166,10 +166,12 @@ export default function JobsPhone({
     if (quotesFailed) void quotesQuery.refetch()
   }
 
-  // Each change rewrites only its own keys, on the latest address.
+  // Each change rewrites only its own keys, on the address as it is now.
+  // The updater's own argument is the address of the last render, which
+  // misses a key written a moment ago, before the list drew it.
   const writeParams = (patch: Record<string, string | null>) => {
-    setSearchParams((prev) => {
-      const sp = new URLSearchParams(prev)
+    setSearchParams(() => {
+      const sp = new URLSearchParams(window.location.search)
       for (const [key, value] of Object.entries(patch)) {
         if (value) sp.set(key, value)
         else sp.delete(key)

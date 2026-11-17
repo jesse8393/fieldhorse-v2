@@ -6,6 +6,7 @@
 // Nothing here mounts a dialog.
 import { expect, test, type Page } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
+import { isReadOnlyRpc } from './helpers/readRpc.ts'
 import { USER } from '../../scripts/qa-mock.mjs'
 
 const NOW = Date.now()
@@ -27,6 +28,8 @@ function watchWrites(page: Page): string[] {
   page.on('request', (req) => {
     const url = new URL(req.url())
     if (!['PATCH', 'DELETE', 'POST'].includes(req.method()) || !url.pathname.includes('/rest/v1/')) return
+    // The bell's reminder read is a POST that changes nothing.
+    if (isReadOnlyRpc(url)) return
     writes.push(`${req.method()} ${url.pathname.split('/rest/v1/')[1]}`)
   })
   return writes
@@ -82,6 +85,7 @@ test.describe('duplicates are reviewed on a screen', () => {
     await open(page, '/clients/merge')
     await expect(page.getByText('Leads, quotes, jobs, invoices and notes move to the kept client.', { exact: false })).toBeVisible()
     await page.getByRole('button', { name: 'Merge cluster' }).click()
+    await page.waitForTimeout(600) // a second tap within 500 ms is ignored (OPS-02)
     await page.getByRole('button', { name: 'Tap again to merge' }).click()
 
     await expect(page.getByText(/still has leads, quotes and invoices that could not be moved, so it was not deleted/)).toBeVisible()

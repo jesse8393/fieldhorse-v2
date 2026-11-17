@@ -6,6 +6,7 @@
 // the row the write would have made and expects to land on it.
 import { expect, test, type Page } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
+import { isReadOnlyRpc } from './helpers/readRpc.ts'
 
 const NOW = '2026-10-08T15:00:00.000Z'
 
@@ -363,7 +364,8 @@ test('New client saves a second client with the same name only when asked (S25)'
 test('New client refuses an email that is not one (S25)', async ({ context, page }) => {
   await signIn(context)
   const posts: string[] = []
-  page.on('request', (req) => { if (req.method() === 'POST' && req.url().includes('/rest/v1/')) posts.push(req.url()) })
+  // The bell's reminder read is a POST that changes nothing.
+  page.on('request', (req) => { if (req.method() === 'POST' && req.url().includes('/rest/v1/') && !isReadOnlyRpc(req.url())) posts.push(req.url()) })
   await open(page, '/clients/new')
   await page.getByLabel('Name').fill('Maria Lopez')
   for (const bad of ['Not-An-Email', 'MARIA@@bad']) {

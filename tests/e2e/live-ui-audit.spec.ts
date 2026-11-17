@@ -121,8 +121,14 @@ for (const width of [320, 390, 1440]) {
     await picker.press('ArrowDown')
     await picker.press('Enter')
     await expect(picker).toHaveValue('Plumbing Bellevue')
+    // A visit linked to a job is titled after the job until a title is
+    // typed (OPS-10). With the title cleared, Save asks for one.
+    const title = page.getByLabel('Title', { exact: true })
+    await expect(title).toHaveValue('Plumbing Bellevue')
+    await title.fill('')
     await page.getByRole('button', { name: 'Save event', exact: true }).click()
-    await expect(page.getByLabel('Title', { exact: true })).toBeFocused()
+    await expect(title).toBeFocused()
+    await expect(title).toHaveValue('')
     await expect(page.getByText('Give the event a title.', { exact: true })).toBeVisible()
     if (width === 390) await page.screenshot({ path: testInfo.outputPath('event-phone.png'), fullPage: true })
   })
