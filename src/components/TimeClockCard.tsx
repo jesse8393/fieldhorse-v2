@@ -306,7 +306,7 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
           <button
             type="button"
             onClick={handleStopRequest}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 12px', borderRadius: 10, border: 'none', background: 'var(--alert-red)', color: '#F2EDE4', fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: 0, cursor: 'pointer' }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 12px', borderRadius: 10, border: 'none', minHeight: 44, background: 'var(--alert-red)', color: '#F2EDE4', fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: 0, cursor: 'pointer' }}
           >
             <Square size={12} /> Clock out
           </button>
@@ -360,7 +360,7 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
               type="button"
               onClick={handleCancel}
               disabled={saving}
-              style={{ padding: '8px 12px', borderRadius: 10, border: '1px solid var(--rule)', background: 'transparent', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 12, cursor: 'pointer' }}
+              style={{ padding: '8px 12px', minHeight: 44, borderRadius: 10, border: '1px solid var(--rule)', background: 'transparent', color: 'var(--ink-strong)', fontFamily: 'var(--font-body)', fontSize: 12, cursor: 'pointer' }}
             >
               Keep running
             </button>
@@ -368,7 +368,7 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
               type="button"
               onClick={handleSubmit}
               disabled={saving || (bookAsExpense && rate <= 0)}
-              style={{ padding: '8px 12px', borderRadius: 10, border: 'none', background: saving ? 'rgba(45, 122, 79,0.5)' : 'var(--signal-green)', color: '#F2EDE4', fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: 0, cursor: saving ? 'default' : 'pointer' }}
+              style={{ padding: '8px 12px', minHeight: 44, borderRadius: 10, border: 'none', background: saving ? 'rgba(45, 122, 79,0.5)' : 'var(--signal-green)', color: '#F2EDE4', fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: 0, cursor: saving ? 'default' : 'pointer' }}
             >
               {saving ? 'Logging…' : 'Log time'}
             </button>

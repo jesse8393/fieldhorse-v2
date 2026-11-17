@@ -147,3 +147,15 @@ test('a failed clock in on Crew home says so in plain words', async ({ context, 
   await expect(toaster).toContainText('Check your connection and try again.')
   await expect(toaster).not.toContainText('row-level security')
 })
+
+// OPS-22: Log time and Keep running were 36 pixels high.
+test('the job clock buttons are at least 44 pixels high', async ({ context, page }) => {
+  await signIn(context, { tables: { fh_contacts: [job('qa-user-1')], fh_time_punches: [openPunch()] } })
+  const clockOut = await openClock(page)
+  expect((await clockOut.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+  await clockOut.click()
+  for (const name of ['Log time', 'Keep running']) {
+    const box = await page.getByRole('button', { name, exact: true }).boundingBox()
+    expect(box!.height, name).toBeGreaterThanOrEqual(44)
+  }
+})
