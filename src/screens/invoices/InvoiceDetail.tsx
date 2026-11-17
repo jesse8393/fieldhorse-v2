@@ -40,6 +40,7 @@ import './invoices.css'
 const loadPdf = () => import('../../lib/pdf.js')
 
 const VOID_ARMED_MS = 4000
+const VOID_SETTLE_MS = 500
 
 function methodLabel(m: string | null | undefined): string {
   const lower = String(m || '').toLowerCase()
@@ -80,6 +81,9 @@ function InvoiceDetailScreen({ id }: { id: string | undefined }) {
   const [voidArmed, setVoidArmed] = useState(false)
   const [voiding, setVoiding] = useState(false)
   const voidTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // When Void was armed. A second tap sooner than VOID_SETTLE_MS after it
+  // is the same double tap, not a decision, so it is ignored (OPS-02).
+  const voidArmedAt = useRef(0)
   useEffect(() => () => { if (voidTimer.current) clearTimeout(voidTimer.current) }, [])
 
   // The description as typed; saved when the field loses focus.
@@ -204,10 +208,12 @@ function InvoiceDetailScreen({ id }: { id: string | undefined }) {
     if (!invoice || voiding || sendingBusy) return
     hapticTap()
     if (!voidArmed) {
+      voidArmedAt.current = Date.now()
       setVoidArmed(true)
       voidTimer.current = setTimeout(() => setVoidArmed(false), VOID_ARMED_MS)
       return
     }
+    if (Date.now() - voidArmedAt.current < VOID_SETTLE_MS) return
     if (voidTimer.current) clearTimeout(voidTimer.current)
     setVoidArmed(false)
     setVoiding(true)

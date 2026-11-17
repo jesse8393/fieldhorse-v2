@@ -655,3 +655,20 @@ test('the invoice payment form warns and drops a hidden check number', async ({ 
   expect(posts[0].reference ?? null).toBeNull()
   expect(posts[0].method).toBe('cash')
 })
+
+// OPS-02: a fast double tap on Void must not void. A second tap within
+// half a second of arming is ignored; a later one voids.
+test('a fast double tap on Void does not void the invoice', async ({ page, context }) => {
+  await installShedInvoice(context)
+  const voids: string[] = []
+  page.on('request', (r) => { if (r.method() === 'PATCH' && r.url().includes('/fh_invoices') && (r.postData() || '').includes('"void"')) voids.push(r.url()) })
+  await openInvoice(page, 'inv-1')
+  const voidButton = page.getByRole('button', { name: /^void$/i })
+  await expect(voidButton).toBeVisible()
+  await voidButton.click()
+  await page.getByRole('button', { name: /tap again/i }).click({ delay: 0 })
+  await page.waitForTimeout(700)
+  expect(voids).toEqual([])
+  await page.getByRole('button', { name: /tap again/i }).click()
+  await expect.poll(() => voids.length).toBe(1)
+})
