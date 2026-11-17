@@ -1,5 +1,5 @@
 import { createUuid } from '../../lib/uuid.ts'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -30,6 +30,7 @@ async function loadPdf(): Promise<any> {
 import { toastSuccess, toastError } from '../../lib/toast.ts'
 import { mintPublicLink } from '../../lib/publicLink.ts'
 import { hapticTap } from '../../lib/haptics.ts'
+import { useArmedId } from '../../lib/secondTap.ts'
 import { handleTablistKeyDown } from '../../lib/tabs.ts'
 import { useMediaQuery } from '../../lib/useMediaQuery.ts'
 import { useFhMotion } from '../../lib/motion.ts'
@@ -52,8 +53,6 @@ import { InvoiceTemplate } from '../../components/documents'
  *     which opens the open draw's payment screen (/invoices/:id/payment)
  *     or, with no open draw, the job's payment recorder
  */
-
-const DELETE_ARMED_MS = 4000
 
 const AGING_BUCKETS = [
   { id: '0-30',  label: 'Current',  max: 30,        color: 'var(--v3-text-muted)',     accent: 'var(--v3-border-strong)' },
@@ -159,11 +158,12 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
   const serviceDescription = useMemo(() => invoiceDescription(billingDraw, contact), [billingDraw, contact])
   const [generating, setGenerating] = useState(false)
   // A payment row deletes with a second tap on its own button within 4
-  // seconds (D57): which row is armed, and which is being deleted.
-  const [deleteArmed, setDeleteArmed] = useState<string | null>(null)
+  // seconds (D57), through the shared hook, which ignores a second tap
+  // within half a second of arming (OPS-02): which row is armed, and which
+  // is being deleted.
+  const deleteTap = useArmedId()
+  const deleteArmed = deleteTap.armedId
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const deleteTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  useEffect(() => () => { if (deleteTimer.current) clearTimeout(deleteTimer.current) }, [])
   // 'detail' = existing list-style breakdown (default, original UX).
   // 'document' = new InvoiceTemplate preview (Phase 2, opt-in so the
   // toggle is reversible and the existing flow stays untouched until
@@ -541,17 +541,13 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
     onOpenLogPayment?.()
   }
 
-  async function handleDeletePayment(paymentId: string, paymentAmount: number) {
+  function handleDeletePayment(paymentId: string, paymentAmount: number) {
     if (!user?.id || deletingId) return
     hapticTap()
-    if (deleteArmed !== paymentId) {
-      if (deleteTimer.current) clearTimeout(deleteTimer.current)
-      setDeleteArmed(paymentId)
-      deleteTimer.current = setTimeout(() => setDeleteArmed(null), DELETE_ARMED_MS)
-      return
-    }
-    if (deleteTimer.current) clearTimeout(deleteTimer.current)
-    setDeleteArmed(null)
+    deleteTap.tap(paymentId, () => { void deletePaymentNow(paymentId, paymentAmount) })
+  }
+
+  async function deletePaymentNow(paymentId: string, paymentAmount: number) {
     setDeletingId(paymentId)
     // By id, with the row asked back: a payment carries the job creator's
     // id, so filtering on the signed in user matched nothing and still said
@@ -846,7 +842,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
                   </div>
                   <button
                     type="button"
-                    onClick={() => void handleDeletePayment(p.id, Number(p.amount || 0))}
+                    onClick={() => handleDeletePayment(p.id, Number(p.amount || 0))}
                     disabled={deletingId === p.id}
                     aria-label={deleteArmed === p.id ? `Tap again to delete the ${fmtMoney(p.amount)} payment` : `Delete the ${fmtMoney(p.amount)} payment`}
                     style={{

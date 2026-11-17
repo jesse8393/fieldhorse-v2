@@ -273,6 +273,18 @@ test.describe('job page on a phone', () => {
     await expect(page.getByRole('dialog')).toHaveCount(0)
   })
 
+  // OPS-19: Harold's $12,800 driveway is fully invoiced with $6,400 still
+  // owed. A new invoice has nothing left to bill, so the main action moves
+  // the job on instead.
+  test('with everything invoiced the main action is Mark complete', async ({ context, page }) => {
+    await signIn(context)
+    await open(page, '/jobs/c-job2')
+    const gold = page.locator('.fhj-capsule .fhc-btn--primary')
+    await expect(gold).toHaveText('Mark complete')
+    await gold.click()
+    await expect(page).toHaveURL(/\/jobs\/c-job2\/complete$/)
+  })
+
   test('Invoice this opens the new invoice screen with the balance', async ({ context, page }) => {
     await signIn(context)
     await open(page, '/jobs/c-job1')
@@ -565,6 +577,19 @@ test.describe('job page on a desktop, redesigned', () => {
     await openDesktop(page, '/jobs/c-job1?tab=financials&action=send_invoice')
     const cue = page.getByRole('region', { name: 'Dashboard action cue' })
     await expect(cue).toBeVisible()
+  })
+
+  // OPS-19: with the whole contract invoiced and money still owed, the
+  // stage action is Mark complete, not a new invoice with nothing to bill.
+  test('with everything invoiced the main action is Mark complete', async ({ context, page }) => {
+    await signIn(context)
+    await openDesktop(page, '/jobs/c-job2')
+    const actions = page.locator('.fh-job-secondary-actions')
+    const complete = actions.getByRole('button', { name: 'Mark complete', exact: true })
+    await expect(complete).toBeVisible()
+    await expect(actions.getByRole('button', { name: 'Invoice this', exact: true })).toHaveCount(0)
+    await complete.click()
+    await expect(page).toHaveURL(/\/jobs\/c-job2\/complete$/)
   })
 
   test('Invoice this opens the new invoice screen with the balance', async ({ context, page }) => {

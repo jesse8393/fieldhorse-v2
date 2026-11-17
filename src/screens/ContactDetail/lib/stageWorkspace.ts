@@ -43,13 +43,19 @@ export type StageCta = { label: string; action: 'invoice' | 'complete' | 'reopen
 
 /**
  * The one gold action for the stage (SPEC D61): Invoice this while money
- * is owed, Mark complete once the balance is collected, Reopen on a closed
- * or lost job. Field roles get none; the caller gates on that.
+ * is owed and part of the contract is still to invoice, Mark complete once
+ * the balance is collected or everything is invoiced (a new invoice would
+ * have nothing left to bill, OPS-19), Reopen on a closed or lost job.
+ * `unbilled` is what is left to invoice; while it is not known (null or
+ * left out) money owed keeps Invoice this. Field roles get none; the
+ * caller gates on that.
  */
-export function stageCta(stage: string | null | undefined, balance: number | null | undefined): StageCta | null {
+export function stageCta(stage: string | null | undefined, balance: number | null | undefined, unbilled?: number | null): StageCta | null {
   const s = jobStage(stage)
   if (s === 'closed' || s === 'lost') return { label: 'Reopen', action: 'reopen' }
-  return Number(balance || 0) > 0
+  // Half a cent: the contract and the invoices are summed separately.
+  const leftToInvoice = unbilled == null || Number(unbilled) > 0.005
+  return Number(balance || 0) > 0 && leftToInvoice
     ? { label: 'Invoice this', action: 'invoice' }
     : { label: 'Mark complete', action: 'complete' }
 }

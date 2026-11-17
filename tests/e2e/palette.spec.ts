@@ -410,6 +410,48 @@ test.describe('search shortcut and key caps', () => {
     await expect(page.getByRole('dialog', { name: 'Command palette' })).toHaveCount(0)
   })
 
+  // D09: Control J, Control N and the narrow Control K used to fire while
+  // the person was typing in a form field and took them off the form.
+  test('Control J, Control N and Control K typed in a field leave the form alone', async ({ context, page }) => {
+    await signIn(context)
+    await page.goto('/jobs/new', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    const title = page.getByLabel('Title')
+    await title.fill('Shed slab')
+    await page.keyboard.press('Control+j')
+    await page.keyboard.press('Control+n')
+    await page.waitForTimeout(300)
+    await expect(page).toHaveURL(/\/jobs\/new$/)
+    await expect(title).toHaveValue('Shed slab')
+    // A textarea, and Control K below 900 px, where it opens the search screen.
+    const scope = page.getByLabel('Scope')
+    await scope.fill('Forms and pour')
+    await page.keyboard.press('Control+j')
+    await page.setViewportSize({ width: 899, height: 900 })
+    await scope.focus()
+    await page.keyboard.press('Control+k')
+    await page.waitForTimeout(300)
+    await expect(page).toHaveURL(/\/jobs\/new$/)
+    await expect(scope).toHaveValue('Forms and pour')
+    // Outside a field the shortcut still works.
+    await page.getByRole('heading', { level: 1, name: 'New job' }).focus()
+    await page.keyboard.press('Control+j')
+    await expect(page).toHaveURL(/\/capture$/)
+  })
+
+  // D09: the browser keeps Control N (and Command N) for a new window, so
+  // the page never sees it. New does not advertise a key it cannot have.
+  test('New does not advertise Control N, which the browser keeps', async ({ context, page }) => {
+    await signIn(context)
+    await open(page, '/')
+    const add = page.locator('.fh-app-header').getByRole('link', { name: 'New', exact: true })
+    await expect(add).toBeVisible()
+    await expect(add).not.toHaveAttribute('aria-keyshortcuts')
+    await expect(add).toHaveAttribute('title', 'New')
+    await page.keyboard.press('Control+n')
+    await page.waitForTimeout(300)
+    await expect(page).not.toHaveURL(/\/new$/)
+  })
+
   test('the Customers and Subs filter boxes show no palette key cap', async ({ context, page }) => {
     await signIn(context)
     for (const [path, label] of [['/clients', 'Search clients'], ['/subs', 'Search vendors and trades']]) {
