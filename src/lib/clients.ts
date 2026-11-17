@@ -225,3 +225,8 @@ export function describeDeleteBlockers(b: { leads: number; quotes: number; invoi
   if (parts.length <= 1) return parts.join('')
   return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
 }
+
+/** True for something shaped like an email address (one @, a dot after it, no spaces). */
+export function isEmail(text: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text.trim())
+}

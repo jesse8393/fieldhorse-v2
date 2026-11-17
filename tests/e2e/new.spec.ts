@@ -277,3 +277,46 @@ test('the first field keeps its focus on New lead and New client (S20)', async (
   await open(page, '/clients/new')
   await expect(page.getByLabel('Name')).toBeFocused({ timeout: 30_000 })
 })
+
+test('New client points to a client who already exists before making a second one (S25)', async ({ context, page }) => {
+  await signIn(context)
+  const posts: string[] = []
+  page.on('request', (req) => { if (req.method() === 'POST' && req.url().includes('/rest/v1/fh_clients')) posts.push(req.postData() ?? '') })
+  await open(page, '/clients/new')
+  await page.getByLabel('Name').fill('Jeff Roy')
+  await page.getByRole('button', { name: 'Save client' }).click()
+  await expect(page.getByText('Jeff Roy is already a client.', { exact: false })).toBeVisible()
+  await page.waitForTimeout(300)
+  expect(posts).toEqual([])
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Open Jeff Roy' }).click()
+  await expect(page).toHaveURL(/\/clients\/cl-1$/)
+  expect(posts).toEqual([])
+})
+
+test('New client saves a second client with the same name only when asked (S25)', async ({ context, page }) => {
+  await signIn(context)
+  const posts: string[] = []
+  page.on('request', (req) => { if (req.method() === 'POST' && req.url().includes('/rest/v1/fh_clients')) posts.push(req.postData() ?? '') })
+  await open(page, '/clients/new')
+  await page.getByLabel('Name').fill('Jeff Roy')
+  await page.getByRole('button', { name: 'Save client' }).click()
+  await page.getByRole('button', { name: 'Save a new client' }).click()
+  await expect(page).toHaveURL(/\/clients\/cl-1$/, { timeout: 30_000 })
+  expect(posts).toHaveLength(1)
+})
+
+test('New client refuses an email that is not one (S25)', async ({ context, page }) => {
+  await signIn(context)
+  const posts: string[] = []
+  page.on('request', (req) => { if (req.method() === 'POST' && req.url().includes('/rest/v1/')) posts.push(req.url()) })
+  await open(page, '/clients/new')
+  await page.getByLabel('Name').fill('Maria Lopez')
+  for (const bad of ['Not-An-Email', 'MARIA@@bad']) {
+    await page.getByLabel('Email').fill(bad)
+    await page.getByRole('button', { name: 'Save client' }).click()
+    await expect(page.getByText('Enter an email like name@example.com.')).toBeVisible()
+  }
+  await page.waitForTimeout(300)
+  expect(posts).toEqual([])
+})

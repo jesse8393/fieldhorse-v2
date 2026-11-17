@@ -4,7 +4,7 @@
 
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Field } from '../../components/fh'
+import { Button, Field } from '../../components/fh'
 import CreateShell, { useDraft } from '../new/CreateShell.tsx'
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useMembership } from '../../contexts/MembershipContext.tsx'
@@ -13,6 +13,7 @@ import { queryClient } from '../../lib/queryClient.ts'
 import { recordRoute } from '../../lib/records.ts'
 import { hapticMedium } from '../../lib/haptics.ts'
 import { createUuid } from '../../lib/uuid.ts'
+import { isEmail, lookupClientMatches, type ClientMatch } from '../../lib/clients.ts'
 
 type Form = {
   /** Minted once per form, so a retried save addresses the same row (DATA-12). */
@@ -36,13 +37,37 @@ export default function ClientNew() {
   const [requestId] = useState(createUuid)
   const { form, set, done } = useDraft<Form>('client', { ...EMPTY, requestId }, text ? { name: text } : null)
   const [saving, setSaving] = useState(false)
-  const [errors, setErrors] = useState<{ name?: string; save?: string }>({})
+  const [errors, setErrors] = useState<{ name?: string; email?: string; save?: string }>({})
+  // A client with this name, phone or email already exists: shown under
+  // the form with Open and Save a new client, instead of a silent second
+  // record (S25). Cleared when the name, phone or email changes.
+  const [existing, setExisting] = useState<{ client: ClientMatch; why: 'name' | 'contact' } | null>(null)
 
-  async function save() {
+  function edit(key: 'name' | 'phone' | 'email', value: string) {
+    setExisting(null)
+    setErrors((e) => ({ ...e, [key]: undefined }))
+    set(key, value)
+  }
+
+  async function save(asNew = false) {
     if (!user) return
-    if (!form.name.trim()) { setErrors({ name: 'Enter a name.' }); return }
+    const next: typeof errors = {}
+    if (!form.name.trim()) next.name = 'Enter a name.'
+    if (form.email.trim() && !isEmail(form.email)) next.email = 'Enter an email like name@example.com.'
+    if (next.name || next.email) { setErrors(next); return }
     setSaving(true)
     setErrors({})
+    if (!asNew) {
+      try {
+        const m = await lookupClientMatches(user.id, { name: form.name, phone: form.phone, email: form.email }, orgId)
+        const match = m.byContact ? { client: m.byContact, why: 'contact' as const } : m.byName ? { client: m.byName, why: 'name' as const } : null
+        if (match) { setExisting(match); setSaving(false); return }
+      } catch {
+        setSaving(false)
+        setErrors({ save: 'Could not check for this client. Check your connection and try again.' })
+        return
+      }
+    }
     const id = form.requestId || requestId
     const row = {
       id,
@@ -73,11 +98,27 @@ export default function ClientNew() {
   }
 
   return (
-    <CreateShell title="New client" saveLabel="Save client" saving={saving} error={errors.save} onSave={save}>
-      <Field label="Name" autoCapitalize="words" autoComplete="off" autoFocus value={form.name} error={errors.name} onChange={(e) => set('name', e.target.value)} />
+    <CreateShell title="New client" saveLabel="Save client" saving={saving} error={errors.save} onSave={() => save()}>
+      <Field label="Name" autoCapitalize="words" autoComplete="off" autoFocus value={form.name} error={errors.name} onChange={(e) => edit('name', e.target.value)} />
+      {existing && (
+        <div className="fhnew-match" role="status">
+          <p className="fhnew-match__text">
+            {existing.client.name} is already a client.{' '}
+            {existing.why === 'name' ? 'Same name.' : 'Same phone or email.'}
+          </p>
+          <div className="fhnew-match__actions">
+            <Button type="button" variant="secondary" size="md" onClick={() => { done(); navigate(recordRoute('client', existing.client.id), { replace: true }) }}>
+              Open {existing.client.name}
+            </Button>
+            <Button type="button" variant="secondary" size="md" disabled={saving} onClick={() => { void save(true) }}>
+              Save a new client
+            </Button>
+          </div>
+        </div>
+      )}
       <Field label="Company" autoComplete="off" value={form.company} onChange={(e) => set('company', e.target.value)} />
-      <Field label="Phone" type="tel" inputMode="tel" autoComplete="off" value={form.phone} onChange={(e) => set('phone', e.target.value)} />
-      <Field label="Email" type="email" inputMode="email" autoComplete="off" value={form.email} onChange={(e) => set('email', e.target.value)} />
+      <Field label="Phone" type="tel" inputMode="tel" autoComplete="off" value={form.phone} onChange={(e) => edit('phone', e.target.value)} />
+      <Field label="Email" type="email" inputMode="email" autoComplete="off" value={form.email} error={errors.email} onChange={(e) => edit('email', e.target.value)} />
       <Field label="Address" autoComplete="off" value={form.address} onChange={(e) => set('address', e.target.value)} />
       <Field label="Notes" multiline value={form.notes} onChange={(e) => set('notes', e.target.value)} />
     </CreateShell>
