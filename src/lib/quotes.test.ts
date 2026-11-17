@@ -77,6 +77,23 @@ describe('createQuote', () => {
     expect(callsOf(0, 'insert')[0][1]).toMatchObject({ user_id: 'user-1', org_id: 'org-1', client_id: 'client-1', lead_id: 'lead-1', title: 'Deck rebuild', status: 'draft' })
   })
 
+  // Audit finding DATA-12: a save whose answer was lost must not make a second quote.
+  it('sends the id the form minted, so a retry addresses the same quote', async () => {
+    responses.push({ data: { ...quote, id: 'minted-1', status: 'draft' }, error: null })
+    await createQuote({ id: 'minted-1', userId: 'user-1', orgId: 'org-1', clientId: 'client-1' })
+    expect(callsOf(0, 'insert')[0][1]).toMatchObject({ id: 'minted-1' })
+  })
+
+  it('a retry that finds its quote already saved returns that quote, not an error', async () => {
+    responses.push({ data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint' } })
+    responses.push({ data: { ...quote, id: 'minted-1', status: 'draft' }, error: null })
+    const row = await createQuote({ id: 'minted-1', userId: 'user-1', orgId: 'org-1', clientId: 'client-1' })
+    expect(row.id).toBe('minted-1')
+    expect(callsOf(1, 'eq')).toEqual(expect.arrayContaining([['eq', 'id', 'minted-1'], ['eq', 'user_id', 'user-1'], ['eq', 'org_id', 'org-1']]))
+    expect(callsOf(1, 'insert')).toEqual([])
+    expect(callsOf(1, 'update')).toEqual([])
+  })
+
   it('throws when the insert fails', async () => {
     responses.push({ data: null, error: { message: 'boom' } })
     await expect(createQuote({ userId: 'u', orgId: 'o', clientId: 'c' })).rejects.toThrow('boom')
@@ -110,3 +127,4 @@ describe('makeJobFromQuote', () => {
     expect(builders).toHaveLength(0)
   })
 })
+

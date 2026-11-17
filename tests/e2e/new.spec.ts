@@ -150,3 +150,27 @@ test('typing a new name on Quote creates the client', async ({ context, page }) 
   expect(clientInserts).toHaveLength(1)
   expect(clientInserts[0]).toMatchObject({ name: 'Dana Whitfield' })
 })
+
+// Audit finding DATA-12: a save whose answer is lost, tapped again, must
+// address the same quote, so the database cannot hold it twice.
+test('saving a quote again after a lost answer sends the same id', async ({ context, page }) => {
+  await signIn(context)
+  const inserts: Record<string, unknown>[] = []
+  await context.route(/\/rest\/v1\/fh_quotes(\?|$)/, async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback()
+    inserts.push(route.request().postDataJSON())
+    if (inserts.length === 1) return route.abort('connectionreset')
+    return route.fallback()
+  })
+  await open(page, '/quotes/new?client=cl-1')
+  await expect(page.getByRole('heading', { level: 1, name: 'New quote' })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByLabel('Client')).toHaveValue('Jeff Roy')
+  await page.getByRole('button', { name: 'Save quote' }).click()
+  await expect.poll(() => inserts.length).toBe(1)
+  await expect(page).toHaveURL(/\/quotes\/new/)
+  await page.getByRole('button', { name: 'Save quote' }).click()
+  await expect(page).toHaveURL(/\/quotes\/q-quote/, { timeout: 30_000 })
+  expect(inserts).toHaveLength(2)
+  expect(typeof inserts[0].id).toBe('string')
+  expect(inserts[1].id).toBe(inserts[0].id)
+})

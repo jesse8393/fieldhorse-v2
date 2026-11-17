@@ -5,7 +5,7 @@
 // client, title and notes are filled and the lead is marked quoted once
 // the quote saves.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Field } from '../../components/fh'
 import ClientField, { fetchClientPick, resolveClientId, restoredClientValue, type ClientFieldValue } from '../../components/ClientField.tsx'
@@ -15,10 +15,13 @@ import { useMembership } from '../../contexts/MembershipContext.tsx'
 import { supabase } from '../../lib/supabase.ts'
 import { leadToQuoteDraft, markLeadQuoted, type LeadRow } from '../../lib/leads.ts'
 import { createQuote } from '../../lib/quotes.ts'
+import { createUuid } from '../../lib/uuid.ts'
 import { JOB_TYPES } from '../../lib/jobTypes.ts'
 import { hapticMedium } from '../../lib/haptics.ts'
 
 type Form = {
+  /** The quote's id, minted once per form so a retried save is the same quote. */
+  requestId: string
   client: string
   clientId: string
   title: string
@@ -26,7 +29,7 @@ type Form = {
   scope: string
 }
 
-const EMPTY: Form = { client: '', clientId: '', title: '', jobType: '', scope: '' }
+const EMPTY: Form = { requestId: '', client: '', clientId: '', title: '', jobType: '', scope: '' }
 
 export default function QuoteNew() {
   const navigate = useNavigate()
@@ -36,7 +39,10 @@ export default function QuoteNew() {
   const clientParam = params.get('client')
   const leadParam = params.get('lead')
   const text = params.get('text')
-  const { form, set, patch, done } = useDraft<Form>('quote', EMPTY, text ? { scope: text } : null)
+  const [requestId] = useState(createUuid)
+  const { form, set, patch, done } = useDraft<Form>('quote', { ...EMPTY, requestId }, text ? { scope: text } : null)
+  const quoteId = form.requestId || requestId
+  const savingRef = useRef(false)
   const [client, setClient] = useState<ClientFieldValue>(() => restoredClientValue(form.client, form.clientId))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -75,14 +81,16 @@ export default function QuoteNew() {
   }
 
   async function save() {
-    if (!user) return
+    if (!user || savingRef.current) return
     if (!client.text.trim()) { setError('Enter a client.'); return }
+    savingRef.current = true
     setSaving(true)
     setError('')
     try {
       const picked = await resolveClientId(client, { userId: user.id, orgId })
       if (!picked) throw new Error('Enter a client.')
       const quote = await createQuote({
+        id: quoteId,
         userId: user.id,
         orgId,
         clientId: picked.id,
@@ -99,6 +107,7 @@ export default function QuoteNew() {
       // The quote screen opens with its line editor ready for the first line.
       navigate(`/quotes/${quote.id}?lines=new`, { replace: true })
     } catch (e) {
+      savingRef.current = false
       setSaving(false)
       setError(e instanceof Error && e.message ? e.message : 'Could not save this quote. Check your connection and try again.')
     }

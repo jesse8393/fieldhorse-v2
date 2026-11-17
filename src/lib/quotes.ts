@@ -20,7 +20,10 @@ const clean = (s: string | null | undefined) => {
   return t ? t : null
 }
 
+// The form mints `id` once (QuoteNew), so a save whose answer was lost and
+// is tapped again addresses the same quote instead of making a second one.
 export async function createQuote(input: {
+  id?: string
   userId: string
   orgId: string | null
   clientId: string
@@ -31,6 +34,7 @@ export async function createQuote(input: {
   jobType?: string | null
 }): Promise<QuoteRow> {
   const row: QuoteInsert = {
+    ...(input.id ? { id: input.id } : {}),
     user_id: input.userId,
     org_id: input.orgId ?? null,
     client_id: input.clientId,
@@ -46,8 +50,16 @@ export async function createQuote(input: {
     .insert(row)
     .select('*')
     .single()
-  if (error) throw new Error(error.message)
-  return data as QuoteRow
+  if (!error && data) return data as QuoteRow
+  if (input.id && (error as { code?: string } | null)?.code === '23505') {
+    // The first try saved and its answer was lost. Read that quote back,
+    // only when it is this person's in this company; never overwrite it.
+    let query = supabase.from('fh_quotes').select('*').eq('id', input.id).eq('user_id', input.userId)
+    query = input.orgId ? query.eq('org_id', input.orgId) : query.is('org_id', null)
+    const existing = await query.maybeSingle()
+    if (!existing.error && existing.data) return existing.data as QuoteRow
+  }
+  throw new Error(error?.message || 'Could not confirm this quote was saved. Try again.')
 }
 
 // The server atomically copies and links the quote. Repeated requests
