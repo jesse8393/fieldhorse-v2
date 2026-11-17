@@ -226,6 +226,17 @@ test.describe('the customer page', () => {
     await expect(main).toContainText(/Contract balance\s*\$500|\$500\s*Remaining contract value/)
   })
 
+  test('Map opens the map app for this device, not Apple Maps on Android (S25)', async ({ context, page }) => {
+    await signIn(context)
+    await open(page, '/clients/cl-1')
+    const map = page.getByRole('link', { name: 'Map' }).first()
+    await expect(map).toBeVisible({ timeout: 30_000 })
+    const href = await map.getAttribute('href')
+    expect(href).toContain(encodeURIComponent('412 Burkitt Station Rd').slice(0, 10))
+    // Pixel 7 is Android; desktop Chrome is not an Apple device either.
+    expect(href).not.toContain('maps.apple.com')
+  })
+
   test('a customer with leads, quotes or invoices is not deleted, and the page says what to do instead', async ({ context, page }) => {
     await signIn(context)
     const writes = watchWrites(page)

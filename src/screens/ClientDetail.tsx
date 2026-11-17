@@ -28,6 +28,8 @@ import { useSecondTap } from '../lib/secondTap.ts'
 import { clientDeleteBlockers, describeDeleteBlockers } from '../lib/clients.ts'
 import { gatherStatement } from '../lib/statement.ts'
 import { rollupJobs } from '../lib/rollups.ts'
+// Apple Maps on iPhone and iPad, Google Maps everywhere else (S25).
+import { navigateHrefHere } from '../lib/todayView.ts'
 import { composeClientTimeline, type TimelineEvent } from '../lib/clientTimeline.ts'
 
 function money(n: any) {
@@ -428,7 +430,7 @@ export default function ClientDetail() {
             <ActionTile
               icon={MapPin}
               label="Map"
-              href={client.address ? `https://maps.apple.com/?address=${encodeURIComponent(client.address)}` : null}
+              href={client.address ? navigateHrefHere(client.address) : null}
               external
             />
           </div>
@@ -641,7 +643,7 @@ function OverviewRead({ client, lifetime, outstanding, activeCount, jobs = [], p
       {client.address && (
         <a
           className="fh-client-directions"
-          href={`https://maps.apple.com/?address=${encodeURIComponent(client.address)}`}
+          href={navigateHrefHere(client.address)}
           target="_blank"
           rel="noopener noreferrer"
           onClick={() => hapticTap()}
