@@ -89,7 +89,9 @@ export default function InvoiceEdit() {
     refresh()
     if (settled.error) toastError('Invoice saved', 'Its paid status was not checked. Open it again to confirm what is owed.')
     else toastSuccess('Invoice saved', settled.paid ? 'The payments already recorded cover it, so it is paid.' : '')
-    navigate(`/invoices/${invoice.id}`, { replace: true })
+    // Back to the invoice this screen was opened from, so one Back there
+    // leaves it (OPS-11); a replace left a second copy in the history.
+    goBackFrom(navigate, `/invoices/${invoice.id}`)
   }
 
   const header = (

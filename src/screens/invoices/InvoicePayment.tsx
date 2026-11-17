@@ -87,7 +87,9 @@ export default function InvoicePayment() {
       if (!record.job) toastSuccess('Payment recorded', `${formatMoney(numeric)}, ${PAYMENT_METHODS.find((m) => m.value === method)?.label || 'Payment'}`)
       refresh()
       invalidateAfterPayment(queryClient, record.job?.id ?? null)
-      navigate(`/invoices/${record.invoice.id}`, { replace: true })
+      // Back to the invoice this screen was opened from, so one Back there
+      // leaves it (OPS-11); a replace left a second copy in the history.
+      goBackFrom(navigate, `/invoices/${record.invoice.id}`)
     } catch (err) {
       toastError("Couldn't record payment", (err as Error)?.message || 'Try again in a moment.')
       setSaving(false)

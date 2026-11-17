@@ -605,3 +605,30 @@ test.describe('money editors keep two decimals', () => {
     await expect(amount).toHaveValue('-12.34')
   })
 })
+
+// OPS-11: one Back after saving an invoice edit or recording a payment
+// leaves the invoice, instead of landing on the same invoice again.
+for (const flow of ['edit', 'payment'] as const) {
+  test(`one Back after the invoice ${flow} screen saves leaves the invoice`, async ({ page, context }) => {
+    await installShedInvoice(context)
+    await page.goto('/money', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+    await page.goto('/invoices/inv-1', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+    await expect(page.locator('.fhinv-actions')).toBeVisible({ timeout: 30_000 })
+    if (flow === 'edit') await page.getByRole('link', { name: 'Edit', exact: true }).first().click()
+    else await action(page, 'Collect payment').click()
+    await expect(page).toHaveURL(new RegExp(`/invoices/inv-1/${flow}$`))
+    const amount = page.getByLabel('Amount')
+    await expect(amount).toBeVisible({ timeout: 30_000 })
+    if (flow === 'edit') {
+      await amount.fill('3000')
+      await page.getByRole('button', { name: /^save/i }).click()
+    } else {
+      await amount.fill('100')
+      await page.getByRole('button', { name: /^record/i }).click()
+    }
+    await expect(page).toHaveURL(/\/invoices\/inv-1$/)
+    await expect(page.locator('.fhinv-actions')).toBeVisible({ timeout: 30_000 })
+    await page.getByRole('button', { name: 'Back' }).first().click()
+    await expect(page).not.toHaveURL(/\/invoices\/inv-1/)
+  })
+}
