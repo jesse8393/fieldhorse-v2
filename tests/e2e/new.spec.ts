@@ -325,6 +325,36 @@ test('a new lead shows in Leads when the person goes back (DATA-13)', async ({ c
   await expect.poll(() => leadReads - before, { timeout: 5000 }).toBeGreaterThan(0)
 })
 
+// D23: a create form's draft was written 0.4 s after the last keystroke,
+// and the timer died with the screen, so the last words typed before Back
+// or a reload were lost. Each step types and leaves in the same moment.
+test('a create form keeps what was typed just before Back or a reload (D23)', async ({ context, page }) => {
+  await signIn(context)
+  await open(page, '/new')
+  const newJob = page.getByRole('list', { name: 'What to create' }).getByRole('link', { name: /^Job/ })
+  await newJob.click()
+  const title = page.getByLabel('Title')
+  await expect(title).toBeVisible({ timeout: 30_000 })
+  await title.evaluate((el) => {
+    const input = el as HTMLInputElement
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'Shed slab')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    document.querySelector<HTMLButtonElement>('.fhnew-head button[aria-label="Back"]')!.click()
+  })
+  await expect(page).toHaveURL(/\/new$/)
+  await newJob.click()
+  await expect(title).toHaveValue('Shed slab', { timeout: 30_000 })
+
+  await title.evaluate((el) => {
+    const input = el as HTMLInputElement
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'Shed slab and apron')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    window.location.reload()
+  })
+  await expect(page.getByRole('heading', { level: 1, name: 'New job' })).toBeVisible({ timeout: 30_000 })
+  await expect(title).toHaveValue('Shed slab and apron', { timeout: 30_000 })
+})
+
 test('the first field keeps its focus on New lead and New client (S20)', async ({ context, page }) => {
   await signIn(context)
   await open(page, '/leads/new')
