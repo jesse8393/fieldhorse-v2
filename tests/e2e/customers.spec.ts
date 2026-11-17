@@ -66,6 +66,30 @@ test.describe('duplicates are reviewed on a screen', () => {
     await expect(page).toHaveURL(/\/clients$/)
   })
 
+  test("merging moves the duplicate's leads, quotes and invoices, and never deletes it while they are still there", async ({ context, page }) => {
+    // The mock does not apply writes, so the moved rows still read as the
+    // duplicate's afterwards: exactly the case where the delete must stop.
+    await signIn(context, {
+      tables: {
+        fh_clients: [JEFF, JEFF_AGAIN],
+        fh_leads: [{ id: 'lead-dup', user_id: USER.id, client_id: 'cl-dup', title: 'Back patio', status: 'open', created_at: iso(NOW - DAY) }],
+        fh_quotes: [{ id: 'q-dup', user_id: USER.id, client_id: 'cl-dup', title: 'Driveway', status: 'approved', amount: 12000, created_at: iso(NOW - DAY) }],
+        fh_invoices: [{ id: 'inv-dup', user_id: USER.id, client_id: 'cl-dup', contact_id: null, amount: 500, status: 'sent', created_at: iso(NOW - DAY) }]
+      }
+    })
+    const writes = watchWrites(page)
+    await open(page, '/clients/merge')
+    await expect(page.getByText('Leads, quotes, jobs, invoices and notes move to the kept client.', { exact: false })).toBeVisible()
+    await page.getByRole('button', { name: 'Merge cluster' }).click()
+    await page.getByRole('button', { name: 'Tap again to merge' }).click()
+
+    await expect(page.getByText(/still has leads, quotes and invoices that could not be moved, so it was not deleted/)).toBeVisible()
+    for (const table of ['fh_leads', 'fh_quotes', 'fh_invoices', 'fh_contacts']) {
+      expect(writes.some((w) => w.startsWith(`PATCH ${table}`)), table).toBe(true)
+    }
+    expect(writes.some((w) => w.startsWith('DELETE fh_clients'))).toBe(false)
+  })
+
   test('an unticked record is kept apart without a second tap, and stays unflagged', async ({ context, page }) => {
     await signIn(context, { tables: { fh_clients: [JEFF, JEFF_AGAIN] } })
     const writes = watchWrites(page)

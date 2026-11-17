@@ -149,11 +149,15 @@ export default function ClientsMerge() {
     try {
       const result = await mergeClients({ userId: user?.id, survivor, losers })
       hapticMedium()
+      const moved = [
+        [result.moved.leads, 'lead'],
+        [result.moved.quotes, 'quote'],
+        [result.moved.jobs, 'job'],
+        [result.moved.invoices, 'invoice']
+      ].filter(([n]) => (n as number) > 0).map(([n, noun]) => `${n} ${countNoun(n as number, noun as string)}`)
       toastSuccess(
         `Merged ${losers.length + 1} into 1`,
-        result.reassigned > 0
-          ? `${result.reassigned} ${countNoun(result.reassigned, 'job')} reassigned`
-          : 'No jobs needed reassigning'
+        moved.length ? `Moved to the kept client: ${moved.join(', ')}.` : 'Nothing else needed moving.'
       )
       if (keptApart.length > 0) setNotDuplicates(rememberNotDuplicates(user?.id, notDuplicates, keptApart))
       setMergedAway((prev) => new Set([...prev, ...losers.map((m: any) => m.id)]))
@@ -255,7 +259,7 @@ export default function ClientsMerge() {
               <div className="fhcm-cluster__foot">
                 <span className="fhcm-cluster__note">
                   {toDelete > 0
-                    ? `${toDelete} ${toDelete === 1 ? 'duplicate' : 'duplicates'} will be deleted. Jobs and notes move to the kept client.${keptApart > 0 ? ` ${keptApart} ${keptApart === 1 ? 'stays' : 'stay'} separate.` : ''}`
+                    ? `${toDelete} ${toDelete === 1 ? 'duplicate' : 'duplicates'} will be deleted. Leads, quotes, jobs, invoices and notes move to the kept client.${keptApart > 0 ? ` ${keptApart} ${keptApart === 1 ? 'stays' : 'stay'} separate.` : ''}`
                     : "Nothing will be deleted. These stay separate and won't be flagged again on this device."}
                 </span>
                 <Button

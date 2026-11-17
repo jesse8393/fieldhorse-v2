@@ -12,10 +12,13 @@
 // are appended to the survivor's, and a loser phone or email that differs
 // from the survivor's is written into the notes, so nothing the operator
 // typed is lost when the loser row is deleted. Then every row that points
-// at a loser (jobs, statement links, selections) is repointed at the
-// survivor, and finally the loser rows are deleted. The
-// fh_clients_aggregate trigger on fh_contacts recomputes the survivor's
-// active/lifetime aggregates, we don't have to call recompute manually.
+// at a loser is moved to the survivor (CLIENT_REFERENCES lists every table
+// with a foreign key to fh_clients). Leads and quotes are deleted with
+// their client and invoices lose it, so nothing may still point at a loser
+// when it is deleted: the merge reads every one of those tables first and
+// stops if anything is left. The fh_clients_aggregate trigger on
+// fh_contacts recomputes the survivor's active/lifetime aggregates, we
+// don't have to call recompute manually.
 //
 // Rows are matched by id only: RLS scopes fh_clients and everything that
 // points at it to the caller's company, so a teammate's client merges
@@ -242,14 +245,72 @@ export function planClientMerge(survivor: Client, losers: Client[]): MergePatch 
   return patch
 }
 
+// Every table with a foreign key to fh_clients, with the words the screen
+// uses for its rows. src/lib/clientMerge.test.ts checks this against the
+// generated types and every migration, so a new reference cannot be missed.
+// `byKey` tables hold at most one row per client and key (tags, consent,
+// the conversation thread). The database merge folds those into the
+// survivor's rows, and what stays on the duplicate is a copy of a row the
+// survivor already has.
+type TableName = keyof Database['public']['Tables']
+
+export const CLIENT_REFERENCES: ReadonlyArray<{ table: TableName; label: string; byKey?: boolean }> = [
+  { table: 'fh_contacts', label: 'jobs' },
+  { table: 'fh_leads', label: 'leads' },
+  { table: 'fh_quotes', label: 'quotes' },
+  { table: 'fh_invoices', label: 'invoices' },
+  { table: 'fh_follow_ups', label: 'follow ups' },
+  { table: 'fh_public_links', label: 'statement links' },
+  { table: 'fh_selections', label: 'selections' },
+  { table: 'fh_appointments', label: 'appointments' },
+  { table: 'fh_reviews', label: 'reviews' },
+  { table: 'fh_review_requests', label: 'review requests' },
+  { table: 'fh_messages', label: 'messages' },
+  { table: 'fh_conversations', label: 'a conversation', byKey: true },
+  { table: 'fh_events', label: 'activity history' },
+  { table: 'fh_outbox', label: 'queued messages' },
+  { table: 'fh_agent_runs', label: 'assistant drafts' },
+  { table: 'fh_workflow_runs', label: 'automations' },
+  { table: 'fh_form_submissions', label: 'form submissions' },
+  { table: 'fh_campaign_recipients', label: 'campaigns', byKey: true },
+  { table: 'fh_client_tags', label: 'tags', byKey: true },
+  { table: 'fh_client_fields', label: 'custom fields', byKey: true },
+  { table: 'fh_consent', label: 'contact preferences', byKey: true },
+  { table: 'fh_client_attribution', label: 'lead source details', byKey: true }
+]
+
+// The tables the app itself moves when the database merge is not installed.
+// The rest (messages, tags, automations) need the database merge; a
+// duplicate that has any of them is left in place until it is installed.
+export const MOVED_BY_APP = [
+  'fh_contacts', 'fh_leads', 'fh_quotes', 'fh_invoices', 'fh_follow_ups', 'fh_public_links', 'fh_selections'
+] as const
+
+const MERGE_FUNCTION = 'fh_merge_client_into'
+
+type Moved = { jobs: number; leads: number; quotes: number; invoices: number }
+
+function functionMissing(error: { code?: string; message?: string } | null | undefined) {
+  if (!error) return false
+  return error.code === 'PGRST202' || error.code === '42883' || /could not find the function/i.test(error.message || '')
+}
+
+function joinWords(words: string[]) {
+  if (words.length <= 1) return words.join('')
+  return `${words.slice(0, -1).join(', ')} and ${words[words.length - 1]}`
+}
+
 // Run a merge. `survivor` is the client row that stays; `losers` is the
 // array of client rows that will be absorbed and deleted. Returns
-// { reassigned, deletedCount, patch } on success or throws on failure.
+// { reassigned, moved, deletedCount, patch } on success or throws a
+// sentence the screen can show.
 //
-// The steps run as separate requests, ordered so a failure part way
-// leaves nothing lost: the survivor takes the losers' details first, then
-// everything pointing at a loser moves, and the losers are deleted last.
-// Running the merge again finishes the job.
+// The steps run in this order so a failure part way leaves nothing lost:
+// the survivor takes the losers' details first, then everything pointing
+// at a loser moves (in one database transaction when fh_merge_client_into
+// is installed, and by the app's own updates either way), then every
+// table that points at a client is read, and the losers are deleted only
+// when nothing points at them. Running the merge again finishes the job.
 export async function mergeClients({ userId, survivor, losers }: { userId: string | undefined; survivor: Client; losers: Client[] }) {
   if (!userId) throw new Error('mergeClients: userId required')
   if (!survivor?.id) throw new Error('mergeClients: survivor required')
@@ -257,7 +318,8 @@ export async function mergeClients({ userId, survivor, losers }: { userId: strin
 
   const absorbed = losers.filter((l) => l?.id && l.id !== survivor.id)
   const loserIds = absorbed.map((l) => l.id)
-  if (loserIds.length === 0) return { reassigned: 0, deletedCount: 0, patch: {} }
+  const moved: Moved = { jobs: 0, leads: 0, quotes: 0, invoices: 0 }
+  if (loserIds.length === 0) return { reassigned: 0, moved, deletedCount: 0, patch: {} }
 
   // 1) Copy what the losers know onto the survivor.
   const patch = planClientMerge(survivor, absorbed)
@@ -267,45 +329,71 @@ export async function mergeClients({ userId, survivor, losers }: { userId: strin
       .update(patch)
       .eq('id', survivor.id)
       .select('id')
-    if (upErr) throw upErr
+    if (upErr) throw new Error("Couldn't update the client you're keeping. Check your connection and try again.")
     if (!updated?.length) throw new Error("Couldn't update the client you're keeping. Refresh and try again.")
   }
 
-  // 2) Reassign every job pointing at a loser. The fh_clients_aggregate
-  // trigger fires per row and recomputes both the old and new client.
-  const { data: reassigned, error: reErr } = await supabase
-    .from('fh_contacts')
-    .update({ client_id: survivor.id })
-    .in('client_id', loserIds)
-    .select('id')
-  if (reErr) throw reErr
+  // 2) Move everything in one transaction when the database can. It is not
+  // in every database yet, so a missing function falls through to step 3.
+  let databaseMerged = false
+  // The generated types do not list the function until its migration is applied.
+  const rpc = supabase.rpc.bind(supabase) as unknown as (name: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { code?: string; message?: string } | null }>
+  const { data: merged, error: mergeErr } = await rpc(MERGE_FUNCTION, { p_survivor: survivor.id, p_duplicates: loserIds })
+  if (mergeErr && !functionMissing(mergeErr)) {
+    throw new Error("Couldn't move the duplicate's records. Nothing was deleted. Check your connection and try again.")
+  }
+  if (!mergeErr && merged && typeof merged === 'object' && !Array.isArray(merged)) {
+    databaseMerged = true
+    const m = merged as Partial<Record<keyof Moved, number>>
+    for (const k of Object.keys(moved) as (keyof Moved)[]) moved[k] += Number(m[k]) || 0
+  }
 
-  // 3) Statement links cascade when their client is deleted, so a link
-  // already sent to the customer would start returning not found.
-  const { error: linkErr } = await supabase
-    .from('fh_public_links')
-    .update({ client_id: survivor.id })
-    .in('client_id', loserIds)
-  if (linkErr) throw linkErr
+  // 3) The app moves the records it writes itself. After the database
+  // merge these find nothing left to move.
+  const countKey: Partial<Record<string, keyof Moved>> = { fh_contacts: 'jobs', fh_leads: 'leads', fh_quotes: 'quotes', fh_invoices: 'invoices' }
+  for (const table of MOVED_BY_APP) {
+    const { data, error } = await supabase
+      .from(table)
+      .update({ client_id: survivor.id })
+      .in('client_id', loserIds)
+      .select('id')
+    if (error) {
+      const label = CLIENT_REFERENCES.find((r) => r.table === table)?.label ?? 'records'
+      throw new Error(`Couldn't move the duplicate's ${label}. Nothing was deleted. Check your connection and try again.`)
+    }
+    const key = countKey[table]
+    if (key) moved[key] += (data || []).length
+  }
 
-  // 4) Selections would lose their client (on delete set null).
-  const { error: selErr } = await supabase
-    .from('fh_selections')
-    .update({ client_id: survivor.id })
-    .in('client_id', loserIds)
-  if (selErr) throw selErr
+  // 4) Read every table that points at a client. A row still on a loser
+  // would be deleted with it (or lose its client), so stop instead.
+  const left: string[] = []
+  for (const ref of CLIENT_REFERENCES) {
+    if (databaseMerged && ref.byKey) continue
+    const { data, error } = await supabase
+      .from(ref.table)
+      .select('client_id')
+      .in('client_id', loserIds)
+      .limit(1)
+    if (error) throw new Error("Couldn't check that everything moved to the kept client. Nothing was deleted. Check your connection and try again.")
+    if (data?.length) left.push(ref.label)
+  }
+  if (left.length) {
+    throw new Error(`The duplicate still has ${joinWords(left)} that could not be moved, so it was not deleted. Nothing was lost.`)
+  }
 
-  // 5) Delete the loser rows.
+  // 5) Delete the loser rows, now that nothing points at them.
   const { data: deleted, error: delErr } = await supabase
     .from('fh_clients')
     .delete()
     .in('id', loserIds)
     .select('id')
-  if (delErr) throw delErr
+  if (delErr) throw new Error("Everything moved to the kept client, but the duplicate couldn't be removed. Try the merge again.")
   if (!deleted?.length) throw new Error("Couldn't remove the duplicate records. Refresh and try again.")
 
   return {
-    reassigned: (reassigned || []).length,
+    reassigned: moved.jobs,
+    moved,
     deletedCount: deleted.length,
     patch
   }
