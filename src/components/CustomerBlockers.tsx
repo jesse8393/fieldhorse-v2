@@ -2,18 +2,20 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
-import { useInvoicesBundle } from '../lib/queries.ts'
+import { useClientDetail } from '../lib/queries.ts'
 import { useOrgScope } from '../lib/orgScope.ts'
 import { useNow } from '../lib/useNow.ts'
 import { supabase } from '../lib/supabase.ts'
-import { customerBlockers } from '../lib/customerBlockers.ts'
+import { clientBillingBundle, customerBlockers } from '../lib/customerBlockers.ts'
 import DataErrorState from './DataErrorState.tsx'
 
 export default function CustomerBlockers({ clientId, jobs }: { clientId: string; jobs: { id: string; stage?: string | null; job_title?: string | null; name?: string | null }[] }) {
   const { user } = useAuth()
   const { canSeeFinancials } = useMembership()
   const orgId = useOrgScope(user?.id)
-  const billing = useInvoicesBundle(canSeeFinancials ? user?.id : undefined)
+  // The customer screen's own read (same query, so no new request): this
+  // customer's invoices and payments, never the whole company's billing.
+  const billing = useClientDetail(canSeeFinancials ? clientId : undefined, user?.id)
   const now = useNow()
   const jobIds = jobs.map(j => j.id).sort()
   const schedule = useQuery({
@@ -37,7 +39,7 @@ export default function CustomerBlockers({ clientId, jobs }: { clientId: string;
   })
   const loading = schedule.isPending || canSeeFinancials && billing.isPending
   const failed = schedule.isError || canSeeFinancials && billing.isError
-  const blockers = customerBlockers({ clientId, jobs, schedules: schedule.data ?? [], billing: canSeeFinancials ? billing.data : null, now })
+  const blockers = customerBlockers({ clientId, jobs, schedules: schedule.data ?? [], billing: canSeeFinancials && billing.data ? clientBillingBundle(clientId, billing.data) : null, now })
   return <section aria-label="Delivery and billing review" style={{ padding: 16, border: '1px solid var(--v3-border)', borderRadius: 10, background: 'var(--v3-surface)' }}>
     <h2 style={{ margin: '0 0 8px', fontSize: 18 }}>Delivery and billing review</h2>
     {loading ? <p role="status">Checking linked records…</p> : failed ? <DataErrorState title="Review unavailable" message="Could not check every linked schedule and invoice. No clear status inferred." onRetry={() => { void schedule.refetch(); if (canSeeFinancials) void billing.refetch() }} /> : <>

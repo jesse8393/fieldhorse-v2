@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildMoneyReconciliation } from './moneyReconciliation.ts'
-import { customerBlockers } from './customerBlockers.ts'
+import { clientBillingBundle, customerBlockers } from './customerBlockers.ts'
 import { reviewInvoice } from './invoiceReview.js'
 const now = new Date('2026-10-27T12:00:00')
 const job = { id: 'job', client_id: 'client', name: 'Rosa', job_title: 'Foundation', stage: 'job', amount: 10000 }
@@ -41,6 +41,20 @@ describe('customer blockers', () => {
   })
   it('does not invent billing risks without billing permission/data', () => {
     expect(customerBlockers({ clientId: 'client', jobs: [job], schedules: [], now })).toEqual([])
+  })
+  // PERF-06: the client screen's own reads (its invoices by client_id,
+  // payments on its jobs and its direct bills, approved change orders) give
+  // the same overdue balances as the company wide bundle.
+  it('finds overdue balances from the customer screen\'s own reads', () => {
+    const own = (id: string, amount: number, status = 'sent', contact_id: string | null = 'job') => ({ id, contact_id, title: 'Progress draw', amount, status, due_at: '2026-10-20', sequence_number: 1, created_at: '2026-10-01T12:00:00Z', updated_at: '2026-10-01T12:00:00Z' })
+    const detail = {
+      jobs: [{ ...job, updated_at: '2026-10-01T12:00:00Z', created_at: '2026-08-01T12:00:00Z', job_type: null }],
+      invoices: [own('a', 3000), own('paid', 500, 'paid'), own('direct', 400, 'sent', null)],
+      payments: [{ contact_id: 'job', invoice_id: 'a', amount: 1000, paid_on: '2026-10-05', created_at: '2026-10-05T12:00:00Z', method: 'check' }, { contact_id: null, invoice_id: 'direct', amount: 100, paid_on: '2026-10-05', created_at: '2026-10-05T12:00:00Z', method: 'cash' }],
+      changeOrders: [],
+    }
+    const result = customerBlockers({ clientId: 'client', jobs: detail.jobs, schedules: [], billing: clientBillingBundle('client', detail), now })
+    expect(result.map(r => [r.id, r.detail.split(' · ').pop()])).toEqual([['invoice-a', '$2,000.00 remaining'], ['invoice-direct', '$300.00 remaining']])
   })
 })
 

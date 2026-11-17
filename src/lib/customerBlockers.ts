@@ -1,6 +1,23 @@
-import type { InvoicesBundle } from './queries.ts'
+import type { ClientDetailBundle, InvoicesBundle } from './queries.ts'
 import { buildMoneyReconciliation } from './moneyReconciliation.ts'
 export type CustomerBlocker = { id: string; label: string; detail: string; to: string }
+
+/**
+ * One customer's billing, from what the customer screen already read
+ * (useClientDetail): its invoices (all read by client_id), the payments on
+ * its jobs and on its direct bills, and its approved change orders, shaped
+ * as the money reconciliation reads them. Payments are allocated per job or
+ * per direct bill, never across customers, so the overdue balances match
+ * the company wide bundle without downloading it.
+ */
+export function clientBillingBundle(clientId: string, detail: Pick<ClientDetailBundle, 'jobs' | 'invoices' | 'payments' | 'changeOrders'>): InvoicesBundle {
+  return {
+    jobs: detail.jobs as unknown as InvoicesBundle['jobs'],
+    payments: detail.payments as unknown as InvoicesBundle['payments'],
+    invoices: detail.invoices.map((invoice) => ({ ...invoice, client_id: clientId })) as unknown as InvoicesBundle['invoices'],
+    changeOrders: detail.changeOrders as unknown as InvoicesBundle['changeOrders'],
+  }
+}
 export function customerBlockers({ clientId, jobs, schedules, billing, now }: { clientId: string; jobs: { id: string; stage?: string | null; job_title?: string | null; name?: string | null }[]; schedules: { id: string; contact_id: string | null; end_at: string | null }[]; billing?: InvoicesBundle | null; now: Date }): CustomerBlocker[] {
   const result: CustomerBlocker[] = []
   const since = now.getTime() - 14 * 86400000

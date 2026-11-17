@@ -63,6 +63,24 @@ test('customer overview reconciles schedule and invoice blockers', async ({ page
   await nothingRunsOffTheSide(page, 'customer blocker review')
 })
 
+// PERF-06: the review works from this customer's own invoices, payments
+// and change orders, which the customer screen has already read, never
+// from the whole company's billing.
+test('the customer review reads only this customer\'s billing', async ({ page }) => {
+  const companyWide: string[] = []
+  page.on('request', request => {
+    const url = new URL(request.url())
+    const table = url.pathname.split('/rest/v1/')[1]
+    if (!['fh_invoices', 'fh_payments', 'fh_change_orders'].includes(table)) return
+    const scopedToRecords = ['client_id', 'contact_id', 'invoice_id', 'id'].some(key => url.searchParams.has(key))
+    if (!scopedToRecords) companyWide.push(`${table}${url.search}`)
+  })
+  await page.goto(`/clients/${client.id}`)
+  const review = page.getByRole('region', { name: 'Delivery and billing review' })
+  await expect(review.locator('a[href="/invoices/issued-finance"]')).toContainText('$3,000.00')
+  expect(companyWide).toEqual([])
+})
+
 test('customer context stays factual and its actions open working destinations', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name.startsWith('mobile'), 'Desktop customer context')
   await page.goto(`/clients/${client.id}`)
