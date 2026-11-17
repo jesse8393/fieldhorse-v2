@@ -207,3 +207,45 @@ test('top clients names a client\'s payments to the cent', async ({ context, pag
   await expect(list.getByText('$1,000.50', { exact: true })).toBeVisible()
   await expect(list.getByText('$1,001', { exact: true })).toHaveCount(0)
 })
+
+// formats-4: with cents on every figure, seven figure stage and monthly
+// totals still fit. The drawn text of each figure sits
+// inside its own row or column, so no cents are clipped and no two month
+// figures run into each other.
+for (const width of [1024, 1280]) {
+  test(`stage and month figures with cents fit at ${width} px`, async ({ context, page }, testInfo) => {
+    test.skip(!testInfo.project.name.startsWith('desktop'), 'The desktop report')
+    await page.setViewportSize({ width, height: 900 })
+    await page.clock.setFixedTime(new Date('2026-10-27T15:00:00Z'))
+    const months = ['2026-05-15', '2026-06-15', '2026-07-15', '2026-08-15', '2026-09-15', '2026-10-15']
+    await signIn(context, { tables: {
+      fh_contacts: [{ id: 'c-big', user_id: USER.id, stage: 'job', name: 'Big client', amount: 1234567.89, cost: null, updated_at: iso(NOW), created_at: iso(NOW) }],
+      fh_payments: months.map((paid_on, i) => ({ id: `p-${i}`, user_id: USER.id, contact_id: 'c-big', amount: 1234567.89 + i, paid_on })),
+      fh_stage_transitions: [], fh_invoices: []
+    } })
+    await open(page)
+    const bar = page.locator('.fh-build-stage-bar').filter({ hasText: '$1,234,567.89' })
+    await expect(bar).toHaveCount(1, { timeout: 30_000 })
+    const fits = await bar.evaluate((row) => {
+      const value = row.querySelector('.fh-build-stage-bar__value') as HTMLElement
+      const range = document.createRange()
+      range.selectNodeContents(value)
+      const text = range.getBoundingClientRect()
+      const box = row.getBoundingClientRect()
+      const card = (row.closest('.fh-build-chart-card') as HTMLElement).getBoundingClientRect()
+      return text.left >= box.left - 0.5 && text.right <= Math.min(box.right, card.right) + 0.5
+    })
+    expect(fits, 'the stage value is drawn whole inside its row').toBe(true)
+    const columns = page.locator('.fh-build-trend-col')
+    await expect(columns).toHaveCount(6)
+    const spill = await columns.evaluateAll((cols) => cols.map((col) => {
+      const value = col.querySelector('.fh-build-trend-col__value') as HTMLElement
+      const range = document.createRange()
+      range.selectNodeContents(value)
+      const text = range.getBoundingClientRect()
+      const box = col.getBoundingClientRect()
+      return text.left >= box.left - 0.5 && text.right <= box.right + 0.5 ? null : value.textContent
+    }).filter(Boolean))
+    expect(spill, 'each month figure stays inside its own column').toEqual([])
+  })
+}

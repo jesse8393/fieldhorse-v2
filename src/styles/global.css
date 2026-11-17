@@ -4180,7 +4180,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
   }
   .fh-build-stage-bar {
     display: grid;
-    grid-template-columns: 160px 1fr 100px;
+    grid-template-columns: 160px minmax(0, 1fr) max-content;
     align-items: center;
     gap: 12px;
   }
@@ -4209,6 +4209,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     font-size: 20px;
     color: var(--v3-primary-text, #C9963A);
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 
   /* Revenue trend (column chart) */
@@ -4249,6 +4250,7 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     font-family: var(--font-display);
     font-size: 14px;
     font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
   }
 
   /* ---------- FORECAST / POUR WINDOW ---------- */
@@ -4361,7 +4363,10 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
     .fh-build-stage-bar {
-      grid-template-columns: 100px 1fr 80px;
+      grid-template-columns: 100px minmax(0, 1fr) max-content;
+    }
+    .fh-build-trend-col__value {
+      font-size: 12px;
     }
   }
 }
