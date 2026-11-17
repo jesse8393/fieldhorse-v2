@@ -211,7 +211,7 @@ export default function ProposalTemplate({
         <section>
           <SectionLabel>Optional additions</SectionLabel>
           <p style={{ margin: '-4px 0 10px', fontSize: 12, color: DOC_COLORS.inkMuted, lineHeight: 1.5 }}>
-            Priced separately and not included in the estimate total. Approve any option to add it to the contract.
+           Priced separately and not included in the estimate total. Ask us to add any of them to the contract.
           </p>
           <AddOnsTable items={upgradeGroupsFlat} />
         </section>

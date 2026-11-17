@@ -746,7 +746,7 @@ const checkboxRowStyle: import('react').CSSProperties = {
 
 const buttonStyle: import('react').CSSProperties = {
   display: 'block', width: '100%',
-  height: 40,
+  minHeight: 44,
   padding: '0 16px',
   borderRadius: 10, border: 'none',
   background: 'linear-gradient(135deg, #C9963A 0%, #C9963A 100%)',
@@ -758,7 +758,7 @@ const buttonStyle: import('react').CSSProperties = {
 }
 
 const secondaryButtonStyle: import('react').CSSProperties = {
-  height: 40,
+  minHeight: 44,
   padding: '0 16px',
   borderRadius: 10,
   border: '1px solid #5C5C5C',

@@ -1800,3 +1800,33 @@ test('the tab names no app while a customer link loads or fails (PT-11)', async 
   expect(await page.title()).toBe('Document')
 })
 
+
+/* ---- Smaller defects on the customer pages (PT-24) ---- */
+
+test('on a phone the billing schedule shows every amount and status without sideways scrolling', async ({ page, context }) => {
+  await mockPortal(context, invoicePayload({
+    invoices: [draw('inv-s1', 1, 2500, 'paid'), draw('inv-s2', 2, 5000, 'sent'), draw('inv-s3', 3, 2500, 'sent')],
+    payments: [{ id: 'p-s1', contact_id: 'job-linked-0003', invoice_id: 'inv-s1', amount: 2500, paid_on: '2026-11-01', method: 'check', kind: 'deposit' }]
+  }))
+  await openInvoice(page)
+  const width = page.viewportSize()!.width
+  for (const text of ['$5,000.00', 'Paid']) {
+    const box = await page.getByText(text, { exact: true }).first().boundingBox()
+    expect(box).not.toBeNull()
+    expect(box!.x + box!.width).toBeLessThanOrEqual(width)
+  }
+})
+
+test('the classic approve button is at least 44 px tall, and no sentence offers to approve an option it cannot', async ({ page, context }) => {
+  await mockPortal(context, proposalPayload({ company: { estimate_template: 'classic' } }))
+  await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+  const box = await page.getByRole('button', { name: 'Approve & notify contractor' }).boundingBox()
+  expect(box!.height).toBeGreaterThanOrEqual(44)
+  await expect(page.getByText(/Approve any option/)).toHaveCount(0)
+})
+
+test('the editorial theme prints the scope of work once', async ({ page, context }) => {
+  await mockPortal(context, proposalPayload({ company: { estimate_template: 'editorial' }, contact: { scope_text: 'Pour a 4 inch slab with a broom finish.' } }))
+  await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByText('Pour a 4 inch slab with a broom finish.')).toHaveCount(1)
+})

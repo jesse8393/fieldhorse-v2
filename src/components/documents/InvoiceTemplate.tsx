@@ -142,20 +142,16 @@ export default function InvoiceTemplate({
       {scheduleRows.length > 0 && (
         <section>
           <SectionLabel>Billing schedule</SectionLabel>
-          {/* Scroll guard: five columns don't fit a 390px phone; the
-              table keeps its letter-width geometry and pans instead of
-              clipping the Status column. */}
-          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-            <div style={{ minWidth: 480 }}>
-              <BillingSchedule
-                invoices={scheduleRows}
-                currentId={currentInvoice?.id || null}
-                company={company}
-                brand={brand}
-                jobSeed={contact?.id}
-              />
-            </div>
-          </div>
+          {/* On a narrow document each draw stacks as a labelled row
+              (documents-responsive.css, .fh-doc-items), so Amount and
+              Status stay on screen instead of off its right edge. */}
+          <BillingSchedule
+            invoices={scheduleRows}
+            currentId={currentInvoice?.id || null}
+            company={company}
+            brand={brand}
+            jobSeed={contact?.id}
+          />
         </section>
       )}
 
@@ -310,7 +306,7 @@ function HeroBand({ brand, amountDue, dueDate, isPaid, isOverdue, paid, contract
 
 function BillingSchedule({ invoices, currentId, company, brand, jobSeed }: any) {
   return (
-    <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: DOC_FONTS.body, fontSize: 12 }}>
+    <table className="fh-doc-items" style={{ width: '100%', borderCollapse: 'collapse', fontFamily: DOC_FONTS.body, fontSize: 12 }}>
       <thead>
         <tr>
           {['Invoice', 'Issued', 'Due', 'Amount', 'Status'].map((h, i) => (
@@ -338,8 +334,8 @@ function BillingSchedule({ invoices, currentId, company, brand, jobSeed }: any) 
           const isCurrent = currentId != null && inv.id === currentId
           const paid = String(inv.status || '').toLowerCase() === 'paid'
           return (
-            <tr key={inv.id} style={{ background: isCurrent ? DOC_COLORS.paperSoft : undefined }}>
-              <td style={cell()}>
+            <tr key={inv.id} className="fh-doc-item-row" style={{ background: isCurrent ? DOC_COLORS.paperSoft : undefined }}>
+              <td className="fh-doc-item-description" style={cell()}>
                 <span style={{ fontWeight: isCurrent ? 700 : 500, color: DOC_COLORS.ink, fontVariantNumeric: 'tabular-nums' }}>
                   {invoiceNumberFromSequence(company?.name, inv.sequence_number, jobSeed || inv.contact_id || inv.id)}
                 </span>
@@ -350,12 +346,12 @@ function BillingSchedule({ invoices, currentId, company, brand, jobSeed }: any) 
                   </span>
                 )}
               </td>
-              <td style={{ ...cell(), color: DOC_COLORS.inkMuted, whiteSpace: 'nowrap' }}>{shortDate(inv.issued_at || inv.created_at)}</td>
-              <td style={{ ...cell(), color: DOC_COLORS.inkMuted, whiteSpace: 'nowrap' }}>{paid ? '\u2003' : shortDate(inv.due_at) || '\u2003'}</td>
-              <td style={{ ...cell(), textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+              <td data-label="Issued" style={{ ...cell(), color: DOC_COLORS.inkMuted, whiteSpace: 'nowrap' }}>{shortDate(inv.issued_at || inv.created_at)}</td>
+              <td data-label="Due" style={{ ...cell(), color: DOC_COLORS.inkMuted, whiteSpace: 'nowrap' }}>{paid ? '\u2003' : shortDate(inv.due_at) || '\u2003'}</td>
+              <td data-label="Amount" style={{ ...cell(), textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
                 {money(Number(inv.amount || 0), { cents: true })}
               </td>
-              <td style={{ ...cell(), textAlign: 'right' }}>
+              <td data-label="Status" style={{ ...cell(), textAlign: 'right' }}>
                 <span
                   style={{
                     fontSize: 12,
