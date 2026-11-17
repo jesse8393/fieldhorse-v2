@@ -1,8 +1,7 @@
-import { Suspense, useEffect, useLayoutEffect, useRef } from 'react'
+import { Suspense, useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import { Navigate, Outlet, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
 import AppHeader from './AppHeader.tsx'
 import Dock from './fh/Dock.tsx'
-import CommandPalette from './CommandPalette.tsx'
 import InstallPrompt from './InstallPrompt.tsx'
 import AppUpdateNotice from './AppUpdateNotice.tsx'
 import RouteErrorBoundary from './RouteErrorBoundary.tsx'
@@ -13,6 +12,54 @@ import { layoutForPath } from '../lib/appLayout.ts'
 import { captureRoute, type OpenCaptureDetail } from '../lib/captureAttach.ts'
 import { useCaptureOutboxSync } from '../lib/captureOutbox.ts'
 import { permissionRouteForPath } from '../lib/permissions.ts'
+import { lazyWithRetry } from '../lib/lazyWithRetry.ts'
+
+// The command palette is the desktop keyboard overlay, so it (and cmdk
+// and Radix with it) loads only at desktop widths: a phone never
+// downloads it.
+const CommandPalette = lazyWithRetry(() => import('./CommandPalette.tsx'))
+
+/**
+ * Mounts the palette on a desktop. An open asked for before its chunk
+ * lands (Control or Cmd+K, the header's search button) is kept and
+ * replayed once the palette is listening, so the first press is never
+ * lost. The palette's own effects run before PaletteMounted's, as its
+ * earlier sibling.
+ */
+function DesktopCommandPalette() {
+  const mounted = useRef(false)
+  const queued = useRef(false)
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (mounted.current || !(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'k') return
+      e.preventDefault()
+      queued.current = !queued.current
+    }
+    function onOpen() { if (!mounted.current) queued.current = true }
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('fh:open-palette', onOpen)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('fh:open-palette', onOpen)
+    }
+  }, [])
+  const onMounted = useCallback(() => {
+    mounted.current = true
+    if (queued.current) window.dispatchEvent(new CustomEvent('fh:open-palette'))
+    queued.current = false
+  }, [])
+  return (
+    <Suspense fallback={null}>
+      <CommandPalette />
+      <PaletteMounted onMounted={onMounted} />
+    </Suspense>
+  )
+}
+
+function PaletteMounted({ onMounted }: { onMounted: () => void }) {
+  useEffect(() => { onMounted() }, [onMounted])
+  return null
+}
 
 // Route-loading skeleton, matches Onyx bg so split-chunk fetches don't
 // flash a white screen. AppHeader and the dock stay mounted around it.
@@ -262,7 +309,7 @@ export default function AppShell() {
       {/* Phone navigation and Capture remain in the dock; desktop Capture
           lives in the header. The command palette is shared. */}
       {!isDesktop && <Dock />}
-      <CommandPalette />
+      {isDesktop && <DesktopCommandPalette />}
       <InstallPrompt />
       {/* Toasts: one Sonner Toaster at the app root (components/AppToaster.tsx). */}
     </div>

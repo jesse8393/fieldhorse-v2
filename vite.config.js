@@ -191,6 +191,12 @@ export default defineConfig({
           if (id.includes('html2canvas')) return 'vendor-html2canvas'
           if (id.includes('dompurify')) return 'vendor-dompurify'
           if (id.includes('recharts') || id.includes('d3-')) return 'vendor-charts'
+          // MotionConfig (main.tsx) honours the OS Reduce Motion setting
+          // for every motion component, so it has to wrap the app from the
+          // start. It and the context it provides get a tiny chunk of their
+          // own, so the entry does not pull in the rest of framer-motion,
+          // which only lazy screens use.
+          if (/framer-motion\/dist\/es\/(components\/MotionConfig\/|context\/MotionConfigContext\.|utils\/use-constant\.|render\/dom\/utils\/filter-props\.|motion\/utils\/valid-prop\.)/.test(id)) return 'vendor-motion-config'
           if (id.includes('framer-motion')) return 'vendor-motion'
           if (id.includes('lucide-react')) return 'vendor-icons'
           if (id.includes('@supabase')) return 'vendor-supabase'

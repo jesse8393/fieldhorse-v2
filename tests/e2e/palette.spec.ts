@@ -363,3 +363,32 @@ test.describe('command palette', () => {
     }
   })
 })
+
+// PERF-04: the palette is the desktop keyboard overlay, so a phone never
+// downloads it (or cmdk and Radix with it). On a desktop it is fetched
+// with the shell, and a Control+K pressed before it lands still opens it.
+test.describe('command palette loading', () => {
+  test('a phone never downloads the command palette', async ({ context, page }, testInfo) => {
+    test.skip(!testInfo.project.name.startsWith('mobile'), 'Phone loading')
+    const fetched: string[] = []
+    page.on('request', request => {
+      if (/CommandPalette|cmdk|radix-ui/.test(request.url())) fetched.push(request.url())
+    })
+    await signIn(context)
+    await open(page, '/')
+    await page.waitForLoadState('networkidle')
+    expect(fetched).toEqual([])
+  })
+
+  test('Control+K pressed while the palette loads still opens it', async ({ context, page }, testInfo) => {
+    test.skip(!testInfo.project.name.startsWith('desktop'), 'Desktop palette')
+    await signIn(context)
+    let release!: () => void
+    const loaded = new Promise<void>(resolve => { release = resolve })
+    await context.route(/CommandPalette/, async route => { await loaded; await route.fallback() })
+    await open(page)
+    await page.keyboard.press('Control+k')
+    release()
+    await expect(page.getByRole('dialog', { name: 'Command palette' })).toBeVisible()
+  })
+})
