@@ -29,18 +29,21 @@ export async function unreadCount(userId?: string) {
   return count || 0
 }
 
+// Both throw when the write fails, so the screen can put the rows back.
 export async function markRead(id: string | undefined, userId: string | undefined) {
   if (!id || !userId) return
-  await supabase.from('fh_notifications').update({ read_at: new Date().toISOString() }).eq('id', id).eq('user_id', userId)
+  const { error } = await supabase.from('fh_notifications').update({ read_at: new Date().toISOString() }).eq('id', id).eq('user_id', userId)
+  if (error) throw error
 }
 
 export async function markAllRead(userId: string | undefined) {
   if (!userId) return
-  await supabase
+  const { error } = await supabase
     .from('fh_notifications')
     .update({ read_at: new Date().toISOString() })
     .eq('user_id', userId)
     .is('read_at', null)
+  if (error) throw error
 }
 
 // Insert a notification for the CURRENT user. Used for self-notifications
