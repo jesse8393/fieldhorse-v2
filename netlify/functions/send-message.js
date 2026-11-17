@@ -32,9 +32,12 @@
 // and fall back to the existing mailto: handoff.
 
 import { createClient } from '@supabase/supabase-js'
-import { hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
+import { hashIdentifier, checkRateLimit, checkDailySendCap, DAILY_SEND_LIMIT_MESSAGE } from './lib/rateLimit.js'
 import { loadAccessibleRow, brandingUserIdFor } from './lib/orgAccess.js'
-import { formatFromHeader, renderParagraphs, textField } from './lib/email.js'
+import { formatFromHeader, renderParagraphs, textField, idempotencyKey, sendViaResend, sendFailure, EMAIL_HEAD } from './lib/email.js'
+
+// Daily cap for messages to an address that is not the job's customer.
+const OTHER_RECIPIENT_DAILY_LIMIT = 30
 
 export default async (request) => {
   if (request.method === 'OPTIONS') {
@@ -133,16 +136,41 @@ export default async (request) => {
     return json({ error: 'rate_limited', message: 'Too many messages. Please try again in a minute.' }, 429)
   }
 
+  const dayOk = await checkDailySendCap(supabase, sender_user_id)
+  if (!dayOk) {
+    return json({ error: 'rate_limited', message: DAILY_SEND_LIMIT_MESSAGE }, 429)
+  }
+
   // Verify the caller may act on the contact: its creator, or an owner,
   // admin or manager of its company. contact_id is required (checked
   // above), so the relay can only reach a client on the company's roster.
   const access = await loadAccessibleRow(supabase, {
     table: 'fh_contacts', id: contact_id, callerId: sender_user_id,
-    select: 'name, job_title'
+    select: 'name, job_title, email, client_id'
   })
   if (access.error === 'lookup_failed') return json({ error: 'contact_lookup_failed', message: 'Could not load this job. Try again.' }, 500)
   if (!access.row) return json({ error: 'forbidden_or_not_found', message: 'This record was not found, or your role cannot send it. Ask an owner, admin or manager.' }, 403)
   const contact = access.row
+
+  // Any address may be written to: contractors email a spouse or a
+  // property manager. One that is not the job's own email or its client's
+  // email counts against a tighter daily cap, so the relay cannot be used
+  // to mail strangers in bulk (FN-02).
+  const customerEmails = [contact.email]
+  if (contact.client_id) {
+    const { data: client } = await supabase.from('fh_clients').select('email').eq('id', contact.client_id).maybeSingle()
+    customerEmails.push(client?.email)
+  }
+  const isCustomer = customerEmails.some((e) => String(e || '').toLowerCase().trim() === normalizedEmail)
+  if (!isCustomer) {
+    const otherOk = await checkDailySendCap(supabase, sender_user_id, { scope: 'send-message-other-day', limit: OTHER_RECIPIENT_DAILY_LIMIT })
+    if (!otherOk) {
+      return json({
+        error: 'rate_limited',
+        message: `You can email ${OTHER_RECIPIENT_DAILY_LIMIT} addresses a day that are not on this customer's record. Add the address to the customer, or try again tomorrow.`
+      }, 429)
+    }
+  }
 
   // Pull the company's branding for From-line + Reply-To.
   const brandingUserId = (await brandingUserIdFor(supabase, contact)) || sender_user_id
@@ -184,25 +212,18 @@ export default async (request) => {
     resendPayload.reply_to = replyTo
   }
 
-  const resendRes = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${RESEND_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(resendPayload)
+  // No attachment here, so the key hashes the message itself: the same
+  // words to the same address on the same job within 24 hours go once.
+  const sent = await sendViaResend({
+    apiKey: RESEND_API_KEY,
+    payload: resendPayload,
+    key: idempotencyKey('send-message', `job:${contact_id}`, normalizedEmail, finalSubject, trimmedBody)
   })
-  const resendBody = await resendRes.json().catch(() => ({}))
-
-  if (!resendRes.ok) {
-    return json({
-      error: 'send_failed',
-      provider_status: resendRes.status,
-      detail: resendBody?.message || resendBody?.error || 'Email provider rejected the send.'
-    }, 502)
+  if (!sent.ok) {
+    return json(sendFailure(sent), 502)
   }
 
-  const emailId = resendBody?.id || null
+  const emailId = sent.body?.id || null
   const sentAtIso = new Date().toISOString()
 
   // Preserve the actual sent content. A failed history write must never be
@@ -244,10 +265,11 @@ function renderMessageHtml({ body, senderLine, companyName }) {
   const bodyHtml = renderParagraphs(body, safe)
   return `<!doctype html>
 <html lang="en">
+${EMAIL_HEAD}
 <body style="margin:0;padding:0;background:#F2EDE4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#141414;line-height:1.55;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#F2EDE4;padding:32px 16px;">
     <tr><td align="center">
-      <table role="presentation" width="560" cellspacing="0" cellpadding="0" style="max-width:560px;background:#F2EDE4;border-radius:10px;border:1px solid #5C5C5C;overflow:hidden;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;max-width:560px;background:#F2EDE4;border-radius:10px;border:1px solid #5C5C5C;overflow:hidden;">
         <tr><td style="padding:32px 32px 24px;">
           <div style="font-size:16px;color:#141414;">${bodyHtml}</div>
         </td></tr>
@@ -255,7 +277,7 @@ function renderMessageHtml({ body, senderLine, companyName }) {
           <p style="margin:0;font-size:14px;color:#5C5C5C;">Reply directly to this email to reach ${safe(senderLine)}.</p>
         </td></tr>
       </table>
-      ${companyName ? `<p style="margin:16px 0 0;font-size:12px;color:#5C5C5C;letter-spacing:0;text-transform:uppercase;">Sent on behalf of ${safe(companyName)}</p>` : ''}
+      ${companyName ? `<p style="margin:16px 0 0;font-size:12px;color:#5C5C5C;letter-spacing:0;">Sent on behalf of ${safe(companyName)}</p>` : ''}
     </td></tr>
   </table>
 </body>

@@ -12,6 +12,8 @@ import { supabaseServiceConfig } from './lib/serviceConfig.js'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'node:crypto'
 import { resolveCallerMembership } from './lib/membership.js'
+import { idempotencyKey, sendViaResend, formatFromHeader } from './lib/email.js'
+import { hashIdentifier, checkRateLimit, checkDailySendCap, DAILY_SEND_LIMIT_MESSAGE } from './lib/rateLimit.js'
 
 const VALID_ROLES = ['owner', 'admin', 'manager', 'foreman', 'crew']
 
@@ -71,6 +73,20 @@ export default async (request) => {
     return json({ error: 'role_exceeds_caller', message: 'You can only invite roles below your own.' }, 403)
   }
 
+  // An invite mails any address, so it goes through the same limiters as
+  // every other sender: the short window shared with the send-* functions
+  // and the daily cap. Checked before the invite row is created.
+  const shortOk = await checkRateLimit(admin, {
+    scope: 'send-email', identifier: hashIdentifier(authUserId), limit: 30, windowSeconds: 600,
+  })
+  if (!shortOk) {
+    return json({ error: 'rate_limited', message: 'Too many invites sent in a short time. Try again in a few minutes.' }, 429)
+  }
+  const dayOk = await checkDailySendCap(admin, authUserId)
+  if (!dayOk) {
+    return json({ error: 'rate_limited', message: DAILY_SEND_LIMIT_MESSAGE }, 429)
+  }
+
   // Generate a fresh token (URL-safe).
   const token = crypto.randomBytes(24).toString('base64url')
 
@@ -120,8 +136,13 @@ export default async (request) => {
       const safeOrgName = safe(orgName)
 
       const subject = `You're invited to join ${orgName} on FieldHorse`
+      // "an admin", "a manager": the article follows the role.
+      const article = /^[aeiou]/i.test(role) ? 'an' : 'a'
+      // From carries the company name, and a reply reaches the person who
+      // sent the invite rather than the shared mailbox.
+      const inviterEmail = String(userData.user.email || '').trim()
       const text = [
-        `You've been invited to join ${orgName} on FieldHorse as a ${role}.`,
+        `You've been invited to join ${orgName} on FieldHorse as ${article} ${role}.`,
         '',
         `Accept the invite: ${acceptUrl}`,
         '',
@@ -129,10 +150,10 @@ export default async (request) => {
       ].join('\n')
       const html = `
         <div style="font-family:system-ui,-apple-system,sans-serif;max-width:520px;padding:24px;color:#141414">
-          <p style="font-size:14px;color:#5C5C5C;letter-spacing:0;text-transform:uppercase;margin:0 0 8px">FieldHorse</p>
+          <p style="font-size:14px;color:#5C5C5C;letter-spacing:0;margin:0 0 8px">FieldHorse</p>
           <h1 style="font-size:24px;margin:0 0 16px">Join ${safeOrgName}</h1>
           <p style="font-size:16px;line-height:1.5;margin:0 0 24px">
-            You've been invited to join <strong>${safeOrgName}</strong> as a <strong>${role}</strong>.
+            You've been invited to join <strong>${safeOrgName}</strong> as ${article} <strong>${role}</strong>.
           </p>
           <p style="margin:0 0 24px">
             <a href="${acceptUrl}" style="display:inline-block;padding:12px 24px;background:#C9963A;color:#141414;text-decoration:none;font-weight:700;border-radius:10px">Accept invite →</a>
@@ -142,29 +163,26 @@ export default async (request) => {
         </div>
       `.trim()
 
-      const res = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${RESEND_API_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          from: SEND_EMAIL_FROM,
+      const res = await sendViaResend({
+        apiKey: RESEND_API_KEY,
+        payload: {
+          from: formatFromHeader(orgRow?.name, SEND_EMAIL_FROM, 'FieldHorse'),
           to: [email],
           subject,
           text,
           html,
-        })
+          ...(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inviterEmail) ? { reply_to: inviterEmail } : {}),
+        },
+        key: idempotencyKey('org-invite', `invite:${inviteRow.id}`, email)
       })
-      const respBody = await res.json().catch(() => ({}))
       if (res.ok) {
-        emailResult = { sent: true, email_id: respBody?.id || null }
+        emailResult = { sent: true, email_id: res.body?.id || null }
       } else {
         emailResult = {
           sent: false,
-          reason: 'provider_rejected',
-          provider_status: res.status,
-          detail: respBody?.message || respBody?.error || null,
+          reason: res.status ? 'provider_rejected' : 'send_threw',
+          provider_status: res.status || null,
+          detail: res.detail || res.body?.message || res.body?.error || null,
         }
       }
     } catch (e) {

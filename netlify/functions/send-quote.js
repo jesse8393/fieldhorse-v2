@@ -34,9 +34,10 @@
 // in that case — sending must succeed before we claim it happened.
 
 import { createClient } from '@supabase/supabase-js'
+import crypto from 'node:crypto'
 import { loadAccessibleRow, brandingUserIdFor } from './lib/orgAccess.js'
-import { hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
-import { formatFromHeader, renderParagraphs, textField } from './lib/email.js'
+import { hashIdentifier, checkRateLimit, checkDailySendCap, DAILY_SEND_LIMIT_MESSAGE } from './lib/rateLimit.js'
+import { formatFromHeader, renderParagraphs, textField, idempotencyKey, sendViaResend, sendFailure, greetingFor, EMAIL_HEAD } from './lib/email.js'
 
 export default async (request) => {
   if (request.method === 'OPTIONS') {
@@ -130,6 +131,11 @@ export default async (request) => {
     return json({ error: 'rate_limited', message: 'Too many emails sent in a short time. Try again in a few minutes.' }, 429)
   }
 
+  const dayOk = await checkDailySendCap(supabase, sender_user_id)
+  if (!dayOk) {
+    return json({ error: 'rate_limited', message: DAILY_SEND_LIMIT_MESSAGE }, 429)
+  }
+
   // 1. Verify the caller may act on the contact (job): its creator, or an
   // owner, admin or manager of its company. Service role bypasses RLS, so
   // this check is what prevents open-relay use.
@@ -205,14 +211,20 @@ export default async (request) => {
   // Optional fields read through textField so a non string value from a
   // malformed client falls back to the default instead of throwing.
   const safeRecipientName = textField(recipient_name) || textField(contact.name)
-  const greeting = safeRecipientName ? `Hi ${safeRecipientName.split(/\s+/)[0]},` : 'Hi,'
+  const greeting = greetingFor(safeRecipientName)
   const senderLine = companyName || 'Your contractor'
   const customMessage = textField(sender_message)
+  // The PDF tells the customer to approve through the link the estimate
+  // was delivered with, so the email carries it (PT-08).
+  const approveUrl = await proposalLinkUrl(supabase, {
+    request, isQuote, quoteId: quote_id, contactId: contact_id, orgId: access.row.org_id, senderId: sender_user_id
+  })
 
   const text = [
     greeting,
     '',
     customMessage || `Please find the proposal for ${contact.job_title || 'your project'} attached.`,
+    ...(approveUrl ? ['', `View and approve: ${approveUrl}`] : []),
     '',
     'Reply directly to this email if you have any questions.',
     '',
@@ -223,6 +235,7 @@ export default async (request) => {
     greeting,
     customMessage,
     jobTitle: contact.job_title,
+    approveUrl,
     senderLine,
     companyName
   })
@@ -243,36 +256,31 @@ export default async (request) => {
     resendPayload.reply_to = replyTo
   }
 
-  const resendRes = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${RESEND_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(resendPayload)
+  const sent = await sendViaResend({
+    apiKey: RESEND_API_KEY,
+    payload: resendPayload,
+    key: idempotencyKey('send-quote', isQuote ? `quote:${quote_id}` : `job:${contact_id}`, storage_path, normalizedEmail)
   })
-  const resendBody = await resendRes.json().catch(() => ({}))
-
-  if (!resendRes.ok) {
+  if (!sent.ok) {
     // Do NOT update quote_sent_at / proposal_status. Sending failed.
-    return json({
-      error: 'send_failed',
-      provider_status: resendRes.status,
-      detail: resendBody?.message || resendBody?.error || 'Email provider rejected the send.'
-    }, 502)
+    return json(sendFailure(sent), 502)
   }
 
-  const emailId = resendBody?.id || null
+  const emailId = sent.body?.id || null
   const sentAtIso = new Date().toISOString()
 
   // 6. Update the contact row + log activity. Only flip status to 'sent'
   // if the quote isn't already past 'sent' (approved/closed shouldn't
   // be demoted). The CHECK constraint from migration 014 enforces the
   // legal value set.
+  // A failed write answers an error: the quote would otherwise still read
+  // Draft after the customer has the email. Trying again is safe, the
+  // idempotency key keeps the provider from mailing the customer twice.
   let scheduledFollowUpOn = null
+  let statusWrite
   if (isQuote) {
     // fh_quotes keeps its own status and sent_at; it has no follow up date.
-    await supabase
+    statusWrite = await supabase
       .from('fh_quotes')
       .update(buildQuoteSendPatch({ status: contact.status, sentAtIso }))
       .eq('id', quote_id)
@@ -287,10 +295,19 @@ export default async (request) => {
     scheduledFollowUpOn = tracking.scheduledFollowUpOn
     // Access was established above; scope by id only so a teammate's send
     // records the same tracking state as the creator's.
-    await supabase
+    statusWrite = await supabase
       .from('fh_contacts')
       .update(tracking.contactPatch)
       .eq('id', contact_id)
+  }
+  if (statusWrite?.error) {
+    console.error('[send-quote] sent status write failed', statusWrite.error)
+    return json({
+      error: 'status_not_saved',
+      email_sent: true,
+      email_id: emailId,
+      message: 'The proposal was sent, but it could not be marked as sent. Try again to record it. The customer will not get a second email.'
+    }, 500)
   }
 
   // Activity log row — best effort, never blocks the success response.
@@ -316,7 +333,49 @@ export default async (request) => {
   })
 }
 
-function renderQuoteHtml({ greeting, customMessage, jobTitle, senderLine, companyName }) {
+// The customer link for this proposal, on the origin the request came in
+// on: the newest active (not revoked, not expired) proposal link for the
+// quote, or for a job's proposal the job, else a new one minted the way
+// the app mints it (src/lib/publicLink.ts), under the record's company.
+// Returns '' when no link can be read or made; the email still goes out.
+const TOKEN_ALPHABET = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+async function proposalLinkUrl(supabase, { request, isQuote, quoteId, contactId, orgId, senderId }) {
+  let origin = ''
+  try { origin = new URL(request.url).origin } catch { return '' }
+  try {
+    const { data: links, error } = await supabase
+      .from('fh_public_links')
+      .select('token, expires_at')
+      .eq(isQuote ? 'quote_id' : 'contact_id', isQuote ? quoteId : contactId)
+      .eq('kind', 'proposal')
+      .is('revoked_at', null)
+      .order('created_at', { ascending: false })
+      .limit(20)
+    if (error) throw error
+    const now = Date.now()
+    let token = (links || []).find((l) => !l.expires_at || new Date(l.expires_at).getTime() >= now)?.token
+    if (!token) {
+      token = Array.from({ length: 24 }, () => TOKEN_ALPHABET[crypto.randomInt(TOKEN_ALPHABET.length)]).join('')
+      const { error: insErr } = await supabase
+        .from('fh_public_links')
+        .insert({
+          user_id: senderId,
+          org_id: orgId || null,
+          contact_id: isQuote ? null : contactId,
+          quote_id: isQuote ? quoteId : null,
+          kind: 'proposal',
+          token
+        })
+      if (insErr) throw insErr
+    }
+    return `${origin}/p/${token}`
+  } catch (e) {
+    console.warn('[send-quote] customer link unavailable, sending without it', e?.message || e)
+    return ''
+  }
+}
+
+function renderQuoteHtml({ greeting, customMessage, jobTitle, approveUrl, senderLine, companyName }) {
   const safe = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   }[c]))
@@ -326,16 +385,22 @@ function renderQuoteHtml({ greeting, customMessage, jobTitle, senderLine, compan
     : `<p style="margin:0;">Please find the proposal for <strong>${safe(jobTitle || 'your project')}</strong> attached.</p>`
   return `<!doctype html>
 <html lang="en">
+${EMAIL_HEAD}
 <body style="margin:0;padding:0;background:#F2EDE4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#141414;line-height:1.55;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#F2EDE4;padding:32px 16px;">
     <tr><td align="center">
-      <table role="presentation" width="560" cellspacing="0" cellpadding="0" style="max-width:560px;background:#F2EDE4;border-radius:10px;border:1px solid #5C5C5C;overflow:hidden;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;max-width:560px;background:#F2EDE4;border-radius:10px;border:1px solid #5C5C5C;overflow:hidden;">
         <tr><td style="padding:32px 32px 8px;">
           <p style="margin:0;font-size:16px;color:#141414;">${safe(greeting)}</p>
         </td></tr>
         <tr><td style="padding:8px 32px 16px;">
           <div style="font-size:16px;color:#141414;">${msg}</div>
         </td></tr>
+        ${approveUrl ? `<tr><td style="padding:4px 32px 16px;">
+          <a href="${safe(approveUrl)}" style="display:inline-block;background:#C9963A;color:#141414;font-size:14px;font-weight:700;text-decoration:none;padding:12px 24px;border-radius:10px;">View and approve</a>
+          <p style="margin:12px 0 0;font-size:12px;color:#5C5C5C;">Or open this link:</p>
+          <p style="margin:4px 0 0;font-size:12px;color:#141414;word-break:break-all;">${safe(approveUrl)}</p>
+        </td></tr>` : ''}
         <tr><td style="padding:8px 32px 24px;">
           <p style="margin:0;font-size:14px;color:#5C5C5C;">Reply directly to this email if you have any questions.</p>
         </td></tr>
@@ -343,7 +408,7 @@ function renderQuoteHtml({ greeting, customMessage, jobTitle, senderLine, compan
           <p style="margin:0;font-size:14px;color:#141414;">From ${safe(senderLine)}</p>
         </td></tr>
       </table>
-      ${companyName ? `<p style="margin:16px 0 0;font-size:12px;color:#5C5C5C;letter-spacing:0;text-transform:uppercase;">Sent on behalf of ${safe(companyName)}</p>` : ''}
+      ${companyName ? `<p style="margin:16px 0 0;font-size:12px;color:#5C5C5C;letter-spacing:0;">Sent on behalf of ${safe(companyName)}</p>` : ''}
     </td></tr>
   </table>
 </body>

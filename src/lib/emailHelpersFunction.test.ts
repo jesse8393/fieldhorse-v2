@@ -49,3 +49,15 @@ describe('paragraphs for the HTML part', () => {
     expect(renderParagraphs('  \n\n ', safe)).toBe('')
   })
 })
+
+describe('greeting', () => {
+  it('greets a person by first name and anything else neutrally', async () => {
+    const { greetingFor } = await import('../../netlify/functions/lib/email.js')
+    expect(greetingFor('Marco Castellanos')).toBe('Hi Marco,')
+    expect(greetingFor('castellanos, marco')).toBe('Hi Marco,')
+    expect(greetingFor('The Roof Doctor')).toBe('Hello,')
+    expect(greetingFor('MMC Properties')).toBe('Hello,')
+    expect(greetingFor('')).toBe('Hello,')
+    expect(greetingFor(null)).toBe('Hello,')
+  })
+})
