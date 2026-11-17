@@ -236,6 +236,7 @@ export default function Analytics() {
     const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
     const contactById = new Map(contacts.map((c) => [c.id, c]))
     const clientById = new Map(clients.map((c) => [c.id, c]))
+    const invoiceById = new Map(invoices.map((i) => [i.id, i]))
     const totals = new Map()
     for (const p of payments) {
       // paid_on is date-only, parse LOCAL (same rule as the YTD sums
@@ -243,7 +244,11 @@ export default function Analytics() {
       const when = parseDateOnly(p.paid_on) || parseDateOnly(p.created_at)
       if (!when || when < cutoff || when >= tomorrow) continue
       const c = contactById.get(p.contact_id as string)
-      const clientName = c?.client_id ? clientById.get(c.client_id)?.name : null
+      // A payment on an invoice that bills the client directly has no job;
+      // its invoice names the client (D05), as on the Money row.
+      const inv = p.invoice_id ? invoiceById.get(p.invoice_id) : null
+      const clientId = c?.client_id || inv?.client_id
+      const clientName = clientId ? clientById.get(clientId)?.name : null
       const key = clientName || c?.name || 'Unknown'
       totals.set(key, (totals.get(key) || 0) + Number(p.amount || 0))
     }
@@ -251,7 +256,7 @@ export default function Analytics() {
       .map(([name, amount]) => ({ name, amount: Math.round(amount) }))
       .sort((a, b) => b.amount - a.amount)
       .slice(0, 5)
-  }, [payments, contacts, clients])
+  }, [payments, contacts, clients, invoices])
   const maxTopClient = Math.max(...topClients.map((t) => t.amount), 1)
 
   // Retainage outstanding, sum of fh_payments tagged retainage
