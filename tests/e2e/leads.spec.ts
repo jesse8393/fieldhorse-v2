@@ -75,6 +75,20 @@ test.describe('the lead screen', () => {
     await expect(page.getByRole('dialog')).toHaveCount(0)
   })
 
+  test('back from Schedule estimate, the lead reads its next visit again (DATA-13)', async ({ context, page }) => {
+    await signIn(context)
+    let visitReads = 0
+    page.on('request', (req) => { if (req.method() === 'GET' && /\/rest\/v1\/fh_schedule\?.*lead_id=eq\.l-lead1/.test(req.url())) visitReads++ })
+    await open(page, '/leads/l-lead1')
+    await expect.poll(() => visitReads).toBe(1)
+    await page.getByRole('link', { name: 'Schedule estimate' }).click()
+    await expect(page).toHaveURL(/\/schedule\/new\?lead=l-lead1$/, { timeout: 30_000 })
+    await expect(page.getByRole('heading', { name: 'Add event' })).toBeVisible({ timeout: 30_000 })
+    await page.goBack()
+    await expect(page).toHaveURL(/\/leads\/l-lead1$/)
+    await expect.poll(() => visitReads, { timeout: 5000 }).toBe(2)
+  })
+
   test('Quote this links the lead it came from', async ({ context, page }) => {
     // One client with two open leads (the mock's cl-1 has l-lead1 and
     // l-lead2). Quote this on the second must never touch the first.
@@ -114,12 +128,25 @@ test.describe('the lead screen', () => {
     const again = page.getByRole('button', { name: 'Tap again to mark lost' })
     await expect(again).toBeVisible()
     expect(patches).toEqual([])
+    // A confirm is a second, separate tap: one this soon after arming is
+    // the rest of a double tap and does nothing (S04).
+    await page.waitForTimeout(600)
     await again.click()
     await expect.poll(() => patches.length).toBe(1)
     expect(patches[0].startsWith('eq.l-lead1=')).toBe(true)
     expect(JSON.parse(patches[0].slice('eq.l-lead1='.length))).toMatchObject({ status: 'lost' })
     await expect(page.getByText('Lost', { exact: true })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Quote this' })).toHaveCount(0)
+  })
+
+  test('a double tap on Mark lost does not mark the lead lost (S04)', async ({ context, page }) => {
+    await signIn(context)
+    const patches = await recordLeadPatches(page)
+    await open(page, '/leads/l-lead1')
+    await page.getByRole('button', { name: 'Mark lost' }).dblclick()
+    await page.waitForTimeout(500)
+    expect(patches).toEqual([])
+    await expect(page.getByRole('button', { name: 'Tap again to mark lost' })).toBeVisible()
   })
 
   test('notes save in place on blur', async ({ context, page }) => {
@@ -138,6 +165,33 @@ test.describe('the lead screen', () => {
     await notes.blur()
     await page.waitForTimeout(300)
     expect(patches.length).toBe(1)
+  })
+
+  test("notes typed and left with the phone's Back are saved (DATA-14)", async ({ context, page }) => {
+    await signIn(context)
+    const patches = await recordLeadPatches(page)
+    await open(page, '/leads')
+    await page.getByText('Vintage Burkitt Station Drainage').first().click()
+    await expect(page).toHaveURL(/\/leads\/l-lead1$/)
+    const notes = page.getByLabel('Notes')
+    await expect(notes).toBeVisible({ timeout: 30_000 })
+    await notes.fill('Gate code 4411, dog in the yard.')
+    // System Back: the field is never blurred by the app's own button.
+    await page.goBack()
+    await expect.poll(() => patches.length, { timeout: 5000 }).toBe(1)
+    expect(JSON.parse(patches[0].slice('eq.l-lead1='.length))).toMatchObject({ notes: 'Gate code 4411, dog in the yard.' })
+  })
+
+  test('notes are saved at once when the app is hidden or closed (DATA-14)', async ({ context, page }) => {
+    await signIn(context)
+    const patches = await recordLeadPatches(page)
+    await open(page, '/leads/l-lead1')
+    const notes = page.getByLabel('Notes')
+    await expect(notes).toBeVisible({ timeout: 30_000 })
+    await notes.fill('Call after 5.')
+    await page.evaluate(() => window.dispatchEvent(new Event('pagehide')))
+    await expect.poll(() => patches.length, { timeout: 400 }).toBe(1)
+    expect(JSON.parse(patches[0].slice('eq.l-lead1='.length))).toMatchObject({ notes: 'Call after 5.' })
   })
 
   test('the next estimate visit and the earlier notes show', async ({ context, page }) => {
@@ -212,5 +266,155 @@ test.describe('the leads list', () => {
     await page.getByRole('tab', { name: /^Quotes\b/ }).click()
     await expect(page.getByRole('link', { name: /Parking lot repour/ })).toHaveAttribute('href', '/quotes/q-quote')
     await expect(page.getByRole('link', { name: /Kitchen renovation/ })).toHaveAttribute('href', '/quotes/q-change')
+  })
+})
+
+/** Every write the page sends: "METHOD table body". */
+function watchWrites(page: Page): string[] {
+  const writes: string[] = []
+  page.on('request', (req) => {
+    const url = new URL(req.url())
+    if (!['PATCH', 'DELETE', 'POST'].includes(req.method()) || !url.pathname.includes('/rest/v1/')) return
+    writes.push(`${req.method()} ${url.pathname.split('/rest/v1/')[1]} ${req.postData() ?? ''}`)
+  })
+  return writes
+}
+
+test.describe('New lead keeps what was typed (DATA-08, S06)', () => {
+  test('a changed phone and address for a picked client are written to that client', async ({ context, page }) => {
+    await signIn(context)
+    const writes = watchWrites(page)
+    await open(page, '/leads/new')
+    await page.getByLabel('Name').fill('Jeff')
+    await page.locator('.fhnew-client__pick').first().click()
+    await expect(page.getByLabel('Phone')).toHaveValue('555-0101')
+    await page.getByLabel('Phone').fill('615-555-7777')
+    await page.getByLabel('Address').fill('88 New Site Ln, Smyrna')
+    await page.getByRole('button', { name: 'Save lead' }).click()
+    await expect(page).toHaveURL(/\/leads\/l-lead1$/, { timeout: 30_000 })
+    const patch = writes.find((w) => w.startsWith('PATCH fh_clients'))
+    expect(patch).toBeTruthy()
+    expect(patch).toContain('615-555-7777')
+    expect(patch).toContain('88 New Site Ln, Smyrna')
+    expect(writes.some((w) => w.startsWith('POST fh_leads'))).toBe(true)
+  })
+
+  test('a phone that belongs to another client is shown, and the person chooses', async ({ context, page }) => {
+    await signIn(context)
+    const writes = watchWrites(page)
+    await open(page, '/leads/new')
+    await page.getByLabel('Name').fill('Bob Smith')
+    await page.getByLabel('Phone').fill('(555) 010-1')
+    await page.getByRole('button', { name: 'Save lead' }).click()
+    await expect(page.getByText('(555) 010-1 belongs to Jeff Roy.')).toBeVisible()
+    await page.waitForTimeout(300)
+    expect(writes.filter((w) => w.startsWith('POST'))).toEqual([])
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+
+    await page.getByRole('button', { name: 'Save as a new client' }).click()
+    await expect(page).toHaveURL(/\/leads\/l-lead1$/, { timeout: 30_000 })
+    const created = writes.find((w) => w.startsWith('POST fh_clients'))
+    expect(created).toContain('Bob Smith')
+    expect(writes.some((w) => w.startsWith('POST fh_leads'))).toBe(true)
+  })
+
+  test('a known name with a new phone is not filed under that client without asking', async ({ context, page }) => {
+    await signIn(context)
+    const writes = watchWrites(page)
+    await open(page, '/leads/new')
+    await page.getByLabel('Name').fill('Jeff Roy')
+    await page.getByLabel('Phone').fill('615-555-7777')
+    await page.getByRole('button', { name: 'Save lead' }).click()
+    await expect(page.getByText(/Jeff Roy is already a client, with a different phone/)).toBeVisible()
+    expect(writes.filter((w) => w.startsWith('POST'))).toEqual([])
+    await page.getByRole('button', { name: 'Save to Jeff Roy' }).click()
+    await expect(page).toHaveURL(/\/leads\/l-lead1$/, { timeout: 30_000 })
+    expect(writes.find((w) => w.startsWith('PATCH fh_clients'))).toContain('615-555-7777')
+    expect(writes.some((w) => w.startsWith('POST fh_clients'))).toBe(false)
+  })
+})
+
+test.describe('New lead takes an email (S19)', () => {
+  test('a new caller is saved with the email typed', async ({ context, page }) => {
+    await signIn(context)
+    const writes = watchWrites(page)
+    await open(page, '/leads/new')
+    await page.getByLabel('Name').fill('Ann Lee')
+    await page.getByLabel('Email').fill('ann@leehomes.com')
+    await page.getByRole('button', { name: 'Save lead' }).click()
+    await expect(page).toHaveURL(/\/leads\/l-lead1$/, { timeout: 30_000 })
+    expect(writes.find((w) => w.startsWith('POST fh_clients'))).toContain('ann@leehomes.com')
+  })
+
+  test('a changed email for a picked client is written to that client', async ({ context, page }) => {
+    await signIn(context)
+    const writes = watchWrites(page)
+    await open(page, '/leads/new')
+    await page.getByLabel('Name').fill('Jeff')
+    await page.locator('.fhnew-client__pick').first().click()
+    await expect(page.getByLabel('Email')).toHaveValue('jeff@roy.com')
+    await page.getByLabel('Email').fill('jeff@roybuilds.com')
+    await page.getByRole('button', { name: 'Save lead' }).click()
+    await expect(page).toHaveURL(/\/leads\/l-lead1$/, { timeout: 30_000 })
+    expect(writes.find((w) => w.startsWith('PATCH fh_clients'))).toContain('jeff@roybuilds.com')
+  })
+
+  test('an email that is not one is refused', async ({ context, page }) => {
+    await signIn(context)
+    const writes = watchWrites(page)
+    await open(page, '/leads/new')
+    await page.getByLabel('Name').fill('Ann Lee')
+    await page.getByLabel('Email').fill('ann@@lee')
+    await page.getByRole('button', { name: 'Save lead' }).click()
+    await expect(page.getByText('Enter an email like name@example.com.')).toBeVisible()
+    expect(writes.filter((w) => w.startsWith('POST'))).toEqual([])
+  })
+})
+
+test.describe('a lead can be kept up to date (S13)', () => {
+  // The mock does not keep writes, so these check what is sent.
+  const lastPatch = (patches: string[], id = 'l-lead1') => JSON.parse(patches[patches.length - 1].slice(`eq.${id}=`.length))
+
+  test('a lost lead can be reopened', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_leads: [lead({ id: 'l-lost', status: 'lost', title: 'Old patio' })] } })
+    const patches = await recordLeadPatches(page)
+    await open(page, '/leads/l-lost')
+    await page.getByRole('button', { name: 'Reopen' }).click()
+    await expect.poll(() => patches.length).toBe(1)
+    expect(lastPatch(patches, 'l-lost')).toMatchObject({ status: 'open' })
+  })
+
+  test('the follow up can be marked done, which clears it from Today', async ({ context, page }) => {
+    await signIn(context)
+    const patches = await recordLeadPatches(page)
+    await open(page, '/leads/l-lead1')
+    await page.getByRole('button', { name: 'Follow up done' }).click()
+    await expect.poll(() => patches.length).toBe(1)
+    expect(lastPatch(patches)).toMatchObject({ follow_up_on: null })
+    expect(lastPatch(patches).last_contact).toBeTruthy()
+  })
+
+  test('the follow up can be moved to another day', async ({ context, page }) => {
+    await signIn(context)
+    const patches = await recordLeadPatches(page)
+    await open(page, '/leads/l-lead1')
+    await page.getByLabel('Follow up on').fill('2026-12-01')
+    await expect.poll(() => patches.length).toBe(1)
+    expect(lastPatch(patches)).toMatchObject({ follow_up_on: '2026-12-01' })
+  })
+
+  test('what they need, the job type and the source can be edited in place', async ({ context, page }) => {
+    await signIn(context)
+    const patches = await recordLeadPatches(page)
+    await open(page, '/leads/l-lead1')
+    await page.getByRole('button', { name: 'Edit details' }).click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await page.getByRole('textbox', { name: 'What they need' }).fill('French drain and regrade')
+    await page.getByLabel('Job type').selectOption({ label: 'Renovation' })
+    await page.getByLabel('Source').selectOption({ label: 'Referral' })
+    await page.getByRole('button', { name: 'Save details' }).click()
+    await expect.poll(() => patches.length).toBe(1)
+    expect(lastPatch(patches)).toMatchObject({ title: 'French drain and regrade', job_type: 'Renovation', source: 'Referral' })
+    await expect(page.getByRole('button', { name: 'Edit details' })).toBeVisible()
   })
 })

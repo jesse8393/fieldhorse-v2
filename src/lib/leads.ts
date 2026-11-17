@@ -16,7 +16,12 @@ const clean = (s: string | null | undefined) => {
   return t ? t : null
 }
 
+// A save whose answer is lost on a weak signal is retried by the person.
+// The screen mints the lead's id once per form, so the retry addresses the
+// same row: a duplicate key answer means the first save landed, and that
+// row is read back instead of a second lead being made (DATA-12).
 export async function createLead(input: {
+  id?: string
   userId: string
   orgId: string | null
   clientId: string
@@ -28,6 +33,7 @@ export async function createLead(input: {
   followUpOn?: string | null
 }): Promise<LeadRow> {
   const row: LeadInsert = {
+    ...(input.id ? { id: input.id } : {}),
     user_id: input.userId,
     org_id: input.orgId ?? null,
     client_id: input.clientId,
@@ -44,8 +50,12 @@ export async function createLead(input: {
     .insert(row)
     .select('*')
     .single()
-  if (error) throw new Error(error.message)
-  return data as LeadRow
+  if (!error && data) return data as LeadRow
+  if (error?.code === '23505' && input.id) {
+    const existing = await supabase.from('fh_leads').select('*').eq('id', input.id).eq('user_id', input.userId).maybeSingle()
+    if (!existing.error && existing.data) return existing.data as LeadRow
+  }
+  throw new Error('Could not save this lead. Check your connection and try again.')
 }
 
 async function setLeadStatus(leadId: string, patch: { status: LeadStatus; quote_id?: string | null }) {
@@ -65,14 +75,28 @@ export async function markLeadLost(leadId: string): Promise<void> {
   await setLeadStatus(leadId, { status: 'lost' })
 }
 
+export type LeadUpdate = Database['public']['Tables']['fh_leads']['Update']
+
+/**
+ * Edits a lead in place: what they need, job type, source, the follow up
+ * date, or Reopen (status open). Throws a sentence the screen can show
+ * when nothing was saved, including when no row changed.
+ */
+export async function updateLead(leadId: string, patch: LeadUpdate): Promise<void> {
+  const { data, error } = await supabase.from('fh_leads').update(patch).eq('id', leadId).select('id')
+  if (error || !data?.length) throw new Error('Could not save the lead. Check your connection and try again.')
+}
+
 // Pure. The quote draft that Quote this opens: same client, title and
-// job type, the lead's notes as the starting scope, and a pointer back.
+// job type, and a pointer back. The lead's notes stay on the lead: they
+// are internal ("no more than 5k", gate codes) and the scope prints on
+// the customer's proposal (S11).
 export function leadToQuoteDraft(lead: LeadRow): Partial<QuoteInsert> {
   return {
     client_id: lead.client_id,
     title: lead.title ?? null,
     job_type: lead.job_type ?? null,
-    scope_text: lead.notes ?? null,
+    scope_text: null,
     lead_id: lead.id,
   }
 }

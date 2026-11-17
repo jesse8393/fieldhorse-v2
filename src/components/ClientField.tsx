@@ -5,14 +5,17 @@
 // are a list under the input and go away once a client is picked or the
 // field is empty.
 //
-// The company's clients are read once (the newest active first) and
+// The company's 200 most recently active clients are read once and
 // matched here, so the list answers every keystroke without a request.
+// Older clients are found by a server search as the person types (as
+// ClientPicker does), so a client outside those 200 is still suggested.
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Button, Field } from './fh'
 import { supabase } from '../lib/supabase.ts'
 import { useOrgScope } from '../lib/orgScope.ts'
 import { findOrCreateClient } from '../lib/clients.ts'
+import { escapeLikeText, ilikeAnyOf, phoneMatches } from '../lib/searchFilter.ts'
 
 export type ClientPick = {
   id: string
@@ -38,6 +41,9 @@ export function restoredClientValue(text: string, id: string): ClientFieldValue 
 const COLUMNS = 'id, name, company_name, phone, email, address'
 const LIMIT = 200
 const SHOWN = 6
+const SEARCH_COLUMNS = ['name', 'company_name', 'email', 'phone']
+const SEARCH_LIMIT = 25
+const SEARCH_DELAY_MS = 250
 
 function clientRows(userId: string, orgScope: string | null) {
   const q = supabase.from('fh_clients').select(COLUMNS)
@@ -57,7 +63,7 @@ export function matchClients(rows: ClientPick[], typed: string, limit = SHOWN): 
   for (const r of rows) {
     const name = norm(r.name)
     if (name.startsWith(t)) starts.push(r)
-    else if (name.includes(t) || norm(r.company_name).includes(t) || norm(r.email).includes(t) || norm(r.phone).includes(t)) contains.push(r)
+    else if (name.includes(t) || norm(r.company_name).includes(t) || norm(r.email).includes(t) || norm(r.phone).includes(t) || phoneMatches(r.phone, t)) contains.push(r)
   }
   return [...starts, ...contains].slice(0, limit)
 }
@@ -98,6 +104,34 @@ export async function resolveClientId(
   return data as ClientPick
 }
 
+/**
+ * The clients anywhere in the book whose name, company, email or phone
+ * contain the typed text, plus an exact name match. Throws when the read fails.
+ */
+export async function searchClientRows(userId: string, orgScope: string | null, typed: string): Promise<ClientPick[]> {
+  const t = typed.trim()
+  if (!t) return []
+  const [matches, exact] = await Promise.all([
+    clientRows(userId, orgScope).or(ilikeAnyOf(SEARCH_COLUMNS, t))
+      .order('last_activity_at', { ascending: false, nullsFirst: false }).limit(SEARCH_LIMIT),
+    clientRows(userId, orgScope).ilike('name', escapeLikeText(t)).limit(5)
+  ])
+  if (matches.error || exact.error) throw new Error('Client search failed')
+  const exactRows = ((exact.data || []) as ClientPick[]).filter((r) => norm(r.name) === norm(t))
+  return [...exactRows, ...((matches.data || []) as ClientPick[])]
+}
+
+function mergeRows(a: ClientPick[], b: ClientPick[]): ClientPick[] {
+  const seen = new Set<string>()
+  const out: ClientPick[] = []
+  for (const r of [...a, ...b]) {
+    if (seen.has(r.id)) continue
+    seen.add(r.id)
+    out.push(r)
+  }
+  return out
+}
+
 /** Reads one client by id, for a screen opened with ?client=. */
 export async function fetchClientPick(id: string): Promise<ClientPick | null> {
   const { data, error } = await supabase.from('fh_clients').select(COLUMNS).eq('id', id).maybeSingle()
@@ -128,6 +162,7 @@ export default function ClientField({ userId, value, onChange, label = 'Client',
   const rows = current?.rows
   const [activeIndex, setActiveIndex] = useState(-1)
   const [dismissed, setDismissed] = useState(false)
+  const [search, setSearch] = useState<{ scope: string; retry: number; term: string; rows: ClientPick[]; failed: boolean } | null>(null)
   const listId = useId()
 
   useEffect(() => {
@@ -146,8 +181,23 @@ export default function ClientField({ userId, value, onChange, label = 'Client',
   }, [userId, orgScope, scope, retry])
 
   const typed = value.text
-  const matches = useMemo(() => (value.picked ? [] : matchClients(rows || [], typed)), [rows, typed, value.picked])
-  const exact = useMemo(() => (value.picked ? null : exactClient(rows || [], typed)), [rows, typed, value.picked])
+  const term = typed.trim()
+  // Search the whole book once typing pauses; the recent rows answer at once.
+  useEffect(() => {
+    if (!userId || orgScope === undefined || value.picked || !term) return
+    let alive = true
+    const timer = setTimeout(() => {
+      void searchClientRows(userId, orgScope, term).then(
+        (found) => { if (alive) setSearch({ scope, retry, term, rows: found, failed: false }) },
+        () => { if (alive) setSearch({ scope, retry, term, rows: [], failed: true }) }
+      )
+    }, SEARCH_DELAY_MS)
+    return () => { alive = false; clearTimeout(timer) }
+  }, [userId, orgScope, scope, retry, term, value.picked])
+  const searched = search && search.scope === scope && search.retry === retry && search.term === term ? search : null
+  const known = useMemo(() => mergeRows(searched?.rows || [], rows || []), [searched, rows])
+  const matches = useMemo(() => (value.picked ? [] : matchClients(known, typed)), [known, typed, value.picked])
+  const exact = useMemo(() => (value.picked ? null : exactClient(known, typed)), [known, typed, value.picked])
   const isNew = !value.picked && typed.trim() !== '' && !exact
   const showList = matches.length > 0 && !dismissed
   const activeClient = showList ? matches[activeIndex] : undefined
@@ -209,7 +259,7 @@ export default function ClientField({ userId, value, onChange, label = 'Client',
           }
         }}
       />
-      {current?.failed && <div role="alert">
+      {(current?.failed || searched?.failed) && <div role="alert">
         <p>Client suggestions could not load. Retry, or type a name to check when saving.</p>
         <Button type="button" variant="secondary" onClick={() => {
           inputRef.current?.focus({ preventScroll: true })

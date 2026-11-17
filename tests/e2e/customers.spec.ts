@@ -66,6 +66,42 @@ test.describe('duplicates are reviewed on a screen', () => {
     await expect(page).toHaveURL(/\/clients$/)
   })
 
+  test("merging moves the duplicate's leads, quotes and invoices, and never deletes it while they are still there", async ({ context, page }) => {
+    // The mock does not apply writes, so the moved rows still read as the
+    // duplicate's afterwards: exactly the case where the delete must stop.
+    await signIn(context, {
+      tables: {
+        fh_clients: [JEFF, JEFF_AGAIN],
+        fh_leads: [{ id: 'lead-dup', user_id: USER.id, client_id: 'cl-dup', title: 'Back patio', status: 'open', created_at: iso(NOW - DAY) }],
+        fh_quotes: [{ id: 'q-dup', user_id: USER.id, client_id: 'cl-dup', title: 'Driveway', status: 'approved', amount: 12000, created_at: iso(NOW - DAY) }],
+        fh_invoices: [{ id: 'inv-dup', user_id: USER.id, client_id: 'cl-dup', contact_id: null, amount: 500, status: 'sent', created_at: iso(NOW - DAY) }]
+      }
+    })
+    const writes = watchWrites(page)
+    await open(page, '/clients/merge')
+    await expect(page.getByText('Leads, quotes, jobs, invoices and notes move to the kept client.', { exact: false })).toBeVisible()
+    await page.getByRole('button', { name: 'Merge cluster' }).click()
+    await page.getByRole('button', { name: 'Tap again to merge' }).click()
+
+    await expect(page.getByText(/still has leads, quotes and invoices that could not be moved, so it was not deleted/)).toBeVisible()
+    for (const table of ['fh_leads', 'fh_quotes', 'fh_invoices', 'fh_contacts']) {
+      expect(writes.some((w) => w.startsWith(`PATCH ${table}`)), table).toBe(true)
+    }
+    expect(writes.some((w) => w.startsWith('DELETE fh_clients'))).toBe(false)
+  })
+
+  test('a failed clients read says so instead of "All clean" (S23)', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_clients: [JEFF, JEFF_AGAIN] } })
+    await page.route(/\/rest\/v1\/fh_clients\?/, (route) => route.request().method() === 'GET'
+      ? route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: 'upstream connect error' }) })
+      : route.fallback())
+    await open(page, '/clients/merge')
+    await expect(page.getByText('Could not load your clients', { exact: false })).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByText('All clean.')).toHaveCount(0)
+    await expect(page.getByText(/Nice cleanup/)).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /Try again|Retry/ })).toBeVisible()
+  })
+
   test('an unticked record is kept apart without a second tap, and stays unflagged', async ({ context, page }) => {
     await signIn(context, { tables: { fh_clients: [JEFF, JEFF_AGAIN] } })
     const writes = watchWrites(page)
@@ -81,6 +117,41 @@ test.describe('duplicates are reviewed on a screen', () => {
     await expect(page.getByText('Jeff Roy', { exact: true }).first()).toBeVisible()
     await expect(page.getByRole('button', { name: /duplicate/i })).toHaveCount(0)
   })
+})
+
+test.describe('phone search (S14)', () => {
+  const MMC = { id: 'cl-mmc', user_id: USER.id, name: 'MMC Properties', company_name: null, phone: '615.555.0199', email: null, address: null, created_at: iso(NOW - 9 * DAY) }
+
+  test('Customers finds a phone typed in any format', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_clients: [JEFF, MMC] } })
+    await open(page, '/clients')
+    // Phone layout: "Search customers"; desktop table: "Search clients".
+    const search = page.getByLabel(/^Search (customers|clients)$/)
+    await expect(search).toBeVisible({ timeout: 30_000 })
+    for (const typed of ['6155550199', '615-555-0199', '(615) 555-0199']) {
+      await search.fill(typed)
+      await expect(page.getByText('MMC Properties').first()).toBeVisible()
+      await expect(page.getByText('No customers match', { exact: false })).toHaveCount(0)
+    }
+  })
+
+  test('the client field suggests a client by its phone in any format', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_clients: [JEFF, MMC] } })
+    await open(page, '/jobs/new')
+    await page.getByLabel('Client').fill('(615) 555-0199')
+    await expect(page.getByRole('option', { name: /MMC Properties/ })).toBeVisible()
+  })
+})
+
+test('a customer row on the phone has Call (S20)', async ({ context, page, isMobile }) => {
+  test.skip(!isMobile, 'The desktop table is a separate component.')
+  await signIn(context)
+  await open(page, '/clients')
+  const call = page.getByRole('link', { name: 'Call Jeff Roy' })
+  await expect(call).toBeVisible({ timeout: 30_000 })
+  await expect(call).toHaveAttribute('href', 'tel:555-0101')
+  const box = await call.boundingBox()
+  expect(box && box.width >= 44 && box.height >= 44).toBe(true)
 })
 
 test.describe('the customer page', () => {
@@ -146,8 +217,92 @@ test.describe('the customer page', () => {
     await expect(page).toHaveURL(/\/invoices\/inv1$/)
   })
 
-  test('deleting a customer takes a second tap on the same button', async ({ context, page }) => {
+  test('a client billed directly shows what it was billed and what it owes (M-13)', async ({ context, page }) => {
+    const DIRECT = { id: 'cl-direct', user_id: USER.id, name: 'Dana Whitfield', company_name: null, phone: '615-555-0144', email: null, address: null, created_at: iso(NOW - 30 * DAY) }
+    await signIn(context, {
+      tables: {
+        fh_clients: [DIRECT],
+        fh_invoices: [
+          { id: 'inv-a', user_id: USER.id, client_id: 'cl-direct', contact_id: null, title: 'Gutter repair', amount: 800, status: 'paid', sequence_number: 1, issued_at: iso(NOW - 40 * DAY), due_at: iso(NOW - 30 * DAY), created_at: iso(NOW - 40 * DAY), updated_at: iso(NOW - 30 * DAY) },
+          { id: 'inv-b', user_id: USER.id, client_id: 'cl-direct', contact_id: null, title: 'Fence post', amount: 500, status: 'sent', sequence_number: 2, issued_at: iso(NOW - 25 * DAY), due_at: iso(NOW - 20 * DAY), created_at: iso(NOW - 25 * DAY), updated_at: iso(NOW - 25 * DAY) }
+        ],
+        fh_payments: [{ id: 'pay-a', user_id: USER.id, contact_id: null, invoice_id: 'inv-a', amount: 800, method: 'check', paid_on: iso(NOW - 30 * DAY).slice(0, 10), created_at: iso(NOW - 30 * DAY) }]
+      }
+    })
+    await open(page, '/clients/cl-direct')
+    // Phone: "Lifetime $1.3K", "Contract balance $500". Desktop: "$1K
+    // Lifetime value", "$500 Remaining contract value". Both read $0 before.
+    const main = page.locator('main')
+    await expect(main).toContainText(/Lifetime\s*\$1\.3K|\$1(\.3)?K\s*Lifetime value/, { timeout: 30_000 })
+    await expect(main).toContainText(/Contract balance\s*\$500|\$500\s*Remaining contract value/)
+  })
+
+  test('Map opens the map app for this device, not Apple Maps on Android (S25)', async ({ context, page }) => {
     await signIn(context)
+    await open(page, '/clients/cl-1')
+    const map = page.getByRole('link', { name: 'Map' }).first()
+    await expect(map).toBeVisible({ timeout: 30_000 })
+    const href = await map.getAttribute('href')
+    expect(href).toContain(encodeURIComponent('412 Burkitt Station Rd').slice(0, 10))
+    // Pixel 7 is Android; desktop Chrome is not an Apple device either.
+    expect(href).not.toContain('maps.apple.com')
+  })
+
+  test('Back on the client page returns where the person came from (S19)', async ({ context, page }) => {
+    // A lead whose client has no phone shows "Add phone", which opens the client page.
+    const noPhone = { ...JEFF, phone: null }
+    await signIn(context, {
+      tables: {
+        fh_clients: [noPhone],
+        fh_leads: [{
+          id: 'l-lead1', user_id: USER.id, client_id: 'cl-1', status: 'open', title: 'Back patio', notes: null, job_type: null,
+          source: null, referred_by: null, follow_up_on: null, last_contact: null, quote_id: null, origin_contact_id: null,
+          created_at: iso(NOW - DAY), updated_at: iso(NOW - DAY), fh_clients: noPhone
+        }]
+      }
+    })
+    await open(page, '/leads/l-lead1')
+    await page.getByRole('link', { name: 'Add phone' }).click()
+    await expect(page).toHaveURL(/\/clients\/cl-1/)
+    await page.getByRole('button', { name: 'Back to clients' }).click()
+    await expect(page).toHaveURL(/\/leads\/l-lead1$/)
+  })
+
+  test('Back on a client page opened directly goes to Customers (S19)', async ({ context, page }) => {
+    await signIn(context)
+    await open(page, '/clients/cl-1')
+    await page.getByRole('button', { name: 'Back to clients' }).click()
+    await expect(page).toHaveURL(/\/clients$/)
+  })
+
+  test('the New button on the client page names what it opens (S24)', async ({ context, page, isMobile }) => {
+    test.skip(!isMobile, 'The desktop client page is a separate component.')
+    await signIn(context)
+    await open(page, '/clients/cl-1')
+    const create = page.getByRole('button', { name: 'New lead, quote, job or invoice' })
+    await expect(create).toBeVisible({ timeout: 30_000 })
+    await create.click()
+    await expect(page).toHaveURL(/\/new\?client=cl-1$/)
+  })
+
+  test('a customer with leads, quotes or invoices is not deleted, and the page says what to do instead', async ({ context, page }) => {
+    await signIn(context)
+    const writes = watchWrites(page)
+    await open(page, '/clients/cl-1')
+    await page.getByRole('button', { name: /^Delete( client)?$/ }).click()
+    await expect(page.getByText(/Jeff Roy has \d+ leads?, \d+ quotes? and \d+ invoices?/)).toBeVisible()
+    await expect(page.getByText(/Merge this client into the right one to keep them/)).toBeVisible()
+    // Not armed: a second tap cannot delete.
+    await expect(page.getByRole('button', { name: 'Tap again to delete' })).toHaveCount(0)
+    await page.getByRole('button', { name: /^Delete( client)?$/ }).click()
+    await page.waitForTimeout(500)
+    expect(writes.filter((w) => w.startsWith('DELETE'))).toEqual([])
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+  })
+
+  test('deleting a customer takes a second tap on the same button', async ({ context, page }) => {
+    // A customer with no leads, quotes or invoices (those would be lost).
+    await signIn(context, { tables: { fh_leads: [], fh_quotes: [], fh_invoices: [] } })
     const writes = watchWrites(page)
     await open(page, '/clients/cl-1')
     const del = page.getByRole('button', { name: /^Delete( client)?$/ })

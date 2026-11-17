@@ -17,6 +17,7 @@ import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, Check, ChevronLeft } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Button, IconButton, SkeletonRows } from '../../components/fh'
+import DataErrorState from '../../components/DataErrorState.tsx'
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useClientsBundle, useInvalidateClients } from '../../lib/queries.ts'
 import { findDuplicateClusters, loadNotDuplicates, rememberNotDuplicates, mergeClients } from '../../lib/clientMerge.ts'
@@ -52,7 +53,9 @@ function oldestMemberId(cluster: any): string | undefined {
 export default function ClientsMerge() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const { data: bundle, isPending: loading } = useClientsBundle(user?.id)
+  // A failed read is not "no duplicates": it says so and offers Retry (S23).
+  const { data: bundle, isPending, isError, refetch } = useClientsBundle(user?.id)
+  const loading = isPending && !isError
   const invalidateClients = useInvalidateClients()
   const titleRef = useRef<HTMLHeadingElement>(null)
 
@@ -149,11 +152,15 @@ export default function ClientsMerge() {
     try {
       const result = await mergeClients({ userId: user?.id, survivor, losers })
       hapticMedium()
+      const moved = [
+        [result.moved.leads, 'lead'],
+        [result.moved.quotes, 'quote'],
+        [result.moved.jobs, 'job'],
+        [result.moved.invoices, 'invoice']
+      ].filter(([n]) => (n as number) > 0).map(([n, noun]) => `${n} ${countNoun(n as number, noun as string)}`)
       toastSuccess(
         `Merged ${losers.length + 1} into 1`,
-        result.reassigned > 0
-          ? `${result.reassigned} ${countNoun(result.reassigned, 'job')} reassigned`
-          : 'No jobs needed reassigning'
+        moved.length ? `Moved to the kept client: ${moved.join(', ')}.` : 'Nothing else needed moving.'
       )
       if (keptApart.length > 0) setNotDuplicates(rememberNotDuplicates(user?.id, notDuplicates, keptApart))
       setMergedAway((prev) => new Set([...prev, ...losers.map((m: any) => m.id)]))
@@ -181,12 +188,15 @@ export default function ClientsMerge() {
         <h1 className="fhcm-title" ref={titleRef} tabIndex={-1}>Merge duplicates</h1>
       </header>
       <p className="fhcm-lede">
-        {loading ? 'Looking for duplicates.' : remaining.length === 0 ? 'All clean.' : `${remaining.length} ${remaining.length === 1 ? 'cluster' : 'clusters'} to review. Tap the record to keep. Untick anyone who is a different client and they stay separate.`}
+        {loading ? 'Looking for duplicates.' : isError ? 'Duplicates could not be checked.' : remaining.length === 0 ? 'All clean.' : `${remaining.length} ${remaining.length === 1 ? 'cluster' : 'clusters'} to review. Tap the record to keep. Untick anyone who is a different client and they stay separate.`}
       </p>
 
       <div className="fhcm-body">
         {loading && <SkeletonRows rows={3} label="Looking for duplicates" />}
-        {!loading && remaining.length === 0 && (
+        {isError && (
+          <DataErrorState title="Could not load your clients" onRetry={() => { void refetch() }} />
+        )}
+        {!loading && !isError && remaining.length === 0 && (
           <p className="fhcm-empty">No duplicate clusters left. Nice cleanup.</p>
         )}
         {remaining.map((cluster: any) => {
@@ -255,7 +265,7 @@ export default function ClientsMerge() {
               <div className="fhcm-cluster__foot">
                 <span className="fhcm-cluster__note">
                   {toDelete > 0
-                    ? `${toDelete} ${toDelete === 1 ? 'duplicate' : 'duplicates'} will be deleted. Jobs and notes move to the kept client.${keptApart > 0 ? ` ${keptApart} ${keptApart === 1 ? 'stays' : 'stay'} separate.` : ''}`
+                    ? `${toDelete} ${toDelete === 1 ? 'duplicate' : 'duplicates'} will be deleted. Leads, quotes, jobs, invoices and notes move to the kept client.${keptApart > 0 ? ` ${keptApart} ${keptApart === 1 ? 'stays' : 'stay'} separate.` : ''}`
                     : "Nothing will be deleted. These stay separate and won't be flagged again on this device."}
                 </span>
                 <Button

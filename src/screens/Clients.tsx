@@ -1,8 +1,9 @@
 import WorkspaceHelp from '../components/experience/WorkspaceHelp.tsx'
+import { phoneMatches } from '../lib/searchFilter.ts'
 import { lazy, Suspense, useCallback, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Search, Briefcase, ChevronRight, AlertTriangle } from 'lucide-react'
+import { Plus, Search, Briefcase, ChevronRight, AlertTriangle, Phone } from 'lucide-react'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { SkeletonList } from '../components/Skeleton.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
@@ -124,6 +125,8 @@ export default function Clients() {
       || (r.company_name || '').toLowerCase().includes(needle)
       || (r.email || '').toLowerCase().includes(needle)
       || (r.phone || '').toLowerCase().includes(needle)
+      // "6155550199" finds a phone stored as "615.555.0199" (S14).
+      || phoneMatches(r.phone, needle)
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, q, filter, rollupMap])
@@ -454,9 +457,11 @@ function ClientRow({ client: c, rollup: r, lastActivityRel, isTop, onOpen }: any
       ? `${r.activeCount} active work ${r.activeCount === 1 ? 'item' : 'items'}`
       : c.company_name || 'No active work'
 
+  // Call sits beside the row, so finding a customer and calling them is
+  // one tap from the list (S20).
   return (
-    <div role="listitem">
-      <button type="button" className="fh-customer-row" onClick={() => { hapticTap(); onOpen() }}>
+    <div role="listitem" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <button type="button" className="fh-customer-row" style={{ flex: 1, minWidth: 0 }} onClick={() => { hapticTap(); onOpen() }}>
         <span className="fh-customer-row__name">{c.name || 'Unnamed client'}</span>
         <span className="fh-customer-row__value">{money(r.lifetime)}</span>
         <ChevronRight size={16} aria-hidden="true" />
@@ -466,6 +471,16 @@ function ClientRow({ client: c, rollup: r, lastActivityRel, isTop, onOpen }: any
           ? `${r.activeCount} active work ${r.activeCount === 1 ? 'item' : 'items'}`
           : lastActivityRel ? `Last activity ${lastActivityRel}` : 'Activity date unavailable'}</span>
       </button>
+      {c.phone && (
+        <a
+          href={`tel:${c.phone}`}
+          aria-label={`Call ${c.name || 'this client'}`}
+          onClick={() => hapticTap()}
+          style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: 'none', width: 44, height: 44, borderRadius: 12, border: '1px solid var(--fh-edge)', color: 'var(--fh-ink)' }}
+        >
+          <Phone size={18} aria-hidden="true" />
+        </a>
+      )}
     </div>
   )
 }

@@ -2,7 +2,8 @@
 // D60). A lead is information from a customer who has no quote yet. The
 // screen shows who (the client's name and phone with Call and Message),
 // where (the address with Navigate), what they need, notes saved in place
-// on blur with the sync pill, the next estimate visit when one is booked,
+// (on blur, after a pause in typing, and when the screen or page goes away)
+// with the sync pill, the next estimate visit when one is booked,
 // the two buttons Schedule estimate and Quote this, Mark lost with a
 // second tap on the same button, and the notes left on the contact row
 // the migration moved, under Earlier notes. No sheet, no dialog.
@@ -21,7 +22,10 @@ import DataErrorState from '../../components/DataErrorState.tsx'
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { supabase } from '../../lib/supabase.ts'
 import { useLead, useInvalidateLeads, leadKey, type LeadRow } from '../../lib/queries.ts'
-import { markLeadLost } from '../../lib/leads.ts'
+import { markLeadLost, updateLead, type LeadUpdate } from '../../lib/leads.ts'
+import { homeDashboardKey } from '../../lib/homeDashboard.ts'
+import { JOB_TYPES } from '../../lib/jobTypes.ts'
+import { Choices, LEAD_SOURCES } from '../new/CreateShell.tsx'
 import { leadName, leadNeed, scheduleEstimateRoute, visitDay, visitTime } from '../../lib/leadsView.ts'
 import { newRecordRoute, recordRoute } from '../../lib/records.ts'
 import { navigateHrefHere } from '../../lib/todayView.ts'
@@ -36,6 +40,10 @@ type Note = { id: string; text: string | null; created_at: string | null; catego
 
 /** The 4 seconds the second tap has before Mark lost goes back to resting (D57). */
 const CONFIRM_MS = 4000
+/** A second tap sooner than this after arming is a double tap, not a confirm (S04). */
+const CONFIRM_MIN_MS = 500
+/** Notes save this long after typing stops, as well as on blur. */
+const NOTES_SAVE_MS = 800
 
 async function fetchNextVisit(leadId: string): Promise<Visit | null> {
   const { data, error } = await supabase
@@ -98,7 +106,10 @@ export default function LeadDetail({ id, fallback }: LeadDetailProps) {
   const visitQuery = useQuery({
     queryKey: ['leadNextVisit', id],
     queryFn: () => fetchNextVisit(id),
-    enabled: !!lead
+    enabled: !!lead,
+    // Schedule estimate books the visit on another screen; coming back here
+    // reads it again so the next visit shows at once (DATA-13).
+    refetchOnMount: 'always'
   })
   const notesQuery = useQuery({
     queryKey: ['leadEarlierNotes', id, lead?.origin_contact_id ?? null],
@@ -117,25 +128,55 @@ export default function LeadDetail({ id, fallback }: LeadDetailProps) {
     savedNotes.current = lead.notes ?? ''
   }
 
+  // Saves the text that is in the field now. Called on blur, after a
+  // pause in typing, when the page is hidden or closed, and when the screen
+  // goes away (the phone's Back never blurs the field), so typed notes are
+  // never left behind. resilientUpdate queues the write when offline.
+  const latest = useRef({ notes, leadId: lead?.id ?? null })
+  latest.current = { notes, leadId: lead?.id ?? null }
   async function saveNotes() {
-    if (!lead) return
-    const next = notes.trim()
+    const { notes: text, leadId: target } = latest.current
+    if (!target) return
+    const next = text.trim()
     const before = (savedNotes.current ?? '').trim()
     if (next === before) return
     savedNotes.current = next
-    const res = await resilientUpdate('fh_leads', { id: lead.id }, { notes: next || null }, { userId: user?.id })
+    const res = await resilientUpdate('fh_leads', { id: target }, { notes: next || null }, { userId: user?.id })
     if (res.error) {
       savedNotes.current = before
       toastError('Could not save the notes.', 'Check your connection and try again.')
       return
     }
-    queryClient.setQueryData<LeadRow | null>(leadKey(lead.id), (prev) => (prev ? { ...prev, notes: next || null } : prev))
+    queryClient.setQueryData<LeadRow | null>(leadKey(target), (prev) => (prev ? { ...prev, notes: next || null } : prev))
     invalidateLeads()
   }
+  const saveNotesRef = useRef(saveNotes)
+  saveNotesRef.current = saveNotes
+
+  // After a pause in typing.
+  useEffect(() => {
+    if (notesSeeded === null) return
+    const t = window.setTimeout(() => { void saveNotesRef.current() }, NOTES_SAVE_MS)
+    return () => window.clearTimeout(t)
+  }, [notes, notesSeeded])
+
+  // When the page is hidden or closed, and when the screen goes away.
+  useEffect(() => {
+    const flush = () => { void saveNotesRef.current() }
+    const onVisibility = () => { if (document.visibilityState === 'hidden') flush() }
+    window.addEventListener('pagehide', flush)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('pagehide', flush)
+      document.removeEventListener('visibilitychange', onVisibility)
+      flush()
+    }
+  }, [])
 
   // Mark lost: the first tap arms the button, the second within 4 seconds
   // writes (D57). No dialog.
   const [armed, setArmed] = useState(false)
+  const armedAt = useRef(0)
   const [losing, setLosing] = useState(false)
   useEffect(() => {
     if (!armed) return
@@ -146,7 +187,8 @@ export default function LeadDetail({ id, fallback }: LeadDetailProps) {
   async function handleMarkLost() {
     hapticTap()
     if (!lead || losing) return
-    if (!armed) { setArmed(true); return }
+    if (!armed) { armedAt.current = Date.now(); setArmed(true); return }
+    if (Date.now() - armedAt.current < CONFIRM_MIN_MS) return
     setArmed(false)
     setLosing(true)
     try {
@@ -165,6 +207,45 @@ export default function LeadDetail({ id, fallback }: LeadDetailProps) {
     const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0
     if (idx > 0) navigate(-1)
     else navigate('/leads')
+  }
+
+  // Keeping the lead up to date (S13): Reopen a lost lead, mark the follow
+  // up done or move it, and edit what they need, the job type and the
+  // source in place. Each write updates this screen, the Leads list and
+  // Today, whose follow up reminders read these fields.
+  const [busy, setBusy] = useState(false)
+  async function patchLead(patch: LeadUpdate) {
+    if (!lead || busy) return false
+    setBusy(true)
+    try {
+      await updateLead(lead.id, patch)
+      queryClient.setQueryData<LeadRow | null>(leadKey(lead.id), (prev) => (prev ? { ...prev, ...patch } as LeadRow : prev))
+      invalidateLeads(lead.id)
+      void queryClient.invalidateQueries({ queryKey: homeDashboardKey(user?.id).slice(0, 2) })
+      return true
+    } catch (e) {
+      toastError(e instanceof Error ? e.message : 'Could not save the lead.', 'Check your connection and try again.')
+      return false
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const [editing, setEditing] = useState(false)
+  const [details, setDetails] = useState({ title: '', job_type: '', source: '' })
+  function startEditing() {
+    if (!lead) return
+    hapticTap()
+    setDetails({ title: lead.title ?? '', job_type: lead.job_type ?? '', source: lead.source ?? '' })
+    setEditing(true)
+  }
+  async function saveDetails() {
+    const ok = await patchLead({
+      title: details.title.trim() || null,
+      job_type: details.job_type || null,
+      source: details.source || null
+    })
+    if (ok) setEditing(false)
   }
 
   const client = lead?.fh_clients ?? null
@@ -279,13 +360,30 @@ export default function LeadDetail({ id, fallback }: LeadDetailProps) {
 
         <section className="fhl-section" aria-labelledby="fhl-need-title">
           <h2 className="fhl-section__title" id="fhl-need-title">What they need</h2>
-          <p className="fhl-need">{leadNeed(lead)}</p>
-          {(lead.job_type || lead.source || lead.referred_by) && (
-            <p className="fhl-muted">
-              {[lead.job_type, lead.source && `From ${lead.source}`, lead.referred_by && lead.referred_by !== lead.source && `Referred by ${lead.referred_by}`]
-                .filter(Boolean)
-                .join('. ')}
-            </p>
+          {editing ? (
+            <div className="fhl-edit">
+              <Field label="What they need" value={details.title} onChange={(e) => setDetails((d) => ({ ...d, title: e.target.value }))} />
+              <Choices label="Job type" options={JOB_TYPES} value={details.job_type} onChange={(v) => setDetails((d) => ({ ...d, job_type: v }))} />
+              <Choices label="Source" options={LEAD_SOURCES} value={details.source} onChange={(v) => setDetails((d) => ({ ...d, source: v }))} />
+              <div className="fhl-line__actions">
+                <Button variant="primary" size="md" loading={busy} onClick={() => { void saveDetails() }}>Save details</Button>
+                <Button variant="quiet" size="md" onClick={() => setEditing(false)}>Cancel</Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <p className="fhl-need">{leadNeed(lead)}</p>
+              {(lead.job_type || lead.source || lead.referred_by) && (
+                <p className="fhl-muted">
+                  {[lead.job_type, lead.source && `From ${lead.source}`, lead.referred_by && lead.referred_by !== lead.source && `Referred by ${lead.referred_by}`]
+                    .filter(Boolean)
+                    .join('. ')}
+                </p>
+              )}
+              <span className="fhl-line__actions">
+                <Button variant="secondary" size="mini" onClick={startEditing}>Edit details</Button>
+              </span>
+            </>
           )}
         </section>
 
@@ -319,6 +417,31 @@ export default function LeadDetail({ id, fallback }: LeadDetailProps) {
           </section>
         )}
 
+        {!lost && (
+          <section className="fhl-section" aria-labelledby="fhl-follow-title">
+            <h2 className="fhl-section__title" id="fhl-follow-title">Follow up</h2>
+            {!lead.follow_up_on && <p className="fhl-muted">No follow up set.</p>}
+            <Field
+              type="date"
+              label="Follow up on"
+              value={lead.follow_up_on ?? ''}
+              onChange={(e) => { void patchLead({ follow_up_on: e.target.value || null }) }}
+            />
+            {lead.follow_up_on && (
+              <span className="fhl-line__actions">
+                <Button
+                  variant="secondary"
+                  size="md"
+                  disabled={busy}
+                  onClick={() => { hapticTap(); void patchLead({ follow_up_on: null, last_contact: new Date().toISOString() }) }}
+                >
+                  Follow up done
+                </Button>
+              </span>
+            )}
+          </section>
+        )}
+
         <section className="fhl-section">
           <Field
             multiline
@@ -327,7 +450,7 @@ export default function LeadDetail({ id, fallback }: LeadDetailProps) {
             onChange={(e) => setNotes(e.target.value)}
             onBlur={() => { void saveNotes() }}
             placeholder="What they said, what to bring, what to check"
-            helper="Saved when you leave the field."
+            helper="Saves as you type."
             rows={4}
           />
         </section>
@@ -344,6 +467,14 @@ export default function LeadDetail({ id, fallback }: LeadDetailProps) {
               ))}
             </ul>
           </section>
+        )}
+
+        {lost && (
+          <div className="fhl-lost">
+            <Button variant="secondary" size="md" disabled={busy} onClick={() => { hapticTap(); void patchLead({ status: 'open' }) }}>
+              Reopen
+            </Button>
+          </div>
         )}
 
         {!lost && (
