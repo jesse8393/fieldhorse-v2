@@ -93,6 +93,22 @@ test('onboarding shows the loading stage while its reads are slow', async ({ con
   await expect(stage).toHaveCount(0)
 })
 
+// The only way to start without sample data was 12 px underlined text in
+// a 26 px tall target. It is a real secondary button now: at least 44 px
+// tall with 16 px text, and still not the primary.
+test('onboarding Skip, start fresh is a full size secondary button', async ({ context, page }) => {
+  await signIn(context, { tables: { profiles: [{ user_id: 'qa-user-1', company_name: '', onboarded_at: null, services: [] }] } })
+  await page.goto('/onboarding')
+  const skip = page.getByRole('button', { name: 'Skip, start fresh', exact: true })
+  await expect(skip).toBeVisible()
+  const box = await skip.boundingBox()
+  expect(box?.height ?? 0).toBeGreaterThanOrEqual(44)
+  const size = await skip.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))
+  expect(size).toBeGreaterThanOrEqual(16)
+  await expect(skip).not.toHaveClass(/primary/)
+  await expect(page.getByRole('button', { name: 'Start with sample data', exact: true })).toHaveClass(/primary/)
+})
+
 test('field roles receive guides without owner checklist queries', async ({ context, page }) => {
   await signIn(context, { role: 'crew' })
   const reads: string[] = []

@@ -11,6 +11,7 @@ import SetupProgress from '../components/experience/SetupProgress.tsx'
 import BrandMark from '../components/experience/BrandMark.tsx'
 import LogoUploader from '../components/LogoUploader.tsx'
 import AuthShell from './auth/AuthShell.tsx'
+import { Button } from '../components/fh'
 import { countNoun } from '../lib/format.ts'
 
 const SERVICES = [
@@ -546,27 +547,15 @@ export default function Onboarding() {
             <p className="fh-onb__meta" style={{ margin: 0 }}>
               Sample data shows you the whole app immediately. Wipe anytime in Settings.
             </p>
-            <button
+            <Button
               type="button"
+              variant="secondary"
+              size="md"
               onClick={() => finish({ withSeed: false })}
               disabled={!canSubmit || busy}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                padding: '4px 0',
-                color: 'var(--ink-muted)',
-                fontFamily: 'var(--font-body)',
-                fontSize: 12,
-                fontWeight: 700,
-                letterSpacing: 0,
-                cursor: (canSubmit && !busy) ? 'pointer' : 'default',
-                opacity: (canSubmit && !busy) ? 1 : 0.5,
-                textDecoration: 'underline',
-                textUnderlineOffset: 3
-              }}
             >
               Skip, start fresh
-            </button>
+            </Button>
           </div>
           <p className="fh-onb__meta" style={{ marginTop: 14 }}>
             Signed in as <span>{user?.email}</span> ·{' '}
