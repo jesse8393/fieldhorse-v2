@@ -53,6 +53,7 @@ export default function InvoicePayment() {
   const paymentId = useRef(initialPaymentId)
   const payloadKey = useRef<string | null>(null)
 
+  const isVoid = String(record?.invoice?.status || '').toLowerCase() === 'void'
   const shownAmount = amount ?? (figures ? amountInput(figures.due) : '')
   const numeric = Number(shownAmount) || 0
   const valid = shownAmount !== '' && Number.isFinite(numeric) && numeric > 0
@@ -61,6 +62,11 @@ export default function InvoicePayment() {
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     if (!record || saving) return
+    // A void invoice takes no money (M-23).
+    if (isVoid) {
+      toastError('This invoice is void', 'It cannot take a payment.')
+      return
+    }
     if (!valid) {
       toastError('Enter an amount', 'Amount must be greater than zero.')
       return
@@ -125,7 +131,7 @@ export default function InvoicePayment() {
           autoComplete="off"
           value={shownAmount}
           disabled={saving}
-          helper={figures.due > 0 ? `${formatMoney(figures.due)} still owed on this invoice.` : 'Nothing is owed on this invoice.'}
+          helper={isVoid ? 'This invoice is void, so it cannot take a payment.' : figures.due > 0 ? `${formatMoney(figures.due)} still owed on this invoice.` : 'Nothing is owed on this invoice.'}
           onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ''))}
         />
         <PaymentClassification method={method} kind={kind} onMethodChange={setMethod} onKindChange={setKind} disabled={saving} />
@@ -140,7 +146,7 @@ export default function InvoicePayment() {
         )}
         <Field label="Paid on" type="date" value={paidOn} disabled={saving} onChange={(e) => setPaidOn(e.target.value)} />
         <div className="fhinv-form__save">
-          <Button type="submit" variant="primary" size="lg" block loading={saving} disabled={!valid}>
+          <Button type="submit" variant="primary" size="lg" block loading={saving} disabled={!valid || isVoid}>
             {valid ? `Record ${formatMoney(numeric)}` : 'Record payment'}
           </Button>
         </div>

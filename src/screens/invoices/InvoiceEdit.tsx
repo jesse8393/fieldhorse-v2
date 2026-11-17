@@ -16,6 +16,7 @@ import { fetchInvoiceReviewContext } from '../../lib/invoiceReviewContext.ts'
 import { reviewInvoice } from '../../lib/invoiceReview.js'
 import InvoiceBillingReview from '../../components/InvoiceBillingReview.tsx'
 import { knownContractTotal } from '../../lib/invoiceSettlement.ts'
+import { settleInvoiceAfterEdit } from '../../lib/invoices.ts'
 import { goBackFrom, useInvoiceScreen } from './useInvoiceScreen.ts'
 import './invoices.css'
 
@@ -79,10 +80,14 @@ export default function InvoiceEdit() {
       toastError("Couldn't save the invoice", error?.message || 'Invoice status changed. Refresh and try again.')
       return
     }
+    // An amount edited down to what was already paid settles it (M-24).
+    let settled: Awaited<ReturnType<typeof settleInvoiceAfterEdit>> = { paid: false, error: null }
+    if (amount !== Number(invoice.amount)) settled = await settleInvoiceAfterEdit({ ...invoice, amount })
     hapticTap()
-    patchInvoice(patch)
+    patchInvoice(settled.paid ? { ...patch, status: 'paid' } : patch)
     refresh()
-    toastSuccess('Invoice saved', '')
+    if (settled.error) toastError('Invoice saved', 'Its paid status was not checked. Open it again to confirm what is owed.')
+    else toastSuccess('Invoice saved', settled.paid ? 'The payments already recorded cover it, so it is paid.' : '')
     navigate(`/invoices/${invoice.id}`, { replace: true })
   }
 
