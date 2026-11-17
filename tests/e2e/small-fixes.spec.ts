@@ -21,6 +21,7 @@
 // Nothing here sends anything: every send route is answered by a stub.
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
+import { isReadOnlyRpc } from './helpers/readRpc.ts'
 import { restResponse } from '../../scripts/qa-mock.mjs'
 
 const NOW = Date.now()
@@ -51,6 +52,8 @@ function watchWrites(page: Page): string[] {
   page.on('request', (req) => {
     const url = new URL(req.url())
     if (!['PATCH', 'DELETE', 'POST'].includes(req.method()) || !url.pathname.includes('/rest/v1/')) return
+    // The bell's reminder read is a POST that changes nothing.
+    if (isReadOnlyRpc(url)) return
     writes.push(`${req.method()} ${url.pathname.split('/rest/v1/')[1]} ${req.postData() || ''}`.trim())
   })
   return writes

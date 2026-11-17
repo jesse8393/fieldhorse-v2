@@ -7,6 +7,7 @@
 // two open leads, l-lead1 and l-lead2, on the one client cl-1.
 import { expect, test, type Page } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
+import { isReadOnlyRpc } from './helpers/readRpc.ts'
 
 const NOW = '2026-10-08T15:00:00.000Z'
 const USER = 'qa-user-1'
@@ -277,7 +278,7 @@ function watchWrites(page: Page): string[] {
     if (!['PATCH', 'DELETE', 'POST'].includes(req.method()) || !url.pathname.includes('/rest/v1/')) return
     // The header bell reads open reminders through an RPC, which is a POST
     // that changes nothing. It is a read, so it is not counted as a write.
-    if (url.pathname.endsWith('/rpc/fh_my_open_reminders')) return
+    if (isReadOnlyRpc(url)) return
     writes.push(`${req.method()} ${url.pathname.split('/rest/v1/')[1]} ${req.postData() ?? ''}`)
   })
   return writes

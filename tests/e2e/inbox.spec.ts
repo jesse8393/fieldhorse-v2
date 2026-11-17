@@ -6,6 +6,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import { signIn, type SignInOptions } from './helpers/signIn.ts'
 import { rpcCalls } from './helpers/rpcCalls.ts'
+import { isReadOnlyRpcName } from './helpers/readRpc.ts'
 
 // The mock company is in Tennessee, so the phone runs on Central time and
 // the clock is fixed: Saturday, October 10, 2026, 10:00 am.
@@ -519,8 +520,8 @@ test.describe('a thread', () => {
 
 // ---- Sends exactly once, only when tapped, only when online (Phase 8, Task 11)
 
-/** Every Growth Engine function the mock recorded for this context. */
-const engineCalls = (context: Parameters<typeof signIn>[0]) => rpcCalls(context).filter((call) => call.name.startsWith('fh_'))
+/** Every Growth Engine function the mock recorded for this context (not the bell's reminder read). */
+const engineCalls = (context: Parameters<typeof signIn>[0]) => rpcCalls(context).filter((call) => call.name.startsWith('fh_') && !isReadOnlyRpcName(call.name))
 
 const replyField = (page: Page) => page.getByRole('textbox', { name: 'Write a reply' })
 
