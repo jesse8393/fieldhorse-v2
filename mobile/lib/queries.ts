@@ -16,7 +16,10 @@ import { assertReadResults, readAllRows } from './readResult'
 import { confirmMutation } from './mutationResult'
 import { jobMoney } from './jobMoney'
 import { allocateInvoiceDue, knownContractTotal } from '../../src/lib/invoiceSettlement'
+import { parseDateOnly, todayYmd } from '../../src/lib/dates'
 import { claudeVision, claudeText } from './anthropic'
+import { API_BASE } from './apiBase'
+import { MOVED_STAGE_FILTER, isJobStageChoice } from './stages'
 import type { Database } from './database.types'
 
 export type Contact = Database['public']['Tables']['fh_contacts']['Row']
@@ -35,6 +38,7 @@ async function fetchJobs(): Promise<JobRow[]> {
   const { data, error } = await supabase
     .from('fh_contacts')
     .select('*, fh_clients!fh_contacts_client_id_fkey(name, phone, email)')
+    .not('stage', 'in', MOVED_STAGE_FILTER)
     .order('updated_at', { ascending: false })
   if (error) throw error
   return (data ?? []) as JobRow[]
@@ -73,7 +77,7 @@ async function fetchClientsBundle(userId: string): Promise<ClientsBundle> {
     supabase.from('fh_clients').select('*').eq('user_id', userId)
       .order('last_activity_at', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false }),
-    supabase.from('fh_contacts').select('id, client_id, amount, stage').eq('user_id', userId),
+    supabase.from('fh_contacts').select('id, client_id, amount, stage').not('stage', 'in', MOVED_STAGE_FILTER).eq('user_id', userId),
     supabase.from('fh_payments').select('contact_id, amount, paid_on').eq('user_id', userId)
   ])
   assertReadResults(clientsRes, jobsRes, paymentsRes)
@@ -104,6 +108,7 @@ async function fetchClientDetail(id: string): Promise<ClientDetail> {
   const [c, j] = await Promise.all([
     supabase.from('fh_clients').select('*').eq('id', id).maybeSingle(),
     supabase.from('fh_contacts').select('id, name, job_title, job_type, amount, stage')
+      .not('stage', 'in', MOVED_STAGE_FILTER)
       .eq('client_id', id).order('updated_at', { ascending: false })
   ])
   assertReadResults(c, j)
@@ -292,7 +297,7 @@ export function useLogPayment() {
       contact_id: input.contactId,
       amount: input.amount,
       method: input.method || 'check',
-      paid_on: input.paidOn || localYmd()
+      paid_on: input.paidOn || todayYmd()
     }
     // A retry of the same sheet attempt reuses its UUID. Verify the stored
     // payload too: ignoreDuplicates alone could accept changed form values.
@@ -315,11 +320,13 @@ export function useLogPayment() {
   }
 }
 
-// Update a job's pipeline stage, then invalidate the detail + lists so
-// the new stage shows everywhere. Returns the supabase error (or null).
+// Update a job's stage, then invalidate the detail + lists so the new
+// stage shows everywhere. Returns the supabase error (or null). A job can
+// only be job, closed or lost; leads and quotes are their own records.
 export function useUpdateStage() {
   const client = useQueryClient()
   return async (input: { contactId: string; stage: string }) => {
+    if (!isJobStageChoice(input.stage)) return { error: new Error('A job can only be set to job, closed or lost.') }
     const { error } = await confirmMutation(supabase.from('fh_contacts')
       .update({ stage: input.stage } as any)
       .eq('id', input.contactId).select('id'))
@@ -589,8 +596,9 @@ export function useDeleteFile() {
 // ---- Create lead ----
 // A lead is an fh_leads row pointing at an fh_clients row (SPEC D53). The
 // client is matched among the user's own clients by phone, then email,
-// or inserted; the lead carries the title, type and notes. The stage
-// update above stays for jobs, which live on fh_contacts.
+// or inserted; the lead carries the title, type and notes. fh_leads has no
+// address column, so a typed job site that differs from a matched client's
+// address goes into the lead's notes rather than being dropped.
 export type NewLeadInput = {
   userId: string
   name: string
@@ -602,18 +610,16 @@ export type NewLeadInput = {
   amount?: number
   notes?: string
   referredBy?: string
-  // Accepted and ignored: a new lead is always open. Stages belong to jobs.
-  stage?: string
 }
 
 const digitsOf = (s?: string | null) => String(s || '').replace(/\D/g, '')
 
-async function findOrCreateMobileClient(input: NewLeadInput): Promise<{ id?: string; error: any }> {
+async function findOrCreateMobileClient(input: NewLeadInput): Promise<{ id?: string; address?: string | null; created?: boolean; error: any }> {
   const phone = digitsOf(input.phone)
   const email = (input.email || '').trim().toLowerCase()
   if (phone.length >= 7 || email) {
     const { data, error } = await supabase.from('fh_clients')
-      .select('id, phone, email')
+      .select('id, phone, email, address')
       .eq('user_id', input.userId)
       .order('created_at', { ascending: false })
       .limit(200)
@@ -621,7 +627,7 @@ async function findOrCreateMobileClient(input: NewLeadInput): Promise<{ id?: str
     const hit = (data || []).find((c: any) =>
       (phone.length >= 7 && digitsOf(c.phone) === phone) ||
       (email && String(c.email || '').trim().toLowerCase() === email))
-    if (hit) return { id: hit.id, error: null }
+    if (hit) return { id: hit.id, address: hit.address ?? null, error: null }
   }
   const { data, error } = await supabase.from('fh_clients').insert({
     user_id: input.userId,
@@ -630,15 +636,18 @@ async function findOrCreateMobileClient(input: NewLeadInput): Promise<{ id?: str
     email: input.email || null,
     address: input.address || null
   } as any).select('id').single()
-  return { id: (data as any)?.id as string | undefined, error }
+  return { id: (data as any)?.id as string | undefined, created: true, error }
 }
 
 export function useCreateLead() {
   const client = useQueryClient()
   return async (input: NewLeadInput) => {
     const who = await findOrCreateMobileClient(input)
-    if (who.error || !who.id) return { id: undefined as string | undefined, error: who.error || new Error('Could not save the client') }
-    const notes = [input.notes || null, input.amount ? `Estimated amount $${input.amount}` : null].filter(Boolean).join('\n') || null
+    if (who.error || !who.id) return { id: undefined as string | undefined, clientId: undefined as string | undefined, error: who.error || new Error('Could not save the client') }
+    const site = (input.address || '').trim()
+    const siteNote = site && !who.created && site.toLowerCase() !== String(who.address || '').trim().toLowerCase()
+      ? `Job site: ${site}` : null
+    const notes = [siteNote, input.notes || null, input.amount ? `Estimated amount $${input.amount}` : null].filter(Boolean).join('\n') || null
     const { data, error } = await supabase.from('fh_leads').insert({
       user_id: input.userId,
       client_id: who.id,
@@ -653,7 +662,7 @@ export function useCreateLead() {
       client.invalidateQueries({ queryKey: queryKeys.jobs })
       client.invalidateQueries({ queryKey: queryKeys.clients })
     }
-    return { id: (data as any)?.id as string | undefined, error }
+    return { id: (data as any)?.id as string | undefined, clientId: who.id, error }
   }
 }
 
@@ -704,7 +713,7 @@ export function useAddExpense() {
       amount: input.amount,
       category: input.category || null,
       description: input.description || null,
-      expense_date: input.expenseDate || new Date().toISOString().slice(0, 10)
+      expense_date: input.expenseDate || todayYmd()
     } as any)
     if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
     return { error }
@@ -1098,49 +1107,91 @@ export function useUpdateProfile() {
   }
 }
 
-// ---- Bid → job ----
-// Creates a stage='quote' contact from an AI estimate and inserts one
-// fh_quote_items row per line item (high end of the rate range so the
-// operator negotiates down). Mirrors the web Bid pushToJob.
+// ---- Bid → quote ----
+// Turns an AI estimate into a draft fh_quotes row for a client, with one
+// fh_quote_items row per line item on quote_id. Mirrors the web Bid
+// pushToJob and createQuote (src/screens/Bid.tsx, src/lib/quotes.ts): the
+// client is matched by name or made, and every line rate is scaled so the
+// lines add up exactly to the recommended price.
 export type BidLineItem = { name: string; qty?: number; unit?: string; rate_low?: number; rate_high?: number; notes?: string }
 export type BidResult = { line_items?: BidLineItem[]; summary?: string; assumptions?: string[]; risks?: string[]; total_low?: number; total_high?: number }
 
-export function useCreateJobFromBid() {
+export type QuoteFromBidInput = {
+  userId: string
+  clientName: string
+  bid: BidResult
+  jobType: string
+  scope: string
+  recommendedPrice: number
+  section?: string
+}
+
+export function useCreateQuoteFromBid() {
   const client = useQueryClient()
-  return async (input: { userId: string; bid: BidResult; jobType: string; scope: string; recommendedPrice: number; section?: string }) => {
+  return async (input: QuoteFromBidInput): Promise<{ error: any; id?: string; clientId?: string }> => {
+    const name = input.clientName.trim()
+    if (!name) return { error: new Error('Type who this quote is for. A new name makes a new client.') }
+
+    let clientId: string | undefined
+    try {
+      const { data: clients } = await readAllRows<{ id: string; name: string | null }>((from, to) =>
+        supabase.from('fh_clients').select('id, name').order('id', { ascending: true }).range(from, to))
+      clientId = (clients || []).find((c) => String(c.name || '').trim().toLowerCase() === name.toLowerCase())?.id
+    } catch (error) {
+      return { error }
+    }
+    if (!clientId) {
+      const { data: made, error } = await supabase.from('fh_clients')
+        .insert({ user_id: input.userId, name } as any).select('id').single()
+      if (error || !made) return { error: error || new Error('Could not save the client.') }
+      clientId = (made as any).id as string
+    }
+
     const notes = [
-      input.bid.assumptions?.length ? `Assumptions:\n${input.bid.assumptions.map((a) => `• ${a}`).join('\n')}` : '',
-      input.bid.risks?.length ? `Risks:\n${input.bid.risks.map((r) => `• ${r}`).join('\n')}` : ''
-    ].filter(Boolean).join('\n\n') || null
-    const { data: contact, error: cErr } = await supabase.from('fh_contacts').insert({
+      input.scope.trim(),
+      input.bid.assumptions?.length ? `Assumptions:\n${input.bid.assumptions.join('\n')}` : '',
+      input.bid.risks?.length ? `Risks:\n${input.bid.risks.join('\n')}` : ''
+    ].filter(Boolean).join('\n\n')
+    const { data: quote, error: qErr } = await supabase.from('fh_quotes').insert({
       user_id: input.userId,
-      name: 'New estimate',
-      job_title: input.bid.summary || (input.jobType ? `${input.jobType} project` : 'New estimate'),
-      job_type: input.jobType || null,
-      amount: input.recommendedPrice,
-      stage: 'quote',
-      scope_text: input.scope || null,
-      notes
-    } as any).select('id').single()
-    if (cErr || !contact) return { error: cErr, id: undefined }
-    const items = (input.bid.line_items || []).map((li, idx) => {
-      const qty = Number(li.qty || 1)
-      const rate = Number(li.rate_high ?? li.rate_low ?? 0)
+      client_id: clientId,
+      title: input.bid.summary?.trim() || (input.jobType ? `${input.jobType} project` : 'New estimate'),
+      scope_text: notes || null,
+      job_type: input.jobType.trim() || null,
+      status: 'draft'
+    } as any).select('*').single()
+    if (qErr || !quote) return { error: qErr || new Error('Could not save the quote.'), clientId }
+    const quoteId = (quote as any).id as string
+
+    const raw = (input.bid.line_items || []).map((li) => ({
+      li, qty: Number(li.qty || 1), rate: Number(li.rate_high ?? li.rate_low ?? 0)
+    })).filter((r) => r.qty * r.rate > 0)
+    const subtotal = raw.reduce((sum, r) => sum + r.qty * r.rate, 0)
+    const scale = subtotal > 0 ? input.recommendedPrice / subtotal : 1
+    let allocated = 0
+    const items = raw.map((r, idx) => {
+      let amount = idx === raw.length - 1 ? input.recommendedPrice - allocated : Math.round(r.qty * r.rate * scale)
+      if (amount < 0) amount = 0
+      allocated += amount
       return {
         user_id: input.userId,
-        contact_id: (contact as any).id,
+        quote_id: quoteId,
+        contact_id: null,
         section: input.section || 'Scope',
-        description: li.name + (li.notes ? `, ${li.notes}` : ''),
-        qty, unit: li.unit || null, rate, amount: qty * rate,
+        description: r.li.name + (r.li.notes ? ` (${r.li.notes})` : ''),
+        qty: r.qty,
+        unit: r.li.unit || null,
+        rate: r.qty > 0 ? Math.round((amount / r.qty) * 100) / 100 : amount,
+        amount,
         is_optional: false, is_excluded: false, sort_order: idx
       }
     }).filter((row) => row.rate > 0 || row.amount > 0)
     if (items.length > 0) {
       const { error: iErr } = await supabase.from('fh_quote_items').insert(items as any)
-      if (iErr) return { error: iErr, id: (contact as any).id as string }
+      if (iErr) return { error: iErr, id: quoteId, clientId }
     }
-    client.invalidateQueries({ queryKey: queryKeys.jobs })
-    return { error: null, id: (contact as any).id as string }
+    client.invalidateQueries({ queryKey: queryKeys.clients })
+    return { error: null, id: quoteId, clientId }
   }
 }
 
@@ -1211,7 +1262,7 @@ export function useAddMileage() {
       contact_id: input.contactId,
       miles: input.miles,
       purpose: input.purpose || null,
-      drove_on: input.droveOn || new Date().toISOString().slice(0, 10)
+      drove_on: input.droveOn || todayYmd()
     } as any)
     if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
     return { error }
@@ -1287,6 +1338,21 @@ export function useMarkNotificationRead() {
     const { error } = await confirmMutation(supabase.from('fh_notifications')
       .update({ read_at: new Date().toISOString() } as any)
       .eq('id', input.id).select('id'))
+    if (!error) client.invalidateQueries({ queryKey: ['notifications', input.userId] })
+    return { error }
+  }
+}
+
+// A reminder (follow_up_due or review_ask_due) is closed as Done or
+// Dismissed through fh_follow_up_set_status, which closes the queued follow
+// up it stands for and marks it read, as the web does. Marking it read
+// alone leaves the follow up open to fire again.
+export const REMINDER_KINDS = ['follow_up_due', 'review_ask_due']
+
+export function useSetFollowUpStatus() {
+  const client = useQueryClient()
+  return async (input: { id: string; userId: string; status: 'done' | 'dismissed' }) => {
+    const { error } = await supabase.rpc('fh_follow_up_set_status', { p_notification_id: input.id, p_status: input.status } as any)
     if (!error) client.invalidateQueries({ queryKey: ['notifications', input.userId] })
     return { error }
   }
@@ -1402,6 +1468,8 @@ export function useCoverPhotos(userId: string | undefined) {
       for (const [jobId, path] of pathByJob.entries()) { const u = urlByPath.get(path); if (u) out[jobId] = u }
       return out
     },
+    // Optional: the list shows without cover photos when they cannot load.
+    throwOnError: false,
     enabled: !!userId
   })
 }
@@ -1460,7 +1528,7 @@ export function useInvoicesOverview(userId: string | undefined) {
       }
       let collectedThisMonth = 0, collectedThisWeek = 0
       for (const p of (payRes.data ?? []) as any[]) {
-        const d = p.paid_on ? new Date(p.paid_on).getTime() : 0
+        const d = parseDateOnly(p.paid_on)?.getTime() ?? 0
         const amt = Number(p.amount || 0)
         if (d >= monthStart.getTime()) collectedThisMonth += amt
         if (d >= weekStart.getTime()) collectedThisWeek += amt
@@ -1472,12 +1540,6 @@ export function useInvoicesOverview(userId: string | undefined) {
     },
     enabled: !!userId
   })
-}
-
-// Today's calendar date on this device. toISOString() is UTC, which is
-// already tomorrow for US users in the evening.
-function localYmd(d: Date = new Date()): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 // Marking an invoice paid also records the money against it, so the job
@@ -1532,7 +1594,7 @@ export function useMarkInvoicePaid() {
         invoice_id: input.id,
         amount: remainder,
         method: 'other',
-        paid_on: localYmd()
+        paid_on: todayYmd()
       } as any)
       if (payErr) return { error: payErr }
     }
@@ -1569,7 +1631,7 @@ export function useActivityFeed(userId: string | undefined) {
       const uid = userId as string
       const [pays, leads, invs, cos, notes] = await Promise.all([
         supabase.from('fh_payments').select('id, amount, kind, paid_on, created_at, contact_id, fh_contacts(name)').eq('user_id', uid).order('created_at', { ascending: false }).limit(25),
-        supabase.from('fh_contacts').select('id, name, stage, amount, created_at').eq('user_id', uid).order('created_at', { ascending: false }).limit(25),
+        supabase.from('fh_contacts').select('id, name, stage, amount, created_at').not('stage', 'in', MOVED_STAGE_FILTER).eq('user_id', uid).order('created_at', { ascending: false }).limit(25),
         supabase.from('fh_invoices').select('id, amount, status, sequence_number, created_at, contact_id, fh_contacts(name)').eq('user_id', uid).order('created_at', { ascending: false }).limit(25),
         supabase.from('fh_change_orders').select('id, amount, title, status, created_at, contact_id, fh_contacts(name)').eq('user_id', uid).order('created_at', { ascending: false }).limit(25),
         supabase.from('fh_notes').select('id, text, created_at, contact_id, fh_contacts(name)').eq('user_id', uid).order('created_at', { ascending: false }).limit(25)
@@ -1581,7 +1643,7 @@ export function useActivityFeed(userId: string | undefined) {
         amount: Number(p.amount || 0), contactId: p.contact_id, contactName: p.fh_contacts?.name ?? null, date: p.paid_on || p.created_at || ''
       })
       for (const l of (leads.data ?? []) as any[]) items.push({
-        id: `lead-${l.id}`, kind: 'lead', title: 'New lead added', sub: l.stage ? String(l.stage).replace(/_/g, ' ') : null,
+        id: `lead-${l.id}`, kind: 'lead', title: 'New job added', sub: l.stage ? String(l.stage).replace(/_/g, ' ') : null,
         amount: l.amount ? Number(l.amount) : null, contactId: l.id, contactName: l.name ?? null, date: l.created_at || ''
       })
       for (const i of (invs.data ?? []) as any[]) items.push({
@@ -1667,6 +1729,7 @@ export function useEstimates(userId: string | undefined) {
       const { data , error: readError } = await supabase
         .from('fh_contacts')
         .select('id, name, amount, proposal_status, quote_sent_at, quote_expires_at')
+        .not('stage', 'in', MOVED_STAGE_FILTER)
         .eq('user_id', userId as string)
         .order('quote_sent_at', { ascending: false, nullsFirst: false })
       assertReadResults({ error: readError })
@@ -1712,7 +1775,7 @@ export function useNotesScreen(userId: string | undefined) {
       const uid = userId as string
       const [nRes, cRes] = await Promise.all([
         supabase.from('fh_notes').select('id, text, contact_id, created_at, category, action, when_text, done').eq('user_id', uid).order('created_at', { ascending: false }).limit(200),
-        supabase.from('fh_contacts').select('id, name').eq('user_id', uid).order('name', { ascending: true })
+        supabase.from('fh_contacts').select('id, name').not('stage', 'in', MOVED_STAGE_FILTER).eq('user_id', uid).order('name', { ascending: true })
       ])
       assertReadResults(nRes, cRes)
       const notes: NoteRow[] = ((nRes.data ?? []) as any[])
@@ -1786,7 +1849,7 @@ export function useSubsRoster(userId: string | undefined) {
       const uid = userId as string
       const [sRes, cRes] = await Promise.all([
         supabase.from('fh_subs').select('id, name, trade, phone, rate, status, contact_id, created_at').eq('user_id', uid).order('created_at', { ascending: false }),
-        supabase.from('fh_contacts').select('id, name, job_title').eq('user_id', uid)
+        supabase.from('fh_contacts').select('id, name, job_title').not('stage', 'in', MOVED_STAGE_FILTER).eq('user_id', uid)
       ])
       assertReadResults(sRes, cRes)
       const subs: SubRowRaw[] = ((sRes.data ?? []) as any[]).map((s) => ({
@@ -1954,6 +2017,9 @@ export function useWeather(lat?: number | null, lon?: number | null) {
   return useQuery({
     queryKey: ['weather', lat ?? 'default', lon ?? 'default'],
     queryFn: () => getWeather(lat ?? undefined, lon ?? undefined),
+    // Optional: no forecast (no signal, rate limit) hides the weather pill
+    // instead of replacing the whole app with the retry screen.
+    throwOnError: false,
     staleTime: 1000 * 60 * 30,
     refetchInterval: 1000 * 60 * 30
   })
@@ -1967,9 +2033,8 @@ export function useDeleteAccount() {
     const { data } = await supabase.auth.getSession()
     const token = data.session?.access_token
     if (!token) return { error: { message: 'You are not signed in.' } }
-    const base = (process.env.EXPO_PUBLIC_API_BASE_URL as string) || 'https://fieldhorse.io'
     try {
-      const res = await fetch(`${base}/api/delete-account`, {
+      const res = await fetch(`${API_BASE}/api/delete-account`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
       })

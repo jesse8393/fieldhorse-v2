@@ -6,6 +6,7 @@ vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries: mock.invalidate })
 }))
 vi.mock('./supabase', () => ({ supabase: {
+  rpc: (name: string, args: unknown) => { mock.calls.push(['rpc', name, args]); return Promise.resolve(mock.results.get(`rpc:${name}`) ?? { data: null, error: null }) },
   from: (table: string) => {
     let range: number[] | null = null
     const operations: any[] = []
@@ -23,6 +24,9 @@ vi.mock('./supabase', () => ({ supabase: {
 } }))
 
 import { useIntegrations, useDisconnectIntegration } from './integrations'
+import { useJobs, useEstimates, useUpdateStage, useCreateQuoteFromBid, useCreateLead, useSetFollowUpStatus } from './queries'
+import { useMembership, moneyVisible } from './membership'
+import { JOB_STAGE_CHOICES } from './stages'
 import { useClientsBundle, useClientDetail, useJobDetail, useInvoiceDetail, useInvoicesOverview, useProfile, useJobPhotos, useJobFiles, useAgenda, useNotesScreen, useActivityFeed, useSubsRoster, useToggleTodo, useDeleteTodo, useUpdateJob, useUpdateProfile, useDeletePhoto, useDeleteFile, useGenerateDraws, useLogPayment, useMarkInvoicePaid, useUpdateInvoiceStatus } from './queries'
 
 beforeEach(() => { mock.results.clear(); mock.options = null; mock.invalidate.mockClear(); mock.calls = []; mock.storageResult = null })
@@ -202,5 +206,167 @@ describe('native payment confirmation and allocation', () => {
     settlement('void')
     expect((await useMarkInvoicePaid()({ id: 'invoice', userId: 'user' })).error?.message).toContain('void')
     expect(mock.calls.some(c => c[1] === 'insert' || c[1] === 'update')).toBe(false)
+  })
+})
+
+describe('native list reads exclude moved rows', () => {
+  const MOVED = '("moved_lead","moved_quote")'
+  for (const [name, hook] of [
+    ['jobs list', () => useJobs()],
+    ['clients bundle', () => useClientsBundle('user')],
+    ['client detail', () => useClientDetail('client')],
+    ['activity feed', () => useActivityFeed('user')],
+    ['estimates', () => useEstimates('user')],
+    ['notes job picker', () => useNotesScreen('user')],
+    ['subs roster', () => useSubsRoster('user')],
+  ] as const) {
+    it(`${name} drops moved_lead and moved_quote rows`, async () => {
+      hook()
+      await mock.options.queryFn()
+      const selects = mock.calls.filter(c => c[0] === 'fh_contacts' && c[1] === 'select')
+      const filters = mock.calls.filter(c => c[0] === 'fh_contacts' && c[1] === 'not')
+      expect(selects.length).toBeGreaterThan(0)
+      expect(filters).toEqual(selects.map(() => ['fh_contacts', 'not', 'stage', 'in', MOVED]))
+    })
+  }
+})
+
+describe('native job stage changes', () => {
+  it('offers only job, closed and lost', () => {
+    expect([...JOB_STAGE_CHOICES]).toEqual(['job', 'closed', 'lost'])
+  })
+  for (const stage of ['lead', 'quote', 'invoice', 'moved_lead']) {
+    it(`refuses to set a job to ${stage} without writing`, async () => {
+      mock.results.set('fh_contacts', { data: [{ id: 'job' }], error: null })
+      const result = await useUpdateStage()({ contactId: 'job', stage })
+      expect(result.error).toBeTruthy()
+      expect(mock.calls).toEqual([])
+    })
+  }
+  it('still saves a closed job', async () => {
+    mock.results.set('fh_contacts', { data: [{ id: 'job' }], error: null })
+    expect((await useUpdateStage()({ contactId: 'job', stage: 'closed' })).error).toBeNull()
+    expect(mock.calls).toContainEqual(['fh_contacts', 'update', { stage: 'closed' }])
+  })
+})
+
+describe('native estimate to quote', () => {
+  const bid = {
+    summary: 'Driveway replacement',
+    line_items: [{ name: 'Demo', qty: 2, unit: 'lump', rate_low: 100, rate_high: 150 }, { name: 'Pour', qty: 3, unit: 'sqft', rate_high: 100.5, notes: '4 inch' }],
+    assumptions: ['Clear access'], risks: []
+  }
+  function tables(existing: any[] = []) {
+    mock.results.set('fh_clients', (_r: unknown, ops: any[]) => ops.some(o => o[0] === 'insert')
+      ? { data: { id: 'client-new' }, error: null } : { data: existing, error: null })
+    mock.results.set('fh_quotes', { data: { id: 'quote-1' }, error: null })
+    mock.results.set('fh_quote_items', { data: null, error: null })
+  }
+
+  it('bid creates an fh_quotes row for the client with its lines on quote_id', async () => {
+    tables([{ id: 'client-1', name: 'Pat Smith ' }])
+    const result = await useCreateQuoteFromBid()({ userId: 'user', clientName: 'pat smith', bid, jobType: 'Concrete', scope: 'Replace drive', recommendedPrice: 1000, section: 'Concrete' })
+    expect(result).toMatchObject({ error: null, id: 'quote-1', clientId: 'client-1' })
+    expect(mock.calls.some(c => c[0] === 'fh_contacts')).toBe(false)
+    expect(mock.calls.some(c => c[0] === 'fh_clients' && c[1] === 'insert')).toBe(false)
+    expect(mock.calls.find(c => c[0] === 'fh_quotes' && c[1] === 'insert')?.[2]).toMatchObject({
+      user_id: 'user', client_id: 'client-1', status: 'draft', title: 'Driveway replacement', job_type: 'Concrete'
+    })
+    const items = mock.calls.find(c => c[0] === 'fh_quote_items' && c[1] === 'insert')?.[2]
+    expect(items).toHaveLength(2)
+    expect(items.every((i: any) => i.quote_id === 'quote-1' && i.contact_id === null)).toBe(true)
+    expect(items.reduce((s: number, i: any) => s + i.amount, 0)).toBe(1000)
+  })
+
+  it('a new client name makes the client first', async () => {
+    tables([])
+    const result = await useCreateQuoteFromBid()({ userId: 'user', clientName: 'New Person', bid, jobType: '', scope: '', recommendedPrice: 500 })
+    expect(result).toMatchObject({ error: null, id: 'quote-1', clientId: 'client-new' })
+    expect(mock.calls.find(c => c[0] === 'fh_clients' && c[1] === 'insert')?.[2]).toMatchObject({ user_id: 'user', name: 'New Person' })
+  })
+
+  it('refuses without a client name and writes nothing', async () => {
+    tables([])
+    const result = await useCreateQuoteFromBid()({ userId: 'user', clientName: '  ', bid, jobType: '', scope: '', recommendedPrice: 500 })
+    expect(result.error).toBeTruthy()
+    expect(mock.calls).toEqual([])
+  })
+})
+
+describe('native new lead', () => {
+  function clients(existing: any[]) {
+    mock.results.set('fh_clients', (_r: unknown, ops: any[]) => ops.some(o => o[0] === 'insert')
+      ? { data: { id: 'client-new' }, error: null } : { data: existing, error: null })
+    mock.results.set('fh_leads', { data: { id: 'lead-1' }, error: null })
+  }
+
+  it('keeps the typed job site address when the client already exists', async () => {
+    clients([{ id: 'client-1', phone: '(555) 123-4567', email: null, address: '1 Home Rd' }])
+    const result = await useCreateLead()({ userId: 'user', name: 'Pat', phone: '555 123 4567', address: '12 Oak St', notes: 'Back patio' })
+    expect(result).toMatchObject({ error: null, id: 'lead-1', clientId: 'client-1' })
+    const lead = mock.calls.find(c => c[0] === 'fh_leads' && c[1] === 'insert')?.[2]
+    expect(lead).toMatchObject({ client_id: 'client-1', status: 'open' })
+    expect(lead.notes).toContain('Job site: 12 Oak St')
+    expect(lead.notes).toContain('Back patio')
+  })
+
+  it('a new client carries the address and the lead does not repeat it', async () => {
+    clients([])
+    const result = await useCreateLead()({ userId: 'user', name: 'New', address: '12 Oak St' })
+    expect(result).toMatchObject({ error: null, id: 'lead-1', clientId: 'client-new' })
+    expect(mock.calls.find(c => c[0] === 'fh_clients' && c[1] === 'insert')?.[2]).toMatchObject({ address: '12 Oak St' })
+    expect(mock.calls.find(c => c[0] === 'fh_leads' && c[1] === 'insert')?.[2].notes ?? '').not.toContain('Job site')
+  })
+})
+
+describe('native reminders', () => {
+  for (const status of ['done', 'dismissed'] as const) {
+    it(`${status} closes the follow up through fh_follow_up_set_status`, async () => {
+      const result = await useSetFollowUpStatus()({ id: 'note-1', userId: 'user', status })
+      expect(result.error).toBeNull()
+      expect(mock.calls).toEqual([['rpc', 'fh_follow_up_set_status', { p_notification_id: 'note-1', p_status: status }]])
+      expect(mock.invalidate).toHaveBeenCalledWith({ queryKey: ['notifications', 'user'] })
+    })
+  }
+  it('a refused follow up update is reported and nothing refreshes', async () => {
+    mock.results.set('rpc:fh_follow_up_set_status', { data: null, error: new Error('not yours') })
+    expect((await useSetFollowUpStatus()({ id: 'note-1', userId: 'user', status: 'done' })).error?.message).toBe('not yours')
+    expect(mock.invalidate).not.toHaveBeenCalled()
+  })
+})
+
+describe('native money visibility', () => {
+  const rows = [
+    { org_id: 'org-old', role: 'owner', joined_at: '2025-01-01T00:00:00Z' },
+    { org_id: 'org-new', role: 'crew', joined_at: '2026-01-01T00:00:00Z' },
+  ]
+  it('loads the active membership and asks fh_money_visible for that org', async () => {
+    mock.results.set('org_members', { data: rows, error: null })
+    mock.results.set('rpc:fh_money_visible', { data: false, error: null })
+    useMembership('user')
+    expect(await mock.options.queryFn()).toEqual({ orgId: 'org-old', role: 'owner', moneyVisible: false })
+    expect(mock.calls).toContainEqual(['org_members', 'eq', 'user_id', 'user'])
+    expect(mock.calls).toContainEqual(['rpc', 'fh_money_visible', { p_org_id: 'org-old' }])
+  })
+  it('crew and foreman see no money', async () => {
+    mock.results.set('org_members', { data: [rows[1]], error: null })
+    mock.results.set('rpc:fh_money_visible', { data: false, error: null })
+    useMembership('user')
+    expect(await mock.options.queryFn()).toMatchObject({ role: 'crew', moneyVisible: false })
+  })
+  it('a person with no company yet sees their own money', async () => {
+    mock.results.set('org_members', { data: [], error: null })
+    useMembership('user')
+    expect(await mock.options.queryFn()).toEqual({ orgId: null, role: null, moneyVisible: true })
+    expect(mock.calls.some(c => c[0] === 'rpc')).toBe(false)
+  })
+  it('a failed check hides money rather than showing it', async () => {
+    mock.results.set('org_members', { data: [rows[0]], error: null })
+    mock.results.set('rpc:fh_money_visible', { data: null, error: new Error('offline') })
+    useMembership('user')
+    await expect(mock.options.queryFn()).rejects.toThrow('offline')
+    expect(mock.options.throwOnError).toBe(false)
+    expect(moneyVisible(undefined)).toBe(false)
+    expect(moneyVisible({ orgId: 'org', role: 'owner', moneyVisible: true })).toBe(true)
   })
 })

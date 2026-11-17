@@ -10,6 +10,8 @@
 // proposalThemes.tsx) so the customer sees the same design whether it
 // comes from the website or the phone. Pure string output, no React.
 
+import { parseDateOnly } from '../../src/lib/dates'
+
 export type ProposalItemRow = {
   description?: string | null
   qty?: number | null
@@ -64,8 +66,8 @@ function money(n: unknown, cents = true): string {
 }
 function fmtDate(d?: Date | string | null): string {
   if (!d) return '\u2003'
-  const dt = d instanceof Date ? d : new Date(d)
-  if (Number.isNaN(dt.getTime())) return '\u2003'
+  const dt = parseDateOnly(d)
+  if (!dt) return '\u2003'
   return dt.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
 }
 function itemAmount(it: ProposalItemRow): number {

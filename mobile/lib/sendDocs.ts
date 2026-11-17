@@ -14,8 +14,7 @@
 import * as Print from 'expo-print'
 import { supabase } from './supabase'
 import { confirmMutation } from './mutationResult'
-
-const API_BASE = (process.env.EXPO_PUBLIC_API_BASE_URL || 'https://fieldhorse.io').replace(/\/+$/, '')
+import { API_BASE } from './apiBase'
 
 // The send-* Netlify functions require the signed-in user's access
 // token; sender_user_id alone is no longer trusted on the server.
@@ -117,22 +116,70 @@ export async function sendMessageEmail(input: {
   return { ok: true }
 }
 
+// The invoice row being sent. The server refuses a send without one
+// (tracked_invoice_required) and refuses one that changed after it was
+// opened (invoice_changed), so both travel with the request.
+export type InvoiceToSend = {
+  id: string
+  contact_id: string | null
+  status: string | null
+  amount: number | null
+  title?: string | null
+  description?: string | null
+  updated_at: string
+}
+
+// The invoice a job's Send acts on: the one that was opened, else the only
+// open one. Null with a reason when there is nothing or too much to choose.
+export function pickInvoiceToSend<T extends { id: string; status: string | null }>(
+  invoices: T[], requestedId: string | null | undefined
+): { invoice: T | null; message?: string } {
+  if (requestedId) {
+    const hit = invoices.find((i) => i.id === requestedId)
+    return hit ? { invoice: hit } : { invoice: null, message: 'This invoice is no longer on the job. Go back and open it again.' }
+  }
+  const open = invoices.filter((i) => i.status !== 'void' && i.status !== 'paid')
+  if (open.length === 1) return { invoice: open[0] }
+  if (open.length === 0) return { invoice: null, message: 'Create an invoice for this job before sending one.' }
+  return { invoice: null, message: 'This job has more than one open invoice. Open the one to send from Invoices.' }
+}
+
+// Checks what the server will check before a PDF is saved, so a send that
+// would be refused does not leave a stray PDF in the job's Files.
+async function invoiceSendProblem(invoice: InvoiceToSend, contactId: string): Promise<string | null> {
+  const { data, error } = await supabase.from('fh_invoices')
+    .select('id, contact_id, status, amount, updated_at').eq('id', invoice.id).maybeSingle()
+  if (error) return `Could not check the invoice: ${error.message}`
+  const row = data as any
+  if (!row) return 'This invoice was not found. Go back and open it again.'
+  if ((row.contact_id || null) !== contactId) return 'This invoice does not belong to this job.'
+  if (row.status === 'void') return 'A void invoice cannot be sent.'
+  if (!(Number(row.amount) > 0)) return 'Enter a positive invoice amount before sending.'
+  if (row.updated_at !== invoice.updated_at) return 'This invoice changed after it was opened. Go back, review it and send again.'
+  return null
+}
+
 export async function sendInvoiceEmail(input: {
   html: string
   filename: string
   userId: string
   contact: { id: string; name?: string | null; email?: string | null }
-  invoiceId?: string | null
+  invoice: InvoiceToSend
 }): Promise<SendResult> {
   const email = (input.contact.email || '').trim()
   if (!email) return { ok: false, message: 'Add a client email first so we know where to send.' }
+  const problem = await invoiceSendProblem(input.invoice, input.contact.id)
+  if (problem) return { ok: false, message: problem }
   const storagePath = await uploadPdf(input.html, input.userId, input.contact.id, input.filename)
   const res = await fetch(`${API_BASE}/api/send-invoice`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     body: JSON.stringify({
       contact_id: input.contact.id,
-      invoice_id: input.invoiceId || null,
+      invoice_id: input.invoice.id,
+      invoice_updated_at: input.invoice.updated_at,
+      amount_due: Number(input.invoice.amount),
+      description: input.invoice.description || input.invoice.title || null,
       sender_user_id: input.userId,
       recipient_email: email,
       recipient_name: input.contact.name || null,
@@ -145,7 +192,7 @@ export async function sendInvoiceEmail(input: {
     return { ok: false, notConfigured: true, message: 'Email sending is not configured on the server yet. The PDF was saved to Files.' }
   }
   if (!res.ok || !body?.ok) {
-    return { ok: false, message: body?.detail || body?.error || 'Email send failed.' }
+    return { ok: false, message: body?.message || body?.detail || body?.error || 'Email send failed.' }
   }
   return { ok: true }
 }

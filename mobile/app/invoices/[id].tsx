@@ -15,10 +15,11 @@ import { ScreenBackground, Card, ScreenHeader, theme } from '../../components/ui
 import { PaymentSheet } from '../../components/PaymentSheet'
 import { buildInvoiceHtml } from '../../lib/invoiceHtml'
 import { shareProposalPdf } from '../../lib/quotePdf'
-import { sendInvoiceEmail } from '../../lib/sendDocs'
+import { sendInvoiceEmail, pickInvoiceToSend } from '../../lib/sendDocs'
 import { mintPublicLink } from '../../lib/publicLink'
 import { useMutationFeedback } from '../../lib/useMutationFeedback'
 import { jobMoney } from '../../lib/jobMoney'
+import { parseDateOnly } from '../../../src/lib/dates'
 
 function money(n: number) { return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 
@@ -26,7 +27,7 @@ export default function InvoiceDetailScreen() {
   const insets = useSafeAreaInsets()
   const router = useRouter()
   const { user } = useAuth()
-  const { id } = useLocalSearchParams<{ id: string }>()
+  const { id, invoice: openedInvoiceId } = useLocalSearchParams<{ id: string; invoice?: string }>()
   const { data, isPending } = useInvoiceDetail(id)
   const { data: profile } = useProfile(user?.id)
   const { data: draws = [] } = useInvoiceDraws(id)
@@ -82,10 +83,12 @@ export default function InvoiceDetailScreen() {
   async function onSendEmail() {
     if (busy || !user) return
     if (!(contact.email || '').trim()) { Alert.alert('Add a client email first', 'Add an email to the client, then send.'); return }
+    const { invoice, message } = pickInvoiceToSend(draws, openedInvoiceId)
+    if (!invoice) { Alert.alert('Choose an invoice', message || 'Open the invoice to send from Invoices.'); return }
     setBusy('send')
     try {
-      const res = await sendInvoiceEmail({ html: buildHtml(), filename: fileName, userId: user.id, contact: { id: contact.id, name: contact.name, email: contact.email } })
-      if (res.ok) { queryClient.invalidateQueries({ queryKey: ['invoiceDetail', id] }); Alert.alert('Invoice sent', `Emailed to ${contact.email}.`) }
+      const res = await sendInvoiceEmail({ html: buildHtml(), filename: fileName, userId: user.id, contact: { id: contact.id, name: contact.name, email: contact.email }, invoice: invoice as any })
+      if (res.ok) { queryClient.invalidateQueries({ queryKey: ['invoiceDetail', id] }); queryClient.invalidateQueries({ queryKey: ['invoiceDraws', id] }); Alert.alert('Invoice sent', `Emailed to ${contact.email}.`) }
       else Alert.alert(res.notConfigured ? 'Saved to Files' : "Couldn't send", res.message || 'Try again.')
     } catch (e: any) { Alert.alert("Couldn't send", e?.message || 'Try again.') }
     finally { setBusy(null) }
@@ -200,7 +203,7 @@ export default function InvoiceDetailScreen() {
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, paddingLeft: 16 }}>
                   <View>
                     <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '700', textTransform: 'capitalize' }}>{p.method || 'Payment'}</Text>
-                    <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 2 }}>{p.paidOn ? new Date(p.paidOn).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : ''}{p.reference ? ` · ${p.reference}` : ''}</Text>
+                    <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 2 }}>{parseDateOnly(p.paidOn)?.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) ?? ''}{p.reference ? ` · ${p.reference}` : ''}</Text>
                   </View>
                   <Text style={{ color: theme.success, fontSize: 16, fontWeight: '800' }}>{money(p.amount)}</Text>
                 </View>

@@ -12,6 +12,7 @@ import { useClientsBundle, type Client } from '../../lib/queries'
 import { useAuth } from '../../contexts/AuthContext'
 import { ScreenBackground, Card, Eyebrow, theme } from '../../components/ui'
 import { NewClientSheet } from '../../components/NewClientSheet'
+import { useMoneyVisible } from '../../lib/membership'
 
 const ACTIVE = new Set(['lead', 'quote', 'job', 'invoice'])
 
@@ -28,6 +29,8 @@ export default function ClientsScreen() {
   const router = useRouter()
   const { user } = useAuth()
   const { data: bundle, isLoading } = useClientsBundle(user?.id)
+  // Foreman and crew see no amounts (fh_money_visible), as on the web.
+  const showMoney = useMoneyVisible(user?.id)
   const [search, setSearch] = useState('')
   const [addOpen, setAddOpen] = useState(false)
 
@@ -105,18 +108,20 @@ export default function ClientsScreen() {
             clients.length > 0 ? (
               <View style={{ marginBottom: 4 }}>
                 <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
-                  <Kpi label="Lifetime billed" value={money(kpis.lifetime)} sub={`${clients.length} client${clients.length === 1 ? '' : 's'}`} />
+                  {showMoney ? <Kpi label="Lifetime billed" value={money(kpis.lifetime)} sub={`${clients.length} client${clients.length === 1 ? '' : 's'}`} /> : null}
                   <Kpi label="Active jobs" value={String(kpis.activeJobs)} sub="in motion" />
                 </View>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <Kpi label="Outstanding" value={money(kpis.outstanding)} sub="owed to you" danger={kpis.outstanding > 0} />
-                  <Kpi label="Avg job size" value={money(kpis.avg)} sub="per job" />
-                </View>
+                {showMoney ? (
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <Kpi label="Outstanding" value={money(kpis.outstanding)} sub="owed to you" danger={kpis.outstanding > 0} />
+                    <Kpi label="Avg job size" value={money(kpis.avg)} sub="per job" />
+                  </View>
+                ) : null}
               </View>
             ) : null
           }
           renderItem={({ item }) => (
-            <ClientCard client={item} roll={rollups.get(item.id)} onPress={() => router.push(`/clients/${item.id}`)} />
+            <ClientCard client={item} roll={rollups.get(item.id)} showMoney={showMoney} onPress={() => router.push(`/clients/${item.id}`)} />
           )}
           ListEmptyComponent={<Text style={{ color: theme.inkMuted, textAlign: 'center', marginTop: 48 }}>No clients yet.</Text>}
         />
@@ -154,7 +159,7 @@ function Kpi({ label, value, sub, danger }: { label: string; value: string; sub:
   )
 }
 
-function ClientCard({ client, roll, onPress }: { client: Client; roll?: Roll; onPress: () => void }) {
+function ClientCard({ client, roll, showMoney, onPress }: { client: Client; roll?: Roll; showMoney: boolean; onPress: () => void }) {
   const initial = (client.name || '·').trim().charAt(0).toUpperCase()
   return (
     <Pressable onPress={onPress}>
@@ -173,7 +178,7 @@ function ClientCard({ client, roll, onPress }: { client: Client; roll?: Roll; on
             </Text>
           </View>
           <View style={{ alignItems: 'flex-end' }}>
-            <Text style={{ color: theme.goldBright, fontSize: 16, fontWeight: '800' }}>{money(roll?.lifetime || 0)}</Text>
+            {showMoney ? <Text style={{ color: theme.goldBright, fontSize: 16, fontWeight: '800' }}>{money(roll?.lifetime || 0)}</Text> : null}
             <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 2 }}>{roll?.active || 0} active</Text>
           </View>
         </View>
