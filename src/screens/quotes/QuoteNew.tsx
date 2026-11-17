@@ -15,7 +15,7 @@ import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useMembership } from '../../contexts/MembershipContext.tsx'
 import { supabase } from '../../lib/supabase.ts'
 import { leadToQuoteDraft, markLeadQuoted, type LeadRow } from '../../lib/leads.ts'
-import { createQuote, invalidateAfterQuoteWrite } from '../../lib/quotes.ts'
+import { createQuote, invalidateAfterQuoteWrite, plainQuoteError } from '../../lib/quotes.ts'
 import { createUuid } from '../../lib/uuid.ts'
 import { JOB_TYPES } from '../../lib/jobTypes.ts'
 import { hapticMedium } from '../../lib/haptics.ts'
@@ -118,7 +118,10 @@ export default function QuoteNew() {
     } catch (e) {
       savingRef.current = false
       setSaving(false)
-      setError(e instanceof Error && e.message ? e.message : 'Could not save this quote. Check your connection and try again.')
+      const message = plainQuoteError(e, '')
+      setError(message === 'Check your connection and try again.' || !message
+        ? 'Could not save this quote. Check your connection and try again.'
+        : message)
     }
   }
 

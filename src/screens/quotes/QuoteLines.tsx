@@ -435,7 +435,7 @@ function LineEditor({ row, defaultSection, suggestions, onSave, onClose, onDelet
 
   return (
     <li className="fhqt-edit">
-      <form aria-label={title} className="fhqt-form" onKeyDown={onKeyDown} onSubmit={(e) => { e.preventDefault(); void submit(false) }}>
+      <form aria-label={title} className="fhqt-form" noValidate onKeyDown={onKeyDown} onSubmit={(e) => { e.preventDefault(); void submit(false) }}>
         <h3 className="fhqt-form__title">{title}</h3>
         <div className="fhqt-form__suggest">
           <Field

@@ -866,3 +866,37 @@ test.describe('taps on the quote screen', () => {
   })
 })
 
+// Phone sales audit finding S22: the quote screens speak in plain sentences.
+test.describe('errors on the quote screens', () => {
+  test('a share link that fails offline says so in words', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS } })
+    await context.route((url) => url.pathname.includes('/rest/v1/fh_public_links'), (route) => route.abort('internetdisconnected'))
+    await openQuote(page)
+    await page.getByRole('list', { name: 'Share or download' }).getByRole('button', { name: /Copy a share link/ }).click()
+    await expect(page.getByText('Check your connection and try again.')).toBeVisible()
+    await expect(page.getByText(/TypeError|Failed to fetch/)).toHaveCount(0)
+  })
+
+  test('a negative rate gets the form\'s own message, not the browser bubble', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS } })
+    await openQuote(page)
+    await page.getByRole('button', { name: 'Add a line' }).click()
+    const editor = page.getByRole('form', { name: 'Add a line' })
+    await editor.getByLabel('Description').fill('Credit')
+    await editor.getByLabel('Rate').fill('-5')
+    await editor.getByRole('button', { name: 'Add line', exact: true }).click()
+    await expect(editor.getByText('Enter a number, 0 or more.').first()).toBeVisible()
+  })
+
+  test('New quote offline says so in words', async ({ context, page }) => {
+    await signIn(context)
+    await context.route(/\/rest\/v1\/fh_quotes(\?|$)/, (route) =>
+      route.request().method() === 'POST' ? route.abort('internetdisconnected') : route.fallback())
+    await page.goto('/quotes/new?client=cl-1', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    await expect(page.getByLabel('Client')).toHaveValue('Jeff Roy', { timeout: 30_000 })
+    await page.getByRole('button', { name: 'Save quote' }).click()
+    await expect(page.getByText('Could not save this quote. Check your connection and try again.')).toBeVisible()
+    await expect(page.getByText(/TypeError|Failed to fetch/)).toHaveCount(0)
+  })
+})
+

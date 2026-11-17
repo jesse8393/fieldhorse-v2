@@ -25,7 +25,7 @@ import { useProfile } from '../../contexts/ProfileContext.tsx'
 import { supabase } from '../../lib/supabase.ts'
 import { useLinkedClientEmail } from '../../lib/queries.ts'
 import { customerEmail } from '../../lib/customerEmail.ts'
-import { invalidateAfterQuoteWrite, makeJobFromQuote, quoteNumber } from '../../lib/quotes.ts'
+import { invalidateAfterQuoteWrite, makeJobFromQuote, plainQuoteError, quoteNumber } from '../../lib/quotes.ts'
 import { recordRoute } from '../../lib/records.ts'
 import { buildQuoteView, previewAsLabel, previewAsName, quoteCapsule } from '../../lib/quoteView.ts'
 import { hapticTap } from '../../lib/haptics.ts'
@@ -198,7 +198,7 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
   const build = () => buildQuotePdf({ quote, company, userId: userId as string, recipientEmail: hasEmail ? recipientEmail : null })
 
   function failed(title: string, e: unknown) {
-    const message = e instanceof NoLinesError ? e.message : (e as Error)?.message || 'Try again.'
+    const message = e instanceof NoLinesError ? e.message : plainQuoteError(e)
     toastError(title, message)
   }
 
@@ -245,7 +245,7 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
         toastSuccess('Share link ready', url)
       }
     }
-  }, "Couldn't mint share link")
+  }, "Couldn't make the share link")
 
   const onMarkSent = () => run('mark', async () => {
     if (!canMarkSent(quote.status) || quote.job_id) return

@@ -82,6 +82,20 @@ export function invalidateAfterQuoteWrite(
   if (jobMade) void client.invalidateQueries({ queryKey: ['jobs'] })
 }
 
+/**
+ * What a failed quote action says on screen: the app's own sentence, never
+ * the browser's or a server's code ("TypeError: Failed to fetch",
+ * "send_failed"). A lost connection says so; a bare code says `fallback`.
+ */
+export function plainQuoteError(error: unknown, fallback = 'Try again.'): string {
+  const message = typeof error === 'string'
+    ? error
+    : error && typeof (error as { message?: unknown }).message === 'string' ? (error as { message: string }).message : ''
+  if (/fetch|network|load failed|timed? ?out|offline|internet/i.test(message)) return 'Check your connection and try again.'
+  if (!message.trim() || /^[a-z0-9_.:-]+$/i.test(message.trim()) || /^[A-Z][a-zA-Z]*Error\b/.test(message)) return fallback
+  return message
+}
+
 // The server atomically copies and links the quote. Repeated requests
 // return the existing job after checking current permissions.
 export async function makeJobFromQuote(quoteId: string): Promise<{ jobId: string }> {
