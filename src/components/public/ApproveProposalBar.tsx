@@ -425,7 +425,7 @@ export default function ApproveProposalBar({
           checked={authorized}
           disabled={busy}
           onChange={(e) => setAuthorized(e.target.checked)}
-          style={{ marginTop: 3, width: 16, height: 16, cursor: 'pointer', accentColor: '#C9963A' }}
+          style={{ marginTop: 3, width: 16, height: 16, cursor: 'pointer', accentColor: 'var(--fh-gold)' }}
         />
         <span>
           I have the authority to approve this {docLabel} on behalf of {contactName || 'the property owner'}, and I agree to the scope and terms shown above. Approving creates a binding record with my name, the date, and my IP address.
@@ -691,7 +691,7 @@ const panelStyle: import('react').CSSProperties = {
   padding: '24px 24px 24px',
   borderRadius: 10,
   background: '#F2EDE4',
-  border: '1px solid rgba(201, 150, 58, 0.45)',
+  border: '1px solid rgba(173, 64, 41, 0.45)',
   boxShadow: '0 24px 64px -32px rgba(20, 20, 20, 0.25)',
   fontFamily: 'var(--font-body)',
   color: '#141414'
@@ -749,12 +749,14 @@ const buttonStyle: import('react').CSSProperties = {
   minHeight: 44,
   padding: '0 16px',
   borderRadius: 10, border: 'none',
-  background: 'linear-gradient(135deg, #C9963A 0%, #C9963A 100%)',
-  color: '#141414',
+  // The brand copper, with the white it was chosen to carry. Dark text on
+  // copper reads at about 3 to 1, below what a customer needs.
+  background: 'var(--fh-gold)',
+  color: 'var(--fh-on-gold)',
   fontFamily: 'var(--font-body)',
   fontSize: 14, fontWeight: 700,
   letterSpacing: 0,
-  boxShadow: '0 6px 16px rgba(201, 150, 58, 0.3)'
+  boxShadow: '0 6px 16px rgba(173, 64, 41, 0.3)'
 }
 
 const secondaryButtonStyle: import('react').CSSProperties = {
@@ -796,5 +798,5 @@ const metaRowStyle: import('react').CSSProperties = {
 
 const dotStyle: import('react').CSSProperties = {
   display: 'inline-block', width: 3, height: 3, borderRadius: 10,
-  background: '#C9963A'
+  background: 'var(--fh-gold)'
 }
