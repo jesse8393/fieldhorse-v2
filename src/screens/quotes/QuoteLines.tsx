@@ -182,8 +182,9 @@ export default function QuoteLines({ items, userId, who, money, focusRef, startA
     if (!editing) return false
     if (!editing.id) {
       lastSection.current = values.section || ''
-      void addItem(values)
-      return true
+      // Wait for the insert: a line that fails stays in the editor as typed.
+      const row = await addItem(values)
+      return Boolean(row)
     }
     const id = editing.id
     const ok = await updateItem(id, values)

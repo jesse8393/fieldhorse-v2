@@ -159,6 +159,14 @@ export function emptyDraft() {
   }
 }
 
+// What a failed line write says on screen: a plain sentence, never the
+// browser's or the database's own text ("TypeError: Failed to fetch").
+export function writeFailure(error: { message?: string } | null | undefined): string {
+  const message = String(error?.message || '')
+  if (/fetch|network|load failed|timeout|offline/i.test(message)) return 'Check your connection and try again.'
+  return 'It was not saved. Try again.'
+}
+
 export function draftFromRow(row: any) {
   // amountOverridden seeds true on edit so changing qty/rate does not
   // silently overwrite an intentionally-set amount on an existing row.
@@ -436,9 +444,10 @@ export function useQuoteItems({ jobId, quoteId, userId, onContactRefresh, onLoad
       .select()
       .single()
     if (error) {
-      // Roll the optimistic row back out and tell the operator.
+      // Roll the optimistic row back out and tell the operator, in words,
+      // once the write has answered. The editor keeps what was typed.
       setRows((rs) => rs.filter((r) => r.id !== tempId))
-      toastError("Couldn't add item", error.message)
+      toastError("Couldn't add the line", writeFailure(error))
       return null
     }
     // Swap the temp row for the persisted one (real id + server defaults).

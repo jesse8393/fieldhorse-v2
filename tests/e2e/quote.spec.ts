@@ -473,6 +473,29 @@ test.describe('the quote screen', () => {
     await expect(total(page).getByText('$3,930.00', { exact: true })).toBeVisible()
   })
 
+  // Audit findings DATA-23 and S12: a failed add keeps what was typed.
+  test('a line that fails to save stays in the editor with what was typed', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS } })
+    await context.route((url) => url.pathname.includes('/rest/v1/fh_quote_items'), (route) => {
+      if (route.request().method() !== 'POST') return route.fallback()
+      return route.abort('internetdisconnected')
+    })
+    await openQuote(page)
+    await page.getByRole('button', { name: 'Add a line' }).click()
+    const editor = page.getByRole('form', { name: 'Add a line' })
+    await editor.getByLabel('Description').fill('Haul off spoils')
+    await editor.getByLabel('Quantity').fill('2')
+    await editor.getByLabel('Rate').fill('390')
+    await editor.getByRole('button', { name: 'Add line', exact: true }).click()
+    await expect(page.getByText("Couldn't add the line")).toBeVisible()
+    await expect(page.getByText(/TypeError|Failed to fetch/)).toHaveCount(0)
+    await expect(editor).toBeVisible()
+    await expect(editor.getByLabel('Description')).toHaveValue('Haul off spoils')
+    await expect(editor.getByLabel('Amount')).toHaveValue('780')
+    await expect(lines(page).getByText('Haul off spoils')).toHaveCount(0)
+    await expect(total(page).getByText('$3,150.00', { exact: true })).toBeVisible()
+  })
+
   test('a new quote lands with its first line open', async ({ context, page }) => {
     await signIn(context, { tables: { fh_quote_items: [] } })
     await openQuote(page, '/quotes/q-quote?lines=new')
