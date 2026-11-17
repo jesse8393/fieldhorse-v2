@@ -150,3 +150,38 @@ test('typing a new name on Quote creates the client', async ({ context, page }) 
   expect(clientInserts).toHaveLength(1)
   expect(clientInserts[0]).toMatchObject({ name: 'Dana Whitfield' })
 })
+
+// The client field read only the 200 most recently active clients, so an
+// older client was never suggested and Save made a duplicate (DATA-09).
+test('the client field finds a client outside the 200 most recently active', async ({ context, page }) => {
+  const recent = Array.from({ length: 200 }, (_, i) => ({
+    id: `cl-r${i}`, user_id: 'qa-user-1', name: `Recent Client ${i}`, phone: null, email: null, address: null,
+    company_name: null, last_activity_at: new Date(Date.parse(NOW) - i * 60_000).toISOString(), created_at: NOW
+  }))
+  const zelda = {
+    id: 'cl-zelda', user_id: 'qa-user-1', name: 'Zelda Oldcustomer & Family', phone: '615.555.0199', email: null,
+    address: '9 Old Mill Rd', company_name: null, last_activity_at: '2024-01-01T00:00:00.000Z', created_at: '2023-01-01T00:00:00.000Z'
+  }
+  await signIn(context, { tables: { fh_clients: [...recent, zelda] } })
+  // The mock ignores or= and ilike filters, so answer the search here the
+  // way the database would: name, company, email or phone contains the text.
+  await page.route(/\/rest\/v1\/fh_clients\?.*or=/, async (route) => {
+    const params = new URL(route.request().url()).searchParams
+    const typed = (params.get('or') || '').match(/name\.ilike\."%(.*?)%"/)?.[1]?.toLowerCase() || ''
+    const rows = [...recent, zelda].filter((c) => c.name.toLowerCase().includes(typed))
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(rows.slice(0, 25)) })
+  })
+  const writes: string[] = []
+  page.on('request', (req) => { if (req.method() === 'POST' && req.url().includes('/rest/v1/')) writes.push(new URL(req.url()).pathname.split('/rest/v1/')[1]) })
+  await open(page, '/leads/new')
+  await expect(page.getByRole('heading', { level: 1, name: 'New lead' })).toBeVisible({ timeout: 30_000 })
+  await page.getByLabel('Name').fill('Zelda Old')
+  const option = page.getByRole('option', { name: /Zelda Oldcustomer & Family/ })
+  await expect(option).toBeVisible()
+  await option.click()
+  await expect(page.getByText('Saves to Zelda Oldcustomer & Family.')).toBeVisible()
+  await page.getByRole('button', { name: 'Save lead' }).click()
+  await expect(page).toHaveURL(/\/leads\/l-lead1$/, { timeout: 30_000 })
+  expect(writes).not.toContain('fh_clients')
+  expect(writes).toContain('fh_leads')
+})
