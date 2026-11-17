@@ -203,6 +203,7 @@ test('backing out of Quote this leaves the next New quote blank', async ({ conte
   await expect(page.getByRole('heading', { level: 1, name: 'New quote' })).toBeVisible({ timeout: 30_000 })
   await expect(page.getByLabel('Title')).toHaveValue('')
   await expect(page.getByLabel('Client')).toHaveValue('')
+})
 
 // The client field read only the 200 most recently active clients, so an
 // older client was never suggested and Save made a duplicate (DATA-09).
