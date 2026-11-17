@@ -495,3 +495,39 @@ test('keeps customer quote change requests in the workflow', async ({ page }, te
 
   expectNoPageErrors()
 })
+
+// Drop a file on the import zone the way a browser does.
+async function dropFile(page: Page, name: string, type: string, text: string) {
+  const zone = page.locator('label:has(input[type="file"])')
+  const transfer = await page.evaluateHandle(([n, t, body]) => {
+    const dt = new DataTransfer()
+    dt.items.add(new File([body], n, { type: t }))
+    return dt
+  }, [name, type, text])
+  await zone.dispatchEvent('dragover', { dataTransfer: transfer })
+  await zone.dispatchEvent('drop', { dataTransfer: transfer })
+}
+
+test('imports a dropped CSV and explains files it cannot use', async ({ page }) => {
+  // D04, D11: drag and drop works, first and last names are joined,
+  // nameless rows are counted, and a file that is not a CSV is refused.
+  const expectNoPageErrors = failOnPageErrors(page)
+  await openRoute(page, '/import')
+  const upload = page.locator('.fh-importer-build__upload, .v3-section').first()
+  await expect(upload).toBeVisible()
+
+  await dropFile(page, 'logo.png', 'image/png', '\u0089PNG\r\n\u001a\nbinary')
+  await expect(page.getByRole('alert')).toContainText('logo.png is not a CSV file')
+
+  await dropFile(page, 'contacts.csv', 'text/csv', 'First Name,Last Name,Phone Number,Deal Name\nJohn,Carter,,Fence\nJohn,Baker,,Deck\n , ,615-555-0999,Patio\n')
+  await expect(page.getByText('3 rows loaded, 2 records ready')).toBeVisible()
+  await expect(page.getByText('John Carter', { exact: true })).toBeVisible()
+  await expect(page.getByText('John Baker', { exact: true })).toBeVisible()
+  await expect(page.getByText(/1 row has no name and will be skipped/)).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Import 2 contacts' })).toBeVisible()
+
+  await dropFile(page, 'empty.csv', 'text/csv', 'Name,Phone,Email\n')
+  await expect(page.getByRole('alert')).toContainText('column names but no rows')
+
+  expectNoPageErrors()
+})

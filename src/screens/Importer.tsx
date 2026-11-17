@@ -18,11 +18,14 @@ import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import BuildTopbar from '../components/desktop/BuildTopbar.tsx'
 import MiniMetric from '../components/MiniMetric.tsx'
 import { Button } from '../ui/index.ts'
-import { parseAmount } from '../lib/amount.ts'
 import { leadKeys, markRepeats } from '../lib/importDedupe.ts'
 import { fetchAllRows } from '../lib/queries.ts'
-import { findOrCreateClient } from '../lib/clients.ts'
 import { useMembership } from '../contexts/MembershipContext.tsx'
+import {
+  TARGET_FIELDS, PRESETS, buildHeaderMap, mapRows, markFileRepeats, looksLikeCsv, hasNameSource,
+  type HeaderMap, type ImportField, type ImportRecord
+} from '../lib/importMapping.ts'
+import { findOrCreateClient } from '../lib/clients.ts'
 import { normalizePhoneKey } from '../lib/subIdentity.ts'
 import type { LeadInsert } from '../lib/leads.ts'
 
@@ -30,78 +33,25 @@ import type { LeadInsert } from '../lib/leads.ts'
 // size or statement time limits and fails as a whole.
 const IMPORT_CHUNK = 200
 
-// Importable target fields, in display order. Used by the mapping
-// review UI + the AI mapper prompt.
-const TARGET_FIELDS = [
-  { key: 'name',      label: 'Name',      required: true },
-  { key: 'phone',     label: 'Phone' },
-  { key: 'email',     label: 'Email' },
-  { key: 'address',   label: 'Address' },
-  { key: 'job_title', label: 'Job title' },
-  { key: 'job_type',  label: 'Job type' },
-  { key: 'amount',    label: 'Amount' }
-]
-
-// Normalize a column header so "First Name" / "first_name" / "firstname" all match.
-function norm(s: any) { return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '') }
-
-// Each field has a list of common synonyms. Matching is normalized (case + punct + whitespace agnostic).
-const FIELD_SYNONYMS: Record<string, any> = {
-  name:      ['name', 'fullname', 'clientname', 'contact', 'contactname', 'customername', 'firstname', 'company', 'companyname', 'businessname', 'first', 'lead'],
-  phone:     ['phone', 'phonenumber', 'mobile', 'mobilephone', 'primaryphone', 'cell', 'cellphone', 'workphone', 'telephone', 'tel'],
-  email:     ['email', 'emailaddress', 'primaryemail', 'workemail', 'contactemail', 'mail'],
-  address:   ['address', 'street', 'streetaddress', 'street1', 'addressline1', 'propertyaddress', 'serviceaddress', 'location', 'address1'],
-  job_title: ['jobname', 'jobtitle', 'title', 'dealname', 'opportunity', 'opportunityname', 'project', 'projectname'],
-  job_type:  ['service', 'category', 'servicetype', 'jobtype', 'dealstage', 'stage', 'type', 'trade'],
-  amount:    ['total', 'amount', 'quotetotal', 'dealamount', 'value', 'price', 'revenue', 'estimate', 'bidamount']
-}
-
-const PRESETS: Record<string, any> = {
-  jobber:  { label: 'Jobber'      },
-  hubspot: { label: 'HubSpot'     },
-  generic: { label: 'Generic CSV' }
-}
-
-// Build a lookup once per parse: for each CSV header we see, resolve which field it maps to (if any).
-function buildHeaderMap(headers: any) {
-  const out: Record<string, any> = {}
-  for (const h of headers) {
-    const n = norm(h)
-    for (const [field, syns] of Object.entries(FIELD_SYNONYMS)) {
-      if (syns.includes(n)) { out[field] = h; break }
-    }
-    // Fallback: startsWith / contains match for loose cases.
-    if (!Object.values(out).includes(h)) {
-      for (const [field, syns] of Object.entries(FIELD_SYNONYMS)) {
-        if (out[field]) continue
-        if (syns.some((s: any) => n.startsWith(s) || n.includes(s))) { out[field] = h; break }
-      }
-    }
-  }
-  return out
-}
-
-function pick(row: any, header: any) {
-  if (!header) return null
-  const v = row[header]
-  return v != null && v !== '' ? v : null
-}
-
 export default function Importer() {
   const isDesktop = useIsDesktop()
   const { user } = useAuth()
   const { orgId } = useMembership()
   const [preset, setPreset] = useState('jobber')
-  const [rows, setRows] = useState<any[]>([])
-  const [mapped, setMapped] = useState<any[]>([])
-  const [headerMap, setHeaderMap] = useState<any>({})
+  const [rows, setRows] = useState<Record<string, unknown>[]>([])
+  const [mapped, setMapped] = useState<ImportRecord[]>([])
+  const [headerMap, setHeaderMap] = useState<HeaderMap>({})
+  // Rows left out for having no name, and a plain note about the file
+  // when it cannot be read or nothing in it maps.
+  const [skipped, setSkipped] = useState(0)
+  const [fileNote, setFileNote] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
   const [progress, setProgress] = useState(0)
   const [done, setDone] = useState<any>(null)
   // Raw CSV headers + AI mapping state. headerMap holds the active
   // field→column resolution; the AI mapper and the manual dropdowns
   // both write into it via applyHeaderMap so the preview re-derives.
-  const [csvHeaders, setCsvHeaders] = useState<any[]>([])
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([])
   const [aiMapping, setAiMapping] = useState(false)
   const [webhookKey, setWebhookKey] = useState('')
   const [copiedWebhook, setCopiedWebhook] = useState(false)
@@ -157,8 +107,12 @@ export default function Importer() {
     () => (existingKeys ? markRepeats(mapped, existingKeys) : mapped.map(() => false)),
     [mapped, existingKeys]
   )
-  const repeatCount = repeatFlags.filter(Boolean).length
-  const toImport = includeRepeats ? mapped : mapped.filter((_, i) => !repeatFlags[i])
+  // A row that repeats an earlier row in the same file is never imported
+  // twice; the pipeline check counts only the rows left.
+  const fileRepeatFlags = useMemo(() => markFileRepeats(mapped), [mapped])
+  const fileRepeatCount = fileRepeatFlags.filter(Boolean).length
+  const repeatCount = repeatFlags.filter((r, i) => r && !fileRepeatFlags[i]).length
+  const toImport = mapped.filter((_, i) => !fileRepeatFlags[i] && (includeRepeats || !repeatFlags[i]))
 
   async function ensureWebhookKey() {
     if (webhookKey) return webhookKey
@@ -168,48 +122,74 @@ export default function Importer() {
     return k
   }
 
-  function onFile(e: any) {
-    const f = e.target.files?.[0]
+  function clearFile() {
+    setRows([])
+    setMapped([])
+    setCsvHeaders([])
+    setHeaderMap({})
+    setSkipped(0)
+  }
+
+  // Shared by the file picker and drag and drop.
+  function loadFile(f: File | null | undefined) {
     if (!f) return
+    setDone(null)
+    setIncludeRepeats(false)
+    if (!looksLikeCsv(f)) {
+      clearFile()
+      setFileNote(`${f.name} is not a CSV file. Export your data as CSV and choose that file.`)
+      return
+    }
     Papa.parse(f, {
       header: true,
       skipEmptyLines: true,
-      complete: (r: any) => {
+      complete: (r: { data: Record<string, unknown>[]; meta?: { fields?: string[] } }) => {
+        const headers = r.meta?.fields?.length ? r.meta.fields : r.data[0] ? Object.keys(r.data[0]) : []
+        if (r.data.length === 0) {
+          clearFile()
+          setFileNote(headers.length ? 'This file has column names but no rows to import.' : 'This file is empty.')
+          return
+        }
+        const hm = buildHeaderMap(headers, preset)
+        if (Object.keys(hm).length === 0) {
+          clearFile()
+          setFileNote('None of the columns in this file look like a name, phone, email or job. Check that the first row holds the column names.')
+          return
+        }
+        setFileNote(null)
         setRows(r.data)
-        setIncludeRepeats(false)
-        remap(r.data, preset)
+        setCsvHeaders(headers)
+        applyHeaderMap(hm, r.data)
       }
     })
   }
 
-  function remap(data: any, p: any) {
-    // Build a header map based on what's actually in the CSV (first row's keys).
-    const headers = data[0] ? Object.keys(data[0]) : []
-    setCsvHeaders(headers)
-    const hm = buildHeaderMap(headers)
-    applyHeaderMap(hm, data)
+  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    loadFile(e.target.files?.[0])
+    // Choosing the same file again should load it again.
+    e.target.value = ''
   }
 
-  // Re-derive the mapped preview rows from a given field→column map.
-  // Shared by remap (static), the AI mapper, and the manual dropdowns.
-  function applyHeaderMap(hm: any, data = rows) {
+  function onDrop(e: React.DragEvent<HTMLLabelElement>) {
+    e.preventDefault()
+    loadFile(e.dataTransfer.files?.[0])
+  }
+
+  function remap(data: Record<string, unknown>[], p: string) {
+    applyHeaderMap(buildHeaderMap(csvHeaders, p), data)
+  }
+
+  // Re-derive the mapped preview rows from a given field to column map.
+  // Shared by remap, the AI mapper, and the manual dropdowns.
+  function applyHeaderMap(hm: HeaderMap, data = rows) {
     setHeaderMap(hm)
-    const out = data.map((r) => ({
-      name: pick(r, hm.name),
-      phone: pick(r, hm.phone),
-      email: pick(r, hm.email),
-      address: pick(r, hm.address),
-      job_title: pick(r, hm.job_title),
-      job_type: pick(r, hm.job_type),
-      // Exports format totals as "$4,500.00"; Number() made that NaN,
-      // which saved as null and showed $0.
-      amount: parseAmount(pick(r, hm.amount)) ?? 0
-    })).filter((r) => r.name)
-    setMapped(out)
+    const { records, skipped: noName } = mapRows(data, hm)
+    setMapped(records)
+    setSkipped(noName)
   }
 
   // Manual override from the mapping review dropdowns.
-  function setFieldColumn(field: any, column: any) {
+  function setFieldColumn(field: ImportField, column: string) {
     const next = { ...headerMap }
     if (column) next[field] = column
     else delete next[field]
@@ -227,7 +207,7 @@ export default function Importer() {
     hapticMedium()
     try {
       const sample = rows.slice(0, 3)
-      const system = `You map spreadsheet columns to a fixed set of CRM fields for a contractor's job/lead import. The target fields are: ${TARGET_FIELDS.map((f) => f.key).join(', ')}. Given the CSV headers and a few sample rows, return ONLY a JSON object whose keys are the target field names and whose values are the EXACT matching CSV header string (or null if no column fits). Map "name" to whichever column best identifies the customer or company. Map "amount" to the column holding the dollar value of the job/deal. Never invent headers, values must be exact strings from the provided header list or null. Return ONLY the JSON object, no prose.`
+      const system = `You map spreadsheet columns to a fixed set of CRM fields for a contractor's job/lead import. The target fields are: ${TARGET_FIELDS.map((f) => f.key).join(', ')}. Given the CSV headers and a few sample rows, return ONLY a JSON object whose keys are the target field names and whose values are the EXACT matching CSV header string (or null if no column fits). Map "name" to a column holding the customer's full name. When names are split, map "first_name" and "last_name" instead and leave "name" null. Map "company" to the company or business name column. Map "amount" to the column holding the dollar value of the job/deal. Never invent headers, values must be exact strings from the provided header list or null. Return ONLY the JSON object, no prose.`
       const userContent = `CSV headers: ${JSON.stringify(csvHeaders)}\n\nSample rows:\n${JSON.stringify(sample, null, 2)}`
       const res = await claudeMessage({
         system,
@@ -239,7 +219,7 @@ export default function Importer() {
       if (!match) throw new Error('AI returned no mapping')
       const parsed = JSON.parse(match[0])
       // Keep only values that are real headers; merge over current map.
-      const next = { ...headerMap }
+      const next: HeaderMap = { ...headerMap }
       for (const f of TARGET_FIELDS) {
         const col = parsed[f.key]
         if (col && csvHeaders.includes(col)) next[f.key] = col
@@ -258,7 +238,7 @@ export default function Importer() {
     }
   }
 
-  function changePreset(p: any) {
+  function changePreset(p: string) {
     setPreset(p)
     if (rows.length) remap(rows, p)
   }
@@ -345,10 +325,7 @@ export default function Importer() {
     }
     hapticSuccess()
     setDone({ count: finalCount })
-    setRows([])
-    setMapped([])
-    setCsvHeaders([])
-    setHeaderMap({})
+    clearFile()
     setIncludeRepeats(false)
     toastSuccess(`Imported ${finalCount} ${countNoun(finalCount, 'contact')}`, 'Open Jobs, then Leads to review imported records.')
   }
@@ -472,6 +449,8 @@ export default function Importer() {
 
         {/* Drop zone */}
         <label
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={onDrop}
           style={{
             display: 'flex',
             flexDirection: 'column',
@@ -492,7 +471,7 @@ export default function Importer() {
           </div>
           <span style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, color: 'var(--ink-strong)' }}>
             {rows.length
-              ? `${rows.length} ${countNoun(rows.length, 'row')} loaded, ${mapped.length} ${countNoun(mapped.length, 'field')} mapped`
+              ? `${rows.length} ${countNoun(rows.length, 'row')} loaded, ${mapped.length} ${countNoun(mapped.length, 'record')} ready`
               : isDesktop ? 'Drop CSV or choose a file' : 'Choose a CSV file'}
           </span>
           {!rows.length && (
@@ -500,8 +479,25 @@ export default function Importer() {
               Columns detected automatically from your {PRESETS[preset].label} export
             </span>
           )}
-          <input type="file" accept=".csv" onChange={onFile} hidden />
+          <input type="file" accept=".csv,text/csv" onChange={onFile} hidden />
         </label>
+
+        {fileNote && (
+          <p role="alert" style={{ marginTop: 12, fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--v3-danger-text)' }}>
+            {fileNote}
+          </p>
+        )}
+        {csvHeaders.length > 0 && !hasNameSource(headerMap) && (
+          <p role="alert" style={{ marginTop: 12, fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--v3-danger-text)' }}>
+            No column in this file looks like a customer name. Pick the name column below.
+          </p>
+        )}
+        {(skipped > 0 || fileRepeatCount > 0) && (
+          <p style={{ marginTop: 12, fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--ink-muted)' }}>
+            {skipped > 0 && `${skipped} ${countNoun(skipped, 'row')} ${skipped === 1 ? 'has' : 'have'} no name and will be skipped. `}
+            {fileRepeatCount > 0 && `${fileRepeatCount} ${countNoun(fileRepeatCount, 'row')} ${fileRepeatCount === 1 ? 'repeats' : 'repeat'} an earlier row in this file and will be skipped.`}
+          </p>
+        )}
 
         {/* Column mapping review, only once a file is loaded. Shows the
             resolved field→column map with manual override dropdowns, plus
@@ -576,14 +572,14 @@ export default function Importer() {
             </Eyebrow>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
               {mapped.slice(0, 5).map((m, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', opacity: repeatFlags[i] && !includeRepeats ? 0.55 : 1 }}>
+                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--rule)', opacity: fileRepeatFlags[i] || (repeatFlags[i] && !includeRepeats) ? 0.55 : 1 }}>
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 600, color: 'var(--ink-strong)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {m.name}
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 2 }}>
                       {m.job_title || '\u2003'} · {m.phone || m.email || 'no contact'}
-                      {repeatFlags[i] ? ' · already in pipeline' : ''}
+                      {fileRepeatFlags[i] ? ' · repeats an earlier row' : repeatFlags[i] ? ' · already in pipeline' : ''}
                     </div>
                   </div>
                   <div style={{ fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: 0, color: 'var(--field-gold-bright)' }}>
