@@ -75,6 +75,18 @@ export async function markLeadLost(leadId: string): Promise<void> {
   await setLeadStatus(leadId, { status: 'lost' })
 }
 
+export type LeadUpdate = Database['public']['Tables']['fh_leads']['Update']
+
+/**
+ * Edits a lead in place: what they need, job type, source, the follow up
+ * date, or Reopen (status open). Throws a sentence the screen can show
+ * when nothing was saved, including when no row changed.
+ */
+export async function updateLead(leadId: string, patch: LeadUpdate): Promise<void> {
+  const { data, error } = await supabase.from('fh_leads').update(patch).eq('id', leadId).select('id')
+  if (error || !data?.length) throw new Error('Could not save the lead. Check your connection and try again.')
+}
+
 // Pure. The quote draft that Quote this opens: same client, title and
 // job type, and a pointer back. The lead's notes stay on the lead: they
 // are internal ("no more than 5k", gate codes) and the scope prints on

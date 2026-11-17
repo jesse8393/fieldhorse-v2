@@ -370,3 +370,51 @@ test.describe('New lead takes an email (S19)', () => {
     expect(writes.filter((w) => w.startsWith('POST'))).toEqual([])
   })
 })
+
+test.describe('a lead can be kept up to date (S13)', () => {
+  // The mock does not keep writes, so these check what is sent.
+  const lastPatch = (patches: string[], id = 'l-lead1') => JSON.parse(patches[patches.length - 1].slice(`eq.${id}=`.length))
+
+  test('a lost lead can be reopened', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_leads: [lead({ id: 'l-lost', status: 'lost', title: 'Old patio' })] } })
+    const patches = await recordLeadPatches(page)
+    await open(page, '/leads/l-lost')
+    await page.getByRole('button', { name: 'Reopen' }).click()
+    await expect.poll(() => patches.length).toBe(1)
+    expect(lastPatch(patches, 'l-lost')).toMatchObject({ status: 'open' })
+  })
+
+  test('the follow up can be marked done, which clears it from Today', async ({ context, page }) => {
+    await signIn(context)
+    const patches = await recordLeadPatches(page)
+    await open(page, '/leads/l-lead1')
+    await page.getByRole('button', { name: 'Follow up done' }).click()
+    await expect.poll(() => patches.length).toBe(1)
+    expect(lastPatch(patches)).toMatchObject({ follow_up_on: null })
+    expect(lastPatch(patches).last_contact).toBeTruthy()
+  })
+
+  test('the follow up can be moved to another day', async ({ context, page }) => {
+    await signIn(context)
+    const patches = await recordLeadPatches(page)
+    await open(page, '/leads/l-lead1')
+    await page.getByLabel('Follow up on').fill('2026-12-01')
+    await expect.poll(() => patches.length).toBe(1)
+    expect(lastPatch(patches)).toMatchObject({ follow_up_on: '2026-12-01' })
+  })
+
+  test('what they need, the job type and the source can be edited in place', async ({ context, page }) => {
+    await signIn(context)
+    const patches = await recordLeadPatches(page)
+    await open(page, '/leads/l-lead1')
+    await page.getByRole('button', { name: 'Edit details' }).click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await page.getByRole('textbox', { name: 'What they need' }).fill('French drain and regrade')
+    await page.getByLabel('Job type').selectOption({ label: 'Renovation' })
+    await page.getByLabel('Source').selectOption({ label: 'Referral' })
+    await page.getByRole('button', { name: 'Save details' }).click()
+    await expect.poll(() => patches.length).toBe(1)
+    expect(lastPatch(patches)).toMatchObject({ title: 'French drain and regrade', job_type: 'Renovation', source: 'Referral' })
+    await expect(page.getByRole('button', { name: 'Edit details' })).toBeVisible()
+  })
+})

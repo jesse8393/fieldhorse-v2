@@ -22,7 +22,10 @@ import DataErrorState from '../../components/DataErrorState.tsx'
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { supabase } from '../../lib/supabase.ts'
 import { useLead, useInvalidateLeads, leadKey, type LeadRow } from '../../lib/queries.ts'
-import { markLeadLost } from '../../lib/leads.ts'
+import { markLeadLost, updateLead, type LeadUpdate } from '../../lib/leads.ts'
+import { homeDashboardKey } from '../../lib/homeDashboard.ts'
+import { JOB_TYPES } from '../../lib/jobTypes.ts'
+import { Choices, LEAD_SOURCES } from '../new/CreateShell.tsx'
 import { leadName, leadNeed, scheduleEstimateRoute, visitDay, visitTime } from '../../lib/leadsView.ts'
 import { newRecordRoute, recordRoute } from '../../lib/records.ts'
 import { navigateHrefHere } from '../../lib/todayView.ts'
@@ -206,6 +209,45 @@ export default function LeadDetail({ id, fallback }: LeadDetailProps) {
     else navigate('/leads')
   }
 
+  // Keeping the lead up to date (S13): Reopen a lost lead, mark the follow
+  // up done or move it, and edit what they need, the job type and the
+  // source in place. Each write updates this screen, the Leads list and
+  // Today, whose follow up reminders read these fields.
+  const [busy, setBusy] = useState(false)
+  async function patchLead(patch: LeadUpdate) {
+    if (!lead || busy) return false
+    setBusy(true)
+    try {
+      await updateLead(lead.id, patch)
+      queryClient.setQueryData<LeadRow | null>(leadKey(lead.id), (prev) => (prev ? { ...prev, ...patch } as LeadRow : prev))
+      invalidateLeads(lead.id)
+      void queryClient.invalidateQueries({ queryKey: homeDashboardKey(user?.id).slice(0, 2) })
+      return true
+    } catch (e) {
+      toastError(e instanceof Error ? e.message : 'Could not save the lead.', 'Check your connection and try again.')
+      return false
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const [editing, setEditing] = useState(false)
+  const [details, setDetails] = useState({ title: '', job_type: '', source: '' })
+  function startEditing() {
+    if (!lead) return
+    hapticTap()
+    setDetails({ title: lead.title ?? '', job_type: lead.job_type ?? '', source: lead.source ?? '' })
+    setEditing(true)
+  }
+  async function saveDetails() {
+    const ok = await patchLead({
+      title: details.title.trim() || null,
+      job_type: details.job_type || null,
+      source: details.source || null
+    })
+    if (ok) setEditing(false)
+  }
+
   const client = lead?.fh_clients ?? null
   const phone = client?.phone?.trim() || ''
   const address = client?.address?.trim() || ''
@@ -318,13 +360,30 @@ export default function LeadDetail({ id, fallback }: LeadDetailProps) {
 
         <section className="fhl-section" aria-labelledby="fhl-need-title">
           <h2 className="fhl-section__title" id="fhl-need-title">What they need</h2>
-          <p className="fhl-need">{leadNeed(lead)}</p>
-          {(lead.job_type || lead.source || lead.referred_by) && (
-            <p className="fhl-muted">
-              {[lead.job_type, lead.source && `From ${lead.source}`, lead.referred_by && lead.referred_by !== lead.source && `Referred by ${lead.referred_by}`]
-                .filter(Boolean)
-                .join('. ')}
-            </p>
+          {editing ? (
+            <div className="fhl-edit">
+              <Field label="What they need" value={details.title} onChange={(e) => setDetails((d) => ({ ...d, title: e.target.value }))} />
+              <Choices label="Job type" options={JOB_TYPES} value={details.job_type} onChange={(v) => setDetails((d) => ({ ...d, job_type: v }))} />
+              <Choices label="Source" options={LEAD_SOURCES} value={details.source} onChange={(v) => setDetails((d) => ({ ...d, source: v }))} />
+              <div className="fhl-line__actions">
+                <Button variant="primary" size="md" loading={busy} onClick={() => { void saveDetails() }}>Save details</Button>
+                <Button variant="quiet" size="md" onClick={() => setEditing(false)}>Cancel</Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <p className="fhl-need">{leadNeed(lead)}</p>
+              {(lead.job_type || lead.source || lead.referred_by) && (
+                <p className="fhl-muted">
+                  {[lead.job_type, lead.source && `From ${lead.source}`, lead.referred_by && lead.referred_by !== lead.source && `Referred by ${lead.referred_by}`]
+                    .filter(Boolean)
+                    .join('. ')}
+                </p>
+              )}
+              <span className="fhl-line__actions">
+                <Button variant="secondary" size="mini" onClick={startEditing}>Edit details</Button>
+              </span>
+            </>
           )}
         </section>
 
@@ -358,6 +417,31 @@ export default function LeadDetail({ id, fallback }: LeadDetailProps) {
           </section>
         )}
 
+        {!lost && (
+          <section className="fhl-section" aria-labelledby="fhl-follow-title">
+            <h2 className="fhl-section__title" id="fhl-follow-title">Follow up</h2>
+            {!lead.follow_up_on && <p className="fhl-muted">No follow up set.</p>}
+            <Field
+              type="date"
+              label="Follow up on"
+              value={lead.follow_up_on ?? ''}
+              onChange={(e) => { void patchLead({ follow_up_on: e.target.value || null }) }}
+            />
+            {lead.follow_up_on && (
+              <span className="fhl-line__actions">
+                <Button
+                  variant="secondary"
+                  size="md"
+                  disabled={busy}
+                  onClick={() => { hapticTap(); void patchLead({ follow_up_on: null, last_contact: new Date().toISOString() }) }}
+                >
+                  Follow up done
+                </Button>
+              </span>
+            )}
+          </section>
+        )}
+
         <section className="fhl-section">
           <Field
             multiline
@@ -366,7 +450,7 @@ export default function LeadDetail({ id, fallback }: LeadDetailProps) {
             onChange={(e) => setNotes(e.target.value)}
             onBlur={() => { void saveNotes() }}
             placeholder="What they said, what to bring, what to check"
-            helper="Saved when you leave the field."
+            helper="Saves as you type."
             rows={4}
           />
         </section>
@@ -383,6 +467,14 @@ export default function LeadDetail({ id, fallback }: LeadDetailProps) {
               ))}
             </ul>
           </section>
+        )}
+
+        {lost && (
+          <div className="fhl-lost">
+            <Button variant="secondary" size="md" disabled={busy} onClick={() => { hapticTap(); void patchLead({ status: 'open' }) }}>
+              Reopen
+            </Button>
+          </div>
         )}
 
         {!lost && (
