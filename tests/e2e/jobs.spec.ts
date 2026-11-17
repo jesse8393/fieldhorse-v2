@@ -94,3 +94,33 @@ test.describe('jobs on a phone', () => {
     expect(await look()).toEqual(first)
   })
 })
+
+// OPS-06 and D02: crew could open the job money screens by URL and saw the
+// contract price, and the More screen offered them partner and edit rows.
+test.describe('job screens a field role cannot open', () => {
+  for (const path of ['/jobs/c-job1/payment', '/jobs/c-job1/complete', '/jobs/c-job1/partner', '/jobs/new']) {
+    test(`crew opening ${path} lands on Crew home without the contract money`, async ({ context, page }) => {
+      await signIn(context, { role: 'crew' })
+      await page.goto(path)
+      await expect(page).toHaveURL(/\/crew$/)
+      await expect(page.getByText('$33,100')).toHaveCount(0)
+    })
+  }
+
+  test('the More screen offers crew no partner invite and no job edit', async ({ context, page }) => {
+    await signIn(context, { role: 'crew' })
+    await page.goto('/jobs/c-job1/more')
+    await expect(page.getByRole('list', { name: 'More actions' })).toBeVisible()
+    await expect(page.getByText('Schedule an event')).toBeVisible()
+    await expect(page.getByText('Invite a partner')).toHaveCount(0)
+    await expect(page.getByText('Edit job details')).toHaveCount(0)
+  })
+
+  test('a manager opens a client from Money and its statement', async ({ context, page }) => {
+    await signIn(context, { role: 'manager' })
+    await page.goto('/clients/cl-1')
+    await expect(page).toHaveURL(/\/clients\/cl-1$/)
+    await page.goto('/clients/cl-1/statement')
+    await expect(page).toHaveURL(/\/clients\/cl-1\/statement$/)
+  })
+})

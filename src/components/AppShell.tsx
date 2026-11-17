@@ -12,6 +12,7 @@ import { useMembership } from '../contexts/MembershipContext.tsx'
 import { layoutForPath } from '../lib/appLayout.ts'
 import { captureRoute, type OpenCaptureDetail } from '../lib/captureAttach.ts'
 import { useCaptureOutboxSync } from '../lib/captureOutbox.ts'
+import { permissionRouteForPath } from '../lib/permissions.ts'
 
 // Route-loading skeleton, matches Onyx bg so split-chunk fetches don't
 // flash a white screen. AppHeader and the dock stay mounted around it.
@@ -56,18 +57,6 @@ function RouteFallback() {
  * just render their mobile-first markup and the shell decides how much
  * canvas they get.
  */
-function permissionRouteForPath(pathname: string) {
-  if (pathname.startsWith('/schedule/')) return '/schedule'
-  if (pathname.startsWith('/leads/')) return '/leads'
-  if (pathname.startsWith('/quotes/')) return '/quotes'
-  if (pathname.startsWith('/jobs/')) return '/jobs'
-  if (pathname.startsWith('/clients/')) return '/clients'
-  if (pathname.startsWith('/subs/')) return '/subs'
-  if (pathname.startsWith('/invoices/')) return '/invoices'
-  if (pathname.startsWith('/sub-portal/')) return '/sub-portal'
-  return pathname
-}
-
 function fallbackRouteForRole(role: string | null) {
   if (!role) return '/sub-portal'
   if (role === 'crew' || role === 'foreman') return '/crew'

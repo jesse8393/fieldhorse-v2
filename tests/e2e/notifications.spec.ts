@@ -103,3 +103,13 @@ test('a failed read says so with Try again', async ({ context, page }) => {
   await expect(page.getByText('MMC Properties approved the quote')).toBeVisible()
   expect(await page.getByRole('alert').count()).toBe(0)
 })
+
+// OPS-05: the bell shows for every role, so every role can open the screen.
+for (const role of ['manager', 'foreman', 'crew']) {
+  test(`a ${role} can open notifications from the bell`, async ({ context, page }) => {
+    await signIn(context, { role, tables: { fh_notifications: [APPROVED] } })
+    await open(page, '/notifications', '.fhn')
+    await expect(page).toHaveURL(/\/notifications$/)
+    await expect(page.getByText('MMC Properties approved the quote')).toBeVisible()
+  })
+}
