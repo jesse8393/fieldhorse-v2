@@ -1,5 +1,5 @@
 // Welcome and Login (docs/design/2026-10-redesign/SPEC.md, section 9.1,
-// decision D11): always onyx with grain, FIELDHORSE wordmark, the line,
+// decision D11): always onyx with grain, FIELDHORSE wordmark, the heading,
 // email and password on linen labels, one brushed gold Sign in, an
 // outlined Create a workspace and the smoke line. The photo from
 // public/welcome.jpg only shows when the file exists.
@@ -215,6 +215,25 @@ test.describe('Welcome and Login', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Create a workspace' })).toBeVisible()
     expect(await page.locator('body').innerText()).not.toMatch(/captain/i)
     expect(await page.title()).not.toMatch(/captain/i)
+  })
+
+  // Found on the live site: Sign in with empty fields went to the server and
+  // came back with its raw "missing email or phone". The form now says what
+  // is missing itself and sends nothing until both fields are filled.
+  test('Sign in with an empty field says what is missing and sends nothing', async ({ context, page }) => {
+    await stubSignedOut(context, 'missing')
+    const authCalls: string[] = []
+    page.on('request', (req) => { if (req.url().includes('/auth/v1/token')) authCalls.push(req.url()) })
+    await openLogin(page)
+    const signIn = page.getByRole('button', { name: 'Sign in', exact: true })
+    await signIn.click()
+    await expect(page.getByRole('alert')).toHaveText('Enter your email.')
+    await page.getByLabel('Email').fill('crew@example.com')
+    await signIn.click()
+    await expect(page.getByRole('alert')).toHaveText('Enter your password.')
+    await page.waitForTimeout(300)
+    expect(authCalls).toEqual([])
+    await expect(page.getByText(/missing email or phone/i)).toHaveCount(0)
   })
 
   for (const mode of ['day', 'night'] as const) {

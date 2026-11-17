@@ -13,7 +13,7 @@ function getErrorMessage(err: unknown, fallback: string) {
 const MISSING_ENV = 'Local Supabase env is missing. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env.local, then restart Vite.'
 
 // Welcome and Login (spec 9.1, render glamor/g-welcome.jpg): the FIELDHORSE
-// wordmark, the line, email and password, one brushed gold Sign in, an
+// wordmark, the Sign in heading, email and password, one brushed gold Sign in, an
 // outlined Create a workspace that switches to sign up, a quiet Forgot
 // password and the smoke line. The stage is always onyx (AuthShell).
 export default function Login() {
@@ -89,6 +89,16 @@ export default function Login() {
     setNotice('')
     if (!isSupabaseConfigured) {
       setError(MISSING_ENV)
+      return
+    }
+    // Say what is missing here, before a round trip on a weak signal that
+    // only comes back with the server's own wording.
+    if (!email.trim()) {
+      setError('Enter your email.')
+      return
+    }
+    if (!password) {
+      setError('Enter your password.')
       return
     }
     setBusy(true)
