@@ -19,6 +19,7 @@ import { sendInvoiceEmail } from '../../lib/sendDocs'
 import { mintPublicLink } from '../../lib/publicLink'
 import { useMutationFeedback } from '../../lib/useMutationFeedback'
 import { jobMoney } from '../../lib/jobMoney'
+import { parseDateOnly } from '../../../src/lib/dates'
 
 function money(n: number) { return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 
@@ -200,7 +201,7 @@ export default function InvoiceDetailScreen() {
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, paddingLeft: 16 }}>
                   <View>
                     <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '700', textTransform: 'capitalize' }}>{p.method || 'Payment'}</Text>
-                    <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 2 }}>{p.paidOn ? new Date(p.paidOn).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : ''}{p.reference ? ` · ${p.reference}` : ''}</Text>
+                    <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 2 }}>{parseDateOnly(p.paidOn)?.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) ?? ''}{p.reference ? ` · ${p.reference}` : ''}</Text>
                   </View>
                   <Text style={{ color: theme.success, fontSize: 16, fontWeight: '800' }}>{money(p.amount)}</Text>
                 </View>

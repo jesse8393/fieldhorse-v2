@@ -9,6 +9,7 @@ import { useRouter } from 'expo-router'
 import { useJobs, useClientsBundle } from '../lib/queries'
 import { useAuth } from '../contexts/AuthContext'
 import { ScreenBackground, Card, ScreenHeader, SectionLabel, theme } from '../components/ui'
+import { parseDateOnly } from '../../src/lib/dates'
 
 const STAGE_TINT: Record<string, string> = {
   lead: '#5C5C5C', quote: '#C9963A', job: '#2D7A4F', invoice: '#C9963A', closed: '#5C5C5C', lost: '#C0392B'
@@ -66,9 +67,8 @@ export default function AnalyticsScreen() {
       monthly.push({ label: d.toLocaleDateString(undefined, { month: 'short' }), value: 0 })
     }
     for (const p of bundle?.payments ?? []) {
-      if (!p.paid_on) continue
-      const d = new Date(p.paid_on)
-      if (Number.isNaN(d.getTime())) continue
+      const d = parseDateOnly(p.paid_on)
+      if (!d) continue
       const idx = monthIdx.get(`${d.getFullYear()}-${d.getMonth()}`)
       if (idx != null) monthly[idx].value += Number(p.amount || 0)
     }

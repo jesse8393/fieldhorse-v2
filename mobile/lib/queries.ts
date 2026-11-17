@@ -16,6 +16,7 @@ import { assertReadResults, readAllRows } from './readResult'
 import { confirmMutation } from './mutationResult'
 import { jobMoney } from './jobMoney'
 import { allocateInvoiceDue, knownContractTotal } from '../../src/lib/invoiceSettlement'
+import { parseDateOnly, todayYmd } from '../../src/lib/dates'
 import { claudeVision, claudeText } from './anthropic'
 import { API_BASE } from './apiBase'
 import { MOVED_STAGE_FILTER, isJobStageChoice } from './stages'
@@ -296,7 +297,7 @@ export function useLogPayment() {
       contact_id: input.contactId,
       amount: input.amount,
       method: input.method || 'check',
-      paid_on: input.paidOn || localYmd()
+      paid_on: input.paidOn || todayYmd()
     }
     // A retry of the same sheet attempt reuses its UUID. Verify the stored
     // payload too: ignoreDuplicates alone could accept changed form values.
@@ -712,7 +713,7 @@ export function useAddExpense() {
       amount: input.amount,
       category: input.category || null,
       description: input.description || null,
-      expense_date: input.expenseDate || new Date().toISOString().slice(0, 10)
+      expense_date: input.expenseDate || todayYmd()
     } as any)
     if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
     return { error }
@@ -1261,7 +1262,7 @@ export function useAddMileage() {
       contact_id: input.contactId,
       miles: input.miles,
       purpose: input.purpose || null,
-      drove_on: input.droveOn || new Date().toISOString().slice(0, 10)
+      drove_on: input.droveOn || todayYmd()
     } as any)
     if (!error) client.invalidateQueries({ queryKey: ['jobDetail', input.contactId] })
     return { error }
@@ -1510,7 +1511,7 @@ export function useInvoicesOverview(userId: string | undefined) {
       }
       let collectedThisMonth = 0, collectedThisWeek = 0
       for (const p of (payRes.data ?? []) as any[]) {
-        const d = p.paid_on ? new Date(p.paid_on).getTime() : 0
+        const d = parseDateOnly(p.paid_on)?.getTime() ?? 0
         const amt = Number(p.amount || 0)
         if (d >= monthStart.getTime()) collectedThisMonth += amt
         if (d >= weekStart.getTime()) collectedThisWeek += amt
@@ -1522,12 +1523,6 @@ export function useInvoicesOverview(userId: string | undefined) {
     },
     enabled: !!userId
   })
-}
-
-// Today's calendar date on this device. toISOString() is UTC, which is
-// already tomorrow for US users in the evening.
-function localYmd(d: Date = new Date()): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 // Marking an invoice paid also records the money against it, so the job
@@ -1582,7 +1577,7 @@ export function useMarkInvoicePaid() {
         invoice_id: input.id,
         amount: remainder,
         method: 'other',
-        paid_on: localYmd()
+        paid_on: todayYmd()
       } as any)
       if (payErr) return { error: payErr }
     }
