@@ -1871,3 +1871,21 @@ test('phone numbers on the invoice link read the way the app prints them (format
   await expect(page.getByText(/\(615\) 555-0100/).first()).toBeVisible()
   expect(await page.locator('body').innerText()).not.toMatch(/615555010[01]/)
 })
+
+test.describe('a customer on Eastern time (formats-2)', () => {
+  test.use({ timezoneId: 'America/New_York' })
+  test('the invoice link shows the due and issue dates the company set', async ({ page, context }) => {
+    // Sent Mon Nov 9 at 11:30 pm Central; due Tue Nov 24, stored at the end
+    // of that day in Central time, the way the job's Invoices tab stores it.
+    await mockPortal(context, invoicePayload({
+      company: { timezone: 'America/Chicago' },
+      invoices: [draw('inv-tz', 1, 5000, 'sent', { issued_at: '2026-11-10T05:30:00Z', due_at: '2026-11-25T05:59:59.999Z' })]
+    }))
+    await openInvoice(page)
+    const text = await page.locator('body').innerText()
+    expect(text).toContain('Due November 24, 2026')
+    expect(text).toContain('November 9, 2026')
+    expect(text).not.toContain('November 25, 2026')
+    expect(text).not.toContain('November 10, 2026')
+  })
+})

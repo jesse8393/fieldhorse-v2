@@ -18,16 +18,33 @@ export function money(n: number | string | null | undefined, _options: { cents?:
 // parsed as LOCAL calendar dates, not UTC, otherwise a payment dated
 // "2026-06-01" prints as "May 31" on the customer's invoice in every US
 // timezone. parseDateOnly handles both bare dates and full timestamps.
-export function longDate(iso: string | Date | null | undefined) {
+//
+// A timestamp (an issue date, a due date stored at the end of the company's
+// day) prints in the company's time zone when the document knows it, so a
+// customer on Eastern time reads the day the company set, the day the PDF
+// and the app print, not the next one (formats-2). A bare date keeps its
+// calendar day in any zone.
+function documentDate(iso: string | Date | null | undefined, month: 'long' | 'short', timeZone?: string | null) {
   const d = parseDateOnly(iso)
   if (!d) return ''
-  return d.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
+  const options: Intl.DateTimeFormatOptions = { month, day: 'numeric', year: 'numeric' }
+  const bareDate = typeof iso === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(iso)
+  if (timeZone && !bareDate) {
+    try {
+      return d.toLocaleDateString(undefined, { ...options, timeZone })
+    } catch {
+      // An unknown zone name: print in the viewer's zone as before.
+    }
+  }
+  return d.toLocaleDateString(undefined, options)
 }
 
-export function shortDate(iso: string | Date | null | undefined) {
-  const d = parseDateOnly(iso)
-  if (!d) return ''
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+export function longDate(iso: string | Date | null | undefined, timeZone?: string | null) {
+  return documentDate(iso, 'long', timeZone)
+}
+
+export function shortDate(iso: string | Date | null | undefined, timeZone?: string | null) {
+  return documentDate(iso, 'short', timeZone)
 }
 
 /**

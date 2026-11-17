@@ -559,3 +559,26 @@ describe('approval alerts name the exact amount', () => {
     expect(db.tables.fh_notifications.find((n) => n.kind === 'change_order_signed')!.title).toBe('Change order signed · −$400.00')
   })
 })
+
+// formats-2: the link carries the company's time zone, so the customer's
+// phone prints the dates the company set, whatever zone it is in.
+describe('the link carries the company time zone', () => {
+  const invoiceTables = (extra: Record<string, Row[]> = {}) => baseTables({
+    fh_public_links: [link({ token: 'tz', kind: 'invoice', contact_id: 'job-1' })],
+    fh_contacts: [job()],
+    fh_invoices: [bill('inv-tz', 1, 5000, 'sent')],
+    ...extra
+  })
+
+  it('names the zone the company set', async () => {
+    seedDb(invoiceTables({ fh_org_settings: [{ org_id: ORG, timezone: 'America/Denver' }] }))
+    const { body } = await getLink('tz')
+    expect(body.company.timezone).toBe('America/Denver')
+  })
+
+  it('uses Central time when the company has set none, as the server does', async () => {
+    seedDb(invoiceTables())
+    const { body } = await getLink('tz')
+    expect(body.company.timezone).toBe('America/Chicago')
+  })
+})
