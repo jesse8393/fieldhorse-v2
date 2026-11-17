@@ -77,7 +77,12 @@ export default function ApproveProposalBar({
   // False when the request changes endpoint would refuse a question (a
   // declined quote, a job already started, a refused link): the capsule
   // then offers none, and an open question form closes.
-  canAsk = true
+  canAsk = true,
+  // What the page showed, posted with the approval so the server records
+  // it only for that document: { expected_total | expected_amount,
+  // expected_updated_at }. A 409 document_changed makes the page read the
+  // link again and says why.
+  expected = null
 }: any) {
   const isCO = variant === 'change_order'
   const endpoint = isCO ? '/api/public-co-approve' : '/api/public-link-approve'
@@ -168,7 +173,8 @@ export default function ApproveProposalBar({
         body: JSON.stringify({
           token,
           signature_name: name.trim(),
-          note: note.trim() || null
+          note: note.trim() || null,
+          ...(expected || {})
         })
       })
       const body = await res.json().catch(() => ({}))

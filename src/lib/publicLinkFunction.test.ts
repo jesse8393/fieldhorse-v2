@@ -11,8 +11,10 @@ vi.mock('../../netlify/functions/lib/push.js', () => ({
 }))
 const pushes = db.pushes
 let currentFake: ReturnType<typeof fakeSupabase> | null = null
-const useDb = (tables: Record<string, Row[]>) => { currentFake = fakeSupabase(tables); db.fake = currentFake; return currentFake }
+const seedDb = (tables: Record<string, Row[]>) => { currentFake = fakeSupabase(tables); db.fake = currentFake; return currentFake }
 
+const { default: approveHandler } = await import('../../netlify/functions/public-link-approve.js')
+const { default: coApproveHandler } = await import('../../netlify/functions/public-co-approve.js')
 const {
   default: linkHandler,
   buildPublicLinkViewEvent,
@@ -29,6 +31,11 @@ afterEach(() => { vi.unstubAllEnvs(); currentFake = null; db.fake = null })
 
 const getLink = async (token: string) => {
   const res = await linkHandler(new Request(`https://x.test/api/public-link?token=${token}`))
+  return { status: res.status, body: await res.json() }
+}
+
+const post = async (handler: (req: Request) => Promise<Response>, body: Row) => {
+  const res = await handler(new Request('https://x.test/api/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }))
   return { status: res.status, body: await res.json() }
 }
 
@@ -70,7 +77,7 @@ const bill = (id: string, seq: number, amount: number, status: string, over: Row
 
 describe('the invoice link asks for what the invoice still owes (PT-01, PT-02, M-01, M-02)', () => {
   it('a client billed with no job: the open invoice owes all of itself, and only its own payments come back', async () => {
-    useDb(baseTables({
+    seedDb(baseTables({
       fh_public_links: [link({ token: 'inv-client', client_id: 'cl-1' })],
       fh_invoices: [bill('inv-1', 1, 500, 'paid', { contact_id: null }), bill('inv-2', 2, 1000, 'sent', { contact_id: null })],
       fh_payments: [{ id: 'p1', org_id: ORG, contact_id: null, invoice_id: 'inv-1', amount: 500, paid_on: '2026-10-07' }]
@@ -87,7 +94,7 @@ describe('the invoice link asks for what the invoice still owes (PT-01, PT-02, M
   it('a job: a part payment linked to the invoice comes off, matching the app and the PDF', async () => {
     const invoices = [bill('inv-1', 1, 5000, 'sent')]
     const payments = [{ id: 'p1', org_id: ORG, contact_id: 'job-1', invoice_id: 'inv-1', amount: 2000, paid_on: '2026-11-13' }]
-    useDb(baseTables({
+    seedDb(baseTables({
       fh_public_links: [link({ token: 'inv-job', contact_id: 'job-1' })],
       fh_contacts: [job()],
       fh_invoices: invoices,
@@ -99,7 +106,7 @@ describe('the invoice link asks for what the invoice still owes (PT-01, PT-02, M
   })
 
   it('a job: money logged against the job pays the unsent deposit draft first, as Money does, and the draft never leaves the server', async () => {
-    useDb(baseTables({
+    seedDb(baseTables({
       fh_public_links: [link({ token: 'inv-draft', contact_id: 'job-1' })],
       fh_contacts: [job()],
       fh_invoices: [bill('inv-1', 1, 2500, 'draft'), bill('inv-2', 2, 5000, 'sent')],
@@ -111,7 +118,7 @@ describe('the invoice link asks for what the invoice still owes (PT-01, PT-02, M
   })
 
   it('a job with no price: a sent invoice owes its amount', async () => {
-    useDb(baseTables({
+    seedDb(baseTables({
       fh_public_links: [link({ token: 'inv-noprice', contact_id: 'job-1' })],
       fh_contacts: [job({ amount: null })],
       fh_invoices: [bill('inv-1', 1, 500, 'sent')]
@@ -149,7 +156,7 @@ describe('the statement link (FN-20, M-13, PT-06)', () => {
   })
 
   it('returns only billing stage jobs, never moved or lost rows and their amounts', async () => {
-    useDb(stmt())
+    seedDb(stmt())
     const { body } = await getLink('stmt')
     expect(body.jobs.map((j: Row) => j.id)).toEqual(['j-drive', 'j-garage'])
     expect(JSON.stringify(body)).not.toContain('48000')
@@ -158,10 +165,149 @@ describe('the statement link (FN-20, M-13, PT-06)', () => {
   })
 
   it('carries the issued invoices, direct ones included, each open one with what it still owes, and no drafts', async () => {
-    useDb(stmt())
+    seedDb(stmt())
     const { body } = await getLink('stmt')
     const rows = Object.fromEntries(body.invoices.map((i: Row) => [i.id, i.amount_due ?? null]))
     expect(rows).toEqual({ 'i-1': null, 'i-2': 6400, 'd-1': null, 'd-2': 400.25 })
+  })
+})
+
+describe('a change order is approved only as the customer saw it (FN-04, M-07)', () => {
+  const coTables = (co: Row = {}) => baseTables({
+    fh_public_links: [link({ token: 'co', kind: 'change_order', contact_id: 'job-1', change_order_id: 'co-1' })],
+    fh_contacts: [job({ amount: 20000 })],
+    fh_change_orders: [{ id: 'co-1', org_id: ORG, user_id: OWNER, contact_id: 'job-1', sequence_number: 1, title: 'Extra footing', amount: 1200, status: 'sent', updated_at: '2026-11-10T15:00:00.000Z', ...co }]
+  })
+  const shown = { token: 'co', signature_name: 'Dana Smith', expected_amount: 1200, expected_updated_at: '2026-11-10T15:00:00.000Z' }
+
+  it('the link carries what the page must post back', async () => {
+    seedDb(coTables())
+    const { body } = await getLink('co')
+    expect(body.changeOrders[0]).toMatchObject({ amount: 1200, updated_at: '2026-11-10T15:00:00.000Z' })
+  })
+
+  it('approves the amount the customer saw', async () => {
+    const db = seedDb(coTables())
+    const res = await post(coApproveHandler, shown)
+    expect(res.status).toBe(200)
+    expect(db.tables.fh_change_orders[0]).toMatchObject({ status: 'approved', approved_by_name: 'Dana Smith', amount: 1200 })
+  })
+
+  it('refuses with 409 and a plain message when the amount changed after the page opened', async () => {
+    const db = seedDb(coTables({ amount: 2100, updated_at: '2026-11-10T16:00:00.000Z' }))
+    const res = await post(coApproveHandler, shown)
+    expect(res.status).toBe(409)
+    expect(res.body.error).toBe('document_changed')
+    expect(res.body.message).toMatch(/changed since you opened it/)
+    expect(db.tables.fh_change_orders[0].status).toBe('sent')
+    expect(db.tables.fh_notifications).toHaveLength(0)
+  })
+
+  it('refuses when the row was edited even with the same amount, and when the page posts nothing to compare', async () => {
+    seedDb(coTables({ updated_at: '2026-11-10T16:00:00.000Z' }))
+    expect((await post(coApproveHandler, shown)).status).toBe(409)
+    const db = seedDb(coTables())
+    expect((await post(coApproveHandler, { token: 'co', signature_name: 'Dana Smith' })).status).toBe(409)
+    expect(db.tables.fh_change_orders[0].status).toBe('sent')
+  })
+
+  it('takes approval only while the change order is sent', async () => {
+    for (const status of ['draft', 'rejected', 'void']) {
+      const db = seedDb(coTables({ status }))
+      const res = await post(coApproveHandler, shown)
+      expect(res.status).toBeGreaterThanOrEqual(409)
+      expect(db.tables.fh_change_orders[0].status).toBe(status)
+    }
+  })
+})
+
+describe('a proposal is approved only as the customer saw it (FN-18)', () => {
+  const quoteTables = (quote: Row = {}, items?: Row[]) => baseTables({
+    fh_public_links: [link({ token: 'q', kind: 'proposal', quote_id: 'quote-1' })],
+    fh_quotes: [{ id: 'quote-1', org_id: ORG, user_id: OWNER, client_id: 'cl-1', title: 'Driveway', status: 'sent', amount: 10000, expires_at: null, job_id: null, created_at: '2026-10-20T00:00:00.000Z', sent_at: '2026-10-20T00:00:00.000Z', updated_at: '2026-10-20T00:00:00.000Z', ...quote }],
+    fh_quote_items: items ?? [
+      { id: 'it-1', quote_id: 'quote-1', contact_id: null, description: 'Slab', qty: 1, rate: 9999.5, amount: 9999.5, sort_order: 0 },
+      { id: 'it-2', quote_id: 'quote-1', contact_id: null, description: 'Sealer', qty: 1, rate: 400, amount: 400, is_optional: true, sort_order: 1 }
+    ]
+  })
+  const shown = { token: 'q', signature_name: 'Dana Smith', expected_total: 9999.5, expected_updated_at: '2026-10-20T00:00:00.000Z' }
+
+  it('the link carries the version the page must post back', async () => {
+    seedDb(quoteTables())
+    const { body } = await getLink('q')
+    expect(body.updated_at).toBe('2026-10-20T00:00:00.000Z')
+  })
+
+  it('approves the total the customer saw', async () => {
+    const db = seedDb(quoteTables())
+    expect((await post(approveHandler, shown)).status).toBe(200)
+    expect(db.tables.fh_quote_versions[0].base_total).toBe(9999.5)
+  })
+
+  it('refuses with 409 when the lines changed after the page opened, and records nothing', async () => {
+    const db = seedDb(quoteTables({}, [{ id: 'it-1', quote_id: 'quote-1', contact_id: null, description: 'Slab', qty: 1, rate: 14000, amount: 14000, sort_order: 0 }]))
+    const res = await post(approveHandler, shown)
+    expect(res.status).toBe(409)
+    expect(res.body.error).toBe('document_changed')
+    expect(db.tables.fh_quote_versions).toHaveLength(0)
+    expect(db.tables.fh_quotes[0].status).toBe('sent')
+  })
+
+  it('refuses when the quote was edited, or the page posts no total', async () => {
+    seedDb(quoteTables({ updated_at: '2026-10-21T00:00:00.000Z' }))
+    expect((await post(approveHandler, shown)).status).toBe(409)
+    seedDb(quoteTables())
+    expect((await post(approveHandler, { token: 'q', signature_name: 'Dana Smith' })).status).toBe(409)
+  })
+
+  it('a draft that was never sent, and a rejected quote, are not approvable', async () => {
+    for (const status of ['draft', 'rejected']) {
+      const db = seedDb(quoteTables({ status }))
+      const res = await post(approveHandler, shown)
+      expect(res.status).toBe(409)
+      expect(res.body.error).toBe('not_approvable')
+      expect(db.tables.fh_quotes[0].status).toBe(status)
+    }
+  })
+
+  it('on a job proposal, a rejected or draft proposal is not approvable and a changed total is refused', async () => {
+    const jobTables = (over: Row) => baseTables({
+      fh_public_links: [link({ token: 'jp', kind: 'proposal', contact_id: 'job-1' })],
+      fh_contacts: [job({ stage: 'quote', proposal_status: 'sent', email: 'dana@example.test', ...over })],
+      fh_quote_items: [{ id: 'ji', quote_id: null, contact_id: 'job-1', description: 'Patio', qty: 1, rate: 20000, amount: 20000, sort_order: 0 }]
+    })
+    for (const proposal_status of ['draft', 'rejected']) {
+      const db = seedDb(jobTables({ proposal_status }))
+      expect((await post(approveHandler, { token: 'jp', signature_name: 'Dana', expected_total: 20000 })).status).toBe(409)
+      expect(db.tables.fh_contacts[0].proposal_status).toBe(proposal_status)
+    }
+    seedDb(jobTables({}))
+    expect((await post(approveHandler, { token: 'jp', signature_name: 'Dana', expected_total: 19000 })).status).toBe(409)
+    const db = seedDb(jobTables({}))
+    expect((await post(approveHandler, { token: 'jp', signature_name: 'Dana', expected_total: 20000 })).status).toBe(200)
+    expect(db.tables.fh_contacts[0].proposal_status).toBe('approved')
+  })
+})
+
+describe('a quote past its valid until date (M-21)', () => {
+  const quoteTables = (expires_at: string) => baseTables({
+    fh_public_links: [link({ token: 'q', kind: 'proposal', quote_id: 'quote-1' })],
+    fh_quotes: [{ id: 'quote-1', org_id: ORG, user_id: OWNER, client_id: 'cl-1', title: 'Driveway', status: 'sent', amount: 100, expires_at, job_id: null, created_at: '2026-10-20T00:00:00.000Z', updated_at: 'u1' }],
+    fh_quote_items: [{ id: 'it-1', quote_id: 'quote-1', contact_id: null, description: 'Slab', qty: 1, rate: 100, amount: 100, sort_order: 0 }]
+  })
+  const body = { token: 'q', signature_name: 'Dana', expected_total: 100, expected_updated_at: 'u1' }
+
+  it('a quote stored as the end of a day that has passed is expired, with no extra day', async () => {
+    seedDb(quoteTables(new Date(Date.now() - 60 * 60 * 1000).toISOString()))
+    const res = await post(approveHandler, body)
+    expect(res.status).toBe(410)
+    expect(res.body.error).toBe('quote_expired')
+  })
+
+  it('a bare date is good through that whole day', async () => {
+    const today = new Date().toISOString().slice(0, 10)
+    seedDb(quoteTables(today))
+    expect((await post(approveHandler, body)).status).toBe(200)
   })
 })
 

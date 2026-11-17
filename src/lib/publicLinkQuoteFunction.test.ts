@@ -143,7 +143,7 @@ describe('a proposal link with quote_id', () => {
 describe('approving a quote through its link', () => {
   it('writes fh_quotes.status and approved_version_id', async () => {
     currentFake = fakeSupabase(quoteTables())
-    const res = await postApprove({ token: 't1', signature_name: 'Marco Castellanos' })
+    const res = await postApprove({ token: 't1', signature_name: 'Marco Castellanos', expected_total: 3000 })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body).toMatchObject({ ok: true, version_number: 1, signed_by: 'Marco Castellanos' })
@@ -162,7 +162,7 @@ describe('approving a quote through its link', () => {
 
   it('the quote number uses the quote id', async () => {
     currentFake = fakeSupabase(quoteTables())
-    await postApprove({ token: 't1', signature_name: 'Marco Castellanos' })
+    await postApprove({ token: 't1', signature_name: 'Marco Castellanos', expected_total: 3000 })
     const snapshot = currentFake.tables.fh_quote_versions[0].snapshot
     expect(snapshot.quote_number).toBe('PC-2026-RTAL')
     expect(snapshot.quote.id).toBe(QUOTE_ID)
@@ -197,7 +197,7 @@ describe('approving a quote through its link', () => {
       { status: 'changes_requested' },
       { fh_quote_versions: [{ id: 'v-old', quote_id: QUOTE_ID, version_number: 3, status: 'approved' }] }
     ))
-    const res = await postApprove({ token: 't1', signature_name: 'Marco' })
+    const res = await postApprove({ token: 't1', signature_name: 'Marco', expected_total: 3000 })
     expect(res.status).toBe(200)
     const versions = currentFake.tables.fh_quote_versions
     const created = versions.find((v) => v.id !== 'v-old')!

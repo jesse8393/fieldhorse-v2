@@ -75,7 +75,7 @@ export function buildPublicLinkViewEvent(req, link, contact, salt) {
 // Columns a customer may see. Internal fields (user_id, org_id, created_by,
 // internal notes on change orders) stay server side.
 const PUBLIC_PAYMENT_COLUMNS = 'id, contact_id, invoice_id, amount, paid_on, created_at, method, reference, kind'
-const PUBLIC_CHANGE_ORDER_COLUMNS = 'id, contact_id, sequence_number, title, description, amount, status, approved_at, approved_by_name, created_at'
+const PUBLIC_CHANGE_ORDER_COLUMNS = 'id, contact_id, sequence_number, title, description, amount, status, approved_at, approved_by_name, created_at, updated_at'
 // What the customer sees of an invoice: its number, what it is for, the
 // note on it and its dates. Only issued ones (CUSTOMER_INVOICE_STATUSES)
 // leave the server.
@@ -583,6 +583,8 @@ async function handleQuote(supabase, req, link) {
     change_order_id: null,
     quote_id: quote.id,
     status,
+    // The version the page posts back with an approval (public-link-approve).
+    updated_at: quote.updated_at || null,
     contact: {
       id: quote.id,
       name: client?.name || null,

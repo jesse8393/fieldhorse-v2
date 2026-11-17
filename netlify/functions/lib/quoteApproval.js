@@ -14,6 +14,48 @@ import { proposalNumber } from './docNumbers.js'
 export const CLOSED_QUOTE_STATUSES = new Set(['lost', 'rejected'])
 
 /**
+ * Whether a quote's valid until date has passed. The app stores it as the
+ * end of the chosen day, so that instant is the end; only a bare date
+ * (year month day, no time) is good through the whole of that day.
+ */
+export function quoteValidityPassed(expiresAt, now = new Date()) {
+  if (!expiresAt) return false
+  const text = String(expiresAt)
+  const d = new Date(text)
+  if (Number.isNaN(d.getTime())) return false
+  const end = /^\d{4}-\d{2}-\d{2}$/.test(text) ? d.getTime() + 24 * 60 * 60 * 1000 : d.getTime()
+  return end < now.getTime()
+}
+
+/**
+ * Whether the document the customer approves is the one the page showed:
+ * the same total to the cent and, when the row has one, the same
+ * updated_at. A page that posts neither (opened before this check
+ * existed) is treated as out of date, so it reads the link again.
+ */
+export function matchesWhatWasShown({ total, updatedAt }, body) {
+  const expected = Number(body?.expected_total ?? body?.expected_amount)
+  if (body?.expected_total == null && body?.expected_amount == null) return false
+  if (!Number.isFinite(expected) || Math.round(expected * 100) !== Math.round(Number(total || 0) * 100)) return false
+  if (updatedAt != null) {
+    const shown = body?.expected_updated_at
+    if (shown == null) return false
+    const a = Date.parse(String(shown))
+    const b = Date.parse(String(updatedAt))
+    if (Number.isFinite(a) && Number.isFinite(b) ? a !== b : String(shown) !== String(updatedAt)) return false
+  }
+  return true
+}
+
+/** The answer when the document changed after the customer opened it. */
+export function documentChanged(label) {
+  return {
+    error: 'document_changed',
+    message: `This ${label} changed since you opened it. Please look it over again before approving.`
+  }
+}
+
+/**
  * The quote a link points at, with its client, scoped to the link's
  * company so a mis-minted token never reaches another tenant's quote.
  * Returns { quote, client } with either null when it is not there.
@@ -126,13 +168,15 @@ export function buildQuoteSnapshot({ quote, client, company, snap, takenAt, extr
  * Returns { claimed: true }, { claimed: false } when already approved, or
  * { error }.
  */
-export async function claimQuoteApproval(supabase, quote) {
-  const { data: claimed, error } = await supabase
+export async function claimQuoteApproval(supabase, quote, { sameVersion = false } = {}) {
+  let query = supabase
     .from('fh_quotes')
     .update({ status: 'approved' })
     .eq('id', quote.id)
     .neq('status', 'approved')
-    .select('id')
+  // The customer link claims only the version the customer was shown.
+  if (sameVersion && quote.updated_at) query = query.eq('updated_at', quote.updated_at)
+  const { data: claimed, error } = await query.select('id')
   if (error) return { error }
   return { claimed: Boolean(claimed && claimed.length > 0) }
 }

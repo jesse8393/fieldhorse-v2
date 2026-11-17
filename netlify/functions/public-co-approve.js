@@ -19,6 +19,7 @@ import { createClient } from '@supabase/supabase-js'
 import { clientIp, hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
 import { sendPushToUser } from './lib/push.js'
 import { linkScope } from './lib/linkScope.js'
+import { documentChanged, matchesWhatWasShown } from './lib/quoteApproval.js'
 
 function corsHeaders() {
   return {
@@ -87,13 +88,22 @@ export default async function handler(req) {
   // 2. Load the CO; idempotency guard against double-taps.
   const { data: co } = await supabase
     .from('fh_change_orders')
-    .select('id, contact_id, user_id, sequence_number, title, amount, status')
+    .select('id, contact_id, user_id, org_id, sequence_number, title, amount, status, updated_at')
     .eq('id', link.change_order_id)
     .match(linkScope(link))
     .maybeSingle()
   if (!co) return json({ error: 'gone' }, 404)
   if (co.status === 'approved') return json({ error: 'already_approved' }, 409)
   if (co.status === 'void' || co.status === 'rejected') return json({ error: 'gone' }, 410)
+  // Only a change order that was sent to the customer takes a signature;
+  // one set back to draft is being reworked.
+  if (co.status !== 'sent') {
+    return json({ error: 'not_approvable', message: 'This change order is not open for approval. Ask your contractor for an updated one.' }, 409)
+  }
+  // The customer signs the amount the page showed them, or nothing.
+  if (!matchesWhatWasShown({ total: co.amount, updatedAt: co.updated_at ?? null }, body)) {
+    return json(documentChanged('change order'), 409)
+  }
 
   const approvedAt = new Date().toISOString()
   // The UPDATE itself is the idempotency guard: `.neq('status','approved')`
@@ -111,13 +121,21 @@ export default async function handler(req) {
     })
     .eq('id', co.id)
     .match(linkScope(link))
-    .neq('status', 'approved')
+    .eq('status', 'sent')
+    // Still the row the customer saw: an edit between the read and this
+    // write moves updated_at and the amount.
+    .eq('amount', co.amount)
+    .match(co.updated_at ? { updated_at: co.updated_at } : {})
     .select('id')
   if (upErr) {
     console.error('[public-co-approve] update failed', upErr)
     return json({ error: 'approve_failed', message: 'Could not record your approval. Try again.' }, 500)
   }
-  if (!updatedRows || updatedRows.length === 0) return json({ error: 'already_approved' }, 409)
+  if (!updatedRows || updatedRows.length === 0) {
+    const { data: now } = await supabase.from('fh_change_orders').select('status').eq('id', co.id).maybeSingle()
+    if (now?.status === 'approved') return json({ error: 'already_approved' }, 409)
+    return json(documentChanged('change order'), 409)
+  }
 
   // 3. Tell the contractor — bell + lock screen. Best effort.
   const { data: contact } = await supabase

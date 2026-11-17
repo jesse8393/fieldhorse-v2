@@ -289,7 +289,7 @@ test('the approve bar is on the page and posts only when approving is tapped', a
 
   await approve.click()
   await expect.poll(() => spies.approve.length).toBe(1)
-  expect(spies.approve[0]).toEqual({ token: 't1', signature_name: 'Marco Castellanos', note: null })
+  expect(spies.approve[0]).toEqual({ token: 't1', signature_name: 'Marco Castellanos', note: null, expected_total: 18458, expected_updated_at: null })
 
   // The page reloads the proposal: approved, so the bar is gone.
   await expect(page.getByText('Approved', { exact: true })).toBeVisible()
@@ -742,7 +742,7 @@ test('on the classic page an approval on the stated day still reaches the server
   await approve.click()
 
   await expect.poll(() => spies.approve.length).toBe(1)
-  expect(spies.approve[0]).toEqual({ token: 't1', signature_name: 'Marco Castellanos', note: null })
+  expect(spies.approve[0]).toEqual({ token: 't1', signature_name: 'Marco Castellanos', note: null, expected_total: 18458, expected_updated_at: null })
   await expect(page.getByText('Proposal approved')).toBeVisible()
   await expect(page.getByRole('alert')).toHaveCount(0)
   expect(spies.stray).toEqual([])
@@ -796,7 +796,7 @@ test('a total that changed since the page loaded stops the approval and shows th
   // Reviewed: the next tap approves the new total.
   await page.getByRole('button', { name: 'Approve this quote' }).click()
   await expect.poll(() => spies.approve.length).toBe(1)
-  expect(spies.approve[0]).toEqual({ token: 't1', signature_name: 'Marco Castellanos', note: null })
+  expect(spies.approve[0]).toEqual({ token: 't1', signature_name: 'Marco Castellanos', note: null, expected_total: 19458, expected_updated_at: null })
   await expect(page.getByText('Approved', { exact: true })).toBeVisible()
   expect(spies.stray).toEqual([])
 })
@@ -1641,4 +1641,45 @@ test('the statement link totals what is owed on sent invoices, to the cent, and 
   const apart = page.getByRole('region', { name: 'Not yet invoiced' })
   await expect(apart.getByText('Garage slab')).toBeVisible()
   await expect(apart.getByText('$33,100.00')).toBeVisible()
+})
+
+/* ---- Approval tied to what the customer saw (FN-04, FN-18, M-07) ---- */
+
+test('a change order approval posts the amount and version shown, and a change since then reloads the page with a plain message', async ({ page, context }) => {
+  const spies = await mockPortal(context, changeOrderPayload())
+  const posts: Array<Record<string, unknown>> = []
+  await context.route('**/api/public-co-approve', async (route) => {
+    posts.push(route.request().postDataJSON())
+    // The contractor raised it to $2,100 while the page was open.
+    spies.setPayload(changeOrderPayload({ co: { amount: 2100, updated_at: '2026-11-10T16:00:00.000Z' } }))
+    await route.fulfill({
+      status: 409,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'document_changed', message: 'This change order changed since you opened it. Please look it over again before approving.' })
+    })
+  })
+  await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByText('+$1,250.50')).toBeVisible()
+
+  await page.getByLabel('Your full name').fill('Marco Castellanos')
+  await page.getByRole('checkbox').check()
+  await page.getByRole('button', { name: 'Approve & notify contractor' }).click()
+
+  await expect.poll(() => posts.length).toBe(1)
+  expect(posts[0]).toMatchObject({ expected_amount: 1250.5, expected_updated_at: '2026-11-10T15:00:00.000Z' })
+  await expect(page.getByText('This change order changed since you opened it. Please look it over again before approving.')).toBeVisible()
+  await expect(page.getByText('+$2,100.00')).toBeVisible()
+})
+
+test('a proposal approval posts the total of the lines shown and the version of the quote', async ({ page, context }) => {
+  const payload = proposalPayload({ company: { estimate_template: 'classic' } }) as Payload & Record<string, unknown>
+  payload.updated_at = '2026-10-02T12:00:00.000Z'
+  const spies = await mockPortal(context, payload)
+  await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+  await page.getByLabel('Your full name').fill('Marco Castellanos')
+  await page.getByRole('checkbox').check()
+  await page.getByRole('button', { name: 'Approve & notify contractor' }).click()
+  await expect.poll(() => spies.approve.length).toBe(1)
+  // Excavate 2,200 + rebar 2,860 + slab 9,350 + joints 4,048; the optional and the excluded lines are not in it.
+  expect(spies.approve[0]).toMatchObject({ expected_total: 18458, expected_updated_at: '2026-10-02T12:00:00.000Z' })
 })

@@ -62,6 +62,24 @@ function approvable(payload: PublicDocPayload, now: Date): boolean {
   return status !== 'approved' && status !== 'changes_requested'
 }
 
+// What the customer is agreeing to, posted with an approval so the server
+// records it only for the document the page showed (FN-18): the base
+// total of the lines, counted as the approval snapshot counts it (neither
+// optional nor excluded lines; qty times rate when a line has no amount),
+// in whole cents, and the quote's version.
+function shownProposal(payload: PublicDocPayload) {
+  let totalCents = 0
+  for (const i of payload.items || []) {
+    if (i?.is_optional || i?.is_excluded) continue
+    const amount = i?.amount != null ? Number(i.amount || 0) : Number(i?.qty || 0) * Number(i?.rate || 0)
+    totalCents += Math.round(amount * 100)
+  }
+  return {
+    expected_total: totalCents / 100,
+    expected_updated_at: (payload as { updated_at?: string | null }).updated_at ?? null
+  }
+}
+
 // "Ask about this" on an optional item opens the request changes form with
 // this text in the box; Back puts focus back on the button tapped (opener).
 // A new id each tap, so tapping again reopens it.
@@ -206,6 +224,7 @@ export default function PublicDoc() {
                 onStale={reload}
                 requestSeed={ask}
                 canAsk={canAsk}
+                expected={shownProposal(data)}
               />
             ) : null
           }}
@@ -238,6 +257,7 @@ export default function PublicDoc() {
               onBeforeApprove={checkBeforeApprove}
               onApproved={reload}
               onStale={reload}
+              expected={shownProposal(data)}
             />
           )}
           {proposalStatus === 'approved' && (
@@ -364,6 +384,8 @@ function ChangeOrderView({ data, token, onApproved }: any) {
           contractTotal={contractAfter}
           initialName={contact?.name || ''}
           onApproved={onApproved}
+          onStale={onApproved}
+          expected={{ expected_amount: delta, expected_updated_at: co.updated_at ?? null }}
         />
       )}
       {approved && (
