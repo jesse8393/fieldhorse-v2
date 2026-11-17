@@ -43,7 +43,7 @@ const TEMPLATE_COMPONENTS: Record<string, (props: { view: any }) => any> = {
 }
 
 const DEFAULT_PAYMENT_COPY = '50% deposit due upon approval · 40% due at material delivery or midpoint · 10% due upon substantial completion.'
-const DEFAULT_DISCLAIMER = 'Pricing includes labor, material, standard equipment, placement, finishing, and cleanup for the listed scope only. Pricing is based on visible site conditions at time of estimating. Any hidden conditions, field changes, requested by owner additions, or scope deviations may require additional pricing through written change order approval. Estimate valid for 30 days.'
+const DEFAULT_DISCLAIMER = 'Pricing includes labor, material, standard equipment, placement, finishing, and cleanup for the listed scope only. Pricing is based on visible site conditions at time of estimating. Any hidden conditions, field changes, requested by owner additions, or scope deviations may require additional pricing through written change order approval.'
 
 export default function ProposalTemplate({
   company = {},
@@ -211,7 +211,7 @@ export default function ProposalTemplate({
         <section>
           <SectionLabel>Optional additions</SectionLabel>
           <p style={{ margin: '-4px 0 10px', fontSize: 12, color: DOC_COLORS.inkMuted, lineHeight: 1.5 }}>
-            Priced separately and not included in the estimate total. Approve any option to add it to the contract.
+           Priced separately and not included in the estimate total. Ask us to add any of them to the contract.
           </p>
           <AddOnsTable items={upgradeGroupsFlat} />
         </section>
@@ -613,6 +613,7 @@ function statusToChip(status: any) {
     case 'changes_requested': return { label: 'Changes requested', tone: 'red' }
     case 'expired':  return { label: 'Expired',  tone: 'red' }
     case 'rejected': return { label: 'Declined', tone: 'red' }
+    case 'closed':   return { label: 'Not open', tone: 'slate' }
     default:         return { label: 'Draft',    tone: 'slate' }
   }
 }

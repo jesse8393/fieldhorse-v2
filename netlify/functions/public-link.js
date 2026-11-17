@@ -23,11 +23,14 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { createHash } from 'node:crypto'
-import { sendPushToUser } from './lib/push.js'
+import { alertLinkRecipients } from './lib/linkAlerts.js'
 import { clientIp, hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
 import { linkScope } from './lib/linkScope.js'
 import { brandingUserIdFor } from './lib/orgAccess.js'
 import { loadQuoteForLink } from './lib/quoteApproval.js'
+// The one allocator Money, the invoice PDF and the invoice email read, so
+// the customer link asks for the same amount to the cent.
+import { allocateInvoiceDue, amountsDueByInvoice, isOpenInvoice, knownContractTotal } from '../../src/lib/invoiceSettlement.ts'
 
 function trimHeader(value, max = 500) {
   const text = String(value || '').trim()
@@ -72,7 +75,35 @@ export function buildPublicLinkViewEvent(req, link, contact, salt) {
 // Columns a customer may see. Internal fields (user_id, org_id, created_by,
 // internal notes on change orders) stay server side.
 const PUBLIC_PAYMENT_COLUMNS = 'id, contact_id, invoice_id, amount, paid_on, created_at, method, reference, kind'
-const PUBLIC_CHANGE_ORDER_COLUMNS = 'id, contact_id, sequence_number, title, description, amount, status, approved_at, approved_by_name, created_at'
+const PUBLIC_CHANGE_ORDER_COLUMNS = 'id, contact_id, sequence_number, title, description, amount, status, approved_at, approved_by_name, created_at, updated_at'
+// What the customer sees of an invoice: its number, what it is for, the
+// note on it and its dates. Only issued ones (CUSTOMER_INVOICE_STATUSES)
+// leave the server.
+const PUBLIC_INVOICE_COLUMNS = 'id, contact_id, client_id, sequence_number, title, amount, status, issued_at, due_at, description, notes, created_at'
+const CUSTOMER_INVOICE_STATUSES = new Set(['sent', 'viewed', 'paid', 'overdue'])
+
+/**
+ * The invoices the customer may see, each issued open one carrying
+ * `amount_due`: what it still owes by allocateInvoiceDue, worked out from
+ * every live invoice on the job (unsent drafts included, so money logged
+ * against the job pays them in the same order Money does), every payment
+ * on the job and the job's contract. Drafts and void rows never leave the
+ * server. `contractTotal` null means the job has no recorded price.
+ */
+export function customerInvoices({ invoices, payments, contractTotal }) {
+  const all = Array.isArray(invoices) ? invoices : []
+  const due = allocateInvoiceDue({ invoices: all, payments: payments || [], contractTotal })
+  return customerRows(all, due)
+}
+
+function customerRows(all, due) {
+  return all
+    .filter((inv) => CUSTOMER_INVOICE_STATUSES.has(String(inv?.status || '').toLowerCase()))
+    .map((inv) => {
+      if (!isOpenInvoice(inv)) return inv
+      return { ...inv, amount_due: Math.round((due.get(inv.id) ?? 0) * 100) / 100 }
+    })
+}
 
 // Human label + in-app deep link for a "customer viewed" notification.
 export function viewedLabelFor(link) {
@@ -146,14 +177,19 @@ export default async function handler(req) {
     .select('*')
     .eq('token', token)
     .maybeSingle()
-  if (linkErr || !link) {
+  if (linkErr) {
+    // A failed read is not a gone link: the page offers Try again.
+    console.error('[public-link] link lookup failed', linkErr)
+    return json({ error: 'read_failed', message: 'We could not load this document just now. Please try again.' }, 503)
+  }
+  if (!link) {
     return json({ error: 'not_found', message: 'This link is no longer available.' }, 404)
   }
   if (link.revoked_at) {
-    return json({ error: 'revoked', message: 'This link has been revoked by the sender.' }, 404)
+    return json({ error: 'revoked', message: 'This link has been revoked by the sender.', company: await refusedLinkCompany(supabase, link) }, 404)
   }
   if (link.expires_at && new Date(link.expires_at) < new Date()) {
-    return json({ error: 'expired', message: 'This link has expired.' }, 404)
+    return json({ error: 'expired', message: 'This link has expired.', company: await refusedLinkCompany(supabase, link) }, 404)
   }
 
   // Statement links are client-scoped (every open job for one client)
@@ -216,11 +252,14 @@ export default async function handler(req) {
     // draft/void rows (amounts for bills that were never issued) and
     // internal notes to anyone with the link — the UI filtered them,
     // but the JSON payload is one View-Source away.
+    // Every invoice on the job, drafts included, so what each issued one
+    // still owes is worked out as Money does; customerInvoices() keeps
+    // only the issued ones for the payload.
     supabase
       .from('fh_invoices')
-      .select('id, contact_id, sequence_number, title, amount, status, issued_at, due_at, description')
+      .select(PUBLIC_INVOICE_COLUMNS)
       .eq('contact_id', link.contact_id)
-      .in('status', ['sent', 'paid', 'overdue'])
+      .neq('status', 'void')
       .order('sequence_number', { ascending: true }),
     supabase
       .from('fh_job_files')
@@ -231,32 +270,8 @@ export default async function handler(req) {
       .limit(12)
   ])
 
-  // Sign photo URLs server-side so the public viewer can render them
-  // directly without a second round-trip. 24h TTL — generous enough
-  // that an emailed link can be reopened the next day but not so long
-  // that revoked photos linger indefinitely. Failures filter out so a
-  // single bad row doesn't kill the response.
-  let photos = []
-  if (Array.isArray(photoRows) && photoRows.length > 0) {
-    const paths = photoRows.map((r) => r.storage_path).filter(Boolean)
-    if (paths.length > 0) {
-      const { data: signedRes } = await supabase.storage
-        .from('job-photos')
-        .createSignedUrls(paths, 60 * 60 * 24)
-      const signedByPath = new Map((signedRes || []).map((s) => [s.path, s.signedUrl]))
-      photos = photoRows
-        .map((r) => {
-          const url = signedByPath.get(r.storage_path)
-          if (!url) return null
-          return {
-            url,
-            section_tag: (r.section_tag || '').trim() || (r.caption || '').trim() || null,
-            caption: r.caption || null
-          }
-        })
-        .filter(Boolean)
-    }
-  }
+  // Signed on the server so the public viewer renders them directly.
+  const photos = await signPhotos(supabase, photoRows, link.contact_id)
 
   if (!contact) {
     // Either the contact was deleted, or the link's contact_id doesn't
@@ -285,24 +300,24 @@ export default async function handler(req) {
 
   if (shouldNotify) {
     const { kindLabel, detailLink } = viewedLabelFor(link)
+    // Bell and lock screen: "they're looking at it right now" is the best
+    // possible moment to call. Same debounce for both.
     sideEffects.push(
-      supabase.from('fh_notifications').insert({
-      user_id: link.user_id,
-      org_id: link.org_id || contact.org_id || null,
-      kind: 'public_link_viewed',
-      title: `Customer viewed your ${kindLabel}`,
-      body: contact.name ? `${contact.name}${contact.job_title ? ` · ${contact.job_title}` : ''}` : null,
-      link: detailLink
-      })
-    )
-    // Lock screen too — "they're looking at it right now" is the best
-    // possible moment to call. Same debounce as the bell row.
-    sideEffects.push(
-      sendPushToUser(supabase, link.user_id, {
-      title: `Customer is viewing your ${kindLabel} 👀`,
-      body: contact.name ? `${contact.name}${contact.job_title ? ` · ${contact.job_title}` : ''}` : `Tap to open the ${kindLabel}`,
-      link: detailLink,
-      tag: `link-viewed-${link.id}`
+      alertLinkRecipients(supabase, {
+        orgId: link.org_id || contact.org_id || null,
+        creatorId: link.user_id,
+        notification: {
+          kind: 'public_link_viewed',
+          title: `Customer viewed your ${kindLabel}`,
+          body: contact.name ? `${contact.name}${contact.job_title ? ` · ${contact.job_title}` : ''}` : null,
+          link: detailLink
+        },
+        push: {
+          title: `Customer is viewing your ${kindLabel} 👀`,
+          body: contact.name ? `${contact.name}${contact.job_title ? ` · ${contact.job_title}` : ''}` : `Tap to open the ${kindLabel}`,
+          link: detailLink,
+          tag: `link-viewed-${link.id}`
+        }
       })
     )
   }
@@ -345,7 +360,11 @@ export default async function handler(req) {
     payments: payments || [],
     changeOrders: changeOrders || [],
     insurance: insurance || null,
-    invoices: invoices || [],
+    invoices: customerInvoices({
+      invoices,
+      payments,
+      contractTotal: knownContractTotal({ amount: contact.amount, changeOrders })
+    }),
     photos
   })
 }
@@ -362,10 +381,10 @@ async function handleClientInvoice(supabase, req, link) {
     supabase.from('profiles').select('*').eq('user_id', brandUserId).maybeSingle(),
     supabase
       .from('fh_invoices')
-      .select('id, contact_id, client_id, sequence_number, title, amount, status, issued_at, due_at, description')
+      .select(PUBLIC_INVOICE_COLUMNS)
       .eq('client_id', link.client_id)
       .is('contact_id', null)
-      .in('status', ['sent', 'paid', 'overdue'])
+      .in('status', ['sent', 'viewed', 'paid', 'overdue'])
       .order('sequence_number', { ascending: true })
   ])
   if (!client) {
@@ -375,8 +394,22 @@ async function handleClientInvoice(supabase, req, link) {
   const { data: payments } = invoiceIds.length > 0
     ? await supabase.from('fh_payments').select(PUBLIC_PAYMENT_COLUMNS).in('invoice_id', invoiceIds).order('paid_on', { ascending: false })
     : { data: [] }
-  const openOnes = (invoices || []).filter((inv) => inv.status !== 'paid')
-  const amount = (openOnes.length > 0 ? openOnes : invoices || []).reduce((s, inv) => s + Number(inv.amount || 0), 0)
+  // An invoice with no job is a contract of its own amount, paid only by
+  // the payments linked to it (amountsDueByInvoice in invoiceSettlement.ts).
+  // Another invoice's payments never come off this one.
+  const due = new Map()
+  for (const inv of invoices || []) {
+    if (!isOpenInvoice(inv)) continue
+    const own = allocateInvoiceDue({
+      invoices: [inv],
+      payments: (payments || []).filter((p) => p.invoice_id === inv.id),
+      contractTotal: Number(inv.amount || 0)
+    })
+    due.set(inv.id, own.get(inv.id) ?? 0)
+  }
+  const rows = customerRows(invoices || [], due)
+  // What the client still owes on these invoices, in whole cents.
+  const amount = rows.reduce((s, inv) => s + Math.round(Number(inv.amount_due || 0) * 100), 0) / 100
   const contact = {
     id: client.id,
     name: client.name,
@@ -403,9 +436,23 @@ async function handleClientInvoice(supabase, req, link) {
     payments: payments || [],
     changeOrders: [],
     insurance: null,
-    invoices: invoices || [],
+    invoices: rows,
     photos: []
   })
+}
+
+// Who to ask about a link that was revoked or has expired: the company's
+// name and phone, which the document itself printed, and nothing else.
+async function refusedLinkCompany(supabase, link) {
+  try {
+    const brandUserId = await brandingUserIdFor(supabase, link)
+    const { data: profile } = await supabase.from('profiles').select('company_name, full_name, company_phone').eq('user_id', brandUserId).maybeSingle()
+    const name = profile?.company_name || profile?.full_name || ''
+    if (!name) return undefined
+    return { name, phone: profile?.company_phone || '' }
+  } catch {
+    return undefined
+  }
 }
 
 // Company branding block shared by every document kind. Mirrors what
@@ -445,7 +492,7 @@ async function handleQuote(supabase, req, link) {
     supabase.from('fh_quote_items').select('*').eq('quote_id', link.quote_id).order('sort_order', { ascending: true }),
     supabase
       .from('fh_quote_versions')
-      .select('id, version_number, status, approved_by_name, approved_at, created_at')
+      .select('id, version_number, status, approved_by_name, approved_at, created_at, base_total, snapshot')
       .eq('quote_id', link.quote_id)
       .eq('status', 'approved')
       .order('version_number', { ascending: false })
@@ -463,14 +510,14 @@ async function handleQuote(supabase, req, link) {
   let photos = []
   if (quote.job_id) {
     const [{ data: jobRow }, { data: pay }, { data: cos }, { data: inv }, { data: photoRows }] = await Promise.all([
-      supabase.from('fh_contacts').select('id, stage').eq('id', quote.job_id).match(linkScope(link)).maybeSingle(),
+      supabase.from('fh_contacts').select('id, stage, amount').eq('id', quote.job_id).match(linkScope(link)).maybeSingle(),
       supabase.from('fh_payments').select(PUBLIC_PAYMENT_COLUMNS).eq('contact_id', quote.job_id).order('paid_on', { ascending: false }),
       supabase.from('fh_change_orders').select(PUBLIC_CHANGE_ORDER_COLUMNS).eq('contact_id', quote.job_id).in('status', ['sent', 'approved']).order('sequence_number', { ascending: true }),
       supabase
         .from('fh_invoices')
-        .select('id, contact_id, sequence_number, title, amount, status, issued_at, due_at, description')
+        .select(PUBLIC_INVOICE_COLUMNS)
         .eq('contact_id', quote.job_id)
-        .in('status', ['sent', 'paid', 'overdue'])
+        .neq('status', 'void')
         .order('sequence_number', { ascending: true }),
       supabase
         .from('fh_job_files')
@@ -483,13 +530,26 @@ async function handleQuote(supabase, req, link) {
     job = jobRow || null
     payments = pay || []
     changeOrders = cos || []
-    invoices = inv || []
-    photos = await signPhotos(supabase, photoRows)
+    invoices = customerInvoices({
+      invoices: inv,
+      payments: payments,
+      contractTotal: knownContractTotal({ amount: jobRow?.amount, changeOrders })
+    })
+    photos = await signPhotos(supabase, photoRows, quote.job_id)
   }
 
   const approvedVersion = Array.isArray(versions) && versions.length > 0 ? versions[0] : null
   const company = buildCompany(profile)
   const status = String(quote.status || 'draft').toLowerCase()
+  // An approved quote shows what the customer approved: the approved
+  // version's lines, scope, terms and total. Lines edited afterwards are
+  // the contractor's working copy, not the agreement.
+  const agreed = status === 'approved' && Array.isArray(approvedVersion?.snapshot?.items) ? approvedVersion.snapshot : null
+  const shownItems = agreed
+    ? agreed.items.map((it, i) => ({ id: `${approvedVersion.id}-${i}`, quote_id: quote.id, ...it }))
+    : (items || [])
+  const shownAmount = agreed && approvedVersion.base_total != null ? Number(approvedVersion.base_total) : quote.amount
+  const pick = (field) => (agreed ? agreed[field] : quote[field]) || null
 
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
   const shouldNotify = !link.last_viewed_at || new Date(link.last_viewed_at) < oneHourAgo
@@ -498,19 +558,21 @@ async function handleQuote(supabase, req, link) {
   if (shouldNotify) {
     const { kindLabel, detailLink } = viewedLabelFor(link)
     sideEffects.push(
-      supabase.from('fh_notifications').insert({
-        user_id: link.user_id,
-        org_id: link.org_id || quote.org_id || null,
-        kind: 'public_link_viewed',
-        title: `Customer viewed your ${kindLabel}`,
-        body: who ? `${who}${quote.title ? ` · ${quote.title}` : ''}` : null,
-        link: detailLink
-      }),
-      sendPushToUser(supabase, link.user_id, {
-        title: `Customer is viewing your ${kindLabel} 👀`,
-        body: who ? `${who}${quote.title ? ` · ${quote.title}` : ''}` : `Tap to open the ${kindLabel}`,
-        link: detailLink,
-        tag: `link-viewed-${link.id}`
+      alertLinkRecipients(supabase, {
+        orgId: link.org_id || quote.org_id || null,
+        creatorId: link.user_id,
+        notification: {
+          kind: 'public_link_viewed',
+          title: `Customer viewed your ${kindLabel}`,
+          body: who ? `${who}${quote.title ? ` · ${quote.title}` : ''}` : null,
+          link: detailLink
+        },
+        push: {
+          title: `Customer is viewing your ${kindLabel} 👀`,
+          body: who ? `${who}${quote.title ? ` · ${quote.title}` : ''}` : `Tap to open the ${kindLabel}`,
+          link: detailLink,
+          tag: `link-viewed-${link.id}`
+        }
       })
     )
   }
@@ -527,6 +589,8 @@ async function handleQuote(supabase, req, link) {
     change_order_id: null,
     quote_id: quote.id,
     status,
+    // The version the page posts back with an approval (public-link-approve).
+    updated_at: quote.updated_at || null,
     contact: {
       id: quote.id,
       name: client?.name || null,
@@ -542,15 +606,15 @@ async function handleQuote(supabase, req, link) {
       quote_sent_at: quote.sent_at || null,
       quote_expires_at: quote.expires_at || null,
       created_at: quote.created_at,
-      terms_text: quote.terms_text || null,
-      scope_text: quote.scope_text || null,
-      exclusions_text: quote.exclusions_text || null,
-      amount: quote.amount,
+      terms_text: pick('terms_text'),
+      scope_text: pick('scope_text'),
+      exclusions_text: pick('exclusions_text'),
+      amount: shownAmount,
       approved_by_name: approvedVersion?.approved_by_name || null,
       approved_at: approvedVersion?.approved_at || approvedVersion?.created_at || null
     },
     company,
-    items: items || [],
+    items: shownItems,
     payments,
     changeOrders,
     insurance: null,
@@ -559,10 +623,31 @@ async function handleQuote(supabase, req, link) {
   })
 }
 
-// Signed photo URLs for the public viewer, 24h TTL; a row that fails to
-// sign is left out so one bad row never kills the response.
-async function signPhotos(supabase, photoRows) {
+/**
+ * Whether a job file's storage_path may be signed for a link to `jobId`.
+ * Photos are stored as {user id}/{job id}/{file}; the row's job_id is the
+ * link's job, but the path is whatever the row says, so a row pointing at
+ * another company's folder would come back signed. Only a plain path whose
+ * second segment is this job is signed: no empty, "." or ".." segment and
+ * no encoded or escape characters.
+ */
+export function isJobPhotoPath(path, jobId) {
+  if (typeof path !== 'string' || !jobId) return false
+  const parts = path.split('/')
+  if (parts.length < 3) return false
+  const plain = (p) => p && p !== '.' && p !== '..' && !/[%\\]/.test(p) && ![...p].some((c) => c.charCodeAt(0) < 32)
+  if (!parts.every(plain)) return false
+  return parts[1] === String(jobId)
+}
+
+// Signed photo URLs for the public viewer, 24h TTL: generous enough that
+// an emailed link can be reopened the next day, short enough that revoked
+// photos do not linger. Only paths in the link's job folder are signed
+// (isJobPhotoPath), and a row that fails to sign is left out so one bad
+// row never kills the response.
+async function signPhotos(supabase, photoRows, jobId) {
   if (!Array.isArray(photoRows) || photoRows.length === 0) return []
+  photoRows = photoRows.filter((r) => isJobPhotoPath(r?.storage_path, jobId))
   const paths = photoRows.map((r) => r.storage_path).filter(Boolean)
   if (paths.length === 0) return []
   const { data: signedRes } = await supabase.storage
@@ -588,15 +673,26 @@ async function signPhotos(supabase, photoRows) {
 // returns the shape the public StatementView renders.
 async function handleStatement(supabase, req, link) {
   const brandUserId = await brandingUserIdFor(supabase, link)
-  const [{ data: client }, { data: profile }, { data: jobs }] = await Promise.all([
+  const [{ data: client }, { data: profile }, { data: jobs }, { data: directInvoices }] = await Promise.all([
     supabase.from('fh_clients').select('*').eq('id', link.client_id).match(linkScope(link)).maybeSingle(),
     supabase.from('profiles').select('*').eq('user_id', brandUserId).maybeSingle(),
+    // Billing stages only (src/lib/statement.ts BILLING_STAGES): moved,
+    // lost and quote rows never leave the server, with or without amounts.
     supabase
       .from('fh_contacts')
       .select('id, name, job_title, job_type, stage, amount, address, created_at')
       .eq('client_id', link.client_id)
       .match(linkScope(link))
-      .order('created_at', { ascending: true })
+      .in('stage', ['job', 'invoice', 'closed'])
+      .order('created_at', { ascending: true }),
+    // Invoices billed to the client directly, with no job (D62).
+    supabase
+      .from('fh_invoices')
+      .select(PUBLIC_INVOICE_COLUMNS)
+      .eq('client_id', link.client_id)
+      .is('contact_id', null)
+      .match(linkScope(link))
+      .neq('status', 'void')
   ])
 
   if (!client) {
@@ -605,17 +701,42 @@ async function handleStatement(supabase, req, link) {
 
   const jobRows = Array.isArray(jobs) ? jobs : []
   const jobIds = jobRows.map((j) => j.id)
+  const directIds = (directInvoices || []).map((inv) => inv.id)
 
   let payments = []
   let changeOrders = []
+  let jobInvoices = []
+  let directPayments = []
   if (jobIds.length > 0) {
-    const [{ data: pay }, { data: cos }] = await Promise.all([
+    const [{ data: pay }, { data: cos }, { data: inv }] = await Promise.all([
       supabase.from('fh_payments').select(PUBLIC_PAYMENT_COLUMNS).in('contact_id', jobIds).order('paid_on', { ascending: false }),
-      supabase.from('fh_change_orders').select(PUBLIC_CHANGE_ORDER_COLUMNS).in('contact_id', jobIds).eq('status', 'approved')
+      supabase.from('fh_change_orders').select(PUBLIC_CHANGE_ORDER_COLUMNS).in('contact_id', jobIds).eq('status', 'approved'),
+      supabase.from('fh_invoices').select(PUBLIC_INVOICE_COLUMNS).in('contact_id', jobIds).neq('status', 'void')
     ])
     payments = pay || []
     changeOrders = cos || []
+    jobInvoices = inv || []
   }
+  if (directIds.length > 0) {
+    const { data: pay } = await supabase.from('fh_payments').select(PUBLIC_PAYMENT_COLUMNS).in('invoice_id', directIds).order('paid_on', { ascending: false })
+    directPayments = (pay || []).filter((p) => !p.contact_id)
+  }
+  payments = [...payments, ...directPayments]
+
+  // What each issued invoice still owes, by the allocator Money and the
+  // in app statement use, drafts included in the allocation; only issued
+  // rows go to the page (gatherStatement reads their amount_due).
+  const allInvoices = [...jobInvoices, ...(directInvoices || [])]
+  const contractByJob = new Map(jobRows.map((j) => [
+    j.id,
+    knownContractTotal({ amount: j.amount, changeOrders: changeOrders.filter((co) => co.contact_id === j.id) })
+  ]))
+  const due = amountsDueByInvoice({
+    invoices: allInvoices,
+    payments,
+    contractFor: (id) => contractByJob.get(id) ?? null
+  })
+  const invoices = customerRows(allInvoices, due)
 
   const company = buildCompany(profile)
 
@@ -631,19 +752,21 @@ async function handleStatement(supabase, req, link) {
   if (shouldNotify) {
     const who = client.company_name || client.name || 'A customer'
     sideEffects.push(
-      supabase.from('fh_notifications').insert({
-        user_id: link.user_id,
-        org_id: link.org_id || client.org_id || null,
-        kind: 'public_link_viewed',
-        title: 'Customer viewed your statement',
-        body: who,
-        link: `/clients/${link.client_id}`
-      }),
-      sendPushToUser(supabase, link.user_id, {
-        title: 'Customer is viewing your statement 👀',
-        body: who,
-        link: `/clients/${link.client_id}`,
-        tag: `link-viewed-${link.id}`
+      alertLinkRecipients(supabase, {
+        orgId: link.org_id || client.org_id || null,
+        creatorId: link.user_id,
+        notification: {
+          kind: 'public_link_viewed',
+          title: 'Customer viewed your statement',
+          body: who,
+          link: `/clients/${link.client_id}`
+        },
+        push: {
+          title: 'Customer is viewing your statement 👀',
+          body: who,
+          link: `/clients/${link.client_id}`,
+          tag: `link-viewed-${link.id}`
+        }
       })
     )
   }
@@ -667,7 +790,8 @@ async function handleStatement(supabase, req, link) {
     company,
     jobs: jobRows,
     payments,
-    changeOrders
+    changeOrders,
+    invoices
   })
 }
 

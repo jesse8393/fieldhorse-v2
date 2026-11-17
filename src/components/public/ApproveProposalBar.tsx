@@ -20,6 +20,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import { Button, Chip, Field, formatMoney } from '../fh'
 import { DOC_COLORS } from '../documents/tokens.ts'
+import { money } from '../documents/format.ts'
 import { companyShortName } from '../../lib/quoteMoney.ts'
 import { personFirstName } from '../../lib/quoteView.ts'
 import '../documents/fieldhorse-proposal.css'
@@ -76,7 +77,12 @@ export default function ApproveProposalBar({
   // False when the request changes endpoint would refuse a question (a
   // declined quote, a job already started, a refused link): the capsule
   // then offers none, and an open question form closes.
-  canAsk = true
+  canAsk = true,
+  // What the page showed, posted with the approval so the server records
+  // it only for that document: { expected_total | expected_amount,
+  // expected_updated_at }. A 409 document_changed makes the page read the
+  // link again and says why.
+  expected = null
 }: any) {
   const isCO = variant === 'change_order'
   const endpoint = isCO ? '/api/public-co-approve' : '/api/public-link-approve'
@@ -167,7 +173,8 @@ export default function ApproveProposalBar({
         body: JSON.stringify({
           token,
           signature_name: name.trim(),
-          note: note.trim() || null
+          note: note.trim() || null,
+          ...(expected || {})
         })
       })
       const body = await res.json().catch(() => ({}))
@@ -663,10 +670,9 @@ function FieldhorseCapsule(p: CapsuleProps) {
   )
 }
 
+// The total the customer agrees to, to the cent.
 function moneyFmt(n: any) {
-  return Number(n || 0).toLocaleString(undefined, {
-    style: 'currency', currency: 'USD', maximumFractionDigits: 0
-  })
+  return money(n, { cents: true })
 }
 
 function formatStamp(iso: any) {
@@ -693,7 +699,7 @@ const panelStyle: import('react').CSSProperties = {
 
 const eyebrowStyle: import('react').CSSProperties = {
   fontSize: 12, fontWeight: 700, letterSpacing: 0,
-  color: 'color-mix(in srgb, var(--v3-primary-text) 54%, #141414 46%)', marginBottom: 8
+  color: '#7A5A1F', marginBottom: 8
 }
 
 const headlineStyle: import('react').CSSProperties = {
@@ -740,7 +746,7 @@ const checkboxRowStyle: import('react').CSSProperties = {
 
 const buttonStyle: import('react').CSSProperties = {
   display: 'block', width: '100%',
-  height: 40,
+  minHeight: 44,
   padding: '0 16px',
   borderRadius: 10, border: 'none',
   background: 'linear-gradient(135deg, #C9963A 0%, #C9963A 100%)',
@@ -752,7 +758,7 @@ const buttonStyle: import('react').CSSProperties = {
 }
 
 const secondaryButtonStyle: import('react').CSSProperties = {
-  height: 40,
+  minHeight: 44,
   padding: '0 16px',
   borderRadius: 10,
   border: '1px solid #5C5C5C',
@@ -775,7 +781,7 @@ const errorStyle: import('react').CSSProperties = {
   borderRadius: 10,
   background: 'rgba(192, 57, 43, 0.10)',
   border: '1px solid rgba(192, 57, 43, 0.4)',
-  color: 'color-mix(in srgb, var(--v3-danger-text) 78%, #141414 22%)',
+  color: '#7E2419',
   fontSize: 14, lineHeight: 1.4,
   marginBottom: 12
 }

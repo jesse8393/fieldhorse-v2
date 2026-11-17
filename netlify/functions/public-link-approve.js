@@ -27,13 +27,13 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { clientIp as rateLimitIp, hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
-import { sendPushToUser } from './lib/push.js'
+import { alertLinkRecipients } from './lib/linkAlerts.js'
 import { linkScope } from './lib/linkScope.js'
 import { brandingUserIdFor } from './lib/orgAccess.js'
 import { proposalNumber } from './lib/docNumbers.js'
 import {
-  CLOSED_QUOTE_STATUSES, buildQuoteSnapshot, claimQuoteApproval, loadQuoteForLink,
-  recordQuoteVersion, releaseQuoteClaim, snapshotCompany, snapshotItems
+  CLOSED_QUOTE_STATUSES, buildQuoteSnapshot, claimQuoteApproval, documentChanged, loadQuoteForLink,
+  matchesWhatWasShown, quoteValidityPassed, recordQuoteVersion, releaseQuoteClaim, snapshotCompany, snapshotItems
 } from './lib/quoteApproval.js'
 
 const CLOSED_STAGES = new Set(['lost', 'closed'])
@@ -113,7 +113,7 @@ export default async function handler(req) {
 
   // A link minted for a quote record approves the quote (Task 11).
   if (link.quote_id) {
-    return approveQuote(supabase, req, link, { signatureName, approvalNote })
+    return approveQuote(supabase, req, link, { signatureName, approvalNote, body })
   }
 
   const { data: contact } = await supabase
@@ -126,21 +126,19 @@ export default async function handler(req) {
   if ((contact.proposal_status || 'draft').toLowerCase() === 'approved') {
     return json({ error: 'already_approved', message: 'This proposal has already been approved.' }, 409)
   }
-  // A lost or closed job cannot be signed from an old link.
-  if (CLOSED_STAGES.has(String(contact.stage || '').toLowerCase())) {
-    return json({ error: 'not_approvable', message: 'This proposal is no longer open. Ask your contractor for an updated one.' }, 409)
+  // A lost or closed job cannot be signed from an old link, nor can a
+  // proposal the customer declined or one never sent.
+  if (CLOSED_STAGES.has(String(contact.stage || '').toLowerCase())
+    || ['rejected', 'draft'].includes(String(contact.proposal_status || '').toLowerCase())) {
+    return json({ error: 'not_approvable', message: 'This proposal is not open for approval. Ask your contractor for an updated one.' }, 409)
   }
   // The quote's own validity date must gate approval too — links are
   // minted with expires_at NULL, so without this check a customer could
   // open an old text-message link months later and legally-bind stale
   // pricing the contractor considered dead ("Valid until Aug 4" printed
   // right on the document they'd be approving).
-  const quoteExpiry = contact.quote_expires_at ? new Date(contact.quote_expires_at) : null
-  if (quoteExpiry && !Number.isNaN(quoteExpiry.getTime())) {
-    const expiryEnd = new Date(quoteExpiry.getTime() + 24 * 60 * 60 * 1000) // valid through the stated day
-    if (expiryEnd < new Date()) {
-      return json({ error: 'quote_expired', message: 'This proposal has expired. Ask your contractor for updated pricing.' }, 410)
-    }
+  if (quoteValidityPassed(contact.quote_expires_at)) {
+    return json({ error: 'quote_expired', message: 'This proposal has expired. Ask your contractor for updated pricing.' }, 410)
   }
   if ((contact.proposal_status || '').toLowerCase() === 'expired') {
     return json({ error: 'quote_expired', message: 'This proposal has expired. Ask your contractor for updated pricing.' }, 410)
@@ -209,10 +207,17 @@ export default async function handler(req) {
     }
   })
 
+  // The customer approves the total the page showed them, or nothing. A
+  // job is touched by much that is not the proposal, so only the total
+  // (the lines' base total) is compared here.
+  if (!matchesWhatWasShown({ total: baseTotal, updatedAt: null }, body)) {
+    return json(documentChanged('proposal'), 409)
+  }
+
   const snapshot = {
     // The number printed on the proposal (src/components/documents/numbers.ts),
     // not a separate Q-XXXXXXXX code the customer never saw.
-    quote_number: proposalNumber(company.name, contact.id, contact.quote_sent_at || contact.created_at),
+    quote_number: proposalNumber(company.name, contact.id, contact.created_at || contact.quote_sent_at),
     snapshot_taken_at: new Date().toISOString(),
     company,
     contact: {
@@ -321,23 +326,22 @@ export default async function handler(req) {
     console.error('[public-link-approve] contact update failed', upErr)
   }
 
-  // 8. Notification to the contractor's bell + lock screen.
-  try {
-    await supabase.from('fh_notifications').insert({
-      user_id: link.user_id,
+  // 8. Bell and lock screen for the company (lib/linkAlerts.js).
+  await alertLinkRecipients(supabase, {
+    orgId: link.org_id || contact.org_id || null,
+    creatorId: link.user_id,
+    notification: {
       kind: 'quote_approved',
       title: `Quote approved · ${moneyFmt(baseTotal)}`,
       body: `${signatureName} signed${contact.name ? ` for ${contact.name}` : ''}`,
       link: `/jobs/${contact.id}`
-    })
-  } catch (e) {
-    console.warn('[public-link-approve] notification insert failed', e)
-  }
-  await sendPushToUser(supabase, link.user_id, {
-    title: `Quote approved · ${moneyFmt(baseTotal)} 🎉`,
-    body: `${signatureName} signed${contact.name ? ` for ${contact.name}` : ''}`,
-    link: `/jobs/${contact.id}`,
-    tag: `quote-approved-${contact.id}`
+    },
+    push: {
+      title: `Quote approved · ${moneyFmt(baseTotal)} 🎉`,
+      body: `${signatureName} signed${contact.name ? ` for ${contact.name}` : ''}`,
+      link: `/jobs/${contact.id}`,
+      tag: `quote-approved-${contact.id}`
+    }
   })
 
   return json({
@@ -353,22 +357,19 @@ export default async function handler(req) {
 // valid until date or marked expired (410), no lines (400). The approval
 // is claimed on fh_quotes.status first, the version is recorded by quote
 // id, and fh_quotes.approved_version_id points at it.
-async function approveQuote(supabase, req, link, { signatureName, approvalNote }) {
+async function approveQuote(supabase, req, link, { signatureName, approvalNote, body }) {
   const { quote, client } = await loadQuoteForLink(supabase, link)
   if (!quote) return json({ error: 'gone' }, 404)
   const status = String(quote.status || 'draft').toLowerCase()
   if (status === 'approved') {
     return json({ error: 'already_approved', message: 'This proposal has already been approved.' }, 409)
   }
-  if (CLOSED_QUOTE_STATUSES.has(status)) {
-    return json({ error: 'not_approvable', message: 'This proposal is no longer open. Ask your contractor for an updated one.' }, 409)
+  // Lost or declined, or a draft never sent: no approval from a link.
+  if (CLOSED_QUOTE_STATUSES.has(status) || status === 'draft') {
+    return json({ error: 'not_approvable', message: 'This proposal is not open for approval. Ask your contractor for an updated one.' }, 409)
   }
-  const quoteExpiry = quote.expires_at ? new Date(quote.expires_at) : null
-  if (quoteExpiry && !Number.isNaN(quoteExpiry.getTime())) {
-    const expiryEnd = new Date(quoteExpiry.getTime() + 24 * 60 * 60 * 1000)
-    if (expiryEnd < new Date()) {
-      return json({ error: 'quote_expired', message: 'This proposal has expired. Ask your contractor for updated pricing.' }, 410)
-    }
+  if (quoteValidityPassed(quote.expires_at)) {
+    return json({ error: 'quote_expired', message: 'This proposal has expired. Ask your contractor for updated pricing.' }, 410)
   }
   if (status === 'expired') {
     return json({ error: 'quote_expired', message: 'This proposal has expired. Ask your contractor for updated pricing.' }, 410)
@@ -386,19 +387,28 @@ async function approveQuote(supabase, req, link, { signatureName, approvalNote }
 
   const company = snapshotCompany(profile)
   const snap = snapshotItems(itemRows)
+  // The customer approves the quote the page showed them, or nothing.
+  if (!matchesWhatWasShown({ total: snap.baseTotal, updatedAt: quote.updated_at ?? null }, body)) {
+    return json(documentChanged('proposal'), 409)
+  }
   const snapshot = buildQuoteSnapshot({
     quote, client, company, snap,
     takenAt: new Date().toISOString(),
     extra: { approval_origin: 'public_link' }
   })
 
-  const claim = await claimQuoteApproval(supabase, quote)
+  const claim = await claimQuoteApproval(supabase, quote, { sameVersion: true })
   if (claim.error) {
     console.error('[public-link-approve] quote approval claim failed', claim.error)
     return json({ error: 'approve_failed', message: 'We could not record your approval. Please try again.' }, 500)
   }
   if (!claim.claimed) {
-    return json({ error: 'already_approved', message: 'This proposal has already been approved.' }, 409)
+    // Approved meanwhile, or edited between the read and the claim.
+    const { data: now } = await supabase.from('fh_quotes').select('status').eq('id', quote.id).maybeSingle()
+    if (String(now?.status || '').toLowerCase() === 'approved') {
+      return json({ error: 'already_approved', message: 'This proposal has already been approved.' }, 409)
+    }
+    return json(documentChanged('proposal'), 409)
   }
 
   const recorded = await recordQuoteVersion(supabase, {
@@ -425,23 +435,21 @@ async function approveQuote(supabase, req, link, { signatureName, approvalNote }
   const newRow = recorded.row
 
   const who = client?.name || null
-  try {
-    await supabase.from('fh_notifications').insert({
-      user_id: link.user_id,
-      org_id: link.org_id || quote.org_id || null,
+  await alertLinkRecipients(supabase, {
+    orgId: link.org_id || quote.org_id || null,
+    creatorId: link.user_id,
+    notification: {
       kind: 'quote_approved',
       title: `Quote approved · ${moneyFmt(snap.baseTotal)}`,
       body: `${signatureName} signed${who ? ` for ${who}` : ''}`,
       link: `/quotes/${quote.id}`
-    })
-  } catch (e) {
-    console.warn('[public-link-approve] notification insert failed', e)
-  }
-  await sendPushToUser(supabase, link.user_id, {
-    title: `Quote approved · ${moneyFmt(snap.baseTotal)} 🎉`,
-    body: `${signatureName} signed${who ? ` for ${who}` : ''}`,
-    link: `/quotes/${quote.id}`,
-    tag: `quote-approved-${quote.id}`
+    },
+    push: {
+      title: `Quote approved · ${moneyFmt(snap.baseTotal)} 🎉`,
+      body: `${signatureName} signed${who ? ` for ${who}` : ''}`,
+      link: `/quotes/${quote.id}`,
+      tag: `quote-approved-${quote.id}`
+    }
   })
 
   return json({

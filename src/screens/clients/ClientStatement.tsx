@@ -3,9 +3,13 @@
 // Who owes you opened: every open invoice across the customer's
 // properties rolled into one document, previewed per property, then
 // emailed, downloaded or shared as a link. The figures come from the same
-// gatherStatement the PDF and the email use, to the cent.
+// gatherStatement the PDF, the email and the customer link use, to the
+// cent: Total due is what is owed on issued invoices (invoices billed to
+// the client directly included), and contract money not yet invoiced is
+// listed apart, outside Total due.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
 import { Button, IconButton, SkeletonRows } from '../../components/fh'
@@ -14,7 +18,7 @@ import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useProfile } from '../../contexts/ProfileContext.tsx'
 import { useClientDetail } from '../../lib/queries.ts'
 import { companyFromProfile } from '../../lib/invoices.ts'
-import { gatherStatement, downloadStatement, sendStatementEmail } from '../../lib/statement.ts'
+import { gatherStatement, downloadStatement, sendStatementEmail, fetchStatementMoney } from '../../lib/statement.ts'
 import { mintPublicLink, listClientStatementLinks, buildPublicUrl } from '../../lib/publicLink.ts'
 import { toast, toastSuccess, toastInfo } from '../../lib/toast.ts'
 import { moneyExact } from '../../lib/format.ts'
@@ -38,11 +42,24 @@ export default function ClientStatement() {
 
   useEffect(() => { titleRef.current?.focus({ preventScroll: true }) }, [])
 
-  // Pure rollup of (contract + approved change orders) less paid, per property.
+  // The invoices and the payments with the invoice each one paid, which
+  // the client bundle does not carry.
+  const jobIds = useMemo(() => (bundle?.jobs ?? []).map((j) => j.id), [bundle])
+  const moneyQuery = useQuery({
+    queryKey: ['clientStatementMoney', id, jobIds],
+    queryFn: () => fetchStatementMoney(id as string, jobIds),
+    enabled: !!id && !!client
+  })
   const data = useMemo(
-    () => gatherStatement((bundle?.jobs ?? []) as any, (bundle?.payments ?? []) as any, (bundle?.changeOrders ?? []) as any),
-    [bundle]
+    () => gatherStatement(
+      (bundle?.jobs ?? []) as any,
+      moneyQuery.data?.payments ?? [],
+      (bundle?.changeOrders ?? []) as any,
+      { invoices: moneyQuery.data?.invoices ?? [] }
+    ),
+    [bundle, moneyQuery.data]
   )
+  const moneyReady = !!moneyQuery.data
   const company = useMemo(() => companyFromProfile(profile), [profile])
   const recipientEmail = (client?.email || '').trim()
   const title = client?.company_name || client?.name || 'client'
@@ -136,13 +153,30 @@ export default function ClientStatement() {
         </div>
       )}
 
-      {client && (
+      {client && !moneyReady && !moneyQuery.isError && (
+        <div className="fhcs-body"><SkeletonRows rows={3} label="Loading the statement" /></div>
+      )}
+
+      {client && moneyQuery.isError && (
+        <div className="fhcs-body">
+          <DataErrorState
+            title="Couldn't load the invoices"
+            message="Check your connection and try again. Nothing was changed."
+            actionLabel="Try again"
+            onRetry={() => { void moneyQuery.refetch() }}
+          />
+        </div>
+      )}
+
+      {client && moneyReady && (
         <div className="fhcs-body">
           {data.lines.length === 0 && (
             <p className="fhcs-empty">
-              Nothing outstanding for this client right now. Statements roll up the balance across every property they owe on.
+              Nothing outstanding for this client right now. Statements roll up what is owed on sent invoices across every property.
             </p>
           )}
+
+          {data.lines.length === 0 && data.notInvoiced.length > 0 && <NotInvoiced data={data} />}
 
           {data.lines.length > 0 && (
             <>
@@ -161,6 +195,8 @@ export default function ClientStatement() {
                 <span className="fhcs-total__label">Total due</span>
                 <span className="fhcs-total__amount">{money(data.totalDue)}</span>
               </div>
+
+              {data.notInvoiced.length > 0 && <NotInvoiced data={data} />}
 
               <div className="fhcs-actions">
                 <Button
@@ -185,5 +221,23 @@ export default function ClientStatement() {
         </div>
       )}
     </div>
+  )
+}
+
+// Contract money nobody has invoiced yet: shown so the contractor sees it,
+// never part of Total due.
+function NotInvoiced({ data }: { data: ReturnType<typeof gatherStatement> }) {
+  return (
+    <ul className="fhcs-lines" aria-label="Not yet invoiced">
+        {data.notInvoiced.map((l, i) => (
+          <li key={i} className="fhcs-line">
+            <div className="fhcs-line__text">
+              <span className="fhcs-line__property">{l.property}</span>
+              <span className="fhcs-line__paid">Not invoiced yet, not in the total</span>
+            </div>
+            <span className="fhcs-line__balance">{money(l.balance)}</span>
+          </li>
+        ))}
+    </ul>
   )
 }
