@@ -1732,3 +1732,33 @@ test('on the classic page an expired, lost, declined or unsent quote shows no ap
   expect(spies.approve).toHaveLength(0)
 })
 
+
+/* ---- A failed read is not a gone link (PT-15) ---- */
+
+test('a failed read says so and offers Try again, which loads the document', async ({ page, context }) => {
+  const spies = await mockPortal(context, proposalPayload())
+  spies.setLinkFailure({ status: 503, body: { ok: false, error: 'read_failed', message: 'We could not load this document just now. Please try again.' } })
+  await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByText('We could not load this document just now. Please try again.')).toBeVisible()
+  await expect(page.getByText('This link is no longer available.')).toHaveCount(0)
+
+  spies.setLinkFailure(null)
+  await page.getByRole('button', { name: 'Try again' }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+})
+
+test('a page that gets no answer at all offers Try again too', async ({ page, context }) => {
+  const spies = await mockPortal(context, proposalPayload())
+  spies.setLinkFailure('abort')
+  await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible()
+})
+
+test('a revoked link names the contractor and offers to call them', async ({ page, context }) => {
+  const spies = await mockPortal(context, proposalPayload())
+  spies.setLinkFailure({ status: 404, body: { ok: false, error: 'revoked', message: 'This link has been revoked by the sender.', company: { name: 'Parker Construction', phone: '615 555 0100' } } })
+  await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByText('This link has been revoked by the sender.')).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Call Parker Construction' })).toHaveAttribute('href', 'tel:6155550100')
+  await expect(page.getByRole('button', { name: 'Try again' })).toHaveCount(0)
+})

@@ -429,6 +429,43 @@ describe('an approved quote shows what the customer approved (M-03, link half)',
   })
 })
 
+describe('a refused or failed read says so (PT-15)', () => {
+  it('a revoked or expired link names the contractor and their phone, and nothing else', async () => {
+    for (const over of [{ revoked_at: '2026-11-01T00:00:00.000Z' }, { expires_at: '2026-01-01T00:00:00.000Z' }]) {
+      seedDb(baseTables({
+        profiles: [{ user_id: OWNER, company_name: 'Parker Concrete', company_phone: '615 555 0100', company_email: 'office@parker.example', logo_url: 'https://img.example/logo.png', payment_link: 'https://pay.example' }],
+        fh_public_links: [link({ token: 'gone', kind: 'proposal', contact_id: 'job-1', ...over })],
+        fh_contacts: [job()]
+      }))
+      const { status, body } = await getLink('gone')
+      expect(status).toBe(404)
+      expect(body.company).toEqual({ name: 'Parker Concrete', phone: '615 555 0100' })
+      expect(JSON.stringify(body)).not.toContain('Dana')
+      expect(JSON.stringify(body)).not.toContain('pay.example')
+    }
+  })
+
+  it('an unknown token says nothing about any company', async () => {
+    seedDb(baseTables())
+    const { status, body } = await getLink('nope')
+    expect(status).toBe(404)
+    expect(body.company).toBeUndefined()
+  })
+
+  it('a database error is a failed read the page can retry, not a gone link', async () => {
+    const db = seedDb(baseTables())
+    const from = db.from
+    ;(db as any).from = (table: string) => {
+      if (table !== 'fh_public_links') return from(table)
+      const q: any = { select: () => q, eq: () => q, maybeSingle: async () => ({ data: null, error: { message: 'connection reset' } }) }
+      return q
+    }
+    const { status, body } = await getLink('any')
+    expect(status).toBe(503)
+    expect(body.error).toBe('read_failed')
+  })
+})
+
 describe('public-link function audit helpers', () => {
   it('prefers the first forwarded client IP', () => {
     const req = new Request('https://fieldhorse.test/api/public-link?token=abc', {

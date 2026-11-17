@@ -177,14 +177,19 @@ export default async function handler(req) {
     .select('*')
     .eq('token', token)
     .maybeSingle()
-  if (linkErr || !link) {
+  if (linkErr) {
+    // A failed read is not a gone link: the page offers Try again.
+    console.error('[public-link] link lookup failed', linkErr)
+    return json({ error: 'read_failed', message: 'We could not load this document just now. Please try again.' }, 503)
+  }
+  if (!link) {
     return json({ error: 'not_found', message: 'This link is no longer available.' }, 404)
   }
   if (link.revoked_at) {
-    return json({ error: 'revoked', message: 'This link has been revoked by the sender.' }, 404)
+    return json({ error: 'revoked', message: 'This link has been revoked by the sender.', company: await refusedLinkCompany(supabase, link) }, 404)
   }
   if (link.expires_at && new Date(link.expires_at) < new Date()) {
-    return json({ error: 'expired', message: 'This link has expired.' }, 404)
+    return json({ error: 'expired', message: 'This link has expired.', company: await refusedLinkCompany(supabase, link) }, 404)
   }
 
   // Statement links are client-scoped (every open job for one client)
@@ -434,6 +439,20 @@ async function handleClientInvoice(supabase, req, link) {
     invoices: rows,
     photos: []
   })
+}
+
+// Who to ask about a link that was revoked or has expired: the company's
+// name and phone, which the document itself printed, and nothing else.
+async function refusedLinkCompany(supabase, link) {
+  try {
+    const brandUserId = await brandingUserIdFor(supabase, link)
+    const { data: profile } = await supabase.from('profiles').select('company_name, full_name, company_phone').eq('user_id', brandUserId).maybeSingle()
+    const name = profile?.company_name || profile?.full_name || ''
+    if (!name) return undefined
+    return { name, phone: profile?.company_phone || '' }
+  } catch {
+    return undefined
+  }
 }
 
 // Company branding block shared by every document kind. Mirrors what

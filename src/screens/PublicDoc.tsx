@@ -40,7 +40,19 @@ import { gatherStatement } from '../lib/statement.ts'
 import { publicInvoiceView } from '../components/public/invoiceView.ts'
 import { money } from '../components/documents/format.ts'
 
-type PublicDocState = { loading: boolean; data: PublicDocPayload | null; error: string | null }
+// `error` is what the customer reads when there is no document to show;
+// `retry` is set when the read failed (no answer, a server error) rather
+// than the link being refused, so the page offers Try again; `contractor`
+// is who to call about a refused link, when the server names them.
+type PublicDocState = {
+  loading: boolean
+  data: PublicDocPayload | null
+  error: string | null
+  retry?: boolean
+  contractor?: { name: string; phone: string } | null
+}
+
+const READ_FAILED = 'We could not load this document just now. Please try again.'
 
 // The Fieldhorse theme draws its own approve capsule and fills the page;
 // every other template keeps the classic page and bar.
@@ -132,14 +144,24 @@ export default function PublicDoc() {
   // approval never replaces the thank you with an error.
   const load = useCallback(async (): Promise<LinkRead> => {
     if (!token) return { ok: false, refused: null }
-    const keepOrFail = (message: string) => {
-      setState((prev) => (prev.data ? prev : { loading: false, data: null, error: message }))
+    const keepOrFail = (message: string, more: Pick<PublicDocState, 'retry' | 'contractor'> = {}) => {
+      setState((prev) => (prev.data ? prev : { loading: false, data: null, error: message, ...more }))
     }
     try {
       const res = await fetch(`/api/public-link?token=${encodeURIComponent(token)}`)
       const body = await res.json().catch(() => ({}))
       if (!res.ok || !body?.ok) {
-        keepOrFail(body?.message || 'This link is no longer available.')
+        const isRefusal = res.status === 404 || res.status === 410
+        const company = body?.company
+        keepOrFail(
+          isRefusal ? (body?.message || 'This link is no longer available.') : (body?.message || READ_FAILED),
+          {
+            retry: !isRefusal,
+            contractor: isRefusal && typeof company?.name === 'string' && company.name
+              ? { name: company.name, phone: typeof company.phone === 'string' ? company.phone : '' }
+              : null
+          }
+        )
         const refused = res.status === 404 || res.status === 410
           ? {
               error: typeof body?.error === 'string' ? body.error : null,
@@ -157,7 +179,7 @@ export default function PublicDoc() {
       document.title = `${co}${proj ? `, ${proj}` : ''}`
       return { ok: true, payload: body as PublicDocPayload }
     } catch {
-      keepOrFail('Could not load this document. Check the link and try again.')
+      keepOrFail(READ_FAILED, { retry: true })
       return { ok: false, refused: null }
     }
   }, [token])
@@ -207,6 +229,10 @@ export default function PublicDoc() {
   }, [load])
 
   const { loading, data, error } = state
+  const retryRead = () => {
+    setState({ loading: true, data: null, error: null })
+    void load()
+  }
   const proposalStatus = data ? portalStatus(data) : ''
 
   if (!loading && data && isFieldhorse(data)) {
@@ -260,7 +286,9 @@ export default function PublicDoc() {
       }}
     >
       {loading && <Loading />}
-      {!loading && error && <ErrorState message={error} />}
+      {!loading && error && (
+        <ErrorState message={error} onRetry={state.retry ? retryRead : undefined} contractor={state.contractor} />
+      )}
       {!loading && data && data.kind === 'proposal' && (
         <>
           <ProposalView data={data} />
@@ -582,7 +610,12 @@ function Loading() {
   )
 }
 
-function ErrorState({ message }: any) {
+function ErrorState({ message, onRetry, contractor }: {
+  message: string
+  onRetry?: () => void
+  contractor?: { name: string; phone: string } | null
+}) {
+  const tel = String(contractor?.phone || '').replace(/[^0-9+]/g, '')
   return (
     <div
       style={{
@@ -596,11 +629,34 @@ function ErrorState({ message }: any) {
         fontSize: 12, fontWeight: 700, letterSpacing: 0,
         color: 'color-mix(in srgb, var(--v3-primary-text) 54%, #141414 46%)', marginBottom: 10
       }}>
-        Unavailable
+        {onRetry ? 'Could not load' : 'Unavailable'}
       </div>
       <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, color: '#141414' }}>
         {message}
       </p>
+      {contractor && (
+        <p style={{ margin: '12px 0 0', fontSize: 14, lineHeight: 1.5, color: '#141414' }}>
+          Questions? Ask {contractor.name}.
+        </p>
+      )}
+      {contractor && tel && (
+        <a href={`tel:${tel}`} style={{ display: 'inline-block', marginTop: 8, minHeight: 44, lineHeight: '44px', fontSize: 14, fontWeight: 700, color: '#141414' }}>
+          Call {contractor.name}
+        </a>
+      )}
+      {onRetry && (
+        <button
+          type="button"
+          onClick={onRetry}
+          style={{
+            marginTop: 16, minHeight: 44, padding: '0 24px', borderRadius: 10,
+            border: '1px solid #141414', background: '#FFFFFF', color: '#141414',
+            fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 700, cursor: 'pointer'
+          }}
+        >
+          Try again
+        </button>
+      )}
     </div>
   )
 }
