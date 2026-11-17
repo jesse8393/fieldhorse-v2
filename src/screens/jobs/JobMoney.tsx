@@ -17,7 +17,7 @@ import { useInvoiceDetail, useInvalidateInvoiceDetail } from '../../lib/queries.
 import { reviewInvoice } from '../../lib/invoiceReview.js'
 import { billTo, companyFromProfile, fetchInvoicesForContact, createInvoice, invoiceAmountDue, invoiceDescription, sendInvoiceEmail } from '../../lib/invoices.ts'
 import { useDocumentProfile } from '../../lib/companyBranding.ts'
-import { sendKey, startInvoiceSend, startSend, useSendInFlight } from '../../lib/invoiceSends.ts'
+import { endSendIntent, sendIntent, sendKey, startInvoiceSend, startSend, useSendInFlight } from '../../lib/invoiceSends.ts'
 import { pickBalanceInvoice } from '../../lib/invoiceSettlement.ts'
 import { moneyExact } from '../../lib/format.ts'
 import { deletePayment } from '../../lib/stages.ts'
@@ -373,7 +373,14 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
     if (plan.invoice) {
       invoice = plan.invoice
     } else {
+      // The new invoice's id is made once per send and kept app wide until
+      // the row is known to exist. A retry after a lost answer writes the
+      // same id, so it finds the first row (createInvoice reads it back)
+      // instead of billing the balance a second time.
+      const balanceKey = sendKey.jobBalance(contact.id)
+      const intent = sendIntent(balanceKey)
       const { data: created, error: createErr } = await createInvoice({
+        id: intent.id,
         contact,
         clientId: contact.client_id,
         userId: user!.id,
@@ -382,6 +389,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
         due_at: new Date(Date.now() + 14 * 86400000).toISOString()
       })
       if (createErr || !created) throw new Error(createErr?.message || "Couldn't create the invoice")
+      endSendIntent(balanceKey, intent)
       invoice = created
     }
     const wasDraft = String(invoice.status || '').toLowerCase() === 'draft'

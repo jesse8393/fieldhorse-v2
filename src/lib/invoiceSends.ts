@@ -14,8 +14,14 @@
 // (useSendInFlight, useInvoicesSending). Invoice sheets also listen for an
 // invoice email that went out (onInvoiceSent) to close, whichever screen
 // started it.
+//
+// A send that did not go out keeps its intent here (sendIntent): an id made
+// once and kept from the first try to every retry, until the send goes out.
+// A record the send creates is written under that id, so a retry after a
+// lost answer finds the first row instead of adding a second.
 
 import { useSyncExternalStore } from 'react'
+import { createUuid } from './uuid.ts'
 
 /** The key of each kind of send. One send per key goes out at a time. */
 export const sendKey = {
@@ -67,19 +73,49 @@ export function subscribeSends(listener: () => void): () => void {
  * called with whether it went out. Returns null, and changes nothing, when
  * a send with this key is already going out: the caller sends nothing
  * then. It is read and set at once, so two taps in one frame start one
- * send. Ending twice is harmless and never ends a later send of the same key.
+ * send. Ending twice is harmless and never ends a later send of the same
+ * key. A send that went out ends its intent; one that did not keeps it.
  */
 export function startSend(key: string): ((sent: boolean) => void) | null {
   if (inFlight.has(key)) return null
   publish(new Set(inFlight).add(key))
   let over = false
-  return () => {
+  return (sent) => {
     if (over) return
     over = true
+    if (sent) intents.delete(key)
     const next = new Set(inFlight)
     next.delete(key)
     publish(next)
   }
+}
+
+/** What one send keeps from its first try to every retry. */
+export type SendIntent = {
+  /** Made once per intent. */
+  readonly id: string
+  /** What the document was when the intent began. */
+  readonly version: string
+}
+
+const intents = new Map<string, SendIntent>()
+
+/**
+ * The intent of the send with this key: the one an earlier try left, when
+ * that try did not go out and the document is still the same version, else
+ * a new one with a new id.
+ */
+export function sendIntent(key: string, version = ''): SendIntent {
+  const kept = intents.get(key)
+  if (kept && kept.version === version) return kept
+  const fresh: SendIntent = { id: createUuid(), version }
+  intents.set(key, fresh)
+  return fresh
+}
+
+/** Forgets the intent once what it was kept for is done; never a newer one. */
+export function endSendIntent(key: string, intent: SendIntent) {
+  if (intents.get(key) === intent) intents.delete(key)
 }
 
 /** Whether the send with this key is going out, app wide; the screen redraws when that changes. */

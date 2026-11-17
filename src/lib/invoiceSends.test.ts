@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { invoicesSending, onInvoiceSent, sendKey, sendsInFlight, startInvoiceSend, startSend, subscribeInvoiceSends } from './invoiceSends.ts'
+import { endSendIntent, invoicesSending, onInvoiceSent, sendIntent, sendKey, sendsInFlight, startInvoiceSend, startSend, subscribeInvoiceSends } from './invoiceSends.ts'
 
 // The invoices whose email is going out live in one place for the whole
 // app, so a Money screen opened again while a reminder is still going out
@@ -149,5 +149,43 @@ describe('document sends in flight', () => {
       sendKey.invoice('a'), sendKey.jobBalance('b'), sendKey.quote('c'), sendKey.quoteSignature('c'),
       sendKey.statement('d'), sendKey.certificate('e'), sendKey.changeOrderSignature('f')
     ]).toEqual(['invoice:a', 'job-balance:b', 'quote:c', 'quote-signature:c', 'statement:d', 'certificate:e', 'co-signature:f'])
+  })
+})
+
+// A send that did not go out keeps one id from its first try to every
+// retry, so a record it creates, or the email it asks for, is the same one
+// when the answer was lost (double-tap-1).
+describe('send intents', () => {
+  it('keeps one id across tries until the send goes out', () => {
+    const key = sendKey.jobBalance('job-intent')
+    const first = sendIntent(key)
+    expect(first.id).toMatch(/^[0-9a-f-]{36}$/)
+    // A try that did not go out keeps the intent.
+    startSend(key)!(false)
+    expect(sendIntent(key)).toBe(first)
+    // One that went out ends it: the next send is a new one.
+    startSend(key)!(true)
+    const next = sendIntent(key)
+    expect(next.id).not.toBe(first.id)
+    endSendIntent(key, next)
+  })
+
+  it('starts a new intent when the document changed', () => {
+    const key = sendKey.quote('q-intent')
+    const v1 = sendIntent(key, 'v1')
+    expect(sendIntent(key, 'v1')).toBe(v1)
+    const v2 = sendIntent(key, 'v2')
+    expect(v2.id).not.toBe(v1.id)
+    endSendIntent(key, v2)
+  })
+
+  it('forgets only the intent it was given', () => {
+    const key = sendKey.jobBalance('job-stale')
+    const old = sendIntent(key, 'a')
+    const current = sendIntent(key, 'b')
+    endSendIntent(key, old)
+    expect(sendIntent(key, 'b')).toBe(current)
+    endSendIntent(key, current)
+    expect(sendIntent(key, 'b')).not.toBe(current)
   })
 })

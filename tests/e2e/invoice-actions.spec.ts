@@ -885,3 +885,71 @@ test.describe('an invoice email going out is busy on every screen', () => {
     expect(disabled, 'the draw shows its email going out').toBe(true)
   })
 })
+
+// Email on a job with nothing billed makes a Balance due invoice for the
+// whole balance and emails it. On a weak signal, leaving the tab and coming
+// back freed Email while the new invoice was still saving, and a second tap
+// made a second Balance due for the same $33,100. The send is now busy app
+// wide, and the new invoice's id is made once per send, so a retry after a
+// lost answer finds the first row instead of adding another.
+test.describe('Email on a job with nothing billed makes one Balance due', () => {
+  const unbilled = { fh_contacts: [{ ...shedJob(), client_id: 'cl-1' }], fh_invoices: [], fh_payments: [], fh_change_orders: [] }
+  const created = (body: Record<string, unknown>, n: number) => ({ id: `inv-new-${n}`, org_id: 'org-1', sequence_number: n, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), issued_at: null, ...body })
+
+  async function emailButton(page: Page) {
+    const email = page.locator('.fh-job-money__actions button').first()
+    await expect(email).toBeEnabled({ timeout: 30_000 })
+    return email
+  }
+
+  test('leaving and coming back while it saves does not make a second invoice', async ({ page, context }) => {
+    test.setTimeout(90_000)
+    await signIn(context, { tables: unbilled })
+    await context.route('**/storage/v1/object/**', (route) => route.fulfill({ status: 200, json: { Key: 'job-files/qa.pdf' } }))
+    const inserts = postsTo(context, '/rest/v1/fh_invoices')
+    const sends = postsTo(context, '/api/send-invoice')
+    // A weak signal: the new invoice takes 4 seconds to save.
+    await holdPosts(context, '**/rest/v1/fh_invoices*', 4000, (n, request) => ({ status: 201, json: created(request.postDataJSON(), n) }))
+    await context.route('**/api/send-invoice', (route) => route.fulfill({ status: 200, json: { ok: true } }))
+    await page.goto('/jobs/c-job1?tab=financials', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+    await (await emailButton(page)).click()
+    await expect.poll(() => inserts.length, { timeout: 20_000 }).toBe(1)
+    await goInApp(page, '/jobs/c-job1?tab=overview')
+    await page.waitForTimeout(600)
+    await goInApp(page, '/jobs/c-job1?tab=financials')
+    const again = page.locator('.fh-job-money__actions button').first()
+    await expect(again).toBeVisible({ timeout: 30_000 })
+    const busy = await again.isDisabled()
+    await again.click({ force: true })
+    await expect.poll(() => sends.length, { timeout: 20_000 }).toBe(1)
+    await page.waitForTimeout(1500)
+    expect(inserts.map((r) => `${r.postDataJSON()?.title} $${r.postDataJSON()?.amount}`), 'one balance, one invoice').toEqual(['Balance due $33100'])
+    expect(sends.length, 'one invoice, one email').toBe(1)
+    expect(busy, 'Email shows the send going out').toBe(true)
+  })
+
+  test('a retry after the save lost its answer sends the same invoice id', async ({ page, context }) => {
+    test.setTimeout(90_000)
+    await signIn(context, { tables: unbilled })
+    await context.route('**/storage/v1/object/**', (route) => route.fulfill({ status: 200, json: { Key: 'job-files/qa.pdf' } }))
+    const ids: string[] = []
+    await context.route('**/rest/v1/fh_invoices*', async (route) => {
+      if (route.request().method() !== 'POST') return route.fallback()
+      const body = route.request().postDataJSON()
+      ids.push(body.id)
+      // The first save's answer never arrives.
+      if (ids.length === 1) return route.abort('failed')
+      return route.fulfill({ status: 201, json: created(body, ids.length) })
+    })
+    const sends = postsTo(context, '/api/send-invoice')
+    await context.route('**/api/send-invoice', (route) => route.fulfill({ status: 200, json: { ok: true } }))
+    await page.goto('/jobs/c-job1?tab=financials', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+    await (await emailButton(page)).click()
+    await expect(page.getByText("Couldn't send invoice", { exact: true })).toBeVisible({ timeout: 20_000 })
+    await (await emailButton(page)).click()
+    await expect.poll(() => sends.length, { timeout: 20_000 }).toBe(1)
+    expect(ids).toHaveLength(2)
+    expect(ids[0], 'the new invoice has a client made id').toMatch(/^[0-9a-f-]{36}$/)
+    expect(ids[1], 'the retry is the same invoice').toBe(ids[0])
+  })
+})
