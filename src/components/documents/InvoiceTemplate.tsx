@@ -28,7 +28,7 @@ import { parseDateOnly } from '../../lib/dates.ts'
 import { invoiceNumber, invoiceNumberFromSequence } from './numbers.ts'
 
 const DEFAULT_PAYMENT_COPY = 'Please remit payment by the due date above. Payments are applied to the project balance.'
-const DEFAULT_DISCLAIMER = 'Pricing covers labor, material, standard equipment, placement, finishing, and cleanup for the scope as billed. Hidden conditions, field changes, or scope deviations may require a separate change order. Past due balances may accrue at 1.5% per month.'
+const DEFAULT_DISCLAIMER = 'Pricing covers labor, material, standard equipment, placement, finishing, and cleanup for the scope as billed. Hidden conditions, field changes, or scope deviations may require a separate change order.'
 
 export default function InvoiceTemplate({
   company = {},

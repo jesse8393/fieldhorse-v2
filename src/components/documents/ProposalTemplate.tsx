@@ -43,7 +43,7 @@ const TEMPLATE_COMPONENTS: Record<string, (props: { view: any }) => any> = {
 }
 
 const DEFAULT_PAYMENT_COPY = '50% deposit due upon approval · 40% due at material delivery or midpoint · 10% due upon substantial completion.'
-const DEFAULT_DISCLAIMER = 'Pricing includes labor, material, standard equipment, placement, finishing, and cleanup for the listed scope only. Pricing is based on visible site conditions at time of estimating. Any hidden conditions, field changes, requested by owner additions, or scope deviations may require additional pricing through written change order approval. Estimate valid for 30 days.'
+const DEFAULT_DISCLAIMER = 'Pricing includes labor, material, standard equipment, placement, finishing, and cleanup for the listed scope only. Pricing is based on visible site conditions at time of estimating. Any hidden conditions, field changes, requested by owner additions, or scope deviations may require additional pricing through written change order approval.'
 
 export default function ProposalTemplate({
   company = {},

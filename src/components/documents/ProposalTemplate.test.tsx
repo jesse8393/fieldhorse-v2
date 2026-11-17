@@ -34,3 +34,20 @@ describe('complete customer proposal scope', () => {
     })
   }
 })
+
+// PT-12: the web documents print no terms the contractor never set.
+describe('no legal terms the contractor did not set', async () => {
+  const { default: ProposalTemplate } = await import('./ProposalTemplate.tsx')
+  const { default: InvoiceTemplate } = await import('./InvoiceTemplate.tsx')
+
+  it('a proposal does not claim a 30 day validity', () => {
+    const html = renderToStaticMarkup(<ProposalTemplate company={company} contact={contact} meta={{ issuedAt: '2026-10-01', expiresAt: '2026-11-13' }} />)
+    expect(html).not.toContain('valid for 30 days')
+  })
+
+  it('an invoice does not threaten a late fee', () => {
+    const html = renderToStaticMarkup(<InvoiceTemplate company={company} contact={contact} contractTotal={1000} />)
+    expect(html).not.toContain('1.5%')
+    expect(html).not.toMatch(/may accrue/)
+  })
+})
