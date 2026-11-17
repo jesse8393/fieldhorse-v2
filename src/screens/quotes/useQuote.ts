@@ -83,7 +83,7 @@ export function useQuote(id: string | undefined) {
     if (message) {
       if (before) queryClient.setQueryData<QuoteWithClient | null>(key, (current) => (current ? before : current))
       toastError("Couldn't save the quote", message)
-      return { error: { message } }
+      return { error: new Error(message) }
     }
     invalidateAfterQuoteWrite(queryClient, { quoteId: id, leadId: before?.lead_id, clientId: before?.client_id })
     return { error: null }

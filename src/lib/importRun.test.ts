@@ -5,6 +5,7 @@ type Req = { table: string; calls: [string, ...unknown[]][] }
 const requests: Req[] = []
 let existingClients: { id: string; name: string; phone: string | null; email: string | null }[] = []
 let failLeadInsertAt = -1
+let clientReadError: unknown = null
 
 function builder(table: string): unknown {
   const req: Req = { table, calls: [] }
@@ -18,7 +19,9 @@ function builder(table: string): unknown {
           if (!insert) {
             const range = req.calls.find((c) => c[0] === 'range') as [string, number, number] | undefined
             const rows = table === 'fh_clients' ? existingClients : []
-            response = { data: range ? rows.slice(range[1], range[2] + 1) : rows, error: null }
+            response = table === 'fh_clients' && clientReadError
+              ? { data: null, error: clientReadError }
+              : { data: range ? rows.slice(range[1], range[2] + 1) : rows, error: null }
           } else if (table === 'fh_leads') {
             const index = requests.filter((r) => r.table === 'fh_leads' && r.calls.some((c) => c[0] === 'insert')).indexOf(req)
             const rows = insert[1] as unknown[]
@@ -60,6 +63,7 @@ beforeEach(() => {
   requests.length = 0
   existingClients = []
   failLeadInsertAt = -1
+  clientReadError = null
   n = 0
 })
 
@@ -101,6 +105,21 @@ describe('runImport (D12)', () => {
     expect(res.landed).toBe(2)
     expect(res.error?.message).toBe('boom')
     expect(requests.map((r) => r.table)).toEqual(['fh_clients', 'fh_clients', 'fh_leads', 'fh_clients', 'fh_leads'])
+  })
+})
+
+describe('a failed read of the customer list', () => {
+  it('hands back the failure as it is, so the screen can word it and log it', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { plainError } = await import('./serviceErrors.ts')
+    clientReadError = { message: 'TypeError: Failed to fetch', details: '', hint: '', code: '' }
+    const offline = await runImport({ userId: 'u1', orgId: 'o1', newId, records: [rec('Ada')] })
+    expect(offline.landed).toBe(0)
+    expect(plainError(offline.error, 'Nothing was imported. Try again.')).toBe('No signal right now. Try again when the signal is back.')
+    clientReadError = { message: 'Something odd happened.' }
+    const odd = await runImport({ userId: 'u1', orgId: 'o1', newId, records: [rec('Ada')] })
+    expect(plainError(odd.error, 'Nothing was imported. Try again.')).toBe('Nothing was imported. Try again.')
+    expect(inserts('fh_leads')).toEqual([])
   })
 })
 

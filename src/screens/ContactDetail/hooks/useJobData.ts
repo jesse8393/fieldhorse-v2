@@ -170,7 +170,7 @@ export function useJobData(id: string | undefined, userId: string | undefined) {
       .select('id')
     const failure = error
       || (!rows || rows.length === 0
-        ? { message: 'This job may have been removed, or you no longer have access to edit it.' }
+        ? new Error('This job may have been removed, or you no longer have access to edit it.')
         : null)
     if (!failure) {
       toastSuccess('Saved', 'Changes synced')

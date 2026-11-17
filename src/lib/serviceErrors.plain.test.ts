@@ -103,6 +103,13 @@ describe('a timeout or a sentence of our own', () => {
   })
 })
 
+describe('a bare { message } object', () => {
+  it('is not taken for our own sentence, since postgrest builds one from any text answer', () => {
+    expect(plainError({ message: 'The service is temporarily down for maintenance.' }, FALLBACK)).toBe(FALLBACK)
+    expect(plainError({ message: 'Could not read your customers: Something odd happened.' }, FALLBACK)).toBe(FALLBACK)
+  })
+})
+
 describe('plainError', () => {
   it('never lets raw text through, for every shape', () => {
     const shapes: unknown[] = [
@@ -154,8 +161,8 @@ describe('plainError', () => {
     expect(plainError(new Error('Only $40.00 remains unreserved on this contract.'), FALLBACK)).toBe('Only $40.00 remains unreserved on this contract.')
     class CrewUnavailable extends Error {}
     expect(plainError(new CrewUnavailable('Crew assignment is not available yet.'), FALLBACK)).toBe('Crew assignment is not available yet.')
-    // pipeline.ts answers a reopen it refuses with { message } alone.
-    expect(plainError({ message: 'This record has no previous job. Review its lead or quote before reopening.' }, FALLBACK))
+    // pipeline.ts answers a reopen it refuses with an Error of its own.
+    expect(plainError(new Error('This record has no previous job. Review its lead or quote before reopening.'), FALLBACK))
       .toBe('This record has no previous job. Review its lead or quote before reopening.')
     const domish = Object.assign(new Error('The operation was aborted.'), { name: 'AbortError' })
     expect(plainError(domish, FALLBACK)).toBe(FALLBACK)

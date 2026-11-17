@@ -135,8 +135,9 @@ function fieldsOf(error: unknown): Fields {
     provider: e.provider_status != null,
     // Our own Errors and their subclasses keep the name Error; the
     // browser's and the libraries' carry their own (TypeError, AuthApiError).
-    // Our libraries also answer { message } alone (pipeline, followUp).
-    plainError: (error instanceof Error ? error.name === 'Error' : Object.keys(e).join() === 'message') && !code && !status
+    // A bare { message } is not ours: postgrest builds one from any text
+    // answer, so our libraries answer with an Error instead.
+    plainError: error instanceof Error && error.name === 'Error' && !code && !status
   }
 }
 

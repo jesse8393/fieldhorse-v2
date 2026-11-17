@@ -86,7 +86,7 @@ export async function saveFollowUp(
     .update({ follow_up_on: value })
     .eq('id', job.id)
     .select('id')
-  const failure = error || (!data || data.length === 0 ? { message: 'This job may have been removed, or you no longer have access to edit it.' } : null)
+  const failure = error || (!data || data.length === 0 ? new Error('This job may have been removed, or you no longer have access to edit it.') : null)
   if (failure) {
     patchCaches(queryClient, job.id, userId, before)
     toastError("Couldn't set follow up", plainError(failure, 'Try again.'))

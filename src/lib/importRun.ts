@@ -60,9 +60,10 @@ export async function runImport(opts: {
     })
   } catch (e) {
     // Without the list we cannot tell a new customer from a known one, so
-    // stop rather than create duplicates.
-    const message = (e as { message?: string })?.message || 'unknown error'
-    return { landed: 0, count: 0, error: { message: `Could not read your customers: ${message}` } }
+    // stop rather than create duplicates. The failure goes back as it is:
+    // the screen words it (no signal, no permission) and logs it for us.
+    const error = e && typeof e === 'object' && 'message' in e ? (e as { message: string }) : new Error(String(e))
+    return { landed: 0, count: 0, error }
   }
 
   const byPhone = new Map<string, string>()

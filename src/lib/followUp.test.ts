@@ -15,7 +15,9 @@ afterAll(() => {
 
 const updates: { values: unknown; id: string }[] = []
 let failNext: { message: string } | null = null
+let emptyNext = false
 const toasts: string[] = []
+const said: string[] = []
 
 vi.mock('./supabase.ts', () => ({
   supabase: {
@@ -29,6 +31,7 @@ vi.mock('./supabase.ts', () => ({
               failNext = null
               return { data: null, error }
             }
+            if (emptyNext) { emptyNext = false; return { data: [], error: null } }
             return { data: [{ id }], error: null }
           }
         })
@@ -38,7 +41,7 @@ vi.mock('./supabase.ts', () => ({
 }))
 vi.mock('./toast.ts', () => ({
   toastSuccess: (title: string) => { toasts.push(title) },
-  toastError: (title: string) => { toasts.push(title) }
+  toastError: (title: string, description?: string) => { toasts.push(title); said.push(description || '') }
 }))
 
 const { followUpOnFor, followUpMeta, saveFollowUp, FOLLOW_UP_PRESETS } = await import('./followUp.ts')
@@ -85,7 +88,9 @@ describe('saveFollowUp', () => {
   beforeEach(() => {
     updates.length = 0
     toasts.length = 0
+    said.length = 0
     failNext = null
+    emptyNext = false
     queryClient = new QueryClient()
     queryClient.setQueryData(['jobDetail', 'c1'], { contact: { ...job } })
     queryClient.setQueryData(jobsKey('u1'), [{ ...job }, { id: 'c2', follow_up_on: null }])
@@ -108,5 +113,12 @@ describe('saveFollowUp', () => {
     expect((queryClient.getQueryData(jobsKey('u1')) as any[])[0].follow_up_on).toBe('2026-10-01')
     // Only the failure is said: never "Follow up set" beside it (OPS-21).
     expect(toasts).toEqual(["Couldn't set follow up"])
+  })
+  it('says in its own words when the job is gone, as a sentence the screen keeps', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    emptyNext = true
+    const res = await saveFollowUp(queryClient, job, 'u1', 3)
+    expect(res.error?.message).toBe('This job may have been removed, or you no longer have access to edit it.')
+    expect(said).toEqual(['This job may have been removed, or you no longer have access to edit it.'])
   })
 })
