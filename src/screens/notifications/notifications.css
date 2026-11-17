@@ -192,6 +192,29 @@
   color: var(--fh-ink);
 }
 
+/* Reminders, then Other notifications, each under a small heading. */
+.fhn-section + .fhn-section {
+  margin-top: 16px;
+}
+
+.fhn-section__title {
+  margin: 0;
+  padding: 8px 0 4px;
+  font-family: var(--fh-font-body);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--fh-ink-2);
+}
+
+/* "3 reminders" under a client's reminder row. */
+.fhn-row__meta {
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 400;
+  color: var(--fh-ink-3);
+}
+
 /* Done and Dismiss, under the text, lined up with it past the icon. */
 .fhn-row__actions {
   display: flex;

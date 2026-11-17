@@ -6121,6 +6121,28 @@ export type Database = {
         Returns: string
       }
       fh_money_visible: { Args: { p_org_id: string }; Returns: boolean }
+      fh_my_open_reminders: {
+        Args: never
+        Returns: {
+          channel: string | null
+          client_email: string | null
+          client_id: string | null
+          client_name: string | null
+          client_phone: string | null
+          created_at: string
+          days_quiet: number | null
+          draft_body: string | null
+          due_on: string | null
+          follow_up_id: string
+          headline: string | null
+          kind: string
+          link: string | null
+          notification_id: string
+          read_at: string | null
+          record_id: string | null
+          record_kind: string
+        }[]
+      }
       fh_next_local_time: {
         Args: {
           p_after?: string

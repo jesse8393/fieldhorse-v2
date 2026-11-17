@@ -4,13 +4,16 @@ import { Bell } from 'lucide-react'
 import Icon from './fh/Icon.tsx'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { supabase } from '../lib/supabase.ts'
-import { unreadCount } from '../lib/notifications.ts'
+import { notificationBadgeCount } from '../lib/reminders.ts'
 import { hapticTap } from '../lib/haptics.ts'
 
 // The bell in the shared header (decision D64). It shows how many
 // notifications are unread and opens the /notifications screen; the list
 // itself lives there, never in a sheet (decision D57). The count follows
-// the inbox in real time, as it always has.
+// the inbox in real time, as it always has. It counts what the screen
+// lists: clients with an open reminder plus the other unread notifications
+// (audit finding AUTO-09), or every unread one until the reminders
+// migration is applied.
 export default function NotificationsBell() {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -18,8 +21,8 @@ export default function NotificationsBell() {
 
   const refresh = useCallback(async () => {
     if (!user) { setUnread(0); return }
-    // unreadCount answers 0 when the read fails, so the bell never throws.
-    setUnread(await unreadCount(user.id))
+    // notificationBadgeCount never throws, so the bell never does.
+    setUnread(await notificationBadgeCount(user.id))
   }, [user])
 
   useEffect(() => { refresh() }, [refresh])
