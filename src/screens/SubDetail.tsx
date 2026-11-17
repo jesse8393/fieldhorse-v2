@@ -212,7 +212,7 @@ export default function SubDetail() {
           <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
             {error}
           </div>
-          <div style={{ fontSize: 12 }}>Try again, or check the Sub Directory.</div>
+          <div style={{ fontSize: 12 }}>Try again, or go back to Subs.</div>
         </div>
       </div>
     )
@@ -1181,7 +1181,7 @@ function BackButton({ onClick }: any) {
       }}
     >
       <ChevronLeft size={16} aria-hidden="true" />
-      Sub Directory
+      Subs
     </button>
   )
 }

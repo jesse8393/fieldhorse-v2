@@ -46,6 +46,8 @@ describe('copy rules', () => {
 
   it('says Mark complete in sentence case', () => {
     expect(opsSource('components/v3/NextActionCard.tsx')).not.toMatch(/Mark Complete/)
+    // ai-copy-4: the job card's button takes its label from here.
+    expect(opsSource('screens/ContactDetail/lib/jobNextAction.ts')).not.toMatch(/Mark Complete/)
   })
 
   it('counts recurring visits with the right noun', () => {

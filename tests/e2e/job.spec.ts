@@ -114,6 +114,23 @@ test.describe('job page on a phone', () => {
     await expect(page.locator('.fhj-spine').getByText('Inspector confirmed Friday.')).toBeVisible()
   })
 
+  // ai-copy-4: the open task's button and the progress label use sentence
+  // case, so the card no longer spells Mark complete two ways.
+  test('the next action and progress read in sentence case', async ({ context, page }) => {
+    await signIn(context, {
+      tables: {
+        fh_schedule: [],
+        fh_job_todos: [{ id: 't1', job_id: 'c-job1', user_id: 'qa-user-1', org_id: 'org-1', text: 'Order rebar', done: false, due_at: null, completed_at: null, assigned_to: null, created_at: new Date().toISOString() }]
+      }
+    })
+    await open(page, '/jobs/c-job1')
+    await openMoreAboutJob(page)
+    const more = page.locator('#fhj-more-body')
+    await expect(more.getByText('Order rebar')).toBeVisible()
+    await expect(more.getByText('Job progress', { exact: true })).toBeVisible()
+    expect(await more.innerText()).not.toMatch(/Mark Complete|Job Progress/)
+  })
+
   test('every section stays one tap away', async ({ context, page }) => {
     await signIn(context)
     await open(page, '/jobs/c-job1')

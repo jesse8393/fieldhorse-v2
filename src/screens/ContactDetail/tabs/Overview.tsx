@@ -364,7 +364,7 @@ export default function OverviewTab({
       {/* PROGRESS, milestone completion (execution stages only) */}
       {isExecutionStage && (
         <ProgressMeter
-          label="Job Progress"
+          label="Job progress"
           value={milestonePct}
           caption={milestones.length
             ? `${milestones.filter((m: any) => m.done).length} of ${milestones.length} ${countNoun(milestones.length, 'milestone')} complete`

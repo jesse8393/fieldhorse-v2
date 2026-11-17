@@ -32,8 +32,8 @@ export type JobNextAction = {
  * plus optional date/pipelineFn/sourceId/dueAt):
  *
  *   { kind: 'schedule',  title, date, ctaLabel: 'View on schedule', sourceId }
- *   { kind: 'milestone', title,       ctaLabel: 'Mark Complete',  sourceId: index }
- *   { kind: 'todo',      title, dueAt, ctaLabel: 'Mark Complete', sourceId }
+ *   { kind: 'milestone', title,       ctaLabel: 'Mark complete',  sourceId: index }
+ *   { kind: 'todo',      title, dueAt, ctaLabel: 'Mark complete', sourceId }
  *   { kind: 'stage',     title,       ctaLabel: <stage cta>,      pipelineFn }
  *   { kind: 'idle',      title: 'No next action.', ctaLabel: '+ Schedule next step' }
  *
@@ -139,7 +139,7 @@ export function resolveNextAction({ contact, scheduleItems = [], todos = [] }: {
     return {
       kind: 'milestone',
       title: milestones[milestoneIdx].label || 'Next milestone',
-      ctaLabel: 'Mark Complete',
+      ctaLabel: 'Mark complete',
       sourceId: milestoneIdx
     }
   }
@@ -155,7 +155,7 @@ export function resolveNextAction({ contact, scheduleItems = [], todos = [] }: {
       kind: 'todo',
       title: nextTodo.text || 'Next task',
       dueAt: nextTodo.due_at || null,
-      ctaLabel: 'Mark Complete',
+      ctaLabel: 'Mark complete',
       sourceId: nextTodo.id
     }
   }
