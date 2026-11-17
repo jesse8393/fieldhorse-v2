@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
-const readResult = vi.hoisted(() => ({ value: { data: [] as unknown[], error: null as null | { code?: string; message?: string } } }))
+const readResult = vi.hoisted(() => ({ value: { data: [] as unknown[], error: null as null | { code?: string; message?: string } }, reads: 0 }))
 vi.mock('./supabase.ts', () => {
   const query: Record<string, unknown> = {}
   for (const method of ['select', 'eq', 'lt', 'or', 'order']) query[method] = () => query
-  query.range = async () => readResult.value
+  query.range = async () => { readResult.reads += 1; return readResult.value }
   return { supabase: { from: () => query } }
 })
-import { CrewAssignmentUnavailableError, fetchAllocationEvents, allocationConflicts, allocationWriteError, canAllocateCrew, eventAssignees } from './scheduleAllocation.ts'
+import { CrewAssignmentUnavailableError, fetchAllocationEvents, allocationConflicts, allocationWriteError, canAllocateCrew, eventAssignees, forgetMissingCrewColumns } from './scheduleAllocation.ts'
 
 const visit = { start_at: '2026-10-28T13:00:00Z', end_at: '2026-10-28T14:00:00Z' }
 const event = { id: 'event-1', title: 'Foundation', ...visit, assigned_to: 'alice' }
@@ -46,11 +46,47 @@ describe('crew allocation', () => {
     expect(allocationWriteError({ message: 'schedule_allocation_member' })).toContain('no longer belongs')
   })
   it('tells a database without the crew columns apart from a read that failed', async () => {
+    forgetMissingCrewColumns()
     readResult.value = { data: [], error: { code: '42703', message: 'column fh_schedule.assigned_user_ids does not exist' } }
     await expect(fetchAllocationEvents('org-1', [visit])).rejects.toBeInstanceOf(CrewAssignmentUnavailableError)
+    forgetMissingCrewColumns()
     readResult.value = { data: [], error: { code: '57014', message: 'upstream request timeout' } }
     const failed = await fetchAllocationEvents('org-1', [visit]).catch((error) => error)
     expect(failed).toBeInstanceOf(Error)
     expect(failed).not.toBeInstanceOf(CrewAssignmentUnavailableError)
+  })
+  // Production lacks the crew columns until 20261027170430 is applied.
+  // Every date or time change on a visit read again and logged a 400
+  // (vibe audit console-3); one answer is enough for the session.
+  for (const [what, error] of [
+    ['42703', { code: '42703', message: 'column fh_schedule.assigned_user_ids does not exist' }],
+    ['PGRST204', { code: 'PGRST204', message: "Could not find the 'assigned_user_ids' column of 'fh_schedule' in the schema cache" }],
+    ['a 400 that names the column', { message: 'column fh_schedule.assigned_user_ids does not exist' }]
+  ] as const) {
+    it(`asks a database without the crew columns once per session (${what})`, async () => {
+      forgetMissingCrewColumns()
+      readResult.reads = 0
+      readResult.value = { data: [], error }
+      for (const day of ['2026-12-01', '2026-12-02', '2026-12-03']) {
+        await expect(fetchAllocationEvents('org-1', [{ start_at: `${day}T14:00:00Z`, end_at: `${day}T15:00:00Z` }])).rejects.toBeInstanceOf(CrewAssignmentUnavailableError)
+      }
+      expect(readResult.reads).toBe(1)
+    })
+  }
+  it('keeps reading availability when the crew columns exist', async () => {
+    forgetMissingCrewColumns()
+    readResult.reads = 0
+    readResult.value = { data: [event], error: null }
+    expect(await fetchAllocationEvents('org-1', [visit])).toEqual([event])
+    expect(await fetchAllocationEvents('org-1', [visit])).toEqual([event])
+    expect(readResult.reads).toBe(2)
+  })
+  it('asks again after a read that failed for another reason', async () => {
+    forgetMissingCrewColumns()
+    readResult.reads = 0
+    readResult.value = { data: [], error: { code: '57014', message: 'upstream request timeout' } }
+    await expect(fetchAllocationEvents('org-1', [visit])).rejects.not.toBeInstanceOf(CrewAssignmentUnavailableError)
+    await expect(fetchAllocationEvents('org-1', [visit])).rejects.not.toBeInstanceOf(CrewAssignmentUnavailableError)
+    expect(readResult.reads).toBe(2)
   })
 })
