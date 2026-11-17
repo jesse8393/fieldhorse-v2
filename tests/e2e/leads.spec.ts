@@ -114,12 +114,25 @@ test.describe('the lead screen', () => {
     const again = page.getByRole('button', { name: 'Tap again to mark lost' })
     await expect(again).toBeVisible()
     expect(patches).toEqual([])
+    // A confirm is a second, separate tap: one this soon after arming is
+    // the rest of a double tap and does nothing (S04).
+    await page.waitForTimeout(600)
     await again.click()
     await expect.poll(() => patches.length).toBe(1)
     expect(patches[0].startsWith('eq.l-lead1=')).toBe(true)
     expect(JSON.parse(patches[0].slice('eq.l-lead1='.length))).toMatchObject({ status: 'lost' })
     await expect(page.getByText('Lost', { exact: true })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Quote this' })).toHaveCount(0)
+  })
+
+  test('a double tap on Mark lost does not mark the lead lost (S04)', async ({ context, page }) => {
+    await signIn(context)
+    const patches = await recordLeadPatches(page)
+    await open(page, '/leads/l-lead1')
+    await page.getByRole('button', { name: 'Mark lost' }).dblclick()
+    await page.waitForTimeout(500)
+    expect(patches).toEqual([])
+    await expect(page.getByRole('button', { name: 'Tap again to mark lost' })).toBeVisible()
   })
 
   test('notes save in place on blur', async ({ context, page }) => {

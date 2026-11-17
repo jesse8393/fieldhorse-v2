@@ -37,6 +37,8 @@ type Note = { id: string; text: string | null; created_at: string | null; catego
 
 /** The 4 seconds the second tap has before Mark lost goes back to resting (D57). */
 const CONFIRM_MS = 4000
+/** A second tap sooner than this after arming is a double tap, not a confirm (S04). */
+const CONFIRM_MIN_MS = 500
 /** Notes save this long after typing stops, as well as on blur. */
 const NOTES_SAVE_MS = 800
 
@@ -168,6 +170,7 @@ export default function LeadDetail({ id, fallback }: LeadDetailProps) {
   // Mark lost: the first tap arms the button, the second within 4 seconds
   // writes (D57). No dialog.
   const [armed, setArmed] = useState(false)
+  const armedAt = useRef(0)
   const [losing, setLosing] = useState(false)
   useEffect(() => {
     if (!armed) return
@@ -178,7 +181,8 @@ export default function LeadDetail({ id, fallback }: LeadDetailProps) {
   async function handleMarkLost() {
     hapticTap()
     if (!lead || losing) return
-    if (!armed) { setArmed(true); return }
+    if (!armed) { armedAt.current = Date.now(); setArmed(true); return }
+    if (Date.now() - armedAt.current < CONFIRM_MIN_MS) return
     setArmed(false)
     setLosing(true)
     try {
