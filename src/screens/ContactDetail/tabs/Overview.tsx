@@ -103,8 +103,8 @@ export default function OverviewTab({
   const reopenTap = useSecondTap()
 
   const health = useMemo(
-    () => computeJobHealth({ contact, payments, scheduleItems }),
-    [contact, payments, scheduleItems]
+    () => computeJobHealth({ contact, payments, scheduleItems, changeOrders }),
+    [contact, payments, scheduleItems, changeOrders]
   )
 
   const nextAction = useMemo(() => {

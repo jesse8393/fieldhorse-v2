@@ -292,8 +292,8 @@ export default function ContactDetail() {
   // The todo "Next action" the old phone header carried lives on the
   // Overview's next action card, which uses the same resolver.
   const jobHealth = useMemo(
-    () => computeJobHealth({ contact, payments, scheduleItems }),
-    [contact, payments, scheduleItems]
+    () => computeJobHealth({ contact, payments, scheduleItems, changeOrders }),
+    [contact, payments, scheduleItems, changeOrders]
   )
 
   // Tab state. Local state is the source of truth for the rendered
@@ -532,7 +532,7 @@ export default function ContactDetail() {
         contractTotal: Number(contractTotal || 0),
         paid: Number(paid || 0),
         balance: Number(balance || 0),
-        marginPct: Number(contact.cost || 0) > 0 && Number(contact.amount || 0) > 0 ? margin(contact) : null
+        marginPct: Number(contact.cost || 0) > 0 && Number(contact.amount || 0) > 0 ? margin(contact, changeOrders) : null
       })
     : null
 
