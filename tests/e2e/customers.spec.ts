@@ -85,6 +85,7 @@ test.describe('duplicates are reviewed on a screen', () => {
     await open(page, '/clients/merge')
     await expect(page.getByText('Leads, quotes, jobs, invoices and notes move to the kept client.', { exact: false })).toBeVisible()
     await page.getByRole('button', { name: 'Merge cluster' }).click()
+    await page.waitForTimeout(600) // a second tap within 500 ms is ignored (OPS-02)
     await page.getByRole('button', { name: 'Tap again to merge' }).click()
 
     await expect(page.getByText(/still has leads, quotes and invoices that could not be moved, so it was not deleted/)).toBeVisible()

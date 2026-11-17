@@ -350,7 +350,7 @@ test.describe('Reopen asks first, like Mark lost', () => {
     const again = card.getByRole('button', { name: 'Tap again to reopen' })
     await expect(again).toBeVisible()
     await expect(again).toBeFocused()
-    await page.waitForTimeout(300)
+    await page.waitForTimeout(600) // a second tap within 500 ms is ignored (OPS-02)
     expect(patches).toEqual([])
     // Enter presses the focused armed button; no menu opens.
     await page.keyboard.press('Enter')
