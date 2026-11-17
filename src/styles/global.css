@@ -376,7 +376,8 @@ select:focus-visible,
   font-family: var(--font-display);
   font-weight: 400;
   font-size: 12px;
-  opacity: 0.7;
+  /* Counts read as text (4.5 to 1): a quieter ink, never opacity. */
+  color: var(--fh-ink-3);
   font-variant-numeric: tabular-nums;
 }
 .dispatch-state__opt.is-on {
@@ -3675,15 +3676,15 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     color: var(--v3-surface);
   }
 
+  /* Counts read as text (4.5 to 1): a quieter ink, never opacity. */
   .fh-build-pill__count {
-    color: inherit;
-    opacity: .65;
+    color: var(--fh-ink-3);
     font-weight: 800;
     font-variant-numeric: tabular-nums;
   }
 
   .fh-build-pill.is-active .fh-build-pill__count {
-    opacity: .8;
+    color: inherit;
   }
 
   /* Generic helpers used by Phase 1 tables */

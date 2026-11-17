@@ -412,3 +412,17 @@ for (const mode of ['day', 'night'] as const) {
     await expect.poll(() => contrastOf(search, 'placeholder')).toBeGreaterThanOrEqual(4.5)
   })
 }
+
+// A11Y-04: the counts on the desktop Customers filter pills read as text
+// (4.5 to 1), never dimmed with opacity, by day and at night.
+for (const mode of ['day', 'night'] as const) {
+  test(`the customer filter counts are readable in ${mode} mode`, async ({ context, page, isMobile }) => {
+    test.skip(isMobile, 'Desktop filter pills')
+    await signIn(context, { mode })
+    await open(page, '/clients')
+    const counts = page.locator('.fh-build-pill__count')
+    await expect(counts.first()).toBeVisible()
+    const n = await counts.count()
+    for (let i = 0; i < n; i++) await expect.poll(() => contrastOf(counts.nth(i))).toBeGreaterThanOrEqual(4.5)
+  })
+}
