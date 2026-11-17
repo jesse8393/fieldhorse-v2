@@ -98,13 +98,17 @@ held a customer link: none could ever be opened, and no quote or invoice
 email could be sent from the app.
 
 Only Jesse can fix it, in Netlify: Site configuration, Environment
-variables, scope Functions. Set `SUPABASE_URL`
-(`https://pnmhblvslftdzfcdezbw.supabase.co`), `SUPABASE_PUBLISHABLE_KEY`
-(the anon or publishable key) and `SUPABASE_SECRET_KEY` (the service role
-or secret key, from Supabase, Project settings, API keys). Rotate that key
-first, since the #245 hole existed, and set the new one. Add
-`ANTHROPIC_API_KEY` for the AI features. Then trigger a deploy. The steps
-and a readiness check are in `docs/operations/service-setup.md`.
+variables, scope Functions. Set, under exactly these names:
+`SUPABASE_URL` (`https://pnmhblvslftdzfcdezbw.supabase.co`),
+`SUPABASE_ANON_KEY` (the anon or publishable key) and
+`SUPABASE_SERVICE_ROLE_KEY` (the service role or secret key, from Supabase,
+Project settings, API keys). Do not use the newer names
+`SUPABASE_PUBLISHABLE_KEY` or `SUPABASE_SECRET_KEY` alone: about twenty
+functions, including every customer link and the quote and invoice
+senders, read only the older names. Rotate the service role key first,
+since the #245 hole existed, and set the new one. Add `ANTHROPIC_API_KEY`
+for the AI features. Then trigger a deploy. The steps are in
+`docs/operations/service-setup.md`.
 
 ### Waiting on Jesse's approval
 
