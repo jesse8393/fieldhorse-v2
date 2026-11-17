@@ -15,7 +15,7 @@ import { Button, Field } from './fh'
 import { supabase } from '../lib/supabase.ts'
 import { useOrgScope } from '../lib/orgScope.ts'
 import { findOrCreateClient } from '../lib/clients.ts'
-import { escapeLikeText, ilikeAnyOf } from '../lib/searchFilter.ts'
+import { escapeLikeText, ilikeAnyOf, phoneMatches } from '../lib/searchFilter.ts'
 
 export type ClientPick = {
   id: string
@@ -63,7 +63,7 @@ export function matchClients(rows: ClientPick[], typed: string, limit = SHOWN): 
   for (const r of rows) {
     const name = norm(r.name)
     if (name.startsWith(t)) starts.push(r)
-    else if (name.includes(t) || norm(r.company_name).includes(t) || norm(r.email).includes(t) || norm(r.phone).includes(t)) contains.push(r)
+    else if (name.includes(t) || norm(r.company_name).includes(t) || norm(r.email).includes(t) || norm(r.phone).includes(t) || phoneMatches(r.phone, t)) contains.push(r)
   }
   return [...starts, ...contains].slice(0, limit)
 }

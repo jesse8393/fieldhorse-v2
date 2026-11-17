@@ -119,6 +119,30 @@ test.describe('duplicates are reviewed on a screen', () => {
   })
 })
 
+test.describe('phone search (S14)', () => {
+  const MMC = { id: 'cl-mmc', user_id: USER.id, name: 'MMC Properties', company_name: null, phone: '615.555.0199', email: null, address: null, created_at: iso(NOW - 9 * DAY) }
+
+  test('Customers finds a phone typed in any format', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_clients: [JEFF, MMC] } })
+    await open(page, '/clients')
+    // Phone layout: "Search customers"; desktop table: "Search clients".
+    const search = page.getByLabel(/^Search (customers|clients)$/)
+    await expect(search).toBeVisible({ timeout: 30_000 })
+    for (const typed of ['6155550199', '615-555-0199', '(615) 555-0199']) {
+      await search.fill(typed)
+      await expect(page.getByText('MMC Properties').first()).toBeVisible()
+      await expect(page.getByText('No customers match', { exact: false })).toHaveCount(0)
+    }
+  })
+
+  test('the client field suggests a client by its phone in any format', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_clients: [JEFF, MMC] } })
+    await open(page, '/jobs/new')
+    await page.getByLabel('Client').fill('(615) 555-0199')
+    await expect(page.getByRole('option', { name: /MMC Properties/ })).toBeVisible()
+  })
+})
+
 test.describe('the customer page', () => {
   test('the statement is a screen with the per property balances', async ({ context, page }) => {
     await signIn(context)

@@ -1,4 +1,5 @@
 import WorkspaceHelp from '../components/experience/WorkspaceHelp.tsx'
+import { phoneMatches } from '../lib/searchFilter.ts'
 import { lazy, Suspense, useCallback, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -124,6 +125,8 @@ export default function Clients() {
       || (r.company_name || '').toLowerCase().includes(needle)
       || (r.email || '').toLowerCase().includes(needle)
       || (r.phone || '').toLowerCase().includes(needle)
+      // "6155550199" finds a phone stored as "615.555.0199" (S14).
+      || phoneMatches(r.phone, needle)
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, q, filter, rollupMap])
