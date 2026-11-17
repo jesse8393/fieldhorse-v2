@@ -155,10 +155,10 @@ export default function Inbox() {
   // /inbox?client=:id: open that client's conversation (dead-ends-7).
   const navigate = useNavigate()
   const clientParam = conversationId ? null : params.get('client')
-  const clientRow = clientParam ? rows.find((r) => r.client_id === clientParam) : undefined
+  const clientConversation = clientParam ? rows.find((r) => r.client_id === clientParam)?.conversation_id : null
   useEffect(() => {
-    if (clientRow) navigate(`/inbox/${encodeURIComponent(clientRow.conversation_id)}`, { replace: true })
-  }, [clientRow, navigate])
+    if (clientConversation) navigate(`/inbox/${encodeURIComponent(clientConversation)}`, { replace: true })
+  }, [clientConversation, navigate])
 
   const title = <h1 className="fhi-title" ref={titleRef} tabIndex={-1}>Inbox</h1>
   const header = <header className="fhi-head">{title}<Link className="fhi-new" to="/compose" aria-label="New message" title="New message"><SquarePen size={20} aria-hidden="true" /></Link></header>
