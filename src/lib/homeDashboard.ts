@@ -711,7 +711,7 @@ async function fetchAllLabelled<T>(label: string, build: Parameters<typeof fetch
 const CONTACT_COLUMNS =
   'id, name, amount, stage, updated_at, created_at, completed_at, follow_up_on, proposal_status, quote_change_request_note, quote_change_requested_at, address, job_title'
 
-const INVOICE_COLUMNS = 'id, contact_id, client_id, title, amount, due_at, status, sequence_number, created_at, fh_clients(name)'
+const INVOICE_COLUMNS = 'id, contact_id, client_id, title, amount, due_at, status, sequence_number, created_at, fh_clients!fh_invoices_client_id_fkey(name)'
 
 const LEAD_COLUMNS = 'id, client_id, title, status, follow_up_on, last_contact, created_at, updated_at, fh_clients!fh_leads_client_id_fkey(name, phone)'
 
