@@ -23,6 +23,7 @@ vi.mock('./supabase', () => ({ supabase: {
 } }))
 
 import { useIntegrations, useDisconnectIntegration } from './integrations'
+import { useJobs, useEstimates } from './queries'
 import { useClientsBundle, useClientDetail, useJobDetail, useInvoiceDetail, useInvoicesOverview, useProfile, useJobPhotos, useJobFiles, useAgenda, useNotesScreen, useActivityFeed, useSubsRoster, useToggleTodo, useDeleteTodo, useUpdateJob, useUpdateProfile, useDeletePhoto, useDeleteFile, useGenerateDraws, useLogPayment, useMarkInvoicePaid, useUpdateInvoiceStatus } from './queries'
 
 beforeEach(() => { mock.results.clear(); mock.options = null; mock.invalidate.mockClear(); mock.calls = []; mock.storageResult = null })
@@ -203,4 +204,26 @@ describe('native payment confirmation and allocation', () => {
     expect((await useMarkInvoicePaid()({ id: 'invoice', userId: 'user' })).error?.message).toContain('void')
     expect(mock.calls.some(c => c[1] === 'insert' || c[1] === 'update')).toBe(false)
   })
+})
+
+describe('native list reads exclude moved rows', () => {
+  const MOVED = '("moved_lead","moved_quote")'
+  for (const [name, hook] of [
+    ['jobs list', () => useJobs()],
+    ['clients bundle', () => useClientsBundle('user')],
+    ['client detail', () => useClientDetail('client')],
+    ['activity feed', () => useActivityFeed('user')],
+    ['estimates', () => useEstimates('user')],
+    ['notes job picker', () => useNotesScreen('user')],
+    ['subs roster', () => useSubsRoster('user')],
+  ] as const) {
+    it(`${name} drops moved_lead and moved_quote rows`, async () => {
+      hook()
+      await mock.options.queryFn()
+      const selects = mock.calls.filter(c => c[0] === 'fh_contacts' && c[1] === 'select')
+      const filters = mock.calls.filter(c => c[0] === 'fh_contacts' && c[1] === 'not')
+      expect(selects.length).toBeGreaterThan(0)
+      expect(filters).toEqual(selects.map(() => ['fh_contacts', 'not', 'stage', 'in', MOVED]))
+    })
+  }
 })

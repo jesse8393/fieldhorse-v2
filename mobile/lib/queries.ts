@@ -18,6 +18,7 @@ import { jobMoney } from './jobMoney'
 import { allocateInvoiceDue, knownContractTotal } from '../../src/lib/invoiceSettlement'
 import { claudeVision, claudeText } from './anthropic'
 import { API_BASE } from './apiBase'
+import { MOVED_STAGE_FILTER } from './stages'
 import type { Database } from './database.types'
 
 export type Contact = Database['public']['Tables']['fh_contacts']['Row']
@@ -36,6 +37,7 @@ async function fetchJobs(): Promise<JobRow[]> {
   const { data, error } = await supabase
     .from('fh_contacts')
     .select('*, fh_clients!fh_contacts_client_id_fkey(name, phone, email)')
+    .not('stage', 'in', MOVED_STAGE_FILTER)
     .order('updated_at', { ascending: false })
   if (error) throw error
   return (data ?? []) as JobRow[]
@@ -74,7 +76,7 @@ async function fetchClientsBundle(userId: string): Promise<ClientsBundle> {
     supabase.from('fh_clients').select('*').eq('user_id', userId)
       .order('last_activity_at', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false }),
-    supabase.from('fh_contacts').select('id, client_id, amount, stage').eq('user_id', userId),
+    supabase.from('fh_contacts').select('id, client_id, amount, stage').not('stage', 'in', MOVED_STAGE_FILTER).eq('user_id', userId),
     supabase.from('fh_payments').select('contact_id, amount, paid_on').eq('user_id', userId)
   ])
   assertReadResults(clientsRes, jobsRes, paymentsRes)
@@ -105,6 +107,7 @@ async function fetchClientDetail(id: string): Promise<ClientDetail> {
   const [c, j] = await Promise.all([
     supabase.from('fh_clients').select('*').eq('id', id).maybeSingle(),
     supabase.from('fh_contacts').select('id, name, job_title, job_type, amount, stage')
+      .not('stage', 'in', MOVED_STAGE_FILTER)
       .eq('client_id', id).order('updated_at', { ascending: false })
   ])
   assertReadResults(c, j)
@@ -1570,7 +1573,7 @@ export function useActivityFeed(userId: string | undefined) {
       const uid = userId as string
       const [pays, leads, invs, cos, notes] = await Promise.all([
         supabase.from('fh_payments').select('id, amount, kind, paid_on, created_at, contact_id, fh_contacts(name)').eq('user_id', uid).order('created_at', { ascending: false }).limit(25),
-        supabase.from('fh_contacts').select('id, name, stage, amount, created_at').eq('user_id', uid).order('created_at', { ascending: false }).limit(25),
+        supabase.from('fh_contacts').select('id, name, stage, amount, created_at').not('stage', 'in', MOVED_STAGE_FILTER).eq('user_id', uid).order('created_at', { ascending: false }).limit(25),
         supabase.from('fh_invoices').select('id, amount, status, sequence_number, created_at, contact_id, fh_contacts(name)').eq('user_id', uid).order('created_at', { ascending: false }).limit(25),
         supabase.from('fh_change_orders').select('id, amount, title, status, created_at, contact_id, fh_contacts(name)').eq('user_id', uid).order('created_at', { ascending: false }).limit(25),
         supabase.from('fh_notes').select('id, text, created_at, contact_id, fh_contacts(name)').eq('user_id', uid).order('created_at', { ascending: false }).limit(25)
@@ -1582,7 +1585,7 @@ export function useActivityFeed(userId: string | undefined) {
         amount: Number(p.amount || 0), contactId: p.contact_id, contactName: p.fh_contacts?.name ?? null, date: p.paid_on || p.created_at || ''
       })
       for (const l of (leads.data ?? []) as any[]) items.push({
-        id: `lead-${l.id}`, kind: 'lead', title: 'New lead added', sub: l.stage ? String(l.stage).replace(/_/g, ' ') : null,
+        id: `lead-${l.id}`, kind: 'lead', title: 'New job added', sub: l.stage ? String(l.stage).replace(/_/g, ' ') : null,
         amount: l.amount ? Number(l.amount) : null, contactId: l.id, contactName: l.name ?? null, date: l.created_at || ''
       })
       for (const i of (invs.data ?? []) as any[]) items.push({
@@ -1668,6 +1671,7 @@ export function useEstimates(userId: string | undefined) {
       const { data , error: readError } = await supabase
         .from('fh_contacts')
         .select('id, name, amount, proposal_status, quote_sent_at, quote_expires_at')
+        .not('stage', 'in', MOVED_STAGE_FILTER)
         .eq('user_id', userId as string)
         .order('quote_sent_at', { ascending: false, nullsFirst: false })
       assertReadResults({ error: readError })
@@ -1713,7 +1717,7 @@ export function useNotesScreen(userId: string | undefined) {
       const uid = userId as string
       const [nRes, cRes] = await Promise.all([
         supabase.from('fh_notes').select('id, text, contact_id, created_at, category, action, when_text, done').eq('user_id', uid).order('created_at', { ascending: false }).limit(200),
-        supabase.from('fh_contacts').select('id, name').eq('user_id', uid).order('name', { ascending: true })
+        supabase.from('fh_contacts').select('id, name').not('stage', 'in', MOVED_STAGE_FILTER).eq('user_id', uid).order('name', { ascending: true })
       ])
       assertReadResults(nRes, cRes)
       const notes: NoteRow[] = ((nRes.data ?? []) as any[])
@@ -1787,7 +1791,7 @@ export function useSubsRoster(userId: string | undefined) {
       const uid = userId as string
       const [sRes, cRes] = await Promise.all([
         supabase.from('fh_subs').select('id, name, trade, phone, rate, status, contact_id, created_at').eq('user_id', uid).order('created_at', { ascending: false }),
-        supabase.from('fh_contacts').select('id, name, job_title').eq('user_id', uid)
+        supabase.from('fh_contacts').select('id, name, job_title').not('stage', 'in', MOVED_STAGE_FILTER).eq('user_id', uid)
       ])
       assertReadResults(sRes, cRes)
       const subs: SubRowRaw[] = ((sRes.data ?? []) as any[]).map((s) => ({
