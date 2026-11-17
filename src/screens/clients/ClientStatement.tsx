@@ -18,7 +18,7 @@ import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useClientDetail } from '../../lib/queries.ts'
 import { companyFromProfile } from '../../lib/invoices.ts'
 import { useDocumentProfile } from '../../lib/companyBranding.ts'
-import { gatherStatement, downloadStatement, sendStatementEmail, fetchStatementMoney } from '../../lib/statement.ts'
+import { gatherStatement, downloadStatement, sendStatementEmail, statementMoneyQuery } from '../../lib/statement.ts'
 import { mintPublicLink, listClientStatementLinks, buildPublicUrl } from '../../lib/publicLink.ts'
 import { toast, toastSuccess, toastInfo } from '../../lib/toast.ts'
 import { moneyExact } from '../../lib/format.ts'
@@ -45,8 +45,7 @@ export default function ClientStatement() {
   // the client bundle does not carry.
   const jobIds = useMemo(() => (bundle?.jobs ?? []).map((j) => j.id), [bundle])
   const moneyQuery = useQuery({
-    queryKey: ['clientStatementMoney', id, jobIds],
-    queryFn: () => fetchStatementMoney(id as string, jobIds),
+    ...statementMoneyQuery(id, jobIds),
     enabled: !!id && !!client
   })
   const data = useMemo(

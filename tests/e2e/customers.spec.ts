@@ -475,3 +475,18 @@ test('the customer page and Customers show a customer\'s money to the cent', asy
   expect(await page.locator('main').innerText()).not.toMatch(/\$\d+(\.\d)?K\b/)
   await nothingRunsOffTheSide(page, 'Customers')
 })
+
+// formats-5: the Statement button on the customer page names the total the
+// statement it opens shows: what is owed on sent invoices, not the contract
+// less what was paid.
+test('the Statement button names the total the statement shows', async ({ context, page, isMobile }) => {
+  test.skip(!isMobile, 'the phone customer page names the total on its Statement button')
+  await signIn(context, { tables: FORMATS_TABLES })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  await open(page, '/clients/cl-h')
+  const button = page.getByRole('button', { name: /^Statement · / })
+  await expect(button).toHaveText(/Statement · \$3,114\.67 across 1 property/, { timeout: 30_000 })
+  await button.click()
+  await expect(page).toHaveURL(/\/clients\/cl-h\/statement$/)
+  await expect(page.locator('.fhcs-total__amount')).toHaveText('$3,114.67')
+})

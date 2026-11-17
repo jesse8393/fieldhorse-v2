@@ -1,6 +1,6 @@
 import { lazy, Suspense, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 const SnowClientDetailBuild = lazy(() => import('../components/desktop/SnowClientDetailBuild.tsx'))
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
@@ -26,7 +26,7 @@ import { stageColor, stageLabel } from '../lib/stages.ts'
 import { recordRoute, type RecordKind } from '../lib/records.ts'
 import { useSecondTap } from '../lib/secondTap.ts'
 import { clientDeleteBlockers, describeDeleteBlockers } from '../lib/clients.ts'
-import { gatherStatement } from '../lib/statement.ts'
+import { gatherStatement, statementMoneyQuery } from '../lib/statement.ts'
 import { rollupJobs } from '../lib/rollups.ts'
 // Apple Maps on iPhone and iPad, Google Maps everywhere else (S25).
 import { navigateHrefHere } from '../lib/todayView.ts'
@@ -112,10 +112,20 @@ export default function ClientDetail() {
   // so the "Statement · $X across N properties" button always agrees
   // with the document it opens (previously the button showed
   // `outstanding`/`activeCount`, which use different stage sets and could
-  // disagree with the generated statement).
+  // disagree with the generated statement). It reads the statement's own
+  // invoices and payments through the same query, so the total is what is
+  // owed on sent invoices, never the contract less what was paid
+  // (formats-5). Until that read is in, the button waits.
+  const statementJobIds = useMemo(() => jobs.map((j: any) => j.id as string), [jobs])
+  const statementMoney = useQuery({
+    ...statementMoneyQuery(id, statementJobIds),
+    enabled: !!id && !!client
+  })
   const statementSummary = useMemo(
-    () => gatherStatement(jobs as any, payments as any, changeOrders as any),
-    [jobs, payments, changeOrders]
+    () => statementMoney.data
+      ? gatherStatement(jobs as any, statementMoney.data.payments, changeOrders as any, { invoices: statementMoney.data.invoices })
+      : { lines: [], totalDue: 0, notInvoiced: [], notInvoicedTotal: 0 },
+    [jobs, changeOrders, statementMoney.data]
   )
 
   // The first tap checks what would be lost and arms the button, the
