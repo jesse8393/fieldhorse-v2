@@ -134,19 +134,34 @@
 .fhc-btn:active::after { opacity: 0.12; }
 .fhc-btn:active { transform: translateY(1px); }
 
-/* Sizes */
+/* Sizes. A main action (lg or md) keeps every word of its label: when the
+   label is wider than the room it has (zoom, or the phone's text made
+   bigger) it wraps onto another line and the button grows to hold it.
+   One line keeps the usual height. Mini buttons stay on one line. */
 .fhc-btn--lg {
   --fhc-radius: 14px;
-  height: 56px;
-  padding: 0 24px;
+  height: auto;
+  min-height: 56px;
+  padding: 8px 24px;
   font-family: var(--fh-font-display);
   font-size: 20px;
   line-height: 24px;
+  white-space: normal;
 }
 
 .fhc-btn--md {
   --fhc-radius: 12px;
-  height: 48px;
+  height: auto;
+  min-height: 48px;
+  padding-block: 8px;
+  white-space: normal;
+}
+
+/* A phone zoomed to 150 percent or more: slimmer sides leave a long word
+   such as "approval" room inside the button. */
+@media (max-width: 239px) {
+  .fhc-btn--lg { padding-inline: 8px; }
+  .fhc-btn--md { padding-inline: 12px; }
 }
 
 .fhc-btn--mini {

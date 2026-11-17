@@ -566,6 +566,54 @@ test.describe('large text and zoom', () => {
       }
     })
   }
+
+  // big-text-5: the main action on a screen was cut to a few letters
+  // ("Mark comp…", "Send for appro…", "M") once zoom or bigger text left it
+  // less room than its label.
+  for (const percent of [100, 150, 200]) {
+    test(`main action buttons keep every word of their label, text at ${percent} percent`, async ({ context, page }) => {
+      await textSize(context, percent)
+      const widths = percent === 100 ? [412, 360, 280, 240, 206, 180] : [412, 360]
+      const screens = [
+        { path: '/jobs/c-big', label: 'Mark complete' },
+        { path: '/quotes/q-big', label: 'Send for approval' },
+        { path: '/invoices/i-big', label: 'Collect payment' },
+        { path: '/', label: 'Open job' }
+      ]
+      await openBig(context, page, '/jobs/c-big')
+      for (const screen of screens) {
+        if (screen.path !== '/jobs/c-big') {
+          await page.goto(screen.path)
+          await bigReady(page)
+        }
+        const button = page.locator('.fhc-btn', { hasText: screen.label }).first()
+        for (const width of widths) {
+          await page.setViewportSize({ width, height: 700 })
+          await page.waitForTimeout(200)
+          const shown = await button.evaluate((el) => {
+            const text = el.querySelector('.fhc-btn__text') as HTMLElement
+            const node = [...text.childNodes].find((n) => n.nodeType === 3)!
+            const split: string[] = []
+            for (const m of (node.textContent || '').matchAll(/\S+/g)) {
+              const range = document.createRange()
+              range.setStart(node, m.index!)
+              range.setEnd(node, m.index! + m[0].length)
+              if (new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size > 1) split.push(m[0])
+            }
+            const r = el.getBoundingClientRect()
+            const t = text.getBoundingClientRect()
+            const cut = text.scrollWidth > text.clientWidth + 1 || t.top < r.top - 0.5 || t.bottom > r.bottom + 0.5
+            return { cut, split, left: r.left, right: r.right, window: document.documentElement.clientWidth }
+          })
+          const at = `${screen.label} at ${width} px: ${JSON.stringify(shown)}`
+          expect(shown.cut, at).toBe(false)
+          expect(shown.split, at).toEqual([])
+          expect(shown.left, at).toBeGreaterThanOrEqual(0)
+          expect(shown.right, at).toBeLessThanOrEqual(shown.window)
+        }
+      }
+    })
+  }
 })
 
 // big-text-3 on a desktop window at 200 percent zoom (640 px wide).

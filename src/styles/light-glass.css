@@ -455,9 +455,9 @@ body:has(.fh-app--glass) .fhj-capsule .fhc-btn { background-image: none; box-sha
 .fh-photo-lightbox :is(input, textarea, button):focus-visible { outline: 2px solid var(--fh-focus-on-onyx) !important; outline-offset: 2px; }
 @media (max-width: 899px) {
   body:has(.fh-app--glass .fhi-thread) .fh-app-header.fh-glass-header { display: none !important; }
-  body:has(.fh-app--glass) .fhj-capsule:not(.fhj-capsule--total) { padding: 8px; gap: 8px; }
+  body:has(.fh-app--glass) .fhj-capsule:not(.fhj-capsule--total) { padding: 8px; gap: 8px; flex-wrap: wrap; }
   body:has(.fh-app--glass) .fhj-capsule:not(.fhj-capsule--total) .fhj-capsule__round { width: 44px; height: 44px; min-width: 44px; }
-  body:has(.fh-app--glass) .fhj-capsule:not(.fhj-capsule--total) .fhj-capsule__primary { min-height: 44px; padding: 8px 16px; font-size: 16px; border-radius: var(--fh-r-control); }
+  body:has(.fh-app--glass) .fhj-capsule:not(.fhj-capsule--total) .fhj-capsule__primary { min-height: 56px; min-width: min-content; padding: 8px 16px; font-size: 16px; border-radius: var(--fh-r-control); }
   .fh-app--glass .fhm > .fhm-reconciliation { margin-inline: 20px; }
   .fh-work-task-open { padding-block: 4px; }
   .fh-work-task-open small { margin-top: 4px; }
@@ -467,7 +467,9 @@ body:has(.fh-app--glass) .fhj-capsule .fhc-btn { background-image: none; box-sha
   .fh-job-phone-heading__bar { gap: 12px; }
   .fh-job-phone-heading__bar .fh-job-status { margin-left: auto; font-size: 12px; }
   .fh-app--glass .fh-job-phone-heading h1 { margin: 4px 0 8px; }
-  body:has(.fh-app--glass) .fhj-capsule:not(.fhj-capsule--total) .fhj-capsule__send { flex: 1; }
+  /* The main action takes a row of its own when even its longest word no
+     longer fits beside the photo and voice buttons (a big zoom). */
+  body:has(.fh-app--glass) .fhj-capsule:not(.fhj-capsule--total) .fhj-capsule__send { flex: 1 1 0; min-width: min-content; }
 }
 /* Reserve identical space before and after the next visit loads. */
 .fh-app--glass .fht-card__tray { padding: 0; border: 1px solid var(--fh-hairline); box-shadow: none; }
@@ -537,7 +539,7 @@ body:has(.fh-app--glass) .fhj-capsule .fhc-btn { background-image: none; box-sha
 .fh-customers-heading { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .fh-customers-heading h1 { margin: 0; color: var(--fh-ink); font-size: 30px; font-weight: 700; line-height: 1.2; letter-spacing: -.04em; }
 .fh-customers-heading p { margin: 0; color: var(--fh-ink-2); font-size: 14px; }
-.fh-customers-heading .fhc-btn { justify-self: start; min-height: 44px; margin-top: 12px; }
+.fh-customers-heading .fhc-btn { justify-self: start; min-height: 48px; margin-top: 12px; }
 .fh-customers-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 28px 0 24px; }
 .fh-customers-metrics > div { display: flex; flex-direction: column; gap: 12px; min-width: 0; padding-bottom: 16px; border-bottom: 1px solid var(--fh-hairline); }
 .fh-customers-metrics span { color: var(--fh-ink-2); font-size: 13px; line-height: 1.5; }
@@ -646,8 +648,10 @@ body:has(.fh-app--glass) .fhj-capsule .fhc-btn { background-image: none; box-sha
 
 @media (min-width: 900px) and (max-width: 1100px) { .fh-app--glass .fh-reports__summary strong { font-size: 30px; } }
 
+/* Mini buttons reach 44 px on a phone; md and lg buttons hold their own
+   48 and 56 px minimum and grow when a label wraps. */
 @media (max-width: 899px) {
-  .fh-app--glass .fhc-btn { min-height: 44px; }
+  .fh-app--glass .fhc-btn--mini { min-height: 44px; }
 }
 
 .fh-app--glass .fh-build-page[data-build-screen] .fh-build-content-grid > .fh-build-rail--page {
