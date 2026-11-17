@@ -279,11 +279,12 @@ test.describe('the customer page', () => {
       }
     })
     await open(page, '/clients/cl-direct')
-    // Phone: "Lifetime $1.3K", "Contract balance $500". Desktop: "$1K
-    // Lifetime value", "$500 Remaining contract value". Both read $0 before.
+    // Phone: "Lifetime $1,300.00", "Contract balance $500.00". Desktop:
+    // "$1,300.00 Lifetime value", "$500.00 Remaining contract value". Both
+    // read $0 before, and a rounded "$1.3K" until formats-4.
     const main = page.locator('main')
-    await expect(main).toContainText(/Lifetime\s*\$1\.3K|\$1(\.3)?K\s*Lifetime value/, { timeout: 30_000 })
-    await expect(main).toContainText(/Contract balance\s*\$500|\$500\s*Remaining contract value/)
+    await expect(main).toContainText(/Lifetime\s*\$1,300\.00|\$1,300\.00\s*Lifetime value/, { timeout: 30_000 })
+    await expect(main).toContainText(/Contract balance\s*\$500\.00|\$500\.00\s*Remaining contract value/)
   })
 
   test('Map opens the map app for this device, not Apple Maps on Android (S25)', async ({ context, page }) => {
