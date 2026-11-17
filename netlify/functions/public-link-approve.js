@@ -27,7 +27,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { clientIp as rateLimitIp, hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
-import { sendPushToUser } from './lib/push.js'
+import { alertLinkRecipients } from './lib/linkAlerts.js'
 import { linkScope } from './lib/linkScope.js'
 import { brandingUserIdFor } from './lib/orgAccess.js'
 import { proposalNumber } from './lib/docNumbers.js'
@@ -326,23 +326,22 @@ export default async function handler(req) {
     console.error('[public-link-approve] contact update failed', upErr)
   }
 
-  // 8. Notification to the contractor's bell + lock screen.
-  try {
-    await supabase.from('fh_notifications').insert({
-      user_id: link.user_id,
+  // 8. Bell and lock screen for the company (lib/linkAlerts.js).
+  await alertLinkRecipients(supabase, {
+    orgId: link.org_id || contact.org_id || null,
+    creatorId: link.user_id,
+    notification: {
       kind: 'quote_approved',
       title: `Quote approved · ${moneyFmt(baseTotal)}`,
       body: `${signatureName} signed${contact.name ? ` for ${contact.name}` : ''}`,
       link: `/jobs/${contact.id}`
-    })
-  } catch (e) {
-    console.warn('[public-link-approve] notification insert failed', e)
-  }
-  await sendPushToUser(supabase, link.user_id, {
-    title: `Quote approved · ${moneyFmt(baseTotal)} 🎉`,
-    body: `${signatureName} signed${contact.name ? ` for ${contact.name}` : ''}`,
-    link: `/jobs/${contact.id}`,
-    tag: `quote-approved-${contact.id}`
+    },
+    push: {
+      title: `Quote approved · ${moneyFmt(baseTotal)} 🎉`,
+      body: `${signatureName} signed${contact.name ? ` for ${contact.name}` : ''}`,
+      link: `/jobs/${contact.id}`,
+      tag: `quote-approved-${contact.id}`
+    }
   })
 
   return json({
@@ -436,23 +435,21 @@ async function approveQuote(supabase, req, link, { signatureName, approvalNote, 
   const newRow = recorded.row
 
   const who = client?.name || null
-  try {
-    await supabase.from('fh_notifications').insert({
-      user_id: link.user_id,
-      org_id: link.org_id || quote.org_id || null,
+  await alertLinkRecipients(supabase, {
+    orgId: link.org_id || quote.org_id || null,
+    creatorId: link.user_id,
+    notification: {
       kind: 'quote_approved',
       title: `Quote approved · ${moneyFmt(snap.baseTotal)}`,
       body: `${signatureName} signed${who ? ` for ${who}` : ''}`,
       link: `/quotes/${quote.id}`
-    })
-  } catch (e) {
-    console.warn('[public-link-approve] notification insert failed', e)
-  }
-  await sendPushToUser(supabase, link.user_id, {
-    title: `Quote approved · ${moneyFmt(snap.baseTotal)} 🎉`,
-    body: `${signatureName} signed${who ? ` for ${who}` : ''}`,
-    link: `/quotes/${quote.id}`,
-    tag: `quote-approved-${quote.id}`
+    },
+    push: {
+      title: `Quote approved · ${moneyFmt(snap.baseTotal)} 🎉`,
+      body: `${signatureName} signed${who ? ` for ${who}` : ''}`,
+      link: `/quotes/${quote.id}`,
+      tag: `quote-approved-${quote.id}`
+    }
   })
 
   return json({

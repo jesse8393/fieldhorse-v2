@@ -23,7 +23,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { createHash } from 'node:crypto'
-import { sendPushToUser } from './lib/push.js'
+import { alertLinkRecipients } from './lib/linkAlerts.js'
 import { clientIp, hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
 import { linkScope } from './lib/linkScope.js'
 import { brandingUserIdFor } from './lib/orgAccess.js'
@@ -319,24 +319,24 @@ export default async function handler(req) {
 
   if (shouldNotify) {
     const { kindLabel, detailLink } = viewedLabelFor(link)
+    // Bell and lock screen: "they're looking at it right now" is the best
+    // possible moment to call. Same debounce for both.
     sideEffects.push(
-      supabase.from('fh_notifications').insert({
-      user_id: link.user_id,
-      org_id: link.org_id || contact.org_id || null,
-      kind: 'public_link_viewed',
-      title: `Customer viewed your ${kindLabel}`,
-      body: contact.name ? `${contact.name}${contact.job_title ? ` · ${contact.job_title}` : ''}` : null,
-      link: detailLink
-      })
-    )
-    // Lock screen too — "they're looking at it right now" is the best
-    // possible moment to call. Same debounce as the bell row.
-    sideEffects.push(
-      sendPushToUser(supabase, link.user_id, {
-      title: `Customer is viewing your ${kindLabel} 👀`,
-      body: contact.name ? `${contact.name}${contact.job_title ? ` · ${contact.job_title}` : ''}` : `Tap to open the ${kindLabel}`,
-      link: detailLink,
-      tag: `link-viewed-${link.id}`
+      alertLinkRecipients(supabase, {
+        orgId: link.org_id || contact.org_id || null,
+        creatorId: link.user_id,
+        notification: {
+          kind: 'public_link_viewed',
+          title: `Customer viewed your ${kindLabel}`,
+          body: contact.name ? `${contact.name}${contact.job_title ? ` · ${contact.job_title}` : ''}` : null,
+          link: detailLink
+        },
+        push: {
+          title: `Customer is viewing your ${kindLabel} 👀`,
+          body: contact.name ? `${contact.name}${contact.job_title ? ` · ${contact.job_title}` : ''}` : `Tap to open the ${kindLabel}`,
+          link: detailLink,
+          tag: `link-viewed-${link.id}`
+        }
       })
     )
   }
@@ -554,19 +554,21 @@ async function handleQuote(supabase, req, link) {
   if (shouldNotify) {
     const { kindLabel, detailLink } = viewedLabelFor(link)
     sideEffects.push(
-      supabase.from('fh_notifications').insert({
-        user_id: link.user_id,
-        org_id: link.org_id || quote.org_id || null,
-        kind: 'public_link_viewed',
-        title: `Customer viewed your ${kindLabel}`,
-        body: who ? `${who}${quote.title ? ` · ${quote.title}` : ''}` : null,
-        link: detailLink
-      }),
-      sendPushToUser(supabase, link.user_id, {
-        title: `Customer is viewing your ${kindLabel} 👀`,
-        body: who ? `${who}${quote.title ? ` · ${quote.title}` : ''}` : `Tap to open the ${kindLabel}`,
-        link: detailLink,
-        tag: `link-viewed-${link.id}`
+      alertLinkRecipients(supabase, {
+        orgId: link.org_id || quote.org_id || null,
+        creatorId: link.user_id,
+        notification: {
+          kind: 'public_link_viewed',
+          title: `Customer viewed your ${kindLabel}`,
+          body: who ? `${who}${quote.title ? ` · ${quote.title}` : ''}` : null,
+          link: detailLink
+        },
+        push: {
+          title: `Customer is viewing your ${kindLabel} 👀`,
+          body: who ? `${who}${quote.title ? ` · ${quote.title}` : ''}` : `Tap to open the ${kindLabel}`,
+          link: detailLink,
+          tag: `link-viewed-${link.id}`
+        }
       })
     )
   }
@@ -725,19 +727,21 @@ async function handleStatement(supabase, req, link) {
   if (shouldNotify) {
     const who = client.company_name || client.name || 'A customer'
     sideEffects.push(
-      supabase.from('fh_notifications').insert({
-        user_id: link.user_id,
-        org_id: link.org_id || client.org_id || null,
-        kind: 'public_link_viewed',
-        title: 'Customer viewed your statement',
-        body: who,
-        link: `/clients/${link.client_id}`
-      }),
-      sendPushToUser(supabase, link.user_id, {
-        title: 'Customer is viewing your statement 👀',
-        body: who,
-        link: `/clients/${link.client_id}`,
-        tag: `link-viewed-${link.id}`
+      alertLinkRecipients(supabase, {
+        orgId: link.org_id || client.org_id || null,
+        creatorId: link.user_id,
+        notification: {
+          kind: 'public_link_viewed',
+          title: 'Customer viewed your statement',
+          body: who,
+          link: `/clients/${link.client_id}`
+        },
+        push: {
+          title: 'Customer is viewing your statement 👀',
+          body: who,
+          link: `/clients/${link.client_id}`,
+          tag: `link-viewed-${link.id}`
+        }
       })
     )
   }

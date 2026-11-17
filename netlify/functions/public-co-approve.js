@@ -17,7 +17,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { clientIp, hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
-import { sendPushToUser } from './lib/push.js'
+import { alertLinkRecipients } from './lib/linkAlerts.js'
 import { linkScope } from './lib/linkScope.js'
 import { documentChanged, matchesWhatWasShown } from './lib/quoteApproval.js'
 
@@ -146,15 +146,7 @@ export default async function handler(req) {
   const who = contact?.name || 'Customer'
   const sign = Number(co.amount) >= 0 ? '+' : '−'
   const title = `Change order signed · ${sign}${moneyFmt(Math.abs(Number(co.amount) || 0))}`
-  try {
-    await supabase.from('fh_notifications').insert({
-      user_id: link.user_id,
-      kind: 'change_order_signed',
-      title,
-      body: `${who} signed CO #${co.sequence_number}${co.title ? `: ${co.title}` : ''}${customerNote ? ` · "${customerNote}"` : ''}`,
-      link: `/jobs/${co.contact_id}?tab=quote`
-    })
-  } catch { /* bell is best-effort */ }
+  const orgId = link.org_id || co.org_id || null
   // Persist the customer's note as an activity row on the job so it
   // isn't lost (it's shown on the Activity/Messages log).
   if (customerNote) {
@@ -167,11 +159,21 @@ export default async function handler(req) {
       })
     } catch { /* best-effort */ }
   }
-  await sendPushToUser(supabase, link.user_id, {
-    title: `${title} ✍️`,
-    body: `${who} signed CO #${co.sequence_number}. It's on the next invoice automatically.`,
-    link: `/jobs/${co.contact_id}?tab=quote`,
-    tag: `co-signed-${co.id}`
+  await alertLinkRecipients(supabase, {
+    orgId,
+    creatorId: link.user_id,
+    notification: {
+      kind: 'change_order_signed',
+      title,
+      body: `${who} signed CO #${co.sequence_number}${co.title ? `: ${co.title}` : ''}${customerNote ? ` · "${customerNote}"` : ''}`,
+      link: `/jobs/${co.contact_id}?tab=quote`
+    },
+    push: {
+      title: `${title} ✍️`,
+      body: `${who} signed CO #${co.sequence_number}. It's on the next invoice automatically.`,
+      link: `/jobs/${co.contact_id}?tab=quote`,
+      tag: `co-signed-${co.id}`
+    }
   })
 
   return json({ ok: true, signed_by: signatureName, approved_at: approvedAt })

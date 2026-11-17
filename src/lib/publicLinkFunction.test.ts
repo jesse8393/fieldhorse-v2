@@ -15,6 +15,7 @@ const seedDb = (tables: Record<string, Row[]>) => { currentFake = fakeSupabase(t
 
 const { default: approveHandler } = await import('../../netlify/functions/public-link-approve.js')
 const { default: coApproveHandler } = await import('../../netlify/functions/public-co-approve.js')
+const { default: docusignHandler } = await import('../../netlify/functions/docusign-webhook.js')
 const {
   default: linkHandler,
   buildPublicLinkViewEvent,
@@ -308,6 +309,75 @@ describe('a quote past its valid until date (M-21)', () => {
     const today = new Date().toISOString().slice(0, 10)
     seedDb(quoteTables(today))
     expect((await post(approveHandler, body)).status).toBe(200)
+  })
+})
+
+describe('who hears about a customer on a link (FN-05, FN-06)', () => {
+  const EX = 'user-ex-manager'
+  const MANAGER = 'user-manager'
+  const members = [
+    { org_id: ORG, user_id: OWNER, role: 'owner', revoked_at: null, joined_at: '2026-01-01T00:00:00.000Z' },
+    { org_id: ORG, user_id: MANAGER, role: 'manager', revoked_at: null, joined_at: '2026-02-01T00:00:00.000Z' },
+    { org_id: ORG, user_id: EX, role: 'manager', revoked_at: '2026-11-01T00:00:00.000Z', joined_at: '2026-02-01T00:00:00.000Z' },
+    { org_id: 'org-other', user_id: 'user-elsewhere', role: 'owner', revoked_at: null, joined_at: '2026-01-01T00:00:00.000Z' }
+  ]
+  const quoteDb = (creator: string) => baseTables({
+    org_members: members,
+    fh_public_links: [link({ token: 'q', kind: 'proposal', quote_id: 'quote-1', user_id: creator, last_viewed_at: null })],
+    fh_quotes: [{ id: 'quote-1', org_id: ORG, user_id: creator, client_id: 'cl-1', title: 'Driveway', status: 'sent', amount: 100, expires_at: null, job_id: null, created_at: '2026-10-20T00:00:00.000Z', updated_at: 'u1' }],
+    fh_quote_items: [{ id: 'it-1', quote_id: 'quote-1', contact_id: null, description: 'Slab', qty: 1, rate: 100, amount: 100, sort_order: 0 }]
+  })
+  const bell = (db: { tables: Record<string, Row[]> }, kind: string) => db.tables.fh_notifications
+    .filter((n) => n.kind === kind).map((n) => `${n.user_id}:${n.org_id}`).sort()
+
+  it('a removed teammate hears nothing; the company owners do', async () => {
+    const db = seedDb(quoteDb(EX))
+    await getLink('q')
+    await post(approveHandler, { token: 'q', signature_name: 'Dana', expected_total: 100, expected_updated_at: 'u1' })
+    expect(bell(db, 'public_link_viewed')).toEqual([`${OWNER}:${ORG}`])
+    expect(bell(db, 'quote_approved')).toEqual([`${OWNER}:${ORG}`])
+    expect(pushes.map((p) => p.userId)).toEqual([OWNER, OWNER])
+  })
+
+  it('the teammate who made the link hears while they are in the company, and so do the owners', async () => {
+    const db = seedDb(quoteDb(MANAGER))
+    await getLink('q')
+    expect(bell(db, 'public_link_viewed')).toEqual([`${MANAGER}:${ORG}`, `${OWNER}:${ORG}`].sort())
+    expect(pushes.map((p) => p.userId).sort()).toEqual([MANAGER, OWNER].sort())
+  })
+
+  it('a change order signature and a job proposal approval write rows the company can read', async () => {
+    let db = seedDb(baseTables({
+      fh_public_links: [link({ token: 'co', kind: 'change_order', contact_id: 'job-1', change_order_id: 'co-1' })],
+      fh_contacts: [job()],
+      fh_change_orders: [{ id: 'co-1', org_id: ORG, user_id: OWNER, contact_id: 'job-1', sequence_number: 1, title: 'Footing', amount: 1200, status: 'sent', updated_at: 'u1' }]
+    }))
+    expect((await post(coApproveHandler, { token: 'co', signature_name: 'Dana', expected_amount: 1200, expected_updated_at: 'u1' })).status).toBe(200)
+    expect(bell(db, 'change_order_signed')).toEqual([`${OWNER}:${ORG}`])
+
+    db = seedDb(baseTables({
+      fh_public_links: [link({ token: 'jp', kind: 'proposal', contact_id: 'job-1' })],
+      fh_contacts: [job({ stage: 'quote', proposal_status: 'sent' })],
+      fh_quote_items: [{ id: 'ji', quote_id: null, contact_id: 'job-1', description: 'Patio', qty: 1, rate: 20000, amount: 20000, sort_order: 0 }]
+    }))
+    expect((await post(approveHandler, { token: 'jp', signature_name: 'Dana', expected_total: 20000 })).status).toBe(200)
+    expect(bell(db, 'quote_approved')).toEqual([`${OWNER}:${ORG}`])
+  })
+
+  it('a DocuSign signature writes a readable bell row and sends a push', async () => {
+    const { createHmac } = await import('node:crypto')
+    vi.stubEnv('DOCUSIGN_CONNECT_HMAC_KEY', 'test-hmac')
+    const db = seedDb({
+      ...quoteDb(MANAGER),
+      fh_esign_envelopes: [{ id: 'env-row', envelope_id: 'ENV-1', user_id: MANAGER, org_id: ORG, contact_id: null, quote_id: 'quote-1', recipient_name: 'Dana Smith', recipient_email: 'dana@example.test', status: 'sent', sent_at: '2026-11-10T00:00:00Z' }]
+    })
+    const raw = JSON.stringify({ event: 'envelope-completed', data: { envelopeId: 'ENV-1', envelopeSummary: { status: 'completed' } } })
+    const sig = createHmac('sha256', 'test-hmac').update(raw, 'utf8').digest('base64')
+    const res = await docusignHandler(new Request('https://x.test/api/docusign-webhook', { method: 'POST', headers: { 'x-docusign-signature-1': sig }, body: raw }))
+    expect(res.status).toBe(200)
+    expect(bell(db, 'quote_approved')).toEqual([`${MANAGER}:${ORG}`, `${OWNER}:${ORG}`].sort())
+    expect(pushes.map((p) => p.userId).sort()).toEqual([MANAGER, OWNER].sort())
+    expect(pushes[0].payload.title).toBe('Proposal signed')
   })
 })
 

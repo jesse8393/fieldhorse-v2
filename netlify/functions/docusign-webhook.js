@@ -25,6 +25,7 @@ import crypto from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import { brandingUserIdFor } from './lib/orgAccess.js'
 import { proposalNumber } from './lib/docNumbers.js'
+import { alertLinkRecipients } from './lib/linkAlerts.js'
 import {
   buildQuoteSnapshot, claimQuoteApproval, recordQuoteVersion, snapshotCompany, snapshotItems
 } from './lib/quoteApproval.js'
@@ -358,7 +359,7 @@ export default async (request) => {
 
   const { data: env, error: lookupError } = await supabase
     .from('fh_esign_envelopes')
-    .select('id, user_id, contact_id, quote_id, recipient_name, recipient_email, status, sent_at')
+    .select('id, user_id, org_id, contact_id, quote_id, recipient_name, recipient_email, status, sent_at')
     .eq('envelope_id', envelopeId)
     .maybeSingle()
   if (lookupError) return new Response('envelope_lookup_failed', { status: 503 })
@@ -407,18 +408,16 @@ export default async (request) => {
       console.error('[docusign-webhook] recording the approval failed', { envelope_id: envelopeId, error: e?.message || e })
     }
 
-    const { error: notifErr } = await supabase.from('fh_notifications').insert({
-      user_id: env.user_id,
-      kind: 'quote_approved',
-      title: 'Proposal signed',
-      body: `${env.recipient_name || 'The customer'} signed via DocuSign`,
-      link: env.quote_id ? `/quotes/${env.quote_id}` : `/jobs/${env.contact_id}`
+    // Bell and lock screen for the company (lib/linkAlerts.js): the
+    // sender while still a member, and the owners.
+    const detail = env.quote_id ? `/quotes/${env.quote_id}` : `/jobs/${env.contact_id}`
+    const signed = `${env.recipient_name || 'The customer'} signed via DocuSign`
+    await alertLinkRecipients(supabase, {
+      orgId: env.org_id || null,
+      creatorId: env.user_id,
+      notification: { kind: 'quote_approved', title: 'Proposal signed', body: signed, link: detail },
+      push: { title: 'Proposal signed', body: signed, link: detail, tag: `esign-signed-${env.id}` }
     })
-    if (notifErr) {
-      console.error('[docusign-webhook] notification insert failed', {
-        user_id: env.user_id, error: notifErr
-      })
-    }
   }
 
   return new Response('ok', { status: 200 })
