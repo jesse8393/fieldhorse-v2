@@ -16,6 +16,7 @@ describe('independent settings sections', () => {
   it('validates only the saved document or payment section', () => {
     expect(() => settingsSectionPatch('documents', { ...form, brandAccentHex: 'bad' }, {})).toThrow('brand color')
     expect(() => settingsSectionPatch('payments', { ...form, paymentLink: 'javascript:bad' }, {})).toThrow('web address')
+    expect(() => settingsSectionPatch('payments', { ...form, paymentLink: 'not a link' }, {})).toThrow('web address')
     expect(settingsSectionPatch('payments', form, {})).toEqual({ payment_link: 'https://venmo.com/u/parker', payment_instructions: 'Pay by check' })
   })
   it('preserves unrelated preferences when saving quote reminders', () => {

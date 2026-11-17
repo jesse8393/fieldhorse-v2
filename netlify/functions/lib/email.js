@@ -46,9 +46,23 @@ export function renderParagraphs(text, safe) {
 export function safePayUrl(raw) {
   const t = String(raw || '').trim()
   if (!t) return ''
-  if (/^(https?|mailto|tel):/i.test(t)) return t
+  if (/^(mailto|tel):/i.test(t)) return t
+  if (/^https?:/i.test(t)) return isWebAddress(t) ? t : ''
   if (/^[a-z][a-z0-9+.-]*:/i.test(t)) return '' // unknown/dangerous scheme
-  return `https://${t}`
+  const url = `https://${t}`
+  return isWebAddress(url) ? url : ''
+}
+
+// A real web address: no spaces, parses, names a host with a dot in it,
+// and carries no user name or password (which would hide the real host).
+function isWebAddress(t) {
+  if (/\s/.test(t)) return false
+  try {
+    const u = new URL(t)
+    return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(u.hostname) && !u.username && !u.password
+  } catch {
+    return false
+  }
 }
 
 // "Pay now" block — a gold button to the contractor's bring-your-own
