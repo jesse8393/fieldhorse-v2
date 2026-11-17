@@ -105,3 +105,28 @@ export async function findOrCreateClient(
     return null
   }
 }
+
+/**
+ * What would be lost with this client. Leads and quotes are deleted with
+ * their client (with their lines, versions and customer links) and
+ * invoices lose it, so a client that has any of them is not deleted.
+ * Throws when the counts cannot be read, so nothing is deleted unchecked.
+ */
+export async function clientDeleteBlockers(clientId: string): Promise<{ leads: number; quotes: number; invoices: number }> {
+  const count = async (table: 'fh_leads' | 'fh_quotes' | 'fh_invoices') => {
+    const { count: n, error } = await supabase.from(table).select('id', { count: 'exact', head: true }).eq('client_id', clientId)
+    if (error || n === null) throw new Error("Couldn't check this client's records. Check your connection and try again.")
+    return n
+  }
+  const [leads, quotes, invoices] = await Promise.all([count('fh_leads'), count('fh_quotes'), count('fh_invoices')])
+  return { leads, quotes, invoices }
+}
+
+/** "1 lead, 2 quotes and 3 invoices" for the counts that are not zero. */
+export function describeDeleteBlockers(b: { leads: number; quotes: number; invoices: number }): string {
+  const parts = ([[b.leads, 'lead'], [b.quotes, 'quote'], [b.invoices, 'invoice']] as const)
+    .filter(([n]) => n > 0)
+    .map(([n, noun]) => `${n} ${noun}${n === 1 ? '' : 's'}`)
+  if (parts.length <= 1) return parts.join('')
+  return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
+}

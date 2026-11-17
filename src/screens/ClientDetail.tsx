@@ -25,6 +25,7 @@ import { toastError, toastInfo } from '../lib/toast.ts'
 import { stageColor, stageLabel } from '../lib/stages.ts'
 import { recordRoute, type RecordKind } from '../lib/records.ts'
 import { useSecondTap } from '../lib/secondTap.ts'
+import { clientDeleteBlockers, describeDeleteBlockers } from '../lib/clients.ts'
 import { gatherStatement } from '../lib/statement.ts'
 import { rollupJobs } from '../lib/rollups.ts'
 import { composeClientTimeline, type TimelineEvent } from '../lib/clientTimeline.ts'
@@ -108,9 +109,32 @@ export default function ClientDetail() {
     [jobs, payments, changeOrders]
   )
 
-  // The first tap arms the button, the second deletes.
-  function requestDelete() {
+  // The first tap checks what would be lost and arms the button, the
+  // second deletes. Leads and quotes go with their client and invoices
+  // lose it, so a client that has any of them is not deleted (the page
+  // says what to do instead and the button stays unarmed).
+  async function blockedFromDelete(): Promise<boolean> {
+    if (!client?.id) return true
+    try {
+      const blockers = await clientDeleteBlockers(client.id)
+      const what = describeDeleteBlockers(blockers)
+      if (!what) return false
+      hapticError()
+      toastError(
+        `${client.name || 'This client'} has ${what}`,
+        'Deleting the client would delete those too. Merge this client into the right one to keep them, or remove them first.'
+      )
+      return true
+    } catch (e) {
+      hapticError()
+      toastError("Couldn't delete", e instanceof Error ? e.message : 'Check your connection and try again.')
+      return true
+    }
+  }
+
+  async function requestDelete() {
     if (!client?.id || deleting) return
+    if (!deleteTap.armed && await blockedFromDelete()) return
     deleteTap.tap(() => { void confirmDelete() })
   }
 
@@ -120,13 +144,15 @@ export default function ClientDetail() {
   async function confirmDelete() {
     if (!client?.id || deleting) return
     setDeleting(true)
+    // Checked again: a lead or invoice may have been added since the first tap.
+    if (await blockedFromDelete()) { setDeleting(false); return }
     const { data, error } = await supabase.from('fh_clients').delete().eq('id', client.id).select('id')
     if (error || !data?.length) {
       setDeleting(false)
-      toastError("Couldn't delete", error?.message || 'This client may already be gone. Refresh and try again.')
+      toastError("Couldn't delete", error ? 'Check your connection and try again.' : 'This client may already be gone. Refresh and try again.')
       return
     }
-    toastInfo('Client deleted', 'Linked jobs unlinked')
+    toastInfo('Client deleted', 'Its jobs stay, with no client.')
     void invalidateClients()
     navigate('/clients')
   }
@@ -236,7 +262,7 @@ export default function ClientDetail() {
           onTabChange={setTab}
           onBack={() => navigate('/clients')}
           onEdit={() => setIsEditing(!isEditing)}
-          onDelete={requestDelete}
+          onDelete={() => { void requestDelete() }}
           deleteArmed={deleteTap.armed}
           onNewDeal={openNew}
           onStatement={statementSummary.totalDue > 0 ? openStatement : undefined}
@@ -275,10 +301,10 @@ export default function ClientDetail() {
             <motion.button
               type="button"
               whileTap={{ scale: 0.97 }}
-              onClick={() => { hapticError(); requestDelete() }}
+              onClick={() => { hapticError(); void requestDelete() }}
               disabled={deleting}
               aria-label="Tap again to delete"
-              title={`Tap again to delete ${client?.name || 'this client'}. Linked jobs keep running, they just lose the client link.`}
+              title={`Tap again to delete ${client?.name || 'this client'}. Its jobs stay, with no client.`}
               style={{
                 minHeight: 40, padding: '0 12px', borderRadius: 10,
                 background: 'rgba(192, 57, 43, 0.10)', border: '1px solid color-mix(in srgb, var(--v3-danger) 35%, transparent)',
@@ -289,7 +315,7 @@ export default function ClientDetail() {
               Tap again to delete
             </motion.button>
           ) : (
-            <IconBtn onClick={() => { hapticError(); requestDelete() }} ariaLabel="Delete client" tone="danger" disabled={deleting}>
+            <IconBtn onClick={() => { hapticError(); void requestDelete() }} ariaLabel="Delete client" tone="danger" disabled={deleting}>
               <Trash2 size={16} />
             </IconBtn>
           )}

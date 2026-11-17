@@ -170,8 +170,24 @@ test.describe('the customer page', () => {
     await expect(page).toHaveURL(/\/invoices\/inv1$/)
   })
 
-  test('deleting a customer takes a second tap on the same button', async ({ context, page }) => {
+  test('a customer with leads, quotes or invoices is not deleted, and the page says what to do instead', async ({ context, page }) => {
     await signIn(context)
+    const writes = watchWrites(page)
+    await open(page, '/clients/cl-1')
+    await page.getByRole('button', { name: /^Delete( client)?$/ }).click()
+    await expect(page.getByText(/Jeff Roy has \d+ leads?, \d+ quotes? and \d+ invoices?/)).toBeVisible()
+    await expect(page.getByText(/Merge this client into the right one to keep them/)).toBeVisible()
+    // Not armed: a second tap cannot delete.
+    await expect(page.getByRole('button', { name: 'Tap again to delete' })).toHaveCount(0)
+    await page.getByRole('button', { name: /^Delete( client)?$/ }).click()
+    await page.waitForTimeout(500)
+    expect(writes.filter((w) => w.startsWith('DELETE'))).toEqual([])
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+  })
+
+  test('deleting a customer takes a second tap on the same button', async ({ context, page }) => {
+    // A customer with no leads, quotes or invoices (those would be lost).
+    await signIn(context, { tables: { fh_leads: [], fh_quotes: [], fh_invoices: [] } })
     const writes = watchWrites(page)
     await open(page, '/clients/cl-1')
     const del = page.getByRole('button', { name: /^Delete( client)?$/ })
