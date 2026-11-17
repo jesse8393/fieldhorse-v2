@@ -862,3 +862,51 @@ test('the contract card shows cents', async ({ context, page }) => {
   await expect(card.locator('.cockpit-headline__bar-meta')).toContainText('$5,000.50 collected')
   await expect(card.locator('.cockpit-headline__bar-meta')).toContainText('$4,999.50 remaining')
 })
+
+// Finding lost-work-2: a half written daily log or job note is not lost to
+// a reload or a tap on another section.
+const TYPED = 'Saw cut joints at 10 ft, broom finish, no curing compound'
+const jobSections = (page: Page) => page.getByRole('combobox', { name: 'Job section', exact: true })
+async function openJob(page: Page, path: string) {
+  await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(jobSections(page)).toBeVisible({ timeout: 30_000 })
+}
+
+test.describe('typed words in the job sections', () => {
+  const WORDS = TYPED
+  const sections = jobSections
+
+  test('a half written daily log survives a tap on another section and a reload', async ({ context, page }) => {
+    await signIn(context)
+    await openJob(page, '/jobs/c-job1?tab=logs')
+    await page.getByRole('button', { name: '+ New log' }).click()
+    await page.getByLabel('Site summary').fill(WORDS)
+    await page.getByLabel('Crew on site (optional)').fill('4')
+    await sections(page).selectOption('tasks')
+    await expect(page.getByLabel('Site summary')).toHaveCount(0)
+    await sections(page).selectOption('logs')
+    await expect(page.getByLabel('Site summary')).toHaveValue(WORDS)
+    await expect(page.getByLabel('Crew on site (optional)')).toHaveValue('4')
+    await page.reload()
+    await expect(page.getByLabel('Site summary')).toHaveValue(WORDS)
+    await expect(page.getByText('Unsaved changes restored')).toBeVisible()
+    // Cancel throws the draft away for good.
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await page.reload()
+    await expect(page.getByRole('button', { name: '+ New log' })).toBeVisible()
+    await expect(page.getByLabel('Site summary')).toHaveCount(0)
+  })
+
+  test('a half written job note survives a tap on another section and a reload', async ({ context, page }) => {
+    await signIn(context)
+    await openJob(page, '/jobs/c-job1?tab=messages')
+    const box = page.getByPlaceholder('Log a note, call, touchpoint…')
+    await box.fill(WORDS)
+    await sections(page).selectOption('tasks')
+    await expect(box).toHaveCount(0)
+    await sections(page).selectOption('messages')
+    await expect(box).toHaveValue(WORDS)
+    await page.reload()
+    await expect(page.getByPlaceholder('Log a note, call, touchpoint…')).toHaveValue(WORDS)
+  })
+})

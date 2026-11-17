@@ -8,6 +8,8 @@ import { hapticTap } from '../../../lib/haptics.ts'
 import { canHover } from '../../../lib/hover.ts'
 import { PostedByChip, Eyebrow } from '../../../components/v3'
 import { useArmedId } from '../../../lib/secondTap.ts'
+import { useEditDraft } from '../../../lib/useEditDraft.ts'
+import DraftRestored from '../../../components/DraftRestored.tsx'
 
 /**
  * Messages section, communication log (fh_notes) tied to this job.
@@ -18,7 +20,11 @@ import { useArmedId } from '../../../lib/secondTap.ts'
  * Text/Email/Call quick actions on Jobs.jsx, same fh_notes table.
  */
 export default function MessagesSection({ contactId, userId, notes = [], fetchAll }: any) {
-  const [draft, setDraft] = useState('')
+  // The note being written stays on the device per job until it is logged,
+  // so a tap on another section or a reload keeps it (D23).
+  const note = useEditDraft(contactId ? `job-note:${contactId}` : null, { text: '' }, { from: 'note' })
+  const draft = note.form.text
+  const setDraft = (value: string) => note.set('text', value)
   const [saving, setSaving] = useState(false)
   // Delete takes a second tap on the same note's button (D57).
   const deleteTap = useArmedId()
@@ -91,6 +97,7 @@ export default function MessagesSection({ contactId, userId, notes = [], fetchAl
         )}
       </div>
 
+      {note.restored && <DraftRestored onDiscard={note.discard} />}
       <div style={{ display: 'flex', gap: 8 }}>
         <input
           value={draft}
