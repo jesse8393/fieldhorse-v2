@@ -347,10 +347,12 @@ type LineErrors = Partial<Record<'description' | 'qty' | 'rate' | 'amount', stri
 // rounded to the cent still counts as quantity times rate: the estimator
 // saves 3 at $333.33 for $1,000.00 (M-09).
 // A line's detail ("1 at $1,234,567.89") may wrap between words, but a
-// money figure in it never breaks inside the number.
+// money figure in it never breaks inside the number. The word before the
+// figure stays with it ("at $950.00"), so the figure alone never repeats
+// the line's amount as a separate piece of text.
 function wholeFigures(text: string) {
   if (!text) return undefined
-  return text.split(/(-?\$[\d,]+(?:\.\d+)?)/).map((part, i) => (i % 2 ? <span key={i} className="fhqt-figure">{part}</span> : part))
+  return text.split(/((?:\S+ )?-?\$[\d,]+(?:\.\d+)?)/).map((part, i) => (i % 2 ? <span key={i} className="fhqt-figure">{part}</span> : part))
 }
 
 function seedFromRow(row: any): LineDraft {
