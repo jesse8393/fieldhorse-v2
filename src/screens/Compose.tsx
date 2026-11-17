@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import RecordPicker from '../components/RecordPicker.tsx'
 import CommunicationHistory from '../components/CommunicationHistory.tsx'
 import { emailDraft, plainDraft as stripMarkdown } from '../lib/composeDraft.ts'
 import { motion } from 'framer-motion'
-import { Sparkles, Copy, Check, MessageSquare, Mail, Mic, Send, PenLine, RotateCw } from 'lucide-react'
+import { Sparkles, Copy, Check, MessageSquare, Mail, Mic, Send, PenLine, RotateCw, ChevronLeft } from 'lucide-react'
+import { IconButton } from '../components/fh'
+import { recordRoute } from '../lib/records.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import BuildTopbar from '../components/desktop/BuildTopbar.tsx'
 import { supabase, authHeaders } from '../lib/supabase.ts'
@@ -14,7 +16,8 @@ import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
 import { claudeMessage, getAiReadiness } from '../lib/anthropic.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
-import { hapticMedium, hapticSuccess } from '../lib/haptics.ts'
+import { hapticMedium, hapticSuccess, hapticTap } from '../lib/haptics.ts'
+import './new/new.css'
 import { useFhMotion } from '../lib/motion.ts'
 import { FilterPill, Eyebrow } from '../components/v3'
 import { countNoun } from '../lib/format.ts'
@@ -40,6 +43,17 @@ export default function Compose() {
   const { user } = useAuth()
   const { profile } = useProfile()
   const [params, setParams] = useSearchParams()
+  const navigate = useNavigate()
+  // Back to the screen Compose was opened from, such as the job's Message.
+  // Opened from a link with nothing behind it, Back goes to the job it
+  // writes to, or Today (dead-ends-4).
+  function goBack() {
+    hapticTap()
+    const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0
+    if (idx > 0) { navigate(-1); return }
+    const job = params.get('contact')
+    navigate(job ? recordRoute('job', job) : '/', { replace: true })
+  }
   const [channel, setChannel] = useState(() => params.get('channel') === 'email' ? 'email' : 'sms')
   const [intent, setIntent] = useState(INTENTS[0])
   const [contactId, setContactId] = useState(() => params.get('contact') || '')
@@ -296,14 +310,22 @@ export default function Compose() {
         // full-width spanner pins them above the columned content.
         <div style={{ gridColumn: '1 / -1' }}>
           <BuildTopbar />
-          <div style={{ padding: '12px var(--v3-gutter) 12px' }}>
-            <div className="fh-build-good">Dispatch</div>
-            <h1 className="fh-build-title">Message composer</h1>
-            <Link to="/inbox?view=history" className="fh-build-outline-btn">Communication history</Link>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '12px var(--v3-gutter) 12px' }}>
+            <IconButton aria-label="Back" icon={ChevronLeft} variant="plain" size={44} onClick={goBack} />
+            <div>
+              <div className="fh-build-good">Dispatch</div>
+              <h1 className="fh-build-title">Message composer</h1>
+              <Link to="/inbox?view=history" className="fh-build-outline-btn">Communication history</Link>
+            </div>
           </div>
         </div>
       )}
-      {!isDesktop && <h1 style={{ padding: '16px 24px 4px', fontSize: 'var(--fh-type-page)', margin: 0 }}>Message composer</h1>}
+      {!isDesktop && (
+        <header className="fhnew-head">
+          <IconButton aria-label="Back" icon={ChevronLeft} variant="plain" size={44} onClick={goBack} />
+          <h1 className="fhnew-title">Message composer</h1>
+        </header>
+      )}
       {/* INPUT COCKPIT, black-glass panel: header eyebrow + channel pills
           + intent + contact + context chips + CTA */}
       <motion.div className="fh-compose-workspace__input" variants={item} style={{ padding: '8px 24px 12px' }}>

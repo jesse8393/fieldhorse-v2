@@ -723,6 +723,23 @@ test.describe('job page on a desktop, redesigned', () => {
   })
 })
 
+// dead-ends-4: Message on a job opens Compose, whose Back returns to that
+// job. Opened straight from a link, with nothing to go back to, Back still
+// lands on the job it writes to.
+test('Compose opened from a job has a Back to the job', async ({ context, page }) => {
+  await signIn(context)
+  await page.goto('/jobs/c-job1', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await page.getByRole('link', { name: /^Message/ }).first().click()
+  await expect(page).toHaveURL(/\/compose\?contact=c-job1/, { timeout: 30_000 })
+  const back = page.locator('#fh-main').getByRole('button', { name: 'Back', exact: true })
+  await back.click()
+  await expect(page).toHaveURL(/\/jobs\/c-job1$/)
+
+  await page.goto('/compose?contact=c-job1&channel=email', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await back.click()
+  await expect(page).toHaveURL(/\/jobs\/c-job1$/)
+})
+
 // M-20 and OPS-08: Log payment keeps cents on the balance, the button and
 // the one toast it shows.
 test('Log payment shows cents and one toast', async ({ context, page }) => {
