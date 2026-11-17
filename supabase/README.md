@@ -153,6 +153,7 @@ writes, unless noted.
 | 20261117110300_function_default_privileges | Applied | |
 | 20261117110400_realtime_publication | Applied | 14 tables published. |
 | 20261117110500_customer_messages_office_roles | Applied | |
+| 20261117130000_hot_read_indexes | Applied | Three indexes, `create index if not exists` only. A dry run built all three and was undone; the performance advisor no longer lists `fh_leads.quote_id` or `fh_quotes.approved_version_id` as unindexed. |
 | 20261117100000_follow_ups_in_step | Waiting on owner approval | Its triggers fire on delete, and the word asks for approval. Then run `supabase/manual/20261117_follow_up_cleanup.sql`, dry run first. |
 | 20261117100100_follow_up_unique_indexes | Waiting | After the cleanup above. |
 | 20261117110200_partner_and_removal_policies | Waiting on owner approval | Names the delete command in a policy. |

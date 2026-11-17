@@ -227,3 +227,39 @@ commit names its finding id.
   can be tested.
 * One word for the customer record (customer, client or account), and one
   for subcontractors, is Jesse's call.
+* PERF-07 (the invoices bundle reads), PERF-08 (Home's refresh timing) and
+  A11Y-14 (text sizes in rem across all the CSS) are larger changes with
+  their own tests to write.
+* Four indexes in production are exact duplicates of another (on
+  fh_mileage, fh_public_link_events, fh_schedule and fh_selections).
+  Removing them needs the owner's approval and saves little.
+
+## Follow up round, 2026-11-17 (PR #246)
+
+* The browser suite is green again against the merged audit. The 42
+  failures on `main` were tests written before the audit's own fixes: the
+  bell's reminder read is a POST and was counted as a write, and several
+  tests tapped faster than the new 500 ms double tap guard. One was a real
+  bug: on a slow phone, a sort tapped just before typing a search went back
+  off. Fixed in the Jobs list with a test.
+* A database check failed only between 11 pm and midnight Chicago time.
+  Its leads were made "30 days ago", which across the November 1 clock
+  change reads as 29 local days, between two reminder windows. The
+  fixtures now sit mid window; the engine was right.
+* Performance and accessibility: PERF-01 to PERF-06, PERF-09 to PERF-12 and
+  A11Y-01 to A11Y-13 fixed, each with a test. Measured on a throttled
+  Pixel 7 profile against production builds:
+
+  | Measure | Before | After |
+  | --- | --- | --- |
+  | First load JavaScript, gzip | 274 KB | 217 KB |
+  | Home, cold open, ready | 4.3 s | 3.4 s |
+  | Home, repeat open on a slow network, ready | 3.4 s | 0.3 s |
+  | Quote, repeat open on a slow network, ready | 9.4 s | 3.4 s |
+  | Jobs with 500 rows, page elements | 9,866 | 533 |
+  | Jobs with 500 rows, longest freeze | 550 ms | 133 ms |
+
+* `20261117130000_hot_read_indexes` is applied in production.
+* Changes Jesse may want to see on the preview: error and Undo messages now
+  stay until closed (at most three at once), and the copper buttons use
+  white text so it can be read.
