@@ -174,3 +174,75 @@ describe('Meta lead form consent', () => {
     expect(await capture([{ name: 'what_do_you_need', values: ['A new driveway, yes'] }])).toBe(false)
   })
 })
+
+// FN-13. With no thread token, an inbound email went to the first company
+// whose sending address shared the receiving domain, so a customer of one
+// company could land in another company's inbox.
+describe('inbound email with no thread token', () => {
+  const ORG_A = 'org-first'
+  const ORG_B = 'org-second'
+
+  async function receive(from: string, to: string, extra: Record<string, any[]> = {}) {
+    const state = newState({
+      fh_org_settings: [
+        { org_id: ORG_A, reply_domain: 'reply.send.example.test', default_from_email: 'first@send.example.test', engine_enabled: true },
+        { org_id: ORG_B, reply_domain: 'reply.send.example.test', default_from_email: 'second@send.example.test', engine_enabled: true },
+      ],
+      fh_clients: [], fh_conversations: [], fh_messages: [], ...extra,
+    })
+    state.rpc = {
+      fh_resolve_client: (args: any) => [{ client_id: `client-in-${args.p_org_id}`, is_new: true }],
+      fh_conversation_for_client: (args: any) => `conv-in-${args.p_org_id}`,
+      fh_automation_tick: () => null,
+    }
+    const app = runtime({ POSTMARK_INBOUND_TOKEN: 'test-token' })
+    app.createClient.mockImplementation(() => fakeClient(state) as any)
+    const response = await app.endpoint('email-events')(new Request('https://example.test/email-events?provider=postmark&token=test-token', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ FromFull: { Email: from, Name: 'Pat Lee' }, ToFull: [{ Email: to }], Subject: 'Driveway', TextBody: 'When can you come out?', MessageID: 'pm-1' }),
+    }))
+    expect(response.status).toBe(200)
+    const resolved = state.log.filter((l) => l.op === 'rpc' && l.fn === 'fh_resolve_client').map((l) => l.payload.p_org_id)
+    return { body: await response.json(), resolved, messages: state.tables.fh_messages }
+  }
+
+  it('files mail sent to a company sending address under that company, not the first on the domain', async () => {
+    const { resolved, messages } = await receive('pat@customer.example.test', 'second@send.example.test')
+    expect(resolved).toEqual([ORG_B])
+    expect(messages.map((m) => m.org_id)).toEqual([ORG_B])
+  })
+
+  it('leaves mail from a stranger to a shared domain unfiled instead of guessing a company', async () => {
+    const { body, resolved, messages } = await receive('stranger@elsewhere.example.test', 'hello@send.example.test')
+    expect(body).toEqual({ ok: true, ignored: 'no matching org' })
+    expect(resolved).toEqual([])
+    expect(messages).toEqual([])
+  })
+
+  it('files mail to a shared domain under the one company that already has the sender as a client', async () => {
+    const { resolved, messages } = await receive('Pat@Customer.example.test', 'hello@send.example.test', {
+      fh_clients: [{ id: 'client-b', org_id: ORG_B, email: 'pat@customer.example.test' }],
+    })
+    expect(resolved).toEqual([ORG_B])
+    expect(messages.map((m) => m.org_id)).toEqual([ORG_B])
+  })
+
+  it('leaves it unfiled when the sender is a client of both companies', async () => {
+    const { resolved, messages } = await receive('pat@customer.example.test', 'reply+stale@reply.send.example.test', {
+      fh_clients: [
+        { id: 'client-a', org_id: ORG_A, email: 'pat@customer.example.test' },
+        { id: 'client-b', org_id: ORG_B, email: 'pat@customer.example.test' },
+      ],
+    })
+    expect(resolved).toEqual([])
+    expect(messages).toEqual([])
+  })
+
+  it('still files a reply with a known thread token in its conversation', async () => {
+    const { resolved, messages } = await receive('pat@customer.example.test', 'reply+tok123@reply.send.example.test', {
+      fh_conversations: [{ id: 'conv-b', org_id: ORG_B, client_id: 'client-b', email_thread_token: 'tok123' }],
+    })
+    expect(resolved).toEqual([])
+    expect(messages.map((m) => [m.org_id, m.conversation_id, m.client_id])).toEqual([[ORG_B, 'conv-b', 'client-b']])
+  })
+})
