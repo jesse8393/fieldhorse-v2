@@ -336,7 +336,9 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
     if (error || !data?.length) {
       toastError("Couldn't save caption", error?.message || 'This photo may have been deleted.')
       fetchRows()
+      return false
     }
+    return true
   }
 
   // Tagging a photo to a scope section ("Roofing", "Demolition", …) lets
@@ -711,9 +713,21 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
   const [sectionTag, setSectionTag] = useState(row.section_tag || '')
   const [customTag, setCustomTag] = useState('')
   const [showCustom, setShowCustom] = useState(false)
+  // A caption typed and not saved yet (the save is out, or the server
+  // refused it). The row read again after a failure must not put the old
+  // caption back over it; leaving the field again tries once more.
+  const unsavedCaption = useRef<{ id: any; text: string } | null>(null)
+
+  async function commitCaption() {
+    const typed = { id: row.id, text: caption }
+    unsavedCaption.current = typed
+    const saved = await onSaveCaption(caption)
+    if (saved !== false && unsavedCaption.current === typed) unsavedCaption.current = null
+  }
 
   useEffect(() => {
-    setCaption(row.caption || '')
+    const kept = unsavedCaption.current
+    setCaption(kept && kept.id === row.id ? kept.text : (row.caption || ''))
     const tag = row.section_tag || ''
     setSectionTag(tag)
     setShowCustom(!!tag && !SCOPE_SECTIONS.includes(tag))
@@ -936,7 +950,7 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
             aria-label="Photo caption"
             value={caption}
             onChange={(e) => setCaption(e.target.value)}
-            onBlur={() => onSaveCaption(caption)}
+            onBlur={() => { void commitCaption() }}
             rows={2}
             placeholder="What's in this photo?"
             style={{

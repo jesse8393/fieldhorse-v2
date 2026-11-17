@@ -962,3 +962,23 @@ test.describe('a milestone that fails to save', () => {
     await expect(box).toHaveValue('Forms inspected before pour')
   })
 })
+
+// Finding lost-work-9: a photo caption the server refuses stays in the field.
+test.describe('a photo caption that fails to save', () => {
+  test('a photo caption the server refuses stays in the field', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_job_files: [{
+      id: 'ph-1', user_id: 'qa-user-1', job_id: 'c-job1', contact_id: 'c-job1', kind: 'photo', storage_path: 'qa-user-1/c-job1/a.jpg',
+      filename: 'a.jpg', caption: 'Old caption', section_tag: null, size: 1000, mime_type: 'image/jpeg', uploaded_at: new Date().toISOString(), created_at: new Date().toISOString()
+    }] } })
+    const refused = await refuseWrites(context, 'fh_job_files')
+    await openJob(page, '/jobs/c-job1?tab=files&photo=ph-1')
+    const caption = page.getByRole('textbox', { name: 'Photo caption' })
+    await expect(caption).toHaveValue('Old caption')
+    await caption.fill('Rebar tied at 12 inch centers')
+    await caption.blur()
+    await expect.poll(() => refused.count).toBeGreaterThan(0)
+    await expect(page.getByText("Couldn't save caption")).toBeVisible()
+    await page.waitForTimeout(1500)
+    await expect(caption).toHaveValue('Rebar tied at 12 inch centers')
+  })
+})
