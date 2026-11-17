@@ -42,13 +42,13 @@ here:
 | fh_daily_sweep | 30 13 * * * | fh_daily_sweep() |
 | fh_jobber_drain | every 5 minutes | fh_jobber_drain_tick() |
 
-**Edge functions.** Seven are deployed. Five are captured here:
-public-api, twilio-sms, twilio-voice, email-events and meta-leads. Their
-shared helpers are in `functions/_shared/lib.ts`. In production each folder
-holds its own copy of that file; the small `lib.ts` in each folder here
-re-exports the shared one so `index.ts` stays identical to the live source
-and the CLI can still deploy it. Two functions were not captured: `jobber`
-and `automation-worker`.
+**Edge functions.** Seven are deployed, and all seven are in this repo:
+public-api, twilio-sms, twilio-voice, email-events, meta-leads, jobber and
+automation-worker. Their shared helpers are in `functions/_shared/lib.ts`.
+In production each folder holds its own copy of that file; the small
+`lib.ts` in a folder here re-exports the shared one so `index.ts` stays
+identical to the live source and the CLI can still deploy it. Nothing
+checks that the deployed code matches these folders.
 
 ## Changes applied on 2026-10-09 during the audit
 
