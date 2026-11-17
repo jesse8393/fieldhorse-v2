@@ -116,7 +116,7 @@ async function openJobs(page: Page) {
 /** Lost jobs stay out of All until the operator enables the explicit filter. */
 async function openLostDealCard(page: Page) {
   await openJobs(page)
-  const card = page.getByRole('article').filter({ has: page.getByRole('button', { name: 'Actions for Old Mill HOA', exact: true }) })
+  const card = page.getByRole('article').filter({ hasText: 'Old Mill HOA' })
   await expect(card).toHaveCount(0)
   const lost = page.getByRole('group', { name: 'Filter and sort' }).getByRole('switch', { name: 'Show lost jobs' })
   await expect(lost).toHaveAttribute('aria-checked', 'false')
@@ -230,9 +230,8 @@ test.describe('Reopen asks first, like Mark lost', () => {
     const patches = watchPatches(page, 'fh_contacts')
     const card = await openLostDealCard(page)
 
-    // Reopen in the menu arms a Tap again button on the card; no dialog.
-    await card.getByRole('button', { name: 'Actions for Old Mill HOA', exact: true }).click()
-    await page.getByRole('menuitem', { name: 'Reopen' }).click()
+    // Reopen on the card arms a Tap again button; no menu, no dialog (D08).
+    await card.getByRole('button', { name: 'Reopen', exact: true }).click()
     const again = card.getByRole('button', { name: 'Tap again to reopen' })
     await expect(again).toBeVisible()
     await expect(card).toContainText('It moves back to Jobs.')
@@ -244,12 +243,12 @@ test.describe('Reopen asks first, like Mark lost', () => {
     await expect(again).toBeHidden({ timeout: 6000 })
     expect(patches).toEqual([])
 
-    await card.getByRole('button', { name: 'Actions for Old Mill HOA', exact: true }).click()
-    await page.getByRole('menuitem', { name: 'Reopen' }).click()
+    await card.getByRole('button', { name: 'Reopen', exact: true }).click()
     await card.getByRole('button', { name: 'Tap again to reopen' }).click()
     await expect.poll(() => patches.length).toBe(1)
     expect(JSON.parse(patches[0])).toEqual({ stage: 'job' })
-    await expect(page.getByRole('region', { name: 'Jobs', exact: true }).getByRole('button', { name: 'Actions for Old Mill HOA', exact: true })).toBeVisible()
+    // Back in Jobs, its ⋯ is a link to the job's More screen.
+    await expect(page.getByRole('region', { name: 'Jobs', exact: true }).getByRole('link', { name: 'Actions for Old Mill HOA', exact: true })).toBeVisible()
   })
 
   test('the job page asks before it reopens a lost job', async ({ context, page }, testInfo) => {
@@ -287,10 +286,9 @@ test.describe('Reopen asks first, like Mark lost', () => {
       await page.getByRole('button', { name: 'Tap again to reopen', exact: true }).click()
     } else {
       const card = await openLostDealCard(page)
-      await card.getByRole('button', { name: 'Actions for Old Mill HOA', exact: true }).click()
-      await page.getByRole('menuitem', { name: 'Reopen' }).click()
+      await card.getByRole('button', { name: 'Reopen', exact: true }).click()
       await card.getByRole('button', { name: 'Tap again to reopen', exact: true }).click()
-      await expect(page.getByRole('region', { name: 'Lost', exact: true }).getByRole('button', { name: 'Actions for Old Mill HOA', exact: true })).toBeVisible()
+      await expect(page.getByRole('region', { name: 'Lost', exact: true }).getByRole('article').filter({ hasText: 'Old Mill HOA' })).toBeVisible()
     }
     await expect(page.getByText('This record has no previous job. Review its lead or quote before reopening.', { exact: true })).toBeVisible()
     expect(patches).toEqual([])
@@ -310,28 +308,20 @@ test.describe('Reopen asks first, like Mark lost', () => {
     expect(JSON.parse(patches[0])).toEqual({ stage: 'job' })
   })
 
-  // The armed button appears from the deal card's menu. It has to take
-  // focus once the menu has gone: the menu hands focus back to its ⋯
-  // button, so without this a screen reader never hears the question and
-  // Enter opens the menu again.
+  // The armed button replaces the card's Reopen button, so it has to take
+  // focus, or a screen reader never hears the question and focus is lost.
   test('from the keyboard, the deal card Tap again button takes focus and Enter answers it', async ({ context, page }, testInfo) => {
     test.skip(isPhone(testInfo.project.name), 'Desktop deal cards')
     await signIn(context, { tables: { fh_stage_transitions: LOST_JOB_HISTORY } })
     const patches = watchPatches(page, 'fh_contacts')
     const card = await openLostDealCard(page)
-    const trigger = card.getByRole('button', { name: 'Actions for Old Mill HOA', exact: true })
+    const trigger = card.getByRole('button', { name: 'Reopen', exact: true })
 
     await trigger.focus()
-    await page.keyboard.press('Enter')
-    const item = page.getByRole('menuitem', { name: 'Reopen' })
-    await expect(item).toBeVisible()
-    await item.focus()
     await page.keyboard.press('Enter')
     const again = card.getByRole('button', { name: 'Tap again to reopen' })
     await expect(again).toBeVisible()
     await expect(page.getByRole('alertdialog')).toHaveCount(0)
-    // Once the menu has gone and handed focus back, focus is on the armed button.
-    await expect(page.locator('[data-slot="dropdown-menu-content"]')).toHaveCount(0)
     await expect(again).toBeFocused()
     await page.waitForTimeout(300)
     expect(patches).toEqual([])
@@ -343,18 +333,14 @@ test.describe('Reopen asks first, like Mark lost', () => {
     expect(JSON.parse(patches[0])).toEqual({ stage: 'job' })
   })
 
-  test('by mouse, Enter then answers the Tap again button, not the menu behind it', async ({ context, page }, testInfo) => {
+  test('by mouse, Enter then answers the Tap again button', async ({ context, page }, testInfo) => {
     test.skip(isPhone(testInfo.project.name), 'Desktop deal cards')
     await signIn(context, { tables: { fh_stage_transitions: LOST_JOB_HISTORY } })
     const patches = watchPatches(page, 'fh_contacts')
     const card = await openLostDealCard(page)
-    const trigger = card.getByRole('button', { name: 'Actions for Old Mill HOA', exact: true })
-
-    await trigger.click()
-    await page.getByRole('menuitem', { name: 'Reopen' }).click()
+    await card.getByRole('button', { name: 'Reopen', exact: true }).click()
     const again = card.getByRole('button', { name: 'Tap again to reopen' })
     await expect(again).toBeVisible()
-    await expect(page.locator('[data-slot="dropdown-menu-content"]')).toHaveCount(0)
     await expect(again).toBeFocused()
     await page.waitForTimeout(300)
     expect(patches).toEqual([])

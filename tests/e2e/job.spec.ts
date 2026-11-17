@@ -452,10 +452,12 @@ test.describe('job page on a desktop, redesigned', () => {
     // Shortcuts only fire inside the command palette, so the button draws no key cap.
     await expect(banner.locator('kbd')).toHaveCount(0)
 
-    await banner.getByRole('button', { name: 'More actions for this job' }).click()
-    await expect(page.getByRole('menuitem', { name: 'Edit job details' })).toBeVisible()
-    await expect(page.getByRole('menuitem', { name: 'Delete this job' })).toBeVisible()
-    await page.keyboard.press('Escape')
+    // More is the job's More screen at every width (D08), not a menu.
+    await banner.getByRole('link', { name: 'More actions for this job' }).click()
+    await expect(page).toHaveURL(/\/jobs\/c-job1\/more$/)
+    await expect(page.getByRole('menu')).toHaveCount(0)
+    await expect(page.getByRole('link', { name: /Edit job details/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Delete job' })).toBeVisible()
   })
 
   test('job without photos keeps a compact visit summary', async ({ context, page }) => {
@@ -608,10 +610,11 @@ test.describe('job page on a desktop, redesigned', () => {
     })
     await openDesktop(page, '/jobs/c-job1')
     const banner = page.locator('.fh-job-workspace')
-    await banner.getByRole('button', { name: 'More actions for this job' }).click()
-    await page.getByRole('menuitem', { name: 'Delete this job' }).click()
+    await banner.getByRole('link', { name: 'More actions for this job' }).click()
+    await expect(page).toHaveURL(/\/jobs\/c-job1\/more$/)
+    await page.getByRole('button', { name: 'Delete job' }).click()
     await expect(page.getByRole('dialog')).toHaveCount(0)
-    const again = page.getByRole('menuitem', { name: 'Tap again to delete' })
+    const again = page.getByRole('button', { name: 'Tap again to delete' })
     await expect(again).toBeVisible()
     expect(deletes).toEqual([])
     await again.click()
