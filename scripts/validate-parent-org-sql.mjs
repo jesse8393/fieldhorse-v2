@@ -147,7 +147,7 @@ try {
   await db.exec(migration)
   await db.exec(migration)
   pass('guard installs twice safely')
-  const triggers = (await db.query(`select c.relname as table, array_agg(t.tgname order by t.tgname) as names from pg_trigger t join pg_class c on c.oid = t.tgrelid
+  const triggers = (await db.query(`select c.relname as table, array_agg(t.tgname::text order by t.tgname) as names from pg_trigger t join pg_class c on c.oid = t.tgrelid
     where not t.tgisinternal and c.relname = any($1) and t.tgname like 'zz%' group by c.relname order by 1`, [children])).rows
   for (const row of triggers) assert.deepEqual(row.names, ['zz_inherit_org_from_contact', 'zzzz_assert_parent_org'], row.table)
   equal(triggers.length, children.length, 'guard is attached to every child table and sorts after the org inherit trigger')
