@@ -70,7 +70,7 @@ export default async (request) => {
   // Load the invite.
   const { data: invite, error: invErr } = await admin
     .from('fh_job_partners')
-    .select('id, job_id, partner_email, status, invited_by_user_id')
+    .select('id, job_id, org_id, partner_email, status, invited_by_user_id')
     .eq('invite_token', token)
     .maybeSingle()
 
@@ -113,7 +113,7 @@ export default async (request) => {
     body: `${invite.partner_email} accepted the invite`,
     link: `/jobs/${invite.job_id}?tab=partners`,
     tag: `partner-accepted-${invite.id}`
-  })
+  }, { orgId: invite.org_id })
 
   return json({ ok: true, job_id: invite.job_id })
 }

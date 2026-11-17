@@ -221,7 +221,7 @@ export default async (request, context) => {
       body,
       link: newId ? `/leads/${newId}` : '/leads',
       tag: `new-lead-${newId || person.name}`
-    }))
+    }, { orgId }))
     .then(() => undefined)
     .catch((e) => { console.warn('[webhook-lead] push failed', e) })
   if (typeof context?.waitUntil === 'function') context.waitUntil(push)

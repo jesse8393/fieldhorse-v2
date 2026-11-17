@@ -54,7 +54,7 @@ export async function alertLinkRecipients(supabase, { orgId, creatorId, notifica
       if (error) console.warn('[linkAlerts] notification insert failed', error)
     }
     if (push) {
-      await Promise.allSettled(recipients.map((userId) => sendPushToUser(supabase, userId, push)))
+      await Promise.allSettled(recipients.map((userId) => sendPushToUser(supabase, userId, push, { orgId })))
     }
   } catch (e) {
     console.warn('[linkAlerts] alert failed', e)

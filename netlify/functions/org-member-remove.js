@@ -69,6 +69,18 @@ export default async (request) => {
     return json({ error: 'remove_failed', message: 'Could not remove this member. Try again.' }, 500)
   }
 
+  // A removed member's phone must stop getting lock screen alerts. Their
+  // push subscriptions go unless they are still in another company, whose
+  // alerts carry on (lib/push.js checks the company on every send).
+  const { data: stillIn, error: stillErr } = await admin
+    .from('org_members').select('org_id').eq('user_id', memberUserId).is('revoked_at', null).limit(1)
+  if (stillErr) {
+    console.error('[org-member-remove] membership check failed, push subscriptions kept', stillErr)
+  } else if (!stillIn?.length) {
+    const { error: subErr } = await admin.from('fh_push_subscriptions').delete().eq('user_id', memberUserId)
+    if (subErr) console.error('[org-member-remove] push subscription cleanup failed', subErr)
+  }
+
   return json({ ok: true })
 }
 
