@@ -42,3 +42,22 @@ describe('the amount the editor saves (M-22)', () => {
     expect(normalizeForDB(draft).amount).toBe(12500)
   })
 })
+
+describe('a lump sum line (M-17)', () => {
+  it('an Amount typed on a quantity 1 line is saved as its rate too', () => {
+    let draft = { ...emptyDraft() }
+    draft = type(draft, 'description', 'Demo and haul off')
+    draft = type(draft, 'amount', '1513')
+    expect(normalizeForDB(draft)).toMatchObject({ qty: 1, rate: 1513, amount: 1513 })
+  })
+
+  it('an edited amount on a quantity 1 line moves its rate with it', () => {
+    const draft = type(draftFromRow({ description: 'Pour', qty: 1, rate: 2000, amount: 2000 }), 'amount', '12500')
+    expect(normalizeForDB(draft)).toMatchObject({ qty: 1, rate: 12500, amount: 12500 })
+  })
+
+  it('a line of several keeps its rate', () => {
+    const draft = type(draftFromRow({ description: 'Pour', qty: 3, rate: 125, amount: 375 }), 'amount', '400')
+    expect(normalizeForDB(draft)).toMatchObject({ qty: 3, rate: 125, amount: 400 })
+  })
+})

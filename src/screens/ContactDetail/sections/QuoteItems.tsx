@@ -204,13 +204,17 @@ export function normalizeForDB(d: any) {
     : d?.is_optional
       ? 'optional'
       : 'base'
+  const qty = Number(d.qty)
+  const amount = roundCents(d.amount)
   return {
     section: d.section?.trim() || null,
     description: d.description.trim(),
-    qty: Number(d.qty),
+    qty,
     unit: d.unit?.trim() || null,
-    rate: Number(d.rate),
-    amount: roundCents(d.amount),
+    // A quantity 1 line costs its amount, so a typed lump sum is its rate
+    // too, and the proposal's unit price multiplies to the amount (M-17).
+    rate: qty === 1 ? amount : Number(d.rate),
+    amount,
     notes: d.notes?.trim() || null,
     is_optional: kind === 'optional',
     is_excluded: kind === 'excluded'
