@@ -15,6 +15,8 @@ import { recalcCost } from '../lib/stages.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { toastSuccess, toastError, toastInfo } from '../lib/toast.ts'
 import MiniMetric from '../components/MiniMetric.tsx'
+import TopbarWeather from '../components/desktop/TopbarWeather.tsx'
+import { startOfWeek, SCHEDULE_WEEK_START } from '../lib/scheduleDates.ts'
 import { Button } from '../ui/index.ts'
 import PaletteKeyCap, { paletteShortcut } from '../components/desktop/PaletteKeyCap.tsx'
 
@@ -42,15 +44,6 @@ function fmtMoney(n: number | null): string {
   return `$${Math.round(n).toLocaleString()}`
 }
 
-function startOfWeek(): Date {
-  const d = new Date()
-  d.setHours(0, 0, 0, 0)
-  // Treat Monday as the start of the week (ISO). Sunday → -6, Mon → 0, etc.
-  const day = d.getDay()
-  const diff = (day === 0 ? -6 : 1) - day
-  d.setDate(d.getDate() + diff)
-  return d
-}
 
 export default function Timesheets() {
   const navigate = useNavigate()
@@ -64,7 +57,7 @@ export default function Timesheets() {
   // The punch whose flag reason is being typed on its row (no prompt box).
   const [flagDraft, setFlagDraft] = useState<{ id: string; reason: string } | null>(null)
   // Filter window in the URL (?window=) so it survives refresh and is
-  // shareable (UI audit #30). 'all' or 'thisWeek' (Mon–now).
+  // shareable (UI audit #30). 'all' or 'thisWeek' (Sunday to now).
   const [searchParams, setSearchParams] = useSearchParams()
   const windowMode: 'all' | 'thisWeek' = searchParams.get('window') === 'all' ? 'all' : 'thisWeek'
   const setWindowMode = (next: 'all' | 'thisWeek') => {
@@ -80,7 +73,8 @@ export default function Timesheets() {
     try {
       const opts: { from?: string; to?: string } = {}
       if (windowMode === 'thisWeek') {
-        opts.from = startOfWeek().toISOString()
+        // The same week as Schedule and Money, which start on Sunday.
+        opts.from = startOfWeek(new Date(), SCHEDULE_WEEK_START).toISOString()
       }
       const res = await orgTimesheetsList(opts)
       setPunches(res.punches || [])
@@ -245,7 +239,7 @@ export default function Timesheets() {
         <div className="fh-build-topbar__meta">
           <span>{orgName || 'Your team'}</span>
           <span className="fh-build-vline" />
-          <span style={{ opacity: 0.6 }}>Weather not set</span>
+          <TopbarWeather />
         </div>
         <button
           className="fh-build-icon-btn"

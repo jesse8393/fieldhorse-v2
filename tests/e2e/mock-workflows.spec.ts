@@ -531,3 +531,22 @@ test('imports a dropped CSV and explains files it cannot use', async ({ page }) 
 
   expectNoPageErrors()
 })
+
+// D24: "This week" on Timesheets starts on Sunday like Schedule and Money,
+// and its top bar shows the pinned location's weather, not a fixed line.
+test('Timesheets this week starts on Sunday and the top bar has no fixed weather text', async ({ context, page }, testInfo) => {
+  test.skip(!testInfo.project.name.startsWith('desktop'), 'Desktop top bar')
+  // Monday 16 November 2026, 10 am in Chicago.
+  await page.clock.setFixedTime(new Date('2026-11-16T16:00:00Z'))
+  const bodies: Record<string, unknown>[] = []
+  await context.route('**/api/org-timesheets-list', (route) => {
+    bodies.push(route.request().postDataJSON())
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, caller_role: 'owner', org_id: 'org-1', punches: [] }) })
+  })
+  await page.goto('/timesheets', { waitUntil: 'domcontentloaded' })
+  await expect.poll(() => bodies.length).toBeGreaterThan(0)
+  // Sunday 15 November at local midnight in Chicago is 06:00 UTC.
+  expect(bodies[0].from).toBe('2026-11-15T06:00:00.000Z')
+  await expect(page.locator('[data-build-screen="Timesheets"]')).toBeVisible()
+  await expect(page.getByText('Weather not set', { exact: true })).toHaveCount(0)
+})
