@@ -42,7 +42,11 @@ export default function QuoteNew() {
   const text = params.get('text')
   const queryClient = useQueryClient()
   const [requestId] = useState(createUuid)
-  const { form, set, patch, done } = useDraft<Form>('quote', { ...EMPTY, requestId }, text ? { scope: text } : null)
+  // A visit that starts from a lead or a client keeps its draft apart, so
+  // backing out of Quote this never leaves that lead in the next plain New
+  // quote (S21).
+  const draftKind = leadParam ? `quote-lead-${leadParam}` : clientParam ? `quote-client-${clientParam}` : 'quote'
+  const { form, set, patch, done } = useDraft<Form>(draftKind, { ...EMPTY, requestId }, text ? { scope: text } : null)
   const quoteId = form.requestId || requestId
   const savingRef = useRef(false)
   const [client, setClient] = useState<ClientFieldValue>(() => restoredClientValue(form.client, form.clientId))

@@ -192,3 +192,15 @@ test('Quote this keeps the lead notes off the scope of work', async ({ context, 
   await expect(page.getByLabel('Scope')).toHaveValue('')
 })
 
+// Phone sales audit finding S21: a Quote this visit never becomes the next
+// New quote's draft.
+test('backing out of Quote this leaves the next New quote blank', async ({ context, page }) => {
+  await signIn(context, { tables: { fh_leads: [LEAD_WITH_NOTES] } })
+  await open(page, '/quotes/new?lead=l-notes')
+  await expect(page.getByLabel('Title')).toHaveValue('Backyard drainage', { timeout: 30_000 })
+  await page.waitForTimeout(800)
+  await open(page, '/quotes/new')
+  await expect(page.getByRole('heading', { level: 1, name: 'New quote' })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByLabel('Title')).toHaveValue('')
+  await expect(page.getByLabel('Client')).toHaveValue('')
+})
