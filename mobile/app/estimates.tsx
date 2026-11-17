@@ -59,7 +59,7 @@ export default function EstimatesScreen() {
         {isLoading ? (
           <ActivityIndicator color={theme.goldBright} style={{ marginTop: 24 }} />
         ) : (data?.rows.length ?? 0) === 0 ? (
-          <Text style={{ color: theme.inkMuted, fontSize: 14, marginTop: 24 }}>No estimates yet. Build a quote on a job and send it, it'll track here.</Text>
+          <Text style={{ color: theme.inkMuted, fontSize: 14, marginTop: 24 }}>No estimates yet. Build a quote on a job and send it. It will show here.</Text>
         ) : (
           <>
             <Card glow style={{ marginTop: 16, marginBottom: 18 }}>

@@ -76,7 +76,7 @@ export default function BidScreen() {
     setGenerating(true); setErr(''); setBid(null); setSaved(null); setSaveErr('')
     try {
       const rateText = Object.keys(RATE_CARD)
-        .map((k) => `${k}: $${RATE_CARD[k].low}–$${RATE_CARD[k].high} per ${RATE_CARD[k].unit}`)
+        .map((k) => `${k}: $${RATE_CARD[k].low} to $${RATE_CARD[k].high} per ${RATE_CARD[k].unit}`)
         .join('; ')
       const res = await claudeMessage({
         system: `${SYSTEM}\n\nRate card: ${rateText}`,
@@ -100,9 +100,9 @@ export default function BidScreen() {
     if (bid.summary) lines.push(bid.summary, '')
     for (const li of bid.line_items || []) {
       const qty = Number(li.qty || 1)
-      lines.push(`• ${li.name}, ${qty} ${li.unit || ''} @ ${money(li.rate_low || 0)}–${money(li.rate_high || 0)}`)
+      lines.push(`• ${li.name}, ${qty} ${li.unit || ''} @ ${money(li.rate_low || 0)} to ${money(li.rate_high || 0)}`)
     }
-    lines.push('', `Recommended price: ${money(total.withMargin)}`, `Range: ${money(total.low)}–${money(total.high)} (${marginPct}% margin)`)
+    lines.push('', `Recommended price: ${money(total.withMargin)}`, `Range: ${money(total.low)} to ${money(total.high)} (${marginPct}% margin)`)
     if (bid.assumptions?.length) lines.push('', 'Assumptions:', ...bid.assumptions.map((a) => `- ${a}`))
     if (bid.risks?.length) lines.push('', 'Risks:', ...bid.risks.map((r) => `- ${r}`))
     await Clipboard.setStringAsync(lines.join('\n'))
@@ -200,7 +200,7 @@ export default function BidScreen() {
             <View style={{ backgroundColor: theme.surface, borderRadius: 10, padding: 16, borderWidth: 1, borderColor: theme.borderGold }}>
               <Text style={{ color: theme.inkMuted, fontSize: 12, fontWeight: '700', letterSpacing: 0, textTransform: 'uppercase' }}>Recommended price</Text>
               <Text style={{ color: theme.ink, fontSize: 24, fontWeight: '800', marginTop: 4 }}>{money(total.withMargin)}</Text>
-              <Text style={{ color: theme.inkMuted, fontSize: 14, marginTop: 4 }}>Range {money(total.low)} – {money(total.high)} · {marginPct}% margin</Text>
+              <Text style={{ color: theme.inkMuted, fontSize: 14, marginTop: 4 }}>Range {money(total.low)} to {money(total.high)} · {marginPct}% margin</Text>
             </View>
 
             {(bid.line_items || []).length > 0 ? (
@@ -212,7 +212,7 @@ export default function BidScreen() {
                     <View key={i} style={{ backgroundColor: 'rgba(20, 20, 20,0.6)', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: theme.borderMid, flexDirection: 'row', justifyContent: 'space-between' }}>
                       <View style={{ flex: 1, paddingRight: 12 }}>
                         <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '600' }}>{li.name}</Text>
-                        <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 2 }}>{qty} {li.unit || ''} · {money(li.rate_low || 0)}–{money(li.rate_high || 0)}{li.notes ? ` · ${li.notes}` : ''}</Text>
+                        <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 2 }}>{qty} {li.unit || ''} · {money(li.rate_low || 0)} to {money(li.rate_high || 0)}{li.notes ? ` · ${li.notes}` : ''}</Text>
                       </View>
                       <Text style={{ color: theme.ink, fontWeight: '700' }}>{money(amt)}</Text>
                     </View>

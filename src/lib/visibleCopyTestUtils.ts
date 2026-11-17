@@ -18,8 +18,9 @@ const WORD_PROPS = new Set([
   'emptyText', 'emptyTitle', 'emptyMessage', 'confirmLabel', 'ctaLabel', 'tooltip',
   'accessibilityLabel', 'accessibilityHint', 'body', 'detail', 'note', 'text', 'value'
 ])
-// Calls whose string arguments show up as a toast or an alert line.
-const TOAST_CALL = /^(toast|toastError|toastSuccess|toastInfo|toastUndo|success|error|info|warning)$/
+// Calls whose string arguments show up as a toast, or in the native app's
+// Alert.alert.
+const TOAST_CALL = /^(toast|toastError|toastSuccess|toastInfo|toastUndo|success|error|info|warning|alert)$/
 
 export function sourceFiles(dir: string, skip: RegExp = /\.test\.tsx?$/): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -77,7 +78,7 @@ export function visibleStrings(file: string, source = readFileSync(file, 'utf8')
     } else if (ts.isCallExpression(node)) {
       const callee = node.expression
       const name = ts.isIdentifier(callee) ? callee.text
-        : ts.isPropertyAccessExpression(callee) && /toast/i.test(callee.expression.getText(sf)) ? callee.name.text : ''
+        : ts.isPropertyAccessExpression(callee) && /^(toast|Alert)$/i.test(callee.expression.getText(sf)) ? callee.name.text : ''
       if (TOAST_CALL.test(name) && (ts.isIdentifier(callee) ? /^toast/.test(name) : true)) {
         for (const arg of node.arguments) literalWords(arg, found)
       }

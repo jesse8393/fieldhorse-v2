@@ -31,7 +31,7 @@ export default function IntegrationsScreen() {
   function onConnect(p: ProviderMeta) {
     if (!p.live) {
       Alert.alert(
-        `${p.name}, setup pending`,
+        `${p.name} is not set up yet`,
         `The backend for this integration isn't connected yet.\n\n${p.setupNote || ''}`,
         [{ text: 'OK' }]
       )
@@ -118,7 +118,7 @@ export default function IntegrationsScreen() {
         )}
 
         <Text style={{ color: theme.inkMuted, fontSize: 12, textAlign: 'center', marginTop: 24, lineHeight: 16 }}>
-          Connections are secured on the server, your tokens never touch the app.
+          Connections are secured on the server. Your tokens never touch the app.
         </Text>
       </ScrollView>
     </View>

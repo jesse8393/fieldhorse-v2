@@ -105,7 +105,7 @@ export default function NotesScreen() {
     <View style={{ flex: 1 }}>
       <ScreenBackground />
       <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: insets.bottom + 24, paddingHorizontal: 24 }} keyboardShouldPersistTaps="handled">
-        <ScreenHeader backLabel="More" onBack={() => router.back()} eyebrow="Field Notes" title="Notes, fast." />
+        <ScreenHeader backLabel="More" onBack={() => router.back()} eyebrow="Field notes" title="Notes" />
 
         {/* Capture */}
         <Card glow style={{ marginTop: 16, marginBottom: 18 }}>

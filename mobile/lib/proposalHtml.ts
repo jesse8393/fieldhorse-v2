@@ -181,7 +181,7 @@ function itemsTable(items: ProposalItemRow[], opts: { headBg?: string; headColor
       <thead><tr>
         <th style="${thBase}text-align:left;">Description</th>
         <th style="${thBase}text-align:right;width:16%;">Qty</th>
-        <th style="${thBase}text-align:right;width:20%;">Unit Price</th>
+        <th style="${thBase}text-align:right;width:20%;">Unit price</th>
         <th style="${thBase}text-align:right;width:20%;">Amount</th>
       </tr></thead>
       <tbody>${rows}</tbody>
@@ -192,7 +192,7 @@ function supportingHtml(n: ProposalNormalized, accent: string, mid: string, mute
   const label = (t: string) => `<div style="font-size: 12px;font-weight:700;letter-spacing: 0;text-transform:uppercase;color:${accent};margin-bottom:6px;">${t}</div>`
   const sections: string[] = []
   if (n.template !== 'editorial' && n.scopeText) {
-    sections.push(`<section>${label('Scope of Work')}<p style="margin:0;font-size: 14px;line-height:1.6;color:${mid};white-space:pre-wrap;">${esc(n.scopeText)}</p></section>`)
+    sections.push(`<section>${label('Scope of work')}<p style="margin:0;font-size: 14px;line-height:1.6;color:${mid};white-space:pre-wrap;">${esc(n.scopeText)}</p></section>`)
   }
   if (n.upgradeItems.length) {
     const rows = n.upgradeItems.map((it) => `
@@ -310,7 +310,7 @@ function renderEditorial(n: ProposalNormalized): string {
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;margin:34px 0 28px;">
       ${col([n.companyName, ...n.companyLines])}
       ${col([n.recipientName, ...n.recipientLines])}
-      <div style="display:flex;flex-direction:column;gap:12px;">${meta('Date', n.issuedAt)}${meta('Estimate #', n.number)}${meta('Est. Total', money(n.total, false))}</div>
+      <div style="display:flex;flex-direction:column;gap:12px;">${meta('Date', n.issuedAt)}${meta('Estimate #', n.number)}${meta('Estimated total', money(n.total, false))}</div>
     </div>
     ${n.scopeText ? `<section style="margin-bottom:26px;"><div class="serif" style="font-size: 20px;color:${tan};margin-bottom:8px;letter-spacing: 0;">SCOPE OF WORK</div><p style="margin:0;font-size: 12px;line-height:1.7;color:#5C5C5C;white-space:pre-wrap;">${esc(n.scopeText)}</p></section>` : ''}
     <div class="serif" style="font-size: 20px;color:${tan};margin-bottom:8px;letter-spacing: 0;">COST BREAKDOWN</div>

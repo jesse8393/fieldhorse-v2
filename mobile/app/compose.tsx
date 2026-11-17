@@ -159,7 +159,7 @@ export default function ComposeScreen() {
           value={context}
           onChangeText={setContext}
           multiline
-          placeholder="Anything specific to mention, dates, amounts, tone…"
+          placeholder="Anything specific to mention: dates, amounts, tone…"
           placeholderTextColor="rgba(242,237,228,0.4)"
           style={[input, { minHeight: 80, textAlignVertical: 'top' }]}
         />
