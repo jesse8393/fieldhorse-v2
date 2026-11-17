@@ -5,11 +5,11 @@
 // absolute URL. The function keeps the Anthropic key on the server and
 // sets CORS, so the anon mobile client can call it directly.
 //
-// Base URL is configurable via EXPO_PUBLIC_API_BASE_URL (defaults to the
-// production site). The model matches the web default.
+// Base URL comes from apiBase.ts (EXPO_PUBLIC_API_BASE_URL, else the
+// live site). The model matches the web default.
 import { supabase } from './supabase'
+import { API_BASE } from './apiBase'
 
-const API_BASE = (process.env.EXPO_PUBLIC_API_BASE_URL as string) || 'https://fieldhorse.io'
 const MODEL = (process.env.EXPO_PUBLIC_ANTHROPIC_MODEL as string) || 'claude-fable-5'
 // Fable 5 always runs adaptive thinking, so turns run longer than the old
 // Sonnet path; the proxy pins these calls to low effort to stay in budget.

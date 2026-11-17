@@ -10,6 +10,7 @@ import * as Location from 'expo-location'
 import { MapPin, LogOut, Trash2, CalendarClock } from 'lucide-react-native'
 import { useProfile, useUpdateProfile, useSaveLocation, useDeleteAccount } from '../lib/queries'
 import { reverseGeocode } from '../lib/weather'
+import { API_BASE } from '../lib/apiBase'
 import { useAuth } from '../contexts/AuthContext'
 import { ScreenBackground, ScreenHeader, GoldButton, theme } from '../components/ui'
 import {
@@ -363,10 +364,10 @@ export default function SettingsScreen() {
 
             <SectionTitle>Legal</SectionTitle>
             <View style={{ flexDirection: 'row', gap: 16 }}>
-              <Pressable onPress={() => Linking.openURL('https://fieldhorse.io/privacy')} hitSlop={8}>
+              <Pressable onPress={() => Linking.openURL(`${API_BASE}/privacy`)} hitSlop={8}>
                 <Text style={{ color: theme.goldBright, fontSize: 14, fontWeight: '700' }}>Privacy Policy</Text>
               </Pressable>
-              <Pressable onPress={() => Linking.openURL('https://fieldhorse.io/terms')} hitSlop={8}>
+              <Pressable onPress={() => Linking.openURL(`${API_BASE}/terms`)} hitSlop={8}>
                 <Text style={{ color: theme.goldBright, fontSize: 14, fontWeight: '700' }}>Terms of Service</Text>
               </Pressable>
             </View>

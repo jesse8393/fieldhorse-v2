@@ -17,6 +17,7 @@ import { confirmMutation } from './mutationResult'
 import { jobMoney } from './jobMoney'
 import { allocateInvoiceDue, knownContractTotal } from '../../src/lib/invoiceSettlement'
 import { claudeVision, claudeText } from './anthropic'
+import { API_BASE } from './apiBase'
 import type { Database } from './database.types'
 
 export type Contact = Database['public']['Tables']['fh_contacts']['Row']
@@ -1967,9 +1968,8 @@ export function useDeleteAccount() {
     const { data } = await supabase.auth.getSession()
     const token = data.session?.access_token
     if (!token) return { error: { message: 'You are not signed in.' } }
-    const base = (process.env.EXPO_PUBLIC_API_BASE_URL as string) || 'https://fieldhorse.io'
     try {
-      const res = await fetch(`${base}/api/delete-account`, {
+      const res = await fetch(`${API_BASE}/api/delete-account`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
       })

@@ -14,8 +14,7 @@
 import * as Print from 'expo-print'
 import { supabase } from './supabase'
 import { confirmMutation } from './mutationResult'
-
-const API_BASE = (process.env.EXPO_PUBLIC_API_BASE_URL || 'https://fieldhorse.io').replace(/\/+$/, '')
+import { API_BASE } from './apiBase'
 
 // The send-* Netlify functions require the signed-in user's access
 // token; sender_user_id alone is no longer trusted on the server.

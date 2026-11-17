@@ -10,8 +10,8 @@ import { Copy, Share2, Check } from 'lucide-react-native'
 import type { JobRow } from '../lib/queries'
 import { BottomSheet, SheetField, GoldButton, theme } from './ui'
 import { supabase } from '../lib/supabase'
+import { API_BASE } from '../lib/apiBase'
 
-const API_BASE = (process.env.EXPO_PUBLIC_API_BASE_URL as string) || 'https://fieldhorse.io'
 const ROLES = [
   { value: 'subcontractor', label: 'Sub' },
   { value: 'gc', label: 'GC' },
