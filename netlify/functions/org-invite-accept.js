@@ -10,7 +10,8 @@ import { supabaseServiceConfig } from './lib/serviceConfig.js'
 // risking the self-recursion that killed migration 033).
 //
 // Idempotent: if the user already belongs to the target org, returns
-// ok with already_member=true.
+// ok with already_member=true. A removed member comes back only through
+// an invite made after the removal.
 
 import { createClient } from '@supabase/supabase-js'
 
@@ -61,7 +62,7 @@ export default async (request) => {
   // Load invite.
   const { data: invite, error: invErr } = await admin
     .from('org_invites')
-    .select('id, org_id, email, role, expires_at, accepted_at, invited_by')
+    .select('id, org_id, email, role, created_at, expires_at, accepted_at, invited_by')
     .eq('token', token)
     .maybeSingle()
 
@@ -75,8 +76,7 @@ export default async (request) => {
     return json({ error: 'invite_expired' }, 410)
   }
   // Single-use: once an invite has been accepted it must not be replayable.
-  // A multi-use invite lets anyone who ever saw the link re-join (and, before
-  // the revoked-membership guard below, silently revive a removed member).
+  // A multi-use invite lets anyone who ever saw the link re-join.
   if (invite.accepted_at) {
     return json({ error: 'invite_already_used', detail: 'This invite has already been used.' }, 410)
   }
@@ -96,28 +96,42 @@ export default async (request) => {
     return json({ ok: true, already_member: true, org_id: invite.org_id, role: existingMember.role })
   }
 
-  // Do NOT resurrect a revoked membership. An owner removed this person on
-  // purpose; accepting a (possibly old) invite must not clear revoked_at and
-  // silently re-admit them. They need a fresh invite issued after removal.
   if (existingMember && existingMember.revoked_at) {
-    return json({
-      error: 'membership_revoked',
-      detail: 'This membership was removed. Ask an owner for a new invite.'
-    }, 403)
-  }
-
-  // Fresh (never-member) user — create the membership row.
-  const { error: insErr } = await admin
-    .from('org_members')
-    .insert({
-      org_id: invite.org_id,
-      user_id: authUserId,
-      role: invite.role,
-      invited_by: invite.invited_by ?? null,
-    })
-  if (insErr) {
-    console.error('[org-invite-accept] membership insert failed', insErr)
-    return json({ error: 'membership_create_failed', message: 'Could not add you to the team. Try again.' }, 500)
+    // An invite made before the removal must not bring the person back: the
+    // owner removed them after it was sent. An invite made after the removal
+    // is the owner asking them back, and the table allows one row per person
+    // per company, so the removed row is reopened with the invite's role.
+    const invitedMs = new Date(invite.created_at || NaN).getTime()
+    const revokedMs = new Date(existingMember.revoked_at).getTime()
+    if (!Number.isFinite(invitedMs) || !Number.isFinite(revokedMs) || invitedMs <= revokedMs) {
+      return json({
+        error: 'membership_revoked',
+        detail: 'This membership was removed. Ask an owner for a new invite.'
+      }, 403)
+    }
+    const { error: rejoinErr } = await admin
+      .from('org_members')
+      .update({ revoked_at: null, role: invite.role, invited_by: invite.invited_by ?? null })
+      .eq('id', existingMember.id)
+      .eq('org_id', invite.org_id)
+    if (rejoinErr) {
+      console.error('[org-invite-accept] membership restore failed', rejoinErr)
+      return json({ error: 'membership_create_failed', message: 'Could not add you to the team. Try again.' }, 500)
+    }
+  } else {
+    // Fresh (never-member) user — create the membership row.
+    const { error: insErr } = await admin
+      .from('org_members')
+      .insert({
+        org_id: invite.org_id,
+        user_id: authUserId,
+        role: invite.role,
+        invited_by: invite.invited_by ?? null,
+      })
+    if (insErr) {
+      console.error('[org-invite-accept] membership insert failed', insErr)
+      return json({ error: 'membership_create_failed', message: 'Could not add you to the team. Try again.' }, 500)
+    }
   }
 
   // Mark invite accepted (best-effort; the membership row is the

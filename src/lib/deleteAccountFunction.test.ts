@@ -1,5 +1,10 @@
-import { describe, expect, it, vi } from 'vitest'
-import { planAccountDeletion, retainedPathsForSharedOrgs, listAllObjects, TEAM_TABLES } from '../../netlify/functions/delete-account.js'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { fakeClient, newState, type FakeState } from './teamAccountFakeSupabase'
+
+let state: FakeState
+vi.mock('@supabase/supabase-js', () => ({ createClient: () => fakeClient(state) }))
+
+import deleteAccount, { planAccountDeletion, retainedPathsForSharedOrgs, listAllObjects, TEAM_TABLES } from '../../netlify/functions/delete-account.js'
 
 const ORG_A = 'org-a'
 const ORG_B = 'org-b'
@@ -118,5 +123,128 @@ describe('shared file preservation during account deletion', () => {
     const objects = await listAllObjects({ storage: { from: () => ({ list }) } }, 'job-files', 'departing')
     expect(objects).toHaveLength(1001)
     expect(list).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('account deletion end to end', () => {
+  const ORG = '0b0b0b0b-0000-4000-8000-000000000001'
+  const OWNER = 'user-owner'
+  const ADMIN = 'user-admin'
+
+  beforeEach(() => {
+    state = newState({
+      organizations: [{ id: ORG, name: 'Parker Concrete', created_by: OWNER }],
+      org_members: [
+        { id: 'm1', org_id: ORG, user_id: OWNER, role: 'owner', joined_at: '2026-01-01T00:00:00Z', revoked_at: null },
+        { id: 'm2', org_id: ORG, user_id: ADMIN, role: 'admin', joined_at: '2026-02-01T00:00:00Z', revoked_at: null },
+      ],
+      fh_contacts: [{ id: 'job-1', org_id: ORG, user_id: ADMIN, name: 'Dana Smith' }],
+    })
+    state.users = { 'tok-admin': { id: ADMIN, email: 'office@example.test' } }
+    vi.stubEnv('SUPABASE_URL', 'https://db.example.test')
+    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'test-service')
+  })
+  afterEach(() => { vi.unstubAllEnvs() })
+
+  const post = (token: string) => new Request('https://app.example.test/api/delete-account', {
+    method: 'POST', headers: { authorization: `Bearer ${token}` },
+  })
+
+  it('goes through when the leaver and the successor both saved a rate for the same trade', async () => {
+    state.tables.fh_rate_cards = [
+      { id: 'rc-owner', org_id: ORG, user_id: OWNER, trade_key: 'concrete', rate_low: 8, rate_high: 12 },
+      { id: 'rc-admin', org_id: ORG, user_id: ADMIN, trade_key: 'concrete', rate_low: 9, rate_high: 13 },
+    ]
+    state.tables.fh_integrations = [
+      { id: 'in-owner', org_id: ORG, user_id: OWNER, provider: 'quickbooks' },
+      { id: 'in-admin', org_id: ORG, user_id: ADMIN, provider: 'quickbooks' },
+    ]
+    // What Postgres answers when a row is moved onto a person who already
+    // has one: unique (user_id, trade_key) and unique (user_id, provider).
+    state.failWrites = {
+      fh_rate_cards: 'duplicate key value violates unique constraint "fh_rate_cards_user_id_trade_key_key"',
+      fh_integrations: 'duplicate key value violates unique constraint "fh_integrations_user_id_provider_key"',
+    }
+
+    const res = await deleteAccount(post('tok-admin'))
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ ok: true, handed_off_orgs: 1 })
+    expect(state.deletedUsers).toEqual([ADMIN])
+    // The job went to the owner; the leaver's own rates and connections were
+    // never moved, so they go with the account.
+    expect(state.tables.fh_contacts[0].user_id).toBe(OWNER)
+    expect(state.log.some((l) => ['fh_rate_cards', 'fh_integrations'].includes(l.table || ''))).toBe(false)
+    expect(TEAM_TABLES).not.toContain('fh_rate_cards')
+    expect(TEAM_TABLES).not.toContain('fh_integrations')
+  })
+
+  describe('time records', () => {
+    const CREW = 'user-crew'
+    const week = (userId: string, orgId: string | null, approved: boolean) => [0, 1, 2, 3, 4].map((d) => ({
+      id: `p-${userId}-${d}`, org_id: orgId, user_id: userId, contact_id: 'job-1',
+      punch_in_at: `2026-11-0${2 + d}T13:00:00Z`, punch_out_at: `2026-11-0${2 + d}T21:00:00Z`,
+      hourly_rate: 28, approved_at: approved ? '2026-11-09T15:00:00Z' : null, approved_by: approved ? OWNER : null,
+    }))
+    const addCrew = (revokedAt: string | null = null) => {
+      state.tables.org_members.push({ id: 'm3', org_id: ORG, user_id: CREW, role: 'crew', joined_at: '2026-03-01T00:00:00Z', revoked_at: revokedAt })
+      state.users['tok-crew'] = { id: CREW, email: 'dana@example.test' }
+    }
+
+    it.each([['approved', true], ['not yet approved', false]])(
+      'refuses a worker whose %s time is on the books of a company that still has a team',
+      async (_label, approved) => {
+        addCrew()
+        state.tables.fh_contacts.push({ id: 'job-2', org_id: ORG, user_id: CREW, name: 'Lee Park' })
+        state.tables.fh_time_punches = week(CREW, ORG, approved)
+
+        const res = await deleteAccount(post('tok-crew'))
+        const body = await res.json()
+        expect(res.status).toBe(409)
+        expect(body.error).toBe('time_records_kept')
+        expect(body.message).toContain('Parker Concrete')
+        expect(body.message).toMatch(/ask an owner to remove you from the team/i)
+        // Nothing moved and nothing deleted: the payroll record is intact.
+        expect(state.deletedUsers).toEqual([])
+        expect(state.log.filter((l) => l.op !== 'select')).toEqual([])
+        expect(state.tables.fh_time_punches).toHaveLength(5)
+      },
+    )
+
+    it('still refuses after the worker was removed, because the punches would go with the account', async () => {
+      addCrew('2026-11-07T00:00:00Z')
+      state.tables.fh_time_punches = week(CREW, ORG, true)
+      const res = await deleteAccount(post('tok-crew'))
+      expect(res.status).toBe(409)
+      expect((await res.json()).error).toBe('time_records_kept')
+      expect(state.deletedUsers).toEqual([])
+    })
+
+    it('lets a teammate with no time on the books leave as before', async () => {
+      addCrew()
+      state.tables.fh_time_punches = week(ADMIN, ORG, true)
+      const res = await deleteAccount(post('tok-crew'))
+      expect(res.status).toBe(200)
+      expect(state.deletedUsers).toEqual([CREW])
+    })
+
+    it('lets the only member of a company delete everything, punches included', async () => {
+      state.tables.org_members = [state.tables.org_members[0]]
+      state.users['tok-owner'] = { id: OWNER, email: 'jesse@example.test' }
+      state.tables.fh_time_punches = week(OWNER, ORG, true)
+      const res = await deleteAccount(post('tok-owner'))
+      expect(res.status).toBe(200)
+      expect(await res.json()).toMatchObject({ ok: true, deleted_orgs: 1, handed_off_orgs: 0 })
+      expect(state.deletedUsers).toEqual([OWNER])
+    })
+
+    it('stops rather than guess when the time records cannot be read', async () => {
+      addCrew()
+      state.failReads = { fh_time_punches: 'canceling statement due to statement timeout' }
+      const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const res = await deleteAccount(post('tok-crew'))
+      expect(res.status).toBe(500)
+      expect(state.deletedUsers).toEqual([])
+      err.mockRestore()
+    })
   })
 })

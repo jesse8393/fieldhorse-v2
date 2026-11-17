@@ -25,13 +25,21 @@
 //   * The only owner of a shared company is refused with 409
 //     transfer_ownership_required until another member is made owner.
 //
+//   * Anyone with time punches in a shared company is refused with 409
+//     time_records_kept. fh_time_punches.user_id is ON DELETE CASCADE, so
+//     deleting the account would take the person's punches, approved ones
+//     included, out of the company's payroll record and job labor cost.
+//     Being removed from the team by an owner keeps the record, so that is
+//     what the message asks for. A solo company's punches go with it.
+//
 // Ordering: nothing destructive happens before auth.admin.deleteUser
 // succeeds. Reassignment is the only write that precedes it, so a failed
 // auth delete leaves a working account with its data intact instead of a
 // live login over an emptied account. Storage objects are purged last.
 //
-// Personal records go with the person in every case: time punches, push
-// subscriptions, notifications, the profile, and webhook rate limit rows.
+// Personal records go with the person in every case: push
+// subscriptions, notifications, the profile, webhook rate limit rows, and
+// the person's own rate cards and integration connections.
 //
 // Env vars required:
 //   SUPABASE_URL                — same origin as VITE_SUPABASE_URL
@@ -51,9 +59,13 @@ export const TEAM_TABLES = [
   'fh_esign_envelopes', 'fh_public_links', 'fh_public_link_events',
   'fh_job_files', 'fh_job_todos', 'fh_notes', 'fh_schedule', 'fh_subs',
   'fh_sub_profiles', 'fh_selections', 'fh_materials', 'fh_daily_logs',
-  'fh_stage_transitions', 'fh_estimate_templates', 'fh_rate_cards',
-  'fh_integrations'
+  'fh_stage_transitions', 'fh_estimate_templates'
 ]
+// Not in the list on purpose: fh_rate_cards and fh_integrations. Each person
+// keeps their own (unique per user and trade, per user and provider), so
+// moving the leaver's rows onto a successor who already has the same trade
+// or provider broke the unique rule and stopped the deletion on every try.
+// They go with the account.
 
 // Storage buckets the app writes to. Every object is stored under a
 // `${userId}/...` path prefix (job-files: `${userId}/${jobId}/…`, job-photos
@@ -239,8 +251,33 @@ export default async (request) => {
     }, 409)
   }
 
-  // 2. Note which storage objects teammates still need, before reassigning.
   const sharedOrgIds = plan.handoffs.map((h) => h.orgId)
+
+  // The caller's time punches in a company that still has a team are that
+  // company's payroll record, and they would be deleted with the account.
+  if (sharedOrgIds.length > 0) {
+    const { data: punches, error: punchErr } = await supabase
+      .from('fh_time_punches')
+      .select('org_id')
+      .eq('user_id', userId)
+      .in('org_id', sharedOrgIds)
+      .limit(1000)
+    if (punchErr) {
+      console.error('[delete-account] time punch lookup failed', punchErr)
+      return json({ error: 'lookup_failed', message: 'Could not check your time records. Try again.' }, 500)
+    }
+    const punchOrgIds = [...new Set((punches || []).map((p) => p.org_id))]
+    if (punchOrgIds.length > 0) {
+      const names = punchOrgIds.map((id) => orgNames[id] || 'your company').join(', ')
+      return json({
+        error: 'time_records_kept',
+        message: `Your time records are part of the payroll record for ${names}, and deleting your account would erase them. Ask an owner to remove you from the team instead. That keeps the record.`,
+        orgs: punchOrgIds.map((id) => ({ orgId: id, orgName: orgNames[id] || 'your company' }))
+      }, 409)
+    }
+  }
+
+  // 2. Note which storage objects teammates still need, before reassigning.
   let retained = new Set()
   try {
     retained = await retainedPathsForSharedOrgs(supabase, userId, sharedOrgIds)
