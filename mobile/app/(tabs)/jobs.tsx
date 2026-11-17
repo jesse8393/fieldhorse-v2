@@ -12,6 +12,7 @@ import { useJobs, useJobsRealtime, useCoverPhotos, type JobRow } from '../../lib
 import { useAuth } from '../../contexts/AuthContext'
 import { ScreenBackground, Card, StagePill, STAGE_TINT, theme } from '../../components/ui'
 import { NewLeadSheet } from '../../components/NewLeadSheet'
+import { useMoneyVisible } from '../../lib/membership'
 
 const STAGE_FILTERS = ['all', 'lead', 'quote', 'job', 'invoice', 'closed', 'lost'] as const
 const STAGE_INDEX: Record<string, number> = { lead: 1, quote: 2, job: 3, invoice: 4, closed: 5, lost: 0 }
@@ -42,6 +43,8 @@ export default function JobsScreen() {
   const { user } = useAuth()
   const { data: jobs = [], isLoading } = useJobs()
   const { data: covers = {} } = useCoverPhotos(user?.id)
+  // Foreman and crew see no amounts (fh_money_visible), as on the web.
+  const showMoney = useMoneyVisible(user?.id)
   useJobsRealtime(user?.id, queryClient)
   const [search, setSearch] = useState('')
   const [stageFilter, setStageFilter] = useState<string>('all')
@@ -82,8 +85,8 @@ export default function JobsScreen() {
         <Text style={{ fontSize: 14, fontWeight: '700', marginTop: 6 }}>
           <Text style={{ color: theme.goldBright }}>{jobs.length}</Text>
           <Text style={{ color: theme.inkMuted }}> total · </Text>
-          <Text style={{ color: theme.goldBright }}>{money(summary.inMotion)}</Text>
-          <Text style={{ color: theme.inkMuted }}> in motion · </Text>
+          {showMoney ? <Text style={{ color: theme.goldBright }}>{money(summary.inMotion)}</Text> : null}
+          {showMoney ? <Text style={{ color: theme.inkMuted }}> in motion · </Text> : null}
           <Text style={{ color: theme.danger }}>{summary.needEyes}</Text>
           <Text style={{ color: theme.inkMuted }}> need eyes</Text>
         </Text>
@@ -139,7 +142,7 @@ export default function JobsScreen() {
           data={filtered}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: insets.bottom + 100, gap: 12 }}
-          renderItem={({ item }) => <JobCard job={item} cover={covers[item.id]} onPress={() => router.push(`/jobs/${item.id}`)} />}
+          renderItem={({ item }) => <JobCard job={item} cover={covers[item.id]} showMoney={showMoney} onPress={() => router.push(`/jobs/${item.id}`)} />}
           ListEmptyComponent={<Text style={{ color: theme.inkMuted, textAlign: 'center', marginTop: 48 }}>No jobs in this view.</Text>}
         />
       )}
@@ -164,12 +167,12 @@ export default function JobsScreen() {
   )
 }
 
-function JobCard({ job, cover, onPress }: { job: JobRow; cover?: string; onPress: () => void }) {
+function JobCard({ job, cover, showMoney, onPress }: { job: JobRow; cover?: string; showMoney: boolean; onPress: () => void }) {
   const stage = job.stage ?? ''
   const tint = STAGE_TINT[stage] ?? '#141414'
   const idx = STAGE_INDEX[stage] ?? 0
   const cold = isCold(job)
-  const topDeal = Number(job.amount || 0) >= 50000
+  const topDeal = showMoney && Number(job.amount || 0) >= 50000
   const approved = APPROVED.has(stage)
   const contactName = job.fh_clients?.name || null
 
@@ -196,7 +199,7 @@ function JobCard({ job, cover, onPress }: { job: JobRow; cover?: string; onPress
                 </View>
               ) : null}
             </View>
-            <Text style={{ color: theme.goldBright, fontSize: 20, fontWeight: '800' }}>{money(job.amount)}</Text>
+            {showMoney ? <Text style={{ color: theme.goldBright, fontSize: 20, fontWeight: '800' }}>{money(job.amount)}</Text> : null}
           </View>
 
           {/* Next action chip */}

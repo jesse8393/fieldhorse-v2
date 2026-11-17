@@ -25,6 +25,7 @@ vi.mock('./supabase', () => ({ supabase: {
 
 import { useIntegrations, useDisconnectIntegration } from './integrations'
 import { useJobs, useEstimates, useUpdateStage, useCreateQuoteFromBid, useCreateLead, useSetFollowUpStatus } from './queries'
+import { useMembership, moneyVisible } from './membership'
 import { JOB_STAGE_CHOICES } from './stages'
 import { useClientsBundle, useClientDetail, useJobDetail, useInvoiceDetail, useInvoicesOverview, useProfile, useJobPhotos, useJobFiles, useAgenda, useNotesScreen, useActivityFeed, useSubsRoster, useToggleTodo, useDeleteTodo, useUpdateJob, useUpdateProfile, useDeletePhoto, useDeleteFile, useGenerateDraws, useLogPayment, useMarkInvoicePaid, useUpdateInvoiceStatus } from './queries'
 
@@ -331,5 +332,41 @@ describe('native reminders', () => {
     mock.results.set('rpc:fh_follow_up_set_status', { data: null, error: new Error('not yours') })
     expect((await useSetFollowUpStatus()({ id: 'note-1', userId: 'user', status: 'done' })).error?.message).toBe('not yours')
     expect(mock.invalidate).not.toHaveBeenCalled()
+  })
+})
+
+describe('native money visibility', () => {
+  const rows = [
+    { org_id: 'org-old', role: 'owner', joined_at: '2025-01-01T00:00:00Z' },
+    { org_id: 'org-new', role: 'crew', joined_at: '2026-01-01T00:00:00Z' },
+  ]
+  it('loads the active membership and asks fh_money_visible for that org', async () => {
+    mock.results.set('org_members', { data: rows, error: null })
+    mock.results.set('rpc:fh_money_visible', { data: false, error: null })
+    useMembership('user')
+    expect(await mock.options.queryFn()).toEqual({ orgId: 'org-old', role: 'owner', moneyVisible: false })
+    expect(mock.calls).toContainEqual(['org_members', 'eq', 'user_id', 'user'])
+    expect(mock.calls).toContainEqual(['rpc', 'fh_money_visible', { p_org_id: 'org-old' }])
+  })
+  it('crew and foreman see no money', async () => {
+    mock.results.set('org_members', { data: [rows[1]], error: null })
+    mock.results.set('rpc:fh_money_visible', { data: false, error: null })
+    useMembership('user')
+    expect(await mock.options.queryFn()).toMatchObject({ role: 'crew', moneyVisible: false })
+  })
+  it('a person with no company yet sees their own money', async () => {
+    mock.results.set('org_members', { data: [], error: null })
+    useMembership('user')
+    expect(await mock.options.queryFn()).toEqual({ orgId: null, role: null, moneyVisible: true })
+    expect(mock.calls.some(c => c[0] === 'rpc')).toBe(false)
+  })
+  it('a failed check hides money rather than showing it', async () => {
+    mock.results.set('org_members', { data: [rows[0]], error: null })
+    mock.results.set('rpc:fh_money_visible', { data: null, error: new Error('offline') })
+    useMembership('user')
+    await expect(mock.options.queryFn()).rejects.toThrow('offline')
+    expect(mock.options.throwOnError).toBe(false)
+    expect(moneyVisible(undefined)).toBe(false)
+    expect(moneyVisible({ orgId: 'org', role: 'owner', moneyVisible: true })).toBe(true)
   })
 })
