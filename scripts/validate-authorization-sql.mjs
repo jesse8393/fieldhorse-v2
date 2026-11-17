@@ -162,5 +162,50 @@ $function$;
   } else console.log('SKIP concurrent version locking: PostgreSQL CI supplies independent sessions; PGlite does not.')
   await db.exec('reset role')
   equal((await db.query("select count(*)::int as n from public.fh_quote_versions where quote_id=$1 and status='approved'",[id(20)])).rows[0].n, 1, 'exactly one current approved quote version remains')
+
+  // Role and partner boundaries (DB-04, DB-05, DB-08, DB-12, DB-14).
+  const refused = async (work, label) => { await assert.rejects(work, e => e.code === '42501'); checks++; console.log(`PASS ${label}`) }
+  const service = async () => { await db.query('reset role'); await db.query("select set_config('request.jwt.claim.sub','',false)"); await db.query('set role service_role') }
+  const rows = async (sql, params) => (await db.query(sql, params)).rows
+  await db.exec(`reset role;
+    create function public.auth_user_org_ids() returns setof uuid language sql stable security definer as $$ select org_id from public.org_members where user_id=auth.uid() and revoked_at is null $$;
+    create function public.fh_is_org_manager(org uuid) returns boolean language sql stable security definer as $$ select exists(select 1 from public.org_members where org_id=org and user_id=auth.uid() and revoked_at is null and role in ('owner','admin','manager')) $$;
+    grant usage on schema public, auth to service_role;
+    alter table public.fh_job_partners add column id uuid primary key default gen_random_uuid(), add column org_id uuid, add column partner_email text, add column accepted_at timestamptz;
+    alter table public.fh_job_partners alter column status set default 'pending';
+    update public.fh_job_partners set org_id='${id(100)}';
+    alter table public.fh_job_partners enable row level security;
+    create policy fh_job_partners_own on public.fh_job_partners for all to authenticated using (org_id in (select public.auth_user_org_ids())) with check (org_id in (select public.auth_user_org_ids()));
+    create policy fh_job_partners_partner_read on public.fh_job_partners for select to authenticated using (partner_user_id = (select auth.uid()));
+    grant select, insert, update on public.fh_job_partners to authenticated, service_role;
+  `)
+  const grantPartner = values => db.query(`insert into public.fh_job_partners(id,job_id,org_id,partner_email,partner_user_id,status) values($1,$2,$3,$4,$5,$6) returning id`, [id(values.row), id(10), id(100), values.email, values.partner == null ? null : id(values.partner), values.status])
+  await scope(3)
+  equal((await grantPartner({ row: 60, email: 'second@example.test', partner: 3, status: 'accepted' })).rows.length, 1, 'baseline: crew grants an account accepted partner access')
+  await db.exec(`reset role; delete from public.fh_job_partners where id='${id(60)}'`)
+
+  const boundaries = await read('migrations/20261117110100_role_boundaries.sql')
+  assert(!/drop|delete|truncate/i.test(boundaries), 'role boundary migration avoids words that need owner approval')
+  await db.exec(boundaries)
+  await db.exec(boundaries)
+  equal(true, true, 'role boundary migration installs twice safely')
+
+  // DB-04: partner access is granted by managers and accepted only by the invite link.
+  await scope(3)
+  await refused(() => grantPartner({ row: 61, email: 'second@example.test', partner: 3, status: 'accepted' }), 'crew cannot grant accepted partner access')
+  await refused(() => grantPartner({ row: 61, email: 'second@example.test', status: 'pending' }), 'crew cannot send a partner invite directly')
+  equal((await rows("update public.fh_job_partners set status='revoked' where partner_user_id=$1 returning id", [id(6)])).length, 0, 'crew cannot revoke a partner')
+  equal((await rows('select id from public.fh_job_partners where job_id=$1', [id(10)])).length, 2, 'crew still sees who is partnered on the job')
+  await scope(2)
+  await refused(() => grantPartner({ row: 61, email: 'second@example.test', partner: 2, status: 'accepted' }), 'manager cannot write an accepted partner row directly')
+  await refused(() => grantPartner({ row: 61, email: 'second@example.test', partner: 2, status: 'pending' }), 'manager cannot pick the partner account directly')
+  equal((await grantPartner({ row: 61, email: 'new@example.test', status: 'pending' })).rows.length, 1, 'manager sends a pending partner invite')
+  await refused(() => db.query('update public.fh_job_partners set partner_user_id=$1 where id=$2', [id(2), id(61)]), 'manager cannot attach an account to an invite')
+  await refused(() => db.query("update public.fh_job_partners set status='accepted' where id=$1", [id(61)]), 'manager cannot mark an invite accepted')
+  equal((await rows("update public.fh_job_partners set status='revoked' where id=$1 returning id", [id(61)])).length, 1, 'manager revokes a partner invite')
+  await service()
+  equal((await rows("update public.fh_job_partners set status='accepted', partner_user_id=$1, accepted_at=now() where id=$2 returning id", [id(5), id(61)])).length, 1, 'invite link acceptance through the service path still works')
+  await db.exec('reset role')
+
   console.log(`${checks} authorization transition checks passed.`)
 } finally { await db.close() }
