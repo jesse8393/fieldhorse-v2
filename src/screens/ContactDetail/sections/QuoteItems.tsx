@@ -11,7 +11,7 @@ import { loadUserRateCard } from '../../../lib/rateCard.ts'
 import { Eyebrow } from '../../../components/v3'
 import { planReorder } from './quoteItemOrder.ts'
 import { keepFocusOnRetry } from '../../../lib/retryFocus.ts'
-import { lineTotal } from '../../../lib/quoteMoney.ts'
+import { lineTotal, roundCents } from '../../../lib/quoteMoney.ts'
 
 /**
  * Quote items section, fh_quote_items CRUD editor.
@@ -210,7 +210,7 @@ export function normalizeForDB(d: any) {
     qty: Number(d.qty),
     unit: d.unit?.trim() || null,
     rate: Number(d.rate),
-    amount: Number(d.amount),
+    amount: roundCents(d.amount),
     notes: d.notes?.trim() || null,
     is_optional: kind === 'optional',
     is_excluded: kind === 'excluded'

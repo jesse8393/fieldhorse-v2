@@ -29,3 +29,16 @@ describe('the amount the editor fills in (M-10)', () => {
   })
 })
 
+describe('the amount the editor saves (M-22)', () => {
+  it('an amount typed as 1.005 is saved as 1.01', () => {
+    let draft = { ...emptyDraft() }
+    draft = type(draft, 'description', 'Sealer')
+    draft = type(draft, 'amount', '1.005')
+    expect(normalizeForDB(draft).amount).toBe(1.01)
+  })
+
+  it('an edited saved line keeps its typed amount to the cent', () => {
+    const draft = type(draftFromRow({ description: 'Pour', qty: 1, rate: 2000, amount: 2000 }), 'amount', '12500')
+    expect(normalizeForDB(draft).amount).toBe(12500)
+  })
+})
