@@ -5,6 +5,7 @@
 // signals, and per-trade status. Same weather data, same handlers,
 // new visual chrome.
 
+import type { ReactNode } from 'react'
 import {
   Bell,
   CloudRain,
@@ -56,6 +57,8 @@ type Props = {
   daily: DailyRow[]
   tradeRows: TradeRow[]
   onPinLocation: () => void
+  /** No company location: shown in place of the forecast, which would be for nowhere. */
+  empty?: ReactNode
   // Present only when the forecast request failed.
   onRetry?: () => void
   onGoToSchedule?: () => void
@@ -95,7 +98,7 @@ export default function SnowForecastBuild(props: Props) {
   const {
     loading, err, hasCoords, cityName, weather, receivedAt,
     currentWindow, daily, tradeRows,
-    onPinLocation, onRetry, onGoToSchedule,
+    onPinLocation, onRetry, onGoToSchedule, empty,
   } = props
 
   const current = weather?.current || {}
@@ -129,8 +132,7 @@ export default function SnowForecastBuild(props: Props) {
           ? 'Review affected days'
           : 'Keep crews on plan'
 
-  return (
-    <div className="fh-build-page" data-build-screen="SnowForecastBuild">
+  const topbar = (
       <header className="fh-build-topbar">
         <button
           type="button"
@@ -163,6 +165,28 @@ export default function SnowForecastBuild(props: Props) {
           <MapPin size={15} /> {hasCoords ? 'Pin again' : 'Pin location'}
         </button>
       </header>
+  )
+
+  if (empty) {
+    return (
+      <div className="fh-build-page" data-build-screen="SnowForecastBuild">
+        {topbar}
+        <div className="fh-build-main">
+          <section className="fh-build-hero-row fh-build-hero-row--page">
+            <div>
+              <div className="fh-build-good">Planning</div>
+              <h1 className="fh-build-title">Forecast</h1>
+            </div>
+          </section>
+          {empty}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="fh-build-page" data-build-screen="SnowForecastBuild">
+      {topbar}
 
       <div className="fh-build-main">
         <section className="fh-build-hero-row fh-build-hero-row--page">

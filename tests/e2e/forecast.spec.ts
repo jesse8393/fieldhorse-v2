@@ -37,3 +37,38 @@ test('shows an honest forecast failure state and recovers on retry', async ({ co
   await expect(failure).toHaveCount(0, { timeout: 15_000 })
   await expect(page.getByText('Within configured weather limits', { exact: true }).first()).toBeVisible()
 })
+
+// A company that skipped the optional location step has no spot to
+// forecast. The screen used to fall back to Murfreesboro and show that
+// town's weather and work calls as if they were the company's. It now
+// asks for the location, links to where it is set, and asks the weather
+// service nothing.
+test('with no company location, Forecast asks for one instead of showing another town', async ({ context, page }) => {
+  await installMock(context, {
+    supabaseHosts: ['qa-mock.supabase.co', 'pnmhblvslftdzfcdezbw.supabase.co'],
+    tables: { profiles: [{ user_id: 'qa-user-1', company_name: 'Fresh Concrete Co', onboarded_at: '2026-11-01T00:00:00Z', location_lat: null, location_lon: null, services: ['Concrete'], preferences: {} }] }
+  })
+  await context.addInitScript((savedSession) => {
+    localStorage.setItem('sb-qa-mock-auth-token', JSON.stringify(savedSession))
+    localStorage.setItem('fh-onboarding-seen', '1')
+  }, session)
+  const asked: string[] = []
+  await context.route('https://api.open-meteo.com/**', (route) => {
+    asked.push(route.request().url())
+    return route.fulfill({ status: 503, body: 'unavailable' })
+  })
+  await context.route('https://api.bigdatacloud.net/**', (route) => {
+    asked.push(route.request().url())
+    return route.fulfill({ status: 503, body: 'unavailable' })
+  })
+
+  await page.goto('/pour-window', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+  const main = page.locator('#fh-main')
+  await expect(main.getByText('Set your company location to see its forecast.', { exact: true })).toBeVisible({ timeout: 15_000 })
+  await expect(main).not.toContainText('Murfreesboro')
+  await expect(main).not.toContainText('Forecast unavailable')
+  expect(asked).toEqual([])
+  await main.getByRole('link', { name: 'Set location', exact: true }).click()
+  await expect(page).toHaveURL(/\/settings#location$/)
+  await expect(page.getByRole('button', { name: 'Pin location', exact: true })).toBeVisible()
+})
