@@ -113,11 +113,10 @@ export default function JobMore() {
                   <Button variant="destructive" block onClick={() => deleteTap.tap(() => { void remove() })}>
                     {deleteTap.armed ? 'Tap again to delete' : 'Delete job'}
                   </Button>
-                  {deleteTap.armed && (
-                    <p className="fhja-danger__why">
-                      Removing {contact.name || 'this job'} takes its {data.subs.length} subs, {data.expenses.length} expenses, {data.payments.length} payments, {data.inspections.length} inspections and {data.scheduleCount} schedule items with it, and archives its {data.notes.length} notes. This cannot be undone.
-                    </p>
-                  )}
+                  {/* Shown before the first tap, so the warning is read before the decision. */}
+                  <p className="fhja-danger__why">
+                    Removing {contact.name || 'this job'} takes its {data.subs.length} subs, {data.expenses.length} expenses, {data.payments.length} payments, {data.inspections.length} inspections and {data.scheduleCount} schedule items with it, and archives its {data.notes.length} notes. This cannot be undone.
+                  </p>
                 </>
               )}
             </div>

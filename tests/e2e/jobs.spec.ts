@@ -95,6 +95,25 @@ test.describe('jobs on a phone', () => {
   })
 })
 
+test.describe('tap again to delete a job', () => {
+  test('a fast double tap does not delete, and the warning shows before the first tap', async ({ context, page }) => {
+    await signIn(context)
+    const deletes: string[] = []
+    await context.route('**/rest/v1/fh_contacts*', (route) => {
+      if (route.request().method() === 'DELETE') { deletes.push(route.request().url()); return route.fulfill({ status: 200, json: [{ id: 'c-job2' }] }) }
+      return route.fallback()
+    })
+    await page.goto('/jobs/c-job2/more')
+    const button = page.getByRole('button', { name: 'Delete job', exact: true })
+    await expect(button).toBeVisible()
+    await expect(page.getByText(/This cannot be undone\./)).toBeVisible()
+    await button.dblclick()
+    await page.waitForTimeout(600)
+    expect(deletes).toHaveLength(0)
+    await expect(page.getByRole('button', { name: 'Tap again to delete', exact: true })).toBeVisible()
+  })
+})
+
 // OPS-06 and D02: crew could open the job money screens by URL and saw the
 // contract price, and the More screen offered them partner and edit rows.
 test.describe('job screens a field role cannot open', () => {

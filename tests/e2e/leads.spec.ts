@@ -114,6 +114,7 @@ test.describe('the lead screen', () => {
     const again = page.getByRole('button', { name: 'Tap again to mark lost' })
     await expect(again).toBeVisible()
     expect(patches).toEqual([])
+    await page.waitForTimeout(600) // a second tap within 500 ms is ignored (OPS-02)
     await again.click()
     await expect.poll(() => patches.length).toBe(1)
     expect(patches[0].startsWith('eq.l-lead1=')).toBe(true)

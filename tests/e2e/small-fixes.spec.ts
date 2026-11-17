@@ -246,6 +246,7 @@ test.describe('Reopen asks first, like Mark lost', () => {
 
     await card.getByRole('button', { name: 'Actions for Old Mill HOA', exact: true }).click()
     await page.getByRole('menuitem', { name: 'Reopen' }).click()
+    await page.waitForTimeout(600) // a second tap within 500 ms is ignored (OPS-02)
     await card.getByRole('button', { name: 'Tap again to reopen' }).click()
     await expect.poll(() => patches.length).toBe(1)
     expect(JSON.parse(patches[0])).toEqual({ stage: 'job' })
@@ -273,6 +274,7 @@ test.describe('Reopen asks first, like Mark lost', () => {
     expect(patches).toEqual([])
 
     await reopen.click()
+    await page.waitForTimeout(600) // a second tap within 500 ms is ignored (OPS-02)
     await reopen.click()
     await expect.poll(() => patches.length).toBe(1)
     expect(JSON.parse(patches[0])).toEqual({ stage: 'job' })
@@ -284,11 +286,13 @@ test.describe('Reopen asks first, like Mark lost', () => {
     if (isPhone(testInfo.project.name)) {
       await openJob(page, '/jobs/c-lost')
       await page.locator('.fhj-capsule .fhc-btn--primary').click()
+      await page.waitForTimeout(600) // a second tap within 500 ms is ignored (OPS-02)
       await page.getByRole('button', { name: 'Tap again to reopen', exact: true }).click()
     } else {
       const card = await openLostDealCard(page)
       await card.getByRole('button', { name: 'Actions for Old Mill HOA', exact: true }).click()
       await page.getByRole('menuitem', { name: 'Reopen' }).click()
+      await page.waitForTimeout(600) // a second tap within 500 ms is ignored (OPS-02)
       await card.getByRole('button', { name: 'Tap again to reopen', exact: true }).click()
       await expect(page.getByRole('region', { name: 'Lost', exact: true }).getByRole('button', { name: 'Actions for Old Mill HOA', exact: true })).toBeVisible()
     }
@@ -305,6 +309,7 @@ test.describe('Reopen asks first, like Mark lost', () => {
     await reopen.click()
     await expect(reopen).toHaveText('Tap again to reopen')
     await expect(page.locator('.fhj-capsule')).toContainText('It moves back to Jobs.')
+    await page.waitForTimeout(600) // a second tap within 500 ms is ignored (OPS-02)
     await reopen.click()
     await expect.poll(() => patches.length).toBe(1)
     expect(JSON.parse(patches[0])).toEqual({ stage: 'job' })
@@ -333,7 +338,7 @@ test.describe('Reopen asks first, like Mark lost', () => {
     // Once the menu has gone and handed focus back, focus is on the armed button.
     await expect(page.locator('[data-slot="dropdown-menu-content"]')).toHaveCount(0)
     await expect(again).toBeFocused()
-    await page.waitForTimeout(300)
+    await page.waitForTimeout(600) // a second tap within 500 ms is ignored (OPS-02)
     expect(patches).toEqual([])
 
     // Enter presses the armed button: the deal moves, no menu opens.
@@ -392,6 +397,7 @@ test.describe('Reopen asks first, like Mark lost', () => {
     expect(writes).toEqual([])
 
     // The second tap deletes the record, then moves the job back to Jobs.
+    await page.waitForTimeout(600) // a second tap within 500 ms is ignored (OPS-02)
     await again.click()
     await expect.poll(() => writes.length).toBe(2)
     expect(writes[0]).toMatch(/^DELETE fh_closeouts/)
@@ -417,6 +423,7 @@ test.describe('Reopen asks first, like Mark lost', () => {
     await page.waitForTimeout(300)
     expect(patches).toEqual([])
 
+    await page.waitForTimeout(600) // a second tap within 500 ms is ignored (OPS-02)
     await again.click()
     await expect.poll(() => patches.length).toBe(1)
     expect(JSON.parse(patches[0])).toEqual({ stage: 'job' })

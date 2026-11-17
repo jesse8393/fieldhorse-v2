@@ -526,6 +526,7 @@ test.describe('the quote screen', () => {
     await expect(page.getByRole('dialog')).toHaveCount(0)
     await expect(page.getByRole('alertdialog')).toHaveCount(0)
     expect(writes).toEqual([])
+    await page.waitForTimeout(600) // a second tap within 500 ms is ignored (OPS-02)
     await page.getByRole('button', { name: 'Tap again to delete' }).click()
     await expect(page).toHaveURL(/\/quotes$/, { timeout: 15_000 })
     expect(writes).toContain('/rest/v1/fh_quote_items')
