@@ -9,6 +9,11 @@
 //     functions: { name: { overloads: Array<Array<{ name, optional }>> } } }
 // A function overload is the list of its named parameters.
 
+/** @typedef {{ name: string, optional: boolean }} Param */
+/** @typedef {{ columns: string[], view: boolean }} TableShape */
+/** @typedef {{ overloads: Array<Param[] | null> }} FunctionShape */
+/** @typedef {{ tables: Record<string, TableShape>, functions: Record<string, FunctionShape> }} Schema */
+
 const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/
 
 // ---- database.types.ts -------------------------------------------------------
@@ -17,6 +22,7 @@ const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/
  * Parses the generated Database type. Only the public schema's Tables, Views
  * and Functions are read; the layout is the one `supabase gen types` writes.
  * @param {string} text
+ * @returns {Schema}
  */
 export function parseDatabaseTypes(text) {
   const lines = text.split('\n')
@@ -26,7 +32,7 @@ export function parseDatabaseTypes(text) {
   if (end < 0) end = lines.length
   const publicStart = lines.findIndex((l, i) => i > start && i < end && l === '  public: {')
   if (publicStart < 0) throw new Error('database.types.ts has no public schema')
-  const schema = { tables: {}, functions: {} }
+  const schema = /** @type {Schema} */ ({ tables: {}, functions: {} })
 
   const section = (name) => {
     const from = lines.findIndex((l, i) => i > publicStart && i < end && l === `    ${name}: {`)
@@ -466,7 +472,7 @@ export function productionPlan(env) {
 
 /** The schema a PostgREST OpenAPI document describes. */
 export function schemaFromOpenApi(doc) {
-  const schema = { tables: {}, functions: {} }
+  const schema = /** @type {Schema} */ ({ tables: {}, functions: {} })
   for (const [name, def] of Object.entries(doc?.definitions ?? {})) {
     schema.tables[name] = { columns: Object.keys(def?.properties ?? {}), view: false }
   }
@@ -488,7 +494,7 @@ export function schemaFromOpenApi(doc) {
  * overloads as { name, args: [{ name, optional }] }.
  */
 export function schemaFromCatalog({ columns, functions }) {
-  const schema = { tables: {}, functions: {} }
+  const schema = /** @type {Schema} */ ({ tables: {}, functions: {} })
   for (const { table, column } of columns) {
     (schema.tables[table] ||= { columns: [], view: false }).columns.push(column)
   }
