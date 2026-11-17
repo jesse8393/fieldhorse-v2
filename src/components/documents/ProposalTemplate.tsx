@@ -613,6 +613,7 @@ function statusToChip(status: any) {
     case 'changes_requested': return { label: 'Changes requested', tone: 'red' }
     case 'expired':  return { label: 'Expired',  tone: 'red' }
     case 'rejected': return { label: 'Declined', tone: 'red' }
+    case 'closed':   return { label: 'Not open', tone: 'slate' }
     default:         return { label: 'Draft',    tone: 'slate' }
   }
 }

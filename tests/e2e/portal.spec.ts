@@ -725,10 +725,9 @@ test('after approval the deposit note and the pay button stay past the valid unt
 })
 
 test('on the classic page an approval on the stated day still reaches the server', async ({ page, context }) => {
-  // Valid until October 9 (end of day, Central); the customer approves at
-  // 9 in the morning on October 10. The server allows the whole next day,
-  // so the approval posts and the server decides, as it always did.
-  await page.clock.setFixedTime(new Date('2026-10-10T14:00:00.000Z'))
+  // Valid until October 9 (stored as the end of that day, Central); the
+  // customer approves at 9 in the morning on October 9, so it posts.
+  await page.clock.setFixedTime(new Date('2026-10-09T14:00:00.000Z'))
   const spies = await mockPortal(context, proposalPayload({
     company: { estimate_template: 'classic' },
     contact: { quote_expires_at: '2026-10-10T04:59:59.999Z' }
@@ -746,6 +745,20 @@ test('on the classic page an approval on the stated day still reaches the server
   await expect(page.getByText('Proposal approved')).toBeVisible()
   await expect(page.getByRole('alert')).toHaveCount(0)
   expect(spies.stray).toEqual([])
+})
+
+test('on the classic page the day after the valid until date shows the expired note and posts nothing (M-21)', async ({ page, context }) => {
+  // The same quote the next morning: the server no longer adds a day to a
+  // date stored as the end of the day, and the page offers no approval.
+  await page.clock.setFixedTime(new Date('2026-10-10T14:00:00.000Z'))
+  const spies = await mockPortal(context, proposalPayload({
+    company: { estimate_template: 'classic' },
+    contact: { quote_expires_at: '2026-10-10T04:59:59.999Z' }
+  }))
+  await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByText('This proposal has expired. Ask Parker Construction for an updated one.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Approve & notify contractor' })).toHaveCount(0)
+  expect(spies.approve).toHaveLength(0)
 })
 
 test('a quote with changes requested shows the request and no way to approve or ask', async ({ page, context }) => {
@@ -1037,8 +1050,8 @@ test('a question sent after the quote was declined reads the link again and leav
   await expect(page.getByRole('button', { name: /Ask about this/ })).toHaveCount(1)
 
   // The contractor marks the quote declined while the customer reads. The
-  // request changes endpoint refuses a question for it; the approve
-  // endpoint still takes an approval.
+  // request changes endpoint refuses a question for it, and so does the
+  // approve endpoint.
   spies.setPayload(proposalPayload({ contact: { proposal_status: 'rejected' } }))
   spies.setRequestReply({ status: 410, body: { ok: false, error: 'gone' } })
   const reads = spies.reads
@@ -1046,16 +1059,14 @@ test('a question sent after the quote was declined reads the link again and leav
 
   await expect.poll(() => spies.requestChanges.length).toBe(1)
   await expect.poll(() => spies.reads).toBeGreaterThan(reads)
-  // The question form closes on the reason, and nothing offers to ask again.
-  const alert = page.getByRole('alert')
-  await expect(alert).toHaveText('This proposal is no longer open for changes.')
-  await expect(alert).toBeFocused()
+  // The page now shows the quote as declined: not open, nothing to ask or
+  // approve (a declined quote takes no approval, FN-18).
+  await expect(page.getByText('This quote is not open for approval.')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Send request' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: /Ask about this/ })).toHaveCount(0)
   await expect(page.getByRole('button', { name: /question first/ })).toHaveCount(0)
   await expect(page.getByText('Stamped ashlar pattern', { exact: true })).toBeVisible()
-  // A declined quote can still be approved.
-  await expect(page.getByRole('button', { name: 'Approve this quote' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Approve this quote' })).toHaveCount(0)
   expect(spies.requestChanges).toHaveLength(1)
   expect(spies.approve).toHaveLength(0)
   expect(spies.stray).toEqual([])
@@ -1204,12 +1215,14 @@ test('a quote marked lost says it is no longer open, with no way to approve or a
   expect(spies.stray).toEqual([])
 })
 
-test('a declined quote, or one already moved to a job, can still be approved but offers no question', async ({ page, context }) => {
-  // The approve endpoint accepts both; the request changes endpoint refuses
-  // both (410), so neither Ask button may show.
+test('a declined quote cannot be approved; one already moved to a job can, but offers no question', async ({ page, context }) => {
+  // The approve endpoint refuses a declined proposal (FN-18) and accepts
+  // one whose job has started; the request changes endpoint refuses both
+  // (410), so no Ask button may show for either.
   const spies = await mockPortal(context, proposalPayload({ contact: { proposal_status: 'rejected' } }))
   await openPortal(page)
-  await expect(page.getByRole('button', { name: 'Approve this quote' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Approve this quote' })).toHaveCount(0)
+  await expect(page.getByText('This quote is not open for approval.')).toBeVisible()
   await expect(page.getByText('Stamped ashlar pattern', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: /Ask about this/ })).toHaveCount(0)
   await expect(page.getByRole('button', { name: /question first/ })).toHaveCount(0)
@@ -1683,3 +1696,39 @@ test('a proposal approval posts the total of the lines shown and the version of 
   // Excavate 2,200 + rebar 2,860 + slab 9,350 + joints 4,048; the optional and the excluded lines are not in it.
   expect(spies.approve[0]).toMatchObject({ expected_total: 18458, expected_updated_at: '2026-10-02T12:00:00.000Z' })
 })
+
+/* ---- Closed documents show no live approve form (PT-13, PT-14, M-21, FN-18) ---- */
+
+for (const status of ['void', 'rejected', 'draft']) {
+  test(`a ${status} change order shows that it is not open, with no approve form`, async ({ page, context }) => {
+    const spies = await mockPortal(context, changeOrderPayload({ co: { status } }))
+    await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+    await expect(page.getByText('Extra footing')).toBeVisible()
+    await expect(page.getByText('This change order is not open for approval.')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Approve & notify contractor' })).toHaveCount(0)
+    await expect(page.getByLabel('Your full name')).toHaveCount(0)
+    expect(spies.stray).toEqual([])
+  })
+}
+
+test('on the classic page an expired, lost, declined or unsent quote shows no approve form and no internal status', async ({ page, context }) => {
+  await page.clock.setFixedTime(new Date('2026-10-10T14:00:00.000Z'))
+  const classic = { estimate_template: 'classic' }
+  const spies = await mockPortal(context, proposalPayload({ company: classic, contact: { quote_expires_at: '2026-10-06T04:59:59.999Z' } }))
+  await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByText('This proposal has expired. Ask Parker Construction for an updated one.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Approve & notify contractor' })).toHaveCount(0)
+  await expect(page.getByText('Expired', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('Sent', { exact: true })).toHaveCount(0)
+
+  for (const contact of [{ stage: 'lost' }, { proposal_status: 'rejected' }, { proposal_status: 'draft' }]) {
+    spies.setPayload(proposalPayload({ company: classic, contact }))
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    await expect(page.getByText('This proposal is not open for approval. Ask Parker Construction for an updated one.')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Approve & notify contractor' })).toHaveCount(0)
+    await expect(page.getByText('Draft', { exact: true })).toHaveCount(0)
+    await expect(page.getByText('Sent', { exact: true })).toHaveCount(0)
+  }
+  expect(spies.approve).toHaveLength(0)
+})
+

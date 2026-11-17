@@ -51,15 +51,29 @@ function isFieldhorse(payload: PublicDocPayload): boolean {
 
 // Whether the page drawn from this payload offers the approve bar. The
 // render and the check before an approval posts both ask this, so nothing
-// posts from a page that, once redrawn, no longer offers approval. The
-// Fieldhorse page offers it while the quote is open (PortalView.open); the
-// classic page unless it is approved or has changes requested, as it
-// always did (D24).
+// posts from a page that, once redrawn, no longer offers approval. Every
+// theme offers it only while the quote is open (PortalView.open: not
+// approved, no changes requested, not past its valid until date, not lost
+// or closed), and never for a declined proposal or one never sent, which
+// the server refuses too (FN-18).
 function approvable(payload: PublicDocPayload, now: Date): boolean {
   if (payload.kind !== 'proposal') return false
-  if (isFieldhorse(payload)) return buildPortalView(payload, now).open
   const status = portalStatus(payload)
-  return status !== 'approved' && status !== 'changes_requested'
+  if (status === 'rejected' || status === 'draft') return false
+  return buildPortalView(payload, now).open
+}
+
+// The status chip the classic letter shows the customer: where the quote
+// stands for them, never an internal state (Draft, Viewed) or a Sent chip
+// on a quote that is no longer open.
+function customerStatus(payload: PublicDocPayload, now: Date): string {
+  const status = portalStatus(payload)
+  if (status === 'approved' || status === 'changes_requested') return status
+  const pv = buildPortalView(payload, now)
+  if (pv.expired) return 'expired'
+  if (status === 'rejected') return 'rejected'
+  if (pv.closed || status === 'draft') return 'closed'
+  return 'sent'
 }
 
 // What the customer is agreeing to, posted with an approval so the server
@@ -211,7 +225,7 @@ export default function PublicDoc() {
           portal={{
             payload: data,
             onAsk: canAsk ? onAsk : undefined,
-            approveBar: pv.open ? (
+            approveBar: approvable(data, new Date()) ? (
               <ApproveProposalBar
                 skin="fieldhorse"
                 token={token}
@@ -226,6 +240,9 @@ export default function PublicDoc() {
                 canAsk={canAsk}
                 expected={shownProposal(data)}
               />
+            ) : pv.open ? (
+              // Open by its dates, but declined or never sent.
+              <NotOpenNote companyName={data.company?.name} phone={data.company?.phone} docLabel="quote" />
             ) : null
           }}
         />
@@ -262,6 +279,14 @@ export default function PublicDoc() {
           )}
           {proposalStatus === 'approved' && (
             <ApprovedNote companyName={data.company?.name} />
+          )}
+          {proposalStatus !== 'approved' && proposalStatus !== 'changes_requested' && !approvable(data, new Date()) && (
+            <NotOpenNote
+              companyName={data.company?.name}
+              phone={data.company?.phone}
+              docLabel="proposal"
+              expired={buildPortalView(data, new Date()).expired}
+            />
           )}
           {proposalStatus === 'changes_requested' && (
             <ChangesRequestedNote
@@ -305,6 +330,9 @@ function ChangeOrderView({ data, token, onApproved }: any) {
   const contractAfter = Math.round((contractBefore + delta) * 100) / 100
   const isCredit = delta < 0
   const approved = co.status === 'approved'
+  // Only a sent change order takes a signature (public-co-approve); a void,
+  // declined or draft one shows that it is not open.
+  const open = co.status === 'sent'
 
   return (
     <>
@@ -375,7 +403,10 @@ function ChangeOrderView({ data, token, onApproved }: any) {
         </div>
       </div>
 
-      {!approved && (
+      {!approved && !open && (
+        <NotOpenNote companyName={company?.name} phone={company?.phone} docLabel="change order" />
+      )}
+      {open && (
         <ApproveProposalBar
           token={token}
           variant="change_order"
@@ -505,6 +536,37 @@ function ChangesRequestedNote({ companyName, requestedNote, requestedAt }: any) 
   )
 }
 
+// A document the customer can read but no longer approve: expired,
+// declined, lost, never sent, or a change order that is void or a draft.
+function NotOpenNote({ companyName, phone, docLabel, expired = false }: {
+  companyName?: string | null
+  phone?: string | null
+  docLabel: string
+  expired?: boolean
+}) {
+  const who = companyName || 'the contractor'
+  const tel = String(phone || '').replace(/[^0-9+]/g, '')
+  return (
+    <section
+      aria-label={expired ? `This ${docLabel} has expired` : `This ${docLabel} is not open`}
+      style={{
+        maxWidth: 760, margin: '24px auto 0', padding: '24px 24px', borderRadius: 10,
+        background: '#FFFFFF', border: '1px solid rgba(20, 20, 20, 0.16)',
+        fontFamily: 'var(--font-body)', color: '#141414', textAlign: 'center'
+      }}
+    >
+      <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5 }}>
+        {expired ? `This ${docLabel} has expired.` : `This ${docLabel} is not open for approval.`} Ask {who} for an updated one.
+      </p>
+      {tel && (
+        <a href={`tel:${tel}`} style={{ display: 'inline-block', marginTop: 12, minHeight: 44, lineHeight: '44px', fontSize: 14, fontWeight: 700, color: '#141414' }}>
+          Call {who}
+        </a>
+      )}
+    </section>
+  )
+}
+
 function Loading() {
   return (
     <div
@@ -579,7 +641,7 @@ function ProposalView({ data, portal }: { data: PublicDocPayload; portal?: Propo
         issuedAt: proposalIssuedAt(contact || {}),
         expiresAt: contact?.quote_expires_at || null
       }}
-      status={portalStatus(data) || 'sent'}
+      status={portal ? (portalStatus(data) || 'sent') : customerStatus(data, new Date())}
       portal={portal}
     />
   )
