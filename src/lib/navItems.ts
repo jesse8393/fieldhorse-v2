@@ -86,10 +86,14 @@ const IMPORT: NavItem = { to: '/import', label: 'Import', icon: Upload, match: u
 
 export type NavGroup = { label: string; items: NavItem[]; crewOnly?: boolean }
 
-/** The phone workspace menu (spec 8.2). */
+/**
+ * The phone workspace menu (spec 8.2). The Team group shows whatever the
+ * member count: an owner with no teammates yet needs Team to invite the
+ * first one (D06). Each item still follows its own role rule.
+ */
 export const MENU_GROUPS: NavGroup[] = [
   { label: 'Work', items: [SCHEDULE, ESTIMATES, FORECAST, CUSTOMERS, FIELD_REPORTS, REPORTS] },
-  { label: 'Team', crewOnly: true, items: [CREW_HOME, TASKS, TIMESHEETS, TEAM] },
+  { label: 'Team', items: [CREW_HOME, TASKS, TIMESHEETS, TEAM] },
   { label: 'Office', items: [SUBS, PARTNERS, SUB_PORTAL, ACTIVITY, COMPOSE, IMPORT, SETTINGS] }
 ]
 
@@ -105,6 +109,6 @@ export function sidebarPrimary(engineEnabled: boolean | undefined): NavItem[] {
 /** The sidebar's collapsible Team and office group. */
 export const SIDEBAR_MORE: NavGroup[] = [
   { label: 'Work', items: [ESTIMATES, FORECAST, FIELD_REPORTS] },
-  { label: 'Team', crewOnly: true, items: [CREW_HOME, TASKS, TIMESHEETS, TEAM] },
+  { label: 'Team', items: [CREW_HOME, TASKS, TIMESHEETS, TEAM] },
   { label: 'Office', items: [SUBS, PARTNERS, SUB_PORTAL, ACTIVITY, COMPOSE, IMPORT] }
 ]
