@@ -51,7 +51,7 @@ describe('logInvoicePayment', () => {
       id: 'pay-1', user_id: 'owner-1', contact_id: null, invoice_id: 'inv-9', amount: 1000,
       method: 'card', kind: 'deposit', reference: 'R-7', paid_on: '2026-11-17'
     })
-    expect(options).toEqual({ onConflict: 'id', ignoreDuplicates: true })
+    expect(options).toEqual({ onConflict: 'id' }) // a retry updates its own row (DATA-15)
     for (const key of Object.keys(payload as object)) expect(columnsOf('fh_payments'), key).toContain(key)
     // Not covered yet, so the invoice keeps its status.
     expect(op('fh_invoices', 'update')).toEqual([])
