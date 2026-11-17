@@ -351,5 +351,21 @@ $function$;
   equal((await rows('delete from public.fh_time_punches where id=$1 returning id', [own.id])).length, 1, 'an active member still removes their unapproved punch')
   await db.exec('reset role')
 
+  // DB-10: new functions in public are not executable by anon by default.
+  await db.exec(`reset role;
+    alter default privileges for role postgres revoke execute on functions from public;
+    alter default privileges for role postgres in schema public grant execute on functions to anon, authenticated, service_role;
+    create function public.fh_fixture_before() returns int language sql as 'select 1';`)
+  const canRun = async (role, fn) => (await rows(`select has_function_privilege($1, 'public.${fn}()', 'EXECUTE') as ok`, [role]))[0].ok
+  equal(await canRun('anon', 'fh_fixture_before'), true, 'baseline: a new function is executable by anon')
+  const defaults = await read('migrations/20261117110300_function_default_privileges.sql')
+  assert(!/drop|delete|truncate/i.test(defaults))
+  await db.exec(defaults); await db.exec(defaults)
+  await db.exec("create function public.fh_fixture_after() returns int language sql as 'select 1'")
+  equal(await canRun('anon', 'fh_fixture_after'), false, 'a new function is not executable by anon')
+  equal(await canRun('authenticated', 'fh_fixture_after'), true, 'a new function stays executable by signed in users')
+  equal(await canRun('service_role', 'fh_fixture_after'), true, 'a new function stays executable by the service role')
+  equal(await canRun('anon', 'fh_fixture_before'), true, 'existing function grants are left as they are')
+
   console.log(`${checks} authorization transition checks passed.`)
 } finally { await db.close() }
