@@ -103,13 +103,56 @@ test('a new conflict found while saving prevents all writes', async ({ context, 
   await expect(page).toHaveURL(/\/schedule\/new$/)
 })
 
-test('missing crew schema blocks allocation but permits an unassigned visit', async ({ context, page }) => {
+const isAvailabilityRead = (url: string) => /\/rest\/v1\/fh_schedule/.test(url) && (new URL(url).searchParams.get('select') || '').includes('assigned_user_ids')
+
+test('a company of one sees no crew picker and still saves a visit', async ({ context, page }) => {
+  await signIn(context, { tables: { fh_schedule: [] } })
+  await context.route('**/api/org-members-list', (route) => route.fulfill({ json: { ok: true, org_id: 'org-1', members: roster.slice(0, 1), invites: [] } }))
+  let written: any[] = []
+  await context.route('**/rest/v1/fh_schedule*', async (route) => {
+    if (route.request().method() === 'POST') { written = route.request().postDataJSON(); return route.fulfill({ status: 201, json: [{ id: 'saved' }] }) }
+    if (isAvailabilityRead(route.request().url())) return route.fulfill({ status: 400, json: { message: 'column fh_schedule.assigned_user_ids does not exist', code: '42703' } })
+    return route.fallback()
+  })
+  const rosterRead = page.waitForResponse('**/api/org-members-list')
+  await page.goto('/schedule/new')
+  await rosterRead
+  await page.getByLabel('Title', { exact: true }).fill('Solo inspection')
+  await expect(page.getByLabel('Duration in minutes')).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Crew allocation' })).toHaveCount(0)
+  await expect(page.getByText(/Crew scheduling unavailable|Availability could not be verified/)).toHaveCount(0)
+  await page.getByRole('button', { name: 'Save event', exact: true }).click()
+  await expect.poll(() => written.length).toBe(1)
+  expect(written[0]).not.toHaveProperty('assigned_user_ids')
+})
+
+test('a missing crew column hides the crew picker without a warning and the visit still saves', async ({ context, page }) => {
   await signIn(context, { tables: { fh_schedule: [] } })
   await context.route('**/api/org-members-list', (route) => route.fulfill({ json: { ok: true, org_id: 'org-1', members: roster, invites: [] } }))
   let written: any[] = []
   await context.route('**/rest/v1/fh_schedule*', async (route) => {
     if (route.request().method() === 'POST') { written = route.request().postDataJSON(); return route.fulfill({ status: 201, json: [{ id: 'saved' }] }) }
-    if (new URL(route.request().url()).searchParams.get('select')?.includes('assigned_user_ids')) return route.fulfill({ status: 400, json: { message: 'column does not exist', code: '42703' } })
+    if (isAvailabilityRead(route.request().url())) return route.fulfill({ status: 400, json: { message: 'column fh_schedule.assigned_user_ids does not exist', code: '42703' } })
+    return route.fallback()
+  })
+  const availabilityRead = page.waitForResponse((response) => isAvailabilityRead(response.url()))
+  await page.goto('/schedule/new')
+  await page.getByLabel('Title', { exact: true }).fill('Unassigned inspection')
+  await availabilityRead
+  await expect(page.getByRole('region', { name: 'Crew allocation' })).toHaveCount(0)
+  await expect(page.getByText(/Crew scheduling unavailable|Availability could not be verified/)).toHaveCount(0)
+  await page.getByRole('button', { name: 'Save event', exact: true }).click()
+  await expect.poll(() => written.length).toBe(1)
+  expect(written[0]).not.toHaveProperty('assigned_user_ids')
+})
+
+test('a failed availability read for a team still says so and permits an unassigned visit', async ({ context, page }) => {
+  await signIn(context, { tables: { fh_schedule: [] } })
+  await context.route('**/api/org-members-list', (route) => route.fulfill({ json: { ok: true, org_id: 'org-1', members: roster, invites: [] } }))
+  let written: any[] = []
+  await context.route('**/rest/v1/fh_schedule*', async (route) => {
+    if (route.request().method() === 'POST') { written = route.request().postDataJSON(); return route.fulfill({ status: 201, json: [{ id: 'saved' }] }) }
+    if (isAvailabilityRead(route.request().url())) return route.fulfill({ status: 500, json: { message: 'upstream request timeout' } })
     return route.fallback()
   })
   await page.goto('/schedule/new')

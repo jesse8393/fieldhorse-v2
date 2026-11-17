@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { orgMembersList, type OrgMember } from '../../lib/orgApi.ts'
-import { allocationConflicts, fetchAllocationEvents, type AllocationEvent, type VisitWindow } from '../../lib/scheduleAllocation.ts'
+import { allocationConflicts, fetchAllocationEvents, CrewAssignmentUnavailableError, type AllocationEvent, type VisitWindow } from '../../lib/scheduleAllocation.ts'
 
 type Props = { orgId: string; visits: VisitWindow[]; assignedIds: string[]; onChange: (ids: string[]) => void; editingId?: string; disabled?: boolean; readOnly?: boolean }
 
@@ -9,7 +9,7 @@ export default function CrewAllocation({ orgId, visits, assignedIds, onChange, e
   const [members, setMembers] = useState<OrgMember[]>([])
   const [events, setEvents] = useState<AllocationEvent[]>([])
   const [rosterState, setRosterState] = useState<'loading' | 'ready' | 'failed'>('loading')
-  const [availability, setAvailability] = useState<'loading' | 'ready' | 'failed'>('loading')
+  const [availability, setAvailability] = useState<'loading' | 'ready' | 'failed' | 'absent'>('loading')
   const [attempt, setAttempt] = useState(0)
   const [search, setSearch] = useState('')
 
@@ -34,7 +34,7 @@ export default function CrewAllocation({ orgId, visits, assignedIds, onChange, e
     const timer = window.setTimeout(() => {
       fetchAllocationEvents(orgId, visits).then((rows) => {
         if (alive) { setEvents(rows); setAvailability('ready') }
-      }).catch(() => { if (alive) setAvailability('failed') })
+      }).catch((error) => { if (alive) setAvailability(error instanceof CrewAssignmentUnavailableError ? 'absent' : 'failed') })
     }, 250)
     return () => { alive = false; window.clearTimeout(timer) }
   }, [orgId, visits, attempt])
@@ -44,6 +44,12 @@ export default function CrewAllocation({ orgId, visits, assignedIds, onChange, e
   const missing = assignedIds.filter((id) => !members.some((member) => member.user_id === id))
   const selectedConflicts = conflicts.filter((conflict) => assignedIds.includes(conflict.userId))
   const unavailable = rosterState === 'failed' || availability === 'failed'
+
+  // Nobody to assign: a company of one (unless an old assignment needs
+  // showing), or a database that has no crew columns yet. Show nothing
+  // rather than a warning the person can do nothing about.
+  if (availability === 'absent') return null
+  if (rosterState === 'ready' && members.length <= 1 && assignedIds.length === 0) return null
 
   return (
     <section className="fhev-crew" aria-label="Crew allocation">

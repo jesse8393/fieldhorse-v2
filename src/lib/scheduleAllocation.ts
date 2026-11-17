@@ -40,6 +40,13 @@ export function allocationConflicts(visits: VisitWindow[], userIds: string[], ev
   return result
 }
 
+/**
+ * The crew columns are not in this database yet (the migration that adds
+ * fh_schedule.assigned_user_ids has not been applied). Nobody can be
+ * assigned, which is different from a read that failed.
+ */
+export class CrewAssignmentUnavailableError extends Error {}
+
 /** Read every relevant event, including long visits that start before this range. */
 export async function fetchAllocationEvents(orgId: string, visits: VisitWindow[]): Promise<AllocationEvent[]> {
   if (!visits.length) return []
@@ -54,6 +61,7 @@ export async function fetchAllocationEvents(orgId: string, visits: VisitWindow[]
       .or(`end_at.gt.${from},end_at.is.null`)
       .order('start_at', { ascending: true }).order('id', { ascending: true })
       .range(offset, offset + pageSize - 1)
+    if (error?.code === '42703') throw new CrewAssignmentUnavailableError('Crew assignment is not available yet.')
     if (error) throw new Error('Crew availability could not be checked. Try again before assigning anyone.')
     const page = (data ?? []) as AllocationEvent[]
     rows.push(...page)
