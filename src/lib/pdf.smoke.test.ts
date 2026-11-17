@@ -211,4 +211,30 @@ describe('pdf engine smoke', () => {
     const figures = text.slice(text.indexOf('FINAL FIGURES'))
     expect(figures.filter((t) => /paid in full|outstanding|^\$/i.test(t))).toEqual(['$1,000.07', '$1,000.06', 'OUTSTANDING', '$0.01'])
   })
+
+  // PT-12: no legal terms the contractor never set.
+  it('drops "valid for 30 days" when the estimate has a valid until date', async () => {
+    for (const estimate_template of ['classic', 'slate']) {
+      const result = await generateQuote({
+        company: { ...company, estimate_template }, contact,
+        items: [{ description: 'Pour slab', qty: 1, rate: 4000, amount: 4000 }],
+        expiresAt: '2026-11-13T23:59:59.000Z', quoteId: 'q-1'
+      } as any)
+      const text = pdfText(result).join(' ')
+      expect(text, estimate_template).toMatch(/valid until/i)
+      expect(text, estimate_template).not.toMatch(/30\s+days/)
+    }
+  })
+
+  it('never prints a late fee the contractor did not set', async () => {
+    const result = await generateInvoice({
+      company, contact,
+      lineItems: [{ description: 'Final balance', qty: 1, rate: 1380, amount: 1380 }],
+      invoiceId: contact.id, contractTotal: 1380, previouslyPaid: 0
+    } as any)
+    const text = pdfText(result).join(' ')
+    expect(text).not.toMatch(/1\.5%|per\s+month/)
+    expect(text).toMatch(/separate change order/)
+  })
 })
+

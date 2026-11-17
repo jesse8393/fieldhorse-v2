@@ -933,8 +933,14 @@ function drawSigCell(doc, { x, y, w, label, dataUrl, name, date, esignAnchorColo
 // ============================================================
 // Document-level disclaimer copy (matches HTML preview footers).
 // ============================================================
-const INVOICE_DISCLAIMER = 'Pricing covers labor, material, standard equipment, placement, finishing, and cleanup for the scope as billed. Hidden conditions, field changes, or scope deviations may require a separate change order. Past due balances may accrue at 1.5% per month.'
-const PROPOSAL_DISCLAIMER = 'Pricing includes labor, material, standard equipment, placement, finishing, and cleanup for the listed scope only. Pricing is based on visible site conditions at time of estimating. Any hidden conditions, field changes, requested by owner additions, or scope deviations may require additional pricing through written change order approval. Estimate valid for 30 days.'
+// No legal terms the contractor never set (PT-12): no late fee, and the
+// 30 day validity line only when the estimate has no valid until date of
+// its own (proposalDisclaimer).
+const INVOICE_DISCLAIMER = 'Pricing covers labor, material, standard equipment, placement, finishing, and cleanup for the scope as billed. Hidden conditions, field changes, or scope deviations may require a separate change order.'
+const PROPOSAL_DISCLAIMER_BASE = 'Pricing includes labor, material, standard equipment, placement, finishing, and cleanup for the listed scope only. Pricing is based on visible site conditions at time of estimating. Any hidden conditions, field changes, requested by owner additions, or scope deviations may require additional pricing through written change order approval.'
+function proposalDisclaimer(expiresAt) {
+  return expiresAt ? PROPOSAL_DISCLAIMER_BASE : `${PROPOSAL_DISCLAIMER_BASE} Estimate valid for 30 days.`
+}
 
 /**
  * Generate a branded invoice PDF, restrained editorial layout
@@ -1418,7 +1424,7 @@ async function drawThemedProposal(doc, ctx) {
   } = ctx
   const t = PDF_THEMES[template]
   const innerW = pageWidth - margin * 2
-  const footer = footerLayout(doc, { pageWidth, pageHeight, margin, text: PROPOSAL_DISCLAIMER, pointSize: 8, bottomOffset: 12 })
+  const footer = footerLayout(doc, { pageWidth, pageHeight, margin, text: proposalDisclaimer(expiresAt), pointSize: 8, bottomOffset: 12 })
   const bottom = footer.contentBottom
 
   // Page background (editorial). Idempotent per page so it paints each
@@ -1827,7 +1833,7 @@ export async function generateQuote({
     }
   }
 
-  const footer = footerLayout(doc, { pageWidth, pageHeight, margin, text: PROPOSAL_DISCLAIMER })
+  const footer = footerLayout(doc, { pageWidth, pageHeight, margin, text: proposalDisclaimer(expiresAt) })
   const bottom = footer.contentBottom
 
   // Letterhead (premium company-name chrome + Issued / Valid until meta)
