@@ -412,7 +412,7 @@ export default function HomeScreen() {
         )}
       </ScrollView>
       {user ? (
-        <NewLeadSheet open={leadOpen} onClose={() => setLeadOpen(false)} userId={user.id} onCreated={(id) => router.push(`/jobs/${id}`)} />
+        <NewLeadSheet open={leadOpen} onClose={() => setLeadOpen(false)} userId={user.id} onCreated={(clientId) => router.push(`/clients/${clientId}?saved=lead`)} />
       ) : null}
       <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} userId={user?.id} />
     </View>

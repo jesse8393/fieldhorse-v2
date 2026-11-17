@@ -158,7 +158,7 @@ export default function JobsScreen() {
       </Pressable>
 
       {user ? (
-        <NewLeadSheet open={addOpen} onClose={() => setAddOpen(false)} userId={user.id} onCreated={(id) => router.push(`/jobs/${id}`)} />
+        <NewLeadSheet open={addOpen} onClose={() => setAddOpen(false)} userId={user.id} onCreated={(clientId) => router.push(`/clients/${clientId}?saved=lead`)} />
       ) : null}
     </View>
   )

@@ -100,7 +100,7 @@ export default function AssistantScreen() {
         const { id } = await createLead({
           userId: user.id, name: data.name, phone: data.phone, email: data.email, address: data.address,
           jobTitle: data.job_title, jobType: data.job_type, amount: typeof data.amount === 'number' ? data.amount : undefined,
-          stage: data.stage || 'lead', notes: data.notes
+          notes: data.notes
         })
         return say || `Added ${data.name}.${id ? '' : ''}`
       }

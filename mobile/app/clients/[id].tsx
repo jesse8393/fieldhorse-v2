@@ -30,7 +30,7 @@ export default function ClientDetailScreen() {
   const insets = useSafeAreaInsets()
   const router = useRouter()
   const { user } = useAuth()
-  const { id } = useLocalSearchParams<{ id: string }>()
+  const { id, saved } = useLocalSearchParams<{ id: string; saved?: string }>()
   const { data, isPending } = useClientDetail(id)
   const updateClient = useUpdateClient()
   const deleteClient = useDeleteClient()
@@ -120,6 +120,9 @@ export default function ClientDetailScreen() {
 
         <Text style={{ color: theme.ink, fontSize: 24, fontWeight: '800', letterSpacing: 0 }} numberOfLines={2}>{client.name || 'Unnamed'}</Text>
         {client.company_name ? <Text style={{ color: theme.inkMuted, fontSize: 14, marginTop: 2 }}>{client.company_name}</Text> : null}
+        {saved === 'lead' ? (
+          <Text style={{ color: theme.success, fontSize: 14, marginTop: 8 }}>Lead saved for this client. Quote it from Leads on the web.</Text>
+        ) : null}
 
         {/* Rollups */}
         <View style={{ flexDirection: 'row', marginTop: 18, gap: 12 }}>

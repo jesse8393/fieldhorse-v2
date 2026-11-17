@@ -595,8 +595,9 @@ export function useDeleteFile() {
 // ---- Create lead ----
 // A lead is an fh_leads row pointing at an fh_clients row (SPEC D53). The
 // client is matched among the user's own clients by phone, then email,
-// or inserted; the lead carries the title, type and notes. The stage
-// update above stays for jobs, which live on fh_contacts.
+// or inserted; the lead carries the title, type and notes. fh_leads has no
+// address column, so a typed job site that differs from a matched client's
+// address goes into the lead's notes rather than being dropped.
 export type NewLeadInput = {
   userId: string
   name: string
@@ -608,18 +609,16 @@ export type NewLeadInput = {
   amount?: number
   notes?: string
   referredBy?: string
-  // Accepted and ignored: a new lead is always open. Stages belong to jobs.
-  stage?: string
 }
 
 const digitsOf = (s?: string | null) => String(s || '').replace(/\D/g, '')
 
-async function findOrCreateMobileClient(input: NewLeadInput): Promise<{ id?: string; error: any }> {
+async function findOrCreateMobileClient(input: NewLeadInput): Promise<{ id?: string; address?: string | null; created?: boolean; error: any }> {
   const phone = digitsOf(input.phone)
   const email = (input.email || '').trim().toLowerCase()
   if (phone.length >= 7 || email) {
     const { data, error } = await supabase.from('fh_clients')
-      .select('id, phone, email')
+      .select('id, phone, email, address')
       .eq('user_id', input.userId)
       .order('created_at', { ascending: false })
       .limit(200)
@@ -627,7 +626,7 @@ async function findOrCreateMobileClient(input: NewLeadInput): Promise<{ id?: str
     const hit = (data || []).find((c: any) =>
       (phone.length >= 7 && digitsOf(c.phone) === phone) ||
       (email && String(c.email || '').trim().toLowerCase() === email))
-    if (hit) return { id: hit.id, error: null }
+    if (hit) return { id: hit.id, address: hit.address ?? null, error: null }
   }
   const { data, error } = await supabase.from('fh_clients').insert({
     user_id: input.userId,
@@ -636,15 +635,18 @@ async function findOrCreateMobileClient(input: NewLeadInput): Promise<{ id?: str
     email: input.email || null,
     address: input.address || null
   } as any).select('id').single()
-  return { id: (data as any)?.id as string | undefined, error }
+  return { id: (data as any)?.id as string | undefined, created: true, error }
 }
 
 export function useCreateLead() {
   const client = useQueryClient()
   return async (input: NewLeadInput) => {
     const who = await findOrCreateMobileClient(input)
-    if (who.error || !who.id) return { id: undefined as string | undefined, error: who.error || new Error('Could not save the client') }
-    const notes = [input.notes || null, input.amount ? `Estimated amount $${input.amount}` : null].filter(Boolean).join('\n') || null
+    if (who.error || !who.id) return { id: undefined as string | undefined, clientId: undefined as string | undefined, error: who.error || new Error('Could not save the client') }
+    const site = (input.address || '').trim()
+    const siteNote = site && !who.created && site.toLowerCase() !== String(who.address || '').trim().toLowerCase()
+      ? `Job site: ${site}` : null
+    const notes = [siteNote, input.notes || null, input.amount ? `Estimated amount $${input.amount}` : null].filter(Boolean).join('\n') || null
     const { data, error } = await supabase.from('fh_leads').insert({
       user_id: input.userId,
       client_id: who.id,
@@ -659,7 +661,7 @@ export function useCreateLead() {
       client.invalidateQueries({ queryKey: queryKeys.jobs })
       client.invalidateQueries({ queryKey: queryKeys.clients })
     }
-    return { id: (data as any)?.id as string | undefined, error }
+    return { id: (data as any)?.id as string | undefined, clientId: who.id, error }
   }
 }
 

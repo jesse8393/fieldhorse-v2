@@ -23,7 +23,7 @@ vi.mock('./supabase', () => ({ supabase: {
 } }))
 
 import { useIntegrations, useDisconnectIntegration } from './integrations'
-import { useJobs, useEstimates, useUpdateStage, useCreateQuoteFromBid } from './queries'
+import { useJobs, useEstimates, useUpdateStage, useCreateQuoteFromBid, useCreateLead } from './queries'
 import { JOB_STAGE_CHOICES } from './stages'
 import { useClientsBundle, useClientDetail, useJobDetail, useInvoiceDetail, useInvoicesOverview, useProfile, useJobPhotos, useJobFiles, useAgenda, useNotesScreen, useActivityFeed, useSubsRoster, useToggleTodo, useDeleteTodo, useUpdateJob, useUpdateProfile, useDeletePhoto, useDeleteFile, useGenerateDraws, useLogPayment, useMarkInvoicePaid, useUpdateInvoiceStatus } from './queries'
 
@@ -288,5 +288,31 @@ describe('native estimate to quote', () => {
     const result = await useCreateQuoteFromBid()({ userId: 'user', clientName: '  ', bid, jobType: '', scope: '', recommendedPrice: 500 })
     expect(result.error).toBeTruthy()
     expect(mock.calls).toEqual([])
+  })
+})
+
+describe('native new lead', () => {
+  function clients(existing: any[]) {
+    mock.results.set('fh_clients', (_r: unknown, ops: any[]) => ops.some(o => o[0] === 'insert')
+      ? { data: { id: 'client-new' }, error: null } : { data: existing, error: null })
+    mock.results.set('fh_leads', { data: { id: 'lead-1' }, error: null })
+  }
+
+  it('keeps the typed job site address when the client already exists', async () => {
+    clients([{ id: 'client-1', phone: '(555) 123-4567', email: null, address: '1 Home Rd' }])
+    const result = await useCreateLead()({ userId: 'user', name: 'Pat', phone: '555 123 4567', address: '12 Oak St', notes: 'Back patio' })
+    expect(result).toMatchObject({ error: null, id: 'lead-1', clientId: 'client-1' })
+    const lead = mock.calls.find(c => c[0] === 'fh_leads' && c[1] === 'insert')?.[2]
+    expect(lead).toMatchObject({ client_id: 'client-1', status: 'open' })
+    expect(lead.notes).toContain('Job site: 12 Oak St')
+    expect(lead.notes).toContain('Back patio')
+  })
+
+  it('a new client carries the address and the lead does not repeat it', async () => {
+    clients([])
+    const result = await useCreateLead()({ userId: 'user', name: 'New', address: '12 Oak St' })
+    expect(result).toMatchObject({ error: null, id: 'lead-1', clientId: 'client-new' })
+    expect(mock.calls.find(c => c[0] === 'fh_clients' && c[1] === 'insert')?.[2]).toMatchObject({ address: '12 Oak St' })
+    expect(mock.calls.find(c => c[0] === 'fh_leads' && c[1] === 'insert')?.[2].notes ?? '').not.toContain('Job site')
   })
 })
