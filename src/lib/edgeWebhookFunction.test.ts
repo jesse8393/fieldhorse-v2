@@ -1,6 +1,7 @@
 import { createHmac } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import { edgeRuntime as runtime } from './edgeRuntimeTestUtils'
+import { fakeClient, newState } from './teamAccountFakeSupabase'
 
 
 const key = Buffer.from('test-only-signing-secret-never-used-by-a-provider')
@@ -64,5 +65,184 @@ describe('provider webhook authentication', () => {
     const req = signedRequest()
     req.headers.set('svix-signature', `v1,invalid ${req.headers.get('svix-signature')}`)
     expect(await shared.svixSignatureOk(req, raw, secret)).toBe(true)
+  })
+})
+
+// FN-11. An inbound "Yes" was stored as marketing consent, and plain stop
+// requests ("Stop texting me", "please stop") were filed as ordinary texts.
+describe('inbound text keywords', () => {
+  const TOKEN = 'test-only-twilio-token'
+  const HOOK = 'https://example.test/functions/v1/twilio-sms'
+  const ORG = 'org-texts'
+
+  function inbound(body: string) {
+    const params: Record<string, string> = { MessageSid: 'SM-test-1', From: '+15125550101', To: '+15125550199', Body: body, NumMedia: '0' }
+    const signed = HOOK + Object.keys(params).sort().map((k) => k + params[k]).join('')
+    return new Request(HOOK, { method: 'POST', body: new URLSearchParams(params).toString(), headers: {
+      'content-type': 'application/x-www-form-urlencoded', 'x-twilio-signature': createHmac('sha1', TOKEN).update(signed).digest('base64')
+    } })
+  }
+
+  async function text(body: string) {
+    const state = newState({ fh_phone_numbers: [{ id: 'num-1', org_id: ORG, status: 'active', e164: '+15125550199' }], fh_messages: [] })
+    state.rpc = {
+      fh_resolve_client: () => [{ client_id: 'client-1', is_new: false }],
+      fh_conversation_for_client: () => 'conv-1',
+      fh_consent_set: () => null,
+      fh_automation_tick: () => null,
+      fh_org_ctx: () => ({ name: 'Parker Concrete', phone: '+15125550100' }),
+    }
+    const app = runtime({ TWILIO_AUTH_TOKEN: TOKEN })
+    app.createClient.mockImplementation(() => fakeClient(state) as any)
+    const response = await app.endpoint('twilio-sms')(inbound(body))
+    const consent = state.log.filter((l) => l.op === 'rpc' && l.fn === 'fh_consent_set').map((l) => l.payload.p_status)
+    return { response, consent, messages: state.tables.fh_messages }
+  }
+
+  it.each([
+    'STOP', 'stop', '  Stop  ', 'STOP.', 'Stop!', 'STOPALL', 'stop all', 'UNSUBSCRIBE', ' unsubscribe\n', 'CANCEL', 'cancel',
+    'END', ' end ', 'QUIT', 'quit.', 'Stop texting me', 'please stop', 'REVOKE', 'opt out', 'Opt-out', 'Unsubscribe me',
+  ])('opts out on %j and still keeps the text', async (body) => {
+    const { response, consent, messages } = await text(body)
+    expect(response.status).toBe(200)
+    expect(consent).toEqual(['opted_out'])
+    expect(messages).toHaveLength(1)
+  })
+
+  it.each(['Yes', 'yes!', 'YES please', 'Yes, Tuesday works', 'ok'])('does not take %j as consent to marketing texts', async (body) => {
+    const { consent, messages } = await text(body)
+    expect(consent).toEqual([])
+    expect(messages).toHaveLength(1)
+  })
+
+  it.each(['START', 'unstop', 'Subscribe'])('opts back in only on the explicit keyword %j', async (body) => {
+    expect((await text(body)).consent).toEqual(['opted_in'])
+  })
+
+  it.each(['Can you stop by Tuesday?', 'Please stop by after 3', 'Cancel Tuesday, I will call to rebook', 'The end of the driveway is cracked'])(
+    'keeps %j as an ordinary text', async (body) => {
+      const { consent, messages } = await text(body)
+      expect(consent).toEqual([])
+      expect(messages).toHaveLength(1)
+    })
+})
+
+// FN-12. Consent was any field whose name contained text, sms or consent with
+// an answer containing yes, true, ok or agree, so "No, I do not agree" and a
+// project_context answer both counted as consent to text.
+describe('Meta lead form consent', () => {
+  const APP_SECRET = 'test-only-meta-app-secret'
+  const body = JSON.stringify({ entry: [{ id: 'page-1', changes: [{ field: 'leadgen', value: { leadgen_id: 'lead-1', form_id: 'form-1' } }] }] })
+
+  async function capture(fieldData: Array<{ name: string; values: string[] }>) {
+    const state = newState({ fh_channels: [{ id: 'ch-1', org_id: 'org-meta', kind: 'messenger', external_id: 'page-1', status: 'active', config: { page_token: 'test-page-token' } }] })
+    state.rpc = { fh_lead_capture: () => ({ ok: true }), fh_automation_tick: () => null }
+    const graph = async () => new Response(JSON.stringify({ field_data: [{ name: 'full_name', values: ['Pat Lee'] }, { name: 'phone_number', values: ['+15125550101'] }, ...fieldData] }), { status: 200 })
+    const app = runtime({ META_APP_SECRET: APP_SECRET }, { fetch: graph })
+    app.createClient.mockImplementation(() => fakeClient(state) as any)
+    const signature = 'sha256=' + createHmac('sha256', APP_SECRET).update(body).digest('hex')
+    const response = await app.endpoint('meta-leads')(new Request('https://example.test/functions/v1/meta-leads', {
+      method: 'POST', body, headers: { 'content-type': 'application/json', 'x-hub-signature-256': signature }
+    }))
+    expect(response.status).toBe(200)
+    const call = state.log.find((l) => l.op === 'rpc' && l.fn === 'fh_lead_capture')
+    expect(call).toBeTruthy()
+    return call!.payload.p_sms_consent
+  }
+
+  it.each([
+    [{ name: 'sms_consent', values: ['No, I do not agree'] }],
+    [{ name: 'text_consent', values: ['Not ok'] }],
+    [{ name: 'sms_consent', values: ['No'] }],
+    [{ name: 'project_context', values: ['broken slab, please look soon'] }],
+    [{ name: 'project_context', values: ['Yes'] }],
+  ])('does not read %j as consent', async (field) => {
+    expect(await capture([field])).toBe(false)
+  })
+
+  it.each([
+    [{ name: 'sms_consent', values: ['Yes'] }],
+    [{ name: 'text_consent', values: [' yes. '] }],
+    [{ name: 'can_we_text_you?', values: ['Yes, I agree'] }],
+    [{ name: 'consent', values: ['I agree'] }],
+    [{ name: 'sms_opt_in', values: ['true'] }],
+  ])('reads the explicit yes %j as consent', async (field) => {
+    expect(await capture([field])).toBe(true)
+  })
+
+  it('reads no consent when the form asks nothing about texts', async () => {
+    expect(await capture([{ name: 'what_do_you_need', values: ['A new driveway, yes'] }])).toBe(false)
+  })
+})
+
+// FN-13. With no thread token, an inbound email went to the first company
+// whose sending address shared the receiving domain, so a customer of one
+// company could land in another company's inbox.
+describe('inbound email with no thread token', () => {
+  const ORG_A = 'org-first'
+  const ORG_B = 'org-second'
+
+  async function receive(from: string, to: string, extra: Record<string, any[]> = {}) {
+    const state = newState({
+      fh_org_settings: [
+        { org_id: ORG_A, reply_domain: 'reply.send.example.test', default_from_email: 'first@send.example.test', engine_enabled: true },
+        { org_id: ORG_B, reply_domain: 'reply.send.example.test', default_from_email: 'second@send.example.test', engine_enabled: true },
+      ],
+      fh_clients: [], fh_conversations: [], fh_messages: [], ...extra,
+    })
+    state.rpc = {
+      fh_resolve_client: (args: any) => [{ client_id: `client-in-${args.p_org_id}`, is_new: true }],
+      fh_conversation_for_client: (args: any) => `conv-in-${args.p_org_id}`,
+      fh_automation_tick: () => null,
+    }
+    const app = runtime({ POSTMARK_INBOUND_TOKEN: 'test-token' })
+    app.createClient.mockImplementation(() => fakeClient(state) as any)
+    const response = await app.endpoint('email-events')(new Request('https://example.test/email-events?provider=postmark&token=test-token', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ FromFull: { Email: from, Name: 'Pat Lee' }, ToFull: [{ Email: to }], Subject: 'Driveway', TextBody: 'When can you come out?', MessageID: 'pm-1' }),
+    }))
+    expect(response.status).toBe(200)
+    const resolved = state.log.filter((l) => l.op === 'rpc' && l.fn === 'fh_resolve_client').map((l) => l.payload.p_org_id)
+    return { body: await response.json(), resolved, messages: state.tables.fh_messages }
+  }
+
+  it('files mail sent to a company sending address under that company, not the first on the domain', async () => {
+    const { resolved, messages } = await receive('pat@customer.example.test', 'second@send.example.test')
+    expect(resolved).toEqual([ORG_B])
+    expect(messages.map((m) => m.org_id)).toEqual([ORG_B])
+  })
+
+  it('leaves mail from a stranger to a shared domain unfiled instead of guessing a company', async () => {
+    const { body, resolved, messages } = await receive('stranger@elsewhere.example.test', 'hello@send.example.test')
+    expect(body).toEqual({ ok: true, ignored: 'no matching org' })
+    expect(resolved).toEqual([])
+    expect(messages).toEqual([])
+  })
+
+  it('files mail to a shared domain under the one company that already has the sender as a client', async () => {
+    const { resolved, messages } = await receive('Pat@Customer.example.test', 'hello@send.example.test', {
+      fh_clients: [{ id: 'client-b', org_id: ORG_B, email: 'pat@customer.example.test' }],
+    })
+    expect(resolved).toEqual([ORG_B])
+    expect(messages.map((m) => m.org_id)).toEqual([ORG_B])
+  })
+
+  it('leaves it unfiled when the sender is a client of both companies', async () => {
+    const { resolved, messages } = await receive('pat@customer.example.test', 'reply+stale@reply.send.example.test', {
+      fh_clients: [
+        { id: 'client-a', org_id: ORG_A, email: 'pat@customer.example.test' },
+        { id: 'client-b', org_id: ORG_B, email: 'pat@customer.example.test' },
+      ],
+    })
+    expect(resolved).toEqual([])
+    expect(messages).toEqual([])
+  })
+
+  it('still files a reply with a known thread token in its conversation', async () => {
+    const { resolved, messages } = await receive('pat@customer.example.test', 'reply+tok123@reply.send.example.test', {
+      fh_conversations: [{ id: 'conv-b', org_id: ORG_B, client_id: 'client-b', email_thread_token: 'tok123' }],
+    })
+    expect(resolved).toEqual([])
+    expect(messages.map((m) => [m.org_id, m.conversation_id, m.client_id])).toEqual([[ORG_B, 'conv-b', 'client-b']])
   })
 })

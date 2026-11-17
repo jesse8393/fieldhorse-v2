@@ -77,11 +77,27 @@ async function inboundEmail(db: any, e: { from_email: string; from_name: string;
     }
   }
   let orgId = conv?.org_id; let clientId = conv?.client_id; let conversationId = conv?.id;
-  // 2. else, the org whose reply domain received it, matched on sender email
+  // 2. else, only a company the mail plainly belongs to: the one whose
+  //    sending address it was sent to, or, among the companies on the
+  //    receiving domain, the one company that already has the sender as a
+  //    client. Companies can share a domain, so a domain match alone never
+  //    picks one; anything else is left unfiled.
   if (!conv) {
-    const domains = e.to.map((t) => String(t).toLowerCase().split("@")[1]?.replace(/>.*$/, "")).filter(Boolean);
+    const addrs = e.to.map((t) => parseAddr(String(t)).email).filter((a) => a.includes("@"));
+    const domains = addrs.map((a) => a.split("@")[1]);
     const { data: orgs } = await db.from("fh_org_settings").select("org_id, reply_domain, default_from_email").eq("engine_enabled", true);
-    const org = (orgs ?? []).find((o: any) => domains.includes(String(o.reply_domain ?? "").toLowerCase()) || domains.includes(String(o.default_from_email ?? "").split("@")[1]?.toLowerCase()));
+    const fromOf = (o: any) => String(o.default_from_email ?? "").trim().toLowerCase();
+    const exact = (orgs ?? []).filter((o: any) => fromOf(o) && addrs.includes(fromOf(o)));
+    let org = exact.length === 1 ? exact[0] : null;
+    if (!org) {
+      const onDomain = (orgs ?? []).filter((o: any) => domains.includes(String(o.reply_domain ?? "").toLowerCase()) || domains.includes(fromOf(o).split("@")[1]));
+      if (onDomain.length) {
+        const sender = e.from_email.trim().replace(/[\\%_]/g, "\\$&");
+        const { data: known } = await db.from("fh_clients").select("org_id").in("org_id", onDomain.map((o: any) => o.org_id)).ilike("email", sender);
+        const knownOrgs = [...new Set((known ?? []).map((c: any) => c.org_id))];
+        if (knownOrgs.length === 1) org = onDomain.find((o: any) => o.org_id === knownOrgs[0]);
+      }
+    }
     if (!org) return json({ ok: true, ignored: "no matching org" });
     orgId = org.org_id;
     const resolved = await rpc<any>(db, "fh_resolve_client", { p_org_id: orgId, p_phone: null, p_email: e.from_email, p_name: e.from_name || null, p_address: null, p_source: "inbound_email" });

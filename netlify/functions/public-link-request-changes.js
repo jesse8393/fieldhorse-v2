@@ -6,6 +6,7 @@
 // the contractor through the inbox and web push.
 
 import { createClient } from '@supabase/supabase-js'
+import { supabaseServiceConfig } from './lib/serviceConfig.js'
 import { clientIp, hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
 import { alertLinkRecipients } from './lib/linkAlerts.js'
 import { linkScope } from './lib/linkScope.js'
@@ -72,8 +73,7 @@ export default async function handler(request) {
   if (parsed.error) return json({ error: parsed.error }, 400)
   const { token, requesterName, requestText } = parsed.value
 
-  const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-  const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const { url: SUPABASE_URL, secretKey: SERVICE_KEY } = supabaseServiceConfig()
   if (!SUPABASE_URL || !SERVICE_KEY) {
     return json({ error: 'server_misconfigured' }, 500)
   }

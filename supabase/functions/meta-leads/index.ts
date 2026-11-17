@@ -6,6 +6,8 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { admin, readBody, json, text, metaSignatureOk, rpc, log, e164, tick } from "./lib.ts";
 
 const GRAPH = "https://graph.facebook.com/v21.0";
+const CONSENT_FIELD_WORDS = new Set(["sms", "text", "texts", "texting", "consent"]);
+const CONSENT_YES = new Set(["yes", "true", "agree", "i agree", "yes i agree"]);
 
 Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
@@ -56,8 +58,12 @@ async function handleLead(db: any, orgId: string, pageToken: string | undefined,
   const phone = fields.phone_number ?? fields.phone ?? null;
   const email = fields.email ?? null;
   const address = [fields.street_address, fields.city, fields.state, fields.zip_code ?? fields.post_code].filter(Boolean).join(", ") || null;
-  const consentKey = Object.keys(fields).find((k) => k.includes("text") || k.includes("sms") || k.includes("consent"));
-  const smsConsent = consentKey ? /yes|true|ok|agree/i.test(fields[consentKey]) : false;
+  // The consent question is a field named with the whole word sms, text or
+  // consent (not "project_context"), and only an explicit yes counts: "No, I
+  // do not agree" contains "agree" but is a no.
+  const consentKey = Object.keys(fields).find((k) => k.split(/[^a-z0-9]+/).some((w) => CONSENT_FIELD_WORDS.has(w)));
+  const answer = consentKey ? fields[consentKey].toLowerCase().replace(/[^a-z]+/g, " ").trim() : "";
+  const smsConsent = CONSENT_YES.has(answer);
   const known = new Set(["full_name", "first_name", "last_name", "phone_number", "phone", "email", "street_address", "city", "state", "zip_code", "post_code"]);
   const extra: Record<string, string> = {};
   for (const [k, val] of Object.entries(fields)) if (!known.has(k)) extra[k] = val;

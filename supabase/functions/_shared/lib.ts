@@ -150,8 +150,17 @@ export function e164(raw: unknown): string | null {
   return null;
 }
 
+/**
+ * The caller's address as the platform saw it, for rate limits. The first
+ * x-forwarded-for value is whatever the caller sent, so it is never used:
+ * the edge sets cf-connecting-ip itself, and failing that the last hop is the
+ * one the platform's own proxy appended.
+ */
 export function clientIp(req: Request): string {
-  return (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || req.headers.get("cf-connecting-ip") || "0.0.0.0";
+  const edge = (req.headers.get("cf-connecting-ip") ?? "").trim();
+  if (edge) return edge;
+  const hops = (req.headers.get("x-forwarded-for") ?? "").split(",").map((h) => h.trim()).filter(Boolean);
+  return hops[hops.length - 1] || "0.0.0.0";
 }
 
 export function log(scope: string, msg: string, extra?: unknown) {
