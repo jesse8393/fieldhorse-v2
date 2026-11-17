@@ -570,8 +570,8 @@ test.describe('the quote screen', () => {
     await page.waitForTimeout(600)
     await page.getByRole('button', { name: 'Tap again to delete' }).click()
     await expect(page).toHaveURL(/\/quotes$/, { timeout: 15_000 })
-    expect(writes).toContain('/rest/v1/fh_quote_items')
-    expect(writes).toContain('/rest/v1/fh_quotes')
+    // One delete of the quote; its lines go with it in the database (DATA-19).
+    expect(writes).toEqual(['/rest/v1/fh_quotes'])
 
     // The approved quote opens in a fresh browser context, so no cache from
     // the draft can stand in for it.

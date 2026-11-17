@@ -335,8 +335,8 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
   const onDelete = () => {
     if (!del.confirm()) return
     void run('delete', async () => {
-      const lines = await supabase.from('fh_quote_items').delete().eq('quote_id', quote.id)
-      if (lines.error) throw new Error(lines.error.message)
+      // One delete: the lines go with the quote in the database (their
+      // quote_id cascades), so a failure never leaves an empty quote.
       const row = await supabase.from('fh_quotes').delete().eq('id', quote.id)
       if (row.error) throw new Error(row.error.message)
       refreshLists()
