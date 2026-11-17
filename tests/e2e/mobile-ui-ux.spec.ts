@@ -732,6 +732,47 @@ test.describe('large text and zoom', () => {
       }
     })
   }
+
+  // big-text-9: on Today a visit's address was squeezed beside Navigate and
+  // broken inside words ("Murfreesb" over "oro"), and Navigate was cut.
+  for (const percent of [100, 150]) {
+    test(`a visit address on Today keeps whole words and a whole Navigate, text at ${percent} percent`, async ({ context, page }) => {
+      await textSize(context, percent)
+      await openBig(context, page, '/')
+      const address = page.locator('.fht-visit__address').first()
+      const navigate = page.locator('.fht-visit__wherein .fhc-btn').first()
+      // 195 px is the narrowest the finding measured. At 180 px the whole
+      // visit card (its time and status columns) is wider than the window,
+      // which is a separate layout limit.
+      const widths = percent === 100 ? [412, 360, 320, 206, 195] : [412, 360]
+      for (const width of widths) {
+        await page.setViewportSize({ width, height: 800 })
+        await page.waitForTimeout(200)
+        const shown = await address.evaluate((el) => {
+          const node = [...el.childNodes].find((n) => n.nodeType === 3 && (n.textContent || '').trim())!
+          const broken: string[] = []
+          for (const m of (node.textContent || '').matchAll(/\S+/g)) {
+            const range = document.createRange()
+            range.setStart(node, m.index!)
+            range.setEnd(node, m.index! + m[0].length)
+            if (new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size > 1) broken.push(m[0])
+          }
+          return { width: Math.round(el.getBoundingClientRect().width), broken }
+        })
+        // The quiet button's right padding sits past the text on purpose;
+        // its label and arrow have to be on screen.
+        const nav = await navigate.evaluate((el) => {
+          const text = el.querySelector('.fhc-btn__text') as HTMLElement
+          const r = (el.querySelector('.fhc-btn__label') as HTMLElement).getBoundingClientRect()
+          return { right: r.right, cut: text.scrollWidth > text.clientWidth + 1, window: document.documentElement.clientWidth }
+        })
+        const at = `${width} px: ${JSON.stringify({ shown, nav })}`
+        expect(shown.broken, at).toEqual([])
+        expect(nav.cut, at).toBe(false)
+        expect(nav.right, at).toBeLessThanOrEqual(nav.window)
+      }
+    })
+  }
 })
 
 // big-text-3 on a desktop window at 200 percent zoom (640 px wide).
