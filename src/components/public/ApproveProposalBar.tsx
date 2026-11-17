@@ -699,7 +699,7 @@ const panelStyle: import('react').CSSProperties = {
 
 const eyebrowStyle: import('react').CSSProperties = {
   fontSize: 12, fontWeight: 700, letterSpacing: 0,
-  color: 'color-mix(in srgb, var(--v3-primary-text) 54%, #141414 46%)', marginBottom: 8
+  color: '#7A5A1F', marginBottom: 8
 }
 
 const headlineStyle: import('react').CSSProperties = {
@@ -781,7 +781,7 @@ const errorStyle: import('react').CSSProperties = {
   borderRadius: 10,
   background: 'rgba(192, 57, 43, 0.10)',
   border: '1px solid rgba(192, 57, 43, 0.4)',
-  color: 'color-mix(in srgb, var(--v3-danger-text) 78%, #141414 22%)',
+  color: '#7E2419',
   fontSize: 14, lineHeight: 1.4,
   marginBottom: 12
 }

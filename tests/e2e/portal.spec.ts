@@ -1762,3 +1762,32 @@ test('a revoked link names the contractor and offers to call them', async ({ pag
   await expect(page.getByRole('link', { name: 'Call Parker Construction' })).toHaveAttribute('href', 'tel:6155550100')
   await expect(page.getByRole('button', { name: 'Try again' })).toHaveCount(0)
 })
+
+/* ---- Fixed ink on the light panels at night (PT-16) ---- */
+
+// Computed colors come back as rgb() or, for color-mix, as color(srgb r g b).
+function inkOf(css: string): [number, number, number] {
+  const m = /color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)/.exec(css)
+  if (m) return [Number(m[1]) * 255, Number(m[2]) * 255, Number(m[3]) * 255]
+  return rgbOf(css)
+}
+
+test('at night the approval note and the approve error keep readable ink on their light panels', async ({ page, context }) => {
+  await setThemeMode(context, 'night')
+  const classic = { estimate_template: 'classic' }
+  const spies = await mockPortal(context, proposalPayload({ company: classic, contact: { proposal_status: 'approved' } }))
+  await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+  const cream = luminanceOf(242, 237, 228)
+  const label = page.getByText('Proposal approved', { exact: true })
+  await expect(label).toBeVisible()
+  expect(contrastRatio(luminanceOf(...inkOf(await label.evaluate((el) => getComputedStyle(el).color))), cream)).toBeGreaterThanOrEqual(4.5)
+
+  spies.setPayload(proposalPayload({ company: classic }))
+  spies.setApproveReply({ status: 500, body: { ok: false, error: 'approve_failed', message: 'We could not record your approval. Please try again.' } })
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.getByRole('checkbox', { name: /I have the authority to approve this proposal/ }).check()
+  await page.getByRole('button', { name: 'Approve & notify contractor' }).click()
+  const error = page.getByText('We could not record your approval. Please try again.')
+  await expect(error).toBeVisible()
+  expect(contrastRatio(luminanceOf(...inkOf(await error.evaluate((el) => getComputedStyle(el).color))), cream)).toBeGreaterThanOrEqual(4.5)
+})
