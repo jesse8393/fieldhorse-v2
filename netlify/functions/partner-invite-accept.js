@@ -11,6 +11,7 @@
 // URL-sharing from letting a non-invited account accept.
 
 import { createClient } from '@supabase/supabase-js'
+import { supabaseServiceConfig } from './lib/serviceConfig.js'
 import { sendPushToUser } from './lib/push.js'
 
 export default async (request) => {
@@ -21,9 +22,7 @@ export default async (request) => {
     return json({ error: 'method_not_allowed' }, 405)
   }
 
-  const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-  const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
-  const ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
+  const { url: SUPABASE_URL, secretKey: SERVICE_KEY, publicKey: ANON_KEY } = supabaseServiceConfig()
   if (!SUPABASE_URL || !SERVICE_KEY || !ANON_KEY) {
     return json({ error: 'server_misconfigured' }, 500)
   }
@@ -70,7 +69,7 @@ export default async (request) => {
   // Load the invite.
   const { data: invite, error: invErr } = await admin
     .from('fh_job_partners')
-    .select('id, job_id, partner_email, status, invited_by_user_id')
+    .select('id, job_id, org_id, partner_email, status, invited_by_user_id')
     .eq('invite_token', token)
     .maybeSingle()
 
@@ -113,7 +112,7 @@ export default async (request) => {
     body: `${invite.partner_email} accepted the invite`,
     link: `/jobs/${invite.job_id}?tab=partners`,
     tag: `partner-accepted-${invite.id}`
-  })
+  }, { orgId: invite.org_id })
 
   return json({ ok: true, job_id: invite.job_id })
 }

@@ -32,6 +32,7 @@
 // and fall back to the existing mailto: handoff.
 
 import { createClient } from '@supabase/supabase-js'
+import { supabaseServiceConfig } from './lib/serviceConfig.js'
 import { hashIdentifier, checkRateLimit, checkDailySendCap, DAILY_SEND_LIMIT_MESSAGE } from './lib/rateLimit.js'
 import { loadAccessibleRow, brandingUserIdFor } from './lib/orgAccess.js'
 import { formatFromHeader, renderParagraphs, textField, idempotencyKey, sendViaResend, sendFailure, EMAIL_HEAD } from './lib/email.js'
@@ -47,8 +48,7 @@ export default async (request) => {
     return json({ error: 'method_not_allowed' }, 405)
   }
 
-  const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-  const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const { url: SUPABASE_URL, secretKey: SERVICE_KEY } = supabaseServiceConfig()
   const RESEND_API_KEY = process.env.RESEND_API_KEY
   const SEND_EMAIL_FROM = process.env.SEND_EMAIL_FROM
   // White-label: when the operator has set a company_name in their

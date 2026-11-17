@@ -3,15 +3,21 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // The writes in invoices.ts against a small in-memory table store that
 // applies every filter the code sends and answers selects after writes.
 const fake = vi.hoisted(() => {
-  const state = { tables: {} as Record<string, any[]>, failUpdates: 0 }
+  // loseInsertAnswers: the next inserts save but their answer is lost.
+  const state = { tables: {} as Record<string, any[]>, failUpdates: 0, loseInsertAnswers: 0, seq: 0 }
   function from(table: string) {
-    const q = { op: 'select' as 'select' | 'insert' | 'update', filters: [] as Array<(r: any) => boolean>, single: false, patch: null as any, row: null as any }
+    const q = { op: 'select' as 'select' | 'insert' | 'update', filters: [] as Array<(r: any) => boolean>, single: false, patch: null as any, row: null as any, upsert: false }
     function run() {
       const rows = (state.tables[table] ||= [])
       if (q.op === 'insert') {
-        if (rows.some((r) => r.id === q.row.id)) return { data: null, error: null }
-        rows.push({ ...q.row })
-        return { data: null, error: null }
+        if (q.row.id != null && rows.some((r) => r.id === q.row.id)) {
+          return q.upsert ? { data: null, error: null } : { data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint' } }
+        }
+        // Postgres gives a row sent with no id an id of its own.
+        const row = { ...q.row, id: q.row.id ?? `gen-${++state.seq}` }
+        rows.push(row)
+        if (state.loseInsertAnswers > 0) { state.loseInsertAnswers--; return { data: null, error: { message: 'TypeError: Failed to fetch' } } }
+        return { data: q.single ? { ...row } : null, error: null }
       }
       const matched = rows.filter((r) => q.filters.every((f) => f(r)))
       if (q.op === 'update') {
@@ -25,7 +31,7 @@ const fake = vi.hoisted(() => {
     const api: any = {
       select: () => api,
       insert: (row: any) => { q.op = 'insert'; q.row = row; return api },
-      upsert: (row: any) => { q.op = 'insert'; q.row = row; return api },
+      upsert: (row: any) => { q.op = 'insert'; q.row = row; q.upsert = true; return api },
       update: (patch: any) => { q.op = 'update'; q.patch = patch; return api },
       eq: (col: string, val: any) => { q.filters.push((r) => r[col] === val); return api },
       in: (col: string, vals: any[]) => { q.filters.push((r) => vals.includes(r[col])); return api },
@@ -47,11 +53,12 @@ vi.mock('./pdf.js', () => ({
   downloadPdf: () => {}
 }))
 
-const { logInvoicePayment, settleInvoiceAfterEdit, sendInvoiceEmail } = await import('./invoices.ts')
+const { createInvoice, logInvoicePayment, settleInvoiceAfterEdit, sendInvoiceEmail } = await import('./invoices.ts')
 
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {})
   fake.state.failUpdates = 0
+  fake.state.loseInsertAnswers = 0
   fake.state.tables = { fh_payments: [], fh_invoices: [], fh_change_orders: [], fh_contacts: [] }
 })
 
@@ -166,5 +173,31 @@ describe('a client invoice payment with no date', () => {
       if (tz === undefined) delete process.env.TZ
       else process.env.TZ = tz
     }
+  })
+})
+
+// DATA-12: a new invoice whose answer was lost on a weak signal is saved
+// again by the person. The form mints the invoice's id once, so the retry
+// addresses the same invoice instead of making a second one.
+describe('a new invoice saved again after a lost answer', () => {
+  const input = { clientId: 'c', userId: 'u', title: 'Deposit', amount: 500 }
+
+  it('is one invoice, the one the first try saved', async () => {
+    fake.state.loseInsertAnswers = 1
+    const first = await createInvoice({ ...input, id: 'inv-minted' })
+    expect(first.error).toBeTruthy()
+    const second = await createInvoice({ ...input, id: 'inv-minted' })
+    expect(second.error).toBeNull()
+    expect(second.data?.id).toBe('inv-minted')
+    expect(fake.state.tables.fh_invoices).toHaveLength(1)
+  })
+
+  it("never takes another person's invoice with that id as its own", async () => {
+    fake.state.tables.fh_invoices = [{ id: 'inv-minted', user_id: 'someone-else', client_id: 'x', amount: 900, status: 'draft' }]
+    const res = await createInvoice({ ...input, id: 'inv-minted' })
+    expect(res.data).toBeNull()
+    expect(res.error).toBeTruthy()
+    expect(fake.state.tables.fh_invoices).toHaveLength(1)
+    expect(fake.state.tables.fh_invoices[0].amount).toBe(900)
   })
 })

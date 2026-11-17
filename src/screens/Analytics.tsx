@@ -12,7 +12,7 @@ import CountUp from '../components/fx/CountUp.tsx'
 import { useAnalyticsBundle, useInvalidateAnalytics } from '../lib/queries.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { STAGES, ACTIVE_STAGES } from '../lib/stages.ts'
-import { wonYTD as wonYTDFn, profitCoverageYTD, computeFunnel } from '../lib/rollups.ts'
+import { wonYTD as wonYTDFn, profitCoverageYTD, computeFunnel, avgMargin as avgMarginFn } from '../lib/rollups.ts'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
@@ -51,7 +51,7 @@ export default function Analytics() {
   const mileage = useMemo(() => bundle?.mileage ?? [], [bundle])
   const payments = useMemo(() => bundle?.payments ?? [], [bundle])
   const invoices = useMemo(() => bundle?.invoices ?? [], [bundle])
-  const changeOrders = bundle?.changeOrders ?? []
+  const changeOrders = useMemo(() => bundle?.changeOrders ?? [], [bundle])
   const clients = useMemo(() => bundle?.clients ?? [], [bundle])
   const stageTransitions = useMemo(() => bundle?.stageTransitions ?? [], [bundle])
 
@@ -123,13 +123,10 @@ export default function Analytics() {
     )
     // Preserve actual recorded losses. Cost coverage remains explicit,
     // and amounts are never silently capped to make a ratio look normal.
+    // Each job is measured against its contract with its approved change
+    // orders (M-15), through the same rollup Money's Tracked margin uses.
     const avgMargin = winsWithCost.length >= 1
-      ? (winsWithCost.reduce((s, c) => {
-          const a = Number(c.amount || 0)
-          const k = Number(c.cost || 0)
-          const m = (a - k) / a
-          return s + m
-        }, 0) / winsWithCost.length) * 100
+      ? avgMarginFn(winsWithCost, changeOrders) * 100
       : null
     // The "won job" qualifier is misleading without context, the
     // operator sees "Across 1 won job" while Win Rate reads "4/4"
@@ -163,7 +160,7 @@ export default function Analytics() {
       milesYTD, mileageDeduction, mileageNote: mileageSummary.missingRates ? mileageRateNote(new Date().getFullYear()) : 'Estimated from business rates by drive date',
       invoiced, collected,
     }
-  }, [contacts, leadRows, quoteRows, mileage, invoices, payments, stageTransitions, funnel])
+  }, [contacts, leadRows, quoteRows, mileage, invoices, payments, changeOrders, stageTransitions, funnel])
 
   const byStage = useMemo(() => {
     // Legacy 'invoice'-stage rows count under 'job' (their v2 home).
@@ -239,6 +236,7 @@ export default function Analytics() {
     const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
     const contactById = new Map(contacts.map((c) => [c.id, c]))
     const clientById = new Map(clients.map((c) => [c.id, c]))
+    const invoiceById = new Map(invoices.map((i) => [i.id, i]))
     const totals = new Map()
     for (const p of payments) {
       // paid_on is date-only, parse LOCAL (same rule as the YTD sums
@@ -246,7 +244,11 @@ export default function Analytics() {
       const when = parseDateOnly(p.paid_on) || parseDateOnly(p.created_at)
       if (!when || when < cutoff || when >= tomorrow) continue
       const c = contactById.get(p.contact_id as string)
-      const clientName = c?.client_id ? clientById.get(c.client_id)?.name : null
+      // A payment on an invoice that bills the client directly has no job;
+      // its invoice names the client (D05), as on the Money row.
+      const inv = p.invoice_id ? invoiceById.get(p.invoice_id) : null
+      const clientId = c?.client_id || inv?.client_id
+      const clientName = clientId ? clientById.get(clientId)?.name : null
       const key = clientName || c?.name || 'Unknown'
       totals.set(key, (totals.get(key) || 0) + Number(p.amount || 0))
     }
@@ -254,7 +256,7 @@ export default function Analytics() {
       .map(([name, amount]) => ({ name, amount: Math.round(amount) }))
       .sort((a, b) => b.amount - a.amount)
       .slice(0, 5)
-  }, [payments, contacts, clients])
+  }, [payments, contacts, clients, invoices])
   const maxTopClient = Math.max(...topClients.map((t) => t.amount), 1)
 
   // Retainage outstanding, sum of fh_payments tagged retainage

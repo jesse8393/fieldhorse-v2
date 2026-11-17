@@ -1,5 +1,5 @@
 import { createUuid } from '../../lib/uuid.ts'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -15,13 +15,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, authHeaders } from '../../lib/supabase.ts'
 import { useInvoiceDetail, useInvalidateInvoiceDetail } from '../../lib/queries.ts'
 import { reviewInvoice } from '../../lib/invoiceReview.js'
-import { fetchInvoicesForContact, createInvoice, invoiceAmountDue, invoiceDescription, sendInvoiceEmail } from '../../lib/invoices.ts'
+import { billTo, companyFromProfile, fetchInvoicesForContact, createInvoice, invoiceAmountDue, invoiceDescription, sendInvoiceEmail } from '../../lib/invoices.ts'
+import { useDocumentProfile } from '../../lib/companyBranding.ts'
 import { pickBalanceInvoice } from '../../lib/invoiceSettlement.ts'
 import { moneyExact } from '../../lib/format.ts'
 import { deletePayment } from '../../lib/stages.ts'
 import { parseDateOnly } from '../../lib/dates.ts'
 import { useAuth } from '../../contexts/AuthContext.tsx'
-import { useProfile } from '../../contexts/ProfileContext.tsx'
 // Lazy, pdf.js + transitive jspdf + autoTable deps are ~430KB. Only
 // loads on the first PDF action (Generate, Share, Email Invoice).
 async function loadPdf(): Promise<any> {
@@ -30,6 +30,7 @@ async function loadPdf(): Promise<any> {
 import { toastSuccess, toastError } from '../../lib/toast.ts'
 import { mintPublicLink } from '../../lib/publicLink.ts'
 import { hapticTap } from '../../lib/haptics.ts'
+import { useArmedId } from '../../lib/secondTap.ts'
 import { handleTablistKeyDown } from '../../lib/tabs.ts'
 import { useMediaQuery } from '../../lib/useMediaQuery.ts'
 import { useFhMotion } from '../../lib/motion.ts'
@@ -52,8 +53,6 @@ import { InvoiceTemplate } from '../../components/documents'
  *     which opens the open draw's payment screen (/invoices/:id/payment)
  *     or, with no open draw, the job's payment recorder
  */
-
-const DELETE_ARMED_MS = 4000
 
 const AGING_BUCKETS = [
   { id: '0-30',  label: 'Current',  max: 30,        color: 'var(--v3-text-muted)',     accent: 'var(--v3-border-strong)' },
@@ -103,7 +102,6 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
   const id = idProp ?? params.id
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { profile } = useProfile()
 
   // Insurance claim payload (migration 018) is one-to-one with the
   // contact (owner-only RLS, null for partner viewers); change orders
@@ -160,11 +158,12 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
   const serviceDescription = useMemo(() => invoiceDescription(billingDraw, contact), [billingDraw, contact])
   const [generating, setGenerating] = useState(false)
   // A payment row deletes with a second tap on its own button within 4
-  // seconds (D57): which row is armed, and which is being deleted.
-  const [deleteArmed, setDeleteArmed] = useState<string | null>(null)
+  // seconds (D57), through the shared hook, which ignores a second tap
+  // within half a second of arming (OPS-02): which row is armed, and which
+  // is being deleted.
+  const deleteTap = useArmedId()
+  const deleteArmed = deleteTap.armedId
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const deleteTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  useEffect(() => () => { if (deleteTimer.current) clearTimeout(deleteTimer.current) }, [])
   // 'detail' = existing list-style breakdown (default, original UX).
   // 'document' = new InvoiceTemplate preview (Phase 2, opt-in so the
   // toggle is reversible and the existing flow stays untouched until
@@ -191,17 +190,12 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
   const shareLabel = sharing ? 'Minting…' : 'Share link'
   const downloadLabel = generating ? 'Generating…' : 'Download'
 
-  // Resolved client info, prefer the denormalized job-row fields, fall
-  // back to fh_clients (the source of truth when edits happen on the
-  // client card and the job row stayed empty).
+  // Who this job bills, by the rule every invoice uses (billTo): the email
+  // and phone from fh_clients, where the office keeps them current, and the
+  // job row's copy only when the client has none (DATA-05).
   const resolved = useMemo(() => {
-    const cli: any = contact?.fh_clients || {}
-    return {
-      name:    contact?.name    || cli.name    || '',
-      email:   contact?.email   || cli.email   || '',
-      phone:   contact?.phone   || cli.phone   || '',
-      address: contact?.address || cli.address || ''
-    }
+    const to = billTo(contact, null)
+    return { name: to.name, email: to.email, phone: to.phone, address: to.address }
   }, [contact])
 
   const totals = useMemo(() => {
@@ -242,19 +236,11 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
     return { label: 'Remaining', tone: 'gold' }
   }, [totals])
 
-  const company = useMemo(() => ({
-    name: profile?.company_name || profile?.full_name || 'My Company',
-    address: profile?.company_address || '',
-    phone: profile?.company_phone || '',
-    email: profile?.company_email || (profile as any)?.email || '',
-    website: profile?.company_website || '',
-    logo_url: profile?.logo_url || null,
-    brand_accent_hex: profile?.brand_accent_hex || null,
-    license_number: profile?.license_number || '',
-    insured_text: profile?.insured_text || '',
-    payment_link: (profile as any)?.payment_link || '',
-    payment_instructions: (profile as any)?.payment_instructions || ''
-  }), [profile])
+  // The job's own company, whoever builds its documents (DATA-06): what is
+  // known now for the preview, read again for each document.
+  const documentProfile = useDocumentProfile(contact?.org_id)
+  const company = useMemo(() => companyFromProfile(documentProfile.profile), [documentProfile.profile])
+  const loadCompany = async () => companyFromProfile(await documentProfile.load())
 
   const pdfLineItems = useMemo(() => (
     billingDraw
@@ -286,7 +272,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
     try {
       const { generateInvoice, downloadPdf } = await loadPdf()
       const result = await generateInvoice({
-        company,
+        company: await loadCompany(),
         contact: {
           id: contact.id,
           name: resolved.name || 'Client',
@@ -401,7 +387,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
       invoice,
       // Same recipient block as this screen's own PDF (client fallbacks).
       contact: { ...contact, name: resolved.name || contact.name, email: resolved.email, phone: resolved.phone, address: resolved.address },
-      company,
+      company: await loadCompany(),
       userId: user!.id,
       recipientEmail: resolved.email,
       payments,
@@ -444,7 +430,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
       }
       const { generateInvoice, downloadPdf } = await loadPdf()
       const result = await generateInvoice({
-        company,
+        company: await loadCompany(),
         contact: {
           id: contact.id,
           name: resolved.name || 'Client',
@@ -555,17 +541,13 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
     onOpenLogPayment?.()
   }
 
-  async function handleDeletePayment(paymentId: string, paymentAmount: number) {
+  function handleDeletePayment(paymentId: string, paymentAmount: number) {
     if (!user?.id || deletingId) return
     hapticTap()
-    if (deleteArmed !== paymentId) {
-      if (deleteTimer.current) clearTimeout(deleteTimer.current)
-      setDeleteArmed(paymentId)
-      deleteTimer.current = setTimeout(() => setDeleteArmed(null), DELETE_ARMED_MS)
-      return
-    }
-    if (deleteTimer.current) clearTimeout(deleteTimer.current)
-    setDeleteArmed(null)
+    deleteTap.tap(paymentId, () => { void deletePaymentNow(paymentId, paymentAmount) })
+  }
+
+  async function deletePaymentNow(paymentId: string, paymentAmount: number) {
     setDeletingId(paymentId)
     // By id, with the row asked back: a payment carries the job creator's
     // id, so filtering on the signed in user matched nothing and still said
@@ -860,7 +842,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
                   </div>
                   <button
                     type="button"
-                    onClick={() => void handleDeletePayment(p.id, Number(p.amount || 0))}
+                    onClick={() => handleDeletePayment(p.id, Number(p.amount || 0))}
                     disabled={deletingId === p.id}
                     aria-label={deleteArmed === p.id ? `Tap again to delete the ${fmtMoney(p.amount)} payment` : `Delete the ${fmtMoney(p.amount)} payment`}
                     style={{

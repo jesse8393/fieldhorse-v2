@@ -418,6 +418,50 @@ test('with no open draw the job money view shows the job title, not a paid draw\
   await expect(service.getByText('Deposit for the shed slab')).toHaveCount(0)
 })
 
+// DATA-05: a job keeps a copy of the client's email from when it was made
+// (x@y.com here). The office corrects the email on the client (jeff@roy.com),
+// so every way a job's invoice is emailed goes to the client's email.
+async function captureInvoiceSends(context: BrowserContext) {
+  await context.route('**/storage/v1/object/**', (route) => route.fulfill({ status: 200, json: { Key: 'job-files/qa-invoice.pdf' } }))
+  const sends: Array<{ recipient_email: string }> = []
+  await context.route('**/api/send-invoice', async (route) => {
+    sends.push(route.request().postDataJSON())
+    await route.fulfill({ status: 200, json: { ok: true } })
+  })
+  return sends
+}
+
+test("Resend on a job's invoice goes to the client's current email", async ({ page, context }) => {
+  await installShedInvoice(context)
+  const sends = await captureInvoiceSends(context)
+  await openInvoice(page, 'inv-1')
+  await action(page, 'Resend').click()
+  await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(1)
+  expect(sends[0].recipient_email).toBe('jeff@roy.com')
+})
+
+test("Email on the job's money view goes to the client's current email", async ({ page, context }) => {
+  await installShedInvoice(context)
+  const sends = await captureInvoiceSends(context)
+  await page.goto('/jobs/c-job1?tab=financials', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+  const email = page.getByRole('button', { name: 'Email', exact: true })
+  await expect(email).toBeVisible({ timeout: 30_000 })
+  await email.click()
+  await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(1)
+  expect(sends[0].recipient_email).toBe('jeff@roy.com')
+})
+
+test("emailing a draw from the job's invoices goes to the client's current email", async ({ page, context }) => {
+  await installShedInvoice(context)
+  const sends = await captureInvoiceSends(context)
+  await page.goto('/jobs/c-job1?tab=draws', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+  const email = page.getByRole('button', { name: 'Email draw to client' }).first()
+  await expect(email).toBeVisible({ timeout: 30_000 })
+  await email.click()
+  await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(1)
+  expect(sends[0].recipient_email).toBe('jeff@roy.com')
+})
+
 // M-08 and DATA-03: a payment on a job a teammate created carries the
 // teammate's id. Delete goes by id, and a delete that removed nothing says
 // so instead of "Payment deleted".
@@ -432,8 +476,26 @@ async function tapDeletePayment(page: Page) {
   const del = page.getByRole('button', { name: /delete the \$6,400(\.00)? payment/i }).first()
   await expect(del).toBeVisible({ timeout: 30_000 })
   await del.click()
+  await page.waitForTimeout(600) // a second tap within 500 ms is ignored (OPS-02)
   await page.getByRole('button', { name: /tap again to delete/i }).first().click()
 }
+
+// OPS-02: a fast double tap on a payment's delete must not delete it. A
+// second tap within half a second of arming is ignored; a later one deletes.
+test('a fast double tap on a payment delete does not delete the payment', async ({ page, context }) => {
+  await signIn(context, { tables: teammatePaymentTables() })
+  const deletes: string[] = []
+  page.on('request', (r) => { if (r.method() === 'DELETE' && r.url().includes('/fh_payments')) deletes.push(r.url()) })
+  await page.goto('/jobs/c-team?tab=financials', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+  const del = page.getByRole('button', { name: /delete the \$6,400(\.00)? payment/i }).first()
+  await expect(del).toBeVisible({ timeout: 30_000 })
+  await del.click()
+  await page.getByRole('button', { name: /tap again to delete/i }).first().click({ delay: 0 })
+  await page.waitForTimeout(700)
+  expect(deletes).toEqual([])
+  await page.getByRole('button', { name: /tap again to delete/i }).first().click()
+  await expect.poll(() => deletes.length).toBe(1)
+})
 
 test("deleting a teammate's payment deletes it by id", async ({ page, context }) => {
   await signIn(context, { tables: teammatePaymentTables() })
@@ -603,6 +665,49 @@ test.describe('money editors keep two decimals', () => {
     const amount = page.locator('input[inputmode="decimal"]').first()
     await amount.pressSequentially('-12.345')
     await expect(amount).toHaveValue('-12.34')
+  })
+})
+
+// DATA-18: a change order write that changed no row never says it saved.
+// The change order here was written by a teammate; anyone who may edit the
+// job's money may send or delete it, and row security decides.
+test.describe('a change order write that finds nothing to change', () => {
+  const teammateCo = { id: 'co-team', org_id: 'org-1', user_id: 'teammate-9', contact_id: 'c-job1', sequence_number: 3, title: 'Extra footing', description: null, amount: 1800, status: 'draft', created_at: '2026-11-10T15:00:00.000Z' }
+  const tables = { fh_contacts: [shedJob()], fh_invoices: [], fh_payments: [], fh_change_orders: [teammateCo] }
+
+  test('a delete that removed nothing does not say deleted', async ({ page, context }) => {
+    await signIn(context, { tables })
+    await context.route(url => url.pathname.endsWith('/rest/v1/fh_change_orders'), route => {
+      if (route.request().method() !== 'DELETE') return route.fallback()
+      return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+    })
+    await page.goto('/jobs/c-job1?tab=change_orders', { waitUntil: 'domcontentloaded' })
+    await page.getByRole('button', { name: 'Delete change order', exact: true }).click()
+    await page.waitForTimeout(600) // a second tap within 500 ms is ignored (OPS-02)
+    await page.getByRole('button', { name: 'Tap again to delete', exact: true }).click()
+    await expect(page.getByText("Couldn't delete change order", { exact: true })).toBeVisible()
+    await expect(page.getByText('Change order deleted', { exact: true })).toHaveCount(0)
+  })
+
+  test("sending a teammate's change order marks it sent by id, and stops when it is gone", async ({ page, context }) => {
+    await signIn(context, { tables })
+    const patches: string[] = []
+    await context.route(url => url.pathname.endsWith('/rest/v1/fh_change_orders'), route => {
+      if (route.request().method() !== 'PATCH') return route.fallback()
+      patches.push(route.request().url())
+      return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+    })
+    await context.route(url => url.pathname.endsWith('/rest/v1/fh_public_links'), route => {
+      if (route.request().method() !== 'POST') return route.fallback()
+      return route.fulfill({ status: 201, json: { id: 'link-co', ...route.request().postDataJSON() } })
+    })
+    await page.goto('/jobs/c-job1?tab=change_orders', { waitUntil: 'domcontentloaded' })
+    await page.getByRole('button', { name: 'Send for signature', exact: true }).click()
+    await expect.poll(() => patches.length).toBe(1)
+    expect(new URL(patches[0]).searchParams.get('id')).toBe('eq.co-team')
+    expect(new URL(patches[0]).searchParams.has('user_id')).toBe(false)
+    await expect(page.getByText('This change order changed on another device. The list is read again.', { exact: true })).toBeVisible()
+    await expect(page.getByText('Approval link copied', { exact: true })).toHaveCount(0)
   })
 })
 

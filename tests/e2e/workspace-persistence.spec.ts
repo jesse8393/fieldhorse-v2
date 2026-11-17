@@ -1,5 +1,6 @@
-import { expect, test, type BrowserContext } from '@playwright/test'
+import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
+import { installMock, session } from '../../scripts/qa-mock.mjs'
 
 const customer = { id: 'customer-selected', org_id: 'org-1', user_id: 'qa-user-1', name: 'Jordan Reed', phone: '6155550102', email: 'jordan@example.test', address: '12 Test Lane', created_at: '2026-10-01T12:00:00Z' }
 
@@ -233,6 +234,83 @@ test('sign out forgets the saved profile and workspace', async ({ context, page 
   await expect(page.getByText('Loading workspace', { exact: true })).toBeVisible()
   release()
   await expect(page.locator('#fh-main')).toBeVisible()
+})
+
+// DATA-11: a shared device. The first person is still signed in when a
+// second person opens their own password reset link on it.
+const USER_B = { id: 'qa-user-2', email: 'second@other.test', aud: 'authenticated', role: 'authenticated', app_metadata: {}, user_metadata: {}, created_at: '2026-02-01T00:00:00Z' }
+const TOKEN_B = 'qa.fake.second-token'
+
+function savedCache(page: Page) {
+  return page.evaluate(() => new Promise<string>((resolve) => {
+    const open = indexedDB.open('keyval-store')
+    open.onupgradeneeded = () => open.transaction?.abort()
+    open.onerror = () => resolve('')
+    open.onsuccess = () => {
+      const db = open.result
+      try {
+        const read = db.transaction('keyval', 'readonly').objectStore('keyval').get('fh-query-cache')
+        read.onsuccess = () => { db.close(); resolve(typeof read.result === 'string' ? read.result : '') }
+        read.onerror = () => { db.close(); resolve('') }
+      } catch {
+        db.close()
+        resolve('')
+      }
+    }
+  }))
+}
+
+test("a second person's email link never opens on the first person's saved book", async ({ context, page }) => {
+  await installMock(context, { supabaseHosts: ['qa-mock.supabase.co', 'pnmhblvslftdzfcdezbw.supabase.co'] })
+  // The second person's own company loads; every other read of theirs
+  // finds no signal, so a job on screen can only come from what the
+  // device saved.
+  const ownRows: Record<string, object[]> = {
+    org_members: [{ id: 'm2', org_id: 'org-2', user_id: USER_B.id, role: 'owner', revoked_at: null, joined_at: '2026-02-01T00:00:00Z' }],
+    organizations: [{ id: 'org-2', name: 'Other Company', slug: null }],
+    profiles: [{ user_id: USER_B.id, full_name: 'Bea Other', company_name: 'Other Company', onboarded_at: '2026-02-01T00:00:00Z', preferences: {} }],
+  }
+  await context.route(/supabase\.co\//, async route => {
+    const request = route.request()
+    if (!(request.headers().authorization || '').includes(TOKEN_B)) return route.fallback()
+    const url = new URL(request.url())
+    if (url.pathname.includes('/auth/v1/user')) return route.fulfill({ json: USER_B })
+    const rows = ownRows[url.pathname.split('/rest/v1/')[1] ?? '']
+    if (!rows) return route.abort('internetdisconnected')
+    if (request.method() === 'HEAD') return route.fulfill({ status: 200, headers: { 'content-range': '*/0' }, body: '' })
+    if ((request.headers().accept || '').includes('vnd.pgrst.object')) return route.fulfill({ json: rows[0] })
+    return route.fulfill({ json: rows })
+  })
+  // Signed in once, as the first person; later loads keep whoever is stored.
+  await context.addInitScript((saved) => {
+    if (localStorage.getItem('e2e:seeded')) return
+    localStorage.setItem('e2e:seeded', '1')
+    localStorage.setItem('sb-qa-mock-auth-token', JSON.stringify(saved))
+    localStorage.setItem('sb-pnmhblvslftdzfcdezbw-auth-token', JSON.stringify(saved))
+    localStorage.setItem('fh:theme-mode', 'day')
+    localStorage.setItem('fh-onboarding-seen', '1')
+  }, session)
+
+  await page.goto('/jobs/c-job1')
+  await expect(page.getByText('Plumbing Bellevue').first()).toBeVisible()
+  await expect.poll(() => savedCache(page), { timeout: 15_000 }).toContain('Plumbing Bellevue')
+
+  const expiresAt = Math.floor(Date.now() / 1000) + 86400
+  await page.goto(`/reset-password#access_token=${TOKEN_B}&refresh_token=qa-refresh-b&expires_in=86400&expires_at=${expiresAt}&token_type=bearer&type=recovery`)
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('sb-qa-mock-auth-token') || 'null')?.user?.id)).toBe('qa-user-2')
+
+  // The second person opens the first person's job from the shared history.
+  await page.goto('/jobs/c-job1')
+  const seen = await page.evaluate(async () => {
+    const end = performance.now() + 4000
+    while (performance.now() < end) {
+      if (document.body.innerText.includes('Plumbing Bellevue')) return true
+      await new Promise(resolve => requestAnimationFrame(resolve))
+    }
+    return false
+  })
+  expect(seen).toBe(false)
+  expect(await savedCache(page)).not.toContain('Plumbing Bellevue')
 })
 
 // PERF-03: the member and partner counts only drive nav flags, so a first

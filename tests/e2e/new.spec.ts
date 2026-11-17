@@ -206,6 +206,26 @@ test('backing out of Quote this leaves the next New quote blank', async ({ conte
   await expect(page.getByLabel('Client')).toHaveValue('')
 })
 
+// Phone sales audit finding S23: when the lead could not be read, Quote
+// this opened a blank quote with nothing to say why.
+test('Quote this says when the lead could not be read, and fills it on Retry', async ({ context, page }) => {
+  await signIn(context, { tables: { fh_leads: [LEAD_WITH_NOTES] } })
+  let signal = false
+  await context.route(/\/rest\/v1\/fh_leads\?/, route => {
+    if (route.request().method() !== 'GET' || signal) return route.fallback()
+    return route.abort('internetdisconnected')
+  })
+  await open(page, '/quotes/new?lead=l-notes')
+  const notice = page.getByRole('alert').filter({ hasText: 'Could not fill this quote from the lead' })
+  await expect(notice).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByLabel('Title')).toHaveValue('')
+  signal = true
+  await notice.getByRole('button', { name: 'Retry', exact: true }).click()
+  await expect(page.getByLabel('Title')).toHaveValue('Backyard drainage')
+  await expect(page.getByLabel('Client')).toHaveValue('Jeff Roy')
+  await expect(notice).toHaveCount(0)
+})
+
 // The client field read only the 200 most recently active clients, so an
 // older client was never suggested and Save made a duplicate (DATA-09).
 test('the client field finds a client outside the 200 most recently active', async ({ context, page }) => {
@@ -292,6 +312,21 @@ test('a client save whose answer was lost is retried on the same row (DATA-12)',
   expect(rowId(bodies[1])).toBe(rowId(bodies[0]))
 })
 
+test('an invoice save whose answer was lost is retried on the same invoice (DATA-12)', async ({ context, page }) => {
+  await signIn(context)
+  const bodies = await loseFirstAnswer(page, 'fh_invoices')
+  await open(page, '/invoices/new?client=cl-1')
+  await expect(page.getByLabel('Client')).toHaveValue('Jeff Roy', { timeout: 30_000 })
+  await page.getByLabel('Amount').fill('1240')
+  await page.getByRole('button', { name: 'Save invoice' }).click()
+  await expect(page.locator('.fhnew-error')).toBeVisible()
+  await page.getByRole('button', { name: 'Save invoice' }).click()
+  await expect(page).toHaveURL(/\/invoices\/inv0$/, { timeout: 30_000 })
+  expect(bodies).toHaveLength(2)
+  expect(rowId(bodies[0])).toBeTruthy()
+  expect(rowId(bodies[1])).toBe(rowId(bodies[0]))
+})
+
 test('a lost connection on New lead and New client reads as a plain sentence (DATA-22)', async ({ context, page }) => {
   await signIn(context)
   await page.route(/\/rest\/v1\/fh_(leads|clients)(\?|$)/, (route) => route.request().method() === 'POST' ? route.abort('failed') : route.fallback())
@@ -323,6 +358,61 @@ test('a new lead shows in Leads when the person goes back (DATA-13)', async ({ c
   await expect(page).toHaveURL(/\/leads$/)
   // The list read again after the save instead of showing its old copy.
   await expect.poll(() => leadReads - before, { timeout: 5000 }).toBeGreaterThan(0)
+})
+
+test('a new invoice shows in Money when the person goes back (DATA-13)', async ({ context, page }) => {
+  await signIn(context)
+  // Money's own list read (the 500 most recent invoices), not the invoice screen's.
+  let listReads = 0
+  page.on('request', (req) => {
+    const url = decodeURIComponent(req.url())
+    if (req.method() === 'GET' && /\/rest\/v1\/fh_invoices\?/.test(url) && url.includes('order=created_at.desc') && url.includes('limit=500')) listReads++
+  })
+  await open(page, '/invoices')
+  await expect(page.getByRole('heading', { level: 1, name: 'Money' })).toBeVisible({ timeout: 30_000 })
+  await expect.poll(() => listReads).toBeGreaterThan(0)
+  await page.getByRole('link', { name: 'New invoice' }).first().click()
+  await expect(page.getByRole('heading', { level: 1, name: 'New invoice' })).toBeVisible({ timeout: 30_000 })
+  await page.getByLabel('Client').fill('Jeff')
+  await page.locator('.fhnew-client__pick').first().click()
+  await page.getByLabel('Amount').fill('1240')
+  const before = listReads
+  await page.getByRole('button', { name: 'Save invoice' }).click()
+  await expect(page).toHaveURL(/\/invoices\/inv0$/, { timeout: 30_000 })
+  await page.getByRole('button', { name: 'Back' }).first().click()
+  await expect(page).toHaveURL(/\/invoices$/)
+  // Money read its list again after the save instead of showing its old copy.
+  await expect.poll(() => listReads - before, { timeout: 5000 }).toBeGreaterThan(0)
+})
+
+// D23: a create form's draft was written 0.4 s after the last keystroke,
+// and the timer died with the screen, so the last words typed before Back
+// or a reload were lost. Each step types and leaves in the same moment.
+test('a create form keeps what was typed just before Back or a reload (D23)', async ({ context, page }) => {
+  await signIn(context)
+  await open(page, '/new')
+  const newJob = page.getByRole('list', { name: 'What to create' }).getByRole('link', { name: /^Job/ })
+  await newJob.click()
+  const title = page.getByLabel('Title')
+  await expect(title).toBeVisible({ timeout: 30_000 })
+  await title.evaluate((el) => {
+    const input = el as HTMLInputElement
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'Shed slab')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    document.querySelector<HTMLButtonElement>('.fhnew-head button[aria-label="Back"]')!.click()
+  })
+  await expect(page).toHaveURL(/\/new$/)
+  await newJob.click()
+  await expect(title).toHaveValue('Shed slab', { timeout: 30_000 })
+
+  await title.evaluate((el) => {
+    const input = el as HTMLInputElement
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'Shed slab and apron')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    window.location.reload()
+  })
+  await expect(page.getByRole('heading', { level: 1, name: 'New job' })).toBeVisible({ timeout: 30_000 })
+  await expect(title).toHaveValue('Shed slab and apron', { timeout: 30_000 })
 })
 
 test('the first field keeps its focus on New lead and New client (S20)', async ({ context, page }) => {

@@ -35,7 +35,9 @@
 // "Email sender is not configured yet."
 
 import { reviewInvoice } from '../../src/lib/invoiceReview.js'
+import { knownContractTotal } from '../../src/lib/invoiceSettlement.ts'
 import { createClient } from '@supabase/supabase-js'
+import { supabaseServiceConfig } from './lib/serviceConfig.js'
 import { renderPayBlock as payBlock, formatFromHeader, renderParagraphs, textField, idempotencyKey, sendViaResend, sendFailure, greetingFor, EMAIL_HEAD } from './lib/email.js'
 import { loadAccessibleRow, brandingUserIdFor } from './lib/orgAccess.js'
 import { hashIdentifier, checkRateLimit, checkDailySendCap, DAILY_SEND_LIMIT_MESSAGE } from './lib/rateLimit.js'
@@ -49,8 +51,7 @@ export default async (request) => {
     return json({ error: 'method_not_allowed' }, 405)
   }
 
-  const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-  const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const { url: SUPABASE_URL, secretKey: SERVICE_KEY } = supabaseServiceConfig()
   const RESEND_API_KEY = process.env.RESEND_API_KEY
   const SEND_EMAIL_FROM = process.env.SEND_EMAIL_FROM
   const SEND_EMAIL_FROM_NAME = process.env.SEND_EMAIL_FROM_NAME || 'Notifications'
@@ -178,15 +179,18 @@ export default async (request) => {
       let contractTotal = null
       if (invoice.contact_id) {
         if (contact.amount != null && !Number.isFinite(Number(contact.amount))) return json({ error: 'invalid_contract_amount', message: 'Review the saved contract amount before sending.' }, 409)
-        let approved = 0
+        const approved = []
         for (let from = 0; ; from += 500) {
-          const changes = await supabase.from('fh_change_orders').select('amount').eq('contact_id', invoice.contact_id).eq('status', 'approved').order('id').range(from, from + 499)
+          const changes = await supabase.from('fh_change_orders').select('amount, status').eq('contact_id', invoice.contact_id).eq('status', 'approved').order('id').range(from, from + 499)
           if (changes.error) return json({ error: 'billing_review_unavailable', message: 'Could not verify approved scope. Try again.' }, 503)
           if ((changes.data || []).some(row => !Number.isFinite(Number(row.amount)))) return json({ error: 'invalid_scope_amount', message: 'Review approved change amounts before sending.' }, 409)
-          approved += (changes.data || []).reduce((sum, row) => sum + Number(row.amount || 0), 0)
+          approved.push(...(changes.data || []))
           if ((changes.data?.length || 0) < 500) break
         }
-        if (Number(contact.amount) > 0 || approved > 0) contractTotal = Number(contact.amount || 0) + approved
+        // The same contract the invoice page and its PDF use (M-14): a job
+        // saved with no price has no known contract, whatever its change
+        // orders, so a $500 change order does not cap $2,000 of draws.
+        contractTotal = knownContractTotal({ amount: contact.amount, changeOrders: approved })
       }
       const review = reviewInvoice({ invoice, invoices: siblings, contractTotal })
       if (review.excess > 0) return json({ error: 'contract_billing_exceeded', message: 'Invoices and drafts exceed approved contract value. Reduce or void unused drafts before sending.' }, 409)

@@ -14,6 +14,7 @@ import { useCaptureOutboxSync } from '../lib/captureOutbox.ts'
 import { permissionRouteForPath } from '../lib/permissions.ts'
 import { lazyWithRetry } from '../lib/lazyWithRetry.ts'
 import { APP_NAME, pageTitle, screenName } from '../lib/pageTitle.ts'
+import { isTypingTarget } from '../lib/shortcutKeys.ts'
 
 // The command palette is the desktop keyboard overlay, so it (and cmdk
 // and Radix with it) loads only at desktop widths: a phone never
@@ -235,7 +236,10 @@ export default function AppShell() {
   // `fh:open-capture` event, with the job on screen attached) and Cmd or
   // Ctrl+J; the workspace menu is /workspace; search below 900 px is
   // /search, while the command palette stays the one keyboard overlay on a
-  // desktop.
+  // desktop. The keys leave a field the person is typing in alone, so they
+  // never take them off a half typed form (D09). New has no key: the
+  // browser keeps Cmd or Ctrl+N for a new window, so the page never gets
+  // it, and the palette lists New lead, New quote and New job.
   useEffect(() => {
     // The screen already open is not stacked on itself.
     function go(to: string) {
@@ -248,6 +252,7 @@ export default function AppShell() {
       go(captureRoute((e as CustomEvent<OpenCaptureDetail | null | undefined>).detail ?? {}))
     }
     function onKey(e: KeyboardEvent) {
+      if (isTypingTarget(e.target)) return
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') {
         e.preventDefault()
         go(captureRoute())
@@ -258,10 +263,6 @@ export default function AppShell() {
       if (window.innerWidth < 900 && !e.defaultPrevented && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
         go('/search')
-      }
-      if (window.innerWidth >= 900 && (e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'n') {
-        e.preventDefault()
-        go('/new')
       }
     }
     function onMenu() { go('/workspace') }

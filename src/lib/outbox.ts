@@ -25,6 +25,13 @@
 // Flush triggers: window 'online', tab becoming visible, and app start
 // (wired in AppShell). Successes toast once per drain; rows the server
 // rejects for good are reported with an error toast, never as synced.
+//
+// What a failed replay does with the entry (drainOutcome):
+//   no signal, a timeout, 408, 429 or any 5xx: keep it and try again
+//     later, waiting longer after each failure (retryDelayMs);
+//   401 or an expired token: keep it until the person signs in again;
+//   any other answer (a 400 for bad input, a 403 for a record they lost
+//     access to, a 413 photo): drop it and say what was not saved.
 
 import { getActiveOrgId, supabase } from './supabase.ts'
 import { toastError, toastSuccess } from './toast.ts'
@@ -53,7 +60,10 @@ export type OutboxEntry = {
   blob?: Blob
   contentType?: string
   created_at: string
+  // Failed replays so far, and the time (epoch ms) before which the next
+  // automatic replay waits. Both grow on every retryable failure.
   attempts: number
+  retryAfter?: number
   // The signed in user who queued the entry. Missing on entries queued
   // before tagging existed; entryOwner() falls back to the row's user_id.
   userId?: string | null
@@ -114,6 +124,7 @@ let store: OutboxStore = idbStore
 
 /** Test seam: swap IndexedDB for an in memory store; null restores it. */
 export function setOutboxStoreForTests(next: OutboxStore | null) {
+  cancelRetry()
   store = next ?? idbStore
 }
 
@@ -369,6 +380,7 @@ export async function queuePhoto(args: {
  */
 export async function clearOutbox(): Promise<void> {
   generation += 1
+  cancelRetry()
   try {
     await store.clear()
   } catch { /* IDB unavailable: nothing was stored */ }
@@ -377,14 +389,51 @@ export async function clearOutbox(): Promise<void> {
 
 // ------------------------------------------------------------- flush
 
-// ok: landed. retry: no signal, keep it and stop the drain. dropped: a
-// real server answer (RLS, a CHECK, a malformed row) that will never
-// succeed, so it leaves the queue, and is reported rather than counted.
-export type DrainOutcome = 'ok' | 'retry' | 'dropped'
+// ok: landed. retry: no signal or a server that could not answer now,
+// keep it, stop the drain and try again after a wait. signin: the token
+// was refused, keep it and stop until the person signs in again.
+// dropped: a real server answer (RLS, a CHECK, a malformed row) that
+// will never succeed, so it leaves the queue, and is reported rather
+// than counted.
+export type DrainOutcome = 'ok' | 'retry' | 'signin' | 'dropped'
 
-function outcomeFor(error: unknown): DrainOutcome {
+// Answers a later attempt can succeed past: a timeout, too early, too
+// many requests. Every 5xx joins them.
+const RETRY_STATUSES = new Set([408, 425, 429])
+
+function httpStatus(error: any, status?: number): number | undefined {
+  if (typeof status === 'number') return status
+  // storage-js keeps the HTTP status on the error itself.
+  if (error && typeof error.status === 'number') return error.status
+  return undefined
+}
+
+/**
+ * What to do with an entry after a replay answered `error` with HTTP
+ * `status` (PostgREST gives it beside the error, storage-js on it).
+ * Status 0 is a request that never got an answer.
+ */
+export function drainOutcome(error: unknown, status?: number): DrainOutcome {
   if (!error) return 'ok'
-  return isNetworkError(error) ? 'retry' : 'dropped'
+  if (isNetworkError(error)) return 'retry'
+  const err = error as { message?: unknown; code?: unknown }
+  const code = httpStatus(err, status)
+  // Storage answers an expired token with a 400 whose message says so.
+  if (code === 401 || /\bjwt\b|\bjws\b/i.test(String(err.message ?? ''))) return 'signin'
+  if (code === 0 || (code !== undefined && (code >= 500 || RETRY_STATUSES.has(code)))) return 'retry'
+  return 'dropped'
+}
+
+// Exponential wait between automatic replays of one entry: about 5 s
+// after the first failure, doubling, capped at five minutes. The random
+// spread keeps many phones from retrying a recovering server together.
+const RETRY_BASE_MS = 5000
+const RETRY_MAX_MS = 5 * 60 * 1000
+
+export function retryDelayMs(attempts: number, random: () => number = Math.random): number {
+  const exponent = Math.min(Math.max(attempts, 1) - 1, 16)
+  const base = Math.min(RETRY_BASE_MS * 2 ** exponent, RETRY_MAX_MS)
+  return Math.round(Math.min(base * (0.8 + 0.4 * random()), RETRY_MAX_MS))
 }
 
 let flushing = false
@@ -392,52 +441,75 @@ let flushRequested = false
 // Bumped by clearOutbox so a drain that is already running stops.
 let generation = 0
 
+// One timer for the next automatic replay after a retryable failure.
+let retryTimer: ReturnType<typeof setTimeout> | null = null
+
+function cancelRetry() {
+  if (retryTimer) clearTimeout(retryTimer)
+  retryTimer = null
+}
+
+function scheduleRetry(at: number) {
+  cancelRetry()
+  retryTimer = setTimeout(() => { retryTimer = null; void flushOutbox() }, Math.max(0, at - Date.now()))
+}
+
 async function drainEntry(e: OutboxEntry): Promise<DrainOutcome> {
   if (e.kind === 'insert' && e.table && e.row) {
-    const { error } = await db
+    const { error, status } = await db
       .from(e.table)
       .upsert(e.row, { onConflict: 'id', ignoreDuplicates: true })
-    return outcomeFor(error)
+    return drainOutcome(error, status)
   }
   if (e.kind === 'update' && e.table && e.match && e.patch) {
-    const { data, error } = await orderedUpdate(e.table, e.match, () =>
-      db.from(e.table).update(e.patch).match(e.match).select('id')) as { data: unknown; error: unknown }
+    const { data, error, status } = await orderedUpdate(e.table, e.match, () =>
+      db.from(e.table).update(e.patch).match(e.match).select('id')) as { data: unknown; error: unknown; status?: number }
     if (!error && (!Array.isArray(data) || data.length === 0)) return 'dropped'
-    return outcomeFor(error)
+    return drainOutcome(error, status)
   }
   if (e.kind === 'photo' && e.bucket && e.path && e.blob && e.row) {
     const { error: upErr } = await supabase.storage
       .from(e.bucket)
       .upload(e.path, e.blob, { upsert: true, contentType: e.contentType || 'image/jpeg' })
     if (upErr) {
-      // Network failure → keep the entry and retry on the next trigger.
-      if (isNetworkError(upErr)) return 'retry'
-      // Non-network failure (413 too large / RLS / missing bucket): the
+      // No signal, a busy server or an expired token: keep the entry,
+      // image included, and try again later.
+      const outcome = drainOutcome(upErr)
+      if (outcome !== 'dropped') return outcome
+      // A real refusal (413 too large / RLS / missing bucket): the
       // object never landed, so DON'T write the fh_job_files row, that
       // would orphan a DB row pointing at storage that doesn't exist.
-      // Treat as permanent (like the insert branch): drop the entry.
       console.warn('[fieldhorse] outbox photo upload failed permanently, dropping entry', upErr)
       return 'dropped'
     }
     // Upload succeeded ("already exists" upsert conflicts count as
     // success), only NOW write the DB row that points at the object.
-    const { error } = await db
+    const { error, status } = await db
       .from('fh_job_files')
       .upsert(e.row, { onConflict: 'id', ignoreDuplicates: true })
-    return outcomeFor(error)
+    return drainOutcome(error, status)
   }
   return 'dropped' // unknown/corrupt entry, it can never drain
 }
 
-export type DrainResult = { synced: OutboxEntry[]; dropped: OutboxEntry[] }
+export type DrainResult = {
+  synced: OutboxEntry[]
+  dropped: OutboxEntry[]
+  /** When the entry the drain stopped at may be replayed again, if it waits. */
+  retryAt: number | null
+}
 
 /**
  * Drain entries oldest first for one user. The effects are injected so
  * the bookkeeping can be tested without IndexedDB or a network:
  *   ok      → removed, counted as synced
  *   dropped → removed (it can never land), reported, not counted
- *   retry   → stop here, still offline; the rest waits for next time
- * Entries that belong to another user are skipped and left in place.
+ *   retry   → kept with one more attempt and a later retryAfter (saved
+ *             through `reschedule`); stop here, the rest waits behind it
+ *   signin  → kept as it is; stop here until the person signs in again
+ * An entry still inside its wait stops the drain too, unless
+ * ignoreBackoff (the connection just came back). Entries that belong to
+ * another user are skipped and left in place.
  */
 export async function drainQueue(
   entries: OutboxEntry[],
@@ -445,26 +517,42 @@ export async function drainQueue(
   deps: {
     drain: (e: OutboxEntry) => Promise<DrainOutcome>
     remove: (key: string) => Promise<void>
+    reschedule?: (e: OutboxEntry) => Promise<void>
     cancelled?: () => boolean
+    ignoreBackoff?: boolean
+    now?: () => number
   }
 ): Promise<DrainResult> {
+  const now = deps.now ?? Date.now
   const synced: OutboxEntry[] = []
   const dropped: OutboxEntry[] = []
+  let retryAt: number | null = null
   for (const e of entries) {
     if (deps.cancelled?.()) break
     if (!belongsToUser(e, userId)) continue
+    if (!deps.ignoreBackoff && typeof e.retryAfter === 'number' && e.retryAfter > now()) {
+      retryAt = e.retryAfter
+      break
+    }
     let outcome: DrainOutcome
     try {
       outcome = await deps.drain(e)
     } catch (err) {
-      outcome = isNetworkError(err) ? 'retry' : 'dropped'
+      outcome = drainOutcome(err)
     }
-    if (outcome === 'retry') break
+    if (outcome === 'signin') break
+    if (outcome === 'retry') {
+      const attempts = (e.attempts || 0) + 1
+      const next = { ...e, attempts, retryAfter: now() + retryDelayMs(attempts) }
+      if (!deps.cancelled?.()) await deps.reschedule?.(next)
+      retryAt = next.retryAfter
+      break
+    }
     await deps.remove(e.key)
     if (outcome === 'ok') synced.push(e)
     else dropped.push(e)
   }
-  return { synced, dropped }
+  return { synced, dropped, retryAt }
 }
 
 const ITEM_LABELS: Record<string, [string, string]> = {
@@ -505,16 +593,24 @@ export function describeDropped(dropped: OutboxEntry[]): { title: string; descri
   }
 }
 
+async function rescheduleEntry(e: OutboxEntry) {
+  try {
+    await store.put(e)
+  } catch { /* IDB unavailable: the entry keeps its old wait */ }
+}
+
 /**
  * Drain the signed in user's queue oldest-first. Stops at the first
- * network failure. Returns how many entries actually landed.
+ * failure a retry may fix, and schedules that retry. Pass ignoreBackoff
+ * when the connection has just come back, to replay without waiting.
+ * Returns how many entries actually landed.
  */
-export async function flushOutbox(): Promise<number> {
+export async function flushOutbox(opts: { ignoreBackoff?: boolean } = {}): Promise<number> {
   if (flushing) { flushRequested = true; return 0 }
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return 0
   flushing = true
   const startGeneration = generation
-  let result: DrainResult = { synced: [], dropped: [] }
+  let result: DrainResult = { synced: [], dropped: [], retryAt: null }
   try {
     // Every tab focus lands here; an empty queue needs no session read
     // and no getAll() of queued blobs.
@@ -525,8 +621,11 @@ export async function flushOutbox(): Promise<number> {
     result = await drainQueue(await allEntries(), userId, {
       drain: drainEntry,
       remove: deleteEntry,
+      reschedule: rescheduleEntry,
       cancelled: () => generation !== startGeneration,
+      ignoreBackoff: opts.ignoreBackoff,
     })
+    if (result.retryAt !== null && generation === startGeneration) scheduleRetry(result.retryAt)
   } finally {
     flushing = false
     emit()
@@ -569,7 +668,8 @@ export async function flushOutbox(): Promise<number> {
 
 /** Wire global flush triggers. Call once at app start. Returns cleanup. */
 export function startOutboxSync(): () => void {
-  const onOnline = () => { void flushOutbox() }
+  // Back online: replay now, whatever wait a failure in the dead zone set.
+  const onOnline = () => { void flushOutbox({ ignoreBackoff: true }) }
   const onVisible = () => {
     if (document.visibilityState === 'visible') void flushOutbox()
   }

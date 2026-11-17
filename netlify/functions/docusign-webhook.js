@@ -23,6 +23,7 @@
 
 import crypto from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
+import { supabaseServiceConfig } from './lib/serviceConfig.js'
 import { brandingUserIdFor } from './lib/orgAccess.js'
 import { proposalNumber } from './lib/docNumbers.js'
 import { alertLinkRecipients } from './lib/linkAlerts.js'
@@ -311,8 +312,7 @@ async function recordDocusignQuoteApproval(supabase, env, envelopeId, now) {
 export default async (request) => {
   if (request.method !== 'POST') return new Response('method_not_allowed', { status: 405 })
 
-  const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-  const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const { url: SUPABASE_URL, secretKey: SERVICE_KEY } = supabaseServiceConfig()
   if (!SUPABASE_URL || !SERVICE_KEY) return new Response('server_misconfigured', { status: 500 })
 
   const raw = await request.text()

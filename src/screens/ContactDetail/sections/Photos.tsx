@@ -14,7 +14,7 @@ import type { SignedUrl } from '../../../lib/signedUrls.ts'
 import { compressImageToBlob, compressImageToDataUrl, captionPhoto } from '../../../lib/docIntelligence.ts'
 import { toastError, toastSuccess } from '../../../lib/toast.ts'
 import { hapticTap, hapticSuccess } from '../../../lib/haptics.ts'
-import { queuePhoto, isNetworkError } from '../../../lib/outbox.ts'
+import { queuePhoto, drainOutcome } from '../../../lib/outbox.ts'
 import { SkeletonList } from '../../../components/Skeleton.tsx'
 import DataErrorState from '../../../components/DataErrorState.tsx'
 import LoadingValue from '../../../components/LoadingValue.tsx'
@@ -194,6 +194,8 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
     setUploadProgress({ current: 1, total: files.length })
     const newPhotoIds: any[] = []
     let queuedCount = 0
+    // Photos the server refused for good. The rest of the batch still goes.
+    const failedNames: string[] = []
     try {
       for (const [index, file] of files.entries()) {
         setUploadProgress({ current: index + 1, total: files.length })
@@ -226,27 +228,40 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
           kind: 'photo'
         }
         // Dead-zone path: park the compressed blob + row in the outbox
-        // (IndexedDB) and move on, it uploads when signal returns.
-        if (navigator.onLine === false) {
+        // (IndexedDB) and move on, it uploads when signal returns. The
+        // outbox replays the upload and the row together, and both are
+        // safe to repeat, so a photo whose image is already up queues too.
+        const queue = async () => {
           const ok = await queuePhoto({ bucket: BUCKET, path, blob: uploadBlob, contentType: 'image/jpeg', row })
           if (ok) queuedCount += 1
           else toastError("Couldn't save offline", `${file.name}: offline storage is full`)
+        }
+        if (navigator.onLine === false) {
+          await queue()
           continue
         }
+        // Lost signal, a busy server or an expired sign in: a retry can
+        // land it, so it waits in the outbox (lib/outbox.ts, drainOutcome).
         const { error: upErr } = await supabase.storage
           .from(BUCKET)
           .upload(path, uploadBlob, { upsert: false, contentType: 'image/jpeg' })
         if (upErr) {
-          if (isNetworkError(upErr)) {
-            const ok = await queuePhoto({ bucket: BUCKET, path, blob: uploadBlob, contentType: 'image/jpeg', row })
-            if (ok) queuedCount += 1
-            else toastError("Couldn't save offline", `${file.name}: offline storage is full`)
-            continue
-          }
-          throw upErr
+          if (drainOutcome(upErr) !== 'dropped') await queue()
+          else failedNames.push(file.name)
+          continue
         }
-        const { error: insErr } = await supabase.from('fh_job_files').insert(row)
-        if (insErr) throw insErr
+        const { error: insErr, status: insStatus } = await supabase.from('fh_job_files').insert(row)
+        if (insErr) {
+          if (drainOutcome(insErr, insStatus) !== 'dropped') {
+            await queue()
+          } else {
+            // Refused for good: take the image back down so nothing is
+            // left in storage with no photo row pointing at it.
+            void supabase.storage.from(BUCKET).remove([path]).catch(() => {})
+            failedNames.push(file.name)
+          }
+          continue
+        }
         newPhotoIds.push({ id: rowId, file: uploadBlob })
       }
       hapticSuccess()
@@ -255,6 +270,11 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
       }
       if (newPhotoIds.length > 0) {
         toastSuccess(`${countNoun(newPhotoIds.length, 'Photo')} uploaded`, `Added ${newPhotoIds.length}`)
+      }
+      if (failedNames.length > 0) {
+        const n = failedNames.length
+        const names = n > 1 ? `${failedNames.slice(0, -1).join(', ')} and ${failedNames[n - 1]}` : failedNames[0]
+        toastError(`${n} photo${n === 1 ? '' : 's'} didn't upload`, `${names}. Add ${n === 1 ? 'it' : 'them'} again to try once more.`)
       }
       await fetchRows()
       refreshJobPhotos()

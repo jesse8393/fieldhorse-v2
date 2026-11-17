@@ -12,10 +12,15 @@
 // never posts as a note under another on a shared device. A capture taken
 // with the sheet open on a job keeps that job, and its note lands on the
 // job (contact_id), as it would have online.
+//
+// Each capture carries the id its note is saved under. A flush whose answer
+// is lost keeps the capture queued; the next flush sends the same id, and a
+// duplicate key answer means the note is already there (DATA-12).
 
 import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from './supabase.ts'
+import { createUuid } from './uuid.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { toastSuccess } from './toast.ts'
 
@@ -25,8 +30,9 @@ const MAX_ITEMS = 100
 // user_id is missing on captures queued before tagging existed; those
 // go to whoever flushes, as they always did. job_id is missing on
 // captures taken with no job, and on any queued before jobs were kept;
-// those land as notes on no job, as they always did.
-type OutboxItem = { text: string; captured_at: string; user_id?: string | null; job_id?: string | null }
+// those land as notes on no job, as they always did. id is missing on
+// captures queued before ids were kept; a flush gives them one.
+type OutboxItem = { id?: string; text: string; captured_at: string; user_id?: string | null; job_id?: string | null }
 
 function read(): OutboxItem[] {
   try {
@@ -59,6 +65,8 @@ function jobOf(item: OutboxItem): string | null {
 // Postgres foreign key violation: the job was deleted while the capture
 // waited in the queue.
 const MISSING_JOB = '23503'
+// Postgres unique violation: a note with this id is already saved.
+const ALREADY_SAVED = '23505'
 
 // Callers that don't pass a user id get the capture tagged from the
 // stored session as soon as it has been read.
@@ -94,6 +102,7 @@ export function pushOutbox(text: string, userId?: string | null, jobId?: string 
   if (items.length >= MAX_ITEMS) return false
   const capturedAt = new Date().toISOString()
   const ok = write([...items, {
+    id: createUuid(),
     text: t,
     captured_at: capturedAt,
     ...(userId ? { user_id: userId } : {}),
@@ -133,6 +142,13 @@ export async function flushOutbox(userId: string): Promise<number> {
   const keep: OutboxItem[] = []
   let synced = 0
   try {
+    // A capture queued before ids were kept gets its id now, stored before
+    // the first try, so every try of its note is the same row.
+    let minted = false
+    for (const item of items) {
+      if (belongsTo(item, userId) && !item.id) { item.id = createUuid(); minted = true }
+    }
+    if (minted) write(items)
     for (const item of items) {
       // Cleared mid drain (sign out): stop and write nothing back.
       if (generation !== startGeneration) return synced
@@ -144,7 +160,7 @@ export async function flushOutbox(userId: string): Promise<number> {
       const stamp = Number.isNaN(when.getTime())
         ? ''
         : ` (captured offline ${when.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })})`
-      const note = { user_id: userId, contact_id: jobOf(item), text: `${item.text}${stamp}`, category: 'note' }
+      const note = { id: item.id, user_id: userId, contact_id: jobOf(item), text: `${item.text}${stamp}`, category: 'note' }
       let landed = false
       try {
         let { error } = await supabase.from('fh_notes').insert(note)
@@ -153,7 +169,8 @@ export async function flushOutbox(userId: string): Promise<number> {
         if (error?.code === MISSING_JOB && note.contact_id) {
           ({ error } = await supabase.from('fh_notes').insert({ ...note, contact_id: null }))
         }
-        landed = !error
+        // Already saved: an earlier flush landed it and its answer was lost.
+        landed = !error || error.code === ALREADY_SAVED
       } catch { /* transport failure: keep it queued */ }
       if (landed) synced += 1
       else keep.push(item)

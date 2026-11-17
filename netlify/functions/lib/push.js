@@ -30,13 +30,34 @@ async function loadVapid(supabase) {
   return true
 }
 
+// Pushes carry customer names, so they go only to people still in the
+// company. `orgId` is the company the alert is about; with none (a record
+// from before companies existed) the user must still be in some company.
+// A failed lookup sends nothing rather than risk reaching someone who left.
+async function isActiveMember(supabase, userId, orgId) {
+  let query = supabase.from('org_members').select('org_id').eq('user_id', userId).is('revoked_at', null)
+  if (orgId) query = query.eq('org_id', orgId)
+  const { data, error } = await query.limit(1)
+  if (error) {
+    console.warn('[push] membership lookup failed, not sending', error)
+    return false
+  }
+  return (data || []).length > 0
+}
+
 /**
  * Push { title, body, link, tag? } to every device the user has
- * subscribed. Never throws. `supabase` must be a service-role client.
+ * subscribed, while they are an active member of `orgId`. Never throws.
+ * `supabase` must be a service-role client.
+ * @param {any} supabase
+ * @param {string | null | undefined} userId
+ * @param {{ title?: string, body?: string, link?: string, tag?: string }} payload
+ * @param {{ orgId?: string | null }} [options]
  */
-export async function sendPushToUser(supabase, userId, payload) {
+export async function sendPushToUser(supabase, userId, payload, { orgId = null } = {}) {
   try {
     if (!userId) return
+    if (!(await isActiveMember(supabase, userId, orgId))) return
     if (!(await loadVapid(supabase))) return
     const { data: subs } = await supabase
       .from('fh_push_subscriptions')

@@ -130,7 +130,7 @@ export default function Login() {
 
   return (
     <AuthShell labelledBy="fh-login-title">
-      <h1 id="fh-login-title" className="fha-line">Run every job like a captain.</h1>
+      <h1 id="fh-login-title" className="fha-line">{isSignIn ? 'Sign in' : 'Create a workspace'}</h1>
 
       <form className="fha-form" onSubmit={onSubmit} noValidate>
         {!isSupabaseConfigured && (

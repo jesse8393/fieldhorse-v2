@@ -62,11 +62,29 @@ export function useDraft<T extends Record<string, unknown>>(kind: string, initia
     return draft ? { ...initial, ...draft } : initial
   })
   const saved = useRef(false)
+  // The change the timer below has not written yet. Leaving the screen, or
+  // the page going away, writes it at once, so the last words typed before
+  // Back or a reload are kept (D23).
+  const pending = useRef<{ kind: string; form: T } | null>(null)
   useEffect(() => {
     if (saved.current) return
-    const t = setTimeout(() => writeDraft(kind, form), 400)
+    pending.current = { kind, form }
+    const t = setTimeout(() => { pending.current = null; writeDraft(kind, form) }, 400)
     return () => clearTimeout(t)
   }, [kind, form])
+  useEffect(() => {
+    function flush() {
+      const last = pending.current
+      pending.current = null
+      if (last && !saved.current) writeDraft(last.kind, last.form)
+    }
+    // A reload or a closed tab never unmounts the screen.
+    window.addEventListener('pagehide', flush)
+    return () => {
+      window.removeEventListener('pagehide', flush)
+      flush()
+    }
+  }, [])
   function set<K extends keyof T>(key: K, value: T[K]) {
     setForm((f) => ({ ...f, [key]: value }))
   }

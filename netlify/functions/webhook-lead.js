@@ -15,6 +15,7 @@
 //   SUPABASE_SERVICE_ROLE_KEY  (service-role, server-only)
 
 import { createClient } from '@supabase/supabase-js'
+import { supabaseServiceConfig } from './lib/serviceConfig.js'
 import { createHash } from 'node:crypto'
 import { sendPushToUser } from './lib/push.js'
 import { logError, requestId } from './lib/logError.js'
@@ -55,8 +56,7 @@ export default async (request, context) => {
     return json({ error: 'missing_key' }, 401)
   }
 
-  const supaUrl = process.env.SUPABASE_URL
-  const supaKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const { url: supaUrl, secretKey: supaKey } = supabaseServiceConfig()
   if (!supaUrl || !supaKey) {
     return json({ error: 'server_misconfigured' }, 500)
   }
@@ -221,7 +221,7 @@ export default async (request, context) => {
       body,
       link: newId ? `/leads/${newId}` : '/leads',
       tag: `new-lead-${newId || person.name}`
-    }))
+    }, { orgId }))
     .then(() => undefined)
     .catch((e) => { console.warn('[webhook-lead] push failed', e) })
   if (typeof context?.waitUntil === 'function') context.waitUntil(push)

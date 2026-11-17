@@ -1,11 +1,13 @@
 import { lazy, Suspense, useState, useMemo, useEffect, useRef } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { XCircle, ArrowRight } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useMembership } from '../../contexts/MembershipContext.tsx'
 import { supabase } from '../../lib/supabase.ts'
 import { reopen, reopenQuestion } from '../../lib/pipeline.ts'
 import { newRecordRoute, recordRoute } from '../../lib/records.ts'
+import { contractTotals, fetchInvoicesForContact } from '../../lib/invoices.ts'
 import { stageColor, margin, isMovedStage } from '../../lib/stages.ts'
 import { MovedRecordRedirect } from '../../components/MovedRecordRedirect.tsx'
 import { toastSuccess, toastError } from '../../lib/toast.ts'
@@ -38,6 +40,7 @@ import { useIsDesktop } from '../../lib/useMediaQuery.ts'
 import { useHideDock } from '../../lib/dockVisibility.ts'
 import { openCapture } from '../../lib/captureAttach.ts'
 import { jobMoney } from './lib/spine.ts'
+import { money } from './lib/format.ts'
 import { assignedCrewIds, railNotes } from './lib/jobDesktop.ts'
 import JobHeaderPhone, { JobSectionTabs } from './phone/JobHeaderPhone.tsx'
 import JobActionCapsule from './phone/JobActionCapsule.tsx'
@@ -141,12 +144,6 @@ function readJobActionIntent(raw: string | null): JobActionIntent | null {
   return Object.prototype.hasOwnProperty.call(JOB_ACTION_INTENTS, raw)
     ? (raw as JobActionIntent)
     : null
-}
-
-function money(n: any) {
-  return Number(n || 0).toLocaleString(undefined, {
-    style: 'currency', currency: 'USD', maximumFractionDigits: 0
-  })
 }
 
 function ActionIntentBanner({
@@ -274,6 +271,20 @@ export default function ContactDetail() {
   // invited to (RLS would refuse the delete anyway).
   const canDeleteJob = !membership.loading && membership.canBillOrDelete
     && (!contact?.org_id || contact.org_id === membership.orgId)
+  // The job's invoices, for what is left to invoice (OPS-19). Under the
+  // job's own key, so whatever refreshes the job (a payment, a draw) reads
+  // them again, and read on every open, since a new invoice is made on
+  // its own screen. Unknown until they land, which keeps Invoice this.
+  const { data: jobInvoices } = useQuery({
+    queryKey: ['jobDetail', id, 'invoices'],
+    enabled: !!id && canMoveMoney,
+    staleTime: 0,
+    queryFn: async () => {
+      const { data: rows, error } = await fetchInvoicesForContact(id as string)
+      if (error) throw error
+      return rows
+    }
+  })
   const routeHome = location.pathname.startsWith('/leads')
     ? '/leads'
     : location.pathname.startsWith('/quotes')
@@ -511,11 +522,15 @@ export default function ContactDetail() {
     await fetchAll()
   }
 
-  // The one gold action (SPEC D61): Invoice this while money is owed,
-  // Mark complete once the balance is collected, Reopen on a closed or
-  // lost job. Every one is a billing or pipeline move, so field roles get
-  // none.
-  const cta = canMoveMoney ? stageCtaFor(contact.stage, balance) : null
+  // The one gold action (SPEC D61): Invoice this while money is owed and
+  // part of the contract is still to invoice, Mark complete once the
+  // balance is collected or everything is invoiced (OPS-19), Reopen on a
+  // closed or lost job. Every one is a billing or pipeline move, so field
+  // roles get none.
+  const unbilled = jobInvoices
+    ? contractTotals({ contact, payments, changeOrders, invoices: jobInvoices }).unbilled
+    : null
+  const cta = canMoveMoney ? stageCtaFor(contact.stage, balance, unbilled) : null
   const stageCta: { label: string; onClick: () => void; hint?: string } | null = cta
     ? {
         label: cta.action === 'reopen' && reopenTap.armed ? 'Tap again to reopen' : cta.label,

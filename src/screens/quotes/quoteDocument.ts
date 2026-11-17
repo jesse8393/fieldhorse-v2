@@ -36,7 +36,7 @@ export type Company = {
   warranty_default: string
 }
 
-/** The company block the proposal prints, from the profile. */
+/** The company block the proposal prints, from the profile of the quote's company (useDocumentProfile). */
 export function companyFromProfile(profile: any): Company {
   return {
     name: profile?.company_name || profile?.full_name || 'My Company',

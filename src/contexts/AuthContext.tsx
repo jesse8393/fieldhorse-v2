@@ -10,6 +10,7 @@ import { flushOutbox as flushCaptureOutbox, clearCaptureOutbox } from '../lib/ca
 import { disablePush, unsubscribePushLocally } from '../lib/push.ts'
 import { toastError } from '../lib/toast.ts'
 import { createAuthSessionBoundary } from '../lib/authSessionBoundary.ts'
+import type { CacheOwnerStore, PurgeScope } from '../lib/authSessionBoundary.ts'
 
 // How long sign out waits for queued offline work to sync, and for this
 // device's push subscription to be removed, before carrying on.
@@ -50,22 +51,51 @@ function clearUserStorage() {
 // Sign-out must also purge the local data stores, or the next person on
 // a shared device inherits the whole book (ultrareview): the persisted
 // TanStack cache (IndexedDB, jobs/leads/clients with names, phones,
-// amounts), both offline outboxes (queued rows, photos and captured
-// notes would otherwise replay under the next account), the per user
-// keys above, and this device's push subscription. Best-effort: storage
-// failures must never block the sign-out itself.
-async function purgeLocalData() {
+// amounts), the per user keys above, and this device's push
+// subscription. Both offline outboxes (queued rows, photos and captured
+// notes) are cleared only when the person chose to sign out; when the
+// session ended on its own or another account arrived, they stay tagged
+// with their owner and sync when that person signs in again (see
+// PurgeScope). Best-effort: storage failures must never block the
+// sign-out itself.
+async function purgeLocalData({ queuedWork }: PurgeScope) {
   // Forget the workspace first (synchronously, before any await) so no
   // request made from here on names the signed out account's org.
   setActiveOrgId(null)
   setOrgApiOrgId(null)
   try { queryClient.clear() } catch { /* non-fatal */ }
   try { await idbDel('fh-query-cache') } catch { /* non-fatal */ }
-  try { await clearOutbox() } catch { /* non-fatal */ }
-  try { clearCaptureOutbox() } catch { /* non-fatal */ }
+  if (queuedWork) {
+    try { await clearOutbox() } catch { /* non-fatal */ }
+    try { clearCaptureOutbox() } catch { /* non-fatal */ }
+  }
   clearUserStorage()
   await settleWithin(unsubscribePushLocally(), SIGN_OUT_PUSH_MS)
 }
+
+// Who the saved book on this device belongs to, across page loads, so a
+// session that arrives from another account's email link purges it
+// before anything is shown (lib/authSessionBoundary.ts). Not a per user
+// key: it must outlive the purge it guards.
+const CACHE_OWNER_KEY = 'fh:cacheOwner'
+const cacheOwner: CacheOwnerStore = {
+  read: () => {
+    try { return window.localStorage.getItem(CACHE_OWNER_KEY) } catch { return null }
+  },
+  write: (userId) => {
+    try {
+      if (userId) window.localStorage.setItem(CACHE_OWNER_KEY, userId)
+      else window.localStorage.removeItem(CACHE_OWNER_KEY)
+    } catch { /* storage blocked: nothing was saved for anyone either */ }
+  },
+}
+
+let markSessionSettled: () => void = () => {}
+/**
+ * Settles once the first session of this page load is published, after
+ * any purge it needed. main.tsx reads the saved query cache only then.
+ */
+export const sessionSettled = new Promise<void>((resolve) => { markSessionSettled = resolve })
 
 type AuthContextValue = {
   session: Session | null
@@ -91,7 +121,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const boundary = createAuthSessionBoundary<Session>({
       purge: purgeLocalData,
       hold: () => { setSession(null); setLoading(true) },
-      publish: (next) => { setSession(next); setLoading(false) },
+      publish: (next) => { setSession(next); setLoading(false); markSessionSettled() },
+      owner: cacheOwner,
     })
     boundaryRef.current = boundary
     void boundary.restore(supabase.auth.getSession()
@@ -129,10 +160,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userId = session?.user?.id
       const online = typeof navigator === 'undefined' || navigator.onLine !== false
       // 1. Give queued offline work a moment to land while this session
-      //    can still write it.
+      //    can still write it, without waiting out any retry backoff.
       await settleWithin(
         Promise.allSettled([
-          flushOutbox(),
+          flushOutbox({ ignoreBackoff: true }),
           userId && online ? flushCaptureOutbox(userId) : Promise.resolve(0)
         ]),
         SIGN_OUT_FLUSH_MS
@@ -145,12 +176,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // 3. Sign out this device only. The default (global) scope would
       //    also end the user's sessions on every other device.
       let res: { error: any }
+      const cancelChosenSignOut = boundaryRef.current?.chosenSignOut()
       try {
         res = await supabase.auth.signOut({ scope: 'local' })
       } catch (error) {
         res = { error }
       }
       if (res.error) {
+        cancelChosenSignOut?.()
         // auth-js keeps the session when the logout request fails (no
         // signal), so the user is still signed in. Keep their cached
         // book and queued offline work rather than wiping it.

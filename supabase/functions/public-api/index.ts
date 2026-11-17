@@ -5,7 +5,8 @@
 //   POST {FUNCTIONS_URL}/public-api/booking/{orgKey}/{typeKey}          {start, name, phone, email, address, notes, sms_consent}
 //   POST {FUNCTIONS_URL}/public-api/booking/cancel/{manageToken}
 //   GET  {FUNCTIONS_URL}/public-api/r/{trackKey}                        review link redirect
-//   GET  {FUNCTIONS_URL}/public-api/u/{emailThreadToken}                email unsubscribe
+//   GET  {FUNCTIONS_URL}/public-api/u/{emailThreadToken}                email unsubscribe confirm page (changes nothing)
+//   POST {FUNCTIONS_URL}/public-api/u/{emailThreadToken}                email unsubscribe
 //   POST {FUNCTIONS_URL}/public-api/webchat/{orgKey}                    {name, phone, email, message, visitor_id}
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { admin, readBody, json, text, rpc, log, sha256hex, clientIp, CORS, e164, tick } from "./lib.ts";
@@ -85,13 +86,16 @@ Deno.serve(async (req: Request) => {
       return new Response(null, { status: 302, headers: { Location: target } });
     }
 
+    // Opening the link only shows a button: mail scanners and link previews
+    // open every link in an email, so a GET must change nothing. The button
+    // (and a mail app's one click unsubscribe) POSTs to the same address.
     if (seg[0] === "u" && seg[1] && req.method === "GET") {
+      return unsubscribePage("Unsubscribe from marketing email?", "You will stop getting marketing email from us. Replies about your active project still reach us.", true);
+    }
+    if (seg[0] === "u" && seg[1] && req.method === "POST") {
       const { data: conv } = await db.from("fh_conversations").select("org_id, client_id").eq("email_thread_token", seg[1]).maybeSingle();
       if (conv) await rpc(db, "fh_consent_set", { p_org_id: conv.org_id, p_client_id: conv.client_id, p_channel: "email", p_status: "opted_out", p_source: "unsubscribe_link" });
-      const page = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Unsubscribed</title>
-<style>body{font-family:system-ui,sans-serif;background:#F2EDE4;color:#141414;display:grid;place-items:center;min-height:100vh;margin:0}main{background:#fff;padding:40px;border-radius:16px;max-width:420px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.08)}h1{font-size:22px;margin:0 0 8px}p{color:#5C5C5C;margin:0}</style></head>
-<body><main><h1>You are unsubscribed</h1><p>${conv ? "You will not receive marketing email from us. Replies about your active project still reach us." : "This link has already been used."}</p></main></body></html>`;
-      return new Response(page, { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } });
+      return unsubscribePage("You are unsubscribed", conv ? "You will not receive marketing email from us. Replies about your active project still reach us." : "This link has already been used.", false);
     }
 
     if (seg[0] === "webchat" && seg[1] && req.method === "POST") {
@@ -122,7 +126,20 @@ Deno.serve(async (req: Request) => {
   } catch (e) {
     const msg = (e as Error).message ?? "error";
     log("public-api", "error", { path: url.pathname, msg });
+    // The caller gets a fixed message; the database text stays in the log.
     const status = /unknown org|unknown form|unknown booking|not found/.test(msg) ? 404 : /required|invalid|slot no longer/.test(msg) ? 400 : 500;
-    return json({ ok: false, error: msg.replace(/^fh_\w+: /, "") }, status);
+    const error = status === 404 ? "not found"
+      : /slot no longer/.test(msg) ? "That time is no longer available."
+      : /phone or email required/.test(msg) ? "A phone number or email is required."
+      : status === 400 ? "Please check the details and try again."
+      : "Something went wrong. Please try again.";
+    return json({ ok: false, error }, status);
   }
 });
+
+function unsubscribePage(heading: string, message: string, confirm: boolean): Response {
+  const page = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Unsubscribe</title>
+<style>body{font-family:system-ui,sans-serif;background:#F2EDE4;color:#141414;display:grid;place-items:center;min-height:100vh;margin:0}main{background:#fff;padding:40px;border-radius:16px;max-width:420px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.08)}h1{font-size:22px;margin:0 0 8px}p{color:#5C5C5C;margin:0}button{margin-top:24px;font:inherit;font-weight:600;padding:12px 24px;border:0;border-radius:10px;background:#141414;color:#fff;cursor:pointer}</style></head>
+<body><main><h1>${heading}</h1><p>${message}</p>${confirm ? `<form method="post"><button type="submit">Unsubscribe</button></form>` : ""}</main></body></html>`;
+  return new Response(page, { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } });
+}

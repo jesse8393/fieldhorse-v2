@@ -61,7 +61,9 @@ function payment(partial: Record<string, unknown>) {
 }
 
 const CONTACTS = [
-  contact({ id: 'c-rosa', stage: 'job', name: 'Rosa Delgado', email: 'rosa@example.com', job_title: 'Concrete steps', amount: 8000 }),
+  // Rosa's job is linked to her own client record, which is where an
+  // invoice's email comes from (DATA-05).
+  contact({ id: 'c-rosa', stage: 'job', name: 'Rosa Delgado', email: 'rosa@example.com', job_title: 'Concrete steps', amount: 8000, fh_clients: { ...CLIENT, name: 'Rosa Delgado', email: 'rosa@example.com' } }),
   contact({ id: 'c-lorraine', stage: 'job', name: 'Lorraine Beasley', job_title: 'Bath retile', amount: 9000 }),
   contact({ id: 'c-gail', stage: 'job', name: 'Gail Abernathy', job_title: 'Roof repair', amount: 6000 }),
   contact({ id: 'c-darnell', stage: 'closed', name: 'Darnell Whitcomb', job_title: 'Garage slab', amount: 9600, cost: 6960, completed_at: '2026-09-29T12:00:00Z' }),
@@ -295,7 +297,7 @@ async function remindTwoQuickly(page: Page, sends: HeldSend[]) {
   // Then Lorraine's: her screen leaves once the email is out.
   sends[1].release()
   await expect(moneyHeading(page)).toBeVisible({ timeout: 15_000 })
-  await expect(page.getByText('Reminder sent to x@y.com', { exact: false }).first()).toBeVisible()
+  await expect(page.getByText('Reminder sent to jeff@roy.com', { exact: false }).first()).toBeVisible()
   await page.waitForTimeout(800)
   expect(sends).toHaveLength(2)
 }
@@ -641,7 +643,7 @@ async function otherScreenSettlesWhenTheEmailLands(page: Page, phone: boolean, s
   await openInvoiceRow(page, 'Overdue', /^Lorraine Beasley/, 'i-lorraine')
   const lorraineResend = page.getByRole('button', { name: 'Resend', exact: true })
   await tapThroughTheLanding(page, phone, lorraineResend, sends[1], false)
-  await expect(page.getByText('Reminder sent to x@y.com', { exact: false }).first()).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByText('Reminder sent to jeff@roy.com', { exact: false }).first()).toBeVisible({ timeout: 15_000 })
   await page.waitForTimeout(1_000)
   expect(sends.map((s) => s.contact)).toEqual(['c-rosa', 'c-lorraine'])
 }
@@ -1063,7 +1065,7 @@ test.describe('money on a phone', () => {
     await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(1)
     await expect(page.getByText('Invoice sent to', { exact: false }).first()).toBeVisible({ timeout: 15_000 })
     await expect(resend).not.toHaveAttribute('aria-busy', 'true')
-    expect(JSON.parse(sends[0]).recipient_email).toBe('x@y.com')
+    expect(JSON.parse(sends[0]).recipient_email).toBe('jeff@roy.com')
     await page.waitForTimeout(800)
     expect(sends).toHaveLength(1)
   })
@@ -1598,4 +1600,19 @@ test('each contract balance link names its age bucket', async ({ context, page }
   const names = await links.evaluateAll(els => els.map(el => el.getAttribute('aria-label') || (el as HTMLElement).innerText))
   expect(new Set(names).size, names.join(' | ')).toBe(3)
   expect(names[1]).toMatch(/^31 to 60 days, \$/)
+})
+
+// M-15: Tracked margin measures a job against its contract with its
+// approved change orders. Darnell's $9,600.00 slab with a $2,400.00
+// approved change order is a $12,000.00 contract; $6,960.00 of cost is a
+// 42.0% margin, not 27.5%. The sent change order does not count.
+test('tracked margin counts an approved change order', async ({ context, page }) => {
+  await openMoney(context, page, { tables: { fh_change_orders: [
+    { id: 'co-1', user_id: 'qa-user-1', contact_id: 'c-darnell', sequence_number: 1, title: 'Thicker slab', amount: 2400, status: 'approved', created_at: '2026-09-20T12:00:00Z' },
+    { id: 'co-2', user_id: 'qa-user-1', contact_id: 'c-darnell', sequence_number: 2, title: 'Sealer', amount: 900, status: 'sent', created_at: '2026-09-21T12:00:00Z' }
+  ] } })
+  const vault = page.locator('.fhc-vault')
+  await expect(vault.getByText('Tracked margin', { exact: true })).toBeVisible()
+  await expect(vault.getByText('42.0%', { exact: true })).toBeVisible()
+  await expect(vault.getByText('27.5%', { exact: true })).toHaveCount(0)
 })
