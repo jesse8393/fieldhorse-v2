@@ -50,8 +50,11 @@ export default function Work() {
   const [search, setSearchState] = useState(() => searchParams.get('q') ?? '')
   const setSearch = useCallback((value: string) => {
     setSearchState(value)
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev)
+    // From the address as it is now, not as this screen last drew it: a sort
+    // or the lost switch written a moment ago may not be drawn yet, and
+    // starting from the drawn address would drop it.
+    setSearchParams(() => {
+      const next = new URLSearchParams(window.location.search)
       if (value) next.set('q', value)
       else next.delete('q')
       return next

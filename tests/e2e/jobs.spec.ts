@@ -173,3 +173,31 @@ test('the Jobs list keeps its search, sort and lost switch on reload and Back', 
   await expect(page.getByRole('heading', { level: 1, name: 'Jobs' })).toBeVisible({ timeout: 30_000 })
   await check()
 })
+
+// D18: each control writes only its own key, on the address as it is now.
+// On a slow phone the list had not drawn the sort yet when the first
+// letter of a search was typed, and the search wrote ?q= over the address
+// the list last drew, so the sort (and the lost switch) went back off.
+test('a sort and the lost switch tapped just before a search stay on', async ({ context, page, isMobile }) => {
+  await signIn(context)
+  await openJobs(page)
+  const chips = page.getByRole('group', { name: 'Filter and sort' })
+  const lost = chips.getByRole('switch', { name: 'Show lost jobs' })
+  const amount = chips.getByRole('radio', { name: 'Amount' })
+  if (isMobile) await page.getByRole('button', { name: 'Search jobs' }).click()
+  const box = page.locator('.fhjl-search input')
+  await expect(box).toBeVisible()
+  // A slow phone: the list draws each change well after the tap.
+  const cpu = await context.newCDPSession(page)
+  await cpu.send('Emulation.setCPUThrottlingRate', { rate: 20 })
+  await lost.click()
+  await amount.click()
+  await box.fill('o')
+  await expect(page).toHaveURL(/[?&]q=o\b/)
+  await cpu.send('Emulation.setCPUThrottlingRate', { rate: 1 })
+
+  await expect(lost).toHaveAttribute('aria-checked', 'true')
+  await expect(amount).toHaveAttribute('aria-checked', 'true')
+  const address = new URL(page.url()).searchParams
+  expect([address.get('lost'), address.get('sort'), address.get('q')]).toEqual(['1', 'amount', 'o'])
+})
