@@ -35,13 +35,51 @@ function requestUrl(input: RequestInfo | URL): string {
   return input.url
 }
 
-export function fetchWithActiveOrg(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+// A REST read with no answer is abandoned after this long, so a screen
+// shows its error and Try again instead of "Loading" for good on a weak
+// signal (audit S23). Reads only (GET and HEAD under /rest/v1/): a write,
+// an upload, an RPC or a sign in may take as long as it needs. The clock
+// stops once the server starts answering, so a large page that arrives
+// slowly is never cut off; only a read with no answer at all is.
+export const READ_TIMEOUT_MS = 15_000
+
+function isRestRead(url: string, method: string): boolean {
+  const verb = method.toUpperCase()
+  return url.includes('/rest/v1/') && (verb === 'GET' || verb === 'HEAD')
+}
+
+function readTimedOut(): DOMException {
+  // An AbortError, so supabase-js answers at once with an error (status 0)
+  // instead of retrying, and worded as a lost connection (isNetworkError).
+  return new DOMException(`Network request failed: no answer in ${READ_TIMEOUT_MS / 1000} seconds`, 'AbortError')
+}
+
+function withReadTimeout(outer: AbortSignal | null | undefined, send: (signal: AbortSignal) => Promise<Response>): Promise<Response> {
+  const controller = new AbortController()
+  // The caller's own cancel still works, for the whole response.
+  if (outer) {
+    if (outer.aborted) controller.abort(outer.reason)
+    else outer.addEventListener('abort', () => controller.abort(outer.reason), { once: true })
+  }
+  const timer = setTimeout(() => controller.abort(readTimedOut()), READ_TIMEOUT_MS)
+  return send(controller.signal).finally(() => clearTimeout(timer))
+}
+
+function sendWithActiveOrg(input: RequestInfo | URL, init: RequestInit | undefined, url: string, isRequest: boolean): Promise<Response> {
   const orgId = activeOrgId
-  if (!orgId || !requestUrl(input).includes('/rest/v1/')) return fetch(input, init)
-  const isRequest = typeof Request !== 'undefined' && input instanceof Request
+  if (!orgId || !url.includes('/rest/v1/')) return fetch(input, init)
   const headers = new Headers(init?.headers ?? (isRequest ? (input as Request).headers : undefined))
   headers.set(ACTIVE_ORG_HEADER, orgId)
   return fetch(input, { ...init, headers })
+}
+
+export function fetchWithActiveOrg(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const url = requestUrl(input)
+  const isRequest = typeof Request !== 'undefined' && input instanceof Request
+  const method = init?.method ?? (isRequest ? (input as Request).method : 'GET')
+  if (!isRestRead(url, method)) return sendWithActiveOrg(input, init, url, isRequest)
+  const outer = init?.signal ?? (isRequest ? (input as Request).signal : null)
+  return withReadTimeout(outer, (signal) => sendWithActiveOrg(input, { ...init, signal }, url, isRequest))
 }
 
 // Password reset and email confirmation links use the implicit flow, so
