@@ -528,6 +528,44 @@ test.describe('large text and zoom', () => {
       }
     })
   }
+
+  // big-text-4: zoom or a bigger text size pushed Schedule, Money and the
+  // account button off the screen, and ran the dock labels together.
+  for (const percent of [100, 150, 200]) {
+    test(`every dock tab and header button stays on screen, text at ${percent} percent`, async ({ context, page }) => {
+      await textSize(context, percent)
+      await openBig(context, page, '/jobs')
+      const widths = percent === 100 ? [412, 360, 320, 280, 240, 206, 180] : [412, 390, 360]
+      for (const width of widths) {
+        await page.setViewportSize({ width, height: 700 })
+        await page.waitForTimeout(250)
+        const shell = await page.evaluate(() => {
+          const vw = document.documentElement.clientWidth
+          const box = (el: Element) => { const r = el.getBoundingClientRect(); return { left: Math.round(r.left), right: Math.round(r.right), width: Math.round(r.width) } }
+          const tabs = [...document.querySelectorAll('.fhs-dock__item')].map((el) => ({ name: el.textContent?.trim(), ...box(el) }))
+          const header = [...document.querySelectorAll('.fhs-header__menu, .fhs-header .fhs-icon-btn, .fh-glass-wordmark')]
+            .filter((el) => getComputedStyle(el).display !== 'none')
+            .map((el) => ({ name: el.getAttribute('aria-label') || el.className, ...box(el) }))
+          const labels = [...document.querySelectorAll('.fhs-dock__label')]
+            .map((el) => ({ name: el.textContent, ...box(el) }))
+            .filter((l) => l.width > 1)
+          // Closer than 6 px, two labels read as one ("MoneySchedule").
+          const touching = labels.flatMap((a, i) => labels.slice(i + 1).filter((b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > -6).map((b) => `${a.name} meets ${b.name}`))
+          return { vw, tabs, header, coin: box(document.querySelector('.fhs-dock__coin')!), touching }
+        })
+        const at = `${width} px: ${JSON.stringify(shell)}`
+        for (const control of [...shell.tabs, ...shell.header, shell.coin]) {
+          expect(control.left, at).toBeGreaterThanOrEqual(0)
+          expect(control.right, at).toBeLessThanOrEqual(shell.vw)
+        }
+        for (const tab of shell.tabs) expect(tab.width, at).toBeGreaterThanOrEqual(24)
+        expect(shell.touching, at).toEqual([])
+        for (const name of ['Today', 'Jobs', 'Money', 'Schedule']) {
+          await expect(page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name, exact: true }), at).toBeVisible()
+        }
+      }
+    })
+  }
 })
 
 // big-text-3 on a desktop window at 200 percent zoom (640 px wide).

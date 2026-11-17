@@ -330,6 +330,14 @@ body:has(.fh-app--glass) .fhj-capsule .fhc-btn { background-image: none; box-sha
   body:has(.fh-app--glass) .fh-app-header.fh-glass-header { min-height: 64px; gap: 8px; }
   .fh-glass-wordmark { font-size: 20px; gap: 8px; }
   .fh-wordmark-symbol { width: 24px; height: 24px; }
+  /* The name gives way before any button. When it no longer fits (zoom, or
+     the phone's text made bigger) it wraps onto a second line that is
+     clipped, and the mark alone links home. New and Search narrow to 32 px
+     before the account button would leave the screen. */
+  .fh-glass-wordmark { min-width: 24px; height: 44px; flex-wrap: wrap; overflow: hidden; }
+  .fh-glass-wordmark .fh-wordmark-symbol { margin-block: 10px; }
+  .fh-glass-header .fhs-header__actions { min-width: 0; }
+  .fh-glass-header .fhs-icon-btn { flex-shrink: 1; min-width: 32px; }
   .fh-work-overview { grid-template-columns: 1fr; gap: 24px; padding: 16px 20px 24px; }
   .fh-work-task.is-priority strong { font-size: 20px; }
   .fh-work-task-open strong { font-size: 17px; }
@@ -342,8 +350,9 @@ body:has(.fh-app--glass) .fhj-capsule .fhc-btn { background-image: none; box-sha
   .fh-work-section-head h2 { font-size: 18px; }
 }
 @media (max-width: 359px) {
-  .fh-glass-wordmark { font-size: 20px; }
+  .fh-glass-wordmark { font-size: 20px; min-width: 20px; }
   .fh-wordmark-symbol { width: 20px; height: 20px; }
+  .fh-glass-wordmark .fh-wordmark-symbol { margin-block: 12px; }
   .fh-glass-wordmark .fh-wordmark-text { display: none; }
   .fh-work-overview { padding-inline: 16px; }
   .fh-work-task-open strong { font-size: 16px; }
