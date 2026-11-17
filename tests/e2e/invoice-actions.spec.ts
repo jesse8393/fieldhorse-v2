@@ -558,3 +558,50 @@ test('after a payment the Money tab reads its money again', async ({ page, conte
   const bundleReads = () => reads.filter((r) => r.at > tapped && r.url.includes('/fh_contacts') && r.url.includes('fh_clients!fh_contacts_client_id_fkey') && r.url.includes('id=eq.c-job1')).length
   await expect.poll(bundleReads, { timeout: 5_000 }).toBeGreaterThan(0)
 })
+
+// M-22: the invoice, payment, draw and change order editors keep amounts
+// to two decimals, as the create screens do.
+test.describe('money editors keep two decimals', () => {
+  test('invoice edit', async ({ page, context }) => {
+    await installShedInvoice(context)
+    await page.goto('/invoices/inv-1/edit', { waitUntil: 'domcontentloaded' })
+    const amount = page.getByLabel('Amount')
+    await expect(amount).toBeVisible({ timeout: 30_000 })
+    await amount.fill('')
+    await amount.pressSequentially('1.005')
+    await expect(amount).toHaveValue('1.00')
+  })
+
+  test('invoice payment', async ({ page, context }) => {
+    await installShedInvoice(context)
+    await page.goto('/invoices/inv-1/payment', { waitUntil: 'domcontentloaded' })
+    const amount = page.getByLabel('Amount')
+    await expect(amount).toBeVisible({ timeout: 30_000 })
+    await amount.fill('')
+    await amount.pressSequentially('1.005')
+    await expect(amount).toHaveValue('1.00')
+  })
+
+  test('draw editor', async ({ page, context }) => {
+    await installShedInvoice(context)
+    await page.goto('/jobs/c-job1?tab=draws', { waitUntil: 'domcontentloaded' })
+    const edit = page.getByRole('button', { name: 'Edit draw' }).first()
+    await expect(edit).toBeVisible({ timeout: 30_000 })
+    await edit.click()
+    const amount = page.locator('.fh-draws-editor').getByLabel('Amount')
+    await amount.fill('')
+    await amount.pressSequentially('1.005')
+    await expect(amount).toHaveValue('1.00')
+  })
+
+  test('change order editor keeps a credit and two decimals', async ({ page, context }) => {
+    await signIn(context, { tables: { fh_contacts: [shedJob()], fh_invoices: [], fh_payments: [], fh_change_orders: [] } })
+    await page.goto('/jobs/c-job1?tab=change_orders', { waitUntil: 'domcontentloaded' })
+    const add = page.getByRole('button', { name: 'Add', exact: true })
+    await expect(add).toBeVisible({ timeout: 30_000 })
+    await add.click()
+    const amount = page.locator('input[inputmode="decimal"]').first()
+    await amount.pressSequentially('-12.345')
+    await expect(amount).toHaveValue('-12.34')
+  })
+})

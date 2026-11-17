@@ -45,6 +45,7 @@ import { quoteMoney } from '../../../lib/quoteMoney.ts'
 import { toCents } from '../../../lib/cents.ts'
 import { useMembership } from '../../../contexts/MembershipContext.tsx'
 import { canEditJobMoney } from '../lib/jobAccess.ts'
+import { moneyInput } from '../../new/CreateShell.tsx'
 
 
 function shortDate(iso: any) {
@@ -934,7 +935,7 @@ function Editor({ initial, isNew, unbilled, onSave, onCancel }: any) {
               // the payment and invoice screens. Without it, typing
               // "1,500" (or pasting "$1,500") passed validation as NaN
               // and persisted a $0 draw.
-              onChange={(e) => { if (!locked) set('amount', e.target.value.replace(/[^0-9.]/g, '')) }}
+              onChange={(e) => { if (!locked) set('amount', moneyInput(e.target.value)) }}
               readOnly={locked}
               aria-readonly={locked || undefined}
               placeholder={unbilled > 0 ? String(unbilled) : '0'}

@@ -27,6 +27,7 @@ import { goBackFrom, useInvoiceScreen } from './useInvoiceScreen.ts'
 import { invalidateAfterPayment } from '../jobs/jobScreen.tsx'
 import { useQueryClient } from '@tanstack/react-query'
 import './invoices.css'
+import { moneyInput } from '../new/CreateShell.tsx'
 
 // A dollar amount for the editable input without stranding cents: a
 // $4,999.50 balance prefills as "4999.50", not "5000". Whole amounts drop
@@ -135,7 +136,7 @@ export default function InvoicePayment() {
           value={shownAmount}
           disabled={saving}
           helper={isVoid ? 'This invoice is void, so it cannot take a payment.' : figures.due > 0 ? `${formatMoney(figures.due)} still owed on this invoice.` : 'Nothing is owed on this invoice.'}
-          onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ''))}
+          onChange={(e) => setAmount(moneyInput(e.target.value))}
         />
         <PaymentClassification method={method} kind={kind} onMethodChange={setMethod} onKindChange={setKind} disabled={saving} />
         {method !== 'cash' && method !== 'other' && (

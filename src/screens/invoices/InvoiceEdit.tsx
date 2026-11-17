@@ -19,6 +19,7 @@ import { knownContractTotal } from '../../lib/invoiceSettlement.ts'
 import { settleInvoiceAfterEdit } from '../../lib/invoices.ts'
 import { goBackFrom, useInvoiceScreen } from './useInvoiceScreen.ts'
 import './invoices.css'
+import { moneyInput } from '../new/CreateShell.tsx'
 
 type Form = { title: string; amount: string; description: string; due: string; notes: string }
 
@@ -131,7 +132,7 @@ export default function InvoiceEdit() {
           value={shown.amount}
           disabled={saving}
           error={amountError}
-          onChange={(e) => { setAmountError(''); set({ amount: e.target.value.replace(/[^\d.]/g, '') }) }}
+          onChange={(e) => { setAmountError(''); set({ amount: moneyInput(e.target.value) }) }}
         />
         <Field
           multiline
