@@ -56,12 +56,14 @@ const lead = {
 }
 
 describe('leadToQuoteDraft', () => {
-  it('copies the client, title, job type and notes and points at the lead', () => {
+  it('copies the client, title and job type, points at the lead, and keeps the notes off the quote (S11)', () => {
     const draft = leadToQuoteDraft(lead)
     expect(draft.client_id).toBe('client-1')
     expect(draft.title).toBe('Deck rebuild')
     expect(draft.job_type).toBe('deck')
-    expect(draft.scope_text).toBe('Wants cedar, call after 5')
+    // Lead notes are internal ("Husband says no more than 5k. Gate code
+    // 4411."); the scope prints on the customer's proposal.
+    expect(draft.scope_text).toBeNull()
     expect(draft.lead_id).toBe('lead-1')
   })
 

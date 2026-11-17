@@ -76,13 +76,15 @@ export async function markLeadLost(leadId: string): Promise<void> {
 }
 
 // Pure. The quote draft that Quote this opens: same client, title and
-// job type, the lead's notes as the starting scope, and a pointer back.
+// job type, and a pointer back. The lead's notes stay on the lead: they
+// are internal ("no more than 5k", gate codes) and the scope prints on
+// the customer's proposal (S11).
 export function leadToQuoteDraft(lead: LeadRow): Partial<QuoteInsert> {
   return {
     client_id: lead.client_id,
     title: lead.title ?? null,
     job_type: lead.job_type ?? null,
-    scope_text: lead.notes ?? null,
+    scope_text: null,
     lead_id: lead.id,
   }
 }
