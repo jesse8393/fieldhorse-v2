@@ -5,8 +5,15 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { admin, readBody, twiml, twilioSignatureOk, xmlEscape, e164, rpc, log, text, tick } from "./lib.ts";
 
-const STOP_WORDS = new Set(["stop", "stopall", "unsubscribe", "cancel", "end", "quit", "stop all"]);
-const START_WORDS = new Set(["start", "unstop", "yes", "subscribe"]);
+// Carrier opt out keywords. A text that is only one of these, in any case and
+// with any spacing or punctuation around it, opts out.
+const STOP_WORDS = new Set(["stop", "stopall", "stop all", "unsubscribe", "cancel", "end", "quit", "revoke", "optout", "opt out"]);
+// Plain requests to stop anywhere in a longer text, such as "Stop texting me"
+// or "please stop". "Stop by Tuesday" is not one.
+const STOP_PHRASE = /\b(unsubscribe|revoke|opt ?out|opt me out|stop (texting|messaging|sending|contacting)|please stop(?! by\b))\b/;
+// Only an explicit opt in keyword is consent to marketing texts. "Yes" is an
+// answer to a question, so it is kept as an ordinary text.
+const START_WORDS = new Set(["start", "unstop", "subscribe"]);
 
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return text("ok");
@@ -48,9 +55,9 @@ Deno.serve(async (req: Request) => {
   const conversationId = await rpc<string>(db, "fh_conversation_for_client", { p_org_id: number.org_id, p_client_id: clientId });
 
   // keyword handling (Twilio Advanced Opt Out also enforces these at the carrier edge)
-  const word = body.toLowerCase().replace(/[.!]/g, "");
+  const word = body.toLowerCase().replace(/['’]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
   let reply: string | null = null;
-  if (STOP_WORDS.has(word)) {
+  if (STOP_WORDS.has(word) || STOP_PHRASE.test(word)) {
     await rpc(db, "fh_consent_set", { p_org_id: number.org_id, p_client_id: clientId, p_channel: "sms", p_status: "opted_out", p_source: "keyword:STOP" });
   } else if (START_WORDS.has(word)) {
     await rpc(db, "fh_consent_set", { p_org_id: number.org_id, p_client_id: clientId, p_channel: "sms", p_status: "opted_in", p_source: "keyword:START" });

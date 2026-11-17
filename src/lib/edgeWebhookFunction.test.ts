@@ -1,6 +1,7 @@
 import { createHmac } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import { edgeRuntime as runtime } from './edgeRuntimeTestUtils'
+import { fakeClient, newState } from './teamAccountFakeSupabase'
 
 
 const key = Buffer.from('test-only-signing-secret-never-used-by-a-provider')
@@ -65,4 +66,63 @@ describe('provider webhook authentication', () => {
     req.headers.set('svix-signature', `v1,invalid ${req.headers.get('svix-signature')}`)
     expect(await shared.svixSignatureOk(req, raw, secret)).toBe(true)
   })
+})
+
+// FN-11. An inbound "Yes" was stored as marketing consent, and plain stop
+// requests ("Stop texting me", "please stop") were filed as ordinary texts.
+describe('inbound text keywords', () => {
+  const TOKEN = 'test-only-twilio-token'
+  const HOOK = 'https://example.test/functions/v1/twilio-sms'
+  const ORG = 'org-texts'
+
+  function inbound(body: string) {
+    const params: Record<string, string> = { MessageSid: 'SM-test-1', From: '+15125550101', To: '+15125550199', Body: body, NumMedia: '0' }
+    const signed = HOOK + Object.keys(params).sort().map((k) => k + params[k]).join('')
+    return new Request(HOOK, { method: 'POST', body: new URLSearchParams(params).toString(), headers: {
+      'content-type': 'application/x-www-form-urlencoded', 'x-twilio-signature': createHmac('sha1', TOKEN).update(signed).digest('base64')
+    } })
+  }
+
+  async function text(body: string) {
+    const state = newState({ fh_phone_numbers: [{ id: 'num-1', org_id: ORG, status: 'active', e164: '+15125550199' }], fh_messages: [] })
+    state.rpc = {
+      fh_resolve_client: () => [{ client_id: 'client-1', is_new: false }],
+      fh_conversation_for_client: () => 'conv-1',
+      fh_consent_set: () => null,
+      fh_automation_tick: () => null,
+      fh_org_ctx: () => ({ name: 'Parker Concrete', phone: '+15125550100' }),
+    }
+    const app = runtime({ TWILIO_AUTH_TOKEN: TOKEN })
+    app.createClient.mockImplementation(() => fakeClient(state) as any)
+    const response = await app.endpoint('twilio-sms')(inbound(body))
+    const consent = state.log.filter((l) => l.op === 'rpc' && l.fn === 'fh_consent_set').map((l) => l.payload.p_status)
+    return { response, consent, messages: state.tables.fh_messages }
+  }
+
+  it.each([
+    'STOP', 'stop', '  Stop  ', 'STOP.', 'Stop!', 'STOPALL', 'stop all', 'UNSUBSCRIBE', ' unsubscribe\n', 'CANCEL', 'cancel',
+    'END', ' end ', 'QUIT', 'quit.', 'Stop texting me', 'please stop', 'REVOKE', 'opt out', 'Opt-out', 'Unsubscribe me',
+  ])('opts out on %j and still keeps the text', async (body) => {
+    const { response, consent, messages } = await text(body)
+    expect(response.status).toBe(200)
+    expect(consent).toEqual(['opted_out'])
+    expect(messages).toHaveLength(1)
+  })
+
+  it.each(['Yes', 'yes!', 'YES please', 'Yes, Tuesday works', 'ok'])('does not take %j as consent to marketing texts', async (body) => {
+    const { consent, messages } = await text(body)
+    expect(consent).toEqual([])
+    expect(messages).toHaveLength(1)
+  })
+
+  it.each(['START', 'unstop', 'Subscribe'])('opts back in only on the explicit keyword %j', async (body) => {
+    expect((await text(body)).consent).toEqual(['opted_in'])
+  })
+
+  it.each(['Can you stop by Tuesday?', 'Please stop by after 3', 'Cancel Tuesday, I will call to rebook', 'The end of the driveway is cracked'])(
+    'keeps %j as an ordinary text', async (body) => {
+      const { consent, messages } = await text(body)
+      expect(consent).toEqual([])
+      expect(messages).toHaveLength(1)
+    })
 })
