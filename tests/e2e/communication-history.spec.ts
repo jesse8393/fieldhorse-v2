@@ -24,8 +24,29 @@ test('job message context combines recorded email and connected replies within c
   await expect(history.getByText('Gate will be unlocked.', { exact: true })).toHaveCount(0)
 })
 
+// Open SMS hands the message to the phone's messaging app by opening an
+// sms: address. Desktop Chrome passes that address to the computer to find
+// an app for it, and in the test browser the page then takes no more taps,
+// so nothing after the hand off could be tested. The test stands in for the
+// messaging app: it keeps each sms:, mailto: or tel: address the page opens
+// and stays on the page, the way a phone comes back to the browser after.
+async function catchHandoffs(context: Parameters<typeof signIn>[0]) {
+  await context.addInitScript(() => {
+    const handoffs: string[] = []
+    Object.assign(window, { __handoffs: handoffs })
+    const navigation = (window as unknown as { navigation?: EventTarget }).navigation
+    navigation?.addEventListener('navigate', (event) => {
+      const { destination } = event as Event & { destination: { url: string } }
+      if (!/^(sms|mailto|tel):/.test(destination.url)) return
+      handoffs.push(destination.url)
+      event.preventDefault()
+    })
+  })
+}
+
 test('opening SMS does not record delivery and explicit confirmation preserves the handed off text', async ({ context, page }) => {
   await signIn(context, { tables: { fh_contacts: [job], fh_notes: [], fh_messages: [] } })
+  await catchHandoffs(context)
   const saved: any[] = []
   await page.route('**/rest/v1/fh_notes*', async (route) => {
     if (route.request().method() === 'POST') {
@@ -39,6 +60,8 @@ test('opening SMS does not record delivery and explicit confirmation preserves t
   await draft.fill('We arrive at 8:30.')
   await page.getByRole('button', { name: 'Open SMS', exact: true }).click()
   await expect(page.getByText('Nothing has been marked sent here.', { exact: false })).toBeVisible()
+  // The messaging app got the customer's number and the message as written.
+  expect(await page.evaluate(() => (window as unknown as { __handoffs: string[] }).__handoffs)).toEqual([`sms:${job.phone}?body=${encodeURIComponent('We arrive at 8:30.')}`])
   expect(saved).toHaveLength(0)
   await draft.fill('Edited after handoff')
   await page.getByRole('button', { name: 'I sent it, record communication', exact: true }).click()
