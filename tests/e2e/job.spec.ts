@@ -735,3 +735,24 @@ test('margin and health count an approved change order', async ({ context, page 
   await expect(page.getByText('20.0% loss')).toHaveCount(0)
   await expect(page.getByText('Overpaid')).toHaveCount(0)
 })
+
+// PERF-09: the job screen read its to-dos twice (the job's bundle and the
+// to-do section) and its photos twice (the header and the photo section).
+// One read each now feeds every part of the screen that shows them.
+test('a job page reads its to-dos and photos once each', async ({ context, page }, testInfo) => {
+  // The desktop job screen is its own build (SnowJobDetailBuild).
+  test.skip(!testInfo.project.name.startsWith('mobile'), 'Phone layout')
+  await signIn(context)
+  const reads: string[] = []
+  page.on('request', request => {
+    if (request.method() !== 'GET') return
+    const url = new URL(request.url())
+    const table = url.pathname.split('/rest/v1/')[1]
+    if (table === 'fh_job_todos') reads.push('todos')
+    if (table === 'fh_job_files' && url.searchParams.get('kind') === 'eq.photo') reads.push('photos')
+  })
+  await open(page, '/jobs/c-job1')
+  await page.waitForLoadState('networkidle')
+  expect(reads.filter(read => read === 'todos')).toHaveLength(1)
+  expect(reads.filter(read => read === 'photos')).toHaveLength(1)
+})
