@@ -34,6 +34,7 @@
 // in that case — sending must succeed before we claim it happened.
 
 import { createClient } from '@supabase/supabase-js'
+import crypto from 'node:crypto'
 import { loadAccessibleRow, brandingUserIdFor } from './lib/orgAccess.js'
 import { hashIdentifier, checkRateLimit, checkDailySendCap, DAILY_SEND_LIMIT_MESSAGE } from './lib/rateLimit.js'
 import { formatFromHeader, renderParagraphs, textField, idempotencyKey, sendViaResend, sendFailure, greetingFor, EMAIL_HEAD } from './lib/email.js'
@@ -213,11 +214,17 @@ export default async (request) => {
   const greeting = greetingFor(safeRecipientName)
   const senderLine = companyName || 'Your contractor'
   const customMessage = textField(sender_message)
+  // The PDF tells the customer to approve through the link the estimate
+  // was delivered with, so the email carries it (PT-08).
+  const approveUrl = await proposalLinkUrl(supabase, {
+    request, isQuote, quoteId: quote_id, contactId: contact_id, orgId: access.row.org_id, senderId: sender_user_id
+  })
 
   const text = [
     greeting,
     '',
     customMessage || `Please find the proposal for ${contact.job_title || 'your project'} attached.`,
+    ...(approveUrl ? ['', `View and approve: ${approveUrl}`] : []),
     '',
     'Reply directly to this email if you have any questions.',
     '',
@@ -228,6 +235,7 @@ export default async (request) => {
     greeting,
     customMessage,
     jobTitle: contact.job_title,
+    approveUrl,
     senderLine,
     companyName
   })
@@ -325,7 +333,49 @@ export default async (request) => {
   })
 }
 
-function renderQuoteHtml({ greeting, customMessage, jobTitle, senderLine, companyName }) {
+// The customer link for this proposal, on the origin the request came in
+// on: the newest active (not revoked, not expired) proposal link for the
+// quote, or for a job's proposal the job, else a new one minted the way
+// the app mints it (src/lib/publicLink.ts), under the record's company.
+// Returns '' when no link can be read or made; the email still goes out.
+const TOKEN_ALPHABET = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+async function proposalLinkUrl(supabase, { request, isQuote, quoteId, contactId, orgId, senderId }) {
+  let origin = ''
+  try { origin = new URL(request.url).origin } catch { return '' }
+  try {
+    const { data: links, error } = await supabase
+      .from('fh_public_links')
+      .select('token, expires_at')
+      .eq(isQuote ? 'quote_id' : 'contact_id', isQuote ? quoteId : contactId)
+      .eq('kind', 'proposal')
+      .is('revoked_at', null)
+      .order('created_at', { ascending: false })
+      .limit(20)
+    if (error) throw error
+    const now = Date.now()
+    let token = (links || []).find((l) => !l.expires_at || new Date(l.expires_at).getTime() >= now)?.token
+    if (!token) {
+      token = Array.from({ length: 24 }, () => TOKEN_ALPHABET[crypto.randomInt(TOKEN_ALPHABET.length)]).join('')
+      const { error: insErr } = await supabase
+        .from('fh_public_links')
+        .insert({
+          user_id: senderId,
+          org_id: orgId || null,
+          contact_id: isQuote ? null : contactId,
+          quote_id: isQuote ? quoteId : null,
+          kind: 'proposal',
+          token
+        })
+      if (insErr) throw insErr
+    }
+    return `${origin}/p/${token}`
+  } catch (e) {
+    console.warn('[send-quote] customer link unavailable, sending without it', e?.message || e)
+    return ''
+  }
+}
+
+function renderQuoteHtml({ greeting, customMessage, jobTitle, approveUrl, senderLine, companyName }) {
   const safe = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   }[c]))
@@ -346,6 +396,11 @@ ${EMAIL_HEAD}
         <tr><td style="padding:8px 32px 16px;">
           <div style="font-size:16px;color:#141414;">${msg}</div>
         </td></tr>
+        ${approveUrl ? `<tr><td style="padding:4px 32px 16px;">
+          <a href="${safe(approveUrl)}" style="display:inline-block;background:#C9963A;color:#141414;font-size:14px;font-weight:700;text-decoration:none;padding:12px 24px;border-radius:10px;">View and approve</a>
+          <p style="margin:12px 0 0;font-size:12px;color:#5C5C5C;">Or open this link:</p>
+          <p style="margin:4px 0 0;font-size:12px;color:#141414;word-break:break-all;">${safe(approveUrl)}</p>
+        </td></tr>` : ''}
         <tr><td style="padding:8px 32px 24px;">
           <p style="margin:0;font-size:14px;color:#5C5C5C;">Reply directly to this email if you have any questions.</p>
         </td></tr>
