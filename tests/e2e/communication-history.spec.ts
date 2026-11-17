@@ -125,3 +125,37 @@ test('a message being written stays through a reload', async ({ context, page })
   await page.reload()
   await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue(words)
 })
+
+// Review of lost-work-12: a message kept for one customer must never come
+// back, unannounced, when Compose opens for another customer.
+test('a message being written for one customer never shows for another', async ({ context, page }) => {
+  const other = { ...job, id: 'message-job-2', client_id: 'message-client-2', name: 'Tom Hughes', email: 'tom@example.com', phone: '6155550101' }
+  const words = 'Hi Priya, your balance of 4,200 is due Friday'
+  await signIn(context, { tables: { fh_contacts: [job, other], fh_notes: [], fh_messages: [] } })
+  await page.goto(`/compose?contact=${job.id}`)
+  await page.getByRole('button', { name: 'Write manually', exact: true }).click()
+  await page.getByRole('textbox', { name: 'Message', exact: true }).fill(words)
+  await page.goto('/')
+  await page.goto(`/compose?contact=${other.id}`)
+  await expect(page.getByText('Tom Hughes', { exact: true }).first()).toBeVisible()
+  await page.getByRole('button', { name: 'Write manually', exact: true }).click()
+  await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue('')
+  await expect(page.getByText('Unsaved changes restored', { exact: true })).toHaveCount(0)
+  // The first customer's message is still waiting for them, and says so.
+  await page.goto(`/compose?contact=${job.id}`)
+  await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue(words)
+  await expect(page.getByText('Unsaved changes restored', { exact: true })).toBeVisible()
+})
+
+test('a message typed before choosing the customer stays on screen when one is chosen', async ({ context, page }) => {
+  const words = 'Pour moved to Thursday morning'
+  await signIn(context, { tables: { fh_contacts: [job], fh_notes: [], fh_messages: [] } })
+  await page.goto('/compose')
+  await page.getByRole('button', { name: 'Write manually', exact: true }).click()
+  await page.getByRole('textbox', { name: 'Message', exact: true }).fill(words)
+  await page.getByRole('combobox', { name: 'Contact' }).click()
+  await page.getByRole('option', { name: /History Customer/ }).click()
+  await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue(words)
+  await page.reload()
+  await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue(words)
+})
