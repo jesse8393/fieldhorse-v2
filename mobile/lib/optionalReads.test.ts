@@ -11,10 +11,8 @@ import { useWeather, useCoverPhotos } from './queries'
 // boundary, which replaces the whole app. Optional reads must not.
 // react-dom/server and the native react types disagree on ReactNode, so the
 // element is passed as the type renderToString asks for.
-const render = (hook: () => unknown) => renderToString(createElement(QueryClientProvider, {
-  client: queryClient,
-  children: createElement(() => { hook(); return createElement('div', null, 'screen') })
-}) as unknown as Parameters<typeof renderToString>[0])
+const render = (hook: () => unknown) => renderToString(createElement(QueryClientProvider, { client: queryClient },
+  createElement(() => { hook(); return createElement('div', null, 'screen') })) as unknown as Parameters<typeof renderToString>[0])
 
 beforeEach(() => { queryClient.clear() })
 
