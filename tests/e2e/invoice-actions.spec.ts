@@ -417,3 +417,284 @@ test('with no open draw the job money view shows the job title, not a paid draw\
   await expect(service.getByText('Slab + trench')).toBeVisible()
   await expect(service.getByText('Deposit for the shed slab')).toHaveCount(0)
 })
+
+// M-08 and DATA-03: a payment on a job a teammate created carries the
+// teammate's id. Delete goes by id, and a delete that removed nothing says
+// so instead of "Payment deleted".
+function teammatePaymentTables() {
+  const job = { ...shedJob(), id: 'c-team', user_id: 'teammate-9', amount: 12800 }
+  const payment = { id: 'pay-team', user_id: 'teammate-9', contact_id: 'c-team', amount: 6400, method: 'check', reference: '1042', kind: 'deposit', paid_on: '2026-11-10', created_at: '2026-11-10T15:00:00.000Z', invoice_id: null }
+  return { fh_contacts: [job], fh_payments: [payment], fh_invoices: [], fh_change_orders: [], fh_closeouts: [] }
+}
+
+async function tapDeletePayment(page: Page) {
+  await page.goto('/jobs/c-team?tab=financials', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+  const del = page.getByRole('button', { name: /delete the \$6,400(\.00)? payment/i }).first()
+  await expect(del).toBeVisible({ timeout: 30_000 })
+  await del.click()
+  await page.getByRole('button', { name: /tap again to delete/i }).first().click()
+}
+
+test("deleting a teammate's payment deletes it by id", async ({ page, context }) => {
+  await signIn(context, { tables: teammatePaymentTables() })
+  const deletes: string[] = []
+  page.on('request', (r) => { if (r.method() === 'DELETE' && r.url().includes('/fh_payments')) deletes.push(new URL(r.url()).search) })
+  await tapDeletePayment(page)
+  await expect(page.getByText('Payment deleted').first()).toBeVisible()
+  expect(deletes.length).toBe(1)
+  expect(deletes[0]).toContain('id=eq.pay-team')
+  expect(deletes[0]).not.toContain('user_id')
+})
+
+test('a payment delete that removes nothing says it failed', async ({ page, context }) => {
+  await signIn(context, { tables: teammatePaymentTables() })
+  await context.route('**/rest/v1/fh_payments*', async (route) => {
+    if (route.request().method() === 'DELETE') { await route.fulfill({ status: 200, json: [] }); return }
+    await route.fallback()
+  })
+  await tapDeletePayment(page)
+  await expect(page.getByText("Couldn't delete payment").first()).toBeVisible()
+  await expect(page.getByText('Payment deleted')).toHaveCount(0)
+})
+
+// DATA-03: an expense a teammate logged carries the teammate's id. The
+// delete goes by id, and one that removed nothing says so.
+function teammateExpenseTables() {
+  const job = { ...shedJob(), id: 'c-team', user_id: 'teammate-9', amount: 12800 }
+  const expense = { id: 'exp-team', user_id: 'teammate-9', contact_id: 'c-team', description: 'Rebar', category: 'Materials', amount: 420, date: '2026-11-10', created_at: '2026-11-10T15:00:00.000Z' }
+  return { fh_contacts: [job], fh_expenses: [expense], fh_payments: [], fh_invoices: [], fh_subs: [] }
+}
+
+test("deleting a teammate's expense deletes it by id", async ({ page, context }) => {
+  await signIn(context, { tables: teammateExpenseTables() })
+  const deletes: string[] = []
+  page.on('request', (r) => { if (r.method() === 'DELETE' && r.url().includes('/fh_expenses')) deletes.push(new URL(r.url()).search) })
+  await page.goto('/jobs/c-team?tab=expenses', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+  const del = page.getByRole('button', { name: 'Delete expense' }).first()
+  await expect(del).toBeVisible({ timeout: 30_000 })
+  await del.click()
+  await expect(page.getByText('Expense removed').first()).toBeVisible()
+  expect(deletes.length).toBe(1)
+  expect(deletes[0]).toContain('id=eq.exp-team')
+  expect(deletes[0]).not.toContain('user_id')
+})
+
+test('an expense delete that removes nothing says it failed', async ({ page, context }) => {
+  await signIn(context, { tables: teammateExpenseTables() })
+  await context.route('**/rest/v1/fh_expenses*', async (route) => {
+    if (route.request().method() === 'DELETE') { await route.fulfill({ status: 200, json: [] }); return }
+    await route.fallback()
+  })
+  await page.goto('/jobs/c-team?tab=expenses', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+  const del = page.getByRole('button', { name: 'Delete expense' }).first()
+  await expect(del).toBeVisible({ timeout: 30_000 })
+  await del.click()
+  await expect(page.getByText("Couldn't delete").first()).toBeVisible()
+  await expect(page.getByText('Expense removed')).toHaveCount(0)
+})
+
+// M-12: a paid draw keeps its amount and status. The Draws tab still lets
+// its title, dates and words change, but the amount is read only, Draft is
+// not offered, and the save sends neither, nor a new owner.
+test('a paid draw cannot be edited to a new amount or set back to draft', async ({ page, context }) => {
+  const draw = { ...shedDeposit('paid'), org_id: 'org-1', amount: 5000 }
+  const payment = { id: 'pay-1', user_id: 'qa-user-1', contact_id: 'c-job1', invoice_id: 'inv-1', amount: 5000, method: 'check', kind: 'deposit', paid_on: '2026-10-12', created_at: '2026-10-12T15:00:00.000Z' }
+  await signIn(context, { tables: { fh_contacts: [{ ...shedJob(), amount: 10000 }], fh_invoices: [draw], fh_payments: [payment], fh_change_orders: [] } })
+  const patches: any[] = []
+  page.on('request', (r) => { if (r.method() === 'PATCH' && r.url().includes('/fh_invoices')) patches.push(r.postDataJSON()) })
+  await page.goto('/jobs/c-job1?tab=draws', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+  const edit = page.getByRole('button', { name: 'Edit draw' }).first()
+  await expect(edit).toBeVisible({ timeout: 30_000 })
+  await edit.click()
+  const editor = page.locator('.fh-draws-editor')
+  const amount = editor.getByLabel('Amount')
+  await expect(amount).toHaveAttribute('readonly', '')
+  await amount.focus()
+  await page.keyboard.press('End')
+  await page.keyboard.type('8')
+  await expect(amount).toHaveValue('5000')
+  await expect(editor.getByRole('button', { name: 'Draft', exact: true })).toHaveCount(0)
+  await expect(editor.getByRole('button', { name: 'Sent', exact: true })).toHaveCount(0)
+  await editor.getByLabel('Title').fill('Deposit paid')
+  await editor.getByRole('button', { name: 'Save changes' }).click()
+  await expect.poll(() => patches.length).toBe(1)
+  expect(patches[0].title).toBe('Deposit paid')
+  expect(patches[0]).not.toHaveProperty('amount')
+  expect(patches[0]).not.toHaveProperty('status')
+  expect(patches[0]).not.toHaveProperty('user_id')
+})
+
+// M-20: the Expenses list keeps cents on each row and the total.
+test('expenses show cents', async ({ page, context }) => {
+  const tables = teammateExpenseTables()
+  tables.fh_expenses = [{ ...tables.fh_expenses[0], amount: 420.5 }, { ...tables.fh_expenses[0], id: 'exp-2', description: 'Forms', amount: 79.25 }]
+  await signIn(context, { tables })
+  await page.goto('/jobs/c-team?tab=expenses', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+  await expect(page.getByText('$420.50').first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText('$79.25').first()).toBeVisible()
+  await expect(page.getByText('$499.75').first()).toBeVisible()
+})
+
+// DATA-07: after a payment the job's Money tab reads its money again, so
+// it does not keep the old balance until the app refocuses.
+test('after a payment the Money tab reads its money again', async ({ page, context }) => {
+  await signIn(context, { tables: { fh_contacts: [shedJob()], fh_invoices: [], fh_payments: [], fh_change_orders: [] } })
+  const reads: { at: number; url: string }[] = []
+  page.on('request', (r) => {
+    const url = r.url()
+    if (r.method() === 'GET' && url.includes('/rest/v1/')) reads.push({ at: Date.now(), url: decodeURIComponent(url) })
+  })
+  await page.goto('/jobs/c-job1?tab=financials', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+  const collect = page.getByRole('button', { name: /collect payment/i }).first()
+  await expect(collect).toBeVisible({ timeout: 30_000 })
+  await collect.click()
+  await page.waitForURL(/\/jobs\/c-job1\/payment/)
+  await page.getByLabel('Amount').fill('500')
+  const tapped = Date.now()
+  await page.getByRole('button', { name: /^record/i }).click()
+  await page.waitForURL((u) => !u.pathname.endsWith('/payment'), { timeout: 15_000 })
+  // The Money tab's own bundle (the job read with its client embed), not
+  // only the job header.
+  const bundleReads = () => reads.filter((r) => r.at > tapped && r.url.includes('/fh_contacts') && r.url.includes('fh_clients!fh_contacts_client_id_fkey') && r.url.includes('id=eq.c-job1')).length
+  await expect.poll(bundleReads, { timeout: 5_000 }).toBeGreaterThan(0)
+})
+
+// M-22: the invoice, payment, draw and change order editors keep amounts
+// to two decimals, as the create screens do.
+test.describe('money editors keep two decimals', () => {
+  test('invoice edit', async ({ page, context }) => {
+    await installShedInvoice(context)
+    await page.goto('/invoices/inv-1/edit', { waitUntil: 'domcontentloaded' })
+    const amount = page.getByLabel('Amount')
+    await expect(amount).toBeVisible({ timeout: 30_000 })
+    await amount.fill('')
+    await amount.pressSequentially('1.005')
+    await expect(amount).toHaveValue('1.00')
+  })
+
+  test('invoice payment', async ({ page, context }) => {
+    await installShedInvoice(context)
+    await page.goto('/invoices/inv-1/payment', { waitUntil: 'domcontentloaded' })
+    const amount = page.getByLabel('Amount')
+    await expect(amount).toBeVisible({ timeout: 30_000 })
+    await amount.fill('')
+    await amount.pressSequentially('1.005')
+    await expect(amount).toHaveValue('1.00')
+  })
+
+  test('draw editor', async ({ page, context }) => {
+    await installShedInvoice(context)
+    await page.goto('/jobs/c-job1?tab=draws', { waitUntil: 'domcontentloaded' })
+    const edit = page.getByRole('button', { name: 'Edit draw' }).first()
+    await expect(edit).toBeVisible({ timeout: 30_000 })
+    await edit.click()
+    const amount = page.locator('.fh-draws-editor').getByLabel('Amount')
+    await amount.fill('')
+    await amount.pressSequentially('1.005')
+    await expect(amount).toHaveValue('1.00')
+  })
+
+  test('change order editor keeps a credit and two decimals', async ({ page, context }) => {
+    await signIn(context, { tables: { fh_contacts: [shedJob()], fh_invoices: [], fh_payments: [], fh_change_orders: [] } })
+    await page.goto('/jobs/c-job1?tab=change_orders', { waitUntil: 'domcontentloaded' })
+    const add = page.getByRole('button', { name: 'Add', exact: true })
+    await expect(add).toBeVisible({ timeout: 30_000 })
+    await add.click()
+    const amount = page.locator('input[inputmode="decimal"]').first()
+    await amount.pressSequentially('-12.345')
+    await expect(amount).toHaveValue('-12.34')
+  })
+})
+
+// OPS-11: one Back after saving an invoice edit or recording a payment
+// leaves the invoice, instead of landing on the same invoice again.
+for (const flow of ['edit', 'payment'] as const) {
+  test(`one Back after the invoice ${flow} screen saves leaves the invoice`, async ({ page, context }) => {
+    await installShedInvoice(context)
+    await page.goto('/money', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+    await page.goto('/invoices/inv-1', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+    await expect(page.locator('.fhinv-actions')).toBeVisible({ timeout: 30_000 })
+    if (flow === 'edit') await page.getByRole('link', { name: 'Edit', exact: true }).first().click()
+    else await action(page, 'Collect payment').click()
+    await expect(page).toHaveURL(new RegExp(`/invoices/inv-1/${flow}$`))
+    const amount = page.getByLabel('Amount')
+    await expect(amount).toBeVisible({ timeout: 30_000 })
+    if (flow === 'edit') {
+      await amount.fill('3000')
+      await page.getByRole('button', { name: /^save/i }).click()
+    } else {
+      await amount.fill('100')
+      await page.getByRole('button', { name: /^record/i }).click()
+    }
+    await expect(page).toHaveURL(/\/invoices\/inv-1$/)
+    await expect(page.locator('.fhinv-actions')).toBeVisible({ timeout: 30_000 })
+    await page.getByRole('button', { name: 'Back' }).first().click()
+    await expect(page).not.toHaveURL(/\/invoices\/inv-1/)
+  })
+}
+
+// OPS-15: the payment form warns on an amount over what is owed and on a
+// future date, and does not send a check number hidden by choosing cash.
+test('the invoice payment form warns and drops a hidden check number', async ({ page, context }) => {
+  await installShedInvoice(context)
+  const posts: any[] = []
+  page.on('request', (r) => { if (r.method() === 'POST' && r.url().includes('/rest/v1/fh_payments')) posts.push(r.postDataJSON()) })
+  await page.goto('/invoices/inv-1/payment', { waitUntil: 'domcontentloaded' })
+  const amount = page.getByLabel('Amount')
+  await expect(amount).toBeVisible({ timeout: 30_000 })
+  await amount.fill('99999')
+  await expect(page.getByText(/more than the \$3,000(\.00)? still owed/i)).toBeVisible()
+  await page.getByLabel('Paid on').fill('2027-03-01')
+  await expect(page.getByText(/in the future/i)).toBeVisible()
+  await amount.fill('100')
+  await page.getByLabel('Paid on').fill('2026-11-10')
+  await page.getByLabel('Check number').fill('1042')
+  await page.getByLabel('Method').selectOption('cash')
+  await page.getByRole('button', { name: /^record/i }).click()
+  await expect.poll(() => posts.length).toBe(1)
+  expect(posts[0].reference ?? null).toBeNull()
+  expect(posts[0].method).toBe('cash')
+})
+
+// OPS-02: a fast double tap on Void must not void. A second tap within
+// half a second of arming is ignored; a later one voids.
+test('a fast double tap on Void does not void the invoice', async ({ page, context }) => {
+  await installShedInvoice(context)
+  const voids: string[] = []
+  page.on('request', (r) => { if (r.method() === 'PATCH' && r.url().includes('/fh_invoices') && (r.postData() || '').includes('"void"')) voids.push(r.url()) })
+  await openInvoice(page, 'inv-1')
+  const voidButton = page.getByRole('button', { name: /^void$/i })
+  await expect(voidButton).toBeVisible()
+  await voidButton.click()
+  await page.getByRole('button', { name: /tap again/i }).click({ delay: 0 })
+  await page.waitForTimeout(700)
+  expect(voids).toEqual([])
+  await page.getByRole('button', { name: /tap again/i }).click()
+  await expect.poll(() => voids.length).toBe(1)
+})
+
+// OPS-14: on a phone a draw row keeps its title, dates and buttons apart,
+// and Open is a full size target.
+for (const width of [320, 390, 412]) {
+  test(`a draw row fits a ${width} px phone`, async ({ page, context }, testInfo) => {
+    test.skip(!testInfo.project.name.startsWith('mobile'), 'phone layout')
+    await page.setViewportSize({ width, height: 900 })
+    await installShedInvoice(context)
+    await page.goto('/jobs/c-job1?tab=draws', { waitUntil: 'domcontentloaded' })
+    const row = page.locator('.fh-draws-row').first()
+    await expect(row).toBeVisible({ timeout: 30_000 })
+    const title = row.getByText('Deposit', { exact: true })
+    const titleBox = (await title.boundingBox())!
+    for (const name of ['Email draw to client', 'Download draw PDF', 'Edit draw']) {
+      const b = (await row.getByRole('button', { name }).boundingBox())!
+      const overlaps = b.x < titleBox.x + titleBox.width && b.x + b.width > titleBox.x && b.y < titleBox.y + titleBox.height && b.y + b.height > titleBox.y
+      expect(overlaps, `${name} covers the title`).toBe(false)
+    }
+    const due = row.getByText(/^Due /)
+    const dueBox = (await due.boundingBox())!
+    expect(dueBox.height, 'the due date stays on one line').toBeLessThan(24)
+    const open = (await row.getByRole('link', { name: /open invoice/i }).boundingBox())!
+    expect(open.height).toBeGreaterThanOrEqual(44)
+    await nothingRunsOffTheSide(page, `/jobs/c-job1?tab=draws at ${width} px`)
+  })
+}

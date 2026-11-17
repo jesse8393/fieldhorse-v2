@@ -80,9 +80,23 @@ function mapChar(ch: string): string {
 }
 
 /** Returns `text` with every character the standard PDF fonts can draw. */
+// An emoji, with its variation selector, skin tone and joined parts, and
+// the space before it. It is decoration the fonts cannot draw, so it is
+// left out rather than marked with '?' (OPS-20). Pictographs the fonts do
+// have, such as the copyright and trademark signs, stay.
+const EMOJI = /\s?\p{Extended_Pictographic}(?:\uFE0F|\p{Emoji_Modifier}|\u200D\p{Extended_Pictographic})*/gu
+
+function dropEmoji(s: string): string {
+  return s.replace(EMOJI, (match) => {
+    const cp = match.trimStart().codePointAt(0) as number
+    return cp <= 0xff || WIN_ANSI_EXTRAS.has(cp) ? match : ''
+  })
+}
+
 export function pdfSafeText(text: string): string {
-  const s = String(text)
-  if (!NEEDS_MAPPING.test(s)) return s
+  const raw = String(text)
+  if (!NEEDS_MAPPING.test(raw)) return raw
+  const s = dropEmoji(raw)
   let out = ''
   for (const ch of s) out += mapChar(ch)
   return out

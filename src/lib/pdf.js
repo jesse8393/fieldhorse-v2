@@ -17,6 +17,7 @@ import autoTable from 'jspdf-autotable'
 import { loadLogoForPdf, loadImageForPdf } from './pdfLogo.ts'
 import { safePayUrl } from './payLink.ts'
 import { installWinAnsiText } from './pdfText.ts'
+import { toCents, fromCents, sumCents } from './cents.ts'
 import {
   invoiceNumber as docInvoiceNumber,
   invoiceNumberFromSequence as docInvoiceNumberFromSequence,
@@ -522,7 +523,8 @@ function parseDateLocal(value) {
 function formatDocDate(d) {
   const dt = parseDateLocal(d)
   if (!dt) return ''
-  return dt.toLocaleDateString(undefined, { month: 'long', day: '2-digit', year: 'numeric' })
+  // A numeric day (PT-19): "November 7, 2026", never "November 07".
+  return dt.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
 }
 
 // money() above uses 2 decimals always; this overload allows compact display.
@@ -571,12 +573,15 @@ function drawModernLetterhead(doc, {
     } catch { /* fall through, name-only identity */ }
   }
 
+  const identityW = rightCol - nameX - 60
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(15)
   doc.setTextColor(...ONYX)
-  doc.text(company?.name || 'Contractor', nameX, topY + 5)
-  let ly = topY + 10
-  const identityW = rightCol - nameX - 60
+  // A long name wraps inside the identity column (PT-18) instead of
+  // running under the document label and off the page.
+  const nameLines = doc.splitTextToSize(String(company?.name || 'Contractor'), Math.max(40, identityW))
+  doc.text(nameLines, nameX, topY + 5)
+  let ly = topY + 10 + (nameLines.length - 1) * 6
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
   doc.setTextColor(...INK_MUTED)
@@ -932,8 +937,14 @@ function drawSigCell(doc, { x, y, w, label, dataUrl, name, date, esignAnchorColo
 // ============================================================
 // Document-level disclaimer copy (matches HTML preview footers).
 // ============================================================
-const INVOICE_DISCLAIMER = 'Pricing covers labor, material, standard equipment, placement, finishing, and cleanup for the scope as billed. Hidden conditions, field changes, or scope deviations may require a separate change order. Past due balances may accrue at 1.5% per month.'
-const PROPOSAL_DISCLAIMER = 'Pricing includes labor, material, standard equipment, placement, finishing, and cleanup for the listed scope only. Pricing is based on visible site conditions at time of estimating. Any hidden conditions, field changes, requested by owner additions, or scope deviations may require additional pricing through written change order approval. Estimate valid for 30 days.'
+// No legal terms the contractor never set (PT-12): no late fee, and the
+// 30 day validity line only when the estimate has no valid until date of
+// its own (proposalDisclaimer).
+const INVOICE_DISCLAIMER = 'Pricing covers labor, material, standard equipment, placement, finishing, and cleanup for the scope as billed. Hidden conditions, field changes, or scope deviations may require a separate change order.'
+const PROPOSAL_DISCLAIMER_BASE = 'Pricing includes labor, material, standard equipment, placement, finishing, and cleanup for the listed scope only. Pricing is based on visible site conditions at time of estimating. Any hidden conditions, field changes, requested by owner additions, or scope deviations may require additional pricing through written change order approval.'
+function proposalDisclaimer(expiresAt) {
+  return expiresAt ? PROPOSAL_DISCLAIMER_BASE : `${PROPOSAL_DISCLAIMER_BASE} Estimate valid for 30 days.`
+}
 
 /**
  * Generate a branded invoice PDF, restrained editorial layout
@@ -1023,14 +1034,22 @@ export async function generateInvoice({
   const approvedCO = (changeOrders || [])
     .filter((co) => co?.status === 'approved')
     .reduce((s, co) => s + Number(co.amount || 0), 0)
-  const rawContract = Number(contractTotal != null ? contractTotal : thisInvoice)
-  const ct = rawContract + approvedCO
-  const pp = previouslyPaid != null
-    ? Number(previouslyPaid)
-    : (payments || []).reduce((s, p) => s + Number(p.amount || 0), 0)
-  const balance = Math.max(0, ct - pp)
+  // A job saved with no price has no contract to reconcile this bill
+  // against, whatever its change orders. Calling that a $0 contract printed
+  // "PAID" and "collected" beside an amount due, so those lines are left
+  // out and the bill owes its own amount less its own payments.
+  const contractUnknown = showContractPosition && !(Number(contractTotal) > 0)
+  const rawContract = Number(contractTotal != null && !contractUnknown ? contractTotal : thisInvoice)
+  const ct = contractUnknown ? rawContract : rawContract + approvedCO
+  const pp = contractUnknown
+    ? fromCents(sumCents((payments || []).filter((p) => currentInvoice?.id && p?.invoice_id === currentInvoice.id), (p) => p.amount))
+    : previouslyPaid != null
+      ? Number(previouslyPaid)
+      : fromCents(sumCents(payments || [], (p) => p?.amount))
+  // Whole cents: 49 cents owed is owed, and float dust is not.
+  const balance = fromCents(Math.max(0, toCents(ct) - toCents(pp)))
   const handedDue = amountDue != null && Number.isFinite(Number(amountDue)) ? Number(amountDue) : null
-  const isPaid = handedDue != null ? handedDue < 0.5 : balance < 0.5
+  const isPaid = handedDue != null ? toCents(handedDue) <= 0 : toCents(balance) <= 0
   // The hero "Amount due" is what THIS invoice still owes: the figure the
   // caller hands in when it has one (the same one the email names), else
   // the invoice amount capped at the remaining contract balance. It used
@@ -1049,12 +1068,12 @@ export async function generateInvoice({
   // 2. Hero band, Amount due (this invoice)
   const heroRight = []
   if (!isPaid && dueDisplay) heroRight.push(`Due ${dueDisplay}`)
-  if (ct > 0) heroRight.push(`${moneyCompact(pp)} of ${moneyCompact(ct)} collected`)
+  if (ct > 0 && !contractUnknown) heroRight.push(`${moneyCompact(pp)} of ${moneyCompact(ct)} collected`)
   cursor = drawHeroBand(doc, {
     startY: cursor, margin, pageWidth, brandRGB,
     label: isPaid ? 'Balance' : 'Amount due',
     amount: heroAmount, isPaid, rightLines: heroRight,
-    paid: pp, contractTotal: ct
+    paid: pp, contractTotal: contractUnknown ? 0 : ct
   })
 
   // 3. Parties
@@ -1099,7 +1118,7 @@ export async function generateInvoice({
   // 6. Balance summary / contract position, the one reconciliation the
   //    customer can check (contract → COs → this invoice → paid → balance).
   //    An invoice with no job has nothing to reconcile against and skips it.
-  if (showContractPosition && (ct > 0 || pp > 0)) {
+  if (showContractPosition && !contractUnknown && (ct > 0 || pp > 0)) {
     // Plain ASCII signs: the standard PDF fonts cannot draw U+2212, and a
     // string holding it printed as junk, losing the sign on credits.
     const balanceRows = []
@@ -1139,8 +1158,8 @@ export async function generateInvoice({
     doc.text('BALANCE REMAINING', labelX, cursor)
     doc.setCharSpace(0)
     doc.setFontSize(16)
-    doc.setTextColor(...(balance > 0.5 ? brandRGB : SIGNAL_GREEN))
-    doc.text(balance > 0.5 ? moneyCompact(balance) : 'PAID', valueX, cursor, { align: 'right' })
+    doc.setTextColor(...(toCents(balance) > 0 ? brandRGB : SIGNAL_GREEN))
+    doc.text(toCents(balance) > 0 ? moneyCompact(balance) : 'PAID', valueX, cursor, { align: 'right' })
     cursor += 8
   }
 
@@ -1409,7 +1428,7 @@ async function drawThemedProposal(doc, ctx) {
   } = ctx
   const t = PDF_THEMES[template]
   const innerW = pageWidth - margin * 2
-  const footer = footerLayout(doc, { pageWidth, pageHeight, margin, text: PROPOSAL_DISCLAIMER, pointSize: 8, bottomOffset: 12 })
+  const footer = footerLayout(doc, { pageWidth, pageHeight, margin, text: proposalDisclaimer(expiresAt), pointSize: 8, bottomOffset: 12 })
   const bottom = footer.contentBottom
 
   // Page background (editorial). Idempotent per page so it paints each
@@ -1818,7 +1837,7 @@ export async function generateQuote({
     }
   }
 
-  const footer = footerLayout(doc, { pageWidth, pageHeight, margin, text: PROPOSAL_DISCLAIMER })
+  const footer = footerLayout(doc, { pageWidth, pageHeight, margin, text: proposalDisclaimer(expiresAt) })
   const bottom = footer.contentBottom
 
   // Letterhead (premium company-name chrome + Issued / Valid until meta)
@@ -1853,6 +1872,10 @@ export async function generateQuote({
     doc.text(titleLines, margin, cursor)
     cursor += titleLines.length * 7
   }
+
+  // Scope of work (PT-10): the classic estimate printed it nowhere, while
+  // the web page and the themed PDFs do.
+  if (scope && String(scope).trim()) drawDetailBlock('Scope of work', String(scope).trim())
 
   // Items
   if (baseRows.length > 0) {
@@ -2049,16 +2072,24 @@ export async function generateCertificate({
   doc.setFontSize(10)
   doc.setTextColor(60, 56, 51)
   doc.text(certificateNumber(company.name, closeout.id || contact.id), rightCol, cursor + 10, { align: 'right' })
+  // Measure the date, then place the tracked label left of it (PT-19):
+  // align right ignores charSpace, so a fixed offset let "ISSUED" run
+  // into a long date such as "December 28, 2026".
+  const issuedDate = formatDocDate(closedAt)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  const issuedDateW = doc.getTextWidth(issuedDate)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(7)
   doc.setTextColor(...INK_MUTED)
   doc.setCharSpace(0.7)
-  doc.text('ISSUED', rightCol - 26, cursor + 16, { align: 'right' })
+  const issuedLabelW = doc.getTextWidth('ISSUED') + 5 * 0.7
+  doc.text('ISSUED', rightCol - issuedDateW - 3 - issuedLabelW, cursor + 16)
   doc.setCharSpace(0)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
   doc.setTextColor(...ONYX)
-  doc.text(formatDocDate(closedAt), rightCol, cursor + 16, { align: 'right' })
+  doc.text(issuedDate, rightCol, cursor + 16, { align: 'right' })
 
   cursor = Math.max(leftY, cursor + 20) + 4
   doc.setDrawColor(213, 207, 190)
@@ -2160,7 +2191,9 @@ export async function generateCertificate({
 
   const contract = Number(closeout.final_amount || contact.amount || 0)
   const paid = Number(closeout.paid_at_close || 0)
-  const balance = Math.max(0, contract - paid)
+  // Whole cents: a certificate saved with a float sum a hair under the
+  // contract read "Outstanding $0.00".
+  const balance = fromCents(Math.max(0, toCents(contract) - toCents(paid)))
   cursor = drawCertSection(doc, {
     margin, pageWidth, pageHeight, paintPage, y: cursor,
     label: 'Final figures',

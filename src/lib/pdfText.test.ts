@@ -29,8 +29,17 @@ describe('pdfSafeText', () => {
     expect(pdfSafeText('Nguy\u1EC5n')).toBe('Nguyen')
     expect(pdfSafeText('\uFB01ne')).toBe('fine')
     expect(pdfSafeText('1\u20443 coat')).toBe('1/3 coat')
-    expect(pdfSafeText('Joe \u{1F44D}')).toBe('Joe ?')
     expect(pdfSafeText('\u674E')).toBe('?')
+  })
+
+  // OPS-20: an emoji is decoration, so it is left out instead of printing
+  // a question mark on the customer's PDF.
+  it('leaves emoji out instead of printing a question mark', () => {
+    expect(pdfSafeText('Joe \u{1F44D}')).toBe('Joe')
+    expect(pdfSafeText('Slab \u{1F9F1} pour')).toBe('Slab pour')
+    expect(pdfSafeText('Done \u2705\uFE0F, thanks')).toBe('Done, thanks')
+    expect(pdfSafeText('Crew \u{1F468}\u200D\u{1F527} on site')).toBe('Crew on site')
+    expect(pdfSafeText('Cost \u00A9 2026')).toBe('Cost \u00A9 2026')
   })
 })
 

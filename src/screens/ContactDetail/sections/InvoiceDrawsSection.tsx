@@ -30,7 +30,6 @@ import { useProfile } from '../../../contexts/ProfileContext.tsx'
 import { useAuth } from '../../../contexts/AuthContext.tsx'
 import { generateInvoice, downloadPdf } from '../../../lib/pdf.js'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
-import { DEFAULT_PAYMENT_SCHEDULE } from '../../../components/documents'
 // Cents aware: whole amounts print as "$1,250", amounts with cents keep
 // them, so a generated $1,249.75 draw never reads "$1,250".
 import { money } from '../../../components/documents/format.ts'
@@ -39,11 +38,15 @@ import { Eyebrow } from '../../../components/v3'
 import { countNoun } from '../../../lib/format.ts'
 import { fetchInvoiceReviewContext } from '../../../lib/invoiceReviewContext.ts'
 import { reviewInvoice } from '../../../lib/invoiceReview.js'
-import { fetchInvoicesForContact, invoiceAmountDue, invoiceDescription } from '../../../lib/invoices.ts'
+import { fetchInvoicesForContact, invoiceAmountDue, invoiceDescription, retryOnce } from '../../../lib/invoices.ts'
 import { invoicesPaidInFull } from '../../../lib/invoiceSettlement.ts'
-import { splitByPercents } from '../../../lib/paymentSchedule.ts'
+import { drawsFromTerms } from '../../../lib/paymentSchedule.ts'
+import { quoteMoney } from '../../../lib/quoteMoney.ts'
+import { toCents } from '../../../lib/cents.ts'
 import { useMembership } from '../../../contexts/MembershipContext.tsx'
 import { canEditJobMoney } from '../lib/jobAccess.ts'
+import { useMediaQuery } from '../../../lib/useMediaQuery.ts'
+import { moneyInput } from '../../new/CreateShell.tsx'
 
 
 function shortDate(iso: any) {
@@ -152,11 +155,22 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       if (review.excess > 0 && (!prior || amount > Number(prior.amount))) {
         throw new Error('This draw exceeds approved contract value. Reduce or void unused drafts, or approve added scope first.')
       }
+      // A paid draw keeps its amount and status (M-12), as the invoice's
+      // own edit screen does: changing them would leave the payment that
+      // paid it describing a different bill. An update never re-owns the
+      // row either: it stays with whoever made it.
+      const stored = draws.find((d: any) => d.id === payload.id)
+      const paid = String(stored?.status || prior?.status || '').toLowerCase() === 'paid'
+      if (payload.id && paid && (toCents(amount) !== toCents(stored?.amount ?? prior?.amount) || row.status !== 'paid')) {
+        throw new Error('A paid draw keeps its amount and status. Delete or change its payment first.')
+      }
       let res
       if (payload.id) {
+        const { user_id: _owner, ...editable } = row
+        const { amount: _amount, status: _status, ...paidEditable } = editable
         res = await supabase
           .from('fh_invoices')
-          .update(row)
+          .update(paid ? paidEditable : editable)
           .eq('id', payload.id)
           .select('*')
           .single()
@@ -177,12 +191,11 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
     }
   }
 
-  // Auto-create draws from the proposal's payment terms. Uses the
-  // ProposalTemplate default schedule (50 / 40 / 10) unless the
-  // contractor has overridden it elsewhere, that override path isn't
-  // wired yet, so v1 always uses the canonical default. Each draw's
-  // title comes from the schedule's label; amount = pct × contractTotal
-  // (which already includes approved change orders).
+  // Auto-create draws from the job's payment terms (M-16), read the way
+  // the customer's link reads them: a named deposit, then the balance.
+  // The default 50 / 40 / 10 schedule applies only when the terms are
+  // blank, and terms this cannot read make nothing. Amounts come from
+  // contractTotal, which already includes approved change orders.
   //
   // Guarded against duplicate generation: only enabled when no live
   // draws exist on the contract. Re-running after voiding or deleting
@@ -203,41 +216,45 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       )
       return
     }
-    const schedule = DEFAULT_PAYMENT_SCHEDULE
+    const termsText = contact?.terms_text ?? null
+    const { deposit } = quoteMoney({ items: [], changeOrders: [], contactAmount: contractTotal, termsText, companyName: null })
+    const schedule = drawsFromTerms({ total: contractTotal, termsText, deposit })
+    if (!schedule) {
+      toastError(
+        'Payment terms not read',
+        'The job\'s payment terms name no deposit this can read. Add the draws by hand.'
+      )
+      return
+    }
     setBusyId('__generate__')
     try {
-      // Build N rows + insert sequentially so the BEFORE INSERT trigger
-      // assigns sequence_numbers 1, 2, 3 deterministically. Batch insert
-      // would race the sequence assignment.
+      // One request for every draw (DATA-19), so a dropped connection
+      // leaves all of them or none. The BEFORE INSERT trigger numbers the
+      // rows of one statement in order (each row sees the ones before it).
       //
-      // splitByPercents works in cents: each draw rounds on its own and
-      // the last takes the remainder, so a $3,000.50 contract produces
-      // draws that add up to exactly $3,000.50. It is the same split the
-      // proposal's payment terms print, so the two never disagree.
-      const amounts = splitByPercents(contractTotal, schedule.map((row) => row.pct))
-      let createdCount = 0
-      for (let i = 0; i < schedule.length; i++) {
-        const row = schedule[i]
-        const pct = Number(row.pct || 0)
-        const { error } = await supabase.from('fh_invoices').insert({
-          contact_id: contact.id,
-          user_id: userId,
-          sequence_number: 0, // trigger assigns next
-          title: `${pct}%, ${row.label}`,
-          amount: amounts[i],
-          status: 'draft',
-          notes: row.sub || null
-        })
-        if (error) throw error
-        createdCount++
-      }
+      // drawsFromTerms splits in cents, so the draws add up to exactly the
+      // contract, with the same deposit the customer's link asks for.
+      const { error } = await supabase.from('fh_invoices').insert(schedule.map((row) => ({
+        contact_id: contact.id,
+        user_id: userId,
+        sequence_number: 0, // trigger assigns next
+        title: row.title,
+        amount: row.amount,
+        status: 'draft',
+        notes: row.notes
+      })))
+      if (error) throw error
       toastSuccess(
-        `Generated ${createdCount} ${countNoun(createdCount, 'draw')}`,
-        `Filled from ${schedule.map((s) => `${s.pct}%`).join(' / ')} payment terms`
+        `Generated ${schedule.length} ${countNoun(schedule.length, 'draw')}`,
+        `Filled from the payment terms: ${schedule.map((d) => money(d.amount)).join(', ')}`
       )
       await fetchDraws()
     } catch (e: any) {
       toastError("Couldn't generate draws", e?.message || 'Try again.')
+      // The write may have reached the server with its answer lost. Read
+      // the draws again before Generate is offered, so a retry cannot add
+      // a second set.
+      await fetchDraws()
     } finally {
       setBusyId(null)
     }
@@ -382,7 +399,9 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       // RAW contract amount, generateInvoice folds approved COs in from
       // the changeOrders array itself, so passing the CO-inclusive
       // contractTotal here would double-count them in the balance box.
-      contractTotal: Number(contact?.amount || 0),
+      // Null, not 0, when the job has no price: the PDF then leaves the
+      // contract lines out instead of calling a $0 contract paid.
+      contractTotal: Number(contact?.amount || 0) || null,
       previouslyPaid,
       amountDue: drawAmountDue(draw),
       insurance,
@@ -517,11 +536,15 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       // Flip the draw to 'sent' so the row badge updates immediately.
       // Skip if the draw is already paid (don't downgrade a paid draw
       // back to sent just because the contractor sent again the PDF).
+      // Checked and tried once more (DATA-17): the email has gone, so a
+      // draw left as a draft must be reported, not passed over.
       if (draw.status !== 'paid') {
-        await supabase
+        const issuedAt = draw.issued_at || new Date().toISOString()
+        const { error: flipErr } = await retryOnce(() => supabase
           .from('fh_invoices')
-          .update({ status: 'sent', issued_at: draw.issued_at || new Date().toISOString() })
-          .eq('id', draw.id)
+          .update({ status: 'sent', issued_at: issuedAt })
+          .eq('id', draw.id))
+        if (flipErr) toastError('Draw not marked sent', 'The email went, but the draw status did not update. Refresh and check it.')
       }
       toastSuccess(`Draw sent to ${recipientEmail}`, result.filename)
       await fetchDraws()
@@ -645,7 +668,7 @@ function Header({ count, canAdd, onAdd, canGenerate, onGenerate, generating }: a
             type="button"
             onClick={onGenerate}
             disabled={generating}
-            title="Fill three draws from the proposal's 50 / 40 / 10 payment terms"
+            title="Fill the draws from the job's payment terms"
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 4,
               padding: '8px 12px', borderRadius: 10,
@@ -764,9 +787,48 @@ function Row({ draw, busy, readOnly, onEdit, onDownload, onSend, onMarkPaid, onV
   const isPaid = draw.status === 'paid'
   const isVoid = draw.status === 'void'
   const isOverdue = draw.status === 'overdue'
+  // Below 600 px the buttons take a row of their own (OPS-14): beside the
+  // title they covered it and squeezed the dates to a word per line.
+  const narrow = useMediaQuery('(max-width: 599px)')
+
+  const actions = !readOnly && (
+    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: narrow ? 'flex-start' : 'flex-end', ...(narrow ? { gridColumn: '1 / -1' } : null) }}>
+      {!isVoid && (
+        <IconBtn onClick={onSend} disabled={busy} title="Email to client" aria-label="Email draw to client">
+          <Send size={12} aria-hidden="true" />
+        </IconBtn>
+      )}
+      {!isVoid && (
+        <IconBtn onClick={onDownload} disabled={busy} title="Download PDF" aria-label="Download draw PDF">
+          <Download size={12} aria-hidden="true" />
+        </IconBtn>
+      )}
+      {!isPaid && !isVoid && (
+        <IconBtn onClick={onMarkPaid} disabled={busy} title="Mark paid" aria-label="Mark draw paid">
+          <Check size={12} aria-hidden="true" />
+        </IconBtn>
+      )}
+      {!isVoid && (
+        <IconBtn onClick={onEdit} disabled={busy} title="Edit" aria-label="Edit draw">
+          <FileEdit size={12} aria-hidden="true" />
+        </IconBtn>
+      )}
+      {!isVoid && (
+        <IconBtn onClick={onVoid} disabled={busy} title={voidArmed ? 'Tap again to void. It stops counting toward the unbilled total.' : 'Void'} aria-label={voidArmed ? 'Tap again to void' : 'Void draw'} wide={voidArmed}>
+          {voidArmed ? <span style={{ fontSize: 12, fontWeight: 700, padding: '0 8px', whiteSpace: 'nowrap' }}>Tap again to void</span> : <X size={12} aria-hidden="true" />}
+        </IconBtn>
+      )}
+      {/* Drafts only: a sent or paid draw is voided, never deleted. */}
+      {draw.status === 'draft' && (
+        <IconBtn onClick={onDelete} tone="danger" title={deleteArmed ? 'Tap again to delete. This cannot be undone.' : 'Delete'} aria-label={deleteArmed ? 'Tap again to delete' : 'Delete draw'} wide={deleteArmed}>
+          {deleteArmed ? <span style={{ fontSize: 12, fontWeight: 700, padding: '0 8px', whiteSpace: 'nowrap' }}>Tap again to delete</span> : <Trash2 size={12} aria-hidden="true" />}
+        </IconBtn>
+      )}
+    </div>
+  )
 
   return (
-    <div className="fh-draws-row" style={{ display: 'grid', gridTemplateColumns: '72px 1fr auto', gap: 12, padding: '12px 16px', alignItems: 'flex-start' }}>
+    <div className="fh-draws-row" style={{ display: 'grid', gridTemplateColumns: narrow ? '64px minmax(0, 1fr) auto' : '72px 1fr auto', gap: narrow ? 8 : 12, padding: '12px 16px', alignItems: 'flex-start' }}>
       <div style={{
         fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
         letterSpacing: 0, color: 'var(--v3-primary-text)',
@@ -783,8 +845,8 @@ function Row({ draw, busy, readOnly, onEdit, onDownload, onSend, onMarkPaid, onV
           {draw.title || `Draw ${draw.sequence_number}`}
         </div>
         <div style={{ marginTop: 4, display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 12, color: 'var(--v3-text-muted)' }}>
-          {draw.issued_at && <span>Issued {shortDate(draw.issued_at)}</span>}
-          {draw.due_at && <span>Due {shortDate(draw.due_at)}</span>}
+          {draw.issued_at && <span style={{ whiteSpace: 'nowrap' }}>Issued {shortDate(draw.issued_at)}</span>}
+          {draw.due_at && <span style={{ whiteSpace: 'nowrap' }}>Due {shortDate(draw.due_at)}</span>}
           {draw.notes && <span style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>· {draw.notes}</span>}
         </div>
         <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -798,7 +860,7 @@ function Row({ draw, busy, readOnly, onEdit, onDownload, onSend, onMarkPaid, onV
             to={`/invoices/${draw.id}`}
             aria-label={`Open invoice ${draw.title || draw.sequence_number}`}
             style={{
-              display: 'inline-flex', alignItems: 'center', minHeight: 24, padding: '0 8px',
+              display: 'inline-flex', alignItems: 'center', minHeight: 44, padding: '0 12px',
               borderRadius: 10, border: '1px solid var(--v3-border)',
               fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
               color: 'var(--v3-text)', textDecoration: 'none'
@@ -818,47 +880,16 @@ function Row({ draw, busy, readOnly, onEdit, onDownload, onSend, onMarkPaid, onV
         }}>
           {money(draw.amount)}
         </div>
-        {!readOnly && (
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-            {!isVoid && (
-              <IconBtn onClick={onSend} disabled={busy} title="Email to client" aria-label="Email draw to client">
-                <Send size={12} aria-hidden="true" />
-              </IconBtn>
-            )}
-            {!isVoid && (
-              <IconBtn onClick={onDownload} disabled={busy} title="Download PDF" aria-label="Download draw PDF">
-                <Download size={12} aria-hidden="true" />
-              </IconBtn>
-            )}
-            {!isPaid && !isVoid && (
-              <IconBtn onClick={onMarkPaid} disabled={busy} title="Mark paid" aria-label="Mark draw paid">
-                <Check size={12} aria-hidden="true" />
-              </IconBtn>
-            )}
-            {!isVoid && (
-              <IconBtn onClick={onEdit} disabled={busy} title="Edit" aria-label="Edit draw">
-                <FileEdit size={12} aria-hidden="true" />
-              </IconBtn>
-            )}
-            {!isVoid && (
-              <IconBtn onClick={onVoid} disabled={busy} title={voidArmed ? 'Tap again to void. It stops counting toward the unbilled total.' : 'Void'} aria-label={voidArmed ? 'Tap again to void' : 'Void draw'} wide={voidArmed}>
-                {voidArmed ? <span style={{ fontSize: 12, fontWeight: 700, padding: '0 8px', whiteSpace: 'nowrap' }}>Tap again to void</span> : <X size={12} aria-hidden="true" />}
-              </IconBtn>
-            )}
-            {/* Drafts only: a sent or paid draw is voided, never deleted. */}
-            {draw.status === 'draft' && (
-              <IconBtn onClick={onDelete} tone="danger" title={deleteArmed ? 'Tap again to delete. This cannot be undone.' : 'Delete'} aria-label={deleteArmed ? 'Tap again to delete' : 'Delete draw'} wide={deleteArmed}>
-                {deleteArmed ? <span style={{ fontSize: 12, fontWeight: 700, padding: '0 8px', whiteSpace: 'nowrap' }}>Tap again to delete</span> : <Trash2 size={12} aria-hidden="true" />}
-              </IconBtn>
-            )}
-          </div>
-        )}
+        {!narrow && actions}
       </div>
+      {narrow && actions}
     </div>
   )
 }
 
 function Editor({ initial, isNew, unbilled, onSave, onCancel }: any) {
+  // A paid draw keeps its amount and status (M-12).
+  const locked = !isNew && String(initial?.status || '').toLowerCase() === 'paid'
   const [form, setForm] = useState({
     id: initial.id || null,
     title: initial.title || '',
@@ -911,7 +942,9 @@ function Editor({ initial, isNew, unbilled, onSave, onCancel }: any) {
               // the payment and invoice screens. Without it, typing
               // "1,500" (or pasting "$1,500") passed validation as NaN
               // and persisted a $0 draw.
-              onChange={(e) => set('amount', e.target.value.replace(/[^0-9.]/g, ''))}
+              onChange={(e) => { if (!locked) set('amount', moneyInput(e.target.value)) }}
+              readOnly={locked}
+              aria-readonly={locked || undefined}
               placeholder={unbilled > 0 ? String(unbilled) : '0'}
               style={{ ...inputStyle, paddingLeft: 24 }}
             />
@@ -962,7 +995,12 @@ function Editor({ initial, isNew, unbilled, onSave, onCancel }: any) {
         {/* Paid is only shown for a draw that already is. A draw becomes
             paid by recording its payment (the check button), so the
             balance moves with the status. */}
-        {(initial.status === 'paid' ? ['draft', 'sent', 'paid', 'overdue'] : ['draft', 'sent', 'overdue']).map((s) => (
+        {locked && (
+          <span style={{ ...labelStyle, textTransform: 'none' }}>
+            Paid. The amount and status stay as they are while its payment stands.
+          </span>
+        )}
+        {(locked ? [] : ['draft', 'sent', 'overdue']).map((s) => (
           <button
             key={s}
             type="button"

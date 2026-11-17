@@ -23,6 +23,7 @@ import { Eyebrow } from '../../../components/v3'
 import { money } from '../../../components/documents/format.ts'
 import { useMembership } from '../../../contexts/MembershipContext.tsx'
 import { canEditJobMoney } from '../lib/jobAccess.ts'
+import { moneyInput } from '../../new/CreateShell.tsx'
 
 function shortDate(iso: any) {
   if (!iso) return ''
@@ -473,9 +474,10 @@ function Editor({ initial, isNew, onSave, onCancel }: any) {
               inputMode="decimal"
               value={form.amount}
               // Like the draws editor, keep only digits and the decimal
-              // point, plus a minus sign here for credits, so typing
-              // "1,500" or pasting "$1,500" saves $1,500 instead of $0.
-              onChange={(e) => set('amount', e.target.value.replace(/[^0-9.-]/g, ''))}
+              // point with two decimals at most (M-22), plus a leading minus
+              // sign here for credits, so typing "1,500" or pasting "$1,500"
+              // saves $1,500 instead of $0.
+              onChange={(e) => set('amount', `${e.target.value.trim().startsWith('-') ? '-' : ''}${moneyInput(e.target.value)}`)}
               disabled={locked}
               placeholder="0"
               style={{ ...inputStyle, paddingLeft: 24, ...(locked ? lockedInputStyle : null) }}

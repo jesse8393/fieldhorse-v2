@@ -18,6 +18,7 @@ import { reviewInvoice } from '../../lib/invoiceReview.js'
 import { fetchInvoicesForContact, createInvoice, invoiceAmountDue, invoiceDescription, sendInvoiceEmail } from '../../lib/invoices.ts'
 import { pickBalanceInvoice } from '../../lib/invoiceSettlement.ts'
 import { moneyExact } from '../../lib/format.ts'
+import { deletePayment } from '../../lib/stages.ts'
 import { parseDateOnly } from '../../lib/dates.ts'
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useProfile } from '../../contexts/ProfileContext.tsx'
@@ -304,7 +305,9 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
         dueDateIso: billingDraw?.due_at || null,
         invoiceId: contact.id,
         payments,
-        contractTotal: Number(contact?.amount || 0),
+        // Null, not 0, when the job has no price: the PDF then leaves the
+        // contract lines out instead of calling a $0 contract paid.
+        contractTotal: Number(contact?.amount || 0) || null,
         previouslyPaid: totals.paid,
         // The hero names the same figure as amount_due below.
         amountDue: billingDraw ? amountDueNow : null,
@@ -411,6 +414,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
       // Name the bill that went out: it can be a draft draw rather than
       // the whole balance this screen showed.
       toastSuccess(`Invoice sent to ${res.recipient}`, `${invoice.title || `Invoice #${invoice.sequence_number}`} · ${moneyExact(invoice.amount)}`)
+      if (res.statusError) toastError('Invoice not marked sent', 'The email went, but the invoice status did not update. Open the invoice to check it.')
       setSent(true)
       setTimeout(() => setSent(false), 2400)
     } else if (res.reason === 'sender_not_configured') {
@@ -456,7 +460,9 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
         dueDateIso: billingDraw?.due_at || null,
         invoiceId: contact.id,
         payments,
-        contractTotal: Number(contact?.amount || 0),
+        // Null, not 0, when the job has no price: the PDF then leaves the
+        // contract lines out instead of calling a $0 contract paid.
+        contractTotal: Number(contact?.amount || 0) || null,
         previouslyPaid: totals.paid,
         // The hero names the same figure as amount_due below.
         amountDue: billingDraw ? amountDueNow : null,
@@ -561,17 +567,25 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
     if (deleteTimer.current) clearTimeout(deleteTimer.current)
     setDeleteArmed(null)
     setDeletingId(paymentId)
-    const { error: delErr } = await supabase
-      .from('fh_payments')
-      .delete()
-      .eq('id', paymentId)
-      .eq('user_id', user.id)
+    // By id, with the row asked back: a payment carries the job creator's
+    // id, so filtering on the signed in user matched nothing and still said
+    // deleted. deletePayment also reopens what the payment had settled.
+    const res = contact ? await deletePayment(contact as any, paymentId) : null
     setDeletingId(null)
-    if (delErr) {
-      toastError("Couldn't delete payment", delErr.message)
+    if (!res || res.error) {
+      toastError("Couldn't delete payment", res?.error?.message || 'This job is not loaded yet. Try again.')
+      refresh()
       return
     }
-    toastSuccess('Payment deleted', `${moneyExact(paymentAmount)} removed`)
+    if (res.statusError) {
+      toastError('Payment deleted', `${moneyExact(paymentAmount)} removed, but the invoice and job status did not update. Check this job.`)
+    } else {
+      const parts = [
+        res.reopenedInvoices.length === 1 ? 'An invoice is owed again' : res.reopenedInvoices.length > 1 ? `${res.reopenedInvoices.length} invoices are owed again` : '',
+        res.reopenedJob ? 'The job is open again' : ''
+      ].filter(Boolean)
+      toastSuccess('Payment deleted', [`${moneyExact(paymentAmount)} removed.`, ...parts.map((t) => `${t}.`)].join(' '))
+    }
     refresh()
   }
 

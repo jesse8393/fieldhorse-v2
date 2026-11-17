@@ -1,3 +1,5 @@
+import { toCents, fromCents, sumCents } from '../../../lib/cents.ts'
+
 /**
  * Job Health, composite 0..100 score answering "is this job on track?"
  *
@@ -20,17 +22,24 @@
  *     because the operator only cares whether anything has slipped, not by
  *     how many days.
  *
- * Pure function. No side effects. No imports beyond what's typed in args.
+ * Pure function. No side effects.
  */
-export function computeJobHealth({ contact, payments = [], scheduleItems = [] }: { contact?: any; payments?: any[]; scheduleItems?: any[] } = {}) {
+export function computeJobHealth({ contact, payments = [], scheduleItems = [], changeOrders = [] }: { contact?: any; payments?: any[]; scheduleItems?: any[]; changeOrders?: any[] } = {}) {
   if (!contact) {
     return { score: 0, tier: 'unknown', label: '\u2003', breakdown: null }
   }
 
-  const amount = Number(contact.amount || 0)
-  const paid = payments.reduce((sum, payment) => sum + Number(payment?.amount || 0), 0)
-  const credit = Math.max(0, paid - amount)
-  if (contact.stage !== 'lost' && amount > 0 && credit > 0.5) {
+  // The contract is the job amount plus approved change orders (M-15), in
+  // whole cents: a $10,000 job with a $5,000 approved change order and
+  // $12,000 paid still has $3,000 owed, it is not overpaid.
+  const amountCents = toCents(contact.amount) > 0
+    ? toCents(contact.amount) + sumCents((changeOrders || []).filter((co: any) => co?.status === 'approved'), (co: any) => co.amount)
+    : 0
+  const paidCents = sumCents(payments, (payment: any) => payment?.amount)
+  const amount = fromCents(amountCents)
+  const paid = fromCents(paidCents)
+  const credit = fromCents(Math.max(0, paidCents - amountCents))
+  if (contact.stage !== 'lost' && amountCents > 0 && paidCents > amountCents) {
     return {
       score: 50,
       tier: 'risk',
@@ -74,16 +83,21 @@ export function computeJobHealth({ contact, payments = [], scheduleItems = [] }:
   const milestoneRatio = milestones.length > 0 ? milestonesDone / milestones.length : 0
 
   // Financial: paid / contracted (cap at 1, overpayment doesn't keep adding)
-  const paymentRatio = amount > 0 ? Math.min(1, paid / amount) : 0
+  const paymentRatio = amountCents > 0 ? Math.min(1, paidCents / amountCents) : 0
 
-  // Schedule: any end_at in the past = overdue. Filter excludes rows with
-  // no end_at since those are "indefinite" (e.g., a saved appointment with
-  // no end time set).
-  const now = Date.now()
-  const hasOverdue = scheduleItems.some((s) => {
-    if (!s?.end_at) return false
-    return new Date(s.end_at).getTime() < now
+  // Schedule (OPS-09): behind only when the job has visits that ended and
+  // none from today on. A visit this morning, or one booked tomorrow, means
+  // the work is moving. Rows with no end_at are "indefinite" (a saved
+  // appointment with no end time) and never count as past.
+  const now = new Date()
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const timeOf = (v: unknown) => (v ? new Date(String(v)).getTime() : NaN)
+  const hasPast = scheduleItems.some((s) => timeOf(s?.end_at) < now.getTime())
+  const hasFromToday = scheduleItems.some((s) => {
+    const t = timeOf(s?.end_at ?? s?.start_at)
+    return Number.isFinite(t) && t >= startOfToday
   })
+  const hasOverdue = hasPast && !hasFromToday
   const scheduleScore = hasOverdue ? 0 : 1
 
   const score = Math.round(

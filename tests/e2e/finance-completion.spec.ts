@@ -129,3 +129,98 @@ test('similar drafts require review before a send begins', async ({ context, pag
   expect(sends).toBe(0)
   await expect(review.getByRole('checkbox')).not.toBeChecked()
 })
+
+// M-16: Generate from terms follows the deposit the approved terms name.
+test('Generate from terms makes the deposit the terms name', async ({ context, page }) => {
+  const job = {
+    id: 'c-terms', stage: 'job', name: 'Marco', job_title: 'Patio', amount: 10000, terms_text: '25% deposit due at signing. Balance due on completion.',
+    user_id: 'qa-user-1', client_id: null, phone: null, email: 'm@x.com', address: '1 Elm St',
+    created_at: '2026-09-23T15:00:00.000Z', updated_at: '2026-10-09T15:00:00.000Z', completed_at: null,
+    proposal_status: 'approved', milestones: [], follow_up_on: null, notes: null, scope_text: null
+  }
+  await signIn(context, { tables: { fh_contacts: [job], fh_invoices: [], fh_payments: [], fh_change_orders: [] } })
+  const inserted: number[] = []
+  page.on('request', (r) => {
+    if (r.method() !== 'POST' || !r.url().includes('/rest/v1/fh_invoices')) return
+    const body = r.postDataJSON()
+    for (const row of Array.isArray(body) ? body : [body]) inserted.push(Number(row.amount))
+  })
+  await page.goto('/jobs/c-terms?tab=draws', { waitUntil: 'domcontentloaded' })
+  const generate = page.getByRole('button', { name: 'Generate from terms' })
+  await expect(generate).toBeVisible({ timeout: 30_000 })
+  await generate.click()
+  await expect.poll(() => inserted.length).toBe(2)
+  expect(inserted).toEqual([2500, 7500])
+})
+
+// DATA-15: the payment form keeps one id for its life. A retry after a lost
+// answer, with the check number added, updates that payment instead of
+// recording a second one.
+for (const screen of ['job', 'invoice'] as const) {
+  test(`${screen === 'job' ? 'a job' : 'an invoice'} payment retried after a change keeps its id`, async ({ context, page }) => {
+    const job = {
+      id: 'c-retry', stage: 'job', name: 'Marco', job_title: 'Patio', amount: 10000,
+      user_id: 'qa-user-1', client_id: null, phone: null, email: 'm@x.com', address: '1 Elm St',
+      created_at: '2026-09-23T15:00:00.000Z', updated_at: '2026-10-09T15:00:00.000Z', completed_at: null,
+      proposal_status: 'approved', milestones: [], follow_up_on: null, notes: null, scope_text: null
+    }
+    const inv = { id: 'inv-r', org_id: 'org-1', contact_id: 'c-retry', client_id: null, user_id: 'qa-user-1', sequence_number: 1, title: 'Deposit', amount: 5000, status: 'sent', issued_at: '2026-10-10T15:00:00.000Z', due_at: '2026-10-24T15:00:00.000Z', notes: null, description: null, created_at: '2026-10-10T15:00:00.000Z', updated_at: '2026-10-10T15:00:00.000Z' }
+    await signIn(context, { tables: { fh_contacts: [job], fh_invoices: [inv], fh_payments: [], fh_change_orders: [] } })
+    const posts: { id: string; reference: string | null; prefer: string }[] = []
+    await context.route('**/rest/v1/fh_payments*', async (route) => {
+      const req = route.request()
+      if (req.method() !== 'POST') return route.fallback()
+      const body = req.postDataJSON()
+      posts.push({ id: body.id, reference: body.reference ?? null, prefer: req.headers().prefer || '' })
+      // The first save reaches the server but its answer is lost.
+      if (posts.length === 1) return route.abort('connectionreset')
+      return route.fulfill({ status: 201, json: [] })
+    })
+    await page.goto(screen === 'job' ? '/jobs/c-retry/payment' : '/invoices/inv-r/payment', { waitUntil: 'domcontentloaded' })
+    const amount = page.getByLabel('Amount')
+    await expect(amount).toBeVisible({ timeout: 30_000 })
+    await amount.fill('500')
+    await page.getByRole('button', { name: /^record/i }).click()
+    await expect.poll(() => posts.length).toBe(1)
+    await page.getByLabel('Check number').fill('1042')
+    await page.getByRole('button', { name: /^record/i }).click()
+    await expect.poll(() => posts.length).toBe(2)
+    expect(posts[1].id).toBe(posts[0].id)
+    expect(posts[1].reference).toBe('1042')
+    expect(posts[1].prefer).toContain('merge-duplicates')
+  })
+}
+
+// DATA-19: Generate from terms writes its draws in one request, and after a
+// failed request it reads the draws again before a retry is offered, so a
+// retry never adds a second deposit.
+test('Generate from terms writes its draws in one request and re-reads after a failure', async ({ context, page }) => {
+  const job = {
+    id: 'c-gen', stage: 'job', name: 'Marco', job_title: 'Patio', amount: 10000, terms_text: null,
+    user_id: 'qa-user-1', client_id: null, phone: null, email: 'm@x.com', address: '1 Elm St',
+    created_at: '2026-09-23T15:00:00.000Z', updated_at: '2026-10-09T15:00:00.000Z', completed_at: null,
+    proposal_status: 'approved', milestones: [], follow_up_on: null, notes: null, scope_text: null
+  }
+  await signIn(context, { tables: { fh_contacts: [job], fh_invoices: [], fh_payments: [], fh_change_orders: [] } })
+  const events: string[] = []
+  await context.route('**/rest/v1/fh_invoices*', async (route) => {
+    const req = route.request()
+    if (req.method() === 'POST') {
+      const body = req.postDataJSON()
+      events.push(`POST ${Array.isArray(body) ? body.length : 1}`)
+      return route.abort('connectionreset')
+    }
+    if (req.method() === 'GET' && req.url().includes('contact_id=eq.c-gen')) events.push('GET')
+    return route.fallback()
+  })
+  await page.goto('/jobs/c-gen?tab=draws', { waitUntil: 'domcontentloaded' })
+  const generate = page.getByRole('button', { name: 'Generate from terms' })
+  await expect(generate).toBeVisible({ timeout: 30_000 })
+  await expect.poll(() => events.includes('GET')).toBe(true)
+  const before = events.length
+  await generate.click()
+  await expect.poll(() => events.slice(before).filter((e) => e.startsWith('POST')).length).toBe(1)
+  expect(events.slice(before).find((e) => e.startsWith('POST'))).toBe('POST 3')
+  // The draws are read again after the failed write.
+  await expect.poll(() => events.slice(before).indexOf('GET') > events.slice(before).indexOf('POST 3')).toBe(true)
+})
