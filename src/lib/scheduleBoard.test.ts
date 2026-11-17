@@ -24,6 +24,7 @@ import {
   dayLabel,
   dropRefusal,
   eventStatus,
+  eventsOnDay,
   hourLabel,
   jobLabel,
   jobSubline,
@@ -363,7 +364,12 @@ describe('boardHours', () => {
   })
 
   it('stops a visit that runs past midnight at the bottom of its day', () => {
-    expect(boardHours(days, [ev('a', at(22), new Date(2026, 9, 10, 2))])).toEqual({ first: 7, last: 24 })
+    expect(boardHours([days[0]], [ev('a', at(22), new Date(2026, 9, 10, 2))])).toEqual({ first: 7, last: 24 })
+  })
+
+  it('opens the next day at midnight for the rest of a visit that runs past it (D16)', () => {
+    expect(boardHours([days[1]], [ev('a', at(22), new Date(2026, 9, 10, 2))])).toEqual({ first: 0, last: 18 })
+    expect(boardHours(days, [ev('a', at(22), new Date(2026, 9, 10, 2))])).toEqual({ first: 0, last: 24 })
   })
 })
 
@@ -448,5 +454,23 @@ describe('dropRefusal', () => {
     for (const words of [dropRefusal(partner, company, friday, now), dropRefusal(own, company, yesterday, now), dropRefusal(own, null, friday, now)]) {
       expect(words).not.toMatch(/[-\u2013\u2014]/)
     }
+  })
+})
+
+describe('visits past midnight (D16)', () => {
+  const ev = (id: string, s: Date, e: Date | null) => ({ id, start_at: s.toISOString(), end_at: e ? e.toISOString() : null })
+  const pour = ev('pour', at(22), new Date(2026, 9, 10, 2))
+
+  it('lists a visit on every day it touches', () => {
+    expect(eventsOnDay(new Date(2026, 9, 9), [pour]).map((e) => e.id)).toEqual(['pour'])
+    expect(eventsOnDay(new Date(2026, 9, 10), [pour]).map((e) => e.id)).toEqual(['pour'])
+    expect(eventsOnDay(new Date(2026, 9, 11), [pour])).toEqual([])
+    // Ending exactly at midnight does not spill into the next day.
+    expect(eventsOnDay(new Date(2026, 9, 10), [ev('m', at(22), new Date(2026, 9, 10, 0))])).toEqual([])
+  })
+
+  it('draws the rest of the visit from midnight on the next day', () => {
+    const [item] = dayLayout(new Date(2026, 9, 10), [pour], 0, 60)
+    expect(item).toEqual({ id: 'pour', top: 0, height: 120, column: 0, columns: 1 })
   })
 })

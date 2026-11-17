@@ -9,6 +9,7 @@ import {
   clientsKey,
   dropScheduleEvent,
   ensureBookedJob,
+  inScheduleRange,
   invoicesKey,
   jobVisitsKey,
   noteContactsKey,
@@ -192,5 +193,20 @@ describe('scoped', () => {
       scoped(query, 'user-1', orgId)
       expect(calls).toEqual([['user_id', 'user-1']])
     }
+  })
+})
+
+describe('inScheduleRange (D16)', () => {
+  it('reads visits that start in the range and those still running into it from before', () => {
+    const calls: unknown[][] = []
+    const q = {
+      lt(...a: unknown[]) { calls.push(['lt', ...a]); return q },
+      or(...a: unknown[]) { calls.push(['or', ...a]); return q },
+    }
+    inScheduleRange(q, '2026-11-14T06:00:00.000Z', '2026-11-15T06:00:00.000Z')
+    expect(calls).toEqual([
+      ['lt', 'start_at', '2026-11-15T06:00:00.000Z'],
+      ['or', 'start_at.gte."2026-11-14T06:00:00.000Z",end_at.gt."2026-11-14T06:00:00.000Z"'],
+    ])
   })
 })

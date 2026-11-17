@@ -13,6 +13,7 @@ import {
   dayLabel,
   dayLayout,
   eventStatus,
+  eventsOnDay,
   hourLabel,
   slotId,
   timeRangeLabel,
@@ -58,17 +59,13 @@ export default function BoardGrid({ days, view, events, loading, failed = false,
   const { first, last } = useMemo(() => boardHours(days, events), [days, events])
   const hours = useMemo(() => Array.from({ length: last - first }, (_, i) => first + i), [first, last])
 
+  // Every day a visit touches, so one that runs past midnight shows its
+  // rest on the next day too.
   const byDay = useMemo(() => {
     const map = new Map<string, BoardEvent[]>()
-    for (const e of events) {
-      if (!e.start_at) continue
-      const key = ymdKey(new Date(e.start_at))
-      const list = map.get(key) || []
-      list.push(e)
-      map.set(key, list)
-    }
+    for (const day of days) map.set(ymdKey(day), eventsOnDay(day, events))
     return map
-  }, [events])
+  }, [days, events])
 
   const nowMinutes = now.getHours() * 60 + now.getMinutes()
   const nowTop = ((nowMinutes - first * 60) / 60) * HOUR_PX
