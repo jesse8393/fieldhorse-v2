@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildInvoicePdf, contractTotals, invoiceAmountDue, invoiceDescription, invoicePdfInput, suggestNextInvoice } from './invoices.ts'
+import { billTo, buildInvoicePdf, contractTotals, invoiceAmountDue, invoiceDescription, invoicePdfInput, suggestNextInvoice } from './invoices.ts'
 
 describe('contractTotals', () => {
   it('folds approved change orders into the contract', () => {
@@ -269,5 +269,45 @@ describe('an invoice with no job', () => {
     const input = invoicePdfInput({ invoice: { ...invoice, contact_id: 'c-1' }, contact, company })
     expect(input.showContractPosition).toBe(true)
     expect(input.contractTotal).toBe(10000)
+  })
+})
+
+// Audit finding DATA-05: a job copies the client's phone and email when it
+// is made. The client record is where they are kept current, so an invoice
+// for the job goes to the client's email as it is now.
+describe('billTo', () => {
+  const job = {
+    id: 'job-1', name: 'Dana Whitfield', email: 'dana@oldmail.com', phone: '615-555-0100', address: '12 Site Rd', job_title: 'Driveway',
+    fh_clients: { name: 'Dana Whitfield-Ross', email: 'dana@newmail.com', phone: '615-555-0199', address: '9 Home St' }
+  }
+
+  it("uses the linked client's current email and phone over the job's copy", () => {
+    const to = billTo(job, null)
+    expect(to.email).toBe('dana@newmail.com')
+    expect(to.phone).toBe('615-555-0199')
+  })
+
+  it("keeps the job's own name and site address", () => {
+    expect(billTo(job, null).name).toBe('Dana Whitfield')
+    expect(billTo(job, null).address).toBe('12 Site Rd')
+  })
+
+  it("falls back to the job's copy when the client has none", () => {
+    const to = billTo({ ...job, fh_clients: { name: '', email: null, phone: '  ', address: null } }, null)
+    expect(to.email).toBe('dana@oldmail.com')
+    expect(to.phone).toBe('615-555-0100')
+  })
+
+  it("reads the invoice's client when the job has no client joined", () => {
+    const to = billTo({ ...job, fh_clients: null }, { id: 'cl-1', name: 'Dana W', email: 'dana@newmail.com', phone: null, address: null })
+    expect(to.email).toBe('dana@newmail.com')
+    expect(to.phone).toBe('615-555-0100')
+  })
+
+  it('sends the email of a job invoice to the client, as the PDF prints it', () => {
+    const invoice = { id: 'i1', contact_id: 'job-1', client_id: 'cl-1', title: 'Deposit', amount: 500, status: 'draft', sequence_number: 1, due_at: null, notes: null, description: null } as any
+    const input = invoicePdfInput({ invoice, contact: job, company: { name: 'Parker Construction Co.' } })
+    expect(input.contact.email).toBe('dana@newmail.com')
+    expect(input.contact.phone).toBe('615-555-0199')
   })
 })

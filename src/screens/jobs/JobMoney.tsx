@@ -15,7 +15,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, authHeaders } from '../../lib/supabase.ts'
 import { useInvoiceDetail, useInvalidateInvoiceDetail } from '../../lib/queries.ts'
 import { reviewInvoice } from '../../lib/invoiceReview.js'
-import { fetchInvoicesForContact, createInvoice, invoiceAmountDue, invoiceDescription, sendInvoiceEmail } from '../../lib/invoices.ts'
+import { billTo, fetchInvoicesForContact, createInvoice, invoiceAmountDue, invoiceDescription, sendInvoiceEmail } from '../../lib/invoices.ts'
 import { pickBalanceInvoice } from '../../lib/invoiceSettlement.ts'
 import { moneyExact } from '../../lib/format.ts'
 import { deletePayment } from '../../lib/stages.ts'
@@ -191,17 +191,12 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
   const shareLabel = sharing ? 'Minting…' : 'Share link'
   const downloadLabel = generating ? 'Generating…' : 'Download'
 
-  // Resolved client info, prefer the denormalized job-row fields, fall
-  // back to fh_clients (the source of truth when edits happen on the
-  // client card and the job row stayed empty).
+  // Who this job bills, by the rule every invoice uses (billTo): the email
+  // and phone from fh_clients, where the office keeps them current, and the
+  // job row's copy only when the client has none (DATA-05).
   const resolved = useMemo(() => {
-    const cli: any = contact?.fh_clients || {}
-    return {
-      name:    contact?.name    || cli.name    || '',
-      email:   contact?.email   || cli.email   || '',
-      phone:   contact?.phone   || cli.phone   || '',
-      address: contact?.address || cli.address || ''
-    }
+    const to = billTo(contact, null)
+    return { name: to.name, email: to.email, phone: to.phone, address: to.address }
   }, [contact])
 
   const totals = useMemo(() => {

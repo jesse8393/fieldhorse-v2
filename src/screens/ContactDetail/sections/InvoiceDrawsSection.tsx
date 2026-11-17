@@ -40,7 +40,7 @@ import { Eyebrow } from '../../../components/v3'
 import { countNoun } from '../../../lib/format.ts'
 import { fetchInvoiceReviewContext } from '../../../lib/invoiceReviewContext.ts'
 import { reviewInvoice } from '../../../lib/invoiceReview.js'
-import { fetchInvoicesForContact, invoiceAmountDue, invoiceDescription, retryOnce } from '../../../lib/invoices.ts'
+import { billTo, fetchInvoicesForContact, invoiceAmountDue, invoiceDescription, retryOnce } from '../../../lib/invoices.ts'
 import { invoicesPaidInFull } from '../../../lib/invoiceSettlement.ts'
 import { drawsFromTerms } from '../../../lib/paymentSchedule.ts'
 import { quoteMoney } from '../../../lib/quoteMoney.ts'
@@ -362,11 +362,26 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
     return invoiceAmountDue({ invoice: draw, contact, payments, changeOrders, invoices: draws })
   }
 
+  // Who the draw bills, by the rule every invoice uses (billTo): the email
+  // and phone of the linked client as it is now, read fresh, since the job
+  // row keeps the copy from when the job was made (DATA-05). A client this
+  // person cannot read leaves the job's copy.
+  async function drawRecipient() {
+    if (!contact?.client_id) return billTo(contact, null)
+    const { data, error } = await supabase
+      .from('fh_clients')
+      .select('name, email, phone, address')
+      .eq('id', contact.client_id)
+      .maybeSingle()
+    if (error) throw new Error("Couldn't read the client's email. Check your connection and try again.")
+    return billTo({ ...contact, fh_clients: data ?? null }, null)
+  }
+
   // Shared per-draw PDF builder. Used by both Download (local save)
   // and Send (upload to job-files + POST to /api/send-invoice). The
   // job_title slot carries "Draw N of M, {label}" so the invoice
   // letterhead title reflects which draw the customer is receiving.
-  async function buildDrawPdf(draw: any) {
+  async function buildDrawPdf(draw: any, to: ReturnType<typeof billTo>) {
     const allActiveDraws = draws.filter((d) => d.status !== 'void')
     const drawCount = allActiveDraws.length
     const drawTitle = draw.title?.trim()
@@ -377,10 +392,10 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       company,
       contact: {
         id: contact.id,
-        name: contact.name || 'Client',
-        address: contact.address,
-        phone: contact.phone,
-        email: contact.email,
+        name: to.name || 'Client',
+        address: to.address,
+        phone: to.phone,
+        email: to.email,
         job_title: `${drawTitle}, ${contact.job_title || 'Construction services'}`
       },
       lineItems: [
@@ -428,7 +443,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
     }
     setBusyId(draw.id)
     try {
-      const result = await buildDrawPdf(draw)
+      const result = await buildDrawPdf(draw, await drawRecipient())
       if (!result?.doc) throw new Error('PDF generator returned no document')
       const { downloadPdf } = await loadPdf()
       downloadPdf(result)
@@ -445,25 +460,12 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
   // upload to job-files (server uses service-role to pull it) → POST
   // to send-invoice → flip the draw's status to 'sent' on success.
   //
-  // Requires the contact to have an email on file. The recipient
-  // resolution lives at this surface (uses the linked client's email
-  // as fallback when the contact row's email is empty, matching the
-  // pattern in Invoices.jsx).
+  // Requires an email on file: the linked client's, read fresh, else the
+  // job row's own (drawRecipient). With neither, a friendly toast points
+  // the operator at the right place to fill it in.
   async function handleSend(draw: any) {
     if (busyId) return
     if (!user?.id) return
-    // Use contact.email directly. The fh_clients-join fallback the
-    // Invoices list does isn't available in useJobData yet, so an
-    // empty contact email surfaces a friendly toast pointing the
-    // operator at the right place to fill it in.
-    const recipientEmail = (contact?.email || '').trim()
-    if (!recipientEmail) {
-      toastError(
-        'Add a client email first',
-        `Open ${contact?.name || 'this contact'} to add an email, then try again.`
-      )
-      return
-    }
     if (draw.status === 'draft') {
       const review = reviewInvoice({ invoice: draw, invoices: draws, contractTotal })
       if (review.excess > 0 || review.duplicates.length) {
@@ -474,7 +476,16 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
     }
     setBusyId(draw.id)
     try {
-      const result = await buildDrawPdf(draw)
+      const to = await drawRecipient()
+      const recipientEmail = to.email
+      if (!recipientEmail) {
+        toastError(
+          'Add a client email first',
+          `Open ${to.name || 'this contact'} to add an email, then try again.`
+        )
+        return
+      }
+      const result = await buildDrawPdf(draw, to)
       if (!result?.doc) throw new Error('PDF generator returned no document')
 
       // Upload to private job-files bucket so the server can fetch

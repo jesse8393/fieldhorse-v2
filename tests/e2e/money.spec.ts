@@ -61,7 +61,9 @@ function payment(partial: Record<string, unknown>) {
 }
 
 const CONTACTS = [
-  contact({ id: 'c-rosa', stage: 'job', name: 'Rosa Delgado', email: 'rosa@example.com', job_title: 'Concrete steps', amount: 8000 }),
+  // Rosa's job is linked to her own client record, which is where an
+  // invoice's email comes from (DATA-05).
+  contact({ id: 'c-rosa', stage: 'job', name: 'Rosa Delgado', email: 'rosa@example.com', job_title: 'Concrete steps', amount: 8000, fh_clients: { ...CLIENT, name: 'Rosa Delgado', email: 'rosa@example.com' } }),
   contact({ id: 'c-lorraine', stage: 'job', name: 'Lorraine Beasley', job_title: 'Bath retile', amount: 9000 }),
   contact({ id: 'c-gail', stage: 'job', name: 'Gail Abernathy', job_title: 'Roof repair', amount: 6000 }),
   contact({ id: 'c-darnell', stage: 'closed', name: 'Darnell Whitcomb', job_title: 'Garage slab', amount: 9600, cost: 6960, completed_at: '2026-09-29T12:00:00Z' }),
@@ -295,7 +297,7 @@ async function remindTwoQuickly(page: Page, sends: HeldSend[]) {
   // Then Lorraine's: her screen leaves once the email is out.
   sends[1].release()
   await expect(moneyHeading(page)).toBeVisible({ timeout: 15_000 })
-  await expect(page.getByText('Reminder sent to x@y.com', { exact: false }).first()).toBeVisible()
+  await expect(page.getByText('Reminder sent to jeff@roy.com', { exact: false }).first()).toBeVisible()
   await page.waitForTimeout(800)
   expect(sends).toHaveLength(2)
 }
@@ -641,7 +643,7 @@ async function otherScreenSettlesWhenTheEmailLands(page: Page, phone: boolean, s
   await openInvoiceRow(page, 'Overdue', /^Lorraine Beasley/, 'i-lorraine')
   const lorraineResend = page.getByRole('button', { name: 'Resend', exact: true })
   await tapThroughTheLanding(page, phone, lorraineResend, sends[1], false)
-  await expect(page.getByText('Reminder sent to x@y.com', { exact: false }).first()).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByText('Reminder sent to jeff@roy.com', { exact: false }).first()).toBeVisible({ timeout: 15_000 })
   await page.waitForTimeout(1_000)
   expect(sends.map((s) => s.contact)).toEqual(['c-rosa', 'c-lorraine'])
 }
@@ -1063,7 +1065,7 @@ test.describe('money on a phone', () => {
     await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(1)
     await expect(page.getByText('Invoice sent to', { exact: false }).first()).toBeVisible({ timeout: 15_000 })
     await expect(resend).not.toHaveAttribute('aria-busy', 'true')
-    expect(JSON.parse(sends[0]).recipient_email).toBe('x@y.com')
+    expect(JSON.parse(sends[0]).recipient_email).toBe('jeff@roy.com')
     await page.waitForTimeout(800)
     expect(sends).toHaveLength(1)
   })

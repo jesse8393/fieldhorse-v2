@@ -170,9 +170,12 @@ export async function createInvoice({ contact = null, contactId = null, clientId
 }
 
 /**
- * Who an invoice bills, for the PDF, the email and the screens: the job's
- * own details first (the job row carries the customer as it was at the
- * time), then the client it or the invoice points at.
+ * Who an invoice bills, for the PDF, the email and the screens. Where it is
+ * sent and which phone is dialled come from the client the job or the
+ * invoice points at, since the client record is where they are kept
+ * current; the job's own copy, taken when the job was made, only fills a
+ * gap (DATA-05). The name and the address are the job's own first: the
+ * address is the site, which a job may change.
  */
 export type BillTo = {
   id: string | null
@@ -192,8 +195,8 @@ export function billTo(
   return {
     id: job?.id || client?.id || null,
     name: pick(job?.name, cli.name) || pick(client?.name, ''),
-    email: pick(job?.email, cli.email) || pick(client?.email, ''),
-    phone: pick(job?.phone, cli.phone) || pick(client?.phone, ''),
+    email: pick(cli.email, client?.email) || pick(job?.email, ''),
+    phone: pick(cli.phone, client?.phone) || pick(job?.phone, ''),
     address: pick(job?.address, cli.address) || pick(client?.address, ''),
     job_title: job?.job_title?.trim() || null
   }
