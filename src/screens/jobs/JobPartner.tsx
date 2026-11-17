@@ -14,6 +14,7 @@ import { toastError, toastSuccess } from '../../lib/toast.ts'
 import { hapticMedium, hapticTap } from '../../lib/haptics.ts'
 import PartnerAccessDetails from '../../components/PartnerAccessDetails.tsx'
 import { JobScreenFallback, useJobScreen } from './jobScreen.tsx'
+import { plainError } from '../../lib/serviceErrors.ts'
 
 const ROLES = PARTNER_ROLES.map((r) => ({ value: r, label: r }))
 
@@ -106,7 +107,7 @@ function PartnerForm({ contactId, contactName, userId, goBack, home }: {
         goBack()
       }
     } catch (e) {
-      const message = (e as { message?: string })?.message || 'Check your connection and try again.'
+      const message = plainError(e, 'The invite was not sent. Check your connection and try again.', { kept: true })
       setError(message)
       toastError("Couldn't send invite", message)
     } finally {

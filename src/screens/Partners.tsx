@@ -32,6 +32,7 @@ import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import SnowPartnersBuild from '../components/desktop/SnowPartnersBuild.tsx'
 import PartnerAccessDetails from '../components/PartnerAccessDetails.tsx'
 import { partnerHasStatus, summarizePartnerShares } from '../lib/partnerView.ts'
+import { plainError } from '../lib/serviceErrors.ts'
 
 const STATUS_FILTERS = [
   { id: 'all',      label: 'All',      match: () => true },
@@ -105,7 +106,7 @@ export default function Partners() {
       }
     } catch (err: any) {
       hapticError()
-      toastError("Couldn't resend", err?.message || 'Unknown error')
+      toastError("Couldn't resend", plainError(err, 'Try again.'))
     } finally {
       setBusyKey(null)
     }
@@ -130,7 +131,7 @@ export default function Partners() {
       await load()
     } catch (err: any) {
       hapticError()
-      toastError("Couldn't revoke", err?.message || 'Unknown error')
+      toastError("Couldn't revoke", plainError(err, 'Try again.'))
     } finally {
       setBusyKey(null)
     }

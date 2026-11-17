@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext.tsx'
 import { supabase } from '../lib/supabase.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { Eyebrow } from './v3'
+import { plainError } from '../lib/serviceErrors.ts'
 
 // Public bucket (the one onboarding's LogoUploader uses), so the stored
 // URL never expires.
@@ -137,7 +138,7 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
       resetPicker()
       void removeOldLogoFiles(user.id, previousUrl)
     } catch (ex: any) {
-      toastError("Couldn't upload logo", ex?.message || 'Try again in a moment.')
+      toastError("Couldn't upload logo", plainError(ex, 'Try again in a moment.'))
     } finally {
       setBusy(false)
     }
@@ -155,7 +156,7 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
       resetPicker()
       void removeOldLogoFiles(user.id, previousUrl)
     } catch (ex: any) {
-      toastError("Couldn't remove logo", ex?.message || 'Try again in a moment.')
+      toastError("Couldn't remove logo", plainError(ex, 'Try again in a moment.'))
     } finally {
       setBusy(false)
     }

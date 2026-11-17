@@ -8,6 +8,7 @@ import { notifySelf } from '../../../lib/notifications.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { toastError } from '../../../lib/toast.ts'
 import { Eyebrow } from '../../../components/v3'
+import { plainError } from '../../../lib/serviceErrors.ts'
 
 const TRADES = [
   'Concrete', 'Framing', 'Roofing', 'Electrical', 'Plumbing',
@@ -51,7 +52,7 @@ export default function InspectionsSection({ contact, inspections = [], userId, 
       data: { notes: notes || '' }
     })
     if (error) {
-      toastError("Couldn't log inspection", error.message)
+      toastError("Couldn't log inspection", plainError(error, 'Try again.'))
       return
     }
     notifySelf(userId, {

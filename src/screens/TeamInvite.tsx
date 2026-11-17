@@ -15,6 +15,7 @@ import type { OrgRole } from '../lib/permissions.ts'
 import { ORG_ROLES } from '../lib/permissions.ts'
 import { toastError, toastSuccess } from '../lib/toast.ts'
 import { hapticMedium, hapticTap } from '../lib/haptics.ts'
+import { plainError } from '../lib/serviceErrors.ts'
 
 const ROLE_TIER: Record<string, number> = { crew: 0, foreman: 1, manager: 2, admin: 3, owner: 4 }
 
@@ -54,7 +55,7 @@ export default function TeamInvite() {
       hapticMedium()
       setAcceptUrl(res.accept_url)
     } catch (e: any) {
-      setError(e?.detail || e?.message || 'Could not create the invite.')
+      setError(plainError(e, 'Could not create the invite.'))
     } finally {
       setSending(false)
     }

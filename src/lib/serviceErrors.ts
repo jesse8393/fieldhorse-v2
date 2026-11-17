@@ -133,7 +133,9 @@ function fieldsOf(error: unknown): Fields {
     fnCode,
     said,
     provider: e.provider_status != null,
-    plainError: error instanceof Error && (error.constructor === Error) && !code && !status
+    // Our own Errors and their subclasses keep the name Error; the
+    // browser's and the libraries' carry their own (TypeError, AuthApiError).
+    plainError: error instanceof Error && error.name === 'Error' && !code && !status
   }
 }
 

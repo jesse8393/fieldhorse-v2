@@ -31,6 +31,7 @@ import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { SCHEDULE_WEEK_START, startOfWeek } from '../lib/scheduleDates.ts'
 import { jobLabel, trayJobs } from '../lib/scheduleBoard.ts'
 import './schedule/schedule-event.css'
+import { plainError } from '../lib/serviceErrors.ts'
 const SnowSchedule = lazy(() => import('../components/desktop/SnowScheduleBuild.tsx'))
 
 const VIEWS = [
@@ -219,7 +220,7 @@ export default function Schedule() {
         .from('fh_schedule').select('*').eq('recurring', seriesId)
       const { data: removed, error: serr } = await supabase
         .from('fh_schedule').delete().eq('recurring', seriesId).select('id')
-      if (serr) { toastError("Couldn't delete", serr.message); return }
+      if (serr) { toastError("Couldn't delete", plainError(serr, 'Try again.')); return }
       if (!removed?.length) { toastError("Couldn't delete", 'This series was not removed. Refresh and try again.'); return }
       for (const r of removed) dropScheduleEvent((r as any).id)
       const n = removed.length
@@ -230,7 +231,7 @@ export default function Schedule() {
           const rows = (seriesRows || []).map(({ fh_contacts, ...row }: any) => row)
           if (rows.length) {
             const { error: insErr } = await supabase.from('fh_schedule').insert(rows)
-            if (insErr) { toastError("Couldn't undo", insErr.message); return }
+            if (insErr) { toastError("Couldn't undo", plainError(insErr, 'Try again.')); return }
           }
           load(); loadUpcoming()
           toastSuccess('Restored', snapshot?.title || '')
@@ -247,7 +248,7 @@ export default function Schedule() {
     const snapshot = (events || []).find((e: any) => e.id === evtId) || (upcoming || []).find((e: any) => e.id === evtId)
     const { data: removed, error } = await supabase.from('fh_schedule').delete().eq('id', evtId).select('id')
     if (error) {
-      toastError("Couldn't delete", error.message)
+      toastError("Couldn't delete", plainError(error, 'Try again.'))
       return
     }
     if (!removed?.length) {
@@ -264,7 +265,7 @@ export default function Schedule() {
         // eslint-disable-next-line no-unused-vars
         const { fh_contacts, ...row } = snapshot
         const { error: insErr } = await supabase.from('fh_schedule').insert(row)
-        if (insErr) { toastError("Couldn't undo", insErr.message); return }
+        if (insErr) { toastError("Couldn't undo", plainError(insErr, 'Try again.')); return }
         load()
         loadUpcoming()
         toastSuccess('Restored', snapshot.title || '')

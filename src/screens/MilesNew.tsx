@@ -16,6 +16,7 @@ import { todayYmd } from '../lib/dates.ts'
 import { toastError, toastSuccess } from '../lib/toast.ts'
 import { hapticMedium } from '../lib/haptics.ts'
 import { businessMileageRate, mileageRateNote } from '../lib/mileageRates.ts'
+import { plainError } from '../lib/serviceErrors.ts'
 
 // The IRS rate depends on the date of the drive, from the same table
 // Reports reads, so the screen and the yearly total always agree.
@@ -73,8 +74,8 @@ export default function MilesNew() {
     })
     if (err) {
       setSaving(false)
-      setError(err.message || 'The miles were not saved.')
-      toastError("Couldn't log miles", err.message || 'Try again in a moment.')
+      setError(plainError(err, 'The miles were not saved. Try again.', { kept: true }))
+      toastError("Couldn't log miles", plainError(err, 'Try again in a moment.'))
       return
     }
     hapticMedium()

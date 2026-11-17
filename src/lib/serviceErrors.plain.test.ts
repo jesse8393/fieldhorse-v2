@@ -135,6 +135,10 @@ describe('plainError', () => {
   it('passes through a plain sentence our own code threw', () => {
     expect(plainError(new Error('Enter a client.'), FALLBACK)).toBe('Enter a client.')
     expect(plainError(new Error('Only $40.00 remains unreserved on this contract.'), FALLBACK)).toBe('Only $40.00 remains unreserved on this contract.')
+    class CrewUnavailable extends Error {}
+    expect(plainError(new CrewUnavailable('Crew assignment is not available yet.'), FALLBACK)).toBe('Crew assignment is not available yet.')
+    const domish = Object.assign(new Error('The operation was aborted.'), { name: 'AbortError' })
+    expect(plainError(domish, FALLBACK)).toBe(FALLBACK)
   })
 
   it("maps our functions' codes, preferring the plain sentence the function sent", () => {

@@ -28,6 +28,7 @@ import { SkeletonList } from '../../../components/Skeleton.tsx'
 import { useArmedId } from '../../../lib/secondTap.ts'
 import { Eyebrow } from '../../../components/v3'
 import { moneyExact } from '../../../lib/format.ts'
+import { plainError } from '../../../lib/serviceErrors.ts'
 
 const SkeletonAny = SkeletonList as any
 
@@ -127,7 +128,7 @@ export default function MaterialsSection({ jobId, userId }: any) {
       .order('created_at', { ascending: false })
       .limit(500)
     if (error) {
-      toastError("Couldn't load materials", error.message)
+      toastError("Couldn't load materials", plainError(error, 'Try again.'))
       setRows([])
     } else {
       setRows(((data || []) as any[]) as MaterialRow[])
@@ -153,7 +154,7 @@ export default function MaterialsSection({ jobId, userId }: any) {
       supplier,
       unit_cost,
     } as any)
-    if (error) { toastError("Couldn't add", error.message); return }
+    if (error) { toastError("Couldn't add", plainError(error, 'Try again.')); return }
     setDraft({ name: '', qty: '1', unit: 'EA', supplier: '', unit_cost: '' })
     toastSuccess('Added')
     load()
@@ -172,7 +173,7 @@ export default function MaterialsSection({ jobId, userId }: any) {
       unit: 'EA',
     }))
     const { error } = await supabase.from('fh_materials').insert(payload as any)
-    if (error) { toastError("Couldn't bulk add", error.message); return }
+    if (error) { toastError("Couldn't bulk add", plainError(error, 'Try again.')); return }
     toastSuccess(`Added ${parsed.length} item${parsed.length === 1 ? '' : 's'}`)
     closeBulk()
     load()
@@ -182,7 +183,7 @@ export default function MaterialsSection({ jobId, userId }: any) {
     const before = rows
     setRows((rs) => rs.map((r) => r.id === id ? { ...r, ...(p as any) } : r))
     const { error } = await supabase.from('fh_materials').update(p as any).eq('id', id)
-    if (error) { toastError("Couldn't update", error.message); setRows(before) }
+    if (error) { toastError("Couldn't update", plainError(error, 'Try again.')); setRows(before) }
   }
 
   async function markOrdered(id: string) {
@@ -217,7 +218,7 @@ export default function MaterialsSection({ jobId, userId }: any) {
       hapticTap()
       setRows((rs) => rs.filter((r) => r.id !== id))
       void supabase.from('fh_materials').delete().eq('id', id).then(({ error }) => {
-        if (error) { toastError("Couldn't delete", error.message); load() }
+        if (error) { toastError("Couldn't delete", plainError(error, 'Try again.')); load() }
       })
     })
   }
@@ -360,7 +361,7 @@ export default function MaterialsSection({ jobId, userId }: any) {
               source: { from: 'note', note_id: it.note_id },
             }))
             const { error } = await supabase.from('fh_materials').insert(payload as any)
-            if (error) toastError("Couldn't add", error.message)
+            if (error) toastError("Couldn't add", plainError(error, 'Try again.'))
             else { toastSuccess(`Added ${items.length}`); closeNotes(); load() }
           }}
         />

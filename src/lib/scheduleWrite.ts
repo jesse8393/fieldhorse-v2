@@ -7,6 +7,7 @@
 import type { QueryClient } from '@tanstack/react-query'
 import { supabase } from './supabase.ts'
 import { allocationWriteError } from './scheduleAllocation.ts'
+import { plainError } from './serviceErrors.ts'
 
 /**
  * Every read that shows visits: the Schedule's own lists, a lead's next
@@ -107,10 +108,10 @@ export async function createScheduleEvent(input: ScheduleEventInput): Promise<Cr
 export async function deleteScheduleEvent(id: string): Promise<{ ok: true } | { error: string }> {
   try {
     const { data, error } = await supabase.from('fh_schedule').delete().eq('id', id).select('id')
-    if (error) return { error: error.message || 'Try again.' }
+    if (error) return { error: plainError(error, 'The event was not removed. Try again.') }
     if (!data?.length) return { error: 'The event was not removed. Refresh and try again.' }
     return { ok: true }
   } catch (e) {
-    return { error: (e as { message?: string })?.message || 'Try again.' }
+    return { error: plainError(e, 'The event was not removed. Try again.') }
   }
 }

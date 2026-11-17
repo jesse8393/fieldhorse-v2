@@ -10,6 +10,7 @@ import { SkeletonList } from '../../../components/Skeleton.tsx'
 import { dateInputToTimestamp, timestampToDateInput, dueStatus } from '../../../lib/dueDate.ts'
 import { orgMembersList, type OrgMember } from '../../../lib/orgApi.ts'
 import { Eyebrow } from '../../../components/v3'
+import { plainError } from '../../../lib/serviceErrors.ts'
 
 /**
  * Tasks section, backed by fh_job_todos. Owns its own fetch (independent of
@@ -138,7 +139,7 @@ export default function TodosSection({ jobId, userId, compact = false, onOpenTas
       if (assignDraft) payload.assigned_to = assignDraft
       const { queued, error } = await resilientInsert('fh_job_todos', payload)
       if (error) {
-        toastError("Couldn't add task", error.message)
+        toastError("Couldn't add task", plainError(error, 'Try again.'))
         return
       }
       if (queued) toastSuccess('Saved offline', 'Will sync when signal returns')
@@ -168,7 +169,7 @@ export default function TodosSection({ jobId, userId, compact = false, onOpenTas
       .eq('id', rowId)
       .select('id')
     if (error || !data?.length) {
-      toastError("Couldn't reassign", error?.message || 'This task may have been deleted.')
+      toastError("Couldn't reassign", plainError(error, 'This task may have been deleted.'))
       fetchRows()
     } else onChanged?.()
   }
@@ -183,7 +184,7 @@ export default function TodosSection({ jobId, userId, compact = false, onOpenTas
       .eq('id', rowId)
       .select('id')
     if (error || !data?.length) {
-      toastError("Couldn't update due date", error?.message || 'This task may have been deleted.')
+      toastError("Couldn't update due date", plainError(error, 'This task may have been deleted.'))
       fetchRows()
     } else onChanged?.()
   }
@@ -206,7 +207,7 @@ export default function TodosSection({ jobId, userId, compact = false, onOpenTas
       { userId }
     )
     if (error) {
-      toastError("Couldn't update", error.message)
+      toastError("Couldn't update", plainError(error, 'Try again.'))
       fetchRows() // rollback to truth
     } else {
       onChanged?.()
@@ -222,7 +223,7 @@ export default function TodosSection({ jobId, userId, compact = false, onOpenTas
     setRows((rs) => rs.filter((r) => r.id !== rowId)) // optimistic
     const { data, error } = await supabase.from('fh_job_todos').delete().eq('id', rowId).select('id')
     if (error || !data?.length) {
-      toastError("Couldn't delete", error?.message || 'This task may already be gone.')
+      toastError("Couldn't delete", plainError(error, 'This task may already be gone.'))
       fetchRows()
       return
     }
@@ -232,7 +233,7 @@ export default function TodosSection({ jobId, userId, compact = false, onOpenTas
       onUndo: async () => {
         if (!snapshot) return
         const { error: insErr } = await supabase.from('fh_job_todos').insert(snapshot)
-        if (insErr) { toastError("Couldn't undo", insErr.message); return }
+        if (insErr) { toastError("Couldn't undo", plainError(insErr, 'Try again.')); return }
         fetchRows()
         onChanged?.()
         toastSuccess('Restored')

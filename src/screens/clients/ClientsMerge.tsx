@@ -26,6 +26,7 @@ import { toastSuccess, toastError } from '../../lib/toast.ts'
 import { countNoun } from '../../lib/format.ts'
 import { useArmedId } from '../../lib/secondTap.ts'
 import './clients-merge.css'
+import { plainError } from '../../lib/serviceErrors.ts'
 
 function fmtPhone(n: any) {
   if (!n) return ''
@@ -168,7 +169,7 @@ export default function ClientsMerge() {
       void invalidateClients()
     } catch (err: any) {
       hapticError()
-      toastError("Couldn't merge", err?.message || 'Unknown error')
+      toastError("Couldn't merge", plainError(err, 'Try again.'))
     } finally {
       setBusyKey(null)
     }

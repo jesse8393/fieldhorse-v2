@@ -24,6 +24,7 @@ import { money } from '../../../components/documents/format.ts'
 import { useMembership } from '../../../contexts/MembershipContext.tsx'
 import { canEditJobMoney } from '../lib/jobAccess.ts'
 import { moneyInput } from '../../new/CreateShell.tsx'
+import { plainError } from '../../../lib/serviceErrors.ts'
 
 function shortDate(iso: any) {
   if (!iso) return ''
@@ -124,7 +125,7 @@ export default function ChangeOrdersSection({ contact, userId, changeOrders = []
       onChange?.()
       return true
     } catch (e: any) {
-      toastError("Couldn't save change order", e?.message || 'Try again.')
+      toastError("Couldn't save change order", plainError(e, 'Try again.'))
       return false
     }
   }
@@ -181,7 +182,7 @@ export default function ChangeOrdersSection({ contact, userId, changeOrders = []
       await navigator.clipboard.writeText(link.url)
       toastSuccess('Approval link copied', 'Text it to the customer, they sign right on the page')
     } catch (e: any) {
-      toastError("Couldn't create approval link", e?.message || 'Try again.')
+      toastError("Couldn't create approval link", plainError(e, 'Try again.'))
     }
   }
 
@@ -212,7 +213,7 @@ export default function ChangeOrdersSection({ contact, userId, changeOrders = []
       }
       toastSuccess('Change order deleted', '')
     } catch (e: any) {
-      toastError("Couldn't delete change order", e?.message || 'Try again.')
+      toastError("Couldn't delete change order", plainError(e, 'Try again.'))
     }
   }
 

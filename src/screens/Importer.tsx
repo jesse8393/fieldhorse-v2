@@ -26,6 +26,7 @@ import {
   type HeaderMap, type ImportField, type ImportRecord
 } from '../lib/importMapping.ts'
 import { runImport } from '../lib/importRun.ts'
+import { plainError } from '../lib/serviceErrors.ts'
 
 export default function Importer() {
   const isDesktop = useIsDesktop()
@@ -226,7 +227,7 @@ export default function Importer() {
         `${mappedCount} of ${TARGET_FIELDS.length} ${countNoun(TARGET_FIELDS.length, 'field')} matched`
       )
     } catch (e: any) {
-      toastError("Couldn't map automatically", e?.message || 'Try the manual mapping below.')
+      toastError("Couldn't map automatically", plainError(e, 'Try the manual mapping below.'))
     } finally {
       setAiMapping(false)
     }
@@ -266,8 +267,8 @@ export default function Importer() {
       // read like the haptic was conditional on the whole line. Split
       // for symmetry with the success path.
       const msg = landed > 0
-        ? `Imported ${landed} of ${payload.length}. The rest did not import: ${error.message}`
-        : error.message
+        ? `Imported ${landed} of ${payload.length}. The rest did not import. ${plainError(error, 'Try again.')}`
+        : plainError(error, 'Nothing was imported. Try again.')
       // The rows that landed now read as repeats; skip them on a retry.
       setIncludeRepeats(false)
       setDone({ err: msg })

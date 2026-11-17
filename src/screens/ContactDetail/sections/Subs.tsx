@@ -9,6 +9,7 @@ import { formatPhone } from '../../../lib/utils.ts'
 import { Button, Field } from '../../../components/fh'
 import { Choices } from '../../../screens/new/CreateShell.tsx'
 import { Eyebrow } from '../../../components/v3'
+import { plainError } from '../../../lib/serviceErrors.ts'
 
 const SUB_STATUSES = [
   { value: 'scheduled', label: 'Scheduled' },
@@ -62,7 +63,7 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }: an
       status: form.status
     })
     if (error) {
-      toastError("Couldn't add sub", error.message)
+      toastError("Couldn't add sub", plainError(error, 'Try again.'))
       setSaving(false)
       return
     }
@@ -78,7 +79,7 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }: an
     // Match by id only: a teammate must be able to remove a sub someone else
     // added. RLS scopes the company; an empty result means nothing was removed.
     const { data: removed, error } = await supabase.from('fh_subs').delete().eq('id', id).select('id')
-    if (error) { toastError("Couldn't delete", error.message); return }
+    if (error) { toastError("Couldn't delete", plainError(error, 'Try again.')); return }
     if (!removed || removed.length === 0) {
       toastError("Couldn't delete", 'This sub may already be gone, or your role cannot remove it.')
       fetchAll?.()
@@ -91,7 +92,7 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }: an
       onUndo: async () => {
         if (!snapshot) return
         const { error: insErr } = await supabase.from('fh_subs').insert(snapshot)
-        if (insErr) { toastError("Couldn't undo", insErr.message); return }
+        if (insErr) { toastError("Couldn't undo", plainError(insErr, 'Try again.')); return }
         await recalcCost(contact.id, userId)
         fetchAll?.()
         toastSuccess('Restored', snapshot.name || '')

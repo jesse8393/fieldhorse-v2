@@ -13,6 +13,7 @@ import { useAuth } from '../contexts/AuthContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
 import { orgInviteAccept, orgInviteInfo, type OrgInviteInfo } from '../lib/orgApi.ts'
+import { plainError } from '../lib/serviceErrors.ts'
 
 type Phase =
   | 'loading'
@@ -53,7 +54,7 @@ export default function OrgInvite() {
       .catch((e: any) => {
         if (cancelled) return
         if (e?.status === 404) setPhase('not_found')
-        else { setPhase('error'); setErrMsg(e?.message || 'Could not load invite.') }
+        else { setPhase('error'); setErrMsg(plainError(e, 'Could not load the invite. Try again.')) }
       })
     return () => { cancelled = true }
   }, [token])
@@ -75,7 +76,7 @@ export default function OrgInvite() {
       if (e?.status === 403 && e?.message === 'email_mismatch') setPhase('mismatch')
       else if (e?.status === 410 && e?.message === 'invite_already_used') setPhase('used')
       else if (e?.status === 410) setPhase('expired')
-      else { setPhase('error'); setErrMsg(e?.detail || e?.message || 'Accept failed.') }
+      else { setPhase('error'); setErrMsg(plainError(e, 'The invite was not accepted. Try again.')) }
     }
   }
 

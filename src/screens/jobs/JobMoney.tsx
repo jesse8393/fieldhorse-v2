@@ -123,7 +123,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
   const payments = useMemo(() => bundle?.payments ?? [], [bundle])
   const insurance = bundle?.insurance ?? null
   const changeOrders = useMemo(() => bundle?.changeOrders ?? [], [bundle])
-  const error = isError ? (queryError?.message || 'Could not load invoice') : ''
+  const error = isError ? plainError(queryError, 'Could not load the invoice. Check your connection and try again.') : ''
 
   // First-class invoice draws (fh_invoices) for this job. fh_contacts has
   // no due_at column, the real issue/due dates, invoice number, and the
@@ -309,7 +309,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
       downloadPdf(result)
       toastSuccess('Invoice PDF downloaded', result.filename)
     } catch (e: any) {
-      toastError("Couldn't generate PDF", e?.message || 'Try again')
+      toastError("Couldn't generate PDF", plainError(e, 'Try again.'))
     } finally {
       setGenerating(false)
     }
@@ -344,7 +344,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
         toastSuccess('Share link ready', link.url)
       }
     } catch (e: any) {
-      toastError("Couldn't mint share link", e?.message || 'Try again.')
+      toastError("Couldn't mint share link", plainError(e, 'Try again.'))
     } finally {
       setSharing(false)
     }
@@ -552,7 +552,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
     const res = contact ? await deletePayment(contact as any, paymentId) : null
     setDeletingId(null)
     if (!res || res.error) {
-      toastError("Couldn't delete payment", res?.error?.message || 'This job is not loaded yet. Try again.')
+      toastError("Couldn't delete payment", plainError(res?.error, 'This job is not loaded yet. Try again.'))
       refresh()
       return
     }

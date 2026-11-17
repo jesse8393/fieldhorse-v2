@@ -110,7 +110,7 @@ function CompleteForm({ data, userId, goBack, home }: { data: ReturnType<typeof 
       goBack()
     } catch (e) {
       hapticError()
-      const message = (e as { message?: string })?.message || 'Unknown error'
+      const message = plainError(e, 'The closeout was not saved. Try again.', { kept: true })
       setError(message)
       toastError("Couldn't save closeout", message)
       setSaving(false)
@@ -132,7 +132,7 @@ function CompleteForm({ data, userId, goBack, home }: { data: ReturnType<typeof 
           goBack()
         } catch (e) {
           hapticError()
-          toastError("Couldn't reopen", (e as { message?: string })?.message || 'Unknown error')
+          toastError("Couldn't reopen", plainError(e, 'Try again.'))
           setBusy(false)
         }
       })()
@@ -165,7 +165,7 @@ function CompleteForm({ data, userId, goBack, home }: { data: ReturnType<typeof 
       toastSuccess('Certificate ready', result.filename)
     } catch (e) {
       hapticError()
-      toastError("Couldn't build certificate", (e as { message?: string })?.message || 'Unknown error')
+      toastError("Couldn't build certificate", plainError(e, 'Try again.'))
     } finally {
       setBusy(false)
     }

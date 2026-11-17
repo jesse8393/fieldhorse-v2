@@ -20,6 +20,7 @@ import { settleInvoiceAfterEdit } from '../../lib/invoices.ts'
 import { goBackFrom, useInvoiceScreen } from './useInvoiceScreen.ts'
 import './invoices.css'
 import { moneyInput } from '../new/CreateShell.tsx'
+import { plainError } from '../../lib/serviceErrors.ts'
 
 type Form = { title: string; amount: string; description: string; due: string; notes: string }
 
@@ -78,7 +79,7 @@ export default function InvoiceEdit() {
     const { data, error } = await supabase.from('fh_invoices').update(patch).eq('id', invoice.id).eq('status', invoice.status).select('id').maybeSingle()
     setSaving(false)
     if (error || !data) {
-      toastError("Couldn't save the invoice", error?.message || 'Invoice status changed. Refresh and try again.')
+      toastError("Couldn't save the invoice", plainError(error, 'Invoice status changed. Refresh and try again.'))
       return
     }
     // An amount edited down to what was already paid settles it (M-24).

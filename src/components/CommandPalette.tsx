@@ -66,6 +66,7 @@ import { useOrgScope, type OrgScope } from '../lib/orgScope.ts'
 import type { OrgRole } from '../lib/permissions.ts'
 import DataErrorState from './DataErrorState.tsx'
 import '../styles/command-palette.css'
+import { plainError } from '../lib/serviceErrors.ts'
 
 type NavEntry = {
   id: string
@@ -279,7 +280,7 @@ export default function CommandPalette() {
       } catch (e: unknown) {
         if (!cancelled) {
           setResultSnapshot(null)
-          setSearchError(e instanceof Error && e.message ? e.message : 'Search is unavailable right now.')
+          setSearchError(plainError(e, 'Search is unavailable right now.'))
         }
       } finally {
         if (!cancelled) setSearching(false)

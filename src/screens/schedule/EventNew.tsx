@@ -31,6 +31,7 @@ import { leadName, leadNeed } from '../../lib/leadsView.ts'
 import { hapticMedium } from '../../lib/haptics.ts'
 import { countNoun } from '../../lib/format.ts'
 import './schedule-event.css'
+import { plainError } from '../../lib/serviceErrors.ts'
 
 type Kind = 'job' | 'lead' | 'quote'
 type Link = { kind: Kind; id: string } | null
@@ -314,7 +315,7 @@ function EventForm({ event }: { event: EventRow | null }) {
       toastSuccess('Event scheduled', 'Added to schedule')
       goBack()
     } catch (e) {
-      const message = (e as { message?: string })?.message || 'Try again.'
+      const message = plainError(e, 'The event was not saved. Try again.', { kept: true })
       setErrors({ save: message })
       toastError(event ? "Couldn't update the event" : "Couldn't save the event", message)
     } finally {
