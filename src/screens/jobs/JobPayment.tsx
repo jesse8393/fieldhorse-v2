@@ -14,7 +14,8 @@ import { logPayment } from '../../lib/pipeline.ts'
 import { toastError } from '../../lib/toast.ts'
 import { hapticMedium } from '../../lib/haptics.ts'
 import { todayYmd } from '../../lib/dates.ts'
-import { JobScreenFallback, money, useJobScreen } from './jobScreen.tsx'
+import { JobScreenFallback, invalidateAfterPayment, money, useJobScreen } from './jobScreen.tsx'
+import { useQueryClient } from '@tanstack/react-query'
 
 // The balance as typed text without stranding cents: $4,999.50 prefills
 // as 4999.50, a whole amount drops the .00.
@@ -42,6 +43,7 @@ function PaymentForm({ data, goBack, home }: { data: ReturnType<typeof useJobScr
   const [paidOn, setPaidOn] = useState(() => todayYmd())
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | undefined>()
+  const queryClient = useQueryClient()
   // One id per payment intent: a retap after a lost response upserts to a
   // no-op, while an edited amount gets a fresh id so the first row is never
   // claimed as the second.
@@ -73,6 +75,7 @@ function PaymentForm({ data, goBack, home }: { data: ReturnType<typeof useJobScr
       // logPayment (lib/pipeline.ts) already shows the one payment toast;
       // a second one here disagreed with it (OPS-08).
       hapticMedium()
+      invalidateAfterPayment(queryClient, contact.id)
       await data.fetchAll()
       goBack()
     } catch (e) {

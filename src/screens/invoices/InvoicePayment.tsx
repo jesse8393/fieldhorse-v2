@@ -24,6 +24,8 @@ import { todayYmd } from '../../lib/dates.ts'
 import { hapticTap } from '../../lib/haptics.ts'
 import { toastError, toastSuccess } from '../../lib/toast.ts'
 import { goBackFrom, useInvoiceScreen } from './useInvoiceScreen.ts'
+import { invalidateAfterPayment } from '../jobs/jobScreen.tsx'
+import { useQueryClient } from '@tanstack/react-query'
 import './invoices.css'
 
 // A dollar amount for the editable input without stranding cents: a
@@ -37,6 +39,7 @@ function amountInput(n: number): string {
 export default function InvoicePayment() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { query, record, figures, refresh } = useInvoiceScreen(id)
   const titleRef = useRef<HTMLHeadingElement>(null)
   useEffect(() => { titleRef.current?.focus({ preventScroll: true }) }, [])
@@ -85,6 +88,7 @@ export default function InvoicePayment() {
       // shows its own toast; only an invoice with no job needs one here.
       if (!record.job) toastSuccess('Payment recorded', `${formatMoney(numeric)}, ${PAYMENT_METHODS.find((m) => m.value === method)?.label || 'Payment'}`)
       refresh()
+      invalidateAfterPayment(queryClient, record.job?.id ?? null)
       navigate(`/invoices/${record.invoice.id}`, { replace: true })
     } catch (err) {
       toastError("Couldn't record payment", (err as Error)?.message || 'Try again in a moment.')

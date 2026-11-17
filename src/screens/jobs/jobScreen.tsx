@@ -5,6 +5,7 @@ import { moneyExact } from '../../lib/format.ts'
 // history behind the screen.
 
 import type { ReactNode } from 'react'
+import type { QueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { SkeletonRows } from '../../components/fh'
 import DataErrorState from '../../components/DataErrorState.tsx'
@@ -55,4 +56,20 @@ export function JobScreenFallback({ title, saveLabel, data, home }: { title: str
 // $1,234.50 payment "Record $1,235".
 export function money(n: unknown) {
   return moneyExact(n as number)
+}
+
+/**
+ * Everything a payment changes on screen (DATA-07): the job's Money tab
+ * bundle and draws, the job header, the invoice lists and Today. Saving a
+ * payment used to refresh only the job header, so the Money tab kept the
+ * old balance with no payment row until the app refocused.
+ */
+export function invalidateAfterPayment(queryClient: QueryClient, jobId: string | null | undefined) {
+  if (jobId) {
+    void queryClient.invalidateQueries({ queryKey: ['invoiceDetail', jobId] })
+    void queryClient.invalidateQueries({ queryKey: ['invoiceDraws', jobId] })
+    void queryClient.invalidateQueries({ queryKey: ['jobDetail', jobId] })
+  }
+  void queryClient.invalidateQueries({ queryKey: ['invoices'] })
+  void queryClient.invalidateQueries({ queryKey: ['homeDashboard'] })
 }

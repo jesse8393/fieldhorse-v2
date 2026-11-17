@@ -534,3 +534,27 @@ test('expenses show cents', async ({ page, context }) => {
   await expect(page.getByText('$79.25').first()).toBeVisible()
   await expect(page.getByText('$499.75').first()).toBeVisible()
 })
+
+// DATA-07: after a payment the job's Money tab reads its money again, so
+// it does not keep the old balance until the app refocuses.
+test('after a payment the Money tab reads its money again', async ({ page, context }) => {
+  await signIn(context, { tables: { fh_contacts: [shedJob()], fh_invoices: [], fh_payments: [], fh_change_orders: [] } })
+  const reads: { at: number; url: string }[] = []
+  page.on('request', (r) => {
+    const url = r.url()
+    if (r.method() === 'GET' && url.includes('/rest/v1/')) reads.push({ at: Date.now(), url: decodeURIComponent(url) })
+  })
+  await page.goto('/jobs/c-job1?tab=financials', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+  const collect = page.getByRole('button', { name: /collect payment/i }).first()
+  await expect(collect).toBeVisible({ timeout: 30_000 })
+  await collect.click()
+  await page.waitForURL(/\/jobs\/c-job1\/payment/)
+  await page.getByLabel('Amount').fill('500')
+  const tapped = Date.now()
+  await page.getByRole('button', { name: /^record/i }).click()
+  await page.waitForURL((u) => !u.pathname.endsWith('/payment'), { timeout: 15_000 })
+  // The Money tab's own bundle (the job read with its client embed), not
+  // only the job header.
+  const bundleReads = () => reads.filter((r) => r.at > tapped && r.url.includes('/fh_contacts') && r.url.includes('fh_clients!fh_contacts_client_id_fkey') && r.url.includes('id=eq.c-job1')).length
+  await expect.poll(bundleReads, { timeout: 5_000 }).toBeGreaterThan(0)
+})
