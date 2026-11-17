@@ -87,7 +87,8 @@ export default function QuoteNew() {
       const draft = leadToQuoteDraft(data as LeadRow)
       // The lead's notes are the office's own (a budget, a gate code), never
       // the scope of work the customer reads, so they stay on the lead (S11).
-      patch({ title: draft.title || '', jobType: draft.job_type || '' })
+      // A lead with no job type of its own keeps the remembered one.
+      patch({ title: draft.title || '', ...(draft.job_type ? { jobType: draft.job_type } : {}) })
       if (draft.client_id && !(await pickClient(draft.client_id)) && alive) setPrefillFailed(true)
     })
     return () => { alive = false }

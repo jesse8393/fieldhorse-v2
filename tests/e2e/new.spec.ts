@@ -177,6 +177,33 @@ test('a saved job leaves no draft behind', async ({ context, page }) => {
   expect(await page.evaluate(() => localStorage.getItem('fh:draft:job'))).toBeNull()
 })
 
+// Most leads carry no job type, because New lead has no such field. Quote
+// this on one of them kept the remembered job type only when the lead
+// named none of its own.
+function lead(partial: Record<string, unknown>) {
+  return {
+    user_id: 'qa-user-1', client_id: 'cl-1', status: 'open', notes: null, last_contact: null, quote_id: null, follow_up_on: null,
+    source: 'Google', referred_by: null, origin_contact_id: null, created_at: NOW, updated_at: NOW,
+    fh_clients: { id: 'cl-1', name: 'Jeff Roy', phone: '555-0101', email: 'jeff@roy.com' },
+    ...partial
+  }
+}
+const LEAD_PLAIN = lead({ id: 'l-plain', title: 'Backyard patio', job_type: null })
+const LEAD_ROOF = lead({ id: 'l-roof', title: 'Garage roof', job_type: 'Roofing' })
+
+test('Quote this on a lead with no job type keeps the remembered job type', async ({ context, page }) => {
+  await signIn(context, { tables: { fh_leads: [LEAD_PLAIN, LEAD_ROOF] } })
+  await context.addInitScript(() => { localStorage.setItem('fh:last-job-type', 'Concrete') })
+  await open(page, '/quotes/new?lead=l-plain')
+  await expect(page.getByLabel('Title')).toHaveValue('Backyard patio', { timeout: 30_000 })
+  await expect(page.getByLabel('Client')).toHaveValue('Jeff Roy')
+  await expect(page.getByLabel(/Job type/)).toHaveValue('Concrete')
+  // A lead that names its own job type still starts the quote with it.
+  await open(page, '/quotes/new?lead=l-roof')
+  await expect(page.getByLabel('Title')).toHaveValue('Garage roof', { timeout: 30_000 })
+  await expect(page.getByLabel(/Job type/)).toHaveValue('Roofing')
+})
+
 test('the job type the old lead sheet remembered still starts New job', async ({ context, page }) => {
   await signIn(context)
   // The build before the October redesign kept it under fh:lastJobType.
