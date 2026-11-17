@@ -185,10 +185,31 @@ export type PendingPunch = {
   is_self?: boolean
 }
 
-export function orgTimesheetsList(
+type TimesheetsPage = {
+  ok: true
+  caller_role: OrgRole
+  org_id: string
+  punches: PendingPunch[]
+  /** True when more pending punches exist than were returned. */
+  has_more?: boolean
+  next_offset?: number | null
+}
+
+// The server answers 500 punches at a time. Twenty pages is far more
+// pending time than a team builds up; past that has_more stays true.
+const TIMESHEET_MAX_PAGES = 20
+
+/** Every pending punch in the window: reads on while the server says more exist. */
+export async function orgTimesheetsList(
   opts: { from?: string; to?: string } = {},
-): Promise<{ ok: true; caller_role: OrgRole; org_id: string; punches: PendingPunch[] }> {
-  return callJson('/api/org-timesheets-list', withOrg({ ...opts }))
+): Promise<TimesheetsPage> {
+  let page = await callJson<TimesheetsPage>('/api/org-timesheets-list', withOrg({ ...opts }))
+  const punches = [...(page.punches || [])]
+  for (let pages = 1; page.has_more && page.next_offset != null && pages < TIMESHEET_MAX_PAGES; pages++) {
+    page = await callJson<TimesheetsPage>('/api/org-timesheets-list', withOrg({ ...opts, offset: page.next_offset }))
+    punches.push(...(page.punches || []))
+  }
+  return { ...page, punches, has_more: !!page.has_more }
 }
 
 export function orgPunchApprove(
@@ -211,6 +232,12 @@ export function orgPunchFlag(
   punchIds: string[],
   flagged: boolean,
   flagReason?: string,
-): Promise<{ ok: true; count: number; ids: string[] }> {
+): Promise<{
+  ok: true
+  count: number
+  ids: string[]
+  /** The caller's own punches, left alone unless the caller is an owner. */
+  self_skipped?: string[]
+}> {
   return callJson('/api/org-punch-flag', withOrg({ punch_ids: punchIds, flagged, flag_reason: flagReason }))
 }
