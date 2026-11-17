@@ -6,7 +6,7 @@
 import { expect, test, type Page, type Route } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 import { contrastOf } from './helpers/contrast.ts'
-import { holdPosts, postsTo, twoTaps } from './helpers/doubleTap.ts'
+import { goInApp, holdPosts, postsTo, twoTaps } from './helpers/doubleTap.ts'
 
 async function open(page: Page, path: string) {
   await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 60_000 })
@@ -939,4 +939,36 @@ test.describe('one tap writes once on the job sections', () => {
     await page.waitForTimeout(500)
     expect(posts.length, 'one tap, one inspection').toBe(1)
   })
+})
+
+// Send certificate kept its busy state on the closeout screen. Leave it
+// while the email is still going out and come back, and the button was
+// free again: one more tap emailed the completion certificate twice. The
+// send is now kept app wide, so the certificate is busy until it lands.
+test('leaving the closeout while the certificate emails and coming back does not email it twice', async ({ context, page }) => {
+  const closeout = {
+    id: 'co1', user_id: 'qa-user-1', contact_id: 'c-done', warranty_start_date: '2026-09-20', warranty_months: 12,
+    signoff_method: 'verbal', signoff_name: 'Danielle Ortiz', notes: 'Walkthrough done.', final_amount: 9600, created_at: '2026-10-28T15:00:00.000Z'
+  }
+  await signIn(context, { tables: { fh_closeouts: [closeout] } })
+  await context.route('**/storage/v1/object/**', (route) => route.fulfill({ status: 200, json: { Key: 'job-files/certificate.pdf' } }))
+  const sends = postsTo(context, '/api/send-certificate')
+  await holdPosts(context, '**/api/send-certificate', 6000, () => ({ status: 200, json: { ok: true } }))
+  await page.goto('/jobs/c-done/complete', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  const send = page.getByRole('button', { name: 'Send certificate' })
+  await expect(send).toBeEnabled({ timeout: 30_000 })
+  await send.click()
+  await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(1)
+  await goInApp(page, '/jobs/c-done')
+  await page.waitForTimeout(800)
+  await goInApp(page, '/jobs/c-done/complete')
+  const again = page.getByRole('button', { name: 'Send certificate' })
+  await expect(again).toBeVisible({ timeout: 30_000 })
+  // Once the screen has read what it needs, the button takes a tap or says it is busy.
+  await expect.poll(async () => await again.isEnabled() || await again.getAttribute('aria-busy') === 'true', { timeout: 30_000 }).toBe(true)
+  const busy = await again.getAttribute('aria-busy')
+  await again.click({ force: true })
+  await page.waitForTimeout(1500)
+  expect(sends.length, 'one certificate, one email').toBe(1)
+  expect(busy, 'Send certificate shows the email going out').toBe('true')
 })

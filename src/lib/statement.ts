@@ -33,6 +33,7 @@ import { createUuid } from './uuid.ts'
 const loadPdf = () => import('./pdf.js')
 
 import { amountsDueByInvoice, isOpenInvoice, knownContractTotal, type DueInvoice } from './invoiceSettlement.ts'
+import { endSendIntent, sendIntent, sendKey } from './invoiceSends.ts'
 
 export type StatementJob = {
   id: string
@@ -282,6 +283,10 @@ export type SendStatementResult =
 /**
  * Email the statement: render → upload to storage → POST send-statement.
  * Falls back to a local download when the email sender isn't configured.
+ * One send id per send, kept with the PDF the first try uploaded for every
+ * retry until the email goes out or the statement or its recipient change,
+ * so after an unclear failure the server's provider key is the same and the
+ * customer gets one email (lib/invoiceSends).
  */
 export async function sendStatementEmail({ company, client, data, userId, recipientEmail }: {
   company: any
@@ -293,17 +298,25 @@ export async function sendStatementEmail({ company, client, data, userId, recipi
   const recipient = (recipientEmail || client?.email || '').trim()
   if (!recipient) return { ok: false, reason: 'no_email' }
 
-  const result = await buildStatementPdf({ company, client, data })
-  if (!result?.doc) return { ok: false, reason: 'error', message: 'PDF generator returned no document' }
-
   const { supabase, authHeaders } = await import('./supabase.ts')
-  const blob = result.doc.output('blob')
-  const rowId = createUuid()
-  const path = `${userId}/statements/${rowId}.pdf`
-  const { error: upErr } = await supabase.storage
-    .from('job-files')
-    .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
-  if (upErr) return { ok: false, reason: 'error', message: `Couldn't save the statement PDF: ${upErr.message}` }
+  const key = sendKey.statement(client.id)
+  const intent = sendIntent(key, JSON.stringify([recipient, data.totalDue, data.lines]))
+  let result: any = null
+  let file = intent.upload
+  if (!file) {
+    result = await buildStatementPdf({ company, client, data })
+    if (!result?.doc) return { ok: false, reason: 'error', message: 'PDF generator returned no document' }
+
+    const blob = result.doc.output('blob')
+    const rowId = createUuid()
+    const path = `${userId}/statements/${rowId}.pdf`
+    const { error: upErr } = await supabase.storage
+      .from('job-files')
+      .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
+    if (upErr) return { ok: false, reason: 'error', message: `Couldn't save the statement PDF: ${upErr.message}` }
+    file = { path, filename: result.filename as string }
+    intent.upload = file
+  }
 
   const sendRes = await fetch('/api/send-statement', {
     method: 'POST',
@@ -313,8 +326,9 @@ export async function sendStatementEmail({ company, client, data, userId, recipi
       sender_user_id: userId,
       recipient_email: recipient,
       recipient_name: client.company_name || client.name || null,
-      storage_path: path,
-      filename: result.filename,
+      storage_path: file.path,
+      filename: file.filename,
+      send_id: intent.id,
       // The statement's own figure, to the cent, the one the screen shows.
       total_due: data.totalDue
     })
@@ -323,11 +337,12 @@ export async function sendStatementEmail({ company, client, data, userId, recipi
 
   if (sendRes.status === 503 && body?.error === 'sender_not_configured') {
     const { downloadPdf } = await loadPdf()
-    downloadPdf(result)
+    downloadPdf(result ?? await buildStatementPdf({ company, client, data }))
     return { ok: false, reason: 'sender_not_configured' }
   }
   if (!sendRes.ok || !body?.ok) {
     return { ok: false, reason: 'error', message: body?.message || body?.error || 'Send failed' }
   }
+  endSendIntent(key, intent)
   return { ok: true, recipient }
 }

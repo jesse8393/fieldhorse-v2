@@ -12,7 +12,7 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 import { contrastOf } from './helpers/contrast.ts'
-import { postsTo } from './helpers/doubleTap.ts'
+import { goInApp, holdPosts, postsTo } from './helpers/doubleTap.ts'
 import { documentSendKey } from '../../netlify/functions/lib/email.js'
 
 const NOW = Date.now()
@@ -1076,4 +1076,32 @@ test('Send again after "the customer will not get a second email" repeats the sa
   const key = (b: Record<string, unknown>) => documentSendKey('send-quote', `quote:${b.quote_id}`, b, String(b.recipient_email).toLowerCase().trim())
   expect(key(retry), 'the retry the message invites carries the same provider key').toBe(key(first))
   expect(retry.storage_path, 'and the same PDF').toBe(first.storage_path)
+})
+
+// Send for approval kept its busy state on the quote screen. Leave the
+// quote while the email is still going out on a weak signal and come back,
+// and Send was free again: one more tap emailed a second proposal. The
+// send is now kept app wide, so the quote is busy until it lands.
+test('leaving the quote while it sends and coming back does not send it twice', async ({ context, page }) => {
+  await signIn(context, { tables: { fh_quote_items: ITEMS } })
+  await context.route('**/storage/v1/object/**', (route) => route.fulfill({ status: 200, json: { Key: 'job-files/q.pdf' } }))
+  const sends = postsTo(context, '/api/send-quote')
+  await holdPosts(context, '**/api/send-quote', 6000, () => ({ status: 200, json: { ok: true } }))
+  await openQuote(page)
+  const send = total(page).getByRole('button', { name: 'Send for approval' })
+  await expect(send).toBeEnabled({ timeout: 30_000 })
+  await send.click()
+  await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(1)
+  await goInApp(page, '/quotes')
+  await page.waitForTimeout(800)
+  await goInApp(page, '/quotes/q-quote')
+  const again = total(page).getByRole('button', { name: 'Send for approval' })
+  await expect(again).toBeVisible({ timeout: 30_000 })
+  // Once the screen has read what it needs, the button takes a tap or says it is busy.
+  await expect.poll(async () => await again.isEnabled() || await again.getAttribute('aria-busy') === 'true', { timeout: 30_000 }).toBe(true)
+  const busy = await again.getAttribute('aria-busy')
+  await again.click({ force: true })
+  await page.waitForTimeout(1500)
+  expect(sends.length, 'one quote, one email').toBe(1)
+  expect(busy, 'Send shows the email going out').toBe('true')
 })

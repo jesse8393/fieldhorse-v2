@@ -20,6 +20,7 @@ import { toastError, toastSuccess } from '../../lib/toast.ts'
 import { hapticError, hapticSuccess } from '../../lib/haptics.ts'
 import { todayYmd } from '../../lib/dates.ts'
 import { useSecondTap } from '../../lib/secondTap.ts'
+import { endSendIntent, sendIntent, sendKey, startSend, useSendInFlight } from '../../lib/invoiceSends.ts'
 import { JobScreenFallback, money, useJobScreen } from './jobScreen.tsx'
 
 // The pdf chunk is large and only needed for a certificate.
@@ -52,6 +53,10 @@ function CompleteForm({ data, userId, goBack, home }: { data: ReturnType<typeof 
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [busy, setBusy] = useState(false)
+  // The certificate email is kept app wide (lib/invoiceSends), not in this
+  // screen: leave the closeout while it is still going out and come back,
+  // and it is still busy.
+  const certificateOut = useSendInFlight(sendKey.certificate(contact.id))
   const [error, setError] = useState<string | undefined>()
   const reopenTap = useSecondTap()
 
@@ -178,44 +183,62 @@ function CompleteForm({ data, userId, goBack, home }: { data: ReturnType<typeof 
       toastError('Add a client email first', 'Open the client to add an email, then send again.')
       return
     }
+    const key = sendKey.certificate(contact.id)
+    const end = startSend(key)
+    if (!end) return
+    let sent = false
     setBusy(true)
     try {
       // The PDF is built here and saved to job-files, so the server can
-      // attach it; the row on fh_job_files shows it on the Files tab.
+      // attach it; the row on fh_job_files shows it on the Files tab. One
+      // send id per send, kept with the PDF the first try uploaded for every
+      // retry until the email goes out or the closeout or recipient change,
+      // so the customer gets one email (lib/invoiceSends).
       const { generateCertificate, downloadPdf } = await loadPdf()
-      const result = await generateCertificate({ company: await companyPayload(), contact, closeout: existing })
-      const blob = result.doc.output('blob')
-      const rowId = createUuid()
-      const path = `${userId}/${contact.id}/${rowId}.pdf`
-      const { error: upErr } = await supabase.storage.from('job-files').upload(path, blob, { upsert: false, contentType: 'application/pdf' })
-      if (upErr) throw new Error(`Couldn't save the certificate PDF: ${upErr.message}`)
-      try {
-        await supabase.from('fh_job_files').insert({
-          id: rowId, user_id: userId, job_id: contact.id, filename: result.filename,
-          storage_path: path, mime_type: 'application/pdf', size_bytes: blob.size || 0, kind: 'file'
-        })
-      } catch { /* the file itself landed; the send does not need the index row */ }
+      const build = async () => generateCertificate({ company: await companyPayload(), contact, closeout: existing })
+      const intent = sendIntent(key, JSON.stringify([recipient, existing]))
+      let result: any = null
+      let file = intent.upload
+      if (!file) {
+        result = await build()
+        const blob = result.doc.output('blob')
+        const rowId = createUuid()
+        const path = `${userId}/${contact.id}/${rowId}.pdf`
+        const { error: upErr } = await supabase.storage.from('job-files').upload(path, blob, { upsert: false, contentType: 'application/pdf' })
+        if (upErr) throw new Error(`Couldn't save the certificate PDF: ${upErr.message}`)
+        file = { path, filename: result.filename as string }
+        intent.upload = file
+        try {
+          await supabase.from('fh_job_files').insert({
+            id: rowId, user_id: userId, job_id: contact.id, filename: result.filename,
+            storage_path: path, mime_type: 'application/pdf', size_bytes: blob.size || 0, kind: 'file'
+          })
+        } catch { /* the file itself landed; the send does not need the index row */ }
+      }
       const sendRes = await fetch('/api/send-certificate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify({
           contact_id: contact.id, sender_user_id: userId, recipient_email: recipient,
-          recipient_name: contact.name || null, storage_path: path, filename: result.filename
+          recipient_name: contact.name || null, storage_path: file.path, filename: file.filename, send_id: intent.id
         })
       })
       const sendBody = await sendRes.json().catch(() => ({}))
       if (sendRes.status === 503 && sendBody?.error === 'sender_not_configured') {
         toastError('Email is not set up yet', 'The PDF is saved to Files, share it yourself.')
-        downloadPdf(result)
+        downloadPdf(result ?? await build())
         return
       }
       if (!sendRes.ok || !sendBody?.ok) throw new Error(sendBody?.detail || sendBody?.error || 'The email did not go out.')
+      endSendIntent(key, intent)
+      sent = true
       hapticSuccess()
-      toastSuccess(`Certificate sent to ${recipient}`, result.filename)
+      toastSuccess(`Certificate sent to ${recipient}`, file.filename)
     } catch (e) {
       hapticError()
       toastError("Couldn't send certificate", (e as { message?: string })?.message || 'Unknown error')
     } finally {
+      end(sent)
       setBusy(false)
     }
   }
@@ -266,8 +289,8 @@ function CompleteForm({ data, userId, goBack, home }: { data: ReturnType<typeof 
       {onFile && (
         <>
           <div className="fhja-pair">
-            <Button variant="secondary" disabled={busy} onClick={() => { void downloadCertificate() }}>Download certificate</Button>
-            <Button variant="secondary" disabled={busy} onClick={() => { void sendCertificate() }}>Send certificate</Button>
+            <Button variant="secondary" disabled={busy || certificateOut} onClick={() => { void downloadCertificate() }}>Download certificate</Button>
+            <Button variant="secondary" disabled={busy} loading={certificateOut} onClick={() => { void sendCertificate() }}>Send certificate</Button>
           </div>
           <div className="fhja-danger">
             <Button variant="destructive" block disabled={busy} onClick={reopen}>
