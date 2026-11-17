@@ -15,7 +15,7 @@
 // thread, on the agent's draft.
 
 import { useEffect, useRef } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import CommunicationHistory from '../../components/CommunicationHistory.tsx'
 import { Inbox as InboxIcon, MessageSquare, SquarePen } from 'lucide-react'
 import { Button, Chip, EmptyState, Row, SkeletonRows } from '../../components/fh'
@@ -150,6 +150,15 @@ export default function Inbox() {
 
   const rows = inbox.data ?? []
   const loading = engine === undefined || (engine === true && inbox.isLoading)
+
+  // An agent alert sent before the worker named the conversation links to
+  // /inbox?client=:id: open that client's conversation (dead-ends-7).
+  const navigate = useNavigate()
+  const clientParam = conversationId ? null : params.get('client')
+  const clientRow = clientParam ? rows.find((r) => r.client_id === clientParam) : undefined
+  useEffect(() => {
+    if (clientRow) navigate(`/inbox/${encodeURIComponent(clientRow.conversation_id)}`, { replace: true })
+  }, [clientRow, navigate])
 
   const title = <h1 className="fhi-title" ref={titleRef} tabIndex={-1}>Inbox</h1>
   const header = <header className="fhi-head">{title}<Link className="fhi-new" to="/compose" aria-label="New message" title="New message"><SquarePen size={20} aria-hidden="true" /></Link></header>

@@ -219,6 +219,14 @@ test.describe('the Inbox list', () => {
     await expect(page).toHaveURL(/\/inbox\/conv-priya$/)
   })
 
+  // dead-ends-7: an agent alert sent before the worker named the
+  // conversation links to /inbox?client=:id. It opens that client's
+  // conversation, not the whole list.
+  test('a link to a client opens that client\'s conversation', async ({ context, page }) => {
+    await start(context, page, '/inbox?client=cl-marcus', { tables: { ...ENGINE_ON, fh_v_inbox: INBOX } })
+    await expect(page).toHaveURL(/\/inbox\/conv-marcus$/, { timeout: 30_000 })
+  })
+
   test('on a desktop the list sits beside the open conversation', async ({ context, page }, testInfo) => {
     test.skip(testInfo.project.name.startsWith('mobile'), 'Two columns need a desktop')
     await start(context, page, '/inbox', { tables: { ...ENGINE_ON, fh_v_inbox: INBOX } })
