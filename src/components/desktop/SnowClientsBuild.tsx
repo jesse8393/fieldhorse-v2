@@ -71,7 +71,9 @@ function relTime(iso: any) {
   if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`
   if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`
   if (diff < 7 * 86_400_000) return `${Math.floor(diff / 86_400_000)}d ago`
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  // An older touch names its year, so last October never reads as this one.
+  const sameYear = new Date(t).getFullYear() === new Date().getFullYear()
+  return new Date(iso).toLocaleDateString(undefined, sameYear ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 const FILTERS: { key: string; label: string }[] = [
@@ -102,12 +104,14 @@ type ClientRow = {
 const columnHelper = createColumnHelper<ClientRow>()
 
 const COLUMNS = [
-  columnHelper.accessor((r) => r.client.name || 'Unnamed', { id: 'name', header: 'Client' }),
+  // Text columns name their sort: left to guess, TanStack only looks past
+  // the first ten rows and sorts a short list with case (Zed before alpha).
+  columnHelper.accessor((r) => r.client.name || 'Unnamed', { id: 'name', header: 'Client', sortingFn: 'text' }),
   columnHelper.accessor((r) => r.status.rank, { id: 'status', header: 'Status' }),
   columnHelper.accessor((r) => r.lastTouch, { id: 'last', header: 'Last touch' }),
   columnHelper.accessor((r) => r.outstanding, { id: 'outstanding', header: 'Contract balance' }),
   columnHelper.accessor((r) => r.activeCount, { id: 'active', header: 'Active work' }),
-  columnHelper.accessor((r) => r.nextAction, { id: 'next', header: 'Next action' }),
+  columnHelper.accessor((r) => r.nextAction, { id: 'next', header: 'Next action', sortingFn: 'text' }),
 ]
 
 function toCsv(rows: ClientRow[]): string {
@@ -174,7 +178,8 @@ export default function SnowClientsBuild(props: Props) {
   }), [filtered, rollupFor])
 
   const sortDescriptionId = useId()
-  const [sorting, setSorting] = useHistoryEntryState('clients:sorting', DEFAULT_SORT, validSort)
+  // Kept by page, not by search: typing in the search must not drop the sort.
+  const [sorting, setSorting] = useHistoryEntryState('clients:sorting', DEFAULT_SORT, validSort, 'path')
   const table = useReactTable({
     data: enriched,
     columns: COLUMNS,
