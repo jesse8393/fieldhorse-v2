@@ -32,6 +32,7 @@ import { newRecordRoute, recordRoute } from '../../lib/records.ts'
 import { navigateHrefHere } from '../../lib/todayView.ts'
 import { resilientUpdate } from '../../lib/outbox.ts'
 import { clearDraft, startEdit, writeDraft } from '../../lib/drafts.ts'
+import { useEditDraft } from '../../lib/useEditDraft.ts'
 import { formatPhone } from '../../lib/utils.ts'
 import { hapticTap } from '../../lib/haptics.ts'
 import { toastError } from '../../lib/toast.ts'
@@ -250,13 +251,21 @@ export default function LeadDetail({ id, fallback }: LeadDetailProps) {
     }
   }
 
-  const [editing, setEditing] = useState(false)
-  const [details, setDetails] = useState({ title: '', job_type: '', source: '' })
+  // What they need, the job type and the source being edited stay on the
+  // device until saved or cancelled, so a reload opens the edit again (D23).
+  const detailsDraft = useEditDraft(lead ? `edit:lead-details:${lead.id}` : null, { title: lead?.title ?? '', job_type: lead?.job_type ?? '', source: lead?.source ?? '' })
+  const details = detailsDraft.form
+  const setDetails = detailsDraft.update
+  const [editingOpen, setEditing] = useState(false)
+  const editing = editingOpen || detailsDraft.dirty
   function startEditing() {
     if (!lead) return
     hapticTap()
-    setDetails({ title: lead.title ?? '', job_type: lead.job_type ?? '', source: lead.source ?? '' })
     setEditing(true)
+  }
+  function cancelEditing() {
+    detailsDraft.discard()
+    setEditing(false)
   }
   async function saveDetails() {
     const ok = await patchLead({
@@ -264,7 +273,10 @@ export default function LeadDetail({ id, fallback }: LeadDetailProps) {
       job_type: details.job_type || null,
       source: details.source || null
     })
-    if (ok) setEditing(false)
+    if (ok) {
+      detailsDraft.done()
+      setEditing(false)
+    }
   }
 
   const client = lead?.fh_clients ?? null
@@ -381,12 +393,13 @@ export default function LeadDetail({ id, fallback }: LeadDetailProps) {
           <h2 className="fhl-section__title" id="fhl-need-title">What they need</h2>
           {editing ? (
             <div className="fhl-edit">
+              {detailsDraft.restored && <DraftRestored onDiscard={cancelEditing} />}
               <Field label="What they need" value={details.title} onChange={(e) => setDetails((d) => ({ ...d, title: e.target.value }))} />
               <Choices label="Job type" options={JOB_TYPES} value={details.job_type} onChange={(v) => setDetails((d) => ({ ...d, job_type: v }))} />
               <Choices label="Source" options={LEAD_SOURCES} value={details.source} onChange={(v) => setDetails((d) => ({ ...d, source: v }))} />
               <div className="fhl-line__actions">
                 <Button variant="primary" size="md" loading={busy} onClick={() => { void saveDetails() }}>Save details</Button>
-                <Button variant="quiet" size="md" onClick={() => setEditing(false)}>Cancel</Button>
+                <Button variant="quiet" size="md" onClick={cancelEditing}>Cancel</Button>
               </div>
             </div>
           ) : (

@@ -22,6 +22,9 @@ import { formatMoney } from '../../components/fh/money.ts'
 import DataErrorState from '../../components/DataErrorState.tsx'
 import { Switch } from '@/components/ui/switch'
 import { keepFocusOnRetry } from '../../lib/retryFocus.ts'
+import { readDraftEntry } from '../../lib/drafts.ts'
+import { useEditDraft } from '../../lib/useEditDraft.ts'
+import DraftRestored from '../../components/DraftRestored.tsx'
 import { hapticTap } from '../../lib/haptics.ts'
 import { createUuid } from '../../lib/uuid.ts'
 import { buildQuoteView, type QuoteTerms } from '../../lib/quoteView.ts'
@@ -54,6 +57,8 @@ export type QuoteLinesChange = {
 
 export type QuoteLinesProps = {
   items: QuoteItemsApi
+  /** The quote the lines belong to: a line being edited is kept per quote. */
+  quoteId: string
   userId: string | undefined
   /** What the customer is called ("Optional for Taylor"). */
   who: string
@@ -72,7 +77,14 @@ export type QuoteLinesProps = {
 
 type Editing = { key: number; id: string | null }
 
-export default function QuoteLines({ items, userId, who, money, focusRef, startAdding = false, locked = false, onEditorClosed, onChange }: QuoteLinesProps) {
+// The line being added or edited is kept on the device per quote (D23),
+// with the saved line it started from, so a reload opens it again.
+function lineDraftKind(quoteId: string) {
+  return `edit:quote-line:${quoteId}`
+}
+const NEW_LINE = 'new line'
+
+export default function QuoteLines({ items, quoteId, userId, who, money, focusRef, startAdding = false, locked = false, onEditorClosed, onChange }: QuoteLinesProps) {
   const { rows, loading, loaded, failed, fetchRows, addItem, updateItem, removeItem, reorderItem } = items
   // No read of the lines has worked yet and the last one failed: the lines
   // are unknown, so nothing may say there are none.
@@ -183,6 +195,18 @@ export default function QuoteLines({ items, userId, who, money, focusRef, startA
       target?.scrollIntoView?.({ block: 'nearest' })
     })
   }
+  // A line left open with typing in it opens again once the lines are in.
+  const reopenChecked = useRef(false)
+  useEffect(() => {
+    if (reopenChecked.current || !loaded || locked) return
+    reopenChecked.current = true
+    if (editing) return
+    const from = readDraftEntry(lineDraftKind(quoteId))?.base as { line?: string } | string | undefined
+    const id = from === NEW_LINE ? null : typeof from === 'object' && from?.line && rows.some((r) => r.id === from.line) ? from.line : undefined
+    if (id === undefined) return
+    editKey.current += 1
+    setEditing({ key: editKey.current, id })
+  }, [loaded, locked, editing, rows, quoteId])
   const editRow = editing?.id ? effective.find((r) => r.id === editing.id) ?? null : null
   const editIndex = editRow ? rows.findIndex((r) => r.id === editRow.id) : -1
   const editPending = editRow ? pending(editRow.id) : false
@@ -209,6 +233,7 @@ export default function QuoteLines({ items, userId, who, money, focusRef, startA
   const editor = editing && !locked ? (
     <LineEditor
       key={editing.key}
+      draftKind={lineDraftKind(quoteId)}
       row={editRow}
       defaultSection={lastSection.current}
       suggestions={suggestions}
@@ -358,6 +383,8 @@ const KINDS = [
 ] as const
 
 type LineEditorProps = {
+  /** Where the typing is kept on the device until it is saved. */
+  draftKind: string
   /** null adds a line; a row edits it. */
   row: any | null
   /** The section the last added line used, carried to the next one. */
@@ -375,7 +402,7 @@ type LineEditorProps = {
 // A confirming tap this soon after the arming one is the same double tap.
 const CONFIRM_AFTER_MS = 500
 
-function LineEditor({ row, defaultSection, suggestions, onSave, onClose, onDelete, onMove, canMoveUp = false, canMoveDown = false }: LineEditorProps) {
+function LineEditor({ draftKind, row, defaultSection, suggestions, onSave, onClose: close, onDelete, onMove, canMoveUp = false, canMoveDown = false }: LineEditorProps) {
   const adding = !row
   // Delete line asks with a second tap on the same button (rule 2, S18).
   const [deleteArmed, setDeleteArmed] = useState(false)
@@ -389,9 +416,18 @@ function LineEditor({ row, defaultSection, suggestions, onSave, onClose, onDelet
     if (!onDelete) return
     if (!deleteArmed) { hapticTap(); deleteArmedAt.current = Date.now(); setDeleteArmed(true); return }
     if (Date.now() - deleteArmedAt.current < CONFIRM_AFTER_MS) return
+    line.discard()
     onDelete()
   }
-  const [draft, setDraft] = useState<LineDraft>(() => (row ? seedFromRow(row) : { ...emptyDraft(), section: defaultSection }))
+  const seed = row ? seedFromRow(row) : { ...emptyDraft(), section: defaultSection }
+  const line = useEditDraft<LineDraft>(draftKind, seed, { from: row ? { line: row.id, ...seed } : NEW_LINE })
+  const draft = line.form
+  const setDraft = (next: LineDraft | ((d: LineDraft) => LineDraft)) => line.update(typeof next === 'function' ? next : () => next)
+  // Cancel and Escape forget what was typed; a save forgets it once it lands.
+  const onClose = () => {
+    line.discard()
+    close()
+  }
   const [errors, setErrors] = useState<LineErrors>({})
   const [saving, setSaving] = useState(false)
   const [descFocused, setDescFocused] = useState(false)
@@ -420,6 +456,7 @@ function LineEditor({ row, defaultSection, suggestions, onSave, onClose, onDelet
     const ok = await onSave(normalizeForDB(draft))
     setSaving(false)
     if (!ok) return
+    line.done()
     if (again) {
       // Quotes are usually entered a section at a time, so the section stays.
       setDraft({ ...emptyDraft(), section: draft.section })
@@ -443,6 +480,7 @@ function LineEditor({ row, defaultSection, suggestions, onSave, onClose, onDelet
     <li className="fhqt-edit">
       <form aria-label={title} className="fhqt-form" noValidate onKeyDown={onKeyDown} onSubmit={(e) => { e.preventDefault(); void submit(false) }}>
         <h3 className="fhqt-form__title">{title}</h3>
+        {line.restored && <DraftRestored onDiscard={line.discard} />}
         <div className="fhqt-form__suggest">
           <Field
             ref={descRef}

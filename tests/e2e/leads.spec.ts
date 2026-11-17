@@ -464,3 +464,17 @@ test.describe('typed words on the lead screen', () => {
     await expect.poll(() => refused.length, { timeout: 8000 }).toBeGreaterThan(tries)
   })
 })
+
+// Finding lost-work-12: lead details being edited are kept on the device.
+test.describe('lead details being edited', () => {
+  const WORDS = TYPED
+
+  test('lead details being edited stay open with what was typed through a reload', async ({ context, page }) => {
+    await signIn(context)
+    await open(page, '/leads/l-lead1')
+    await page.getByRole('button', { name: 'Edit details' }).click()
+    await page.getByRole('textbox', { name: 'What they need' }).fill(WORDS)
+    await page.reload()
+    await expect(page.getByRole('textbox', { name: 'What they need' })).toHaveValue(WORDS)
+  })
+})

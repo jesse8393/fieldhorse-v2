@@ -17,6 +17,7 @@ import { Button, Field, Icon, SkeletonRows } from '../../components/fh'
 import { cx } from '../../components/fh/cx.ts'
 import { formatMoney } from '../../components/fh/money.ts'
 import DataErrorState from '../../components/DataErrorState.tsx'
+import DraftRestored from '../../components/DraftRestored.tsx'
 import LoadingValue from '../../components/LoadingValue.tsx'
 import SignaturePad from '../../components/SignaturePad.tsx'
 import { useAuth } from '../../contexts/AuthContext.tsx'
@@ -29,6 +30,7 @@ import { recordRoute } from '../../lib/records.ts'
 import { hapticTap } from '../../lib/haptics.ts'
 import { toastSuccess } from '../../lib/toast.ts'
 import { keepFocusOnRetry } from '../../lib/retryFocus.ts'
+import { useEditDraft } from '../../lib/useEditDraft.ts'
 import { relativeAgo, shortDate } from '../ContactDetail/lib/quoteStatus.ts'
 import QuoteHeader, { useGoBack } from './QuoteHeader.tsx'
 import { useQuote } from './useQuote.ts'
@@ -77,9 +79,13 @@ function ApproveForm({ quote, patch, home }: { quote: QuoteWithClient; patch: Re
   const client = quote.fh_clients ?? null
 
   const [method, setMethod] = useState<string>('verbal')
-  const [name, setName] = useState(client?.name || '')
+  // Who approved and the note stay on the device until the approval is
+  // recorded, so a reload keeps them (D23).
+  const typed = useEditDraft(`edit:quote-approval:${quote.id}`, { name: client?.name || '', note: '' })
+  const { name, note } = typed.form
+  const setName = (value: string) => typed.set('name', value)
+  const setNote = (value: string) => typed.set('note', value)
   const [email, setEmail] = useState('')
-  const [note, setNote] = useState('')
   // signatureKind mirrors the schema ('drawn' | 'typed' | null); signatureData
   // is a PNG data URL (drawn) or plain text (typed).
   const [signatureKind, setSignatureKind] = useState<'drawn' | 'typed' | null>(null)
@@ -236,6 +242,7 @@ function ApproveForm({ quote, patch, home }: { quote: QuoteWithClient; patch: Re
           link: recordRoute('quote', quote.id)
         })
       } catch { /* best effort */ }
+      typed.done()
       goBack()
     } catch (e: any) {
       console.error('[approve-quote] failed:', e)
@@ -255,6 +262,7 @@ function ApproveForm({ quote, patch, home }: { quote: QuoteWithClient; patch: Re
       </p>
 
       <form className="fhqt-form fhqt-form--page" onSubmit={(e) => { e.preventDefault(); void commit() }}>
+        {typed.restored && <DraftRestored onDiscard={typed.discard} />}
         {err && <p role="alert" className="fhqt-alert">{err}</p>}
 
         <div className="fhqt-card">

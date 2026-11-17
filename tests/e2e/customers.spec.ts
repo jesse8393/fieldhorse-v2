@@ -443,3 +443,17 @@ for (const mode of ['day', 'night'] as const) {
     await expect.poll(() => textContrastAgainst(button, ['var(--v3-primary-hot)', 'var(--v3-primary)'])).toBeGreaterThanOrEqual(4.5)
   })
 }
+
+// Finding lost-work-12: a customer being edited keeps what was typed through
+// a reload, opened from the Edit control or from a link.
+test('a customer being edited keeps the typed notes through a reload', async ({ context, page }) => {
+  const words = 'Saw cut joints at 10 ft, broom finish, no curing compound'
+  await signIn(context)
+  await open(page, '/clients/cl-1?edit=contact')
+  const notes = () => page.locator('label', { hasText: 'Notes' }).locator('textarea')
+  await expect(notes()).toBeVisible({ timeout: 30_000 })
+  await notes().fill(words)
+  await page.reload()
+  await expect(notes()).toHaveValue(words)
+  await expect(page.getByText('Unsaved changes restored')).toBeVisible()
+})

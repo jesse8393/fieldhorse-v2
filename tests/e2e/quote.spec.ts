@@ -1045,6 +1045,7 @@ test('an older record id still opens through the quote address', async ({ contex
   await expect(page.getByText(/Contact not found/i)).toHaveCount(0)
 })
 
+
 // Finding lost-work-1: what is typed on Scope and terms stays through
 // Back, a reload and the phone's Back until it is saved or discarded.
 const TYPED = 'Saw cut joints at 10 ft, broom finish, no curing compound'
@@ -1106,5 +1107,43 @@ test.describe('typed words on the quote screens', () => {
     await saved
     await expect(page).toHaveURL(/\/quotes\/q-quote$/)
     await expect.poll(() => page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('fh:draft:edit:')))).toEqual([])
+  })
+})
+
+// Finding lost-work-12: the line editor and the in person approval keep
+// what was typed through a reload too.
+test.describe('typed words on the quote line and approval screens', () => {
+  const WORDS = TYPED
+
+  test('a line being edited stays open with what was typed through a reload', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS } })
+    await openQuote(page)
+    await lines(page).getByRole('button', { name: /Pump truck/ }).click()
+    const editor = page.getByRole('form', { name: 'Edit line' })
+    await editor.getByLabel('Description').fill('Pump truck, 52 meter boom')
+    await editor.getByLabel('Rate').fill('1150')
+    await page.reload()
+    const back = page.getByRole('form', { name: 'Edit line' })
+    await expect(back.getByLabel('Description')).toHaveValue('Pump truck, 52 meter boom')
+    await expect(back.getByLabel('Rate')).toHaveValue('1150')
+  })
+
+  test('a new line being added stays open with what was typed through a reload', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS } })
+    await openQuote(page)
+    await page.getByRole('button', { name: 'Add a line' }).click()
+    await page.getByRole('form', { name: 'Add a line' }).getByLabel('Description').fill(WORDS)
+    await page.reload()
+    await expect(page.getByRole('form', { name: 'Add a line' }).getByLabel('Description')).toHaveValue(WORDS)
+  })
+
+  test('the in person approval keeps the approver and the note through a reload', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS } })
+    await openQuote(page, '/quotes/q-quote/approve')
+    await page.getByLabel('Approved by').fill('Dana Roy')
+    await page.getByLabel('Note (optional)').fill(WORDS)
+    await page.reload()
+    await expect(page.getByLabel('Approved by')).toHaveValue('Dana Roy')
+    await expect(page.getByLabel('Note (optional)')).toHaveValue(WORDS)
   })
 })

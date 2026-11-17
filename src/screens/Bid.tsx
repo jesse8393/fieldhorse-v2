@@ -28,6 +28,8 @@ import { updateProfilePreferences } from '../lib/profilePreferences.ts'
 import { changeTemplatePreferences, templatePreferences, type TemplatePreferences } from './estimates/estimateLibrary.ts'
 import QuoteLibrary from './estimates/QuoteLibrary.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
+import DraftRestored from '../components/DraftRestored.tsx'
+import { useEditDraft } from '../lib/useEditDraft.ts'
 
 
 // White-label: internal-only tool but no app-attributable phrasing
@@ -94,13 +96,18 @@ export default function Bid() {
   // Deleting a template takes a second tap on the same button (D57).
   const deleteTap = useArmedId()
   const navigate = useNavigate()
-  const [scope, setScope] = useState('')
+  // The scope, job type and client being written stay on the device until
+  // the estimate becomes a quote, so a reload keeps them (D23).
+  const estimate = useEditDraft('estimate', { scope: '', jobType: '', clientName: '' }, { from: 'estimate' })
+  const { scope, jobType, clientName } = estimate.form
+  const setScope = (value: string) => estimate.set('scope', value)
+  const setJobType = (value: string) => estimate.set('jobType', value)
+  const setClientName = (value: string) => estimate.set('clientName', value)
   const [marginPct, setMarginPct] = useState(25)
   const [generating, setGenerating] = useState(false)
   const [bid, setBid] = useState<any>(null)
   const [err, setErr] = useState('')
   const [picks, setPicks] = useState<any[]>([])
-  const [jobType, setJobType] = useState('')
   const [copied, setCopied] = useState(false)
   const [pushing, setPushing] = useState(false)
   // The quote the bid becomes needs a client (SPEC D59): typed here, picked
@@ -108,7 +115,6 @@ export default function Bid() {
   const orgId = useOrgScope(user?.id)
   const { data: clientsBundle } = useClientsBundle(user?.id)
   const clients = clientsBundle?.clients ?? []
-  const [clientName, setClientName] = useState('')
   // Templates library (migration 024). Loaded via TanStack Query and
   // invalidated after every save/delete so the picker stays fresh.
   const templateQueryState = useEstimateTemplates(user?.id)
@@ -288,6 +294,7 @@ export default function Bid() {
       }
 
       hapticSuccess()
+      estimate.done()
       toastSuccess(
         'Pushed to a new quote',
         `${items.length} line item${items.length === 1 ? '' : 's'} added, ${money(recommendedPrice)}`
@@ -646,6 +653,7 @@ export default function Bid() {
         <SectionHeader label="Scope" />
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
+          {estimate.restored && <DraftRestored onDiscard={estimate.discard} />}
           {/* Scope textarea */}
           <textarea
             aria-label="Estimate scope"

@@ -982,3 +982,16 @@ test.describe('a photo caption that fails to save', () => {
     await expect(caption).toHaveValue('Rebar tied at 12 inch centers')
   })
 })
+
+// Finding lost-work-12: the closing note on Mark complete survives a reload.
+test.describe('typed words on Mark complete', () => {
+  const WORDS = TYPED
+
+  test('the closing note on Mark complete survives a reload', async ({ context, page }) => {
+    await signIn(context)
+    await page.goto('/jobs/c-job2/complete', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    await page.getByLabel('Closing note').fill(WORDS)
+    await page.reload()
+    await expect(page.getByLabel('Closing note')).toHaveValue(WORDS)
+  })
+})

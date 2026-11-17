@@ -118,11 +118,21 @@ export function useEditDraft<T extends Record<string, unknown>>(kind: string | n
     setState((s) => s.form ? { ...s, form: { ...s.form, ...values } } : { ...s, auto: { ...s.auto, ...values } })
   }, [])
 
-  /** Forget the changes: after a save lands, or when the person discards them. */
+  /** Forget the changes: when the person discards them. */
   const reset = useCallback(() => {
     pending.current = null
     if (latest.current.kind) clearDraft(latest.current.kind)
     setState((s) => ({ ...s, form: null, from: null, restored: false }))
+  }, [])
+  /**
+   * The changes were saved: forget the stored copy. With keep, the form
+   * goes on showing them (a message sent that may be sent again), and only
+   * new changes are stored.
+   */
+  const done = useCallback((options: { keep?: boolean } = {}) => {
+    pending.current = null
+    if (latest.current.kind) clearDraft(latest.current.kind)
+    setState((s) => ({ ...s, form: null, from: null, restored: false, auto: options.keep && s.form ? { ...s.auto, ...s.form } : s.auto }))
   }, [])
 
   return {
@@ -135,7 +145,7 @@ export function useEditDraft<T extends Record<string, unknown>>(kind: string | n
     dirty: current.form != null,
     /** The changes were brought back when the screen opened. */
     restored: current.restored && current.form != null,
-    done: reset,
+    done,
     discard: reset,
   }
 }

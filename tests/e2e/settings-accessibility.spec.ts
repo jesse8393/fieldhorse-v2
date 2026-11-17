@@ -280,3 +280,15 @@ test('deleting a custom trade takes a second tap', async ({ page, context }) => 
   await expect.poll(() => deletes.length).toBe(1)
   await expect(page.getByText('Trade deleted', { exact: true })).toBeVisible()
 })
+
+// Finding lost-work-12: a rate typed and not saved yet stays through a
+// reload, ready to save.
+test('a rate being typed survives a reload', async ({ page, context }) => {
+  await signInWithPersistedSettings(context)
+  await page.goto('/settings#rates')
+  const concrete = () => page.getByRole('region', { name: 'Your rates.' }).getByRole('group', { name: 'Concrete rates', exact: true })
+  await concrete().getByRole('spinbutton', { name: 'Concrete low price ($)', exact: true }).fill('9.75')
+  await page.reload()
+  await expect(concrete().getByRole('spinbutton', { name: 'Concrete low price ($)', exact: true })).toHaveValue('9.75')
+  await expect(concrete().getByRole('button', { name: 'Save Concrete rate', exact: true })).toBeEnabled()
+})

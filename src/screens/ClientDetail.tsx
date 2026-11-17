@@ -25,6 +25,9 @@ import { toastError, toastInfo } from '../lib/toast.ts'
 import { stageColor, stageLabel } from '../lib/stages.ts'
 import { recordRoute, type RecordKind } from '../lib/records.ts'
 import { useSecondTap } from '../lib/secondTap.ts'
+import { readDraftEntry } from '../lib/drafts.ts'
+import { useEditDraft } from '../lib/useEditDraft.ts'
+import DraftRestored from '../components/DraftRestored.tsx'
 import { clientDeleteBlockers, describeDeleteBlockers } from '../lib/clients.ts'
 import { gatherStatement } from '../lib/statement.ts'
 import { rollupJobs } from '../lib/rollups.ts'
@@ -82,7 +85,8 @@ export default function ClientDetail() {
   const [tab, setTab] = useState('overview')
   // Every row on the Projects tab opens its own record (D53).
   const openRecord = (kind: RecordKind, recordId: string) => navigate(recordRoute(kind, recordId))
-  const [isEditing, setIsEditing] = useState(() => searchParams.get('edit') === 'contact')
+  // An edit left open with changes in it opens again (D23).
+  const [isEditing, setIsEditing] = useState(() => searchParams.get('edit') === 'contact' || readDraftEntry(clientEditKind(id)) != null)
   // Deleting the client takes a second tap on the same button (D57).
   const deleteTap = useSecondTap()
   const [deleting, setDeleting] = useState(false)
@@ -177,7 +181,7 @@ export default function ClientDetail() {
     if (error || !data?.length) {
       hapticError()
       toastError("Couldn't save", error?.message || 'This client may have been removed. Refresh and try again.')
-      return
+      return false
     }
     await fetchClient()
     void invalidateClients()
@@ -186,6 +190,7 @@ export default function ClientDetail() {
       void queryClient.invalidateQueries({ queryKey: homeDashboardKey(user.id, orgId) })
     }
     setIsEditing(false)
+    return true
   }
 
   // New for this client (SPEC D58): the New screen, with this client
@@ -754,10 +759,23 @@ function ContactRow({ icon: Icon, label, value, href, multiline, isLast }: any) 
    OverviewEdit, controlled form, v3 surface
    ============================================================ */
 
+const CLIENT_EDITABLE = ['name', 'company_name', 'phone', 'email', 'address', 'notes']
+
+function clientEditKind(id: string | undefined) {
+  return `edit:client:${id}`
+}
+
 function OverviewEdit({ client, onCommit, onCancel }: any) {
-  const [form, setForm] = useState({ ...client })
+  // What is typed stays on the device until it is saved or cancelled, so a
+  // reload keeps it (D23).
+  const draft = useEditDraft<Record<string, any>>(clientEditKind(client.id), Object.fromEntries(CLIENT_EDITABLE.map((k) => [k, client[k] ?? null])))
+  const form = draft.form
   const [saving, setSaving] = useState(false)
-  function set(k: any, v: any) { setForm((f: any) => ({ ...f, [k]: v })) }
+  function set(k: any, v: any) { draft.set(k, v) }
+  function cancel() {
+    draft.discard()
+    onCancel()
+  }
   const fieldStyle: import('react').CSSProperties = {
     width: '100%', boxSizing: 'border-box',
     padding: '12px 12px', borderRadius: 10,
@@ -778,17 +796,17 @@ function OverviewEdit({ client, onCommit, onCancel }: any) {
       toastError('Add a name', 'A client needs a name before you can save.')
       return
     }
-    const EDITABLE = ['name', 'company_name', 'phone', 'email', 'address', 'notes']
     const patch: Record<string, any> = {}
-    for (const k of EDITABLE) {
+    for (const k of CLIENT_EDITABLE) {
       const next = form[k]
       const prev = client[k]
       if ((next ?? null) !== (prev ?? null)) patch[k] = next === '' ? null : next
     }
-    if (Object.keys(patch).length === 0) { onCancel(); return }
+    if (Object.keys(patch).length === 0) { cancel(); return }
     setSaving(true)
-    await onCommit(patch)
+    const saved = await onCommit(patch)
     setSaving(false)
+    if (saved) draft.done()
   }
   return (
     <div style={{
@@ -797,6 +815,7 @@ function OverviewEdit({ client, onCommit, onCancel }: any) {
       display: 'flex', flexDirection: 'column', gap: 12,
       margin: '12px 0 24px'
     }}>
+      {draft.restored && <DraftRestored onDiscard={draft.discard} />}
       <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <span style={labelStyle}>Name</span>
         <input style={fieldStyle} value={form.name || ''} onChange={(e) => set('name', e.target.value)} />
@@ -824,7 +843,7 @@ function OverviewEdit({ client, onCommit, onCancel }: any) {
         <textarea rows={4} style={{ ...fieldStyle, resize: 'vertical' }} value={form.notes || ''} onChange={(e) => set('notes', e.target.value)} />
       </label>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: 12, marginTop: 4 }}>
-        <button type="button" onClick={onCancel} disabled={saving} style={{
+        <button type="button" onClick={cancel} disabled={saving} style={{
           padding: '12px 12px', borderRadius: 10,
           background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)',
           color: 'var(--v3-text)', fontFamily: 'var(--font-body)',

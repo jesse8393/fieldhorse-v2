@@ -481,7 +481,7 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
         </section>
       )}
 
-      <QuoteLines items={items} userId={userId} who={who} money={terms} focusRef={titleRef} startAdding={startAdding} locked={approved} onEditorClosed={onEditorClosed} onChange={setLines} />
+      <QuoteLines items={items} quoteId={quote.id} userId={userId} who={who} money={terms} focusRef={titleRef} startAdding={startAdding} locked={approved} onEditorClosed={onEditorClosed} onChange={setLines} />
 
       {approved && (
         <section className="fhqt-panel" aria-labelledby="fhqt-approved-title">

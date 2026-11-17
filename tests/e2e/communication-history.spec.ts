@@ -113,3 +113,15 @@ test('unconfigured AI opens manual writing without a generation attempt', async 
   await expect(draft).toHaveValue('Manual writing stays available.')
   expect(generated).toBe(0)
 })
+
+// Finding lost-work-12: a message being written, and what to highlight,
+// stay through a reload until they are sent.
+test('a message being written stays through a reload', async ({ context, page }) => {
+  const words = 'Saw cut joints at 10 ft, broom finish, no curing compound'
+  await signIn(context, { tables: { fh_contacts: [job], fh_notes: [], fh_messages: [] } })
+  await page.goto(`/compose?contact=${job.id}`)
+  await page.getByRole('button', { name: 'Write manually', exact: true }).click()
+  await page.getByRole('textbox', { name: 'Message', exact: true }).fill(words)
+  await page.reload()
+  await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue(words)
+})

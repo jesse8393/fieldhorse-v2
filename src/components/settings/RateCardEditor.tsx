@@ -9,13 +9,15 @@
 // All persistence flows through lib/rateCard.ts so Bid.jsx and any
 // future consumer pulls the same merged view via loadUserRateCard().
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Plus, Save as SaveIcon, RotateCcw, Trash2, Check } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { hapticTap, hapticSuccess, hapticError } from '../../lib/haptics.ts'
 import { toastSuccess, toastError } from '../../lib/toast.ts'
 import { useArmedId } from '../../lib/secondTap.ts'
+import { clearDraft, readDraftEntry, sameDraft, writeDraft } from '../../lib/drafts.ts'
+import DraftRestored from '../DraftRestored.tsx'
 import {
   RATE_CARD, TRADE_LABELS, RATE_UNITS,
   loadUserRateCard, upsertRate, resetRate
@@ -31,6 +33,14 @@ function slugify(s: any) {
     .replace(/^(.)/, (_, c) => c.toLowerCase())
 }
 
+// Rates typed and not saved yet stay on the device (D23), each with the
+// saved rate it started from, so a reload keeps them ready to save. One
+// whose trade was saved differently since is dropped.
+const RATE_DRAFT = 'edit:rate-card'
+function savedRate(current: any) {
+  return { unit: current?.unit || 'lump', rate_low: String(current?.low ?? 0), rate_high: String(current?.high ?? 0) }
+}
+
 export default function RateCardEditor() {
   const { user } = useAuth()
   const userId = user?.id
@@ -42,6 +52,36 @@ export default function RateCardEditor() {
   const deleteTap = useArmedId()
   const [adding, setAdding] = useState(false)
   const [newLabel, setNewLabel] = useState('')
+
+  const [restored, setRestored] = useState(false)
+  const draftReady = useRef(false)
+  useEffect(() => {
+    if (loading || draftReady.current) return
+    draftReady.current = true
+    const entry = readDraftEntry<Record<string, any>>(RATE_DRAFT)
+    if (!entry) return
+    const from = (entry.base || {}) as Record<string, any>
+    const back: Record<string, any> = {}
+    for (const [key, typed] of Object.entries(entry.form)) {
+      if (sameDraft(from[key], savedRate(merged[key] || RATE_CARD[key]))) back[key] = { ...typed, dirty: true }
+    }
+    if (Object.keys(back).length === 0) return
+    setDraft((d: any) => ({ ...back, ...d }))
+    setRestored(true)
+  }, [loading, merged])
+  useEffect(() => {
+    if (!draftReady.current) return
+    const form: Record<string, any> = {}
+    const from: Record<string, any> = {}
+    for (const [key, d] of Object.entries(draft) as [string, any][]) {
+      if (!d?.dirty) continue
+      form[key] = { unit: d.unit, rate_low: d.rate_low, rate_high: d.rate_high }
+      from[key] = savedRate(merged[key] || RATE_CARD[key])
+    }
+    if (Object.keys(form).length) writeDraft(RATE_DRAFT, form, from)
+    else clearDraft(RATE_DRAFT)
+  }, [draft, merged])
+  const unsaved = Object.values(draft).some((d: any) => d?.dirty)
 
   const reload = useCallback(async () => {
     if (!userId) return
@@ -197,6 +237,7 @@ export default function RateCardEditor() {
       }}>
         These rates are used for bid estimates. Each trade saves separately. Change a rate, then use its save button. Reset restores the default.
       </p>
+      {restored && unsaved && <DraftRestored onDiscard={() => { setDraft({}); setRestored(false) }} />}
 
       <div style={{
         borderRadius: 10,

@@ -19,6 +19,7 @@ import { useFhMotion } from '../lib/motion.ts'
 import { FilterPill, Eyebrow } from '../components/v3'
 import { countNoun } from '../lib/format.ts'
 import { aiDraftError } from '../lib/serviceErrors.ts'
+import { useEditDraft } from '../lib/useEditDraft.ts'
 
 const CHANNELS = [
   { id: 'sms', label: 'SMS', tone: 'Keep it under 160 chars. Tight. No emoji. Punctuation minimal.', Icon: MessageSquare },
@@ -53,10 +54,15 @@ export default function Compose() {
   const [handoff, setHandoff] = useState<{ contactId: string; channel: string; body: string; subject?: string; to: string } | null>(null)
   const [loggingHandoff, setLoggingHandoff] = useState(false)
   const sendLock = useRef(false)
-  const [context, setContext] = useState('')
-  const [draft, setDraft] = useState('')
-  // Writing is always available, whether or not AI is configured.
-  const [manual, setManual] = useState(false)
+  // The message and its context stay on the device until the message is
+  // sent or recorded, so a reload or Back keeps them (D23).
+  const words = useEditDraft('compose', { context: '', draft: '' }, { from: 'compose' })
+  const { context, draft } = words.form
+  const setContext = (value: string) => words.set('context', value)
+  const setDraft = (value: string) => words.set('draft', value)
+  // Writing is always available, whether or not AI is configured. A
+  // message brought back from the device opens where it can be edited.
+  const [manual, setManual] = useState(() => words.restored && draft.trim() !== '')
   const [loading, setLoading] = useState(false)
   const [aiReadiness, setAiReadiness] = useState<'configured' | 'unavailable' | 'unknown'>('unknown')
   const [readinessAttempt, setReadinessAttempt] = useState(0)
@@ -191,6 +197,7 @@ export default function Compose() {
       })
       if (error) throw error
       setHandoff(null)
+      words.done({ keep: true })
       setHistoryVersion((value) => value + 1)
       toastSuccess('Communication recorded', 'Delivery and replies stay in your messaging app.')
     } catch {
@@ -244,6 +251,7 @@ export default function Compose() {
 
       hapticSuccess()
       setSent(true)
+      words.done({ keep: true })
       setHistoryVersion((value) => value + 1)
       if (data.history_saved === false) toastError('Email sent, history unavailable', 'Do not send again. The email provider accepted this message, but its history could not be saved.')
       toastSuccess(
