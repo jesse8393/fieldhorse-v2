@@ -814,3 +814,93 @@ test('a two line job title keeps clear of the client name on a zoomed desktop in
   const job = await ink(page.locator('a.fhinv-hero__job'))
   expect(job.top, JSON.stringify({ who, job })).toBeGreaterThanOrEqual(who.bottom - 1)
 })
+
+// A phone keyboard, as iOS Safari and Chrome on Android draw it by
+// default: the page keeps its full height and only the visual viewport
+// shrinks, to about 55 percent of the screen. A page scale shrinks the
+// visual viewport the same way and keeps window.innerHeight. Then the
+// browser brings the focused field into what is left, as a phone does.
+async function keyboardUp(context: import('@playwright/test').BrowserContext, page: import('@playwright/test').Page, field: import('@playwright/test').Locator) {
+  const height = page.viewportSize()!.height
+  const cdp = await context.newCDPSession(page)
+  await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: height / Math.round(height * 0.55) })
+  await page.waitForTimeout(400)
+  await field.evaluate((el) => {
+    const vv = window.visualViewport!
+    const r = el.getBoundingClientRect()
+    if (r.top < vv.offsetTop || r.bottom > vv.offsetTop + vv.height) el.scrollIntoView({ block: 'center', inline: 'nearest' })
+  })
+  await page.waitForTimeout(400)
+}
+
+/** Where a box sits against the part of the page the keyboard leaves. */
+function aboveKeyboard(target: import('@playwright/test').Locator) {
+  return target.evaluate((el) => {
+    const vv = window.visualViewport!
+    const r = el.getBoundingClientRect()
+    return { top: Math.round(r.top), bottom: Math.round(r.bottom), visibleTop: Math.round(vv.offsetTop), visibleBottom: Math.round(vv.offsetTop + vv.height), inView: r.top >= vv.offsetTop - 0.5 && r.bottom <= vv.offsetTop + vv.height + 0.5 }
+  })
+}
+
+function writesTo(page: import('@playwright/test').Page, table: string) {
+  const writes: string[] = []
+  page.on('request', (request) => {
+    const url = new URL(request.url())
+    if (url.pathname === `/rest/v1/${table}` && !['GET', 'HEAD', 'OPTIONS'].includes(request.method())) writes.push(request.method())
+  })
+  return writes
+}
+
+test.describe('phone keyboard', () => {
+  test.skip(({ isMobile }) => !isMobile, 'Phone keyboard')
+
+  // keyboard-1: the floating Save on Settings stayed at the dock's height,
+  // under the keyboard, and Enter in a field did nothing.
+  test('Settings keeps Save above the keyboard and Enter in a field saves', async ({ context, page }) => {
+    await signIn(context)
+    await page.goto('/settings', { waitUntil: 'domcontentloaded' })
+    const field = page.getByPlaceholder('Your company')
+    await expect(field).toBeVisible({ timeout: 30_000 })
+    await page.waitForTimeout(500)
+    // The field already in the top half, so the browser has no reason to move.
+    await field.evaluate((el) => window.scrollBy(0, el.getBoundingClientRect().top - 200))
+    const writes = writesTo(page, 'profiles')
+    await field.click()
+    await field.fill('Parker Concrete LLC')
+    const save = page.locator('.fh-settings-save-bar button')
+    await expect(save).toBeEnabled()
+    await keyboardUp(context, page, field)
+    await expect.poll(async () => (await aboveKeyboard(save)).inView, { message: JSON.stringify(await aboveKeyboard(save)) }).toBe(true)
+    expect((await aboveKeyboard(field)).inView).toBe(true)
+    await field.press('Enter')
+    await expect.poll(() => writes.length, { message: 'Enter saved the change' }).toBeGreaterThan(0)
+  })
+
+  // keyboard-1: the same on a sub's profile, whose Save sticks to the
+  // bottom of the page.
+  test("a sub's profile keeps Save above the keyboard and Enter in a field saves", async ({ context, page }) => {
+    await signIn(context, {
+      tables: {
+        fh_sub_profiles: [{
+          id: 'sp-1', user_id: 'qa-user-1', org_id: 'org-1', identity_key: 'acme pumping', name: 'Acme Pumping', phone: '555-0199',
+          email: 'office@acme.example', trade: 'Concrete pumping', notes: 'Call before 7 am.', created_at: '2026-09-01T12:00:00Z'
+        }]
+      }
+    })
+    await page.goto('/subs/acme%20pumping', { waitUntil: 'domcontentloaded' })
+    const bar = page.locator('.fh-subdetail-savebar')
+    await expect(bar).toBeVisible({ timeout: 30_000 })
+    await page.waitForTimeout(500)
+    const field = page.locator('.fh-app input:not([type=checkbox]):not([type=file]):not([type=date])').first()
+    const writes = writesTo(page, 'fh_sub_profiles')
+    await field.click()
+    await field.fill('Acme Pumping LLC')
+    const save = bar.locator('button')
+    await expect(save).toBeEnabled()
+    await keyboardUp(context, page, field)
+    await expect.poll(async () => (await aboveKeyboard(save)).inView, { message: JSON.stringify(await aboveKeyboard(save)) }).toBe(true)
+    expect((await aboveKeyboard(field)).inView).toBe(true)
+    await field.press('Enter')
+    await expect.poll(() => writes.length, { message: 'Enter saved the change' }).toBeGreaterThan(0)
+  })
+})
