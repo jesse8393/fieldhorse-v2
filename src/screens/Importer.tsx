@@ -25,13 +25,7 @@ import {
   TARGET_FIELDS, PRESETS, buildHeaderMap, mapRows, markFileRepeats, looksLikeCsv, hasNameSource,
   type HeaderMap, type ImportField, type ImportRecord
 } from '../lib/importMapping.ts'
-import { findOrCreateClient } from '../lib/clients.ts'
-import { normalizePhoneKey } from '../lib/subIdentity.ts'
-import type { LeadInsert } from '../lib/leads.ts'
-
-// Rows per insert. One giant insert for a big export can hit request
-// size or statement time limits and fails as a whole.
-const IMPORT_CHUNK = 200
+import { runImport } from '../lib/importRun.ts'
 
 export default function Importer() {
   const isDesktop = useIsDesktop()
@@ -248,55 +242,12 @@ export default function Importer() {
     setImporting(true)
     setProgress(5)
     const payload = toImport
-    // Each row becomes an fh_leads row pointing at a client (SPEC D53).
-    // The client is matched by phone, then email, then name across the
-    // company, or made, through the same helper every create path uses.
-    // Rows in one file that name the same person share one client.
-    const clientByKey = new Map<string, string>()
-    const keyFor = (m: any) => {
-      const phone = normalizePhoneKey(m.phone)
-      if (phone) return `p:${phone}`
-      const email = String(m.email || '').trim().toLowerCase()
-      if (email) return `e:${email}`
-      return `n:${String(m.name || '').trim().toLowerCase()}`
-    }
-    let landed = 0
-    let finalCount = 0
-    let error: { message: string } | null = null
-    const leads: LeadInsert[] = []
-    for (const m of payload) {
-      const k = keyFor(m)
-      let clientId = clientByKey.get(k) ?? null
-      if (!clientId) {
-        clientId = await findOrCreateClient(user.id, { name: m.name, phone: m.phone, email: m.email, address: m.address }, orgId)
-        if (clientId) clientByKey.set(k, clientId)
-      }
-      if (!clientId) { error = { message: `Could not save the customer for ${m.name}.` }; break }
-      leads.push({
-        user_id: user.id,
-        org_id: orgId ?? null,
-        client_id: clientId,
-        title: m.job_title || null,
-        job_type: m.job_type || null,
-        // fh_leads has no amount column; a total in the export stays in the notes.
-        notes: m.amount ? `Estimated amount $${Number(m.amount).toLocaleString('en-US', { maximumFractionDigits: 2 })}` : null,
-        source: 'import',
-        status: 'open'
-      })
-      setProgress(5 + Math.round((45 * leads.length) / payload.length))
-    }
-    // Insert in chunks so a large export doesn't fail as one giant
-    // request, and so the bar shows real progress.
-    if (!error) {
-      for (let i = 0; i < leads.length; i += IMPORT_CHUNK) {
-        const batch = leads.slice(i, i + IMPORT_CHUNK)
-        const res = await supabase.from('fh_leads').insert(batch, { count: 'exact' })
-        if (res.error) { error = res.error; break }
-        landed += batch.length
-        finalCount += res.count ?? batch.length
-        setProgress(50 + Math.round((50 * landed) / leads.length))
-      }
-    }
+    const { landed, count: finalCount, error } = await runImport({
+      userId: user.id,
+      orgId,
+      records: payload,
+      onProgress: setProgress
+    })
     // Rows that landed are now on file: a retry or a second file in this
     // session must treat them as repeats.
     if (landed > 0) {
