@@ -699,11 +699,11 @@ test.describe('Reports', () => {
       await expect.poll(() => read.held.length).toBeGreaterThan(0)
       await holds(async () => {
         await expect(page.getByRole('status').filter({ hasText: 'Loading' }).first()).toBeVisible()
-        await expect(page.getByText('Not enough data yet.', { exact: true })).toHaveCount(0)
+        await expect(page.getByText('Reports fill in as you add leads, quotes and jobs.', { exact: true })).toHaveCount(0)
       })
       read.release()
       await expect(page.getByText('Business overview', { exact: true })).toBeVisible()
-      await expect(page.getByText('Not enough data yet.', { exact: true })).toHaveCount(0)
+      await expect(page.getByText('Reports fill in as you add leads, quotes and jobs.', { exact: true })).toHaveCount(0)
       return
     }
     await open(page, '/analytics', '[data-build-screen="SnowAnalyticsBuild"]')
@@ -732,7 +732,7 @@ test.describe('Reports', () => {
     await page.goto('/analytics', { waitUntil: 'domcontentloaded', timeout: 60_000 })
     const error = page.getByRole('alert').filter({ hasText: "Couldn't load your reports" })
     await expect(error).toBeVisible({ timeout: 30_000 })
-    await expect(page.getByText('Not enough data yet.', { exact: true })).toHaveCount(0)
+    await expect(page.getByText('Reports fill in as you add leads, quotes and jobs.', { exact: true })).toHaveCount(0)
     await expect(page.getByText(/\$0 won/)).toHaveCount(0)
     failing.on = false
     await retryFromKeyboard(page, error.getByRole('button', { name: 'Try again' }))

@@ -47,6 +47,25 @@ async function open(page: Page) {
   await expect(page.getByRole('heading', { name: 'Reports', exact: true })).toBeVisible({ timeout: 30_000 })
 }
 
+// A brand new company has nothing to report. Both layouts say what fills
+// the page and offer the first step, instead of a dashboard of $0 with a
+// largest and a smallest stage that are the same empty stage.
+test('Reports on a company with no work yet offers the first lead', async ({ context, page }) => {
+  await signIn(context, { tables: {
+    fh_contacts: [], fh_leads: [], fh_quotes: [], fh_invoices: [], fh_payments: [],
+    fh_stage_transitions: [], fh_change_orders: [], fh_clients: []
+  } })
+  await open(page)
+  const main = page.locator('#fh-main')
+  await expect(main.getByText('Reports fill in as you add leads, quotes and jobs.', { exact: true })).toBeVisible()
+  await main.getByRole('link', { name: 'New lead', exact: true }).click()
+  await expect(page).toHaveURL(/\/leads\/new$/)
+  await page.goBack()
+  await expect(main.getByText('Reports fill in as you add leads, quotes and jobs.', { exact: true })).toBeVisible()
+  await expect(main.getByText('Smallest stage')).toHaveCount(0)
+  await expect(main).not.toContainText('$0')
+})
+
 test.describe('Reports read the four records', () => {
   test('the funnel counts leads, quotes, a quote that became a job and the lost ones', async ({ context, page }, testInfo) => {
     await signIn(context, { tables: { fh_leads: LEADS, fh_quotes: QUOTES } })

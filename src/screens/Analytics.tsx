@@ -17,6 +17,8 @@ import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { keepFocusOnRetry } from '../lib/retryFocus.ts'
+import { useNavAccess } from '../lib/useNavAccess.ts'
+import { Button, EmptyState } from '../components/fh'
 const SnowAnalytics = lazy(() => import('../components/desktop/SnowAnalyticsBuild.tsx'))
 import SectionHeader from '../components/v3/SectionHeader.tsx'
 import { Eyebrow } from '../components/v3'
@@ -296,6 +298,18 @@ export default function Analytics() {
 
   const { stagger, item } = useFhMotion()
   const isDesktop = useIsDesktop()
+  const { canSee } = useNavAccess()
+
+  // A company with no jobs, leads or quotes yet gets one empty state on
+  // both layouts: what fills this page and the first step, not $0 tiles.
+  const empty = !loading && contacts.length === 0 && leadRows.length === 0 && quoteRows.length === 0
+  const emptyState = (
+    <EmptyState
+      icon={BarChart3}
+      title="Reports fill in as you add leads, quotes and jobs."
+      action={canSee('/leads/new') ? <Button variant="primary" size="md" to="/leads/new">New lead</Button> : undefined}
+    />
+  )
 
   // A failed read with nothing to show says so on both layouts, never
   // "Not enough data yet." or a book of zeros. A failed refresh keeps the
@@ -325,6 +339,7 @@ export default function Analytics() {
         byStage={byStage}
         revenueByMonth={revenueByMonth}
         topClients={topClients}
+        empty={empty ? emptyState : undefined}
       /></Suspense>
     )
   }
@@ -375,17 +390,9 @@ export default function Analytics() {
         </motion.div>
       )}
 
-      {!loading && contacts.length === 0 && leadRows.length === 0 && quoteRows.length === 0 && (
-        <motion.div variants={item} className="v3-section" style={{ margin: '0 var(--v3-gutter) 14px' }}>
-          <div className="v3-empty">
-            <BarChart3 size={22} color="var(--v3-text-muted)" style={{ margin: '0 auto 8px' }} />
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
-              Not enough data yet.
-            </div>
-            <div style={{ fontSize: 14, lineHeight: 1.5 }}>
-              Add a few leads and start closing. Analytics lights up once the pipeline moves.
-            </div>
-          </div>
+      {empty && (
+        <motion.div variants={item} style={{ margin: '0 var(--v3-gutter) 14px' }}>
+          {emptyState}
         </motion.div>
       )}
 
