@@ -244,6 +244,23 @@ $function$;
   equal(true, true, 'baseline: crew pushes a notification with any link to the owner')
   await db.exec('reset role')
 
+  // Partner and removal policies (DB-13, DB-14) run in a separate migration.
+  const partnerTables = ['fh_invoices', 'fh_change_orders', 'fh_stage_transitions']
+  for (const [n, table] of partnerTables.entries()) {
+    await db.exec(`
+      create table public.${table}(id uuid primary key,org_id uuid,contact_id uuid);
+      insert into public.${table} values ('${id(90 + n)}','${id(100)}','${id(10)}');
+      alter table public.${table} enable row level security;
+      create policy ${table}_sel on public.${table} for select to authenticated using (
+        org_id in (select public.auth_user_org_ids())
+        or exists (select 1 from public.fh_job_partners p where p.job_id = ${table}.contact_id and p.partner_user_id = (select auth.uid()) and p.status = 'accepted'));
+      grant select on public.${table} to authenticated;
+    `)
+  }
+  const visible = async table => (await rows(`select id from public.${table}`)).length
+  await scope(9)
+  for (const table of partnerTables) equal(await visible(table), 1, `baseline: a partner who left still reads ${table}`)
+  await db.exec('reset role')
   const boundaries = await read('migrations/20261117110100_role_boundaries.sql')
   assert(!/drop|delete|truncate/i.test(boundaries), 'role boundary migration avoids words that need owner approval')
   await db.exec(boundaries)
@@ -306,6 +323,17 @@ $function$;
   await refused(() => notify(2), "owner cannot write into another member's bell directly")
   await notify(1); equal(true, true, 'owner can still notify themselves')
   await db.exec('reset role')
+
+  const removal = await read('migrations/20261117110200_partner_and_removal_policies.sql')
+  await db.exec(removal)
+  await db.exec(removal)
+  equal(true, true, 'partner and removal policy migration installs twice safely')
+
+  // DB-13: a partner who left the job no longer reads its invoices, change orders or history.
+  for (const [user, expected, who] of [[9, 0, 'a partner who left'], [6, 1, 'an active partner'], [1, 1, 'the owner'], [3, 1, 'crew']]) {
+    await scope(user)
+    for (const table of partnerTables) equal(await visible(table), expected, `${who} ${expected ? 'reads' : 'no longer reads'} ${table}`)
+  }
 
   console.log(`${checks} authorization transition checks passed.`)
 } finally { await db.close() }
