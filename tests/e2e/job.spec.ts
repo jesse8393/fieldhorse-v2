@@ -865,8 +865,8 @@ test('the contract card shows cents', async ({ context, page }) => {
 })
 
 // A double tap while the write is still out wrote twice: two lines for one
-// material, or the bulk list twice. Each add now takes no second tap until
-// the first settles.
+// material, the bulk list twice, two inspection results for one visit. Each
+// add or save now takes no second tap until the first settles.
 test.describe('one tap writes once on the job sections', () => {
   test.beforeEach(async ({ page: _page }, testInfo) => {
     test.skip(!testInfo.project.name.startsWith('mobile'), 'touch taps')
@@ -916,5 +916,27 @@ test.describe('one tap writes once on the job sections', () => {
     await expect(page.getByText('Added 2', { exact: true }).first()).toBeVisible({ timeout: 10_000 })
     await page.waitForTimeout(500)
     expect(posts.length, 'one tap, one insert').toBe(1)
+  })
+
+  test('Save on an inspection logs one result', async ({ context, page }) => {
+    const job = {
+      id: 'c-job1', stage: 'job', name: 'Plumbing Bellevue', job_title: 'Slab + trench', amount: 33100,
+      user_id: 'qa-user-1', client_id: null, phone: '555-0101', email: 'x@y.com', address: '412 Burkitt Station Rd',
+      created_at: '2026-09-20T15:00:00.000Z', updated_at: '2026-10-09T15:00:00.000Z', completed_at: null,
+      proposal_status: null, milestones: [], follow_up_on: null, notes: null, scope_text: null, has_inspections: true
+    }
+    await signIn(context, { tables: { fh_contacts: [job], fh_inspections: [] } })
+    const posts = postsTo(context, '/rest/v1/fh_inspections')
+    await holdPosts(context, '**/rest/v1/fh_inspections*', 1500, () => ({ status: 201, json: [] }))
+    await page.goto('/jobs/c-job1?tab=inspections', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    const trade = page.getByRole('button', { name: /^Concrete/ }).first()
+    await expect(trade).toBeVisible({ timeout: 30_000 })
+    await trade.click()
+    const form = page.locator('form[aria-label="Log Concrete"]')
+    await expect(form).toBeVisible()
+    await twoTaps(page, form.getByRole('button', { name: 'Save' }))
+    await expect(form).toHaveCount(0, { timeout: 10_000 })
+    await page.waitForTimeout(500)
+    expect(posts.length, 'one tap, one inspection').toBe(1)
   })
 })
