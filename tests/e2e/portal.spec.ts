@@ -1791,3 +1791,12 @@ test('at night the approval note and the approve error keep readable ink on thei
   await expect(error).toBeVisible()
   expect(contrastRatio(luminanceOf(...inkOf(await error.evaluate((el) => getComputedStyle(el).color))), cream)).toBeGreaterThanOrEqual(4.5)
 })
+
+test('the tab names no app while a customer link loads or fails (PT-11)', async ({ page, context }) => {
+  const spies = await mockPortal(context, proposalPayload())
+  spies.setLinkFailure('abort')
+  await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible()
+  expect(await page.title()).toBe('Document')
+})
+

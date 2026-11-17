@@ -219,6 +219,10 @@ export default function PublicDoc() {
     return 'ok'
   }, [load])
 
+  // Until the document names its sender, the tab names no one: never the
+  // app, on a page that belongs to the contractor.
+  useEffect(() => { document.title = 'Document' }, [token])
+
   useEffect(() => {
     let cancelled = false
     ;(async () => {
