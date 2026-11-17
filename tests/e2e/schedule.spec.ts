@@ -151,7 +151,7 @@ test.describe('unscheduled tray', () => {
     await expect(card).toBeVisible()
     await card.getByRole('button', { name: 'Schedule', exact: true }).click()
     // A screen, not a sheet (D57).
-    await expect(page).toHaveURL(/\/schedule\/new\?job=c-job1&title=Plumbing\+Bellevue$/)
+    await expect(page).toHaveURL(/\/schedule\/new\?date=\d{4}-\d{2}-\d{2}&job=c-job1&title=Plumbing\+Bellevue$/)
     await expect(page.getByRole('dialog')).toHaveCount(0)
     await expect(page.getByRole('heading', { name: 'Add event' })).toBeVisible()
     await expect(page.getByLabel('Link to')).toHaveValue('Plumbing Bellevue')

@@ -132,3 +132,32 @@ describe('deleteScheduleEvent', () => {
     expect(await deleteScheduleEvent('new-1')).toEqual({ error: 'The event was not removed. Refresh and try again.' })
   })
 })
+
+// DATA-12: a save whose answer is lost used to insert the visits again on
+// retry. With the form's own ids the write is an upsert on id.
+describe('createScheduleEvents with ids minted by the form', () => {
+  it('upserts on id, so a retry after a lost answer writes the same rows', async () => {
+    response = { data: [{ id: 'visit-a' }, { id: 'visit-b' }], error: null }
+    const result = await createScheduleEvents([{ ...input, id: 'visit-a' }, { ...input, id: 'visit-b' }])
+    expect(result).toEqual({ ids: ['visit-a', 'visit-b'] })
+    const upsert = calls.find((c) => c[0] === 'upsert')
+    expect(upsert).toBeTruthy()
+    expect((upsert![1] as Record<string, unknown>[]).map((r) => r.id)).toEqual(['visit-a', 'visit-b'])
+    expect(upsert![2]).toMatchObject({ onConflict: 'id' })
+    expect(calls.some((c) => c[0] === 'insert')).toBe(false)
+  })
+})
+
+// DATA-13: after a visit is saved or removed, every read that shows visits
+// refreshes: the Schedule, a lead's next estimate visit, the Leads list
+// chips and Today.
+describe('invalidateVisitReads', () => {
+  it('refreshes the schedule, the lead visit reads and Today', async () => {
+    const { invalidateVisitReads } = await import('./scheduleWrite.ts')
+    const keys: unknown[] = []
+    invalidateVisitReads({ invalidateQueries: (filter: { queryKey: unknown }) => { keys.push(filter.queryKey); return Promise.resolve() } } as never)
+    for (const key of [['schedule'], ['scheduleUpcoming'], ['scheduleBooked'], ['scheduleJobVisits'], ['leadVisits'], ['leadNextVisit'], ['homeDashboard']]) {
+      expect(keys).toContainEqual(key)
+    }
+  })
+})
