@@ -11,7 +11,8 @@ import CreateShell, { Choices, LEAD_SOURCES, useDraft } from '../new/CreateShell
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useMembership } from '../../contexts/MembershipContext.tsx'
 import { createLead } from '../../lib/leads.ts'
-import { createClientRow, lookupClientMatches, saveErrorMessage, syncClientContact, type ClientMatch } from '../../lib/clients.ts'
+import { createClientRow, isEmail, lookupClientMatches, saveErrorMessage, syncClientContact, type ClientMatch } from '../../lib/clients.ts'
+import { phoneMatches } from '../../lib/searchFilter.ts'
 import { useInvalidateClientDetail, useInvalidateLeads } from '../../lib/queries.ts'
 import { createUuid } from '../../lib/uuid.ts'
 import { recordRoute } from '../../lib/records.ts'
@@ -24,13 +25,14 @@ type Form = {
   name: string
   clientId: string
   phone: string
+  email: string
   address: string
   title: string
   notes: string
   source: string
 }
 
-const EMPTY: Form = { requestId: '', clientRequestId: '', name: '', clientId: '', phone: '', address: '', title: '', notes: '', source: '' }
+const EMPTY: Form = { requestId: '', clientRequestId: '', name: '', clientId: '', phone: '', email: '', address: '', title: '', notes: '', source: '' }
 
 export default function LeadNew() {
   const navigate = useNavigate()
@@ -46,6 +48,7 @@ export default function LeadNew() {
   const [client, setClient] = useState<ClientFieldValue>(() => restoredClientValue(form.name, form.clientId))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [emailError, setEmailError] = useState('')
   // A typed phone that belongs to a client with another name, or a known
   // name typed with a new phone: shown under the name, and the person picks
   // which client the lead goes to (S06). Cleared when the name or phone changes.
@@ -58,7 +61,7 @@ export default function LeadNew() {
     void fetchClientPick(clientParam).then((c) => {
       if (!alive || !c) return
       setClient({ text: c.name, picked: c })
-      patch({ name: c.name, clientId: c.id, phone: c.phone || '', address: c.address || '' })
+      patch({ name: c.name, clientId: c.id, phone: c.phone || '', email: c.email || '', address: c.address || '' })
     })
     return () => { alive = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -77,7 +80,7 @@ export default function LeadNew() {
   async function chooseClient(choice?: { existing: string } | 'new'): Promise<{ id: string; created: boolean } | null> {
     if (!user) return null
     if (client.picked) return { id: client.picked.id, created: false }
-    const typed = { name: client.text, phone: form.phone, address: form.address }
+    const typed = { name: client.text, phone: form.phone, email: form.email, address: form.address }
     if (choice && choice !== 'new') return { id: choice.existing, created: false }
     if (choice !== 'new') {
       const m = await lookupClientMatches(user.id, typed, orgId)
@@ -95,6 +98,7 @@ export default function LeadNew() {
   async function save(choice?: { existing: string } | 'new') {
     if (!user) return
     if (!client.text.trim()) { setError('Enter a name.'); return }
+    if (form.email.trim() && !isEmail(form.email)) { setEmailError('Enter an email like name@example.com.'); return }
     setSaving(true)
     setError('')
     try {
@@ -105,7 +109,7 @@ export default function LeadNew() {
       if (!picked) throw new Error('Enter a name.')
       // What was typed for an existing client goes onto that client, so the
       // lead (which reads the client's phone and address) shows it.
-      if (!chosen.created) await syncClientContact(picked.id, { phone: form.phone, address: form.address })
+      if (!chosen.created) await syncClientContact(picked.id, { phone: form.phone, email: form.email, address: form.address })
       const lead = await createLead({
         id: form.requestId || undefined,
         userId: user.id,
@@ -136,15 +140,16 @@ export default function LeadNew() {
         value={client}
         onChange={onClient}
         autoFocus
-        onPick={(c) => patch({ phone: form.phone || c.phone || '', address: form.address || c.address || '' })}
+        onPick={(c) => patch({ phone: form.phone || c.phone || '', email: form.email || c.email || '', address: form.address || c.address || '' })}
       />
       <Field label="Phone" type="tel" inputMode="tel" autoComplete="off" value={form.phone} onChange={(e) => { setConflict(null); set('phone', e.target.value) }} />
+      <Field label="Email" type="email" inputMode="email" autoComplete="off" value={form.email} error={emailError} onChange={(e) => { setConflict(null); setEmailError(''); set('email', e.target.value) }} />
       {conflict && (
         <div className="fhnew-match" role="status">
           <p className="fhnew-match__text">
             {conflict.kind === 'contact'
-              ? `${form.phone.trim()} belongs to ${conflict.client.name}.`
-              : `${conflict.client.name} is already a client, with a different phone.`}
+              ? `${phoneMatches(conflict.client.phone, form.phone) ? form.phone.trim() : form.email.trim()} belongs to ${conflict.client.name}.`
+              : `${conflict.client.name} is already a client, with a different phone or email.`}
             {' '}Which client is this lead for?
           </p>
           <div className="fhnew-match__actions">

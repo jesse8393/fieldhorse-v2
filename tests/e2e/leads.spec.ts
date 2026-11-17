@@ -333,3 +333,40 @@ test.describe('New lead keeps what was typed (DATA-08, S06)', () => {
     expect(writes.some((w) => w.startsWith('POST fh_clients'))).toBe(false)
   })
 })
+
+test.describe('New lead takes an email (S19)', () => {
+  test('a new caller is saved with the email typed', async ({ context, page }) => {
+    await signIn(context)
+    const writes = watchWrites(page)
+    await open(page, '/leads/new')
+    await page.getByLabel('Name').fill('Ann Lee')
+    await page.getByLabel('Email').fill('ann@leehomes.com')
+    await page.getByRole('button', { name: 'Save lead' }).click()
+    await expect(page).toHaveURL(/\/leads\/l-lead1$/, { timeout: 30_000 })
+    expect(writes.find((w) => w.startsWith('POST fh_clients'))).toContain('ann@leehomes.com')
+  })
+
+  test('a changed email for a picked client is written to that client', async ({ context, page }) => {
+    await signIn(context)
+    const writes = watchWrites(page)
+    await open(page, '/leads/new')
+    await page.getByLabel('Name').fill('Jeff')
+    await page.locator('.fhnew-client__pick').first().click()
+    await expect(page.getByLabel('Email')).toHaveValue('jeff@roy.com')
+    await page.getByLabel('Email').fill('jeff@roybuilds.com')
+    await page.getByRole('button', { name: 'Save lead' }).click()
+    await expect(page).toHaveURL(/\/leads\/l-lead1$/, { timeout: 30_000 })
+    expect(writes.find((w) => w.startsWith('PATCH fh_clients'))).toContain('jeff@roybuilds.com')
+  })
+
+  test('an email that is not one is refused', async ({ context, page }) => {
+    await signIn(context)
+    const writes = watchWrites(page)
+    await open(page, '/leads/new')
+    await page.getByLabel('Name').fill('Ann Lee')
+    await page.getByLabel('Email').fill('ann@@lee')
+    await page.getByRole('button', { name: 'Save lead' }).click()
+    await expect(page.getByText('Enter an email like name@example.com.')).toBeVisible()
+    expect(writes.filter((w) => w.startsWith('POST'))).toEqual([])
+  })
+})
