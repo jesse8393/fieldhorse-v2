@@ -160,6 +160,23 @@ test('the job type of the last saved job starts the next New job and New quote',
   await expect(page.getByLabel(/Job type/)).toHaveValue('Roofing', { timeout: 30_000 })
 })
 
+// A Save right after a change left the draft timer running. It wrote the
+// saved job back as the draft once the job screen was loading, so the next
+// New job opened refilled with the job just saved.
+test('a saved job leaves no draft behind', async ({ context, page }) => {
+  await signIn(context, { tables: JOB_FIRST })
+  await open(page, '/jobs/new')
+  await expect(page.getByRole('heading', { level: 1, name: 'New job' })).toBeVisible({ timeout: 30_000 })
+  await page.getByLabel('Client').fill('Jeff')
+  await page.getByRole('option', { name: /Jeff Roy/ }).click()
+  await page.getByLabel('Title').fill('Shed slab')
+  await page.getByLabel(/Job type/).selectOption('Concrete')
+  await page.getByRole('button', { name: 'Save job' }).click()
+  await expect(page).toHaveURL(/\/jobs\/c-job1/, { timeout: 30_000 })
+  await page.waitForTimeout(1000)
+  expect(await page.evaluate(() => localStorage.getItem('fh:draft:job'))).toBeNull()
+})
+
 test('the job type the old lead sheet remembered still starts New job', async ({ context, page }) => {
   await signIn(context)
   // The build before the October redesign kept it under fh:lastJobType.

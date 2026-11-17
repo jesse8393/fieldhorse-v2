@@ -69,7 +69,9 @@ export function useDraft<T extends Record<string, unknown>>(kind: string, initia
   useEffect(() => {
     if (saved.current) return
     pending.current = { kind, form }
-    const t = setTimeout(() => { pending.current = null; writeDraft(kind, form) }, 400)
+    // A save can land before the timer fires while the screen is still
+    // mounted (the next route is loading), so the timer checks it too.
+    const t = setTimeout(() => { pending.current = null; if (!saved.current) writeDraft(kind, form) }, 400)
     return () => clearTimeout(t)
   }, [kind, form])
   useEffect(() => {
@@ -93,6 +95,7 @@ export function useDraft<T extends Record<string, unknown>>(kind: string, initia
   }
   function done() {
     saved.current = true
+    pending.current = null
     clearDraft(kind)
   }
   return { form, set, patch, done }
