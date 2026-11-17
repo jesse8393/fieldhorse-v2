@@ -30,7 +30,6 @@ import { useProfile } from '../../../contexts/ProfileContext.tsx'
 import { useAuth } from '../../../contexts/AuthContext.tsx'
 import { generateInvoice, downloadPdf } from '../../../lib/pdf.js'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
-import { DEFAULT_PAYMENT_SCHEDULE } from '../../../components/documents'
 // Cents aware: whole amounts print as "$1,250", amounts with cents keep
 // them, so a generated $1,249.75 draw never reads "$1,250".
 import { money } from '../../../components/documents/format.ts'
@@ -41,7 +40,8 @@ import { fetchInvoiceReviewContext } from '../../../lib/invoiceReviewContext.ts'
 import { reviewInvoice } from '../../../lib/invoiceReview.js'
 import { fetchInvoicesForContact, invoiceAmountDue, invoiceDescription } from '../../../lib/invoices.ts'
 import { invoicesPaidInFull } from '../../../lib/invoiceSettlement.ts'
-import { splitByPercents } from '../../../lib/paymentSchedule.ts'
+import { drawsFromTerms } from '../../../lib/paymentSchedule.ts'
+import { quoteMoney } from '../../../lib/quoteMoney.ts'
 import { toCents } from '../../../lib/cents.ts'
 import { useMembership } from '../../../contexts/MembershipContext.tsx'
 import { canEditJobMoney } from '../lib/jobAccess.ts'
@@ -189,12 +189,11 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
     }
   }
 
-  // Auto-create draws from the proposal's payment terms. Uses the
-  // ProposalTemplate default schedule (50 / 40 / 10) unless the
-  // contractor has overridden it elsewhere, that override path isn't
-  // wired yet, so v1 always uses the canonical default. Each draw's
-  // title comes from the schedule's label; amount = pct × contractTotal
-  // (which already includes approved change orders).
+  // Auto-create draws from the job's payment terms (M-16), read the way
+  // the customer's link reads them: a named deposit, then the balance.
+  // The default 50 / 40 / 10 schedule applies only when the terms are
+  // blank, and terms this cannot read make nothing. Amounts come from
+  // contractTotal, which already includes approved change orders.
   //
   // Guarded against duplicate generation: only enabled when no live
   // draws exist on the contract. Re-running after voiding or deleting
@@ -215,37 +214,42 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       )
       return
     }
-    const schedule = DEFAULT_PAYMENT_SCHEDULE
+    const termsText = contact?.terms_text ?? null
+    const { deposit } = quoteMoney({ items: [], changeOrders: [], contactAmount: contractTotal, termsText, companyName: null })
+    const schedule = drawsFromTerms({ total: contractTotal, termsText, deposit })
+    if (!schedule) {
+      toastError(
+        'Payment terms not read',
+        'The job\'s payment terms name no deposit this can read. Add the draws by hand.'
+      )
+      return
+    }
     setBusyId('__generate__')
     try {
       // Build N rows + insert sequentially so the BEFORE INSERT trigger
       // assigns sequence_numbers 1, 2, 3 deterministically. Batch insert
       // would race the sequence assignment.
       //
-      // splitByPercents works in cents: each draw rounds on its own and
-      // the last takes the remainder, so a $3,000.50 contract produces
-      // draws that add up to exactly $3,000.50. It is the same split the
-      // proposal's payment terms print, so the two never disagree.
-      const amounts = splitByPercents(contractTotal, schedule.map((row) => row.pct))
+      // drawsFromTerms splits in cents, so the draws add up to exactly the
+      // contract, with the same deposit the customer's link asks for.
       let createdCount = 0
       for (let i = 0; i < schedule.length; i++) {
         const row = schedule[i]
-        const pct = Number(row.pct || 0)
         const { error } = await supabase.from('fh_invoices').insert({
           contact_id: contact.id,
           user_id: userId,
           sequence_number: 0, // trigger assigns next
-          title: `${pct}%, ${row.label}`,
-          amount: amounts[i],
+          title: row.title,
+          amount: row.amount,
           status: 'draft',
-          notes: row.sub || null
+          notes: row.notes
         })
         if (error) throw error
         createdCount++
       }
       toastSuccess(
         `Generated ${createdCount} ${countNoun(createdCount, 'draw')}`,
-        `Filled from ${schedule.map((s) => `${s.pct}%`).join(' / ')} payment terms`
+        `Filled from the payment terms: ${schedule.map((d) => money(d.amount)).join(', ')}`
       )
       await fetchDraws()
     } catch (e: any) {
@@ -659,7 +663,7 @@ function Header({ count, canAdd, onAdd, canGenerate, onGenerate, generating }: a
             type="button"
             onClick={onGenerate}
             disabled={generating}
-            title="Fill three draws from the proposal's 50 / 40 / 10 payment terms"
+            title="Fill the draws from the job's payment terms"
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 4,
               padding: '8px 12px', borderRadius: 10,

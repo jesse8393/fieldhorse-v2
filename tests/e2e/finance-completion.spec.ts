@@ -129,3 +129,26 @@ test('similar drafts require review before a send begins', async ({ context, pag
   expect(sends).toBe(0)
   await expect(review.getByRole('checkbox')).not.toBeChecked()
 })
+
+// M-16: Generate from terms follows the deposit the approved terms name.
+test('Generate from terms makes the deposit the terms name', async ({ context, page }) => {
+  const job = {
+    id: 'c-terms', stage: 'job', name: 'Marco', job_title: 'Patio', amount: 10000, terms_text: '25% deposit due at signing. Balance due on completion.',
+    user_id: 'qa-user-1', client_id: null, phone: null, email: 'm@x.com', address: '1 Elm St',
+    created_at: '2026-09-23T15:00:00.000Z', updated_at: '2026-10-09T15:00:00.000Z', completed_at: null,
+    proposal_status: 'approved', milestones: [], follow_up_on: null, notes: null, scope_text: null
+  }
+  await signIn(context, { tables: { fh_contacts: [job], fh_invoices: [], fh_payments: [], fh_change_orders: [] } })
+  const inserted: number[] = []
+  page.on('request', (r) => {
+    if (r.method() !== 'POST' || !r.url().includes('/rest/v1/fh_invoices')) return
+    const body = r.postDataJSON()
+    for (const row of Array.isArray(body) ? body : [body]) inserted.push(Number(row.amount))
+  })
+  await page.goto('/jobs/c-terms?tab=draws', { waitUntil: 'domcontentloaded' })
+  const generate = page.getByRole('button', { name: 'Generate from terms' })
+  await expect(generate).toBeVisible({ timeout: 30_000 })
+  await generate.click()
+  await expect.poll(() => inserted.length).toBe(2)
+  expect(inserted).toEqual([2500, 7500])
+})
