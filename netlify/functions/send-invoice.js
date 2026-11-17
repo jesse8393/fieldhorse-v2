@@ -451,7 +451,7 @@ ${EMAIL_HEAD}
     <tr><td align="center">
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;max-width:560px;background:#F2EDE4;border-radius:10px;border:1px solid #5C5C5C;overflow:hidden;">
         <tr><td style="padding:32px 32px 8px;">
-          <p style="margin:0;font-size:12px;letter-spacing:0;text-transform:uppercase;color:#5C5C5C;">Invoice</p>
+          <p style="margin:0;font-size:12px;letter-spacing:0;color:#5C5C5C;">Invoice</p>
           <p style="margin:8px 0 0;font-size:16px;color:#141414;">${safe(greeting)}</p>
         </td></tr>
         <tr><td style="padding:8px 32px 16px;">
@@ -465,7 +465,7 @@ ${EMAIL_HEAD}
           <p style="margin:0;font-size:14px;color:#141414;">From ${safe(senderLine)}</p>
         </td></tr>
       </table>
-      ${companyName ? `<p style="margin:16px 0 0;font-size:12px;color:#5C5C5C;letter-spacing:0;text-transform:uppercase;">Sent on behalf of ${safe(companyName)}</p>` : ''}
+      ${companyName ? `<p style="margin:16px 0 0;font-size:12px;color:#5C5C5C;letter-spacing:0;">Sent on behalf of ${safe(companyName)}</p>` : ''}
     </td></tr>
   </table>
 </body>

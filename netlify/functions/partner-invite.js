@@ -106,7 +106,7 @@ export default async (request) => {
   // 1. Verify the caller may manage partners on this job: its creator, or
   // an owner, admin or manager of its company.
   const access = await loadAccessibleRow(supabase, {
-    table: 'fh_contacts', id: job_id, callerId: invited_by_user_id, select: 'name'
+    table: 'fh_contacts', id: job_id, callerId: invited_by_user_id, select: 'name, job_title'
   })
   if (access.error === 'lookup_failed') {
     return json({ error: 'job_lookup_failed', message: 'Could not load this job. Try again.' }, 500)
@@ -115,6 +115,9 @@ export default async (request) => {
     return json({ error: 'forbidden_or_not_found', message: 'This record was not found, or your role cannot send it. Ask an owner, admin or manager.' }, 403)
   }
   const ownedJob = access.row
+  // The email names the job by its title; the customer's name is the
+  // fallback for a job saved without one (PT-21).
+  const emailJobName = ownedJob.job_title || ownedJob.name
   const brandingUserId = (await brandingUserIdFor(supabase, ownedJob)) || invited_by_user_id
 
   // 2. Insert the invite. Trigger fh_fill_invite_token generates invite_token.
@@ -181,7 +184,7 @@ export default async (request) => {
             jobId: job_id,
             recipientEmail: normalizedEmail,
             inviteUrl: resentUrl,
-            jobName: ownedJob.name,
+            jobName: emailJobName,
             partnerName: normalizedName,
             partnerRole: normalizedRole
           })
@@ -214,7 +217,7 @@ export default async (request) => {
         jobId: job_id,
         recipientEmail: normalizedEmail,
         inviteUrl: newUrl,
-        jobName: ownedJob.name,
+        jobName: emailJobName,
         partnerName: normalizedName,
         partnerRole: normalizedRole
       })
@@ -383,7 +386,7 @@ function renderInviteHtml({ senderLine, jobName, inviteUrl, companyName, partner
     <tr><td align="center">
       <table role="presentation" width="560" cellspacing="0" cellpadding="0" style="max-width:560px;background:#F2EDE4;border-radius:10px;border:1px solid #5C5C5C;overflow:hidden;">
         <tr><td style="padding:32px 32px 8px;">
-          <p style="margin:0;font-size:12px;letter-spacing:0;text-transform:uppercase;color:#5C5C5C;">Partner invite</p>
+          <p style="margin:0;font-size:12px;letter-spacing:0;color:#5C5C5C;">Partner invite</p>
           <h1 style="margin:8px 0 0;font-size:24px;font-weight:600;color:#141414;letter-spacing:0;">You've been invited to help manage <em style="color:#C9963A;">${safe(jobName)}</em>.</h1>
         </td></tr>
         <tr><td style="padding:16px 32px;">
@@ -391,7 +394,7 @@ function renderInviteHtml({ senderLine, jobName, inviteUrl, companyName, partner
           <p style="margin:0;font-size:16px;color:#141414;">${safe(senderLine)} added you ${roleClause} on this job. You will only see this specific job and no other contacts, rates, or data from their account.</p>
         </td></tr>
         <tr><td style="padding:8px 32px 24px;" align="left">
-          <a href="${safe(inviteUrl)}" style="display:inline-block;background:#C9963A;color:#141414;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:700;letter-spacing:0;">Accept Invite</a>
+          <a href="${safe(inviteUrl)}" style="display:inline-block;background:#C9963A;color:#141414;text-decoration:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:700;letter-spacing:0;">Accept invite</a>
         </td></tr>
         <tr><td style="padding:0 32px 24px;">
           <p style="margin:0;font-size:12px;color:#5C5C5C;">If the button doesn't work, copy this link into your browser:</p>
@@ -401,7 +404,7 @@ function renderInviteHtml({ senderLine, jobName, inviteUrl, companyName, partner
           <p style="margin:0;font-size:14px;color:#141414;">From ${safe(senderLine)}</p>
         </td></tr>
       </table>
-      ${companyName ? `<p style="margin:16px 0 0;font-size:12px;color:#5C5C5C;letter-spacing:0;text-transform:uppercase;">Sent on behalf of ${safe(companyName)}</p>` : ''}
+      ${companyName ? `<p style="margin:16px 0 0;font-size:12px;color:#5C5C5C;letter-spacing:0;">Sent on behalf of ${safe(companyName)}</p>` : ''}
     </td></tr>
   </table>
 </body>

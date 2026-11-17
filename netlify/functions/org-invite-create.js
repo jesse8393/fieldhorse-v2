@@ -12,7 +12,7 @@ import { supabaseServiceConfig } from './lib/serviceConfig.js'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'node:crypto'
 import { resolveCallerMembership } from './lib/membership.js'
-import { idempotencyKey, sendViaResend } from './lib/email.js'
+import { idempotencyKey, sendViaResend, formatFromHeader } from './lib/email.js'
 import { hashIdentifier, checkRateLimit, checkDailySendCap, DAILY_SEND_LIMIT_MESSAGE } from './lib/rateLimit.js'
 
 const VALID_ROLES = ['owner', 'admin', 'manager', 'foreman', 'crew']
@@ -136,8 +136,13 @@ export default async (request) => {
       const safeOrgName = safe(orgName)
 
       const subject = `You're invited to join ${orgName} on FieldHorse`
+      // "an admin", "a manager": the article follows the role.
+      const article = /^[aeiou]/i.test(role) ? 'an' : 'a'
+      // From carries the company name, and a reply reaches the person who
+      // sent the invite rather than the shared mailbox.
+      const inviterEmail = String(userData.user.email || '').trim()
       const text = [
-        `You've been invited to join ${orgName} on FieldHorse as a ${role}.`,
+        `You've been invited to join ${orgName} on FieldHorse as ${article} ${role}.`,
         '',
         `Accept the invite: ${acceptUrl}`,
         '',
@@ -145,10 +150,10 @@ export default async (request) => {
       ].join('\n')
       const html = `
         <div style="font-family:system-ui,-apple-system,sans-serif;max-width:520px;padding:24px;color:#141414">
-          <p style="font-size:14px;color:#5C5C5C;letter-spacing:0;text-transform:uppercase;margin:0 0 8px">FieldHorse</p>
+          <p style="font-size:14px;color:#5C5C5C;letter-spacing:0;margin:0 0 8px">FieldHorse</p>
           <h1 style="font-size:24px;margin:0 0 16px">Join ${safeOrgName}</h1>
           <p style="font-size:16px;line-height:1.5;margin:0 0 24px">
-            You've been invited to join <strong>${safeOrgName}</strong> as a <strong>${role}</strong>.
+            You've been invited to join <strong>${safeOrgName}</strong> as ${article} <strong>${role}</strong>.
           </p>
           <p style="margin:0 0 24px">
             <a href="${acceptUrl}" style="display:inline-block;padding:12px 24px;background:#C9963A;color:#141414;text-decoration:none;font-weight:700;border-radius:10px">Accept invite →</a>
@@ -161,11 +166,12 @@ export default async (request) => {
       const res = await sendViaResend({
         apiKey: RESEND_API_KEY,
         payload: {
-          from: SEND_EMAIL_FROM,
+          from: formatFromHeader(orgRow?.name, SEND_EMAIL_FROM, 'FieldHorse'),
           to: [email],
           subject,
           text,
           html,
+          ...(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inviterEmail) ? { reply_to: inviterEmail } : {}),
         },
         key: idempotencyKey('org-invite', `invite:${inviteRow.id}`, email)
       })
