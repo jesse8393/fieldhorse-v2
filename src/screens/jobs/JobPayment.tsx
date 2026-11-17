@@ -16,6 +16,7 @@ import { hapticMedium } from '../../lib/haptics.ts'
 import { todayYmd } from '../../lib/dates.ts'
 import { JobScreenFallback, invalidateAfterPayment, money, useJobScreen } from './jobScreen.tsx'
 import { useQueryClient } from '@tanstack/react-query'
+import { plainError } from '../../lib/serviceErrors.ts'
 
 // The balance as typed text without stranding cents: $4,999.50 prefills
 // as 4999.50, a whole amount drops the .00.
@@ -75,9 +76,8 @@ function PaymentForm({ data, goBack, home }: { data: ReturnType<typeof useJobScr
       await data.fetchAll()
       goBack()
     } catch (e) {
-      const message = (e as { message?: string })?.message || 'Try again in a moment.'
-      setError(message)
-      toastError("Couldn't record payment", message)
+      // Once, on the line above Record, in plain words (raw-errors-4).
+      setError(plainError(e, 'The payment was not recorded. Check the amount and kind, then try again.', { kept: true }))
       setSaving(false)
     }
   }

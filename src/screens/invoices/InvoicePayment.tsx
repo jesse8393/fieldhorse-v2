@@ -29,6 +29,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import './invoices.css'
 import { moneyInput } from '../new/CreateShell.tsx'
 import { toCents } from '../../lib/cents.ts'
+import { plainError } from '../../lib/serviceErrors.ts'
 
 // A dollar amount for the editable input without stranding cents: a
 // $4,999.50 balance prefills as "4999.50", not "5000". Whole amounts drop
@@ -96,7 +97,7 @@ export default function InvoicePayment() {
       // leaves it (OPS-11); a replace left a second copy in the history.
       goBackFrom(navigate, `/invoices/${record.invoice.id}`)
     } catch (err) {
-      toastError("Couldn't record payment", (err as Error)?.message || 'Try again in a moment.')
+      toastError("Couldn't record payment", plainError(err, 'The payment was not recorded. Check the amount and kind, then try again.', { kept: true }))
       setSaving(false)
     }
   }

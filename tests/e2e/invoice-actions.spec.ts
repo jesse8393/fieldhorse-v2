@@ -3,6 +3,7 @@ import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { installMock, restResponse, session } from '../../scripts/qa-mock.mjs'
 import { nothingRunsOffTheSide } from './helpers/overflow.ts'
 import { signIn } from './helpers/signIn.ts'
+import { FAIL, expectPlain } from './helpers/rawErrors.ts'
 
 // The invoice screen's actions (Phase 9, Task 12, decisions D57 and D62):
 // the gold Collect payment, then Resend (Send on a draft), PDF and Share
@@ -449,6 +450,27 @@ test("Email on the job's money view goes to the client's current email", async (
   await email.click()
   await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(1)
   expect(sends[0].recipient_email).toBe('jeff@roy.com')
+})
+
+// raw-errors-4: a payment on no signal said "TypeError: Failed to fetch",
+// and after the sign in ran out it said "JWT expired".
+test('a payment on the invoice with no signal or a lapsed sign in says so in plain words', async ({ page, context }) => {
+  await installShedInvoice(context)
+  let answer: 'drop' | 'jwt' = 'drop'
+  await context.route((url) => url.pathname === '/rest/v1/fh_payments', (route) => {
+    if (route.request().method() !== 'POST') return route.fallback()
+    return answer === 'drop' ? route.abort('failed') : route.fulfill(FAIL.jwt())
+  })
+  await page.goto('/invoices/inv-1/payment', { waitUntil: 'domcontentloaded' })
+  const amount = page.getByLabel('Amount')
+  await expect(amount).toBeVisible({ timeout: 30_000 })
+  await amount.fill('500')
+  const toasts = page.locator('[data-sonner-toaster]')
+  await page.getByRole('button', { name: /^record/i }).click()
+  await expectPlain(toasts, 'No signal right now. Your work is still here, so try again when the signal is back.')
+  answer = 'jwt'
+  await page.getByRole('button', { name: /^record/i }).click()
+  await expectPlain(toasts, 'Your sign in ran out. Sign in again, then try again.')
 })
 
 test("emailing a draw from the job's invoices goes to the client's current email", async ({ page, context }) => {
