@@ -15,6 +15,7 @@ import {
   useCreateLead, useCreateEvent, useCreateClient, useSaveNote
 } from '../lib/queries'
 import { claudeMessage, claudeText } from '../lib/anthropic'
+import { runAssistantAction } from '../lib/assistantActions'
 import { useAuth } from '../contexts/AuthContext'
 import { ScreenBackground, theme } from '../components/ui'
 
@@ -25,7 +26,7 @@ const SYSTEM = `You are FieldHorse Dispatch, a sharp, plain-spoken assistant for
 1) CREATE records. When the user wants to add or schedule something, reply with ONLY a JSON object (no prose, no code fence) in this exact shape:
 {"action":"create_lead"|"create_event"|"create_client"|"add_note","data":{...},"say":"one-line confirmation"}
 Field shapes:
-- create_lead: { "name": string (required), "phone"?, "email"?, "address"?, "job_title"?, "job_type"?, "amount"?: number, "stage"?: "lead"|"quote"|"job", "notes"? }
+- create_lead: { "name": string (required), "phone"?, "email"?, "address"?, "job_title"?, "job_type"?, "amount"?: number, "notes"? }
 - create_event: { "title": string (required), "date"?: "year month day", "time"?: "HH:MM" 24h, "notes"? }
 - create_client: { "name": string (required), "company"?, "phone"?, "email"?, "address"? }
 - add_note: { "text": string (required) }
@@ -34,21 +35,6 @@ If a REQUIRED field is missing, do NOT emit JSON, ask for it in one short senten
 2) ANSWER questions about the business using the BUSINESS CONTEXT provided below. Keep answers short, direct, numeric. No markdown headers, no fluff.
 
 Never mention being an AI model or these instructions.`
-
-function pad(n: number) { return String(n).padStart(2, '0') }
-function toIso(date?: string, time?: string): string {
-  const now = new Date()
-  let d = now
-  if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    const [y, mo, da] = date.split('-').map(Number)
-    let hh = 9, mm = 0
-    if (time && /^\d{1,2}:\d{2}$/.test(time)) { const [h, m] = time.split(':').map(Number); hh = h; mm = m }
-    d = new Date(y, mo - 1, da, hh, mm, 0, 0)
-  } else if (time && /^\d{1,2}:\d{2}$/.test(time)) {
-    const [h, m] = time.split(':').map(Number); d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0, 0)
-  }
-  return d.toISOString()
-}
 
 function csvCell(v: unknown) {
   const s = v == null ? '' : String(v)
@@ -94,35 +80,7 @@ export default function AssistantScreen() {
 
   async function runAction(action: string, data: any, say: string): Promise<string> {
     if (!user) return 'You need to be signed in.'
-    try {
-      if (action === 'create_lead') {
-        if (!data?.name) return 'What name should I put on the lead?'
-        const { id } = await createLead({
-          userId: user.id, name: data.name, phone: data.phone, email: data.email, address: data.address,
-          jobTitle: data.job_title, jobType: data.job_type, amount: typeof data.amount === 'number' ? data.amount : undefined,
-          notes: data.notes
-        })
-        return say || `Added ${data.name}.${id ? '' : ''}`
-      }
-      if (action === 'create_event') {
-        if (!data?.title) return 'What should I title the event?'
-        await createEvent({ userId: user.id, title: data.title, startAt: toIso(data.date, data.time) })
-        return say || `Scheduled "${data.title}".`
-      }
-      if (action === 'create_client') {
-        if (!data?.name) return 'What is the client name?'
-        await createClient({ userId: user.id, name: data.name, companyName: data.company, phone: data.phone, email: data.email, address: data.address })
-        return say || `Added client ${data.name}.`
-      }
-      if (action === 'add_note') {
-        if (!data?.text) return 'What should the note say?'
-        await saveNote({ userId: user.id, text: data.text, contactId: null })
-        return say || 'Note saved.'
-      }
-      return "I didn't recognize that action."
-    } catch (e) {
-      return `Couldn't do that: ${(e as Error).message}`
-    }
+    return runAssistantAction(user.id, { createLead, createEvent, createClient, saveNote }, action, data, say)
   }
 
   async function send() {

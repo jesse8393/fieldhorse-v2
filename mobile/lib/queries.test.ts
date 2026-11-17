@@ -6,6 +6,7 @@ vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries: mock.invalidate })
 }))
 vi.mock('./supabase', () => ({ supabase: {
+  rpc: (name: string, args: unknown) => { mock.calls.push(['rpc', name, args]); return Promise.resolve(mock.results.get(`rpc:${name}`) ?? { data: null, error: null }) },
   from: (table: string) => {
     let range: number[] | null = null
     const operations: any[] = []
@@ -23,7 +24,7 @@ vi.mock('./supabase', () => ({ supabase: {
 } }))
 
 import { useIntegrations, useDisconnectIntegration } from './integrations'
-import { useJobs, useEstimates, useUpdateStage, useCreateQuoteFromBid, useCreateLead } from './queries'
+import { useJobs, useEstimates, useUpdateStage, useCreateQuoteFromBid, useCreateLead, useSetFollowUpStatus } from './queries'
 import { JOB_STAGE_CHOICES } from './stages'
 import { useClientsBundle, useClientDetail, useJobDetail, useInvoiceDetail, useInvoicesOverview, useProfile, useJobPhotos, useJobFiles, useAgenda, useNotesScreen, useActivityFeed, useSubsRoster, useToggleTodo, useDeleteTodo, useUpdateJob, useUpdateProfile, useDeletePhoto, useDeleteFile, useGenerateDraws, useLogPayment, useMarkInvoicePaid, useUpdateInvoiceStatus } from './queries'
 
@@ -314,5 +315,21 @@ describe('native new lead', () => {
     expect(result).toMatchObject({ error: null, id: 'lead-1', clientId: 'client-new' })
     expect(mock.calls.find(c => c[0] === 'fh_clients' && c[1] === 'insert')?.[2]).toMatchObject({ address: '12 Oak St' })
     expect(mock.calls.find(c => c[0] === 'fh_leads' && c[1] === 'insert')?.[2].notes ?? '').not.toContain('Job site')
+  })
+})
+
+describe('native reminders', () => {
+  for (const status of ['done', 'dismissed'] as const) {
+    it(`${status} closes the follow up through fh_follow_up_set_status`, async () => {
+      const result = await useSetFollowUpStatus()({ id: 'note-1', userId: 'user', status })
+      expect(result.error).toBeNull()
+      expect(mock.calls).toEqual([['rpc', 'fh_follow_up_set_status', { p_notification_id: 'note-1', p_status: status }]])
+      expect(mock.invalidate).toHaveBeenCalledWith({ queryKey: ['notifications', 'user'] })
+    })
+  }
+  it('a refused follow up update is reported and nothing refreshes', async () => {
+    mock.results.set('rpc:fh_follow_up_set_status', { data: null, error: new Error('not yours') })
+    expect((await useSetFollowUpStatus()({ id: 'note-1', userId: 'user', status: 'done' })).error?.message).toBe('not yours')
+    expect(mock.invalidate).not.toHaveBeenCalled()
   })
 })

@@ -1,12 +1,15 @@
 // mobile/app/notifications.tsx, notifications feed.
 // Pushed from More. Lists fh_notifications newest-first; tapping marks a
 // row read (and follows its link if it points at a job), and a header
-// action marks everything read.
+// action marks everything read. A reminder also has Done and Dismiss, which
+// close its follow up through fh_follow_up_set_status and take it out of the
+// list, as on the web.
+import { useState } from 'react'
 import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { Bell } from 'lucide-react-native'
-import { useNotifications, useMarkNotificationRead, useMarkAllNotificationsRead, type Notification } from '../lib/queries'
+import { useNotifications, useMarkNotificationRead, useMarkAllNotificationsRead, useSetFollowUpStatus, REMINDER_KINDS, type Notification } from '../lib/queries'
 import { useAuth } from '../contexts/AuthContext'
 import { ScreenBackground, Card, ScreenHeader, theme } from '../components/ui'
 import { useMutationFeedback } from '../lib/useMutationFeedback'
@@ -30,7 +33,16 @@ export default function NotificationsScreen() {
   const { data: items = [], isLoading } = useNotifications(user?.id)
   const markRead = useMarkNotificationRead()
   const markAll = useMarkAllNotificationsRead()
+  const setFollowUp = useSetFollowUpStatus()
   const { run, pending } = useMutationFeedback()
+  const [closed, setClosed] = useState<Set<string>>(() => new Set())
+
+  async function closeReminder(n: Notification, status: 'done' | 'dismissed') {
+    if (!user) return
+    const saved = await run(`reminder:${n.id}`, status === 'done' ? "Couldn't mark the reminder done" : "Couldn't dismiss the reminder",
+      () => setFollowUp({ id: n.id, userId: user.id, status }))
+    if (saved) setClosed((cur) => new Set(cur).add(n.id))
+  }
 
   const unread = items.filter((n) => !n.read_at).length
 
@@ -62,8 +74,9 @@ export default function NotificationsScreen() {
           </View>
         ) : (
           <View style={{ gap: 12, marginTop: 20 }}>
-            {items.map((n) => {
+            {items.filter((n) => !closed.has(n.id)).map((n) => {
               const isUnread = !n.read_at
+              const reminder = REMINDER_KINDS.includes(n.kind ?? '')
               return (
                 <Pressable key={n.id} onPress={() => onPress(n)}>
                   <Card glow={isUnread} accent={isUnread ? theme.goldBright : undefined}>
@@ -72,6 +85,16 @@ export default function NotificationsScreen() {
                         <Text style={{ color: theme.ink, fontSize: 14, fontWeight: '700' }} numberOfLines={1}>{n.title}</Text>
                         {n.body ? <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 3 }} numberOfLines={2}>{n.body}</Text> : null}
                         <Text style={{ color: theme.inkFaint, fontSize: 12, marginTop: 4 }}>{timeAgo(n.created_at)}</Text>
+                        {reminder ? (
+                          <View style={{ flexDirection: 'row', gap: 16, marginTop: 10 }}>
+                            <Pressable disabled={pending.has(`reminder:${n.id}`)} onPress={() => closeReminder(n, 'done')} hitSlop={8}>
+                              <Text style={{ color: theme.goldBright, fontSize: 14, fontWeight: '700' }}>Done</Text>
+                            </Pressable>
+                            <Pressable disabled={pending.has(`reminder:${n.id}`)} onPress={() => closeReminder(n, 'dismissed')} hitSlop={8}>
+                              <Text style={{ color: theme.inkMuted, fontSize: 14, fontWeight: '700' }}>Dismiss</Text>
+                            </Pressable>
+                          </View>
+                        ) : null}
                       </View>
                     </View>
                   </Card>

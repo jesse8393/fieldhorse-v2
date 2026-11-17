@@ -1343,6 +1343,21 @@ export function useMarkNotificationRead() {
   }
 }
 
+// A reminder (follow_up_due or review_ask_due) is closed as Done or
+// Dismissed through fh_follow_up_set_status, which closes the queued follow
+// up it stands for and marks it read, as the web does. Marking it read
+// alone leaves the follow up open to fire again.
+export const REMINDER_KINDS = ['follow_up_due', 'review_ask_due']
+
+export function useSetFollowUpStatus() {
+  const client = useQueryClient()
+  return async (input: { id: string; userId: string; status: 'done' | 'dismissed' }) => {
+    const { error } = await supabase.rpc('fh_follow_up_set_status', { p_notification_id: input.id, p_status: input.status } as any)
+    if (!error) client.invalidateQueries({ queryKey: ['notifications', input.userId] })
+    return { error }
+  }
+}
+
 export function useMarkAllNotificationsRead() {
   const client = useQueryClient()
   return async (userId: string) => {
