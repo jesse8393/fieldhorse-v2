@@ -494,15 +494,22 @@
 }
 
 .fhqt-total__label {
+  flex: none;
   font-size: 15px;
   line-height: 20px;
   font-weight: 500;
   color: var(--fh-ink-2);
 }
 
+/* One line, never past the tray: a total too wide for the room beside
+   "Total" is scaled down to fit it by useFitWidth (the --fh-fit factor). */
 .fhqt-total__amount {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: right;
+  white-space: nowrap;
   font-family: var(--fh-font-display);
-  font-size: 30px;
+  font-size: calc(30px * var(--fh-fit, 1));
   line-height: 36px;
   font-weight: 600;
   letter-spacing: 0;

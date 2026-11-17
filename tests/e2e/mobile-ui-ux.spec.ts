@@ -614,6 +614,33 @@ test.describe('large text and zoom', () => {
       }
     })
   }
+
+  // big-text-7: the quote total sat beside "Total" at a fixed 30 px and ran
+  // off the right edge (the cents gone) with larger text or zoom.
+  for (const percent of [100, 130, 150]) {
+    test(`the quote total stays whole inside its tray, text at ${percent} percent`, async ({ context, page }) => {
+      await textSize(context, percent)
+      await openBig(context, page, '/quotes/q-big')
+      const amount = page.locator('.fhqt-total__amount')
+      const widths = percent === 100 ? [412, 360, 280, 206, 180] : [412, 360]
+      for (const width of widths) {
+        await page.setViewportSize({ width, height: 800 })
+        await page.waitForTimeout(200)
+        const drawn = await ink(amount)
+        const label = await ink(page.locator('.fhqt-total__label'))
+        const tray = await page.locator('.fhqt-total').evaluate((el) => {
+          const r = el.getBoundingClientRect()
+          const s = getComputedStyle(el)
+          return { left: r.left + parseFloat(s.paddingLeft), right: r.right - parseFloat(s.paddingRight) }
+        })
+        const at = `${await amount.textContent()} at ${width} px: ${JSON.stringify({ drawn, label, tray })}`
+        expect(drawn.lines, at).toBe(1)
+        expect(drawn.left, at).toBeGreaterThanOrEqual(tray.left - 0.5)
+        expect(drawn.right, at).toBeLessThanOrEqual(tray.right + 0.5)
+        expect(label.left, at).toBeGreaterThanOrEqual(tray.left - 0.5)
+      }
+    })
+  }
 })
 
 // big-text-3 on a desktop window at 200 percent zoom (640 px wide).
