@@ -148,6 +148,14 @@ async function addJob(db, client, { org = 100, user = 1, stage = 'job', name = '
   return jid
 }
 
+// A lead quiet this many days is inside the Day 30 window (days 30 to 44)
+// whatever the hour. The engine counts quiet days on the company's local
+// calendar, so a lead created exactly 30 x 24 hours ago across a daylight
+// saving change can read as 29 days for an hour each evening, and day 29
+// falls between the Day 14 window (ends day 28) and Day 30. Fixtures that
+// only need some reminder raised sit in the middle of a window.
+const QUIET_MID_DAY30 = 35
+
 const runEngine = async db => (await db.query('select public.fh_run_follow_up_engine() as r')).rows[0].r
 /** Move every date N days into the past, which is the clock moving N days on. */
 async function advanceDays(db, n) {
@@ -199,7 +207,8 @@ async function reset(db) {
   try {
     await seedOrg(db)
     // Leads reminded, then bulk skipped with their notifications left unread (2026-10-31).
-    for (let i = 0; i < 6; i++) await addLead(db, await addClient(db, { name: `Skipped ${i}` }), { daysAgo: 30 })
+    // 35 days, not 30: see QUIET_MID_DAY30 above.
+    for (let i = 0; i < 6; i++) await addLead(db, await addClient(db, { name: `Skipped ${i}` }), { daysAgo: QUIET_MID_DAY30 })
     await runEngine(db)
     await db.exec("update public.fh_follow_ups set status = 'skipped', completed_at = now() where status = 'queued'")
     // Leads with a live reminder (queued, unread).
@@ -355,7 +364,7 @@ try {
 
   await reset(db)
   await test('a bulk close by plain SQL reads every notification (AUTO-01)', async () => {
-    for (let i = 0; i < 5; i++) await addLead(db, await addClient(db, { name: `Bulk ${i}` }), { daysAgo: 30 })
+    for (let i = 0; i < 5; i++) await addLead(db, await addClient(db, { name: `Bulk ${i}` }), { daysAgo: QUIET_MID_DAY30 })
     await runEngine(db)
     assert.equal((await unread(db)).length, 5)
     await db.exec("update public.fh_follow_ups set status = 'skipped' where status = 'queued'")
