@@ -20,7 +20,8 @@ const {
   default: linkHandler,
   buildPublicLinkViewEvent,
   getPublicLinkClientIp,
-  hashPublicLinkIp
+  hashPublicLinkIp,
+  viewedLabelFor
 } = await import('../../netlify/functions/public-link.js')
 
 beforeEach(() => {
@@ -354,6 +355,10 @@ describe('who hears about a customer on a link (FN-05, FN-06)', () => {
     }))
     expect((await post(coApproveHandler, { token: 'co', signature_name: 'Dana', expected_amount: 1200, expected_updated_at: 'u1' })).status).toBe(200)
     expect(bell(db, 'change_order_signed')).toEqual([`${OWNER}:${ORG}`])
+    // dead-ends-6: the bell row and the push open the job's Change orders.
+    expect(db.tables.fh_notifications.filter((n) => n.kind === 'change_order_signed').map((n) => n.link)).toEqual(['/jobs/job-1?tab=change_orders'])
+    expect(pushes.map((p) => p.payload.link)).toEqual(['/jobs/job-1?tab=change_orders'])
+    expect(viewedLabelFor({ kind: 'change_order', contact_id: 'job-1' })).toEqual({ kindLabel: 'change order', detailLink: '/jobs/job-1?tab=change_orders' })
 
     db = seedDb(baseTables({
       fh_public_links: [link({ token: 'jp', kind: 'proposal', contact_id: 'job-1' })],

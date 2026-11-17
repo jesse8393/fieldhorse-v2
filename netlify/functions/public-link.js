@@ -115,7 +115,7 @@ export function viewedLabelFor(link) {
     return { kindLabel: 'invoice', detailLink }
   }
   if (link.kind === 'change_order') {
-    return { kindLabel: 'change order', detailLink: `/jobs/${link.contact_id}?tab=quote` }
+    return { kindLabel: 'change order', detailLink: `/jobs/${link.contact_id}?tab=change_orders` }
   }
   if (link.quote_id) {
     return { kindLabel: 'proposal', detailLink: `/quotes/${link.quote_id}` }

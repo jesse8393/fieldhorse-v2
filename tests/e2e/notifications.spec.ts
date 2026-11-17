@@ -117,6 +117,37 @@ test('tapping a notification opens its link', async ({ context, page }) => {
   await expect(page).toHaveURL(/\/jobs\/c-job2/)
 })
 
+// dead-ends-6: change order and partner notifications open the section they
+// name. Rows already sent carry ?tab=quote and ?tab=partners, which open
+// Change orders and Partner access too, and a new change order writes a row
+// that names Change orders.
+test('change order and partner notifications open the section they name', async ({ context, page }) => {
+  const signed = note('nt-co', 'change_order_signed', 'Change order signed', '/jobs/c-job1?tab=quote')
+  const joined = note('nt-pa', 'partner_accepted', 'Partner joined your job', '/jobs/c-job1?tab=partners')
+  const co = { id: 'co-1', org_id: 'org-1', user_id: 'qa-user-1', contact_id: 'c-job1', sequence_number: 1, title: 'Extra footing', description: null, amount: 1800, status: 'draft', created_at: iso(Date.now() - HOUR) }
+  await signIn(context, { tables: { fh_notifications: [signed, joined], fh_change_orders: [co] } })
+  for (const [title, section] of [['Change order signed', 'Change orders'], ['Partner joined your job', 'Partner access']]) {
+    await open(page, '/notifications', '.fhn')
+    await page.getByRole('button', { name: new RegExp(title) }).click()
+    await expect(page).toHaveURL(/\/jobs\/c-job1\?tab=/)
+    await expect(page.getByRole('region', { name: `${section} workspace`, exact: true })).toBeVisible({ timeout: 30_000 })
+  }
+
+  const written: Record<string, unknown>[] = []
+  await context.route((url) => url.pathname.endsWith('/rest/v1/fh_notifications'), (route) => {
+    if (route.request().method() !== 'POST') return route.fallback()
+    written.push(route.request().postDataJSON())
+    return route.fulfill({ status: 201, contentType: 'application/json', body: '[]' })
+  })
+  await open(page, '/jobs/c-job1?tab=change_orders', '.fh-app-header')
+  await page.getByRole('button', { name: 'Add', exact: true }).click()
+  await page.getByPlaceholder("Rot at SW corner, replace ~8' bottom plate").fill('Extra footing')
+  await page.locator('input[inputmode="decimal"]').first().fill('1800')
+  await page.getByRole('button', { name: 'Add change order', exact: true }).click()
+  await expect.poll(() => written.length).toBe(1)
+  expect(written[0]).toMatchObject({ kind: 'change_order_added', link: '/jobs/c-job1?tab=change_orders' })
+})
+
 test('a failed read says so with Try again', async ({ context, page }) => {
   await signIn(context, { tables: { fh_notifications: [APPROVED] } })
   const failing = { on: true }

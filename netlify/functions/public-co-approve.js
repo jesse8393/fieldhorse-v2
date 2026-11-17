@@ -166,12 +166,12 @@ export default async function handler(req) {
       kind: 'change_order_signed',
       title,
       body: `${who} signed CO #${co.sequence_number}${co.title ? `: ${co.title}` : ''}${customerNote ? ` · "${customerNote}"` : ''}`,
-      link: `/jobs/${co.contact_id}?tab=quote`
+      link: `/jobs/${co.contact_id}?tab=change_orders`
     },
     push: {
       title: `${title} ✍️`,
       body: `${who} signed CO #${co.sequence_number}. It's on the next invoice automatically.`,
-      link: `/jobs/${co.contact_id}?tab=quote`,
+      link: `/jobs/${co.contact_id}?tab=change_orders`,
       tag: `co-signed-${co.id}`
     }
   })

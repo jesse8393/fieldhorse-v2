@@ -116,7 +116,7 @@ export default function ChangeOrdersSection({ contact, userId, changeOrders = []
             kind: 'change_order_added',
             title: `CO #${res.data.sequence_number} added · ${sign}${money(Math.abs(amt))}`,
             body: `${contact?.name || 'Job'} · ${res.data.title || 'Change order'}`,
-            link: `/jobs/${contact.id}?tab=quote`
+            link: `/jobs/${contact.id}?tab=change_orders`
           })
         } catch {}
       }

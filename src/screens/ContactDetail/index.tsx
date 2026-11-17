@@ -20,7 +20,7 @@ import DataErrorState from '../../components/DataErrorState.tsx'
 import { Eyebrow } from '../../components/v3'
 import { useJobData } from './hooks/useJobData.ts'
 import { computeJobHealth } from './lib/jobHealth.ts'
-import { tabsForStage, resolveTabForStage, stageCta as stageCtaFor } from './lib/stageWorkspace.ts'
+import { tabsForStage, resolveTabForStage, canonicalJobTab, stageCta as stageCtaFor } from './lib/stageWorkspace.ts'
 import { tabsForRole, pickVisibleTab } from './lib/jobAccess.ts'
 import OverviewTab from './tabs/Overview.tsx'
 // Lazy, non-default tabs + sections only render
@@ -322,7 +322,7 @@ export default function ContactDetail() {
   const visibleTabs = tabsForRole(TOP_TABS.filter((t) => stageTabs.includes(t.id as any)), canSeeMoney)
   // Overview is home for every stage, and the param the URL omits.
   const defaultTab = 'overview'
-  const urlTab = (tabParam && VALID_TABS.has(tabParam))
+  const urlTab = (tabParam && VALID_TABS.has(canonicalJobTab(tabParam) ?? ''))
     ? resolveTabForStage(contact?.stage, tabParam)
     : defaultTab
   const [localTab, setLocalTab] = useState<string | null>(null)
