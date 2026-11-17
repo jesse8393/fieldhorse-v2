@@ -761,6 +761,18 @@ test('a failed payment on the job says what to do once, in plain words', async (
   await expect(amount).toHaveValue('500')
 })
 
+// raw-errors-6: Delete job on no signal said "TypeError: Failed to fetch".
+test('Delete job on no signal says so in plain words and keeps the job', async ({ context, page }) => {
+  await signIn(context)
+  await context.route((url) => url.pathname === '/rest/v1/fh_contacts', (route) => route.request().method() === 'DELETE' ? route.abort('failed') : route.fallback())
+  await page.goto('/jobs/c-job1/more', { waitUntil: 'domcontentloaded' })
+  await page.getByRole('button', { name: 'Delete job' }).click()
+  await page.waitForTimeout(600)
+  await page.getByRole('button', { name: 'Tap again to delete' }).click()
+  await expectPlain(page.locator('[data-sonner-toaster]'), 'No signal right now. Try again when the signal is back.')
+  await expect(page).toHaveURL(/\/jobs\/c-job1\/more$/)
+})
+
 // M-15: the job page measures margin and health against the contract
 // with its approved change orders.
 test('margin and health count an approved change order', async ({ context, page }, testInfo) => {

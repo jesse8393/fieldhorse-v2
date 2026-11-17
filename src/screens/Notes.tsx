@@ -29,6 +29,7 @@ import { SkeletonRows } from '../components/fh'
 import { keepFocusOnRetry } from '../lib/retryFocus.ts'
 import { filterReports, reportJobLabel, reportStats } from '../lib/reportHistory.ts'
 import ReportDetails from '../components/ReportDetails.tsx'
+import { plainError } from '../lib/serviceErrors.ts'
 const SnowNotes = lazy(() => import('../components/desktop/SnowNotesBuild.tsx'))
 
 const SYSTEM = `You are Fieldhorse, a construction operations AI. You receive rough field notes dictated or typed by a contractor from a jobsite. Parse them into structured JSON with fields: summary (one sentence), action_items (array of strings with owners if mentioned), risks (array), materials_needed (array), follow_up_date (ISO date if mentioned or null). Return ONLY JSON, no prose.`
@@ -192,7 +193,7 @@ export default function Notes() {
       // resilientInsert only surfaces a non-network error here (dead zones
       // queue instead), a real failure the user must see, not a silent
       // no-op that looks like the note was saved.
-      toastError("Couldn't save note", error.message || 'Try again')
+      toastError("Couldn't save note", plainError(error, 'Try again.'))
       return
     }
     // Keep the AI parse with the note so the AI badge, risk spine and
@@ -230,7 +231,7 @@ export default function Notes() {
     const { error } = await supabase.from('fh_notes').update({ done: true }).eq('id', id).eq('user_id', user.id)
     if (error) {
       patchNotes(() => prev)
-      toastError("Couldn't archive note", error.message)
+      toastError("Couldn't archive note", plainError(error, 'Try again.'))
     }
   }
 
@@ -238,14 +239,14 @@ export default function Notes() {
     if (!user) return
     const snapshot = notes.find((n) => n.id === id)
     const { error } = await supabase.from('fh_notes').delete().eq('id', id).eq('user_id', user.id)
-    if (error) { toastError("Couldn't delete", error.message); return }
+    if (error) { toastError("Couldn't delete", plainError(error, 'Try again.')); return }
     patchNotes((n: any) => n.filter((x: any) => x.id !== id))
     toastUndo('Note deleted', {
       description: (snapshot as any)?.parsed?.summary || (snapshot?.text || '').slice(0, 60) || 'Tap Undo to restore',
       onUndo: async () => {
         if (!snapshot) return
         const { error: insErr } = await supabase.from('fh_notes').insert(snapshot)
-        if (insErr) { toastError("Couldn't undo", insErr.message); return }
+        if (insErr) { toastError("Couldn't undo", plainError(insErr, 'Try again.')); return }
         patchNotes((n: any) => [snapshot, ...n])
         toastSuccess('Restored', '')
       }

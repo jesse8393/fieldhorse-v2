@@ -3,7 +3,7 @@ import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { installMock, restResponse, session } from '../../scripts/qa-mock.mjs'
 import { nothingRunsOffTheSide } from './helpers/overflow.ts'
 import { signIn } from './helpers/signIn.ts'
-import { FAIL, expectPlain } from './helpers/rawErrors.ts'
+import { FAIL, expectPlain, failRest } from './helpers/rawErrors.ts'
 
 // The invoice screen's actions (Phase 9, Task 12, decisions D57 and D62):
 // the gold Collect payment, then Resend (Send on a draft), PDF and Share
@@ -450,6 +450,17 @@ test("Email on the job's money view goes to the client's current email", async (
   await email.click()
   await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(1)
   expect(sends[0].recipient_email).toBe('jeff@roy.com')
+})
+
+// raw-errors-6: Void refused by the database showed the policy's words.
+test('a refused Void says so in plain words', async ({ page, context }) => {
+  await installShedInvoice(context)
+  await failRest(context, 'fh_invoices', 'PATCH', FAIL.rls('fh_invoices'))
+  await openInvoice(page, 'inv-1')
+  await page.getByRole('button', { name: /^void$/i }).click()
+  await page.waitForTimeout(700)
+  await page.getByRole('button', { name: /tap again/i }).click()
+  await expectPlain(page.locator('[data-sonner-toaster]'), 'Your role does not allow this. Ask an owner or admin.')
 })
 
 // raw-errors-4: a payment on no signal said "TypeError: Failed to fetch",

@@ -35,6 +35,7 @@ import { parseDateOnly } from '../../lib/dates.ts'
 import type { InvoiceRecord } from '../../lib/queries.ts'
 import { goBackFrom, shortDate, useInvoiceScreen } from './useInvoiceScreen.ts'
 import './invoices.css'
+import { plainError } from '../../lib/serviceErrors.ts'
 
 // pdf.js pulls in jspdf. Load it on the first PDF tap only.
 const loadPdf = () => import('../../lib/pdf.js')
@@ -125,7 +126,7 @@ function InvoiceDetailScreen({ id }: { id: string | undefined }) {
         return saved
       } catch (e) {
         setDescriptionError('Description unsaved. Try again before continuing.')
-        toastError("Couldn't save description", (e as Error)?.message || 'Try again')
+        toastError("Couldn't save description", plainError(e, 'Try again.'))
         return null
       }
     })()
@@ -165,7 +166,7 @@ function InvoiceDetailScreen({ id }: { id: string | undefined }) {
       downloadPdf(result)
       toastSuccess('Invoice PDF downloaded', result.filename)
     } catch (e) {
-      toastError("Couldn't generate PDF", (e as Error)?.message || 'Try again')
+      toastError("Couldn't generate PDF", plainError(e, 'Try again.'))
     } finally {
       setDownloading(false)
     }
@@ -196,7 +197,7 @@ function InvoiceDetailScreen({ id }: { id: string | undefined }) {
         toastSuccess('Share link ready', link.url)
       }
     } catch (e) {
-      toastError("Couldn't mint share link", (e as Error)?.message || 'Try again.')
+      toastError("Couldn't mint share link", plainError(e, 'Try again.'))
     } finally {
       setSharing(false)
     }
@@ -220,7 +221,7 @@ function InvoiceDetailScreen({ id }: { id: string | undefined }) {
     const { error } = await setInvoiceStatus(invoice, 'void')
     setVoiding(false)
     if (error) {
-      toastError("Couldn't void", error.message || 'Try again')
+      toastError("Couldn't void", plainError(error, 'Try again.'))
       return
     }
     patchInvoice({ status: 'void' })

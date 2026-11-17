@@ -27,6 +27,7 @@ import {
 
 import { preferenceObject, updateProfilePreferences } from '../lib/profilePreferences.ts'
 import { activeSettingsSection, SETTINGS_SECTIONS, SETTINGS_SECTION_FIELDS, settingsSectionDirty, settingsSectionFor, settingsSectionPatch, type SettingsSection } from '../lib/settingsSections.ts'
+import { plainError } from '../lib/serviceErrors.ts'
 
 const SettingsSectionContext = createContext<SettingsSection>('business')
 
@@ -201,7 +202,7 @@ export default function Settings() {
       toastSuccess('Sample data removed', total > 0 ? `${total} demo ${countNoun(total, 'row')} cleared` : 'Nothing to remove')
       setConfirmWipe(false)
     } catch (e: any) {
-      setWipeResult(`Couldn't remove sample data: ${e.message}`)
+      setWipeResult(plainError(e, "Couldn't remove sample data. Try again."))
     } finally {
       setWiping(false)
       setTimeout(() => setWipeResult(''), 4000)
@@ -335,7 +336,7 @@ export default function Settings() {
       hapticSuccess()
       toastSuccess(`${sectionDetails.label} saved`, 'Your changes are saved')
     } catch (error: any) {
-      toastError(`Couldn't save ${sectionDetails.label.toLowerCase()}`, error?.message || 'Try again in a moment.')
+      toastError(`Couldn't save ${sectionDetails.label.toLowerCase()}`, plainError(error, 'Try again in a moment.'))
     } finally {
       setSaving(false)
     }
@@ -1103,14 +1104,14 @@ function DeleteAccountRow({ onDone }: { onDone: () => void }) {
       })
       const body = await res.json().catch(() => ({}))
       if (!res.ok || !body?.ok) {
-        toastError("Couldn't delete account", body?.message || body?.error || 'Try again.')
+        toastError("Couldn't delete account", plainError({ ...body, status: res.status }, 'Try again.'))
         setBusy(false)
         return
       }
       toastSuccess('Account deleted', 'Signing you out…')
       onDone()
     } catch (e: any) {
-      toastError("Couldn't delete account", e?.message || 'Try again.')
+      toastError("Couldn't delete account", plainError(e, 'Try again.'))
       setBusy(false)
     }
   }

@@ -19,6 +19,7 @@ import { hapticError } from '../../lib/haptics.ts'
 import { useSecondTap } from '../../lib/secondTap.ts'
 import { useJobScreen } from './jobScreen.tsx'
 import '../new/new.css'
+import { plainError } from '../../lib/serviceErrors.ts'
 
 export default function JobMore() {
   const { id = '' } = useParams()
@@ -47,7 +48,7 @@ export default function JobMore() {
     // By id only: the owner deletes any job in the company and RLS scopes
     // the tenant. The select turns a zero row delete into a visible failure.
     const { data: removed, error } = await supabase.from('fh_contacts').delete().eq('id', contact.id).select('id')
-    if (error) { toastError("Couldn't delete this job", error.message || 'Check your connection and try again.'); return }
+    if (error) { toastError("Couldn't delete this job", plainError(error, 'Check your connection and try again.')); return }
     if (!removed || removed.length === 0) {
       toastError("This job wasn't deleted", 'It may already be gone, or your account cannot delete it.')
       return
@@ -60,7 +61,7 @@ export default function JobMore() {
     if (!contact || !canMarkLost) return
     hapticError()
     const res: any = await markLost(contact)
-    if (res?.error) { toastError("Couldn't mark lost", res.error.message || 'Try again'); return }
+    if (res?.error) { toastError("Couldn't mark lost", plainError(res.error, 'Try again.')); return }
     await data.fetchAll()
     goBack()
   }

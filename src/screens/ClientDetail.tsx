@@ -31,6 +31,7 @@ import { rollupJobs } from '../lib/rollups.ts'
 // Apple Maps on iPhone and iPad, Google Maps everywhere else (S25).
 import { navigateHrefHere } from '../lib/todayView.ts'
 import { composeClientTimeline, type TimelineEvent } from '../lib/clientTimeline.ts'
+import { plainError } from '../lib/serviceErrors.ts'
 
 function money(n: any) {
   const v = Number(n || 0)
@@ -139,7 +140,7 @@ export default function ClientDetail() {
       return true
     } catch (e) {
       hapticError()
-      toastError("Couldn't delete", e instanceof Error ? e.message : 'Check your connection and try again.')
+      toastError("Couldn't delete", plainError(e, 'Check your connection and try again.'))
       return true
     }
   }
@@ -176,7 +177,7 @@ export default function ClientDetail() {
     const { data, error } = await supabase.from('fh_clients').update(patch).eq('id', client.id).select('id')
     if (error || !data?.length) {
       hapticError()
-      toastError("Couldn't save", error?.message || 'This client may have been removed. Refresh and try again.')
+      toastError("Couldn't save", plainError(error, 'This client may have been removed. Refresh and try again.'))
       return
     }
     await fetchClient()
@@ -1453,7 +1454,7 @@ function FilesList({ rows }: any) {
     const bucket = row.kind === 'photo' ? 'job-photos' : 'job-files'
     const { data, error } = await supabase.storage.from(bucket).createSignedUrl(row.storage_path, 60 * 60)
     if (error || !data?.signedUrl) {
-      toastError('Could not open', error?.message || 'Try again')
+      toastError('Could not open', plainError(error, 'Try again.'))
       return
     }
     window.open(data.signedUrl, '_blank', 'noopener')
