@@ -15,6 +15,8 @@ import { toastError, toastSuccess } from '../../lib/toast.ts'
 import { fetchInvoiceReviewContext } from '../../lib/invoiceReviewContext.ts'
 import { reviewInvoice } from '../../lib/invoiceReview.js'
 import InvoiceBillingReview from '../../components/InvoiceBillingReview.tsx'
+import DraftRestored from '../../components/DraftRestored.tsx'
+import { useEditDraft } from '../../lib/useEditDraft.ts'
 import { knownContractTotal } from '../../lib/invoiceSettlement.ts'
 import { settleInvoiceAfterEdit } from '../../lib/invoices.ts'
 import { goBackFrom, useInvoiceScreen } from './useInvoiceScreen.ts'
@@ -30,18 +32,20 @@ export default function InvoiceEdit() {
   const titleRef = useRef<HTMLHeadingElement>(null)
   useEffect(() => { titleRef.current?.focus({ preventScroll: true }) }, [])
 
-  const [form, setForm] = useState<Form | null>(null)
   const [saving, setSaving] = useState(false)
   const [amountError, setAmountError] = useState('')
   const invoice = record?.invoice ?? null
-  const shown: Form = form ?? {
+  // What is typed is kept per invoice until it is saved or discarded, so
+  // Back or a reload loses nothing (D23).
+  const draft = useEditDraft<Form>(invoice ? `edit:invoice:${invoice.id}` : null, {
     title: invoice?.title ?? '',
     amount: invoice ? String(invoice.amount ?? '') : '',
     description: invoice?.description ?? '',
     due: toYmd(invoice?.due_at ?? null),
     notes: invoice?.notes ?? ''
-  }
-  const set = (patch: Partial<Form>) => setForm({ ...shown, ...patch })
+  })
+  const shown: Form = draft.form
+  const set = (patch: Partial<Form>) => draft.patch(patch)
   const back = () => goBackFrom(navigate, `/invoices/${id}`)
 
   async function submit(e: React.FormEvent) {
@@ -85,6 +89,7 @@ export default function InvoiceEdit() {
     let settled: Awaited<ReturnType<typeof settleInvoiceAfterEdit>> = { paid: false, error: null }
     if (amount !== Number(invoice.amount)) settled = await settleInvoiceAfterEdit({ ...invoice, amount })
     hapticTap()
+    draft.done()
     patchInvoice(settled.paid ? { ...patch, status: 'paid' } : patch)
     refresh()
     if (settled.error) toastError('Invoice saved', 'Its paid status was not checked. Open it again to confirm what is owed.')
@@ -126,6 +131,7 @@ export default function InvoiceEdit() {
       <p className="fhinv-intro">{`${figures.to.name || 'Customer'}${record.job?.job_title ? `, ${record.job.job_title}` : ''}`}</p>
       <InvoiceBillingReview review={reviewInvoice({ invoice: { ...invoice, amount: Number(shown.amount), title: shown.title }, invoices: record.jobInvoices, contractTotal: record.job ? knownContractTotal({ amount: record.job.amount, changeOrders: record.changeOrders }) : null })} />
       <form className="fhinv-form" onSubmit={(e) => void submit(e)}>
+        {draft.restored && <DraftRestored onDiscard={draft.discard} />}
         <Field label="Title" value={shown.title} disabled={saving} placeholder="Deposit, Progress draw 2, Final balance" onChange={(e) => set({ title: e.target.value })} />
         <Field
           label="Amount"
