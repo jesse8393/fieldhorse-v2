@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
-import { expectPlain } from './helpers/rawErrors.ts'
+import { expectPlain, FAIL } from './helpers/rawErrors.ts'
 
 const NOW = '2026-11-02T14:00:00.000Z'
 const quotes = ['draft', 'sent', 'approved', 'changes_requested', 'sent'].map((status, i) => ({
@@ -82,10 +82,17 @@ test('making the workspace on a weak signal says so in plain words', async ({ co
     profiles: [{ user_id: 'qa-user-1', full_name: null, company_name: null, onboarded_at: null, logo_url: null, location_lat: null, location_lon: null, services: [], preferences: {} }],
     org_members: [], organizations: []
   } })
-  await context.route((url) => url.pathname === '/rest/v1/rpc/create_own_org', (route) => route.abort('failed'))
+  let answer: 'check' | 'drop' = 'check'
+  await context.route((url) => url.pathname === '/rest/v1/rpc/create_own_org', (route) => answer === 'drop'
+    ? route.abort('failed')
+    : route.fulfill({ status: FAIL.check('organizations', 'organizations_name_check').status, contentType: 'application/json', body: FAIL.check('organizations', 'organizations_name_check').body }))
   await page.goto('/onboarding')
   await page.getByLabel('Company name', { exact: true }).fill('Fresh Concrete Co')
   await page.getByRole('group', { name: 'Trade services' }).getByRole('button').first().click()
+  await page.getByRole('button', { name: 'Start with sample data' }).click()
+  // No control is named Start, so the sentence names none (raw-errors-12).
+  await expectPlain(page.getByRole('alert'), 'Your workspace was not made yet. Try again.')
+  answer = 'drop'
   await page.getByRole('button', { name: 'Start with sample data' }).click()
   await expectPlain(page.getByRole('alert'), 'No signal right now. Your work is still here, so try again when the signal is back.')
   await expect(page.getByLabel('Company name', { exact: true })).toHaveValue('Fresh Concrete Co')
