@@ -15,7 +15,7 @@ import { ScreenBackground, Card, ScreenHeader, theme } from '../../components/ui
 import { PaymentSheet } from '../../components/PaymentSheet'
 import { buildInvoiceHtml } from '../../lib/invoiceHtml'
 import { shareProposalPdf } from '../../lib/quotePdf'
-import { sendInvoiceEmail } from '../../lib/sendDocs'
+import { sendInvoiceEmail, pickInvoiceToSend } from '../../lib/sendDocs'
 import { mintPublicLink } from '../../lib/publicLink'
 import { useMutationFeedback } from '../../lib/useMutationFeedback'
 import { jobMoney } from '../../lib/jobMoney'
@@ -27,7 +27,7 @@ export default function InvoiceDetailScreen() {
   const insets = useSafeAreaInsets()
   const router = useRouter()
   const { user } = useAuth()
-  const { id } = useLocalSearchParams<{ id: string }>()
+  const { id, invoice: openedInvoiceId } = useLocalSearchParams<{ id: string; invoice?: string }>()
   const { data, isPending } = useInvoiceDetail(id)
   const { data: profile } = useProfile(user?.id)
   const { data: draws = [] } = useInvoiceDraws(id)
@@ -83,10 +83,12 @@ export default function InvoiceDetailScreen() {
   async function onSendEmail() {
     if (busy || !user) return
     if (!(contact.email || '').trim()) { Alert.alert('Add a client email first', 'Add an email to the client, then send.'); return }
+    const { invoice, message } = pickInvoiceToSend(draws, openedInvoiceId)
+    if (!invoice) { Alert.alert('Choose an invoice', message || 'Open the invoice to send from Invoices.'); return }
     setBusy('send')
     try {
-      const res = await sendInvoiceEmail({ html: buildHtml(), filename: fileName, userId: user.id, contact: { id: contact.id, name: contact.name, email: contact.email } })
-      if (res.ok) { queryClient.invalidateQueries({ queryKey: ['invoiceDetail', id] }); Alert.alert('Invoice sent', `Emailed to ${contact.email}.`) }
+      const res = await sendInvoiceEmail({ html: buildHtml(), filename: fileName, userId: user.id, contact: { id: contact.id, name: contact.name, email: contact.email }, invoice: invoice as any })
+      if (res.ok) { queryClient.invalidateQueries({ queryKey: ['invoiceDetail', id] }); queryClient.invalidateQueries({ queryKey: ['invoiceDraws', id] }); Alert.alert('Invoice sent', `Emailed to ${contact.email}.`) }
       else Alert.alert(res.notConfigured ? 'Saved to Files' : "Couldn't send", res.message || 'Try again.')
     } catch (e: any) { Alert.alert("Couldn't send", e?.message || 'Try again.') }
     finally { setBusy(null) }

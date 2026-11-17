@@ -101,7 +101,7 @@ export default function InvoicesScreen() {
                   return (
                     <Card key={inv.id} accent={paid ? theme.success : '#C9963A'}>
                       <View style={{ padding: 16, paddingLeft: 16 }}>
-                        <Pressable onPress={() => inv.contactId && router.push(`/invoices/${inv.contactId}`)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Pressable onPress={() => inv.contactId && router.push(`/invoices/${inv.contactId}?invoice=${inv.id}`)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                           <Text style={{ color: theme.ink, fontSize: 16, fontWeight: '700', flex: 1 }} numberOfLines={1}>{inv.name || `Invoice #${inv.sequence ?? ''}`}</Text>
                           <Text style={{ color: theme.ink, fontSize: 20, fontWeight: '800' }}>{full(inv.amount)}</Text>
                         </Pressable>

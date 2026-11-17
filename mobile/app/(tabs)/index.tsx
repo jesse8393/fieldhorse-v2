@@ -136,7 +136,7 @@ export default function HomeScreen() {
         id: `i-${inv.id}`, overdue: false, sort: inv.ageDays,
         title: `Chase invoice for ${inv.name || 'client'}`,
         sub: `Unpaid · ${inv.ageDays}d`, tone: theme.success, label: 'Invoice',
-        onPress: () => inv.contactId && router.push(`/invoices/${inv.contactId}`)
+        onPress: () => inv.contactId && router.push(`/invoices/${inv.contactId}?invoice=${inv.id}`)
       })
     }
     out.sort((a, b) => (b.overdue ? 1 : 0) - (a.overdue ? 1 : 0) || b.sort - a.sort)
