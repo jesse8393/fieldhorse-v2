@@ -10,7 +10,7 @@ import {
   Bell, Search, ChevronLeft, ChevronRight, Edit2, Trash2,
   Phone, Mail, MapPin, ArrowUpRight, Plus, ExternalLink, Receipt,
 } from 'lucide-react'
-import { money, moneyFull } from '../../lib/format.ts'
+import { moneyCents, moneyFull } from '../../lib/format.ts'
 import { clientActivity } from '../../lib/clientActivity.ts'
 import MiniMetric from '../MiniMetric.tsx'
 import PaletteKeyCap, { paletteShortcut } from './PaletteKeyCap.tsx'
@@ -143,8 +143,8 @@ export default function SnowClientDetailBuild(props: Props) {
           </div>
 
           <div className="fh-build-mini-grid fh-build-mini-grid--detail">
-            <MiniMetric label="Lifetime value" value={money(lifetime)} accent />
-            <MiniMetric label="Open value" value={openValue > 0 ? money(openValue) : '\u2003'} />
+            <MiniMetric label="Lifetime value" value={moneyCents(lifetime)} accent />
+            <MiniMetric label="Open value" value={openValue > 0 ? moneyCents(openValue) : '\u2003'} />
             <MiniMetric label="Active jobs" value={String(activeCount)} />
             <MiniMetric label="Remaining contract value" value={moneyFull(outstanding)} />
           </div>

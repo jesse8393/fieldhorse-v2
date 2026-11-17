@@ -7,10 +7,9 @@
 //                 "$84K", 1_240_000 → "$1.24M". Sub-thousand values
 //                 render with comma grouping, e.g. 742 → "$742".
 //
-//   moneyFull(n)  Full currency, no fractional digits. For invoices,
-//                 payment confirmations, totals, anywhere the
-//                 operator needs the exact dollar amount. Example:
-//                 1_240_000 → "$1,240,000".
+//   moneyFull(n)  The same as moneyCents: full currency with cents, for
+//                 totals and report figures where the operator needs the
+//                 exact amount. Example: 1_240_000 → "$1,240,000.00".
 //
 //   moneyExact(n) The same as moneyCents: always dollars and cents, the
 //                 way the PDF prints money. For a single payment or bill.
@@ -39,8 +38,10 @@ export function money(n: number | null | undefined): string {
   return `${whole ? sign : ''}$${whole.toLocaleString()}`
 }
 
+// Exact figures follow the PDF's rule, so a customer's balance or a
+// client's payments never read rounded to the dollar (formats-4).
 export function moneyFull(n: number | null | undefined): string {
-  return `$${Math.round(Number(n || 0)).toLocaleString()}`
+  return moneyCents(n)
 }
 
 // One record's amount prints the way the PDF and the customer documents
@@ -77,6 +78,13 @@ export function moneyK(n: number | string | null | undefined): string | null {
   const wholeK = (a / 1_000).toFixed(0)
   if (Number(wholeK) < 1_000) return `${sign}$${wholeK}K`
   return `${sign}$${(a / 1_000_000).toFixed(1)}M`
+}
+
+// A margin as a percent with one decimal, the way Money prints Tracked
+// margin: 35.2%, never 35% on one screen and 35.2% on another (formats-4).
+export function marginPercent(n: number | string | null | undefined): string {
+  const v = Number(n ?? 0)
+  return `${(Number.isFinite(v) ? v : 0).toFixed(1)}%`
 }
 
 export function countNoun(

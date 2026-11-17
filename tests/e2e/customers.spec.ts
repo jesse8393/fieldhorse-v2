@@ -9,6 +9,8 @@ import { signIn } from './helpers/signIn.ts'
 import { isReadOnlyRpc } from './helpers/readRpc.ts'
 import { contrastOf, textContrastAgainst } from './helpers/contrast.ts'
 import { USER } from '../../scripts/qa-mock.mjs'
+import { nothingRunsOffTheSide } from './helpers/overflow.ts'
+import { NOW as FORMATS_NOW, TABLES as FORMATS_TABLES } from './helpers/formatsSeed.ts'
 
 const NOW = Date.now()
 const DAY = 86400000
@@ -443,3 +445,33 @@ for (const mode of ['day', 'night'] as const) {
     await expect.poll(() => textContrastAgainst(button, ['var(--v3-primary-hot)', 'var(--v3-primary)'])).toBeGreaterThanOrEqual(4.5)
   })
 }
+
+// formats-4: one customer's money reads to the cent, the figure Money and
+// the statement show, never "$12K" or "$11K".
+test('the customer page and Customers show a customer\'s money to the cent', async ({ context, page }) => {
+  await signIn(context, { tables: FORMATS_TABLES })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  await open(page, '/clients/cl-h')
+  await expect(page.getByText(/\$12,345\.50/).first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText(/\$11,345\.00/).first()).toBeVisible()
+  expect(await page.locator('main').innerText()).not.toMatch(/\$\d+(\.\d)?K\b/)
+  await nothingRunsOffTheSide(page, 'customer page')
+  // The longer figures sit side by side without drawing over each other.
+  // Measure the drawn text, not the box: a number wider than its column
+  // spills past a box clipped to the column.
+  const drawn = (text: string) => page.getByText(text, { exact: true }).first().evaluate((el) => {
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    const r = range.getBoundingClientRect()
+    return { x: r.x, y: r.y, width: r.width, height: r.height }
+  })
+  const lifetime = await drawn('$12,345.50')
+  const balance = await drawn('$11,345.00')
+  const apart = lifetime.x + lifetime.width <= balance.x || balance.x + balance.width <= lifetime.x ||
+    lifetime.y + lifetime.height <= balance.y || balance.y + balance.height <= lifetime.y
+  expect(apart, 'Lifetime and Contract balance do not overlap').toBe(true)
+  await open(page, '/clients')
+  await expect(page.getByText(/\$11,345\.00/).filter({ visible: true }).first()).toBeVisible({ timeout: 30_000 })
+  expect(await page.locator('main').innerText()).not.toMatch(/\$\d+(\.\d)?K\b/)
+  await nothingRunsOffTheSide(page, 'Customers')
+})

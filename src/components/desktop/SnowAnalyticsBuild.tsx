@@ -9,7 +9,7 @@ import {
   TrendingDown,
   Target,
 } from 'lucide-react'
-import { countNoun, moneyFull } from '../../lib/format.ts'
+import { countNoun, marginPercent, moneyFull } from '../../lib/format.ts'
 import { completedMonthComparison } from '../../lib/reportingMetrics.ts'
 import LoadingValue from '../LoadingValue.tsx'
 
@@ -118,7 +118,7 @@ export default function SnowAnalyticsBuild(props: Props) {
         </section>
         <section className="fh-reports__context" aria-label="Business overview">
           <div><h2>Win rate · 90 days</h2><strong>{loading ? pending('Loading win rate') : pct(stats.closeRate)}</strong>{stats.closeRateNote && <p>{stats.closeRateNote}</p>}</div>
-          <div><h2>Tracked margin</h2><strong>{loading ? pending('Loading margin') : pct(stats.avgMargin)}</strong>{stats.avgMarginNote && <p>{stats.avgMarginNote}</p>}</div>
+          <div><h2>Tracked margin</h2><strong>{loading ? pending('Loading margin') : stats.avgMargin == null ? pct(null) : marginPercent(stats.avgMargin)}</strong>{stats.avgMarginNote && <p>{stats.avgMarginNote}</p>}</div>
           <div><h2>Tracked profit YTD</h2><strong>{loading ? pending('Loading profit') : stats.profitYTD == null ? 'Not enough cost data' : moneyFull(stats.profitYTD)}</strong><p>{stats.profitNote}</p></div>
         </section>
 

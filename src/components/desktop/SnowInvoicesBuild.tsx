@@ -25,6 +25,7 @@ import WorkspaceHelp from '../experience/WorkspaceHelp.tsx'
 
 import { useMemo } from 'react'
 import { buildMoneyReconciliation } from '../../lib/moneyReconciliation.ts'
+import { marginPercent } from '../../lib/format.ts'
 import { ReconciliationLinks, ReconciliationPanel } from '../../screens/money/Reconciliation.tsx'
 import { Link, useNavigate } from 'react-router-dom'
 import { ChevronRight, Plus, Receipt } from 'lucide-react'
@@ -153,7 +154,7 @@ export default function SnowInvoicesBuild({
                 facts={[
                   { label: 'Due by Saturday', hint: 'Includes overdue invoices', value: view.dueThisWeek },
                   { label: `${month} so far`, value: view.monthToDate },
-                  { label: 'Tracked margin', value: view.marginPct == null ? 'None yet' : `${view.marginPct.toFixed(1)}%` }
+                  { label: 'Tracked margin', value: view.marginPct == null ? 'None yet' : marginPercent(view.marginPct) }
                 ]}
                 corner={<Monogram name={profile?.company_name} logoUrl={profile?.logo_url} size={32} />}
               />

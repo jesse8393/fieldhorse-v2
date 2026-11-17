@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { countNoun, money, moneyCents, moneyExact, moneyK } from './format.ts'
+import { countNoun, marginPercent, money, moneyCents, moneyExact, moneyFull, moneyK } from './format.ts'
 
 describe('countNoun', () => {
   it('uses the singular noun only for exactly one', () => {
@@ -95,5 +95,24 @@ describe('moneyCents', () => {
     expect(moneyCents(-1200)).toBe('-$1,200.00')
     expect(moneyCents(null)).toBe('$0.00')
     expect(moneyCents('abc')).toBe('$0.00')
+  })
+})
+
+// formats-4: report and customer figures are exact, the PDF's rule.
+describe('moneyFull', () => {
+  it('prints dollars and cents, never rounding to the dollar', () => {
+    expect(moneyFull(12_345.5)).toBe('$12,345.50')
+    expect(moneyFull(1000.5)).toBe('$1,000.50')
+    expect(moneyFull(4500)).toBe('$4,500.00')
+    expect(moneyFull(null)).toBe('$0.00')
+  })
+})
+
+describe('marginPercent', () => {
+  it('prints one decimal, the way Money prints Tracked margin', () => {
+    expect(marginPercent(35.2)).toBe('35.2%')
+    expect(marginPercent(20)).toBe('20.0%')
+    expect(marginPercent(35.24)).toBe('35.2%')
+    expect(marginPercent(null)).toBe('0.0%')
   })
 })

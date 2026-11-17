@@ -5,6 +5,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 import { USER } from '../../scripts/qa-mock.mjs'
+import { NOW as FORMATS_NOW, TABLES as FORMATS_TABLES } from './helpers/formatsSeed.ts'
 
 const NOW = Date.now()
 const DAY = 86400000
@@ -153,7 +154,8 @@ test('the margin counts an approved change order', async ({ context, page }, tes
   const value = testInfo.project.name.startsWith('desktop')
     ? page.getByRole('heading', { name: 'Tracked margin', exact: true }).locator('..').locator('strong')
     : page.locator('.fh-report-metric').filter({ hasText: 'Avg margin' }).locator('.fh-report-metric__value')
-  await expect(value).toHaveText('20%')
+  // formats-4: one decimal, the way Money prints Tracked margin.
+  await expect(value).toHaveText('20.0%')
 })
 
 // D05: a payment on an invoice that bills a client directly (no job)
@@ -187,4 +189,18 @@ test('log miles shows and computes the IRS rate for the drive date', async ({ co
   await page.getByLabel('Date', { exact: true }).fill('2026-03-02')
   await expect(page.getByText(/on this date is \$0\.725 deducted/)).toBeVisible()
   await expect(page.getByText('Deduction $72.50', { exact: true })).toBeVisible()
+})
+
+// formats-4: a client's payments in Top clients read to the cent, the
+// figure the payment shows, never rounded to whole dollars.
+test('top clients names a client\'s payments to the cent', async ({ context, page }, testInfo) => {
+  await signIn(context, { tables: FORMATS_TABLES })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  await open(page)
+  const list = testInfo.project.name.startsWith('desktop')
+    ? page.locator('.fh-build-table').filter({ hasText: 'Top clients' })
+    : page.getByText('Top clients · 90 days', { exact: true }).locator('..')
+  await expect(list.getByText('Harold Wickham', { exact: true })).toBeVisible({ timeout: 30_000 })
+  await expect(list.getByText('$1,000.50', { exact: true })).toBeVisible()
+  await expect(list.getByText('$1,001', { exact: true })).toHaveCount(0)
 })

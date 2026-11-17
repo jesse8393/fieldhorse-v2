@@ -28,7 +28,7 @@ import {
   createColumnHelper,
 } from '@tanstack/react-table'
 import type { SortingState } from '@tanstack/react-table'
-import { countNoun, money, moneyFull } from '../../lib/format.ts'
+import { countNoun, moneyCents, moneyFull } from '../../lib/format.ts'
 import { clientActivity } from '../../lib/clientActivity.ts'
 import { buildCsv, downloadCsv } from '../../lib/csv.ts'
 import MiniMetric from '../MiniMetric.tsx'
@@ -260,7 +260,7 @@ export default function SnowClientsBuild(props: Props) {
           <div className="fh-build-mini-grid">
             <MiniMetric label="Total clients" value={loading ? pending('Loading total clients') : rows.length.toLocaleString()} />
             <MiniMetric label="Active relationships" value={loading ? pending('Loading active relationships') : String(screenStats.activeAccounts)} accent />
-            <MiniMetric label="Contract balance" value={loading ? pending('Loading outstanding', 72) : money(screenStats.outstanding)} tone={screenStats.outstanding > 0 ? 'warn' : undefined} />
+            <MiniMetric label="Contract balance" value={loading ? pending('Loading outstanding', 72) : moneyCents(screenStats.outstanding)} tone={screenStats.outstanding > 0 ? 'warn' : undefined} />
             <MiniMetric label="Needs follow up" value={loading ? pending('Loading follow ups') : String(needsFollowUp)} tone={needsFollowUp > 0 ? 'warn' : undefined} />
           </div>
         </section>
@@ -396,7 +396,7 @@ export default function SnowClientsBuild(props: Props) {
               <div className="fh-build-eyebrow">Lifetime value</div>
               {loading ? railPending : (
                 <>
-                  <strong>{money(totalLifetime || 0)}</strong>
+                  <strong>{moneyCents(totalLifetime || 0)}</strong>
                   <span>booked revenue all time</span>
                 </>
               )}

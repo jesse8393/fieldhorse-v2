@@ -34,6 +34,7 @@ import { useListWindow } from '../../lib/useListWindow.ts'
 import { useActiveCompany, useQuotes } from '../../lib/queries.ts'
 import { buildInvoiceList, buildMoneyView, type MoneyRow } from '../../lib/moneyView.ts'
 import { hapticTap } from '../../lib/haptics.ts'
+import { marginPercent } from '../../lib/format.ts'
 import {
   BalancesPanel,
   InvoicesPanel,
@@ -208,7 +209,7 @@ export default function MoneyPhone({
             facts={[
               { label: 'Due by Saturday', hint: 'Includes overdue invoices', value: view.dueThisWeek },
               { label: `${month} so far`, value: view.monthToDate },
-              { label: 'Tracked margin', value: view.marginPct == null ? 'None yet' : `${view.marginPct.toFixed(1)}%` }
+              { label: 'Tracked margin', value: view.marginPct == null ? 'None yet' : marginPercent(view.marginPct) }
             ]}
             corner={<Monogram name={profile?.company_name} logoUrl={profile?.logo_url} size={32} />}
           />

@@ -31,14 +31,11 @@ import { rollupJobs } from '../lib/rollups.ts'
 // Apple Maps on iPhone and iPad, Google Maps everywhere else (S25).
 import { navigateHrefHere } from '../lib/todayView.ts'
 import { composeClientTimeline, type TimelineEvent } from '../lib/clientTimeline.ts'
+import { moneyCents } from '../lib/format.ts'
 
-function money(n: any) {
-  const v = Number(n || 0)
-  if (!v) return '$0'
-  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(v >= 10_000_000 ? 1 : 2)}M`
-  if (v >= 1_000) return `$${(v / 1_000).toFixed(v >= 10_000 ? 0 : 1)}K`
-  return `$${Math.round(v).toLocaleString()}`
-}
+// One customer's money to the cent, the figure Money and the statement
+// show, never "$12K" (formats-4).
+const money = moneyCents
 
 function fmtPhone(n: any) {
   if (!n) return ''
@@ -391,13 +388,15 @@ export default function ClientDetail() {
             </div>
           </div>
 
-          {/* Metrics row, surfaces lifetime / outstanding / active */}
+          {/* Metrics row, surfaces lifetime / outstanding / active. The
+              amounts carry cents, so a figure that does not fit beside
+              the others moves to the next line instead of overlapping. */}
           {(lifetime > 0 || outstanding > 0 || activeCount > 0) && (
             <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr 1fr',
-              alignItems: 'end',
-              gap: 12,
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'flex-end',
+              gap: '12px 24px',
               marginTop: 12,
               paddingTop: 12,
               borderTop: '1px solid var(--v3-border)'
