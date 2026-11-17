@@ -2169,7 +2169,9 @@ export async function generateCertificate({
 
   const contract = Number(closeout.final_amount || contact.amount || 0)
   const paid = Number(closeout.paid_at_close || 0)
-  const balance = Math.max(0, contract - paid)
+  // Whole cents: a certificate saved with a float sum a hair under the
+  // contract read "Outstanding $0.00".
+  const balance = fromCents(Math.max(0, toCents(contract) - toCents(paid)))
   cursor = drawCertSection(doc, {
     margin, pageWidth, pageHeight, paintPage, y: cursor,
     label: 'Final figures',

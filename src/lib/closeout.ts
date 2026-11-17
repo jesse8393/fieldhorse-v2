@@ -15,6 +15,7 @@
 
 import { supabase } from './supabase.ts'
 import { transitionStage } from './stages.ts'
+import { toCents, fromCents, sumCents } from './cents.ts'
 import type { Database } from './database.types.ts'
 
 type Contact = Database['public']['Tables']['fh_contacts']['Row']
@@ -61,7 +62,9 @@ export async function loadCloseout({ userId, contactId }: { userId: string | und
 // change orders, minus what has been paid. Matches the final_amount the
 // certificate snapshots, so the sheet and the certificate agree.
 export function closeoutBalance(amount: number | string | null | undefined, approvedCO: number | string | null | undefined, paid: number | string | null | undefined) {
-  return Math.max(0, Number(amount || 0) + Number(approvedCO || 0) - Number(paid || 0))
+  // Whole cents, so payments that add up to the contract leave exactly
+  // zero and not float dust that reads as a balance.
+  return fromCents(Math.max(0, toCents(amount) + toCents(approvedCO) - toCents(paid)))
 }
 
 // Snapshot helpers, called by the sheet before save so the modal can
@@ -86,8 +89,8 @@ export async function snapshotJobTotals({ userId, contactId }: { userId: string 
       .eq('contact_id', contactId)
       .eq('status', 'approved')
   ])
-  const paid = (payments || []).reduce((s, p) => s + Number(p.amount || 0), 0)
-  const approvedCO = (cos || []).reduce((s, c) => s + Number(c.amount || 0), 0)
+  const paid = fromCents(sumCents(payments || [], (p) => p.amount))
+  const approvedCO = fromCents(sumCents(cos || [], (c) => c.amount))
   return { paid, photoCount: photoCount || 0, approvedCO }
 }
 
@@ -118,7 +121,7 @@ export async function saveCloseout({ userId, contact, payload, advanceStage = tr
     // Contract snapshot INCLUDES approved change orders so the
     // certificate's Final Figures reconcile (contract − paid = balance)
     // instead of printing "Paid in full" while CO money is outstanding.
-    final_amount: Number(contact.amount || 0) + Number(totals.approvedCO || 0),
+    final_amount: fromCents(toCents(contact.amount) + toCents(totals.approvedCO)),
     paid_at_close: totals.paid,
     final_photo_count: totals.photoCount
   }

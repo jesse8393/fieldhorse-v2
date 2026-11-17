@@ -174,6 +174,28 @@ describe('logPayment', () => {
     expect(fake.state.tables.fh_contacts[0].stage).toBe('job')
   })
 
+  // M-11: 500.04 + 400.03 + 100 is 1000.0699999999999 as floats.
+  it('closes a $1,000.07 job once its three generated draws are paid', async () => {
+    const centsJob = { ...job, amount: 1000.07 }
+    fake.state.tables.fh_contacts = [{ ...centsJob }]
+    const draws = [500.04, 400.03, 100]
+    fake.state.tables.fh_invoices = draws.map((amount, i) => invoice(`inv${i + 1}`, i + 1, amount))
+    let last: any
+    for (let i = 0; i < draws.length; i++) {
+      last = await logPayment(centsJob, { id: `p${i + 1}`, amount: draws[i], invoice_id: `inv${i + 1}` })
+    }
+    expect(fake.state.tables.fh_invoices.map((r) => r.status)).toEqual(['paid', 'paid', 'paid'])
+    expect({ closed: last.closed, stage: fake.state.tables.fh_contacts[0].stage, total: last.total }).toEqual({ closed: true, stage: 'closed', total: 1000.07 })
+  })
+
+  it('does not close a job that is one cent short', async () => {
+    const centsJob = { ...job, amount: 1000.07 }
+    fake.state.tables.fh_contacts = [{ ...centsJob }]
+    const res: any = await logPayment(centsJob, { amount: 1000.06 })
+    expect(res.closed).toBe(false)
+    expect(fake.state.tables.fh_contacts[0].stage).toBe('job')
+  })
+
   it('never touches void invoices', async () => {
     fake.state.tables.fh_invoices = [invoice('v', 1, 10000, 'void')]
     await logPayment(job, { amount: 10000, invoice_id: 'v' })

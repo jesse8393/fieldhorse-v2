@@ -196,4 +196,19 @@ describe('pdf engine smoke', () => {
       expect(text.some((t) => / collected$/.test(t))).toBe(true)
     })
   })
+
+  // M-11: paid_at_close was saved as the float sum 1000.0699999999999.
+  it('the certificate of a job paid to the cent reads Paid in full', async () => {
+    const closeout = { final_amount: 1000.07, paid_at_close: 500.04 + 400.03 + 100, closed_at: '2026-11-16T18:00:00Z', signoff_at: '2026-11-16T18:00:00Z', signoff_method: 'verbal', signoff_name: 'Marco Castellanos', warranty_months: 12, warranty_start_date: '2026-11-16' }
+    const text = pdfText(await generateCertificate({ company, contact: { id: 'job-1', name: 'Marco Castellanos', job_title: 'Slab', amount: 1000.07 }, closeout } as any))
+    const figures = text.slice(text.indexOf('FINAL FIGURES'))
+    expect(figures.filter((t) => /paid in full|outstanding|^\$/i.test(t))).toEqual(['$1,000.07', '$1,000.07', 'Paid in full'])
+  })
+
+  it('the certificate still shows one cent outstanding', async () => {
+    const closeout = { final_amount: 1000.07, paid_at_close: 1000.06, closed_at: '2026-11-16T18:00:00Z', signoff_method: 'verbal' }
+    const text = pdfText(await generateCertificate({ company, contact: { id: 'job-1', name: 'Marco Castellanos', amount: 1000.07 }, closeout } as any))
+    const figures = text.slice(text.indexOf('FINAL FIGURES'))
+    expect(figures.filter((t) => /paid in full|outstanding|^\$/i.test(t))).toEqual(['$1,000.07', '$1,000.06', 'OUTSTANDING', '$0.01'])
+  })
 })

@@ -4,6 +4,7 @@ import { todayYmd } from './dates.ts'
 import { crewLaborForContact } from './labor.ts'
 import { moneyExact } from './format.ts'
 import { invoicesPaidInFull } from './invoiceSettlement.ts'
+import { toCents, fromCents, sumCents } from './cents.ts'
 import { toastError } from './toast.ts'
 import type { Database } from './database.types.ts'
 
@@ -217,7 +218,9 @@ export async function logPayment(contact: Contact, { id, amount, method, kind, r
       .maybeSingle()
   ])
   const pays = paysRes.data || []
-  const total = pays.reduce((s, p) => s + Number(p.amount || 0), 0)
+  // Whole cents: three draws of a $1,000.07 contract sum to
+  // 1000.0699999999999 as floats and the job never closed.
+  const total = fromCents(sumCents(pays, (p) => p.amount))
   const coErr = cosRes.error
   const freshContact = freshRes.data
   const baseAmount = Number((freshContact?.amount ?? contact.amount) || 0)
@@ -227,7 +230,7 @@ export async function logPayment(contact: Contact, { id, amount, method, kind, r
   // prematurely close a job that still owes change order money.
   const contractAmount = coErr
     ? null
-    : baseAmount + (cosRes.data || []).reduce((s, c) => s + Number(c.amount || 0), 0)
+    : fromCents(toCents(baseAmount) + sumCents(cosRes.data || [], (c) => c.amount))
 
   // Settle the job's invoices from its payments. A payment linked to an
   // invoice pays that one first; a payment logged against the job pays
@@ -273,7 +276,7 @@ export async function logPayment(contact: Contact, { id, amount, method, kind, r
   // auto-closing on its first payment, `total >= 0` is otherwise always true.
   let closed = false
   if (contractAmount != null) {
-    if (contractAmount > 0 && total >= contractAmount && currentStage !== 'closed') {
+    if (toCents(contractAmount) > 0 && toCents(total) >= toCents(contractAmount) && currentStage !== 'closed') {
       const { error: closeErr } = await supabase.from('fh_contacts').update({ stage: 'closed' }).eq('id', contact.id).eq('user_id', contact.user_id)
       closed = !closeErr
     }
