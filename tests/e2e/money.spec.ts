@@ -1586,3 +1586,16 @@ test.describe('money on a desktop', () => {
     await expect(page.getByRole('link', { name: /^Statements/ })).toContainText('1 customer owes you')
   })
 })
+
+// A11Y-13: links that go to different places have different names: each
+// contract balance link names its age bucket, not just its amount (two
+// read "$0.00" on the mock), on a phone and a desktop (WCAG 2.4.4).
+test('each contract balance link names its age bucket', async ({ context, page }) => {
+  await openMoney(context, page)
+  await page.goto('/invoices?panel=balances', { waitUntil: 'domcontentloaded' })
+  const links = page.getByRole('region', { name: 'Contract balances by reference age' }).getByRole('link', { name: /\$/ })
+  await expect(links).toHaveCount(3)
+  const names = await links.evaluateAll(els => els.map(el => el.getAttribute('aria-label') || (el as HTMLElement).innerText))
+  expect(new Set(names).size, names.join(' | ')).toBe(3)
+  expect(names[1]).toMatch(/^31 to 60 days, \$/)
+})

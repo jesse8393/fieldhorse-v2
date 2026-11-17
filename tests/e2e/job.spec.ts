@@ -445,9 +445,9 @@ test.describe('job page on a desktop, redesigned', () => {
     await expect(banner.getByText('Plumbing Bellevue · 412 Burkitt Station Rd')).toBeVisible()
     await expect(banner.getByRole('link', { name: 'Back to jobs' }).or(banner.getByRole('button', { name: 'Back to jobs' }))).toBeVisible()
 
-    // Message and Schedule are secondary; the stage action is the one gold button.
+    // Message and Add a visit are secondary; the stage action is the one gold button.
     await expect(banner.getByRole('link', { name: /^Message/ })).toHaveAttribute('href', '/compose?contact=c-job1&channel=email')
-    await expect(page.locator('.fh-job-secondary-actions').getByRole('button', { name: 'Schedule', exact: true })).toBeVisible()
+    await expect(page.locator('.fh-job-secondary-actions').getByRole('button', { name: 'Add a visit', exact: true })).toBeVisible()
     const gold = page.locator('.fhc-btn--primary')
     await expect(gold).toHaveCount(1)
     await expect(gold).toHaveText('Add update')
@@ -581,7 +581,7 @@ test.describe('job page on a desktop, redesigned', () => {
     await signIn(context)
     await openDesktop(page, '/jobs/c-job1')
     const banner = page.locator('.fh-job-workspace')
-    await page.locator('.fh-job-secondary-actions').getByRole('button', { name: 'Schedule', exact: true }).click()
+    await page.locator('.fh-job-secondary-actions').getByRole('button', { name: 'Add a visit', exact: true }).click()
     await expect(page).toHaveURL(/\/schedule\/new\?job=c-job1$/)
     await expect(page.getByRole('dialog')).toHaveCount(0)
     await page.goBack()
@@ -798,3 +798,16 @@ for (const mode of ['day', 'night'] as const) {
     await expect.poll(() => contrastOf(view, 'outline')).toBeGreaterThanOrEqual(3)
   })
 }
+
+// A11Y-13: one name, one action: on the desktop job page the Schedule tab
+// and the button that adds a visit no longer share the name "Schedule".
+test('the desktop job page has one control named Schedule', async ({ context, page }, testInfo) => {
+  test.skip(!testInfo.project.name.startsWith('desktop'), 'Desktop job page')
+  await signIn(context)
+  await page.goto('/jobs/c-job1', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.locator('[data-build-screen="SnowJobDetailBuild"]')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('button', { name: 'Add a visit', exact: true })).toBeVisible()
+  // In the screen: the header's Schedule link goes to the Schedule screen.
+  const named = page.locator('#fh-main').locator('button, [role="tab"], a').filter({ hasText: /^Schedule$/ })
+  await expect(named).toHaveCount(1)
+})
