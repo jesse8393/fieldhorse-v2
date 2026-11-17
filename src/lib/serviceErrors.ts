@@ -135,7 +135,8 @@ function fieldsOf(error: unknown): Fields {
     provider: e.provider_status != null,
     // Our own Errors and their subclasses keep the name Error; the
     // browser's and the libraries' carry their own (TypeError, AuthApiError).
-    plainError: error instanceof Error && error.name === 'Error' && !code && !status
+    // Our libraries also answer { message } alone (pipeline, followUp).
+    plainError: (error instanceof Error ? error.name === 'Error' : Object.keys(e).join() === 'message') && !code && !status
   }
 }
 

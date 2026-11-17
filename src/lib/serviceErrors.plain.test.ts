@@ -137,6 +137,9 @@ describe('plainError', () => {
     expect(plainError(new Error('Only $40.00 remains unreserved on this contract.'), FALLBACK)).toBe('Only $40.00 remains unreserved on this contract.')
     class CrewUnavailable extends Error {}
     expect(plainError(new CrewUnavailable('Crew assignment is not available yet.'), FALLBACK)).toBe('Crew assignment is not available yet.')
+    // pipeline.ts answers a reopen it refuses with { message } alone.
+    expect(plainError({ message: 'This record has no previous job. Review its lead or quote before reopening.' }, FALLBACK))
+      .toBe('This record has no previous job. Review its lead or quote before reopening.')
     const domish = Object.assign(new Error('The operation was aborted.'), { name: 'AbortError' })
     expect(plainError(domish, FALLBACK)).toBe(FALLBACK)
   })
