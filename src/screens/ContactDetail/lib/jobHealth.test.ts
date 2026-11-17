@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { computeJobHealth } from './jobHealth.ts'
 
 const past = (mins: number) => new Date(Date.now() - mins * 60_000).toISOString()
@@ -41,7 +41,8 @@ describe('computeJobHealth', () => {
     const overdue = computeJobHealth({
       contact: { amount: 1000, milestones: [{ done: true }] },
       payments: [{ amount: 1000 }],
-      scheduleItems: [{ end_at: past(60) }]
+      // Two days ago: a visit earlier today alone does not make a job late.
+      scheduleItems: [{ end_at: past(60 * 48) }]
     })
     expect(onTrack.score - overdue.score).toBe(20)
     expect(overdue.breakdown?.schedule).toBe('overdue')
@@ -91,4 +92,22 @@ describe('computeJobHealth', () => {
     expect(h.label).toBe('Overpaid')
     expect(h.breakdown?.payments).toMatchObject({ credit: 0.01 })
   })
+
+  // OPS-09: a visit that happened this morning, with another booked, is
+  // not behind schedule.
+  it('is not behind with a visit this morning and one booked tomorrow', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 10, 16, 15, 0, 0))
+    try {
+      const at = (d: number, h: number) => new Date(2026, 10, d, h, 0, 0).toISOString()
+      const base = { contact: { amount: 1000, stage: 'job', milestones: [] }, payments: [] }
+      expect(computeJobHealth({ ...base, scheduleItems: [{ start_at: at(16, 8), end_at: at(16, 10) }, { start_at: at(17, 8), end_at: at(17, 10) }] }).breakdown?.schedule).toBe('on-track')
+      expect(computeJobHealth({ ...base, scheduleItems: [{ start_at: at(16, 8), end_at: at(16, 10) }] }).breakdown?.schedule).toBe('on-track')
+      expect(computeJobHealth({ ...base, scheduleItems: [{ start_at: at(13, 8), end_at: at(13, 10) }] }).breakdown?.schedule).toBe('overdue')
+      expect(computeJobHealth({ ...base, scheduleItems: [{ start_at: at(13, 8), end_at: at(13, 10) }, { start_at: at(18, 8), end_at: at(18, 10) }] }).breakdown?.schedule).toBe('on-track')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
+

@@ -85,14 +85,19 @@ export function computeJobHealth({ contact, payments = [], scheduleItems = [], c
   // Financial: paid / contracted (cap at 1, overpayment doesn't keep adding)
   const paymentRatio = amountCents > 0 ? Math.min(1, paidCents / amountCents) : 0
 
-  // Schedule: any end_at in the past = overdue. Filter excludes rows with
-  // no end_at since those are "indefinite" (e.g., a saved appointment with
-  // no end time set).
-  const now = Date.now()
-  const hasOverdue = scheduleItems.some((s) => {
-    if (!s?.end_at) return false
-    return new Date(s.end_at).getTime() < now
+  // Schedule (OPS-09): behind only when the job has visits that ended and
+  // none from today on. A visit this morning, or one booked tomorrow, means
+  // the work is moving. Rows with no end_at are "indefinite" (a saved
+  // appointment with no end time) and never count as past.
+  const now = new Date()
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const timeOf = (v: unknown) => (v ? new Date(String(v)).getTime() : NaN)
+  const hasPast = scheduleItems.some((s) => timeOf(s?.end_at) < now.getTime())
+  const hasFromToday = scheduleItems.some((s) => {
+    const t = timeOf(s?.end_at ?? s?.start_at)
+    return Number.isFinite(t) && t >= startOfToday
   })
+  const hasOverdue = hasPast && !hasFromToday
   const scheduleScore = hasOverdue ? 0 : 1
 
   const score = Math.round(
