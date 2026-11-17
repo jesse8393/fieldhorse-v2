@@ -48,6 +48,8 @@ export default function LeadNew() {
   const [client, setClient] = useState<ClientFieldValue>(() => restoredClientValue(form.name, form.clientId))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  // A missing name is the name field's error, so the field says it (A11Y-08).
+  const [nameError, setNameError] = useState('')
   const [emailError, setEmailError] = useState('')
   // A typed phone that belongs to a client with another name, or a known
   // name typed with a new phone: shown under the name, and the person picks
@@ -70,6 +72,7 @@ export default function LeadNew() {
   function onClient(next: ClientFieldValue) {
     setClient(next)
     setConflict(null)
+    setNameError('')
     patch({ name: next.text, clientId: next.picked?.id || '' })
   }
 
@@ -97,7 +100,7 @@ export default function LeadNew() {
 
   async function save(choice?: { existing: string } | 'new') {
     if (!user) return
-    if (!client.text.trim()) { setError('Enter a name.'); return }
+    if (!client.text.trim()) { setNameError('Enter a name.'); return }
     if (form.email.trim() && !isEmail(form.email)) { setEmailError('Enter an email like name@example.com.'); return }
     setSaving(true)
     setError('')
@@ -137,6 +140,7 @@ export default function LeadNew() {
         userId={user?.id}
         label="Name"
         placeholder="Who called"
+        error={nameError}
         value={client}
         onChange={onClient}
         autoFocus

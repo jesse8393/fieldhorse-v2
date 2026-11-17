@@ -43,6 +43,8 @@ function PaymentForm({ data, goBack, home }: { data: ReturnType<typeof useJobScr
   const [paidOn, setPaidOn] = useState(() => todayYmd())
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | undefined>()
+  // A missing amount is the amount field's error, so the field says it (A11Y-08).
+  const [amountError, setAmountError] = useState<string | undefined>()
   const queryClient = useQueryClient()
   // One id for the life of this form (DATA-15): a retry after a lost
   // answer, even with a field changed, updates that payment instead of
@@ -55,7 +57,7 @@ function PaymentForm({ data, goBack, home }: { data: ReturnType<typeof useJobScr
   async function save() {
     if (saving) return
     if (!Number.isFinite(numeric) || numeric <= 0) {
-      setError('Enter an amount above zero.')
+      setAmountError('Enter an amount above zero.')
       return
     }
     setSaving(true)
@@ -99,7 +101,8 @@ function PaymentForm({ data, goBack, home }: { data: ReturnType<typeof useJobScr
         placeholder="0.00"
         value={amount}
         helper={balance > 0 ? `Balance ${money(balance)}${overage ? ', this is more than the balance' : ''}` : 'No outstanding balance'}
-        onChange={(e) => { setAmount(moneyInput(e.target.value)); setError(undefined) }}
+        error={amountError}
+        onChange={(e) => { setAmount(moneyInput(e.target.value)); setError(undefined); setAmountError(undefined) }}
       />
       <PaymentClassification method={method} kind={kind} onMethodChange={setMethod} onKindChange={setKind} disabled={saving} />
       {method !== 'cash' && method !== 'other' && (

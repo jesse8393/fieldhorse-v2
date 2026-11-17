@@ -35,6 +35,8 @@ export default function MilesNew() {
   const [contacts, setContacts] = useState<{ id: string; name: string | null }[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | undefined>()
+  // Missing miles are the miles field's error, so the field says it (A11Y-08).
+  const [milesError, setMilesError] = useState<string | undefined>()
 
   useEffect(() => {
     if (!user?.id) return
@@ -57,7 +59,7 @@ export default function MilesNew() {
   async function save() {
     if (saving || !user?.id) return
     if (!(milesNum > 0)) {
-      setError('Enter the miles driven.')
+      setMilesError('Enter the miles driven.')
       return
     }
     setSaving(true)
@@ -108,7 +110,8 @@ export default function MilesNew() {
         placeholder="0"
         value={miles}
         helper={milesNum > 0 && deduction != null ? `Deduction $${deduction.toFixed(2)}` : undefined}
-        onChange={(e) => { setMiles(e.target.value); setError(undefined) }}
+        error={milesError}
+        onChange={(e) => { setMiles(e.target.value); setError(undefined); setMilesError(undefined) }}
       />
       <Field
         label="Purpose"

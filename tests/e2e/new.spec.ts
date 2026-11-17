@@ -395,3 +395,27 @@ test('create forms are centred on desktop, in line with New', async ({ context, 
   const lead = await centre('/leads/new')
   expect(Math.abs(lead.mid - lead.mainMid)).toBeLessThanOrEqual(2)
 })
+
+// A11Y-08: a save that fails on one field marks that field: aria-invalid,
+// the message tied to it with aria-describedby, and focus on the field,
+// so tabbing back to it still says what is wrong (WCAG 3.3.1, 1.3.1).
+for (const { path, save, field, message, clear = false } of [
+  { path: '/leads/new', save: 'Save lead', field: { role: 'combobox', name: /^Name/ }, message: 'Enter a name.' },
+  { path: '/quotes/new', save: 'Save quote', field: { role: 'combobox', name: /^Client/ }, message: 'Enter a client.' },
+  // The amount starts at the balance; the test empties it.
+  { path: '/jobs/c-job1/payment', save: 'Record payment', field: { role: 'textbox', name: /^Amount/ }, message: 'Enter an amount above zero.', clear: true },
+  { path: '/miles/new', save: 'Save miles', field: { role: 'spinbutton', name: /^Miles/ }, message: 'Enter the miles driven.' },
+  { path: '/subs/new', save: 'Add sub', field: { role: 'textbox', name: /^Name/ }, message: 'Enter the sub or company name.' },
+] as const) {
+  test(`an empty save on ${path} marks the field that needs it`, async ({ context, page }) => {
+    await signIn(context)
+    await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    const input = page.getByRole(field.role, { name: field.name }).first()
+    await expect(input).toBeVisible({ timeout: 30_000 })
+    if (clear) await input.fill('')
+    await page.getByRole('button', { name: save, exact: true }).click()
+    await expect(input).toHaveAttribute('aria-invalid', 'true')
+    await expect(input).toHaveAccessibleDescription(new RegExp(message.replace('.', '\\.')))
+    await expect(input).toBeFocused()
+  })
+}
