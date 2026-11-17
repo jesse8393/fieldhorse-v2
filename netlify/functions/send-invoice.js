@@ -143,13 +143,17 @@ export default async (request) => {
 
   // Re-read the actual invoice and its obligations immediately before delivery.
   // The request cannot attach an invoice from a different job or company.
+  // The row is kept: the email is written from it (title, number,
+  // Description), not from what the browser happened to send.
+  let invoiceRow = null
   if (invoice_id) {
     const access = await loadAccessibleRow(supabase, {
       table: 'fh_invoices', id: invoice_id, callerId: sender_user_id,
-      select: 'contact_id, client_id, title, description, amount, status, due_at, updated_at'
+      select: 'contact_id, client_id, title, description, amount, status, due_at, updated_at, sequence_number'
     })
     if (access.error === 'lookup_failed') return json({ error: 'billing_review_unavailable', message: 'Could not verify current billing. Try again.' }, 503)
     const invoice = access.row
+    invoiceRow = invoice
     if (!invoice || (invoice.contact_id || null) !== (contact_id || null)) return json({ error: 'invoice_mismatch', message: 'This invoice does not belong to the selected record.' }, 403)
     if (invoice.updated_at && body.invoice_updated_at !== invoice.updated_at) return json({ error: 'invoice_changed', message: 'This invoice changed after it was opened. Refresh and review before sending.' }, 409)
     if (!Number.isFinite(Number(invoice.amount)) || Number(invoice.amount) <= 0) return json({ error: 'invalid_invoice_amount', message: 'Enter a positive invoice amount before sending.' }, 409)
@@ -226,11 +230,19 @@ export default async (request) => {
   // empty (incomplete profile).
   const fromName = companyName || SEND_EMAIL_FROM_NAME
   const fromHeader = formatFromHeader(fromName, SEND_EMAIL_FROM)
-  // What the invoice is for: the invoice's own description when the client
-  // sent one (the same words its PDF prints), else the job title as before.
-  const jobTitle = textField(description).slice(0, 200) || contact.job_title || 'your project'
+  // What the invoice is for: the stored invoice's Description (the same
+  // words its PDF prints), else what the request sent. The job page sends
+  // none, so reading the request first mailed the job title instead (FN-09).
+  // The Description is printed whole as its own paragraph; the subject is
+  // built from the invoice's title or number, so a long Description no
+  // longer runs into the subject cut mid word (PT-09).
+  const jobTitle = contact.job_title || 'your project'
+  const invoiceDescription = textField(invoiceRow?.description) || textField(description)
   const amountLabel = formatMoneyLabel(amount_due ?? contact.amount)
-  const subject = `Invoice for ${jobTitle}${amountLabel ? ` (${amountLabel})` : ''}`
+  const subject = invoiceSubject({ invoice: invoiceRow, jobTitle, amountLabel })
+  const descriptionText = describesMore(invoiceDescription, [jobTitle, invoiceRow?.title])
+    ? invoiceDescription.replace(/\r\n?/g, '\n')
+    : ''
   // Optional fields read through textField so a non string value from a
   // malformed client falls back to the default instead of throwing.
   const safeRecipientName = textField(recipient_name) || textField(contact.name)
@@ -245,6 +257,7 @@ export default async (request) => {
     greeting,
     '',
     customMessage || `Your invoice for ${jobTitle} is attached.${amountLabel ? ` Amount due: ${amountLabel}.` : ''}`,
+    ...(descriptionText ? ['', descriptionText] : []),
     ...(payLink ? ['', `Pay online: ${payLink}`] : []),
     ...(payInstructions ? ['', payInstructions] : []),
     '',
@@ -257,6 +270,7 @@ export default async (request) => {
     greeting,
     customMessage,
     jobTitle,
+    descriptionText,
     amountLabel,
     senderLine,
     companyName,
@@ -376,7 +390,29 @@ function formatMoneyLabel(n) {
   return `$${v.toLocaleString('en-US', { minimumFractionDigits: hasCents ? 2 : 0, maximumFractionDigits: hasCents ? 2 : 0 })}`
 }
 
-function renderInvoiceHtml({ greeting, customMessage, jobTitle, amountLabel, senderLine, companyName, payLink, payInstructions }) {
+// Subject line: the invoice's title, else its number and the job, else the
+// job alone, then the amount. One line, whitespace collapsed, kept short.
+export function invoiceSubject({ invoice, jobTitle, amountLabel }) {
+  const oneLine = (s) => String(s || '').replace(/\s+/g, ' ').trim()
+  const short = (s) => (s.length > 80 ? `${s.slice(0, 80).replace(/\s+\S*$/, '')}...` : s)
+  const title = oneLine(invoice?.title)
+  const job = short(oneLine(jobTitle) || 'your project')
+  const number = Number(invoice?.sequence_number)
+  const name = title
+    ? `Invoice: ${short(title)}`
+    : Number.isInteger(number) && number > 0 ? `Invoice ${number} for ${job}` : `Invoice for ${job}`
+  return `${name}${amountLabel ? ` (${amountLabel})` : ''}`
+}
+
+// A Description worth its own paragraph: not empty and not a repeat of the
+// title or job name already in the sentence above it.
+function describesMore(text, names) {
+  const norm = (s) => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase()
+  const t = norm(text)
+  return Boolean(t) && !names.some((n) => norm(n) === t)
+}
+
+function renderInvoiceHtml({ greeting, customMessage, jobTitle, descriptionText, amountLabel, senderLine, companyName, payLink, payInstructions }) {
   const safe = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   }[c]))
@@ -384,6 +420,10 @@ function renderInvoiceHtml({ greeting, customMessage, jobTitle, amountLabel, sen
   const msg = customMessage
     ? renderParagraphs(customMessage, safe)
     : `<p style="margin:0;">Your invoice for <strong>${safe(jobTitle)}</strong> is attached.${amountLabel ? ` Amount due: <strong>${safe(amountLabel)}</strong>.` : ''}</p>`
+  // The Description keeps its own line breaks and paragraphs, escaped.
+  const describedAs = descriptionText
+    ? `<div style="margin:14px 0 0;font-size:16px;color:#141414;">${renderParagraphs(descriptionText, safe)}</div>`
+    : ''
   return `<!doctype html>
 <html lang="en">
 <body style="margin:0;padding:0;background:#F2EDE4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#141414;line-height:1.55;">
@@ -395,7 +435,7 @@ function renderInvoiceHtml({ greeting, customMessage, jobTitle, amountLabel, sen
           <p style="margin:8px 0 0;font-size:16px;color:#141414;">${safe(greeting)}</p>
         </td></tr>
         <tr><td style="padding:8px 32px 16px;">
-          <div style="font-size:16px;color:#141414;">${msg}</div>
+          <div style="font-size:16px;color:#141414;">${msg}</div>${describedAs}
         </td></tr>
         ${payBlock(payLink, payInstructions, amountLabel, safe)}
         <tr><td style="padding:8px 32px 24px;">
