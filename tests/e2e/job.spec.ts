@@ -910,3 +910,29 @@ test.describe('typed words in the job sections', () => {
     await expect(page.getByPlaceholder('Log a note, call, touchpoint…')).toHaveValue(WORDS)
   })
 })
+
+// Finding lost-work-6: Edit job details keeps its edits through a stray
+// tap on another section and a reload.
+test.describe('typed words in edit job details', () => {
+  const WORDS = TYPED
+  const sections = jobSections
+
+  test('edit job details keeps its edits through a tap on another section and a reload', async ({ context, page }) => {
+    await signIn(context)
+    await openJob(page, '/jobs/c-job1?edit=1')
+    const form = page.getByRole('form', { name: 'Edit job details' })
+    await form.getByLabel('Scope notes').fill(WORDS)
+    await sections(page).selectOption('tasks')
+    await sections(page).selectOption('overview')
+    await expect(page.getByRole('form', { name: 'Edit job details' }).getByLabel('Scope notes')).toHaveValue(WORDS)
+    await page.reload()
+    await expect(page.getByRole('form', { name: 'Edit job details' }).getByLabel('Scope notes')).toHaveValue(WORDS)
+    await expect(page.getByText('Unsaved changes restored')).toBeVisible()
+    // Cancel closes the edit and forgets it.
+    await page.getByRole('form', { name: 'Edit job details' }).getByRole('button', { name: 'Cancel', exact: true }).click()
+    await expect(page.getByRole('form', { name: 'Edit job details' })).toHaveCount(0)
+    await page.reload()
+    await expect(sections(page)).toBeVisible()
+    await expect(page.getByRole('form', { name: 'Edit job details' })).toHaveCount(0)
+  })
+})

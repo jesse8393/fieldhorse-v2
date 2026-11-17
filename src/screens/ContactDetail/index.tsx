@@ -352,16 +352,20 @@ export default function ContactDetail() {
   const [deleting, setDeleting] = useState(false)
   // Edit mode is a flag the Overview tab + section editors read. The
   // header's Edit toggles it and jumps to overview if on another tab; the
-  // More screen's "Edit job details" arrives with ?edit=1.
-  const [isEditing, setIsEditing] = useState(() => searchParams.get('edit') === '1')
+  // More screen's "Edit job details" arrives with ?edit=1. The flag stays
+  // in the address while editing, so a reload comes back to the open form
+  // (its edits are kept as a draft, D23).
+  const [isEditing, setIsEditingState] = useState(() => searchParams.get('edit') === '1')
   useEffect(() => {
-    if (searchParams.get('edit') !== '1') return
-    setIsEditing(true)
-    const sp = new URLSearchParams(searchParams)
-    sp.delete('edit')
-    setSearchParams(sp, { replace: true })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (searchParams.get('edit') === '1') setIsEditingState(true)
   }, [searchParams])
+  function setIsEditing(next: boolean, from: URLSearchParams = searchParams) {
+    setIsEditingState(next)
+    const sp = new URLSearchParams(from)
+    if (next) sp.set('edit', '1')
+    else sp.delete('edit')
+    if (sp.toString() !== searchParams.toString()) setSearchParams(sp, { replace: true })
+  }
 
   // Phone (spec 8.1 and 9.4): the page brings its own onyx action
   // capsule, so the dock steps aside while it is mounted. The header's
@@ -443,8 +447,13 @@ export default function ContactDetail() {
   function handleEditClick() {
     // Edit form lives on Overview today; jump there first if on another tab
     // (preserves the audit-batch-X fix that "EDIT does nothing on Files").
-    if (tab !== 'overview') setTab('overview')
-    setIsEditing((v) => !v)
+    // One address change carries both.
+    const sp = new URLSearchParams(searchParams)
+    if (tab !== 'overview') {
+      setLocalTab('overview')
+      sp.delete('tab')
+    }
+    setIsEditing(!isEditing, sp)
   }
 
   // Loading skeleton
