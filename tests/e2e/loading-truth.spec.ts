@@ -1516,7 +1516,12 @@ test.describe('Quote lines', () => {
     await expect(lines(page).getByText('Pump truck')).toBeVisible()
     reads.on = true
     await lines(page).getByRole('button', { name: /Pump truck/ }).click()
-    await page.getByRole('form', { name: 'Edit line' }).getByRole('button', { name: 'Delete line' }).click()
+    // Delete line asks with a second tap on the same button (S18), and a
+    // second tap within half a second is the same double tap (OPS-02).
+    const editor = page.getByRole('form', { name: 'Edit line' })
+    await editor.getByRole('button', { name: 'Delete line' }).click()
+    await page.waitForTimeout(600)
+    await editor.getByRole('button', { name: 'Tap again to delete line' }).click()
     await expect(page.getByText("Couldn't delete item")).toBeVisible({ timeout: 15_000 })
     await expect.poll(() => deletes.count).toBeGreaterThan(0)
     await holds(async () => {
