@@ -42,6 +42,7 @@ import { renderPayBlock as payBlock, formatFromHeader, renderParagraphs, textFie
 import { loadAccessibleRow, brandingUserIdFor } from './lib/orgAccess.js'
 import { hashIdentifier, checkRateLimit, checkDailySendCap, DAILY_SEND_LIMIT_MESSAGE } from './lib/rateLimit.js'
 import { isOwnedStoragePath } from './lib/storagePath.js'
+import { moneyCents } from './lib/money.js'
 
 export default async (request) => {
   if (request.method === 'OPTIONS') {
@@ -410,11 +411,10 @@ async function loadBilledRecord(supabase, { contact_id, invoice_id, sender_user_
 function formatMoneyLabel(n) {
   const v = Number(n || 0)
   if (!Number.isFinite(v) || v <= 0) return ''
-  // Show cents when the amount has them — rounding a $2,499.50 invoice
-  // to "$2,500" in the email subject made customers overpay by 50¢ and
-  // the invoice never reconciled.
-  const hasCents = Math.abs(v - Math.round(v)) >= 0.005
-  return `$${v.toLocaleString('en-US', { minimumFractionDigits: hasCents ? 2 : 0, maximumFractionDigits: hasCents ? 2 : 0 })}`
+  // Dollars and cents, the way the attached PDF prints the amount: a
+  // rounded "$2,500" for a $2,499.50 invoice made customers overpay, and
+  // "$6,400" against a PDF that says "$6,400.00" reads as two figures.
+  return moneyCents(v)
 }
 
 // Subject line: the invoice's title, else its number and the job, else the

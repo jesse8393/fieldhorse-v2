@@ -858,7 +858,21 @@ test('the contract card shows cents', async ({ context, page }) => {
   await openMoreAboutJob(page)
   const card = page.locator('.cockpit-headline')
   await expect(card).toBeVisible({ timeout: 30_000 })
-  await expect(card.locator('.cockpit-headline__amt')).toHaveText('$10,000')
+  await expect(card.locator('.cockpit-headline__amt')).toHaveText('$10,000.00')
   await expect(card.locator('.cockpit-headline__bar-meta')).toContainText('$5,000.50 collected')
   await expect(card.locator('.cockpit-headline__bar-meta')).toContainText('$4,999.50 remaining')
+})
+
+// formats-6: a whole amount prints .00 on the job the way the invoice page
+// and the PDF print it, so $6,400 never sits next to $6,400.00.
+test('whole amounts keep .00 on Log payment and the Invoices tab', async ({ context, page }) => {
+  await signIn(context)
+  await page.goto('/jobs/c-job2/payment', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText('Balance $6,400.00')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('button', { name: 'Record $6,400.00' })).toBeVisible()
+  await page.goto('/jobs/c-job2?tab=draws', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText(/Unbilled/).first()).toBeVisible({ timeout: 30_000 })
+  const text = await page.locator('main').innerText()
+  expect(text).toContain('$6,400.00')
+  expect(text).not.toMatch(/\$[\d,]+(?![\d,]*\.\d\d)\b/)
 })

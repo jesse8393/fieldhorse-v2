@@ -4,22 +4,14 @@
 // here (not in lib/) so document concerns stay co-located.
 
 import { parseDateOnly } from '../../lib/dates.ts'
+import { moneyCents } from '../../lib/format.ts'
 
-export function money(n: number | string | null | undefined, { cents = false }: { cents?: boolean } = {}) {
-  const v = Number(n || 0)
-  // Whole-dollar display is a STYLE choice for heroes/summary chips,
-  // but it must never change the number: a $12,499.50 total shown as
-  // "$12,500" next to a cent-precise line item table reads as two
-  // different figures on one document. When the value carries cents,
-  // show them regardless of the requested style.
-  const hasCents = Math.abs(v - Math.round(v)) >= 0.005
-  const showCents = cents || hasCents
-  return v.toLocaleString(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: showCents ? 2 : 0,
-    maximumFractionDigits: showCents ? 2 : 0
-  })
+// Every amount on a customer document prints dollars and cents, the way
+// the PDF prints it: "$6,400.00 of $12,800.00 collected", never "$6,400"
+// under "AMOUNT DUE $6,400.00" (formats-6). The cents option is kept so
+// callers need no change; it no longer alters the output.
+export function money(n: number | string | null | undefined, _options: { cents?: boolean } = {}) {
+  return moneyCents(n)
 }
 
 // Date-only columns (paid_on, due_at-as-date, warranty dates) must be

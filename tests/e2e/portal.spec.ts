@@ -1844,3 +1844,18 @@ test('the editorial theme prints the scope of work once', async ({ page, context
   await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
   await expect(page.getByText('Pour a 4 inch slab with a broom finish.')).toHaveCount(1)
 })
+
+/* ---- One record reads the same on the link as on the PDF (formats) ---- */
+
+test('whole amounts keep .00 on the invoice link, the way the PDF prints them (formats-6)', async ({ page, context }) => {
+  await mockPortal(context, invoicePayload({
+    contact: { amount: 12800 },
+    invoices: [draw('inv-w1', 1, 6400, 'paid'), draw('inv-w2', 2, 6400, 'sent')],
+    payments: [{ id: 'pay-w1', contact_id: 'job-linked-0003', invoice_id: 'inv-w1', amount: 6400, paid_on: '2026-11-11', method: 'check', kind: 'deposit' }]
+  }))
+  await openInvoice(page)
+  await expect(page.getByTestId('invoice-amount-due')).toHaveText('$6,400.00')
+  await expect(page.getByText('$6,400.00 of $12,800.00 collected')).toBeVisible()
+  const text = await page.locator('body').innerText()
+  expect(text).not.toMatch(/\$[\d,]+(?![\d,]*\.\d\d)\b/)
+})

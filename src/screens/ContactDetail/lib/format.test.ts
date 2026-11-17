@@ -2,16 +2,17 @@ import { describe, it, expect } from 'vitest'
 import { money, fmtSize } from './format.ts'
 
 describe('money', () => {
-  it('renders whole dollars with no decimals', () => {
-    expect(money(1234)).toBe('$1,234')
-    expect(money(1000000)).toBe('$1,000,000')
+  // formats-6: whole dollars print .00, the way the PDF prints them.
+  it('renders whole dollars with .00', () => {
+    expect(money(1234)).toBe('$1,234.00')
+    expect(money(1000000)).toBe('$1,000,000.00')
   })
 
-  it('returns $0 for null / undefined / empty / NaN-y input', () => {
-    expect(money(null)).toBe('$0')
-    expect(money(undefined)).toBe('$0')
-    expect(money(0)).toBe('$0')
-    expect(money('' as any)).toBe('$0')
+  it('returns $0.00 for null / undefined / empty / NaN-y input', () => {
+    expect(money(null)).toBe('$0.00')
+    expect(money(undefined)).toBe('$0.00')
+    expect(money(0)).toBe('$0.00')
+    expect(money('' as any)).toBe('$0.00')
   })
 
   // M-20: job money is exact to the cent. A $4,999.50 balance read

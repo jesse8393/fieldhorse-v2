@@ -12,10 +12,9 @@
 //                 operator needs the exact dollar amount. Example:
 //                 1_240_000 → "$1,240,000".
 //
-//   moneyExact(n) Exact to the cent: whole amounts print without
-//                 decimals, amounts with cents print both digits.
-//                 For a single payment or bill where rounding would
-//                 change the number. Example: 1_234.5 → "$1,234.50".
+//   moneyExact(n) The same as moneyCents: always dollars and cents, the
+//                 way the PDF prints money. For a single payment or bill.
+//                 Example: 1_234.5 → "$1,234.50", 6_400 → "$6,400.00".
 //
 // Negative values keep the sign in front of the currency symbol
 // ("-$1,200", never "$-1,200"), and the compact forms pick their unit
@@ -44,15 +43,10 @@ export function moneyFull(n: number | null | undefined): string {
   return `$${Math.round(Number(n || 0)).toLocaleString()}`
 }
 
+// One record's amount prints the way the PDF and the customer documents
+// print it, so a whole amount reads "$6,400.00" here too (formats-6).
 export function moneyExact(n: number | string | null | undefined): string {
-  const v = toNumber(n)
-  const hasCents = Math.abs(v - Math.round(v)) >= 0.005
-  return v.toLocaleString(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: hasCents ? 2 : 0,
-    maximumFractionDigits: hasCents ? 2 : 0
-  })
+  return moneyCents(n)
 }
 
 // Compact K-notation for list cards ($24.4K / $135K / $840). Extracted

@@ -65,14 +65,22 @@ describe('moneyExact', () => {
     expect(moneyExact(12_345.67)).toBe('$12,345.67')
   })
 
-  it('prints whole amounts without decimals and never abbreviates', () => {
-    expect(moneyExact(12_000)).toBe('$12,000')
-    expect(moneyExact(1_500_000)).toBe('$1,500,000')
-    expect(moneyExact(null)).toBe('$0')
+  // formats-6: a whole amount prints .00 the way the PDF and moneyCents
+  // print it, so $6,400 never sits next to $6,400.00 for the same record.
+  it('prints whole amounts with .00 and never abbreviates', () => {
+    expect(moneyExact(12_000)).toBe('$12,000.00')
+    expect(moneyExact(1_500_000)).toBe('$1,500,000.00')
+    expect(moneyExact(null)).toBe('$0.00')
+  })
+
+  it('is the same formatter as moneyCents', () => {
+    for (const n of [0, 6400, 6400.5, 1234.567, -1200, '12345.5', null, undefined, 'abc']) {
+      expect(moneyExact(n as never)).toBe(moneyCents(n as never))
+    }
   })
 
   it('puts the sign before the currency symbol', () => {
-    expect(moneyExact(-1200)).toBe('-$1,200')
+    expect(moneyExact(-1200)).toBe('-$1,200.00')
   })
 })
 
