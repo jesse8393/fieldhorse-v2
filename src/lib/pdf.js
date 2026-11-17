@@ -523,7 +523,8 @@ function parseDateLocal(value) {
 function formatDocDate(d) {
   const dt = parseDateLocal(d)
   if (!dt) return ''
-  return dt.toLocaleDateString(undefined, { month: 'long', day: '2-digit', year: 'numeric' })
+  // A numeric day (PT-19): "November 7, 2026", never "November 07".
+  return dt.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
 }
 
 // money() above uses 2 decimals always; this overload allows compact display.
@@ -2071,16 +2072,24 @@ export async function generateCertificate({
   doc.setFontSize(10)
   doc.setTextColor(60, 56, 51)
   doc.text(certificateNumber(company.name, closeout.id || contact.id), rightCol, cursor + 10, { align: 'right' })
+  // Measure the date, then place the tracked label left of it (PT-19):
+  // align right ignores charSpace, so a fixed offset let "ISSUED" run
+  // into a long date such as "December 28, 2026".
+  const issuedDate = formatDocDate(closedAt)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  const issuedDateW = doc.getTextWidth(issuedDate)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(7)
   doc.setTextColor(...INK_MUTED)
   doc.setCharSpace(0.7)
-  doc.text('ISSUED', rightCol - 26, cursor + 16, { align: 'right' })
+  const issuedLabelW = doc.getTextWidth('ISSUED') + 5 * 0.7
+  doc.text('ISSUED', rightCol - issuedDateW - 3 - issuedLabelW, cursor + 16)
   doc.setCharSpace(0)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
   doc.setTextColor(...ONYX)
-  doc.text(formatDocDate(closedAt), rightCol, cursor + 16, { align: 'right' })
+  doc.text(issuedDate, rightCol, cursor + 16, { align: 'right' })
 
   cursor = Math.max(leftY, cursor + 20) + 4
   doc.setDrawColor(213, 207, 190)
