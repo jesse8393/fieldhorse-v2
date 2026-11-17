@@ -85,6 +85,27 @@ live catalog found exactly two gaps: the function above, and the column
 
 ## Still open in production
 
+### Found after the merge: the live functions have no server key
+
+Checked against the live site on 2026-11-17 after #244 and #245 deployed.
+Every Netlify function that needs the Supabase server key answers 500
+with "server_misconfigured" or "Server is missing Supabase credentials":
+public-link (every customer link page), partner-invite-info,
+org-members-list, send-quote, send-invoice, claude, delete-account and the
+new client-error. `netlify/functions/lib/serviceConfig.js` did not change
+in this audit, so this predates it. It explains why production has never
+held a customer link: none could ever be opened, and no quote or invoice
+email could be sent from the app.
+
+Only Jesse can fix it, in Netlify: Site configuration, Environment
+variables, scope Functions. Set `SUPABASE_URL`
+(`https://pnmhblvslftdzfcdezbw.supabase.co`), `SUPABASE_PUBLISHABLE_KEY`
+(the anon or publishable key) and `SUPABASE_SECRET_KEY` (the service role
+or secret key, from Supabase, Project settings, API keys). Rotate that key
+first, since the #245 hole existed, and set the new one. Add
+`ANTHROPIC_API_KEY` for the AI features. Then trigger a deploy. The steps
+and a readiness check are in `docs/operations/service-setup.md`.
+
 ### Waiting on Jesse's approval
 
 The database tool asks the owner before running any statement that removes
