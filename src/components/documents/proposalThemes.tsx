@@ -193,7 +193,7 @@ function SupportingSections({ view, accent, muted = '#5C5C5C', mid = '#141414', 
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, marginTop: 30 }}>
       {scopeText && scopeText.trim() && (
         <section>
-          <Label>Scope of Work</Label>
+          <Label>Scope of work</Label>
           <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: mid, whiteSpace: 'pre-wrap' }}>{scopeText.trim()}</p>
         </section>
       )}
@@ -369,7 +369,7 @@ export function SlateProposal({ view }: { view: ProposalView }) {
           <tr style={{ borderBottom: '2px solid #141414' }}>
             <th style={thL}>Description</th>
             <th style={thR}>Quantity</th>
-            <th style={thR}>Unit Price</th>
+            <th style={thR}>Unit price</th>
             <th style={thR}>Amount</th>
           </tr>
         </thead>
@@ -440,7 +440,7 @@ export function MintProposal({ view }: { view: ProposalView }) {
           <tr style={{ background: green, color: pal.onAccent }}>
             <th style={{ ...thR, color: pal.onAccent, padding: '12px 12px', width: '12%' }}>Qty</th>
             <th style={{ ...thL, color: pal.onAccent, padding: '12px 12px' }}>Description</th>
-            <th style={{ ...thR, color: pal.onAccent, padding: '12px 12px', width: '20%' }}>Unit Price</th>
+            <th style={{ ...thR, color: pal.onAccent, padding: '12px 12px', width: '20%' }}>Unit price</th>
             <th style={{ ...thR, color: pal.onAccent, padding: '12px 12px', width: '20%' }}>Amount</th>
           </tr>
         </thead>
@@ -492,7 +492,7 @@ export function EditorialProposal({ view }: { view: ProposalView }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <EditMeta label="Date" value={fmtDate(view.issuedAt) || '\u2003'} tan={tan} />
           <EditMeta label="Estimate #" value={view.number} tan={tan} />
-          <EditMeta label="Est. Total" value={money(view.total)} tan={tan} />
+          <EditMeta label="Estimated total" value={money(view.total)} tan={tan} />
         </div>
       </div>
 

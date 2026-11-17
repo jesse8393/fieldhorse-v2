@@ -80,3 +80,13 @@ describe('partner invite wording', () => {
     expect(mail.html).toContain('>Accept invite</a>')
   })
 })
+
+// ai-copy-8: the certificate email names the document in sentence case.
+describe('certificate email wording', () => {
+  it('says Certificate of completion in the subject and the message', async () => {
+    const mail = await mailFrom('send-certificate', all['send-certificate'])
+    expect(mail.subject).toBe('Certificate of completion for Back patio slab')
+    expect(mail.text).toContain('Attached is the certificate of completion for Back patio slab.')
+    expect(JSON.stringify(mail)).not.toContain('Certificate of Completion')
+  })
+})

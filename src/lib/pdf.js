@@ -248,7 +248,7 @@ function drawDocItemsTable(doc, opts) {
     const innerWidth = pageWidth - margin * 2
     autoTable(doc, {
       startY,
-      head: [['Scope of Work', 'Description', 'Amount']],
+      head: [['Scope of work', 'Description', 'Amount']],
       body: rows.map((r) => {
         const amount = Number(r.amount != null ? r.amount : Number(r.qty || 1) * Number(r.rate || 0))
         const desc = r.descriptionLines && r.descriptionLines.length > 0
@@ -270,7 +270,7 @@ function drawDocItemsTable(doc, opts) {
   // line, and every header fits on one line.
   autoTable(doc, {
     startY,
-    head: [['Product/Service', 'Description', 'Qty.', 'Unit Price', 'Total']],
+    head: [['Item', 'Description', 'Qty.', 'Unit price', 'Total']],
     body: rows.map((r) => {
       const qty = Number(r.qty || 1)
       const rate = Number(r.rate || 0)
@@ -1274,7 +1274,7 @@ export async function generateStatement({
   const totalDue = lines.reduce((s, l) => s + Number(l.balance || 0), 0)
   autoTable(doc, {
     startY: cursor + 4,
-    head: [['Property / Project', 'Contract', 'Paid', 'Balance Due']],
+    head: [['Property or project', 'Contract', 'Paid', 'Balance due']],
     body: lines.length > 0
       ? lines.map((l) => [
           l.property || '',
@@ -1531,7 +1531,7 @@ async function drawThemedProposal(doc, ctx) {
       })
       yMax = Math.max(yMax, yy)
     })
-    const meta = [['Date', fmtShortPdf(issuedAt)], ['Estimate #', number], ['Est. Total', moneyCompact(total)]]
+    const meta = [['Date', fmtShortPdf(issuedAt)], ['Estimate #', number], ['Estimated total', moneyCompact(total)]]
     meta.forEach(([label, val], i) => {
       const my = cursor + i * 6
       doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...t.accent)
@@ -1659,7 +1659,7 @@ function drawThemedProjectTitle(doc, { margin, y, title, t }) {
 function drawThemedItemsTable(doc, { startY, items, margin, pageHeight, bottom, t, paintBg }) {
   autoTable(doc, {
     startY,
-    head: [['Description', 'Qty', 'Unit Price', 'Amount']],
+    head: [['Description', 'Qty', 'Unit price', 'Amount']],
     body: items.map((it) => [
       it.description || '',
       it.qty ? `${it.qty}${it.unit ? ` ${it.unit}` : ''}` : '',
@@ -2101,7 +2101,7 @@ export async function generateCertificate({
   doc.setFont('times', 'normal')
   doc.setFontSize(26)
   doc.setTextColor(...ONYX)
-  doc.text('Certificate of Completion', margin, cursor)
+  doc.text('Certificate of completion', margin, cursor)
   cursor += 8
 
   doc.setFont('helvetica', 'normal')

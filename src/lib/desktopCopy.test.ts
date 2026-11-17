@@ -25,6 +25,9 @@ const BANNED: [string, string][] = [
   ['src/screens/ContactDetail/sections/Files.tsx', "'Add Files'"],
   ['src/screens/ContactDetail/tabs/Overview.tsx', 'label="Job Progress"'],
   ['src/screens/SubDetail.tsx', 'Sub Directory'],
+  // ai-copy-8: customer documents use sentence case headings.
+  ['src/components/documents/proposalThemes.tsx', '>Unit Price<'],
+  ['src/components/documents/proposalThemes.tsx', 'label="Est. Total"'],
 ]
 
 describe('desktop copy (D25)', () => {
