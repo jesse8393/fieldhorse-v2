@@ -217,6 +217,25 @@ test.describe('Welcome and Login', () => {
     expect(await page.title()).not.toMatch(/captain/i)
   })
 
+  // Found on the live site: Sign in with empty fields went to the server and
+  // came back with its raw "missing email or phone". The form now says what
+  // is missing itself and sends nothing until both fields are filled.
+  test('Sign in with an empty field says what is missing and sends nothing', async ({ context, page }) => {
+    await stubSignedOut(context, 'missing')
+    const authCalls: string[] = []
+    page.on('request', (req) => { if (req.url().includes('/auth/v1/token')) authCalls.push(req.url()) })
+    await openLogin(page)
+    const signIn = page.getByRole('button', { name: 'Sign in', exact: true })
+    await signIn.click()
+    await expect(page.getByRole('alert')).toHaveText('Enter your email.')
+    await page.getByLabel('Email').fill('crew@example.com')
+    await signIn.click()
+    await expect(page.getByRole('alert')).toHaveText('Enter your password.')
+    await page.waitForTimeout(300)
+    expect(authCalls).toEqual([])
+    await expect(page.getByText(/missing email or phone/i)).toHaveCount(0)
+  })
+
   for (const mode of ['day', 'night'] as const) {
     test(`shows the heading and Sign in on onyx with linen labels in ${mode}`, async ({ context, page }) => {
       await context.addInitScript((themeMode) => {

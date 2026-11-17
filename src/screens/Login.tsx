@@ -91,6 +91,16 @@ export default function Login() {
       setError(MISSING_ENV)
       return
     }
+    // Say what is missing here, before a round trip on a weak signal that
+    // only comes back with the server's own wording.
+    if (!email.trim()) {
+      setError('Enter your email.')
+      return
+    }
+    if (!password) {
+      setError('Enter your password.')
+      return
+    }
     setBusy(true)
     try {
       if (mode === 'signin') {
