@@ -76,3 +76,28 @@ revoke all on function public.fh_job_partners_guard_acceptance() from public, an
 create or replace trigger fh_job_partners_guard_acceptance
   before insert or update on public.fh_job_partners
   for each row execute function public.fh_job_partners_guard_acceptance();
+
+-- DB-05 -------------------------------------------------------------------
+-- An admin could insert an org_invites row for the owner role straight
+-- through the REST API, skipping the tier check in org-invite-create.js,
+-- and then accept it with a second account to join as an owner.
+--
+-- The insert check now matches that function: an invite is always for a
+-- role below the inviter's. Owners invite admins and below, admins invite
+-- managers and below, and nobody invites an owner.
+
+alter policy "org_invites_insert_by_owner_admin" on public.org_invites
+  with check (
+    invited_by = (select auth.uid())
+    and exists (
+      select 1
+        from public.org_members m
+       where m.org_id = org_invites.org_id
+         and m.user_id = (select auth.uid())
+         and m.revoked_at is null
+         and (
+           (m.role = 'owner' and org_invites.role in ('admin', 'manager', 'foreman', 'crew'))
+           or (m.role = 'admin' and org_invites.role in ('manager', 'foreman', 'crew'))
+         )
+    )
+  );

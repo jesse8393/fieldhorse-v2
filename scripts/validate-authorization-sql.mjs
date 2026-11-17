@@ -184,6 +184,21 @@ $function$;
   equal((await grantPartner({ row: 60, email: 'second@example.test', partner: 3, status: 'accepted' })).rows.length, 1, 'baseline: crew grants an account accepted partner access')
   await db.exec(`reset role; delete from public.fh_job_partners where id='${id(60)}'`)
 
+  await db.exec(`reset role;
+    create table public.org_invites(id uuid primary key default gen_random_uuid(),org_id uuid not null,email text not null,role text not null default 'crew',token text not null unique,invited_by uuid not null,expires_at timestamptz not null default now() + interval '14 days');
+    alter table public.org_invites enable row level security;
+    create policy "org_invites_insert_by_owner_admin" on public.org_invites for insert to authenticated
+      with check (invited_by = (select auth.uid()) and exists (select 1 from public.org_members m where m.org_id = org_invites.org_id and m.user_id = (select auth.uid()) and m.role in ('owner','admin') and m.revoked_at is null));
+    grant insert on public.org_invites to authenticated;
+    grant select on public.org_members to authenticated;
+  `)
+  let inviteCount = 0
+  const invite = (user, role) => db.query('insert into public.org_invites(org_id,email,role,token,invited_by) values($1,$2,$3,$4,$5)', [id(100), `invitee${++inviteCount}@example.test`, role, `token-${inviteCount}`, id(user)])
+  await scope(7)
+  await invite(7, 'owner')
+  equal(true, true, 'baseline: an admin creates an owner invite directly')
+  await db.exec('reset role')
+
   const boundaries = await read('migrations/20261117110100_role_boundaries.sql')
   assert(!/drop|delete|truncate/i.test(boundaries), 'role boundary migration avoids words that need owner approval')
   await db.exec(boundaries)
@@ -205,6 +220,15 @@ $function$;
   equal((await rows("update public.fh_job_partners set status='revoked' where id=$1 returning id", [id(61)])).length, 1, 'manager revokes a partner invite')
   await service()
   equal((await rows("update public.fh_job_partners set status='accepted', partner_user_id=$1, accepted_at=now() where id=$2 returning id", [id(5), id(61)])).length, 1, 'invite link acceptance through the service path still works')
+  await db.exec('reset role')
+
+  // DB-05: an invite is always for a role below the inviter's.
+  const roleName = { 1: 'owner', 2: 'manager', 3: 'crew', 4: 'removed owner', 7: 'admin' }
+  for (const [user, role, allowed] of [[7,'owner',false],[7,'admin',false],[7,'manager',true],[7,'crew',true],[1,'owner',false],[1,'admin',true],[1,'foreman',true],[2,'crew',false],[3,'crew',false],[4,'crew',false]]) {
+    await scope(user)
+    const label = `${roleName[user]} ${allowed ? 'can' : 'cannot'} invite ${/^[aeiou]/.test(role) ? 'an' : 'a'} ${role}`
+    if (allowed) { await invite(user, role); equal(true, true, label) } else await refused(() => invite(user, role), label)
+  }
   await db.exec('reset role')
 
   console.log(`${checks} authorization transition checks passed.`)
