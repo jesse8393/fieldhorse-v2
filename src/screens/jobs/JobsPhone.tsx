@@ -73,6 +73,15 @@ const EMPTY_TAB: Record<JobsTab, string> = {
   done: 'Nothing finished yet.'
 }
 
+// The create action that fills each tab. Done fills as jobs finish, so it
+// offers New job too.
+const TAB_CREATE: Record<Exclude<JobsTab, 'all'>, { label: string; to: string }> = {
+  leads: { label: 'New lead', to: '/leads/new' },
+  quotes: { label: 'New quote', to: '/quotes/new' },
+  jobs: { label: 'New job', to: '/jobs/new' },
+  done: { label: 'New job', to: '/jobs/new' }
+}
+
 function rowEnd(row: JobsRowView): ReactNode {
   // Money, then a chip or the gray next step. A row without money has
   // room for both, as the new lead in the render does.
@@ -259,11 +268,16 @@ export default function JobsPhone({
         />
       )
     } else if (tab !== 'all') {
+      // The action that fills this tab; Show all only when another tab has rows.
+      const create = TAB_CREATE[tab]
       body = (
         <EmptyState
           icon={HardHat}
           title={EMPTY_TAB[tab]}
-          action={<Button variant="secondary" size="md" onClick={() => selectTab('all')}>Show all</Button>}
+          action={<div className="fh-empty-actions">
+            {canSee(create.to) && <Button variant="primary" size="md" to={create.to}>{create.label}</Button>}
+            {view.counts.all > 0 && <Button variant="secondary" size="md" onClick={() => selectTab('all')}>Show all</Button>}
+          </div>}
         />
       )
     } else {
