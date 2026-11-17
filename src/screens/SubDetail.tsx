@@ -699,7 +699,7 @@ function SubDetailDesktop({
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Trades</div>
-              <strong>{totals.trades.length || '-'}</strong>
+              <strong>{totals.trades.length}</strong>
               <span>{totals.trades.length ? totals.trades.join(', ') : 'No trade tags yet'}</span>
             </section>
 
@@ -712,9 +712,7 @@ function SubDetailDesktop({
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Documents</div>
               <strong>
-                {profile
-                  ? [profile.w9_path, profile.coi_path, profile.license_path].filter(Boolean).length
-                  : '-'} / 3
+                {[profile?.w9_path, profile?.coi_path, profile?.license_path].filter(Boolean).length} of 3
               </strong>
               <span>W9, COI, and license tracked in the editor.</span>
             </section>

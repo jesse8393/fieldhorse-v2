@@ -10,6 +10,7 @@ import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { Eyebrow } from '../components/v3'
+import LoadingValue from '../components/LoadingValue.tsx'
 const SnowForecast = lazy(() => import('../components/desktop/SnowForecastBuild.tsx'))
 
 // Status token → brand palette mapping used across the whole screen.
@@ -277,10 +278,18 @@ useEffect(() => {
               {currentCode == null ? 'Today' : `Today · ${weatherLabel(currentCode)}`}
             </Eyebrow>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 10 }}>
-              <span style={{ fontFamily: 'var(--font-display)', fontSize: 52, letterSpacing: '-.04em', lineHeight: 1, color: 'var(--ink-strong)' }}>
-                {loading || currentTemp == null ? '—' : Math.round(currentTemp)}
-              </span>
-              <span style={{ fontFamily: 'var(--font-display)', fontSize: 24, color: 'var(--ink-muted)', marginTop: 6 }}>°F</span>
+              {loading ? (
+                <LoadingValue label="Loading the temperature" width={88} height={52} />
+              ) : currentTemp == null ? (
+                <span style={{ fontFamily: 'var(--font-body)', fontSize: 15, color: 'var(--ink-muted)' }}>No reading</span>
+              ) : (
+                <>
+                  <span style={{ fontFamily: 'var(--font-display)', fontSize: 52, letterSpacing: '-.04em', lineHeight: 1, color: 'var(--ink-strong)' }}>
+                    {Math.round(currentTemp)}
+                  </span>
+                  <span style={{ fontFamily: 'var(--font-display)', fontSize: 24, color: 'var(--ink-muted)', marginTop: 6 }}>°F</span>
+                </>
+              )}
             </div>
           </div>
           <div
@@ -318,12 +327,15 @@ useEffect(() => {
           </div>
         </div>
 
-        {/* Metric trio */}
-        <div className="fh-forecast-readings">
-          <Metric label="Wind" value={currentWind != null ? `${Math.round(currentWind)}` : '—'} unit="mph" />
-          <Metric label="Rain now" value={currentRain == null ? '—' : currentRain.toFixed(2)} unit='in/h' />
-          <Metric label="Humidity" value={currentHumidity != null ? `${Math.round(currentHumidity)}` : '—'} unit="%" />
-        </div>
+        {/* Metric trio. With no forecast at all the status line above already
+            says so, so the trio stays out of the way. */}
+        {(weather || loading) && (
+          <div className="fh-forecast-readings">
+            <Metric label="Wind" loading={loading} value={currentWind != null ? `${Math.round(currentWind)}` : null} unit="mph" />
+            <Metric label="Rain now" loading={loading} value={currentRain == null ? null : currentRain.toFixed(2)} unit='in/h' />
+            <Metric label="Humidity" loading={loading} value={currentHumidity != null ? `${Math.round(currentHumidity)}` : null} unit="%" />
+          </div>
+        )}
       </motion.section>
       <div style={{ margin: '0 24px' }}><ForecastBasis weather={weather} receivedAt={receivedAt} trades={tradeRows.map((r) => r.trade)} /></div>
 
@@ -566,7 +578,9 @@ function dayAggregateStatus(weather: any, services: any, dayIso: any) {
   return !samples || unknown ? 'unknown' : worst
 }
 
-function Metric({ label, value, unit }: { label: string; value: string; unit: string }) {
+// A reading that is loading shows a placeholder, and one the forecast did
+// not include says No reading, never a dash.
+function Metric({ label, value, unit, loading = false }: { label: string; value: string | null; unit: string; loading?: boolean }) {
   return (
     <div
       style={{
@@ -580,10 +594,12 @@ function Metric({ label, value, unit }: { label: string; value: string; unit: st
         {label}
       </span>
       <span style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 4 }}>
-        <span style={{ fontFamily: 'var(--font-display)', fontSize: 20, letterSpacing: 0, lineHeight: 1, color: 'var(--ink-strong)' }}>
-          {value}
-        </span>
-        {unit && (
+        {loading ? <LoadingValue label={`Loading ${label.toLowerCase()}`} width={40} height={20} /> : (
+          <span style={{ fontFamily: value == null ? 'var(--font-body)' : 'var(--font-display)', fontSize: value == null ? 13 : 20, letterSpacing: 0, lineHeight: 1, color: value == null ? 'var(--ink-muted)' : 'var(--ink-strong)' }}>
+            {value ?? 'No reading'}
+          </span>
+        )}
+        {unit && !loading && value != null && (
           <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--ink-faint)', letterSpacing: 0 }}>
             {unit}
           </span>

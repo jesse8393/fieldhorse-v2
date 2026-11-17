@@ -4,6 +4,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { PUNCTUATION_DASH, sourceFiles as screenSources, visibleStrings } from './visibleCopyTestUtils.ts'
 
 const srcDir = join(process.cwd(), 'src')
 
@@ -78,5 +79,40 @@ describe('legal pages', () => {
   it('titles both pages in sentence case', () => {
     expect(legal('Privacy.tsx')).toContain('title="Privacy policy"')
     expect(legal('Terms.tsx')).toContain('title="Terms of service"')
+  })
+})
+
+// Every string a person can read (JSX text, words given to label, hint,
+// placeholder, title and similar props or fields, words shown straight from
+// a JSX expression, and toasts) uses no dash as punctuation: no em dash, no
+// en dash, no spaced hyphen, and no lone dash standing in for a value
+// (ai-copy-5). Prompts for the AI and code nobody reads are not scanned.
+describe('no dash as punctuation in what a person reads', () => {
+  // [file under src, the exact string] that may keep its dash. Keep this
+  // short, and say on each line why the dash is not punctuation.
+  const ALLOWED: [string, string][] = [
+  ]
+  const allowed = (file: string, text: string) => ALLOWED.some(([f, t]) => f === file && t === text)
+
+  // Parsing every file in src takes a couple of seconds, more on a busy
+  // machine, so this test gets more time than the default.
+  it('finds none in src', () => {
+    const hits = screenSources(srcDir)
+      .flatMap((file) => visibleStrings(file))
+      .map((s) => ({ ...s, file: s.file.slice(srcDir.length + 1), text: s.text.trim() }))
+      .filter((s) => PUNCTUATION_DASH.test(s.text) && !allowed(s.file, s.text))
+      .map((s) => `${s.file}:${s.line} ${JSON.stringify(s.text)}`)
+    expect(hits).toEqual([])
+  }, 60_000)
+
+  it('catches the kinds of string it is meant to catch', () => {
+    const sample = [
+      "const row = { detail: `Sent ${days}d ago - nudge`, key: 'a - b' }",
+      "toastError('Saved - will sync')",
+      'export const A = () => <div title="Re-pour">Today \u2014 later {temp ?? \'\u2014\'}',
+      '  <Metric value={wind ?? \'\u2013\'} label="Wind" /><b>{n || \'-\'}</b><i className={a - b}>2026-11-17</i></div>'
+    ].join('\n')
+    const texts = visibleStrings('sample.tsx', sample).filter((s) => PUNCTUATION_DASH.test(s.text)).map((s) => s.text.trim())
+    expect(texts).toEqual(['d ago - nudge', 'Saved - will sync', 'Today \u2014 later', '\u2014', '\u2013', '-'])
   })
 })
