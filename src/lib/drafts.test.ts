@@ -107,7 +107,17 @@ describe('a session that ends', () => {
 describe('an edit draft', () => {
   it('comes back when the record still holds what the edit started from', () => {
     writeDraft('edit:quote-terms:q1', { scope: 'Pour 6 inch' }, { scope: '', terms: '' })
-    expect(startEdit('edit:quote-terms:q1', { scope: '', terms: '' })).toEqual({ form: { scope: 'Pour 6 inch', terms: '' }, base: { scope: '', terms: '' } })
+    expect(startEdit('edit:quote-terms:q1', { scope: '', terms: '' })).toEqual({ form: { scope: 'Pour 6 inch', terms: '' } })
+  })
+
+  it('keeps a change that empties a field', () => {
+    writeDraft('edit:client:cl-1', { notes: '' }, { notes: 'Gate code 4411' })
+    expect(startEdit('edit:client:cl-1', { notes: 'Gate code 4411' })).toEqual({ form: { notes: '' } })
+  })
+
+  it('for a new record always comes back over fresh defaults', () => {
+    writeDraft('event:new', { title: 'Pour footings' }, 'new')
+    expect(startEdit('event:new', { title: '', time: '15:00' }, 'new')).toEqual({ form: { title: 'Pour footings', time: '15:00' } })
   })
 
   it('is dropped when the record was saved differently since', () => {

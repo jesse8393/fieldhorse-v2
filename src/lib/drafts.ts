@@ -87,12 +87,16 @@ function hasContent(form: Record<string, unknown>) {
   return Object.values(form).some((v) => typeof v === 'string' ? v.trim() !== '' : v != null && v !== false)
 }
 
-/** Saves a draft, or forgets it when nothing is typed. `base` is what an edit started from. */
+/**
+ * Saves a draft, or forgets it when nothing is typed. `base` is what an
+ * edit started from; an edit is kept even when it empties a field.
+ */
 export function writeDraft(kind: string, form: Record<string, unknown>, base?: unknown) {
   const store = storage()
   if (!store) return
   try {
-    if (!owner || !hasContent(form)) { store.removeItem(draftKey(kind)); return }
+    const empty = base === undefined ? !hasContent(form) : Object.keys(form).length === 0
+    if (!owner || empty) { store.removeItem(draftKey(kind)); return }
     const entry: DraftEntry<unknown> = { form, savedAt: Date.now(), userId: owner }
     if (base !== undefined) entry.base = base
     store.setItem(draftKey(kind), JSON.stringify(entry))
@@ -128,16 +132,17 @@ export function sameDraft(a: unknown, b: unknown) {
 }
 
 /**
- * Where an edit starts: the stored draft when it began from the same saved
- * value the screen shows now, else nothing. A draft whose record changed
- * underneath it (saved elsewhere since) is stale and is removed.
+ * Where an edit starts: the stored changes over the saved form, when they
+ * began from the same saved value (`from`, the form itself unless given)
+ * that the screen shows now. A draft whose record changed underneath it
+ * (saved elsewhere since) is stale and is removed.
  */
-export function startEdit<T>(kind: string, base: T): { form: T; base: T } | null {
-  const entry = readDraftEntry<T>(kind)
+export function startEdit<T extends Record<string, unknown>>(kind: string, base: T, from: unknown = base): { form: T } | null {
+  const entry = readDraftEntry<Partial<T>>(kind)
   if (!entry) return null
-  if (!sameDraft(entry.base, base)) {
+  if (!sameDraft(entry.base, from)) {
     clearDraft(kind)
     return null
   }
-  return { form: { ...base, ...entry.form }, base }
+  return { form: { ...base, ...entry.form } }
 }

@@ -1,0 +1,9 @@
+.fh-draft-restored {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--fh-ink-2);
+  font: 400 14px/1.5 var(--fh-font-body);
+}
