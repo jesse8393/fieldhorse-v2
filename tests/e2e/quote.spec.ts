@@ -958,7 +958,7 @@ test.describe('errors on the quote screens', () => {
     await context.route((url) => url.pathname.includes('/rest/v1/fh_public_links'), (route) => route.abort('internetdisconnected'))
     await openQuote(page)
     await page.getByRole('list', { name: 'Share or download' }).getByRole('button', { name: /Copy a share link/ }).click()
-    await expect(page.getByText('Check your connection and try again.')).toBeVisible()
+    await expect(page.getByText('No signal right now. Try again when the signal is back.')).toBeVisible()
     await expect(page.getByText(/TypeError|Failed to fetch/)).toHaveCount(0)
   })
 
@@ -980,7 +980,7 @@ test.describe('errors on the quote screens', () => {
     await page.goto('/quotes/new?client=cl-1', { waitUntil: 'domcontentloaded', timeout: 60_000 })
     await expect(page.getByLabel('Client')).toHaveValue('Jeff Roy', { timeout: 30_000 })
     await page.getByRole('button', { name: 'Save quote' }).click()
-    await expect(page.getByText('Could not save this quote. Check your connection and try again.')).toBeVisible()
+    await expect(page.getByText('No signal right now. Your work is still here, so try again when the signal is back.')).toBeVisible()
     await expect(page.getByText(/TypeError|Failed to fetch/)).toHaveCount(0)
   })
 })

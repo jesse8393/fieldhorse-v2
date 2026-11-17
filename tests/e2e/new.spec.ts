@@ -7,7 +7,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 import { isReadOnlyRpc } from './helpers/readRpc.ts'
-import { FAIL, expectPlain } from './helpers/rawErrors.ts'
+import { FAIL, expectPlain, failRest } from './helpers/rawErrors.ts'
 
 const NOW = '2026-10-08T15:00:00.000Z'
 
@@ -121,6 +121,18 @@ test('a refused or dropped save on New job says what to do in plain words', asyn
   await page.getByRole('button', { name: 'Save job' }).click()
   await expectPlain(page.locator('.fhnew-error'), 'No signal right now. Your work is still here, so try again when the signal is back.')
   await expect(page.getByLabel('Title')).toHaveValue('Shed slab')
+})
+
+// raw-errors-3: the quote helper let the database's refusal through.
+test('a refused save on New quote says so in plain words', async ({ context, page }) => {
+  await signIn(context)
+  await failRest(context, 'fh_quotes', 'POST', FAIL.rls('fh_quotes'))
+  await open(page, '/quotes/new')
+  await expect(page.getByRole('heading', { level: 1, name: 'New quote' })).toBeVisible({ timeout: 30_000 })
+  await page.getByLabel('Client').fill('Jeff')
+  await page.getByRole('option', { name: /Jeff Roy/ }).click()
+  await page.getByRole('button', { name: 'Save quote' }).click()
+  await expectPlain(page.locator('.fhnew-error'), 'Your role does not allow this. Ask an owner or admin.')
 })
 
 test('an invoice from a job prefills only unbilled contract value', async ({ context, page }) => {

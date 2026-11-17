@@ -16,10 +16,11 @@ import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useMembership } from '../../contexts/MembershipContext.tsx'
 import { supabase } from '../../lib/supabase.ts'
 import { leadToQuoteDraft, markLeadQuoted, type LeadRow } from '../../lib/leads.ts'
-import { createQuote, invalidateAfterQuoteWrite, plainQuoteError } from '../../lib/quotes.ts'
+import { createQuote, invalidateAfterQuoteWrite } from '../../lib/quotes.ts'
 import { createUuid } from '../../lib/uuid.ts'
 import { JOB_TYPES } from '../../lib/jobTypes.ts'
 import { hapticMedium } from '../../lib/haptics.ts'
+import { plainError } from '../../lib/serviceErrors.ts'
 
 type Form = {
   /** The quote's id, minted once per form so a retried save is the same quote. */
@@ -129,10 +130,7 @@ export default function QuoteNew() {
     } catch (e) {
       savingRef.current = false
       setSaving(false)
-      const message = plainQuoteError(e, '')
-      setError(message === 'Check your connection and try again.' || !message
-        ? 'Could not save this quote. Check your connection and try again.'
-        : message)
+      setError(plainError(e, 'Could not save this quote. Try again.', { kept: true }))
     }
   }
 

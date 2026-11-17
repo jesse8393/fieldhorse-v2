@@ -26,7 +26,7 @@ function builder(): unknown {
 
 vi.mock('./supabase.ts', () => ({ supabase: { rpc, from: (table: string) => { const b = builder(); builders[builders.length - 1].push(['from', table]); return b } } }))
 
-const { createQuote, invalidateAfterQuoteWrite, makeJobFromQuote, quoteNumber } = await import('./quotes.ts')
+const { createQuote, invalidateAfterQuoteWrite, makeJobFromQuote, plainQuoteError, quoteNumber } = await import('./quotes.ts')
 
 function callsOf(index: number, method: string) {
   return builders[index].filter((c) => c[0] === method)
@@ -144,5 +144,27 @@ describe('invalidateAfterQuoteWrite', () => {
     expect(keysAfter({ quoteId: 'q-1', clientId: 'c-1', jobMade: true })).toEqual([
       ['quotes'], ['quote', 'q-1'], ['clientDetail', 'c-1'], ['jobs']
     ])
+  })
+})
+
+// raw-errors-3: plainQuoteError let any message with a space in it through,
+// so every PostgREST refusal reached the quote screens as it was.
+describe('plainQuoteError', () => {
+  beforeEach(() => { vi.spyOn(console, 'warn').mockImplementation(() => {}) })
+
+  it('never shows the database, a gateway page or a lapsed session as they are', () => {
+    expect(plainQuoteError({ code: '42501', message: 'new row violates row-level security policy for table "fh_quotes"' }))
+      .toBe('Your role does not allow this. Ask an owner or admin.')
+    expect(plainQuoteError({ code: '23505', message: 'duplicate key value violates unique constraint "fh_quotes_pkey"' }))
+      .toBe('This was already saved. Refresh to see the latest.')
+    expect(plainQuoteError({ message: '<html><head><title>502 Bad Gateway</title></head><body><center>cloudflare</center></body></html>' }))
+      .toBe('Something went wrong on our side. Try again in a minute.')
+    expect(plainQuoteError({ code: 'PGRST303', message: 'JWT expired' })).toBe('Your sign in ran out. Sign in again, then try again.')
+    expect(plainQuoteError({ code: '23514', message: 'new row for relation "fh_quotes" violates check constraint "fh_quotes_status_check"' }, 'The quote was not saved. Try again.'))
+      .toBe('The quote was not saved. Try again.')
+  })
+
+  it('keeps a sentence the app wrote', () => {
+    expect(plainQuoteError(new Error('This quote changed on another device. Check it and try again.'))).toBe('This quote changed on another device. Check it and try again.')
   })
 })
