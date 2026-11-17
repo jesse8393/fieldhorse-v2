@@ -493,7 +493,8 @@ function contentRange(offset, count, total) {
 /**
  * The mock's answer to one REST request. Exported for the mock's own tests.
  * @param {string} url
- * @param {{ method?: string, headers?: Record<string, string>, tables?: Record<string, object[]> }} [request]
+ * @param {{ method?: string, headers?: Record<string, string>, tables?: Record<string, object[]>, body?: unknown, schema?: import('./lib/schemaRefs.mjs').Schema | null }} [request]
+ *   body is the write's JSON (text or parsed); schema null skips the schema checks.
  * @returns {{ status: number, body: string, headers: Record<string, string> }}
  */
 export function restResponse(url, { method = 'GET', headers = {}, tables = TABLES, body = null, schema = SCHEMA } = {}) {
@@ -625,6 +626,12 @@ function argsFit(fn, body) {
   ))
 }
 
+/**
+ * @param {string} name
+ * @param {Record<string, any>} body
+ * @param {Record<string, any[]>} [tables]
+ * @param {import('./lib/schemaRefs.mjs').Schema | null} [schema]
+ */
 export function rpcResponse(name, body, tables = TABLES, schema = SCHEMA) {
   const json = (data) => ({ status: 200, body: JSON.stringify(data) })
   const empty = { status: 204, body: '' }
