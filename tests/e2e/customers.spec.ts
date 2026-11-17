@@ -275,6 +275,16 @@ test.describe('the customer page', () => {
     await expect(page).toHaveURL(/\/clients$/)
   })
 
+  test('the New button on the client page names what it opens (S24)', async ({ context, page, isMobile }) => {
+    test.skip(!isMobile, 'The desktop client page is a separate component.')
+    await signIn(context)
+    await open(page, '/clients/cl-1')
+    const create = page.getByRole('button', { name: 'New lead, quote, job or invoice' })
+    await expect(create).toBeVisible({ timeout: 30_000 })
+    await create.click()
+    await expect(page).toHaveURL(/\/new\?client=cl-1$/)
+  })
+
   test('a customer with leads, quotes or invoices is not deleted, and the page says what to do instead', async ({ context, page }) => {
     await signIn(context)
     const writes = watchWrites(page)

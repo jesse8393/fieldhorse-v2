@@ -462,7 +462,7 @@ export default function ClientDetail() {
           }}
         >
           <Plus size={17} strokeWidth={2.4} aria-hidden="true" />
-          New quote or invoice
+          New lead, quote, job or invoice
         </motion.button>
 
         {/* STATEMENT, roll every open invoice across all this client's
