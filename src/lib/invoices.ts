@@ -5,6 +5,7 @@ import { createUuid } from './uuid.ts'
 // for create / PDF / send / settle so the invoice screen, the job's money
 // tab and Money all drive the same plumbing.
 
+import type { QueryClient } from '@tanstack/react-query'
 import { supabase, authHeaders } from './supabase.ts'
 import { allocateInvoiceDue, invoicesPaidInFull, knownContractTotal, type DueInvoice } from './invoiceSettlement.ts'
 import { toCents, sumCents } from './cents.ts'
@@ -178,6 +179,26 @@ export async function createInvoice({ id, contact = null, contactId = null, clie
     if (!existing.error && existing.data) return { data: existing.data as InvoiceRow, error: null }
   }
   return { data: data as InvoiceRow | null, error }
+}
+
+/**
+ * After a new invoice saves, the screens that list it read again (DATA-13):
+ * Money, Today, the client's page and, for a job's invoice, the job's money
+ * view and its draws. New invoice used to refresh nothing, so Money kept
+ * its old copy without the invoice for up to 30 seconds.
+ */
+export function invalidateAfterInvoiceCreate(
+  client: Pick<QueryClient, 'invalidateQueries'>,
+  { clientId, jobId }: { clientId?: string | null; jobId?: string | null }
+) {
+  void client.invalidateQueries({ queryKey: ['invoices'] })
+  void client.invalidateQueries({ queryKey: ['homeDashboard'] })
+  if (clientId) void client.invalidateQueries({ queryKey: ['clientDetail', clientId] })
+  if (jobId) {
+    void client.invalidateQueries({ queryKey: ['invoiceDetail', jobId] })
+    void client.invalidateQueries({ queryKey: ['invoiceDraws', jobId] })
+    void client.invalidateQueries({ queryKey: ['jobDetail', jobId] })
+  }
 }
 
 /**

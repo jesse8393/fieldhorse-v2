@@ -340,6 +340,31 @@ test('a new lead shows in Leads when the person goes back (DATA-13)', async ({ c
   await expect.poll(() => leadReads - before, { timeout: 5000 }).toBeGreaterThan(0)
 })
 
+test('a new invoice shows in Money when the person goes back (DATA-13)', async ({ context, page }) => {
+  await signIn(context)
+  // Money's own list read (the 500 most recent invoices), not the invoice screen's.
+  let listReads = 0
+  page.on('request', (req) => {
+    const url = decodeURIComponent(req.url())
+    if (req.method() === 'GET' && /\/rest\/v1\/fh_invoices\?/.test(url) && url.includes('order=created_at.desc') && url.includes('limit=500')) listReads++
+  })
+  await open(page, '/invoices')
+  await expect(page.getByRole('heading', { level: 1, name: 'Money' })).toBeVisible({ timeout: 30_000 })
+  await expect.poll(() => listReads).toBeGreaterThan(0)
+  await page.getByRole('link', { name: 'New invoice' }).first().click()
+  await expect(page.getByRole('heading', { level: 1, name: 'New invoice' })).toBeVisible({ timeout: 30_000 })
+  await page.getByLabel('Client').fill('Jeff')
+  await page.locator('.fhnew-client__pick').first().click()
+  await page.getByLabel('Amount').fill('1240')
+  const before = listReads
+  await page.getByRole('button', { name: 'Save invoice' }).click()
+  await expect(page).toHaveURL(/\/invoices\/inv0$/, { timeout: 30_000 })
+  await page.getByRole('button', { name: 'Back' }).first().click()
+  await expect(page).toHaveURL(/\/invoices$/)
+  // Money read its list again after the save instead of showing its old copy.
+  await expect.poll(() => listReads - before, { timeout: 5000 }).toBeGreaterThan(0)
+})
+
 test('the first field keeps its focus on New lead and New client (S20)', async ({ context, page }) => {
   await signIn(context)
   await open(page, '/leads/new')

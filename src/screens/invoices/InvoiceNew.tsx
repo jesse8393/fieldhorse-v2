@@ -6,6 +6,7 @@
 // through fh_invoices.client_id.
 
 import { useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Field, formatMoney } from '../../components/fh'
 import ClientField, { fetchClientPick, resolveClientId, type ClientFieldValue, type ClientPick } from '../../components/ClientField.tsx'
@@ -13,7 +14,7 @@ import CreateShell, { Choices, moneyInput, useDraft } from '../new/CreateShell.t
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useMembership } from '../../contexts/MembershipContext.tsx'
 import { supabase } from '../../lib/supabase.ts'
-import { createInvoice } from '../../lib/invoices.ts'
+import { createInvoice, invalidateAfterInvoiceCreate } from '../../lib/invoices.ts'
 import { createUuid } from '../../lib/uuid.ts'
 import { fetchInvoiceReviewContext } from '../../lib/invoiceReviewContext.ts'
 import { reviewInvoice } from '../../lib/invoiceReview.js'
@@ -67,6 +68,7 @@ export default function InvoiceNew() {
   const clientParam = params.get('client')
   const jobParam = params.get('job')
   const text = params.get('text')
+  const queryClient = useQueryClient()
   const [requestId] = useState(createUuid)
   const { form, set, patch, done } = useDraft<Form>('invoice', { ...EMPTY, requestId }, text ? { description: text } : null)
   const invoiceId = form.requestId || requestId
@@ -170,6 +172,7 @@ export default function InvoiceNew() {
       })
       if (error || !data) throw new Error(error?.message || 'Could not save this invoice.')
       done()
+      invalidateAfterInvoiceCreate(queryClient, { clientId: picked.id, jobId: form.jobId || null })
       hapticMedium()
       navigate(recordRoute('invoice', data.id), { replace: true })
     } catch (e) {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { billTo, buildInvoicePdf, contractTotals, invoiceAmountDue, invoiceDescription, invoicePdfInput, suggestNextInvoice } from './invoices.ts'
+import { billTo, buildInvoicePdf, contractTotals, invalidateAfterInvoiceCreate, invoiceAmountDue, invoiceDescription, invoicePdfInput, suggestNextInvoice } from './invoices.ts'
 
 describe('contractTotals', () => {
   it('folds approved change orders into the contract', () => {
@@ -309,5 +309,24 @@ describe('billTo', () => {
     const input = invoicePdfInput({ invoice, contact: job, company: { name: 'Parker Construction Co.' } })
     expect(input.contact.email).toBe('dana@newmail.com')
     expect(input.contact.phone).toBe('615-555-0199')
+  })
+})
+
+// Audit finding DATA-13: a new invoice shows where the person goes next.
+describe('invalidateAfterInvoiceCreate', () => {
+  function keysAfter(input: Parameters<typeof invalidateAfterInvoiceCreate>[1]) {
+    const keys: unknown[] = []
+    invalidateAfterInvoiceCreate({ invalidateQueries: (f: { queryKey: unknown }) => { keys.push(f.queryKey); return Promise.resolve() } } as any, input)
+    return keys
+  }
+
+  it("refreshes Money, the client's page and Today for an invoice with no job", () => {
+    expect(keysAfter({ clientId: 'cl-1' })).toEqual([['invoices'], ['homeDashboard'], ['clientDetail', 'cl-1']])
+  })
+
+  it("refreshes the job's money view and draws too for a job's invoice", () => {
+    expect(keysAfter({ clientId: 'cl-1', jobId: 'c-1' })).toEqual([
+      ['invoices'], ['homeDashboard'], ['clientDetail', 'cl-1'], ['invoiceDetail', 'c-1'], ['invoiceDraws', 'c-1'], ['jobDetail', 'c-1']
+    ])
   })
 })
