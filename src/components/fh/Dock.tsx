@@ -60,7 +60,10 @@ function labelsCollide(nav: HTMLElement) {
   return spans.some((span, i) => span.left < box.left + 2 || span.right > box.right - 2 || (i > 0 && span.left < spans[i - 1].right + 6))
 }
 
-function useIconsOnly() {
+// `tabs` names the tabs shown: the labels are watched again only when
+// that set changes, not on every render. Size, zoom and text size changes
+// reach the watcher on their own.
+function useIconsOnly(tabs: string) {
   const ref = useRef<HTMLElement | null>(null)
   const [iconsOnly, setIconsOnly] = useState(false)
   useLayoutEffect(() => {
@@ -73,7 +76,7 @@ function useIconsOnly() {
     observer.observe(nav)
     nav.querySelectorAll('.fhs-dock__label').forEach((label) => observer.observe(label))
     return () => observer.disconnect()
-  })
+  }, [tabs])
   return { ref, iconsOnly }
 }
 
@@ -84,13 +87,13 @@ export default function Dock() {
   const hiddenByScreen = useDockHidden()
   const keyboardOpen = useKeyboardOpen()
   const engineEnabled = useEngineEnabled()
-  const { ref, iconsOnly } = useIconsOnly()
-
-  if (typeof document === 'undefined') return null
-
   const left = DOCK_LEFT.filter((it) => canSee(it.to))
   // A role that cannot open the Inbox keeps Schedule in the fifth slot.
   const right = dockRight(engineEnabled && canSee(INBOX.to)).filter((it) => canSee(it.to))
+  const { ref, iconsOnly } = useIconsOnly([...left, ...right].map((it) => it.to).join(' '))
+
+  if (typeof document === 'undefined') return null
+
   const hidden = hiddenByScreen || keyboardOpen
   const night = theme === 'dark'
   const captureShortcut = desktopShortcut('J', browserEnv())

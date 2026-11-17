@@ -567,6 +567,32 @@ test.describe('large text and zoom', () => {
     })
   }
 
+  // big-text-4 follow up: the dock measures its labels once and then on a
+  // change of size, not again on every route change.
+  test('the dock keeps one label watcher across route changes', async ({ context, page }) => {
+    await context.addInitScript(() => {
+      const Native = window.ResizeObserver
+      const w = window as unknown as { __dockWatchers: number }
+      w.__dockWatchers = 0
+      window.ResizeObserver = class extends Native {
+        observe(target: Element, options?: ResizeObserverOptions) {
+          if (target.matches?.('nav.fhs-dock')) w.__dockWatchers += 1
+          super.observe(target, options)
+        }
+      }
+    })
+    await openBig(context, page, '/jobs')
+    const dock = page.getByRole('navigation', { name: 'Primary' })
+    const watchers = () => page.evaluate(() => (window as unknown as { __dockWatchers: number }).__dockWatchers)
+    const first = await watchers()
+    expect(first).toBeGreaterThanOrEqual(1)
+    for (const name of ['Money', 'Schedule', 'Today', 'Jobs']) {
+      await dock.getByRole('link', { name, exact: true }).click()
+      await bigReady(page)
+    }
+    expect(await watchers()).toBe(first)
+  })
+
   // big-text-5: the main action on a screen was cut to a few letters
   // ("Mark comp…", "Send for appro…", "M") once zoom or bigger text left it
   // less room than its label.
