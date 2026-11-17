@@ -13,6 +13,7 @@ import { createClient } from '@supabase/supabase-js'
 import crypto from 'node:crypto'
 import { resolveCallerMembership } from './lib/membership.js'
 import { idempotencyKey, sendViaResend } from './lib/email.js'
+import { hashIdentifier, checkRateLimit, checkDailySendCap, DAILY_SEND_LIMIT_MESSAGE } from './lib/rateLimit.js'
 
 const VALID_ROLES = ['owner', 'admin', 'manager', 'foreman', 'crew']
 
@@ -70,6 +71,20 @@ export default async (request) => {
   const inviteTier = ROLE_TIER[role] ?? 0
   if (inviteTier >= myTier) {
     return json({ error: 'role_exceeds_caller', message: 'You can only invite roles below your own.' }, 403)
+  }
+
+  // An invite mails any address, so it goes through the same limiters as
+  // every other sender: the short window shared with the send-* functions
+  // and the daily cap. Checked before the invite row is created.
+  const shortOk = await checkRateLimit(admin, {
+    scope: 'send-email', identifier: hashIdentifier(authUserId), limit: 30, windowSeconds: 600,
+  })
+  if (!shortOk) {
+    return json({ error: 'rate_limited', message: 'Too many invites sent in a short time. Try again in a few minutes.' }, 429)
+  }
+  const dayOk = await checkDailySendCap(admin, authUserId)
+  if (!dayOk) {
+    return json({ error: 'rate_limited', message: DAILY_SEND_LIMIT_MESSAGE }, 429)
   }
 
   // Generate a fresh token (URL-safe).

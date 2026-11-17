@@ -38,7 +38,7 @@ import { reviewInvoice } from '../../src/lib/invoiceReview.js'
 import { createClient } from '@supabase/supabase-js'
 import { renderPayBlock as payBlock, formatFromHeader, renderParagraphs, textField, idempotencyKey, sendViaResend, sendFailure } from './lib/email.js'
 import { loadAccessibleRow, brandingUserIdFor } from './lib/orgAccess.js'
-import { hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
+import { hashIdentifier, checkRateLimit, checkDailySendCap, DAILY_SEND_LIMIT_MESSAGE } from './lib/rateLimit.js'
 
 export default async (request) => {
   if (request.method === 'OPTIONS') {
@@ -125,6 +125,11 @@ export default async (request) => {
   })
   if (!rlOk) {
     return json({ error: 'rate_limited', message: 'Too many emails sent in a short time. Try again in a few minutes.' }, 429)
+  }
+
+  const dayOk = await checkDailySendCap(supabase, sender_user_id)
+  if (!dayOk) {
+    return json({ error: 'rate_limited', message: DAILY_SEND_LIMIT_MESSAGE }, 429)
   }
 
   // 1. Verify the caller may act on the record: the job when the invoice

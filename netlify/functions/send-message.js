@@ -32,9 +32,12 @@
 // and fall back to the existing mailto: handoff.
 
 import { createClient } from '@supabase/supabase-js'
-import { hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
+import { hashIdentifier, checkRateLimit, checkDailySendCap, DAILY_SEND_LIMIT_MESSAGE } from './lib/rateLimit.js'
 import { loadAccessibleRow, brandingUserIdFor } from './lib/orgAccess.js'
 import { formatFromHeader, renderParagraphs, textField, idempotencyKey, sendViaResend, sendFailure } from './lib/email.js'
+
+// Daily cap for messages to an address that is not the job's customer.
+const OTHER_RECIPIENT_DAILY_LIMIT = 30
 
 export default async (request) => {
   if (request.method === 'OPTIONS') {
@@ -133,16 +136,41 @@ export default async (request) => {
     return json({ error: 'rate_limited', message: 'Too many messages. Please try again in a minute.' }, 429)
   }
 
+  const dayOk = await checkDailySendCap(supabase, sender_user_id)
+  if (!dayOk) {
+    return json({ error: 'rate_limited', message: DAILY_SEND_LIMIT_MESSAGE }, 429)
+  }
+
   // Verify the caller may act on the contact: its creator, or an owner,
   // admin or manager of its company. contact_id is required (checked
   // above), so the relay can only reach a client on the company's roster.
   const access = await loadAccessibleRow(supabase, {
     table: 'fh_contacts', id: contact_id, callerId: sender_user_id,
-    select: 'name, job_title'
+    select: 'name, job_title, email, client_id'
   })
   if (access.error === 'lookup_failed') return json({ error: 'contact_lookup_failed', message: 'Could not load this job. Try again.' }, 500)
   if (!access.row) return json({ error: 'forbidden_or_not_found', message: 'This record was not found, or your role cannot send it. Ask an owner, admin or manager.' }, 403)
   const contact = access.row
+
+  // Any address may be written to: contractors email a spouse or a
+  // property manager. One that is not the job's own email or its client's
+  // email counts against a tighter daily cap, so the relay cannot be used
+  // to mail strangers in bulk (FN-02).
+  const customerEmails = [contact.email]
+  if (contact.client_id) {
+    const { data: client } = await supabase.from('fh_clients').select('email').eq('id', contact.client_id).maybeSingle()
+    customerEmails.push(client?.email)
+  }
+  const isCustomer = customerEmails.some((e) => String(e || '').toLowerCase().trim() === normalizedEmail)
+  if (!isCustomer) {
+    const otherOk = await checkDailySendCap(supabase, sender_user_id, { scope: 'send-message-other-day', limit: OTHER_RECIPIENT_DAILY_LIMIT })
+    if (!otherOk) {
+      return json({
+        error: 'rate_limited',
+        message: `You can email ${OTHER_RECIPIENT_DAILY_LIMIT} addresses a day that are not on this customer's record. Add the address to the customer, or try again tomorrow.`
+      }, 429)
+    }
+  }
 
   // Pull the company's branding for From-line + Reply-To.
   const brandingUserId = (await brandingUserIdFor(supabase, contact)) || sender_user_id
