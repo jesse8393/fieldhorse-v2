@@ -27,6 +27,25 @@ describe('a drafted message uses plain punctuation', () => {
 
   it('reads a range between numbers as to', () => {
     expect(plainDraft('We arrive 7\u20139 am. Expect $500 - $700 for the extra pad.')).toBe('We arrive 7 to 9 am. Expect $500 to $700 for the extra pad.')
+    expect(plainDraft('Pour set for Nov 3\u20135. Budget $4,500\u2013$5,000.')).toBe('Pour set for Nov 3 to 5. Budget $4,500 to $5,000.')
+  })
+
+  // A range of days, months or clock times must stay a range. Read as a list
+  // it would tell the customer something else.
+  it('reads a range of days, months and times as to', () => {
+    expect(plainDraft('We will be on site Monday\u2013Friday.')).toBe('We will be on site Monday to Friday.')
+    expect(plainDraft('Crew hours 7am\u20133pm.')).toBe('Crew hours 7am to 3pm.')
+    expect(plainDraft('Crew hours 7 am \u2013 3 pm.')).toBe('Crew hours 7 am to 3 pm.')
+    expect(plainDraft('Crew hours 7 a.m. \u2014 3 p.m.')).toBe('Crew hours 7 a.m. to 3 p.m.')
+    expect(plainDraft('The job runs March\u2013April.')).toBe('The job runs March to April.')
+    expect(plainDraft('Open Mon - Fri.')).toBe('Open Mon to Fri.')
+    expect(plainDraft('Open Tues \u2014 Sat, closed Sunday.')).toBe('Open Tues to Sat, closed Sunday.')
+  })
+
+  it('still reads a dash between other words as a pause', () => {
+    expect(plainDraft('Hi Jeff \u2013 quick note about Friday.')).toBe('Hi Jeff, quick note about Friday.')
+    expect(plainDraft('See you Friday \u2014 the crew will call ahead.')).toBe('See you Friday, the crew will call ahead.')
+    expect(plainDraft('We may \u2014 if it rains \u2014 move the pour.')).toBe('We may, if it rains, move the pour.')
   })
 
   it('drops a dash that ends a line or follows other punctuation', () => {
