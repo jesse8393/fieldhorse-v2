@@ -138,6 +138,13 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
     invalidateAfterQuoteWrite(queryClient, { quoteId: quote.id, leadId: quote.lead_id, clientId: quote.client_id, jobMade })
 
   const items = useQuoteItems({ quoteId: quote.id, userId, onContactRefresh: () => refreshLists() })
+
+  // When the line editor closes, the rows below it move up under the thumb.
+  // A tap that lands within half a second is the same burst of taps, not a
+  // choice, so the action rows ignore it (S03).
+  const quietUntil = useRef(0)
+  const onEditorClosed = () => { quietUntil.current = Date.now() + 500 }
+  const settling = () => Date.now() < quietUntil.current
   const [lines, setLines] = useState<QuoteLinesChange>({ effective: [], switchSaving: false, lineSaving: false })
   const linesFailed = !items.loading && items.failed && !items.loaded
 
@@ -194,7 +201,7 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
   }
 
   async function run(kind: Exclude<Busy, null>, work: () => Promise<void>, title: string) {
-    if (!userId || busyRef.current) return
+    if (!userId || busyRef.current || settling()) return
     hapticTap()
     busyRef.current = kind
     setBusy(kind)
@@ -252,6 +259,7 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
   }, "Couldn't update the quote")
 
   const onOpenPdf = () => {
+    if (settling()) return
     // Open the tab now, inside the tap: building the PDF takes seconds, and
     // Safari drops a window.open that runs after that much async work.
     const win = window.open('', '_blank')
@@ -402,7 +410,7 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
         </section>
       )}
 
-      <QuoteLines items={items} userId={userId} who={who} money={terms} focusRef={titleRef} startAdding={startAdding} locked={approved} onChange={setLines} />
+      <QuoteLines items={items} userId={userId} who={who} money={terms} focusRef={titleRef} startAdding={startAdding} locked={approved} onEditorClosed={onEditorClosed} onChange={setLines} />
 
       {approved && (
         <section className="fhqt-panel" aria-labelledby="fhqt-approved-title">

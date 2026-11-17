@@ -822,6 +822,24 @@ test.describe('taps on the quote screen', () => {
     expect(deletes[0]).toContain('id=eq.qi2')
   })
 
+  test('a tap right after the line editor closes does not land on an action row (S03)', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS, fh_quotes: [quoteRow({ status: 'draft', sent_at: null })] } })
+    const quoteWrites: string[] = []
+    page.on('request', (req) => { if (req.method() === 'PATCH' && req.url().includes('/rest/v1/fh_quotes')) quoteWrites.push(req.url()) })
+    await openQuote(page)
+    await lines(page).getByRole('button', { name: /Pump truck/ }).click()
+    const editor = page.getByRole('form', { name: 'Edit line' })
+    await editor.getByRole('button', { name: 'Save changes' }).click()
+    await expect(editor).toBeHidden()
+    await page.getByRole('button', { name: /Mark as sent/ }).click()
+    await page.waitForTimeout(300)
+    expect(quoteWrites).toEqual([])
+    // A deliberate tap a moment later works.
+    await page.waitForTimeout(400)
+    await page.getByRole('button', { name: /Mark as sent/ }).click()
+    await expect.poll(() => quoteWrites.length).toBe(1)
+  })
+
 
 })
 

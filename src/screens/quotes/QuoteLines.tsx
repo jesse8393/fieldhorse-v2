@@ -64,12 +64,14 @@ export type QuoteLinesProps = {
   startAdding?: boolean
   /** The quote is approved: the lines read, and nothing opens an editor. */
   locked?: boolean
+  /** The line editor just closed: the rows below it move under the thumb. */
+  onEditorClosed?: () => void
   onChange?: (change: QuoteLinesChange) => void
 }
 
 type Editing = { key: number; id: string | null }
 
-export default function QuoteLines({ items, userId, who, money, focusRef, startAdding = false, locked = false, onChange }: QuoteLinesProps) {
+export default function QuoteLines({ items, userId, who, money, focusRef, startAdding = false, locked = false, onEditorClosed, onChange }: QuoteLinesProps) {
   const { rows, loading, loaded, failed, fetchRows, addItem, updateItem, removeItem, reorderItem } = items
   // No read of the lines has worked yet and the last one failed: the lines
   // are unknown, so nothing may say there are none.
@@ -165,6 +167,7 @@ export default function QuoteLines({ items, userId, who, money, focusRef, startA
   }
   const close = () => {
     setEditing(null)
+    onEditorClosed?.()
     const back = opener.current
     opener.current = null
     // The plus row leaves while the add editor is open, so when it comes
@@ -172,6 +175,7 @@ export default function QuoteLines({ items, userId, who, money, focusRef, startA
     requestAnimationFrame(() => {
       const target = back && back.isConnected ? back : root.current?.querySelector<HTMLElement>('.fhqt-add')
       target?.focus({ preventScroll: true })
+      target?.scrollIntoView?.({ block: 'nearest' })
     })
   }
   const editRow = editing?.id ? effective.find((r) => r.id === editing.id) ?? null : null
