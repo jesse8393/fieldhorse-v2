@@ -135,7 +135,9 @@ export function snapshotCompany(profile) {
  */
 export function buildQuoteSnapshot({ quote, client, company, snap, takenAt, extra = {} }) {
   return {
-    quote_number: proposalNumber(company.name, quote.id, quote.sent_at || quote.created_at),
+    // The created date first, as the page and the PDF date the proposal
+    // (src/lib/proposalDate.ts), so the record keeps the printed number.
+    quote_number: proposalNumber(company.name, quote.id, quote.created_at || quote.sent_at),
     snapshot_taken_at: takenAt,
     company,
     quote: {

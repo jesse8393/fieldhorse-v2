@@ -153,7 +153,7 @@ export async function recordDocusignApproval(supabase, env, envelopeId, now = ne
     quote_number: proposalNumber(
       profile ? (profile.company_name || profile.full_name || 'My Company') : 'My Company',
       contact.id,
-      contact.quote_sent_at || contact.created_at
+      contact.created_at || contact.quote_sent_at
     ),
     snapshot_taken_at: approvedAt,
     company: profile ? {

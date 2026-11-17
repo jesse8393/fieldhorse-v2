@@ -217,7 +217,7 @@ export default async function handler(req) {
   const snapshot = {
     // The number printed on the proposal (src/components/documents/numbers.ts),
     // not a separate Q-XXXXXXXX code the customer never saw.
-    quote_number: proposalNumber(company.name, contact.id, contact.quote_sent_at || contact.created_at),
+    quote_number: proposalNumber(company.name, contact.id, contact.created_at || contact.quote_sent_at),
     snapshot_taken_at: new Date().toISOString(),
     company,
     contact: {
