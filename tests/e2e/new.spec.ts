@@ -150,3 +150,24 @@ test('typing a new name on Quote creates the client', async ({ context, page }) 
   expect(clientInserts).toHaveLength(1)
   expect(clientInserts[0]).toMatchObject({ name: 'Dana Whitfield' })
 })
+
+// D14: on a wide screen the create forms sit in the middle like New does,
+// so the column does not jump sideways from New to the form it opens.
+test('create forms are centred on desktop, in line with New', async ({ context, page }, testInfo) => {
+  test.skip(!testInfo.project.name.startsWith('desktop'), 'Desktop width')
+  await signIn(context)
+  await page.setViewportSize({ width: 1440, height: 900 })
+  const centre = async (path: string) => {
+    await open(page, path)
+    await expect(page.locator('.fhnew').first()).toBeVisible({ timeout: 30_000 })
+    return page.evaluate(() => {
+      const r = document.querySelector('.fhnew')!.getBoundingClientRect()
+      const main = document.querySelector('#fh-main')!.getBoundingClientRect()
+      return { mid: Math.round(r.left + r.width / 2), mainMid: Math.round(main.left + main.width / 2) }
+    })
+  }
+  const quote = await centre('/quotes/new')
+  expect(Math.abs(quote.mid - quote.mainMid)).toBeLessThanOrEqual(2)
+  const lead = await centre('/leads/new')
+  expect(Math.abs(lead.mid - lead.mainMid)).toBeLessThanOrEqual(2)
+})
