@@ -38,17 +38,24 @@ function sameText(a: string | null | undefined, b: string): boolean {
   return (a || '').trim().toLowerCase() === b.toLowerCase()
 }
 
+type ClientFields = { name?: string | null; phone?: string | null; email?: string | null; address?: string | null; company?: string | null }
+export type ClientMatch = { id: string; name: string; phone: string | null; email: string | null }
+
 /**
- * Pass the viewer's org id to match against the whole org's clients (a
- * teammate's client is the same customer); without it the lookup stays
- * on the user's own rows as before.
+ * The existing clients what was typed points at: `byContact` shares the
+ * typed phone (or, with no phone match, the typed email); `byName` has the
+ * typed name exactly. `contactTyped` says whether a phone or email was
+ * typed at all. Throws when a lookup fails, so nothing is created blind.
+ * With `stopAtContact`, the name is not looked up once a phone or email
+ * was typed (findOrCreateClient files by contact details first and never
+ * by name alone over a typed phone or email).
  */
-export async function findOrCreateClient(
-  userId: string | undefined,
-  fields: { name?: string | null; phone?: string | null; email?: string | null; address?: string | null; company?: string | null },
-  orgId?: string | null
-): Promise<string | null> {
-  if (!userId) return null
+export async function lookupClientMatches(
+  userId: string,
+  fields: ClientFields,
+  orgId?: string | null,
+  { stopAtContact = false }: { stopAtContact?: boolean } = {}
+): Promise<{ byContact: ClientMatch | null; byName: ClientMatch | null; contactTyped: boolean }> {
   const name = (fields.name || '').trim()
   const phone = (fields.phone || '').trim()
   const email = (fields.email || '').trim().toLowerCase()
@@ -57,53 +64,122 @@ export async function findOrCreateClient(
     const q = supabase.from('fh_clients').select('id, name, phone, email')
     return orgId ? q.eq('org_id', orgId) : q.eq('user_id', userId)
   }
+  let byContact: ClientMatch | null = null
+  let byName: ClientMatch | null = null
+  if (phoneKey) {
+    const { data, error } = await clients()
+      .ilike('phone', phoneLikePattern(phoneKey))
+      .order('created_at', { ascending: false })
+      .limit(CANDIDATES)
+    if (error) throw error
+    byContact = (data ?? []).find((c) => normalizePhoneKey(c.phone) === phoneKey) ?? null
+  }
+  if (!byContact && email) {
+    const { data, error } = await clients()
+      .ilike('email', escapeLike(email))
+      .order('created_at', { ascending: false })
+      .limit(CANDIDATES)
+    if (error) throw error
+    byContact = (data ?? []).find((c) => sameText(c.email, email)) ?? null
+  }
+  if (name && !(stopAtContact && (phoneKey || email))) {
+    const { data, error } = await clients()
+      .ilike('name', escapeLike(name))
+      .order('created_at', { ascending: false })
+      .limit(CANDIDATES)
+    if (error) throw error
+    byName = (data ?? []).find((c) => sameText(c.name, name)) ?? null
+  }
+  return { byContact, byName, contactTyped: !!(phoneKey || email) }
+}
+
+/** Inserts a client from what was typed. Null when there is no name. */
+export async function createClientRow(userId: string, fields: ClientFields, orgId?: string | null): Promise<string | null> {
+  const name = (fields.name || '').trim()
+  if (!name) return null // don't create a nameless client
+  const company = (fields.company || '').trim()
+  const { data: created, error } = await supabase.from('fh_clients').insert({
+    user_id: userId,
+    ...(orgId ? { org_id: orgId } : {}),
+    name,
+    phone: (fields.phone || '').trim() || null,
+    email: (fields.email || '').trim().toLowerCase() || null,
+    address: (fields.address || '').trim() || null,
+    company_name: company || null
+  }).select('id').single()
+  if (error) throw error
+  // Every caller (new lead, capture, picker) should see the new client in
+  // the Clients list without a reload. Prefix match covers every scope.
+  if (created?.id) void queryClient.invalidateQueries({ queryKey: ['clients'] })
+  return created?.id || null
+}
+
+/**
+ * Pass the viewer's org id to match against the whole org's clients (a
+ * teammate's client is the same customer); without it the lookup stays
+ * on the user's own rows as before.
+ *
+ * A typed phone or email that matches nobody means a new caller: the name
+ * alone is not enough to file them under an existing client (two people
+ * called Mike are two clients).
+ */
+export async function findOrCreateClient(
+  userId: string | undefined,
+  fields: ClientFields,
+  orgId?: string | null
+): Promise<string | null> {
+  if (!userId) return null
   try {
-    let existing: string | null = null
-    if (phoneKey) {
-      const { data, error } = await clients()
-        .ilike('phone', phoneLikePattern(phoneKey))
-        .order('created_at', { ascending: false })
-        .limit(CANDIDATES)
-      if (error) throw error
-      existing = (data ?? []).find((c) => normalizePhoneKey(c.phone) === phoneKey)?.id ?? null
-    }
-    if (!existing && email) {
-      const { data, error } = await clients()
-        .ilike('email', escapeLike(email))
-        .order('created_at', { ascending: false })
-        .limit(CANDIDATES)
-      if (error) throw error
-      existing = (data ?? []).find((c) => sameText(c.email, email))?.id ?? null
-    }
-    if (!existing && name) {
-      const { data, error } = await clients()
-        .ilike('name', escapeLike(name))
-        .order('created_at', { ascending: false })
-        .limit(CANDIDATES)
-      if (error) throw error
-      existing = (data ?? []).find((c) => sameText(c.name, name))?.id ?? null
-    }
-    if (existing) return existing
-    if (!name) return null // don't create a nameless client
-    const company = (fields.company || '').trim()
-    const { data: created } = await supabase.from('fh_clients').insert({
-      user_id: userId,
-      ...(orgId ? { org_id: orgId } : {}),
-      name,
-      phone: phone || null,
-      email: email || null,
-      address: fields.address || null,
-      company_name: company || null
-    }).select('id').single()
-    // Every caller (new lead, capture, picker) should see the new client in
-    // the Clients list without a reload. Prefix match covers every scope.
-    if (created?.id) void queryClient.invalidateQueries({ queryKey: ['clients'] })
-    return created?.id || null
+    const m = await lookupClientMatches(userId, fields, orgId, { stopAtContact: true })
+    if (m.byContact) return m.byContact.id
+    if (m.byName && !m.contactTyped) return m.byName.id
+    return await createClientRow(userId, fields, orgId)
   } catch (e) {
     // Non-fatal, caller proceeds with a null client_id.
     console.warn('[clients] findOrCreateClient failed', e)
     return null
   }
+}
+
+/**
+ * Writes the phone, email and address typed on a create screen to the
+ * client they were saved against, when they differ from what the client
+ * has. A value it replaces is kept in the client's notes ("Other phone:"),
+ * as a merge does, so nothing typed before is lost. Throws a sentence the
+ * screen can show when the write fails.
+ */
+export async function syncClientContact(
+  clientId: string,
+  typed: { phone?: string | null; email?: string | null; address?: string | null }
+): Promise<void> {
+  const { data: row, error } = await supabase
+    .from('fh_clients')
+    .select('id, phone, email, address, notes')
+    .eq('id', clientId)
+    .maybeSingle()
+  if (error || !row) throw new Error("Couldn't save the phone and address to this client. Check your connection and try again.")
+  const patch: { phone?: string; email?: string; address?: string; notes?: string } = {}
+  const kept: string[] = []
+  const same = {
+    phone: (a: string, b: string) => normalizePhoneKey(a) === normalizePhoneKey(b),
+    email: (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase(),
+    address: (a: string, b: string) => a.trim().replace(/\s+/g, ' ').toLowerCase() === b.trim().replace(/\s+/g, ' ').toLowerCase()
+  }
+  for (const key of ['phone', 'email', 'address'] as const) {
+    const next = (typed[key] || '').trim()
+    if (!next) continue
+    const current = (row[key] || '').trim()
+    if (current && same[key](current, next)) continue
+    patch[key] = key === 'email' ? next.toLowerCase() : next
+    if (current) kept.push(`Other ${key}: ${current}`)
+  }
+  if (Object.keys(patch).length === 0) return
+  const notes = (row.notes || '').trim()
+  const added = kept.filter((line) => !notes.includes(line))
+  if (added.length) patch.notes = [notes, added.join('\n')].filter(Boolean).join('\n\n')
+  const { data: updated, error: upErr } = await supabase.from('fh_clients').update(patch).eq('id', clientId).select('id')
+  if (upErr || !updated?.length) throw new Error("Couldn't save the phone and address to this client. Check your connection and try again.")
+  void queryClient.invalidateQueries({ queryKey: ['clients'] })
 }
 
 /**

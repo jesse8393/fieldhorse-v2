@@ -27,7 +27,7 @@ function builder(): unknown {
 
 vi.mock('./supabase.ts', () => ({ supabase: { from: () => builder() } }))
 
-const { findOrCreateClient, escapeLike, phoneLikePattern } = await import('./clients.ts')
+const { findOrCreateClient, escapeLike, phoneLikePattern, lookupClientMatches, syncClientContact } = await import('./clients.ts')
 
 function callsOf(index: number, method: string) {
   return builders[index].filter((c) => c[0] === method)
@@ -68,7 +68,7 @@ describe('findOrCreateClient', () => {
 
   it('does not treat an underscore in an email as a wildcard', async () => {
     responses.push({ data: [{ id: 'wrong', name: 'J', phone: null, email: 'jasmith@x.com' }], error: null }) // email lookup
-    responses.push({ data: [], error: null }) // name lookup
+    // A typed email that matches nobody is a new client: no name lookup (DATA-08).
     responses.push({ data: { id: 'created' }, error: null }) // insert
     expect(await findOrCreateClient('user-1', { name: 'J Smith', email: 'J_Smith@x.com' })).toBe('created')
     expect(callsOf(0, 'ilike')).toEqual([['ilike', 'email', 'j\\_smith@x.com']])
@@ -89,5 +89,58 @@ describe('findOrCreateClient', () => {
     expect(await findOrCreateClient('user-1', { name: 'New Client' }, 'org-1')).toBe('created')
     expect(callsOf(0, 'eq')).toEqual([['eq', 'org_id', 'org-1']])
     expect(callsOf(1, 'insert')[0][1]).toMatchObject({ user_id: 'user-1', org_id: 'org-1', name: 'New Client' })
+  })
+})
+
+describe('a new caller is not filed under someone else (DATA-08)', () => {
+  it('creates a new client when the typed phone matches nobody, even if the first name does', async () => {
+    responses.push({ data: [], error: null }) // phone lookup: nobody has this number
+    responses.push({ data: { id: 'created' }, error: null }) // insert
+    expect(await findOrCreateClient('user-1', { name: 'Mike', phone: '615-555-9999' })).toBe('created')
+    expect(builders).toHaveLength(2)
+    expect(callsOf(1, 'insert')[0][1]).toMatchObject({ name: 'Mike', phone: '615-555-9999' })
+    // No name lookup ran.
+    expect(builders.some((b) => b.some((c) => c[0] === 'ilike' && c[1] === 'name'))).toBe(false)
+  })
+
+  it('still matches by name when no phone or email was typed', async () => {
+    responses.push({ data: [{ id: 'mike', name: 'Mike', phone: '6155550000', email: null }], error: null })
+    expect(await findOrCreateClient('user-1', { name: 'Mike' })).toBe('mike')
+  })
+
+  it('reports a phone match and a name match separately, so the screen can ask', async () => {
+    responses.push({ data: [{ id: 'mmc', name: 'MMC Properties', phone: '615.555.0199', email: null }], error: null })
+    responses.push({ data: [{ id: 'bob', name: 'Bob Smith', phone: null, email: null }], error: null })
+    const m = await lookupClientMatches('user-1', { name: 'Bob Smith', phone: '615 555 0199' }, null)
+    expect(m.byContact?.id).toBe('mmc')
+    expect(m.byName?.id).toBe('bob')
+    expect(m.contactTyped).toBe(true)
+  })
+})
+
+describe('syncClientContact', () => {
+  it('writes a changed phone and address to the client and keeps the old ones in its notes', async () => {
+    responses.push({ data: { id: 'jeff', phone: '555-0101', email: 'jeff@roy.com', address: '412 Burkitt Station Rd', notes: 'Gate code 4411' }, error: null })
+    responses.push({ data: [{ id: 'jeff' }], error: null })
+    await syncClientContact('jeff', { phone: '615-555-7777', address: '88 New Site Ln, Smyrna' })
+    const update = callsOf(1, 'update')[0][1]
+    expect(update).toEqual({
+      phone: '615-555-7777',
+      address: '88 New Site Ln, Smyrna',
+      notes: 'Gate code 4411\n\nOther phone: 555-0101\nOther address: 412 Burkitt Station Rd'
+    })
+    expect(callsOf(1, 'eq')).toEqual([['eq', 'id', 'jeff']])
+  })
+
+  it('writes nothing when what was typed is what the client has', async () => {
+    responses.push({ data: { id: 'jeff', phone: '(555) 010-1', email: null, address: '412 Burkitt Station Rd', notes: null }, error: null })
+    await syncClientContact('jeff', { phone: '5550101', address: ' 412 burkitt station rd ' })
+    expect(builders).toHaveLength(1)
+  })
+
+  it('fails in plain words when the update changes no row', async () => {
+    responses.push({ data: { id: 'jeff', phone: null, email: null, address: null, notes: null }, error: null })
+    responses.push({ data: [], error: null })
+    await expect(syncClientContact('jeff', { phone: '615-555-7777' })).rejects.toThrow(/phone and address/)
   })
 })

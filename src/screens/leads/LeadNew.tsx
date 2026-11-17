@@ -5,12 +5,13 @@
 
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Field } from '../../components/fh'
+import { Button, Field } from '../../components/fh'
 import ClientField, { fetchClientPick, resolveClientId, restoredClientValue, type ClientFieldValue } from '../../components/ClientField.tsx'
 import CreateShell, { Choices, LEAD_SOURCES, useDraft } from '../new/CreateShell.tsx'
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useMembership } from '../../contexts/MembershipContext.tsx'
 import { createLead } from '../../lib/leads.ts'
+import { createClientRow, lookupClientMatches, syncClientContact, type ClientMatch } from '../../lib/clients.ts'
 import { recordRoute } from '../../lib/records.ts'
 import { hapticMedium } from '../../lib/haptics.ts'
 
@@ -37,6 +38,10 @@ export default function LeadNew() {
   const [client, setClient] = useState<ClientFieldValue>(() => restoredClientValue(form.name, form.clientId))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  // A typed phone that belongs to a client with another name, or a known
+  // name typed with a new phone: shown under the name, and the person picks
+  // which client the lead goes to (S06). Cleared when the name or phone changes.
+  const [conflict, setConflict] = useState<{ kind: 'contact' | 'name'; client: ClientMatch } | null>(null)
 
   // Opened from a client's page: that client is the name.
   useEffect(() => {
@@ -53,17 +58,46 @@ export default function LeadNew() {
 
   function onClient(next: ClientFieldValue) {
     setClient(next)
+    setConflict(null)
     patch({ name: next.text, clientId: next.picked?.id || '' })
   }
 
-  async function save() {
+  // The client the lead saves against. A picked client wins. Otherwise a
+  // phone match with the same name, or a name match when no phone was
+  // typed, is used; anything less certain is shown for the person to
+  // choose. Null when the screen is waiting on that choice.
+  async function chooseClient(choice?: { existing: string } | 'new'): Promise<{ id: string; created: boolean } | null> {
+    if (!user) return null
+    if (client.picked) return { id: client.picked.id, created: false }
+    const typed = { name: client.text, phone: form.phone, address: form.address }
+    if (choice && choice !== 'new') return { id: choice.existing, created: false }
+    if (choice !== 'new') {
+      const m = await lookupClientMatches(user.id, typed, orgId)
+      const sameName = (c: ClientMatch | null) => !!c && c.name.trim().toLowerCase() === client.text.trim().toLowerCase()
+      if (m.byContact && sameName(m.byContact)) return { id: m.byContact.id, created: false }
+      if (m.byContact) { setConflict({ kind: 'contact', client: m.byContact }); return null }
+      if (m.byName && m.contactTyped) { setConflict({ kind: 'name', client: m.byName }); return null }
+      if (m.byName) return { id: m.byName.id, created: false }
+    }
+    const id = await createClientRow(user.id, typed, orgId)
+    if (!id) throw new Error('Enter a name.')
+    return { id, created: true }
+  }
+
+  async function save(choice?: { existing: string } | 'new') {
     if (!user) return
     if (!client.text.trim()) { setError('Enter a name.'); return }
     setSaving(true)
     setError('')
     try {
-      const picked = await resolveClientId(client, { userId: user.id, orgId }, { phone: form.phone, address: form.address })
+      const chosen = await chooseClient(choice)
+      if (!chosen) { setSaving(false); return }
+      setConflict(null)
+      const picked = await resolveClientId({ text: client.text, picked: { id: chosen.id, name: client.text } }, { userId: user.id, orgId })
       if (!picked) throw new Error('Enter a name.')
+      // What was typed for an existing client goes onto that client, so the
+      // lead (which reads the client's phone and address) shows it.
+      if (!chosen.created) await syncClientContact(picked.id, { phone: form.phone, address: form.address })
       const lead = await createLead({
         userId: user.id,
         orgId,
@@ -92,7 +126,25 @@ export default function LeadNew() {
         autoFocus
         onPick={(c) => patch({ phone: form.phone || c.phone || '', address: form.address || c.address || '' })}
       />
-      <Field label="Phone" type="tel" inputMode="tel" autoComplete="off" value={form.phone} onChange={(e) => set('phone', e.target.value)} />
+      <Field label="Phone" type="tel" inputMode="tel" autoComplete="off" value={form.phone} onChange={(e) => { setConflict(null); set('phone', e.target.value) }} />
+      {conflict && (
+        <div className="fhnew-match" role="status">
+          <p className="fhnew-match__text">
+            {conflict.kind === 'contact'
+              ? `${form.phone.trim()} belongs to ${conflict.client.name}.`
+              : `${conflict.client.name} is already a client, with a different phone.`}
+            {' '}Which client is this lead for?
+          </p>
+          <div className="fhnew-match__actions">
+            <Button type="button" variant="secondary" size="md" disabled={saving} onClick={() => { void save({ existing: conflict.client.id }) }}>
+              Save to {conflict.client.name}
+            </Button>
+            <Button type="button" variant="secondary" size="md" disabled={saving} onClick={() => { void save('new') }}>
+              Save as a new client
+            </Button>
+          </div>
+        </div>
+      )}
       <Field label="Address" autoComplete="off" value={form.address} onChange={(e) => set('address', e.target.value)} />
       <Field label="What they need" placeholder="Shed slab, driveway, retaining wall" value={form.title} onChange={(e) => set('title', e.target.value)} />
       <Field label="Notes" multiline value={form.notes} onChange={(e) => set('notes', e.target.value)} />

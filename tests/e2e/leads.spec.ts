@@ -214,3 +214,68 @@ test.describe('the leads list', () => {
     await expect(page.getByRole('link', { name: /Kitchen renovation/ })).toHaveAttribute('href', '/quotes/q-change')
   })
 })
+
+/** Every write the page sends: "METHOD table body". */
+function watchWrites(page: Page): string[] {
+  const writes: string[] = []
+  page.on('request', (req) => {
+    const url = new URL(req.url())
+    if (!['PATCH', 'DELETE', 'POST'].includes(req.method()) || !url.pathname.includes('/rest/v1/')) return
+    writes.push(`${req.method()} ${url.pathname.split('/rest/v1/')[1]} ${req.postData() ?? ''}`)
+  })
+  return writes
+}
+
+test.describe('New lead keeps what was typed (DATA-08, S06)', () => {
+  test('a changed phone and address for a picked client are written to that client', async ({ context, page }) => {
+    await signIn(context)
+    const writes = watchWrites(page)
+    await open(page, '/leads/new')
+    await page.getByLabel('Name').fill('Jeff')
+    await page.locator('.fhnew-client__pick').first().click()
+    await expect(page.getByLabel('Phone')).toHaveValue('555-0101')
+    await page.getByLabel('Phone').fill('615-555-7777')
+    await page.getByLabel('Address').fill('88 New Site Ln, Smyrna')
+    await page.getByRole('button', { name: 'Save lead' }).click()
+    await expect(page).toHaveURL(/\/leads\/l-lead1$/, { timeout: 30_000 })
+    const patch = writes.find((w) => w.startsWith('PATCH fh_clients'))
+    expect(patch).toBeTruthy()
+    expect(patch).toContain('615-555-7777')
+    expect(patch).toContain('88 New Site Ln, Smyrna')
+    expect(writes.some((w) => w.startsWith('POST fh_leads'))).toBe(true)
+  })
+
+  test('a phone that belongs to another client is shown, and the person chooses', async ({ context, page }) => {
+    await signIn(context)
+    const writes = watchWrites(page)
+    await open(page, '/leads/new')
+    await page.getByLabel('Name').fill('Bob Smith')
+    await page.getByLabel('Phone').fill('(555) 010-1')
+    await page.getByRole('button', { name: 'Save lead' }).click()
+    await expect(page.getByText('(555) 010-1 belongs to Jeff Roy.')).toBeVisible()
+    await page.waitForTimeout(300)
+    expect(writes.filter((w) => w.startsWith('POST'))).toEqual([])
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+
+    await page.getByRole('button', { name: 'Save as a new client' }).click()
+    await expect(page).toHaveURL(/\/leads\/l-lead1$/, { timeout: 30_000 })
+    const created = writes.find((w) => w.startsWith('POST fh_clients'))
+    expect(created).toContain('Bob Smith')
+    expect(writes.some((w) => w.startsWith('POST fh_leads'))).toBe(true)
+  })
+
+  test('a known name with a new phone is not filed under that client without asking', async ({ context, page }) => {
+    await signIn(context)
+    const writes = watchWrites(page)
+    await open(page, '/leads/new')
+    await page.getByLabel('Name').fill('Jeff Roy')
+    await page.getByLabel('Phone').fill('615-555-7777')
+    await page.getByRole('button', { name: 'Save lead' }).click()
+    await expect(page.getByText(/Jeff Roy is already a client, with a different phone/)).toBeVisible()
+    expect(writes.filter((w) => w.startsWith('POST'))).toEqual([])
+    await page.getByRole('button', { name: 'Save to Jeff Roy' }).click()
+    await expect(page).toHaveURL(/\/leads\/l-lead1$/, { timeout: 30_000 })
+    expect(writes.find((w) => w.startsWith('PATCH fh_clients'))).toContain('615-555-7777')
+    expect(writes.some((w) => w.startsWith('POST fh_clients'))).toBe(false)
+  })
+})
