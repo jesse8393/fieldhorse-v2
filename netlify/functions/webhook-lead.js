@@ -1,8 +1,9 @@
 // Netlify Function — inbound lead webhook.
 // External tools (GoHighLevel, Zapier, Make, Facebook Lead Ads) POST JSON here.
-// We validate the ?key= against profiles.webhook_key, resolve the client
-// (fh_resolve_client matches by phone or email inside the company, else
-// makes one) and insert a row into fh_leads pointing at it (SPEC D53).
+// We validate the ?key= against profiles.webhook_key, find the company from
+// the key owner's active membership, resolve the client (fh_resolve_client
+// matches by phone or email inside the company, else makes one) and insert
+// a row into fh_leads pointing at it (SPEC D53).
 //
 // ENV required:
 //   SUPABASE_URL       (e.g. https://pnmhblvslftdzfcdezbw.supabase.co)
@@ -81,7 +82,21 @@ export default async (request) => {
     return json({ error: 'invalid_key' }, 401)
   }
   const userId = profile.user_id
-  const orgId = profile.org_id || null
+
+  // The company comes from the key owner's active membership, never from
+  // profiles.org_id alone: nothing keeps that column current, so it can be
+  // empty for a real member or still name a company the person was removed
+  // from.
+  const { data: memberRows, error: memberErr } = await supabase
+    .from('org_members')
+    .select('org_id, joined_at')
+    .eq('user_id', userId)
+    .is('revoked_at', null)
+  if (memberErr) {
+    console.error('[webhook-lead] membership lookup failed', memberErr)
+    return json({ error: 'membership_lookup_failed' }, 502)
+  }
+  const orgId = pickWebhookOrgId(memberRows, profile.org_id)
 
   const rateLimit = await checkWebhookRateLimit(supabase, { userId, orgId, key })
   if (!rateLimit.allowed) {
@@ -93,6 +108,13 @@ export default async (request) => {
       429,
       { 'Retry-After': String(RATE_LIMIT_WINDOW_SECONDS) }
     )
+  }
+
+  if (!orgId) {
+    return json({
+      error: 'no_company',
+      detail: 'This webhook key is not linked to an active company, so the lead was not saved.'
+    }, 409)
   }
 
   let payload
@@ -133,7 +155,7 @@ export default async (request) => {
     status: 'open'
   }
 
-  const clientId = await resolveClient(supabase, { userId, orgId, person, source })
+  const clientId = await resolveClient(supabase, { orgId, person, source })
   if (!clientId) {
     return json({ error: 'client_failed', detail: 'Could not save the customer. Try again shortly.' }, 500)
   }
@@ -181,49 +203,41 @@ export function leadNotes(notes, amount) {
   return parts.length ? parts.join('\n') : null
 }
 
-// The client the lead belongs to. Inside an organization fh_resolve_client
-// matches by phone, then email, then makes one, the same path the inbound
-// text and email functions take. A profile with no organization writes
-// fh_clients directly, matching the user's own rows by phone or email.
-async function resolveClient(supabase, { userId, orgId, person, source }) {
-  if (orgId) {
-    const { data, error } = await supabase.rpc('fh_resolve_client', {
-      p_org_id: orgId,
-      p_phone: person.phone,
-      p_email: person.email,
-      p_name: person.name,
-      p_address: person.address,
-      p_source: source
-    })
-    if (error) {
-      console.error('[webhook-lead] fh_resolve_client failed', error)
-      return null
-    }
-    const row = Array.isArray(data) ? data[0] : data
-    if (row?.client_id) return row.client_id
-    return null
+/**
+ * Which company a webhook key writes into. `memberRows` are the key owner's
+ * active memberships. One membership: that company. None: null. Several: the
+ * company on the profile when it is one of them, else the oldest membership.
+ */
+export function pickWebhookOrgId(memberRows, profileOrgId) {
+  const rows = (memberRows || []).filter((m) => m?.org_id)
+  if (rows.length === 0) return null
+  if (rows.length === 1) return rows[0].org_id
+  if (profileOrgId && rows.some((m) => m.org_id === profileOrgId)) return profileOrgId
+  const joinedMs = (m) => {
+    const t = new Date(m.joined_at || 0).getTime()
+    return Number.isFinite(t) ? t : 0
   }
-  const mine = () => supabase.from('fh_clients').select('id, phone, email').eq('user_id', userId)
-  const digits = (s) => String(s || '').replace(/\D/g, '')
-  if (person.phone && digits(person.phone).length >= 7) {
-    const { data } = await mine().order('created_at', { ascending: false }).limit(200)
-    const hit = (data || []).find((c) => digits(c.phone) === digits(person.phone))
-    if (hit) return hit.id
-  }
-  if (person.email) {
-    const { data } = await mine().ilike('email', person.email).limit(1)
-    if (data?.[0]?.id) return data[0].id
-  }
-  const { data: created, error } = await supabase
-    .from('fh_clients')
-    .insert({ user_id: userId, name: person.name, phone: person.phone, email: person.email, address: person.address })
-    .select('id')
-    .single()
+  return [...rows].sort((a, b) => joinedMs(a) - joinedMs(b))[0].org_id
+}
+
+// The client the lead belongs to: fh_resolve_client matches by phone, then
+// email, then makes one, the same path the inbound text and email functions
+// take.
+async function resolveClient(supabase, { orgId, person, source }) {
+  const { data, error } = await supabase.rpc('fh_resolve_client', {
+    p_org_id: orgId,
+    p_phone: person.phone,
+    p_email: person.email,
+    p_name: person.name,
+    p_address: person.address,
+    p_source: source
+  })
   if (error) {
-    console.error('[webhook-lead] client insert failed', error)
+    console.error('[webhook-lead] fh_resolve_client failed', error)
     return null
   }
-  return created?.id || null
+  const row = Array.isArray(data) ? data[0] : data
+  return row?.client_id || null
 }
 
 async function checkWebhookRateLimit(supabase, { userId, orgId, key }) {
