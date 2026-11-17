@@ -112,16 +112,32 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
+// The same person published again (the saved session, then the auth
+// listener's INITIAL_SESSION, then each token refresh) keeps the same user
+// object, so screens and effects keyed on the user do not start over and
+// read again (vibe audit console-1).
+function sameUser(a: User | null, b: User | null) {
+  if (a === b) return true
+  if (!a || !b || a.id !== b.id) return false
+  try { return JSON.stringify(a) === JSON.stringify(b) } catch { return false }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
+  const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const boundaryRef = useRef<ReturnType<typeof createAuthSessionBoundary<Session>> | null>(null)
 
   useEffect(() => {
     const boundary = createAuthSessionBoundary<Session>({
       purge: purgeLocalData,
-      hold: () => { setSession(null); setLoading(true) },
-      publish: (next) => { setSession(next); setLoading(false); markSessionSettled() },
+      hold: () => { setSession(null); setUser(null); setLoading(true) },
+      publish: (next) => {
+        setSession(next)
+        setUser((current) => sameUser(current, next?.user ?? null) ? current : next?.user ?? null)
+        setLoading(false)
+        markSessionSettled()
+      },
       owner: cacheOwner,
     })
     boundaryRef.current = boundary
@@ -147,7 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // cascade a full-app re-render through every consumer.
   const value = useMemo<AuthContextValue>(() => ({
     session,
-    user: session?.user ?? null,
+    user,
     loading,
     signIn: (email, password) => supabase.auth.signInWithPassword({ email, password }),
     signUp: (email, password, redirectPath) =>
@@ -201,7 +217,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         redirectTo: `${window.location.origin}/reset-password`
       }),
     updatePassword: (password) => supabase.auth.updateUser({ password })
-  }), [session, loading])
+  }), [session, user, loading])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
