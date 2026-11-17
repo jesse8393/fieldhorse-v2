@@ -6,6 +6,7 @@
 import { expect, test, type Page, type Route } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 import { contrastOf } from './helpers/contrast.ts'
+import { holdPosts, postsTo, twoTaps } from './helpers/doubleTap.ts'
 
 async function open(page: Page, path: string) {
   await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 60_000 })
@@ -861,4 +862,59 @@ test('the contract card shows cents', async ({ context, page }) => {
   await expect(card.locator('.cockpit-headline__amt')).toHaveText('$10,000')
   await expect(card.locator('.cockpit-headline__bar-meta')).toContainText('$5,000.50 collected')
   await expect(card.locator('.cockpit-headline__bar-meta')).toContainText('$4,999.50 remaining')
+})
+
+// A double tap while the write is still out wrote twice: two lines for one
+// material, or the bulk list twice. Each add now takes no second tap until
+// the first settles.
+test.describe('one tap writes once on the job sections', () => {
+  test.beforeEach(async ({ page: _page }, testInfo) => {
+    test.skip(!testInfo.project.name.startsWith('mobile'), 'touch taps')
+  })
+
+  test('Add material sends one row', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_materials: [] } })
+    const posts = postsTo(context, '/rest/v1/fh_materials')
+    await holdPosts(context, '**/rest/v1/fh_materials*', 1500, () => ({ status: 201, json: [] }))
+    await page.goto('/jobs/c-job1?tab=materials', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    const name = page.getByLabel('Material name')
+    await expect(name).toBeVisible({ timeout: 30_000 })
+    await name.fill('2x4 studs')
+    await twoTaps(page, page.getByRole('button', { name: 'Add material' }))
+    await expect(page.getByText('Added', { exact: true }).first()).toBeVisible({ timeout: 10_000 })
+    await page.waitForTimeout(500)
+    expect(posts.length, 'one tap, one material').toBe(1)
+  })
+
+  test('Bulk add sends the list once', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_materials: [] } })
+    const posts = postsTo(context, '/rest/v1/fh_materials')
+    await holdPosts(context, '**/rest/v1/fh_materials*', 1500, () => ({ status: 201, json: [] }))
+    await page.goto('/jobs/c-job1?tab=materials', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    const bulk = page.getByRole('button', { name: /Bulk add/ })
+    await expect(bulk).toBeVisible({ timeout: 30_000 })
+    await bulk.click()
+    await page.getByLabel('Materials to add, one per line').fill('4 of 2x4 studs\n1 box of #10 screws\nDrywall mud (3)')
+    await twoTaps(page, page.getByRole('button', { name: 'Add 3', exact: true }))
+    await expect(page.getByText('Added 3 items', { exact: true }).first()).toBeVisible({ timeout: 10_000 })
+    await page.waitForTimeout(500)
+    expect(posts.length, 'one tap, one bulk insert').toBe(1)
+  })
+
+  test('Pull from notes adds the picked materials once', async ({ context, page }) => {
+    const note = { id: 'n-mat', user_id: 'qa-user-1', contact_id: 'c-job1', text: 'Need studs', category: 'note', created_at: '2026-11-10T15:00:00.000Z', parsed: { materials_needed: ['4 of 2x4 studs', 'Drywall mud (3)'] } }
+    await signIn(context, { tables: { fh_materials: [], fh_notes: [note] } })
+    const posts = postsTo(context, '/rest/v1/fh_materials')
+    await holdPosts(context, '**/rest/v1/fh_materials*', 1500, () => ({ status: 201, json: [] }))
+    await page.goto('/jobs/c-job1?tab=materials', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    const pull = page.getByRole('button', { name: /Pull from notes/ })
+    await expect(pull).toBeVisible({ timeout: 30_000 })
+    await pull.click()
+    const add = page.getByRole('button', { name: 'Add 2', exact: true })
+    await expect(add).toBeEnabled({ timeout: 10_000 })
+    await twoTaps(page, add)
+    await expect(page.getByText('Added 2', { exact: true }).first()).toBeVisible({ timeout: 10_000 })
+    await page.waitForTimeout(500)
+    expect(posts.length, 'one tap, one insert').toBe(1)
+  })
 })
