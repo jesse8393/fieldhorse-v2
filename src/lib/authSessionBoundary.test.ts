@@ -41,6 +41,32 @@ describe('browser account boundary', () => {
     boundary.update('SIGNED_OUT', null); await boundary.flush()
     expect(purge).toHaveBeenCalledOnce()
   })
+  it('keeps queued offline work when the session ends without the person choosing to sign out', async () => {
+    const purge = vi.fn(async (_scope: { queuedWork: boolean }) => {})
+    const boundary = createAuthSessionBoundary({ publish: vi.fn(), hold: vi.fn(), purge })
+    boundary.update('SIGNED_IN', session('a')); await boundary.flush()
+    // auth-js drops a session whose refresh token was refused (a 401).
+    boundary.update('SIGNED_OUT', null); await boundary.flush()
+    expect(purge).toHaveBeenLastCalledWith({ queuedWork: false })
+    // Another account on the device keeps it too: queued work is tagged
+    // with its owner and only ever drains for them.
+    boundary.update('SIGNED_IN', session('a')); await boundary.flush()
+    boundary.update('SIGNED_IN', session('b')); await boundary.flush()
+    expect(purge).toHaveBeenLastCalledWith({ queuedWork: false })
+  })
+  it('clears queued offline work when the person signs out', async () => {
+    const purge = vi.fn(async (_scope: { queuedWork: boolean }) => {})
+    const boundary = createAuthSessionBoundary({ publish: vi.fn(), hold: vi.fn(), purge })
+    boundary.update('SIGNED_IN', session('a')); await boundary.flush()
+    const cancel = boundary.chosenSignOut()
+    cancel() // the sign out request failed: still signed in
+    boundary.update('SIGNED_OUT', null); await boundary.flush()
+    expect(purge).toHaveBeenLastCalledWith({ queuedWork: false })
+    boundary.update('SIGNED_IN', session('a')); await boundary.flush()
+    boundary.chosenSignOut()
+    boundary.update('SIGNED_OUT', null); await boundary.flush()
+    expect(purge).toHaveBeenLastCalledWith({ queuedWork: true })
+  })
   it('does not publish an account after disposal', async () => {
     const publish = vi.fn()
     const boundary = createAuthSessionBoundary({ publish, hold: vi.fn(), purge: vi.fn(async () => {}) })
