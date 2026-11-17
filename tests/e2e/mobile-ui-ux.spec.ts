@@ -903,4 +903,38 @@ test.describe('phone keyboard', () => {
     await field.press('Enter')
     await expect.poll(() => writes.length, { message: 'Enter saved the change' }).toBeGreaterThan(0)
   })
+
+  // keyboard-3: a record search list kept its usual height under the field,
+  // so with the keyboard up its last results sat under the keyboard and
+  // could not be scrolled into sight from inside the list.
+  for (const route of ['/schedule/new', '/compose']) {
+    test(`the record list on ${route} keeps its last result above the keyboard`, async ({ context, page }) => {
+      await signIn(context)
+      await page.goto(route, { waitUntil: 'domcontentloaded' })
+      const input = page.locator('.fh-record-picker input').first()
+      await expect(input).toBeVisible({ timeout: 30_000 })
+      await input.scrollIntoViewIfNeeded()
+      await input.click()
+      await expect(page.locator('.fh-record-picker__list [role="option"]').first()).toBeVisible()
+      await keyboardUp(context, page, input)
+      const reading = () => page.evaluate(() => {
+        const vv = window.visualViewport!
+        const list = document.querySelector<HTMLElement>('.fh-record-picker__list')!
+        list.scrollTop = list.scrollHeight
+        const options = [...list.querySelectorAll('[role="option"]')]
+        const box = list.getBoundingClientRect()
+        const bottom = vv.offsetTop + vv.height
+        return {
+          list: [Math.round(box.top), Math.round(box.bottom)], visible: [Math.round(vv.offsetTop), Math.round(bottom)],
+          rows: options.length, hidden: options.filter((o) => o.getBoundingClientRect().bottom > bottom + 0.5).length,
+          listInView: box.top >= vv.offsetTop - 0.5 && box.bottom <= bottom + 0.5, height: Math.round(box.height)
+        }
+      })
+      await expect.poll(async () => (await reading()).hidden, { message: JSON.stringify(await reading()) }).toBe(0)
+      const end = await reading()
+      expect(end.listInView, JSON.stringify(end)).toBe(true)
+      expect(end.height, JSON.stringify(end)).toBeGreaterThanOrEqual(96)
+      await expect(input).toBeFocused()
+    })
+  }
 })

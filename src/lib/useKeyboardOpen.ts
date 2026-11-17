@@ -6,7 +6,7 @@ import type { KeyboardEvent } from 'react'
 // layout viewport. The dock hides then (spec 8.1), so it never rides up
 // on top of the keyboard on iOS.
 
-const KEYBOARD_MIN_PX = 120
+export const KEYBOARD_MIN_PX = 120
 
 function isTextEntry(el: Element | null) {
   if (!el) return false
