@@ -12,8 +12,11 @@ import { supabase } from '../../lib/supabase.ts'
 import { queryClient } from '../../lib/queryClient.ts'
 import { recordRoute } from '../../lib/records.ts'
 import { hapticMedium } from '../../lib/haptics.ts'
+import { createUuid } from '../../lib/uuid.ts'
 
 type Form = {
+  /** Minted once per form, so a retried save addresses the same row (DATA-12). */
+  requestId: string
   name: string
   company: string
   phone: string
@@ -22,7 +25,7 @@ type Form = {
   notes: string
 }
 
-const EMPTY: Form = { name: '', company: '', phone: '', email: '', address: '', notes: '' }
+const EMPTY: Form = { requestId: '', name: '', company: '', phone: '', email: '', address: '', notes: '' }
 
 export default function ClientNew() {
   const navigate = useNavigate()
@@ -30,7 +33,8 @@ export default function ClientNew() {
   const { orgId } = useMembership()
   const [params] = useSearchParams()
   const text = params.get('text')
-  const { form, set, done } = useDraft<Form>('client', EMPTY, text ? { name: text } : null)
+  const [requestId] = useState(createUuid)
+  const { form, set, done } = useDraft<Form>('client', { ...EMPTY, requestId }, text ? { name: text } : null)
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<{ name?: string; save?: string }>({})
 
@@ -39,7 +43,9 @@ export default function ClientNew() {
     if (!form.name.trim()) { setErrors({ name: 'Enter a name.' }); return }
     setSaving(true)
     setErrors({})
+    const id = form.requestId || requestId
     const row = {
+      id,
       user_id: user.id,
       ...(orgId ? { org_id: orgId } : {}),
       name: form.name.trim(),
@@ -49,10 +55,15 @@ export default function ClientNew() {
       address: form.address.trim() || null,
       notes: form.notes.trim() || null
     }
-    const { data, error } = await supabase.from('fh_clients').insert(row).select('id').single()
+    let { data, error } = await supabase.from('fh_clients').insert(row).select('id').single()
+    // A duplicate key means an earlier try saved this client and only its
+    // answer was lost: use that row instead of making a second client.
+    if (error?.code === '23505') {
+      ;({ data, error } = await supabase.from('fh_clients').select('id').eq('id', id).single())
+    }
     if (error || !data) {
       setSaving(false)
-      setErrors({ save: error?.message || 'Could not save this client. Check your connection and try again.' })
+      setErrors({ save: 'Could not save this client. Check your connection and try again.' })
       return
     }
     void queryClient.invalidateQueries({ queryKey: ['clients'] })

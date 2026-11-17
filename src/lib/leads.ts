@@ -16,7 +16,12 @@ const clean = (s: string | null | undefined) => {
   return t ? t : null
 }
 
+// A save whose answer is lost on a weak signal is retried by the person.
+// The screen mints the lead's id once per form, so the retry addresses the
+// same row: a duplicate key answer means the first save landed, and that
+// row is read back instead of a second lead being made (DATA-12).
 export async function createLead(input: {
+  id?: string
   userId: string
   orgId: string | null
   clientId: string
@@ -28,6 +33,7 @@ export async function createLead(input: {
   followUpOn?: string | null
 }): Promise<LeadRow> {
   const row: LeadInsert = {
+    ...(input.id ? { id: input.id } : {}),
     user_id: input.userId,
     org_id: input.orgId ?? null,
     client_id: input.clientId,
@@ -44,8 +50,12 @@ export async function createLead(input: {
     .insert(row)
     .select('*')
     .single()
-  if (error) throw new Error(error.message)
-  return data as LeadRow
+  if (!error && data) return data as LeadRow
+  if (error?.code === '23505' && input.id) {
+    const existing = await supabase.from('fh_leads').select('*').eq('id', input.id).eq('user_id', input.userId).maybeSingle()
+    if (!existing.error && existing.data) return existing.data as LeadRow
+  }
+  throw new Error('Could not save this lead. Check your connection and try again.')
 }
 
 async function setLeadStatus(leadId: string, patch: { status: LeadStatus; quote_id?: string | null }) {

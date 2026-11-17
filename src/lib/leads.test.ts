@@ -86,7 +86,8 @@ describe('createLead', () => {
 
   it('throws when the insert fails', async () => {
     responses.push({ data: null, error: { message: 'boom' } })
-    await expect(createLead({ userId: 'u', orgId: 'o', clientId: 'c' })).rejects.toThrow('boom')
+    // The screen shows this message, so it is a plain sentence (DATA-22).
+    await expect(createLead({ userId: 'u', orgId: 'o', clientId: 'c' })).rejects.toThrow('Could not save this lead. Check your connection and try again.')
   })
 })
 
@@ -104,5 +105,25 @@ describe('markLeadLost', () => {
     await markLeadLost('lead-1')
     expect(callsOf(0, 'update')[0][1]).toMatchObject({ status: 'lost' })
     expect(callsOf(0, 'eq')[0]).toEqual(['eq', 'id', 'lead-1'])
+  })
+})
+
+describe('createLead retried after a lost answer (DATA-12, DATA-22)', () => {
+  it('sends the id minted by the form', async () => {
+    responses.push({ data: { id: 'lead-x' }, error: null })
+    await createLead({ id: 'lead-x', userId: 'u1', orgId: null, clientId: 'c1' })
+    expect(callsOf(0, 'insert')[0][1]).toMatchObject({ id: 'lead-x' })
+  })
+
+  it('reads back the row the first try made when the id already exists', async () => {
+    responses.push({ data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint "fh_leads_pkey"' } })
+    responses.push({ data: { id: 'lead-x', title: 'Shed slab' }, error: null })
+    expect(await createLead({ id: 'lead-x', userId: 'u1', orgId: null, clientId: 'c1' })).toEqual({ id: 'lead-x', title: 'Shed slab' })
+    expect(callsOf(1, 'eq')).toContainEqual(['eq', 'id', 'lead-x'])
+  })
+
+  it('fails in a plain sentence, never the database text', async () => {
+    responses.push({ data: null, error: { message: 'TypeError: Failed to fetch' } })
+    await expect(createLead({ id: 'lead-x', userId: 'u1', orgId: null, clientId: 'c1' })).rejects.toThrow('Could not save this lead. Check your connection and try again.')
   })
 })

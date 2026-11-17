@@ -11,11 +11,15 @@ import CreateShell, { Choices, LEAD_SOURCES, useDraft } from '../new/CreateShell
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useMembership } from '../../contexts/MembershipContext.tsx'
 import { createLead } from '../../lib/leads.ts'
-import { createClientRow, lookupClientMatches, syncClientContact, type ClientMatch } from '../../lib/clients.ts'
+import { createClientRow, lookupClientMatches, saveErrorMessage, syncClientContact, type ClientMatch } from '../../lib/clients.ts'
+import { createUuid } from '../../lib/uuid.ts'
 import { recordRoute } from '../../lib/records.ts'
 import { hapticMedium } from '../../lib/haptics.ts'
 
 type Form = {
+  /** Ids minted once per form, so a retried save addresses the same rows (DATA-12). */
+  requestId: string
+  clientRequestId: string
   name: string
   clientId: string
   phone: string
@@ -25,7 +29,7 @@ type Form = {
   source: string
 }
 
-const EMPTY: Form = { name: '', clientId: '', phone: '', address: '', title: '', notes: '', source: '' }
+const EMPTY: Form = { requestId: '', clientRequestId: '', name: '', clientId: '', phone: '', address: '', title: '', notes: '', source: '' }
 
 export default function LeadNew() {
   const navigate = useNavigate()
@@ -34,7 +38,9 @@ export default function LeadNew() {
   const [params] = useSearchParams()
   const clientParam = params.get('client')
   const text = params.get('text')
-  const { form, set, patch, done } = useDraft<Form>('lead', EMPTY, text ? { notes: text } : null)
+  const [ids] = useState(() => ({ requestId: createUuid(), clientRequestId: createUuid() }))
+  const { form, set, patch, done } = useDraft<Form>('lead', { ...EMPTY, ...ids }, text ? { notes: text } : null)
+
   const [client, setClient] = useState<ClientFieldValue>(() => restoredClientValue(form.name, form.clientId))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -79,7 +85,7 @@ export default function LeadNew() {
       if (m.byName && m.contactTyped) { setConflict({ kind: 'name', client: m.byName }); return null }
       if (m.byName) return { id: m.byName.id, created: false }
     }
-    const id = await createClientRow(user.id, typed, orgId)
+    const id = await createClientRow(user.id, typed, orgId, form.clientRequestId || undefined)
     if (!id) throw new Error('Enter a name.')
     return { id, created: true }
   }
@@ -99,6 +105,7 @@ export default function LeadNew() {
       // lead (which reads the client's phone and address) shows it.
       if (!chosen.created) await syncClientContact(picked.id, { phone: form.phone, address: form.address })
       const lead = await createLead({
+        id: form.requestId || undefined,
         userId: user.id,
         orgId,
         clientId: picked.id,
@@ -111,7 +118,7 @@ export default function LeadNew() {
       navigate(recordRoute('lead', lead.id), { replace: true })
     } catch (e) {
       setSaving(false)
-      setError(e instanceof Error && e.message ? e.message : 'Could not save this lead. Check your connection and try again.')
+      setError(saveErrorMessage(e, 'Could not save this lead. Check your connection and try again.'))
     }
   }
 

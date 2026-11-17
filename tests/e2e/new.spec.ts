@@ -185,3 +185,69 @@ test('the client field finds a client outside the 200 most recently active', asy
   expect(writes).not.toContain('fh_clients')
   expect(writes).toContain('fh_leads')
 })
+
+/**
+ * Answers the first insert into `table` with a dropped connection after
+ * recording it, the way a weak signal loses the answer to a save the
+ * server made. Returns every insert body sent.
+ */
+async function loseFirstAnswer(page: Page, table: string): Promise<string[]> {
+  const bodies: string[] = []
+  await page.route(new RegExp(`/rest/v1/${table}(\\?|$)`), async (route) => {
+    const req = route.request()
+    if (req.method() !== 'POST') return route.fallback()
+    bodies.push(req.postData() ?? '')
+    if (bodies.length === 1) return route.abort('connectionreset')
+    return route.fallback()
+  })
+  return bodies
+}
+
+const rowId = (body: string) => {
+  const j = JSON.parse(body)
+  return (Array.isArray(j) ? j[0] : j).id ?? null
+}
+
+test('a lead save whose answer was lost is retried on the same row (DATA-12)', async ({ context, page }) => {
+  await signIn(context)
+  const bodies = await loseFirstAnswer(page, 'fh_leads')
+  await open(page, '/leads/new')
+  await page.getByLabel('Name').fill('Jeff')
+  await page.locator('.fhnew-client__pick').first().click()
+  await page.getByRole('button', { name: 'Save lead' }).click()
+  await expect(page.locator('.fhnew-error')).toBeVisible()
+  await page.getByRole('button', { name: 'Save lead' }).click()
+  await expect(page).toHaveURL(/\/leads\/l-lead1$/, { timeout: 30_000 })
+  expect(bodies).toHaveLength(2)
+  expect(rowId(bodies[0])).toBeTruthy()
+  expect(rowId(bodies[1])).toBe(rowId(bodies[0]))
+})
+
+test('a client save whose answer was lost is retried on the same row (DATA-12)', async ({ context, page }) => {
+  await signIn(context)
+  const bodies = await loseFirstAnswer(page, 'fh_clients')
+  await open(page, '/clients/new')
+  await page.getByLabel('Name').fill('Mike Salas')
+  await page.getByRole('button', { name: 'Save client' }).click()
+  await expect(page.locator('.fhnew-error')).toBeVisible()
+  await page.getByRole('button', { name: 'Save client' }).click()
+  await expect(page).toHaveURL(/\/clients\/cl-1$/, { timeout: 30_000 })
+  expect(bodies).toHaveLength(2)
+  expect(rowId(bodies[0])).toBeTruthy()
+  expect(rowId(bodies[1])).toBe(rowId(bodies[0]))
+})
+
+test('a lost connection on New lead and New client reads as a plain sentence (DATA-22)', async ({ context, page }) => {
+  await signIn(context)
+  await page.route(/\/rest\/v1\/fh_(leads|clients)(\?|$)/, (route) => route.request().method() === 'POST' ? route.abort('failed') : route.fallback())
+  await open(page, '/leads/new')
+  await page.getByLabel('Name').fill('Jeff')
+  await page.locator('.fhnew-client__pick').first().click()
+  await page.getByRole('button', { name: 'Save lead' }).click()
+  await expect(page.locator('.fhnew-error')).toHaveText('Could not save this lead. Check your connection and try again.')
+
+  await open(page, '/clients/new')
+  await page.getByLabel('Name').fill('Mike Salas')
+  await page.getByRole('button', { name: 'Save client' }).click()
+  await expect(page.locator('.fhnew-error')).toHaveText('Could not save this client. Check your connection and try again.')
+})

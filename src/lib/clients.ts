@@ -93,12 +93,27 @@ export async function lookupClientMatches(
   return { byContact, byName, contactTyped: !!(phoneKey || email) }
 }
 
-/** Inserts a client from what was typed. Null when there is no name. */
-export async function createClientRow(userId: string, fields: ClientFields, orgId?: string | null): Promise<string | null> {
+/**
+ * The sentence a create screen shows for a failed save: its own sentences
+ * pass through, while transport and database errors ("TypeError: Failed to
+ * fetch", constraint names) become `fallback` (DATA-22).
+ */
+export function saveErrorMessage(e: unknown, fallback: string): string {
+  if (e instanceof Error && e.constructor === Error && !('code' in e) && e.message) return e.message
+  return fallback
+}
+
+/**
+ * Inserts a client from what was typed. Null when there is no name. Pass
+ * `id` (minted once per form) so a retry after a lost answer finds the
+ * row the first try made instead of making a second client (DATA-12).
+ */
+export async function createClientRow(userId: string, fields: ClientFields, orgId?: string | null, id?: string): Promise<string | null> {
   const name = (fields.name || '').trim()
   if (!name) return null // don't create a nameless client
   const company = (fields.company || '').trim()
   const { data: created, error } = await supabase.from('fh_clients').insert({
+    ...(id ? { id } : {}),
     user_id: userId,
     ...(orgId ? { org_id: orgId } : {}),
     name,
@@ -107,6 +122,10 @@ export async function createClientRow(userId: string, fields: ClientFields, orgI
     address: (fields.address || '').trim() || null,
     company_name: company || null
   }).select('id').single()
+  if (error?.code === '23505' && id) {
+    const existing = await supabase.from('fh_clients').select('id').eq('id', id).maybeSingle()
+    if (!existing.error && existing.data?.id) return existing.data.id
+  }
   if (error) throw error
   // Every caller (new lead, capture, picker) should see the new client in
   // the Clients list without a reload. Prefix match covers every scope.
