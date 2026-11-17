@@ -15,13 +15,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, authHeaders } from '../../lib/supabase.ts'
 import { useInvoiceDetail, useInvalidateInvoiceDetail } from '../../lib/queries.ts'
 import { reviewInvoice } from '../../lib/invoiceReview.js'
-import { fetchInvoicesForContact, createInvoice, invoiceAmountDue, invoiceDescription, sendInvoiceEmail } from '../../lib/invoices.ts'
+import { billTo, companyFromProfile, fetchInvoicesForContact, createInvoice, invoiceAmountDue, invoiceDescription, sendInvoiceEmail } from '../../lib/invoices.ts'
+import { useDocumentProfile } from '../../lib/companyBranding.ts'
 import { pickBalanceInvoice } from '../../lib/invoiceSettlement.ts'
 import { moneyExact } from '../../lib/format.ts'
 import { deletePayment } from '../../lib/stages.ts'
 import { parseDateOnly } from '../../lib/dates.ts'
 import { useAuth } from '../../contexts/AuthContext.tsx'
-import { useProfile } from '../../contexts/ProfileContext.tsx'
 // Lazy, pdf.js + transitive jspdf + autoTable deps are ~430KB. Only
 // loads on the first PDF action (Generate, Share, Email Invoice).
 async function loadPdf(): Promise<any> {
@@ -103,7 +103,6 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
   const id = idProp ?? params.id
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { profile } = useProfile()
 
   // Insurance claim payload (migration 018) is one-to-one with the
   // contact (owner-only RLS, null for partner viewers); change orders
@@ -191,17 +190,12 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
   const shareLabel = sharing ? 'Minting…' : 'Share link'
   const downloadLabel = generating ? 'Generating…' : 'Download'
 
-  // Resolved client info, prefer the denormalized job-row fields, fall
-  // back to fh_clients (the source of truth when edits happen on the
-  // client card and the job row stayed empty).
+  // Who this job bills, by the rule every invoice uses (billTo): the email
+  // and phone from fh_clients, where the office keeps them current, and the
+  // job row's copy only when the client has none (DATA-05).
   const resolved = useMemo(() => {
-    const cli: any = contact?.fh_clients || {}
-    return {
-      name:    contact?.name    || cli.name    || '',
-      email:   contact?.email   || cli.email   || '',
-      phone:   contact?.phone   || cli.phone   || '',
-      address: contact?.address || cli.address || ''
-    }
+    const to = billTo(contact, null)
+    return { name: to.name, email: to.email, phone: to.phone, address: to.address }
   }, [contact])
 
   const totals = useMemo(() => {
@@ -242,19 +236,11 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
     return { label: 'Remaining', tone: 'gold' }
   }, [totals])
 
-  const company = useMemo(() => ({
-    name: profile?.company_name || profile?.full_name || 'My Company',
-    address: profile?.company_address || '',
-    phone: profile?.company_phone || '',
-    email: profile?.company_email || (profile as any)?.email || '',
-    website: profile?.company_website || '',
-    logo_url: profile?.logo_url || null,
-    brand_accent_hex: profile?.brand_accent_hex || null,
-    license_number: profile?.license_number || '',
-    insured_text: profile?.insured_text || '',
-    payment_link: (profile as any)?.payment_link || '',
-    payment_instructions: (profile as any)?.payment_instructions || ''
-  }), [profile])
+  // The job's own company, whoever builds its documents (DATA-06): what is
+  // known now for the preview, read again for each document.
+  const documentProfile = useDocumentProfile(contact?.org_id)
+  const company = useMemo(() => companyFromProfile(documentProfile.profile), [documentProfile.profile])
+  const loadCompany = async () => companyFromProfile(await documentProfile.load())
 
   const pdfLineItems = useMemo(() => (
     billingDraw
@@ -286,7 +272,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
     try {
       const { generateInvoice, downloadPdf } = await loadPdf()
       const result = await generateInvoice({
-        company,
+        company: await loadCompany(),
         contact: {
           id: contact.id,
           name: resolved.name || 'Client',
@@ -401,7 +387,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
       invoice,
       // Same recipient block as this screen's own PDF (client fallbacks).
       contact: { ...contact, name: resolved.name || contact.name, email: resolved.email, phone: resolved.phone, address: resolved.address },
-      company,
+      company: await loadCompany(),
       userId: user!.id,
       recipientEmail: resolved.email,
       payments,
@@ -444,7 +430,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
       }
       const { generateInvoice, downloadPdf } = await loadPdf()
       const result = await generateInvoice({
-        company,
+        company: await loadCompany(),
         contact: {
           id: contact.id,
           name: resolved.name || 'Client',

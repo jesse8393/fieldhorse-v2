@@ -418,6 +418,50 @@ test('with no open draw the job money view shows the job title, not a paid draw\
   await expect(service.getByText('Deposit for the shed slab')).toHaveCount(0)
 })
 
+// DATA-05: a job keeps a copy of the client's email from when it was made
+// (x@y.com here). The office corrects the email on the client (jeff@roy.com),
+// so every way a job's invoice is emailed goes to the client's email.
+async function captureInvoiceSends(context: BrowserContext) {
+  await context.route('**/storage/v1/object/**', (route) => route.fulfill({ status: 200, json: { Key: 'job-files/qa-invoice.pdf' } }))
+  const sends: Array<{ recipient_email: string }> = []
+  await context.route('**/api/send-invoice', async (route) => {
+    sends.push(route.request().postDataJSON())
+    await route.fulfill({ status: 200, json: { ok: true } })
+  })
+  return sends
+}
+
+test("Resend on a job's invoice goes to the client's current email", async ({ page, context }) => {
+  await installShedInvoice(context)
+  const sends = await captureInvoiceSends(context)
+  await openInvoice(page, 'inv-1')
+  await action(page, 'Resend').click()
+  await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(1)
+  expect(sends[0].recipient_email).toBe('jeff@roy.com')
+})
+
+test("Email on the job's money view goes to the client's current email", async ({ page, context }) => {
+  await installShedInvoice(context)
+  const sends = await captureInvoiceSends(context)
+  await page.goto('/jobs/c-job1?tab=financials', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+  const email = page.getByRole('button', { name: 'Email', exact: true })
+  await expect(email).toBeVisible({ timeout: 30_000 })
+  await email.click()
+  await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(1)
+  expect(sends[0].recipient_email).toBe('jeff@roy.com')
+})
+
+test("emailing a draw from the job's invoices goes to the client's current email", async ({ page, context }) => {
+  await installShedInvoice(context)
+  const sends = await captureInvoiceSends(context)
+  await page.goto('/jobs/c-job1?tab=draws', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+  const email = page.getByRole('button', { name: 'Email draw to client' }).first()
+  await expect(email).toBeVisible({ timeout: 30_000 })
+  await email.click()
+  await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(1)
+  expect(sends[0].recipient_email).toBe('jeff@roy.com')
+})
+
 // M-08 and DATA-03: a payment on a job a teammate created carries the
 // teammate's id. Delete goes by id, and a delete that removed nothing says
 // so instead of "Payment deleted".

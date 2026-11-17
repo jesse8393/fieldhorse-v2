@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-type NoteRow = { user_id: string; contact_id: string | null; text: string; category: string }
+type NoteRow = { id?: string; user_id: string; contact_id: string | null; text: string; category: string }
 const inserted: NoteRow[] = []
 const failTexts = new Set<string>()
 // Jobs the database no longer has: a note filed on one breaks the foreign key.
 const goneJobs = new Set<string>()
 let sessionUser: string | null = 'user-a'
+// The next inserts save, and then their answer is lost on a weak signal.
+let loseAnswers = 0
 
 vi.mock('./supabase.ts', () => ({
   supabase: {
@@ -15,7 +17,11 @@ vi.mock('./supabase.ts', () => ({
         if (row.contact_id && goneJobs.has(row.contact_id)) {
           return { error: { code: '23503', message: 'insert or update on table "fh_notes" violates foreign key constraint' } }
         }
+        if (row.id && inserted.some((r) => r.id === row.id)) {
+          return { error: { code: '23505', message: 'duplicate key value violates unique constraint "fh_notes_pkey"' } }
+        }
         inserted.push(row)
+        if (loseAnswers > 0) { loseAnswers -= 1; return { error: { message: 'TypeError: Failed to fetch' } } }
         return { error: null }
       },
     }),
@@ -34,7 +40,7 @@ vi.stubGlobal('localStorage', {
 
 const capture = await import('./captureOutbox.ts')
 
-function queued(): { text: string; user_id?: string; job_id?: string }[] {
+function queued(): { id?: string; text: string; user_id?: string; job_id?: string }[] {
   return JSON.parse(storage.get('fh:capture-outbox') || '[]')
 }
 
@@ -44,6 +50,7 @@ beforeEach(() => {
   failTexts.clear()
   goneJobs.clear()
   sessionUser = 'user-a'
+  loseAnswers = 0
 })
 
 describe('pushOutbox', () => {
@@ -141,5 +148,30 @@ describe('clearCaptureOutbox', () => {
     capture.pushOutbox('theirs', 'user-b')
     capture.clearCaptureOutbox()
     expect(capture.outboxCount()).toBe(0)
+  })
+})
+
+// DATA-12: a note the server saved whose answer was lost stays queued and
+// is sent again on the next flush. It carries the id it was queued with,
+// so the second try is the same note, not a second copy of it.
+describe('a capture whose answer was lost', () => {
+  it('lands once over two flushes', async () => {
+    capture.pushOutbox('call the tile guy', 'user-a')
+    loseAnswers = 1
+    expect(await capture.flushOutbox('user-a')).toBe(0)
+    expect(queued()).toHaveLength(1)
+    expect(await capture.flushOutbox('user-a')).toBe(1)
+    expect(inserted).toHaveLength(1)
+    expect(queued()).toEqual([])
+  })
+
+  it('gives a capture queued before ids existed one id, kept between flushes', async () => {
+    storage.set('fh:capture-outbox', JSON.stringify([{ text: 'measure the deck', captured_at: new Date().toISOString(), user_id: 'user-a' }]))
+    loseAnswers = 1
+    expect(await capture.flushOutbox('user-a')).toBe(0)
+    expect(typeof queued()[0].id).toBe('string')
+    expect(await capture.flushOutbox('user-a')).toBe(1)
+    expect(inserted).toHaveLength(1)
+    expect(inserted[0].id).toBeTruthy()
   })
 })

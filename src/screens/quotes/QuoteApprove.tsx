@@ -20,9 +20,9 @@ import DataErrorState from '../../components/DataErrorState.tsx'
 import LoadingValue from '../../components/LoadingValue.tsx'
 import SignaturePad from '../../components/SignaturePad.tsx'
 import { useAuth } from '../../contexts/AuthContext.tsx'
-import { useProfile } from '../../contexts/ProfileContext.tsx'
 import { supabase } from '../../lib/supabase.ts'
 import { useLinkedClientEmail } from '../../lib/queries.ts'
+import { useDocumentProfile } from '../../lib/companyBranding.ts'
 import { customerEmail } from '../../lib/customerEmail.ts'
 import { quoteNumber } from '../../lib/quotes.ts'
 import { recordRoute } from '../../lib/records.ts'
@@ -70,7 +70,8 @@ export default function QuoteApprove() {
 
 function ApproveForm({ quote, patch, home }: { quote: QuoteWithClient; patch: ReturnType<typeof useQuote>['patch']; home: string }) {
   const { user } = useAuth()
-  const { profile } = useProfile()
+  // The quote's own company goes on the approved copy, whoever records it (DATA-06).
+  const documentProfile = useDocumentProfile(quote.org_id)
   const userId = user?.id
   const goBack = useGoBack(home)
   const client = quote.fh_clients ?? null
@@ -150,7 +151,7 @@ function ApproveForm({ quote, patch, home }: { quote: QuoteWithClient; patch: Re
     setErr('')
     setSubmitting(true)
     try {
-      const company = companyFromProfile(profile)
+      const company = companyFromProfile(await documentProfile.load())
       const snapshot = {
         quote_number: quoteNumber(company.name, quote.id, quote.sent_at || quote.created_at),
         snapshot_taken_at: new Date().toISOString(),

@@ -17,7 +17,6 @@ import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { NavigateFunction } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext.tsx'
-import { useProfile } from '../../contexts/ProfileContext.tsx'
 import {
   billTo,
   companyFromProfile,
@@ -31,6 +30,7 @@ import { knownContractTotal } from '../../lib/invoiceSettlement.ts'
 import { classifyInvoice, type InvoiceStanding } from '../../lib/moneyView.ts'
 import { onInvoiceSent, startInvoiceSend, useInvoicesSending } from '../../lib/invoiceSends.ts'
 import { invoiceRecordKey, useInvalidateInvoiceRecord, useInvoiceRecord, type InvoiceRecord, type InvoiceRecordBundle } from '../../lib/queries.ts'
+import { useDocumentProfile } from '../../lib/companyBranding.ts'
 import { useNow } from '../../lib/useNow.ts'
 import { toastError, toastSuccess } from '../../lib/toast.ts'
 import { hapticTap } from '../../lib/haptics.ts'
@@ -111,7 +111,6 @@ export function goBackFrom(navigate: NavigateFunction, fallback: string) {
 
 export function useInvoiceScreen(id: string | undefined) {
   const { user } = useAuth()
-  const { profile } = useProfile()
   const query = useInvoiceRecord(id, user?.id)
   const invalidate = useInvalidateInvoiceRecord()
   const queryClient = useQueryClient()
@@ -121,7 +120,10 @@ export function useInvoiceScreen(id: string | undefined) {
   const record = query.data ?? null
   const figures = useMemo(() => (record ? describeInvoice(record, now) : null), [record, now])
   const billingReview = useMemo(() => record ? reviewInvoice({ invoice: record.invoice, invoices: record.jobInvoices, contractTotal: record.job ? knownContractTotal({ amount: record.job.amount, changeOrders: record.changeOrders }) : null }) : null, [record])
-  const company = useMemo(() => companyFromProfile(profile), [profile])
+  // The company block of the invoice's own company, read again for each
+  // document so it is current, whoever builds it (DATA-06).
+  const { load: loadDocumentProfile } = useDocumentProfile(record?.invoice.org_id)
+  const loadCompany = useCallback(async () => companyFromProfile(await loadDocumentProfile()), [loadDocumentProfile])
   const sending = !!id && sendingIds.has(id)
 
   const refresh = useCallback(() => invalidate(id), [invalidate, id])
@@ -182,7 +184,7 @@ export function useInvoiceScreen(id: string | undefined) {
         duplicateReviewed: !!options.duplicateReviewed,
         contact: current.job,
         client: current.client,
-        company,
+        company: await loadCompany(),
         userId: user.id,
         recipientEmail: currentFigures.to.email,
         payments: current.payments,
@@ -205,7 +207,7 @@ export function useInvoiceScreen(id: string | undefined) {
       finish(sent)
     }
     return sent
-  }, [record, user, company, refresh, queryClient, id, now])
+  }, [record, user, loadCompany, refresh, queryClient, id, now])
 
-  return { user, query, record, figures, billingReview, company, now, sending, refresh, patchInvoice, send }
+  return { user, query, record, figures, billingReview, loadCompany, now, sending, refresh, patchInvoice, send }
 }

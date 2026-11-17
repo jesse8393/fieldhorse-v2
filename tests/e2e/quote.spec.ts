@@ -497,6 +497,45 @@ test.describe('the quote screen', () => {
     await expect(total(page).getByText('$3,150.00', { exact: true })).toBeVisible()
   })
 
+  // Audit finding DATA-12: a line the server saved whose answer was lost,
+  // added again from the same editor, is the same line, not a second one.
+  test('adding a line again after a lost answer sends the same id', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS } })
+    const inserts: Record<string, unknown>[] = []
+    // The first insert saves and its answer is lost. The second is refused
+    // as a duplicate the way Postgres refuses it, and the saved line reads back.
+    await context.route((url) => url.pathname.includes('/rest/v1/fh_quote_items'), (route) => {
+      const request = route.request()
+      const saved = inserts[0] ? { created_at: iso(NOW), updated_at: iso(NOW), ...inserts[0] } : null
+      if (request.method() === 'GET' && saved && decodeURIComponent(request.url()).includes(`id=eq.${String(inserts[0].id)}`)) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([saved]) })
+      }
+      if (request.method() !== 'POST') return route.fallback()
+      inserts.push(request.postDataJSON())
+      if (inserts.length === 1) return route.abort('connectionreset')
+      return route.fulfill({
+        status: 409,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: '23505', message: 'duplicate key value violates unique constraint "fh_quote_items_pkey"', details: null, hint: null })
+      })
+    })
+    await openQuote(page)
+    await page.getByRole('button', { name: 'Add a line' }).click()
+    const editor = page.getByRole('form', { name: 'Add a line' })
+    await editor.getByLabel('Description').fill('Haul off spoils')
+    await editor.getByLabel('Quantity').fill('2')
+    await editor.getByLabel('Rate').fill('390')
+    await editor.getByRole('button', { name: 'Add line', exact: true }).click()
+    await expect(page.getByText("Couldn't add the line")).toBeVisible()
+    await expect(editor.getByLabel('Description')).toHaveValue('Haul off spoils')
+    await editor.getByRole('button', { name: 'Add line', exact: true }).click()
+    await expect(editor).toBeHidden()
+    await expect(lines(page).getByText('Haul off spoils')).toBeVisible()
+    expect(inserts).toHaveLength(2)
+    expect(typeof inserts[0].id).toBe('string')
+    expect(inserts[1].id).toBe(inserts[0].id)
+  })
+
   test('a new quote lands with its first line open', async ({ context, page }) => {
     await signIn(context, { tables: { fh_quote_items: [] } })
     await openQuote(page, '/quotes/q-quote?lines=new')

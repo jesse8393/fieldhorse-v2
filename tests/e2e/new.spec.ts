@@ -292,6 +292,21 @@ test('a client save whose answer was lost is retried on the same row (DATA-12)',
   expect(rowId(bodies[1])).toBe(rowId(bodies[0]))
 })
 
+test('an invoice save whose answer was lost is retried on the same invoice (DATA-12)', async ({ context, page }) => {
+  await signIn(context)
+  const bodies = await loseFirstAnswer(page, 'fh_invoices')
+  await open(page, '/invoices/new?client=cl-1')
+  await expect(page.getByLabel('Client')).toHaveValue('Jeff Roy', { timeout: 30_000 })
+  await page.getByLabel('Amount').fill('1240')
+  await page.getByRole('button', { name: 'Save invoice' }).click()
+  await expect(page.locator('.fhnew-error')).toBeVisible()
+  await page.getByRole('button', { name: 'Save invoice' }).click()
+  await expect(page).toHaveURL(/\/invoices\/inv0$/, { timeout: 30_000 })
+  expect(bodies).toHaveLength(2)
+  expect(rowId(bodies[0])).toBeTruthy()
+  expect(rowId(bodies[1])).toBe(rowId(bodies[0]))
+})
+
 test('a lost connection on New lead and New client reads as a plain sentence (DATA-22)', async ({ context, page }) => {
   await signIn(context)
   await page.route(/\/rest\/v1\/fh_(leads|clients)(\?|$)/, (route) => route.request().method() === 'POST' ? route.abort('failed') : route.fallback())
@@ -323,6 +338,31 @@ test('a new lead shows in Leads when the person goes back (DATA-13)', async ({ c
   await expect(page).toHaveURL(/\/leads$/)
   // The list read again after the save instead of showing its old copy.
   await expect.poll(() => leadReads - before, { timeout: 5000 }).toBeGreaterThan(0)
+})
+
+test('a new invoice shows in Money when the person goes back (DATA-13)', async ({ context, page }) => {
+  await signIn(context)
+  // Money's own list read (the 500 most recent invoices), not the invoice screen's.
+  let listReads = 0
+  page.on('request', (req) => {
+    const url = decodeURIComponent(req.url())
+    if (req.method() === 'GET' && /\/rest\/v1\/fh_invoices\?/.test(url) && url.includes('order=created_at.desc') && url.includes('limit=500')) listReads++
+  })
+  await open(page, '/invoices')
+  await expect(page.getByRole('heading', { level: 1, name: 'Money' })).toBeVisible({ timeout: 30_000 })
+  await expect.poll(() => listReads).toBeGreaterThan(0)
+  await page.getByRole('link', { name: 'New invoice' }).first().click()
+  await expect(page.getByRole('heading', { level: 1, name: 'New invoice' })).toBeVisible({ timeout: 30_000 })
+  await page.getByLabel('Client').fill('Jeff')
+  await page.locator('.fhnew-client__pick').first().click()
+  await page.getByLabel('Amount').fill('1240')
+  const before = listReads
+  await page.getByRole('button', { name: 'Save invoice' }).click()
+  await expect(page).toHaveURL(/\/invoices\/inv0$/, { timeout: 30_000 })
+  await page.getByRole('button', { name: 'Back' }).first().click()
+  await expect(page).toHaveURL(/\/invoices$/)
+  // Money read its list again after the save instead of showing its old copy.
+  await expect.poll(() => listReads - before, { timeout: 5000 }).toBeGreaterThan(0)
 })
 
 test('the first field keeps its focus on New lead and New client (S20)', async ({ context, page }) => {

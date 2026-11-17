@@ -66,7 +66,7 @@ export default function InvoiceDetail() {
 
 function InvoiceDetailScreen({ id }: { id: string | undefined }) {
   const navigate = useNavigate()
-  const { user, query, record, figures, billingReview, company, now, sending, refresh, patchInvoice, send } = useInvoiceScreen(id)
+  const { user, query, record, figures, billingReview, loadCompany, now, sending, refresh, patchInvoice, send } = useInvoiceScreen(id)
   const waitId = useId()
   const titleRef = useRef<HTMLHeadingElement>(null)
   useEffect(() => { titleRef.current?.focus({ preventScroll: true }) }, [])
@@ -157,7 +157,7 @@ function InvoiceDetailScreen({ id }: { id: string | undefined }) {
       const savedInvoice = await saveDescription()
       if (!savedInvoice) return
       const result = await buildInvoicePdf({
-        invoice: savedInvoice, contact: record.job, client: record.client, company,
+        invoice: savedInvoice, contact: record.job, client: record.client, company: await loadCompany(),
         payments: record.payments, changeOrders: record.changeOrders, insurance: record.insurance,
         invoices: record.jobInvoices, amountDue: figures.due
       })

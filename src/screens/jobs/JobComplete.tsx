@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Button, Field, SkeletonRows } from '../../components/fh'
 import CreateShell, { Choices } from '../new/CreateShell.tsx'
-import { useProfile } from '../../contexts/ProfileContext.tsx'
+import { useDocumentProfile } from '../../lib/companyBranding.ts'
 import { supabase, authHeaders } from '../../lib/supabase.ts'
 import {
   SIGNOFF_METHODS, WARRANTY_PRESETS,
@@ -40,7 +40,8 @@ export default function JobComplete() {
 function CompleteForm({ data, userId, goBack, home }: { data: ReturnType<typeof useJobScreen>['data']; userId: string | undefined; goBack: () => void; home: string }) {
   // The parent renders this form only once the job is in.
   const contact = data.contact as NonNullable<typeof data.contact>
-  const { profile } = useProfile()
+  // The job's own company, whoever builds its certificate (DATA-06).
+  const documentProfile = useDocumentProfile(contact.org_id)
   const [loading, setLoading] = useState(true)
   const [existing, setExisting] = useState<any>(null)
   const [totals, setTotals] = useState({ paid: 0, photoCount: 0, approvedCO: 0 })
@@ -137,7 +138,8 @@ function CompleteForm({ data, userId, goBack, home }: { data: ReturnType<typeof 
     })
   }
 
-  function companyPayload() {
+  async function companyPayload() {
+    const profile = await documentProfile.load()
     return {
       name: profile?.company_name || profile?.full_name || 'My Company',
       address: profile?.company_address || '',
@@ -156,7 +158,7 @@ function CompleteForm({ data, userId, goBack, home }: { data: ReturnType<typeof 
     setBusy(true)
     try {
       const { generateCertificate, downloadPdf } = await loadPdf()
-      const result = await generateCertificate({ company: companyPayload(), contact, closeout: existing })
+      const result = await generateCertificate({ company: await companyPayload(), contact, closeout: existing })
       downloadPdf(result)
       hapticSuccess()
       toastSuccess('Certificate ready', result.filename)
@@ -181,7 +183,7 @@ function CompleteForm({ data, userId, goBack, home }: { data: ReturnType<typeof 
       // The PDF is built here and saved to job-files, so the server can
       // attach it; the row on fh_job_files shows it on the Files tab.
       const { generateCertificate, downloadPdf } = await loadPdf()
-      const result = await generateCertificate({ company: companyPayload(), contact, closeout: existing })
+      const result = await generateCertificate({ company: await companyPayload(), contact, closeout: existing })
       const blob = result.doc.output('blob')
       const rowId = createUuid()
       const path = `${userId}/${contact.id}/${rowId}.pdf`

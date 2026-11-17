@@ -23,6 +23,7 @@ import DataErrorState from '../../components/DataErrorState.tsx'
 import { Switch } from '@/components/ui/switch'
 import { keepFocusOnRetry } from '../../lib/retryFocus.ts'
 import { hapticTap } from '../../lib/haptics.ts'
+import { createUuid } from '../../lib/uuid.ts'
 import { buildQuoteView, type QuoteTerms } from '../../lib/quoteView.ts'
 import { amountFollowsRate } from '../../lib/quoteMoney.ts'
 import {
@@ -152,6 +153,9 @@ export default function QuoteLines({ items, userId, who, money, focusRef, startA
   // An approval that lands while an editor is open closes it.
   useEffect(() => { if (locked) setEditing(null) }, [locked])
   const editKey = useRef(0)
+  // The id of the line the add editor is making, minted once per line: a
+  // save whose answer was lost, tapped again, is the same line (DATA-12).
+  const newLineId = useRef(createUuid())
   const root = useRef<HTMLDivElement>(null)
   const lastSection = useRef('')
 
@@ -162,6 +166,7 @@ export default function QuoteLines({ items, userId, who, money, focusRef, startA
     if (locked) return
     hapticTap()
     opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    if (!id) newLineId.current = createUuid()
     editKey.current += 1
     setEditing({ key: editKey.current, id })
   }
@@ -187,7 +192,8 @@ export default function QuoteLines({ items, userId, who, money, focusRef, startA
     if (!editing.id) {
       lastSection.current = values.section || ''
       // Wait for the insert: a line that fails stays in the editor as typed.
-      const row = await addItem(values)
+      const row = await addItem({ ...values, id: newLineId.current })
+      if (row) newLineId.current = createUuid()
       return Boolean(row)
     }
     const id = editing.id

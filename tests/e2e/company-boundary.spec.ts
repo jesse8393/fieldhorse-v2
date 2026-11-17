@@ -8,6 +8,7 @@
 // org-1, and a partner's job from org-2 comes back through job sharing.
 // Migrations 092/093 do not carry that share to the new quote table:
 // canonical quotes require org membership and money visibility.
+import { readFileSync } from 'node:fs'
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 
@@ -144,5 +145,91 @@ test.describe('the Jobs list', () => {
     await expect(main.locator('a[href="/quotes/q-partner-quote"]')).toHaveCount(0)
     expect(quoteReads.length).toBeGreaterThan(0)
     expect(quoteReads.every((url) => url.searchParams.get('org_id') === 'eq.org-1')).toBe(true)
+  })
+})
+
+// DATA-06: the company block on a document is the company's, whoever
+// builds it. An invited admin's own profile holds only the onboarding
+// stamp, so building from it printed "My Company" with no address, licence
+// or payment link. The company's details come from fh_company_branding.
+const COMPANY = {
+  org_id: 'org-1',
+  company_name: 'Parker Construction Company',
+  full_name: 'Jesse Parker',
+  company_address: '100 Main St, Murfreesboro TN',
+  company_phone: '615-555-0100',
+  company_email: 'office@parker.co',
+  company_website: null,
+  logo_url: null,
+  brand_accent_hex: null,
+  license_number: 'TN-12345',
+  insured_text: 'Fully insured',
+  payment_link: null,
+  payment_instructions: 'Checks to Parker Construction',
+  estimate_template: 'classic',
+  warranty_default: null
+}
+
+const TEAM_JOB = contact({ id: 'c-team-job', org_id: 'org-1', stage: 'job', name: 'Plumbing Bellevue', job_title: 'Slab and trench', amount: 33100 })
+const TEAM_INVOICE = {
+  id: 'inv-team', org_id: 'org-1', contact_id: 'c-team-job', client_id: 'cl-1', user_id: 'qa-user-1', sequence_number: 1, title: 'Deposit',
+  amount: 3000, status: 'sent', issued_at: '2026-10-01T15:00:00.000Z', due_at: '2026-10-15T15:00:00.000Z', notes: null, description: null,
+  created_at: '2026-10-01T15:00:00.000Z', updated_at: '2026-10-01T15:00:00.000Z', fh_clients: CLIENT
+}
+const TEAM_LINES = [{
+  id: 'qi-team', user_id: 'qa-user-1', quote_id: 'q-own-quote', contact_id: null, section: null, description: 'Pour the pool deck',
+  qty: 1, unit: null, rate: 18458, amount: 18458, notes: null, is_optional: false, is_excluded: false, sort_order: 0,
+  created_at: '2026-09-01T12:00:00Z', updated_at: '2026-09-01T12:00:00Z'
+}]
+
+async function asInvitedAdmin(context: BrowserContext) {
+  await signIn(context, {
+    role: 'admin',
+    tables: {
+      ...TABLES,
+      fh_contacts: [TEAM_JOB],
+      fh_invoices: [TEAM_INVOICE],
+      fh_quote_items: TEAM_LINES,
+      profiles: [{ user_id: 'qa-user-1', onboarded_at: '2026-03-01T00:00:00Z' }]
+    }
+  })
+  const asked: unknown[] = []
+  await context.route('**/rest/v1/rpc/fh_company_branding', async (route) => {
+    asked.push(route.request().postDataJSON())
+    await route.fulfill({ status: 200, json: COMPANY })
+  })
+  return asked
+}
+
+async function downloadedText(page: Page, tap: () => Promise<void>) {
+  const download = page.waitForEvent('download')
+  await tap()
+  return readFileSync((await (await download).path()) as string, 'latin1')
+}
+
+test.describe("a teammate's documents", () => {
+  test("an invoice PDF prints the company's details, not My Company", async ({ context, page }) => {
+    const asked = await asInvitedAdmin(context)
+    await page.goto('/invoices/inv-team', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    const actions = page.locator('.fhinv-actions')
+    await expect(actions).toBeVisible({ timeout: 30_000 })
+    const text = await downloadedText(page, () => actions.getByRole('button', { name: 'PDF', exact: true }).click())
+    expect(text).toContain('Parker Construction Company')
+    expect(text).toContain('100 Main St')
+    expect(text).toContain('office@parker.co')
+    expect(text).not.toContain('My Company')
+    expect(asked).toContainEqual({ p_org_id: 'org-1' })
+  })
+
+  test("a quote PDF prints the company's name, not My Company", async ({ context, page }) => {
+    const asked = await asInvitedAdmin(context)
+    await page.goto('/quotes/q-own-quote', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    await expect(page.locator('.fhqt-page')).toBeVisible({ timeout: 30_000 })
+    const pdf = page.getByRole('list', { name: 'Share or download' }).getByRole('button', { name: /Download the PDF/ })
+    await expect(pdf).toBeEnabled({ timeout: 30_000 })
+    const text = await downloadedText(page, () => pdf.click())
+    expect(text).toContain('Parker Construction Company')
+    expect(text).not.toContain('My Company')
+    expect(asked).toContainEqual({ p_org_id: 'org-1' })
   })
 })
