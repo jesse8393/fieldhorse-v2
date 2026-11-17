@@ -396,6 +396,39 @@ export function dayLayout(
   }))
 }
 
+export type MoreLink = { top: number; count: number; ids: string[] }
+
+/**
+ * Keeps at most `max` visits side by side so each stays readable; the
+ * rest of an overlapping group fold into one "+N more" link, placed at
+ * the first hidden visit's start, which opens the day view.
+ */
+export function capDayColumns(items: DayItem[], max = 2): { shown: DayItem[]; more: MoreLink[] } {
+  if (items.every((i) => i.columns <= max)) return { shown: items, more: [] }
+  const shown: DayItem[] = []
+  const hidden: DayItem[] = []
+  for (const item of items) {
+    if (item.columns <= max) shown.push(item)
+    else if (item.column < max) shown.push({ ...item, columns: max })
+    else hidden.push(item)
+  }
+  // Hidden visits that overlap one another share one link.
+  const sorted = [...hidden].sort((a, b) => a.top - b.top)
+  const more: MoreLink[] = []
+  let bottom = -Infinity
+  for (const item of sorted) {
+    const last = more[more.length - 1]
+    if (last && item.top < bottom) {
+      last.count += 1
+      last.ids.push(item.id)
+    } else {
+      more.push({ top: item.top, count: 1, ids: [item.id] })
+    }
+    bottom = Math.max(bottom, item.top + item.height)
+  }
+  return { shown, more }
+}
+
 type JobNames = {
   name?: string | null
   job_title?: string | null

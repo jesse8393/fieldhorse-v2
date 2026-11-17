@@ -10,6 +10,7 @@ import { Button, Chip, Skeleton } from '../../fh'
 import {
   WEEKDAYS,
   boardHours,
+  capDayColumns,
   dayLabel,
   dayLayout,
   eventStatus,
@@ -104,7 +105,10 @@ export default function BoardGrid({ days, view, events, loading, failed = false,
           const key = ymdKey(day)
           const isToday = sameDay(day, now)
           const dayEvents = byDay.get(key) || []
-          const items = dayLayout(day, dayEvents, first, HOUR_PX)
+          // The week's narrow columns hold two visits side by side; the
+          // rest fold into a "+N more" link to the day view.
+          const laid = dayLayout(day, dayEvents, first, HOUR_PX)
+          const { shown: items, more } = view === 'week' ? capDayColumns(laid, 2) : { shown: laid, more: [] }
           const byId = new Map(dayEvents.map((e) => [e.id, e]))
           const headName = `${WEEKDAYS[day.getDay()]} ${day.getDate()}${isToday ? ', today' : ''}`
           return (
@@ -177,6 +181,18 @@ export default function BoardGrid({ days, view, events, loading, failed = false,
                     </button>
                   )
                 })}
+                {more.map((link) => (
+                  <button
+                    key={link.ids.join(',')}
+                    type="button"
+                    className="fhsch-more"
+                    style={{ top: link.top }}
+                    aria-label={`${link.count} more ${link.count === 1 ? 'visit' : 'visits'} on ${FULL_WEEKDAYS[day.getDay()]}, open day view`}
+                    onClick={() => onOpenDay(day)}
+                  >
+                    +{link.count} more
+                  </button>
+                ))}
               </div>
             </section>
           )

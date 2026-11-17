@@ -18,6 +18,7 @@ vi.mock('./supabase.ts', () => ({ supabase: {} }))
 
 import {
   boardHours,
+  capDayColumns,
   capTray,
   crewHours,
   dayLayout,
@@ -472,5 +473,26 @@ describe('visits past midnight (D16)', () => {
   it('draws the rest of the visit from midnight on the next day', () => {
     const [item] = dayLayout(new Date(2026, 9, 10), [pour], 0, 60)
     expect(item).toEqual({ id: 'pour', top: 0, height: 120, column: 0, columns: 1 })
+  })
+})
+
+describe('capDayColumns (D15)', () => {
+  const ev = (id: string, s: Date, e: Date) => ({ id, start_at: s.toISOString(), end_at: e.toISOString() })
+
+  it('keeps at most two visits side by side and counts the rest for a more link', () => {
+    const items = dayLayout(new Date(2026, 9, 9), [
+      ev('a', at(8), at(10)), ev('b', at(8), at(10)), ev('c', at(8, 30), at(10)), ev('d', at(9), at(10))
+    ], 7, 60)
+    const { shown, more } = capDayColumns(items, 2)
+    expect(shown.map((i) => i.id)).toEqual(['a', 'b'])
+    expect(shown.every((i) => i.columns === 2)).toBe(true)
+    expect(more).toEqual([{ top: 90, count: 2, ids: ['c', 'd'] }])
+  })
+
+  it('leaves a day with no more than the cap alone', () => {
+    const items = dayLayout(new Date(2026, 9, 9), [ev('a', at(8), at(9)), ev('b', at(8), at(9)), ev('c', at(11), at(12))], 7, 60)
+    const { shown, more } = capDayColumns(items, 2)
+    expect(shown).toEqual(items)
+    expect(more).toEqual([])
   })
 })
