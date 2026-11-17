@@ -5,6 +5,7 @@
 // that takes the dock's place.
 import { expect, test, type Page, type Route } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
+import { contrastOf } from './helpers/contrast.ts'
 
 async function open(page: Page, path: string) {
   await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 60_000 })
@@ -782,3 +783,18 @@ test('Mark complete saves the closeout and closes the job', async ({ context, pa
   expect(stage?.url).toContain('id=eq.c-job1')
   expect(stage?.body).toEqual({ stage: 'closed' })
 })
+
+// A11Y-06: the keyboard focus ring on the dark visit card's View schedule
+// can be seen (3 to 1 against the card), by day and at night.
+for (const mode of ['day', 'night'] as const) {
+  test(`the focus ring on the visit card can be seen in ${mode} mode`, async ({ context, page }) => {
+    await signIn(context, { mode })
+    await page.goto('/jobs/c-job1', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    const view = page.locator('.fh-job-visit').getByRole('button', { name: /^(View schedule|Schedule a visit)$/ }).first()
+    await expect(view).toBeVisible({ timeout: 30_000 })
+    await view.focus()
+    await expect(view).toBeFocused()
+    expect(await view.evaluate(element => element.matches(':focus-visible'))).toBe(true)
+    await expect.poll(() => contrastOf(view, 'outline')).toBeGreaterThanOrEqual(3)
+  })
+}

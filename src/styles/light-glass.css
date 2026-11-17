@@ -290,6 +290,9 @@ body:has(.fh-app--glass) .fh-app-header.fh-glass-header {
 .fh-work-execution .fh-job-visit p { color: var(--fh-smoke); font-size: 14px; line-height: 1.6; }
 .fh-work-execution .fh-job-visit button { color: var(--fh-linen); min-height: 44px; padding-block: 4px; }
 .fh-work-execution .fh-job-visit button:focus-visible { outline-color: var(--fh-focus-on-onyx); }
+/* The card is onyx in both modes: every focus ring inside it takes the
+   onyx focus colour, whichever rule draws the ring. */
+.fh-work-execution .fh-job-visit { --fh-focus: var(--fh-focus-on-onyx); }
 .fh-work-overview .fhj-spine { padding: 0; border: 0; }
 .fh-work-overview .fhj-spine__head { padding: 0 0 12px; }
 .fh-work-overview .fhj-spine__title { font-size: 16px; font-weight: 650; letter-spacing: -.025em; }
