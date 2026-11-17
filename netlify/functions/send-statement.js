@@ -14,7 +14,7 @@
 //   Reply-To: company_email || sender's auth email
 
 import { createClient } from '@supabase/supabase-js'
-import { renderPayBlock, formatFromHeader, textField, idempotencyKey, sendViaResend, sendFailure } from './lib/email.js'
+import { renderPayBlock, formatFromHeader, textField, idempotencyKey, sendViaResend, sendFailure, greetingFor, EMAIL_HEAD } from './lib/email.js'
 import { loadAccessibleRow, brandingUserIdFor } from './lib/orgAccess.js'
 import { hashIdentifier, checkRateLimit, checkDailySendCap, DAILY_SEND_LIMIT_MESSAGE } from './lib/rateLimit.js'
 
@@ -144,7 +144,7 @@ export default async (request) => {
   // Optional fields read through textField so a non string value from a
   // malformed client falls back to the default instead of throwing.
   const safeRecipientName = textField(recipient_name) || textField(client.company_name) || textField(client.name)
-  const greeting = safeRecipientName ? `Hi ${safeRecipientName.split(/\s+/)[0]},` : 'Hi,'
+  const greeting = greetingFor(safeRecipientName)
   const senderLine = companyName || 'Your contractor'
   const payLink = (profile?.payment_link || '').trim()
   const payInstructions = (profile?.payment_instructions || '').trim()
@@ -203,6 +203,7 @@ function renderStatementHtml({ greeting, clientLabel, amountLabel, senderLine, p
   const payRow = renderPayBlock(payLink, payInstructions, amountLabel, safe)
   return `<!doctype html>
 <html lang="en">
+${EMAIL_HEAD}
 <body style="margin:0;padding:0;background:#F2EDE4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#141414;line-height:1.55;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#F2EDE4;padding:32px 16px;">
     <tr><td align="center">

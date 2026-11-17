@@ -34,7 +34,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { hashIdentifier, checkRateLimit, checkDailySendCap, DAILY_SEND_LIMIT_MESSAGE } from './lib/rateLimit.js'
 import { loadAccessibleRow, brandingUserIdFor } from './lib/orgAccess.js'
-import { formatFromHeader, renderParagraphs, textField, idempotencyKey, sendViaResend, sendFailure } from './lib/email.js'
+import { formatFromHeader, renderParagraphs, textField, idempotencyKey, sendViaResend, sendFailure, EMAIL_HEAD } from './lib/email.js'
 
 // Daily cap for messages to an address that is not the job's customer.
 const OTHER_RECIPIENT_DAILY_LIMIT = 30
@@ -265,10 +265,11 @@ function renderMessageHtml({ body, senderLine, companyName }) {
   const bodyHtml = renderParagraphs(body, safe)
   return `<!doctype html>
 <html lang="en">
+${EMAIL_HEAD}
 <body style="margin:0;padding:0;background:#F2EDE4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#141414;line-height:1.55;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#F2EDE4;padding:32px 16px;">
     <tr><td align="center">
-      <table role="presentation" width="560" cellspacing="0" cellpadding="0" style="max-width:560px;background:#F2EDE4;border-radius:10px;border:1px solid #5C5C5C;overflow:hidden;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;max-width:560px;background:#F2EDE4;border-radius:10px;border:1px solid #5C5C5C;overflow:hidden;">
         <tr><td style="padding:32px 32px 24px;">
           <div style="font-size:16px;color:#141414;">${bodyHtml}</div>
         </td></tr>

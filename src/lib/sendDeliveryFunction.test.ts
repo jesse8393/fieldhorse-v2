@@ -130,3 +130,30 @@ describe('the record is marked sent on the server', () => {
     })
   }
 })
+
+describe('what the customer sees on a phone (PT-22)', () => {
+  for (const [name, s] of Object.entries(senders)) {
+    it(`${name} is fluid width with a viewport, so it fits a 390 px screen`, async () => {
+      const send = await handler(s.file)
+      await send(post(`/api/${name}`, s.body(path('a'))))
+      const html = outbound.find((o) => o.host === 'api.resend.com')!.body.html as string
+      expect(html).toContain('<meta name="viewport" content="width=device-width, initial-scale=1">')
+      expect(html).not.toMatch(/width="\d+"/)
+    })
+  }
+
+  for (const [name, s] of Object.entries(senders).filter(([n]) => n !== 'send-message')) {
+    it(`${name} greets a person by first name and a company neutrally`, async () => {
+      const send = await handler(s.file)
+      const greetingOf = async (recipient_name: string) => {
+        outbound.length = 0
+        seed()
+        await send(post(`/api/${name}`, { ...s.body(path('a')), recipient_name }))
+        return (outbound.find((o) => o.host === 'api.resend.com')!.body.text as string).split('\n')[0]
+      }
+      expect(await greetingOf('Marco Castellanos')).toBe('Hi Marco,')
+      expect(await greetingOf('The Roof Doctor')).toBe('Hello,')
+      expect(await greetingOf('MMC Properties')).toBe('Hello,')
+    })
+  }
+})

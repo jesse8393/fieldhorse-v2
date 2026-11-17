@@ -3,6 +3,20 @@
 // Shared email-rendering helpers for the send-* functions.
 
 import crypto from 'node:crypto'
+import { personFirstName } from '../../../src/lib/quoteView.ts'
+
+// The greeting line: "Hi Marco," when the name reads as a person's, and a
+// neutral "Hello," for a company ("The Roof Doctor", "MMC Properties") or
+// no name, which used to read "Hi The," and "Hi MMC,". The same reading
+// the customer page uses (personFirstName).
+export function greetingFor(name) {
+  const first = personFirstName(typeof name === 'string' ? name : '')
+  return first ? `Hi ${first},` : 'Hello,'
+}
+
+// Head for every customer email: a phone renders it at its own width
+// instead of zooming out a desktop layout.
+export const EMAIL_HEAD = '<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>'
 
 // How long one call to the mail provider may take. Netlify stops a
 // synchronous function after 10 seconds, so the send gives up first and
