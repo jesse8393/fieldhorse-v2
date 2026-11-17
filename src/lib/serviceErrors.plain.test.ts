@@ -5,6 +5,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { errorKind, plainError } from './serviceErrors.ts'
 
+vi.mock('./reportClientError.ts', () => ({ reportClientError: vi.fn() }))
+
 
 const FALLBACK = 'Could not save the job. Try again.'
 
@@ -197,6 +199,25 @@ describe('plainError', () => {
     plainError(null, FALLBACK)
     plainError(new Error('Enter a client.'), FALLBACK)
     expect(console.warn).not.toHaveBeenCalled()
+  })
+
+  it('reports to the crash reporter only what we cannot explain', async () => {
+    const { reportClientError } = await import('./reportClientError.ts')
+    const report = vi.mocked(reportClientError)
+    report.mockClear()
+    plainError(Object.assign(new Error('Invalid login credentials'), { name: 'AuthApiError', status: 400, code: 'invalid_credentials' }), FALLBACK)
+    plainError({ ...PG.rls }, FALLBACK)
+    plainError({ ...PG.jwt }, FALLBACK)
+    plainError({ ...PG.dup }, FALLBACK)
+    plainError({ status: 429 }, FALLBACK)
+    plainError(new TypeError('Failed to fetch'), FALLBACK)
+    plainError({ error: 'last_owner' }, FALLBACK)
+    expect(report).not.toHaveBeenCalled()
+    plainError({ ...PG.timeout }, FALLBACK)
+    plainError({ ...PG.check }, FALLBACK)
+    expect(report).toHaveBeenCalledTimes(2)
+    // Every value still reaches the console.
+    expect(console.warn).toHaveBeenCalledTimes(9)
   })
 
   it('still logs the raw value for us', () => {
