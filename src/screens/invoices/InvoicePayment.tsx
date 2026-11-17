@@ -28,6 +28,7 @@ import { invalidateAfterPayment } from '../jobs/jobScreen.tsx'
 import { useQueryClient } from '@tanstack/react-query'
 import './invoices.css'
 import { moneyInput } from '../new/CreateShell.tsx'
+import { toCents } from '../../lib/cents.ts'
 
 // A dollar amount for the editable input without stranding cents: a
 // $4,999.50 balance prefills as "4999.50", not "5000". Whole amounts drop
@@ -58,6 +59,10 @@ export default function InvoicePayment() {
 
   const isVoid = String(record?.invoice?.status || '').toLowerCase() === 'void'
   const shownAmount = amount ?? (figures ? amountInput(figures.due) : '')
+  // A reference only counts while its field shows (OPS-15): a check number
+  // typed before switching to cash is not sent.
+  const referenceShown = method !== 'cash' && method !== 'other'
+  const futureDate = paidOn > todayYmd()
   const numeric = Number(shownAmount) || 0
   const valid = shownAmount !== '' && Number.isFinite(numeric) && numeric > 0
   const back = () => goBackFrom(navigate, `/invoices/${id}`)
@@ -77,8 +82,8 @@ export default function InvoicePayment() {
     setSaving(true)
     try {
       const res = record.job
-        ? await logPayment(record.job as never, { id: paymentId, amount: numeric, method, kind, reference, paid_on: paidOn, invoice_id: record.invoice.id })
-        : await logInvoicePayment(record.invoice, { id: paymentId, amount: numeric, method, kind, reference, paid_on: paidOn, priorPayments: record.payments })
+        ? await logPayment(record.job as never, { id: paymentId, amount: numeric, method, kind, reference: referenceShown ? reference : '', paid_on: paidOn, invoice_id: record.invoice.id })
+        : await logInvoicePayment(record.invoice, { id: paymentId, amount: numeric, method, kind, reference: referenceShown ? reference : '', paid_on: paidOn, priorPayments: record.payments })
       if (res && 'error' in res && res.error) throw new Error((res.error as { message?: string }).message || 'save failed')
       hapticTap()
       if ((res as { statusError?: unknown })?.statusError) toastError('Invoice status not updated', 'The payment is saved, but the invoice status did not update. Open the invoice to check it.')
@@ -137,11 +142,17 @@ export default function InvoicePayment() {
           autoComplete="off"
           value={shownAmount}
           disabled={saving}
-          helper={isVoid ? 'This invoice is void, so it cannot take a payment.' : figures.due > 0 ? `${formatMoney(figures.due)} still owed on this invoice.` : 'Nothing is owed on this invoice.'}
+          helper={isVoid
+            ? 'This invoice is void, so it cannot take a payment.'
+            : figures.due > 0
+              ? (toCents(numeric) > toCents(figures.due)
+                  ? `This is more than the ${formatMoney(figures.due)} still owed on this invoice.`
+                  : `${formatMoney(figures.due)} still owed on this invoice.`)
+              : 'Nothing is owed on this invoice.'}
           onChange={(e) => setAmount(moneyInput(e.target.value))}
         />
         <PaymentClassification method={method} kind={kind} onMethodChange={setMethod} onKindChange={setKind} disabled={saving} />
-        {method !== 'cash' && method !== 'other' && (
+        {referenceShown && (
           <Field
             label={method === 'check' ? 'Check number' : method === 'card' ? 'Last 4 or receipt' : 'Reference'}
             value={reference}
@@ -150,7 +161,7 @@ export default function InvoicePayment() {
             onChange={(e) => setReference(e.target.value)}
           />
         )}
-        <Field label="Paid on" type="date" value={paidOn} disabled={saving} onChange={(e) => setPaidOn(e.target.value)} />
+        <Field label="Paid on" type="date" value={paidOn} disabled={saving} helper={futureDate ? 'This date is in the future.' : undefined} onChange={(e) => setPaidOn(e.target.value)} />
         <div className="fhinv-form__save">
           <Button type="submit" variant="primary" size="lg" block loading={saving} disabled={!valid || isVoid}>
             {valid ? `Record ${formatMoney(numeric)}` : 'Record payment'}

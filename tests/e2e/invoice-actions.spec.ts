@@ -632,3 +632,26 @@ for (const flow of ['edit', 'payment'] as const) {
     await expect(page).not.toHaveURL(/\/invoices\/inv-1/)
   })
 }
+
+// OPS-15: the payment form warns on an amount over what is owed and on a
+// future date, and does not send a check number hidden by choosing cash.
+test('the invoice payment form warns and drops a hidden check number', async ({ page, context }) => {
+  await installShedInvoice(context)
+  const posts: any[] = []
+  page.on('request', (r) => { if (r.method() === 'POST' && r.url().includes('/rest/v1/fh_payments')) posts.push(r.postDataJSON()) })
+  await page.goto('/invoices/inv-1/payment', { waitUntil: 'domcontentloaded' })
+  const amount = page.getByLabel('Amount')
+  await expect(amount).toBeVisible({ timeout: 30_000 })
+  await amount.fill('99999')
+  await expect(page.getByText(/more than the \$3,000(\.00)? still owed/i)).toBeVisible()
+  await page.getByLabel('Paid on').fill('2027-03-01')
+  await expect(page.getByText(/in the future/i)).toBeVisible()
+  await amount.fill('100')
+  await page.getByLabel('Paid on').fill('2026-11-10')
+  await page.getByLabel('Check number').fill('1042')
+  await page.getByLabel('Method').selectOption('cash')
+  await page.getByRole('button', { name: /^record/i }).click()
+  await expect.poll(() => posts.length).toBe(1)
+  expect(posts[0].reference ?? null).toBeNull()
+  expect(posts[0].method).toBe('cash')
+})
