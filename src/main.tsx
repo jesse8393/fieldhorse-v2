@@ -9,12 +9,12 @@ import App from './App.tsx'
 import AppErrorBoundary from './components/AppErrorBoundary.tsx'
 import AppToaster from './components/AppToaster.tsx'
 import ThemeLocationSync from './components/ThemeLocationSync.tsx'
-import { AuthProvider } from './contexts/AuthContext.tsx'
+import { AuthProvider, sessionSettled } from './contexts/AuthContext.tsx'
 import { ProfileProvider } from './contexts/ProfileContext.tsx'
 import { MembershipProvider } from './contexts/MembershipContext.tsx'
 import { ThemeProvider } from './contexts/ThemeContext.tsx'
 import { queryClient } from './lib/queryClient.ts'
-import { shouldPersistMutation, shouldPersistQuery } from './lib/queryPersistence.ts'
+import { readSavedCacheAfter, shouldPersistMutation, shouldPersistQuery } from './lib/queryPersistence.ts'
 import { isChunkLoadError, reloadOnceForStaleChunk } from './lib/lazyWithRetry.ts'
 import { installErrorReporting } from './lib/reportClientError.ts'
 // Self hosted variable type remains available in the installed app.
@@ -127,12 +127,14 @@ try { localStorage.removeItem('fh-query-cache') } catch { /* non-fatal */ }
 // Bump only when the shape of persisted query data changes in a way that
 // old rows would break the new code.
 const QUERY_CACHE_VERSION = 'v2'
+// The saved book is read only once the first session of the page load is
+// known: if it belongs to another account, the purge runs first.
 const queryPersister = createAsyncStoragePersister({
-  storage: {
+  storage: readSavedCacheAfter(sessionSettled, {
     getItem: (key: string) => idbGet(key).then((v) => v ?? null),
     setItem: (key: string, value: string) => idbSet(key, value),
     removeItem: (key: string) => idbDel(key)
-  },
+  }),
   key: 'fh-query-cache',
   // Coalesce rapid cache updates (realtime bursts, optimistic patches)
   // into one IDB write instead of one per update.

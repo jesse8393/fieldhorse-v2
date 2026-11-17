@@ -10,7 +10,7 @@ import { flushOutbox as flushCaptureOutbox, clearCaptureOutbox } from '../lib/ca
 import { disablePush, unsubscribePushLocally } from '../lib/push.ts'
 import { toastError } from '../lib/toast.ts'
 import { createAuthSessionBoundary } from '../lib/authSessionBoundary.ts'
-import type { PurgeScope } from '../lib/authSessionBoundary.ts'
+import type { CacheOwnerStore, PurgeScope } from '../lib/authSessionBoundary.ts'
 
 // How long sign out waits for queued offline work to sync, and for this
 // device's push subscription to be removed, before carrying on.
@@ -73,6 +73,30 @@ async function purgeLocalData({ queuedWork }: PurgeScope) {
   await settleWithin(unsubscribePushLocally(), SIGN_OUT_PUSH_MS)
 }
 
+// Who the saved book on this device belongs to, across page loads, so a
+// session that arrives from another account's email link purges it
+// before anything is shown (lib/authSessionBoundary.ts). Not a per user
+// key: it must outlive the purge it guards.
+const CACHE_OWNER_KEY = 'fh:cacheOwner'
+const cacheOwner: CacheOwnerStore = {
+  read: () => {
+    try { return window.localStorage.getItem(CACHE_OWNER_KEY) } catch { return null }
+  },
+  write: (userId) => {
+    try {
+      if (userId) window.localStorage.setItem(CACHE_OWNER_KEY, userId)
+      else window.localStorage.removeItem(CACHE_OWNER_KEY)
+    } catch { /* storage blocked: nothing was saved for anyone either */ }
+  },
+}
+
+let markSessionSettled: () => void = () => {}
+/**
+ * Settles once the first session of this page load is published, after
+ * any purge it needed. main.tsx reads the saved query cache only then.
+ */
+export const sessionSettled = new Promise<void>((resolve) => { markSessionSettled = resolve })
+
 type AuthContextValue = {
   session: Session | null
   user: User | null
@@ -97,7 +121,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const boundary = createAuthSessionBoundary<Session>({
       purge: purgeLocalData,
       hold: () => { setSession(null); setLoading(true) },
-      publish: (next) => { setSession(next); setLoading(false) },
+      publish: (next) => { setSession(next); setLoading(false); markSessionSettled() },
+      owner: cacheOwner,
     })
     boundaryRef.current = boundary
     void boundary.restore(supabase.auth.getSession()

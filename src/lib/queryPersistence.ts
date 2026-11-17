@@ -37,3 +37,20 @@ export function shouldPersistMutation(mutation: PersistableMutation): boolean {
   if (mutation.options.mutationKey?.[0] === 'inbox') return false
   return mutation.state.isPaused
 }
+
+type AsyncStorage = {
+  getItem(key: string): Promise<string | null>
+  setItem(key: string, value: string): Promise<unknown>
+  removeItem(key: string): Promise<unknown>
+}
+
+/**
+ * The saved cache is read only after `settled`: the first session of the
+ * page load has been published, after any purge it needed. Read earlier,
+ * the book of the account that last used the device could be hydrated
+ * after the purge that a different account's session started, and shown
+ * to that account (contexts/AuthContext.tsx, sessionSettled).
+ */
+export function readSavedCacheAfter<S extends AsyncStorage>(settled: Promise<unknown>, storage: S): S {
+  return { ...storage, getItem: (key: string) => settled.then(() => storage.getItem(key)) }
+}
