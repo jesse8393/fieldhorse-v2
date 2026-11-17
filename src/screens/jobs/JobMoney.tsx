@@ -304,7 +304,9 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
         dueDateIso: billingDraw?.due_at || null,
         invoiceId: contact.id,
         payments,
-        contractTotal: Number(contact?.amount || 0),
+        // Null, not 0, when the job has no price: the PDF then leaves the
+        // contract lines out instead of calling a $0 contract paid.
+        contractTotal: Number(contact?.amount || 0) || null,
         previouslyPaid: totals.paid,
         // The hero names the same figure as amount_due below.
         amountDue: billingDraw ? amountDueNow : null,
@@ -456,7 +458,9 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
         dueDateIso: billingDraw?.due_at || null,
         invoiceId: contact.id,
         payments,
-        contractTotal: Number(contact?.amount || 0),
+        // Null, not 0, when the job has no price: the PDF then leaves the
+        // contract lines out instead of calling a $0 contract paid.
+        contractTotal: Number(contact?.amount || 0) || null,
         previouslyPaid: totals.paid,
         // The hero names the same figure as amount_due below.
         amountDue: billingDraw ? amountDueNow : null,

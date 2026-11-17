@@ -382,7 +382,9 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       // RAW contract amount, generateInvoice folds approved COs in from
       // the changeOrders array itself, so passing the CO-inclusive
       // contractTotal here would double-count them in the balance box.
-      contractTotal: Number(contact?.amount || 0),
+      // Null, not 0, when the job has no price: the PDF then leaves the
+      // contract lines out instead of calling a $0 contract paid.
+      contractTotal: Number(contact?.amount || 0) || null,
       previouslyPaid,
       amountDue: drawAmountDue(draw),
       insurance,

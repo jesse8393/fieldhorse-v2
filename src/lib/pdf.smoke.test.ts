@@ -10,6 +10,12 @@ import { describe, it, expect } from 'vitest'
 // pdf.js is a large untyped legacy module, array params infer as
 // never[], so fixture payloads go through `as any` at the call sites.
 import { generateInvoice, generateQuote, generateCertificate, generateStatement } from './pdf.js'
+import { invoicePdfInput } from './invoices.ts'
+
+// Every string the PDF draws, in drawing order.
+function pdfText(result: any): string[] {
+  return [...String(result.doc.output()).matchAll(/\(((?:\\.|[^\\()])*)\)\s*Tj/g)].map((m: any) => m[1])
+}
 
 const company = {
   name: 'Parker Construction Co.',
@@ -136,5 +142,58 @@ describe('pdf engine smoke', () => {
   it('survives empty inputs (defensive defaults)', async () => {
     const result = await generateInvoice({})
     expectRealPdf(result)
+  })
+
+  // M-06: a job saved with no price has no contract to reconcile against.
+  describe('an invoice on a job with no price', () => {
+    const job = { id: 'job-1', name: 'Marco Castellanos', email: 'marco@example.com', phone: null, address: null, job_title: 'Weekly service', amount: 0 }
+
+    it('second invoice: prints what it owes and never PAID or a collected line', async () => {
+      const invA = { id: 'inv-a', contact_id: 'job-1', sequence_number: 1, title: 'Week 1', amount: 500, status: 'paid', issued_at: '2026-11-02T15:00:00Z', due_at: null, description: null, notes: null }
+      const invB = { id: 'inv-b', contact_id: 'job-1', sequence_number: 2, title: 'Week 2', amount: 500, status: 'sent', issued_at: '2026-11-09T15:00:00Z', due_at: '2026-11-24T05:59:59.999Z', description: null, notes: null }
+      const payments = [{ id: 'p1', contact_id: 'job-1', invoice_id: 'inv-a', amount: 500, paid_on: '2026-11-05' }]
+      const input = invoicePdfInput({ invoice: invB as any, contact: job, company, payments, changeOrders: [], invoices: [invA, invB] as any })
+      expect(input.amountDue).toBe(500)
+      const text = pdfText(await generateInvoice(input as any))
+      expect(text[text.indexOf('AMOUNT DUE') + 1]).toBe('$500.00')
+      expect(text.filter((t) => / collected$/.test(t) || t === 'PAID' || t === 'BALANCE REMAINING' || t === 'CONTRACT POSITION')).toEqual([])
+    })
+
+    it('a draw printed from the job page with part of it paid is not PAID', async () => {
+      const draw = { id: 'inv-1', contact_id: 'job-1', sequence_number: 1, title: 'Deposit', amount: 500, status: 'sent', issued_at: '2026-11-09T15:00:00Z', due_at: null }
+      const text = pdfText(await generateInvoice({
+        company,
+        contact: { id: 'job-1', name: 'Marco Castellanos', job_title: 'Deposit, Service call' },
+        lineItems: [{ description: 'Deposit', notes: 'Service call', qty: 1, rate: 500, amount: 500 }],
+        invoiceId: 'inv-1', currentInvoice: draw, invoices: [draw],
+        payments: [{ id: 'p1', contact_id: 'job-1', invoice_id: 'inv-1', amount: 200, paid_on: '2026-11-12' }],
+        contractTotal: 0, previouslyPaid: 200, amountDue: 300, changeOrders: []
+      } as any))
+      expect(text[text.indexOf('AMOUNT DUE') + 1]).toBe('$300.00')
+      expect(text.filter((t) => / collected$/.test(t) || t === 'PAID' || t === 'BALANCE REMAINING')).toEqual([])
+    })
+
+    it('with no figure handed in, the draw owes its amount less its own payments', async () => {
+      const draw = { id: 'inv-1', contact_id: 'job-1', sequence_number: 2, title: 'Week 2', amount: 500, status: 'sent', issued_at: '2026-11-09T15:00:00Z', due_at: null }
+      const text = pdfText(await generateInvoice({
+        company, contact: { id: 'job-1', name: 'Marco Castellanos' },
+        lineItems: [{ description: 'Week 2', qty: 1, rate: 500, amount: 500 }],
+        invoiceId: 'inv-1', currentInvoice: draw,
+        payments: [{ invoice_id: 'inv-0', amount: 500 }, { invoice_id: 'inv-1', amount: 200.25 }],
+        contractTotal: null, previouslyPaid: 700.25, changeOrders: []
+      } as any))
+      expect(text[text.indexOf('AMOUNT DUE') + 1]).toBe('$299.75')
+    })
+
+    it('a job with a price still prints its contract position, and 49 cents owed is not PAID', async () => {
+      const text = pdfText(await generateInvoice({
+        company, contact,
+        lineItems: [{ description: 'Final balance', qty: 1, rate: 1380, amount: 1380 }],
+        invoiceId: contact.id, contractTotal: 1380, previouslyPaid: 1379.51, amountDue: 0.49
+      } as any))
+      expect(text[text.indexOf('AMOUNT DUE') + 1]).toBe('$0.49')
+      expect(text[text.indexOf('BALANCE REMAINING') + 1]).toBe('$0.49')
+      expect(text.some((t) => / collected$/.test(t))).toBe(true)
+    })
   })
 })

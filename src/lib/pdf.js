@@ -17,6 +17,7 @@ import autoTable from 'jspdf-autotable'
 import { loadLogoForPdf, loadImageForPdf } from './pdfLogo.ts'
 import { safePayUrl } from './payLink.ts'
 import { installWinAnsiText } from './pdfText.ts'
+import { toCents, fromCents, sumCents } from './cents.ts'
 import {
   invoiceNumber as docInvoiceNumber,
   invoiceNumberFromSequence as docInvoiceNumberFromSequence,
@@ -1023,14 +1024,22 @@ export async function generateInvoice({
   const approvedCO = (changeOrders || [])
     .filter((co) => co?.status === 'approved')
     .reduce((s, co) => s + Number(co.amount || 0), 0)
-  const rawContract = Number(contractTotal != null ? contractTotal : thisInvoice)
-  const ct = rawContract + approvedCO
-  const pp = previouslyPaid != null
-    ? Number(previouslyPaid)
-    : (payments || []).reduce((s, p) => s + Number(p.amount || 0), 0)
-  const balance = Math.max(0, ct - pp)
+  // A job saved with no price has no contract to reconcile this bill
+  // against, whatever its change orders. Calling that a $0 contract printed
+  // "PAID" and "collected" beside an amount due, so those lines are left
+  // out and the bill owes its own amount less its own payments.
+  const contractUnknown = showContractPosition && !(Number(contractTotal) > 0)
+  const rawContract = Number(contractTotal != null && !contractUnknown ? contractTotal : thisInvoice)
+  const ct = contractUnknown ? rawContract : rawContract + approvedCO
+  const pp = contractUnknown
+    ? fromCents(sumCents((payments || []).filter((p) => currentInvoice?.id && p?.invoice_id === currentInvoice.id), (p) => p.amount))
+    : previouslyPaid != null
+      ? Number(previouslyPaid)
+      : fromCents(sumCents(payments || [], (p) => p?.amount))
+  // Whole cents: 49 cents owed is owed, and float dust is not.
+  const balance = fromCents(Math.max(0, toCents(ct) - toCents(pp)))
   const handedDue = amountDue != null && Number.isFinite(Number(amountDue)) ? Number(amountDue) : null
-  const isPaid = handedDue != null ? handedDue < 0.5 : balance < 0.5
+  const isPaid = handedDue != null ? toCents(handedDue) <= 0 : toCents(balance) <= 0
   // The hero "Amount due" is what THIS invoice still owes: the figure the
   // caller hands in when it has one (the same one the email names), else
   // the invoice amount capped at the remaining contract balance. It used
@@ -1049,12 +1058,12 @@ export async function generateInvoice({
   // 2. Hero band, Amount due (this invoice)
   const heroRight = []
   if (!isPaid && dueDisplay) heroRight.push(`Due ${dueDisplay}`)
-  if (ct > 0) heroRight.push(`${moneyCompact(pp)} of ${moneyCompact(ct)} collected`)
+  if (ct > 0 && !contractUnknown) heroRight.push(`${moneyCompact(pp)} of ${moneyCompact(ct)} collected`)
   cursor = drawHeroBand(doc, {
     startY: cursor, margin, pageWidth, brandRGB,
     label: isPaid ? 'Balance' : 'Amount due',
     amount: heroAmount, isPaid, rightLines: heroRight,
-    paid: pp, contractTotal: ct
+    paid: pp, contractTotal: contractUnknown ? 0 : ct
   })
 
   // 3. Parties
@@ -1099,7 +1108,7 @@ export async function generateInvoice({
   // 6. Balance summary / contract position, the one reconciliation the
   //    customer can check (contract → COs → this invoice → paid → balance).
   //    An invoice with no job has nothing to reconcile against and skips it.
-  if (showContractPosition && (ct > 0 || pp > 0)) {
+  if (showContractPosition && !contractUnknown && (ct > 0 || pp > 0)) {
     // Plain ASCII signs: the standard PDF fonts cannot draw U+2212, and a
     // string holding it printed as junk, losing the sign on credits.
     const balanceRows = []
@@ -1139,8 +1148,8 @@ export async function generateInvoice({
     doc.text('BALANCE REMAINING', labelX, cursor)
     doc.setCharSpace(0)
     doc.setFontSize(16)
-    doc.setTextColor(...(balance > 0.5 ? brandRGB : SIGNAL_GREEN))
-    doc.text(balance > 0.5 ? moneyCompact(balance) : 'PAID', valueX, cursor, { align: 'right' })
+    doc.setTextColor(...(toCents(balance) > 0 ? brandRGB : SIGNAL_GREEN))
+    doc.text(toCents(balance) > 0 ? moneyCompact(balance) : 'PAID', valueX, cursor, { align: 'right' })
     cursor += 8
   }
 
