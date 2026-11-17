@@ -71,4 +71,20 @@ describe('a removed teammate accepting an invite', () => {
     expect(res.status).toBe(403)
     expect(crewRow().revoked_at).toBe(REMOVED_AT)
   })
+
+  it('a failed restore logs one line with no row values in it', async () => {
+    state.tables.org_invites.push({
+      id: 'inv-new', org_id: ORG, email: 'dana@example.test', role: 'foreman', token: 'fresh-token',
+      invited_by: OWNER, created_at: '2026-11-10T00:00:00.000Z', expires_at: inTwoWeeks(), accepted_at: null,
+    })
+    state.failWrites = { org_members: 'duplicate key value violates unique constraint Key (user_id, email)=(user-crew, dana@example.test)' }
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const res = await accept(post('fresh-token'))
+    const lines = spy.mock.calls.map((c) => c.map(String).join(' '))
+    spy.mockRestore()
+    expect(res.status).toBe(500)
+    expect(lines).toHaveLength(1)
+    expect(JSON.parse(lines[0])).toMatchObject({ scope: 'org-invite-accept', what: 'membership restore failed', code: 'XX000', org_id: ORG })
+    expect(lines[0]).not.toMatch(/dana@example|user-crew/)
+  })
 })

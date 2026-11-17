@@ -11,7 +11,9 @@ const fake = vi.hoisted(() => {
     inserts: [] as Array<{ table: string; row: Row }>,
     rpcs: [] as Array<{ name: string; args: Row }>,
     rpcResult: null as any,
-    reset() { state.tables = {}; state.inserts = []; state.rpcs = []; state.rpcResult = null },
+    // An error the next insert into this table answers with.
+    failInsert: {} as Record<string, { code: string; message: string; details?: string }>,
+    reset() { state.tables = {}; state.inserts = []; state.rpcs = []; state.rpcResult = null; state.failInsert = {} },
   }
   let nextId = 1
   function from(table: string) {
@@ -33,6 +35,10 @@ const fake = vi.hoisted(() => {
       },
       insert(payload: Row | Row[]) {
         const list = Array.isArray(payload) ? payload : [payload]
+        if (state.failInsert[table]) {
+          insertError = state.failInsert[table]
+          return chain
+        }
         // The primary key is unique, as in the database.
         if (list.some((p) => p.id && (state.tables[table] ?? []).some((r) => r.id === p.id))) {
           insertError = { code: '23505', message: 'duplicate key value violates unique constraint' }
@@ -173,6 +179,19 @@ describe('webhook-lead writes the new records', () => {
     expect(notification?.link).toBe(`/leads/${lead?.id}`)
     expect(notification?.kind).toBe('new_lead')
     expect(body).toMatchObject({ ok: true, id: lead?.id, client_id: 'client-9' })
+  })
+
+  it('a failed insert logs one line with no customer data in it', async () => {
+    fake.state.rpcResult = [{ client_id: 'client-9', is_new: true }]
+    fake.state.failInsert.fh_leads = { code: '23505', message: 'duplicate key value violates unique constraint "fh_leads_pkey"', details: 'Key (email)=(ana@ruiz.com) already exists.' }
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { status } = await post({ name: 'Ana Ruiz', phone: '615-555-0142', email: 'ana@ruiz.com', job_title: 'Deck rebuild' })
+    expect(status).toBe(500)
+    const lines = spy.mock.calls.map((c) => c.map(String).join(' '))
+    spy.mockRestore()
+    expect(lines).toHaveLength(1)
+    expect(JSON.parse(lines[0])).toMatchObject({ scope: 'webhook-lead', what: 'insert failed', code: '23505', org_id: 'org-1' })
+    expect(lines[0]).not.toMatch(/ana@ruiz|615-555|Ana Ruiz|Key \(/)
   })
 
   // The company comes from the key owner's active membership. profiles.org_id
