@@ -140,6 +140,33 @@ test.describe('the lead screen', () => {
     expect(patches.length).toBe(1)
   })
 
+  test("notes typed and left with the phone's Back are saved (DATA-14)", async ({ context, page }) => {
+    await signIn(context)
+    const patches = await recordLeadPatches(page)
+    await open(page, '/leads')
+    await page.getByText('Vintage Burkitt Station Drainage').first().click()
+    await expect(page).toHaveURL(/\/leads\/l-lead1$/)
+    const notes = page.getByLabel('Notes')
+    await expect(notes).toBeVisible({ timeout: 30_000 })
+    await notes.fill('Gate code 4411, dog in the yard.')
+    // System Back: the field is never blurred by the app's own button.
+    await page.goBack()
+    await expect.poll(() => patches.length, { timeout: 5000 }).toBe(1)
+    expect(JSON.parse(patches[0].slice('eq.l-lead1='.length))).toMatchObject({ notes: 'Gate code 4411, dog in the yard.' })
+  })
+
+  test('notes are saved at once when the app is hidden or closed (DATA-14)', async ({ context, page }) => {
+    await signIn(context)
+    const patches = await recordLeadPatches(page)
+    await open(page, '/leads/l-lead1')
+    const notes = page.getByLabel('Notes')
+    await expect(notes).toBeVisible({ timeout: 30_000 })
+    await notes.fill('Call after 5.')
+    await page.evaluate(() => window.dispatchEvent(new Event('pagehide')))
+    await expect.poll(() => patches.length, { timeout: 400 }).toBe(1)
+    expect(JSON.parse(patches[0].slice('eq.l-lead1='.length))).toMatchObject({ notes: 'Call after 5.' })
+  })
+
   test('the next estimate visit and the earlier notes show', async ({ context, page }) => {
     await signIn(context, {
       tables: {

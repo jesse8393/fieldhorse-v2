@@ -2,7 +2,8 @@
 // D60). A lead is information from a customer who has no quote yet. The
 // screen shows who (the client's name and phone with Call and Message),
 // where (the address with Navigate), what they need, notes saved in place
-// on blur with the sync pill, the next estimate visit when one is booked,
+// (on blur, after a pause in typing, and when the screen or page goes away)
+// with the sync pill, the next estimate visit when one is booked,
 // the two buttons Schedule estimate and Quote this, Mark lost with a
 // second tap on the same button, and the notes left on the contact row
 // the migration moved, under Earlier notes. No sheet, no dialog.
@@ -36,6 +37,8 @@ type Note = { id: string; text: string | null; created_at: string | null; catego
 
 /** The 4 seconds the second tap has before Mark lost goes back to resting (D57). */
 const CONFIRM_MS = 4000
+/** Notes save this long after typing stops, as well as on blur. */
+const NOTES_SAVE_MS = 800
 
 async function fetchNextVisit(leadId: string): Promise<Visit | null> {
   const { data, error } = await supabase
@@ -117,21 +120,50 @@ export default function LeadDetail({ id, fallback }: LeadDetailProps) {
     savedNotes.current = lead.notes ?? ''
   }
 
+  // Saves the text that is in the field now. Called on blur, after a
+  // pause in typing, when the page is hidden or closed, and when the screen
+  // goes away (the phone's Back never blurs the field), so typed notes are
+  // never left behind. resilientUpdate queues the write when offline.
+  const latest = useRef({ notes, leadId: lead?.id ?? null })
+  latest.current = { notes, leadId: lead?.id ?? null }
   async function saveNotes() {
-    if (!lead) return
-    const next = notes.trim()
+    const { notes: text, leadId: target } = latest.current
+    if (!target) return
+    const next = text.trim()
     const before = (savedNotes.current ?? '').trim()
     if (next === before) return
     savedNotes.current = next
-    const res = await resilientUpdate('fh_leads', { id: lead.id }, { notes: next || null }, { userId: user?.id })
+    const res = await resilientUpdate('fh_leads', { id: target }, { notes: next || null }, { userId: user?.id })
     if (res.error) {
       savedNotes.current = before
       toastError('Could not save the notes.', 'Check your connection and try again.')
       return
     }
-    queryClient.setQueryData<LeadRow | null>(leadKey(lead.id), (prev) => (prev ? { ...prev, notes: next || null } : prev))
+    queryClient.setQueryData<LeadRow | null>(leadKey(target), (prev) => (prev ? { ...prev, notes: next || null } : prev))
     invalidateLeads()
   }
+  const saveNotesRef = useRef(saveNotes)
+  saveNotesRef.current = saveNotes
+
+  // After a pause in typing.
+  useEffect(() => {
+    if (notesSeeded === null) return
+    const t = window.setTimeout(() => { void saveNotesRef.current() }, NOTES_SAVE_MS)
+    return () => window.clearTimeout(t)
+  }, [notes, notesSeeded])
+
+  // When the page is hidden or closed, and when the screen goes away.
+  useEffect(() => {
+    const flush = () => { void saveNotesRef.current() }
+    const onVisibility = () => { if (document.visibilityState === 'hidden') flush() }
+    window.addEventListener('pagehide', flush)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('pagehide', flush)
+      document.removeEventListener('visibilitychange', onVisibility)
+      flush()
+    }
+  }, [])
 
   // Mark lost: the first tap arms the button, the second within 4 seconds
   // writes (D57). No dialog.
