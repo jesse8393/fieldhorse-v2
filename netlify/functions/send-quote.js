@@ -37,6 +37,7 @@ import { createClient } from '@supabase/supabase-js'
 import { loadAccessibleRow, brandingUserIdFor } from './lib/orgAccess.js'
 import { hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
 import { formatFromHeader, renderParagraphs, textField } from './lib/email.js'
+import { isOwnedStoragePath } from './lib/storagePath.js'
 
 export default async (request) => {
   if (request.method === 'OPTIONS') {
@@ -170,13 +171,17 @@ export default async (request) => {
   const companyName = (profile?.company_name || profile?.full_name || '').trim()
   const replyTo = (profile?.company_email || authData.user.email || '').trim()
 
-  // 3. Download the uploaded proposal PDF from job-files. Service role
-  // bypasses the per-user folder RLS, so we must re-impose tenant scoping
-  // ourselves: every job-files object is written under `${userId}/...`
-  // (see src/screens/**/Quote.tsx upload paths), so a path that doesn't
-  // start with the caller's own id belongs to another tenant. Reject it
-  // rather than let a forged storage_path exfiltrate another user's PDF.
-  if (!String(storage_path).startsWith(`${sender_user_id}/`)) {
+  // 3. Download the uploaded proposal PDF from job-files. The service role
+  // key ignores the per user folder rules, so the path is checked here
+  // first. isOwnedStoragePath (lib/storagePath.js) accepts only a PDF under
+  // the caller's own folder, which is where every upload in the apps puts
+  // it (`${userId}/...`), written as 2 to 5 plain segments: no "." or ".."
+  // segment, no encoded character, no query string and no fragment.
+  // Starting with the caller's id is not enough. fetch resolves dot
+  // segments, so "<id>/../../../../../rest/v1/<table>" would make the
+  // service key read that table, and "<id>/../<other id>/..." another
+  // account's file. Anything else is refused before the download.
+  if (!isOwnedStoragePath(storage_path, sender_user_id, { extensions: ['pdf'] })) {
     return json({ error: 'forbidden_path', detail: 'storage_path is outside your namespace.' }, 403)
   }
   const { data: fileBlob, error: dlErr } = await supabase.storage
