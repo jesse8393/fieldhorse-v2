@@ -275,6 +275,9 @@ function watchWrites(page: Page): string[] {
   page.on('request', (req) => {
     const url = new URL(req.url())
     if (!['PATCH', 'DELETE', 'POST'].includes(req.method()) || !url.pathname.includes('/rest/v1/')) return
+    // The header bell reads open reminders through an RPC, which is a POST
+    // that changes nothing. It is a read, so it is not counted as a write.
+    if (url.pathname.endsWith('/rpc/fh_my_open_reminders')) return
     writes.push(`${req.method()} ${url.pathname.split('/rest/v1/')[1]} ${req.postData() ?? ''}`)
   })
   return writes
