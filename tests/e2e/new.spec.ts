@@ -419,3 +419,17 @@ for (const { path, save, field, message, clear = false } of [
     await expect(input).toBeFocused()
   })
 }
+
+// A11Y-09: New lead says which field it cannot save without before a save
+// fails: Name reads Required on screen and to assistive tech (WCAG 3.3.2).
+test('New lead marks its name as required', async ({ context, page }) => {
+  await signIn(context)
+  await open(page, '/leads/new')
+  const name = page.getByRole('combobox', { name: /^Name/ })
+  await expect(name).toBeVisible()
+  const required = (field: typeof name) => field.evaluate(el => (el as HTMLInputElement).required || el.getAttribute('aria-required') === 'true')
+  expect(await required(name)).toBe(true)
+  await expect(page.locator('label', { has: page.getByText('Required', { exact: true }) })).toHaveText(/^Name\s*Required$/)
+  // The optional fields stay optional.
+  expect(await required(page.getByRole('textbox', { name: /^Phone/ }))).toBe(false)
+})

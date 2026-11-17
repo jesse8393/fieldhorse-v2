@@ -148,11 +148,13 @@ type Props = {
   placeholder?: string
   error?: string
   autoFocus?: boolean
+  /** The form cannot save without it: the label says Required and the input is marked so. */
+  required?: boolean
   /** Called with the picked client, so a screen can fill its own fields from it. */
   onPick?: (client: ClientPick) => void
 }
 
-export default function ClientField({ userId, value, onChange, label = 'Client', placeholder = 'Type a name', error, autoFocus, onPick }: Props) {
+export default function ClientField({ userId, value, onChange, label = 'Client', placeholder = 'Type a name', error, autoFocus, required, onPick }: Props) {
   const orgScope = useOrgScope(userId)
   const scope = JSON.stringify([userId, orgScope === undefined ? 'unresolved' : orgScope])
   const [read, setRead] = useState<{ scope: string; retry: number; rows: ClientPick[]; failed: boolean } | null>(null)
@@ -222,7 +224,8 @@ export default function ClientField({ userId, value, onChange, label = 'Client',
     <div className="fhnew-client">
       <Field
         ref={inputRef}
-        label={label}
+        label={required ? <>{label} <span className="fhnew-optional">Required</span></> : label}
+        required={required}
         value={typed}
         placeholder={placeholder}
         autoComplete="off"

@@ -140,6 +140,7 @@ export default function LeadNew() {
         userId={user?.id}
         label="Name"
         placeholder="Who called"
+        required
         error={nameError}
         value={client}
         onChange={onClient}
