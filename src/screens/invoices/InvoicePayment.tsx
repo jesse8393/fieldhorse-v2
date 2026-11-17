@@ -80,6 +80,7 @@ export default function InvoicePayment() {
         : await logInvoicePayment(record.invoice, { id: paymentId, amount: numeric, method, kind, reference, paid_on: paidOn, priorPayments: record.payments })
       if (res && 'error' in res && res.error) throw new Error((res.error as { message?: string }).message || 'save failed')
       hapticTap()
+      if ((res as { statusError?: unknown })?.statusError) toastError('Invoice status not updated', 'The payment is saved, but the invoice status did not update. Open the invoice to check it.')
       // A job's payment goes through logPayment (lib/pipeline.ts), which
       // shows its own toast; only an invoice with no job needs one here.
       if (!record.job) toastSuccess('Payment recorded', `${formatMoney(numeric)}, ${PAYMENT_METHODS.find((m) => m.value === method)?.label || 'Payment'}`)

@@ -37,12 +37,17 @@ const fake = vi.hoisted(() => {
     }
     return api
   }
-  return { state, supabase: { from } }
+  const storage = { from: () => ({ upload: async () => ({ error: null }) }) }
+  return { state, supabase: { from, storage } }
 })
 
 vi.mock('./supabase.ts', () => ({ supabase: fake.supabase, authHeaders: async () => ({}) }))
+vi.mock('./pdf.js', () => ({
+  generateInvoice: async () => ({ doc: { output: () => new Blob(['%PDF-']) }, filename: 'Invoice.pdf' }),
+  downloadPdf: () => {}
+}))
 
-const { logInvoicePayment, settleInvoiceAfterEdit } = await import('./invoices.ts')
+const { logInvoicePayment, settleInvoiceAfterEdit, sendInvoiceEmail } = await import('./invoices.ts')
 
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -103,3 +108,43 @@ describe('an invoice edited down to what was already paid on it', () => {
     expect(fake.state.tables.fh_invoices[0].status).toBe('sent')
   })
 })
+
+// DATA-17: the status write after a payment or a send is checked, tried
+// once more, and reported when it still fails.
+describe('status writes after a payment or a send', () => {
+  it('retries the paid flip once after a dropped connection', async () => {
+    fake.state.tables.fh_invoices = [{ id: 'i', user_id: 'u', amount: 500, status: 'sent' }]
+    fake.state.failUpdates = 1
+    const res: any = await logInvoicePayment({ id: 'i', user_id: 'u', amount: 500, status: 'sent' } as any, { amount: 500, paid_on: '2026-11-16' })
+    expect(fake.state.tables.fh_invoices[0].status).toBe('paid')
+    expect(res.statusError ?? null).toBeNull()
+  })
+
+  it('reports a paid flip that failed twice', async () => {
+    fake.state.tables.fh_invoices = [{ id: 'i', user_id: 'u', amount: 500, status: 'sent' }]
+    fake.state.failUpdates = 2
+    const res: any = await logInvoicePayment({ id: 'i', user_id: 'u', amount: 500, status: 'sent' } as any, { amount: 500, paid_on: '2026-11-16' })
+    expect(res.error).toBeNull()
+    expect(res.statusError).toBeTruthy()
+    expect(fake.state.tables.fh_invoices[0].status).toBe('sent')
+  })
+
+  it('retries the sent flip once and reports when it still fails', async () => {
+    vi.stubGlobal('fetch', async () => ({ ok: true, status: 200, json: async () => ({ ok: true }) }))
+    const invoice = { id: 'i', contact_id: null, client_id: 'c', user_id: 'u', amount: 500, status: 'draft', sequence_number: 1, title: 'Deposit', issued_at: null, updated_at: 'x' }
+    fake.state.tables.fh_invoices = [{ ...invoice }]
+    fake.state.failUpdates = 1
+    const ok: any = await sendInvoiceEmail({ invoice: invoice as any, contact: null, client: { id: 'c', name: 'Dana', email: 'd@x.com' }, company: {}, userId: 'u' })
+    expect(ok.ok).toBe(true)
+    expect(ok.statusError ?? null).toBeNull()
+    expect(fake.state.tables.fh_invoices[0].status).toBe('sent')
+
+    fake.state.tables.fh_invoices = [{ ...invoice }]
+    fake.state.failUpdates = 2
+    const bad: any = await sendInvoiceEmail({ invoice: invoice as any, contact: null, client: { id: 'c', name: 'Dana', email: 'd@x.com' }, company: {}, userId: 'u' })
+    expect(bad.ok).toBe(true)
+    expect(bad.statusError).toBeTruthy()
+    vi.unstubAllGlobals()
+  })
+})
+

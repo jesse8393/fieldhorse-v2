@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // update / eq / in / maybeSingle) for logPayment, and it applies every
 // filter the code sends, so a stray user_id filter shows up as a miss.
 const fake = vi.hoisted(() => {
-  const state = { tables: {} as Record<string, any[]> }
+  const state = { tables: {} as Record<string, any[]>, failInvoiceUpdates: 0 }
   function from(table: string) {
     const q = {
       op: 'select' as 'select' | 'insert' | 'update' | 'delete',
@@ -30,6 +30,7 @@ const fake = vi.hoisted(() => {
       }
       const matched = rows.filter((r) => q.filters.every((f) => f(r)))
       if (q.op === 'update') {
+        if (table === 'fh_invoices' && state.failInvoiceUpdates > 0) { state.failInvoiceUpdates--; return { data: null, error: { message: 'network' } } }
         for (const r of matched) Object.assign(r, q.patch)
         return { data: matched.map((r) => ({ id: r.id })), error: null }
       }
@@ -145,6 +146,7 @@ describe('logPayment', () => {
 
   beforeEach(() => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
+    fake.state.failInvoiceUpdates = 0
     fake.state.tables = {
       fh_contacts: [{ ...job }],
       fh_invoices: [],
@@ -224,6 +226,23 @@ describe('logPayment', () => {
     expect(res.closed).toBe(false)
     expect(fake.state.tables.fh_contacts[0].stage).toBe('job')
     expect(fake.state.tables.fh_invoices.map((r) => r.status)).toEqual(['paid', 'sent'])
+  })
+
+  // DATA-17: the invoice status write after a payment is checked.
+  it('retries the paid flip once after a dropped connection', async () => {
+    fake.state.tables.fh_invoices = [invoice('final', 1, 10000)]
+    fake.state.failInvoiceUpdates = 1
+    const res: any = await logPayment(job, { amount: 10000 })
+    expect(fake.state.tables.fh_invoices[0].status).toBe('paid')
+    expect(res.statusError ?? null).toBeNull()
+  })
+
+  it('reports a paid flip that failed twice', async () => {
+    fake.state.tables.fh_invoices = [invoice('final', 1, 10000)]
+    fake.state.failInvoiceUpdates = 2
+    const res: any = await logPayment(job, { amount: 10000 })
+    expect(res.error ?? null).toBeNull()
+    expect(res.statusError).toBeTruthy()
   })
 
   // DATA-15: a retry after the first answer was lost, with a field changed,

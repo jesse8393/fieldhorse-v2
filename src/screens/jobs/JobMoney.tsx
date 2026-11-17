@@ -414,6 +414,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
       // Name the bill that went out: it can be a draft draw rather than
       // the whole balance this screen showed.
       toastSuccess(`Invoice sent to ${res.recipient}`, `${invoice.title || `Invoice #${invoice.sequence_number}`} · ${moneyExact(invoice.amount)}`)
+      if (res.statusError) toastError('Invoice not marked sent', 'The email went, but the invoice status did not update. Open the invoice to check it.')
       setSent(true)
       setTimeout(() => setSent(false), 2400)
     } else if (res.reason === 'sender_not_configured') {

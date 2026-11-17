@@ -38,7 +38,7 @@ import { Eyebrow } from '../../../components/v3'
 import { countNoun } from '../../../lib/format.ts'
 import { fetchInvoiceReviewContext } from '../../../lib/invoiceReviewContext.ts'
 import { reviewInvoice } from '../../../lib/invoiceReview.js'
-import { fetchInvoicesForContact, invoiceAmountDue, invoiceDescription } from '../../../lib/invoices.ts'
+import { fetchInvoicesForContact, invoiceAmountDue, invoiceDescription, retryOnce } from '../../../lib/invoices.ts'
 import { invoicesPaidInFull } from '../../../lib/invoiceSettlement.ts'
 import { drawsFromTerms } from '../../../lib/paymentSchedule.ts'
 import { quoteMoney } from '../../../lib/quoteMoney.ts'
@@ -535,11 +535,15 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       // Flip the draw to 'sent' so the row badge updates immediately.
       // Skip if the draw is already paid (don't downgrade a paid draw
       // back to sent just because the contractor sent again the PDF).
+      // Checked and tried once more (DATA-17): the email has gone, so a
+      // draw left as a draft must be reported, not passed over.
       if (draw.status !== 'paid') {
-        await supabase
+        const issuedAt = draw.issued_at || new Date().toISOString()
+        const { error: flipErr } = await retryOnce(() => supabase
           .from('fh_invoices')
-          .update({ status: 'sent', issued_at: draw.issued_at || new Date().toISOString() })
-          .eq('id', draw.id)
+          .update({ status: 'sent', issued_at: issuedAt })
+          .eq('id', draw.id))
+        if (flipErr) toastError('Draw not marked sent', 'The email went, but the draw status did not update. Refresh and check it.')
       }
       toastSuccess(`Draw sent to ${recipientEmail}`, result.filename)
       await fetchDraws()

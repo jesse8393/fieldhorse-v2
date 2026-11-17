@@ -68,6 +68,7 @@ function PaymentForm({ data, goBack, home }: { data: ReturnType<typeof useJobScr
       // logPayment (lib/pipeline.ts) already shows the one payment toast;
       // a second one here disagreed with it (OPS-08).
       hapticMedium()
+      if ((res as { statusError?: unknown })?.statusError) toastError('Invoice status not updated', 'The payment is saved, but the invoice status did not update. Open the invoice to check it.')
       invalidateAfterPayment(queryClient, contact.id)
       await data.fetchAll()
       goBack()

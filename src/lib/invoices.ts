@@ -109,6 +109,18 @@ export function invoiceAmountDue({ invoice, contact, payments = [], changeOrders
   return Math.round((due.get(id) ?? 0) * 100) / 100
 }
 
+/**
+ * Runs a status write and, when it fails, runs it once more (DATA-17). A
+ * payment or an email has already happened by the time its invoice status
+ * is written, so a dropped connection here must not pass silently: the
+ * caller reports what is still returned as an error.
+ */
+export async function retryOnce<T extends { error: unknown }>(run: () => PromiseLike<T>): Promise<T> {
+  const first = await run()
+  if (!first.error) return first
+  return run()
+}
+
 export async function fetchInvoicesForContact(contactId: string) {
   const rows: InvoiceRow[] = []
   for (let from = 0; ; from += 500) {
@@ -223,10 +235,15 @@ export async function logInvoicePayment(invoice: Pick<InvoiceRow, 'id' | 'user_i
   const { error } = await supabase.from('fh_payments').upsert(payload as any, { onConflict: 'id' })
   if (error) return { error, paid: false }
   const paid = sumCents(input.priorPayments || [], (p) => p.amount) + toCents(amount) >= toCents(invoice.amount)
+  let statusError: unknown = null
   if (paid && invoice.status !== 'paid' && invoice.status !== 'void') {
-    await supabase.from('fh_invoices').update({ status: 'paid' }).eq('id', invoice.id)
+    const { error: flipErr } = await retryOnce(() => supabase.from('fh_invoices').update({ status: 'paid' }).eq('id', invoice.id))
+    if (flipErr) {
+      console.error('[fieldhorse] logInvoicePayment status update failed', flipErr)
+      statusError = flipErr
+    }
   }
-  return { error: null, paid }
+  return { error: null, paid, statusError }
 }
 
 /**
@@ -382,7 +399,8 @@ export async function buildInvoicePdf(args: InvoicePdfArgs) {
 }
 
 export type SendInvoiceResult =
-  | { ok: true; filename: string; recipient: string }
+  /** statusError: the email went, but the invoice could not be marked sent. */
+  | { ok: true; filename: string; recipient: string; statusError?: unknown }
   | { ok: false; reason: 'no_email' | 'sender_not_configured' | 'error'; message?: string }
 
 // Email an invoice: build PDF → upload to the private job-files bucket
@@ -480,14 +498,20 @@ export async function sendInvoiceEmail({ invoice, duplicateReviewed = false, con
   // can take seconds on a weak signal: only a row still in that status
   // moves to sent, so a void or a payment recorded meanwhile stays
   // (review of Phase 8, task 6).
+  let statusError: unknown = null
   if (invoice.status !== 'paid') {
-    await supabase
+    const issuedAt = invoice.issued_at || new Date().toISOString()
+    const { error: flipErr } = await retryOnce(() => supabase
       .from('fh_invoices')
-      .update({ status: 'sent', issued_at: invoice.issued_at || new Date().toISOString() })
+      .update({ status: 'sent', issued_at: issuedAt })
       .eq('id', invoice.id)
-      .eq('status', invoice.status)
+      .eq('status', invoice.status))
+    if (flipErr) {
+      console.error('[fieldhorse] sendInvoiceEmail status update failed', flipErr)
+      statusError = flipErr
+    }
   }
-  return { ok: true, filename: result.filename, recipient }
+  return { ok: true, filename: result.filename, recipient, statusError }
 }
 
 // Suggested next invoice for a job, drives the new invoice screen's

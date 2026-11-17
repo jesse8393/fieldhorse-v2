@@ -6,6 +6,7 @@ import { moneyExact } from './format.ts'
 import { invoicesPaidInFull, knownContractTotal } from './invoiceSettlement.ts'
 import { toCents, fromCents, sumCents } from './cents.ts'
 import { toastError } from './toast.ts'
+import { retryOnce } from './invoices.ts'
 import type { Database } from './database.types.ts'
 
 // Only the fields the stage helpers actually read, declared narrowly so
@@ -244,32 +245,38 @@ export async function logPayment(contact: Contact, { id, amount, method, kind, r
   // actually COVER it: partial pay is an explicit feature and must leave
   // a residual balance. Best-effort: the payment rows remain the source
   // of truth for money math either way.
+  let statusError: unknown = null
   if (paysRes.error || invsRes.error) {
     console.error('[fieldhorse] logPayment invoice settle skipped', paysRes.error || invsRes.error)
+    statusError = paysRes.error || invsRes.error
   } else {
     const invs = invsRes.data || []
     const paidIds = invoicesPaidInFull({ invoices: invs, payments: pays, contractTotal: contractAmount })
     if (paidIds.length > 0) {
-      const { error: paidErr } = await supabase
+      // Checked and tried once more (DATA-17): the payment is saved, so a
+      // dropped status write would leave a paid bill reading as owed.
+      const { error: paidErr } = await retryOnce(() => supabase
         .from('fh_invoices')
         .update({ status: 'paid' })
         .in('id', paidIds)
-        .in('status', ['draft', 'sent', 'overdue'])
+        .in('status', ['draft', 'sent', 'overdue']))
       if (paidErr) {
         console.error('[fieldhorse] logPayment invoice status update failed', paidErr)
+        statusError = paidErr
       }
     }
     // A partial payment against a draft means the bill went out: it reads
     // 'sent' with a residual balance from here on.
     const target = invoice_id ? invs.find((inv) => inv.id === invoice_id) : null
     if (target && target.status === 'draft' && !paidIds.includes(target.id)) {
-      const { error: sentErr } = await supabase
+      const { error: sentErr } = await retryOnce(() => supabase
         .from('fh_invoices')
         .update({ status: 'sent' })
         .eq('id', target.id)
-        .eq('status', 'draft')
+        .eq('status', 'draft'))
       if (sentErr) {
         console.error('[fieldhorse] logPayment invoice status update failed', sentErr)
+        statusError = statusError || sentErr
       }
     }
   }
@@ -287,7 +294,7 @@ export async function logPayment(contact: Contact, { id, amount, method, kind, r
   } else {
     console.error('[fieldhorse] logPayment approved-CO fetch failed; skipping auto-close', coErr)
   }
-  return { total, closed }
+  return { total, closed, statusError }
 }
 
 /**
