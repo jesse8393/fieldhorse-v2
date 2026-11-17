@@ -4,7 +4,7 @@ import LegalLayout, { H2, P, UL } from './LegalLayout.tsx'
 
 export default function Terms() {
   return (
-    <LegalLayout title="Terms of Service" updated="May 21, 2026">
+    <LegalLayout title="Terms of service" updated="May 21, 2026">
       <P>
         These terms govern your use of FieldHorse (the "Service"). By creating
         an account or using the app, you agree to them. Questions:
@@ -20,8 +20,8 @@ export default function Terms() {
 
       <H2>Your content</H2>
       <P>
-        You retain ownership of the data you put into the Service, your jobs,
-        clients, documents, and photos. You grant us the limited right to store
+        You retain ownership of the data you put into the Service (your jobs,
+        clients, documents, and photos). You grant us the limited right to store
         and process that data solely to operate the Service for you. You are
         responsible for having the right to store any customer information you
         enter.

@@ -31,6 +31,19 @@ test.describe('public app shell', () => {
     await expect(page.getByRole('link', { name: /sign in/i }).first()).toBeVisible()
   })
 
+  // ai-copy-1: the legal pages say what each provider and each kind of
+  // data is, instead of a comma splice that reads as a list.
+  test('the privacy policy and terms read as sentences', async ({ page }) => {
+    await page.goto('/privacy')
+    await expect(page.getByRole('heading', { level: 1, name: 'Privacy policy', exact: true })).toBeVisible()
+    await expect(page.getByText('Supabase: database, authentication, and file storage hosting.')).toBeVisible()
+    expect(await page.locator('body').innerText()).not.toMatch(/Supabase, database|Usage data, basic logs/)
+
+    await page.goto('/terms')
+    await expect(page.getByRole('heading', { level: 1, name: 'Terms of service', exact: true })).toBeVisible()
+    expect((await page.locator('body').innerText()).replace(/\s+/g, ' ')).toContain('into the Service (your jobs, clients, documents, and photos)')
+  })
+
   // PT-11: a shared link's preview must not point at a dead host.
   test('the share tags name no dead host and no fixed page address', async ({ request }) => {
     const html = await (await request.get('/p/abc')).text()

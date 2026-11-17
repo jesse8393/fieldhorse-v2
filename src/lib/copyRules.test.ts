@@ -56,3 +56,27 @@ describe('copy rules', () => {
     expect(schedule).not.toMatch(/'Upcoming':\s*\{ variant: 'up',\s*label: 'Up next' \}/)
   })
 })
+
+// ai-copy-1: a dash swap once turned each "Label: what it means" line on
+// the legal pages into "Label, what it means", which reads as a list
+// ("Supabase, database, authentication, and file storage hosting" names
+// four things). Each line names its subject and then says what it is.
+describe('legal pages', () => {
+  const legal = (file: string) => readFileSync(join(srcDir, 'screens', file), 'utf8')
+  const listItems = (file: string) => [...legal(file).matchAll(/^\s*'([^']+)',?$/gm)].map((m) => m[1])
+
+  it('starts no privacy policy line with a short label and a comma', () => {
+    const items = listItems('Privacy.tsx')
+    expect(items.length).toBeGreaterThan(10)
+    expect(items.filter((item) => /^[A-Z][^,.:']{2,30}, /.test(item))).toEqual([])
+  })
+
+  it('says what your data is in the terms without a comma splice', () => {
+    expect(legal('Terms.tsx').replace(/\s+/g, ' ')).not.toContain('into the Service, your jobs')
+  })
+
+  it('titles both pages in sentence case', () => {
+    expect(legal('Privacy.tsx')).toContain('title="Privacy policy"')
+    expect(legal('Terms.tsx')).toContain('title="Terms of service"')
+  })
+})
