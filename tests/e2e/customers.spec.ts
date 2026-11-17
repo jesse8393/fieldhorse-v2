@@ -143,6 +143,17 @@ test.describe('phone search (S14)', () => {
   })
 })
 
+test('a customer row on the phone has Call (S20)', async ({ context, page, isMobile }) => {
+  test.skip(!isMobile, 'The desktop table is a separate component.')
+  await signIn(context)
+  await open(page, '/clients')
+  const call = page.getByRole('link', { name: 'Call Jeff Roy' })
+  await expect(call).toBeVisible({ timeout: 30_000 })
+  await expect(call).toHaveAttribute('href', 'tel:555-0101')
+  const box = await call.boundingBox()
+  expect(box && box.width >= 44 && box.height >= 44).toBe(true)
+})
+
 test.describe('the customer page', () => {
   test('the statement is a screen with the per property balances', async ({ context, page }) => {
     await signIn(context)
