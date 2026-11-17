@@ -259,3 +259,22 @@ test('Activity and Search keep the cents', async ({ context, page }) => {
   await expect(page.getByText(/\$4,115\.17/).first()).toBeVisible()
   await expect(page.getByText(/\$12,346\b/)).toHaveCount(0)
 })
+
+// formats-9: a follow up date the AI read from a field report prints as a
+// date ("Nov 20, 2026"), never as raw "2026-11-20".
+test('a field report prints its follow up date as a date', async ({ context, page }) => {
+  const note = {
+    id: 'n-h1', user_id: 'qa-user-1', org_id: 'org-1', contact_id: 'c-h', category: 'report', done: false,
+    text: 'Forms set on the driveway. Inspector wants to see the rebar before we pour, call him Friday.',
+    parsed: { summary: 'Forms set; rebar inspection needed before the pour.', action_items: ['Call the inspector'], risks: [], materials_needed: [], follow_up_date: '2026-11-20' },
+    created_at: '2026-11-17T14:00:00Z', when_text: null, action: null, audio_url: null, lead_id: null, quote_id: null
+  }
+  await signIn(context, { tables: { ...FORMATS_TABLES, fh_notes: [note] } })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  await page.goto('/notes', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText(/Forms set on the driveway/).first()).toBeVisible({ timeout: 30_000 })
+  const more = page.getByText('Read full report').filter({ visible: true }).first()
+  if (await more.count()) await more.click()
+  await expect(page.getByText(/Follow up:\s*Nov 20, 2026/).filter({ visible: true }).first()).toBeVisible()
+  await expect(page.getByText(/2026-11-20/).filter({ visible: true })).toHaveCount(0)
+})

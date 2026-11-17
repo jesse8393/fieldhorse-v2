@@ -6,6 +6,7 @@
 import { expect, test, type Page, type Route } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 import { contrastOf } from './helpers/contrast.ts'
+import { NOW as FORMATS_NOW, TABLES as FORMATS_TABLES } from './helpers/formatsSeed.ts'
 
 async function open(page: Page, path: string) {
   await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 60_000 })
@@ -875,4 +876,15 @@ test('whole amounts keep .00 on Log payment and the Invoices tab', async ({ cont
   const text = await page.locator('main').innerText()
   expect(text).toContain('$6,400.00')
   expect(text).not.toMatch(/\$[\d,]+(?![\d,]*\.\d\d)\b/)
+})
+
+// formats-9: an expense date reads like every other date on the job
+// ("Nov 12, 2026"), never as raw "2026-11-12".
+test('the Expenses tab prints the expense date as a date', async ({ context, page }) => {
+  await signIn(context, { tables: { ...FORMATS_TABLES, fh_expenses: [{ id: 'e-h1', user_id: 'qa-user-1', org_id: 'org-1', contact_id: 'c-h', description: 'Rebar and chairs', amount: 412.38, category: 'Materials', expense_date: '2026-11-12', created_at: '2026-11-12T18:00:00Z' }] } })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  await page.goto('/jobs/c-h?tab=expenses', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText('Rebar and chairs')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText('Materials · Nov 12, 2026')).toBeVisible()
+  await expect(page.getByText(/2026-11-12/)).toHaveCount(0)
 })

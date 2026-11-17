@@ -7,7 +7,7 @@ import { moneyExact } from '../../../lib/format.ts'
 import { crewLaborForContact, type CrewLabor } from '../../../lib/labor.ts'
 import { toastError, toastSuccess, toastUndo } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
-import { todayYmd } from '../../../lib/dates.ts'
+import { formatDate, todayYmd } from '../../../lib/dates.ts'
 import { Button, Field } from '../../../components/fh'
 import { Choices, moneyInput } from '../../../screens/new/CreateShell.tsx'
 import { Eyebrow } from '../../../components/v3'
@@ -243,7 +243,7 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
                     fontVariantNumeric: 'tabular-nums',
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
                   }}>
-                    {e.category} · {e.expense_date}
+                    {e.category} · {formatDate(e.expense_date) || e.expense_date}
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
