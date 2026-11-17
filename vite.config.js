@@ -71,10 +71,16 @@ export default defineConfig({
         // offline, but not chunks only an on demand feature loads. Each
         // install (and each deploy that changes them) would otherwise
         // download them for every user. Do not list a chunk that a screen
-        // imports statically: vendor-jspdf and vendor-pdf-table stay in
-        // because the Financials tab and ApproveQuoteSheet import them.
+        // imports statically (src/lib/precacheRules.test.ts checks the PDF
+        // code). The runtime cache below keeps each one once it has loaded.
         globIgnores: [
           '**/node_modules/**/*',
+          // jsPDF and its table plugin: every PDF action imports lib/pdf.js
+          // when it runs.
+          'assets/vendor-jspdf-*.js',
+          'assets/vendor-pdf-table-*.js',
+          // The desktop builds (900 px and up), which a phone never opens.
+          'assets/Snow*Build-*',
           // jsPDF's optional HTML and SVG renderers (html2canvas,
           // DOMPurify, and canvg, which Rollup names index.es). They load
           // only for doc.html() or addSvgAsImage(), which the app never
@@ -105,7 +111,9 @@ export default defineConfig({
             handler: 'CacheFirst',
             options: {
               cacheName: 'fh-lazy-assets',
-              expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 30, purgeOnQuotaError: true },
+              // Room for every chunk left out above: the desktop builds
+              // alone are about 20 files.
+              expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 30, purgeOnQuotaError: true },
               cacheableResponse: { statuses: [200] },
               plugins: [
                 {
