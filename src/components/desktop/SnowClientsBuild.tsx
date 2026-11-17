@@ -34,7 +34,6 @@ import { buildCsv, downloadCsv } from '../../lib/csv.ts'
 import MiniMetric from '../MiniMetric.tsx'
 import LoadingValue from '../LoadingValue.tsx'
 import TopbarWeather from './TopbarWeather.tsx'
-import PaletteKeyCap from './PaletteKeyCap.tsx'
 
 type Rollup = {
   activeCount: number
@@ -214,7 +213,6 @@ export default function SnowClientsBuild(props: Props) {
             placeholder="Search clients..."
             aria-label="Search clients"
           />
-          <PaletteKeyCap />
         </div>
         <div className="fh-build-topbar__meta">
           <span>

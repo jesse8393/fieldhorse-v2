@@ -228,6 +228,12 @@ export default function CommandPalette() {
       }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
+        // Below 900 px the header Search opens the search screen; the
+        // shortcut asks for the same thing (the shell routes it there).
+        if (window.innerWidth < 900) {
+          window.dispatchEvent(new CustomEvent('fh:open-palette'))
+          return
+        }
         setOpen((v) => !v)
       }
     }
