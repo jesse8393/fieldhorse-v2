@@ -936,3 +936,29 @@ test.describe('typed words in edit job details', () => {
     await expect(page.getByRole('form', { name: 'Edit job details' })).toHaveCount(0)
   })
 })
+
+// Finding lost-work-8: a milestone the server refuses stays in the box.
+/** Answers one table's writes with a server refusal. */
+async function refuseWrites(context: import('@playwright/test').BrowserContext, table: string) {
+  const hits = { count: 0 }
+  await context.route((url) => url.pathname === `/rest/v1/${table}`, (route) => {
+    if (route.request().method() !== 'PATCH') return route.fallback()
+    hits.count += 1
+    return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ code: '57014', message: 'canceling statement due to statement timeout', details: null, hint: null }) })
+  })
+  return hits
+}
+
+test.describe('a milestone that fails to save', () => {
+  test('a milestone the server refuses stays in the box', async ({ context, page }) => {
+    await signIn(context)
+    const refused = await refuseWrites(context, 'fh_contacts')
+    await openJob(page, '/jobs/c-job1?tab=details')
+    const box = page.getByPlaceholder('Add milestone…')
+    await box.fill('Forms inspected before pour')
+    await page.getByRole('button', { name: 'Add milestone' }).click()
+    await expect.poll(() => refused.count).toBeGreaterThan(0)
+    await expect(page.getByText("Couldn't save", { exact: false }).first()).toBeVisible()
+    await expect(box).toHaveValue('Forms inspected before pour')
+  })
+})
