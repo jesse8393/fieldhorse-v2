@@ -21,6 +21,7 @@
 //     request makes it impossible to miss again.
 
 import crypto from 'node:crypto'
+import { supabaseServiceConfig } from './serviceConfig.js'
 
 export function clientIp(req) {
   // Prefer Netlify's platform-set client IP. x-forwarded-for is
@@ -38,7 +39,7 @@ export function clientIp(req) {
   )
 }
 
-export function hashIdentifier(value, salt = process.env.PUBLIC_LINK_AUDIT_SALT || process.env.SUPABASE_SERVICE_ROLE_KEY || 'fieldhorse-rate-limit') {
+export function hashIdentifier(value, salt = process.env.PUBLIC_LINK_AUDIT_SALT || supabaseServiceConfig().secretKey || 'fieldhorse-rate-limit') {
   return crypto.createHmac('sha256', salt).update(String(value || 'unknown')).digest('hex').slice(0, 40)
 }
 

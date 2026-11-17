@@ -46,6 +46,7 @@
 //   SUPABASE_SERVICE_ROLE_KEY   — server-only; bypasses RLS + enables auth admin
 
 import { createClient } from '@supabase/supabase-js'
+import { supabaseServiceConfig } from './lib/serviceConfig.js'
 import { readAllRows } from './lib/pagedRows.js'
 
 // Tables whose rows belong to the company's book of business. In a shared
@@ -188,8 +189,7 @@ export default async (request) => {
     return json({ error: 'method_not_allowed' }, 405)
   }
 
-  const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-  const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const { url: SUPABASE_URL, secretKey: SERVICE_KEY } = supabaseServiceConfig()
   if (!SUPABASE_URL || !SERVICE_KEY) {
     return json({ error: 'server_misconfigured', message: 'Account deletion is not configured on the server.' }, 500)
   }

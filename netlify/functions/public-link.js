@@ -22,6 +22,7 @@
 // policy enforced across send-quote / send-invoice / send-message.
 
 import { createClient } from '@supabase/supabase-js'
+import { supabaseServiceConfig } from './lib/serviceConfig.js'
 import { createHash } from 'node:crypto'
 import { alertLinkRecipients } from './lib/linkAlerts.js'
 import { clientIp, hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
@@ -48,7 +49,7 @@ export function getPublicLinkClientIp(req) {
   ).trim()
 }
 
-export function hashPublicLinkIp(ip, salt = process.env.PUBLIC_LINK_AUDIT_SALT || process.env.SUPABASE_SERVICE_ROLE_KEY || 'fieldhorse-public-link') {
+export function hashPublicLinkIp(ip, salt = process.env.PUBLIC_LINK_AUDIT_SALT || supabaseServiceConfig().secretKey || 'fieldhorse-public-link') {
   const clean = String(ip || '').trim()
   if (!clean) return null
   return createHash('sha256').update(`${salt}:${clean}`).digest('hex')
@@ -152,8 +153,7 @@ export default async function handler(req) {
     return json({ error: 'missing_token', message: 'Token is required.' }, 400)
   }
 
-  const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-  const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const { url: SUPABASE_URL, secretKey: SERVICE_KEY } = supabaseServiceConfig()
   if (!SUPABASE_URL || !SERVICE_KEY) {
     return json({ error: 'server_misconfigured' }, 500)
   }
