@@ -455,7 +455,7 @@ test.describe('Welcome and Login', () => {
     await page.getByLabel('Email').fill('nobody@example.com')
     await page.getByLabel('Password').fill('wrong-password')
     await page.getByRole('button', { name: 'Sign in', exact: true }).click()
-    await expect(page.getByRole('alert')).toHaveText('Invalid login credentials')
+    await expect(page.getByRole('alert')).toHaveText('Wrong email or password.')
     expect(stub.authCalls.some((call) => call.includes('/auth/v1/token'))).toBe(true)
     // The form is usable again and still on onyx.
     await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeEnabled()
@@ -618,4 +618,22 @@ test.describe('Reset password and partner invite use the same shell', () => {
     await expect(page.getByRole('alert')).toHaveText('This invite link is invalid or was removed.')
     await expect(page.getByRole('link', { name: 'Sign in' })).toHaveCount(0)
   })
+})
+
+// raw-errors-10: Sign in showed "Failed to fetch" with no signal and
+// Supabase's "Database error querying schema" during an outage.
+test('Sign in with no signal or during an outage says so in plain words', async ({ context, page }) => {
+  await stubSignedOut(context, 'missing')
+  let answer: 'drop' | 'outage' = 'drop'
+  await context.route('**/auth/v1/token**', (route) => answer === 'drop'
+    ? route.abort('failed')
+    : route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ code: 500, error_code: 'unexpected_failure', msg: 'Database error querying schema' }) }))
+  await openLogin(page)
+  await page.getByLabel('Email').fill('jesse@parker.co')
+  await page.getByLabel('Password').fill('pour-day-2026')
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+  await expect(page.getByRole('alert')).toHaveText('No signal right now. Try again when the signal is back.', { timeout: 30_000 })
+  answer = 'outage'
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+  await expect(page.getByRole('alert')).toHaveText('Something went wrong on our side. Try again in a minute.', { timeout: 30_000 })
 })

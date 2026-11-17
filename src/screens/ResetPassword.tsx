@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext.tsx'
 import { supabase } from '../lib/supabase.ts'
 import { Button, Chip, Field } from '../components/fh'
 import AuthShell from './auth/AuthShell.tsx'
+import { plainError } from '../lib/serviceErrors.ts'
 
 // Reset password, on the same onyx stage as Login (spec 9.1).
 export default function ResetPassword() {
@@ -45,7 +46,7 @@ export default function ResetPassword() {
       setNotice('Password updated. Redirecting…')
       setTimeout(() => navigate('/', { replace: true }), 1200)
     } catch (err: any) {
-      setError(err?.message || 'Could not update password.')
+      setError(plainError(err, 'Could not update your password. Try again.'))
     } finally {
       setBusy(false)
     }

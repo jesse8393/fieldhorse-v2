@@ -237,7 +237,7 @@ test('Login with the photo still fits the window with an alert or a notice line 
   await page.getByLabel('Email').fill('jesse@parker.co')
   await page.getByLabel('Password').fill('not the password')
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
-  await expect(page.getByRole('alert')).toHaveText('Invalid login credentials')
+  await expect(page.getByRole('alert')).toHaveText('Wrong email or password.')
   await everySize('a failed sign in')
 
   // Forgot password with no email.
@@ -290,7 +290,7 @@ async function failSignIn(page: Page) {
   await page.getByLabel('Email').fill('jesse@parker.co')
   await page.getByLabel('Password').fill('not the password')
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
-  await expect(page.getByRole('alert')).toHaveText('Invalid login credentials')
+  await expect(page.getByRole('alert')).toHaveText('Wrong email or password.')
   await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
 }
 
