@@ -729,3 +729,31 @@ test.describe('the quotes list', () => {
     await expect(page.locator('.fhqt-page')).toBeVisible({ timeout: 30_000 })
   })
 })
+
+// Audit finding DATA-13: the list shows what was just done to a quote.
+test.describe('the quotes list after a change', () => {
+  test('a deleted quote leaves the list at once', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS, fh_quotes: [quoteRow({ status: 'draft', sent_at: null })] } })
+    // The mock keeps no writes: once the delete is sent, reads find no quotes.
+    let deleted = false
+    await context.route((url) => url.pathname.endsWith('/rest/v1/fh_quotes'), (route) => {
+      const method = route.request().method()
+      if (method === 'DELETE') deleted = true
+      if (method === 'GET' && deleted) return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+      return route.fallback()
+    })
+    await page.goto('/quotes', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    const rows = page.getByRole('list', { name: 'Quotes' })
+    await expect(rows.getByText('Parking lot repour')).toBeVisible({ timeout: 30_000 })
+    await rows.getByRole('link', { name: /Parking lot repour/ }).click()
+    await expect(page.locator('.fhqt-page')).toBeVisible({ timeout: 30_000 })
+    await page.getByRole('button', { name: 'Delete draft quote' }).click()
+    await page.waitForTimeout(600)
+    await page.getByRole('button', { name: 'Tap again to delete' }).click()
+    await expect(page).toHaveURL(/\/quotes$/, { timeout: 15_000 })
+    await expect(page.getByRole('heading', { level: 1, name: 'Quotes' })).toBeVisible()
+    await expect(page.getByText('Parking lot repour')).toHaveCount(0)
+  })
+
+})
+

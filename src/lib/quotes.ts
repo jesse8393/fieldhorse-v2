@@ -3,6 +3,7 @@
 // scope, price and terms into a new fh_contacts row at stage job and
 // sets fh_quotes.job_id; the quote itself keeps its status (D54).
 
+import type { QueryClient } from '@tanstack/react-query'
 import { supabase } from './supabase.ts'
 import { proposalNumber } from '../components/documents/numbers.ts'
 import type { Database } from './database.types.ts'
@@ -60,6 +61,25 @@ export async function createQuote(input: {
     if (!existing.error && existing.data) return existing.data as QuoteRow
   }
   throw new Error(error?.message || 'Could not confirm this quote was saved. Try again.')
+}
+
+/**
+ * After a quote is created, edited, deleted or made a job, the screens that
+ * show it read again: the quotes list, the quote, the lead it came from
+ * (its quote link), the client page and, once a job exists, the jobs list.
+ */
+export function invalidateAfterQuoteWrite(
+  client: Pick<QueryClient, 'invalidateQueries'>,
+  { quoteId, leadId, clientId, jobMade = false }: { quoteId?: string | null; leadId?: string | null; clientId?: string | null; jobMade?: boolean }
+) {
+  void client.invalidateQueries({ queryKey: ['quotes'] })
+  if (quoteId) void client.invalidateQueries({ queryKey: ['quote', quoteId] })
+  if (leadId) {
+    void client.invalidateQueries({ queryKey: ['leads'] })
+    void client.invalidateQueries({ queryKey: ['lead', leadId] })
+  }
+  if (clientId) void client.invalidateQueries({ queryKey: ['clientDetail', clientId] })
+  if (jobMade) void client.invalidateQueries({ queryKey: ['jobs'] })
 }
 
 // The server atomically copies and links the quote. Repeated requests

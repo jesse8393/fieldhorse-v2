@@ -26,7 +26,7 @@ function builder(): unknown {
 
 vi.mock('./supabase.ts', () => ({ supabase: { rpc, from: (table: string) => { const b = builder(); builders[builders.length - 1].push(['from', table]); return b } } }))
 
-const { createQuote, makeJobFromQuote, quoteNumber } = await import('./quotes.ts')
+const { createQuote, invalidateAfterQuoteWrite, makeJobFromQuote, quoteNumber } = await import('./quotes.ts')
 
 function callsOf(index: number, method: string) {
   return builders[index].filter((c) => c[0] === method)
@@ -128,3 +128,21 @@ describe('makeJobFromQuote', () => {
   })
 })
 
+// Audit finding DATA-13: what refreshes after a quote write.
+describe('invalidateAfterQuoteWrite', () => {
+  function keysAfter(input: Parameters<typeof invalidateAfterQuoteWrite>[1]) {
+    const keys: unknown[] = []
+    invalidateAfterQuoteWrite({ invalidateQueries: (f: { queryKey: unknown }) => { keys.push(f.queryKey); return Promise.resolve() } } as any, input)
+    return keys
+  }
+  it('refreshes the quotes list, the quote, its lead and its client', () => {
+    expect(keysAfter({ quoteId: 'q-1', leadId: 'l-1', clientId: 'c-1' })).toEqual([
+      ['quotes'], ['quote', 'q-1'], ['leads'], ['lead', 'l-1'], ['clientDetail', 'c-1']
+    ])
+  })
+  it('refreshes the jobs list too when a job was made', () => {
+    expect(keysAfter({ quoteId: 'q-1', clientId: 'c-1', jobMade: true })).toEqual([
+      ['quotes'], ['quote', 'q-1'], ['clientDetail', 'c-1'], ['jobs']
+    ])
+  })
+})

@@ -16,6 +16,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { ChevronRight } from 'lucide-react'
 import { Button, Chip, Icon, Row, SkeletonRows } from '../../components/fh'
 import DataErrorState from '../../components/DataErrorState.tsx'
@@ -24,7 +25,7 @@ import { useProfile } from '../../contexts/ProfileContext.tsx'
 import { supabase } from '../../lib/supabase.ts'
 import { useLinkedClientEmail } from '../../lib/queries.ts'
 import { customerEmail } from '../../lib/customerEmail.ts'
-import { makeJobFromQuote, quoteNumber } from '../../lib/quotes.ts'
+import { invalidateAfterQuoteWrite, makeJobFromQuote, quoteNumber } from '../../lib/quotes.ts'
 import { recordRoute } from '../../lib/records.ts'
 import { buildQuoteView, previewAsLabel, previewAsName, quoteCapsule } from '../../lib/quoteView.ts'
 import { hapticTap } from '../../lib/haptics.ts'
@@ -129,7 +130,14 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
     setSearchParams(next, { replace: true })
   }, [searchParams, setSearchParams])
 
-  const items = useQuoteItems({ quoteId: quote.id, userId })
+  // After a write, the lists and screens that show this quote read again
+  // (the quotes list, its lead, the client page, and the jobs list once a
+  // job is made).
+  const queryClient = useQueryClient()
+  const refreshLists = (jobMade = false) =>
+    invalidateAfterQuoteWrite(queryClient, { quoteId: quote.id, leadId: quote.lead_id, clientId: quote.client_id, jobMade })
+
+  const items = useQuoteItems({ quoteId: quote.id, userId, onContactRefresh: () => refreshLists() })
   const [lines, setLines] = useState<QuoteLinesChange>({ effective: [], switchSaving: false, lineSaving: false })
   const linesFailed = !items.loading && items.failed && !items.loaded
 
@@ -201,6 +209,7 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
       return
     }
     await refresh()
+    refreshLists()
     toastSuccess(`Proposal sent to ${recipientEmail}`)
   }, "Couldn't send proposal")
 
@@ -238,6 +247,7 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
       throw error
     }
     await refresh()
+    refreshLists()
     toastSuccess('Quote marked as sent', 'Recorded that you shared the proposal with the customer.')
   }, "Couldn't update the quote")
 
@@ -277,6 +287,7 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
       return
     }
     await refresh()
+    refreshLists()
     toastSuccess(`Sent to ${recipientEmail} for signature`, 'DocuSign will email the signing request.')
   }, "Couldn't send for electronic signature")
 
@@ -284,6 +295,7 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
   // price and terms; the quote keeps its status and points at the job.
   const onMakeJob = () => run('job', async () => {
     const { jobId } = await makeJobFromQuote(quote.id)
+    refreshLists(true)
     toastSuccess('Job created', 'The quote now points at it.')
     navigate(recordRoute('job', jobId))
   }, "Couldn't make the job")
@@ -310,6 +322,7 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
         throw new Error('This quote changed on another device. Check it and try again.')
       }
       await refresh()
+      refreshLists()
       toastSuccess('Quote ready to revise', 'Edit the lines, then send it or approve it again.')
     }, "Couldn't revise the quote")
   }
@@ -326,6 +339,7 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
       if (lines.error) throw new Error(lines.error.message)
       const row = await supabase.from('fh_quotes').delete().eq('id', quote.id)
       if (row.error) throw new Error(row.error.message)
+      refreshLists()
       toastSuccess(quote.status === 'draft' ? 'Draft quote deleted' : 'Quote deleted')
       navigate('/quotes', { replace: true })
     }, "Couldn't delete the quote")

@@ -6,6 +6,7 @@
 // the quote saves.
 
 import { useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Field } from '../../components/fh'
 import ClientField, { fetchClientPick, resolveClientId, restoredClientValue, type ClientFieldValue } from '../../components/ClientField.tsx'
@@ -14,7 +15,7 @@ import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useMembership } from '../../contexts/MembershipContext.tsx'
 import { supabase } from '../../lib/supabase.ts'
 import { leadToQuoteDraft, markLeadQuoted, type LeadRow } from '../../lib/leads.ts'
-import { createQuote } from '../../lib/quotes.ts'
+import { createQuote, invalidateAfterQuoteWrite } from '../../lib/quotes.ts'
 import { createUuid } from '../../lib/uuid.ts'
 import { JOB_TYPES } from '../../lib/jobTypes.ts'
 import { hapticMedium } from '../../lib/haptics.ts'
@@ -39,6 +40,7 @@ export default function QuoteNew() {
   const clientParam = params.get('client')
   const leadParam = params.get('lead')
   const text = params.get('text')
+  const queryClient = useQueryClient()
   const [requestId] = useState(createUuid)
   const { form, set, patch, done } = useDraft<Form>('quote', { ...EMPTY, requestId }, text ? { scope: text } : null)
   const quoteId = form.requestId || requestId
@@ -103,6 +105,7 @@ export default function QuoteNew() {
         try { await markLeadQuoted(leadParam, quote.id) } catch { /* the quote is saved; the lead keeps its status */ }
       }
       done()
+      invalidateAfterQuoteWrite(queryClient, { quoteId: quote.id, leadId: leadParam, clientId: picked.id })
       hapticMedium()
       // The quote screen opens with its line editor ready for the first line.
       navigate(`/quotes/${quote.id}?lines=new`, { replace: true })
