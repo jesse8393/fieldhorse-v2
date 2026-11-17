@@ -728,6 +728,26 @@ test.describe('the quotes list', () => {
     await expect(page).toHaveURL(/\/quotes\/q-quote$/)
     await expect(page.locator('.fhqt-page')).toBeVisible({ timeout: 30_000 })
   })
+
+  // PERF-02: the list already holds the quote's row, so the quote shows at
+  // once from it and its own read only brings it up to date.
+  test('a quote opened from the list shows at once while its own read is out', async ({ context, page }) => {
+    await signIn(context)
+    await page.goto('/quotes', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    const rows = page.getByRole('list', { name: 'Quotes' })
+    await expect(rows.getByText('Parking lot repour')).toBeVisible({ timeout: 30_000 })
+    let release!: () => void
+    const held = new Promise<void>(resolve => { release = resolve })
+    await context.route(/\/rest\/v1\/fh_quotes\?.*id=eq\.q-quote/, async route => {
+      if (route.request().method() === 'GET') await held
+      await route.fallback()
+    })
+    await rows.getByRole('link', { name: /Parking lot repour/ }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Parking lot repour' })).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByText('Loading the quote', { exact: true })).toHaveCount(0)
+    release()
+    await expect(page.getByRole('heading', { level: 1, name: 'Parking lot repour' })).toBeVisible()
+  })
 })
 
 // Audit finding DATA-18: a write that changed no row is never reported as saved.
