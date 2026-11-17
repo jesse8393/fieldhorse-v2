@@ -71,10 +71,16 @@ export default defineConfig({
         // offline, but not chunks only an on demand feature loads. Each
         // install (and each deploy that changes them) would otherwise
         // download them for every user. Do not list a chunk that a screen
-        // imports statically: vendor-jspdf and vendor-pdf-table stay in
-        // because the Financials tab and ApproveQuoteSheet import them.
+        // imports statically (src/lib/precacheRules.test.ts checks the PDF
+        // code). The runtime cache below keeps each one once it has loaded.
         globIgnores: [
           '**/node_modules/**/*',
+          // jsPDF and its table plugin: every PDF action imports lib/pdf.js
+          // when it runs.
+          'assets/vendor-jspdf-*.js',
+          'assets/vendor-pdf-table-*.js',
+          // The desktop builds (900 px and up), which a phone never opens.
+          'assets/Snow*Build-*',
           // jsPDF's optional HTML and SVG renderers (html2canvas,
           // DOMPurify, and canvg, which Rollup names index.es). They load
           // only for doc.html() or addSvgAsImage(), which the app never
@@ -105,7 +111,9 @@ export default defineConfig({
             handler: 'CacheFirst',
             options: {
               cacheName: 'fh-lazy-assets',
-              expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 30, purgeOnQuotaError: true },
+              // Room for every chunk left out above: the desktop builds
+              // alone are about 20 files.
+              expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 30, purgeOnQuotaError: true },
               cacheableResponse: { statuses: [200] },
               plugins: [
                 {
@@ -191,6 +199,12 @@ export default defineConfig({
           if (id.includes('html2canvas')) return 'vendor-html2canvas'
           if (id.includes('dompurify')) return 'vendor-dompurify'
           if (id.includes('recharts') || id.includes('d3-')) return 'vendor-charts'
+          // MotionConfig (main.tsx) honours the OS Reduce Motion setting
+          // for every motion component, so it has to wrap the app from the
+          // start. It and the context it provides get a tiny chunk of their
+          // own, so the entry does not pull in the rest of framer-motion,
+          // which only lazy screens use.
+          if (/framer-motion\/dist\/es\/(components\/MotionConfig\/|context\/MotionConfigContext\.|utils\/use-constant\.|render\/dom\/utils\/filter-props\.|motion\/utils\/valid-prop\.)/.test(id)) return 'vendor-motion-config'
           if (id.includes('framer-motion')) return 'vendor-motion'
           if (id.includes('lucide-react')) return 'vendor-icons'
           if (id.includes('@supabase')) return 'vendor-supabase'

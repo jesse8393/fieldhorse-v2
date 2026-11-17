@@ -376,7 +376,8 @@ select:focus-visible,
   font-family: var(--font-display);
   font-weight: 400;
   font-size: 12px;
-  opacity: 0.7;
+  /* Counts read as text (4.5 to 1): a quieter ink, never opacity. */
+  color: var(--fh-ink-3);
   font-variant-numeric: tabular-nums;
 }
 .dispatch-state__opt.is-on {
@@ -3675,15 +3676,15 @@ details[open] > summary .fh-importer-chev { transform: rotate(180deg); }
     color: var(--v3-surface);
   }
 
+  /* Counts read as text (4.5 to 1): a quieter ink, never opacity. */
   .fh-build-pill__count {
-    color: inherit;
-    opacity: .65;
+    color: var(--fh-ink-3);
     font-weight: 800;
     font-variant-numeric: tabular-nums;
   }
 
   .fh-build-pill.is-active .fh-build-pill__count {
-    opacity: .8;
+    color: inherit;
   }
 
   /* Generic helpers used by Phase 1 tables */
@@ -5591,7 +5592,8 @@ select[style*="outline"]:focus-visible,
   .fh-build-primary-btn {
     background: linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%);
     border: 1px solid rgba(92, 92, 92, 0.72);
-    color: #141414;
+    /* The text colour made for copper: onyx read 3.1 to 1 on it. */
+    color: var(--fh-on-gold);
     box-shadow: 0 10px 26px color-mix(in srgb, var(--v3-primary) 22%, transparent);
   }
 

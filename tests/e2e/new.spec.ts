@@ -6,6 +6,7 @@
 // the row the write would have made and expects to land on it.
 import { expect, test, type Page } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
+import { isReadOnlyRpc } from './helpers/readRpc.ts'
 
 const NOW = '2026-10-08T15:00:00.000Z'
 
@@ -363,7 +364,8 @@ test('New client saves a second client with the same name only when asked (S25)'
 test('New client refuses an email that is not one (S25)', async ({ context, page }) => {
   await signIn(context)
   const posts: string[] = []
-  page.on('request', (req) => { if (req.method() === 'POST' && req.url().includes('/rest/v1/')) posts.push(req.url()) })
+  // The bell's reminder read is a POST that changes nothing.
+  page.on('request', (req) => { if (req.method() === 'POST' && req.url().includes('/rest/v1/') && !isReadOnlyRpc(req.url())) posts.push(req.url()) })
   await open(page, '/clients/new')
   await page.getByLabel('Name').fill('Maria Lopez')
   for (const bad of ['Not-An-Email', 'MARIA@@bad']) {
@@ -394,4 +396,42 @@ test('create forms are centred on desktop, in line with New', async ({ context, 
   expect(Math.abs(quote.mid - quote.mainMid)).toBeLessThanOrEqual(2)
   const lead = await centre('/leads/new')
   expect(Math.abs(lead.mid - lead.mainMid)).toBeLessThanOrEqual(2)
+})
+
+// A11Y-08: a save that fails on one field marks that field: aria-invalid,
+// the message tied to it with aria-describedby, and focus on the field,
+// so tabbing back to it still says what is wrong (WCAG 3.3.1, 1.3.1).
+for (const { path, save, field, message, clear = false } of [
+  { path: '/leads/new', save: 'Save lead', field: { role: 'combobox', name: /^Name/ }, message: 'Enter a name.' },
+  { path: '/quotes/new', save: 'Save quote', field: { role: 'combobox', name: /^Client/ }, message: 'Enter a client.' },
+  // The amount starts at the balance; the test empties it.
+  { path: '/jobs/c-job1/payment', save: 'Record payment', field: { role: 'textbox', name: /^Amount/ }, message: 'Enter an amount above zero.', clear: true },
+  { path: '/miles/new', save: 'Save miles', field: { role: 'spinbutton', name: /^Miles/ }, message: 'Enter the miles driven.' },
+  { path: '/subs/new', save: 'Add sub', field: { role: 'textbox', name: /^Name/ }, message: 'Enter the sub or company name.' },
+] as const) {
+  test(`an empty save on ${path} marks the field that needs it`, async ({ context, page }) => {
+    await signIn(context)
+    await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    const input = page.getByRole(field.role, { name: field.name }).first()
+    await expect(input).toBeVisible({ timeout: 30_000 })
+    if (clear) await input.fill('')
+    await page.getByRole('button', { name: save, exact: true }).click()
+    await expect(input).toHaveAttribute('aria-invalid', 'true')
+    await expect(input).toHaveAccessibleDescription(new RegExp(message.replace('.', '\\.')))
+    await expect(input).toBeFocused()
+  })
+}
+
+// A11Y-09: New lead says which field it cannot save without before a save
+// fails: Name reads Required on screen and to assistive tech (WCAG 3.3.2).
+test('New lead marks its name as required', async ({ context, page }) => {
+  await signIn(context)
+  await open(page, '/leads/new')
+  const name = page.getByRole('combobox', { name: /^Name/ })
+  await expect(name).toBeVisible()
+  const required = (field: typeof name) => field.evaluate(el => (el as HTMLInputElement).required || el.getAttribute('aria-required') === 'true')
+  expect(await required(name)).toBe(true)
+  await expect(page.locator('label', { has: page.getByText('Required', { exact: true }) })).toHaveText(/^Name\s*Required$/)
+  // The optional fields stay optional.
+  expect(await required(page.getByRole('textbox', { name: /^Phone/ }))).toBe(false)
 })

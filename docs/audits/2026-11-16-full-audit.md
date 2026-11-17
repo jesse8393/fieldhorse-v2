@@ -85,6 +85,31 @@ live catalog found exactly two gaps: the function above, and the column
 
 ## Still open in production
 
+### Found after the merge: the live functions have no server key
+
+Checked against the live site on 2026-11-17 after #244 and #245 deployed.
+Every Netlify function that needs the Supabase server key answers 500
+with "server_misconfigured" or "Server is missing Supabase credentials":
+public-link (every customer link page), partner-invite-info,
+org-members-list, send-quote, send-invoice, claude, delete-account and the
+new client-error. `netlify/functions/lib/serviceConfig.js` did not change
+in this audit, so this predates it. It explains why production has never
+held a customer link: none could ever be opened, and no quote or invoice
+email could be sent from the app.
+
+Only Jesse can fix it, in Netlify: Site configuration, Environment
+variables, scope Functions. Set, under exactly these names:
+`SUPABASE_URL` (`https://pnmhblvslftdzfcdezbw.supabase.co`),
+`SUPABASE_ANON_KEY` (the anon or publishable key) and
+`SUPABASE_SERVICE_ROLE_KEY` (the service role or secret key, from Supabase,
+Project settings, API keys). Do not use the newer names
+`SUPABASE_PUBLISHABLE_KEY` or `SUPABASE_SECRET_KEY` alone: about twenty
+functions, including every customer link and the quote and invoice
+senders, read only the older names. Rotate the service role key first,
+since the #245 hole existed, and set the new one. Add `ANTHROPIC_API_KEY`
+for the AI features. Then trigger a deploy. The steps are in
+`docs/operations/service-setup.md`.
+
 ### Waiting on Jesse's approval
 
 The database tool asks the owner before running any statement that removes
@@ -206,3 +231,39 @@ commit names its finding id.
   can be tested.
 * One word for the customer record (customer, client or account), and one
   for subcontractors, is Jesse's call.
+* PERF-07 (the invoices bundle reads), PERF-08 (Home's refresh timing) and
+  A11Y-14 (text sizes in rem across all the CSS) are larger changes with
+  their own tests to write.
+* Four indexes in production are exact duplicates of another (on
+  fh_mileage, fh_public_link_events, fh_schedule and fh_selections).
+  Removing them needs the owner's approval and saves little.
+
+## Follow up round, 2026-11-17 (PR #246)
+
+* The browser suite is green again against the merged audit. The 42
+  failures on `main` were tests written before the audit's own fixes: the
+  bell's reminder read is a POST and was counted as a write, and several
+  tests tapped faster than the new 500 ms double tap guard. One was a real
+  bug: on a slow phone, a sort tapped just before typing a search went back
+  off. Fixed in the Jobs list with a test.
+* A database check failed only between 11 pm and midnight Chicago time.
+  Its leads were made "30 days ago", which across the November 1 clock
+  change reads as 29 local days, between two reminder windows. The
+  fixtures now sit mid window; the engine was right.
+* Performance and accessibility: PERF-01 to PERF-06, PERF-09 to PERF-12 and
+  A11Y-01 to A11Y-13 fixed, each with a test. Measured on a throttled
+  Pixel 7 profile against production builds:
+
+  | Measure | Before | After |
+  | --- | --- | --- |
+  | First load JavaScript, gzip | 274 KB | 217 KB |
+  | Home, cold open, ready | 4.3 s | 3.4 s |
+  | Home, repeat open on a slow network, ready | 3.4 s | 0.3 s |
+  | Quote, repeat open on a slow network, ready | 9.4 s | 3.4 s |
+  | Jobs with 500 rows, page elements | 9,866 | 533 |
+  | Jobs with 500 rows, longest freeze | 550 ms | 133 ms |
+
+* `20261117130000_hot_read_indexes` is applied in production.
+* Changes Jesse may want to see on the preview: error and Undo messages now
+  stay until closed (at most three at once), and the copper buttons use
+  white text so it can be read.

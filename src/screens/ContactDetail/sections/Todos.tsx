@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Check, Plus, Trash2, Calendar, UserRound, ArrowUpRight } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
@@ -21,8 +22,22 @@ import { Eyebrow } from '../../../components/v3'
  *
  * Delete uses toastUndo so a stray tap can be reversed within 6s.
  */
-export default function TodosSection({ jobId, userId, compact = false, onOpenTasks, onChanged }: { jobId?: string; userId?: string; compact?: boolean; onOpenTasks?: () => void; onChanged?: () => void }) {
+export default function TodosSection({ jobId, userId, compact = false, onOpenTasks, onChanged, initialRows }: {
+  jobId?: string; userId?: string; compact?: boolean; onOpenTasks?: () => void; onChanged?: () => void
+  /**
+   * The job's to-dos as the job page's own read brought them (useJobData,
+   * ['jobDetail', jobId]). They stand as this section's first read, and
+   * again each time that read brings new ones, so the page reads its to-dos
+   * once. Only a read made while the app has been open counts: a copy the
+   * offline cache restored may predate the last change. Writes, Try again
+   * and offline sync still read from the server.
+   */
+  initialRows?: any[]
+}) {
+  const queryClient = useQueryClient()
   const [rows, setRows] = useState<any[]>([])
+  const seedRows = useRef(initialRows)
+  seedRows.current = initialRows
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const headingRef = useRef<HTMLHeadingElement>(null)
@@ -60,7 +75,7 @@ export default function TodosSection({ jobId, userId, compact = false, onOpenTas
     return m
   })()
 
-  const fetchRows = useCallback(async () => {
+  const fetchRows = useCallback(async (fromJobRead = false) => {
     if (!jobId) return
     const version = ++readVersion.current
     setLoading(true)
@@ -69,12 +84,16 @@ export default function TodosSection({ jobId, userId, compact = false, onOpenTas
     // can drop the legacy `user_id = me` filter and show every task
     // on the job to every teammate. The user_id column stays as
     // provenance ("created by X").
-    const { data, error } = await supabase
-      .from('fh_job_todos')
-      .select('*')
-      .eq('job_id', jobId)
-      .order('done', { ascending: true })
-      .order('created_at', { ascending: false })
+    const jobRead = fromJobRead ? queryClient.getQueryState(['jobDetail', jobId]) : undefined
+    const seed = jobRead && jobRead.dataUpdatedAt >= performance.timeOrigin ? seedRows.current : undefined
+    const { data, error } = seed
+      ? { data: seed, error: null }
+      : await supabase
+        .from('fh_job_todos')
+        .select('*')
+        .eq('job_id', jobId)
+        .order('done', { ascending: true })
+        .order('created_at', { ascending: false })
     const pending = await pendingWritesFor('fh_job_todos', userId)
     if (version !== readVersion.current) return
     setLoadError(!!error)
@@ -90,14 +109,22 @@ export default function TodosSection({ jobId, userId, compact = false, onOpenTas
       setRows(Array.from(merged.values()))
     }
     setLoading(false)
-  }, [jobId, userId])
+  }, [jobId, userId, queryClient])
 
   // Queue changes include successful replay and rejected edits. Reconcile
   // both so a task cannot remain falsely completed after reconnecting.
   useEffect(() => {
-    const unsubscribe = subscribeOutbox(() => { void fetchRows() })
+    let first = true
+    const unsubscribe = subscribeOutbox(() => { void fetchRows(first); first = false })
     return () => { readVersion.current += 1; unsubscribe() }
   }, [fetchRows])
+  // The job page read its to-dos again (after a change here or elsewhere).
+  const seeded = useRef(initialRows)
+  useEffect(() => {
+    if (!initialRows || seeded.current === initialRows) return
+    seeded.current = initialRows
+    void fetchRows(true)
+  }, [initialRows, fetchRows])
 
   async function add() {
     const txt = draft.trim()
@@ -226,7 +253,7 @@ export default function TodosSection({ jobId, userId, compact = false, onOpenTas
         <h2 id="fh-work-tasks-heading" ref={headingRef} tabIndex={-1}>Open tasks {!loading && !loadError && <span>{undoneCount}</span>}</h2>
         <button type="button" className="fh-work-link" onClick={onOpenTasks}><Plus size={16} aria-hidden="true" />Add task</button>
       </div>
-      {loading ? <SkeletonList rows={2} card={false} /> : loadError ? <div className="fh-work-empty" role="status">Tasks could not load.<button className="fh-work-link" type="button" onClick={fetchRows}>Try again</button></div> : open.length ? <ul className="fh-work-task-list">
+      {loading ? <SkeletonList rows={2} card={false} /> : loadError ? <div className="fh-work-empty" role="status">Tasks could not load.<button className="fh-work-link" type="button" onClick={() => { void fetchRows() }}>Try again</button></div> : open.length ? <ul className="fh-work-task-list">
         {open.slice(0, 3).map((row, index) => {
           const due = dueStatus(row.due_at)
           const assigned = row.assigned_to === userId ? 'You' : memberById[row.assigned_to]?.name || (row.assigned_to ? 'Teammate' : 'Unassigned')
@@ -268,7 +295,7 @@ export default function TodosSection({ jobId, userId, compact = false, onOpenTas
         <button className="fh-task-add" type="submit" disabled={!draft.trim() || saving} aria-label="Add task"><Plus size={16} aria-hidden="true" />{saving ? 'Adding…' : 'Add task'}</button>
       </form>
       {loading && <SkeletonList rows={3} card={false} />}
-      {!loading && loadError && <p role="status">Tasks could not load. <button type="button" className="fh-work-link" onClick={fetchRows}>Try again</button></p>}
+      {!loading && loadError && <p role="status">Tasks could not load. <button type="button" className="fh-work-link" onClick={() => { void fetchRows() }}>Try again</button></p>}
       {!loading && !loadError && rows.length === 0 && <p className="fh-work-empty">No tasks added yet.</p>}
       {!loading && !loadError && rows.length > 0 && <ul className="fh-task-editor__list">
         <AnimatePresence>

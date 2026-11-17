@@ -1,7 +1,8 @@
-import { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import { createContext, useContext, useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { supabase } from '../lib/supabase.ts'
 import { legacyLogoPath, migrateLegacyLogo } from '../lib/logoMigration.ts'
+import { readSavedIdentity, saveIdentity } from '../lib/identityCache.ts'
 import { useAuth } from './AuthContext.tsx'
 import type { Database } from '../lib/database.types.ts'
 
@@ -9,8 +10,9 @@ type Profile = Database['public']['Tables']['profiles']['Row']
 
 type ProfileContextValue = {
   profile: Profile | null
-  // True only until the first load for the signed in user finishes.
-  // Later refetches run silently: RequireOnboarded swaps the whole app
+  // True only until the first load for the signed in user finishes, and
+  // not at all when this device has their profile saved (that load then
+  // runs in the background). Later refetches run silently: RequireOnboarded swaps the whole app
   // for a loader while this is true, which would throw away open sheets
   // and half typed forms.
   loading: boolean
@@ -90,6 +92,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     const own = data && data.user_id === uid ? data : null
     setProfile(own)
     setLoading(false)
+    saveIdentity('profile', uid, own)
     // One time move of an old expiring logo link to the public bucket
     // (lib/logoMigration.ts). Background and best effort; a failure keeps
     // the old link and the next load tries again.
@@ -121,13 +124,19 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   // Clear the prior profile the instant the auth user changes so a
   // renaming screen never paints with the previous user's name, then
   // load. Keyed on the user id, not the access token: a token refresh
-  // must not refetch, let alone flash the loader.
-  useEffect(() => {
+  // must not refetch, let alone flash the loader. The profile this
+  // device last read for the user shows meanwhile (a repeat open then
+  // never waits on the network); the fetch replaces it. A layout effect,
+  // so that copy is in place before the first paint.
+  useLayoutEffect(() => {
+    const saved = userId ? readSavedIdentity<Profile>('profile', userId) : null
+    const seeded = saved && saved.user_id === userId ? saved : null
     activeUserIdRef.current = userId
-    loadedUserIdRef.current = null
+    loadedUserIdRef.current = seeded ? userId : null
     lastFetchFailedRef.current = false
-    setLoadedUserId(null)
-    setProfile(null)
+    setLoadedUserId(seeded ? userId : null)
+    setProfile(seeded)
+    if (seeded) setLoading(false)
     setError(null)
     void fetchProfile()
   }, [userId, fetchProfile])
@@ -158,7 +167,10 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         .upsert(payload as Database['public']['Tables']['profiles']['Insert'], { onConflict: 'user_id' })
         .select()
         .single()
-      if (!error && activeUserIdRef.current === userId) setProfile(data)
+      if (!error && activeUserIdRef.current === userId) {
+        setProfile(data)
+        saveIdentity('profile', userId, data)
+      }
       return { data: data ?? undefined, error }
     },
     [userId]

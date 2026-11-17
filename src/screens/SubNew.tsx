@@ -29,12 +29,14 @@ export default function SubNew() {
   const [phone, setPhone] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | undefined>()
+  // A missing name is the name field's error, so the field says it (A11Y-08).
+  const [nameError, setNameError] = useState<string | undefined>()
 
   async function save() {
     if (saving || !user?.id) return
     const trimmed = name.trim()
     if (!trimmed) {
-      setError('Enter the sub or company name.')
+      setNameError('Enter the sub or company name.')
       return
     }
     setSaving(true)
@@ -69,7 +71,8 @@ export default function SubNew() {
         value={name}
         placeholder="Crew lead or company"
         autoComplete="off"
-        onChange={(e) => { setName(e.target.value); setError(undefined) }}
+        error={nameError}
+        onChange={(e) => { setName(e.target.value); setError(undefined); setNameError(undefined) }}
       />
       <Field label="Trade" value={trade} placeholder="Framer, electrician, roofer" onChange={(e) => setTrade(e.target.value)} />
       <Field label="Phone" type="tel" inputMode="tel" value={phone} placeholder="(615) 555-0000" onChange={(e) => setPhone(e.target.value)} />

@@ -248,8 +248,10 @@ export default function PublicDoc() {
     // link was not just refused, and the customer has not just approved or
     // asked one.
     const canAsk = pv.canAsk && !finished && !linkRefused
+    // The page's one main landmark, so a screen reader can jump to the
+    // document (A11Y-12).
     return (
-      <div className="fhp-ground">
+      <main className="fhp-ground">
         <ProposalView
           data={data}
           portal={{
@@ -276,12 +278,12 @@ export default function PublicDoc() {
             ) : null
           }}
         />
-      </div>
+      </main>
     )
   }
 
   return (
-    <div
+    <main
       style={{
         minHeight: '100vh',
         background: '#F2EDE4',
@@ -338,7 +340,7 @@ export default function PublicDoc() {
       {!loading && data && !['proposal', 'invoice', 'change_order', 'statement'].includes(data.kind) && (
         <ErrorState message="This document type can't be displayed here. Please ask the sender for an updated link." />
       )}
-    </div>
+    </main>
   )
 }
 

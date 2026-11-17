@@ -183,7 +183,8 @@ test.describe('Importer', () => {
   test('one row reads "Import 1 contact", two read "Import 2 contacts"', async ({ context, page }) => {
     await signIn(context)
     await open(page, '/import', 'text=CSV upload')
-    const file = page.locator('input[type="file"][accept=".csv"]')
+    // The picker takes a CSV by its extension or its type (importer fixes D04, D10, D11).
+    const file = page.locator('input[type="file"][accept=".csv,text/csv"]')
     await file.setInputFiles(csv(['Ana Ruiz,615-555-0142,ana@ruiz.com']))
     await expect(page.getByRole('button', { name: 'Import 1 contact', exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Import 1 contacts', exact: true })).toHaveCount(0)

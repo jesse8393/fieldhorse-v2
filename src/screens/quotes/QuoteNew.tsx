@@ -52,6 +52,8 @@ export default function QuoteNew() {
   const [client, setClient] = useState<ClientFieldValue>(() => restoredClientValue(form.client, form.clientId))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  // A missing client is the client field's error, so the field says it (A11Y-08).
+  const [clientError, setClientError] = useState('')
 
   function pickClient(id: string) {
     return fetchClientPick(id).then((c) => {
@@ -85,12 +87,13 @@ export default function QuoteNew() {
 
   function onClient(next: ClientFieldValue) {
     setClient(next)
+    setClientError('')
     patch({ client: next.text, clientId: next.picked?.id || '' })
   }
 
   async function save() {
     if (!user || savingRef.current) return
-    if (!client.text.trim()) { setError('Enter a client.'); return }
+    if (!client.text.trim()) { setClientError('Enter a client.'); return }
     savingRef.current = true
     setSaving(true)
     setError('')
@@ -127,7 +130,7 @@ export default function QuoteNew() {
 
   return (
     <CreateShell title="New quote" saveLabel="Save quote" saving={saving} error={error} onSave={save}>
-      <ClientField userId={user?.id} value={client} onChange={onClient} autoFocus={!clientParam && !leadParam} />
+      <ClientField userId={user?.id} value={client} onChange={onClient} error={clientError} autoFocus={!clientParam && !leadParam} />
       <Field label="Title" placeholder="Driveway replacement" value={form.title} onChange={(e) => set('title', e.target.value)} />
       <Choices label="Job type" options={JOB_TYPES} value={form.jobType} onChange={(v) => set('jobType', v)} />
       <Field label="Scope" multiline placeholder="What the price covers" value={form.scope} onChange={(e) => set('scope', e.target.value)} />

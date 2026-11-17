@@ -441,7 +441,7 @@ export default function OverviewTab({
         {editCard && <div className="fhj-edit">{editCard}</div>}
         <div className="fh-work-overview">
           <div className="fh-work-execution">
-            <TodosSection jobId={contact.id} userId={userId} compact onOpenTasks={onOpenTasks} onChanged={fetchAll} />
+            <TodosSection jobId={contact.id} userId={userId} compact onOpenTasks={onOpenTasks} onChanged={fetchAll} initialRows={todos} />
             <JobVisitSummary visits={scheduleItems} onOpen={onOpenSchedule || onOpenAddEvent} />
           </div>
           <section className="fh-work-evidence" aria-label="Latest from site">
@@ -453,6 +453,7 @@ export default function OverviewTab({
               </button>
             </>}
             <SpineList
+              photos={photos}
               initialCount={3}
               excludePhotoId={coverId}
               contact={contact}

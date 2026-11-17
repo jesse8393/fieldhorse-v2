@@ -274,7 +274,7 @@ test('deleting a custom trade takes a second tap', async ({ page, context }) => 
   const remove = page.getByRole('button', { name: 'Delete Stamped concrete trade', exact: true })
   await expect(remove).toBeVisible({ timeout: 30_000 })
   await remove.click()
-  await page.waitForTimeout(300)
+  await page.waitForTimeout(600) // a second tap within 500 ms is ignored (OPS-02)
   expect(deletes).toEqual([])
   await page.getByRole('button', { name: 'Tap again to delete Stamped concrete', exact: true }).click()
   await expect.poll(() => deletes.length).toBe(1)

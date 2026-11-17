@@ -53,6 +53,8 @@ export type SpineListProps = {
   onAdd: () => void
   initialCount?: number
   excludePhotoId?: string
+  /** The page's photo read, when it has one; else the list reads its own. */
+  photos?: JobPhotos
 }
 
 export default function SpineList({
@@ -66,9 +68,13 @@ export default function SpineList({
   canSeeMoney = false,
   initialCount = FIRST_PAGE,
   excludePhotoId,
-  onAdd
+  onAdd,
+  photos: pagePhotos
 }: SpineListProps) {
-  const photos = useJobPhotos(contact?.id)
+  // One photo read per page: a second observer mounting after the first
+  // read landed would read again (staleTime 0).
+  const ownPhotos = useJobPhotos(pagePhotos ? null : contact?.id)
+  const photos = pagePhotos ?? ownPhotos
   const [showAll, setShowAll] = useState(false)
 
   const items = useMemo(() => {

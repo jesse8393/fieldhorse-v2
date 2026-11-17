@@ -90,7 +90,8 @@ export default function SnowJobDetailBuild(props: Props) {
           <div className="fh-job-sidebar">
             <div className="fh-job-secondary-actions">
               <Button variant="secondary" icon={MessageSquare} to={`/compose?contact=${encodeURIComponent(contact.id)}&channel=${contact?.email || !contact?.phone ? 'email' : 'sms'}`}>Message</Button>
-              {onAddEvent && <Button variant="secondary" onClick={onAddEvent}>Schedule</Button>}
+              {/* Not "Schedule": that is the section tab, which does something else. */}
+              {onAddEvent && <Button variant="secondary" onClick={onAddEvent}>Add a visit</Button>}
               {primaryAction && <Button variant="secondary" onClick={primaryAction.onClick}>{primaryAction.label}</Button>}
             </div>
             <JobFactsPanel contact={contact} client={client} money={showMoney ? money ?? null : null} canSeeMoney={showMoney} tabs={tabs} crewIds={crewIds} scheduleLabel={scheduleStatus?.label ?? null} changeOrderTotals={showMoney ? changeOrderTotals ?? null : null} onOpenTab={onTabChange} onInvitePartner={onInvitePartner} onOpenClient={onOpenClient} onEdit={onEdit} />

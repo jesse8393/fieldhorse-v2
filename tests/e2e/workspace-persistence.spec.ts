@@ -180,3 +180,74 @@ test('task creation without native randomUUID submits a valid persistent row', a
   await expect(page.getByText('Valid task identity', { exact: true })).toBeVisible()
   expect(rows).toHaveLength(1)
 })
+
+// PERF-01: a repeat open must not wait on the network for who the person
+// is. The last profile and workspace read on this device show at once,
+// and the server's answer replaces them when it lands.
+const WORKSPACE = { id: 'org-1', name: 'Ridgeback Paving', slug: null, created_at: '2026-08-01T12:00:00Z' }
+
+async function holdIdentityReads(context: BrowserContext) {
+  const held: Array<() => void> = []
+  let holding = true
+  await context.route(/\/rest\/v1\/(profiles|org_members|organizations)(\?|$)/, route => {
+    if (!holding) return route.fallback()
+    return new Promise<void>(resolve => {
+      held.push(() => { void route.fallback().then(resolve, resolve) })
+    })
+  })
+  return () => {
+    holding = false
+    for (const release of held.splice(0)) release()
+  }
+}
+
+test('a repeat open shows the saved profile and workspace while they reload', async ({ context, page }) => {
+  await signIn(context, { tables: { organizations: [WORKSPACE] } })
+  await page.goto('/')
+  const menu = page.getByRole('button', { name: 'Open workspace menu', exact: true })
+  await expect(menu).toHaveAttribute('title', 'Ridgeback Paving')
+  // This device keeps the workspace once the first open's reads are in.
+  await expect.poll(() => page.evaluate(() => Object.keys(localStorage)
+    .some(key => (localStorage.getItem(key) || '').includes('Ridgeback Paving')))).toBe(true)
+  const release = await holdIdentityReads(context)
+  await page.reload()
+  await expect(page.locator('#fh-main')).toBeVisible({ timeout: 5_000 })
+  await expect(page.getByText('Loading workspace', { exact: true })).toHaveCount(0)
+  await expect(menu).toHaveAttribute('title', 'Ridgeback Paving')
+  release()
+  await expect(menu).toHaveAttribute('title', 'Ridgeback Paving')
+})
+
+test('sign out forgets the saved profile and workspace', async ({ context, page }) => {
+  await signIn(context, { tables: { organizations: [WORKSPACE] } })
+  await page.goto('/workspace')
+  await expect(page.getByRole('button', { name: 'Open workspace menu', exact: true })).toHaveAttribute('title', 'Ridgeback Paving')
+  const signOut = page.getByRole('button', { name: 'Sign out', exact: true }).last()
+  await signOut.click()
+  await expect(page).toHaveURL(/\/login$/)
+  const stored = await page.evaluate(() => Object.keys(localStorage).map(key => localStorage.getItem(key) || ''))
+  expect(stored.filter(value => value.includes('Ridgeback Paving') || value.includes('Jesse Parker'))).toEqual([])
+  // The next open has nothing saved to show, so it waits for the server.
+  const release = await holdIdentityReads(context)
+  await page.goto('/')
+  await expect(page.getByText('Loading workspace', { exact: true })).toBeVisible()
+  release()
+  await expect(page.locator('#fh-main')).toBeVisible()
+})
+
+// PERF-03: the member and partner counts only drive nav flags, so a first
+// open settles the workspace once the membership and company rows are in
+// and asks for its screen data without waiting on them.
+test('a first open asks for its screen data while the member counts are still out', async ({ context, page }) => {
+  await signIn(context)
+  const held: Array<() => void> = []
+  await context.route(/\/rest\/v1\/(org_members|fh_job_partners)(\?|$)/, route => {
+    if (route.request().method() !== 'HEAD') return route.fallback()
+    return new Promise<void>(resolve => { held.push(() => { void route.fallback().then(resolve, resolve) }) })
+  })
+  const leadsRead = page.waitForRequest(/\/rest\/v1\/fh_leads(\?|$)/, { timeout: 8_000 })
+  await page.goto('/jobs')
+  await leadsRead
+  expect(held.length).toBeGreaterThan(0)
+  for (const release of held.splice(0)) release()
+})

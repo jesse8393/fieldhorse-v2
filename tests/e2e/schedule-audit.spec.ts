@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 import { nothingRunsOffTheSide } from './helpers/overflow.ts'
+import { contrastOf } from './helpers/contrast.ts'
 import { USER } from '../../scripts/qa-mock.mjs'
 
 test.use({ timezoneId: 'America/Chicago' })
@@ -271,3 +272,18 @@ test('a failed timesheets read shows plain words and no empty line', async ({ co
   await expect(page.getByText('server_error')).toHaveCount(0)
   await expect(page.getByText('No timesheets are waiting for approval.')).toHaveCount(0)
 })
+
+// A11Y-04: the status counts beside All, Live, Upcoming and Done read as
+// text (4.5 to 1), never dimmed with opacity, by day and at night.
+for (const mode of ['day', 'night'] as const) {
+  test(`the day's status counts are readable in ${mode} mode`, async ({ context, page, isMobile }) => {
+    test.skip(!isMobile, 'Phone Day view')
+    await signIn(context, { mode })
+    await page.clock.setFixedTime(new Date('2026-10-31T13:00:00Z'))
+    await page.goto('/schedule?d=2026-10-31')
+    await page.getByRole('tab', { name: 'Day', exact: true }).click()
+    const counts = page.getByRole('tablist', { name: 'Filter schedule by status' }).locator('b')
+    await expect(counts).toHaveCount(4)
+    for (let i = 0; i < 4; i++) await expect.poll(() => contrastOf(counts.nth(i))).toBeGreaterThanOrEqual(4.5)
+  })
+}

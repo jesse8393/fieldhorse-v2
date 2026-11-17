@@ -96,14 +96,19 @@ test('job tasks can be completed, undone, and created on a narrow phone', async 
 
 test('a failed task read offers retry without claiming the job has no tasks', async ({ context, page }) => {
   await signIn(context)
-  let reads = 0
+  let failReads = false
   await context.route(/\/rest\/v1\/fh_job_todos(\?|$)/, route => {
-    // Let the parent job load, then fail the task section's independent read.
-    if (++reads === 1) return route.fallback()
+    // The job page's own read lands. The overview's task list shows those
+    // rows instead of reading them again (PERF-09), so the read that fails
+    // is the Tasks section's, opened from the overview.
+    if (route.request().method() !== 'GET' || !failReads) return route.fallback()
     return route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ message: 'Temporary test failure' }) })
   })
   await page.goto('/jobs/c-job1')
-  const tasks = page.getByRole('region', { name: 'Open tasks', exact: true })
+  await expect(page.getByRole('button', { name: 'Add task', exact: true })).toBeVisible()
+  failReads = true
+  await page.getByRole('button', { name: 'Add task', exact: true }).click()
+  const tasks = page.getByRole('region', { name: 'Tasks', exact: true })
   await expect(tasks).toContainText('Tasks could not load.')
   await expect(tasks.getByRole('button', { name: 'Try again' })).toBeVisible()
   await expect(tasks.getByText('No tasks added yet.')).toHaveCount(0)
@@ -120,4 +125,25 @@ test('the material composer and existing materials fit a narrow phone', async ({
   await expect(page.getByRole('button', { name: 'Add material', exact: true })).toBeVisible()
   await expect(page.getByText('Pressure treated timber', { exact: true })).toBeVisible()
   await nothingRunsOffTheSide(page, 'Material composer and rows at 320 pixels')
+})
+
+// A11Y-11: an error toast stays until it is closed, and every toast has a
+// close button, so a slow reader or a gloved hand never loses it.
+test('an error toast stays until its close button is tapped', async ({ context, page }) => {
+  await signIn(context)
+  const task = { id: 'task-toast', job_id: 'c-job1', user_id: 'qa-user-1', assigned_to: null,
+    text: 'Keep this task when deletion is denied', done: false, completed_at: null, due_at: null, created_at: new Date().toISOString() }
+  await context.route(/\/rest\/v1\/fh_job_todos(\?|$)/, route => route.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify(route.request().method() === 'DELETE' ? [] : [task])
+  }))
+  await page.clock.install()
+  await page.goto('/tasks')
+  await page.getByRole('button', { name: `Delete ${task.text}`, exact: true }).click()
+  const toast = page.locator('[data-sonner-toast]').filter({ hasText: "Couldn't delete" })
+  await expect(toast).toBeVisible()
+  await page.mouse.move(0, 0)
+  await page.clock.runFor(15_000)
+  await expect(toast).toBeVisible()
+  await toast.getByRole('button', { name: /close/i }).click()
+  await expect(toast).toHaveCount(0)
 })

@@ -1801,6 +1801,20 @@ test('the tab names no app while a customer link loads or fails (PT-11)', async 
 })
 
 
+// A11Y-12: a customer using a screen reader can jump straight to the
+// document: the page has one main landmark, on the proposal and on a
+// link that failed to load.
+test('the customer page has a main landmark', async ({ page, context }) => {
+  const spies = await mockPortal(context, proposalPayload())
+  await openPortal(page)
+  await expect(page.getByRole('main')).toHaveCount(1)
+  await expect(page.getByRole('main').getByRole('heading', { level: 1 })).toBeVisible()
+  spies.setLinkFailure('abort')
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible()
+  await expect(page.getByRole('main')).toHaveCount(1)
+})
+
 /* ---- Smaller defects on the customer pages (PT-24) ---- */
 
 test('on a phone the billing schedule shows every amount and status without sideways scrolling', async ({ page, context }) => {

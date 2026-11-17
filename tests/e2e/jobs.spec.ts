@@ -70,6 +70,45 @@ test.describe('jobs on a phone', () => {
     await expect(page.getByRole('tab', { name: /^Leads\b/ })).toHaveCount(0)
   })
 
+  // PERF-05: jobs land before leads and quotes, which wait on the company.
+  // The All list keeps its skeleton until all three are in, so rows never
+  // move under a thumb when the sales records arrive above them.
+  test('the All list waits for leads and quotes instead of jumping when they land', async ({ context, page }) => {
+    await signIn(context)
+    let release!: () => void
+    const held = new Promise<void>(resolve => { release = resolve })
+    await context.route(/\/rest\/v1\/fh_leads(\?|$)/, async route => {
+      if (route.request().method() === 'GET') await held
+      await route.fallback()
+    })
+    await openJobs(page, '/jobs')
+    const tabs = page.getByRole('tablist', { name: 'Job stages' })
+    // The jobs are in: their tab has its count.
+    await expect(tabs.getByRole('tab', { name: /^Jobs\b/ }).locator('.fhjl-tab__count')).toBeVisible()
+    await expect(page.getByText('Plumbing Bellevue', { exact: true })).toHaveCount(0)
+    await expect(page.getByText('Loading jobs', { exact: true })).toBeAttached()
+    release()
+    await expect(page.getByText('Plumbing Bellevue', { exact: true })).toBeVisible()
+  })
+
+  // PERF-10: a long list draws 40 rows and Load more adds the next 40.
+  test('a long jobs list draws 40 rows and Load more brings the rest', async ({ context, page }) => {
+    const client = { id: 'cl-1', name: 'Jeff Roy', phone: '555-0101', email: 'jeff@roy.com' }
+    const jobs = Array.from({ length: 60 }, (_, i) => ({
+      id: `c-long-${i}`, user_id: 'qa-user-1', client_id: 'cl-1', stage: 'job', name: `Customer ${i}`, job_title: `Driveway ${i}`,
+      amount: 1000 + i, phone: null, email: null, address: null, notes: null, milestones: [], completed_at: null,
+      created_at: '2026-09-01T12:00:00Z', updated_at: new Date(Date.UTC(2026, 9, 1, 12, i)).toISOString(), fh_clients: client
+    }))
+    await signIn(context, { tables: { fh_contacts: jobs } })
+    await openJobs(page, '/jobs?stage=active')
+    const rows = page.locator('.fhjl-rows > li')
+    await expect(rows).toHaveCount(40)
+    await expect(page.getByText('Showing 40 of 60 jobs.', { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Load more jobs', exact: true }).click()
+    await expect(rows).toHaveCount(60)
+    await expect(page.getByRole('button', { name: 'Load more jobs', exact: true })).toHaveCount(0)
+  })
+
   test('rows open the job', async ({ context, page }) => {
     await signIn(context)
     await openJobs(page)
@@ -172,4 +211,32 @@ test('the Jobs list keeps its search, sort and lost switch on reload and Back', 
   await page.goBack()
   await expect(page.getByRole('heading', { level: 1, name: 'Jobs' })).toBeVisible({ timeout: 30_000 })
   await check()
+})
+
+// D18: each control writes only its own key, on the address as it is now.
+// On a slow phone the list had not drawn the sort yet when the first
+// letter of a search was typed, and the search wrote ?q= over the address
+// the list last drew, so the sort (and the lost switch) went back off.
+test('a sort and the lost switch tapped just before a search stay on', async ({ context, page, isMobile }) => {
+  await signIn(context)
+  await openJobs(page)
+  const chips = page.getByRole('group', { name: 'Filter and sort' })
+  const lost = chips.getByRole('switch', { name: 'Show lost jobs' })
+  const amount = chips.getByRole('radio', { name: 'Amount' })
+  if (isMobile) await page.getByRole('button', { name: 'Search jobs' }).click()
+  const box = page.locator('.fhjl-search input')
+  await expect(box).toBeVisible()
+  // A slow phone: the list draws each change well after the tap.
+  const cpu = await context.newCDPSession(page)
+  await cpu.send('Emulation.setCPUThrottlingRate', { rate: 20 })
+  await lost.click()
+  await amount.click()
+  await box.fill('o')
+  await expect(page).toHaveURL(/[?&]q=o\b/)
+  await cpu.send('Emulation.setCPUThrottlingRate', { rate: 1 })
+
+  await expect(lost).toHaveAttribute('aria-checked', 'true')
+  await expect(amount).toHaveAttribute('aria-checked', 'true')
+  const address = new URL(page.url()).searchParams
+  expect([address.get('lost'), address.get('sort'), address.get('q')]).toEqual(['1', 'amount', 'o'])
 })

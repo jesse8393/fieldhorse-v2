@@ -29,6 +29,8 @@ import Monogram from '../../components/fh/Monogram.tsx'
 import { useProfile } from '../../contexts/ProfileContext.tsx'
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import DataErrorState from '../../components/DataErrorState.tsx'
+import ListMore from '../../components/ListMore.tsx'
+import { useListWindow } from '../../lib/useListWindow.ts'
 import { useActiveCompany, useQuotes } from '../../lib/queries.ts'
 import { buildInvoiceList, buildMoneyView, type MoneyRow } from '../../lib/moneyView.ts'
 import { hapticTap } from '../../lib/haptics.ts'
@@ -60,6 +62,8 @@ type GroupProps = {
 
 function Group({ id, title, note, rows, remind = false }: GroupProps) {
   const headingId = `fhm-group-${id}`
+  // Long groups draw 40 rows at a time.
+  const { count, showMore } = useListWindow(`money:${id}`)
   return (
     <section className="fhm-group" aria-labelledby={headingId}>
       <div className="fhm-group__head">
@@ -67,7 +71,7 @@ function Group({ id, title, note, rows, remind = false }: GroupProps) {
         <p className="fhm-group__note">{note}</p>
       </div>
       <ul className="fhm-rows">
-        {rows.map((r) => {
+        {rows.slice(0, count).map((r) => {
           // A chip when the row has one (days overdue, Paid Sep 30), else
           // the gray line (Due Oct 15, Sent yesterday).
           const end = r.chip
@@ -110,6 +114,7 @@ function Group({ id, title, note, rows, remind = false }: GroupProps) {
           )
         })}
       </ul>
+      <ListMore shown={Math.min(count, rows.length)} total={rows.length} noun="invoices" onMore={showMore} />
     </section>
   )
 }

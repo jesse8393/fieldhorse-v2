@@ -19,7 +19,9 @@ import { useSearchParams } from 'react-router-dom'
 import { HardHat, Plus, Search, SearchX } from 'lucide-react'
 import { Button, Chip, EmptyState, Field, IconButton, Row, SkeletonRows } from '../../components/fh'
 import DataErrorState from '../../components/DataErrorState.tsx'
+import ListMore from '../../components/ListMore.tsx'
 import { useAuth } from '../../contexts/AuthContext.tsx'
+import { useListWindow } from '../../lib/useListWindow.ts'
 import { useNavAccess } from '../../lib/useNavAccess.ts'
 import { useJobVisits, useLeads, useLeadVisits, useQuotes, type JobRow } from '../../lib/queries.ts'
 import { jobsVisitWindow, JOBS_TABS, type JobsRowView, type JobsSort, type JobsTab } from '../../lib/jobsList.ts'
@@ -166,10 +168,12 @@ export default function JobsPhone({
     if (quotesFailed) void quotesQuery.refetch()
   }
 
-  // Each change rewrites only its own keys, on the latest address.
+  // Each change rewrites only its own keys, on the address as it is now.
+  // The updater's own argument is the address of the last render, which
+  // misses a key written a moment ago, before the list drew it.
   const writeParams = (patch: Record<string, string | null>) => {
-    setSearchParams((prev) => {
-      const sp = new URLSearchParams(prev)
+    setSearchParams(() => {
+      const sp = new URLSearchParams(window.location.search)
       for (const [key, value] of Object.entries(patch)) {
         if (value) sp.set(key, value)
         else sp.delete(key)
@@ -210,13 +214,28 @@ export default function JobsPhone({
     }
   }
 
+  // Long lists draw 40 rows at a time, across the groups in order.
+  const { count: windowCount, showMore } = useListWindow(`jobs:${user?.id || ''}`)
+  const totalRows = view.groups.reduce((sum, g) => sum + g.rows.length, 0)
+  let budget = windowCount
+  const shownGroups = view.groups
+    .map((g) => {
+      const rows = g.rows.slice(0, Math.max(0, budget))
+      budget -= rows.length
+      return { ...g, rows }
+    })
+    .filter((g) => g.rows.length > 0)
+
   const filterTitle = showMoney ? 'Filter and sort' : 'Filter'
   const query = search.trim()
   const hasRows = view.groups.length > 0
   const tabLoading = !fieldView && ((tab === 'all' && salesPending) || (tab === 'leads' && leadsQuery.isPending) || (tab === 'quotes' && quotesQuery.isPending))
 
   let body: ReactNode
-  if ((loading || tabLoading) && !hasRows) {
+  // All mixes jobs with leads and quotes, which land later (they wait on
+  // the company). It keeps its skeleton until all three are in, so rows
+  // never move under a thumb as the sales records arrive above them.
+  if ((loading || tabLoading) && (!hasRows || tab === 'all')) {
     body = <SkeletonRows rows={6} label="Loading jobs" />
   } else if (salesError && !hasRows) {
     body = <DataErrorState title="Could not load sales records" message="Your leads and quotes could not be loaded. Try again." onRetry={retrySales} />
@@ -258,7 +277,7 @@ export default function JobsPhone({
       )
     }
   } else {
-    body = view.groups.map((g) => {
+    body = shownGroups.map((g) => {
       const headingId = `${idBase}-group-${g.id}`
       return (
         <section key={g.id} className="fhjl-group" aria-labelledby={headingId}>
@@ -286,6 +305,7 @@ export default function JobsPhone({
         </section>
       )
     })
+    body = <>{body}<ListMore shown={Math.min(windowCount, totalRows)} total={totalRows} noun="jobs" onMore={showMore} /></>
   }
 
   return (

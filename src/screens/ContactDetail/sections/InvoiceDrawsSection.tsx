@@ -28,7 +28,9 @@ import { supabase, authHeaders } from '../../../lib/supabase.ts'
 import { parseDateOnly, toYmd } from '../../../lib/dates.ts'
 import { useProfile } from '../../../contexts/ProfileContext.tsx'
 import { useAuth } from '../../../contexts/AuthContext.tsx'
-import { generateInvoice, downloadPdf } from '../../../lib/pdf.js'
+// Loaded on the first PDF action, never with the screen: jsPDF stays out
+// of the service worker precache and of the Financials tab's own chunk.
+const loadPdf = () => import('../../../lib/pdf.js')
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
 // Cents aware: whole amounts print as "$1,250", amounts with cents keep
 // them, so a generated $1,249.75 draw never reads "$1,250".
@@ -370,6 +372,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
     const drawTitle = draw.title?.trim()
       || `Draw ${draw.sequence_number} of ${drawCount}`
 
+    const { generateInvoice } = await loadPdf()
     return generateInvoice({
       company,
       contact: {
@@ -427,6 +430,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
     try {
       const result = await buildDrawPdf(draw)
       if (!result?.doc) throw new Error('PDF generator returned no document')
+      const { downloadPdf } = await loadPdf()
       downloadPdf(result)
       toastSuccess('Draw PDF downloaded', result.filename)
     } catch (e: any) {
@@ -524,6 +528,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
           "Email not sent, sender isn't configured",
           'Downloaded the PDF so you can email it manually.'
         )
+        const { downloadPdf } = await loadPdf()
         downloadPdf(result)
         return
       }

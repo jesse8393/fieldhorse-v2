@@ -4,12 +4,23 @@ Team roster management and AI drafting run through Netlify Functions. Database h
 
 ## Required server configuration
 
-| Service | Variables |
-| --- | --- |
-| Team | `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` |
-| AI | `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `ANTHROPIC_API_KEY` |
+Set these three for every function, under these exact names:
 
-Existing `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` values remain supported. Public keys may also use `VITE_SUPABASE_PUBLISHABLE_KEY` or `VITE_SUPABASE_ANON_KEY`. URL may use `VITE_SUPABASE_URL`.
+| Variable | Value |
+| --- | --- |
+| `SUPABASE_URL` | `https://pnmhblvslftdzfcdezbw.supabase.co` |
+| `SUPABASE_ANON_KEY` | the anon (or publishable) key |
+| `SUPABASE_SERVICE_ROLE_KEY` | the service role (or secret) key |
+
+Add `ANTHROPIC_API_KEY` for AI drafting.
+
+Use these names, not `SUPABASE_PUBLISHABLE_KEY` or `SUPABASE_SECRET_KEY`.
+The Team and AI functions accept either naming, but about twenty other
+functions (customer links, quote and invoice sending, partner invites,
+account deletion, DocuSign, lead webhooks) read only
+`SUPABASE_SERVICE_ROLE_KEY`, and some read only `SUPABASE_ANON_KEY`. With
+the newer names alone those would still fail. URL may also come from
+`VITE_SUPABASE_URL`.
 
 Set server secrets in the hosting environment for Functions and the intended deploy context. Never put secret keys or the AI key in a variable beginning with `VITE_`. Rebuild and deploy after configuration changes.
 
