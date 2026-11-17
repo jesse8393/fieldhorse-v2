@@ -249,7 +249,7 @@ export default function HomeScreen() {
                   <View style={{ flex: 1 }} />
                   <TrendChip pct={stats.trend} />
                 </View>
-                <Text style={{ color: theme.inkMuted, fontSize: 14, marginTop: 2 }}>Total pipeline</Text>
+                <Text style={{ color: theme.inkMuted, fontSize: 14, marginTop: 2 }}>Open leads, quotes and jobs</Text>
 
                 {/* sparkline */}
                 <View style={{ marginTop: 14 }}>

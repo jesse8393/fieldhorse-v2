@@ -41,6 +41,8 @@ describe('native app copy', () => {
   const BANNED: [string, string][] = [
     // Title Case menu items, buttons, labels and links.
     ['app/(tabs)/index.tsx', 'Total Pipeline'],
+    // The hero card is labelled Pipeline; its caption says what the figure counts.
+    ['app/(tabs)/index.tsx', '>Total pipeline<'],
     ['app/(tabs)/index.tsx', 'label="AI Compose"'],
     ['app/(tabs)/more.tsx', 'title="Dispatch AI"'],
     ['app/(tabs)/more.tsx', 'Invoices & Payments'],
