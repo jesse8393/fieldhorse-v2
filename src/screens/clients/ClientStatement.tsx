@@ -100,7 +100,7 @@ export default function ClientStatement() {
         toastInfo('Email not set up, downloaded instead', 'The statement PDF was saved to your device.')
         goBack()
       } else {
-        toast("Couldn't send the statement", { description: res.message || 'Try again' })
+        toast("Couldn't send the statement", { description: res.message || 'The statement was not sent. Try again.' })
       }
     } finally {
       setBusy(null)

@@ -36,6 +36,7 @@ import { useMediaQuery } from '../../lib/useMediaQuery.ts'
 import { useFhMotion } from '../../lib/motion.ts'
 import { Eyebrow, StampNumber } from '../../components/v3'
 import { InvoiceTemplate } from '../../components/documents'
+import { plainError } from '../../lib/serviceErrors.ts'
 
 /**
  * JobMoney, a job's money, reached at /jobs/:id?tab=financials only (the
@@ -466,7 +467,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
       const { error: upErr } = await supabase.storage
         .from('job-files')
         .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
-      if (upErr) throw new Error(`Couldn't save the invoice PDF: ${upErr.message}`)
+      if (upErr) throw new Error(plainError(upErr, 'The invoice PDF could not be saved, so nothing was sent. Try again.'))
       // Audit row (best-effort).
       try {
         await supabase.from('fh_job_files').insert({
@@ -509,13 +510,9 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
         return
       }
       if (!sendRes.ok || !sendBody?.ok) {
-        // Surface the actual provider error (Resend message + HTTP status)
-        // so the operator sees exactly why the send failed instead of
-        // hunting through Netlify function logs. Was previously hidden
-        // behind a generic "Email send failed." string.
-        const detail = sendBody?.message || sendBody?.detail || sendBody?.error || 'Unknown provider error'
-        const status = sendBody?.provider_status ? ` (HTTP ${sendBody.provider_status})` : ''
-        throw new Error(`Resend rejected${status}: ${detail}`)
+        // The provider's words and status go to the log; the owner reads
+        // what did not happen and what to do (raw-errors-7).
+        throw new Error(plainError({ ...sendBody, status: sendRes.status }, 'The invoice was not sent. Try again.'))
       }
 
       toastSuccess(`Invoice sent to ${resolved.email}`, result.filename)
@@ -523,7 +520,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
       setTimeout(() => setSent(false), 2400)
       refresh()
     } catch (e: any) {
-      toastError("Couldn't send invoice", e?.message || 'Try again')
+      toastError("Couldn't send invoice", plainError(e, 'The invoice was not sent. Try again.'))
     } finally {
       setSending(false)
     }

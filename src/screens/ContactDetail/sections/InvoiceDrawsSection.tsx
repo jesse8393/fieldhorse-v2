@@ -49,6 +49,7 @@ import { useMembership } from '../../../contexts/MembershipContext.tsx'
 import { canEditJobMoney } from '../lib/jobAccess.ts'
 import { useMediaQuery } from '../../../lib/useMediaQuery.ts'
 import { moneyInput } from '../../new/CreateShell.tsx'
+import { plainError } from '../../../lib/serviceErrors.ts'
 
 
 function shortDate(iso: any) {
@@ -497,7 +498,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       const { error: upErr } = await supabase.storage
         .from('job-files')
         .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
-      if (upErr) throw new Error(`Couldn't save the draw PDF: ${upErr.message}`)
+      if (upErr) throw new Error(plainError(upErr, 'The draw PDF could not be saved, so nothing was sent. Try again.'))
 
       // Audit row, best-effort, never blocks the send.
       try {
@@ -545,9 +546,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
         return
       }
       if (!sendRes.ok || !sendBody?.ok) {
-        const detail = sendBody?.message || sendBody?.detail || sendBody?.error || 'Unknown provider error'
-        const status = sendBody?.provider_status ? ` (HTTP ${sendBody.provider_status})` : ''
-        throw new Error(`Resend rejected${status}: ${detail}`)
+        throw new Error(plainError({ ...sendBody, status: sendRes.status }, 'The draw was not sent. Try again.'))
       }
 
       // Flip the draw to 'sent' so the row badge updates immediately.
@@ -566,7 +565,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       toastSuccess(`Draw sent to ${recipientEmail}`, result.filename)
       await fetchDraws()
     } catch (e: any) {
-      toastError("Couldn't send draw", e?.message || 'Try again.')
+      toastError("Couldn't send draw", plainError(e, 'The draw was not sent. Try again.'))
     } finally {
       setBusyId(null)
     }

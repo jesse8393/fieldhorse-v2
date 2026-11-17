@@ -35,6 +35,7 @@ import { useNow } from '../../lib/useNow.ts'
 import { toastError, toastSuccess } from '../../lib/toast.ts'
 import { hapticTap } from '../../lib/haptics.ts'
 import { parseDateOnly } from '../../lib/dates.ts'
+import { plainError } from '../../lib/serviceErrors.ts'
 
 // How long after an email lands a tap on its button is taken as aimed at the busy button.
 const SETTLE_MS = 800
@@ -202,7 +203,7 @@ export function useInvoiceScreen(id: string | undefined) {
         throw new Error(res.message || 'Send failed')
       }
     } catch (e) {
-      toastError("Couldn't send invoice", (e as Error)?.message || 'Try again')
+      toastError("Couldn't send invoice", plainError(e, 'The invoice was not sent. Try again.'))
     } finally {
       finish(sent)
     }

@@ -11,6 +11,7 @@ import { allocateInvoiceDue, invoicesPaidInFull, knownContractTotal, type DueInv
 import { toCents, sumCents } from './cents.ts'
 import { todayYmd } from './dates.ts'
 import type { Database } from './database.types.ts'
+import { plainError } from './serviceErrors.ts'
 
 // pdf.js pulls in jspdf (~390KB). Load it lazily at call time so merely
 // importing this module (Invoices, ClientDetail, PublicDoc route graphs)
@@ -470,7 +471,7 @@ export async function sendInvoiceEmail({ invoice, duplicateReviewed = false, con
   // One figure for the email and the PDF it attaches.
   const amountDue = invoiceAmountDue({ invoice, contact: job, payments, changeOrders, invoices })
   const result = await buildInvoicePdf({ invoice, contact: job, client, company, payments, changeOrders, insurance, invoices, amountDue })
-  if (!result?.doc) return { ok: false, reason: 'error', message: 'PDF generator returned no document' }
+  if (!result?.doc) return { ok: false, reason: 'error', message: 'The invoice PDF could not be made. Try again.' }
 
   const blob = result.doc.output('blob')
   const rowId = createUuid()
@@ -480,7 +481,7 @@ export async function sendInvoiceEmail({ invoice, duplicateReviewed = false, con
   const { error: upErr } = await supabase.storage
     .from('job-files')
     .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
-  if (upErr) return { ok: false, reason: 'error', message: `Couldn't save the invoice PDF: ${upErr.message}` }
+  if (upErr) return { ok: false, reason: 'error', message: plainError(upErr, 'The invoice PDF could not be saved, so nothing was sent. Try again.') }
 
   // Audit row on the job, best-effort, never blocks the send.
   if (job) {
@@ -527,9 +528,8 @@ export async function sendInvoiceEmail({ invoice, duplicateReviewed = false, con
     return { ok: false, reason: 'sender_not_configured' }
   }
   if (!sendRes.ok || !sendBody?.ok) {
-    const detail = sendBody?.message || sendBody?.detail || sendBody?.error || 'Unknown provider error'
-    const status = sendBody?.provider_status ? ` (HTTP ${sendBody.provider_status})` : ''
-    return { ok: false, reason: 'error', message: `Delivery stopped${status}: ${detail}` }
+    // The provider's words and status go to the log, not the screen (raw-errors-7).
+    return { ok: false, reason: 'error', message: plainError({ ...sendBody, status: sendRes.status }, 'The invoice was not sent. Try again.') }
   }
 
   // Don't downgrade a paid invoice just because the PDF was sent again.
