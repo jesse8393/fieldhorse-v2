@@ -504,7 +504,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
       if (sendRes.status === 503 && sendBody?.error === 'sender_not_configured') {
         toastError(
           "Email not sent, sender isn't configured",
-          'Downloaded the PDF so you can email it manually. To send direct, add Resend keys in Netlify env.'
+          'Downloaded the PDF so you can email it manually.'
         )
         downloadPdf(result)
         return

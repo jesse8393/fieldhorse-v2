@@ -469,6 +469,19 @@ test('a refused send says in plain words that the email did not go out', async (
   await expectPlain(toasts, 'Your sign in ran out. Sign in again, then try again.')
 })
 
+// raw-errors-13: the job's money view told the owner to add Resend keys in
+// Netlify.
+test("Email on the job's money view with no email sender says what to do", async ({ page, context }) => {
+  await installShedInvoice(context)
+  await context.route('**/storage/v1/object/**', (route) => route.fulfill({ status: 200, json: { Key: 'job-files/qa-invoice.pdf' } }))
+  await context.route('**/api/send-invoice', (route) => route.fulfill({ status: 503, json: { error: 'sender_not_configured', message: 'Email sender is not configured yet.' } }))
+  await page.goto('/jobs/c-job1?tab=financials', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+  const email = page.getByRole('button', { name: 'Email', exact: true })
+  await expect(email).toBeVisible({ timeout: 30_000 })
+  await email.click()
+  await expectPlain(page.locator('[data-sonner-toaster]'), 'Downloaded the PDF so you can email it manually.')
+})
+
 // raw-errors-6: Void refused by the database showed the policy's words.
 test('a refused Void says so in plain words', async ({ page, context }) => {
   await installShedInvoice(context)
