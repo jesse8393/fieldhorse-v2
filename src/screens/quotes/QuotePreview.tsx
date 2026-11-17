@@ -9,8 +9,8 @@ import { useParams } from 'react-router-dom'
 import { Button, SkeletonRows } from '../../components/fh'
 import DataErrorState from '../../components/DataErrorState.tsx'
 import { useAuth } from '../../contexts/AuthContext.tsx'
-import { useProfile } from '../../contexts/ProfileContext.tsx'
 import { useLinkedClientEmail } from '../../lib/queries.ts'
+import { useDocumentProfile } from '../../lib/companyBranding.ts'
 import { previewAsName } from '../../lib/quoteView.ts'
 import { recordRoute } from '../../lib/records.ts'
 import { hapticTap } from '../../lib/haptics.ts'
@@ -46,11 +46,12 @@ export default function QuotePreview() {
 
 function Preview({ quote, home }: { quote: QuoteWithClient; home: string }) {
   const { user } = useAuth()
-  const { profile } = useProfile()
+  // The quote's own company, whoever previews it (DATA-06).
+  const documentProfile = useDocumentProfile(quote.org_id)
   const userId = user?.id
   const items = useQuoteItems({ quoteId: quote.id, userId })
   const linesFailed = !items.loading && items.failed && !items.loaded
-  const company = useMemo(() => companyFromProfile(profile), [profile])
+  const company = useMemo(() => companyFromProfile(documentProfile.profile), [documentProfile.profile])
   const linked = useLinkedClientEmail(quote.client_id)
   const email = linked.data ?? null
   const contact = useMemo(() => quoteAsContact(quote, email), [quote, email])
@@ -81,7 +82,7 @@ function Preview({ quote, home }: { quote: QuoteWithClient; home: string }) {
     hapticTap()
     setDownloading(true)
     try {
-      const result = await buildQuotePdf({ quote, company, userId, recipientEmail: email })
+      const result = await buildQuotePdf({ quote, company: companyFromProfile(await documentProfile.load()), userId, recipientEmail: email })
       await downloadQuotePdf(result)
       toastSuccess('Quote downloaded', result.filename)
     } catch (e) {

@@ -24,6 +24,7 @@ import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useProfile } from '../../contexts/ProfileContext.tsx'
 import { supabase } from '../../lib/supabase.ts'
 import { useLinkedClientEmail } from '../../lib/queries.ts'
+import { useDocumentProfile } from '../../lib/companyBranding.ts'
 import { customerEmail } from '../../lib/customerEmail.ts'
 import { invalidateAfterQuoteWrite, makeJobFromQuote, plainQuoteError, quoteNumber } from '../../lib/quotes.ts'
 import { recordRoute } from '../../lib/records.ts'
@@ -183,7 +184,11 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
   const lost = ['lost', 'rejected'].includes(String(quote.status || '').toLowerCase())
   const client = quote.fh_clients ?? null
   const who = previewAsName(client?.name)
-  const company = useMemo(() => companyFromProfile(profile), [profile])
+  // The quote's own company, whoever builds its documents (DATA-06): what
+  // is known now for the number on screen, read again for each document.
+  const documentProfile = useDocumentProfile(quote.org_id)
+  const company = useMemo(() => companyFromProfile(documentProfile.profile), [documentProfile.profile])
+  const loadCompany = async () => companyFromProfile(await documentProfile.load())
 
   // The money: the base lines plus, until a line is priced, the quote's own
   // amount, and the deposit the payment terms name (D31).
@@ -224,7 +229,7 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
       ? "Couldn't check the email"
       : emailKnown && !hasEmail ? 'Copies a link' : undefined
 
-  const build = () => buildQuotePdf({ quote, company, userId: userId as string, recipientEmail: hasEmail ? recipientEmail : null })
+  const build = async () => buildQuotePdf({ quote, company: await loadCompany(), userId: userId as string, recipientEmail: hasEmail ? recipientEmail : null })
 
   function failed(title: string, e: unknown) {
     const message = e instanceof NoLinesError ? e.message : plainQuoteError(e)
@@ -240,7 +245,7 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
   }
 
   const onSend = () => run('send', async () => {
-    const outcome = await sendQuoteByEmail({ quote, company, userId: userId as string, recipientEmail, preferences: profile?.preferences })
+    const outcome = await sendQuoteByEmail({ quote, company: await loadCompany(), userId: userId as string, recipientEmail, preferences: profile?.preferences })
     if (outcome.kind === 'sender_not_configured') {
       toastError('Email sender is not configured yet', 'The PDF is saved. Ask whoever set up the deploy to add the Resend keys.')
       await downloadQuotePdf(outcome.result)
@@ -320,7 +325,7 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
   }, "Couldn't download")
 
   const onEsign = () => run('esign', async () => {
-    const outcome = await sendQuoteForSignature({ quote, company, userId: userId as string, recipientEmail })
+    const outcome = await sendQuoteForSignature({ quote, company: await loadCompany(), userId: userId as string, recipientEmail })
     if (outcome === 'esign_not_configured') {
       toastError('DocuSign not connected yet', 'Add the DocuSign keys in Netlify, then try again.')
       return

@@ -22,8 +22,10 @@ type Contact = Database['public']['Tables']['fh_contacts']['Row']
 
 export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'void'
 
-// Company block for the PDF letterhead, built from the profile row.
-// Kept here so every surface formats it identically.
+// Company block for the PDF letterhead, built from the profile of the
+// company the record belongs to (useDocumentProfile in
+// lib/companyBranding.ts, DATA-06). Kept here so every surface formats it
+// identically.
 export function companyFromProfile(profile: any) {
   return {
     name: profile?.company_name || profile?.full_name || 'My Company',

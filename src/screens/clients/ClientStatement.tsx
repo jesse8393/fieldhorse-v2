@@ -15,9 +15,9 @@ import { ChevronLeft } from 'lucide-react'
 import { Button, IconButton, SkeletonRows } from '../../components/fh'
 import DataErrorState from '../../components/DataErrorState.tsx'
 import { useAuth } from '../../contexts/AuthContext.tsx'
-import { useProfile } from '../../contexts/ProfileContext.tsx'
 import { useClientDetail } from '../../lib/queries.ts'
 import { companyFromProfile } from '../../lib/invoices.ts'
+import { useDocumentProfile } from '../../lib/companyBranding.ts'
 import { gatherStatement, downloadStatement, sendStatementEmail, fetchStatementMoney } from '../../lib/statement.ts'
 import { mintPublicLink, listClientStatementLinks, buildPublicUrl } from '../../lib/publicLink.ts'
 import { toast, toastSuccess, toastInfo } from '../../lib/toast.ts'
@@ -33,7 +33,6 @@ const money = moneyExact
 export default function ClientStatement() {
   const { id } = useParams()
   const { user } = useAuth()
-  const { profile } = useProfile()
   const navigate = useNavigate()
   const { data: bundle, isPending: loading, isError, refetch } = useClientDetail(id, user?.id)
   const client = bundle?.client ?? null
@@ -60,7 +59,9 @@ export default function ClientStatement() {
     [bundle, moneyQuery.data]
   )
   const moneyReady = !!moneyQuery.data
-  const company = useMemo(() => companyFromProfile(profile), [profile])
+  // The client's own company, whoever builds the statement (DATA-06).
+  const documentProfile = useDocumentProfile(client?.org_id)
+  const loadCompany = async () => companyFromProfile(await documentProfile.load())
   const recipientEmail = (client?.email || '').trim()
   const title = client?.company_name || client?.name || 'client'
   const home = recordRoute('client', id || '')
@@ -76,7 +77,7 @@ export default function ClientStatement() {
     if (!data || busy || !client) return
     setBusy('download')
     try {
-      await downloadStatement({ company, client, data })
+      await downloadStatement({ company: await loadCompany(), client, data })
       toastSuccess('Statement downloaded', `${money(data.totalDue)} across ${data.lines.length} invoice${data.lines.length === 1 ? '' : 's'}`)
     } catch (e: any) {
       toast('Could not generate the statement', { description: e?.message || 'Try again' })
@@ -89,7 +90,7 @@ export default function ClientStatement() {
     if (!data || busy || !client || !user?.id) return
     setBusy('email')
     try {
-      const res = await sendStatementEmail({ company, client, data, userId: user.id, recipientEmail })
+      const res = await sendStatementEmail({ company: await loadCompany(), client, data, userId: user.id, recipientEmail })
       if (res.ok) {
         toastSuccess(`Statement sent to ${res.recipient}`, `${money(data.totalDue)} due`)
         goBack()

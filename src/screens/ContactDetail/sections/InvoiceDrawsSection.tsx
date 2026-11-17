@@ -26,7 +26,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Plus, FileEdit, Send, Download, Check, X, Trash2, FileText } from 'lucide-react'
 import { supabase, authHeaders } from '../../../lib/supabase.ts'
 import { parseDateOnly, toYmd } from '../../../lib/dates.ts'
-import { useProfile } from '../../../contexts/ProfileContext.tsx'
+import { useDocumentProfile } from '../../../lib/companyBranding.ts'
 import { useAuth } from '../../../contexts/AuthContext.tsx'
 // Loaded on the first PDF action, never with the screen: jsPDF stays out
 // of the service worker precache and of the Financials tab's own chunk.
@@ -79,7 +79,8 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
   // Void and Delete take a second tap on the same draw's button (D57).
   const armedTap = useArmedId()
   const navigate = useNavigate()
-  const { profile } = useProfile()
+  // The job's own company, whoever builds its draws (DATA-06).
+  const documentProfile = useDocumentProfile(contact?.org_id)
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const [draws, setDraws] = useState<any[]>([])
@@ -343,7 +344,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
     }
   }
 
-  const company = {
+  const companyOf = (profile: any) => ({
     name: profile?.company_name || profile?.full_name || 'My Company',
     address: profile?.company_address || '',
     phone: profile?.company_phone || '',
@@ -353,7 +354,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
     brand_accent_hex: profile?.brand_accent_hex || null,
     license_number: profile?.license_number || '',
     insured_text: profile?.insured_text || ''
-  }
+  })
 
   // What Money asks for on this draw: the job's other draws let money
   // logged against the job count toward the oldest open one. The PDF hero
@@ -389,7 +390,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
 
     const { generateInvoice } = await loadPdf()
     return generateInvoice({
-      company,
+      company: companyOf(await documentProfile.load()),
       contact: {
         id: contact.id,
         name: to.name || 'Client',
