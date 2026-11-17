@@ -52,3 +52,21 @@ begin
   end loop;
 end
 $$;
+
+-- DB-14 -------------------------------------------------------------------
+-- A removed member could still remove their own unapproved time punches:
+-- the select policy lets them read their own punches and the removal policy
+-- had no membership test. They now need to be an active member of the
+-- punch's company, as the insert and update checks already require.
+--
+-- Not changed: fh_time_punches_upd (its WITH CHECK already requires
+-- membership, so a removed member's edit is refused) and
+-- fh_daily_logs_self_delete (a removed member cannot read their logs any
+-- more, and a filtered removal needs read access, so it removes nothing).
+
+alter policy fh_time_punches_del on public.fh_time_punches
+  using (
+    user_id = (select auth.uid())
+    and approved_at is null
+    and org_id in (select public.auth_user_org_ids())
+  );

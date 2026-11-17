@@ -261,6 +261,14 @@ $function$;
   await scope(9)
   for (const table of partnerTables) equal(await visible(table), 1, `baseline: a partner who left still reads ${table}`)
   await db.exec('reset role')
+  await db.exec(`reset role;
+    create policy fh_time_punches_del on public.fh_time_punches for delete to authenticated using (user_id = (select auth.uid()) and approved_at is null);
+    grant delete on public.fh_time_punches to authenticated;
+    insert into public.fh_time_punches(id,user_id,org_id) values ('${id(71)}','${id(4)}','${id(100)}');`)
+  await scope(4)
+  equal((await rows('delete from public.fh_time_punches where id=$1 returning id', [id(71)])).length, 1, 'baseline: a removed member removes their unapproved punch')
+  await db.exec('reset role')
+
   const boundaries = await read('migrations/20261117110100_role_boundaries.sql')
   assert(!/drop|delete|truncate/i.test(boundaries), 'role boundary migration avoids words that need owner approval')
   await db.exec(boundaries)
@@ -334,6 +342,14 @@ $function$;
     await scope(user)
     for (const table of partnerTables) equal(await visible(table), expected, `${who} ${expected ? 'reads' : 'no longer reads'} ${table}`)
   }
+
+  // DB-14: removed members no longer remove their punches; active members still can.
+  await scope(4)
+  equal((await rows('delete from public.fh_time_punches where id=$1 returning id', [id(70)])).length, 0, 'a removed member can no longer remove their punch')
+  await scope(3)
+  const own = await punch(3)
+  equal((await rows('delete from public.fh_time_punches where id=$1 returning id', [own.id])).length, 1, 'an active member still removes their unapproved punch')
+  await db.exec('reset role')
 
   console.log(`${checks} authorization transition checks passed.`)
 } finally { await db.close() }
