@@ -1,42 +1,99 @@
-// The invoices whose email is going out right now, kept for the whole app
-// instead of in the Money screen (review of Phase 8, task 6). A send
-// outlives the screen that started it: leave Money while a reminder is
-// still building its PDF or uploading on a weak signal, come back, and the
-// new screen must still show that invoice busy, or one more tap emails the
-// customer twice. /api/send-invoice does not drop a repeat on its own.
+// The documents going out right now, kept for the whole app instead of in
+// the screen that started them (review of Phase 8, task 6). A send outlives
+// the screen that started it: leave a screen while a document is still
+// building its PDF or uploading on a weak signal, come back or open the
+// same document elsewhere, and that screen must still show it busy, or one
+// more tap emails the customer twice. A server does not always drop a
+// repeat on its own.
 //
-// Invoices.tsx starts each send here and finishes it once the email is out
-// or has failed. Money reads the set for its busy buttons
-// (useInvoicesSending), and its sheets listen for sends that went out
-// (onInvoiceSent) to close, whichever screen started them.
+// Each send is keyed by what it sends (sendKey): an invoice, the Balance
+// due invoice a job's money view makes, a quote, a statement, a completion
+// certificate, a change order's approval link. A screen starts its send
+// here (startSend, or startInvoiceSend for an invoice) and ends it once the
+// send is over; every screen reads the same keys for its busy buttons
+// (useSendInFlight, useInvoicesSending). Invoice sheets also listen for an
+// invoice email that went out (onInvoiceSent) to close, whichever screen
+// started it.
 
 import { useSyncExternalStore } from 'react'
+
+/** The key of each kind of send. One send per key goes out at a time. */
+export const sendKey = {
+  invoice: (invoiceId: string) => `invoice:${invoiceId}`,
+  /** The Balance due invoice Email makes on a job with nothing open to bill. */
+  jobBalance: (jobId: string) => `job-balance:${jobId}`,
+  quote: (quoteId: string) => `quote:${quoteId}`,
+  quoteSignature: (quoteId: string) => `quote-signature:${quoteId}`,
+  statement: (clientId: string) => `statement:${clientId}`,
+  certificate: (jobId: string) => `certificate:${jobId}`,
+  changeOrderSignature: (changeOrderId: string) => `co-signature:${changeOrderId}`
+}
+
+const INVOICE = 'invoice:'
 
 /** How the email went out: a reminder from the Remind sheet, or a resend from the invoice's actions. */
 export type InvoiceSendKind = { reminder: boolean }
 
 type SentListener = (invoiceId: string, kind: InvoiceSendKind) => void
 
-// A new set on every change, so useSyncExternalStore sees each one.
-let sending: ReadonlySet<string> = new Set()
+// A new set on every change, so useSyncExternalStore sees each one. The
+// invoice ids are kept beside the keys for the screens that read them.
+let inFlight: ReadonlySet<string> = new Set()
+let invoiceIds: ReadonlySet<string> = new Set()
 const changeListeners = new Set<() => void>()
 const sentListeners = new Set<SentListener>()
 
 function publish(next: ReadonlySet<string>) {
-  sending = next
+  inFlight = next
+  const ids = new Set<string>()
+  for (const key of next) if (key.startsWith(INVOICE)) ids.add(key.slice(INVOICE.length))
+  invoiceIds = ids
   for (const listener of changeListeners) listener()
+}
+
+/** The keys of every send going out right now. The same set until it changes. */
+export function sendsInFlight(): ReadonlySet<string> {
+  return inFlight
+}
+
+/** Calls `listener` whenever a send starts or stops. Returns the unsubscribe. */
+export function subscribeSends(listener: () => void): () => void {
+  changeListeners.add(listener)
+  return () => { changeListeners.delete(listener) }
+}
+
+/**
+ * Marks the send as going out and returns the function that ends it,
+ * called with whether it went out. Returns null, and changes nothing, when
+ * a send with this key is already going out: the caller sends nothing
+ * then. It is read and set at once, so two taps in one frame start one
+ * send. Ending twice is harmless and never ends a later send of the same key.
+ */
+export function startSend(key: string): ((sent: boolean) => void) | null {
+  if (inFlight.has(key)) return null
+  publish(new Set(inFlight).add(key))
+  let over = false
+  return () => {
+    if (over) return
+    over = true
+    const next = new Set(inFlight)
+    next.delete(key)
+    publish(next)
+  }
+}
+
+/** Whether the send with this key is going out, app wide; the screen redraws when that changes. */
+export function useSendInFlight(key: string | null | undefined): boolean {
+  return useSyncExternalStore(subscribeSends, () => !!key && inFlight.has(key), () => false)
 }
 
 /** The invoice ids whose email is going out right now. The same set until it changes. */
 export function invoicesSending(): ReadonlySet<string> {
-  return sending
+  return invoiceIds
 }
 
-/** Calls `listener` whenever an invoice starts or stops going out. Returns the unsubscribe. */
-export function subscribeInvoiceSends(listener: () => void): () => void {
-  changeListeners.add(listener)
-  return () => { changeListeners.delete(listener) }
-}
+/** Calls `listener` whenever a send starts or stops. Returns the unsubscribe. */
+export const subscribeInvoiceSends = subscribeSends
 
 /**
  * Calls `listener` each time an invoice's email has gone out, after the
@@ -48,22 +105,18 @@ export function onInvoiceSent(listener: SentListener): () => void {
 }
 
 /**
- * Marks the invoice's email as going out and returns the function that
- * ends it, called with whether the email went out. Returns null, and
- * changes nothing, when this invoice's email is already going out: the
- * caller sends nothing then. Ending twice is harmless and never ends a
- * later send of the same invoice.
+ * startSend for an invoice's email, which also tells the sent listeners
+ * when it went out. Returns null, and changes nothing, when this invoice's
+ * email is already going out, from any screen.
  */
 export function startInvoiceSend(invoiceId: string, kind: InvoiceSendKind): ((sent: boolean) => void) | null {
-  if (sending.has(invoiceId)) return null
-  publish(new Set(sending).add(invoiceId))
+  const end = startSend(sendKey.invoice(invoiceId))
+  if (!end) return null
   let over = false
   return (sent) => {
     if (over) return
     over = true
-    const next = new Set(sending)
-    next.delete(invoiceId)
-    publish(next)
+    end(sent)
     if (sent) for (const listener of sentListeners) listener(invoiceId, kind)
   }
 }

@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs'
-import { expect, test, type BrowserContext, type Page } from '@playwright/test'
+import { expect, test, type BrowserContext, type Page, type Request } from '@playwright/test'
 import { installMock, restResponse, session } from '../../scripts/qa-mock.mjs'
 import { nothingRunsOffTheSide } from './helpers/overflow.ts'
 import { signIn } from './helpers/signIn.ts'
+import { goInApp, holdPosts, postsTo } from './helpers/doubleTap.ts'
 
 // The invoice screen's actions (Phase 9, Task 12, decisions D57 and D62):
 // the gold Collect payment, then Resend (Send on a draft), PDF and Share
@@ -815,4 +816,72 @@ test('the remind screen keeps its intro and facts in the centred column', async 
     .map((sel) => Math.round(document.querySelector(sel)!.getBoundingClientRect().left)))
   expect(lefts[0]).toBe(lefts[2])
   expect(lefts[1]).toBe(lefts[2])
+})
+
+// An invoice's email kept its busy state on the screen that started it.
+// Leave the job's money view while Email is still going out on a weak
+// signal, or open the same invoice from another screen, and Send was free
+// again: one more tap emailed the customer the same invoice twice. Every
+// screen that sends an invoice now reads one app wide list of sends.
+test.describe('an invoice email going out is busy on every screen', () => {
+  async function slowInvoiceSends(context: BrowserContext) {
+    await context.route('**/storage/v1/object/**', (route) => route.fulfill({ status: 200, json: { Key: 'job-files/qa-invoice.pdf' } }))
+    const sends = postsTo(context, '/api/send-invoice')
+    // A weak signal: the send takes 6 seconds to answer.
+    await holdPosts(context, '**/api/send-invoice', 6000, () => ({ status: 200, json: { ok: true } }))
+    return sends
+  }
+
+  async function emailFromJobMoney(page: Page, sends: Request[]) {
+    await page.goto('/jobs/c-job2?tab=financials', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+    const email = page.getByRole('button', { name: /^(Email|Sending…)$/ })
+    await expect(email).toBeEnabled({ timeout: 30_000 })
+    await email.click()
+    await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(1)
+  }
+
+  test('Resend on the invoice screen waits for the job money view', async ({ page, context }) => {
+    await signIn(context)
+    const sends = await slowInvoiceSends(context)
+    await emailFromJobMoney(page, sends)
+    await goInApp(page, '/invoices/inv1')
+    const resend = page.locator('.fhinv-actions').getByRole('button', { name: /^(Resend|Send)$/ })
+    await expect(resend).toBeVisible({ timeout: 30_000 })
+    const busy = await resend.getAttribute('aria-busy')
+    await resend.click({ force: true })
+    await page.waitForTimeout(1500)
+    expect(sends.map((r) => r.postDataJSON()?.invoice_id), 'one invoice, one email').toEqual(['inv1'])
+    expect(busy, 'Resend shows the email going out').toBe('true')
+  })
+
+  test('the job money view still shows Email busy after leaving and coming back', async ({ page, context }) => {
+    await signIn(context)
+    const sends = await slowInvoiceSends(context)
+    await emailFromJobMoney(page, sends)
+    await goInApp(page, '/jobs/c-job2?tab=overview')
+    await page.waitForTimeout(800)
+    await goInApp(page, '/jobs/c-job2?tab=financials')
+    const again = page.getByRole('button', { name: /^(Email|Sending…)$/ })
+    await expect(again).toBeVisible({ timeout: 30_000 })
+    const disabled = await again.isDisabled()
+    await again.click({ force: true })
+    await page.waitForTimeout(1500)
+    expect(sends.length, 'one invoice, one email').toBe(1)
+    expect(disabled, 'Email shows the email going out').toBe(true)
+  })
+
+  test("Email draw to client waits for the job money view's email of the same invoice", async ({ page, context }) => {
+    await signIn(context)
+    const sends = await slowInvoiceSends(context)
+    await emailFromJobMoney(page, sends)
+    await goInApp(page, '/jobs/c-job2?tab=draws')
+    const row = page.locator('.fh-draws-row').filter({ hasText: 'Progress draw 1' })
+    const draw = row.getByRole('button', { name: 'Email draw to client' })
+    await expect(draw).toBeVisible({ timeout: 30_000 })
+    const disabled = await draw.isDisabled()
+    await draw.click({ force: true })
+    await page.waitForTimeout(1500)
+    expect(sends.map((r) => r.postDataJSON()?.invoice_id), 'one invoice, one email').toEqual(['inv1'])
+    expect(disabled, 'the draw shows its email going out').toBe(true)
+  })
 })

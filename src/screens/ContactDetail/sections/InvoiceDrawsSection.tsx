@@ -27,6 +27,7 @@ import { Plus, FileEdit, Send, Download, Check, X, Trash2, FileText } from 'luci
 import { supabase, authHeaders } from '../../../lib/supabase.ts'
 import { parseDateOnly, toYmd } from '../../../lib/dates.ts'
 import { useDocumentProfile } from '../../../lib/companyBranding.ts'
+import { startInvoiceSend, useInvoicesSending } from '../../../lib/invoiceSends.ts'
 import { useAuth } from '../../../contexts/AuthContext.tsx'
 // Loaded on the first PDF action, never with the screen: jsPDF stays out
 // of the service worker precache and of the Financials tab's own chunk.
@@ -91,6 +92,10 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
   const [editingId, setEditingId] = useState<any>(null)
   const [creating, setCreating] = useState(false)
   const [busyId, setBusyId] = useState<any>(null)
+  // A draw's email is kept app wide (lib/invoiceSends), so a draw whose
+  // email is going out from the job's money view or its own screen is busy
+  // here too.
+  const sendingIds = useInvoicesSending()
   // The draw a payment is being recorded against, and what is still owed
   // on it, while the payment sheet is open.
   // Any owner, admin or manager of the job's company may edit, not only
@@ -475,6 +480,10 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
         return
       }
     }
+    // One email of this draw at a time, from any screen.
+    const end = startInvoiceSend(draw.id, { reminder: false })
+    if (!end) return
+    let delivered = false
     setBusyId(draw.id)
     try {
       const to = await drawRecipient()
@@ -564,10 +573,12 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
         if (flipErr) toastError('Draw not marked sent', 'The email went, but the draw status did not update. Refresh and check it.')
       }
       toastSuccess(`Draw sent to ${recipientEmail}`, result.filename)
+      delivered = true
       await fetchDraws()
     } catch (e: any) {
       toastError("Couldn't send draw", e?.message || 'Try again.')
     } finally {
+      end(delivered)
       setBusyId(null)
     }
   }
@@ -628,6 +639,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
           draws={draws}
           editingId={editingId}
           busyId={busyId}
+          sendingIds={sendingIds}
           onEdit={(id: any) => setEditingId(id)}
           onCancelEdit={() => setEditingId(null)}
           onSave={async (payload: any) => { const ok = await handleSave(payload); if (ok) setEditingId(null) }}
@@ -761,7 +773,7 @@ function Summary({ contractTotal, drawsIssued, previouslyPaid, unbilled }: any) 
   )
 }
 
-function List({ draws, editingId, busyId, readOnly, armedKey, onEdit, onCancelEdit, onSave, onMarkPaid, onVoid, onDelete, onDownload, onSend }: any) {
+function List({ draws, editingId, busyId, sendingIds, readOnly, armedKey, onEdit, onCancelEdit, onSave, onMarkPaid, onVoid, onDelete, onDownload, onSend }: any) {
   if (draws.length === 0) {
     return (
       <div style={{
@@ -782,7 +794,7 @@ function List({ draws, editingId, busyId, readOnly, armedKey, onEdit, onCancelEd
           ) : (
             <Row
               draw={d}
-              busy={busyId === d.id}
+              busy={busyId === d.id || !!sendingIds?.has(d.id)}
               readOnly={readOnly}
               onEdit={() => onEdit?.(d.id)}
               onDownload={() => onDownload?.(d)}

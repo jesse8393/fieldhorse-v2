@@ -17,6 +17,7 @@ import { useInvoiceDetail, useInvalidateInvoiceDetail } from '../../lib/queries.
 import { reviewInvoice } from '../../lib/invoiceReview.js'
 import { billTo, companyFromProfile, fetchInvoicesForContact, createInvoice, invoiceAmountDue, invoiceDescription, sendInvoiceEmail } from '../../lib/invoices.ts'
 import { useDocumentProfile } from '../../lib/companyBranding.ts'
+import { sendKey, startInvoiceSend, startSend, useSendInFlight } from '../../lib/invoiceSends.ts'
 import { pickBalanceInvoice } from '../../lib/invoiceSettlement.ts'
 import { moneyExact } from '../../lib/format.ts'
 import { deletePayment } from '../../lib/stages.ts'
@@ -172,7 +173,13 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
   // Send Invoice state, mirrors Send Proposal flow on the Quote tab.
   // Builds the PDF locally, uploads to job-files, posts the storage_path
   // to /api/send-invoice for on the server Resend send + activity log.
-  const [sending, setSending] = useState(false)
+  // The send is kept app wide (lib/invoiceSends), not in this screen: leave
+  // the tab while Email is still going out and come back, or open the same
+  // invoice on another screen, and it is still busy. This screen sends the
+  // open draw's email, else the job's Balance due.
+  const balanceSending = useSendInFlight(id ? sendKey.jobBalance(id) : null)
+  const drawSending = useSendInFlight(billingDraw ? sendKey.invoice(billingDraw.id) : null)
+  const sending = balanceSending || drawSending
   // Sent flag flips back to false after 2.4s so the Send button
   // briefly morphs to green ✓ "Sent" on success, mirrors the Compose
   // pattern. Gives the operator visual confirmation that's hard to
@@ -355,8 +362,9 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
   // shared sendInvoiceEmail, so the issue date, due date and status are
   // tracked like every other send. An untracked ad hoc PDF left no open
   // invoice behind and A/R aging fell back to the job's creation date.
-  async function sendTrackedBalanceInvoice() {
-    if (!contact) return
+  // Resolves true once the email has gone out.
+  async function sendTrackedBalanceInvoice(): Promise<boolean> {
+    if (!contact) return false
     const { data: rows, error: listErr } = await fetchInvoicesForContact(contact.id)
     if (listErr) throw new Error(listErr.message || "Couldn't load this job's invoices")
     const plan = pickBalanceInvoice({ invoices: rows, contractTotal: totals.amount, balance: totals.balance })
@@ -381,21 +389,31 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
     if (wasDraft && (review.excess > 0 || review.duplicates.length)) {
       navigate(`/invoices/${invoice.id}`)
       toastError('Review this draft before sending', 'Check similar invoices and approved contract value.')
-      return
+      return false
     }
-    const res = await sendInvoiceEmail({
-      invoice,
-      // Same recipient block as this screen's own PDF (client fallbacks).
-      contact: { ...contact, name: resolved.name || contact.name, email: resolved.email, phone: resolved.phone, address: resolved.address },
-      company: await loadCompany(),
-      userId: user!.id,
-      recipientEmail: resolved.email,
-      payments,
-      changeOrders,
-      // The job's invoices, so this asks for what Money asks for on it.
-      invoices: rows,
-      insurance
-    })
+    // The draft can be going out from its own screen already.
+    const endInvoice = startInvoiceSend(invoice.id, { reminder: false })
+    if (!endInvoice) return false
+    let res
+    try {
+      res = await sendInvoiceEmail({
+        invoice,
+        // Same recipient block as this screen's own PDF (client fallbacks).
+        contact: { ...contact, name: resolved.name || contact.name, email: resolved.email, phone: resolved.phone, address: resolved.address },
+        company: await loadCompany(),
+        userId: user!.id,
+        recipientEmail: resolved.email,
+        payments,
+        changeOrders,
+        // The job's invoices, so this asks for what Money asks for on it.
+        invoices: rows,
+        insurance
+      })
+    } catch (e) {
+      endInvoice(false)
+      throw e
+    }
+    endInvoice(res.ok)
     if (res.ok) {
       // Name the bill that went out: it can be a draft draw rather than
       // the whole balance this screen showed.
@@ -414,6 +432,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
       throw new Error(res.message || 'Send failed')
     }
     refresh()
+    return res.ok
   }
 
   async function handleSendInvoice() {
@@ -422,10 +441,16 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
       toastError('Add a client email first', 'Open the linked client or job to add an email.')
       return
     }
-    setSending(true)
+    // One send of this bill at a time, from any screen: the open draw's
+    // email, else the job's Balance due. Read and set at once, so a second
+    // tap in the same frame sends nothing.
+    const draw = billingDraw
+    const end = draw ? startInvoiceSend(draw.id, { reminder: false }) : startSend(sendKey.jobBalance(contact.id))
+    if (!end) return
+    let delivered = false
     try {
-      if (!billingDraw && totals.balance > 0.5) {
-        await sendTrackedBalanceInvoice()
+      if (!draw && totals.balance > 0.5) {
+        delivered = await sendTrackedBalanceInvoice()
         return
       }
       const { generateInvoice, downloadPdf } = await loadPdf()
@@ -522,10 +547,11 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
       setSent(true)
       setTimeout(() => setSent(false), 2400)
       refresh()
+      delivered = true
     } catch (e: any) {
       toastError("Couldn't send invoice", e?.message || 'Try again')
     } finally {
-      setSending(false)
+      end(delivered)
     }
   }
 
