@@ -111,7 +111,7 @@ test.describe('Reports read the four records', () => {
     await open(page)
     const chart = page.locator('.fh-build-chart-card').filter({ hasText: 'Revenue received' })
     await expect(chart).toContainText('September 2026 versus August 2026')
-    await expect(chart).toContainText('$47,000 less')
+    await expect(chart).toContainText('$47,000.00 less')
     await expect(chart).toContainText('Oct · so far')
     await expect(page.getByText('collection rate YTD', { exact: true })).toHaveCount(0)
   })
