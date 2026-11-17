@@ -18,6 +18,7 @@ import { claudeMessage, claudeText } from '../lib/anthropic'
 import { useJobs, useProfile, type JobRow } from '../lib/queries'
 import { useAuth } from '../contexts/AuthContext'
 import { sendMessageEmail } from '../lib/sendDocs'
+import { plainPunctuation } from '../lib/composeDraft'
 
 const CHANNELS = [
   { id: 'sms', label: 'SMS', tone: 'Keep it under 160 chars. Tight. No emoji. Punctuation minimal.', Icon: MessageSquare },
@@ -70,7 +71,7 @@ export default function ComposeScreen() {
       })
       const text = claudeText(res)
       if (!text) throw new Error('Empty response from the assistant.')
-      setDraft(text)
+      setDraft(plainPunctuation(text))
     } catch (e: any) {
       const msg = String(e?.message || '').toLowerCase()
       if (msg.includes('500') || msg.includes('api_key')) setError('AI not configured on the server (ANTHROPIC_API_KEY).')
