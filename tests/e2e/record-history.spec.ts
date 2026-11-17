@@ -243,3 +243,16 @@ test('failed job lookup does not classify every report as an unavailable job', a
   await expect(page.getByRole('combobox', { name: 'History job', exact: true })).toBeEnabled()
   await expect(history.locator('details')).toHaveCount(0)
 })
+
+// Finding lost-work-11: a half written field report on the Notes screen
+// stays through a reload until it is saved.
+test('a half written report on the Notes screen survives a reload', async ({ context, page }) => {
+  const words = 'Saw cut joints at 10 ft, broom finish, no curing compound'
+  await signIn(context)
+  await page.goto('/notes')
+  const box = page.locator('textarea').first()
+  await expect(box).toBeVisible({ timeout: 30_000 })
+  await box.fill(words)
+  await page.reload()
+  await expect(page.locator('textarea').first()).toHaveValue(words)
+})
