@@ -12,6 +12,7 @@
 // form lets headless QA scripts (scripts/qa-render-proposal.mjs)
 // render the same code path the browser uses.
 import { proposalIssuedAt } from './proposalDate.ts'
+import { toYmd } from './dates.ts'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { loadLogoForPdf, loadImageForPdf } from './pdfLogo.ts'
@@ -2229,7 +2230,9 @@ export async function generateCertificate({
   doc.text(discLines, margin, pageHeight - 12 - (discLines.length - 1) * 3.6)
 
   const safeName = (contact.name || 'completion').replace(/[^A-Za-z0-9_-]+/g, '-').slice(0, 40)
-  const stamp = new Date(closedAt).toISOString().slice(0, 10)
+  // The local day the job closed, the day the app shows, never the UTC
+  // day, which is already tomorrow after 6 pm Central (formats-14).
+  const stamp = toYmd(closedAt)
   const filename = options.filename || `Certificate-${safeName}-${stamp}.pdf`
   return { doc, filename }
 }

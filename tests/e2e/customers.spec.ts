@@ -4,6 +4,7 @@
 // /clients/:id/statement (also where Money's Who owes you goes), and
 // deleting a customer confirms with a second tap on the same button.
 // Nothing here mounts a dialog.
+import { readFileSync } from 'node:fs'
 import { expect, test, type Page } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 import { isReadOnlyRpc } from './helpers/readRpc.ts'
@@ -490,4 +491,28 @@ test('the Statement button names the total the statement shows', async ({ contex
   await button.click()
   await expect(page).toHaveURL(/\/clients\/cl-h\/statement$/)
   await expect(page.locator('.fhcs-total__amount')).toHaveText('$3,114.67')
+})
+
+// formats-14: the Customers export writes each customer's last activity as
+// the local day the app shows, not the UTC day, which is already tomorrow
+// after 6 pm Central.
+test('the Customers export writes the local day of the last activity', async ({ context, page, isMobile }) => {
+  test.skip(isMobile, 'the export is on the desktop Customers table')
+  // Mon Nov 16, 7:30 pm Central, which is Nov 17 in UTC.
+  const evening = '2026-11-17T01:30:00Z'
+  await signIn(context, { tables: {
+    fh_clients: [{ ...JEFF, created_at: evening, updated_at: evening, last_activity_at: evening }],
+    fh_contacts: [{ id: 'j-csv', user_id: USER.id, client_id: 'cl-1', name: 'Jeff Roy', job_title: 'Driveway', stage: 'job', amount: 1000, created_at: evening, updated_at: evening }],
+    fh_invoices: [], fh_payments: [], fh_leads: [], fh_quotes: []
+  } })
+  await page.clock.setFixedTime(new Date('2026-11-17T02:00:00Z'))
+  await open(page, '/clients')
+  const [download] = await Promise.all([
+    page.waitForEvent('download', { timeout: 30_000 }),
+    page.getByRole('button', { name: /Export CSV/ }).click()
+  ])
+  const csv = readFileSync(await download.path(), 'utf8')
+  const row = csv.split(/\r?\n/).find((line) => line.startsWith('Jeff Roy'))!
+  expect(row).toContain('2026-11-16')
+  expect(row).not.toContain('2026-11-17')
 })

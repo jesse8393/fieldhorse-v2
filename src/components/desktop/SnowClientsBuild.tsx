@@ -31,6 +31,7 @@ import type { SortingState } from '@tanstack/react-table'
 import { countNoun, moneyCents, moneyFull } from '../../lib/format.ts'
 import { clientActivity } from '../../lib/clientActivity.ts'
 import { buildCsv, downloadCsv } from '../../lib/csv.ts'
+import { toYmd } from '../../lib/dates.ts'
 import MiniMetric from '../MiniMetric.tsx'
 import LoadingValue from '../LoadingValue.tsx'
 import TopbarWeather from './TopbarWeather.tsx'
@@ -120,7 +121,8 @@ function toCsv(rows: ClientRow[]): string {
     rows.map((r) => [
       r.client.name || 'Unnamed',
       r.status.label,
-      r.lastTouch ? new Date(r.lastTouch).toISOString().slice(0, 10) : '',
+      // The local day the app shows, not the UTC day (formats-14).
+      r.lastTouch ? toYmd(new Date(r.lastTouch)) : '',
       r.outstanding.toFixed(2),
       r.activeCount,
       r.nextAction,
