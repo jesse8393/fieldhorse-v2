@@ -1282,7 +1282,7 @@ const brandInputStyle: import('react').CSSProperties = {
  */
 const COLOR_PRESETS = [
   { hex: '#C9963A', name: 'FieldGold (default)' },
-  { hex: '#5C5C5C', name: 'Indigo' },
+  { hex: '#5C5C5C', name: 'Slate' },
   { hex: '#2D7A4F', name: 'Forest' },
   { hex: '#C0392B', name: 'Brick' },
   { hex: '#141414', name: 'Onyx' }
