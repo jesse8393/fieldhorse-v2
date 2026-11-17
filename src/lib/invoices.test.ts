@@ -148,11 +148,12 @@ describe('invoiceAmountDue', () => {
     expect(invoiceAmountDue({ invoice: i1, contact: { amount: null } as any, payments, invoices: [i1] })).toBe(3000)
     expect(invoiceAmountDue({ invoice: i1, contact: { amount: null } as any, payments })).toBe(3000)
     expect(invoiceAmountDue({ invoice: i1, contact: {} as any, payments: [] })).toBe(5000)
-    // An approved change order makes the contract known again.
+    // An approved change order on a job with no price is not the whole
+    // contract (M-14): the invoice still asks for its own amount.
     expect(invoiceAmountDue({
       invoice: i1, contact: { amount: null } as any, payments: [],
       changeOrders: [{ amount: 1200, status: 'approved' }]
-    })).toBe(1200)
+    })).toBe(5000)
   })
 })
 

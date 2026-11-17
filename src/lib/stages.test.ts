@@ -196,6 +196,18 @@ describe('logPayment', () => {
     expect(fake.state.tables.fh_contacts[0].stage).toBe('job')
   })
 
+  // M-14: with no price the change order is not the whole contract.
+  it('does not close a job with no price when a payment covers only its change order', async () => {
+    const openJob = { ...job, amount: 0 }
+    fake.state.tables.fh_contacts = [{ ...openJob }]
+    fake.state.tables.fh_change_orders = [{ id: 'co', contact_id: 'job', user_id: 'admin', amount: 500, status: 'approved' }]
+    fake.state.tables.fh_invoices = [invoice('a', 1, 1000), invoice('b', 2, 1000)]
+    const res: any = await logPayment(openJob, { amount: 1000 })
+    expect(res.closed).toBe(false)
+    expect(fake.state.tables.fh_contacts[0].stage).toBe('job')
+    expect(fake.state.tables.fh_invoices.map((r) => r.status)).toEqual(['paid', 'sent'])
+  })
+
   it('never touches void invoices', async () => {
     fake.state.tables.fh_invoices = [invoice('v', 1, 10000, 'void')]
     await logPayment(job, { amount: 10000, invoice_id: 'v' })

@@ -3,7 +3,7 @@ import { supabase } from './supabase.ts'
 import { todayYmd } from './dates.ts'
 import { crewLaborForContact } from './labor.ts'
 import { moneyExact } from './format.ts'
-import { invoicesPaidInFull } from './invoiceSettlement.ts'
+import { invoicesPaidInFull, knownContractTotal } from './invoiceSettlement.ts'
 import { toCents, fromCents, sumCents } from './cents.ts'
 import { toastError } from './toast.ts'
 import type { Database } from './database.types.ts'
@@ -228,9 +228,12 @@ export async function logPayment(contact: Contact, { id, amount, method, kind, r
   // If the CO fetch fails we can't know the true contract, so fail safe:
   // skip the auto-close rather than treat a failed fetch as "no COs" and
   // prematurely close a job that still owes change order money.
+  // A job with no price has no known contract either, whatever its change
+  // orders: an approved $500 change order must not close a job that has
+  // $2,000 of invoices out.
   const contractAmount = coErr
     ? null
-    : fromCents(toCents(baseAmount) + sumCents(cosRes.data || [], (c) => c.amount))
+    : knownContractTotal({ amount: baseAmount, changeOrders: cosRes.data || [] })
 
   // Settle the job's invoices from its payments. A payment linked to an
   // invoice pays that one first; a payment logged against the job pays
@@ -275,8 +278,8 @@ export async function logPayment(contact: Contact, { id, amount, method, kind, r
   // freshly created quick invoice before line items set the total) from
   // auto-closing on its first payment, `total >= 0` is otherwise always true.
   let closed = false
-  if (contractAmount != null) {
-    if (toCents(contractAmount) > 0 && toCents(total) >= toCents(contractAmount) && currentStage !== 'closed') {
+  if (!coErr) {
+    if (contractAmount != null && toCents(contractAmount) > 0 && toCents(total) >= toCents(contractAmount) && currentStage !== 'closed') {
       const { error: closeErr } = await supabase.from('fh_contacts').update({ stage: 'closed' }).eq('id', contact.id).eq('user_id', contact.user_id)
       closed = !closeErr
     }
