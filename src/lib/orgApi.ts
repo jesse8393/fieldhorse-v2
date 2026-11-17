@@ -190,6 +190,8 @@ type TimesheetsPage = {
   caller_role: OrgRole
   org_id: string
   punches: PendingPunch[]
+  /** False for a manager: hourly_rate and cost are then null on every punch. */
+  rates_visible?: boolean
   /** True when more pending punches exist than were returned. */
   has_more?: boolean
   next_offset?: number | null

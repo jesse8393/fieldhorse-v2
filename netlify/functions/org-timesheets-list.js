@@ -12,6 +12,10 @@ import { supabaseServiceConfig } from './lib/serviceConfig.js'
 // caller's own punches: org-punch-approve skips those unless the
 // caller is an owner.
 //
+// Pay rates and cost are for owners and admins only, the same rule the
+// roster (org-members-list) applies. A manager approves hours and gets
+// hourly_rate and cost as null, with rates_visible false.
+//
 // One answer holds at most 500 punches, oldest first. has_more says
 // whether more are waiting, and next_offset is the offset to send for
 // the next page (null on the last one).
@@ -136,9 +140,11 @@ export default async (request) => {
     }
   }
 
+  const canSeeRates = myMember.role === 'owner' || myMember.role === 'admin'
   const decorated = (punches || []).map((p) => {
     const minutes = netPunchMinutes(p)
-    const rate = p.hourly_rate != null ? Number(p.hourly_rate) : (defaultRateByUser[p.user_id] ?? null)
+    const rate = !canSeeRates ? null
+      : p.hourly_rate != null ? Number(p.hourly_rate) : (defaultRateByUser[p.user_id] ?? null)
     return {
       id: p.id,
       // Zero-length shifts (in == out, or out before in) are not valid
@@ -169,6 +175,7 @@ export default async (request) => {
     caller_role: myMember.role,
     org_id: myMember.org_id,
     punches: decorated,
+    rates_visible: canSeeRates,
     has_more: hasMore,
     next_offset: hasMore ? offset + PAGE_SIZE : null,
   })

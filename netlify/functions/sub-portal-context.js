@@ -46,12 +46,16 @@ export default async (request) => {
     auth: { autoRefreshToken: false, persistSession: false }
   })
 
-  // 1) Accepted partner rows for this caller.
+  // 1) Accepted partner rows for this caller. A job the sub has left
+  //    (deleted_by_partner_at) is not theirs any more: the same test
+  //    boundSubOrgIds in lib/subAccess.js applies, so this endpoint and the
+  //    other sub endpoints agree on which jobs and companies a sub reaches.
   const partnersRes = await admin
     .from('fh_job_partners')
     .select('id, job_id, partner_role, accepted_at, invited_at, status, org_id, invited_by_user_id')
     .eq('partner_user_id', authUserId)
     .eq('status', 'accepted')
+    .is('deleted_by_partner_at', null)
     .order('accepted_at', { ascending: false })
     .limit(200)
 

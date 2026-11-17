@@ -247,4 +247,25 @@ describe('time handlers', () => {
       expect(punchRows().find((p) => p.id === 'p-own')).toMatchObject({ flagged: false, flag_reason: null })
     })
   })
+
+  describe('who sees pay rates on the timesheet list', () => {
+    it('owners and admins see each rate and cost', async () => {
+      state.tables.org_members.find((m) => m.user_id === MANAGER)!.role = 'admin'
+      for (const token of ['tok-owner', 'tok-manager']) {
+        const { body } = await listed(token)
+        expect(body.rates_visible).toBe(true)
+        expect(body.punches[0]).toMatchObject({ hourly_rate: 28, cost: 224 })
+      }
+    })
+
+    it('a manager gets the hours but no rate and no cost, like the roster', async () => {
+      punchRows().push(shift('p-stamped', NORATE, 3, { hourly_rate: 31 }))
+      const { status, body } = await listed('tok-manager')
+      expect(status).toBe(200)
+      expect(body.rates_visible).toBe(false)
+      expect(body.punches).toHaveLength(6)
+      expect(body.punches.every((p: any) => p.hourly_rate === null && p.cost === null && p.minutes === 480)).toBe(true)
+      expect(JSON.stringify(body)).not.toMatch(/"(hourly_rate|cost)":\s*\d/)
+    })
+  })
 })
