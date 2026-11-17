@@ -12,6 +12,7 @@ import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useMembership } from '../../contexts/MembershipContext.tsx'
 import { createLead } from '../../lib/leads.ts'
 import { createClientRow, lookupClientMatches, saveErrorMessage, syncClientContact, type ClientMatch } from '../../lib/clients.ts'
+import { useInvalidateClientDetail, useInvalidateLeads } from '../../lib/queries.ts'
 import { createUuid } from '../../lib/uuid.ts'
 import { recordRoute } from '../../lib/records.ts'
 import { hapticMedium } from '../../lib/haptics.ts'
@@ -40,7 +41,8 @@ export default function LeadNew() {
   const text = params.get('text')
   const [ids] = useState(() => ({ requestId: createUuid(), clientRequestId: createUuid() }))
   const { form, set, patch, done } = useDraft<Form>('lead', { ...EMPTY, ...ids }, text ? { notes: text } : null)
-
+  const invalidateLeads = useInvalidateLeads()
+  const invalidateClientDetail = useInvalidateClientDetail()
   const [client, setClient] = useState<ClientFieldValue>(() => restoredClientValue(form.name, form.clientId))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -114,6 +116,9 @@ export default function LeadNew() {
         source: form.source
       })
       done()
+      // The Leads list, the lead and the client's page show it at once (DATA-13).
+      invalidateLeads(lead.id)
+      invalidateClientDetail(picked.id)
       hapticMedium()
       navigate(recordRoute('lead', lead.id), { replace: true })
     } catch (e) {

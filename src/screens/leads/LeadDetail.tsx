@@ -103,7 +103,10 @@ export default function LeadDetail({ id, fallback }: LeadDetailProps) {
   const visitQuery = useQuery({
     queryKey: ['leadNextVisit', id],
     queryFn: () => fetchNextVisit(id),
-    enabled: !!lead
+    enabled: !!lead,
+    // Schedule estimate books the visit on another screen; coming back here
+    // reads it again so the next visit shows at once (DATA-13).
+    refetchOnMount: 'always'
   })
   const notesQuery = useQuery({
     queryKey: ['leadEarlierNotes', id, lead?.origin_contact_id ?? null],

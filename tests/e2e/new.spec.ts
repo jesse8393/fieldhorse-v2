@@ -251,3 +251,21 @@ test('a lost connection on New lead and New client reads as a plain sentence (DA
   await page.getByRole('button', { name: 'Save client' }).click()
   await expect(page.locator('.fhnew-error')).toHaveText('Could not save this client. Check your connection and try again.')
 })
+
+test('a new lead shows in Leads when the person goes back (DATA-13)', async ({ context, page }) => {
+  await signIn(context)
+  let leadReads = 0
+  page.on('request', (req) => { if (req.method() === 'GET' && /\/rest\/v1\/fh_leads\?/.test(req.url())) leadReads++ })
+  await open(page, '/leads')
+  await expect(page.getByRole('heading', { level: 1, name: 'Leads' })).toBeVisible({ timeout: 30_000 })
+  await page.getByRole('link', { name: 'New lead' }).click()
+  await page.getByLabel('Name').fill('Jeff')
+  await page.locator('.fhnew-client__pick').first().click()
+  const before = leadReads
+  await page.getByRole('button', { name: 'Save lead' }).click()
+  await expect(page).toHaveURL(/\/leads\/l-lead1$/, { timeout: 30_000 })
+  await page.getByRole('button', { name: 'Back' }).first().click()
+  await expect(page).toHaveURL(/\/leads$/)
+  // The list read again after the save instead of showing its old copy.
+  await expect.poll(() => leadReads - before, { timeout: 5000 }).toBeGreaterThan(0)
+})

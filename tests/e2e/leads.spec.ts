@@ -75,6 +75,20 @@ test.describe('the lead screen', () => {
     await expect(page.getByRole('dialog')).toHaveCount(0)
   })
 
+  test('back from Schedule estimate, the lead reads its next visit again (DATA-13)', async ({ context, page }) => {
+    await signIn(context)
+    let visitReads = 0
+    page.on('request', (req) => { if (req.method() === 'GET' && /\/rest\/v1\/fh_schedule\?.*lead_id=eq\.l-lead1/.test(req.url())) visitReads++ })
+    await open(page, '/leads/l-lead1')
+    await expect.poll(() => visitReads).toBe(1)
+    await page.getByRole('link', { name: 'Schedule estimate' }).click()
+    await expect(page).toHaveURL(/\/schedule\/new\?lead=l-lead1$/, { timeout: 30_000 })
+    await expect(page.getByRole('heading', { name: 'Add event' })).toBeVisible({ timeout: 30_000 })
+    await page.goBack()
+    await expect(page).toHaveURL(/\/leads\/l-lead1$/)
+    await expect.poll(() => visitReads, { timeout: 5000 }).toBe(2)
+  })
+
   test('Quote this links the lead it came from', async ({ context, page }) => {
     // One client with two open leads (the mock's cl-1 has l-lead1 and
     // l-lead2). Quote this on the second must never touch the first.
