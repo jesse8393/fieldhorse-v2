@@ -90,6 +90,18 @@ test.describe('duplicates are reviewed on a screen', () => {
     expect(writes.some((w) => w.startsWith('DELETE fh_clients'))).toBe(false)
   })
 
+  test('a failed clients read says so instead of "All clean" (S23)', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_clients: [JEFF, JEFF_AGAIN] } })
+    await page.route(/\/rest\/v1\/fh_clients\?/, (route) => route.request().method() === 'GET'
+      ? route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: 'upstream connect error' }) })
+      : route.fallback())
+    await open(page, '/clients/merge')
+    await expect(page.getByText('Could not load your clients', { exact: false })).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByText('All clean.')).toHaveCount(0)
+    await expect(page.getByText(/Nice cleanup/)).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /Try again|Retry/ })).toBeVisible()
+  })
+
   test('an unticked record is kept apart without a second tap, and stays unflagged', async ({ context, page }) => {
     await signIn(context, { tables: { fh_clients: [JEFF, JEFF_AGAIN] } })
     const writes = watchWrites(page)
