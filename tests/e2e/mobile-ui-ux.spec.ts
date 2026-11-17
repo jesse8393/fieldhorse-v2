@@ -467,4 +467,32 @@ test.describe('large text and zoom', () => {
       }
     })
   }
+
+  // big-text-2: the classic customer quote kept its totals box 300 px wide
+  // even on a narrower page, so Subtotal and Total lost their first letters
+  // off the left edge.
+  for (const percent of [100, 150]) {
+    test(`the classic customer quote keeps Subtotal and Total on the page, text at ${percent} percent`, async ({ context, page }) => {
+      await textSize(context, percent)
+      await openBigPortal(context, page, 'classic')
+      const subtotal = page.locator('td', { hasText: /^Subtotal$/ })
+      await expect(subtotal).toBeAttached({ timeout: 20_000 })
+      const total = page.locator('span', { hasText: /^Total$/ }).last()
+      const figures = [subtotal.locator('xpath=following-sibling::td[1]'), total.locator('xpath=following-sibling::span[1]')]
+      for (const width of [412, 360, 340, 320, 206, 180]) {
+        await page.setViewportSize({ width, height: 800 })
+        await page.waitForTimeout(150)
+        const sheet = await subtotal.evaluate((el) => {
+          const r = (el.closest('article') as HTMLElement).getBoundingClientRect()
+          return { left: r.left, right: r.right }
+        })
+        for (const label of [subtotal, total, ...figures]) {
+          const drawn = await ink(label)
+          const at = `${await label.textContent()} at ${width} px: ${JSON.stringify({ drawn, sheet })}`
+          expect(drawn.left, at).toBeGreaterThanOrEqual(sheet.left - 0.5)
+          expect(drawn.right, at).toBeLessThanOrEqual(sheet.right + 0.5)
+        }
+      }
+    })
+  }
 })
