@@ -42,7 +42,7 @@ function builder(table: string): unknown {
 vi.mock('./supabase.ts', () => ({ supabase: { from: (t: string) => builder(t) } }))
 vi.mock('./queryClient.ts', () => ({ queryClient: { invalidateQueries: () => Promise.resolve() } }))
 
-const { runImport } = await import('./importRun.ts')
+const { runImport, amountNote } = await import('./importRun.ts')
 
 function rec(name: string, phone: string | null = null, email: string | null = null, job_title: string | null = null) {
   return { name, phone, email, address: null, job_title, job_type: null, amount: 0 }
@@ -101,5 +101,13 @@ describe('runImport (D12)', () => {
     expect(res.landed).toBe(2)
     expect(res.error?.message).toBe('boom')
     expect(requests.map((r) => r.table)).toEqual(['fh_clients', 'fh_clients', 'fh_leads', 'fh_clients', 'fh_leads'])
+  })
+})
+
+describe('amountNote (D25)', () => {
+  it('writes an amount with cents as money, and leaves out a zero', () => {
+    expect(amountNote(1250.5)).toBe('Estimated amount $1,250.50')
+    expect(amountNote(4500)).toBe('Estimated amount $4,500')
+    expect(amountNote(0)).toBeNull()
   })
 })

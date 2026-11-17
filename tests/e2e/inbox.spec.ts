@@ -176,7 +176,7 @@ test.describe('the Inbox list', () => {
     await start(context, page, '/inbox')
     await expect(page.getByRole('heading', { level: 1, name: 'Inbox' })).toBeVisible()
     await expect(page.getByText('Inbox turns on with messaging', { exact: true })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Open Settings' })).toHaveAttribute('href', '/settings')
+    await expect(page.getByRole('link', { name: 'Open settings' })).toHaveAttribute('href', '/settings')
     await expect(page.locator('.fhi-rows')).toHaveCount(0)
     if (testInfo.project.name.startsWith('mobile')) {
       // And the dock still has Schedule, not Inbox.
@@ -189,7 +189,7 @@ test.describe('the Inbox list', () => {
   test('a manager is told to ask an owner when the engine is off', async ({ context, page }) => {
     await start(context, page, '/inbox', { role: 'manager' })
     await expect(page.getByText('Inbox turns on with messaging', { exact: true })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Open Settings' })).toHaveCount(0)
+    await expect(page.getByRole('link', { name: 'Open settings' })).toHaveCount(0)
     await expect(page.getByText('Ask an owner or an admin to turn it on.')).toBeVisible()
   })
 

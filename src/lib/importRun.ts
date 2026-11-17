@@ -31,7 +31,10 @@ function textKey(v: string | null | undefined): string {
 
 /** The note a lead carries for the amount in the export (fh_leads has no amount column). */
 export function amountNote(amount: number): string | null {
-  return amount ? `Estimated amount $${amount.toLocaleString('en-US', { maximumFractionDigits: 2 })}` : null
+  if (!amount) return null
+  // Cents show as cents ($1,250.50), a whole amount stays whole ($4,500).
+  const cents = !Number.isInteger(amount)
+  return `Estimated amount $${amount.toLocaleString('en-US', { minimumFractionDigits: cents ? 2 : 0, maximumFractionDigits: 2 })}`
 }
 
 export async function runImport(opts: {

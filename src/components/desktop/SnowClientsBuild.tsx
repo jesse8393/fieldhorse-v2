@@ -229,7 +229,7 @@ export default function SnowClientsBuild(props: Props) {
         </div>
         <button className="fh-build-icon-btn" type="button" onClick={() => window.dispatchEvent(new CustomEvent('fh:navigate', { detail: { to: '/activity' } }))} aria-label="Open activity" title="Activity"><Bell size={16} /></button>
         <button className="fh-build-new-btn" type="button" onClick={onNewClient}>
-          <Plus size={15} /> New Client
+          <Plus size={15} /> New client
         </button>
       </header>
 

@@ -120,7 +120,7 @@ export default function SnowSubsBuild(props: Props) {
         </div>
         <button className="fh-build-icon-btn" type="button" onClick={() => navigate('/activity')} aria-label="Open activity" title="Activity"><Bell size={16} /></button>
         <button className="fh-build-new-btn" type="button" onClick={onAddSub}>
-          <Plus size={15} /> Add Vendor
+          <Plus size={15} /> Add vendor
         </button>
       </header>
 

@@ -62,7 +62,7 @@ const SCOPE_SECTIONS = [
  *   - Lightbox with swipe-between + caption editor.
  *   - Compare mode: select 2 photos, drag the before/after slider.
  *   - incomingFiles: photos the phone Job page's camera took; they upload
- *     once, exactly as if picked with Add Photos.
+ *     once, exactly as if picked with Add photos.
  */
 export default function PhotosSection({ jobId, userId, incomingFiles = null, onIncomingHandled }: any) {
   const queryClient = useQueryClient()
@@ -506,7 +506,7 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
             }}
           >
             <Upload size={12} aria-hidden="true" />
-            {uploading ? 'Uploading…' : 'Add Photos'}
+            {uploading ? 'Uploading…' : 'Add photos'}
           </motion.button>
         </div>
       </div>
@@ -564,7 +564,7 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12
         }}>
           <ImageIcon size={28} aria-hidden="true" color="var(--v3-text-muted)" />
-          <div>Photos tell the story. Tap <strong>Add Photos</strong> above to start.</div>
+          <div>Photos tell the story. Tap <strong>Add photos</strong> above to start.</div>
         </div>
       )}
 

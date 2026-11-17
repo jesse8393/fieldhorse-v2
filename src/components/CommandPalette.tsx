@@ -88,15 +88,8 @@ const QUICK_ACTIONS: NavEntry[] = [
   { id: 'compose', label: 'Draft message', hint: 'AI compose for customers', icon: MessageSquare, to: '/compose' },
 ]
 
-function homeHint() {
-  const h = new Date().getHours()
-  if (h < 12) return 'Morning revenue brief'
-  if (h < 17) return 'Afternoon command brief'
-  return 'Evening closeout'
-}
-
 const NAV_ITEMS: NavEntry[] = [
-  { id: 'home', label: 'Today', hint: homeHint(), icon: Home, to: '/' },
+  { id: 'home', label: 'Today', hint: 'What needs you today', icon: Home, to: '/' },
   { id: 'work', label: 'Jobs', hint: 'Every deal, lead to done, one list', icon: Briefcase, to: '/jobs' },
   { id: 'clients', label: 'Customers', hint: 'Customer profiles', icon: Users, to: '/clients' },
   { id: 'schedule', label: 'Schedule', hint: 'Day, week, and month planning', icon: Calendar, to: '/schedule' },
@@ -114,7 +107,7 @@ const SYSTEM_ITEMS: NavEntry[] = [
   { id: 'tasks', label: 'Tasks', hint: 'Owner queue', icon: ClipboardCheck, to: '/tasks' },
   { id: 'team', label: 'Team', hint: 'Roles and operators', icon: UsersRound, to: '/team' },
   { id: 'import', label: 'Import data', hint: 'CSV and webhooks', icon: Upload, to: '/import' },
-  { id: 'settings', label: 'Settings', hint: 'Profile, templates, billing', icon: Settings, to: '/settings' },
+  { id: 'settings', label: 'Settings', hint: 'Profile, templates, payments', icon: Settings, to: '/settings' },
 ]
 
 const ICON_FOR_KIND: Record<string, LucideIcon> = {

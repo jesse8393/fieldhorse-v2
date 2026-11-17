@@ -290,7 +290,7 @@ export default function Tasks() {
         {[
           ['Total open', kpi.total], ['Overdue', kpi.overdue],
           ['Due today', kpi.today], ['Unassigned', kpi.unassigned]
-        ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{loading ? '…' : error ? '—' : value}</dd></div>)}
+        ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{loading ? '…' : error ? 'Not available' : value}</dd></div>)}
       </dl>
 
       <div className="fh-tasks-filter">

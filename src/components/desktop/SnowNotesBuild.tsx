@@ -249,7 +249,7 @@ export default function SnowNotesBuild(props: Props) {
                     onClick={onParse}
                     disabled={parsing || !draft.trim()}
                   >
-                    <Sparkles size={13} /> {parsing ? 'Parsing…' : 'AI Parse'}
+                    <Sparkles size={13} /> {parsing ? 'Parsing…' : 'Parse with AI'}
                   </button>
                   <button
                     type="button"

@@ -505,7 +505,7 @@ export default function Importer() {
                         cursor: 'pointer'
                       }}
                     >
-                      <option value="">: not mapped :</option>
+                      <option value="">Not mapped</option>
                       {csvHeaders.map((h) => <option key={h} value={h}>{h}</option>)}
                     </select>
                   </div>
@@ -534,7 +534,7 @@ export default function Importer() {
                     </div>
                   </div>
                   <div style={{ fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: 0, color: 'var(--field-gold-bright)' }}>
-                    ${m.amount || 0}
+                    {m.amount ? `$${m.amount.toLocaleString('en-US', { maximumFractionDigits: 2 })}` : ''}
                   </div>
                 </div>
               ))}

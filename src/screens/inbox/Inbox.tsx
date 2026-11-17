@@ -124,7 +124,7 @@ function EngineOff() {
         title="Inbox turns on with messaging"
         action={
           canEditSettings ? (
-            <Button variant="secondary" size="md" to="/settings">Open Settings</Button>
+            <Button variant="secondary" size="md" to="/settings">Open settings</Button>
           ) : (
             <p className="fhi-off__note">Ask an owner or an admin to turn it on. Recorded communications remain available under Communication history.</p>
           )
