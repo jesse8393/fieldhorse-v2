@@ -70,6 +70,27 @@ test.describe('jobs on a phone', () => {
     await expect(page.getByRole('tab', { name: /^Leads\b/ })).toHaveCount(0)
   })
 
+  // PERF-05: jobs land before leads and quotes, which wait on the company.
+  // The All list keeps its skeleton until all three are in, so rows never
+  // move under a thumb when the sales records arrive above them.
+  test('the All list waits for leads and quotes instead of jumping when they land', async ({ context, page }) => {
+    await signIn(context)
+    let release!: () => void
+    const held = new Promise<void>(resolve => { release = resolve })
+    await context.route(/\/rest\/v1\/fh_leads(\?|$)/, async route => {
+      if (route.request().method() === 'GET') await held
+      await route.fallback()
+    })
+    await openJobs(page, '/jobs')
+    const tabs = page.getByRole('tablist', { name: 'Job stages' })
+    // The jobs are in: their tab has its count.
+    await expect(tabs.getByRole('tab', { name: /^Jobs\b/ }).locator('.fhjl-tab__count')).toBeVisible()
+    await expect(page.getByText('Plumbing Bellevue', { exact: true })).toHaveCount(0)
+    await expect(page.getByText('Loading jobs', { exact: true })).toBeAttached()
+    release()
+    await expect(page.getByText('Plumbing Bellevue', { exact: true })).toBeVisible()
+  })
+
   test('rows open the job', async ({ context, page }) => {
     await signIn(context)
     await openJobs(page)

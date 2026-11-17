@@ -213,7 +213,10 @@ export default function JobsPhone({
   const tabLoading = !fieldView && ((tab === 'all' && salesPending) || (tab === 'leads' && leadsQuery.isPending) || (tab === 'quotes' && quotesQuery.isPending))
 
   let body: ReactNode
-  if ((loading || tabLoading) && !hasRows) {
+  // All mixes jobs with leads and quotes, which land later (they wait on
+  // the company). It keeps its skeleton until all three are in, so rows
+  // never move under a thumb as the sales records arrive above them.
+  if ((loading || tabLoading) && (!hasRows || tab === 'all')) {
     body = <SkeletonRows rows={6} label="Loading jobs" />
   } else if (salesError && !hasRows) {
     body = <DataErrorState title="Could not load sales records" message="Your leads and quotes could not be loaded. Try again." onRetry={retrySales} />
