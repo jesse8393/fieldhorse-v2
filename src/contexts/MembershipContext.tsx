@@ -316,27 +316,39 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
       setOrg(orgsById[picked.org_id] || null)
       setMemberships(summarize(rows, orgsById))
 
+      // The org and role are known, so the workspace is settled: screens
+      // may load their data now. The two counts below only drive nav
+      // flags, so they run together afterwards and never hold a screen.
+      settle(null)
+
       // Step 3, active member count for the picked org (drives the
       // solo-mode nav: crew screens only appear when hasCrew).
-      const { count } = await supabase
-        .from('org_members')
-        .select('id', { count: 'exact', head: true })
-        .eq('org_id', picked.org_id)
-        .is('revoked_at', null)
-      if (stale()) return
-      setMemberCount(count ?? 1)
-
       // Step 4, accepted partnerships (RLS: partner_user_id = auth.uid()).
       // Keeps the Sub Portal nav entry visible for role holders who also
       // sub on other contractors' jobs.
-      const { count: partnerCount } = await supabase
-        .from('fh_job_partners')
-        .select('*', { count: 'exact', head: true })
-        .eq('partner_user_id', uid)
-        .not('accepted_at', 'is', null)
+      let counts: [{ count: number | null }, { count: number | null }]
+      try {
+        counts = await Promise.all([
+          supabase
+            .from('org_members')
+            .select('id', { count: 'exact', head: true })
+            .eq('org_id', picked.org_id)
+            .is('revoked_at', null),
+          supabase
+            .from('fh_job_partners')
+            .select('*', { count: 'exact', head: true })
+            .eq('partner_user_id', uid)
+            .not('accepted_at', 'is', null),
+        ])
+      } catch (e) {
+        // The workspace itself loaded; the nav keeps its last flags.
+        console.warn('[fieldhorse] membership counts failed', e)
+        return
+      }
       if (stale()) return
+      const [{ count }, { count: partnerCount }] = counts
+      setMemberCount(count ?? 1)
       setIsPartner((partnerCount ?? 0) > 0)
-      settle(null)
       saveIdentity<SavedMembership>('membership', uid, {
         rows,
         orgs: Object.values(orgsById),

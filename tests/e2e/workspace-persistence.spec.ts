@@ -234,3 +234,20 @@ test('sign out forgets the saved profile and workspace', async ({ context, page 
   release()
   await expect(page.locator('#fh-main')).toBeVisible()
 })
+
+// PERF-03: the member and partner counts only drive nav flags, so a first
+// open settles the workspace once the membership and company rows are in
+// and asks for its screen data without waiting on them.
+test('a first open asks for its screen data while the member counts are still out', async ({ context, page }) => {
+  await signIn(context)
+  const held: Array<() => void> = []
+  await context.route(/\/rest\/v1\/(org_members|fh_job_partners)(\?|$)/, route => {
+    if (route.request().method() !== 'HEAD') return route.fallback()
+    return new Promise<void>(resolve => { held.push(() => { void route.fallback().then(resolve, resolve) }) })
+  })
+  const leadsRead = page.waitForRequest(/\/rest\/v1\/fh_leads(\?|$)/, { timeout: 8_000 })
+  await page.goto('/jobs')
+  await leadsRead
+  expect(held.length).toBeGreaterThan(0)
+  for (const release of held.splice(0)) release()
+})
