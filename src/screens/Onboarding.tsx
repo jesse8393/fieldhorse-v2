@@ -10,6 +10,7 @@ import { seedDemoData } from '../lib/demoSeed.ts'
 import SetupProgress from '../components/experience/SetupProgress.tsx'
 import BrandMark from '../components/experience/BrandMark.tsx'
 import LogoUploader from '../components/LogoUploader.tsx'
+import AuthShell from './auth/AuthShell.tsx'
 import { countNoun } from '../lib/format.ts'
 
 const SERVICES = [
@@ -190,7 +191,9 @@ export default function Onboarding() {
     [companyName, services]
   )
 
-  if (loading || membershipLoading) return null
+  // Straight after Create account, on a weak signal: paint the same
+  // loading stage the sign in screens use, never a blank white page.
+  if (loading || membershipLoading) return <AuthShell labelledBy="fh-onboarding-title" loading />
   if (isOnboarded) return <Navigate to="/" replace />
 
   // An invited teammate (any membership that is not an owner's) already

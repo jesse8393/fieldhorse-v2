@@ -74,6 +74,25 @@ test('setup steps reflect entered details and support keyboard navigation', asyn
   await expect(page.getByLabel('Company name', { exact: true })).toHaveValue('Oak & Stone')
 })
 
+// A new sign up on a weak signal: while the profile and membership reads
+// are out, onboarding paints the same dark loading stage the sign in
+// screens use, not a blank white page.
+test('onboarding shows the loading stage while its reads are slow', async ({ context, page }) => {
+  await signIn(context, { tables: { profiles: [], org_members: [], organizations: [] } })
+  let release = () => {}
+  const held = new Promise<void>((resolve) => { release = resolve })
+  await context.route('**/rest/v1/profiles**', async (route) => { await held; return route.fallback() })
+  await page.goto('/onboarding', { waitUntil: 'domcontentloaded' })
+  const stage = page.locator('main.fha[aria-busy="true"]')
+  await expect(stage).toBeVisible()
+  const background = await page.evaluate(() => getComputedStyle(document.querySelector('main.fha') as Element).backgroundColor)
+  expect(background).not.toBe('rgba(0, 0, 0, 0)')
+  expect(background).not.toBe('rgb(255, 255, 255)')
+  release()
+  await expect(page.getByLabel('Company name', { exact: true })).toBeVisible()
+  await expect(stage).toHaveCount(0)
+})
+
 test('field roles receive guides without owner checklist queries', async ({ context, page }) => {
   await signIn(context, { role: 'crew' })
   const reads: string[] = []
