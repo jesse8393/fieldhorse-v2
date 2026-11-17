@@ -20,6 +20,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import { Button, Chip, Field, formatMoney } from '../fh'
 import { DOC_COLORS } from '../documents/tokens.ts'
+import { money } from '../documents/format.ts'
 import { companyShortName } from '../../lib/quoteMoney.ts'
 import { personFirstName } from '../../lib/quoteView.ts'
 import '../documents/fieldhorse-proposal.css'
@@ -663,10 +664,9 @@ function FieldhorseCapsule(p: CapsuleProps) {
   )
 }
 
+// The total the customer agrees to, to the cent.
 function moneyFmt(n: any) {
-  return Number(n || 0).toLocaleString(undefined, {
-    style: 'currency', currency: 'USD', maximumFractionDigits: 0
-  })
+  return money(n, { cents: true })
 }
 
 function formatStamp(iso: any) {

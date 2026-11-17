@@ -279,9 +279,10 @@ function ChangeOrderView({ data, token, onApproved }: any) {
   const priorApproved = (changeOrders || [])
     .filter((c: any) => c.status === 'approved' && c.id !== co.id)
     .reduce((s: number, c: any) => s + Number(c.amount || 0), 0)
-  const contractBefore = Number(contact?.amount || 0) + priorApproved
+  // In whole cents, so $25,200 plus $1,250.50 is $26,450.50 exactly.
+  const contractBefore = Math.round((Number(contact?.amount || 0) + priorApproved) * 100) / 100
   const delta = Number(co.amount || 0)
-  const contractAfter = contractBefore + delta
+  const contractAfter = Math.round((contractBefore + delta) * 100) / 100
   const isCredit = delta < 0
   const approved = co.status === 'approved'
 
@@ -404,10 +405,9 @@ function MoneyRow({ label, value, strong, accent }: any) {
   )
 }
 
+// Every amount a customer reads on this page keeps its cents.
 function moneyFmt(n: any) {
-  return Number(n || 0).toLocaleString(undefined, {
-    style: 'currency', currency: 'USD', maximumFractionDigits: 0
-  })
+  return money(n, { cents: true })
 }
 
 function ApprovedNote({ companyName }: any) {

@@ -1564,3 +1564,44 @@ test('an invoice due yesterday reads past due today, as it does in the app', asy
   await openInvoice(page)
   await expect(page.getByText('Past due', { exact: true })).toBeVisible()
 })
+
+/* ---- Cents on the change order and the approve sentence (PT-04, PT-05, M-05) ---- */
+
+function changeOrderPayload({ co = {}, contact = {}, others = [] }: {
+  co?: Record<string, unknown>
+  contact?: Record<string, unknown>
+  others?: Array<Record<string, unknown>>
+} = {}): Payload {
+  return {
+    ok: true,
+    kind: 'change_order',
+    change_order_id: 'co-1',
+    contact: { id: 'job-co-0001', name: 'Marco Castellanos', address: '1150 Cherry Blossom Ln', job_title: 'Pool deck pour', stage: 'job', amount: 25200, ...contact },
+    company: { name: 'Parker Construction', phone: '615 555 0100', email: 'office@parker.co', logo_url: null, estimate_template: 'classic' },
+    items: [],
+    payments: [],
+    changeOrders: [
+      ...others,
+      { id: 'co-1', sequence_number: 2, title: 'Extra footing', description: 'Deeper footing at the north wall.', amount: 1250.5, status: 'sent', updated_at: '2026-11-10T15:00:00.000Z', ...co }
+    ],
+    insurance: null,
+    invoices: [],
+    photos: []
+  } as unknown as Payload
+}
+
+test('the change order page and its approve sentence keep the cents', async ({ page, context }) => {
+  await mockPortal(context, changeOrderPayload())
+  await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+
+  await expect(page.getByText('+$1,250.50')).toBeVisible()
+  await expect(page.getByText('$25,200.00')).toBeVisible()
+  await expect(page.getByText('$26,450.50').first()).toBeVisible()
+  await expect(page.getByText('The updated contract total is $26,450.50.')).toBeVisible()
+})
+
+test('the classic approve sentence keeps the cents of the total', async ({ page, context }) => {
+  await mockPortal(context, proposalPayload({ contact: { amount: 18458.5 }, company: { estimate_template: 'classic' } }))
+  await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByText('The approved contract total is $18,458.50.')).toBeVisible()
+})
