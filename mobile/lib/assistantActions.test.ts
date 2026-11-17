@@ -3,8 +3,8 @@ import { runAssistantAction } from './assistantActions'
 
 const failed = { error: { message: 'Permission denied' } }
 const actions = (result: object = { error: null }) => ({
-  createLead: vi.fn(async () => result), createEvent: vi.fn(async () => result),
-  createClient: vi.fn(async () => result), saveNote: vi.fn(async () => result)
+  createLead: vi.fn(async (_input: any) => result), createEvent: vi.fn(async (_input: any) => result),
+  createClient: vi.fn(async (_input: any) => result), saveNote: vi.fn(async (_input: any) => result)
 })
 
 describe('assistant actions report what really happened', () => {
