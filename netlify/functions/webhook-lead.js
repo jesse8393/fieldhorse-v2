@@ -5,6 +5,11 @@
 // matches by phone or email inside the company, else makes one) and insert
 // a row into fh_leads pointing at it (SPEC D53).
 //
+// Senders retry. A delivery that names itself (the Idempotency-Key header or
+// an external_id field) always lands on the lead first made with that name.
+// One that does not is treated as a repeat when an identical open lead (same
+// client, title and source) was made in the last 10 minutes.
+//
 // ENV required:
 //   SUPABASE_URL       (e.g. https://pnmhblvslftdzfcdezbw.supabase.co)
 //   SUPABASE_SERVICE_ROLE_KEY  (service-role, server-only)
@@ -17,6 +22,8 @@ const REQUIRED_FIELDS = ['name']
 const MAX_BODY_BYTES = 64 * 1024
 const RATE_LIMIT_WINDOW_SECONDS = 60
 const DEFAULT_RATE_LIMIT_PER_MINUTE = 60
+const REPEAT_WINDOW_MS = 10 * 60 * 1000
+const MAX_IDEMPOTENCY_KEY_LENGTH = 200
 
 export function getWebhookRateLimitPerMinute(value = process.env.WEBHOOK_LEAD_RATE_LIMIT_PER_MINUTE) {
   const parsed = Number(value)
@@ -33,7 +40,7 @@ export function getWebhookRateBucketStart(now = new Date(), windowSeconds = RATE
   return new Date(Math.floor(now.getTime() / bucketMs) * bucketMs).toISOString()
 }
 
-export default async (request) => {
+export default async (request, context) => {
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders() })
   }
@@ -155,16 +162,36 @@ export default async (request) => {
     status: 'open'
   }
 
+  // A named delivery: the lead id is derived from the company and the name,
+  // so the same name always means the same row and the primary key settles
+  // two copies arriving at once. No extra column is needed.
+  const idempotencyKey = readIdempotencyKey(request, payload)
+  const keyedLeadId = idempotencyKey ? leadIdForIdempotencyKey(orgId, idempotencyKey) : null
+  if (keyedLeadId) {
+    const prior = await findLeadById(supabase, orgId, keyedLeadId)
+    if (prior) return repeatResponse(prior)
+  }
+
   const clientId = await resolveClient(supabase, { orgId, person, source })
   if (!clientId) {
     return json({ error: 'client_failed', detail: 'Could not save the customer. Try again shortly.' }, 500)
   }
 
+  if (!keyedLeadId) {
+    const prior = await findRecentIdenticalLead(supabase, { orgId, clientId, title: lead.title, source })
+    if (prior) return repeatResponse(prior)
+  }
+
   const { data: inserted, error: insertErr } = await supabase
     .from('fh_leads')
-    .insert({ ...lead, client_id: clientId })
+    .insert({ ...lead, client_id: clientId, ...(keyedLeadId ? { id: keyedLeadId } : {}) })
     .select('id')
   if (insertErr) {
+    // The other copy of a named delivery won the insert a moment ago.
+    if (keyedLeadId && insertErr.code === '23505') {
+      const prior = await findLeadById(supabase, orgId, keyedLeadId)
+      if (prior) return repeatResponse(prior)
+    }
     console.error('[webhook-lead] insert failed', insertErr)
     return json({ error: 'insert_failed', detail: 'Could not save the lead. Try again shortly.' }, 500)
   }
@@ -182,18 +209,78 @@ export default async (request) => {
       body,
       link: newId ? `/leads/${newId}` : '/leads'
     })
-    await sendPushToUser(supabase, userId, {
+  } catch (e) {
+    console.warn('[webhook-lead] notify failed', e)
+  }
+  // The sender is not kept waiting on the push services. The platform is
+  // asked to let the push finish after the response has gone.
+  const push = Promise.resolve()
+    .then(() => sendPushToUser(supabase, userId, {
       title: `New lead · ${person.name}`,
       body,
       link: newId ? `/leads/${newId}` : '/leads',
       tag: `new-lead-${newId || person.name}`
-    })
-  } catch (e) {
-    console.warn('[webhook-lead] notify failed', e)
-  }
+    }))
+    .then(() => undefined)
+    .catch((e) => { console.warn('[webhook-lead] push failed', e) })
+  if (typeof context?.waitUntil === 'function') context.waitUntil(push)
 
   // `stage: 'lead'` stays for integrations that read it; the row is a lead.
   return json({ ok: true, id: newId, client_id: clientId, record: 'lead', stage: 'lead' }, 200)
+}
+
+// A repeated delivery answers like the first one did, with `duplicate: true`,
+// and makes no new lead and no new alert.
+function repeatResponse(prior) {
+  return json({ ok: true, id: prior.id, client_id: prior.client_id, record: 'lead', stage: 'lead', duplicate: true }, 200)
+}
+
+/** The name a delivery gives itself: the Idempotency-Key header, else external_id in the body. */
+export function readIdempotencyKey(request, payload) {
+  const fromHeader = request.headers.get('idempotency-key')
+  const fromBody = ['string', 'number'].includes(typeof payload?.external_id) ? payload.external_id : null
+  const raw = fromHeader && fromHeader.trim() ? fromHeader : fromBody
+  const key = raw == null ? '' : String(raw).trim().slice(0, MAX_IDEMPOTENCY_KEY_LENGTH)
+  return key || null
+}
+
+/** A stable uuid for (company, delivery name). The same pair always gives the same lead id. */
+export function leadIdForIdempotencyKey(orgId, key) {
+  const hex = createHash('sha256').update(`webhook-lead:${orgId}:${key}`).digest('hex')
+  const variant = ((parseInt(hex[16], 16) & 0x3) | 0x8).toString(16)
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`
+}
+
+async function findLeadById(supabase, orgId, leadId) {
+  const { data, error } = await supabase
+    .from('fh_leads')
+    .select('id, client_id')
+    .eq('id', leadId)
+    .eq('org_id', orgId)
+    .maybeSingle()
+  if (error) {
+    console.warn('[webhook-lead] repeat lookup failed', error)
+    return null
+  }
+  return data || null
+}
+
+async function findRecentIdenticalLead(supabase, { orgId, clientId, title, source }) {
+  let query = supabase
+    .from('fh_leads')
+    .select('id, client_id')
+    .eq('org_id', orgId)
+    .eq('client_id', clientId)
+    .eq('status', 'open')
+    .eq('source', source)
+    .gte('created_at', new Date(Date.now() - REPEAT_WINDOW_MS).toISOString())
+  query = title === null ? query.is('title', null) : query.eq('title', title)
+  const { data, error } = await query.order('created_at', { ascending: false }).limit(1)
+  if (error) {
+    console.warn('[webhook-lead] repeat lookup failed', error)
+    return null
+  }
+  return data?.[0] || null
 }
 
 export function leadNotes(notes, amount) {
@@ -267,7 +354,7 @@ function corsHeaders() {
   return {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type'
+    'Access-Control-Allow-Headers': 'Content-Type, Idempotency-Key'
   }
 }
 
