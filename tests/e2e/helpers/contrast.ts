@@ -55,3 +55,39 @@ export function contrastOf(locator: Locator, part: Part = 'text'): Promise<numbe
     return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05)
   }, part)
 }
+
+/**
+ * The lowest contrast of an element's text against each of the given CSS
+ * colours, resolved where the element sits (so var() reads its scope).
+ * For a background a canvas pixel cannot stand for, such as a gradient:
+ * pass its stops.
+ */
+export function textContrastAgainst(locator: Locator, backgrounds: string[]): Promise<number> {
+  return locator.evaluate((element, backgrounds) => {
+    const canvas = document.createElement('canvas')
+    canvas.width = canvas.height = 1
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })!
+    const rgba = (css: string) => {
+      ctx.clearRect(0, 0, 1, 1)
+      ctx.fillStyle = '#000'
+      ctx.fillStyle = css
+      ctx.fillRect(0, 0, 1, 1)
+      const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data
+      return [r, g, b, a / 255]
+    }
+    const probe = document.createElement('span')
+    element.appendChild(probe)
+    const resolved = backgrounds.map((css) => { probe.style.backgroundColor = css; return rgba(getComputedStyle(probe).backgroundColor) })
+    probe.remove()
+    const lum = (c: number[]) => c.slice(0, 3).map(v => {
+      const s = v / 255
+      return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
+    }).reduce((sum, v, i) => sum + v * [0.2126, 0.7152, 0.0722][i], 0)
+    const [r, g, b, a] = rgba(getComputedStyle(element).color)
+    return Math.min(...resolved.map((bg) => {
+      const fore = [r, g, b].map((c, i) => c * a + bg[i] * (1 - a))
+      const x = lum(fore), y = lum(bg)
+      return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05)
+    }))
+  }, backgrounds)
+}

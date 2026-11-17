@@ -7,6 +7,7 @@
 // 900 px and wider: the vault card and the four groups as tables.
 import { expect, test, type BrowserContext, type Locator, type Page } from '@playwright/test'
 import { signIn, type SignInOptions } from './helpers/signIn.ts'
+import { contrastOf } from './helpers/contrast.ts'
 
 // The mock company sits in Murfreesboro, Tennessee, so the phone runs on
 // Central time and the clock is fixed: Thursday, October 8, 2026, 6:40 am.
@@ -771,6 +772,17 @@ async function expectInvoiceWithoutAJob(page: Page) {
 
 test.describe('money on a phone', () => {
   test.skip(({ isMobile }) => !isMobile, 'Phone Money screen')
+
+  // A11Y-05: the company initials on the vault card's onyx mark read at
+  // 4.5 to 1, by day and at night.
+  for (const mode of ['day', 'night'] as const) {
+    test(`the vault card's company initials are readable in ${mode} mode`, async ({ context, page }) => {
+      await openMoney(context, page, { mode })
+      const initials = page.locator('.fhc-vault__corner .fhc-monogram__initials')
+      await expect(initials).toBeVisible()
+      await expect.poll(() => contrastOf(initials)).toBeGreaterThanOrEqual(4.5)
+    })
+  }
 
   // PERF-10: a long group draws 40 rows and Load more adds the next 40.
   test('a long overdue group draws 40 rows and Load more brings the rest', async ({ context, page }) => {

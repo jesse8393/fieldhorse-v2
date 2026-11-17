@@ -6,7 +6,7 @@
 // Nothing here mounts a dialog.
 import { expect, test, type Page } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
-import { contrastOf } from './helpers/contrast.ts'
+import { contrastOf, textContrastAgainst } from './helpers/contrast.ts'
 import { USER } from '../../scripts/qa-mock.mjs'
 
 const NOW = Date.now()
@@ -424,5 +424,18 @@ for (const mode of ['day', 'night'] as const) {
     await expect(counts.first()).toBeVisible()
     const n = await counts.count()
     for (let i = 0; i < n; i++) await expect.poll(() => contrastOf(counts.nth(i))).toBeGreaterThanOrEqual(4.5)
+  })
+}
+
+// A11Y-05: New client on the desktop Customers screen reads at 4.5 to 1 on
+// both ends of its copper gradient, by day and at night.
+for (const mode of ['day', 'night'] as const) {
+  test(`New client is readable in ${mode} mode`, async ({ context, page, isMobile }) => {
+    test.skip(isMobile, 'Desktop Customers header')
+    await signIn(context, { mode })
+    await open(page, '/clients')
+    const button = page.getByRole('button', { name: 'New client', exact: true })
+    await expect(button).toBeVisible()
+    await expect.poll(() => textContrastAgainst(button, ['var(--v3-primary-hot)', 'var(--v3-primary)'])).toBeGreaterThanOrEqual(4.5)
   })
 }

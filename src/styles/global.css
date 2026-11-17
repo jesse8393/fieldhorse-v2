@@ -5592,7 +5592,8 @@ select[style*="outline"]:focus-visible,
   .fh-build-primary-btn {
     background: linear-gradient(180deg, var(--v3-primary-hot) 0%, var(--v3-primary) 100%);
     border: 1px solid rgba(92, 92, 92, 0.72);
-    color: #141414;
+    /* The text colour made for copper: onyx read 3.1 to 1 on it. */
+    color: var(--fh-on-gold);
     box-shadow: 0 10px 26px color-mix(in srgb, var(--v3-primary) 22%, transparent);
   }
 
