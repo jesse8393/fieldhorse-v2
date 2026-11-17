@@ -677,3 +677,26 @@ describe('classifyInvoice', () => {
     expect(late).toMatchObject({ status: 'overdue', daysLate: 1, owed: 600 })
   })
 })
+
+// M-18: "Contract value not yet issued" leaves out money already collected.
+describe('Contract value not yet issued', () => {
+  it('leaves out a closed job paid in full through Log payment', async () => {
+    const { buildMoneyReconciliation } = await import('./moneyReconciliation.ts')
+    const groups = buildMoneyReconciliation(bundle({
+      jobs: [job({ id: 'j1', stage: 'closed', amount: 9600 })],
+      payments: [payment({ id: 'p1', contact_id: 'j1', amount: 9600 })]
+    }), [], NOW)
+    const unbilled = groups.find((g) => g.id === 'unbilled')!
+    expect({ total: unbilled.total, rows: unbilled.rows.length }).toEqual({ total: 0, rows: 0 })
+  })
+
+  it('counts money collected with no invoice once, beside the invoices issued', async () => {
+    const { buildMoneyReconciliation } = await import('./moneyReconciliation.ts')
+    const groups = buildMoneyReconciliation(bundle({
+      jobs: [job({ id: 'j1', amount: 10000.5 })],
+      invoices: [invoice({ id: 'i1', amount: 5000, status: 'paid' })],
+      payments: [payment({ id: 'p1', invoice_id: 'i1', amount: 5000 }), payment({ id: 'p2', amount: 2000.25 })]
+    }), [], NOW)
+    expect(groups.find((g) => g.id === 'unbilled')!.total).toBe(3000.25)
+  })
+})
