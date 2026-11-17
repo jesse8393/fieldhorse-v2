@@ -42,6 +42,7 @@ import { reviewInvoice } from '../../../lib/invoiceReview.js'
 import { fetchInvoicesForContact, invoiceAmountDue, invoiceDescription } from '../../../lib/invoices.ts'
 import { invoicesPaidInFull } from '../../../lib/invoiceSettlement.ts'
 import { splitByPercents } from '../../../lib/paymentSchedule.ts'
+import { toCents } from '../../../lib/cents.ts'
 import { useMembership } from '../../../contexts/MembershipContext.tsx'
 import { canEditJobMoney } from '../lib/jobAccess.ts'
 
@@ -152,11 +153,22 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       if (review.excess > 0 && (!prior || amount > Number(prior.amount))) {
         throw new Error('This draw exceeds approved contract value. Reduce or void unused drafts, or approve added scope first.')
       }
+      // A paid draw keeps its amount and status (M-12), as the invoice's
+      // own edit screen does: changing them would leave the payment that
+      // paid it describing a different bill. An update never re-owns the
+      // row either: it stays with whoever made it.
+      const stored = draws.find((d: any) => d.id === payload.id)
+      const paid = String(stored?.status || prior?.status || '').toLowerCase() === 'paid'
+      if (payload.id && paid && (toCents(amount) !== toCents(stored?.amount ?? prior?.amount) || row.status !== 'paid')) {
+        throw new Error('A paid draw keeps its amount and status. Delete or change its payment first.')
+      }
       let res
       if (payload.id) {
+        const { user_id: _owner, ...editable } = row
+        const { amount: _amount, status: _status, ...paidEditable } = editable
         res = await supabase
           .from('fh_invoices')
-          .update(row)
+          .update(paid ? paidEditable : editable)
           .eq('id', payload.id)
           .select('*')
           .single()
@@ -861,6 +873,8 @@ function Row({ draw, busy, readOnly, onEdit, onDownload, onSend, onMarkPaid, onV
 }
 
 function Editor({ initial, isNew, unbilled, onSave, onCancel }: any) {
+  // A paid draw keeps its amount and status (M-12).
+  const locked = !isNew && String(initial?.status || '').toLowerCase() === 'paid'
   const [form, setForm] = useState({
     id: initial.id || null,
     title: initial.title || '',
@@ -913,7 +927,9 @@ function Editor({ initial, isNew, unbilled, onSave, onCancel }: any) {
               // the payment and invoice screens. Without it, typing
               // "1,500" (or pasting "$1,500") passed validation as NaN
               // and persisted a $0 draw.
-              onChange={(e) => set('amount', e.target.value.replace(/[^0-9.]/g, ''))}
+              onChange={(e) => { if (!locked) set('amount', e.target.value.replace(/[^0-9.]/g, '')) }}
+              readOnly={locked}
+              aria-readonly={locked || undefined}
               placeholder={unbilled > 0 ? String(unbilled) : '0'}
               style={{ ...inputStyle, paddingLeft: 24 }}
             />
@@ -964,7 +980,12 @@ function Editor({ initial, isNew, unbilled, onSave, onCancel }: any) {
         {/* Paid is only shown for a draw that already is. A draw becomes
             paid by recording its payment (the check button), so the
             balance moves with the status. */}
-        {(initial.status === 'paid' ? ['draft', 'sent', 'paid', 'overdue'] : ['draft', 'sent', 'overdue']).map((s) => (
+        {locked && (
+          <span style={{ ...labelStyle, textTransform: 'none' }}>
+            Paid. The amount and status stay as they are while its payment stands.
+          </span>
+        )}
+        {(locked ? [] : ['draft', 'sent', 'overdue']).map((s) => (
           <button
             key={s}
             type="button"

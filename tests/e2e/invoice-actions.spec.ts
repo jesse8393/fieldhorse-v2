@@ -492,3 +492,34 @@ test('an expense delete that removes nothing says it failed', async ({ page, con
   await expect(page.getByText("Couldn't delete").first()).toBeVisible()
   await expect(page.getByText('Expense removed')).toHaveCount(0)
 })
+
+// M-12: a paid draw keeps its amount and status. The Draws tab still lets
+// its title, dates and words change, but the amount is read only, Draft is
+// not offered, and the save sends neither, nor a new owner.
+test('a paid draw cannot be edited to a new amount or set back to draft', async ({ page, context }) => {
+  const draw = { ...shedDeposit('paid'), org_id: 'org-1', amount: 5000 }
+  const payment = { id: 'pay-1', user_id: 'qa-user-1', contact_id: 'c-job1', invoice_id: 'inv-1', amount: 5000, method: 'check', kind: 'deposit', paid_on: '2026-10-12', created_at: '2026-10-12T15:00:00.000Z' }
+  await signIn(context, { tables: { fh_contacts: [{ ...shedJob(), amount: 10000 }], fh_invoices: [draw], fh_payments: [payment], fh_change_orders: [] } })
+  const patches: any[] = []
+  page.on('request', (r) => { if (r.method() === 'PATCH' && r.url().includes('/fh_invoices')) patches.push(r.postDataJSON()) })
+  await page.goto('/jobs/c-job1?tab=draws', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+  const edit = page.getByRole('button', { name: 'Edit draw' }).first()
+  await expect(edit).toBeVisible({ timeout: 30_000 })
+  await edit.click()
+  const editor = page.locator('.fh-draws-editor')
+  const amount = editor.getByLabel('Amount')
+  await expect(amount).toHaveAttribute('readonly', '')
+  await amount.focus()
+  await page.keyboard.press('End')
+  await page.keyboard.type('8')
+  await expect(amount).toHaveValue('5000')
+  await expect(editor.getByRole('button', { name: 'Draft', exact: true })).toHaveCount(0)
+  await expect(editor.getByRole('button', { name: 'Sent', exact: true })).toHaveCount(0)
+  await editor.getByLabel('Title').fill('Deposit paid')
+  await editor.getByRole('button', { name: 'Save changes' }).click()
+  await expect.poll(() => patches.length).toBe(1)
+  expect(patches[0].title).toBe('Deposit paid')
+  expect(patches[0]).not.toHaveProperty('amount')
+  expect(patches[0]).not.toHaveProperty('status')
+  expect(patches[0]).not.toHaveProperty('user_id')
+})
