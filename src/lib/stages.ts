@@ -289,6 +289,93 @@ export async function logPayment(contact: Contact, { id, amount, method, kind, r
   return { total, closed }
 }
 
+/**
+ * Deletes one payment on a job and undoes what it settled (M-08, DATA-03).
+ *
+ * The row is deleted by its id on this job, not by the signed in user: a
+ * payment carries the job creator's id, so a teammate's delete matched
+ * nothing and still reported success. The delete asks for the id back and
+ * an empty answer is an error.
+ *
+ * Then, from the payments that remain: an invoice those payments no longer
+ * cover goes back to sent, but only one the job's payments covered before
+ * the delete (an invoice someone marked paid by hand stays paid). A job
+ * the payments had closed goes back to job when they no longer cover its
+ * contract; a job closed out on the Complete job screen stays closed.
+ */
+export async function deletePayment(contact: Contact, paymentId: string) {
+  const [paysRes, invsRes, cosRes, freshRes] = await Promise.all([
+    supabase.from('fh_payments').select('id, amount, invoice_id').eq('contact_id', contact.id),
+    supabase.from('fh_invoices').select('id, amount, status, sequence_number').eq('contact_id', contact.id),
+    supabase.from('fh_change_orders').select('amount, status').eq('contact_id', contact.id).eq('status', 'approved'),
+    supabase.from('fh_contacts').select('amount, stage').eq('id', contact.id).maybeSingle()
+  ])
+
+  const { data: deleted, error: delErr } = await supabase
+    .from('fh_payments')
+    .delete()
+    .eq('id', paymentId)
+    .eq('contact_id', contact.id)
+    .select('id')
+  if (delErr) return { error: delErr, reopenedInvoices: [] as string[], reopenedJob: false }
+  if (!deleted?.length) {
+    return { error: new Error('This payment was not deleted. It may have been removed already, or you may not have access to it.'), reopenedInvoices: [] as string[], reopenedJob: false }
+  }
+
+  // Without a full picture of the job's money, leave every status alone:
+  // the payment is gone either way, and a guess could reopen a paid bill.
+  if (paysRes.error || invsRes.error || cosRes.error || freshRes.error) {
+    console.error('[fieldhorse] deletePayment status check skipped', paysRes.error || invsRes.error || cosRes.error || freshRes.error)
+    return { error: null, reopenedInvoices: [] as string[], reopenedJob: false, statusUnchecked: true }
+  }
+
+  const before = paysRes.data || []
+  const after = before.filter((p) => p.id !== paymentId)
+  const invs = invsRes.data || []
+  const contractAmount = knownContractTotal({ amount: freshRes.data?.amount ?? contact.amount, changeOrders: cosRes.data || [] })
+
+  // Ask which bills each set of payments covers, reading a paid bill as
+  // open so it can be counted either way.
+  const asOpen = invs.map((inv) => (inv.status === 'paid' ? { ...inv, status: 'sent' } : inv))
+  const coveredBefore = new Set(invoicesPaidInFull({ invoices: asOpen, payments: before, contractTotal: contractAmount }))
+  const coveredAfter = new Set(invoicesPaidInFull({ invoices: asOpen, payments: after, contractTotal: contractAmount }))
+  const reopen = invs
+    .filter((inv) => inv.status === 'paid' && coveredBefore.has(inv.id) && !coveredAfter.has(inv.id))
+    .map((inv) => inv.id)
+
+  let statusError: unknown = null
+  const reopenedInvoices: string[] = []
+  if (reopen.length > 0) {
+    const { data: reopened, error } = await supabase
+      .from('fh_invoices')
+      .update({ status: 'sent' })
+      .in('id', reopen)
+      .eq('status', 'paid')
+      .select('id')
+    if (error) statusError = error
+    else reopenedInvoices.push(...(reopened || []).map((r: { id: string }) => r.id))
+  }
+
+  let reopenedJob = false
+  const stage = freshRes.data?.stage ?? contact.stage
+  const contractCents = toCents(contractAmount)
+  if (stage === 'closed' && contractAmount != null && contractCents > 0
+    && sumCents(before, (p) => p.amount) >= contractCents
+    && sumCents(after, (p) => p.amount) < contractCents) {
+    const { data: closeout, error: closeoutErr } = await supabase
+      .from('fh_closeouts').select('id').eq('contact_id', contact.id).maybeSingle()
+    if (closeoutErr) statusError = statusError || closeoutErr
+    else if (!closeout) {
+      const { data: moved, error } = await supabase
+        .from('fh_contacts').update({ stage: 'job' }).eq('id', contact.id).eq('stage', 'closed').select('id')
+      if (error) statusError = statusError || error
+      else reopenedJob = !!moved?.length
+    }
+  }
+  if (statusError) console.error('[fieldhorse] deletePayment status update failed', statusError)
+  return { error: null, reopenedInvoices, reopenedJob, statusError }
+}
+
 export async function recalcCost(contactId: string | undefined, userId: string | undefined) {
   if (!contactId || !userId) return 0
   try {

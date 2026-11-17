@@ -9,7 +9,7 @@ const fake = vi.hoisted(() => {
   const state = { tables: {} as Record<string, any[]> }
   function from(table: string) {
     const q = {
-      op: 'select' as 'select' | 'insert' | 'update',
+      op: 'select' as 'select' | 'insert' | 'update' | 'delete',
       filters: [] as Array<(r: any) => boolean>,
       single: false,
       patch: null as any,
@@ -24,7 +24,11 @@ const fake = vi.hoisted(() => {
       const matched = rows.filter((r) => q.filters.every((f) => f(r)))
       if (q.op === 'update') {
         for (const r of matched) Object.assign(r, q.patch)
-        return { data: null, error: null }
+        return { data: matched.map((r) => ({ id: r.id })), error: null }
+      }
+      if (q.op === 'delete') {
+        state.tables[table] = rows.filter((r) => !matched.includes(r))
+        return { data: matched.map((r) => ({ id: r.id })), error: null }
       }
       return { data: q.single ? (matched[0] ?? null) : matched.map((r) => ({ ...r })), error: null }
     }
@@ -33,6 +37,7 @@ const fake = vi.hoisted(() => {
       insert: (row: any) => { q.op = 'insert'; q.row = row; return api },
       upsert: (row: any) => { q.op = 'insert'; q.row = row; return api },
       update: (patch: any) => { q.op = 'update'; q.patch = patch; return api },
+      delete: () => { q.op = 'delete'; return api },
       eq: (col: string, val: any) => { q.filters.push((r) => r[col] === val); return api },
       in: (col: string, vals: any[]) => { q.filters.push((r) => vals.includes(r[col])); return api },
       maybeSingle: () => { q.single = true; return api },
@@ -46,7 +51,7 @@ const fake = vi.hoisted(() => {
 
 vi.mock('./supabase.ts', () => ({ supabase: fake.supabase }))
 
-const { margin, marginTier, logPayment, HIDDEN_STAGES, isMovedStage, STAGES, STAGE_MAP, LIST_STAGE_META, detailRoute } = await import('./stages.ts')
+const { margin, marginTier, logPayment, deletePayment, HIDDEN_STAGES, isMovedStage, STAGES, STAGE_MAP, LIST_STAGE_META, detailRoute } = await import('./stages.ts')
 
 // SPEC D55 and D56: fh_contacts keeps job, closed and lost as the stages a
 // person can pick. Rows copied into fh_leads and fh_quotes are marked
@@ -214,3 +219,61 @@ describe('logPayment', () => {
     expect(fake.state.tables.fh_invoices[0].status).toBe('void')
   })
 })
+
+// M-08 and DATA-03: a delete that removes nothing must not read as done,
+// and a real delete must undo what that payment settled.
+describe('deletePayment', () => {
+  const job = { id: 'job', user_id: 'owner', stage: 'closed', name: 'Kitchen', job_title: null, address: null, amount: 5000 }
+  const invoice = (id: string, sequence_number: number, amount: number, status = 'paid') =>
+    ({ id, contact_id: 'job', user_id: 'admin', sequence_number, amount, status })
+
+  beforeEach(() => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    fake.state.tables = { fh_contacts: [{ ...job }], fh_invoices: [], fh_payments: [], fh_change_orders: [], fh_closeouts: [] }
+  })
+
+  it('deletes a teammate\'s payment by its id', async () => {
+    fake.state.tables.fh_payments = [{ id: 'p1', contact_id: 'job', user_id: 'owner', amount: 5000, invoice_id: null }]
+    const res: any = await deletePayment(job, 'p1')
+    expect(res.error).toBeNull()
+    expect(fake.state.tables.fh_payments).toEqual([])
+  })
+
+  it('reports a failure when no row was deleted', async () => {
+    const res: any = await deletePayment(job, 'gone')
+    expect(res.error).toBeTruthy()
+    expect(fake.state.tables.fh_contacts[0].stage).toBe('closed')
+  })
+
+  it('reopens the invoice the payment paid and the job it closed', async () => {
+    fake.state.tables.fh_invoices = [invoice('fin', 1, 5000)]
+    fake.state.tables.fh_payments = [{ id: 'p1', contact_id: 'job', user_id: 'owner', amount: 5000, invoice_id: 'fin' }]
+    const res: any = await deletePayment(job, 'p1')
+    expect(res.error).toBeNull()
+    expect(fake.state.tables.fh_invoices[0].status).toBe('sent')
+    expect(fake.state.tables.fh_contacts[0].stage).toBe('job')
+    expect(res.reopenedInvoices).toEqual(['fin'])
+    expect(res.reopenedJob).toBe(true)
+  })
+
+  it('reopens only the bills money logged against the job no longer covers', async () => {
+    fake.state.tables.fh_invoices = [invoice('dep', 1, 2500.5), invoice('fin', 2, 2499.5)]
+    fake.state.tables.fh_payments = [
+      { id: 'p1', contact_id: 'job', user_id: 'owner', amount: 2500.5, invoice_id: null },
+      { id: 'p2', contact_id: 'job', user_id: 'owner', amount: 2499.5, invoice_id: null }
+    ]
+    await deletePayment(job, 'p2')
+    expect(fake.state.tables.fh_invoices.map((r) => r.status)).toEqual(['paid', 'sent'])
+    expect(fake.state.tables.fh_contacts[0].stage).toBe('job')
+  })
+
+  it('leaves an invoice marked paid by hand and a job closed out by hand', async () => {
+    fake.state.tables.fh_invoices = [invoice('hand', 1, 5000)]
+    fake.state.tables.fh_payments = [{ id: 'p1', contact_id: 'job', user_id: 'owner', amount: 100, invoice_id: null }]
+    fake.state.tables.fh_closeouts = [{ id: 'c1', contact_id: 'job' }]
+    await deletePayment(job, 'p1')
+    expect(fake.state.tables.fh_invoices[0].status).toBe('paid')
+    expect(fake.state.tables.fh_contacts[0].stage).toBe('closed')
+  })
+})
+

@@ -18,6 +18,7 @@ import { reviewInvoice } from '../../lib/invoiceReview.js'
 import { fetchInvoicesForContact, createInvoice, invoiceAmountDue, invoiceDescription, sendInvoiceEmail } from '../../lib/invoices.ts'
 import { pickBalanceInvoice } from '../../lib/invoiceSettlement.ts'
 import { moneyExact } from '../../lib/format.ts'
+import { deletePayment } from '../../lib/stages.ts'
 import { parseDateOnly } from '../../lib/dates.ts'
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useProfile } from '../../contexts/ProfileContext.tsx'
@@ -565,17 +566,25 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
     if (deleteTimer.current) clearTimeout(deleteTimer.current)
     setDeleteArmed(null)
     setDeletingId(paymentId)
-    const { error: delErr } = await supabase
-      .from('fh_payments')
-      .delete()
-      .eq('id', paymentId)
-      .eq('user_id', user.id)
+    // By id, with the row asked back: a payment carries the job creator's
+    // id, so filtering on the signed in user matched nothing and still said
+    // deleted. deletePayment also reopens what the payment had settled.
+    const res = contact ? await deletePayment(contact as any, paymentId) : null
     setDeletingId(null)
-    if (delErr) {
-      toastError("Couldn't delete payment", delErr.message)
+    if (!res || res.error) {
+      toastError("Couldn't delete payment", res?.error?.message || 'This job is not loaded yet. Try again.')
+      refresh()
       return
     }
-    toastSuccess('Payment deleted', `${moneyExact(paymentAmount)} removed`)
+    if (res.statusError) {
+      toastError('Payment deleted', `${moneyExact(paymentAmount)} removed, but the invoice and job status did not update. Check this job.`)
+    } else {
+      const parts = [
+        res.reopenedInvoices.length === 1 ? 'An invoice is owed again' : res.reopenedInvoices.length > 1 ? `${res.reopenedInvoices.length} invoices are owed again` : '',
+        res.reopenedJob ? 'The job is open again' : ''
+      ].filter(Boolean)
+      toastSuccess('Payment deleted', [`${moneyExact(paymentAmount)} removed.`, ...parts.map((t) => `${t}.`)].join(' '))
+    }
     refresh()
   }
 

@@ -85,8 +85,15 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
   async function remove(id: any) {
     hapticTap()
     const snapshot = expenses.find((e: any) => e.id === id)
-    const { error } = await supabase.from('fh_expenses').delete().eq('id', id).eq('user_id', userId)
+    // By id, with the row asked back: an expense a teammate logged carries
+    // their id, so a user filter matched nothing and still said removed.
+    const { data: removed, error } = await supabase.from('fh_expenses').delete().eq('id', id).eq('contact_id', contact.id).select('id')
     if (error) { toastError("Couldn't delete", error.message); return }
+    if (!removed?.length) {
+      toastError("Couldn't delete", 'This expense was not removed. It may be gone already, or you may not have access to it.')
+      fetchAll?.()
+      return
+    }
     await recalcCost(contact.id, userId)
     fetchAll?.()
     toastUndo('Expense removed', {

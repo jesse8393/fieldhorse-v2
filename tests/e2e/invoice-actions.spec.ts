@@ -417,3 +417,78 @@ test('with no open draw the job money view shows the job title, not a paid draw\
   await expect(service.getByText('Slab + trench')).toBeVisible()
   await expect(service.getByText('Deposit for the shed slab')).toHaveCount(0)
 })
+
+// M-08 and DATA-03: a payment on a job a teammate created carries the
+// teammate's id. Delete goes by id, and a delete that removed nothing says
+// so instead of "Payment deleted".
+function teammatePaymentTables() {
+  const job = { ...shedJob(), id: 'c-team', user_id: 'teammate-9', amount: 12800 }
+  const payment = { id: 'pay-team', user_id: 'teammate-9', contact_id: 'c-team', amount: 6400, method: 'check', reference: '1042', kind: 'deposit', paid_on: '2026-11-10', created_at: '2026-11-10T15:00:00.000Z', invoice_id: null }
+  return { fh_contacts: [job], fh_payments: [payment], fh_invoices: [], fh_change_orders: [], fh_closeouts: [] }
+}
+
+async function tapDeletePayment(page: Page) {
+  await page.goto('/jobs/c-team?tab=financials', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+  const del = page.getByRole('button', { name: /delete the \$6,400(\.00)? payment/i }).first()
+  await expect(del).toBeVisible({ timeout: 30_000 })
+  await del.click()
+  await page.getByRole('button', { name: /tap again to delete/i }).first().click()
+}
+
+test("deleting a teammate's payment deletes it by id", async ({ page, context }) => {
+  await signIn(context, { tables: teammatePaymentTables() })
+  const deletes: string[] = []
+  page.on('request', (r) => { if (r.method() === 'DELETE' && r.url().includes('/fh_payments')) deletes.push(new URL(r.url()).search) })
+  await tapDeletePayment(page)
+  await expect(page.getByText('Payment deleted').first()).toBeVisible()
+  expect(deletes.length).toBe(1)
+  expect(deletes[0]).toContain('id=eq.pay-team')
+  expect(deletes[0]).not.toContain('user_id')
+})
+
+test('a payment delete that removes nothing says it failed', async ({ page, context }) => {
+  await signIn(context, { tables: teammatePaymentTables() })
+  await context.route('**/rest/v1/fh_payments*', async (route) => {
+    if (route.request().method() === 'DELETE') { await route.fulfill({ status: 200, json: [] }); return }
+    await route.fallback()
+  })
+  await tapDeletePayment(page)
+  await expect(page.getByText("Couldn't delete payment").first()).toBeVisible()
+  await expect(page.getByText('Payment deleted')).toHaveCount(0)
+})
+
+// DATA-03: an expense a teammate logged carries the teammate's id. The
+// delete goes by id, and one that removed nothing says so.
+function teammateExpenseTables() {
+  const job = { ...shedJob(), id: 'c-team', user_id: 'teammate-9', amount: 12800 }
+  const expense = { id: 'exp-team', user_id: 'teammate-9', contact_id: 'c-team', description: 'Rebar', category: 'Materials', amount: 420, date: '2026-11-10', created_at: '2026-11-10T15:00:00.000Z' }
+  return { fh_contacts: [job], fh_expenses: [expense], fh_payments: [], fh_invoices: [], fh_subs: [] }
+}
+
+test("deleting a teammate's expense deletes it by id", async ({ page, context }) => {
+  await signIn(context, { tables: teammateExpenseTables() })
+  const deletes: string[] = []
+  page.on('request', (r) => { if (r.method() === 'DELETE' && r.url().includes('/fh_expenses')) deletes.push(new URL(r.url()).search) })
+  await page.goto('/jobs/c-team?tab=expenses', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+  const del = page.getByRole('button', { name: 'Delete expense' }).first()
+  await expect(del).toBeVisible({ timeout: 30_000 })
+  await del.click()
+  await expect(page.getByText('Expense removed').first()).toBeVisible()
+  expect(deletes.length).toBe(1)
+  expect(deletes[0]).toContain('id=eq.exp-team')
+  expect(deletes[0]).not.toContain('user_id')
+})
+
+test('an expense delete that removes nothing says it failed', async ({ page, context }) => {
+  await signIn(context, { tables: teammateExpenseTables() })
+  await context.route('**/rest/v1/fh_expenses*', async (route) => {
+    if (route.request().method() === 'DELETE') { await route.fulfill({ status: 200, json: [] }); return }
+    await route.fallback()
+  })
+  await page.goto('/jobs/c-team?tab=expenses', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+  const del = page.getByRole('button', { name: 'Delete expense' }).first()
+  await expect(del).toBeVisible({ timeout: 30_000 })
+  await del.click()
+  await expect(page.getByText("Couldn't delete").first()).toBeVisible()
+  await expect(page.getByText('Expense removed')).toHaveCount(0)
+})
