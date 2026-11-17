@@ -381,6 +381,28 @@ describe('who hears about a customer on a link (FN-05, FN-06)', () => {
   })
 })
 
+describe('photos on a customer link are signed only from the link job folder (FN-21)', () => {
+  const photo = (id: string, storage_path: string) => ({ id, org_id: ORG, job_id: 'job-1', kind: 'photo', storage_path, caption: null, section_tag: null, uploaded_at: `2026-11-0${id.slice(-1)}` })
+
+  it('signs a path under the job, and nothing pointing elsewhere or written to escape it', async () => {
+    const db = seedDb(baseTables({
+      fh_public_links: [link({ token: 'p', kind: 'proposal', contact_id: 'job-1' })],
+      fh_contacts: [job({ stage: 'quote' })],
+      fh_job_files: [
+        photo('f1', `${OWNER}/job-1/site.jpg`),
+        photo('f2', 'victim-owner/job-9/their-site.jpg'),
+        photo('f3', `${OWNER}/job-1/../../victim-owner/job-9/x.jpg`),
+        photo('f4', `${OWNER}/job-1/%2e%2e/x.jpg`),
+        photo('f5', `${OWNER}/./job-1/x.jpg`),
+        photo('f6', `${OWNER}//job-1/x.jpg`)
+      ]
+    }))
+    const { body } = await getLink('p')
+    expect(db.signed).toEqual([`${OWNER}/job-1/site.jpg`])
+    expect(body.photos.map((p: Row) => p.url)).toEqual([`https://signed.example.test/${OWNER}/job-1/site.jpg`])
+  })
+})
+
 describe('public-link function audit helpers', () => {
   it('prefers the first forwarded client IP', () => {
     const req = new Request('https://fieldhorse.test/api/public-link?token=abc', {

@@ -265,32 +265,8 @@ export default async function handler(req) {
       .limit(12)
   ])
 
-  // Sign photo URLs server-side so the public viewer can render them
-  // directly without a second round-trip. 24h TTL — generous enough
-  // that an emailed link can be reopened the next day but not so long
-  // that revoked photos linger indefinitely. Failures filter out so a
-  // single bad row doesn't kill the response.
-  let photos = []
-  if (Array.isArray(photoRows) && photoRows.length > 0) {
-    const paths = photoRows.map((r) => r.storage_path).filter(Boolean)
-    if (paths.length > 0) {
-      const { data: signedRes } = await supabase.storage
-        .from('job-photos')
-        .createSignedUrls(paths, 60 * 60 * 24)
-      const signedByPath = new Map((signedRes || []).map((s) => [s.path, s.signedUrl]))
-      photos = photoRows
-        .map((r) => {
-          const url = signedByPath.get(r.storage_path)
-          if (!url) return null
-          return {
-            url,
-            section_tag: (r.section_tag || '').trim() || (r.caption || '').trim() || null,
-            caption: r.caption || null
-          }
-        })
-        .filter(Boolean)
-    }
-  }
+  // Signed on the server so the public viewer renders them directly.
+  const photos = await signPhotos(supabase, photoRows, link.contact_id)
 
   if (!contact) {
     // Either the contact was deleted, or the link's contact_id doesn't
@@ -540,7 +516,7 @@ async function handleQuote(supabase, req, link) {
       payments: payments,
       contractTotal: knownContractTotal({ amount: jobRow?.amount, changeOrders })
     })
-    photos = await signPhotos(supabase, photoRows)
+    photos = await signPhotos(supabase, photoRows, quote.job_id)
   }
 
   const approvedVersion = Array.isArray(versions) && versions.length > 0 ? versions[0] : null
@@ -619,10 +595,31 @@ async function handleQuote(supabase, req, link) {
   })
 }
 
-// Signed photo URLs for the public viewer, 24h TTL; a row that fails to
-// sign is left out so one bad row never kills the response.
-async function signPhotos(supabase, photoRows) {
+/**
+ * Whether a job file's storage_path may be signed for a link to `jobId`.
+ * Photos are stored as {user id}/{job id}/{file}; the row's job_id is the
+ * link's job, but the path is whatever the row says, so a row pointing at
+ * another company's folder would come back signed. Only a plain path whose
+ * second segment is this job is signed: no empty, "." or ".." segment and
+ * no encoded or escape characters.
+ */
+export function isJobPhotoPath(path, jobId) {
+  if (typeof path !== 'string' || !jobId) return false
+  const parts = path.split('/')
+  if (parts.length < 3) return false
+  const plain = (p) => p && p !== '.' && p !== '..' && !/[%\\]/.test(p) && ![...p].some((c) => c.charCodeAt(0) < 32)
+  if (!parts.every(plain)) return false
+  return parts[1] === String(jobId)
+}
+
+// Signed photo URLs for the public viewer, 24h TTL: generous enough that
+// an emailed link can be reopened the next day, short enough that revoked
+// photos do not linger. Only paths in the link's job folder are signed
+// (isJobPhotoPath), and a row that fails to sign is left out so one bad
+// row never kills the response.
+async function signPhotos(supabase, photoRows, jobId) {
   if (!Array.isArray(photoRows) || photoRows.length === 0) return []
+  photoRows = photoRows.filter((r) => isJobPhotoPath(r?.storage_path, jobId))
   const paths = photoRows.map((r) => r.storage_path).filter(Boolean)
   if (paths.length === 0) return []
   const { data: signedRes } = await supabase.storage
