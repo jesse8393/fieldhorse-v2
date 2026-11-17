@@ -17,7 +17,7 @@ import { useInvoiceDetail, useInvalidateInvoiceDetail } from '../../lib/queries.
 import { reviewInvoice } from '../../lib/invoiceReview.js'
 import { billTo, companyFromProfile, fetchInvoicesForContact, createInvoice, invoiceAmountDue, invoiceDescription, sendInvoiceEmail } from '../../lib/invoices.ts'
 import { useDocumentProfile } from '../../lib/companyBranding.ts'
-import { endSendIntent, sendIntent, sendKey, startInvoiceSend, startSend, useSendInFlight } from '../../lib/invoiceSends.ts'
+import { endSendIntent, sendIntent, sendKey, startInvoiceSend, startSend, useSendInFlight, type SendIntent } from '../../lib/invoiceSends.ts'
 import { pickBalanceInvoice } from '../../lib/invoiceSettlement.ts'
 import { moneyExact } from '../../lib/format.ts'
 import { deletePayment } from '../../lib/stages.ts'
@@ -462,7 +462,13 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
         return
       }
       const { generateInvoice, downloadPdf } = await loadPdf()
-      const result = await generateInvoice({
+      // One send id per send of the open draw, kept for every retry until
+      // the email goes out or the draw, its amount due or its recipient
+      // changes. A retry sends the same id and the PDF the first try
+      // uploaded, so the customer gets one email (lib/invoiceSends).
+      const intentKey = draw ? sendKey.invoice(draw.id) : null
+      const intent: SendIntent | null = intentKey && draw ? sendIntent(intentKey, JSON.stringify([draw.updated_at, resolved.email, amountDueNow])) : null
+      const buildPdf = async () => generateInvoice({
         company: await loadCompany(),
         contact: {
           id: contact.id,
@@ -490,30 +496,37 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
         invoices: invoiceRows,
         currentInvoice: billingDraw
       })
-      if (!result?.doc) throw new Error('PDF generator returned no document')
+      let result: any = null
+      let file = intent?.upload ?? null
+      if (!file) {
+        result = await buildPdf()
+        if (!result?.doc) throw new Error('PDF generator returned no document')
 
-      // Upload to job-files so the server can pull it with service role.
-      const blob = result.doc.output('blob')
-      const rowId = createUuid()
-      const path = `${user!.id}/${contact.id}/${rowId}.pdf`
-      const { error: upErr } = await supabase.storage
-        .from('job-files')
-        .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
-      if (upErr) throw new Error(`Couldn't save the invoice PDF: ${upErr.message}`)
-      // Audit row (best-effort).
-      try {
-        await supabase.from('fh_job_files').insert({
-          id: rowId,
-          user_id: user!.id,
-          job_id: contact.id,
-          filename: result.filename,
-          storage_path: path,
-          mime_type: 'application/pdf',
-          size_bytes: blob.size || 0,
-          kind: 'file'
-        })
-      } catch (e: any) {
-        console.warn('[invoice] fh_job_files row insert failed', e)
+        // Upload to job-files so the server can pull it with service role.
+        const blob = result.doc.output('blob')
+        const rowId = createUuid()
+        const path = `${user!.id}/${contact.id}/${rowId}.pdf`
+        const { error: upErr } = await supabase.storage
+          .from('job-files')
+          .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
+        if (upErr) throw new Error(`Couldn't save the invoice PDF: ${upErr.message}`)
+        file = { path, filename: result.filename as string }
+        if (intent) intent.upload = file
+        // Audit row (best-effort).
+        try {
+          await supabase.from('fh_job_files').insert({
+            id: rowId,
+            user_id: user!.id,
+            job_id: contact.id,
+            filename: result.filename,
+            storage_path: path,
+            mime_type: 'application/pdf',
+            size_bytes: blob.size || 0,
+            kind: 'file'
+          })
+        } catch (e: any) {
+          console.warn('[invoice] fh_job_files row insert failed', e)
+        }
       }
 
       const sendRes = await fetch('/api/send-invoice', {
@@ -526,8 +539,9 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
           sender_user_id: user!.id,
           recipient_email: resolved.email,
           recipient_name: resolved.name || null,
-          storage_path: path,
-          filename: result.filename,
+          storage_path: file.path,
+          filename: file.filename,
+          ...(intent ? { send_id: intent.id } : {}),
           amount_due: amountDueNow
         })
       })
@@ -538,7 +552,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
           "Email not sent, sender isn't configured",
           'Downloaded the PDF so you can email it manually. To send direct, add Resend keys in Netlify env.'
         )
-        downloadPdf(result)
+        downloadPdf(result ?? await buildPdf())
         return
       }
       if (!sendRes.ok || !sendBody?.ok) {
@@ -551,7 +565,8 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
         throw new Error(`Resend rejected${status}: ${detail}`)
       }
 
-      toastSuccess(`Invoice sent to ${resolved.email}`, result.filename)
+      if (intentKey && intent) endSendIntent(intentKey, intent)
+      toastSuccess(`Invoice sent to ${resolved.email}`, file.filename)
       setSent(true)
       setTimeout(() => setSent(false), 2400)
       refresh()

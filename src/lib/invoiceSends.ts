@@ -16,9 +16,12 @@
 // started it.
 //
 // A send that did not go out keeps its intent here (sendIntent): an id made
-// once and kept from the first try to every retry, until the send goes out.
-// A record the send creates is written under that id, so a retry after a
-// lost answer finds the first row instead of adding a second.
+// once and kept from the first try to every retry, until the send goes out
+// or the document changes. A record the send creates is written under that
+// id, so a retry after a lost answer finds the first row instead of adding
+// a second. A document email sends it as send_id with the PDF its first try
+// uploaded, so the server's provider key is the same on every retry and
+// the customer gets one email however often Try again is tapped.
 
 import { useSyncExternalStore } from 'react'
 import { createUuid } from './uuid.ts'
@@ -91,12 +94,17 @@ export function startSend(key: string): ((sent: boolean) => void) | null {
   }
 }
 
+/** The PDF a document email's first try uploaded. */
+export type SentFile = { path: string; filename: string }
+
 /** What one send keeps from its first try to every retry. */
 export type SendIntent = {
-  /** Made once per intent. */
+  /** Made once per intent: the send_id of a document email, or the id of a record the send creates. */
   readonly id: string
   /** What the document was when the intent began. */
   readonly version: string
+  /** The PDF the first try uploaded, which a retry sends again. */
+  upload: SentFile | null
 }
 
 const intents = new Map<string, SendIntent>()
@@ -109,7 +117,7 @@ const intents = new Map<string, SendIntent>()
 export function sendIntent(key: string, version = ''): SendIntent {
   const kept = intents.get(key)
   if (kept && kept.version === version) return kept
-  const fresh: SendIntent = { id: createUuid(), version }
+  const fresh: SendIntent = { id: createUuid(), version, upload: null }
   intents.set(key, fresh)
   return fresh
 }

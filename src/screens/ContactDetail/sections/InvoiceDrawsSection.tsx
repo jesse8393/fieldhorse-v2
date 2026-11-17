@@ -27,7 +27,7 @@ import { Plus, FileEdit, Send, Download, Check, X, Trash2, FileText } from 'luci
 import { supabase, authHeaders } from '../../../lib/supabase.ts'
 import { parseDateOnly, toYmd } from '../../../lib/dates.ts'
 import { useDocumentProfile } from '../../../lib/companyBranding.ts'
-import { startInvoiceSend, useInvoicesSending } from '../../../lib/invoiceSends.ts'
+import { endSendIntent, sendIntent, sendKey, startInvoiceSend, useInvoicesSending } from '../../../lib/invoiceSends.ts'
 import { useAuth } from '../../../contexts/AuthContext.tsx'
 // Loaded on the first PDF action, never with the screen: jsPDF stays out
 // of the service worker precache and of the Financials tab's own chunk.
@@ -495,33 +495,45 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
         )
         return
       }
-      const result = await buildDrawPdf(draw, to)
-      if (!result?.doc) throw new Error('PDF generator returned no document')
+      // One send id per send of this draw, kept for every retry until the
+      // email goes out or the draw, its amount due or its recipient
+      // changes. A retry sends the same id and the PDF the first try
+      // uploaded, so the customer gets one email (lib/invoiceSends).
+      const intentKey = sendKey.invoice(draw.id)
+      const intent = sendIntent(intentKey, JSON.stringify([draw.updated_at, recipientEmail, drawAmountDue(draw)]))
+      let result: any = null
+      let file = intent.upload
+      if (!file) {
+        result = await buildDrawPdf(draw, to)
+        if (!result?.doc) throw new Error('PDF generator returned no document')
 
-      // Upload to private job-files bucket so the server can fetch
-      // with service role + attach to the Resend send.
-      const blob = result.doc.output('blob')
-      const rowId = createUuid()
-      const path = `${user.id}/${contact.id}/${rowId}.pdf`
-      const { error: upErr } = await supabase.storage
-        .from('job-files')
-        .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
-      if (upErr) throw new Error(`Couldn't save the draw PDF: ${upErr.message}`)
+        // Upload to private job-files bucket so the server can fetch
+        // with service role + attach to the Resend send.
+        const blob = result.doc.output('blob')
+        const rowId = createUuid()
+        const path = `${user.id}/${contact.id}/${rowId}.pdf`
+        const { error: upErr } = await supabase.storage
+          .from('job-files')
+          .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
+        if (upErr) throw new Error(`Couldn't save the draw PDF: ${upErr.message}`)
+        file = { path, filename: result.filename as string }
+        intent.upload = file
 
-      // Audit row, best-effort, never blocks the send.
-      try {
-        await supabase.from('fh_job_files').insert({
-          id: rowId,
-          user_id: user.id,
-          job_id: contact.id,
-          filename: result.filename,
-          storage_path: path,
-          mime_type: 'application/pdf',
-          size_bytes: blob.size || 0,
-          kind: 'file'
-        })
-      } catch (e: any) {
-        console.warn('[draw] fh_job_files row insert failed', e)
+        // Audit row, best-effort, never blocks the send.
+        try {
+          await supabase.from('fh_job_files').insert({
+            id: rowId,
+            user_id: user.id,
+            job_id: contact.id,
+            filename: result.filename,
+            storage_path: path,
+            mime_type: 'application/pdf',
+            size_bytes: blob.size || 0,
+            kind: 'file'
+          })
+        } catch (e: any) {
+          console.warn('[draw] fh_job_files row insert failed', e)
+        }
       }
 
       const sendRes = await fetch('/api/send-invoice', {
@@ -534,8 +546,9 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
           sender_user_id: user.id,
           recipient_email: recipientEmail,
           recipient_name: contact.name || null,
-          storage_path: path,
-          filename: result.filename,
+          storage_path: file.path,
+          filename: file.filename,
+          send_id: intent.id,
           // The same figure the PDF hero printed (drawAmountDue).
           amount_due: drawAmountDue(draw)
         })
@@ -550,7 +563,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
           'Downloaded the PDF so you can email it manually.'
         )
         const { downloadPdf } = await loadPdf()
-        downloadPdf(result)
+        downloadPdf(result ?? await buildDrawPdf(draw, to))
         return
       }
       if (!sendRes.ok || !sendBody?.ok) {
@@ -558,6 +571,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
         const status = sendBody?.provider_status ? ` (HTTP ${sendBody.provider_status})` : ''
         throw new Error(`Resend rejected${status}: ${detail}`)
       }
+      endSendIntent(intentKey, intent)
 
       // Flip the draw to 'sent' so the row badge updates immediately.
       // Skip if the draw is already paid (don't downgrade a paid draw
@@ -572,7 +586,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
           .eq('id', draw.id))
         if (flipErr) toastError('Draw not marked sent', 'The email went, but the draw status did not update. Refresh and check it.')
       }
-      toastSuccess(`Draw sent to ${recipientEmail}`, result.filename)
+      toastSuccess(`Draw sent to ${recipientEmail}`, file.filename)
       delivered = true
       await fetchDraws()
     } catch (e: any) {

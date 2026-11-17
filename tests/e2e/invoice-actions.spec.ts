@@ -4,6 +4,7 @@ import { installMock, restResponse, session } from '../../scripts/qa-mock.mjs'
 import { nothingRunsOffTheSide } from './helpers/overflow.ts'
 import { signIn } from './helpers/signIn.ts'
 import { goInApp, holdPosts, postsTo, twoTaps } from './helpers/doubleTap.ts'
+import { documentSendKey } from '../../netlify/functions/lib/email.js'
 
 // The invoice screen's actions (Phase 9, Task 12, decisions D57 and D62):
 // the gold Collect payment, then Resend (Send on a draft), PDF and Share
@@ -1001,4 +1002,35 @@ test.describe('a change order takes one tap', () => {
     await page.waitForTimeout(1000)
     expect(writes.length, 'one tap, one write').toBe(1)
   })
+})
+
+// When the email went out but the invoice could not be marked sent, the
+// server answers "Try again to record it. The customer will not get a
+// second email." The retry built and uploaded a new PDF, so the provider
+// key, which followed the PDF's path, was new and the customer got a second
+// email. A retry now carries the same send id and the same PDF, so the
+// provider sees the same email and sends nothing new.
+test('Resend after "the customer will not get a second email" repeats the same send', async ({ page, context }) => {
+  await signIn(context)
+  await context.route('**/storage/v1/object/**', (route) => route.fulfill({ status: 200, json: { Key: 'job-files/i.pdf' } }))
+  const sends = postsTo(context, '/api/send-invoice')
+  const notSaved = 'The invoice was sent, but it could not be marked as sent. Try again to record it. The customer will not get a second email.'
+  let n = 0
+  await context.route('**/api/send-invoice', (route) => {
+    n += 1
+    return n === 1
+      ? route.fulfill({ status: 500, json: { error: 'status_not_saved', email_sent: true, email_id: 're_1', message: notSaved, detail: notSaved } })
+      : route.fulfill({ status: 200, json: { ok: true } })
+  })
+  await openInvoice(page)
+  const resend = action(page, 'Resend')
+  await resend.click()
+  await expect(page.locator('[data-sonner-toast]').filter({ hasText: 'second email' })).toBeVisible({ timeout: 30_000 })
+  await page.waitForTimeout(1500) // past the settle window
+  await resend.click()
+  await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(2)
+  const [first, retry] = sends.map((r) => r.postDataJSON())
+  const key = (b: Record<string, unknown>) => documentSendKey('send-invoice', `invoice:${b.invoice_id}`, b, String(b.recipient_email).toLowerCase().trim())
+  expect(key(retry), 'the retry the message invites carries the same provider key').toBe(key(first))
+  expect(retry.storage_path, 'and the same PDF').toBe(first.storage_path)
 })
