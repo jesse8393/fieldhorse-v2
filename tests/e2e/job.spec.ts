@@ -678,3 +678,26 @@ test.describe('job page on a desktop, redesigned', () => {
     await expect(page.getByRole('complementary', { name: 'Job facts' })).toBeVisible()
   })
 })
+
+// Mark complete writes the closeout record and moves the job to Closed.
+// Before this test nothing submitted the screen.
+test('Mark complete saves the closeout and closes the job', async ({ context, page }) => {
+  await signIn(context)
+  const writes: { method: string; url: string; body: any }[] = []
+  page.on('request', (req) => {
+    if (req.method() !== 'GET' && req.url().includes('/rest/v1/')) writes.push({ method: req.method(), url: req.url(), body: req.postDataJSON() })
+  })
+  await page.goto('/jobs/c-job1/complete', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText('Mark this job complete', { exact: true }).first()).toBeVisible({ timeout: 30_000 })
+  const save = page.getByRole('button', { name: 'Mark complete', exact: true })
+  await expect(save).toBeEnabled()
+  await save.click()
+
+  await expect.poll(() => writes.some((w) => w.method === 'PATCH' && w.url.includes('/fh_contacts'))).toBe(true)
+  const closeout = writes.find((w) => w.method === 'POST' && w.url.includes('/fh_closeouts'))
+  expect(closeout?.url).toContain('on_conflict=contact_id')
+  expect(closeout?.body).toMatchObject({ user_id: 'qa-user-1', contact_id: 'c-job1', signoff_method: 'verbal', warranty_months: 12, final_amount: 33100 })
+  const stage = writes.find((w) => w.method === 'PATCH' && w.url.includes('/fh_contacts'))
+  expect(stage?.url).toContain('id=eq.c-job1')
+  expect(stage?.body).toEqual({ stage: 'closed' })
+})
