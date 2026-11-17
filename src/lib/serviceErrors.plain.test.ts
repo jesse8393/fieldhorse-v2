@@ -152,6 +152,23 @@ describe('plainError', () => {
     expect(plainError({ status: 429 }, FALLBACK)).toBe('Too many tries at once. Wait a minute, then try again.')
   })
 
+  it('leads with what did not happen on an inline line, when the caller asks', () => {
+    const payment = 'The payment was not recorded. Check the amount and kind, then try again.'
+    expect(plainError(PG.gateway, payment, { kept: true, lead: true }))
+      .toBe('The payment was not recorded. Something went wrong on our side. Try again in a minute.')
+    expect(plainError(new TypeError('Failed to fetch'), 'Could not save this job. Try again.', { kept: true, lead: true }))
+      .toBe('Could not save this job. No signal right now. Your work is still here, so try again when the signal is back.')
+    expect(plainError(PG.rls, 'Could not save this job. Try again.', { lead: true }))
+      .toBe('Could not save this job. Your role does not allow this. Ask an owner or admin.')
+    expect(plainError(PG.jwt, 'Could not save this job. Try again.', { lead: true }))
+      .toBe('Could not save this job. Your sign in ran out. Sign in again, then try again.')
+    // A duplicate was saved after all, so no "not saved" lead.
+    expect(plainError(PG.dup, 'Could not save this job. Try again.', { lead: true })).toBe('This was already saved. Refresh to see the latest.')
+    // Anything else is the caller's own sentence, once.
+    expect(plainError(PG.check, payment, { lead: true })).toBe(payment)
+    expect(plainError(new Error('Enter a client.'), payment, { lead: true })).toBe('Enter a client.')
+  })
+
   it("gives the caller's sentence for anything else", () => {
     expect(plainError(PG.check, FALLBACK)).toBe(FALLBACK)
     expect(plainError(new RangeError('Invalid time value'), FALLBACK)).toBe(FALLBACK)

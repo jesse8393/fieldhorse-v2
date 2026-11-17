@@ -241,7 +241,7 @@ export default function Onboarding() {
     })
     if (orgErr || !ownOrgId) {
       setBusy(false)
-      setError(plainError(orgErr, 'Your workspace was not made yet. Try again.', { kept: true }))
+      setError(plainError(orgErr, 'Your workspace was not made yet. Try again.', { kept: true, lead: true }))
       return
     }
     // Membership context fetched before the org existed, refresh it so
@@ -263,7 +263,7 @@ export default function Onboarding() {
     })
     if (profErr) {
       setBusy(false)
-      setError(plainError(profErr, 'Your company details did not save. Try again.', { kept: true }))
+      setError(plainError(profErr, 'Your company details did not save. Try again.', { kept: true, lead: true }))
       return
     }
     if (withSeed && user?.id) {
@@ -303,7 +303,7 @@ export default function Onboarding() {
     })
     setBusy(false)
     if (profErr) {
-      setError(plainError(profErr, 'Your details did not save. Try again.', { kept: true }))
+      setError(plainError(profErr, 'Your details did not save. Try again.', { kept: true, lead: true }))
       return
     }
     navigate('/', { replace: true })

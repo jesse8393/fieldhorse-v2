@@ -106,7 +106,7 @@ export default function JobNew() {
     } catch (e) {
       savingRef.current = false
       setSaving(false)
-      setErrors({ save: plainError(e, 'Could not save this job. Try again.', { kept: true }) })
+      setErrors({ save: plainError(e, 'Could not save this job. Try again.', { kept: true, lead: true }) })
     }
   }
 

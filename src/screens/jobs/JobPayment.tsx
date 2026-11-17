@@ -65,9 +65,8 @@ function PaymentForm({ data, goBack, home }: { data: ReturnType<typeof useJobScr
     setError(undefined)
     try {
       const res = await logPayment(contact, { id: paymentId, amount: numeric, method, kind, reference, paid_on: paidOn })
-      if (res && (res as { error?: { message?: string } }).error) {
-        throw new Error((res as { error?: { message?: string } }).error?.message || 'The payment was not saved.')
-      }
+      // The database's answer is thrown as it is, so its code still sorts it.
+      if (res && (res as { error?: unknown }).error) throw (res as { error: unknown }).error
       // logPayment (lib/pipeline.ts) already shows the one payment toast;
       // a second one here disagreed with it (OPS-08).
       hapticMedium()
@@ -77,7 +76,7 @@ function PaymentForm({ data, goBack, home }: { data: ReturnType<typeof useJobScr
       goBack()
     } catch (e) {
       // Once, on the line above Record, in plain words (raw-errors-4).
-      setError(plainError(e, 'The payment was not recorded. Check the amount and kind, then try again.', { kept: true }))
+      setError(plainError(e, 'The payment was not recorded. Check the amount and kind, then try again.', { kept: true, lead: true }))
       setSaving(false)
     }
   }

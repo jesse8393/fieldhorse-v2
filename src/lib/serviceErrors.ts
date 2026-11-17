@@ -196,17 +196,23 @@ function logRaw(error: unknown, f: Fields, kind: ErrorKind, fallback: string) {
 /**
  * The sentence a screen shows for a failure. `fallback` is the caller's own
  * sentence naming the action, used when the failure is none of the kinds
- * below. Pass `kept: true` where what the person typed is still on screen.
+ * below. Pass `kept: true` where what the person typed is still on screen,
+ * and `lead: true` on an inline line, so a kind's sentence follows the
+ * fallback's first sentence and still says what did not happen.
  */
-export function plainError(error: unknown, fallback: string, options: { kept?: boolean } = {}): string {
+export function plainError(error: unknown, fallback: string, options: { kept?: boolean; lead?: boolean } = {}): string {
   const f = fieldsOf(error)
   const kind = errorKind(error)
   logRaw(error, f, kind, fallback)
-  if (kind === 'offline') return options.kept ? OFFLINE_KEPT : OFFLINE
+  const first = options.lead ? fallback.match(/^.*?[.?](?=\s|$)/)?.[0] : undefined
+  const lead = first ? `${first} ` : ''
+  if (kind === 'offline') return lead + (options.kept ? OFFLINE_KEPT : OFFLINE)
   if (f.fnCode && !UNTRUSTED_DETAIL.has(f.fnCode) && !f.provider && isPlainSentence(f.said)) return f.said.trim()
   const coded = CODE_SAYS[f.fnCode] || CODE_SAYS[f.code]
   if (coded) return coded
-  if (kind !== 'unknown') return SAY[kind]
+  // A duplicate was saved after all, so it never follows a "not saved" lead.
+  if (kind === 'conflict') return SAY.conflict
+  if (kind !== 'unknown') return lead + SAY[kind]
   if (f.plainError && isPlainSentence(f.message)) return f.message.trim()
   return fallback
 }

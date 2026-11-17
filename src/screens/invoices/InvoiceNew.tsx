@@ -179,7 +179,7 @@ export default function InvoiceNew() {
     } catch (e) {
       savingRef.current = false
       setSaving(false)
-      setErrors({ save: plainError(e, 'Could not save this invoice. Try again.', { kept: true }) })
+      setErrors({ save: plainError(e, 'Could not save this invoice. Try again.', { kept: true, lead: true }) })
     }
   }
 

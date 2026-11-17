@@ -94,7 +94,7 @@ test('making the workspace on a weak signal says so in plain words', async ({ co
   await expectPlain(page.getByRole('alert'), 'Your workspace was not made yet. Try again.')
   answer = 'drop'
   await page.getByRole('button', { name: 'Start with sample data' }).click()
-  await expectPlain(page.getByRole('alert'), 'No signal right now. Your work is still here, so try again when the signal is back.')
+  await expectPlain(page.getByRole('alert'), 'Your workspace was not made yet. No signal right now. Your work is still here, so try again when the signal is back.')
   await expect(page.getByLabel('Company name', { exact: true })).toHaveValue('Fresh Concrete Co')
 })
 

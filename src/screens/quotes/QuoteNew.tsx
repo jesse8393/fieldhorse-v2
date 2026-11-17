@@ -130,7 +130,7 @@ export default function QuoteNew() {
     } catch (e) {
       savingRef.current = false
       setSaving(false)
-      setError(plainError(e, 'Could not save this quote. Try again.', { kept: true }))
+      setError(plainError(e, 'Could not save this quote. Try again.', { kept: true, lead: true }))
     }
   }
 

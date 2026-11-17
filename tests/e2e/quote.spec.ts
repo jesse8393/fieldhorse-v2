@@ -980,7 +980,7 @@ test.describe('errors on the quote screens', () => {
     await page.goto('/quotes/new?client=cl-1', { waitUntil: 'domcontentloaded', timeout: 60_000 })
     await expect(page.getByLabel('Client')).toHaveValue('Jeff Roy', { timeout: 30_000 })
     await page.getByRole('button', { name: 'Save quote' }).click()
-    await expect(page.getByText('No signal right now. Your work is still here, so try again when the signal is back.')).toBeVisible()
+    await expect(page.getByText('Could not save this quote. No signal right now. Your work is still here, so try again when the signal is back.')).toBeVisible()
     await expect(page.getByText(/TypeError|Failed to fetch/)).toHaveCount(0)
   })
 })

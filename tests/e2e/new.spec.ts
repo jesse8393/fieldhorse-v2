@@ -116,10 +116,10 @@ test('a refused or dropped save on New job says what to do in plain words', asyn
   await page.getByRole('option', { name: /Jeff Roy/ }).click()
   await page.getByLabel('Title').fill('Shed slab')
   await page.getByRole('button', { name: 'Save job' }).click()
-  await expectPlain(page.locator('.fhnew-error'), 'Your role does not allow this. Ask an owner or admin.')
+  await expectPlain(page.locator('.fhnew-error'), 'Could not save this job. Your role does not allow this. Ask an owner or admin.')
   answer = 'drop'
   await page.getByRole('button', { name: 'Save job' }).click()
-  await expectPlain(page.locator('.fhnew-error'), 'No signal right now. Your work is still here, so try again when the signal is back.')
+  await expectPlain(page.locator('.fhnew-error'), 'Could not save this job. No signal right now. Your work is still here, so try again when the signal is back.')
   await expect(page.getByLabel('Title')).toHaveValue('Shed slab')
 })
 
@@ -132,7 +132,7 @@ test('a refused save on New quote says so in plain words', async ({ context, pag
   await page.getByLabel('Client').fill('Jeff')
   await page.getByRole('option', { name: /Jeff Roy/ }).click()
   await page.getByRole('button', { name: 'Save quote' }).click()
-  await expectPlain(page.locator('.fhnew-error'), 'Your role does not allow this. Ask an owner or admin.')
+  await expectPlain(page.locator('.fhnew-error'), 'Could not save this quote. Your role does not allow this. Ask an owner or admin.')
 })
 
 test('an invoice from a job prefills only unbilled contract value', async ({ context, page }) => {

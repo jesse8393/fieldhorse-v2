@@ -753,7 +753,7 @@ test('a failed payment on the job says what to do once, in plain words', async (
   await expect(amount).toBeVisible({ timeout: 30_000 })
   await amount.fill('500')
   await page.getByRole('button', { name: /^Record/ }).click()
-  await expectPlain(page.locator('.fhnew-error'), 'Something went wrong on our side. Try again in a minute.')
+  await expectPlain(page.locator('.fhnew-error'), 'The payment was not recorded. Something went wrong on our side. Try again in a minute.')
   await expect(page.locator('[data-sonner-toast]').filter({ hasText: "Couldn't record payment" })).toHaveCount(0)
   answer = 'refuse'
   await page.getByRole('button', { name: /^Record/ }).click()
