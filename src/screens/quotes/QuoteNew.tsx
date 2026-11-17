@@ -70,7 +70,9 @@ export default function QuoteNew() {
     void supabase.from('fh_leads').select('*').eq('id', leadParam).maybeSingle().then(({ data }) => {
       if (!alive || !data) return
       const draft = leadToQuoteDraft(data as LeadRow)
-      patch({ title: draft.title || '', jobType: draft.job_type || '', scope: draft.scope_text || '' })
+      // The lead's notes are the office's own (a budget, a gate code), never
+      // the scope of work the customer reads, so they stay on the lead (S11).
+      patch({ title: draft.title || '', jobType: draft.job_type || '' })
       if (draft.client_id) void pickClient(draft.client_id)
     })
     return () => { alive = false }

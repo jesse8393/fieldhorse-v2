@@ -174,3 +174,21 @@ test('saving a quote again after a lost answer sends the same id', async ({ cont
   expect(typeof inserts[0].id).toBe('string')
   expect(inserts[1].id).toBe(inserts[0].id)
 })
+
+const LEAD_WITH_NOTES = {
+  id: 'l-notes', user_id: 'qa-user-1', client_id: 'cl-1', status: 'open', title: 'Backyard drainage', job_type: 'Drainage',
+  notes: 'Husband says no more than 5k. Dog bites. Gate code 4411.', last_contact: null, quote_id: null, follow_up_on: null,
+  source: 'Google', referred_by: null, origin_contact_id: null, created_at: NOW, updated_at: NOW,
+  fh_clients: { id: 'cl-1', name: 'Jeff Roy', phone: '555-0101', email: 'jeff@roy.com' }
+}
+
+// Phone sales audit finding S11: lead notes are internal and never become
+// the scope of work the customer reads.
+test('Quote this keeps the lead notes off the scope of work', async ({ context, page }) => {
+  await signIn(context, { tables: { fh_leads: [LEAD_WITH_NOTES] } })
+  await open(page, '/quotes/new?lead=l-notes')
+  await expect(page.getByLabel('Title')).toHaveValue('Backyard drainage', { timeout: 30_000 })
+  await expect(page.getByLabel('Client')).toHaveValue('Jeff Roy')
+  await expect(page.getByLabel('Scope')).toHaveValue('')
+})
+
