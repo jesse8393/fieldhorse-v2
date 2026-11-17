@@ -8,6 +8,7 @@
 // flip or mints a one cent invoice.
 
 import { parseDateOnly } from './dates.ts'
+import { toCents } from './cents.ts'
 
 export type SettleInvoice = {
   id: string
@@ -26,11 +27,6 @@ export type SettlePayment = {
 // Statuses that still ask the customer for money: a bill not yet sent
 // (draft) or one the customer has (sent, viewed, overdue).
 const OPEN_STATUSES = new Set(['draft', 'sent', 'viewed', 'overdue'])
-
-function toCents(n: unknown): number {
-  const v = Math.round(Number(n || 0) * 100)
-  return Number.isFinite(v) ? v : 0
-}
 
 function statusOf(inv: { status?: string | null } | null | undefined): string {
   return String(inv?.status || '').toLowerCase()
