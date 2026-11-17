@@ -28,6 +28,9 @@ import { clientIp, hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
 import { linkScope } from './lib/linkScope.js'
 import { brandingUserIdFor } from './lib/orgAccess.js'
 import { loadQuoteForLink } from './lib/quoteApproval.js'
+// The one allocator Money, the invoice PDF and the invoice email read, so
+// the customer link asks for the same amount to the cent.
+import { allocateInvoiceDue, isOpenInvoice, knownContractTotal } from '../../src/lib/invoiceSettlement.ts'
 
 function trimHeader(value, max = 500) {
   const text = String(value || '').trim()
@@ -73,6 +76,34 @@ export function buildPublicLinkViewEvent(req, link, contact, salt) {
 // internal notes on change orders) stay server side.
 const PUBLIC_PAYMENT_COLUMNS = 'id, contact_id, invoice_id, amount, paid_on, created_at, method, reference, kind'
 const PUBLIC_CHANGE_ORDER_COLUMNS = 'id, contact_id, sequence_number, title, description, amount, status, approved_at, approved_by_name, created_at'
+// What the customer sees of an invoice: its number, what it is for, the
+// note on it and its dates. Only issued ones (CUSTOMER_INVOICE_STATUSES)
+// leave the server.
+const PUBLIC_INVOICE_COLUMNS = 'id, contact_id, client_id, sequence_number, title, amount, status, issued_at, due_at, description, notes, created_at'
+const CUSTOMER_INVOICE_STATUSES = new Set(['sent', 'viewed', 'paid', 'overdue'])
+
+/**
+ * The invoices the customer may see, each issued open one carrying
+ * `amount_due`: what it still owes by allocateInvoiceDue, worked out from
+ * every live invoice on the job (unsent drafts included, so money logged
+ * against the job pays them in the same order Money does), every payment
+ * on the job and the job's contract. Drafts and void rows never leave the
+ * server. `contractTotal` null means the job has no recorded price.
+ */
+export function customerInvoices({ invoices, payments, contractTotal }) {
+  const all = Array.isArray(invoices) ? invoices : []
+  const due = allocateInvoiceDue({ invoices: all, payments: payments || [], contractTotal })
+  return customerRows(all, due)
+}
+
+function customerRows(all, due) {
+  return all
+    .filter((inv) => CUSTOMER_INVOICE_STATUSES.has(String(inv?.status || '').toLowerCase()))
+    .map((inv) => {
+      if (!isOpenInvoice(inv)) return inv
+      return { ...inv, amount_due: Math.round((due.get(inv.id) ?? 0) * 100) / 100 }
+    })
+}
 
 // Human label + in-app deep link for a "customer viewed" notification.
 export function viewedLabelFor(link) {
@@ -216,11 +247,14 @@ export default async function handler(req) {
     // draft/void rows (amounts for bills that were never issued) and
     // internal notes to anyone with the link — the UI filtered them,
     // but the JSON payload is one View-Source away.
+    // Every invoice on the job, drafts included, so what each issued one
+    // still owes is worked out as Money does; customerInvoices() keeps
+    // only the issued ones for the payload.
     supabase
       .from('fh_invoices')
-      .select('id, contact_id, sequence_number, title, amount, status, issued_at, due_at, description')
+      .select(PUBLIC_INVOICE_COLUMNS)
       .eq('contact_id', link.contact_id)
-      .in('status', ['sent', 'paid', 'overdue'])
+      .neq('status', 'void')
       .order('sequence_number', { ascending: true }),
     supabase
       .from('fh_job_files')
@@ -345,7 +379,11 @@ export default async function handler(req) {
     payments: payments || [],
     changeOrders: changeOrders || [],
     insurance: insurance || null,
-    invoices: invoices || [],
+    invoices: customerInvoices({
+      invoices,
+      payments,
+      contractTotal: knownContractTotal({ amount: contact.amount, changeOrders })
+    }),
     photos
   })
 }
@@ -362,10 +400,10 @@ async function handleClientInvoice(supabase, req, link) {
     supabase.from('profiles').select('*').eq('user_id', brandUserId).maybeSingle(),
     supabase
       .from('fh_invoices')
-      .select('id, contact_id, client_id, sequence_number, title, amount, status, issued_at, due_at, description')
+      .select(PUBLIC_INVOICE_COLUMNS)
       .eq('client_id', link.client_id)
       .is('contact_id', null)
-      .in('status', ['sent', 'paid', 'overdue'])
+      .in('status', ['sent', 'viewed', 'paid', 'overdue'])
       .order('sequence_number', { ascending: true })
   ])
   if (!client) {
@@ -375,8 +413,22 @@ async function handleClientInvoice(supabase, req, link) {
   const { data: payments } = invoiceIds.length > 0
     ? await supabase.from('fh_payments').select(PUBLIC_PAYMENT_COLUMNS).in('invoice_id', invoiceIds).order('paid_on', { ascending: false })
     : { data: [] }
-  const openOnes = (invoices || []).filter((inv) => inv.status !== 'paid')
-  const amount = (openOnes.length > 0 ? openOnes : invoices || []).reduce((s, inv) => s + Number(inv.amount || 0), 0)
+  // An invoice with no job is a contract of its own amount, paid only by
+  // the payments linked to it (amountsDueByInvoice in invoiceSettlement.ts).
+  // Another invoice's payments never come off this one.
+  const due = new Map()
+  for (const inv of invoices || []) {
+    if (!isOpenInvoice(inv)) continue
+    const own = allocateInvoiceDue({
+      invoices: [inv],
+      payments: (payments || []).filter((p) => p.invoice_id === inv.id),
+      contractTotal: Number(inv.amount || 0)
+    })
+    due.set(inv.id, own.get(inv.id) ?? 0)
+  }
+  const rows = customerRows(invoices || [], due)
+  // What the client still owes on these invoices, in whole cents.
+  const amount = rows.reduce((s, inv) => s + Math.round(Number(inv.amount_due || 0) * 100), 0) / 100
   const contact = {
     id: client.id,
     name: client.name,
@@ -403,7 +455,7 @@ async function handleClientInvoice(supabase, req, link) {
     payments: payments || [],
     changeOrders: [],
     insurance: null,
-    invoices: invoices || [],
+    invoices: rows,
     photos: []
   })
 }
@@ -463,14 +515,14 @@ async function handleQuote(supabase, req, link) {
   let photos = []
   if (quote.job_id) {
     const [{ data: jobRow }, { data: pay }, { data: cos }, { data: inv }, { data: photoRows }] = await Promise.all([
-      supabase.from('fh_contacts').select('id, stage').eq('id', quote.job_id).match(linkScope(link)).maybeSingle(),
+      supabase.from('fh_contacts').select('id, stage, amount').eq('id', quote.job_id).match(linkScope(link)).maybeSingle(),
       supabase.from('fh_payments').select(PUBLIC_PAYMENT_COLUMNS).eq('contact_id', quote.job_id).order('paid_on', { ascending: false }),
       supabase.from('fh_change_orders').select(PUBLIC_CHANGE_ORDER_COLUMNS).eq('contact_id', quote.job_id).in('status', ['sent', 'approved']).order('sequence_number', { ascending: true }),
       supabase
         .from('fh_invoices')
-        .select('id, contact_id, sequence_number, title, amount, status, issued_at, due_at, description')
+        .select(PUBLIC_INVOICE_COLUMNS)
         .eq('contact_id', quote.job_id)
-        .in('status', ['sent', 'paid', 'overdue'])
+        .neq('status', 'void')
         .order('sequence_number', { ascending: true }),
       supabase
         .from('fh_job_files')
@@ -483,7 +535,11 @@ async function handleQuote(supabase, req, link) {
     job = jobRow || null
     payments = pay || []
     changeOrders = cos || []
-    invoices = inv || []
+    invoices = customerInvoices({
+      invoices: inv,
+      payments: payments,
+      contractTotal: knownContractTotal({ amount: jobRow?.amount, changeOrders })
+    })
     photos = await signPhotos(supabase, photoRows)
   }
 

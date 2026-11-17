@@ -46,6 +46,7 @@ export default function InvoiceTemplate({
   notes,
   insurance = null,
   changeOrders = [],
+  showContractPosition = true, // false when no contract stands behind the invoice
   invoices = [],          // fh_invoices draw rows, billing schedule
   currentInvoice = null,  // the fh_invoices row this document bills
   photos = []
@@ -71,13 +72,16 @@ export default function InvoiceTemplate({
     ? Number(balanceRemaining)
     : Math.max(0, adjustedContractTotal - paid)
   const amountDue = thisInvoice != null ? Number(thisInvoice) : balance
-  const isPaid = String(status).toLowerCase() === 'paid' || balance < 0.5
-  // due_at can be a date-only string, parse LOCAL (the codebase rule,
-  // see format.ts) and don't flag "Past due" until the due DAY has
-  // fully passed; the raw UTC parse flipped the chip red the evening
-  // before the due date in every US timezone.
+  // Whole cents: an invoice is paid only when nothing at all is owed.
+  const isPaid = String(status).toLowerCase() === 'paid' || Math.round(balance * 100) <= 0
+  // Past due from the day after the due day, by calendar day in the
+  // viewer's zone, which is how Money and Today count it (classifyInvoice
+  // in lib/moneyView.ts). due_at is a bare date or the end of the due day.
   const dueParsed = parseDateOnly(dueDate)
-  const isOverdue = !isPaid && dueParsed != null && dueParsed.getTime() + 86400000 <= Date.now()
+  const today = new Date()
+  const isOverdue = !isPaid && dueParsed != null
+    && new Date(dueParsed.getFullYear(), dueParsed.getMonth(), dueParsed.getDate()).getTime()
+      < new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
 
   const rows = (lineItems && lineItems.length > 0)
     ? lineItems.map((li: any) => ({
@@ -120,6 +124,7 @@ export default function InvoiceTemplate({
           isOverdue={isOverdue}
           paid={paid}
           contractTotal={adjustedContractTotal}
+          balance={balance}
         />
       }
       footer={DEFAULT_DISCLAIMER}
@@ -163,16 +168,18 @@ export default function InvoiceTemplate({
       )}
 
       {/* Contract position, one reconciliation the customer can check. */}
-      <section>
-        <SectionLabel>Contract position</SectionLabel>
-        <ContractPosition
-          contractTotal={Number(contractTotal || 0)}
-          coAdjustment={approvedCOAdjustment}
-          paid={paid}
-          balance={balance}
-          brand={brand}
-        />
-      </section>
+      {showContractPosition && (
+        <section>
+          <SectionLabel>Contract position</SectionLabel>
+          <ContractPosition
+            contractTotal={Number(contractTotal || 0)}
+            coAdjustment={approvedCOAdjustment}
+            paid={paid}
+            balance={balance}
+            brand={brand}
+          />
+        </section>
+      )}
 
       {/* Payment history */}
       {payments.length > 0 && (
@@ -232,7 +239,7 @@ export default function InvoiceTemplate({
 
 /* ─── Internal blocks ─── */
 
-function HeroBand({ brand, amountDue, dueDate, isPaid, isOverdue, paid, contractTotal }: any) {
+function HeroBand({ brand, amountDue, dueDate, isPaid, isOverdue, paid, contractTotal, balance }: any) {
   const pct = contractTotal > 0 ? Math.max(0, Math.min(1, paid / contractTotal)) : 0
   return (
     <section
@@ -246,9 +253,12 @@ function HeroBand({ brand, amountDue, dueDate, isPaid, isOverdue, paid, contract
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 24, flexWrap: 'wrap' }}>
         <div>
           <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase', color: DOC_COLORS.inkMuted, marginBottom: 4 }}>
-            {isPaid ? 'Balance' : 'Amount due'}
+            {/* A paid invoice on a job that still has contract left to bill
+                is paid as an invoice, not as a balance. */}
+            {isPaid ? (Math.round(Number(balance || 0) * 100) > 0 ? 'This invoice' : 'Balance') : 'Amount due'}
           </div>
           <div
+            data-testid="invoice-amount-due"
             style={{
               fontFamily: DOC_FONTS.serif,
               fontSize: 24,
@@ -259,7 +269,7 @@ function HeroBand({ brand, amountDue, dueDate, isPaid, isOverdue, paid, contract
               fontVariantNumeric: 'tabular-nums'
             }}
           >
-            {isPaid ? 'Paid in full' : money(amountDue)}
+            {isPaid ? 'Paid in full' : money(amountDue, { cents: true })}
           </div>
         </div>
         <div style={{ textAlign: 'right', fontSize: 12, color: DOC_COLORS.inkMuted, lineHeight: 1.6 }}>
@@ -433,11 +443,11 @@ function ContractPosition({ contractTotal, coAdjustment, paid, balance, brand }:
             fontFamily: DOC_FONTS.body,
             fontSize: 20,
             fontWeight: 700,
-            color: balance > 0.5 ? DOC_COLORS.ink : DOC_COLORS.signalGreen,
+            color: Math.round(balance * 100) > 0 ? DOC_COLORS.ink : DOC_COLORS.signalGreen,
             fontVariantNumeric: 'tabular-nums'
           }}
         >
-          {balance > 0.5 ? money(balance, { cents: true }) : 'Paid in full'}
+          {Math.round(balance * 100) > 0 ? money(balance, { cents: true }) : 'Paid in full'}
         </span>
       </div>
     </div>

@@ -1416,3 +1416,151 @@ test('the header text stays readable over a bright cover photo', async ({ page, 
     expect(ratio, `${ground.sel} over the brightest pixel under it`).toBeGreaterThanOrEqual(4.5)
   }
 })
+
+/* ---- The invoice link (audit 2026-11-16: PT-01, PT-02, PT-05, PT-07, PT-17, M-01, M-02, M-25) ---- */
+
+// An invoice link payload, as /api/public-link serves it for a job.
+function invoicePayload({ contact = {}, company = {}, invoices = [], payments = [], changeOrders = [] }: {
+  contact?: Record<string, unknown>
+  company?: Record<string, unknown>
+  invoices?: Array<Record<string, unknown>>
+  payments?: Array<Record<string, unknown>>
+  changeOrders?: Array<Record<string, unknown>>
+} = {}): Payload {
+  return {
+    ok: true,
+    kind: 'invoice',
+    change_order_id: null,
+    contact: {
+      id: 'job-linked-0003', name: 'Dana O’Brien', address: '1150 Cherry Blossom Ln, La Vergne', phone: '615 555 0142',
+      email: 'dana@example.com', job_title: 'Garage slab', stage: 'job', amount: 10000, created_at: '2026-10-16T12:00:00.000Z',
+      ...contact
+    },
+    company: {
+      name: 'Parker Concrete & Construction', phone: '615 555 0100', email: 'office@parker.co', logo_url: null,
+      estimate_template: 'classic', payment_link: 'https://pay.example.com/parker', payment_instructions: '',
+      ...company
+    },
+    items: [],
+    payments,
+    changeOrders,
+    insurance: null,
+    invoices,
+    photos: []
+  } as unknown as Payload
+}
+
+const draw = (id: string, seq: number, amount: number, status: string, extra: Record<string, unknown> = {}) => ({
+  id, contact_id: 'job-linked-0003', sequence_number: seq, title: `Draw ${seq}`, amount, status,
+  issued_at: '2026-11-06T12:00:00.000Z', due_at: '2099-11-21', description: null, ...extra
+})
+
+async function openInvoice(page: Page) {
+  await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByText('Billed to')).toBeVisible()
+}
+
+test('an invoice for a client with no job asks for the open invoice, whatever an earlier paid one took in', async ({ page, context }) => {
+  await mockPortal(context, invoicePayload({
+    contact: { id: 'cl-0009', job_title: null, stage: null, amount: 1000 },
+    invoices: [
+      draw('inv-n1', 1, 500, 'paid', { contact_id: null, client_id: 'cl-0009' }),
+      draw('inv-n2', 2, 1000, 'sent', { contact_id: null, client_id: 'cl-0009' })
+    ],
+    payments: [{ id: 'pay-n1', contact_id: null, invoice_id: 'inv-n1', amount: 500, paid_on: '2026-10-07', method: 'cash', kind: 'other' }]
+  }))
+  await openInvoice(page)
+
+  await expect(page.getByTestId('invoice-amount-due')).toHaveText('$1,000.00')
+  await expect(page.getByRole('link', { name: 'Pay $1,000.00 now' })).toBeVisible()
+  await expect(page.getByText('Paid in full')).toHaveCount(0)
+})
+
+test('a part payment on the open invoice comes off the amount the link asks for', async ({ page, context }) => {
+  await mockPortal(context, invoicePayload({
+    invoices: [draw('inv-l1', 1, 5000, 'sent')],
+    payments: [{ id: 'pay-l1', contact_id: 'job-linked-0003', invoice_id: 'inv-l1', amount: 2000, paid_on: '2026-11-13', method: 'zelle', kind: 'deposit' }]
+  }))
+  await openInvoice(page)
+
+  await expect(page.getByTestId('invoice-amount-due')).toHaveText('$3,000.00')
+  await expect(page.getByRole('link', { name: 'Pay $3,000.00 now' })).toBeVisible()
+})
+
+test('the invoice link uses the amount the server worked out for the invoice', async ({ page, context }) => {
+  // A deposit logged against the job paid an unsent draft the link never
+  // carries, so only the server knows this draw still owes all of itself.
+  await mockPortal(context, invoicePayload({
+    invoices: [draw('inv-2', 2, 5000, 'sent', { amount_due: 5000 })],
+    payments: [{ id: 'pay-1', contact_id: 'job-linked-0003', invoice_id: null, amount: 2500, paid_on: '2026-11-01', method: 'check', kind: 'deposit' }]
+  }))
+  await openInvoice(page)
+  await expect(page.getByTestId('invoice-amount-due')).toHaveText('$5,000.00')
+})
+
+test('the amount due and the pay button keep their cents', async ({ page, context }) => {
+  await mockPortal(context, invoicePayload({ contact: { amount: 2499.5 }, invoices: [draw('inv-c1', 1, 2499.5, 'sent')] }))
+  await openInvoice(page)
+
+  await expect(page.getByTestId('invoice-amount-due')).toHaveText('$2,499.50')
+  await expect(page.getByRole('link', { name: 'Pay $2,499.50 now' })).toBeVisible()
+})
+
+test('a sent invoice on a job saved with no price is owed, and 49 cents short is not paid in full', async ({ page, context }) => {
+  const spies = await mockPortal(context, invoicePayload({ contact: { amount: null }, invoices: [draw('inv-z1', 1, 500, 'sent')] }))
+  await openInvoice(page)
+  await expect(page.getByTestId('invoice-amount-due')).toHaveText('$500.00')
+  await expect(page.getByText('Paid in full')).toHaveCount(0)
+  await expect(page.getByRole('link', { name: 'Pay $500.00 now' })).toBeVisible()
+
+  spies.setPayload(invoicePayload({
+    contact: { amount: 5000 },
+    invoices: [draw('inv-z2', 1, 5000, 'sent')],
+    payments: [{ id: 'pay-z', contact_id: 'job-linked-0003', invoice_id: 'inv-z2', amount: 4999.51, paid_on: '2026-11-13', method: 'check', kind: 'final' }]
+  }))
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await expect(page.getByTestId('invoice-amount-due')).toHaveText('$0.49')
+  await expect(page.getByText('Paid in full')).toHaveCount(0)
+})
+
+test('once every issued invoice is paid the link keeps its number and asks for nothing that was not invoiced', async ({ page, context }) => {
+  await mockPortal(context, invoicePayload({
+    invoices: [draw('inv-p1', 1, 5000, 'paid', { issued_at: '2026-11-02T12:00:00.000Z' })],
+    payments: [{ id: 'pay-p1', contact_id: 'job-linked-0003', invoice_id: 'inv-p1', amount: 5000, paid_on: '2026-11-10', method: 'ach', kind: 'deposit' }]
+  }))
+  await openInvoice(page)
+
+  // The bill the customer was sent, not a number made up from the job.
+  await expect(page.getByText('PCC-0003-01').first()).toBeVisible()
+  await expect(page.getByText(/PCC-INV-/)).toHaveCount(0)
+  await expect(page.getByText('November 2, 2026')).toBeVisible()
+  await expect(page.getByTestId('invoice-amount-due')).toHaveText('Paid in full')
+  await expect(page.getByRole('link', { name: /^Pay / })).toHaveCount(0)
+  // The other half of the contract is not invoiced yet, and the page says so.
+  await expect(page.getByText('$5,000.00').last()).toBeVisible()
+})
+
+test('the invoice link shows the invoice description and its notes', async ({ page, context }) => {
+  await mockPortal(context, invoicePayload({
+    invoices: [draw('inv-d1', 1, 5000, 'sent', {
+      title: 'Deposit',
+      description: 'Deposit for the garage slab.\nForms and rebar are set once this is in.',
+      notes: 'Gate code is 4410. Please keep the dog inside on pour day.'
+    })]
+  }))
+  await openInvoice(page)
+
+  await expect(page.getByText('Deposit for the garage slab.')).toBeVisible()
+  await expect(page.getByText('Forms and rebar are set once this is in.')).toBeVisible()
+  await expect(page.getByText('Gate code is 4410. Please keep the dog inside on pour day.')).toBeVisible()
+})
+
+test('an invoice due yesterday reads past due today, as it does in the app', async ({ page, context }) => {
+  // Yesterday on the browser's calendar (the config pins Central time),
+  // stored as the end of that day, the way the app saves a due date.
+  await page.clock.install({ time: new Date('2026-11-17T18:00:00-06:00') })
+  const dueAt = '2026-11-16T23:59:59-06:00'
+  await mockPortal(context, invoicePayload({ invoices: [draw('inv-o1', 1, 5000, 'sent', { due_at: dueAt })] }))
+  await openInvoice(page)
+  await expect(page.getByText('Past due', { exact: true })).toBeVisible()
+})

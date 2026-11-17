@@ -37,6 +37,8 @@ import '../components/documents/fieldhorse-proposal.css'
 import { safePayUrl } from '../lib/payLink.ts'
 import { buildPortalView, portalStatus, quoteFingerprint, type PublicDocPayload } from '../lib/portalView.ts'
 import { gatherStatement } from '../lib/statement.ts'
+import { publicInvoiceView } from '../components/public/invoiceView.ts'
+import { money } from '../components/documents/format.ts'
 
 type PublicDocState = { loading: boolean; data: PublicDocPayload | null; error: string | null }
 
@@ -563,54 +565,51 @@ function ProposalView({ data, portal }: { data: PublicDocPayload; portal?: Propo
 
 function InvoiceView({ data }: any) {
   const { contact, company, payments, changeOrders, insurance, photos } = data
-  const paid = (payments || []).reduce((s: any, p: any) => s + Number(p.amount || 0), 0)
-  // Raw contract amount, passed to InvoiceTemplate, which folds in approved
-  // COs itself. The customer facing balance MUST include approved COs too,
-  // or the link shows "PAID" while change order money is still owed.
-  const contractTotal = Number(contact?.amount || 0)
-  const approvedCO = (changeOrders || [])
-    .filter((co: any) => co?.status === 'approved')
-    .reduce((s: any, co: any) => s + Number(co?.amount || 0), 0)
-  const balance = Math.max(0, contractTotal + approvedCO - paid)
-  // The specific draw this link bills: the oldest still-open invoice
-  // row. Gives the document a real sequence number, issue date, and
-  // due date instead of anonymous whole-job math. Absent rows (legacy
-  // jobs) degrade to the whole-job presentation.
-  //
-  // Only ISSUED draws are shown to the customer, draft (never-sent)
-  // and void rows must never leak into the public billing schedule or
-  // be selected as "this invoice" (a draft's amount/due date is not a
-  // real bill). Customer-visible statuses: sent, paid, overdue.
-  const VISIBLE = new Set(['sent', 'paid', 'overdue'])
-  const invoiceRows = (data.invoices || []).filter((inv: any) => inv && VISIBLE.has(String(inv.status || '').toLowerCase()))
-  const currentInvoice = invoiceRows.find((inv: any) => String(inv.status || '').toLowerCase() !== 'paid') || null
-  const thisInvoiceAmount = currentInvoice ? Math.min(balance, Number(currentInvoice.amount || 0)) : balance
+  // Every figure on this page comes from publicInvoiceView: what the open
+  // invoice still owes by the allocator the app, the PDF and the email
+  // use, in whole cents. A job that has invoice rows is never asked for
+  // its contract balance, and once every issued invoice is settled the
+  // page keeps the number and dates of the last bill and asks for nothing.
+  const view = publicInvoiceView({ contact, payments, changeOrders, invoices: data.invoices })
+  const shown = view.shown
+  // What this invoice is for (the invoice Description must show) and the
+  // note the contractor wrote on it, as the PDF prints them.
+  const lineItems = shown
+    ? [{
+        id: shown.id,
+        description: String(shown.title || '').trim() || `Invoice #${shown.sequence_number}`,
+        notes: String(shown.description || '').trim() || contact?.job_title || '',
+        qty: 1,
+        rate: shown.amount,
+        amount: shown.amount
+      }]
+    : undefined
   return (
     <>
-    {/* The Pay button quotes THE SAME number as the page's "Amount due"
-        hero, it used to quote the whole remaining balance while the
-        hero showed the current draw, so a $2,500 deposit page carried a
-        "Pay $10,000 now" button. */}
-    {balance > 0.5 && <PayNowBar company={company} amount={thisInvoiceAmount} />}
+    {/* The Pay button quotes the same number as the page's "Amount due". */}
+    {view.amountDue > 0 && <PayNowBar company={company} amount={view.amountDue} />}
     <InvoiceTemplate
       company={company}
       contact={contact}
       project={{
-        title: contact?.job_title || 'Construction services',
+        title: contact?.job_title || (view.showContractPosition ? 'Construction services' : ''),
         address: contact?.address || ''
       }}
-      contractTotal={contractTotal}
+      lineItems={lineItems}
+      notes={String(shown?.notes || '').trim() || undefined}
+      contractTotal={view.contractTotal}
+      showContractPosition={view.showContractPosition}
       payments={payments}
-      previouslyPaid={paid}
-      thisInvoice={thisInvoiceAmount}
-      balanceRemaining={balance}
-      invoices={invoiceRows}
-      currentInvoice={currentInvoice}
+      previouslyPaid={view.paid}
+      thisInvoice={view.amountDue}
+      balanceRemaining={view.balance}
+      invoices={view.rows}
+      currentInvoice={shown}
       meta={{
-        issuedAt: currentInvoice?.issued_at || contact?.created_at,
-        dueDate: currentInvoice?.due_at || null
+        issuedAt: shown?.issued_at || contact?.created_at,
+        dueDate: view.current?.due_at || null
       }}
-      status={balance < 0.5 ? 'paid' : 'outstanding'}
+      status={view.status}
       insurance={insurance}
       changeOrders={changeOrders}
       photos={photos || []}
@@ -719,9 +718,7 @@ function PayNowBar({ company, amount }: any) {
   // Allow-list the scheme so a pasted `javascript:`/`data:` link can
   // never become an href on this customer facing page.
   const url = safePayUrl(link)
-  const amountLabel = amount > 0
-    ? Number(amount).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
-    : ''
+  const amountLabel = amount > 0 ? money(amount, { cents: true }) : ''
   return (
     <div style={{
       maxWidth: 760, margin: '0 auto 16px',
