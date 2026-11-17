@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { billTo, buildInvoicePdf, contractTotals, invalidateAfterInvoiceCreate, invoiceAmountDue, invoiceDescription, invoicePdfInput, suggestNextInvoice } from './invoices.ts'
+import { billTo, buildInvoicePdf, contractTotals, invalidateAfterInvoiceCreate, invoiceAmountDue, invoiceDescription, invoicePdfInput, jobInvoicesKey, suggestNextInvoice } from './invoices.ts'
 
 describe('contractTotals', () => {
   it('folds approved change orders into the contract', () => {
@@ -326,7 +326,10 @@ describe('invalidateAfterInvoiceCreate', () => {
 
   it("refreshes the job's money view and draws too for a job's invoice", () => {
     expect(keysAfter({ clientId: 'cl-1', jobId: 'c-1' })).toEqual([
-      ['invoices'], ['homeDashboard'], ['clientDetail', 'cl-1'], ['invoiceDetail', 'c-1'], ['invoiceDraws', 'c-1'], ['jobDetail', 'c-1']
+      ['invoices'], ['homeDashboard'], ['clientDetail', 'cl-1'], ['invoiceDetail', 'c-1'], ['jobDetail', 'c-1']
     ])
+    // The job's draws are one query under the job's key, so the job's
+    // refresh reads them again.
+    expect(jobInvoicesKey('c-1').slice(0, 2)).toEqual(['jobDetail', 'c-1'])
   })
 })

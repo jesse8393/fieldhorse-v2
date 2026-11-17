@@ -22,7 +22,7 @@ import { createUuid } from '../../../lib/uuid.ts'
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Link } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, FileEdit, Send, Download, Check, X, Trash2, FileText } from 'lucide-react'
 import { supabase, authHeaders } from '../../../lib/supabase.ts'
 import { parseDateOnly, toYmd } from '../../../lib/dates.ts'
@@ -40,7 +40,7 @@ import { Eyebrow } from '../../../components/v3'
 import { countNoun } from '../../../lib/format.ts'
 import { fetchInvoiceReviewContext } from '../../../lib/invoiceReviewContext.ts'
 import { reviewInvoice } from '../../../lib/invoiceReview.js'
-import { billTo, fetchInvoicesForContact, invoiceAmountDue, invoiceDescription, retryOnce } from '../../../lib/invoices.ts'
+import { billTo, invoiceAmountDue, invoiceDescription, jobInvoicesKey, readJobInvoices, retryOnce } from '../../../lib/invoices.ts'
 import { invoicesPaidInFull } from '../../../lib/invoiceSettlement.ts'
 import { drawsFromTerms } from '../../../lib/paymentSchedule.ts'
 import { quoteMoney } from '../../../lib/quoteMoney.ts'
@@ -50,6 +50,8 @@ import { canEditJobMoney } from '../lib/jobAccess.ts'
 import { useMediaQuery } from '../../../lib/useMediaQuery.ts'
 import { moneyInput } from '../../new/CreateShell.tsx'
 
+
+const NO_DRAWS: any[] = []
 
 function shortDate(iso: any) {
   const d = parseDateOnly(iso)
@@ -83,11 +85,23 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
   const documentProfile = useDocumentProfile(contact?.org_id)
   const { user } = useAuth()
   const queryClient = useQueryClient()
-  const [draws, setDraws] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  // A failed read shows an empty list, which must not offer "Generate
-  // from terms" on a job that may already have draws.
-  const [loadFailed, setLoadFailed] = useState(false)
+  // The job's invoices come from the job screen's own query (one read per
+  // job, vibe audit console-2). A failed read must not offer "Generate
+  // from terms" on a job that may already have draws, and neither may a
+  // read still on its way after a change.
+  const contactId = contact?.id
+  const drawsQuery = useQuery({
+    queryKey: jobInvoicesKey(contactId),
+    queryFn: () => readJobInvoices(contactId as string),
+    enabled: !!contactId
+  })
+  const draws: any[] = drawsQuery.data ?? NO_DRAWS
+  const loading = drawsQuery.isPending
+  const loadFailed = drawsQuery.isError
+  const drawsError = drawsQuery.error
+  useEffect(() => {
+    if (drawsError) toastError("Couldn't load draws", drawsError.message)
+  }, [drawsError])
   const [editingId, setEditingId] = useState<any>(null)
   const [creating, setCreating] = useState(false)
   const [busyId, setBusyId] = useState<any>(null)
@@ -116,18 +130,10 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
   const drawsIssued = liveDraws.reduce((s, d) => s + Number(d.amount || 0), 0)
   const unbilled = Math.max(0, contractTotal - drawsIssued)
 
-  const contactId = contact?.id
   const fetchDraws = useCallback(async () => {
     if (!contactId) return
-    setLoading(true)
-    const { data, error } = await fetchInvoicesForContact(contactId)
-    if (error) toastError("Couldn't load draws", error.message)
-    setDraws(data || [])
-    setLoadFailed(!!error)
-    setLoading(false)
-  }, [contactId])
-
-  useEffect(() => { fetchDraws() }, [fetchDraws])
+    await queryClient.invalidateQueries({ queryKey: jobInvoicesKey(contactId) })
+  }, [contactId, queryClient])
 
   // Paid to date and the PDF's previously paid come from the job detail
   // query, so a payment recorded here refreshes it.
@@ -590,7 +596,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
         count={draws.length}
         canAdd={!creating && editingId == null}
         onAdd={() => setCreating(true)}
-        canGenerate={!loading && !loadFailed && liveDraws.length === 0 && contractTotal > 0 && !creating && editingId == null}
+        canGenerate={!loading && !drawsQuery.isFetching && !loadFailed && liveDraws.length === 0 && contractTotal > 0 && !creating && editingId == null}
         onGenerate={handleGenerateFromTerms}
         generating={busyId === '__generate__'}
       />

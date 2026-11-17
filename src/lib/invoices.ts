@@ -125,6 +125,20 @@ export async function retryOnce<T extends { error: unknown }>(run: () => Promise
   return run()
 }
 
+/**
+ * One query per job for its invoices, shared by the job screen, its
+ * Contract balance and its Invoices tab, so opening a tab never reads them
+ * twice (vibe audit console-2). Under the job's own key, so whatever
+ * refreshes the job reads them again.
+ */
+export const jobInvoicesKey = (jobId: string | null | undefined) => ['jobDetail', jobId, 'invoices'] as const
+
+export async function readJobInvoices(jobId: string) {
+  const { data, error } = await fetchInvoicesForContact(jobId)
+  if (error) throw error
+  return data
+}
+
 export async function fetchInvoicesForContact(contactId: string) {
   const rows: InvoiceRow[] = []
   for (let from = 0; ; from += 500) {
@@ -198,7 +212,7 @@ export function invalidateAfterInvoiceCreate(
   if (clientId) void client.invalidateQueries({ queryKey: ['clientDetail', clientId] })
   if (jobId) {
     void client.invalidateQueries({ queryKey: ['invoiceDetail', jobId] })
-    void client.invalidateQueries({ queryKey: ['invoiceDraws', jobId] })
+    // Also the job's invoices (jobInvoicesKey), which sit under its key.
     void client.invalidateQueries({ queryKey: ['jobDetail', jobId] })
   }
 }

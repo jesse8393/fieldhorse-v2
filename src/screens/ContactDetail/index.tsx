@@ -7,7 +7,7 @@ import { useMembership } from '../../contexts/MembershipContext.tsx'
 import { supabase } from '../../lib/supabase.ts'
 import { reopen, reopenQuestion } from '../../lib/pipeline.ts'
 import { newRecordRoute, recordRoute } from '../../lib/records.ts'
-import { contractTotals, fetchInvoicesForContact } from '../../lib/invoices.ts'
+import { contractTotals, jobInvoicesKey, readJobInvoices } from '../../lib/invoices.ts'
 import { stageColor, margin, isMovedStage } from '../../lib/stages.ts'
 import { MovedRecordRedirect } from '../../components/MovedRecordRedirect.tsx'
 import { toastSuccess, toastError } from '../../lib/toast.ts'
@@ -276,14 +276,10 @@ export default function ContactDetail() {
   // them again, and read on every open, since a new invoice is made on
   // its own screen. Unknown until they land, which keeps Invoice this.
   const { data: jobInvoices } = useQuery({
-    queryKey: ['jobDetail', id, 'invoices'],
+    queryKey: jobInvoicesKey(id),
     enabled: !!id && canMoveMoney,
     staleTime: 0,
-    queryFn: async () => {
-      const { data: rows, error } = await fetchInvoicesForContact(id as string)
-      if (error) throw error
-      return rows
-    }
+    queryFn: () => readJobInvoices(id as string)
   })
   const routeHome = location.pathname.startsWith('/leads')
     ? '/leads'
@@ -612,6 +608,7 @@ export default function ContactDetail() {
             contact={contact}
             inspections={inspections}
             scheduleItems={scheduleItems}
+            todos={todos}
             userId={user?.id}
             fetchAll={fetchAll}
             patch={patch}
