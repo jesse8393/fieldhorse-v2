@@ -269,3 +269,11 @@ test('a new lead shows in Leads when the person goes back (DATA-13)', async ({ c
   // The list read again after the save instead of showing its old copy.
   await expect.poll(() => leadReads - before, { timeout: 5000 }).toBeGreaterThan(0)
 })
+
+test('the first field keeps its focus on New lead and New client (S20)', async ({ context, page }) => {
+  await signIn(context)
+  await open(page, '/leads/new')
+  await expect(page.getByLabel('Name')).toBeFocused({ timeout: 30_000 })
+  await open(page, '/clients/new')
+  await expect(page.getByLabel('Name')).toBeFocused({ timeout: 30_000 })
+})
