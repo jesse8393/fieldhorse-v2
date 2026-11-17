@@ -2,12 +2,12 @@
 //
 // Native port of the web Bid screen. Takes a scope + job type + trades,
 // asks Claude for a structured estimate (line items + ranges), applies a
-// margin, and can spin up a stage='quote' job with quote items via
-// useCreateJobFromBid. Rate card is the seed default (web pulls user
+// margin, and saves it as a draft quote (fh_quotes plus its lines) for a
+// client via useCreateQuoteFromBid. Rate card is the seed default (web pulls user
 // overrides too; mobile keeps the seed for now).
 import { useMemo, useState } from 'react'
 import {
-  View, Text, TextInput, Pressable, ActivityIndicator, ScrollView, Alert
+  View, Text, TextInput, Pressable, ActivityIndicator, ScrollView
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
@@ -15,7 +15,7 @@ import * as Clipboard from 'expo-clipboard'
 import { Sparkles, Check, Copy } from 'lucide-react-native'
 import { ScreenBackground, ScreenHeader, GoldButton, theme } from '../components/ui'
 import { claudeMessage, claudeText } from '../lib/anthropic'
-import { useCreateJobFromBid, type BidResult } from '../lib/queries'
+import { useCreateQuoteFromBid, type BidResult } from '../lib/queries'
 import { useAuth } from '../contexts/AuthContext'
 
 const RATE_CARD: Record<string, { unit: string; low: number; high: number; label: string }> = {
@@ -43,9 +43,12 @@ export default function BidScreen() {
   const insets = useSafeAreaInsets()
   const router = useRouter()
   const { user } = useAuth()
-  const createJob = useCreateJobFromBid()
+  const createQuote = useCreateQuoteFromBid()
 
   const [scope, setScope] = useState('')
+  const [clientName, setClientName] = useState('')
+  const [saved, setSaved] = useState<{ clientId: string } | null>(null)
+  const [saveErr, setSaveErr] = useState('')
   const [jobType, setJobType] = useState('')
   const [picks, setPicks] = useState<string[]>([])
   const [marginPct, setMarginPct] = useState(25)
@@ -70,7 +73,7 @@ export default function BidScreen() {
 
   async function generate() {
     if (!scope.trim() || generating) return
-    setGenerating(true); setErr(''); setBid(null)
+    setGenerating(true); setErr(''); setBid(null); setSaved(null); setSaveErr('')
     try {
       const rateText = Object.keys(RATE_CARD)
         .map((k) => `${k}: $${RATE_CARD[k].low}–$${RATE_CARD[k].high} per ${RATE_CARD[k].unit}`)
@@ -106,17 +109,20 @@ export default function BidScreen() {
     setCopied(true); setTimeout(() => setCopied(false), 2000)
   }
 
-  async function pushToJob() {
-    if (!bid || !total || !user || pushing) return
-    setPushing(true)
-    const { error, id } = await createJob({
-      userId: user.id, bid, jobType, scope,
+  async function pushToQuote() {
+    if (!bid || !total || !user || pushing || saved) return
+    if (!clientName.trim()) { setSaveErr('Type who this quote is for, in Client above. A new name makes a new client.'); return }
+    setPushing(true); setSaveErr('')
+    const { error, id, clientId } = await createQuote({
+      userId: user.id, clientName, bid, jobType, scope,
       recommendedPrice: Math.round(total.withMargin),
       section: picks[0] ? RATE_CARD[picks[0]]?.label : 'Scope'
     })
     setPushing(false)
-    if (error || !id) { Alert.alert("Couldn't create job", error?.message || 'Try again.'); return }
-    router.replace(`/jobs/${id}`)
+    if (id && clientId) setSaved({ clientId })
+    if (id && !error) return
+    if (id) { setSaveErr(`The quote was saved but its lines were not: ${error?.message || 'try again on the web.'}`); return }
+    setSaveErr(error?.message || "Couldn't save the quote. Try again.")
   }
 
   return (
@@ -134,6 +140,16 @@ export default function BidScreen() {
           placeholder="e.g. Demo and replace a 480 sf composite deck, re-frame as needed, install code compliant flashing and Trex decking."
           placeholderTextColor="rgba(242,237,228,0.4)"
           style={[input, { minHeight: 100, textAlignVertical: 'top' }]}
+        />
+
+        <Text style={[lbl, { marginTop: 18 }]}>Client</Text>
+        <TextInput
+          value={clientName}
+          onChangeText={setClientName}
+          placeholder="Who is this quote for"
+          placeholderTextColor="rgba(242,237,228,0.4)"
+          autoCapitalize="words"
+          style={input}
         />
 
         <Text style={[lbl, { marginTop: 18 }]}>Job type</Text>
@@ -214,9 +230,20 @@ export default function BidScreen() {
                 <Text style={{ color: copied ? theme.success : theme.ink, fontWeight: '700' }}>{copied ? 'Copied' : 'Copy'}</Text>
               </Pressable>
               <View style={{ flex: 1 }}>
-                <GoldButton label="Create job from estimate" onPress={pushToJob} loading={pushing} />
+                <GoldButton label={saved ? 'Quote saved' : 'Save as quote'} onPress={pushToQuote} loading={pushing} />
               </View>
             </View>
+            {saveErr ? <Text style={{ color: theme.danger, fontSize: 14, marginTop: 12 }}>{saveErr}</Text> : null}
+            {saved ? (
+              <View style={{ marginTop: 12 }}>
+                <Text style={{ color: theme.success, fontSize: 14 }}>
+                  Draft quote saved for {clientName.trim()}. Review and send it from Quotes on the web.
+                </Text>
+                <Pressable onPress={() => router.replace(`/clients/${saved.clientId}`)} hitSlop={8} style={{ marginTop: 8 }}>
+                  <Text style={{ color: theme.goldBright, fontWeight: '700' }}>Open client</Text>
+                </Pressable>
+              </View>
+            ) : null}
           </View>
         ) : null}
       </ScrollView>

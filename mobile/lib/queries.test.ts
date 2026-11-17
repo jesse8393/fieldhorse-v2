@@ -23,7 +23,7 @@ vi.mock('./supabase', () => ({ supabase: {
 } }))
 
 import { useIntegrations, useDisconnectIntegration } from './integrations'
-import { useJobs, useEstimates, useUpdateStage } from './queries'
+import { useJobs, useEstimates, useUpdateStage, useCreateQuoteFromBid } from './queries'
 import { JOB_STAGE_CHOICES } from './stages'
 import { useClientsBundle, useClientDetail, useJobDetail, useInvoiceDetail, useInvoicesOverview, useProfile, useJobPhotos, useJobFiles, useAgenda, useNotesScreen, useActivityFeed, useSubsRoster, useToggleTodo, useDeleteTodo, useUpdateJob, useUpdateProfile, useDeletePhoto, useDeleteFile, useGenerateDraws, useLogPayment, useMarkInvoicePaid, useUpdateInvoiceStatus } from './queries'
 
@@ -245,5 +245,48 @@ describe('native job stage changes', () => {
     mock.results.set('fh_contacts', { data: [{ id: 'job' }], error: null })
     expect((await useUpdateStage()({ contactId: 'job', stage: 'closed' })).error).toBeNull()
     expect(mock.calls).toContainEqual(['fh_contacts', 'update', { stage: 'closed' }])
+  })
+})
+
+describe('native estimate to quote', () => {
+  const bid = {
+    summary: 'Driveway replacement',
+    line_items: [{ name: 'Demo', qty: 2, unit: 'lump', rate_low: 100, rate_high: 150 }, { name: 'Pour', qty: 3, unit: 'sqft', rate_high: 100.5, notes: '4 inch' }],
+    assumptions: ['Clear access'], risks: []
+  }
+  function tables(existing: any[] = []) {
+    mock.results.set('fh_clients', (_r: unknown, ops: any[]) => ops.some(o => o[0] === 'insert')
+      ? { data: { id: 'client-new' }, error: null } : { data: existing, error: null })
+    mock.results.set('fh_quotes', { data: { id: 'quote-1' }, error: null })
+    mock.results.set('fh_quote_items', { data: null, error: null })
+  }
+
+  it('bid creates an fh_quotes row for the client with its lines on quote_id', async () => {
+    tables([{ id: 'client-1', name: 'Pat Smith ' }])
+    const result = await useCreateQuoteFromBid()({ userId: 'user', clientName: 'pat smith', bid, jobType: 'Concrete', scope: 'Replace drive', recommendedPrice: 1000, section: 'Concrete' })
+    expect(result).toMatchObject({ error: null, id: 'quote-1', clientId: 'client-1' })
+    expect(mock.calls.some(c => c[0] === 'fh_contacts')).toBe(false)
+    expect(mock.calls.some(c => c[0] === 'fh_clients' && c[1] === 'insert')).toBe(false)
+    expect(mock.calls.find(c => c[0] === 'fh_quotes' && c[1] === 'insert')?.[2]).toMatchObject({
+      user_id: 'user', client_id: 'client-1', status: 'draft', title: 'Driveway replacement', job_type: 'Concrete'
+    })
+    const items = mock.calls.find(c => c[0] === 'fh_quote_items' && c[1] === 'insert')?.[2]
+    expect(items).toHaveLength(2)
+    expect(items.every((i: any) => i.quote_id === 'quote-1' && i.contact_id === null)).toBe(true)
+    expect(items.reduce((s: number, i: any) => s + i.amount, 0)).toBe(1000)
+  })
+
+  it('a new client name makes the client first', async () => {
+    tables([])
+    const result = await useCreateQuoteFromBid()({ userId: 'user', clientName: 'New Person', bid, jobType: '', scope: '', recommendedPrice: 500 })
+    expect(result).toMatchObject({ error: null, id: 'quote-1', clientId: 'client-new' })
+    expect(mock.calls.find(c => c[0] === 'fh_clients' && c[1] === 'insert')?.[2]).toMatchObject({ user_id: 'user', name: 'New Person' })
+  })
+
+  it('refuses without a client name and writes nothing', async () => {
+    tables([])
+    const result = await useCreateQuoteFromBid()({ userId: 'user', clientName: '  ', bid, jobType: '', scope: '', recommendedPrice: 500 })
+    expect(result.error).toBeTruthy()
+    expect(mock.calls).toEqual([])
   })
 })

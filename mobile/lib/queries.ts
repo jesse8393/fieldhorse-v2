@@ -1104,49 +1104,91 @@ export function useUpdateProfile() {
   }
 }
 
-// ---- Bid → job ----
-// Creates a stage='quote' contact from an AI estimate and inserts one
-// fh_quote_items row per line item (high end of the rate range so the
-// operator negotiates down). Mirrors the web Bid pushToJob.
+// ---- Bid → quote ----
+// Turns an AI estimate into a draft fh_quotes row for a client, with one
+// fh_quote_items row per line item on quote_id. Mirrors the web Bid
+// pushToJob and createQuote (src/screens/Bid.tsx, src/lib/quotes.ts): the
+// client is matched by name or made, and every line rate is scaled so the
+// lines add up exactly to the recommended price.
 export type BidLineItem = { name: string; qty?: number; unit?: string; rate_low?: number; rate_high?: number; notes?: string }
 export type BidResult = { line_items?: BidLineItem[]; summary?: string; assumptions?: string[]; risks?: string[]; total_low?: number; total_high?: number }
 
-export function useCreateJobFromBid() {
+export type QuoteFromBidInput = {
+  userId: string
+  clientName: string
+  bid: BidResult
+  jobType: string
+  scope: string
+  recommendedPrice: number
+  section?: string
+}
+
+export function useCreateQuoteFromBid() {
   const client = useQueryClient()
-  return async (input: { userId: string; bid: BidResult; jobType: string; scope: string; recommendedPrice: number; section?: string }) => {
+  return async (input: QuoteFromBidInput): Promise<{ error: any; id?: string; clientId?: string }> => {
+    const name = input.clientName.trim()
+    if (!name) return { error: new Error('Type who this quote is for. A new name makes a new client.') }
+
+    let clientId: string | undefined
+    try {
+      const { data: clients } = await readAllRows<{ id: string; name: string | null }>((from, to) =>
+        supabase.from('fh_clients').select('id, name').order('id', { ascending: true }).range(from, to))
+      clientId = (clients || []).find((c) => String(c.name || '').trim().toLowerCase() === name.toLowerCase())?.id
+    } catch (error) {
+      return { error }
+    }
+    if (!clientId) {
+      const { data: made, error } = await supabase.from('fh_clients')
+        .insert({ user_id: input.userId, name } as any).select('id').single()
+      if (error || !made) return { error: error || new Error('Could not save the client.') }
+      clientId = (made as any).id as string
+    }
+
     const notes = [
-      input.bid.assumptions?.length ? `Assumptions:\n${input.bid.assumptions.map((a) => `• ${a}`).join('\n')}` : '',
-      input.bid.risks?.length ? `Risks:\n${input.bid.risks.map((r) => `• ${r}`).join('\n')}` : ''
-    ].filter(Boolean).join('\n\n') || null
-    const { data: contact, error: cErr } = await supabase.from('fh_contacts').insert({
+      input.scope.trim(),
+      input.bid.assumptions?.length ? `Assumptions:\n${input.bid.assumptions.join('\n')}` : '',
+      input.bid.risks?.length ? `Risks:\n${input.bid.risks.join('\n')}` : ''
+    ].filter(Boolean).join('\n\n')
+    const { data: quote, error: qErr } = await supabase.from('fh_quotes').insert({
       user_id: input.userId,
-      name: 'New estimate',
-      job_title: input.bid.summary || (input.jobType ? `${input.jobType} project` : 'New estimate'),
-      job_type: input.jobType || null,
-      amount: input.recommendedPrice,
-      stage: 'quote',
-      scope_text: input.scope || null,
-      notes
-    } as any).select('id').single()
-    if (cErr || !contact) return { error: cErr, id: undefined }
-    const items = (input.bid.line_items || []).map((li, idx) => {
-      const qty = Number(li.qty || 1)
-      const rate = Number(li.rate_high ?? li.rate_low ?? 0)
+      client_id: clientId,
+      title: input.bid.summary?.trim() || (input.jobType ? `${input.jobType} project` : 'New estimate'),
+      scope_text: notes || null,
+      job_type: input.jobType.trim() || null,
+      status: 'draft'
+    } as any).select('*').single()
+    if (qErr || !quote) return { error: qErr || new Error('Could not save the quote.'), clientId }
+    const quoteId = (quote as any).id as string
+
+    const raw = (input.bid.line_items || []).map((li) => ({
+      li, qty: Number(li.qty || 1), rate: Number(li.rate_high ?? li.rate_low ?? 0)
+    })).filter((r) => r.qty * r.rate > 0)
+    const subtotal = raw.reduce((sum, r) => sum + r.qty * r.rate, 0)
+    const scale = subtotal > 0 ? input.recommendedPrice / subtotal : 1
+    let allocated = 0
+    const items = raw.map((r, idx) => {
+      let amount = idx === raw.length - 1 ? input.recommendedPrice - allocated : Math.round(r.qty * r.rate * scale)
+      if (amount < 0) amount = 0
+      allocated += amount
       return {
         user_id: input.userId,
-        contact_id: (contact as any).id,
+        quote_id: quoteId,
+        contact_id: null,
         section: input.section || 'Scope',
-        description: li.name + (li.notes ? `, ${li.notes}` : ''),
-        qty, unit: li.unit || null, rate, amount: qty * rate,
+        description: r.li.name + (r.li.notes ? ` (${r.li.notes})` : ''),
+        qty: r.qty,
+        unit: r.li.unit || null,
+        rate: r.qty > 0 ? Math.round((amount / r.qty) * 100) / 100 : amount,
+        amount,
         is_optional: false, is_excluded: false, sort_order: idx
       }
     }).filter((row) => row.rate > 0 || row.amount > 0)
     if (items.length > 0) {
       const { error: iErr } = await supabase.from('fh_quote_items').insert(items as any)
-      if (iErr) return { error: iErr, id: (contact as any).id as string }
+      if (iErr) return { error: iErr, id: quoteId, clientId }
     }
-    client.invalidateQueries({ queryKey: queryKeys.jobs })
-    return { error: null, id: (contact as any).id as string }
+    client.invalidateQueries({ queryKey: queryKeys.clients })
+    return { error: null, id: quoteId, clientId }
   }
 }
 
