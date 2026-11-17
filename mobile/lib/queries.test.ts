@@ -23,7 +23,8 @@ vi.mock('./supabase', () => ({ supabase: {
 } }))
 
 import { useIntegrations, useDisconnectIntegration } from './integrations'
-import { useJobs, useEstimates } from './queries'
+import { useJobs, useEstimates, useUpdateStage } from './queries'
+import { JOB_STAGE_CHOICES } from './stages'
 import { useClientsBundle, useClientDetail, useJobDetail, useInvoiceDetail, useInvoicesOverview, useProfile, useJobPhotos, useJobFiles, useAgenda, useNotesScreen, useActivityFeed, useSubsRoster, useToggleTodo, useDeleteTodo, useUpdateJob, useUpdateProfile, useDeletePhoto, useDeleteFile, useGenerateDraws, useLogPayment, useMarkInvoicePaid, useUpdateInvoiceStatus } from './queries'
 
 beforeEach(() => { mock.results.clear(); mock.options = null; mock.invalidate.mockClear(); mock.calls = []; mock.storageResult = null })
@@ -226,4 +227,23 @@ describe('native list reads exclude moved rows', () => {
       expect(filters).toEqual(selects.map(() => ['fh_contacts', 'not', 'stage', 'in', MOVED]))
     })
   }
+})
+
+describe('native job stage changes', () => {
+  it('offers only job, closed and lost', () => {
+    expect([...JOB_STAGE_CHOICES]).toEqual(['job', 'closed', 'lost'])
+  })
+  for (const stage of ['lead', 'quote', 'invoice', 'moved_lead']) {
+    it(`refuses to set a job to ${stage} without writing`, async () => {
+      mock.results.set('fh_contacts', { data: [{ id: 'job' }], error: null })
+      const result = await useUpdateStage()({ contactId: 'job', stage })
+      expect(result.error).toBeTruthy()
+      expect(mock.calls).toEqual([])
+    })
+  }
+  it('still saves a closed job', async () => {
+    mock.results.set('fh_contacts', { data: [{ id: 'job' }], error: null })
+    expect((await useUpdateStage()({ contactId: 'job', stage: 'closed' })).error).toBeNull()
+    expect(mock.calls).toContainEqual(['fh_contacts', 'update', { stage: 'closed' }])
+  })
 })

@@ -38,6 +38,7 @@ import { parseExpenseFromImage } from '../../lib/docIntelligence'
 import { useMutationFeedback } from '../../lib/useMutationFeedback'
 import { moneyAmount, paymentAmount } from '../../lib/paymentInput'
 import { jobMoney } from '../../lib/jobMoney'
+import { JOB_STAGE_CHOICES } from '../../lib/stages'
 
 const INVOICE_TINT: Record<string, string> = {
   draft: '#5C5C5C', sent: '#5C5C5C', paid: '#2D7A4F', overdue: '#C0392B', void: '#5C5C5C'
@@ -56,7 +57,6 @@ const STAGE_TINT: Record<string, string> = {
   invoice: '#C9963A', closed: '#5C5C5C', lost: '#C0392B'
 }
 
-const STAGES = ['lead', 'quote', 'job', 'invoice', 'closed', 'lost'] as const
 
 function money(n: number) {
   return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -629,7 +629,7 @@ export default function JobDetailScreen() {
         {/* Stage progression */}
         <Text className="text-ink-muted text-xs font-bold tracking-[2px] uppercase mt-6 mb-2">Stage</Text>
         <View className="flex-row flex-wrap" style={{ gap: 8 }}>
-          {STAGES.map((s) => {
+          {JOB_STAGE_CHOICES.map((s) => {
             const active = contact.stage === s
             const chipTint = STAGE_TINT[s]
             return (

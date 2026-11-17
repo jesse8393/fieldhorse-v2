@@ -18,7 +18,7 @@ import { jobMoney } from './jobMoney'
 import { allocateInvoiceDue, knownContractTotal } from '../../src/lib/invoiceSettlement'
 import { claudeVision, claudeText } from './anthropic'
 import { API_BASE } from './apiBase'
-import { MOVED_STAGE_FILTER } from './stages'
+import { MOVED_STAGE_FILTER, isJobStageChoice } from './stages'
 import type { Database } from './database.types'
 
 export type Contact = Database['public']['Tables']['fh_contacts']['Row']
@@ -319,11 +319,13 @@ export function useLogPayment() {
   }
 }
 
-// Update a job's pipeline stage, then invalidate the detail + lists so
-// the new stage shows everywhere. Returns the supabase error (or null).
+// Update a job's stage, then invalidate the detail + lists so the new
+// stage shows everywhere. Returns the supabase error (or null). A job can
+// only be job, closed or lost; leads and quotes are their own records.
 export function useUpdateStage() {
   const client = useQueryClient()
   return async (input: { contactId: string; stage: string }) => {
+    if (!isJobStageChoice(input.stage)) return { error: new Error('A job can only be set to job, closed or lost.') }
     const { error } = await confirmMutation(supabase.from('fh_contacts')
       .update({ stage: input.stage } as any)
       .eq('id', input.contactId).select('id'))
