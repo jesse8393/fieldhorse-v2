@@ -102,7 +102,7 @@ test.describe('desktop Schedule', () => {
   // Thursday, October 8, 2026 at 9 am in Central time: the board shows
   // Sunday Oct 4 to Saturday Oct 10, and next week starts Oct 11.
   const NOW = new Date('2026-10-08T14:00:00Z')
-  const NEXT_WEEK_FROM = 'gte.2026-10-11T05:00:00.000Z'
+  const NEXT_WEEK_FROM = '2026-10-11T05:00:00.000Z'
   const VISITS = [
     { id: 'v1', contact_id: 'c-job1', title: 'Pour slab, crew A', start_at: '2026-10-08T16:00:00Z', end_at: '2026-10-08T19:00:00Z' },
     { id: 'v2', contact_id: 'c-job2', title: 'Driveway forms', start_at: '2026-10-13T15:00:00Z', end_at: '2026-10-13T17:00:00Z' }
@@ -110,9 +110,14 @@ test.describe('desktop Schedule', () => {
 
   // Up next is the only schedule read capped at 8 rows.
   const upNextRead: Matcher = (url, method) => method === 'GET' && url.searchParams.get('limit') === '8'
-  // The board's read of next week, not the tray's booked list.
-  const nextWeekRead: Matcher = (url, method) =>
-    method === 'GET' && url.searchParams.get('select') !== 'contact_id' && url.searchParams.getAll('start_at').includes(NEXT_WEEK_FROM)
+  // A board read of the range that starts at `from`, not the tray's booked
+  // list. The read takes the visits that start in the range and the ones
+  // that started earlier and still run into it (D16).
+  const rangeRead = (from: string): Matcher => (url, method) =>
+    method === 'GET' && url.searchParams.get('select') !== 'contact_id' &&
+    (url.searchParams.get('or') ?? '').includes(`start_at.gte."${from}"`)
+  // The board's read of next week.
+  const nextWeekRead = rangeRead(NEXT_WEEK_FROM)
 
   async function openSchedule(page: Page) {
     await page.clock.setFixedTime(NOW)
@@ -203,9 +208,7 @@ test.describe('desktop Schedule', () => {
 
   // Day view. The board shows Thursday, October 8; the next day's read
   // starts at midnight Friday in Central time.
-  const NEXT_DAY_FROM = 'gte.2026-10-09T05:00:00.000Z'
-  const nextDayRead: Matcher = (url, method) =>
-    method === 'GET' && url.searchParams.get('select') !== 'contact_id' && url.searchParams.getAll('start_at').includes(NEXT_DAY_FROM)
+  const nextDayRead = rangeRead('2026-10-09T05:00:00.000Z')
   const WITH_FRIDAY = [
     ...VISITS,
     { id: 'v4', contact_id: 'c-job2', title: 'Friday walkthrough', start_at: '2026-10-09T15:00:00Z', end_at: '2026-10-09T16:00:00Z', user_id: 'qa-user-1', description: null, created_at: '2026-10-01T12:00:00Z' }
@@ -255,9 +258,7 @@ test.describe('desktop Schedule', () => {
 
   // Month view. November 2026 starts on a Sunday, so its grid's read starts
   // at midnight Nov 1 in Central time.
-  const NOVEMBER_FROM = 'gte.2026-11-01T05:00:00.000Z'
-  const novemberRead: Matcher = (url, method) =>
-    method === 'GET' && url.searchParams.get('select') !== 'contact_id' && url.searchParams.getAll('start_at').includes(NOVEMBER_FROM)
+  const novemberRead = rangeRead('2026-11-01T05:00:00.000Z')
   const WITH_NOVEMBER = [
     ...VISITS,
     { id: 'v3', contact_id: 'c-job2', title: 'November walkthrough', start_at: '2026-11-12T15:00:00Z', end_at: '2026-11-12T17:00:00Z', user_id: 'qa-user-1', description: null, created_at: '2026-10-01T12:00:00Z' }
@@ -306,11 +307,9 @@ test.describe('desktop Schedule', () => {
   // it fails: a minute later the app comes back into view, the range is
   // stale, and the reread and its one retry fail. The board and the month
   // keep cached visits on screen without a word, so an empty range does too.
-  const THIS_WEEK_FROM = 'gte.2026-10-04T05:00:00.000Z'
+  const THIS_WEEK_FROM = '2026-10-04T05:00:00.000Z'
   // October 2026 starts on a Thursday, so its grid starts Sunday, Sep 27.
-  const OCTOBER_GRID_FROM = 'gte.2026-09-27T05:00:00.000Z'
-  const rangeRead = (from: string): Matcher => (url, method) =>
-    method === 'GET' && url.searchParams.get('select') !== 'contact_id' && url.searchParams.getAll('start_at').includes(from)
+  const OCTOBER_GRID_FROM = '2026-09-27T05:00:00.000Z'
   async function comeBackLater(page: Page) {
     await page.clock.setFixedTime(new Date(NOW.getTime() + 60_000))
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange', { bubbles: true })))
