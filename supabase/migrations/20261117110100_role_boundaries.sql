@@ -175,3 +175,16 @@ begin
   return new;
 end;
 $$;
+
+-- DB-12 -------------------------------------------------------------------
+-- The notification insert check only tested the company, so any member
+-- could put a notification with any title and link into another member's
+-- bell. A signed in caller now writes only to their own bell. Notifications
+-- for someone else come from server code on the service role, which this
+-- does not touch.
+
+alter policy "fh_notifications_own" on public.fh_notifications
+  with check (
+    org_id in (select public.auth_user_org_ids())
+    and user_id = (select auth.uid())
+  );

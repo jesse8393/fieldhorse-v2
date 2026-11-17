@@ -230,6 +230,20 @@ $function$;
   await refused(() => db.query('update public.fh_time_punches set punch_out_at=now() where id=$1', [id(70)]), 'a removed member already cannot edit their punch (the update check needs membership)')
   await db.exec('reset role')
 
+  await db.exec(`
+    alter table public.fh_notifications enable row level security;
+    create policy fh_notifications_own on public.fh_notifications for all to authenticated
+      using (org_id in (select public.auth_user_org_ids()) and user_id = (select auth.uid()))
+      with check (org_id in (select public.auth_user_org_ids()));
+    grant select, insert on public.fh_notifications to authenticated;
+  `)
+  let notificationCount = 80
+  const notify = (to, link = '/jobs') => db.query('insert into public.fh_notifications(id,user_id,org_id,title,link) values($1,$2,$3,$4,$5)', [id(++notificationCount), id(to), id(100), 'Fixture alert', link])
+  await scope(3)
+  await notify(1, 'https://example.test/phish')
+  equal(true, true, 'baseline: crew pushes a notification with any link to the owner')
+  await db.exec('reset role')
+
   const boundaries = await read('migrations/20261117110100_role_boundaries.sql')
   assert(!/drop|delete|truncate/i.test(boundaries), 'role boundary migration avoids words that need owner approval')
   await db.exec(boundaries)
@@ -282,6 +296,15 @@ $function$;
   const unrated = await punch(3)
   await service()
   equal(rate((await rows('update public.fh_time_punches set hourly_rate=30 where id=$1 returning hourly_rate', [unrated.id]))[0].hourly_rate), 30, 'approval through the service path stamps the rate')
+  await db.exec('reset role')
+
+  // DB-12: a signed in member writes notifications only to their own bell.
+  await scope(3)
+  await refused(() => notify(1), 'crew cannot notify another member')
+  await notify(3); equal(true, true, 'crew can still notify themselves')
+  await scope(1)
+  await refused(() => notify(2), "owner cannot write into another member's bell directly")
+  await notify(1); equal(true, true, 'owner can still notify themselves')
   await db.exec('reset role')
 
   console.log(`${checks} authorization transition checks passed.`)
