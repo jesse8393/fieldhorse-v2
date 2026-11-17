@@ -12,6 +12,7 @@ export type FakeState = {
   rpc: Record<string, (args: any) => any>
   log: Array<{ op: string; table?: string; fn?: string; filters?: string[]; payload?: any; rows?: number }>
   failWrites?: Record<string, string>   // table -> error message for insert/update
+  failReads?: Record<string, string>    // table -> error message for select
   deletedUsers: string[]
   seq: number
 }
@@ -137,6 +138,8 @@ class Query implements PromiseLike<any> {
       this.state.log.push({ op: 'delete', table: this.table, filters, rows: hit.length })
       return this.shape(hit)
     }
+    const failRead = this.state.failReads?.[this.table]
+    if (failRead) return { data: null, error: { message: failRead, code: 'XX000' }, count: null }
     let hit = this.matching()
     for (const o of [...this.orderBy].reverse()) {
       hit = [...hit].sort((a, b) => (a[o.col] === b[o.col] ? 0 : (a[o.col] > b[o.col] ? 1 : -1) * (o.asc ? 1 : -1)))

@@ -177,4 +177,74 @@ describe('account deletion end to end', () => {
     expect(TEAM_TABLES).not.toContain('fh_rate_cards')
     expect(TEAM_TABLES).not.toContain('fh_integrations')
   })
+
+  describe('time records', () => {
+    const CREW = 'user-crew'
+    const week = (userId: string, orgId: string | null, approved: boolean) => [0, 1, 2, 3, 4].map((d) => ({
+      id: `p-${userId}-${d}`, org_id: orgId, user_id: userId, contact_id: 'job-1',
+      punch_in_at: `2026-11-0${2 + d}T13:00:00Z`, punch_out_at: `2026-11-0${2 + d}T21:00:00Z`,
+      hourly_rate: 28, approved_at: approved ? '2026-11-09T15:00:00Z' : null, approved_by: approved ? OWNER : null,
+    }))
+    const addCrew = (revokedAt: string | null = null) => {
+      state.tables.org_members.push({ id: 'm3', org_id: ORG, user_id: CREW, role: 'crew', joined_at: '2026-03-01T00:00:00Z', revoked_at: revokedAt })
+      state.users['tok-crew'] = { id: CREW, email: 'dana@example.test' }
+    }
+
+    it.each([['approved', true], ['not yet approved', false]])(
+      'refuses a worker whose %s time is on the books of a company that still has a team',
+      async (_label, approved) => {
+        addCrew()
+        state.tables.fh_contacts.push({ id: 'job-2', org_id: ORG, user_id: CREW, name: 'Lee Park' })
+        state.tables.fh_time_punches = week(CREW, ORG, approved)
+
+        const res = await deleteAccount(post('tok-crew'))
+        const body = await res.json()
+        expect(res.status).toBe(409)
+        expect(body.error).toBe('time_records_kept')
+        expect(body.message).toContain('Parker Concrete')
+        expect(body.message).toMatch(/ask an owner to remove you from the team/i)
+        // Nothing moved and nothing deleted: the payroll record is intact.
+        expect(state.deletedUsers).toEqual([])
+        expect(state.log.filter((l) => l.op !== 'select')).toEqual([])
+        expect(state.tables.fh_time_punches).toHaveLength(5)
+      },
+    )
+
+    it('still refuses after the worker was removed, because the punches would go with the account', async () => {
+      addCrew('2026-11-07T00:00:00Z')
+      state.tables.fh_time_punches = week(CREW, ORG, true)
+      const res = await deleteAccount(post('tok-crew'))
+      expect(res.status).toBe(409)
+      expect((await res.json()).error).toBe('time_records_kept')
+      expect(state.deletedUsers).toEqual([])
+    })
+
+    it('lets a teammate with no time on the books leave as before', async () => {
+      addCrew()
+      state.tables.fh_time_punches = week(ADMIN, ORG, true)
+      const res = await deleteAccount(post('tok-crew'))
+      expect(res.status).toBe(200)
+      expect(state.deletedUsers).toEqual([CREW])
+    })
+
+    it('lets the only member of a company delete everything, punches included', async () => {
+      state.tables.org_members = [state.tables.org_members[0]]
+      state.users['tok-owner'] = { id: OWNER, email: 'jesse@example.test' }
+      state.tables.fh_time_punches = week(OWNER, ORG, true)
+      const res = await deleteAccount(post('tok-owner'))
+      expect(res.status).toBe(200)
+      expect(await res.json()).toMatchObject({ ok: true, deleted_orgs: 1, handed_off_orgs: 0 })
+      expect(state.deletedUsers).toEqual([OWNER])
+    })
+
+    it('stops rather than guess when the time records cannot be read', async () => {
+      addCrew()
+      state.failReads = { fh_time_punches: 'canceling statement due to statement timeout' }
+      const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const res = await deleteAccount(post('tok-crew'))
+      expect(res.status).toBe(500)
+      expect(state.deletedUsers).toEqual([])
+      err.mockRestore()
+    })
+  })
 })
