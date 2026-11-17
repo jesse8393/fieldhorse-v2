@@ -9,12 +9,20 @@
 //   logError('webhook-lead', 'insert failed', insertErr, { org_id: orgId, request_id })
 import { cleanMessage } from '../../../src/lib/errorReport.js'
 
+/**
+ * @param {string} scope
+ * @param {string} what
+ * @param {unknown} error
+ * @param {{ org_id?: string | null, request_id?: string | null }} [context]
+ */
 export function logError(scope, what, error, { org_id = null, request_id = null } = {}) {
-  const raw = typeof error === 'string' ? error : error?.message
+  const err = /** @type {{ code?: unknown, message?: unknown } | null | undefined} */ (typeof error === 'object' ? error : null)
+  const raw = typeof error === 'string' ? error : err?.message
+  /** @type {Record<string, string | null>} */
   const line = {
     scope,
     what,
-    code: typeof error?.code === 'string' ? error.code : null,
+    code: typeof err?.code === 'string' ? err.code : null,
     message: cleanMessage(typeof raw === 'string' ? raw : String(raw ?? ''))
   }
   if (org_id) line.org_id = String(org_id)
