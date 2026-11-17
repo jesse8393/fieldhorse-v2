@@ -28,6 +28,7 @@ const BANNED: [string, string][] = [
   // ai-copy-8: customer documents use sentence case headings.
   ['src/components/documents/proposalThemes.tsx', '>Unit Price<'],
   ['src/components/documents/proposalThemes.tsx', 'label="Est. Total"'],
+  ['src/screens/Settings.tsx', 'Scope of Work and Cost Breakdown'],
 ]
 
 describe('desktop copy (D25)', () => {
