@@ -173,11 +173,17 @@ test.describe('the Inbox list', () => {
     await expect(page.getByText('No conversations yet.', { exact: true })).toBeVisible()
   })
 
-  test('with the engine off it explains itself and points to Settings', async ({ context, page }, testInfo) => {
+  // dead-ends-5 and empty-start-7: Settings has no switch for messaging and
+  // nothing in the app turns it on, so the screen says who does instead of
+  // sending the owner to Settings to look for one.
+  test('with the engine off it says who turns messaging on, with no dead Settings button', async ({ context, page }, testInfo) => {
     await start(context, page, '/inbox')
     await expect(page.getByRole('heading', { level: 1, name: 'Inbox' })).toBeVisible()
     await expect(page.getByText('Inbox turns on with messaging', { exact: true })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Open settings' })).toHaveAttribute('href', '/settings')
+    await expect(page.getByRole('link', { name: 'Open settings' })).toHaveCount(0)
+    await expect(page.locator('#fh-main a[href="/settings"]')).toHaveCount(0)
+    await expect(page.getByText('The FieldHorse team turns messaging on for your company.')).toBeVisible()
+    await expect(page.getByRole('link', { name: 'support@fieldhorse.com' })).toHaveAttribute('href', 'mailto:support@fieldhorse.com')
     await expect(page.locator('.fhi-rows')).toHaveCount(0)
     if (testInfo.project.name.startsWith('mobile')) {
       // And the dock still has Schedule, not Inbox.
@@ -187,11 +193,14 @@ test.describe('the Inbox list', () => {
     }
   })
 
-  test('a manager is told to ask an owner when the engine is off', async ({ context, page }) => {
+  // An owner or admin cannot turn it on either, so a manager reads the same
+  // line rather than being sent to them.
+  test('a manager is told who turns messaging on when the engine is off', async ({ context, page }) => {
     await start(context, page, '/inbox', { role: 'manager' })
     await expect(page.getByText('Inbox turns on with messaging', { exact: true })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Open settings' })).toHaveCount(0)
-    await expect(page.getByText('Ask an owner or an admin to turn it on.')).toBeVisible()
+    await expect(page.getByText('The FieldHorse team turns messaging on for your company.')).toBeVisible()
+    await expect(page.getByText('Ask an owner or an admin to turn it on.')).toHaveCount(0)
   })
 
   test('field roles cannot open the Inbox', async ({ context, page }) => {

@@ -8,7 +8,7 @@
 //
 // The Inbox only exists when the company's messaging engine is on
 // (fh_org_settings.engine_enabled). While it is off the screen says
-// "Inbox turns on with messaging" and points to Settings; while the
+// "Inbox turns on with messaging" and who turns it on; while the
 // setting is still loading it shows a skeleton, never the message.
 //
 // There is no gold action here. The one brushed gold button lives in the
@@ -20,7 +20,6 @@ import CommunicationHistory from '../../components/CommunicationHistory.tsx'
 import { Inbox as InboxIcon, MessageSquare, SquarePen } from 'lucide-react'
 import { Button, Chip, EmptyState, Row, SkeletonRows } from '../../components/fh'
 import DataErrorState from '../../components/DataErrorState.tsx'
-import { useMembership } from '../../contexts/MembershipContext.tsx'
 import { useIsDesktop } from '../../lib/useMediaQuery.ts'
 import { hapticTap } from '../../lib/haptics.ts'
 import {
@@ -115,19 +114,18 @@ function InboxList({ rows, loading, error, onRetry, selectedId }: ListProps) {
   )
 }
 
+// Settings has no switch for messaging and nothing in the app turns it on
+// (dead-ends-5), so every role reads who does, with no button to a dead end.
 function EngineOff() {
-  const { canEditSettings } = useMembership()
   return (
     <div className="fhi-off">
       <EmptyState
         icon={MessageSquare}
         title="Inbox turns on with messaging"
         action={
-          canEditSettings ? (
-            <Button variant="secondary" size="md" to="/settings">Open settings</Button>
-          ) : (
-            <p className="fhi-off__note">Ask an owner or an admin to turn it on. Recorded communications remain available under Communication history.</p>
-          )
+          <p className="fhi-off__note">
+            The FieldHorse team turns messaging on for your company. Email <a href="mailto:support@fieldhorse.com">support@fieldhorse.com</a> to ask. Recorded communications remain available under Communication history.
+          </p>
         }
       />
     </div>
