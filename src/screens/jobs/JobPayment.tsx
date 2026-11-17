@@ -5,7 +5,7 @@ import { createUuid } from '../../lib/uuid.ts'
 // the fh_payments row through logPayment, which also closes the job when
 // it is paid in full, and goes back to the job.
 
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Field } from '../../components/fh'
 import CreateShell, { moneyInput } from '../new/CreateShell.tsx'
@@ -44,12 +44,10 @@ function PaymentForm({ data, goBack, home }: { data: ReturnType<typeof useJobScr
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | undefined>()
   const queryClient = useQueryClient()
-  // One id per payment intent: a retap after a lost response upserts to a
-  // no-op, while an edited amount gets a fresh id so the first row is never
-  // claimed as the second.
-  const [initialPaymentId] = useState(createUuid)
-  const paymentId = useRef(initialPaymentId)
-  const paymentKey = useRef<string | null>(null)
+  // One id for the life of this form (DATA-15): a retry after a lost
+  // answer, even with a field changed, updates that payment instead of
+  // recording a second one. Leaving the screen ends the form.
+  const [paymentId] = useState(createUuid)
 
   const numeric = Number(amount) || 0
   const overage = numeric > balance
@@ -60,15 +58,10 @@ function PaymentForm({ data, goBack, home }: { data: ReturnType<typeof useJobScr
       setError('Enter an amount above zero.')
       return
     }
-    const key = JSON.stringify([numeric, method, kind, reference, paidOn])
-    if (paymentKey.current != null && paymentKey.current !== key) {
-      paymentId.current = createUuid()
-    }
-    paymentKey.current = key
     setSaving(true)
     setError(undefined)
     try {
-      const res = await logPayment(contact, { id: paymentId.current, amount: numeric, method, kind, reference, paid_on: paidOn })
+      const res = await logPayment(contact, { id: paymentId, amount: numeric, method, kind, reference, paid_on: paidOn })
       if (res && (res as { error?: { message?: string } }).error) {
         throw new Error((res as { error?: { message?: string } }).error?.message || 'The payment was not saved.')
       }

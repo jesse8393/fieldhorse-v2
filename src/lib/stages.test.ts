@@ -13,11 +13,18 @@ const fake = vi.hoisted(() => {
       filters: [] as Array<(r: any) => boolean>,
       single: false,
       patch: null as any,
-      row: null as any
+      row: null as any,
+      conflict: false,
+      ignoreDuplicates: false
     }
     function run() {
       const rows = (state.tables[table] ||= [])
       if (q.op === 'insert') {
+        const existing = q.conflict ? rows.find((r) => r.id === q.row.id) : undefined
+        if (existing) {
+          if (!q.ignoreDuplicates) Object.assign(existing, q.row)
+          return { data: null, error: null }
+        }
         rows.push({ ...q.row })
         return { data: null, error: null }
       }
@@ -35,7 +42,7 @@ const fake = vi.hoisted(() => {
     const api: any = {
       select: () => api,
       insert: (row: any) => { q.op = 'insert'; q.row = row; return api },
-      upsert: (row: any) => { q.op = 'insert'; q.row = row; return api },
+      upsert: (row: any, opts: any = {}) => { q.op = 'insert'; q.row = row; q.conflict = true; q.ignoreDuplicates = !!opts.ignoreDuplicates; return api },
       update: (patch: any) => { q.op = 'update'; q.patch = patch; return api },
       delete: () => { q.op = 'delete'; return api },
       eq: (col: string, val: any) => { q.filters.push((r) => r[col] === val); return api },
@@ -217,6 +224,14 @@ describe('logPayment', () => {
     expect(res.closed).toBe(false)
     expect(fake.state.tables.fh_contacts[0].stage).toBe('job')
     expect(fake.state.tables.fh_invoices.map((r) => r.status)).toEqual(['paid', 'sent'])
+  })
+
+  // DATA-15: a retry after the first answer was lost, with a field changed,
+  // records one payment carrying the latest values.
+  it('records a retried payment once under its id, with the latest fields', async () => {
+    await logPayment(job, { id: 'pay-1', amount: 500, method: 'check' })
+    await logPayment(job, { id: 'pay-1', amount: 500, method: 'check', reference: '1042' })
+    expect(fake.state.tables.fh_payments.map((p) => [p.id, p.amount, p.reference])).toEqual([['pay-1', 500, '1042']])
   })
 
   it('never touches void invoices', async () => {

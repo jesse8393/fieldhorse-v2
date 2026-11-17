@@ -220,7 +220,7 @@ export async function logInvoicePayment(invoice: Pick<InvoiceRow, 'id' | 'user_i
     reference: input.reference || null,
     paid_on: input.paid_on || new Date().toISOString().slice(0, 10)
   }
-  const { error } = await supabase.from('fh_payments').upsert(payload as any, { onConflict: 'id', ignoreDuplicates: true })
+  const { error } = await supabase.from('fh_payments').upsert(payload as any, { onConflict: 'id' })
   if (error) return { error, paid: false }
   const paid = sumCents(input.priorPayments || [], (p) => p.amount) + toCents(amount) >= toCents(invoice.amount)
   if (paid && invoice.status !== 'paid' && invoice.status !== 'void') {

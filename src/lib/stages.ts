@@ -128,9 +128,10 @@ export async function logPayment(contact: Contact, { id, amount, method, kind, r
   const normalizedAmount = Number(amount) || 0
   const normalizedKind = ['deposit','progress','final','retainage','other'].includes(kind ?? '') ? (kind as string) : 'other'
   // Client-minted id makes the write idempotent: if the request commits but
-  // the response is lost and the operator retaps, the sheet passes the SAME
-  // id and the upsert no-ops instead of double-recording the payment (which
-  // would inflate the balance and wrongly auto-close the job). Callers that
+  // the response is lost and the operator retaps, the screen passes the SAME
+  // id and the upsert updates that row (with any field changed since)
+  // instead of double-recording the payment (which would inflate the
+  // balance and wrongly auto-close the job). Callers that
   // don't pass an id get a fresh one, safe, just not retry-dedup'd.
   const paymentId = id
     || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : undefined)
@@ -152,7 +153,7 @@ export async function logPayment(contact: Contact, { id, amount, method, kind, r
   }
   const { error: insErr } = await supabase
     .from('fh_payments')
-    .upsert(payload as any, { onConflict: 'id', ignoreDuplicates: true })
+    .upsert(payload as any, { onConflict: 'id' })
   if (insErr) return { error: insErr }
 
   // Write a notification for the contractor's own inbox so the bell

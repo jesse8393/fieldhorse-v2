@@ -50,11 +50,10 @@ export default function InvoicePayment() {
   const [reference, setReference] = useState('')
   const [paidOn, setPaidOn] = useState(() => todayYmd())
   const [saving, setSaving] = useState(false)
-  // One id for this payment, so a retry after a lost answer records it once;
-  // a new id when the form changes after a failed try.
-  const [initialPaymentId] = useState(createUuid)
-  const paymentId = useRef(initialPaymentId)
-  const payloadKey = useRef<string | null>(null)
+  // One id for the life of this form (DATA-15): a retry after a lost
+  // answer, even with a field changed, updates that payment instead of
+  // recording a second one.
+  const [paymentId] = useState(createUuid)
 
   const isVoid = String(record?.invoice?.status || '').toLowerCase() === 'void'
   const shownAmount = amount ?? (figures ? amountInput(figures.due) : '')
@@ -74,14 +73,11 @@ export default function InvoicePayment() {
       toastError('Enter an amount', 'Amount must be greater than zero.')
       return
     }
-    const key = JSON.stringify([numeric, method, kind, reference, paidOn])
-    if (payloadKey.current != null && payloadKey.current !== key) paymentId.current = createUuid()
-    payloadKey.current = key
     setSaving(true)
     try {
       const res = record.job
-        ? await logPayment(record.job as never, { id: paymentId.current, amount: numeric, method, kind, reference, paid_on: paidOn, invoice_id: record.invoice.id })
-        : await logInvoicePayment(record.invoice, { id: paymentId.current, amount: numeric, method, kind, reference, paid_on: paidOn, priorPayments: record.payments })
+        ? await logPayment(record.job as never, { id: paymentId, amount: numeric, method, kind, reference, paid_on: paidOn, invoice_id: record.invoice.id })
+        : await logInvoicePayment(record.invoice, { id: paymentId, amount: numeric, method, kind, reference, paid_on: paidOn, priorPayments: record.payments })
       if (res && 'error' in res && res.error) throw new Error((res.error as { message?: string }).message || 'save failed')
       hapticTap()
       // A job's payment goes through logPayment (lib/pipeline.ts), which
