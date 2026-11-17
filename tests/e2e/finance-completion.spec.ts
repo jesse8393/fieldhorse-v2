@@ -123,7 +123,8 @@ test('phone customer summaries remain separate and filters stay usable at 320 pi
   expect(boxes[0].right).toBeLessThanOrEqual(boxes[1].left)
   for (const box of boxes) expect(box.scroll).toBeLessThanOrEqual(box.width + 1)
   const row = page.getByRole('button', { name: /^Rosa Ledger/ })
-  await expect(row.getByText('Contract balance $10K', { exact: true })).toBeVisible()
+  // A customer's balance reads to the cent (formats-4).
+  await expect(row.getByText('Contract balance $10,000.00', { exact: true })).toBeVisible()
   const create = page.getByRole('button', { name: 'New customer', exact: true })
   expect((await create.boundingBox())?.height).toBeGreaterThanOrEqual(44)
   await nothingRunsOffTheSide(page, 'phone customer directory')
