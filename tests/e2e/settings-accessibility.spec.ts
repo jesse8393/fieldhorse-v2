@@ -261,3 +261,22 @@ test('Pin location says so when the browser refuses the location', async ({ page
   await pin.click()
   await expect(page.getByText("Couldn't get your location", { exact: true })).toBeVisible()
 })
+
+// D22: deleting a custom trade asks with a second tap on the same button
+// and says the trade was deleted, not reset.
+test('deleting a custom trade takes a second tap', async ({ page, context }) => {
+  await signIn(context, { tables: { fh_rate_cards: [
+    { id: 'rc-1', user_id: 'qa-user-1', trade_key: 'stampedconcrete', label: 'Stamped concrete', unit: 'sqft', rate_low: 14, rate_high: 22, notes: null, updated_at: '2026-11-01T12:00:00Z' }
+  ] } })
+  const deletes: string[] = []
+  page.on('request', (req) => { if (req.method() === 'DELETE' && req.url().includes('/fh_rate_cards')) deletes.push(req.url()) })
+  await page.goto('/settings#rates')
+  const remove = page.getByRole('button', { name: 'Delete Stamped concrete trade', exact: true })
+  await expect(remove).toBeVisible({ timeout: 30_000 })
+  await remove.click()
+  await page.waitForTimeout(300)
+  expect(deletes).toEqual([])
+  await page.getByRole('button', { name: 'Tap again to delete Stamped concrete', exact: true }).click()
+  await expect.poll(() => deletes.length).toBe(1)
+  await expect(page.getByText('Trade deleted', { exact: true })).toBeVisible()
+})
