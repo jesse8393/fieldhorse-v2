@@ -641,6 +641,56 @@ test.describe('large text and zoom', () => {
       }
     })
   }
+
+  // big-text-6: list rows kept the amount and status beside the name at
+  // any width, so at a big zoom or text size the cents ran off the edge
+  // and names were squeezed into a sliver, broken inside words.
+  for (const percent of [100, 150, 200]) {
+    test(`list rows keep the name, status and amount readable, text at ${percent} percent`, async ({ context, page }) => {
+      await textSize(context, percent)
+      await openBig(context, page, '/jobs')
+      const widths = percent === 100 ? [412, 360, 280, 240, 206, 180] : [412, 360]
+      for (const path of ['/jobs', '/quotes', '/invoices']) {
+        if (path !== '/jobs') {
+          await page.goto(path)
+          await bigReady(page)
+        }
+        for (const width of widths) {
+          await page.setViewportSize({ width, height: 800 })
+          await page.waitForTimeout(200)
+          const rows = await page.locator('#fh-main .fhc-row').evaluateAll((all) => {
+            const vw = document.documentElement.clientWidth
+            const words = (el: Element) => {
+              const split: string[] = []
+              const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+              for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+                for (const m of (node.textContent || '').matchAll(/\S+/g)) {
+                  const range = document.createRange()
+                  range.setStart(node, m.index!)
+                  range.setEnd(node, m.index! + m[0].length)
+                  if (new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size > 1) split.push(m[0])
+                }
+              }
+              return split
+            }
+            const problems: string[] = []
+            for (const row of all) {
+              const name = row.querySelector('.fhc-row__title')?.textContent?.slice(0, 30)
+              for (const el of row.querySelectorAll('.fhc-row__money, .fhc-chip, .fhc-row__title')) {
+                const r = el.getBoundingClientRect()
+                if (r.width === 0) continue
+                if (r.left < -0.5 || r.right > vw + 0.5) problems.push(`${name}: ${el.textContent} spans ${Math.round(r.left)}..${Math.round(r.right)}`)
+                const split = words(el)
+                if (split.length) problems.push(`${name}: ${split.join(', ')} broken across lines`)
+              }
+            }
+            return problems
+          })
+          expect(rows, `${path} at ${width} px`).toEqual([])
+        }
+      }
+    })
+  }
 })
 
 // big-text-3 on a desktop window at 200 percent zoom (640 px wide).

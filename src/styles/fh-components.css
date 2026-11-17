@@ -698,6 +698,10 @@
   flex: 1;
   min-width: 0;
   display: flex;
+  /* The amount and status move under the name when the row is too narrow
+     to hold both (zoom, or the phone's text made bigger), rather than
+     squeezing the name or running off the edge. */
+  flex-wrap: wrap;
   align-items: flex-start;
   gap: 12px;
   min-height: 64px;
@@ -766,8 +770,9 @@
 .fhc-row__dot--danger { --fhc-dot: var(--fh-danger); }
 
 .fhc-row__body {
+  /* Never narrower than the name's longest word. */
   flex: 1;
-  min-width: 0;
+  max-width: 100%;
   display: grid;
   align-content: start;
   gap: 4px;
@@ -779,7 +784,7 @@
   line-height: 22px;
   font-weight: 600;
   color: var(--fh-ink);
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .fhc-row__sub {
@@ -794,6 +799,10 @@
 .fhc-row__end {
   flex: none;
   max-width: 50%;
+  /* The amount and a status chip stay whole; on a line of their own they
+     sit at the right. */
+  min-width: min-content;
+  margin-left: auto;
   display: grid;
   justify-items: end;
   gap: 4px;
