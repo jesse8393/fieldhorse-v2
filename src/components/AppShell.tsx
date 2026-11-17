@@ -232,6 +232,13 @@ export default function AppShell() {
         e.preventDefault()
         go(captureRoute())
       }
+      // Below 900 px there is no palette mounted (it loads at desktop
+      // widths only), so the shell takes Control or Cmd+K to the search
+      // screen, as the header's Search does.
+      if (window.innerWidth < 900 && !e.defaultPrevented && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        go('/search')
+      }
       if (window.innerWidth >= 900 && (e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'n') {
         e.preventDefault()
         go('/new')
