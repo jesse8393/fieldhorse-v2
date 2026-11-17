@@ -78,7 +78,7 @@ export default function QuoteDetail({ fallback }: { fallback?: ReactNode }) {
   const { id = '' } = useParams()
   const state = useQuote(id)
 
-  if (state.status === 'missing') return <>{fallback ?? <QuoteGone />}</>
+  if (state.status === 'missing') return fallback ? <OlderRecordOr id={id} fallback={fallback} /> : <QuoteGone />
   if (state.status === 'loading' || (state.status === 'failed' && !state.quote)) {
     return (
       <div className="fhqt-page">
@@ -97,6 +97,31 @@ export default function QuoteDetail({ fallback }: { fallback?: ReactNode }) {
     )
   }
   return <QuoteScreen quote={state.quote as QuoteWithClient} refresh={state.refresh} />
+}
+
+// An id that is no quote may be an older record (D56), which the fallback
+// opens. When it is neither, the quote is gone: say so here instead of
+// handing a deleted quote's id to the older screen ("Contact not found").
+function OlderRecordOr({ id, fallback }: { id: string; fallback: ReactNode }) {
+  const [older, setOlder] = useState<'checking' | 'yes' | 'no'>('checking')
+  useEffect(() => {
+    let alive = true
+    setOlder('checking')
+    void supabase.from('fh_contacts').select('id').eq('id', id).maybeSingle().then(({ data, error }) => {
+      // A failed check hands over to the older screen, which has its own errors.
+      if (alive) setOlder(error || data ? 'yes' : 'no')
+    })
+    return () => { alive = false }
+  }, [id])
+  if (older === 'checking') {
+    return (
+      <div className="fhqt-page">
+        <QuoteHeader kicker="Quote" home="/quotes" />
+        <div className="fhqt-loading"><SkeletonRows rows={5} label="Loading the quote" /></div>
+      </div>
+    )
+  }
+  return older === 'yes' ? <>{fallback}</> : <QuoteGone />
 }
 
 function QuoteGone() {

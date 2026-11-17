@@ -944,3 +944,19 @@ test.describe('a lost quote', () => {
   })
 })
 
+// Phone sales audit finding S09: an id that is no quote and no older record
+// says the quote is gone, not "Contact not found".
+test('an unknown quote id shows the quote gone screen', async ({ context, page }) => {
+  await signIn(context)
+  await page.goto('/quotes/q-nothing-here', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText('This quote is gone')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText(/Contact not found/i)).toHaveCount(0)
+})
+
+test('an older record id still opens through the quote address', async ({ context, page }) => {
+  await signIn(context)
+  await page.goto('/quotes/c-job1', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText('This quote is gone')).toHaveCount(0)
+  await expect(page.getByText(/Contact not found/i)).toHaveCount(0)
+})
+
