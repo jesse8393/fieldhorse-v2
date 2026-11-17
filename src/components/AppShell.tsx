@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useEffect, useLayoutEffect, useRef } from 'react'
+import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Navigate, Outlet, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
 import AppHeader from './AppHeader.tsx'
 import Dock from './fh/Dock.tsx'
@@ -13,6 +13,7 @@ import { captureRoute, type OpenCaptureDetail } from '../lib/captureAttach.ts'
 import { useCaptureOutboxSync } from '../lib/captureOutbox.ts'
 import { permissionRouteForPath } from '../lib/permissions.ts'
 import { lazyWithRetry } from '../lib/lazyWithRetry.ts'
+import { APP_NAME, pageTitle, screenName } from '../lib/pageTitle.ts'
 
 // The command palette is the desktop keyboard overlay, so it (and cmdk
 // and Radix with it) loads only at desktop widths: a phone never
@@ -175,6 +176,25 @@ export default function AppShell() {
     return () => cancelAnimationFrame(raf)
   }, [location.key, location.pathname, navigationType])
 
+  // Each screen names itself in the tab title, and a move to another
+  // screen inside the app is read out politely (the first screen is
+  // announced by the page load itself). Leaving the shell (sign out)
+  // gives the title back to the app.
+  const [announcement, setAnnouncement] = useState('')
+  const announcedPath = useRef<string | null>(null)
+  useEffect(() => {
+    document.title = pageTitle(location.pathname)
+    const first = announcedPath.current === null
+    const moved = announcedPath.current !== location.pathname
+    announcedPath.current = location.pathname
+    if (first || !moved) return
+    // Cleared first, so the same name twice (one job to another) is read again.
+    setAnnouncement('')
+    const timer = window.setTimeout(() => setAnnouncement(screenName(location.pathname) ?? APP_NAME), 100)
+    return () => window.clearTimeout(timer)
+  }, [location.pathname])
+  useEffect(() => () => { document.title = APP_NAME }, [])
+
   // Offline outbox: drain queued writes on app start, on regaining
   // network, and whenever the tab becomes visible. See lib/outbox.ts.
   useEffect(() => startOutboxSync(), [])
@@ -272,6 +292,7 @@ export default function AppShell() {
           Bumps a11y so keyboard users don't have to tab through every
           header + nav control to reach the screen body. */}
       <a href="#fh-main" className="fh-skip-link">Skip to content</a>
+      <div id="fh-route-announcer" className="fhc-vh" aria-live="polite" aria-atomic="true">{announcement}</div>
       {/* Removed for v3:
           - <Aurora />          three large gold radial blobs (atmosphere)
           - <GridPattern />     drifting 40px white grid (the "grid texture")

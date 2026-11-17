@@ -158,3 +158,25 @@ test('keeps the core desktop workspace coherent in light theme', async ({ page }
     await capture(page, testInfo, `light-${route.name}`)
   }
 })
+
+// A11Y-01: every screen names itself in the page title, and moving to
+// another screen inside the app is read out politely (WCAG 2.4.2).
+test('each screen has its own page title, and a screen change is announced', async ({ page }) => {
+  const titles: Record<string, string> = {}
+  for (const path of ['/', '/jobs', '/leads', '/quotes', '/quotes/q-quote', '/jobs/c-job1', '/clients', '/clients/cl-1', '/schedule', '/invoices', '/settings']) {
+    await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    await expect(page.locator('#fh-main')).toBeVisible({ timeout: 30_000 })
+    await expect.poll(() => page.title()).toMatch(/ · Fieldhorse$/)
+    titles[path] = await page.title()
+  }
+  expect(new Set(Object.values(titles)).size, JSON.stringify(titles, null, 1)).toBe(Object.keys(titles).length)
+  expect(titles['/quotes']).toBe('Quotes · Fieldhorse')
+
+  // In-app navigation keeps the page and says where it went.
+  const announcer = page.locator('#fh-route-announcer')
+  await expect(announcer).toHaveAttribute('aria-live', 'polite')
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent('fh:navigate', { detail: { to: '/schedule' } })))
+  await expect(page).toHaveURL(/\/schedule$/)
+  await expect(page).toHaveTitle('Schedule · Fieldhorse')
+  await expect(announcer).toHaveText('Schedule')
+})
