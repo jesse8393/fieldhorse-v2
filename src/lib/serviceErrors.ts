@@ -99,12 +99,12 @@ const CODE_SAYS: Record<string, string> = {
 // meant for us, so the code's own sentence is always used.
 const UNTRUSTED_DETAIL = new Set(['send_failed', 'server_misconfigured', 'missing_api_key', 'sender_not_configured', 'esign_not_configured', 'missing_token', 'invalid_token', 'forbidden', 'forbidden_path'])
 
-const NETWORK = /failed to fetch|networkerror|network ?error|load failed|network request failed|fetch failed|err_internet|err_network|internet connection appears to be offline|the network connection was lost|timed? ?out/i
+const NETWORK = /failed to fetch|networkerror|network ?error|load failed|network request failed|fetch failed|err_internet|err_network|internet connection appears to be offline|the network connection was lost/i
 const SESSION = /jwt|refresh token|auth session missing|session (has )?expired|not authenticated/i
 const PERMISSION = /row-level security|permission denied|insufficient[_ ]privilege/i
 const CONFLICT = /duplicate key|already exists/i
 const HTML = /^\s*<|<html|<!doctype/i
-const SERVER = /bad gateway|service unavailable|gateway time-?out|internal server error|cloudflare|upstream|statement timeout|^http_5\d\d$/i
+const SERVER = /bad gateway|service unavailable|gateway time-?out|internal server error|cloudflare|upstream|statement timeout|timed? ?out|^http_5\d\d$/i
 const SERVER_CODES = new Set(['57014', '53300', '53400', '08000', '08001', '08003', '08006', 'XX000', 'PGRST000', 'PGRST001', 'PGRST002'])
 const SESSION_CODES = new Set(['PGRST301', 'PGRST302', 'PGRST303'])
 const SNAKE = /^[a-z][a-z0-9]*(_[a-z0-9]+)+$/
@@ -156,6 +156,9 @@ export function isPlainSentence(value: unknown): value is string {
 export function errorKind(error: unknown): ErrorKind {
   if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) return 'offline'
   const f = fieldsOf(error)
+  // A sentence we wrote ourselves is never read for failure words: "The
+  // upload timed out on our side." is not a lost signal.
+  if (f.plainError && isPlainSentence(f.message)) return 'unknown'
   const blob = `${f.name} ${f.message}`
   if (!f.status && !f.code && !HTML.test(f.message) && (NETWORK.test(blob) || /RetryableFetchError|FetchError|FunctionsFetchError/.test(f.name))) return 'offline'
   const byCode = CODE_KIND[f.fnCode] || CODE_KIND[f.code]
@@ -164,7 +167,7 @@ export function errorKind(error: unknown): ErrorKind {
   if (f.code === '42501' || f.status === 403 || PERMISSION.test(f.message)) return 'permission'
   if (f.code === '23505' || f.status === 409 || CONFLICT.test(f.message)) return 'conflict'
   if (f.status === 429 || /too many requests|rate limit/i.test(f.message)) return 'busy'
-  if (f.status >= 500 || SERVER_CODES.has(f.code) || HTML.test(f.message) || SERVER.test(f.message) || /_failed$/.test(f.fnCode)) return 'server'
+  if (f.status >= 500 || f.name === 'TimeoutError' || SERVER_CODES.has(f.code) || HTML.test(f.message) || SERVER.test(f.message) || /_failed$/.test(f.fnCode)) return 'server'
   return 'unknown'
 }
 

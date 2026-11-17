@@ -5,6 +5,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { errorKind, plainError } from './serviceErrors.ts'
 
+
 const FALLBACK = 'Could not save the job. Try again.'
 
 // Words that must never reach a screen.
@@ -83,6 +84,22 @@ describe('errorKind', () => {
     expect(errorKind(PG.check)).toBe('unknown')
     expect(errorKind(undefined)).toBe('unknown')
     expect(errorKind(new Error('Enter a client.'))).toBe('unknown')
+  })
+})
+
+describe('a timeout or a sentence of our own', () => {
+  it('reads a request that timed out as trouble on our side, never as no signal', () => {
+    const ai = new Error('Claude request timed out (30s)')
+    expect(errorKind(ai)).toBe('server')
+    expect(plainError(ai, FALLBACK)).toBe('Something went wrong on our side. Try again in a minute.')
+    const aborted = Object.assign(new Error('signal timed out'), { name: 'TimeoutError' })
+    expect(errorKind(aborted)).toBe('server')
+  })
+
+  it('keeps our own sentence even when it has words a failure kind looks for', () => {
+    expect(plainError(new Error('The upload timed out on our side.'), FALLBACK)).toBe('The upload timed out on our side.')
+    expect(plainError(new Error('Too many requests. Please wait a minute and try again.'), FALLBACK)).toBe('Too many requests. Please wait a minute and try again.')
+    expect(errorKind(new Error('The upload timed out on our side.'))).toBe('unknown')
   })
 })
 
