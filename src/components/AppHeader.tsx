@@ -40,28 +40,36 @@ export default function AppHeader() {
   const company = headerName(orgName, profile?.company_name, profile?.full_name)
   const companyFull = headerFullName(orgName, profile?.company_name, profile?.full_name)
   const ownCompany = profileCompanyIsWorkspace({ orgName, companyName: profile?.company_name, ownsWorkspace: isOwner, workspacesOwned: memberships.filter(m => m.role === 'owner').length })
+  // Each control shows only when its screen will open for this person. With
+  // no company role that is just the sub portal (dead-ends-2).
+  const canMenu = canSee('/workspace')
+  const home = primary[0]?.to ?? (canMenu ? '/workspace' : '/sub-portal')
 
   return (
     <header className="fh-app-header fhs-header fh-glass-header">
-      <Link className="fh-glass-wordmark" to={primary[0]?.to ?? '/workspace'} aria-label="Fieldhorse home"><svg className="fh-wordmark-symbol" viewBox="0 0 28 28" fill="none" aria-hidden="true"><path d="M5 25V4h20M10 25V10h15" stroke="currentColor" strokeWidth="2.5" /></svg><span className="fh-wordmark-text">fieldhorse<span aria-hidden="true">.</span></span></Link>
+      <Link className="fh-glass-wordmark" to={home} aria-label="Fieldhorse home"><svg className="fh-wordmark-symbol" viewBox="0 0 28 28" fill="none" aria-hidden="true"><path d="M5 25V4h20M10 25V10h15" stroke="currentColor" strokeWidth="2.5" /></svg><span className="fh-wordmark-text">fieldhorse<span aria-hidden="true">.</span></span></Link>
       <nav className="fh-glass-nav" aria-label="Primary">
         {primary.map(item => <Link key={item.to} to={item.to} aria-current={isActive(item, pathname) ? 'page' : undefined}
           onPointerEnter={() => prefetchRoute(item.to)} onFocus={() => prefetchRoute(item.to)}>{item.label}</Link>)}
-        <Link to="/workspace" aria-current={pathname === '/workspace' ? 'page' : undefined}>More</Link>
+        {canMenu && <Link to="/workspace" aria-current={pathname === '/workspace' ? 'page' : undefined}>More</Link>}
       </nav>
-      <button
-        type="button"
-        className="fhs-header__menu"
-        aria-label="Open workspace menu"
-        title={companyFull}
-        onClick={openWorkspaceMenu}
-      >
-        <Monogram name={company} logoUrl={ownCompany ? profile?.logo_url : null} size={40} />
-      </button>
-      <div className="fhs-header__actions">
-        <button type="button" className="fh-glass-capture" aria-label={`Capture (${captureKeys.spoken})`} aria-keyshortcuts={captureKeys.combo} onClick={() => openCapture()} title={`Capture a note, photo, or update (${captureKeys.keys})`}>
-          <Icon icon={Mic} size={18} /><span>Capture</span>
+      {canMenu && (
+        <button
+          type="button"
+          className="fhs-header__menu"
+          aria-label="Open workspace menu"
+          title={companyFull}
+          onClick={openWorkspaceMenu}
+        >
+          <Monogram name={company} logoUrl={ownCompany ? profile?.logo_url : null} size={40} />
         </button>
+      )}
+      <div className="fhs-header__actions">
+        {canSee('/capture') && (
+          <button type="button" className="fh-glass-capture" aria-label={`Capture (${captureKeys.spoken})`} aria-keyshortcuts={captureKeys.combo} onClick={() => openCapture()} title={`Capture a note, photo, or update (${captureKeys.keys})`}>
+            <Icon icon={Mic} size={18} /><span>Capture</span>
+          </button>
+        )}
         {/* One New button (D58): the full screen with Lead, Quote, Job,
             Invoice and Client. The long press menu on the dock coin is gone.
             No key: the browser keeps Cmd or Ctrl+N for a new window (D09).
@@ -71,10 +79,12 @@ export default function AppHeader() {
             <Icon icon={Plus} size={22} />
           </Link>
         )}
-        <button type="button" className="fhs-icon-btn" aria-label="Search everything" aria-keyshortcuts={searchKeys.combo} title={`Search (${searchKeys.keys})`} onClick={openSearch}>
-          <Icon icon={Search} size={22} />
-        </button>
-        <NotificationsBell />
+        {canSee('/search') && (
+          <button type="button" className="fhs-icon-btn" aria-label="Search everything" aria-keyshortcuts={searchKeys.combo} title={`Search (${searchKeys.keys})`} onClick={openSearch}>
+            <Icon icon={Search} size={22} />
+          </button>
+        )}
+        {canSee('/notifications') && <NotificationsBell />}
       </div>
     </header>
   )
