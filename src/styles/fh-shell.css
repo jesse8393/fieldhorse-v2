@@ -30,7 +30,8 @@
   font-family: var(--fh-font-display);
   font-weight: 600;
   line-height: 1;
-  color: var(--fh-gold);
+  /* The light copper made for onyx: the deep copper read 3.1 to 1 on it. */
+  color: var(--fh-gold-line);
 }
 .fhc-monogram--32 .fhc-monogram__initials { font-size: 14px; }
 .fhc-monogram--40 .fhc-monogram__initials { font-size: 18px; }

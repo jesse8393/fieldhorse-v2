@@ -78,6 +78,14 @@
   overflow-wrap: anywhere;
 }
 
+/* A 44 px target for a thumb; the negative margin keeps the line where it was. */
+a.fhinv-hero__job {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-block: -12px;
+}
+
 a.fhinv-hero__job:hover,
 a.fhinv-hero__job:focus-visible {
   color: var(--fh-ink);

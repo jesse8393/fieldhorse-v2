@@ -11,6 +11,7 @@
 // carry a real send answer with a canned reply.
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
+import { contrastOf } from './helpers/contrast.ts'
 
 const NOW = Date.now()
 const DAY = 86400000
@@ -727,6 +728,51 @@ test.describe('the quotes list', () => {
     await rows.getByRole('link', { name: /Parking lot repour/ }).click()
     await expect(page).toHaveURL(/\/quotes\/q-quote$/)
     await expect(page.locator('.fhqt-page')).toBeVisible({ timeout: 30_000 })
+  })
+
+  // A11Y-02 and A11Y-03: the search box has an edge a field needs (3 to 1)
+  // and its placeholder reads as text (4.5 to 1), by day and at night.
+  for (const mode of ['day', 'night'] as const) {
+    test(`the quote search box edge and placeholder can be seen in ${mode} mode`, async ({ context, page }) => {
+      await signIn(context, { mode })
+      await page.goto('/quotes', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+      const search = page.getByRole('searchbox', { name: 'Search quotes' })
+      await expect(search).toBeVisible({ timeout: 30_000 })
+      await expect.poll(() => contrastOf(page.locator('.fh-quote-search'), 'border')).toBeGreaterThanOrEqual(3)
+      await expect.poll(() => contrastOf(search, 'placeholder')).toBeGreaterThanOrEqual(4.5)
+    })
+  }
+
+  // PERF-10: a long list draws 40 rows and Load more adds the next 40.
+  test('a long quotes list draws 40 rows and Load more brings the rest', async ({ context, page }) => {
+    const quotes = Array.from({ length: 60 }, (_, i) => quoteRow({ id: `q-long-${i}`, title: `Patio ${i}`, updated_at: new Date(NOW - i * 60_000).toISOString() }))
+    await signIn(context, { tables: { fh_quotes: quotes } })
+    await page.goto('/quotes', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    const rows = page.getByRole('list', { name: 'Quotes' }).getByRole('listitem')
+    await expect(rows).toHaveCount(40, { timeout: 30_000 })
+    await expect(page.getByText('Showing 40 of 60 quotes.', { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Load more quotes', exact: true }).click()
+    await expect(rows).toHaveCount(60)
+  })
+
+  // PERF-02: the list already holds the quote's row, so the quote shows at
+  // once from it and its own read only brings it up to date.
+  test('a quote opened from the list shows at once while its own read is out', async ({ context, page }) => {
+    await signIn(context)
+    await page.goto('/quotes', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    const rows = page.getByRole('list', { name: 'Quotes' })
+    await expect(rows.getByText('Parking lot repour')).toBeVisible({ timeout: 30_000 })
+    let release!: () => void
+    const held = new Promise<void>(resolve => { release = resolve })
+    await context.route(/\/rest\/v1\/fh_quotes\?.*id=eq\.q-quote/, async route => {
+      if (route.request().method() === 'GET') await held
+      await route.fallback()
+    })
+    await rows.getByRole('link', { name: /Parking lot repour/ }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Parking lot repour' })).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByText('Loading the quote', { exact: true })).toHaveCount(0)
+    release()
+    await expect(page.getByRole('heading', { level: 1, name: 'Parking lot repour' })).toBeVisible()
   })
 })
 

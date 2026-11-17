@@ -239,7 +239,8 @@ export function BalancesPanel({
           {AGING.map((b) => (
             <div key={b.id} className="fhm-aging__fact">
               <dt>{b.label}</dt>
-              <dd><Link to={`/invoices?panel=reconciliation&bucket=${encodeURIComponent(b.id)}`}>{formatMoney(totals[b.id])}</Link></dd>
+              {/* The bucket in the name: two amounts can read the same. */}
+              <dd><Link to={`/invoices?panel=reconciliation&bucket=${encodeURIComponent(b.id)}`} aria-label={`${b.label}, ${formatMoney(totals[b.id])}`}>{formatMoney(totals[b.id])}</Link></dd>
               <dd className="fhm-aging__range">{b.range}</dd>
             </div>
           ))}

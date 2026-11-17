@@ -26,12 +26,13 @@
 //     context only answers "who am I, and what role do I have?"
 //   - load anything for an unauthenticated user (returns nulls)
 
-import { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import { createContext, useContext, useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { supabase, setActiveOrgId, getActiveOrgId } from '../lib/supabase.ts'
 import { setOrgApiOrgId } from '../lib/orgApi.ts'
 import { queryClient } from '../lib/queryClient.ts'
 import { pickActiveMembership, readStoredOrgId, writeStoredOrgId } from '../lib/activeOrg.ts'
+import { readSavedIdentity, saveIdentity } from '../lib/identityCache.ts'
 import { useAuth } from './AuthContext.tsx'
 import {
   type OrgRole,
@@ -153,6 +154,30 @@ function emptyValue(loading: boolean, error: string | null): MembershipContextVa
   }
 }
 
+// The last full read kept on this device (lib/identityCache.ts), so a
+// repeat open shows the workspace at once while the read revalidates.
+type SavedMembership = {
+  rows: MembershipRow[]
+  orgs: OrgRow[]
+  memberCount: number
+  isPartner: boolean
+}
+
+function readSavedMembership(userId: string): SavedMembership | null {
+  const saved = readSavedIdentity<SavedMembership>('membership', userId)
+  if (!saved || !Array.isArray(saved.rows) || saved.rows.length === 0 || !Array.isArray(saved.orgs)) return null
+  return saved
+}
+
+function summarize(rows: MembershipRow[], orgsById: Record<string, OrgRow>): MembershipSummary[] {
+  return rows.map((r) => ({
+    orgId: r.org_id,
+    orgName: orgsById[r.org_id]?.name ?? null,
+    role: r.role,
+    joinedAt: r.joined_at,
+  }))
+}
+
 function errorMessage(e: unknown, fallback: string) {
   return e instanceof Error && e.message ? e.message : fallback
 }
@@ -261,6 +286,7 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
         setMemberships([])
         setMemberCount(0)
         settle(null)
+        saveIdentity('membership', uid, null)
         return
       }
 
@@ -288,34 +314,47 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
       for (const o of (orgQuery.data || []) as OrgRow[]) orgsById[o.id] = o
       orgsRef.current = orgsById
       setOrg(orgsById[picked.org_id] || null)
-      setMemberships(rows.map((r) => ({
-        orgId: r.org_id,
-        orgName: orgsById[r.org_id]?.name ?? null,
-        role: r.role,
-        joinedAt: r.joined_at,
-      })))
+      setMemberships(summarize(rows, orgsById))
+
+      // The org and role are known, so the workspace is settled: screens
+      // may load their data now. The two counts below only drive nav
+      // flags, so they run together afterwards and never hold a screen.
+      settle(null)
 
       // Step 3, active member count for the picked org (drives the
       // solo-mode nav: crew screens only appear when hasCrew).
-      const { count } = await supabase
-        .from('org_members')
-        .select('id', { count: 'exact', head: true })
-        .eq('org_id', picked.org_id)
-        .is('revoked_at', null)
-      if (stale()) return
-      setMemberCount(count ?? 1)
-
       // Step 4, accepted partnerships (RLS: partner_user_id = auth.uid()).
       // Keeps the Sub Portal nav entry visible for role holders who also
       // sub on other contractors' jobs.
-      const { count: partnerCount } = await supabase
-        .from('fh_job_partners')
-        .select('*', { count: 'exact', head: true })
-        .eq('partner_user_id', uid)
-        .not('accepted_at', 'is', null)
+      let counts: [{ count: number | null }, { count: number | null }]
+      try {
+        counts = await Promise.all([
+          supabase
+            .from('org_members')
+            .select('id', { count: 'exact', head: true })
+            .eq('org_id', picked.org_id)
+            .is('revoked_at', null),
+          supabase
+            .from('fh_job_partners')
+            .select('*', { count: 'exact', head: true })
+            .eq('partner_user_id', uid)
+            .not('accepted_at', 'is', null),
+        ])
+      } catch (e) {
+        // The workspace itself loaded; the nav keeps its last flags.
+        console.warn('[fieldhorse] membership counts failed', e)
+        return
+      }
       if (stale()) return
+      const [{ count }, { count: partnerCount }] = counts
+      setMemberCount(count ?? 1)
       setIsPartner((partnerCount ?? 0) > 0)
-      settle(null)
+      saveIdentity<SavedMembership>('membership', uid, {
+        rows,
+        orgs: Object.values(orgsById),
+        memberCount: count ?? 1,
+        isPartner: (partnerCount ?? 0) > 0,
+      })
     } catch (e) {
       if (stale()) return
       console.warn('[fieldhorse] membership fetch failed', e)
@@ -339,21 +378,32 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
   // On user change: forget the previous user's org (and the workspace
   // header) before anything else can render or fetch with it, then load.
   // Keyed on the user id, not the session, so a token refresh does not
-  // refetch anything.
-  useEffect(() => {
+  // refetch anything. The workspace this device last read for the user
+  // shows meanwhile, so a repeat open never waits on the network; the
+  // fetch replaces it. A layout effect, so the workspace header is set
+  // before any screen's effects can send a request.
+  useLayoutEffect(() => {
+    const saved = userId ? readSavedMembership(userId) : null
+    const orgsById: Record<string, OrgRow> = {}
+    for (const o of saved?.orgs ?? []) orgsById[o.id] = o
+    const picked = saved ? pickActiveMembership(saved.rows, readStoredOrgId()) : null
     activeUserIdRef.current = userId
-    loadedUserIdRef.current = null
+    loadedUserIdRef.current = picked ? userId : null
     preferredOrgIdRef.current = null
-    rowsRef.current = []
-    orgsRef.current = {}
+    rowsRef.current = saved?.rows ?? []
+    orgsRef.current = orgsById
     lastFetchFailedRef.current = false
-    applyActiveOrg(null)
-    setLoadedUserId(null)
-    setMembership(null)
-    setOrg(null)
-    setMemberships([])
-    setMemberCount(0)
-    setIsPartner(false)
+    applyActiveOrg(picked?.org_id ?? null)
+    setLoadedUserId(picked ? userId : null)
+    setMembership(picked)
+    setOrg(picked ? orgsById[picked.org_id] || null : null)
+    setMemberships(saved ? summarize(saved.rows, orgsById) : [])
+    setMemberCount(picked ? saved!.memberCount : 0)
+    setIsPartner(picked ? Boolean(saved!.isPartner) : false)
+    if (picked) {
+      setError(null)
+      setLoading(false)
+    }
     void fetchMembership()
   }, [userId, fetchMembership])
 

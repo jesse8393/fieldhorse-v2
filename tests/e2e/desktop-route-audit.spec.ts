@@ -158,3 +158,72 @@ test('keeps the core desktop workspace coherent in light theme', async ({ page }
     await capture(page, testInfo, `light-${route.name}`)
   }
 })
+
+// A11Y-01: every screen names itself in the page title, and moving to
+// another screen inside the app is read out politely (WCAG 2.4.2).
+test('each screen has its own page title, and a screen change is announced', async ({ page }) => {
+  const titles: Record<string, string> = {}
+  for (const path of ['/', '/jobs', '/leads', '/quotes', '/quotes/q-quote', '/jobs/c-job1', '/clients', '/clients/cl-1', '/schedule', '/invoices', '/settings']) {
+    await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    await expect(page.locator('#fh-main')).toBeVisible({ timeout: 30_000 })
+    await expect.poll(() => page.title()).toMatch(/ · Fieldhorse$/)
+    titles[path] = await page.title()
+  }
+  expect(new Set(Object.values(titles)).size, JSON.stringify(titles, null, 1)).toBe(Object.keys(titles).length)
+  expect(titles['/quotes']).toBe('Quotes · Fieldhorse')
+
+  // In-app navigation keeps the page and says where it went.
+  const announcer = page.locator('#fh-route-announcer')
+  await expect(announcer).toHaveAttribute('aria-live', 'polite')
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent('fh:navigate', { detail: { to: '/schedule' } })))
+  await expect(page).toHaveURL(/\/schedule$/)
+  await expect(page).toHaveTitle('Schedule · Fieldhorse')
+  await expect(announcer).toHaveText('Schedule')
+})
+
+// A11Y-07: tabbing to a control the page has scrolled past brings it into
+// view clear of the sticky header and, on a phone, clear of the dock
+// (WCAG 2.4.11).
+test('a focused control is never hidden under the sticky header or the phone dock', async ({ page, isMobile }) => {
+  const client = { id: 'cl-1', name: 'Jeff Roy', phone: '555-0101', email: 'jeff@roy.com' }
+  const jobs = Array.from({ length: 40 }, (_, i) => ({
+    id: `c-long-${i}`, user_id: 'qa-user-1', client_id: 'cl-1', stage: 'job', name: `Customer ${i}`, job_title: `Driveway ${i}`,
+    amount: 1000 + i, created_at: '2026-09-01T12:00:00Z', updated_at: new Date(Date.UTC(2026, 9, 1, 12, i)).toISOString(), fh_clients: client
+  }))
+  await page.context().unrouteAll({ behavior: 'ignoreErrors' })
+  await installMock(page.context(), { tables: { fh_contacts: jobs } })
+  await page.goto('/jobs?stage=active', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  const main = page.locator('#fh-main')
+  await expect(main.locator('.fhjl-rows > li')).toHaveCount(40, { timeout: 30_000 })
+  const rows = main.locator('.fhjl-rows > li')
+  const headerBottom = await page.locator('.fh-glass-header').evaluate(el => el.getBoundingClientRect().bottom)
+  const dockTop = isMobile
+    ? await page.locator('.fhs-dock').evaluate(el => el.getBoundingClientRect().top)
+    : await page.evaluate(() => window.innerHeight)
+  // Scroll so the row sits at `y` in the viewport, then Tab onto it from
+  // the row before (or Shift+Tab from the row after).
+  async function tabOnto(index: number, y: (height: number) => number, back: boolean) {
+    const target = rows.nth(index).locator('a[href]').first()
+    await target.evaluate((el, at) => {
+      const rect = el.getBoundingClientRect()
+      window.scrollBy(0, rect.top - at)
+    }, y(await target.evaluate(el => el.getBoundingClientRect().height)))
+    // Focus its neighbour in tab order without scrolling, then step onto it.
+    await target.evaluate((el, back) => {
+      const all = [...document.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])')]
+        .filter(node => node.offsetParent !== null && node.tabIndex >= 0)
+      all[all.indexOf(el as HTMLElement) + (back ? 1 : -1)].focus({ preventScroll: true })
+    }, back)
+    await page.keyboard.press(back ? 'Shift+Tab' : 'Tab')
+    await expect(target).toBeFocused()
+    return target.evaluate(el => el.getBoundingClientRect())
+  }
+
+  // Half under the header: going back up stops clear of it.
+  const up = await tabOnto(10, height => headerBottom - height / 2, true)
+  expect(up.top).toBeGreaterThanOrEqual(headerBottom)
+  // Half under the dock (or the window's foot): going down stops clear of it.
+  const down = await tabOnto(20, height => dockTop - height / 2, false)
+  // A pixel of rounding is allowed.
+  expect(down.bottom).toBeLessThanOrEqual(dockTop + 1)
+})

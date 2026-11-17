@@ -5,6 +5,7 @@
 // that takes the dock's place.
 import { expect, test, type Page, type Route } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
+import { contrastOf } from './helpers/contrast.ts'
 
 async function open(page: Page, path: string) {
   await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 60_000 })
@@ -444,9 +445,9 @@ test.describe('job page on a desktop, redesigned', () => {
     await expect(banner.getByText('Plumbing Bellevue · 412 Burkitt Station Rd')).toBeVisible()
     await expect(banner.getByRole('link', { name: 'Back to jobs' }).or(banner.getByRole('button', { name: 'Back to jobs' }))).toBeVisible()
 
-    // Message and Schedule are secondary; the stage action is the one gold button.
+    // Message and Add a visit are secondary; the stage action is the one gold button.
     await expect(banner.getByRole('link', { name: /^Message/ })).toHaveAttribute('href', '/compose?contact=c-job1&channel=email')
-    await expect(page.locator('.fh-job-secondary-actions').getByRole('button', { name: 'Schedule', exact: true })).toBeVisible()
+    await expect(page.locator('.fh-job-secondary-actions').getByRole('button', { name: 'Add a visit', exact: true })).toBeVisible()
     const gold = page.locator('.fhc-btn--primary')
     await expect(gold).toHaveCount(1)
     await expect(gold).toHaveText('Add update')
@@ -580,7 +581,7 @@ test.describe('job page on a desktop, redesigned', () => {
     await signIn(context)
     await openDesktop(page, '/jobs/c-job1')
     const banner = page.locator('.fh-job-workspace')
-    await page.locator('.fh-job-secondary-actions').getByRole('button', { name: 'Schedule', exact: true }).click()
+    await page.locator('.fh-job-secondary-actions').getByRole('button', { name: 'Add a visit', exact: true }).click()
     await expect(page).toHaveURL(/\/schedule\/new\?job=c-job1$/)
     await expect(page.getByRole('dialog')).toHaveCount(0)
     await page.goBack()
@@ -739,6 +740,27 @@ test('margin and health count an approved change order', async ({ context, page 
   await expect(page.getByText('Overpaid')).toHaveCount(0)
 })
 
+// PERF-09: the job screen read its to-dos twice (the job's bundle and the
+// to-do section) and its photos twice (the header and the photo section).
+// One read each now feeds every part of the screen that shows them.
+test('a job page reads its to-dos and photos once each', async ({ context, page }, testInfo) => {
+  // The desktop job screen is its own build (SnowJobDetailBuild).
+  test.skip(!testInfo.project.name.startsWith('mobile'), 'Phone layout')
+  await signIn(context)
+  const reads: string[] = []
+  page.on('request', request => {
+    if (request.method() !== 'GET') return
+    const url = new URL(request.url())
+    const table = url.pathname.split('/rest/v1/')[1]
+    if (table === 'fh_job_todos') reads.push('todos')
+    if (table === 'fh_job_files' && url.searchParams.get('kind') === 'eq.photo') reads.push('photos')
+  })
+  await open(page, '/jobs/c-job1')
+  await page.waitForLoadState('networkidle')
+  expect(reads.filter(read => read === 'todos')).toHaveLength(1)
+  expect(reads.filter(read => read === 'photos')).toHaveLength(1)
+})
+
 // Mark complete writes the closeout record and moves the job to Closed.
 // Before this test nothing submitted the screen.
 test('Mark complete saves the closeout and closes the job', async ({ context, page }) => {
@@ -760,4 +782,32 @@ test('Mark complete saves the closeout and closes the job', async ({ context, pa
   const stage = writes.find((w) => w.method === 'PATCH' && w.url.includes('/fh_contacts'))
   expect(stage?.url).toContain('id=eq.c-job1')
   expect(stage?.body).toEqual({ stage: 'closed' })
+})
+
+// A11Y-06: the keyboard focus ring on the dark visit card's View schedule
+// can be seen (3 to 1 against the card), by day and at night.
+for (const mode of ['day', 'night'] as const) {
+  test(`the focus ring on the visit card can be seen in ${mode} mode`, async ({ context, page }) => {
+    await signIn(context, { mode })
+    await page.goto('/jobs/c-job1', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    const view = page.locator('.fh-job-visit').getByRole('button', { name: /^(View schedule|Schedule a visit)$/ }).first()
+    await expect(view).toBeVisible({ timeout: 30_000 })
+    await view.focus()
+    await expect(view).toBeFocused()
+    expect(await view.evaluate(element => element.matches(':focus-visible'))).toBe(true)
+    await expect.poll(() => contrastOf(view, 'outline')).toBeGreaterThanOrEqual(3)
+  })
+}
+
+// A11Y-13: one name, one action: on the desktop job page the Schedule tab
+// and the button that adds a visit no longer share the name "Schedule".
+test('the desktop job page has one control named Schedule', async ({ context, page }, testInfo) => {
+  test.skip(!testInfo.project.name.startsWith('desktop'), 'Desktop job page')
+  await signIn(context)
+  await page.goto('/jobs/c-job1', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.locator('[data-build-screen="SnowJobDetailBuild"]')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('button', { name: 'Add a visit', exact: true })).toBeVisible()
+  // In the screen: the header's Schedule link goes to the Schedule screen.
+  const named = page.locator('#fh-main').locator('button, [role="tab"], a').filter({ hasText: /^Schedule$/ })
+  await expect(named).toHaveCount(1)
 })

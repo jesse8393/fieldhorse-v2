@@ -229,6 +229,18 @@ test.describe('the lead screen', () => {
 })
 
 test.describe('the leads list', () => {
+  // PERF-10: a long list draws 40 rows and Load more adds the next 40.
+  test('a long leads list draws 40 rows and Load more brings the rest', async ({ context, page }) => {
+    const leads = Array.from({ length: 60 }, (_, i) => lead({ id: `l-long-${i}`, title: `Retaining wall ${i}`, created_at: new Date(Date.UTC(2026, 9, 1, 12, i)).toISOString() }))
+    await signIn(context, { tables: { fh_leads: leads } })
+    await open(page, '/leads')
+    const rows = page.getByRole('list', { name: 'Leads' }).getByRole('listitem')
+    await expect(rows).toHaveCount(40, { timeout: 30_000 })
+    await expect(page.getByText('Showing 40 of 60 leads.', { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Load more leads', exact: true }).click()
+    await expect(rows).toHaveCount(60)
+  })
+
   test('lists every open lead, soonest follow up first, with an estimate chip', async ({ context, page }) => {
     await signIn(context, {
       tables: {

@@ -6,6 +6,10 @@ import { toast as sonnerToast } from 'sonner'
 
 const DEFAULT_DURATION = 4500
 const HEAVY_DURATION = 6000 // destructive actions + auto-created entities
+// Errors and Undo stay until closed (every toast has a close button,
+// AppToaster): one that vanishes on a timer is lost to a slow reader or a
+// gloved hand (WCAG 2.2.1).
+const UNTIL_CLOSED = Infinity
 
 export type ToastOptions = {
   accent?: string
@@ -26,11 +30,14 @@ function variantFromAccent(accent: string | undefined): 'success' | 'error' | nu
 export function toast(message: string, options: ToastOptions = {}) {
   if (typeof window === 'undefined') return
   const heavy = options.heavy || options.destructive
+  const accent = options.accent || 'gold'   // gold | green | red | steel | stageId
+  // Explicit variant wins; otherwise infer from accent.
+  const variant = options.variant || variantFromAccent(accent)
   const detail = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     message,
-    accent: options.accent || 'gold',   // gold | green | red | steel | stageId
-    duration: options.duration ?? (heavy ? HEAVY_DURATION : DEFAULT_DURATION)
+    accent,
+    duration: options.duration ?? (variant === 'error' ? UNTIL_CLOSED : heavy ? HEAVY_DURATION : DEFAULT_DURATION)
   }
   // Dev-only, audit L2 caught the same toast logged 4× in production
   // (the Sonner forward dispatches its own event handlers downstream).
@@ -38,8 +45,6 @@ export function toast(message: string, options: ToastOptions = {}) {
     // eslint-disable-next-line no-console
     console.log(`[toast] ${detail.accent}: ${message}`)
   }
-  // Explicit variant wins; otherwise infer from accent.
-  const variant = options.variant || variantFromAccent(detail.accent)
   const sonnerOpts = { description: options.description, duration: detail.duration }
   if (variant === 'success') sonnerToast.success(message, sonnerOpts)
   else if (variant === 'error') sonnerToast.error(message, sonnerOpts)
@@ -55,8 +60,8 @@ export const toastInfo = (message: string, description?: string) => toast(messag
  *
  * Sonner action toast pattern: success-style toast with a label/onClick.
  * The host call is responsible for the actual undo work (typically
- * re-inserting the deleted row from a captured snapshot). Default 8s
- * window so the user has time to react after putting the phone down.
+ * re-inserting the deleted row from a captured snapshot). It stays until
+ * closed, so the user has time to react after putting the phone down.
  *
  * Usage:
  *   const snapshot = { ...row }
@@ -70,7 +75,7 @@ export const toastInfo = (message: string, description?: string) => toast(messag
  *     }
  *   })
  */
-export function toastUndo(message: string, { description, onUndo, duration = 8000 }: { description?: string; onUndo?: () => void | Promise<void>; duration?: number } = {}) {
+export function toastUndo(message: string, { description, onUndo, duration = UNTIL_CLOSED }: { description?: string; onUndo?: () => void | Promise<void>; duration?: number } = {}) {
   if (typeof window === 'undefined') return
   // The action button is the whole point
   sonnerToast(message, {
