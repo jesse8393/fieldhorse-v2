@@ -58,12 +58,15 @@ export function useQuote(id: string | undefined) {
       before = s.quote
       return { ...s, quote: { ...s.quote, ...updates } as QuoteWithClient }
     })
-    const { error } = await supabase.from('fh_quotes').update(updates).eq('id', id)
-    if (error) {
+    const { data, error } = await supabase.from('fh_quotes').update(updates).eq('id', id).select('id')
+    // A write that matched no row saved nothing: the quote was deleted or
+    // changed elsewhere, so it is never reported as saved.
+    const message = error ? error.message : !data || data.length === 0 ? 'This quote changed on another device. Check it and try again.' : null
+    if (message) {
       const saved = before
       if (saved) setState((s) => (s.quote ? { ...s, quote: saved } : s))
-      toastError("Couldn't save the quote", error.message)
-      return { error: { message: error.message } }
+      toastError("Couldn't save the quote", message)
+      return { error: { message } }
     }
     const saved = before as QuoteWithClient | null
     invalidateAfterQuoteWrite(queryClient, { quoteId: id, leadId: saved?.lead_id, clientId: saved?.client_id })

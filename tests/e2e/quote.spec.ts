@@ -730,6 +730,52 @@ test.describe('the quotes list', () => {
   })
 })
 
+// Audit finding DATA-18: a write that changed no row is never reported as saved.
+test.describe('a write that finds nothing to change', () => {
+  test('a line edit that matched no line says so and keeps the editor', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS } })
+    await context.route((url) => url.pathname.endsWith('/rest/v1/fh_quote_items'), (route) => {
+      if (route.request().method() !== 'PATCH') return route.fallback()
+      return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+    })
+    await openQuote(page)
+    await lines(page).getByRole('button', { name: /Pump truck/ }).click()
+    const editor = page.getByRole('form', { name: 'Edit line' })
+    await editor.getByLabel('Rate').fill('1000')
+    await editor.getByRole('button', { name: 'Save changes' }).click()
+    await expect(page.getByText("Couldn't update the line")).toBeVisible()
+    await expect(editor).toBeVisible()
+  })
+
+  test('scope and terms that matched no quote say so and stay on the form', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS } })
+    await context.route((url) => url.pathname.endsWith('/rest/v1/fh_quotes'), (route) => {
+      if (route.request().method() !== 'PATCH') return route.fallback()
+      return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+    })
+    await openQuote(page, '/quotes/q-quote/terms')
+    await page.getByLabel('Scope of work').fill('Remove and repour the lot')
+    await page.getByRole('button', { name: 'Save terms' }).click()
+    await expect(page.getByText("Couldn't save the quote")).toBeVisible()
+    await expect(page).toHaveURL(/\/quotes\/q-quote\/terms$/)
+  })
+
+  test('a delete that matched no quote does not say deleted', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS, fh_quotes: [quoteRow({ status: 'draft', sent_at: null })] } })
+    await context.route((url) => url.pathname.endsWith('/rest/v1/fh_quotes'), (route) => {
+      if (route.request().method() !== 'DELETE') return route.fallback()
+      return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+    })
+    await openQuote(page)
+    await page.getByRole('button', { name: 'Delete draft quote' }).click()
+    await page.waitForTimeout(600)
+    await page.getByRole('button', { name: 'Tap again to delete' }).click()
+    await expect(page.getByText("Couldn't delete the quote")).toBeVisible()
+    await expect(page.getByText('Draft quote deleted')).toHaveCount(0)
+    await expect(page).toHaveURL(/\/quotes\/q-quote$/)
+  })
+})
+
 // Audit finding DATA-13: the list shows what was just done to a quote.
 test.describe('the quotes list after a change', () => {
   test('a deleted quote leaves the list at once', async ({ context, page }) => {

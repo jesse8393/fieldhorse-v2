@@ -337,8 +337,13 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
     void run('delete', async () => {
       // One delete: the lines go with the quote in the database (their
       // quote_id cascades), so a failure never leaves an empty quote.
-      const row = await supabase.from('fh_quotes').delete().eq('id', quote.id)
+      // A delete that matched no row did not delete anything.
+      const row = await supabase.from('fh_quotes').delete().eq('id', quote.id).select('id')
       if (row.error) throw new Error(row.error.message)
+      if (!row.data || row.data.length === 0) {
+        await refresh()
+        throw new Error('This quote changed on another device. Check it and try again.')
+      }
       refreshLists()
       toastSuccess(quote.status === 'draft' ? 'Draft quote deleted' : 'Quote deleted')
       navigate('/quotes', { replace: true })

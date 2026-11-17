@@ -458,12 +458,20 @@ export function useQuoteItems({ jobId, quoteId, userId, onContactRefresh, onLoad
 
   async function updateItem(id: any, patch: any) {
     if (!id || !userId) return false
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('fh_quote_items')
       .update(patch)
       .eq('id', id)
+      .select('id')
     if (error) {
-      toastError("Couldn't update item", error.message)
+      toastError("Couldn't update the line", writeFailure(error))
+      return false
+    }
+    // An update that matched no row saved nothing: the line was deleted or
+    // changed elsewhere. Say so and read the lines again.
+    if (!data || data.length === 0) {
+      toastError("Couldn't update the line", 'It changed on another device. The lines are read again.')
+      void fetchRows({ silent: true })
       return false
     }
     await fetchRows({ silent: true })
