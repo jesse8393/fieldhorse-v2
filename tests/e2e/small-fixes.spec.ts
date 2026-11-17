@@ -1014,24 +1014,26 @@ test.describe('The quote screen', () => {
     await expect(send).toBeEnabled()
   })
 
-  // An approved quote's new version is a snapshot of the lines, so it waits
-  // too: taken during the save, it froze the lines from before the switch.
-  // The row leads to the approval screen while it can, and waits as a
-  // disabled row while it cannot.
-  test('Approve a new version waits while a switch saves', async ({ context, page }) => {
+  // An approved quote's new version is a snapshot of the lines, so it must
+  // never be taken while a switch saves. Since M-03 the lines of an approved
+  // quote are locked at what the customer agreed to and its switches hold,
+  // so no save can start there: a tap on the switch writes nothing and the
+  // row keeps leading to the approval screen.
+  test('Approve a new version never waits on a switch: the approved quote holds its switches (M-03)', async ({ context, page }) => {
     await signIn(context, { tables: { fh_quotes: [quoteRow({ status: 'approved' })], fh_quote_items: QUOTE_ITEMS } })
     const save = await holdQuoteItemPatches(context)
     await openQuote(page)
     const toggle = page.getByRole('switch', { name: 'Include Stamped ashlar, charcoal release in the total' })
     await expect(page.getByRole('link', { name: /^Approve a new version/ })).toBeVisible()
+    await expect(toggle).toBeDisabled()
+    await expect(toggle).toHaveAttribute('aria-checked', 'false')
 
-    await toggle.click()
-    await expect.poll(() => save.patches.length).toBe(1)
-    await expect(page.getByRole('button', { name: /^Approve a new version/ })).toBeDisabled()
-    await expect(page.getByRole('link', { name: /^Approve a new version/ })).toHaveCount(0)
-
-    save.release()
+    await toggle.click({ force: true })
+    await page.waitForTimeout(300)
+    expect(save.patches).toEqual([])
+    await expect(toggle).toHaveAttribute('aria-checked', 'false')
     await expect(page.getByRole('link', { name: /^Approve a new version/ })).toBeVisible()
+    save.release()
   })
 
   // A disabled control that has focus drops it to the page: the switch
