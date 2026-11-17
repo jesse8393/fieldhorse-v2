@@ -9,6 +9,7 @@ import { toastSuccess, toastError } from '../lib/toast.ts'
 import { hapticTap, hapticSuccess } from '../lib/haptics.ts'
 import { Eyebrow } from './v3'
 import { countNoun } from '../lib/format.ts'
+import { plainError } from '../lib/serviceErrors.ts'
 
 // Time clock card, Phase 19 / Upgrade Move #A2.
 //
@@ -150,7 +151,9 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
       if (msg.includes('one_active_per_user') || ex?.code === '23505') {
         toastError('Already on the clock', 'Clock out before starting a new shift.')
       } else {
-        toastError("Couldn't clock in", msg || 'Try again')
+        // Plain words, never the database's or the browser's own, as on
+        // Crew home (OPS-18, raw-errors-11).
+        toastError("Couldn't clock in", plainError(ex, 'Your shift did not start. Try again.'))
       }
     }
   }
@@ -255,7 +258,7 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
       try { await recalcCost(contact.id, userId) } catch {}
       onLogged?.()
     } catch (ex: any) {
-      toastError("Couldn't log time", ex?.message || 'Try again')
+      toastError("Couldn't log time", plainError(ex, 'Your hours are still on the clock. Try again.'))
     } finally {
       setSaving(false)
     }
