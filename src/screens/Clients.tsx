@@ -271,10 +271,11 @@ export default function Clients() {
           <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--v3-text-muted)', pointerEvents: 'none' }} />
           <input
             aria-label="Search customers"
+            className="fh-clients__search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search customers"
-            style={{ width: '100%', padding: '12px 12px 12px 32px', borderRadius: 10, background: 'var(--v3-surface)', border: '1px solid var(--v3-border-strong)', color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 16, boxSizing: 'border-box' }}
+            style={{ width: '100%', padding: '12px 12px 12px 32px', borderRadius: 10, background: 'var(--v3-surface)', border: '1px solid var(--fh-edge-strong)', color: 'var(--v3-text)', fontFamily: 'var(--font-body)', fontSize: 16, boxSizing: 'border-box' }}
           />
         </div>
         <div className="fh-customer-filters" aria-label="Customer filters">

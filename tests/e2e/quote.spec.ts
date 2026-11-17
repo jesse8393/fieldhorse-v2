@@ -11,6 +11,7 @@
 // carry a real send answer with a canned reply.
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
+import { contrastOf } from './helpers/contrast.ts'
 
 const NOW = Date.now()
 const DAY = 86400000
@@ -728,6 +729,19 @@ test.describe('the quotes list', () => {
     await expect(page).toHaveURL(/\/quotes\/q-quote$/)
     await expect(page.locator('.fhqt-page')).toBeVisible({ timeout: 30_000 })
   })
+
+  // A11Y-02 and A11Y-03: the search box has an edge a field needs (3 to 1)
+  // and its placeholder reads as text (4.5 to 1), by day and at night.
+  for (const mode of ['day', 'night'] as const) {
+    test(`the quote search box edge and placeholder can be seen in ${mode} mode`, async ({ context, page }) => {
+      await signIn(context, { mode })
+      await page.goto('/quotes', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+      const search = page.getByRole('searchbox', { name: 'Search quotes' })
+      await expect(search).toBeVisible({ timeout: 30_000 })
+      await expect.poll(() => contrastOf(page.locator('.fh-quote-search'), 'border')).toBeGreaterThanOrEqual(3)
+      await expect.poll(() => contrastOf(search, 'placeholder')).toBeGreaterThanOrEqual(4.5)
+    })
+  }
 
   // PERF-10: a long list draws 40 rows and Load more adds the next 40.
   test('a long quotes list draws 40 rows and Load more brings the rest', async ({ context, page }) => {
