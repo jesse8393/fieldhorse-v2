@@ -1,7 +1,7 @@
 // One inventory for every viewport. Desktop may add job quick actions,
 // but membership, filters, counts and source records stay shared.
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { Phone as PhoneIcon, MessageSquare as MsgIcon, CalendarClock, MoreHorizontal, RotateCcw } from 'lucide-react'
@@ -45,7 +45,18 @@ export default function Work() {
   const isMoneyRole = !membershipLoading && canCreateFinancialDocs
   const showMoney = !membershipLoading && canSeeFinancials
   const isDesktop = useIsDesktop()
-  const [search, setSearch] = useState('')
+  // The search lives in ?q= (D18), so Back from a job and a reload keep it.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [search, setSearchState] = useState(() => searchParams.get('q') ?? '')
+  const setSearch = useCallback((value: string) => {
+    setSearchState(value)
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (value) next.set('q', value)
+      else next.delete('q')
+      return next
+    }, { replace: true })
+  }, [setSearchParams])
   const [debouncedSearch, setDebouncedSearch] = useState('')
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300)
