@@ -9,15 +9,18 @@
 //
 // Server-side validation:
 //   - kind must be one of coi / w9 / license
-//   - storage_path must start with the caller's user_id (the path
-//     scheme baked in by /api/sub-doc-upload-url). This prevents a
-//     malicious client from claiming someone else's path as their
-//     own document.
+//   - storage_path must be a path /api/sub-doc-upload-url issues to this
+//     caller for this kind: <user_id>/<kind>/<file>, plain segments only
+//     (see lib/storagePath.js). This prevents a malicious client from
+//     claiming someone else's path as their own document.
 
 import { createClient } from '@supabase/supabase-js'
-import { boundSubOrgIds, normalizeEmail } from './lib/subAccess.js'
+import { boundSubOrgIds, normalizeEmail, SUB_DOC_TYPES } from './lib/subAccess.js'
+import { isOwnedStoragePath } from './lib/storagePath.js'
 
 const VALID_KINDS = ['coi', 'w9', 'license']
+// The file extensions /api/sub-doc-upload-url puts on a path: pdf, jpg, png.
+const DOC_EXTENSIONS = Object.values(SUB_DOC_TYPES)
 
 // Map kind → column name on fh_sub_profiles.
 const COLUMN_BY_KIND = {
@@ -61,10 +64,17 @@ export default async (request) => {
   const authEmail = normalizeEmail(userData.user.email)
   if (!authEmail) return json({ error: 'no_auth_email' }, 400)
 
-  // Ownership guard: the path must start with the caller's user_id.
-  // Matches the path scheme produced by /api/sub-doc-upload-url:
+  // Ownership guard. The path must be one /api/sub-doc-upload-url issues to
+  // this caller for this kind of document:
   //   <userId>/<kind>/<ts>-<rand>.<ext>
-  if (!storagePath.startsWith(`${authUserId}/${kind}/`)) {
+  // isOwnedStoragePath (lib/storagePath.js) checks that the first folder is
+  // exactly the caller's user id, the next is exactly the kind, a file name
+  // follows it, the extension is one the upload handler issues, and every
+  // segment is plain: no "." or ".." segment, no encoded character, no
+  // query string and no fragment. Starting with "<userId>/<kind>/" is not
+  // enough: the saved path is later put into storage URLs, where
+  // "<userId>/<kind>/../.." resolves to somewhere else.
+  if (!isOwnedStoragePath(storagePath, authUserId, { prefix: [kind], extensions: DOC_EXTENSIONS })) {
     return json({ error: 'path_not_owned', detail: 'Storage path does not belong to this caller.' }, 403)
   }
 

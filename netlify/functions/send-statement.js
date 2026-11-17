@@ -17,6 +17,7 @@ import { createClient } from '@supabase/supabase-js'
 import { renderPayBlock, formatFromHeader, textField } from './lib/email.js'
 import { loadAccessibleRow, brandingUserIdFor } from './lib/orgAccess.js'
 import { hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
+import { isOwnedStoragePath } from './lib/storagePath.js'
 
 export default async (request) => {
   if (request.method === 'OPTIONS') {
@@ -112,12 +113,15 @@ export default async (request) => {
   const replyTo = (profile?.company_email || authData.user.email || '').trim()
 
   // 3. Download the uploaded statement PDF.
-  // Tenant guard: service role bypasses the per-user folder RLS, and every
-  // job-files object is written under `${userId}/...` (see the upload paths
-  // in src/screens/**). A path that doesn't start with the caller's own id
-  // belongs to another tenant — reject it so a forged storage_path can't
-  // exfiltrate another user's PDF.
-  if (!String(storage_path).startsWith(`${sender_user_id}/`)) {
+  // Tenant guard: the service role key ignores the per user folder rules,
+  // so the path is checked here first. isOwnedStoragePath
+  // (lib/storagePath.js) accepts only a PDF under the caller's own folder
+  // in job-files (`${userId}/...`), written as plain segments: no "." or
+  // ".." segment, no encoded character, no query string and no fragment.
+  // Starting with the caller's id is not enough, because fetch resolves
+  // "<id>/../.." and would take the service key to another account's file
+  // or to another API of the project. See send-quote.js.
+  if (!isOwnedStoragePath(storage_path, sender_user_id, { extensions: ['pdf'] })) {
     return json({ error: 'forbidden_path', detail: 'storage_path is outside your namespace.' }, 403)
   }
   const { data: fileBlob, error: dlErr } = await supabase.storage
