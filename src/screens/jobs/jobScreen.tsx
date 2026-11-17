@@ -1,3 +1,4 @@
+import { moneyExact } from '../../lib/format.ts'
 // What the job's action screens share (Phase 9, Task 13, D57): the job
 // read through the same hook as the job page, the fallback while it loads
 // or when it is gone, and Back that returns to the job when there is no
@@ -50,6 +51,8 @@ export function JobScreenFallback({ title, saveLabel, data, home }: { title: str
   )
 }
 
+// Exact to the cent (M-20): a $4,999.50 balance read "$5,000" and a
+// $1,234.50 payment "Record $1,235".
 export function money(n: unknown) {
-  return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
+  return moneyExact(n as number)
 }

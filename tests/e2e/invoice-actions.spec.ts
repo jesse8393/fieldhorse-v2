@@ -523,3 +523,14 @@ test('a paid draw cannot be edited to a new amount or set back to draft', async 
   expect(patches[0]).not.toHaveProperty('status')
   expect(patches[0]).not.toHaveProperty('user_id')
 })
+
+// M-20: the Expenses list keeps cents on each row and the total.
+test('expenses show cents', async ({ page, context }) => {
+  const tables = teammateExpenseTables()
+  tables.fh_expenses = [{ ...tables.fh_expenses[0], amount: 420.5 }, { ...tables.fh_expenses[0], id: 'exp-2', description: 'Forms', amount: 79.25 }]
+  await signIn(context, { tables })
+  await page.goto('/jobs/c-team?tab=expenses', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+  await expect(page.getByText('$420.50').first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText('$79.25').first()).toBeVisible()
+  await expect(page.getByText('$499.75').first()).toBeVisible()
+})

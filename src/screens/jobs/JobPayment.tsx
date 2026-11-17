@@ -9,9 +9,9 @@ import { useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Field } from '../../components/fh'
 import CreateShell, { moneyInput } from '../new/CreateShell.tsx'
-import PaymentClassification, { PAYMENT_METHODS } from '../../components/PaymentClassification.tsx'
+import PaymentClassification from '../../components/PaymentClassification.tsx'
 import { logPayment } from '../../lib/pipeline.ts'
-import { toastError, toastSuccess } from '../../lib/toast.ts'
+import { toastError } from '../../lib/toast.ts'
 import { hapticMedium } from '../../lib/haptics.ts'
 import { todayYmd } from '../../lib/dates.ts'
 import { JobScreenFallback, money, useJobScreen } from './jobScreen.tsx'
@@ -70,8 +70,9 @@ function PaymentForm({ data, goBack, home }: { data: ReturnType<typeof useJobScr
       if (res && (res as { error?: { message?: string } }).error) {
         throw new Error((res as { error?: { message?: string } }).error?.message || 'The payment was not saved.')
       }
+      // logPayment (lib/pipeline.ts) already shows the one payment toast;
+      // a second one here disagreed with it (OPS-08).
       hapticMedium()
-      toastSuccess('Payment recorded', `${money(numeric)}, ${PAYMENT_METHODS.find((m) => m.value === method)?.label || 'payment'}`)
       await data.fetchAll()
       goBack()
     } catch (e) {

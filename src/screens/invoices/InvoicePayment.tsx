@@ -81,7 +81,9 @@ export default function InvoicePayment() {
         : await logInvoicePayment(record.invoice, { id: paymentId.current, amount: numeric, method, kind, reference, paid_on: paidOn, priorPayments: record.payments })
       if (res && 'error' in res && res.error) throw new Error((res.error as { message?: string }).message || 'save failed')
       hapticTap()
-      toastSuccess('Payment recorded', `${formatMoney(numeric)}, ${PAYMENT_METHODS.find((m) => m.value === method)?.label || 'Payment'}`)
+      // A job's payment goes through logPayment (lib/pipeline.ts), which
+      // shows its own toast; only an invoice with no job needs one here.
+      if (!record.job) toastSuccess('Payment recorded', `${formatMoney(numeric)}, ${PAYMENT_METHODS.find((m) => m.value === method)?.label || 'Payment'}`)
       refresh()
       navigate(`/invoices/${record.invoice.id}`, { replace: true })
     } catch (err) {

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Trash2, Receipt } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
 import { recalcCost } from '../../../lib/stages.ts'
+import { moneyExact } from '../../../lib/format.ts'
 import { crewLaborForContact, type CrewLabor } from '../../../lib/labor.ts'
 import { toastError, toastSuccess, toastUndo } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
@@ -19,10 +20,9 @@ const EXPENSE_CATEGORIES = [
   { value: 'Other',     label: 'Other' }
 ]
 
+// Exact to the cent (M-20): a $420.50 receipt read "$421".
 function money(n: any) {
-  return Number(n || 0).toLocaleString(undefined, {
-    style: 'currency', currency: 'USD', maximumFractionDigits: 0
-  })
+  return moneyExact(n)
 }
 
 /**

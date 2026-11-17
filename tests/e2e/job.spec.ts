@@ -678,3 +678,31 @@ test.describe('job page on a desktop, redesigned', () => {
     await expect(page.getByRole('complementary', { name: 'Job facts' })).toBeVisible()
   })
 })
+
+// M-20 and OPS-08: Log payment keeps cents on the balance, the button and
+// the one toast it shows.
+test('Log payment shows cents and one toast', async ({ context, page }) => {
+  const job = {
+    id: 'c-cents', stage: 'job', name: 'Whitcomb', job_title: 'Garage slab', amount: 10000,
+    user_id: 'qa-user-1', client_id: null, phone: '615 555 0148', email: 'd@w.com', address: '2210 Ridgecrest Dr',
+    created_at: '2026-09-23T15:00:00.000Z', updated_at: '2026-10-09T15:00:00.000Z', completed_at: null,
+    proposal_status: 'approved', milestones: [], follow_up_on: null, notes: null, scope_text: null
+  }
+  await signIn(context, {
+    tables: {
+      fh_contacts: [job], fh_clients: [], fh_invoices: [], fh_change_orders: [],
+      fh_payments: [{ id: 'p1', user_id: 'qa-user-1', contact_id: 'c-cents', amount: 5000.5, method: 'check', reference: '1', paid_on: '2026-09-30', created_at: '2026-09-30T15:00:00.000Z' }]
+    }
+  })
+  await page.goto('/jobs/c-cents/payment', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByText('Balance $4,999.50')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('button', { name: 'Record $4,999.50' })).toBeVisible()
+  const amount = page.getByLabel('Amount')
+  await amount.fill('1234.50')
+  const record = page.getByRole('button', { name: 'Record $1,234.50' })
+  await expect(record).toBeVisible()
+  await record.click()
+  await expect(page.getByText(/\$1,234\.50/).first()).toBeVisible()
+  await expect(page.getByText(/\$1,235\b/)).toHaveCount(0)
+  await expect(page.locator('[data-sonner-toast]').filter({ hasText: /payment/i })).toHaveCount(1)
+})
