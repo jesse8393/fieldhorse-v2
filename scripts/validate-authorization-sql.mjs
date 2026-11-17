@@ -199,6 +199,37 @@ $function$;
   equal(true, true, 'baseline: an admin creates an owner invite directly')
   await db.exec('reset role')
 
+  await db.exec(`
+    alter table public.org_members add column default_hourly_rate numeric;
+    update public.org_members set default_hourly_rate = 25 where user_id = '${id(3)}';
+    create table public.fh_time_punches(id uuid primary key default gen_random_uuid(),user_id uuid not null,org_id uuid,contact_id uuid,punch_out_at timestamptz,hourly_rate numeric,approved_at timestamptz,approved_by uuid,flagged boolean not null default false,flag_reason text);
+    alter table public.fh_time_punches enable row level security;
+    create policy fh_time_punches_ins on public.fh_time_punches for insert to authenticated with check (user_id = (select auth.uid()) and org_id in (select public.auth_user_org_ids()));
+    create policy fh_time_punches_sel on public.fh_time_punches for select to authenticated using (public.fh_is_org_manager(org_id) or user_id = (select auth.uid()));
+    create policy fh_time_punches_upd on public.fh_time_punches for update to authenticated using (user_id = (select auth.uid()) and approved_at is null)
+      with check (user_id = (select auth.uid()) and approved_at is null and org_id in (select public.auth_user_org_ids()));
+    grant select, insert, update on public.fh_time_punches to authenticated, service_role;
+  `)
+  {
+    const source = await read('migrations/054_audit_hardening.sql')
+    const start = source.indexOf('create or replace function public.fh_guard_time_punch_approval()')
+    const end = source.indexOf('$$;', source.indexOf('as $$', start)) + 3
+    assert(start >= 0 && end > start)
+    await db.exec(source.slice(start, end))
+    await db.exec('create trigger fh_time_punches_guard_approval before insert or update on public.fh_time_punches for each row execute function public.fh_guard_time_punch_approval()')
+  }
+  const punch = (user, rate = null) => db.query('insert into public.fh_time_punches(user_id,org_id,hourly_rate) values($1,$2,$3) returning id, hourly_rate', [id(user), id(100), rate]).then(r => r.rows[0])
+  const rate = value => value == null ? null : Number(value)
+  await scope(3)
+  equal(rate((await punch(3, 9999)).hourly_rate), 9999, 'baseline: crew sets their own pay rate on a new punch')
+  const open = await punch(3)
+  equal(rate((await rows('update public.fh_time_punches set hourly_rate=9999 where id=$1 returning hourly_rate', [open.id]))[0].hourly_rate), 9999, 'baseline: crew sets their own pay rate at clock out')
+  await db.exec('reset role')
+  await db.query('insert into public.fh_time_punches(id,user_id,org_id) values($1,$2,$3)', [id(70), id(4), id(100)])
+  await scope(4)
+  await refused(() => db.query('update public.fh_time_punches set punch_out_at=now() where id=$1', [id(70)]), 'a removed member already cannot edit their punch (the update check needs membership)')
+  await db.exec('reset role')
+
   const boundaries = await read('migrations/20261117110100_role_boundaries.sql')
   assert(!/drop|delete|truncate/i.test(boundaries), 'role boundary migration avoids words that need owner approval')
   await db.exec(boundaries)
@@ -229,6 +260,28 @@ $function$;
     const label = `${roleName[user]} ${allowed ? 'can' : 'cannot'} invite ${/^[aeiou]/.test(role) ? 'an' : 'a'} ${role}`
     if (allowed) { await invite(user, role); equal(true, true, label) } else await refused(() => invite(user, role), label)
   }
+  await db.exec('reset role')
+
+  // DB-08: only owners and admins choose a pay rate; everyone else gets their member rate.
+  await scope(3)
+  equal(rate((await punch(3, 9999)).hourly_rate), 25, 'crew rate on a new punch becomes their member rate')
+  const closing = await punch(3)
+  equal(rate(closing.hourly_rate), null, 'crew punch without a rate stays unrated')
+  equal(rate((await rows('update public.fh_time_punches set hourly_rate=9999 where id=$1 returning hourly_rate', [closing.id]))[0].hourly_rate), 25, 'crew rate at clock out becomes their member rate')
+  await assert.rejects(db.query('update public.fh_time_punches set hourly_rate=30 where id=$1', [closing.id])); equal(true, true, 'a stamped rate still cannot be changed')
+  await assert.rejects(db.query("insert into public.fh_time_punches(user_id,org_id,approved_at) values($1,$2,now())", [id(3), id(100)])); equal(true, true, 'crew still cannot insert an approved punch')
+  await scope(8)
+  equal(rate((await punch(8, 50)).hourly_rate), null, 'foreman without a member rate cannot invent one')
+  await scope(2)
+  equal(rate((await punch(2, 40)).hourly_rate), null, 'manager cannot set their own pay rate')
+  await scope(1)
+  equal(rate((await punch(1, 80)).hourly_rate), 80, 'owner still sets a rate on their own punch')
+  await scope(7)
+  equal(rate((await punch(7, 60)).hourly_rate), 60, 'admin still sets a rate on their own punch')
+  await scope(3)
+  const unrated = await punch(3)
+  await service()
+  equal(rate((await rows('update public.fh_time_punches set hourly_rate=30 where id=$1 returning hourly_rate', [unrated.id]))[0].hourly_rate), 30, 'approval through the service path stamps the rate')
   await db.exec('reset role')
 
   console.log(`${checks} authorization transition checks passed.`)

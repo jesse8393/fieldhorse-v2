@@ -101,3 +101,77 @@ alter policy "org_invites_insert_by_owner_admin" on public.org_invites
          )
     )
   );
+
+-- DB-08 -------------------------------------------------------------------
+-- Any member could put their own hourly_rate on a punch when creating it or
+-- at clock out, and approval kept that rate, so crew could set their own
+-- pay. Rates are hidden from managers in the app, so only owners and admins
+-- choose one.
+--
+-- When anyone else sets a rate (on insert, or the first time on a later
+-- update) the punch takes that member's own default rate from org_members
+-- instead, or stays unrated when they have none. Clock out keeps working;
+-- the app already sends the member rate there. Everything the guard did
+-- before is unchanged, and the service role (approval) is still trusted.
+
+create or replace function public.fh_guard_time_punch_approval()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+  v_rate numeric;
+begin
+  -- Service role / elevated contexts have no auth.uid(); trust them.
+  if auth.uid() is null then
+    return new;
+  end if;
+
+  if tg_op = 'INSERT' then
+    -- A member creating their own punch must not pre-set approval or flag
+    -- columns.
+    if new.approved_at is not null
+       or new.approved_by is not null
+       or new.flagged is true
+       or new.flag_reason is not null then
+      raise exception 'time-punch approval/flag fields cannot be set on insert';
+    end if;
+  else
+    if new.approved_at   is distinct from old.approved_at
+       or new.approved_by  is distinct from old.approved_by
+       or new.flagged      is distinct from old.flagged
+       or new.flag_reason  is distinct from old.flag_reason then
+      raise exception 'time-punch approval fields are managed by the approval workflow';
+    end if;
+
+    -- The rate is stamped once (null to a value) and then fixed.
+    if old.hourly_rate is not null
+       and new.hourly_rate is distinct from old.hourly_rate then
+      raise exception 'time-punch hourly_rate cannot be changed after it is set';
+    end if;
+  end if;
+
+  -- Only owners and admins choose a rate. Anyone else gets the punch
+  -- owner's member rate.
+  if new.hourly_rate is not null
+     and (tg_op = 'INSERT' or old.hourly_rate is null)
+     and not exists (
+       select 1 from public.org_members m
+        where m.org_id = new.org_id
+          and m.user_id = auth.uid()
+          and m.revoked_at is null
+          and m.role in ('owner', 'admin')
+     ) then
+    select m.default_hourly_rate into v_rate
+      from public.org_members m
+     where m.org_id = new.org_id
+       and m.user_id = new.user_id
+       and m.revoked_at is null
+     limit 1;
+    new.hourly_rate := v_rate;
+  end if;
+
+  return new;
+end;
+$$;
