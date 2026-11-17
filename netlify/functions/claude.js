@@ -13,12 +13,16 @@ import { supabaseServiceConfig } from './lib/serviceConfig.js'
 
 import { createClient } from '@supabase/supabase-js'
 import { hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
+import { resolveCallerMembership } from './lib/membership.js'
 
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages'
 const ANTHROPIC_VERSION = '2023-06-01'
-// Ceiling on a single response. The app's largest ask is ~2048 tokens
-// (doc intelligence); 8192 leaves headroom while capping abuse cost.
-const MAX_TOKENS_CEILING = 8192
+// Ceiling on a single response: the largest the app itself asks for
+// (captureIntelligence.ts, 1500). A larger request is cut to this.
+const MAX_TOKENS_CEILING = 1500
+// Calls a company may make in a day, across all its people. Generous for
+// notes, bids, imports and photos; a stop for a script on a leaked token.
+export const COMPANY_DAILY_CALLS = 500
 
 // Input caps. The per user rate limit bounds how many requests run; these
 // bound what one request can cost. Before them a signed in account could
@@ -139,6 +143,21 @@ export default async (request) => {
     return json({ error: 'rate_limited', message: 'Too many requests. Please try again in a minute.' }, 429)
   }
 
+  // Only people in a company may spend the shared key: an account that
+  // signed up a minute ago, or a removed teammate, has no active
+  // membership. Any role may use the assistant.
+  const resolved = await resolveCallerMembership(supabase, authData.user.id, {})
+  if (!resolved.membership) {
+    return json({ error: resolved.error, message: resolved.status === 403 ? 'The assistant is for members of a company. Join or create one first.' : resolved.message }, resolved.status)
+  }
+  // Per company daily budget, through the same limiter.
+  const budgetOk = await checkRateLimit(supabase, {
+    scope: 'claude-company-day', identifier: hashIdentifier(resolved.membership.org_id), limit: COMPANY_DAILY_CALLS, windowSeconds: 86400,
+  })
+  if (!budgetOk) {
+    return json({ error: 'rate_limited', message: 'Your company has used the assistant as much as it can today. It is ready again tomorrow.' }, 429)
+  }
+
   // Read the raw text first so an oversized body is refused before it is
   // parsed (see INPUT_LIMITS).
   let rawBody
@@ -162,8 +181,7 @@ export default async (request) => {
     system,
     messages,
     max_tokens = 1024,
-    temperature,
-    effort
+    temperature
   } = body || {}
 
   if (!Array.isArray(messages) || messages.length === 0) {
@@ -210,16 +228,15 @@ export default async (request) => {
   //     so temperature is never forwarded to them.
   //   * Where thinking stays on, depth (and therefore latency and token
   //     spend) is controlled via output_config.effort. These are short,
-  //     latency sensitive utility calls, so default to LOW effort unless
-  //     the caller asks otherwise; low effort keeps us inside the client
-  //     timeout.
+  //     latency sensitive utility calls, so effort is LOW, the only level
+  //     the app sends; a request for more gets low too. Low effort keeps
+  //     us inside the client timeout.
   //   * claude-sonnet-5 (allowlisted fallback) runs adaptive thinking when
   //     `thinking` is omitted; disable it there for the same latency reason.
   if (typeof temperature === 'number' && !traits.isClaude5) payload.temperature = temperature
   if (traits.disableThinking) payload.thinking = { type: 'disabled' }
-  const EFFORTS = new Set(['low', 'medium', 'high'])
   if (traits.thinkingOn) {
-    payload.output_config = { effort: EFFORTS.has(effort) ? effort : 'low' }
+    payload.output_config = { effort: 'low' }
   }
 
   try {

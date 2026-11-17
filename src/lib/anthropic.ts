@@ -20,9 +20,19 @@ type ClaudeMessage = { role: string; content: unknown }
 // so `content[0].text`, the read every consumer does, comes back
 // undefined. Normalize here (drop non-text blocks) so consumers keep
 // their simple `content[0].text` reads and heal in one place.
+//
+// A declined request (stop_reason refusal) or an answer with no text in it
+// throws a plain error, so a caller shows a message instead of reading
+// `content[0].text` off an empty array.
 function normalizeResponse(data: any) {
   if (Array.isArray(data?.content)) {
     data.content = data.content.filter((b: any) => b?.type === 'text')
+  }
+  if (data?.stop_reason === 'refusal') {
+    throw Object.assign(new Error('The assistant could not answer this one. Try wording it another way.'), { code: 'refusal' })
+  }
+  if (!Array.isArray(data?.content) || !data.content.some((b: any) => typeof b?.text === 'string' && b.text.trim())) {
+    throw Object.assign(new Error('The assistant sent back an empty answer. Try again.'), { code: 'empty_answer' })
   }
   return data
 }
