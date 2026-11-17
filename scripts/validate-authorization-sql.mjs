@@ -376,5 +376,38 @@ $function$;
   await db.exec(realtime); await db.exec(realtime)
   equal(await published(), ['fh_change_orders', 'fh_contacts', 'fh_invoices', 'fh_notifications', 'fh_quotes'], 'present app tables join the publication once, and missing ones are passed over')
 
+  // DB-09: customer conversations are for owners, admins and managers.
+  for (const table of ['fh_conversations', 'fh_messages']) {
+    await db.exec(`
+      create table public.${table}(id uuid primary key default gen_random_uuid(),org_id uuid,body text);
+      insert into public.${table}(org_id,body) values ('${id(100)}','Customer thread');
+      alter table public.${table} enable row level security;
+      create policy ${table.slice(3)}_org on public.${table} for all to authenticated using (org_id in (select public.auth_user_org_ids())) with check (org_id in (select public.auth_user_org_ids()));
+      grant select, insert, update on public.${table} to authenticated;
+    `)
+  }
+  await scope(3)
+  equal((await rows('select id from public.fh_messages')).length, 1, 'baseline: crew reads customer messages')
+  await db.exec('reset role')
+  const office = await read('migrations/20261117110500_customer_messages_office_roles.sql')
+  assert(!/drop|delete|truncate/i.test(office))
+  await db.exec(office); await db.exec(office)
+  for (const user of [3, 8]) {
+    await scope(user)
+    for (const table of ['fh_conversations', 'fh_messages']) {
+      equal((await rows(`select id from public.${table}`)).length, 0, `${roleName[user] ?? 'foreman'} no longer reads ${table}`)
+      await refused(() => db.query(`insert into public.${table}(org_id,body) values($1,'x')`, [id(100)]), `${roleName[user] ?? 'foreman'} cannot write ${table}`)
+      equal((await rows(`update public.${table} set body='x' returning id`)).length, 0, `${roleName[user] ?? 'foreman'} cannot edit ${table}`)
+    }
+  }
+  for (const user of [1, 2, 7]) {
+    await scope(user)
+    for (const table of ['fh_conversations', 'fh_messages']) {
+      equal((await rows(`select id from public.${table}`)).length >= 1, true, `${roleName[user]} still reads ${table}`)
+      equal((await rows(`insert into public.${table}(org_id,body) values($1,'Reply') returning id`, [id(100)])).length, 1, `${roleName[user]} still writes ${table}`)
+    }
+  }
+  await db.exec('reset role')
+
   console.log(`${checks} authorization transition checks passed.`)
 } finally { await db.close() }
