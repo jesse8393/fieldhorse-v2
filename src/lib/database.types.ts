@@ -1,3 +1,11 @@
+// This file describes the schema the repo's migrations build, not what
+// production has. It has been edited by hand (fh_make_job_from_quote sits
+// out of the generator's order, and assigned_user_ids was added for the
+// crew allocation migration before production had it), so a clean
+// typecheck only proves the code and the migrations agree. Run
+// `npm run check:schema` to compare what the code uses with these types,
+// and with production when the run can read it (see that script's header).
+
 export type Json =
   | string
   | number

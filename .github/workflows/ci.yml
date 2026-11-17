@@ -111,6 +111,12 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # Every database function, table and column the code uses must be in
+      # src/lib/database.types.ts. Production is compared by the daily
+      # schema-check.yml, which holds the service key; this job has none.
+      - name: Database names the code uses
+        run: npm run check:schema -- --types-only
+
       - name: Unit tests
         run: npm test
 
