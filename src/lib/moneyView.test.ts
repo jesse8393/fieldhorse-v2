@@ -414,6 +414,19 @@ describe('margin', () => {
     const view = build(bundle({ jobs: [job({ id: 'a', amount: 1000, cost: 99000 })] }))
     expect(view.marginPct).toBe(-9800)
   })
+
+  // M-15: Tracked margin measures a job against its contract with its
+  // approved change orders.
+  it('counts approved change orders in each job contract', () => {
+    const view = build(bundle({
+      jobs: [job({ id: 'a', amount: 10000, cost: 12000 })],
+      changeOrders: [
+        { contact_id: 'a', amount: 5000, status: 'approved' },
+        { contact_id: 'a', amount: 900, status: 'sent' }
+      ] as InvoicesBundle['changeOrders']
+    }))
+    expect(view.marginPct).toBe(20)
+  })
 })
 
 describe('empty and edge cases', () => {

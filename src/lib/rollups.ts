@@ -6,6 +6,8 @@
 // Centralize here so the four surfaces can never drift again.
 
 import { parseDateOnly } from './dates.ts'
+import { knownContractTotal } from './invoiceSettlement.ts'
+import { toCents } from './cents.ts'
 
 // Structural inputs, callers pass full fh_contacts / fh_payments rows
 // or partial picks of them, so these list only the fields read here and
@@ -297,15 +299,25 @@ export function closeRate(jobs: JobRow[] | null | undefined) {
   return total === 0 ? 0 : won / total
 }
 
-// Avg margin across won jobs = mean of (amount - cost) / amount.
-export function avgMargin(jobs: JobRow[] | null | undefined) {
-  const won = (jobs || []).filter((j) => WON_STAGES.has(j.stage || '') && Number(j.amount) > 0)
+// Avg margin across won jobs = mean of (contract - cost) / contract. Pass
+// the change orders: the contract is the job amount plus the approved ones
+// (knownContractTotal, the same contract margin() in stages.ts uses), so a
+// $10,000 job with a $5,000 approved change order and $12,000 of cost is a
+// 20% margin, not a 20% loss (M-15). Worked in whole cents.
+export function avgMargin(jobs: JobRow[] | null | undefined, changeOrders: ChangeOrderRow[] | null | undefined = []) {
+  const coByJob = new Map<string, ChangeOrderRow[]>()
+  for (const co of changeOrders || []) {
+    if (!co?.contact_id) continue
+    const list = coByJob.get(co.contact_id)
+    if (list) list.push(co)
+    else coByJob.set(co.contact_id, [co])
+  }
+  const won = (jobs || [])
+    .filter((j) => WON_STAGES.has(j.stage || '') && Number(j.amount) > 0)
+    .map((j) => ({ contract: toCents(knownContractTotal({ amount: j.amount, changeOrders: j.id ? coByJob.get(j.id) : [] })), cost: toCents(j.cost) }))
+    .filter((j) => j.contract > 0)
   if (won.length === 0) return 0
-  const sum = won.reduce((s, j) => {
-    const a = Number(j.amount || 0)
-    const c = Number(j.cost || 0)
-    return s + (a - c) / a
-  }, 0)
+  const sum = won.reduce((s, j) => s + (j.contract - j.cost) / j.contract, 0)
   return sum / won.length
 }
 

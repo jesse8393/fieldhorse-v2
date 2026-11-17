@@ -33,6 +33,9 @@ import { DOC_COLORS, DOC_FONTS, THEME_PALETTES } from './tokens.ts'
 import { money, longDate } from './format.ts'
 import InsuranceModeBlock from './InsuranceModeBlock.tsx'
 import ChangeOrdersBlock from './ChangeOrdersBlock.tsx'
+// The unit price a line prints only when quantity times it is the amount
+// (M-17), the rule the shared line table uses.
+import { unitPriceText } from './LineItemsTable.tsx'
 import { Button, Chip, Icon, OnyxStage, Row, formatMoney } from '../fh'
 import Monogram from '../fh/Monogram.tsx'
 import DocumentLogo, { useDocumentLogo } from './DocumentLogo.tsx'
@@ -217,7 +220,7 @@ function SupportingSections({ view, accent, muted = '#5C5C5C', mid = '#141414', 
                 <tr key={i} className="fh-doc-item-row" style={{ borderBottom: `1px solid ${rule}` }}>
                   <td className="fh-doc-item-description" style={{ ...tdL, color: mid }}><ItemDescription item={it} /></td>
                   <td data-label="Quantity" style={{ ...tdR, color: mid }}>{qtyLabel(it)}</td>
-                  <td data-label="Unit price" style={{ ...tdR, color: mid }}>{money(it.rate, { cents: true })}</td>
+                  <td data-label="Unit price" style={{ ...tdR, color: mid }}>{unitPriceText(it)}</td>
                   <td data-label="Amount" style={{ ...tdR, color: mid, fontWeight: 600 }}>{money(it.amount, { cents: true })}</td>
                 </tr>
               ))}
@@ -375,7 +378,7 @@ export function SlateProposal({ view }: { view: ProposalView }) {
             <tr key={i} className="fh-doc-item-row" style={{ borderBottom: `1px solid ${pal.rule}` }}>
               <td className="fh-doc-item-description" style={tdL}><ItemDescription item={it} /></td>
               <td data-label="Quantity" style={tdR}>{qtyLabel(it)}</td>
-              <td data-label="Unit price" style={tdR}>{money(it.rate, { cents: true })}</td>
+              <td data-label="Unit price" style={tdR}>{unitPriceText(it)}</td>
               <td data-label="Amount" style={{ ...tdR, fontWeight: 600 }}>{money(it.amount, { cents: true })}</td>
             </tr>
           ))}
@@ -446,7 +449,7 @@ export function MintProposal({ view }: { view: ProposalView }) {
             <tr key={i} className="fh-doc-item-row" style={{ borderBottom: `1px solid ${pal.rule}` }}>
               <td data-label="Quantity" style={{ ...tdR, paddingLeft: 12, paddingRight: 12 }}>{qtyLabel(it)}</td>
               <td className="fh-doc-item-description" style={tdL}><ItemDescription item={it} /></td>
-              <td data-label="Unit price" style={tdR}>{money(it.rate, { cents: true })}</td>
+              <td data-label="Unit price" style={tdR}>{unitPriceText(it)}</td>
               <td data-label="Amount" style={{ ...tdR, fontWeight: 600 }}>{money(it.amount, { cents: true })}</td>
             </tr>
           ))}
@@ -508,7 +511,7 @@ export function EditorialProposal({ view }: { view: ProposalView }) {
             <tr key={i} className="fh-doc-item-row" style={{ borderBottom: `1px solid ${pal.rule}` }}>
               <td className="fh-doc-item-description" style={{ ...tdL, color: ink }}><ItemDescription item={it} /></td>
               <td data-label="Quantity" style={{ ...tdR, color: ink }}>{qtyLabel(it)}</td>
-              <td data-label="Unit price" style={{ ...tdR, color: ink }}>{money(it.rate, { cents: true })}</td>
+              <td data-label="Unit price" style={{ ...tdR, color: ink }}>{unitPriceText(it)}</td>
               <td data-label="Amount" style={{ ...tdR, color: ink, fontWeight: 600 }}>{money(it.amount, { cents: true })}</td>
             </tr>
           ))}

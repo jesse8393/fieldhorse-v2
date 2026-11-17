@@ -47,3 +47,36 @@ describe('the unit price on the proposal', () => {
     expect(html).not.toContain('$2,000.00')
   })
 })
+
+// The themed proposals (slate, mint, editorial) print their own line table
+// and the optional upgrades table, and follow the same rule (M-17).
+function themedUnitPrices(template: string, items: any[]) {
+  const mapped = mapItemsToScope(items)
+  const html = renderToStaticMarkup(
+    <ProposalTemplate
+      company={{ name: 'Parker Construction', estimate_template: template }}
+      contact={{ id: 'q-1', name: 'Marco Castellanos', job_title: 'Driveway', amount: 0, proposal_status: 'sent' }}
+      project={{ title: 'Driveway', address: '' }}
+      scopeSections={mapped.scopeSections}
+      upgrades={mapped.upgrades}
+      pricing={{ baseTotal: mapped.baseTotal, upgradeTotal: mapped.upgradeTotal, discount: 0, taxRate: 0 }}
+      status="sent"
+    />
+  )
+  return [...html.matchAll(/data-label="Unit price"[^>]*>([^<]*)</g)].map((m) => m[1])
+}
+
+for (const template of ['slate', 'mint', 'editorial']) {
+  describe(`the unit price on the ${template} proposal`, () => {
+    it('prints a rate only when quantity times it is the amount, base lines and upgrades alike', () => {
+      expect(themedUnitPrices(template, [
+        { id: 'a', description: 'Excavate', qty: 1100, unit: 'sq ft', rate: 2, amount: 2200, sort_order: 0 },
+        { id: 'b', description: 'Demo and haul off', qty: 1, rate: 0, amount: 1513, sort_order: 1 },
+        { id: 'c', description: 'Driveway, 4 in', qty: 1100, unit: 'sq ft', rate: 9.875, amount: 10862.5, sort_order: 2 },
+        { id: 'd', description: 'Pour', qty: 1, rate: 2000, amount: 12500, sort_order: 3 },
+        { id: 'e', description: 'Sealer', qty: 1, rate: 0, amount: 450, is_optional: true, sort_order: 4 },
+        { id: 'f', description: 'Edging', qty: 3, rate: 125, amount: 400, is_optional: true, sort_order: 5 }
+      ])).toEqual(['$2.00', '', '$9.875', '', '', ''])
+    })
+  })
+}

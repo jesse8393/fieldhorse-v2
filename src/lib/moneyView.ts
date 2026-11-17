@@ -367,11 +367,13 @@ function waitingRows(quotes: QuoteRow[], now: Date, company: ActiveCompany | nul
 // The margin of won jobs that have a cost. A job with no cost recorded
 // would read as 100 percent, so it is left out. Real losses may exceed
 // the contract value; do not silently cap those costs to change the result.
-function marginPct(jobs: InvoiceJob[]): number | null {
+// Each job is measured against its contract with its approved change
+// orders (M-15).
+function marginPct(jobs: InvoiceJob[], changeOrders: InvoicesBundle['changeOrders']): number | null {
   const costed = jobs
     .filter((j) => Number(j.amount) > 0 && Number(j.cost) > 0)
   if (costed.length === 0) return null
-  return Math.round(avgMargin(costed) * 1000) / 10
+  return Math.round(avgMargin(costed, changeOrders) * 1000) / 10
 }
 
 export function buildMoneyView(input: { bundle: InvoicesBundle; quotes: QuoteRow[]; now: Date; company?: ActiveCompany | null }): MoneyView {
@@ -420,7 +422,7 @@ export function buildMoneyView(input: { bundle: InvoicesBundle; quotes: QuoteRow
     collectedThisWeek: cents(collectedThisWeek),
     dueThisWeek: cents(dueThisWeek),
     monthToDate: cents(monthToDate),
-    marginPct: marginPct(bundle.jobs),
+    marginPct: marginPct(bundle.jobs, bundle.changeOrders),
     marginNote: `Based on ${bundle.jobs.filter((j) => Number(j.amount) > 0 && Number(j.cost) > 0).length} of ${bundle.jobs.length} jobs with recorded costs`,
     overdue: overdue.sort(byDue).map((e) => e.row),
     dueSoon: dueSoon.sort(byDue).map((e) => e.row),
