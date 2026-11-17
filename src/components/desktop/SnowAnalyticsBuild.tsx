@@ -9,7 +9,7 @@ import {
   TrendingDown,
   Target,
 } from 'lucide-react'
-import { countNoun, money, moneyFull } from '../../lib/format.ts'
+import { countNoun, moneyFull } from '../../lib/format.ts'
 import { completedMonthComparison } from '../../lib/reportingMetrics.ts'
 import LoadingValue from '../LoadingValue.tsx'
 
@@ -130,7 +130,7 @@ export default function SnowAnalyticsBuild(props: Props) {
           <KpiCell label="Active leads" value={loading ? pending('Loading active leads', 40) : String(stats.leads || 0)} />
           <KpiCell label="Quotes out" value={loading ? pending('Loading quotes out', 40) : String(stats.quotes || 0)} />
           <KpiCell label="Miles YTD" value={loading ? pending('Loading miles this year', 48) : Number(stats.milesYTD || 0).toLocaleString()} />
-          <KpiCell label="Mileage estimate" value={loading ? pending('Loading the mileage deduction', 64) : stats.mileageDeduction == null ? 'Rate needed' : money(stats.mileageDeduction)} />
+          <KpiCell label="Mileage estimate" value={loading ? pending('Loading the mileage deduction', 64) : stats.mileageDeduction == null ? 'Rate needed' : moneyFull(stats.mileageDeduction)} />
         </div>
 
         <section className="fh-build-content-grid fh-build-content-grid--analytics">
@@ -156,7 +156,7 @@ export default function SnowAnalyticsBuild(props: Props) {
                       <div className="fh-build-stage-bar__track">
                         <div className="fh-build-stage-bar__fill" style={{ width: `${Math.max(width, 0)}%`, background: s.color || 'var(--v3-primary, #c9963a)' }} />
                       </div>
-                      <div className="fh-build-stage-bar__value">{money(s.value)}</div>
+                      <div className="fh-build-stage-bar__value">{moneyFull(s.value)}</div>
                     </div>
                   )
                 })}
@@ -170,11 +170,11 @@ export default function SnowAnalyticsBuild(props: Props) {
                 <span className="fh-build-rel">
                   {monthOverMonth != null && monthOverMonth > 0 ? (
                     <span style={{ color: 'var(--v3-success-text)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                      <TrendingUp size={12} /> {money(monthOverMonth)} more
+                      <TrendingUp size={12} /> {moneyFull(monthOverMonth)} more
                     </span>
                   ) : monthOverMonth != null && monthOverMonth < 0 ? (
                     <span style={{ color: 'var(--v3-danger-text)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                      <TrendingDown size={12} /> {money(Math.abs(monthOverMonth))} less
+                      <TrendingDown size={12} /> {moneyFull(Math.abs(monthOverMonth))} less
                     </span>
                   ) : '\u2003'}
                 </span>
@@ -189,10 +189,11 @@ export default function SnowAnalyticsBuild(props: Props) {
                   const v = revenueValue(r)
                   const h = (v / maxRev) * 100
                   return (
-                    <div key={i} className="fh-build-trend-col" title={`${r.label || r.month || ''}: ${money(v)}`}>
-                      <div className="fh-build-trend-col__bar" style={{ height: `${Math.max(h * 1.3, 6)}px` }} />
+                    <div key={i} className="fh-build-trend-col" title={`${r.label || r.month || ''}: ${moneyFull(v)}`}>
+                      {/* A month with nothing received draws no bar. */}
+                      {v > 0 && <div className="fh-build-trend-col__bar" style={{ height: `${Math.max(h * 1.3, 6)}px` }} />}
                       <div className="fh-build-trend-col__label">{r.label || r.month || ''}{r.partial ? ' · so far' : ''}</div>
-                      <div className="fh-build-trend-col__value">{money(v)}</div>
+                      <div className="fh-build-trend-col__value">{moneyFull(v)}</div>
                     </div>
                   )
                 })}
@@ -201,7 +202,7 @@ export default function SnowAnalyticsBuild(props: Props) {
 
             <section className="fh-build-card fh-build-table">
               <header className="fh-build-card-head">
-                <div className="fh-build-eyebrow">{loading ? 'Top clients' : <>Top clients · {topClients.length}</>}</div>
+                <div className="fh-build-eyebrow">{loading ? 'Top clients' : <>Top clients · last 90 days · {topClients.length}</>}</div>
               </header>
               <div className="fh-build-table__head is-topclients">
                 <span>#</span>
@@ -218,7 +219,7 @@ export default function SnowAnalyticsBuild(props: Props) {
                   <div key={c.id || c.name || i} className="fh-build-table__row is-topclients">
                     <span className="fh-build-rel">{String(i + 1).padStart(2, '0')}</span>
                     <strong className="fh-build-truncate">{c.name || 'Unnamed'}</strong>
-                    <span className="fh-build-num" style={{ color: 'var(--v3-primary-text)', fontWeight: 700 }}>{money(v)}</span>
+                    <span className="fh-build-num" style={{ color: 'var(--v3-primary-text)', fontWeight: 700 }}>{moneyFull(v)}</span>
                   </div>
                 )
               })}
@@ -233,7 +234,7 @@ export default function SnowAnalyticsBuild(props: Props) {
                   <strong>{strongestStage ? (strongestStage.label || strongestStage.id) : '\u2003'}</strong>
                   <span>
                     {strongestStage
-                      ? `${money(strongestStage.value)} in ${strongestStage.count} ${countNoun(strongestStage.count, 'job')}`
+                      ? `${moneyFull(strongestStage.value)} in ${strongestStage.count} ${countNoun(strongestStage.count, 'job')}`
                       : 'No data yet'}
                   </span>
                   {strongestStage && <div className="fh-build-spark is-gold" />}
@@ -248,7 +249,7 @@ export default function SnowAnalyticsBuild(props: Props) {
                   <strong>{weakestStage ? (weakestStage.label || weakestStage.id) : ' '}</strong>
                   <span>
                     {weakestStage
-                      ? `${money(weakestStage.value)} in ${weakestStage.count} ${countNoun(weakestStage.count, 'job')}`
+                      ? `${moneyFull(weakestStage.value)} in ${weakestStage.count} ${countNoun(weakestStage.count, 'job')}`
                       : 'No data yet'}
                   </span>
                 </>
@@ -259,7 +260,7 @@ export default function SnowAnalyticsBuild(props: Props) {
               <div className="fh-build-eyebrow">Recorded payments YTD</div>
               {loading ? railPending : (
                 <>
-                  <strong>{stats.collected == null ? 'No payments recorded' : money(stats.collected)}</strong>
+                  <strong>{stats.collected == null ? 'No payments recorded' : moneyFull(stats.collected)}</strong>
                   <span>Receipts by payment date. Payments may settle invoices issued in earlier periods.</span>
                   <span>Issued invoices exclude drafts and voids. Contract value remains separate.</span>
                 </>
@@ -284,7 +285,7 @@ export default function SnowAnalyticsBuild(props: Props) {
                     {monthOverMonth == null ? 'Not enough history' : monthOverMonth > 0 ? 'Receipts increased' : monthOverMonth < 0 ? 'Receipts decreased' : 'No change'}
                   </strong>
                   <span>
-                    {comparisonLabel}{monthOverMonth == null ? '' : `. ${money(Math.abs(monthOverMonth))} ${monthOverMonth > 0 ? 'more' : monthOverMonth < 0 ? 'less' : 'change'}.`}
+                    {comparisonLabel}{monthOverMonth == null ? '' : `. ${moneyFull(Math.abs(monthOverMonth))} ${monthOverMonth > 0 ? 'more' : monthOverMonth < 0 ? 'less' : 'change'}.`}
                   </span>
                   <div className="fh-build-rail-card__spark">
                     <Target size={14} />
