@@ -85,6 +85,11 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
   const [rate, setRate] = useState(readPreferredRate())
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
+  // Clock in waits up to 4 seconds for a location before it writes, so a
+  // second tap in that time must do nothing. The ref is read at once; the
+  // state redraws the button as working.
+  const [clockingIn, setClockingIn] = useState(false)
+  const clockingInRef = useRef(false)
   const tickRef = useRef<any>(null)
   // Only the job owner books labor as an expense row; everyone else's
   // punch is priced by lib/labor.ts (see laborBooksAsExpense).
@@ -134,6 +139,9 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
   }, [start])
 
   async function handleClockIn() {
+    if (clockingInRef.current) return
+    clockingInRef.current = true
+    setClockingIn(true)
     hapticTap()
     try {
       const punch = await dbPunchIn({ userId, contactId: contact.id })
@@ -152,6 +160,9 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
       } else {
         toastError("Couldn't clock in", msg || 'Try again')
       }
+    } finally {
+      clockingInRef.current = false
+      setClockingIn(false)
     }
   }
 
@@ -297,9 +308,11 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
           <button
             type="button"
             onClick={handleClockIn}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 12px', borderRadius: 10, border: 'none', minHeight: 44, background: 'var(--fh-gold)', color: 'var(--fh-on-gold)', fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: 0, cursor: 'pointer' }}
+            disabled={clockingIn}
+            aria-busy={clockingIn || undefined}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 12px', borderRadius: 10, border: 'none', minHeight: 44, background: 'var(--fh-gold)', color: 'var(--fh-on-gold)', fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: 0, cursor: clockingIn ? 'wait' : 'pointer', opacity: clockingIn ? 0.7 : 1 }}
           >
-            <Play size={12} /> Clock in
+            <Play size={12} /> {clockingIn ? 'Clocking in…' : 'Clock in'}
           </button>
         )}
         {start && !confirming && (

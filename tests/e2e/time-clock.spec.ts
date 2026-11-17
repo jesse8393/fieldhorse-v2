@@ -1,6 +1,7 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 import { nothingRunsOffTheSide } from './helpers/overflow.ts'
+import { holdPosts, postsTo, twoTaps } from './helpers/doubleTap.ts'
 
 // The job page's time clock (TimeClockCard) when the shift it shows was
 // ended somewhere else first. Clock out never moves an ended shift's end
@@ -158,4 +159,31 @@ test('the job clock buttons are at least 44 pixels high', async ({ context, page
     const box = await page.getByRole('button', { name, exact: true }).boundingBox()
     expect(box!.height, name).toBeGreaterThanOrEqual(44)
   }
+})
+
+// A double tap on Clock in on the job card, while the location wait and the
+// insert are still out, made a second punch. The one active shift index
+// refused it and the card showed the running meter next to "Already on the
+// clock". One tap is one punch, and the card says it is working.
+test('a double tap on Clock in on the job card makes one punch and no false error', async ({ context, page }) => {
+  test.setTimeout(60_000)
+  await signIn(context, { tables: { fh_contacts: [job('qa-user-1')], fh_time_punches: [] } })
+  const posts = postsTo(context, '/rest/v1/fh_time_punches')
+  const started = new Date().toISOString()
+  await holdPosts(context, '**/rest/v1/fh_time_punches*', 1200, (n) => n === 1
+    ? { status: 201, json: { ...openPunch(), id: 'tp-new', punch_in_at: started, created_at: started, updated_at: started } }
+    : { status: 409, json: { code: '23505', details: null, hint: null, message: 'duplicate key value violates unique constraint "fh_time_punches_one_active_per_user"' } })
+  await page.goto('/jobs/c-job1', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+  await page.getByRole('button', { name: 'More about this job' }).click()
+  const clockIn = page.getByRole('button', { name: 'Clock in', exact: true })
+  await expect(clockIn).toBeVisible({ timeout: 15_000 })
+  await twoTaps(page, clockIn)
+  // While the punch is out the button says so and takes no tap.
+  const busy = page.getByRole('button', { name: 'Clocking in…', exact: true })
+  const busyWhileOut = (await busy.count()) === 1 && await busy.isDisabled()
+  await expect(page.getByRole('button', { name: 'Clock out', exact: true })).toBeVisible({ timeout: 15_000 })
+  await page.waitForTimeout(1500)
+  expect(posts.length, 'one tap, one punch').toBe(1)
+  await expect(page.getByText('Already on the clock', { exact: true })).toHaveCount(0)
+  expect(busyWhileOut, 'Clock in shows it is working').toBe(true)
 })
