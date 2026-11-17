@@ -67,3 +67,30 @@ test('the mock merges a duplicate client in one call and deletes nothing', async
   expect((await rest(page, 'fh_leads?select=id&client_id=eq.cl-keep')).body).toHaveLength(2)
   expect((await rest(page, 'fh_clients?select=id&id=eq.cl-dupe')).body).toHaveLength(1)
 })
+
+// The mock refuses what 20261117090100_merge_client_into.sql refuses, and
+// moves nothing when it does: a personal client is merged only by its own
+// person, a missing duplicate is P0002, and two companies never mix.
+test('the mock refuses a merge the database would refuse', async ({ context, page }) => {
+  const client = (id: string, extra: Record<string, unknown> = {}) => ({ id, user_id: 'qa-user-1', org_id: null, name: id, phone: null, email: null, ...extra })
+  await signIn(context, { tables: {
+    fh_clients: [
+      client('cl-mine'), client('cl-mine-2'),
+      client('cl-theirs', { user_id: 'someone-else' }), client('cl-theirs-2', { user_id: 'someone-else' }),
+      client('cl-org', { org_id: 'org-1' }), client('cl-other-org', { org_id: 'org-other' })
+    ],
+    fh_leads: [{ id: 'l-a', client_id: 'cl-mine-2', user_id: 'qa-user-1' }, { id: 'l-b', client_id: 'cl-theirs-2', user_id: 'someone-else' }]
+  } })
+  await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  const merge = (keep: string, dupes: string[]) => rpc(page, 'fh_merge_client_into', { p_survivor: keep, p_duplicates: dupes })
+
+  expect(await merge('cl-theirs', ['cl-theirs-2'])).toMatchObject({ status: 403, body: { code: '42501' } })
+  expect(await merge('cl-mine', ['cl-mine-2', 'cl-gone'])).toMatchObject({ status: 400, body: { code: 'P0002' } })
+  expect(await merge('cl-org', ['cl-other-org'])).toMatchObject({ status: 403, body: { code: '42501' } })
+  expect(await merge('cl-mine', ['cl-theirs-2'])).toMatchObject({ status: 403, body: { code: '42501' } })
+  // Nothing moved on any refusal.
+  expect((await rest(page, 'fh_leads?select=id&client_id=eq.cl-mine-2')).body).toHaveLength(1)
+  expect((await rest(page, 'fh_leads?select=id&client_id=eq.cl-theirs-2')).body).toHaveLength(1)
+
+  expect(await merge('cl-mine', ['cl-mine-2'])).toEqual({ status: 200, body: { jobs: 0, leads: 1, quotes: 0, invoices: 0 } })
+})

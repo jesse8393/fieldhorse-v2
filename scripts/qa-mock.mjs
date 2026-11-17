@@ -678,9 +678,22 @@ export function rpcResponse(name, body, tables = TABLES, schema = SCHEMA) {
       const keep = body.p_survivor
       const kept = (tables.fh_clients ?? []).find((c) => c.id === keep)
       if (!kept) return { status: 400, body: JSON.stringify({ code: 'P0002', message: 'the client to keep was not found' }) }
-      const member = (tables.org_members ?? []).find((m) => m.org_id === (kept.org_id ?? 'org-1') && m.user_id === USER.id && !m.revoked_at)
-      if (!member || !['owner', 'admin', 'manager'].includes(member.role)) {
-        return { status: 403, body: JSON.stringify({ code: '42501', message: 'not allowed to merge clients in this company' }) }
+      const refuse = (message) => ({ status: 403, body: JSON.stringify({ code: '42501', message }) })
+      if (kept.org_id) {
+        const member = (tables.org_members ?? []).find((m) => m.org_id === kept.org_id && m.user_id === USER.id && !m.revoked_at)
+        if (!member || !['owner', 'admin', 'manager'].includes(member.role)) return refuse('not allowed to merge clients in this company')
+      } else if (kept.user_id !== USER.id) {
+        return refuse('not allowed to merge this client')
+      }
+      // The function raises inside one transaction, so a refused duplicate
+      // moves nothing at all: every duplicate is checked before any row moves.
+      for (const dup of body.p_duplicates ?? []) {
+        if (!dup || dup === keep) continue
+        const row = (tables.fh_clients ?? []).find((c) => c.id === dup)
+        if (!row) return { status: 400, body: JSON.stringify({ code: 'P0002', message: 'a duplicate was not found' }) }
+        if ((row.org_id ?? null) !== (kept.org_id ?? null) || (!kept.org_id && row.user_id !== kept.user_id)) {
+          return refuse('clients from different companies cannot be merged')
+        }
       }
       const counted = { fh_contacts: 'jobs', fh_leads: 'leads', fh_quotes: 'quotes', fh_invoices: 'invoices' }
       const moved = { jobs: 0, leads: 0, quotes: 0, invoices: 0 }
