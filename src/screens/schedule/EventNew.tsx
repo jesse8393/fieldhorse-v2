@@ -29,6 +29,7 @@ import { isMovedStage } from '../../lib/stages.ts'
 import { jobLabel } from '../../lib/scheduleBoard.ts'
 import { leadName, leadNeed } from '../../lib/leadsView.ts'
 import { hapticMedium } from '../../lib/haptics.ts'
+import { countNoun } from '../../lib/format.ts'
 import './schedule-event.css'
 
 type Kind = 'job' | 'lead' | 'quote'
@@ -385,7 +386,7 @@ function EventForm({ event }: { event: EventRow | null }) {
                 <Field label="Total visits" type="number" inputMode="numeric" min={2} max={52} step={1} value={occurrences} error={errors.recurrence} onChange={(e) => setOccurrences(e.target.value)} />
               </div>
               <section className="fhev-preview" aria-label="Recurring visit preview">
-                <p>{visitPreview.length} visits total, including this date. Every {every || '?'} days.</p>
+                <p>{visitPreview.length} {countNoun(visitPreview.length, 'visit')} in all, including this date. Every {every || '?'} days.</p>
                 <ol>{visitPreview.map((visit) => <li key={visit.start_at}>{new Date(visit.start_at).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} until {new Date(visit.end_at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</li>)}</ol>
               </section>
             </>

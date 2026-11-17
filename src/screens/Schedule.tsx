@@ -734,6 +734,13 @@ function DayView({ events, now, onOpen, canOpen, onEdit, onDelete, onDeleteSerie
     return c
   }, [events, now])
 
+  // The one visit still to come today that starts first.
+  const nextId = useMemo(() => {
+    const later = events.filter((e: any) => deriveStatus(e, now) === 'Upcoming')
+      .sort((a: any, b: any) => Date.parse(a.start_at) - Date.parse(b.start_at))
+    return later[0]?.id ?? null
+  }, [events, now])
+
   const filtered = useMemo(() => {
     if (stateFilter === 'all') return events
     return events.filter((e: any) => {
@@ -796,6 +803,7 @@ function DayView({ events, now, onOpen, canOpen, onEdit, onDelete, onDeleteSerie
         <ul className="fh-timeline fhev-day" aria-label="Daily agenda" style={{ listStyle: 'none', padding: 0, margin: '0 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {filtered.map((e: any, i: any) => {
             const status = deriveStatus(e, now)
+            const isNext = status === 'Upcoming' && e.id === nextId
             const start = fmtTime(e.start_at)
             const end = e.end_at ? fmtTime(e.end_at) : null
             const primary = e.fh_contacts?.name || e.title || 'Untitled'
@@ -814,6 +822,7 @@ function DayView({ events, now, onOpen, canOpen, onEdit, onDelete, onDeleteSerie
                 startStr={start}
                 endStr={end}
                 status={status}
+                upNext={isNext}
                 initial={initial}
                 onClick={() => onOpen(e)}
                 onEdit={onEdit ? () => onEdit(e) : undefined}
@@ -866,7 +875,8 @@ function deriveStatus(e: any, now: any) {
 const PILL_FOR_STATUS: Record<string, any> = {
   'On Site':     { variant: 'live',    label: 'Live' },
   'In Progress': { variant: 'live',    label: 'Live' },
-  'Upcoming':    { variant: 'up',      label: 'Up next' },
+  // Later today. Only the first of these is the next visit (OPS-21).
+  'Upcoming':    { variant: 'up',      label: 'Later today' },
   'Scheduled':   { variant: 'default', label: 'Upcoming' },
   'Done':        { variant: 'done',    label: 'Done' }
 }
@@ -881,9 +891,9 @@ function splitTime(s: any) {
   return [s.slice(0, idx), s.slice(idx + 1)]
 }
 
-function ScheduleRow({ index, primary, secondary, kind, crewCount, startStr, endStr, status, onClick, onEdit, onDelete, deleteArmed, onDeleteSeries, seriesCount, seriesArmed, isClickable }: any) {
+function ScheduleRow({ upNext, index, primary, secondary, kind, crewCount, startStr, endStr, status, onClick, onEdit, onDelete, deleteArmed, onDeleteSeries, seriesCount, seriesArmed, isClickable }: any) {
   // Full-width event content and explicit actions remain usable with touch or keyboard.
-  const pill = PILL_FOR_STATUS[status] || PILL_FOR_STATUS.Scheduled
+  const pill = upNext ? { variant: 'up', label: 'Up next' } : (PILL_FOR_STATUS[status] || PILL_FOR_STATUS.Scheduled)
   const isLive = pill.variant === 'live'
   const [hrPart, apPart] = splitTime(startStr)
 
@@ -971,7 +981,7 @@ function WeekView({ start, events, onOpen, canOpen, onEdit, onDay, onDelete, onD
               {dayEvents.map((event: any) => (
                 <li key={event.id} className="fhev-agenda__event">
                   <button type="button" className="fhev-agenda__open" disabled={!canOpen(event)} onClick={() => onOpen(event)}>
-                    <span className="fhev-agenda__time">{fmtTime(event.start_at)}{event.end_at ? ` – ${fmtTime(event.end_at)}` : ''}</span>
+                    <span className="fhev-agenda__time">{fmtTime(event.start_at)}{event.end_at ? ` to ${fmtTime(event.end_at)}` : ''}</span>
                     <strong>{event.title || event.fh_contacts?.name || 'Untitled event'}</strong>
                     {event.fh_contacts?.name && event.title !== event.fh_contacts.name && <span>{event.fh_contacts.name}</span>}
                     {eventAssignees(event).length > 0 && <span>{eventAssignees(event).length} crew assigned</span>}
