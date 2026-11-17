@@ -170,6 +170,26 @@ test.describe('the customer page', () => {
     await expect(page).toHaveURL(/\/invoices\/inv1$/)
   })
 
+  test('a client billed directly shows what it was billed and what it owes (M-13)', async ({ context, page }) => {
+    const DIRECT = { id: 'cl-direct', user_id: USER.id, name: 'Dana Whitfield', company_name: null, phone: '615-555-0144', email: null, address: null, created_at: iso(NOW - 30 * DAY) }
+    await signIn(context, {
+      tables: {
+        fh_clients: [DIRECT],
+        fh_invoices: [
+          { id: 'inv-a', user_id: USER.id, client_id: 'cl-direct', contact_id: null, title: 'Gutter repair', amount: 800, status: 'paid', sequence_number: 1, issued_at: iso(NOW - 40 * DAY), due_at: iso(NOW - 30 * DAY), created_at: iso(NOW - 40 * DAY), updated_at: iso(NOW - 30 * DAY) },
+          { id: 'inv-b', user_id: USER.id, client_id: 'cl-direct', contact_id: null, title: 'Fence post', amount: 500, status: 'sent', sequence_number: 2, issued_at: iso(NOW - 25 * DAY), due_at: iso(NOW - 20 * DAY), created_at: iso(NOW - 25 * DAY), updated_at: iso(NOW - 25 * DAY) }
+        ],
+        fh_payments: [{ id: 'pay-a', user_id: USER.id, contact_id: null, invoice_id: 'inv-a', amount: 800, method: 'check', paid_on: iso(NOW - 30 * DAY).slice(0, 10), created_at: iso(NOW - 30 * DAY) }]
+      }
+    })
+    await open(page, '/clients/cl-direct')
+    // Phone: "Lifetime $1.3K", "Contract balance $500". Desktop: "$1K
+    // Lifetime value", "$500 Remaining contract value". Both read $0 before.
+    const main = page.locator('main')
+    await expect(main).toContainText(/Lifetime\s*\$1\.3K|\$1(\.3)?K\s*Lifetime value/, { timeout: 30_000 })
+    await expect(main).toContainText(/Contract balance\s*\$500|\$500\s*Remaining contract value/)
+  })
+
   test('a customer with leads, quotes or invoices is not deleted, and the page says what to do instead', async ({ context, page }) => {
     await signIn(context)
     const writes = watchWrites(page)

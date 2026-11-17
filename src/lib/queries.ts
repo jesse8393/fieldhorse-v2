@@ -1090,7 +1090,7 @@ export type ClientDetailBundle = {
   files: (Database['public']['Tables']['fh_job_files']['Row'] & {
     fh_contacts: Pick<Contact, 'name'> | null
   })[]
-  payments: Pick<Payment, 'contact_id' | 'amount' | 'paid_on' | 'created_at' | 'method'>[]
+  payments: Pick<Payment, 'contact_id' | 'invoice_id' | 'amount' | 'paid_on' | 'created_at' | 'method'>[]
   changeOrders: Pick<Database['public']['Tables']['fh_change_orders']['Row'], 'contact_id' | 'amount' | 'status'>[]
 }
 
@@ -1146,11 +1146,22 @@ async function fetchClientDetail(id: string, userId: string, orgId?: string | nu
     invoices: (invoicesRes.data ?? []) as ClientInvoice[]
   }
   const jobIds = jobs.map((r) => r.id)
+  // Payments on invoices billed straight to the client (no job), so the
+  // client's totals count them (M-13).
+  const directInvoiceIds = records.invoices.filter((inv) => !inv.contact_id).map((inv) => inv.id)
+  const PAYMENT_COLUMNS = 'contact_id, invoice_id, amount, paid_on, created_at, method'
+  const directPayments = async () => {
+    if (directInvoiceIds.length === 0) return [] as ClientDetailBundle['payments']
+    const res = await scoped(supabase.from('fh_payments').select(PAYMENT_COLUMNS), userId, orgId)
+      .in('invoice_id', directInvoiceIds)
+    if (res.error) throw res.error
+    return (res.data ?? []) as ClientDetailBundle['payments']
+  }
   if (jobIds.length === 0) {
-    return { client: client as Client, ...EMPTY_CLIENT_DETAIL, ...records }
+    return { client: client as Client, ...EMPTY_CLIENT_DETAIL, ...records, payments: await directPayments() }
   }
 
-  const [notesRes, filesRes, paymentsRes, coRes] = await Promise.all([
+  const [notesRes, filesRes, paymentsRes, coRes, invoicePayments] = await Promise.all([
     scoped(supabase.from('fh_notes').select('*, fh_contacts(name)'), userId, orgId)
       .in('contact_id', jobIds)
       .order('created_at', { ascending: false })
@@ -1159,11 +1170,12 @@ async function fetchClientDetail(id: string, userId: string, orgId?: string | nu
       .in('job_id', jobIds)
       .order('uploaded_at', { ascending: false })
       .limit(60),
-    scoped(supabase.from('fh_payments').select('contact_id, amount, paid_on, created_at, method'), userId, orgId)
+    scoped(supabase.from('fh_payments').select(PAYMENT_COLUMNS), userId, orgId)
       .in('contact_id', jobIds),
     scoped(supabase.from('fh_change_orders').select('contact_id, amount, status'), userId, orgId)
       .in('contact_id', jobIds)
-      .eq('status', 'approved')
+      .eq('status', 'approved'),
+    directPayments()
   ])
   if (notesRes.error) throw notesRes.error
   if (filesRes.error) throw filesRes.error
@@ -1178,7 +1190,7 @@ async function fetchClientDetail(id: string, userId: string, orgId?: string | nu
     ...records,
     notes: (notesRes.data ?? []) as ClientDetailBundle['notes'],
     files: (filesRes.data ?? []) as ClientDetailBundle['files'],
-    payments: (paymentsRes.data ?? []) as ClientDetailBundle['payments'],
+    payments: [...(paymentsRes.data ?? []) as ClientDetailBundle['payments'], ...invoicePayments],
     changeOrders: (coRes.data ?? []) as ClientDetailBundle['changeOrders']
   }
 }

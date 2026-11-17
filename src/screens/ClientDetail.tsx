@@ -72,7 +72,7 @@ export default function ClientDetail() {
   const jobs = useMemo(() => bundle?.jobs ?? [], [bundle?.jobs])
   const leads = bundle?.leads ?? []
   const quotes = bundle?.quotes ?? []
-  const invoices = bundle?.invoices ?? []
+  const invoices = useMemo(() => bundle?.invoices ?? [], [bundle?.invoices])
   const notes = bundle?.notes ?? []
   const files = bundle?.files ?? []
   const payments = useMemo(() => bundle?.payments ?? [], [bundle?.payments])
@@ -91,9 +91,11 @@ export default function ClientDetail() {
   // version this replaced excluded closed jobs and approved change
   // orders from "outstanding", so this screen's tile could say $0 while
   // the statement button right below it billed the client $2,000.
+  // The client's invoices count too: one billed straight to the client,
+  // or on a job saved with no price, has no contract to roll up (M-13).
   const rollup = useMemo(
-    () => rollupJobs(jobs as any, payments as any, changeOrders as any),
-    [jobs, payments, changeOrders]
+    () => rollupJobs(jobs as any, payments as any, changeOrders as any, invoices as any),
+    [jobs, payments, changeOrders, invoices]
   )
   const lifetime = rollup.lifetime
   const outstanding = rollup.outstanding
