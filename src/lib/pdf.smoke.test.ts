@@ -212,6 +212,19 @@ describe('pdf engine smoke', () => {
     expect(figures.filter((t) => /paid in full|outstanding|^\$/i.test(t))).toEqual(['$1,000.07', '$1,000.06', 'OUTSTANDING', '$0.01'])
   })
 
+  // PT-10: the classic estimate, the default template, prints the scope.
+  it('the classic estimate prints the scope of work', async () => {
+    const result = await generateQuote({
+      company, contact,
+      items: [{ description: 'Pour slab', qty: 1, rate: 4000, amount: 4000 }],
+      scope: 'Remove the old patio and pour a 4 inch slab with wire mesh.',
+      quoteId: 'q-1'
+    } as any)
+    const text = pdfText(result).join(' ')
+    expect(text).toContain('SCOPE OF WORK')
+    expect(text).toContain('Remove the old patio and pour a 4 inch slab with wire mesh.')
+  })
+
   // PT-12: no legal terms the contractor never set.
   it('drops "valid for 30 days" when the estimate has a valid until date', async () => {
     for (const estimate_template of ['classic', 'slate']) {

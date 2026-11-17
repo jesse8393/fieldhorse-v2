@@ -1869,6 +1869,10 @@ export async function generateQuote({
     cursor += titleLines.length * 7
   }
 
+  // Scope of work (PT-10): the classic estimate printed it nowhere, while
+  // the web page and the themed PDFs do.
+  if (scope && String(scope).trim()) drawDetailBlock('Scope of work', String(scope).trim())
+
   // Items
   if (baseRows.length > 0) {
     cursor = drawDocItemsTable(doc, { startY: cursor + 4, rows: baseRows, brandRGB, margin, pageWidth, pageHeight, bottom, layout: 'sectioned' })
