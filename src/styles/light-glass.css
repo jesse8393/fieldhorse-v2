@@ -536,6 +536,9 @@ body:has(.fh-app--glass) .fhj-capsule .fhc-btn { background-image: none; box-sha
 .fh-customer-row:hover .fh-customer-row__name { color: var(--fh-gold-ink); }
 .fh-customer-row:focus-visible { outline: 2px solid var(--fh-focus); outline-offset: 4px; }
 .fh-customer-list-footer { padding: 16px 0; color: var(--fh-ink-2); }
+/* The foot of a list drawn 40 rows at a time (components/ListMore.tsx). */
+.fh-list-more { display: grid; justify-items: start; gap: 12px; padding: 16px 0; color: var(--fh-ink-2); font-size: 14px; }
+.fh-list-more p { margin: 0; }
 @media (min-width: 400px) and (max-width: 899px) {
   .fh-customers-heading { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
   .fh-customers-heading .fhc-btn { grid-column: 2; grid-row: 1 / 3; margin-top: 0; }

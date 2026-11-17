@@ -91,6 +91,24 @@ test.describe('jobs on a phone', () => {
     await expect(page.getByText('Plumbing Bellevue', { exact: true })).toBeVisible()
   })
 
+  // PERF-10: a long list draws 40 rows and Load more adds the next 40.
+  test('a long jobs list draws 40 rows and Load more brings the rest', async ({ context, page }) => {
+    const client = { id: 'cl-1', name: 'Jeff Roy', phone: '555-0101', email: 'jeff@roy.com' }
+    const jobs = Array.from({ length: 60 }, (_, i) => ({
+      id: `c-long-${i}`, user_id: 'qa-user-1', client_id: 'cl-1', stage: 'job', name: `Customer ${i}`, job_title: `Driveway ${i}`,
+      amount: 1000 + i, phone: null, email: null, address: null, notes: null, milestones: [], completed_at: null,
+      created_at: '2026-09-01T12:00:00Z', updated_at: new Date(Date.UTC(2026, 9, 1, 12, i)).toISOString(), fh_clients: client
+    }))
+    await signIn(context, { tables: { fh_contacts: jobs } })
+    await openJobs(page, '/jobs?stage=active')
+    const rows = page.locator('.fhjl-rows > li')
+    await expect(rows).toHaveCount(40)
+    await expect(page.getByText('Showing 40 of 60 jobs.', { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Load more jobs', exact: true }).click()
+    await expect(rows).toHaveCount(60)
+    await expect(page.getByRole('button', { name: 'Load more jobs', exact: true })).toHaveCount(0)
+  })
+
   test('rows open the job', async ({ context, page }) => {
     await signIn(context)
     await openJobs(page)

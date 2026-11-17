@@ -729,6 +729,18 @@ test.describe('the quotes list', () => {
     await expect(page.locator('.fhqt-page')).toBeVisible({ timeout: 30_000 })
   })
 
+  // PERF-10: a long list draws 40 rows and Load more adds the next 40.
+  test('a long quotes list draws 40 rows and Load more brings the rest', async ({ context, page }) => {
+    const quotes = Array.from({ length: 60 }, (_, i) => quoteRow({ id: `q-long-${i}`, title: `Patio ${i}`, updated_at: new Date(NOW - i * 60_000).toISOString() }))
+    await signIn(context, { tables: { fh_quotes: quotes } })
+    await page.goto('/quotes', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    const rows = page.getByRole('list', { name: 'Quotes' }).getByRole('listitem')
+    await expect(rows).toHaveCount(40, { timeout: 30_000 })
+    await expect(page.getByText('Showing 40 of 60 quotes.', { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Load more quotes', exact: true }).click()
+    await expect(rows).toHaveCount(60)
+  })
+
   // PERF-02: the list already holds the quote's row, so the quote shows at
   // once from it and its own read only brings it up to date.
   test('a quote opened from the list shows at once while its own read is out', async ({ context, page }) => {

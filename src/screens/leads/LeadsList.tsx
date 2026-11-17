@@ -12,6 +12,7 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, Plus, Users } from 'lucide-react'
 import { Button, Chip, EmptyState, IconButton, Row, SkeletonRows } from '../../components/fh'
 import DataErrorState from '../../components/DataErrorState.tsx'
+import ListMore from '../../components/ListMore.tsx'
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useLeads, useLeadVisits } from '../../lib/queries.ts'
 import {
@@ -19,6 +20,7 @@ import {
 } from '../../lib/leadsView.ts'
 import { newRecordRoute, recordRoute } from '../../lib/records.ts'
 import { hapticTap } from '../../lib/haptics.ts'
+import { useListWindow } from '../../lib/useListWindow.ts'
 import './leads.css'
 
 export default function LeadsList() {
@@ -30,6 +32,9 @@ export default function LeadsList() {
   const now = new Date()
   const rows = useMemo(() => sortLeads(listedLeads(leadsQuery.data ?? [])), [leadsQuery.data])
   const visits = nextVisitByLead(visitsQuery.data, now)
+  // Long lists draw 40 rows at a time.
+  const { count, showMore } = useListWindow(`leads:${user?.id || ''}`)
+  const shown = rows.slice(0, count)
 
   function goBack() {
     hapticTap()
@@ -60,8 +65,9 @@ export default function LeadsList() {
     )
   } else {
     body = (
+      <>
       <ul className="fhl-rows" aria-label="Leads">
-        {rows.map((lead) => {
+        {shown.map((lead) => {
           const chip = leadChip(lead, visits.get(lead.id))
           const next = chip
             ? <Chip label={chip.label} tone={chip.tone} />
@@ -78,6 +84,8 @@ export default function LeadsList() {
           )
         })}
       </ul>
+      <ListMore shown={shown.length} total={rows.length} noun="leads" onMore={showMore} />
+      </>
     )
   }
 

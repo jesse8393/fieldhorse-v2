@@ -3,10 +3,12 @@ import { useSearchParams } from 'react-router-dom'
 import { FileText, Plus, Search, SearchX, X } from 'lucide-react'
 import { Button, Chip, EmptyState, Row, SkeletonRows } from '../../components/fh'
 import DataErrorState from '../../components/DataErrorState.tsx'
+import ListMore from '../../components/ListMore.tsx'
 import WorkspaceHelp from '../../components/experience/WorkspaceHelp.tsx'
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useQuotes } from '../../lib/queries.ts'
 import { useNow } from '../../lib/useNow.ts'
+import { useListWindow } from '../../lib/useListWindow.ts'
 import { QUOTE_FILTERS, quoteListView } from '../../lib/quoteListView.ts'
 import { newRecordRoute, recordRoute } from '../../lib/records.ts'
 import { statusChip } from '../ContactDetail/lib/quoteStatus.ts'
@@ -37,6 +39,9 @@ export default function QuotesList() {
     searchRef.current?.focus()
   }
   const known = !quotes.isPending && !quotes.isError
+  // Long lists draw 40 rows at a time.
+  const { count, showMore } = useListWindow(`quotes:${user?.id || ''}`)
+  const shown = view.visible.slice(0, count)
   return <div className="fhqt-page fhqt-page--list fh-quote-workspace">
     <header className="fhqt-list-head">
       <div><p className="fh-workspace-eyebrow">From scope to approval</p><h1 className="fhqt-list-title" ref={titleRef} tabIndex={-1}>Quotes</h1><p className="fh-workspace-subtitle">Clear proposals. Confident next steps.</p></div>
@@ -48,10 +53,10 @@ export default function QuotesList() {
     {quotes.isError && <DataErrorState compact={Boolean(quotes.data?.length)} title={quotes.data?.length ? 'Quotes could not refresh' : 'Could not load quotes'} message={quotes.data?.length ? 'Showing saved results. Retry for current records.' : 'Check your connection and try again.'} onRetry={() => { void quotes.refetch() }} />}
     {quotes.isPending ? <div className="fhqt-loading"><SkeletonRows rows={5} label="Loading quotes" /></div> : quotes.isError && !quotes.data?.length ? null : !quotes.data?.length ? <EmptyState icon={FileText} title="No quotes yet." sub="Start with scope, pricing, and your customer." action={<Button variant="primary" icon={Plus} to={newRecordRoute('quote')}>New quote</Button>} /> : <>
       <p className="fh-quote-result-count" role="status">{view.visible.length} {view.visible.length === 1 ? 'quote' : 'quotes'}{query ? ' matching your search' : ''}</p>
-      {view.visible.length ? <ul className="fhqt-rows" aria-label="Quotes">{view.visible.map(q => {
+      {view.visible.length ? <><ul className="fhqt-rows" aria-label="Quotes">{shown.map(q => {
         const chip = statusChip(quoteStatusView(q))
         return <Row key={q.id} as="li" title={quoteTitle(q)} subline={q.fh_clients?.name || 'No client'} money={Number(q.amount) || 0} next={<Chip tone={chip.tone} label={chip.label} />} to={recordRoute('quote', q.id)} />
-      })}</ul> : <EmptyState icon={SearchX} title="No matching quotes" sub="Try another status or customer name." action={<Button variant="secondary" onClick={clear}>Clear filters</Button>} />}
+      })}</ul><ListMore shown={shown.length} total={view.visible.length} noun="quotes" onMore={showMore} /></> : <EmptyState icon={SearchX} title="No matching quotes" sub="Try another status or customer name." action={<Button variant="secondary" onClick={clear}>Clear filters</Button>} />}
     </>}
     <WorkspaceHelp topic="quotes" />
   </div>

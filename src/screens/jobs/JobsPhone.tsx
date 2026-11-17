@@ -17,7 +17,9 @@ import { useSearchParams } from 'react-router-dom'
 import { HardHat, Plus, Search, SearchX } from 'lucide-react'
 import { Button, Chip, EmptyState, Field, IconButton, Row, SkeletonRows } from '../../components/fh'
 import DataErrorState from '../../components/DataErrorState.tsx'
+import ListMore from '../../components/ListMore.tsx'
 import { useAuth } from '../../contexts/AuthContext.tsx'
+import { useListWindow } from '../../lib/useListWindow.ts'
 import { useNavAccess } from '../../lib/useNavAccess.ts'
 import { useJobVisits, useLeads, useLeadVisits, useQuotes, type JobRow } from '../../lib/queries.ts'
 import { jobsVisitWindow, JOBS_TABS, type JobsRowView, type JobsSort, type JobsTab } from '../../lib/jobsList.ts'
@@ -207,6 +209,18 @@ export default function JobsPhone({
     }
   }
 
+  // Long lists draw 40 rows at a time, across the groups in order.
+  const { count: windowCount, showMore } = useListWindow(`jobs:${user?.id || ''}`)
+  const totalRows = view.groups.reduce((sum, g) => sum + g.rows.length, 0)
+  let budget = windowCount
+  const shownGroups = view.groups
+    .map((g) => {
+      const rows = g.rows.slice(0, Math.max(0, budget))
+      budget -= rows.length
+      return { ...g, rows }
+    })
+    .filter((g) => g.rows.length > 0)
+
   const filterTitle = showMoney ? 'Filter and sort' : 'Filter'
   const query = search.trim()
   const hasRows = view.groups.length > 0
@@ -258,7 +272,7 @@ export default function JobsPhone({
       )
     }
   } else {
-    body = view.groups.map((g) => {
+    body = shownGroups.map((g) => {
       const headingId = `${idBase}-group-${g.id}`
       return (
         <section key={g.id} className="fhjl-group" aria-labelledby={headingId}>
@@ -286,6 +300,7 @@ export default function JobsPhone({
         </section>
       )
     })
+    body = <>{body}<ListMore shown={Math.min(windowCount, totalRows)} total={totalRows} noun="jobs" onMore={showMore} /></>
   }
 
   return (

@@ -772,6 +772,18 @@ async function expectInvoiceWithoutAJob(page: Page) {
 test.describe('money on a phone', () => {
   test.skip(({ isMobile }) => !isMobile, 'Phone Money screen')
 
+  // PERF-10: a long group draws 40 rows and Load more adds the next 40.
+  test('a long overdue group draws 40 rows and Load more brings the rest', async ({ context, page }) => {
+    const late = Array.from({ length: 60 }, (_, i) => invoice({ id: `i-late-${i}`, contact_id: 'c-rosa', title: `Draw ${i}`, amount: 100 + i, sequence_number: i + 1, due_at: '2026-09-30' }))
+    await openMoney(context, page, { tables: { fh_invoices: late, fh_payments: [] } })
+    const overdue = page.getByRole('region', { name: 'Overdue' })
+    const rows = overdue.getByRole('listitem')
+    await expect(rows).toHaveCount(40)
+    await expect(overdue.getByText('Showing 40 of 60 invoices.', { exact: true })).toBeVisible()
+    await overdue.getByRole('button', { name: 'Load more invoices', exact: true }).click()
+    await expect(rows).toHaveCount(60)
+  })
+
   test('money vault and groups', async ({ context, page }) => {
     await openMoney(context, page)
 
