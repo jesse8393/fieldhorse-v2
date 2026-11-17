@@ -18,7 +18,7 @@ import { supabase } from '../../lib/supabase.ts'
 import { leadToQuoteDraft, markLeadQuoted, type LeadRow } from '../../lib/leads.ts'
 import { createQuote, invalidateAfterQuoteWrite, plainQuoteError } from '../../lib/quotes.ts'
 import { createUuid } from '../../lib/uuid.ts'
-import { JOB_TYPES } from '../../lib/jobTypes.ts'
+import { JOB_TYPES, readLastJobType, writeLastJobType } from '../../lib/jobTypes.ts'
 import { hapticMedium } from '../../lib/haptics.ts'
 
 type Form = {
@@ -47,7 +47,8 @@ export default function QuoteNew() {
   // backing out of Quote this never leaves that lead in the next plain New
   // quote (S21).
   const draftKind = leadParam ? `quote-lead-${leadParam}` : clientParam ? `quote-client-${clientParam}` : 'quote'
-  const { form, set, patch, done } = useDraft<Form>(draftKind, { ...EMPTY, requestId }, text ? { scope: text } : null)
+  const [lastJobType] = useState(readLastJobType)
+  const { form, set, patch, done } = useDraft<Form>(draftKind, { ...EMPTY, requestId, jobType: lastJobType }, text ? { scope: text } : null)
   const quoteId = form.requestId || requestId
   const savingRef = useRef(false)
   const [client, setClient] = useState<ClientFieldValue>(() => restoredClientValue(form.client, form.clientId))
@@ -122,6 +123,7 @@ export default function QuoteNew() {
         try { await markLeadQuoted(leadParam, quote.id) } catch { /* the quote is saved; the lead keeps its status */ }
       }
       done()
+      writeLastJobType(form.jobType)
       invalidateAfterQuoteWrite(queryClient, { quoteId: quote.id, leadId: leadParam, clientId: picked.id })
       hapticMedium()
       // The quote screen opens with its line editor ready for the first line.

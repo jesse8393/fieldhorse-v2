@@ -135,6 +135,46 @@ test('a fully invoiced job never prefills or saves the unpaid balance again', as
   expect(invoiceWrites).toBe(0)
 })
 
+// The job type picked on the last saved job or quote starts the next New
+// job and New quote, as the old lead sheet did (vibe audit
+// settings-wiped-2). A company that pours concrete picks it once.
+test('the job type of the last saved job starts the next New job and New quote', async ({ context, page }) => {
+  await signIn(context, { tables: JOB_FIRST })
+  await open(page, '/jobs/new')
+  await expect(page.getByRole('heading', { level: 1, name: 'New job' })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByLabel(/Job type/)).toHaveValue('')
+  await page.getByLabel('Client').fill('Jeff')
+  await page.getByRole('option', { name: /Jeff Roy/ }).click()
+  await page.getByLabel('Title').fill('Shed slab')
+  await page.getByLabel(/Job type/).selectOption('Concrete')
+  await page.getByRole('button', { name: 'Save job' }).click()
+  await expect(page).toHaveURL(/\/jobs\/c-job1/, { timeout: 30_000 })
+
+  await open(page, '/quotes/new')
+  await expect(page.getByLabel(/Job type/)).toHaveValue('Concrete', { timeout: 30_000 })
+  await page.getByLabel('Client').fill('Dana Whitfield')
+  await page.getByLabel(/Job type/).selectOption('Roofing')
+  await page.getByRole('button', { name: 'Save quote' }).click()
+  await expect(page).toHaveURL(/\/quotes\/q-quote/, { timeout: 30_000 })
+  await open(page, '/jobs/new')
+  await expect(page.getByLabel(/Job type/)).toHaveValue('Roofing', { timeout: 30_000 })
+})
+
+test('the job type the old lead sheet remembered still starts New job', async ({ context, page }) => {
+  await signIn(context)
+  // The build before the October redesign kept it under fh:lastJobType.
+  await context.addInitScript(() => {
+    if (sessionStorage.getItem('old-job-type-seeded')) return
+    sessionStorage.setItem('old-job-type-seeded', '1')
+    localStorage.setItem('fh:lastJobType', 'Concrete')
+  })
+  await open(page, '/jobs/new')
+  await expect(page.getByLabel(/Job type/)).toHaveValue('Concrete', { timeout: 30_000 })
+  expect(await page.evaluate(() => localStorage.getItem('fh:lastJobType'))).toBeNull()
+  await open(page, '/quotes/new')
+  await expect(page.getByLabel(/Job type/)).toHaveValue('Concrete', { timeout: 30_000 })
+})
+
 test('typing a new name on Quote creates the client', async ({ context, page }) => {
   await signIn(context)
   const clientInserts: Record<string, unknown>[] = []
