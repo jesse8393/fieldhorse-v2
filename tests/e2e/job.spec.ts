@@ -614,6 +614,17 @@ test.describe('job page on a desktop, redesigned', () => {
     await expect(page.getByRole('button', { name: 'Add a line' })).toBeVisible()
   })
 
+  // dead-ends-10: an invoice in the facts panel's Documents opens that
+  // invoice, from the Contract balance tab as from anywhere else.
+  test('an invoice in Documents opens the invoice', async ({ context, page }) => {
+    await signIn(context)
+    await openDesktop(page, '/jobs/c-job2?tab=financials')
+    const invoice = page.getByRole('complementary', { name: 'Job facts' }).getByRole('link', { name: /^Invoice 2, Progress draw 1/ })
+    await expect(invoice).toHaveAttribute('href', '/invoices/inv1')
+    await invoice.click()
+    await expect(page).toHaveURL(/\/invoices\/inv1$/)
+  })
+
   test('deep links and the action cue keep working', async ({ context, page }) => {
     await signIn(context)
     await openDesktop(page, '/jobs/c-job1?tab=files')

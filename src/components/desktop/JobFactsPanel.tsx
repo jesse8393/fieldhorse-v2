@@ -8,11 +8,12 @@
 // else. Sections never draw a blank: each has one quiet line for when
 // there is nothing to show yet.
 //
-// Rows that lead somewhere are real buttons that open the section tab
-// that holds the record, and are plain text when the job's stage does
-// not offer that tab.
+// Rows that lead somewhere are real controls: an invoice opens its own
+// screen, and the other rows open the section tab that holds the record,
+// or are plain text when the job's stage does not offer that tab.
 
 import type { ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import { Button, VaultCard } from '../fh/index.ts'
 import type { VaultFact } from '../fh/index.ts'
@@ -124,6 +125,14 @@ export default function JobFactsPanel({
         {row.detail && <span className="fhd-doc__detail">{row.detail}</span>}
       </>
     )
+    // An invoice opens its own screen; the quote and files open their tab.
+    if (row.to) {
+      return (
+        <li key={row.id}>
+          <Link className="fhd-doc fhd-doc--link" to={row.to}>{body}</Link>
+        </li>
+      )
+    }
     return has(row.tab) ? (
       <li key={row.id}>
         <button type="button" className="fhd-doc fhd-doc--link" onClick={() => onOpenTab(row.tab)}>{body}</button>

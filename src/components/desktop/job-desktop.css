@@ -672,6 +672,7 @@ a.fhd-person__line {
 
 .fhd-doc--link {
   cursor: pointer;
+  text-decoration: none;
   -webkit-tap-highlight-color: transparent;
 }
 
