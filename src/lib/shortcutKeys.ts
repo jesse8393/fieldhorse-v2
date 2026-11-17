@@ -37,3 +37,20 @@ export function desktopShortcut(letter: string, env: ShortcutEnv = {}): DesktopS
     ? { keys: `⌘${key}`, spoken: `Command ${key}`, combo: `Meta+${key}` }
     : { keys: `Ctrl ${key}`, spoken: `Control ${key}`, combo: `Control+${key}` }
 }
+
+// Input types that take no typing; a shortcut pressed on one still runs.
+const NON_TEXT_INPUTS = new Set(['button', 'checkbox', 'color', 'file', 'hidden', 'image', 'radio', 'range', 'reset', 'submit'])
+
+/**
+ * True when a key press lands where the person is typing: a text input, a
+ * textarea, a select or editable text. The app's own shortcuts stay out of
+ * those, so Control J never takes someone off a half typed form (D09).
+ */
+export function isTypingTarget(target: EventTarget | null | undefined): boolean {
+  const el = target as { tagName?: unknown; type?: unknown; isContentEditable?: unknown } | null | undefined
+  if (!el || typeof el.tagName !== 'string') return false
+  const tag = el.tagName.toUpperCase()
+  if (tag === 'TEXTAREA' || tag === 'SELECT') return true
+  if (tag === 'INPUT') return !NON_TEXT_INPUTS.has(String(el.type || 'text').toLowerCase())
+  return el.isContentEditable === true
+}

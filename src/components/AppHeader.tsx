@@ -36,7 +36,6 @@ export default function AppHeader() {
   const env = useMemo(() => browserEnv(), [])
   const captureKeys = desktopShortcut('J', env)
   const searchKeys = desktopShortcut('K', env)
-  const newKeys = desktopShortcut('N', env)
   const primary = [TODAY, SCHEDULE, JOBS, MONEY, ...(engineEnabled ? [INBOX] : [])].filter(item => canSee(item.to))
   const company = headerName(orgName, profile?.company_name, profile?.full_name)
   const companyFull = headerFullName(orgName, profile?.company_name, profile?.full_name)
@@ -64,8 +63,9 @@ export default function AppHeader() {
           <Icon icon={Mic} size={18} /><span>Capture</span>
         </button>
         {/* One New button (D58): the full screen with Lead, Quote, Job,
-            Invoice and Client. The long press menu on the dock coin is gone. */}
-        <Link to="/new" className="fhs-icon-btn" aria-label="New" aria-keyshortcuts={newKeys.combo} title={`New (${newKeys.keys})`}>
+            Invoice and Client. The long press menu on the dock coin is gone.
+            No key: the browser keeps Cmd or Ctrl+N for a new window (D09). */}
+        <Link to="/new" className="fhs-icon-btn" aria-label="New" title="New">
           <Icon icon={Plus} size={22} />
         </Link>
         <button type="button" className="fhs-icon-btn" aria-label="Search everything" aria-keyshortcuts={searchKeys.combo} title={`Search (${searchKeys.keys})`} onClick={openSearch}>
