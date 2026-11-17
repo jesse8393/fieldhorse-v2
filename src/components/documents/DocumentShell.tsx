@@ -130,7 +130,7 @@ export default function DocumentShell({
           )}
           <p style={{ margin: footer ? '10px 0 0' : 0, fontSize: 12, lineHeight: 1.55, color: DOC_COLORS.inkMuted }}>
             {company?.name || ''}
-            {contactLine ? `${company?.name ? ', ' : ''}Questions? ${contactLine}` : ''}
+            {contactLine ? `${company?.name ? '. ' : ''}Questions? ${contactLine}` : ''}
           </p>
         </footer>
       </div>

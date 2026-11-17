@@ -118,3 +118,64 @@ describe('no dash as punctuation in what a person reads', () => {
     expect(texts).toEqual(['d ago - nudge', 'Saved - will sync', 'Today \u2014 later', '\u2014', '\u2013', '-'])
   })
 })
+
+// ai-copy-3: commit 4bc837d swapped each em dash for a comma and kept the
+// words, which left run on sentences in hints, empty states, toasts and on
+// customer documents. Each pair names a file and a splice it printed. The
+// rewrites use two sentences, a colon, or a word that joins the clauses.
+describe('no comma splice left where a dash was swapped out', () => {
+  const SPLICES: [string, string][] = [
+    ['components/BrandLogoPicker.tsx', 'Logo too large, keep it'],
+    ['components/BrandLogoPicker.tsx', "Couldn't read image, try"],
+    ['components/SignaturePad.tsx', 'Optional, hand the phone'],
+    ['components/TimeClockCard.tsx', 'Less than 3 minutes, sure?'],
+    ['components/desktop/SnowNotesBuild.tsx', 'Speak or type, AI will'],
+    ['components/desktop/SnowNotesBuild.tsx', 'No reports yet, start'],
+    ['components/documents/DocumentShell.tsx', "company?.name ? ', ' : ''}Questions?"],
+    ['components/documents/ProposalTemplate.tsx', ', itemized below'],
+    ['components/documents/ProposalTemplate.tsx', 'Approved, thank you'],
+    ['components/documents/ProposalTemplate.tsx', '`, ${nameUnder}`'],
+    ['lib/captureActions.ts', 'Note saved, will sync'],
+    ['lib/captureActions.ts', 'Task saved, will sync'],
+    ['lib/captureActions.ts', "'Saved, will sync'"],
+    ['lib/outbox.ts', "storage is full, this didn't save"],
+    ['screens/Activity.tsx', 'approved, ${co.title'],
+    ['screens/Activity.tsx', 'added, ${co.title'],
+    ['screens/Activity.tsx', '`, ${inv.title}`'],
+    ['screens/ContactDetail/sections/composeActivityEvents.ts', 'added, ${co.title'],
+    ['screens/Compose.tsx', 'Anything to highlight, price change'],
+    ['screens/ContactDetail/lib/jobNextAction.ts', 'done, collect the balance'],
+    ['screens/ContactDetail/sections/ChangeOrdersSection.tsx', '${co.sequence_number}, ${co.title}'],
+    ['screens/ContactDetail/sections/ChangeOrdersSection.tsx', 'customer, they sign'],
+    ['screens/ContactDetail/sections/ChangeOrdersSection.tsx', 'SW corner, replace'],
+    ['screens/ContactDetail/sections/Expenses.tsx', 'missing a rate, set rates'],
+    ['screens/ContactDetail/sections/Expenses.tsx', 'permits, log as you go'],
+    ['screens/ContactDetail/sections/Files.tsx', 'plans, upload anything'],
+    ['screens/ContactDetail/sections/Messages.tsx', 'Every touchpoint, call, text, onsite, captured'],
+    ['screens/ContactDetail/sections/Selections.tsx', 'needs to pick, tile'],
+    ['screens/ContactDetail/sections/Selections.tsx', "': overdue'"],
+    ['screens/ContactDetail/sections/Subs.tsx', 'each trade, rates roll'],
+    ['screens/Invoices.tsx', 'and retry, your numbers'],
+    ['screens/Onboarding.tsx', 'Recommended, seeds'],
+    ['screens/Onboarding.tsx', 'Skip, start fresh'],
+    ['screens/Partners.tsx', 'sender skipped, share'],
+    ['screens/Settings.tsx', 'get started, everything else'],
+    ['screens/Settings.tsx', 'One line or several, used'],
+    ['screens/Settings.tsx', 'customer documents, proposals'],
+    ['screens/Settings.tsx', 'already use, Venmo'],
+    ['screens/Settings.tsx', 'touch the money, it goes'],
+    ['screens/Settings.tsx', 'under the button, checks'],
+    ['screens/Settings.tsx', 'sample data, your own'],
+    ['screens/Settings.tsx', 'Off, approvals'],
+    ['screens/SubDetail.tsx', 'Lightweight only, never'],
+    ['screens/SubDetail.tsx', 'Anything to remember, scheduling'],
+    ['screens/Tasks.tsx', "instead, that's your own"],
+    ['screens/Team.tsx', 'rate, feeds job labor'],
+    ['screens/jobs/JobComplete.tsx', 'saved to Files, share'],
+  ]
+  for (const [file, text] of SPLICES) {
+    it(`${file} no longer says "${text}"`, () => {
+      expect(readFileSync(join(srcDir, file), 'utf8')).not.toContain(text)
+    })
+  }
+})

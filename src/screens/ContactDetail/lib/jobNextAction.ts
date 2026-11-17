@@ -58,7 +58,7 @@ const STAGE_DEFAULTS: Record<string, Pick<JobNextAction, 'title' | 'ctaLabel' | 
 // Job-stage default, work already marked complete: the next move is
 // collecting the money, not completing again.
 const JOB_COMPLETED_DEFAULT: Pick<JobNextAction, 'title' | 'ctaLabel' | 'pipelineFn'> = {
-  title: 'Work’s done, collect the balance.',
+  title: 'Work’s done. Collect the balance.',
   ctaLabel: 'Send invoice',
   pipelineFn: 'sendInvoice'
 }

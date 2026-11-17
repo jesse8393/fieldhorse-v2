@@ -131,6 +131,16 @@ test.describe('job page on a phone', () => {
     expect(await more.innerText()).not.toMatch(/Mark Complete|Job Progress/)
   })
 
+  // ai-copy-3: the empty Files and Expenses lines read as sentences.
+  test('the empty files and expenses lines read as sentences', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_files: [], fh_expenses: [] } })
+    await open(page, '/jobs/c-job1?tab=documents')
+    await expect(page.getByText('No files yet.', { exact: false })).toBeVisible()
+    await expect(page.getByText('No files yet. Upload permits, contracts, plans or anything else that supports the job.')).toBeVisible()
+    await open(page, '/jobs/c-job1?tab=expenses')
+    await expect(page.getByText('No expenses yet. Log materials, fuel and permits as you go so the margin stays real.')).toBeVisible()
+  })
+
   test('every section stays one tap away', async ({ context, page }) => {
     await signIn(context)
     await open(page, '/jobs/c-job1')

@@ -164,7 +164,7 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }: an
           color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)',
           fontSize: 14, textAlign: 'center', lineHeight: 1.5
         }}>
-          No subs on this job. Add who's running each trade, rates roll into cost + margin live.
+          No subs on this job. Add who's running each trade. Their rates count toward cost and margin right away.
         </div>
       ) : (
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>

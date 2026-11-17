@@ -406,7 +406,7 @@ export default function Compose() {
                   rows={3}
                   value={context}
                   onChange={(e) => setContext(e.target.value)}
-                  placeholder="Anything to highlight, price change, delay reason, specific material…"
+                  placeholder="Anything to highlight: a price change, a delay, a specific material…"
                   style={{ ...selectStyle, resize: 'vertical', minHeight: 72, fontFamily: 'var(--font-body)' }}
                 />
               </Field>

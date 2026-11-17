@@ -129,8 +129,8 @@ export default function Activity() {
           icon: isApproved ? Check : FileEdit,
           tone: isApproved ? 'green' : 'neutral',
           title: isApproved
-            ? `CO #${co.sequence_number} approved, ${co.title || ''}`
-            : `CO #${co.sequence_number} added, ${co.title || ''}`,
+            ? `CO #${co.sequence_number} approved${co.title ? `: ${co.title}` : ''}`
+            : `CO #${co.sequence_number} added${co.title ? `: ${co.title}` : ''}`,
           sub: `${co.amount >= 0 ? '+' : ''}${money(co.amount)}`,
           amount: Number(co.amount || 0)
         })
@@ -147,7 +147,7 @@ export default function Activity() {
           kind: 'invoice',
           icon: Receipt,
           tone: inv.status === 'paid' ? 'green' : 'gold',
-          title: `Draw #${inv.sequence_number} ${inv.status === 'paid' ? 'paid' : inv.status}${inv.title ? `, ${inv.title}` : ''}`,
+          title: `Draw #${inv.sequence_number} ${inv.status === 'paid' ? 'paid' : inv.status}${inv.title ? `: ${inv.title}` : ''}`,
           sub: money(inv.amount),
           amount: Number(inv.amount || 0)
         })

@@ -564,7 +564,7 @@ export default function Settings() {
         id="documents"
         variants={item}
         title={<>Customer facing <em>details.</em></>}
-        sub="These details strengthen your proposals, invoices, and approvals when filled in. Only company name is needed to get started, everything else is optional and can be added anytime."
+        sub="These details appear on your proposals, invoices and approvals. Only the company name is needed to get started. Everything else is optional and can be added anytime."
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <BrandField label="Company phone" optional>
@@ -603,7 +603,7 @@ export default function Settings() {
             />
           </BrandField>
 
-          <BrandField label="Company address" optional hint="One line or several, used on cover pages.">
+          <BrandField label="Company address" optional hint="One line or several. Shown on cover pages.">
             <textarea
               rows={2}
               value={companyAddress}
@@ -646,7 +646,7 @@ export default function Settings() {
           <BrandField
             label="Brand accent color"
             optional
-            hint="The accent color on your customer documents, proposals, invoices, and statements. Leave blank to use the default."
+            hint="The accent color on your customer documents: proposals, invoices and statements. Leave blank to use the default."
           >
             <BrandColorEditor
               value={brandAccentHex}
@@ -726,10 +726,10 @@ export default function Settings() {
         id="payments"
         variants={item}
         title={<>Getting <em>paid.</em></>}
-        sub="Paste a payment link you already use, Venmo, Zelle, Square, PayPal, or a Stripe Payment Link. It becomes a “Pay now” button on every invoice and statement you send. Leave blank to keep collecting the way you do now."
+        sub="Paste a payment link you already use, such as Venmo, Zelle, Square, PayPal or a Stripe Payment Link. It becomes a “Pay now” button on every invoice and statement you send. Leave blank to keep collecting the way you do now."
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <BrandField label="Payment link" optional hint="The page customers land on to pay you. We don't touch the money, it goes straight to your account.">
+          <BrandField label="Payment link" optional hint="The page customers land on to pay you. We don't touch the money. It goes straight to your account.">
             <input
               type="url"
               inputMode="url"
@@ -741,7 +741,7 @@ export default function Settings() {
             />
           </BrandField>
 
-          <BrandField label="Payment instructions" optional hint="Shown under the button, checks payable to, mailing address, Zelle email/phone, etc.">
+          <BrandField label="Payment instructions" optional hint="Shown under the button: who checks are payable to, a mailing address, or a Zelle email or phone.">
             <textarea
               rows={3}
               value={paymentInstructions}
@@ -906,7 +906,7 @@ export default function Settings() {
           metaTone="red"
         >
           <p style={{ margin: 0, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontSize: 14 }}>
-            Clears the example clients, jobs, and activity that were loaded to show you around. Only removes sample data, your own clients and jobs are never touched.
+            Clears the example clients, jobs, and activity that were loaded to show you around. It removes only sample data. Your own clients and jobs are never touched.
           </p>
           <div style={{ marginTop: 10 }}>
             {!confirmWipe ? (
@@ -1058,7 +1058,7 @@ function PushRow({ userId }: { userId?: string }) {
           Push notifications
         </div>
         <div style={{ fontSize: 14, color: 'var(--fh-ink-2)', marginTop: 2 }}>
-          {enabled ? 'On for this device' : 'Off, approvals and new leads stay silent'}
+          {enabled ? 'On for this device' : 'Off. Approvals and new leads stay silent'}
         </div>
       </div>
       <motion.button

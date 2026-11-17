@@ -352,7 +352,7 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
           />
           {hoursPreview < 0.05 && (
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--v3-primary-text)' }}>
-              <AlertTriangle size={11} /> Less than 3 minutes, sure?
+              <AlertTriangle size={11} /> Less than 3 minutes. Log it anyway?
             </div>
           )}
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>

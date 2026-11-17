@@ -314,13 +314,13 @@ function HeroBand({ brand, total, itemCount, expiresAt, approved }: any) {
         </div>
       </div>
       <div style={{ textAlign: 'right', fontSize: 12, color: DOC_COLORS.inkMuted, lineHeight: 1.6 }}>
-        {itemCount > 0 && <div>{itemCount} priced line item{itemCount === 1 ? '' : 's'}, itemized below</div>}
+        {itemCount > 0 && <div>{itemCount} priced line item{itemCount === 1 ? '' : 's'} below</div>}
         {expiresAt && !approved && (
           <div>
             Pricing honored through <span style={{ color: DOC_COLORS.ink, fontWeight: 600 }}>{longDate(expiresAt)}</span>
           </div>
         )}
-        {approved && <div style={{ color: DOC_COLORS.signalGreen, fontWeight: 600 }}>Approved, thank you</div>}
+        {approved && <div style={{ color: DOC_COLORS.signalGreen, fontWeight: 600 }}>Approved. Thank you.</div>}
       </div>
     </section>
   )
@@ -588,7 +588,7 @@ function SigLine({ label, name, nameUnder, dataUrl, date, stamped }: any) {
         }}
       >
         <span style={{ fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase' }}>
-          {label}{!stamped && nameUnder ? `, ${nameUnder}` : ''}
+          {label}{!stamped && nameUnder ? `: ${nameUnder}` : ''}
         </span>
         <span style={{ fontSize: 12 }}>
           Date{date ? `: ${shortDateOnly(date)}` : ''}

@@ -205,7 +205,7 @@ function CompleteForm({ data, userId, goBack, home }: { data: ReturnType<typeof 
       })
       const sendBody = await sendRes.json().catch(() => ({}))
       if (sendRes.status === 503 && sendBody?.error === 'sender_not_configured') {
-        toastError('Email is not set up yet', 'The PDF is saved to Files, share it yourself.')
+        toastError('Email is not set up yet', 'The PDF is saved to Files. Share it from there.')
         downloadPdf(result)
         return
       }

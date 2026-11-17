@@ -243,7 +243,7 @@ export default function FilesSection({ jobId, userId }: any) {
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12
         }}>
           <Paperclip size={28} aria-hidden="true" color="var(--v3-text-muted)" />
-          <div>No files yet. Permits, contracts, plans, upload anything that supports the job.</div>
+          <div>No files yet. Upload permits, contracts, plans or anything else that supports the job.</div>
         </div>
       )}
 

@@ -911,7 +911,7 @@ function ProfileEditor({ profile, onSaved }: any) {
           />
         </Row>
         <Eyebrow as="div" style={{ marginTop: 4, color: 'var(--v3-text-muted)' }}>
-          Lightweight only, never store full account or routing numbers here.
+          Keep it short. Never store full account or routing numbers here.
         </Eyebrow>
       </Section>
 
@@ -923,7 +923,7 @@ function ProfileEditor({ profile, onSaved }: any) {
         <textarea
           value={form.notes}
           onChange={(e) => setField('notes', e.target.value)}
-          placeholder="Anything to remember, scheduling quirks, crew sizes, preferred suppliers…"
+          placeholder="Anything to remember: scheduling quirks, crew sizes, preferred suppliers…"
           rows={4}
           style={{
             width: '100%', boxSizing: 'border-box',
