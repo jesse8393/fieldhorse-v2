@@ -3,7 +3,7 @@ import { expect, test, type BrowserContext, type Page, type Request } from '@pla
 import { installMock, restResponse, session } from '../../scripts/qa-mock.mjs'
 import { nothingRunsOffTheSide } from './helpers/overflow.ts'
 import { signIn } from './helpers/signIn.ts'
-import { goInApp, holdPosts, postsTo } from './helpers/doubleTap.ts'
+import { goInApp, holdPosts, postsTo, twoTaps } from './helpers/doubleTap.ts'
 
 // The invoice screen's actions (Phase 9, Task 12, decisions D57 and D62):
 // the gold Collect payment, then Resend (Send on a draft), PDF and Share
@@ -951,5 +951,54 @@ test.describe('Email on a job with nothing billed makes one Balance due', () => 
     expect(ids).toHaveLength(2)
     expect(ids[0], 'the new invoice has a client made id').toMatch(/^[0-9a-f-]{36}$/)
     expect(ids[1], 'the retry is the same invoice').toBe(ids[0])
+  })
+})
+
+// A double tap on a change order's Send for signature, while the link was
+// still being made, minted two live approval links for one change order,
+// and a double tap on Approve wrote it twice. Both take one tap now.
+test.describe('a change order takes one tap', () => {
+  const co = { id: 'co-1', org_id: 'org-1', contact_id: 'c-job1', user_id: 'qa-user-1', sequence_number: 1, title: 'Extra footing', description: null, amount: 1200, status: 'draft', approval_method: null, approved_by_name: null, approved_at: null, created_at: '2026-11-10T15:00:00.000Z' }
+  const tables = { fh_contacts: [shedJob()], fh_invoices: [], fh_payments: [], fh_change_orders: [co], fh_public_links: [] }
+
+  test.beforeEach(async ({ context }, testInfo) => {
+    test.skip(!testInfo.project.name.startsWith('mobile'), 'touch taps')
+    await context.addInitScript(() => {
+      // The clipboard path, quietly, as a phone without a share sheet.
+      Object.defineProperty(navigator, 'share', { value: undefined, configurable: true })
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText: async () => {} }, configurable: true })
+    })
+  })
+
+  test('Send for signature makes one approval link', async ({ page, context }) => {
+    await signIn(context, { tables })
+    const links = postsTo(context, '/rest/v1/fh_public_links')
+    await holdPosts(context, '**/rest/v1/fh_public_links*', 1500, (n) => ({ status: 201, json: { id: `pl-${n}`, token: `tok${n}`, kind: 'change_order' } }))
+    await page.goto('/jobs/c-job1?tab=change_orders', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+    const sign = page.getByRole('button', { name: 'Send for signature', exact: true })
+    await expect(sign).toBeVisible({ timeout: 30_000 })
+    await twoTaps(page, sign)
+    await expect(page.getByText('Approval link copied', { exact: true }).first()).toBeVisible({ timeout: 10_000 })
+    await page.waitForTimeout(1000)
+    expect(links.length, 'one tap, one approval link').toBe(1)
+  })
+
+  test('Approve writes once', async ({ page, context }) => {
+    await signIn(context, { tables })
+    const writes: string[] = []
+    await context.route((url) => url.pathname.endsWith('/rest/v1/fh_change_orders'), async (route) => {
+      const method = route.request().method()
+      if (method !== 'PATCH' && method !== 'POST') return route.fallback()
+      writes.push(method)
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+      return route.fulfill({ status: 200, json: { ...co, status: 'approved', approval_method: 'verbal', approved_at: new Date().toISOString() } })
+    })
+    await page.goto('/jobs/c-job1?tab=change_orders', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+    const approve = page.getByRole('button', { name: 'Approve change order', exact: true })
+    await expect(approve).toBeVisible({ timeout: 30_000 })
+    await twoTaps(page, approve)
+    await expect(page.getByText('Change order updated', { exact: true }).first()).toBeVisible({ timeout: 10_000 })
+    await page.waitForTimeout(1000)
+    expect(writes.length, 'one tap, one write').toBe(1)
   })
 })

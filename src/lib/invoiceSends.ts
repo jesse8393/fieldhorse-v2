@@ -36,6 +36,7 @@ export const sendKey = {
 }
 
 const INVOICE = 'invoice:'
+const NONE: ReadonlySet<string> = new Set()
 
 /** How the email went out: a reminder from the Remind sheet, or a resend from the invoice's actions. */
 export type InvoiceSendKind = { reminder: boolean }
@@ -118,6 +119,11 @@ export function endSendIntent(key: string, intent: SendIntent) {
   if (intents.get(key) === intent) intents.delete(key)
 }
 
+/** The keys of every send going out, app wide; the screen redraws when that changes. */
+export function useSendsInFlight(): ReadonlySet<string> {
+  return useSyncExternalStore(subscribeSends, sendsInFlight, () => NONE)
+}
+
 /** Whether the send with this key is going out, app wide; the screen redraws when that changes. */
 export function useSendInFlight(key: string | null | undefined): boolean {
   return useSyncExternalStore(subscribeSends, () => !!key && inFlight.has(key), () => false)
@@ -156,8 +162,6 @@ export function startInvoiceSend(invoiceId: string, kind: InvoiceSendKind): ((se
     if (sent) for (const listener of sentListeners) listener(invoiceId, kind)
   }
 }
-
-const NONE: ReadonlySet<string> = new Set()
 
 /** The invoices whose email is going out, app wide; the screen redraws when that changes. */
 export function useInvoicesSending(): ReadonlySet<string> {
