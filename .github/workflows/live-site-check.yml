@@ -1,0 +1,37 @@
+# Daily check that the live site answers. For days every Netlify function on
+# the live site answered 500 because the Supabase server key was missing from
+# the site settings, and nothing noticed.
+#
+# scripts/check-live-site.mjs loads the page and its app script, then asks
+# the customer link, partner invite and team invite functions about a token
+# that does not exist; each must answer 404, not a server error. It reads
+# nothing private, sends nothing and needs no secrets.
+#
+# A failed check fails the run, and GitHub emails the failure to whoever last
+# changed the schedule below (the repository owner). Run it by hand from the
+# Actions tab with "Run workflow" after a deploy or a settings change.
+name: Live site check
+
+on:
+  schedule:
+    - cron: '37 12 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check the live site
+        run: node scripts/check-live-site.mjs https://animated-kheer-db7c2c.netlify.app
