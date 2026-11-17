@@ -38,11 +38,13 @@ import { Link } from 'react-router-dom'
 import { Building2, ChevronDown, ChevronLeft, Clock, HardHat, Mic, Phone, SendHorizontal, Sparkles } from 'lucide-react'
 import { Button, Chip, EmptyState, Icon, IconButton, Skeleton } from '../../components/fh'
 import DataErrorState from '../../components/DataErrorState.tsx'
+import DraftRestored from '../../components/DraftRestored.tsx'
 import { useJobs, type JobRow } from '../../lib/queries.ts'
 import { useHideDock } from '../../lib/dockVisibility.ts'
 import { hapticTap } from '../../lib/haptics.ts'
 import { speechErrorFeedback } from '../../lib/speech.ts'
 import { toastError, toastInfo } from '../../lib/toast.ts'
+import { useEditDraft } from '../../lib/useEditDraft.ts'
 import {
   draftChannel,
   draftSendsLine,
@@ -303,8 +305,12 @@ export default function Thread({ conversationId, row: listRow, embedded = false 
   const subject = replySubject(messages)
   const canWrite = !outside && channel !== null && clientId !== null
 
-  // ---- The draft: the person's edits live here, keyed by the agent run.
-  const [edits, setEdits] = useState<Record<string, string>>({})
+  // ---- The draft: the person's edits live here, keyed by the agent run,
+  // and stay on the device per conversation until sent or discarded (D23).
+  const editDraft = useEditDraft<Record<string, string>>(`inbox-draft-edits:${conversationId}`, {}, { from: 'inbox' })
+  const edits = editDraft.form
+  const setEdits = editDraft.update
+  const forgetEdit = (id: string) => setEdits(({ [id]: _gone, ...rest }) => rest)
   const [openOlder, setOpenOlder] = useState<Record<string, boolean>>({})
   const draftValue = (item: ThreadDraftItem) => edits[item.id] ?? item.body
   const draftWay = (item: ThreadDraftItem) => {
@@ -317,7 +323,10 @@ export default function Thread({ conversationId, row: listRow, embedded = false 
     if (!body || !runsFresh || outside) return
     hapticTap()
     const result = await actions.approveDraft(item.runId, body)
-    if (result.ok) focusReply()
+    if (result.ok) {
+      forgetEdit(item.id)
+      focusReply()
+    }
     else if (result.reason === 'offline') toastError(NO_SIGNAL)
     else if (result.reason === 'failed') toastError(NOT_CONFIRMED, CHECK_THREAD)
   }
@@ -327,14 +336,18 @@ export default function Thread({ conversationId, row: listRow, embedded = false 
     hapticTap()
     const result = await actions.rejectDraft(item.runId)
     if (result.ok) {
+      forgetEdit(item.id)
       toastInfo('Draft discarded')
       focusReply()
     } else if (result.reason === 'offline') toastError('No signal. Nothing was discarded.')
     else if (result.reason === 'failed') toastError("Couldn't discard that draft", 'Check your connection and try again.')
   }
 
-  // ---- The composer.
-  const [text, setText] = useState('')
+  // ---- The composer. What is typed stays on the device per conversation
+  // until it is sent, so Back to inbox or a reload keeps it.
+  const reply = useEditDraft(`inbox-reply:${conversationId}`, { text: '' }, { from: 'inbox' })
+  const text = reply.form.text
+  const setText = (value: string) => reply.set('text', value)
   const sending = actions.sending
 
   // ---- Dictation: the browser's SpeechRecognition, as the Capture screen uses it.
@@ -541,6 +554,7 @@ export default function Thread({ conversationId, row: listRow, embedded = false 
           ) : row ? (
             <p className="fhi-composer__channel">No phone number or email on file for this customer.</p>
           ) : null}
+          {reply.restored && <DraftRestored onDiscard={reply.discard} />}
           <div className="fhi-composer__row">
             <div className="fhi-composer__field">
               <textarea

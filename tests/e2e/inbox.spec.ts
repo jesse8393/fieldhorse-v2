@@ -866,3 +866,32 @@ test.describe('sending exactly once, only when tapped and online', () => {
     await expect(replyField(page)).toBeFocused()
   })
 })
+
+// Finding lost-work-7: a reply typed in a thread, and an edit to the
+// agent's draft, stay through Back to inbox and a reload until sent.
+test.describe('typed words in a thread', () => {
+  const WORDS = 'Saw cut joints at 10 ft, broom finish, no curing compound'
+
+  test('a typed reply stays through a reload', async ({ context, page }) => {
+    await openThread(context, page, { ...THREAD, fh_agent_runs: [] })
+    await page.getByRole('textbox', { name: 'Write a reply' }).fill(WORDS)
+    await page.reload()
+    await expect(page.getByRole('textbox', { name: 'Write a reply' })).toHaveValue(WORDS)
+  })
+
+  test('a typed reply stays through Back to inbox on a phone', async ({ context, page, isMobile }) => {
+    test.skip(!isMobile, 'The phone thread has its own Back')
+    await openThread(context, page, { ...THREAD, fh_agent_runs: [] })
+    await page.getByRole('textbox', { name: 'Write a reply' }).fill(WORDS)
+    await page.getByRole('link', { name: 'Back to inbox' }).first().click()
+    await page.locator('.fhi-rows > li').filter({ hasText: 'Priya' }).first().getByRole('link').click()
+    await expect(page.getByRole('textbox', { name: 'Write a reply' })).toHaveValue(WORDS)
+  })
+
+  test("an edit to the agent's draft stays through a reload", async ({ context, page }) => {
+    await openThread(context, page)
+    await draftBox(page).fill('Of course, 11:30 works. See you then.')
+    await page.reload()
+    await expect(draftBox(page)).toHaveValue('Of course, 11:30 works. See you then.')
+  })
+})
