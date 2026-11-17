@@ -473,7 +473,7 @@ async function handleQuote(supabase, req, link) {
     supabase.from('fh_quote_items').select('*').eq('quote_id', link.quote_id).order('sort_order', { ascending: true }),
     supabase
       .from('fh_quote_versions')
-      .select('id, version_number, status, approved_by_name, approved_at, created_at')
+      .select('id, version_number, status, approved_by_name, approved_at, created_at, base_total, snapshot')
       .eq('quote_id', link.quote_id)
       .eq('status', 'approved')
       .order('version_number', { ascending: false })
@@ -522,6 +522,15 @@ async function handleQuote(supabase, req, link) {
   const approvedVersion = Array.isArray(versions) && versions.length > 0 ? versions[0] : null
   const company = buildCompany(profile)
   const status = String(quote.status || 'draft').toLowerCase()
+  // An approved quote shows what the customer approved: the approved
+  // version's lines, scope, terms and total. Lines edited afterwards are
+  // the contractor's working copy, not the agreement.
+  const agreed = status === 'approved' && Array.isArray(approvedVersion?.snapshot?.items) ? approvedVersion.snapshot : null
+  const shownItems = agreed
+    ? agreed.items.map((it, i) => ({ id: `${approvedVersion.id}-${i}`, quote_id: quote.id, ...it }))
+    : (items || [])
+  const shownAmount = agreed && approvedVersion.base_total != null ? Number(approvedVersion.base_total) : quote.amount
+  const pick = (field) => (agreed ? agreed[field] : quote[field]) || null
 
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
   const shouldNotify = !link.last_viewed_at || new Date(link.last_viewed_at) < oneHourAgo
@@ -578,15 +587,15 @@ async function handleQuote(supabase, req, link) {
       quote_sent_at: quote.sent_at || null,
       quote_expires_at: quote.expires_at || null,
       created_at: quote.created_at,
-      terms_text: quote.terms_text || null,
-      scope_text: quote.scope_text || null,
-      exclusions_text: quote.exclusions_text || null,
-      amount: quote.amount,
+      terms_text: pick('terms_text'),
+      scope_text: pick('scope_text'),
+      exclusions_text: pick('exclusions_text'),
+      amount: shownAmount,
       approved_by_name: approvedVersion?.approved_by_name || null,
       approved_at: approvedVersion?.approved_at || approvedVersion?.created_at || null
     },
     company,
-    items: items || [],
+    items: shownItems,
     payments,
     changeOrders,
     insurance: null,

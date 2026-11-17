@@ -403,6 +403,32 @@ describe('photos on a customer link are signed only from the link job folder (FN
   })
 })
 
+describe('an approved quote shows what the customer approved (M-03, link half)', () => {
+  it('serves the approved version snapshot and its total, not lines edited afterwards', async () => {
+    seedDb(baseTables({
+      fh_public_links: [link({ token: 'q', kind: 'proposal', quote_id: 'quote-1' })],
+      fh_quotes: [{ id: 'quote-1', org_id: ORG, user_id: OWNER, client_id: 'cl-1', title: 'Driveway', status: 'approved', amount: 13500, scope_text: 'Edited scope', terms_text: 'Edited terms', approved_version_id: 'v-1', job_id: null, created_at: '2026-10-20T00:00:00.000Z' }],
+      // Edited after approval.
+      fh_quote_items: [
+        { id: 'it-1', quote_id: 'quote-1', contact_id: null, description: 'Slab', qty: 1, rate: 12500, amount: 12500, sort_order: 0 },
+        { id: 'it-2', quote_id: 'quote-1', contact_id: null, description: 'Pump', qty: 1, rate: 1000, amount: 1000, sort_order: 1 }
+      ],
+      fh_quote_versions: [{
+        id: 'v-1', quote_id: 'quote-1', contact_id: null, version_number: 1, status: 'approved', base_total: 3000,
+        approved_by_name: 'Dana Smith', approved_at: '2026-10-25T00:00:00.000Z',
+        snapshot: {
+          scope_text: 'Approved scope', terms_text: 'Approved terms', exclusions_text: null,
+          items: [{ section: null, description: 'Slab', qty: 1, unit: null, rate: 3000, amount: 3000, notes: null, is_optional: false, is_excluded: false, sort_order: 0 }],
+          totals: { base: 3000, optional: 0, excluded_count: 0 }
+        }
+      }]
+    }))
+    const { body } = await getLink('q')
+    expect(body.items.map((i: Row) => [i.description, i.amount])).toEqual([['Slab', 3000]])
+    expect(body.contact).toMatchObject({ amount: 3000, scope_text: 'Approved scope', terms_text: 'Approved terms', approved_by_name: 'Dana Smith' })
+  })
+})
+
 describe('public-link function audit helpers', () => {
   it('prefers the first forwarded client IP', () => {
     const req = new Request('https://fieldhorse.test/api/public-link?token=abc', {
