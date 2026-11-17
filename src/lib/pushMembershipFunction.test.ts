@@ -112,7 +112,7 @@ describe('a partner accepting an invite', () => {
     const res = await acceptPartner(post('/api/partner-invite-accept', 'tok-partner', { token: 'inv-2' }))
     expect(res.status).toBe(200)
     expect(sentTo()).toEqual(['https://push.example.test/owner-phone'])
-    const sent = JSON.parse(webpush.sendNotification.mock.calls[0][1] as string)
+    const sent = JSON.parse((webpush.sendNotification.mock.calls[0] as unknown[])[1] as string)
     expect(sent.link).toBe('/jobs/job-1?tab=partner')
   })
 })
