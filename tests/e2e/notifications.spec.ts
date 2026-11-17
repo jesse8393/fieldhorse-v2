@@ -113,3 +113,79 @@ for (const role of ['manager', 'foreman', 'crew']) {
     await expect(page.getByText('MMC Properties approved the quote')).toBeVisible()
   })
 }
+
+// OPS-12: the bell kept the old count after Mark all read.
+test('after Mark all read the bell no longer shows the old count', async ({ context, page }) => {
+  await signIn(context, { tables: { fh_notifications: [APPROVED] } })
+  // The mock keeps no write, so once the row is marked read the unread
+  // count answers 0, as the database would.
+  let marked = false
+  await context.route((url) => url.pathname === '/rest/v1/fh_notifications', (route) => {
+    const request = route.request()
+    if (request.method() === 'PATCH') marked = true
+    else if (marked && new URL(request.url()).searchParams.get('read_at') === 'is.null') {
+      return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': '*/0' }, body: '[]' })
+    }
+    return route.fallback()
+  })
+  await open(page, '/work', '.fhs-header')
+  await page.getByRole('button', { name: 'Notifications, 1 unread', exact: true }).click()
+  await expect(page).toHaveURL(/\/notifications$/)
+  await page.getByRole('button', { name: 'Mark all read', exact: true }).click()
+  await expect(page.getByText('All caught up.')).toBeVisible()
+  await page.getByRole('button', { name: 'Back', exact: true }).click()
+  await expect(page).toHaveURL(/\/(work|jobs)/)
+  await expect(page.getByRole('button', { name: 'Notifications', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: /unread/ })).toHaveCount(0)
+})
+
+// OPS-13: a failed write used to read as success.
+test('a failed Mark all read puts the rows back and says so', async ({ context, page }) => {
+  await signIn(context, { tables: { fh_notifications: [APPROVED] } })
+  await context.route((url) => url.pathname === '/rest/v1/fh_notifications', (route) => {
+    if (route.request().method() === 'PATCH') return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'Server error' }) })
+    return route.fallback()
+  })
+  await open(page, '/notifications', '.fhn')
+  await page.getByRole('button', { name: 'Mark all read', exact: true }).click()
+  await expect(page.getByText(/Couldn't mark/).first()).toBeVisible()
+  await expect(page.getByText('1 new notification.')).toBeVisible()
+  await expect(page.getByText('All caught up.')).toHaveCount(0)
+})
+
+test('a failed mark read on opening a row puts the row back to unread', async ({ context, page }) => {
+  await signIn(context, { tables: { fh_notifications: [{ ...APPROVED, link: null }] } })
+  await context.route((url) => url.pathname === '/rest/v1/fh_notifications', (route) => {
+    if (route.request().method() === 'PATCH') return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'Server error' }) })
+    return route.fallback()
+  })
+  await open(page, '/notifications', '.fhn')
+  await page.getByRole('button', { name: /MMC Properties approved the quote/ }).click()
+  await expect(page.getByText(/Couldn't mark/).first()).toBeVisible()
+  await expect(page.getByText('1 new notification.')).toBeVisible()
+})
+
+// DATA-16: past 100 rows the list stopped, and Mark all read cleared rows
+// never shown.
+test('the list pages past 100, and Mark all read marks only the rows on screen', async ({ context, page }) => {
+  const many = Array.from({ length: 130 }, (_, n) => note(`nt-${String(n).padStart(3, '0')}`, 'quote_approved', `Approved quote ${n}`, null, {
+    created_at: iso(Date.now() - (n + 1) * HOUR)
+  }))
+  await signIn(context, { tables: { fh_notifications: many } })
+  const patches: string[] = []
+  await context.route((url) => url.pathname === '/rest/v1/fh_notifications', (route) => {
+    if (route.request().method() === 'PATCH') patches.push(decodeURIComponent(route.request().url()))
+    return route.fallback()
+  })
+  await open(page, '/notifications', '.fhn')
+  await expect(page.getByText('Approved quote 99')).toBeVisible()
+  await expect(page.getByText('Approved quote 100')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Mark all read', exact: true }).click()
+  await expect.poll(() => patches.length).toBe(1)
+  expect(patches[0]).toContain('id=in.(')
+  expect(patches[0]).toContain('nt-099')
+  expect(patches[0]).not.toContain('nt-100')
+  await page.getByRole('button', { name: 'Show older notifications', exact: true }).click()
+  await expect(page.getByText('Approved quote 129')).toBeVisible()
+  await expect(page.getByText('30 new notifications.')).toBeVisible()
+})

@@ -23,7 +23,7 @@ import DataErrorState from '../components/DataErrorState.tsx'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { supabase } from '../lib/supabase.ts'
 import {
-  completeFollowUp, dismissFollowUp, fetchInbox, fmtAge, markAllRead, markRead
+  completeFollowUp, dismissFollowUp, fetchInbox, fmtAge, markIdsRead
 } from '../lib/notifications.ts'
 import { countNoun } from '../lib/format.ts'
 import { hapticTap } from '../lib/haptics.ts'
@@ -65,6 +65,10 @@ export function isReminder(kind: string | null | undefined) {
   return !!kind && REMINDER_KINDS.has(kind)
 }
 
+// The list reads a page at a time, so nothing past the newest 100 is out
+// of reach (DATA-16).
+const PAGE = 100
+
 export default function Notifications() {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -74,6 +78,11 @@ export default function Notifications() {
   const [busy, setBusy] = useState<Set<string>>(() => new Set())
   // Only the latest read decides what the screen says (D49).
   const readSeq = useRef(0)
+  // How many rows are on screen, so a refresh reads them all again, and
+  // whether an older page may exist.
+  const shown = useRef(PAGE)
+  const [hasOlder, setHasOlder] = useState(false)
+  const [loadingOlder, setLoadingOlder] = useState(false)
 
   const titleRef = useRef<HTMLHeadingElement>(null)
   useEffect(() => { titleRef.current?.focus({ preventScroll: true }) }, [])
@@ -85,9 +94,11 @@ export default function Notifications() {
     const seq = ++readSeq.current
     if (first) setStatus('loading')
     try {
-      const list = (await fetchInbox(100, user.id)) as Notification[]
+      const limit = Math.max(PAGE, shown.current)
+      const list = (await fetchInbox(limit, user.id)) as Notification[]
       if (seq !== readSeq.current) return
       setRows(list)
+      setHasOlder(list.length === limit)
       setStatus('ready')
     } catch {
       if (seq !== readSeq.current) return
@@ -120,20 +131,47 @@ export default function Notifications() {
     else navigate('/')
   }
 
+  useEffect(() => { shown.current = Math.max(PAGE, rows.length) }, [rows.length])
+
+  async function loadOlder() {
+    if (!user || loadingOlder || rows.length === 0) return
+    setLoadingOlder(true)
+    try {
+      const older = (await fetchInbox(PAGE, user.id, rows[rows.length - 1].created_at)) as Notification[]
+      setRows((prev) => [...prev, ...older.filter((o) => !prev.some((p) => p.id === o.id))])
+      setHasOlder(older.length === PAGE)
+    } catch {
+      toastError("Couldn't load older notifications", 'Check your connection and try again.')
+    } finally {
+      setLoadingOlder(false)
+    }
+  }
+
+  // Mark rows read on screen at once, and put them back if the write
+  // fails, saying so (OPS-13).
+  async function markOnScreen(ids: string[], failTitle: string) {
+    if (!user || ids.length === 0) return
+    const at = new Date().toISOString()
+    const marked = new Set(ids)
+    setRows((prev) => prev.map((r) => (marked.has(r.id) && !r.read_at ? { ...r, read_at: at } : r)))
+    const result = await markIdsRead(ids, user.id)
+    if (!result.ok) {
+      setRows((prev) => prev.map((r) => (marked.has(r.id) && r.read_at === at ? { ...r, read_at: null } : r)))
+      toastError(failTitle, result.error)
+    }
+  }
+
   async function handleOpen(row: Notification) {
     hapticTap()
-    if (!row.read_at && user) {
-      setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, read_at: new Date().toISOString() } : r)))
-      void markRead(row.id, user.id)
-    }
+    if (!row.read_at) void markOnScreen([row.id], "Couldn't mark the notification read")
     if (row.link) navigate(row.link)
   }
 
   async function handleMarkAll() {
     hapticTap()
     if (!user || unread === 0) return
-    setRows((prev) => prev.map((r) => (r.read_at ? r : { ...r, read_at: new Date().toISOString() })))
-    await markAllRead(user.id)
+    // Only the rows on screen: never ones the person has not seen.
+    await markOnScreen(rows.filter((r) => !r.read_at).map((r) => r.id), "Couldn't mark the notifications read")
   }
 
   async function handleFollowUp(row: Notification, action: 'done' | 'dismissed') {
@@ -219,6 +257,11 @@ export default function Notifications() {
               )
             })}
           </ul>
+        )}
+        {status === 'ready' && hasOlder && (
+          <Button variant="secondary" block loading={loadingOlder} onClick={() => void loadOlder()}>
+            Show older notifications
+          </Button>
         )}
       </div>
     </div>
