@@ -1,5 +1,5 @@
 // Welcome and Login (docs/design/2026-10-redesign/SPEC.md, section 9.1,
-// decision D11): always onyx with grain, FIELDHORSE wordmark, the line,
+// decision D11): always onyx with grain, FIELDHORSE wordmark, the heading,
 // email and password on linen labels, one brushed gold Sign in, an
 // outlined Create a workspace and the smoke line. The photo from
 // public/welcome.jpg only shows when the file exists.
