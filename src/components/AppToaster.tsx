@@ -9,7 +9,8 @@ import { Toaster as SonnerToaster } from 'sonner'
  * Redesign (spec section 7): every toast is an onyx card with linen
  * text, in both themes, so Sonner runs in its dark theme for its own
  * description, action and close colors. Sonner announces toasts in a
- * polite live region. Phone: full width above the dock. Desktop: bottom
+ * polite live region. Every toast has a close button, and errors and Undo
+ * stay until it is used (lib/toast.ts). Phone: full width above the dock. Desktop: bottom
  * right, left of the corner plus button column (Jobs keeps its New deal
  * button there).
  */
@@ -19,6 +20,7 @@ export default function AppToaster() {
       position="bottom-right"
       theme="dark"
       visibleToasts={3}
+      closeButton
       offset={{ bottom: '20px', right: '92px' }}
       mobileOffset={{ bottom: 'calc(var(--fh-mobile-dock-height) + 16px)', left: '16px', right: '16px' }}
       toastOptions={{
