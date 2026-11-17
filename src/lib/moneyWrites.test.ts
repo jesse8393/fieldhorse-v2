@@ -45,7 +45,7 @@ const invoice = { id: 'inv-9', user_id: 'owner-1', amount: 2960, status: 'sent' 
 describe('logInvoicePayment', () => {
   it('upserts one fh_payments row linked to the invoice and to no job, idempotent by id', async () => {
     const res = await logInvoicePayment(invoice, { id: 'pay-1', amount: 1000, method: 'card', kind: 'deposit', reference: 'R-7', paid_on: '2026-11-17' })
-    expect(res).toEqual({ error: null, paid: false })
+    expect(res).toEqual({ error: null, paid: false, statusError: null })
     const [[, payload, options]] = op('fh_payments', 'upsert')
     expect(payload).toEqual({
       id: 'pay-1', user_id: 'owner-1', contact_id: null, invoice_id: 'inv-9', amount: 1000,
@@ -66,7 +66,7 @@ describe('logInvoicePayment', () => {
 
   it('marks the invoice paid once this payment and the earlier ones cover it', async () => {
     const res = await logInvoicePayment(invoice, { id: 'pay-2', amount: 960, priorPayments: [{ amount: 1000 }, { amount: '1000' }] })
-    expect(res).toEqual({ error: null, paid: true })
+    expect(res).toEqual({ error: null, paid: true, statusError: null })
     const updates = calls.filter((c) => c.table === 'fh_invoices')
     expect(updates).toHaveLength(1)
     expect(updates[0].ops).toEqual([['update', { status: 'paid' }], ['eq', 'id', 'inv-9']])
