@@ -31,6 +31,7 @@ import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { SCHEDULE_WEEK_START, startOfWeek } from '../lib/scheduleDates.ts'
 import { jobLabel, trayJobs } from '../lib/scheduleBoard.ts'
 import './schedule/schedule-event.css'
+import { timeOfDay } from '../lib/dates.ts'
 const SnowSchedule = lazy(() => import('../components/desktop/SnowScheduleBuild.tsx'))
 
 const VIEWS = [
@@ -43,7 +44,8 @@ function startOfDay(d: any) { const x = new Date(d); x.setHours(0,0,0,0); return
 function addDays(d: any, n: any) { const x = new Date(d); x.setDate(x.getDate() + n); return x }
 function sameDay(a: any, b: any) { return a.toDateString() === b.toDateString() }
 function fmtDate(d: any) { return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) }
-function fmtTime(iso: any) { return iso ? new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '' }
+// The one clock time format, "7:00 am" (formats-12).
+function fmtTime(iso: any) { return timeOfDay(iso) }
 
 const WEATHERBAR_TONE: Record<string, string> = { go: 'good', warn: 'ok', stop: 'poor' }
 

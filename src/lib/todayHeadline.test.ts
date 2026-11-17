@@ -28,18 +28,18 @@ describe('dayHeadline', () => {
       stop(7, 30, 'Pour slab, crew A'),
       stop(11, 30, 'Site visit'),
       stop(14, 30, 'Walkthrough')
-    ]).title).toEqual(['Three stops.', 'First pour at 7:30.'])
+    ]).title).toEqual(['Three stops.', 'First pour at 7:30 am.'])
   })
 
   it('only the first stop decides whether the line says pour', () => {
     expect(dayHeadline([
       stop(9, 0, 'Site visit'),
       stop(13, 0, 'Pour footings')
-    ]).title).toEqual(['Two stops.', 'First at 9:00.'])
+    ]).title).toEqual(['Two stops.', 'First at 9:00 am.'])
   })
 
-  it('reads the afternoon on a 12 hour clock without am or pm', () => {
-    expect(dayHeadline([stop(13, 15, 'Measure deck')]).title).toEqual(['One stop.', 'First at 1:15.'])
+  it('reads the afternoon on a 12 hour clock with its pm', () => {
+    expect(dayHeadline([stop(13, 15, 'Measure deck')]).title).toEqual(['One stop.', 'First at 1:15 pm.'])
   })
 
   it('says clear day when nothing is scheduled', () => {
@@ -58,18 +58,18 @@ describe('dayHeadline', () => {
       stop(14, 30, 'Walkthrough'),
       stop(6, 45, 'Pour the garage slab'),
       stop(9, 0, 'Site visit')
-    ]).title).toEqual(['Three stops.', 'First pour at 6:45.'])
+    ]).title).toEqual(['Three stops.', 'First pour at 6:45 am.'])
   })
 
   it('skips stops without a start time when it looks for the first', () => {
     expect(dayHeadline([
       { startAt: '', title: 'Pour later' },
       stop(10, 5, 'Estimate')
-    ]).title).toEqual(['Two stops.', 'First at 10:05.'])
+    ]).title).toEqual(['Two stops.', 'First at 10:05 am.'])
   })
 
-  it('reads 12:30 after midnight as 12:30', () => {
-    expect(dayHeadline([stop(0, 30, 'Night pour')]).title).toEqual(['One stop.', 'First pour at 12:30.'])
+  it('reads 12:30 after midnight as 12:30 am', () => {
+    expect(dayHeadline([stop(0, 30, 'Night pour')]).title).toEqual(['One stop.', 'First pour at 12:30 am.'])
   })
 })
 

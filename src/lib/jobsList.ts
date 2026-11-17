@@ -15,7 +15,7 @@
 import type { JobRow } from './queries.ts'
 import { detailRoute, stageLabel } from './stages.ts'
 import { moneyCents } from './format.ts'
-import { parseDateOnly } from './dates.ts'
+import { parseDateOnly, timeOfDay } from './dates.ts'
 
 export type JobsTab = 'all' | 'leads' | 'quotes' | 'jobs' | 'done'
 
@@ -126,11 +126,8 @@ function shortDate(d: Date, now: Date): string {
   return d.getFullYear() === now.getFullYear() ? base : `${base}, ${d.getFullYear()}`
 }
 
-function clock(d: Date): string {
-  const h = d.getHours()
-  const m = String(d.getMinutes()).padStart(2, '0')
-  return `${h % 12 || 12}:${m} ${h < 12 ? 'am' : 'pm'}`
-}
+// The one clock time format (formats-12).
+const clock = (d: Date): string => timeOfDay(d)
 
 function plural(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`

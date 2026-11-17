@@ -14,6 +14,7 @@ import MiniMetric from '../MiniMetric.tsx'
 import { SkeletonList } from '../Skeleton.tsx'
 import { activityBucketLabel } from '../../lib/activityTime.ts'
 import { moneyCents } from '../../lib/format.ts'
+import { timeOfDay } from '../../lib/dates.ts'
 
 type ActivityEvent = {
   id: string
@@ -258,7 +259,7 @@ function DesktopEventRow({ event }: { event: ActivityEvent }) {
       <span className={`fh-build-dot ${toneClass(event.tone)}`}>{eventType(event)}</span>
       <time dateTime={event.when.toISOString()}>
         {event.when.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-        {!event.dateOnly && <span>{event.when.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</span>}
+        {!event.dateOnly && <span>{timeOfDay(event.when)}</span>}
       </time>
       <ArrowRight size={13} aria-hidden="true" />
     </Link>

@@ -4,6 +4,7 @@
 // left column holds the stage, the next stop and the day, and the right
 // column holds what needs an answer and the week strip.
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
+import { TABLES as FORMATS_TABLES } from './helpers/formatsSeed.ts'
 import { signIn, type SignInOptions } from './helpers/signIn.ts'
 
 // The mock company sits in Murfreesboro, Tennessee, so the phone runs on
@@ -125,7 +126,7 @@ async function coldOpen(context: BrowserContext, page: Page) {
   await page.clock.setSystemTime(NEXT_MORNING)
   await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 })
 
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Two stops. First at 9:00.', { timeout: 30_000 })
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Two stops. First at 9:00 am.', { timeout: 30_000 })
   await expect(page.getByText('Friday, October 9')).toBeVisible()
   const day = page.getByRole('region', { name: 'Your day' })
   await expect(day.getByRole('listitem')).toHaveCount(2)
@@ -233,7 +234,7 @@ test.describe('today on a phone', () => {
     await setUp(context, page, { at: MORNING })
     const headline = page.getByRole('heading', { level: 1 })
     await expect(headline).toHaveText(/stops?\.|Clear day\./)
-    await expect(headline).toHaveText('Three stops. First pour at 7:30.')
+    await expect(headline).toHaveText('Three stops. First pour at 7:30 am.')
     await expect(page.getByText('Thursday, October 8')).toBeVisible()
     await expect(page.getByText('71° and partly cloudy. Clear to work until 3 pm.')).toBeVisible()
 
@@ -302,7 +303,7 @@ test.describe('today on a phone', () => {
 
   test('eight visits all count in the headline and the day', async ({ context, page }) => {
     await setUp(context, page, { at: MORNING, tables: { fh_schedule: EIGHT_VISITS } })
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Eight stops. First pour at 7:30.')
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Eight stops. First pour at 7:30 am.')
     const day = page.getByRole('region', { name: 'Your day' })
     await expect(day.getByRole('listitem')).toHaveCount(8)
     await expect(day.getByText('Trench check')).toBeVisible()
@@ -310,7 +311,7 @@ test.describe('today on a phone', () => {
 
   test('with eight visits the seventh is the next stop in the afternoon', async ({ context, page }) => {
     await setUp(context, page, { at: AFTERNOON, tables: { fh_schedule: EIGHT_VISITS } })
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Eight stops. First pour at 7:30.')
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Eight stops. First pour at 7:30 am.')
     const nextStop = page.getByRole('region', { name: 'Next stop' })
     await expect(nextStop.getByText('Next stop, 2:30 pm')).toBeVisible()
     await expect(nextStop.getByText('Harold Wickham')).toBeVisible()
@@ -348,7 +349,7 @@ test.describe('today on a desktop', () => {
   test('shows the stage, the next stop, what needs an answer and the day', async ({ context, page }) => {
     await setUp(context, page, { at: MORNING })
     const headline = page.getByRole('heading', { level: 1 })
-    await expect(headline).toHaveText('Three stops. First pour at 7:30.')
+    await expect(headline).toHaveText('Three stops. First pour at 7:30 am.')
     await expect(page.getByText('Thursday, October 8')).toBeVisible()
     await expect(page.getByText('71° and partly cloudy. Clear to work until 3 pm.')).toBeVisible()
 
@@ -395,7 +396,7 @@ test.describe('today on a desktop', () => {
 
   test('eight visits all count, and the seventh is the next stop in the afternoon', async ({ context, page }) => {
     await setUp(context, page, { at: AFTERNOON, tables: { fh_schedule: EIGHT_VISITS } })
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Eight stops. First pour at 7:30.')
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Eight stops. First pour at 7:30 am.')
     const day = page.getByRole('region', { name: 'Your day' })
     await expect(day.getByRole('listitem')).toHaveCount(8)
     await expect(day.getByText('Done', { exact: true })).toHaveCount(6)
@@ -506,4 +507,19 @@ test.describe('today on a desktop', () => {
     await expect(page.getByRole('region', { name: /Needs an answer/ })).toHaveCount(0)
     await expect(page.getByRole('region', { name: 'This week' })).toHaveCount(0)
   })
+})
+
+// formats-12: one visit time reads the same way on Today, Schedule and the
+// job, always with its am or pm.
+test('a visit time reads the same on Today and Schedule, with am or pm', async ({ context, page, isMobile }) => {
+  test.skip(!isMobile, 'Today and the Schedule list on a phone')
+  await signIn(context, { tables: FORMATS_TABLES })
+  await page.clock.setFixedTime(new Date('2026-11-18T12:00:00Z'))
+  await page.goto('/schedule', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText(/Ends 11:00 am/).first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('button', { name: /7:00 am Pour driveway/ }).first()).toBeVisible()
+  await expect(page.getByText(/\d:\d\d (AM|PM)\b/)).toHaveCount(0)
+  await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText(/Next stop, 7:00\s+am/).first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(/at 7:00 am\./)
 })

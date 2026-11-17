@@ -33,6 +33,7 @@ import { moneyCents } from '../lib/format.ts'
 import { invoiceReference } from '../lib/invoiceReference.ts'
 import { useDocumentCompanyName } from '../lib/companyBranding.ts'
 import { useOrgScope } from '../lib/orgScope.ts'
+import { timeOfDay } from '../lib/dates.ts'
 
 const PAGE_SIZE = 60
 
@@ -54,7 +55,7 @@ const STAGE_TONE: Record<string, any> = {
 // timeline of "today / yesterday / this week / older" sections.
 function timeAt(d: any) {
   if (!d) return ''
-  return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+  return timeOfDay(d)
 }
 
 export default function Activity() {

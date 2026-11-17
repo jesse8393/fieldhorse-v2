@@ -68,6 +68,7 @@ import { pushOutbox } from '../lib/captureOutbox.ts'
 import { compressImageToDataUrl, parseExpenseFromImage } from '../lib/docIntelligence.ts'
 import { speechErrorFeedback } from '../lib/speech.ts'
 import './capture.css'
+import { timeOfDay } from '../lib/dates.ts'
 
 type Phase = 'input' | 'parsing' | 'confirm' | 'saving'
 // Where the words came from, for the "Heard" line.
@@ -912,7 +913,7 @@ function dayLabel(d: Date, now: Date) {
 
 // 8:00 am
 function timeLabel(d: Date) {
-  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).toLowerCase()
+  return timeOfDay(d)
 }
 
 // ISO (UTC) → value for <input type="datetime-local"> in local time.

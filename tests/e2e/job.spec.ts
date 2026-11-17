@@ -888,3 +888,15 @@ test('the Expenses tab prints the expense date as a date', async ({ context, pag
   await expect(page.getByText('Materials · Nov 12, 2026')).toBeVisible()
   await expect(page.getByText(/2026-11-12/)).toHaveCount(0)
 })
+
+// formats-12: the job's spine writes a time with its am or pm, so a payment
+// logged at 8:15 pm never reads as "8:15" beside a morning visit.
+test('the job spine writes an evening payment as 8:15 pm', async ({ context, page }, testInfo) => {
+  test.skip(!testInfo.project.name.startsWith('mobile'), 'Phone layout')
+  await signIn(context, { tables: FORMATS_TABLES })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  await open(page, '/jobs/c-h')
+  const spine = page.locator('.fhj-spine')
+  await expect(spine.getByText('8:15 pm', { exact: true }).first()).toBeVisible({ timeout: 30_000 })
+  await expect(spine.getByText('8:15', { exact: true })).toHaveCount(0)
+})

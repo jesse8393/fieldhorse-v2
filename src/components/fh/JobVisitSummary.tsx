@@ -1,5 +1,6 @@
 import { CalendarDays, ArrowUpRight } from 'lucide-react'
 import { useNow } from '../../lib/useNow.ts'
+import { timeOfDay } from '../../lib/dates.ts'
 
 export type JobVisit = { id?: string; title?: string | null; start_at?: string | null; end_at?: string | null }
 
@@ -19,9 +20,9 @@ export default function JobVisitSummary({ visits = [], onOpen }: { visits?: JobV
   const end = visit?.end_at ? new Date(visit.end_at) : null
   const current = start && start.getTime() <= now
   const dateLabel = start?.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
-  const timeLabel = start?.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+  const timeLabel = start ? timeOfDay(start) : undefined
   const endLabel = end && start && end.getTime() > start.getTime()
-    ? `${end.toDateString() !== start.toDateString() ? `${end.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · ` : ''}${end.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}` : null
+    ? `${end.toDateString() !== start.toDateString() ? `${end.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · ` : ''}${timeOfDay(end)}` : null
   return <section className="fh-job-visit" aria-label={current ? 'Current job visit' : 'Next job visit'}>
     <div className="fh-job-visit__label"><CalendarDays size={17} aria-hidden="true" />{visit ? current ? 'Current visit' : 'Next visit' : 'Schedule'}</div>
     <h2>{visit?.title || (visit ? 'Job visit' : 'Plan your next visit')}</h2>

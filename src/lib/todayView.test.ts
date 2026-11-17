@@ -176,7 +176,7 @@ describe('buildTodayView', () => {
     })
     expect(view.evening).toBe(false)
     expect(view.title).toEqual(dayHeadline(headlineStops(today)).title)
-    expect(view.title).toEqual(['Three stops.', 'First pour at 7:30.'])
+    expect(view.title).toEqual(['Three stops.', 'First pour at 7:30 am.'])
     expect(view.nextStop).toEqual({
       jobId: 'job-1',
       title: 'Whitcomb garage slab',
@@ -217,7 +217,7 @@ describe('buildTodayView', () => {
   it('at 5:00 am, before sunrise, is not the evening', () => {
     const view = buildTodayView({ bundle: bundle({ todayOnSite: threeStops() }), now: at(5), lat: LAT, lon: LON })
     expect(view.evening).toBe(false)
-    expect(view.title).toEqual(['Three stops.', 'First pour at 7:30.'])
+    expect(view.title).toEqual(['Three stops.', 'First pour at 7:30 am.'])
   })
 
   it('an empty bundle is a clear day with nothing next', () => {
@@ -284,7 +284,7 @@ describe('buildTodayView', () => {
       lon: LON
     })
     expect(view.day.map((row) => row.id)).toEqual(['t1', 't2'])
-    expect(view.title).toEqual(['Two stops.', 'First at 9:00.'])
+    expect(view.title).toEqual(['Two stops.', 'First at 9:00 am.'])
     expect(view.nextStop?.jobId).toBe('job-4')
     expect(view.tomorrow).toEqual([])
   })
@@ -373,7 +373,7 @@ describe('Today past six, read through the dashboard queries', () => {
     fakeDb.tables.fh_schedule = [...eightVisits(0), ...eightVisits(1)]
     const view = await todayAt(at(14))
     expect(view.evening).toBe(false)
-    expect(view.title).toEqual(['Eight stops.', 'First pour at 7:30.'])
+    expect(view.title).toEqual(['Eight stops.', 'First pour at 7:30 am.'])
     expect(view.day).toHaveLength(8)
     expect(view.done).toHaveLength(6)
     expect(view.nextStop).toMatchObject({ jobId: 'job-7', title: 'Job 7', address: '7 Main St' })
@@ -394,7 +394,7 @@ describe('Today past six, read through the dashboard queries', () => {
     const cached = await fetchHomeDashboard('user-1', at(21), 'org-1')
     const view = buildTodayView({ bundle: cached, now: at(6, 30, 1), lat: LAT, lon: LON })
     expect(view.evening).toBe(false)
-    expect(view.title).toEqual(['Three stops.', 'First pour at 7:30.'])
+    expect(view.title).toEqual(['Three stops.', 'First pour at 7:30 am.'])
     expect(view.day.map((row) => row.id)).toEqual(['d1-v1', 'd1-v2', 'd1-v3'])
     expect(view.done).toEqual([])
     expect(view.nextStop).toMatchObject({ jobId: 'job-1', startAt: at(7, 30, 1).toISOString(), address: '1 Main St' })
