@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { shouldPersistMutation, shouldPersistQuery } from './queryPersistence.ts'
+import { readSavedCacheAfter, shouldPersistMutation, shouldPersistQuery } from './queryPersistence.ts'
 
 // What the offline cache in main.tsx saves to IndexedDB. Settled reads are
 // kept so a cold open with no signal still has jobs and the schedule. The
@@ -54,5 +54,26 @@ describe('shouldPersistMutation', () => {
       expect(shouldPersistMutation(mutation(['inbox', name], true))).toBe(false)
       expect(shouldPersistMutation(mutation(['inbox', name], false))).toBe(false)
     }
+  })
+})
+
+describe('readSavedCacheAfter', () => {
+  it('reads the saved cache only once the first session of the page load is settled', async () => {
+    let settle!: () => void
+    const settled = new Promise<void>((resolve) => { settle = resolve })
+    const reads: string[] = []
+    const storage = readSavedCacheAfter(settled, {
+      getItem: async (key: string) => { reads.push(key); return 'saved book' },
+      setItem: async () => {},
+      removeItem: async () => {},
+    })
+    const value = storage.getItem('fh-query-cache')
+    await Promise.resolve(); await Promise.resolve()
+    // Still deciding whose session this is: an account switch may yet
+    // purge the saved book, so it must not be hydrated first.
+    expect(reads).toEqual([])
+    settle()
+    expect(await value).toBe('saved book')
+    expect(reads).toEqual(['fh-query-cache'])
   })
 })

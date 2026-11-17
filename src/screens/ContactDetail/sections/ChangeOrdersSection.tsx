@@ -152,12 +152,21 @@ export default function ChangeOrdersSection({ contact, userId, changeOrders = []
         changeOrderId: co.id
       })
       if (co.status === 'draft') {
-        await supabase
+        // By id: anyone who may edit the job's money may send a teammate's
+        // change order, and row security decides. A write that matched no
+        // row means it was deleted or changed elsewhere, so the link is
+        // never shared for it.
+        const { data, error } = await supabase
           .from('fh_change_orders')
           .update({ status: 'sent' })
           .eq('id', co.id)
-          .eq('user_id', userId)
+          .select('id')
+        if (error) throw error
         onChange?.()
+        if (!data || data.length === 0) {
+          toastError("Couldn't create approval link", 'This change order changed on another device. The list is read again.')
+          return
+        }
       }
       const sign = Number(co.amount) >= 0 ? '+' : '−'
       const shareText = `Change order #${co.sequence_number}, ${co.title} (${sign}${money(Math.abs(Number(co.amount) || 0))}). Review and sign here: ${link.url}`
@@ -188,13 +197,20 @@ export default function ChangeOrdersSection({ contact, userId, changeOrders = []
 
   async function deleteNow(co: any) {
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('fh_change_orders')
         .delete()
         .eq('id', co.id)
+        .select('id')
       if (error) throw error
-      toastSuccess('Change order deleted', '')
       onChange?.()
+      // A delete that matched no row removed nothing: it was already gone,
+      // or this role cannot remove it.
+      if (!data || data.length === 0) {
+        toastError("Couldn't delete change order", 'It changed on another device. The list is read again.')
+        return
+      }
+      toastSuccess('Change order deleted', '')
     } catch (e: any) {
       toastError("Couldn't delete change order", e?.message || 'Try again.')
     }

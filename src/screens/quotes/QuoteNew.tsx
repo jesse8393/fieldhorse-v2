@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Field } from '../../components/fh'
+import DataErrorState from '../../components/DataErrorState.tsx'
 import ClientField, { fetchClientPick, resolveClientId, restoredClientValue, type ClientFieldValue } from '../../components/ClientField.tsx'
 import CreateShell, { Choices, useDraft } from '../new/CreateShell.tsx'
 import { useAuth } from '../../contexts/AuthContext.tsx'
@@ -54,12 +55,17 @@ export default function QuoteNew() {
   const [error, setError] = useState('')
   // A missing client is the client field's error, so the field says it (A11Y-08).
   const [clientError, setClientError] = useState('')
+  // Quote this could not read the lead or its client: say so, with Retry,
+  // instead of opening a blank quote as if there were nothing to fill (S23).
+  const [prefillFailed, setPrefillFailed] = useState(false)
+  const [prefillAttempt, setPrefillAttempt] = useState(0)
 
   function pickClient(id: string) {
     return fetchClientPick(id).then((c) => {
-      if (!c) return
+      if (!c) return false
       setClient({ text: c.name, picked: c })
       patch({ client: c.name, clientId: c.id })
+      return true
     })
   }
 
@@ -73,17 +79,19 @@ export default function QuoteNew() {
   useEffect(() => {
     if (!leadParam) return
     let alive = true
-    void supabase.from('fh_leads').select('*').eq('id', leadParam).maybeSingle().then(({ data }) => {
-      if (!alive || !data) return
+    setPrefillFailed(false)
+    void supabase.from('fh_leads').select('*').eq('id', leadParam).maybeSingle().then(async ({ data, error }) => {
+      if (!alive) return
+      if (error || !data) { setPrefillFailed(true); return }
       const draft = leadToQuoteDraft(data as LeadRow)
       // The lead's notes are the office's own (a budget, a gate code), never
       // the scope of work the customer reads, so they stay on the lead (S11).
       patch({ title: draft.title || '', jobType: draft.job_type || '' })
-      if (draft.client_id) void pickClient(draft.client_id)
+      if (draft.client_id && !(await pickClient(draft.client_id)) && alive) setPrefillFailed(true)
     })
     return () => { alive = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leadParam])
+  }, [leadParam, prefillAttempt])
 
   function onClient(next: ClientFieldValue) {
     setClient(next)
@@ -130,6 +138,14 @@ export default function QuoteNew() {
 
   return (
     <CreateShell title="New quote" saveLabel="Save quote" saving={saving} error={error} onSave={save}>
+      {prefillFailed && (
+        <DataErrorState
+          compact
+          title="Could not fill this quote from the lead"
+          message="Check your connection and tap Retry, or fill it in yourself."
+          onRetry={() => setPrefillAttempt((n) => n + 1)}
+        />
+      )}
       <ClientField userId={user?.id} value={client} onChange={onClient} error={clientError} autoFocus={!clientParam && !leadParam} />
       <Field label="Title" placeholder="Driveway replacement" value={form.title} onChange={(e) => set('title', e.target.value)} />
       <Choices label="Job type" options={JOB_TYPES} value={form.jobType} onChange={(v) => set('jobType', v)} />

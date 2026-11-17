@@ -650,6 +650,49 @@ test.describe('money editors keep two decimals', () => {
   })
 })
 
+// DATA-18: a change order write that changed no row never says it saved.
+// The change order here was written by a teammate; anyone who may edit the
+// job's money may send or delete it, and row security decides.
+test.describe('a change order write that finds nothing to change', () => {
+  const teammateCo = { id: 'co-team', org_id: 'org-1', user_id: 'teammate-9', contact_id: 'c-job1', sequence_number: 3, title: 'Extra footing', description: null, amount: 1800, status: 'draft', created_at: '2026-11-10T15:00:00.000Z' }
+  const tables = { fh_contacts: [shedJob()], fh_invoices: [], fh_payments: [], fh_change_orders: [teammateCo] }
+
+  test('a delete that removed nothing does not say deleted', async ({ page, context }) => {
+    await signIn(context, { tables })
+    await context.route(url => url.pathname.endsWith('/rest/v1/fh_change_orders'), route => {
+      if (route.request().method() !== 'DELETE') return route.fallback()
+      return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+    })
+    await page.goto('/jobs/c-job1?tab=change_orders', { waitUntil: 'domcontentloaded' })
+    await page.getByRole('button', { name: 'Delete change order', exact: true }).click()
+    await page.waitForTimeout(600) // a second tap within 500 ms is ignored (OPS-02)
+    await page.getByRole('button', { name: 'Tap again to delete', exact: true }).click()
+    await expect(page.getByText("Couldn't delete change order", { exact: true })).toBeVisible()
+    await expect(page.getByText('Change order deleted', { exact: true })).toHaveCount(0)
+  })
+
+  test("sending a teammate's change order marks it sent by id, and stops when it is gone", async ({ page, context }) => {
+    await signIn(context, { tables })
+    const patches: string[] = []
+    await context.route(url => url.pathname.endsWith('/rest/v1/fh_change_orders'), route => {
+      if (route.request().method() !== 'PATCH') return route.fallback()
+      patches.push(route.request().url())
+      return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+    })
+    await context.route(url => url.pathname.endsWith('/rest/v1/fh_public_links'), route => {
+      if (route.request().method() !== 'POST') return route.fallback()
+      return route.fulfill({ status: 201, json: { id: 'link-co', ...route.request().postDataJSON() } })
+    })
+    await page.goto('/jobs/c-job1?tab=change_orders', { waitUntil: 'domcontentloaded' })
+    await page.getByRole('button', { name: 'Send for signature', exact: true }).click()
+    await expect.poll(() => patches.length).toBe(1)
+    expect(new URL(patches[0]).searchParams.get('id')).toBe('eq.co-team')
+    expect(new URL(patches[0]).searchParams.has('user_id')).toBe(false)
+    await expect(page.getByText('This change order changed on another device. The list is read again.', { exact: true })).toBeVisible()
+    await expect(page.getByText('Approval link copied', { exact: true })).toHaveCount(0)
+  })
+})
+
 // OPS-11: one Back after saving an invoice edit or recording a payment
 // leaves the invoice, instead of landing on the same invoice again.
 for (const flow of ['edit', 'payment'] as const) {

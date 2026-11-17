@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ACTIVE_ORG_HEADER, detectSessionInUrl, fetchWithActiveOrg, setActiveOrgId, supabase } from './supabase.ts'
+import { ACTIVE_ORG_HEADER, READ_TIMEOUT_MS, detectSessionInUrl, fetchWithActiveOrg, setActiveOrgId, supabase } from './supabase.ts'
+import { isNetworkError } from './outbox.ts'
 
 function stubFetch() {
   const calls: Array<{ url: string; init?: RequestInit }> = []
@@ -84,5 +85,79 @@ describe('auth tokens in the URL', () => {
     expect(detectSessionInUrl(new URL('https://app.example/login#error_description=Link+expired'), { error_description: 'Link expired' })).toBe(true)
     expect(detectSessionInUrl(new URL('https://app.example/settings#templates'), {})).toBe(false)
     expect(replaceState).not.toHaveBeenCalled()
+  })
+})
+
+describe('reads that never answer', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  // A fetch that never answers, and rejects only when its signal aborts.
+  function stubHungFetch() {
+    const calls: Array<{ url: string; init?: RequestInit }> = []
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ url: String(input), init })
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(init.signal?.reason))
+      })
+    }))
+    return calls
+  }
+
+  it('gives up on a REST read with no answer after the read timeout', async () => {
+    vi.useFakeTimers()
+    stubHungFetch()
+    let outcome: unknown = 'pending'
+    void fetchWithActiveOrg('https://p.supabase.co/rest/v1/fh_leads?select=*', { method: 'GET' }).then(
+      () => { outcome = 'answered' },
+      (error) => { outcome = error }
+    )
+    await vi.advanceTimersByTimeAsync(READ_TIMEOUT_MS - 1)
+    expect(outcome).toBe('pending')
+    await vi.advanceTimersByTimeAsync(2)
+    expect((outcome as Error).name).toBe('AbortError')
+    // Reported like any other lost connection.
+    expect(isNetworkError(outcome)).toBe(true)
+  })
+
+  it('times out a hung read made through the shared client, which then reports an error', async () => {
+    vi.useFakeTimers()
+    stubHungFetch()
+    // The builder sends on then(), so start it before the clock moves.
+    const read = supabase.from('fh_leads').select('id').then((result) => result)
+    await vi.advanceTimersByTimeAsync(READ_TIMEOUT_MS + 1)
+    const { error, status } = await read
+    expect(status).toBe(0)
+    expect(error).toBeTruthy()
+  })
+
+  it('never cuts off a write, an upload, an RPC or a sign in, however long they take', async () => {
+    vi.useFakeTimers()
+    const calls = stubHungFetch()
+    const settled: string[] = []
+    const requests: Array<[string, RequestInit]> = [
+      ['https://p.supabase.co/rest/v1/fh_notes', { method: 'POST' }],
+      ['https://p.supabase.co/rest/v1/fh_notes?id=eq.1', { method: 'PATCH' }],
+      ['https://p.supabase.co/rest/v1/rpc/fh_merge_clients', { method: 'POST' }],
+      ['https://p.supabase.co/storage/v1/object/job-photos/a.jpg', { method: 'POST' }],
+      ['https://p.supabase.co/storage/v1/object/job-photos/a.jpg', { method: 'GET' }],
+      ['https://p.supabase.co/auth/v1/token?grant_type=password', { method: 'POST' }],
+    ]
+    for (const [url, init] of requests) {
+      void fetchWithActiveOrg(url, init).then(() => settled.push(url), () => settled.push(url))
+    }
+    await vi.advanceTimersByTimeAsync(10 * READ_TIMEOUT_MS)
+    expect(settled).toEqual([])
+    expect(calls).toHaveLength(requests.length)
+  })
+
+  it('still lets the caller cancel a read', async () => {
+    stubHungFetch()
+    const controller = new AbortController()
+    const read = fetchWithActiveOrg('https://p.supabase.co/rest/v1/fh_leads', { method: 'GET', signal: controller.signal })
+    controller.abort()
+    await expect(read).rejects.toBeTruthy()
   })
 })

@@ -206,6 +206,26 @@ test('backing out of Quote this leaves the next New quote blank', async ({ conte
   await expect(page.getByLabel('Client')).toHaveValue('')
 })
 
+// Phone sales audit finding S23: when the lead could not be read, Quote
+// this opened a blank quote with nothing to say why.
+test('Quote this says when the lead could not be read, and fills it on Retry', async ({ context, page }) => {
+  await signIn(context, { tables: { fh_leads: [LEAD_WITH_NOTES] } })
+  let signal = false
+  await context.route(/\/rest\/v1\/fh_leads\?/, route => {
+    if (route.request().method() !== 'GET' || signal) return route.fallback()
+    return route.abort('internetdisconnected')
+  })
+  await open(page, '/quotes/new?lead=l-notes')
+  const notice = page.getByRole('alert').filter({ hasText: 'Could not fill this quote from the lead' })
+  await expect(notice).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByLabel('Title')).toHaveValue('')
+  signal = true
+  await notice.getByRole('button', { name: 'Retry', exact: true }).click()
+  await expect(page.getByLabel('Title')).toHaveValue('Backyard drainage')
+  await expect(page.getByLabel('Client')).toHaveValue('Jeff Roy')
+  await expect(notice).toHaveCount(0)
+})
+
 // The client field read only the 200 most recently active clients, so an
 // older client was never suggested and Save made a duplicate (DATA-09).
 test('the client field finds a client outside the 200 most recently active', async ({ context, page }) => {

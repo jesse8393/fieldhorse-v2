@@ -160,6 +160,43 @@ test('photo batch feedback tracks actual processing and confirmed writes', async
   await expect(panel.getByRole('button', { name: 'Add photos', exact: true })).toBeEnabled()
 })
 
+// DATA-24: one failed photo used to end the batch, and the photos after
+// it were never tried.
+test('a photo batch keeps going past a photo that fails, and names it', async ({ context, page }) => {
+  await signIn(context)
+  const rows: Record<string, unknown>[] = []
+  const removed: string[] = []
+  await context.route(url => url.pathname.startsWith('/storage/v1/object/job-photos/'), route => route.fulfill({ status: 200, json: { Key: 'job-photos/photo.jpg' } }))
+  await context.route(url => url.pathname === '/storage/v1/object/job-photos', route => {
+    if (route.request().method() === 'DELETE') removed.push(...(route.request().postDataJSON()?.prefixes ?? []))
+    return route.fulfill({ status: 200, json: [] })
+  })
+  await context.route('**/rest/v1/fh_job_files?*', route => route.request().method() === 'GET' ? route.fulfill({ json: rows }) : route.fallback())
+  await context.route('**/rest/v1/fh_job_files', async route => {
+    if (route.request().method() !== 'POST') return route.fallback()
+    const row = route.request().postDataJSON()
+    // Refused for good: this job is no longer theirs to add to.
+    if (row.filename === 'two.png') return route.fulfill({ status: 403, json: { code: '42501', message: 'new row violates row-level security policy for table "fh_job_files"' } })
+    // The signal drops while this row is on its way.
+    if (row.filename === 'three.png') return route.abort('internetdisconnected')
+    rows.push({ ...row, uploaded_at: NOW })
+    await route.fulfill({ status: 201, json: [row] })
+  })
+  await page.goto('/jobs/c-job1?tab=files')
+  const panel = page.locator('#fh-job-files-panel-photos')
+  await expect(panel).toBeVisible()
+  const bytes = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1sAAAAASUVORK5CYII=', 'base64')
+  await panel.locator('input[type="file"]').setInputFiles(['one.png', 'two.png', 'three.png', 'four.png'].map(name => ({ name, mimeType: 'image/png', buffer: bytes })))
+  await expect.poll(() => rows.map(row => row.filename)).toEqual(['one.png', 'four.png'])
+  await expect(page.getByText("1 photo didn't upload", { exact: true })).toBeVisible()
+  await expect(page.getByText('two.png. Add it again to try once more.', { exact: true })).toBeVisible()
+  await expect(page.getByText('1 photo will upload when signal returns', { exact: true })).toBeVisible()
+  await expect(page.getByText('Upload failed', { exact: true })).toHaveCount(0)
+  // The refused photo's image does not stay up with nothing pointing at it.
+  await expect.poll(() => removed.length).toBe(1)
+  await expect(panel.getByRole('button', { name: 'Add photos', exact: true })).toBeEnabled()
+})
+
 for (const mode of ['day', 'night'] as const) {
   test(`interior controls fit 320px in ${mode} with reduced motion`, async ({ context, page }) => {
     await signIn(context, { mode, tables: { fh_quotes: quotes } })
