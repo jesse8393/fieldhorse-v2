@@ -32,6 +32,7 @@ import { alertLinkRecipients } from './lib/linkAlerts.js'
 import { linkScope } from './lib/linkScope.js'
 import { brandingUserIdFor } from './lib/orgAccess.js'
 import { proposalNumber } from './lib/docNumbers.js'
+import { moneyCents } from './lib/money.js'
 import {
   CLOSED_QUOTE_STATUSES, buildQuoteSnapshot, claimQuoteApproval, documentChanged, loadQuoteForLink,
   matchesWhatWasShown, quoteValidityPassed, recordQuoteVersion, releaseQuoteClaim, snapshotCompany, snapshotItems
@@ -54,11 +55,9 @@ function clientIp(req) {
   )
 }
 
-function moneyFmt(n) {
-  return Number(n || 0).toLocaleString(undefined, {
-    style: 'currency', currency: 'USD', maximumFractionDigits: 0
-  })
-}
+// The amount the customer signed, to the cent, the way the quote, the
+// job and the PDF print it (formats-8).
+const moneyFmt = moneyCents
 
 
 export default async function handler(req) {
