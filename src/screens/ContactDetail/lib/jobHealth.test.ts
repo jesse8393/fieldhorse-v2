@@ -69,4 +69,26 @@ describe('computeJobHealth', () => {
     expect(h.breakdown?.milestones).toMatchObject({ done: 1, total: 4, pct: 25 })
     expect(h.breakdown?.payments).toMatchObject({ paid: 500, amount: 2000, pct: 25 })
   })
+
+  // M-15: the contract includes approved change orders.
+  it('does not call a job Overpaid while change order money is owed', () => {
+    const h = computeJobHealth({
+      contact: { amount: 10000, stage: 'job', milestones: [] },
+      payments: [{ amount: 12000 }],
+      changeOrders: [{ amount: 5000, status: 'approved' }, { amount: 900, status: 'sent' }],
+      scheduleItems: []
+    })
+    expect(h.label).not.toBe('Overpaid')
+    expect(h.breakdown?.payments).toMatchObject({ paid: 12000, amount: 15000, pct: 80 })
+  })
+
+  it('still calls a job paid past its whole contract Overpaid, to the cent', () => {
+    const h = computeJobHealth({
+      contact: { amount: 10000, stage: 'job', milestones: [] },
+      payments: [{ amount: 15000.01 }],
+      changeOrders: [{ amount: 5000, status: 'approved' }]
+    })
+    expect(h.label).toBe('Overpaid')
+    expect(h.breakdown?.payments).toMatchObject({ credit: 0.01 })
+  })
 })

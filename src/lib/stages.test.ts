@@ -107,6 +107,12 @@ describe('margin', () => {
     expect(margin({ amount: 1000, cost: 1200 })).toBe(-20)
   })
 
+  // M-15: the contract includes approved change orders.
+  it('counts approved change orders in the contract', () => {
+    const changeOrders = [{ amount: 5000, status: 'approved' }, { amount: 900, status: 'sent' }]
+    expect(margin({ amount: 10000, cost: 12000 }, changeOrders)).toBe(20)
+  })
+
   it('treats null/undefined cost as zero', () => {
     expect(margin({ amount: 1000, cost: null })).toBe(100)
     expect(margin({ amount: 1000 } as any)).toBe(100)

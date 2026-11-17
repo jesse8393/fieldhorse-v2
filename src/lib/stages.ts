@@ -446,11 +446,20 @@ export async function recalcCost(contactId: string | undefined, userId: string |
   }
 }
 
-export function margin(contact: { amount?: number | null; cost?: number | null } | null | undefined) {
-  const amt = Number(contact?.amount || 0)
-  const cost = Number(contact?.cost || 0)
-  if (!amt) return 0
-  return ((amt - cost) / amt) * 100
+/**
+ * Margin as a percentage of the contract. Pass the job's change orders:
+ * the contract is the job amount plus the approved ones (M-15), so a
+ * $10,000 job with a $5,000 approved change order and $12,000 of cost is a
+ * 20% margin, not a 20% loss. A job with no amount has no margin.
+ */
+export function margin(
+  contact: { amount?: number | null; cost?: number | null } | null | undefined,
+  changeOrders: readonly { amount?: number | string | null; status?: string | null }[] = []
+) {
+  const contract = knownContractTotal({ amount: contact?.amount, changeOrders })
+  if (contract == null || toCents(contract) === 0) return 0
+  const cost = toCents(contact?.cost)
+  return ((toCents(contract) - cost) / toCents(contract)) * 100
 }
 
 export function marginTier(pct: number) {
