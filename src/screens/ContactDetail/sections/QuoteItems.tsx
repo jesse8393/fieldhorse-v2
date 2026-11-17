@@ -433,16 +433,26 @@ export function useQuoteItems({ jobId, quoteId, userId, onContactRefresh, onLoad
     }
     const sortOrder = Number.isFinite(input.sort_order) ? input.sort_order : sortRef.current++
     const tempId = `temp-${(typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${rows.length}-${sortOrder}`}`
-    const optimisticRow = { id: tempId, user_id: userId, ...scopeFields, ...input, sort_order: sortOrder, _pending: true }
+    // `id`, when the editor minted one, is the line's own: a save whose
+    // answer was lost and is tapped again addresses the same line (DATA-12).
+    const { id: lineId, ...fields } = input
+    const optimisticRow = { id: tempId, user_id: userId, ...scopeFields, ...fields, sort_order: sortOrder, _pending: true }
     // Show the line immediately, no network wait between entries. This is
     // what makes rapid multi-item entry feel instant instead of glitchy.
     setRows((rs) => [...rs, optimisticRow])
-    const payload = { user_id: userId, ...scopeFields, ...input, sort_order: sortOrder }
-    const { data, error } = await supabase
+    const payload = { ...(lineId ? { id: lineId } : {}), user_id: userId, ...scopeFields, ...fields, sort_order: sortOrder }
+    const inserted = await supabase
       .from('fh_quote_items')
       .insert(payload)
       .select()
       .single()
+    let data: any = inserted.data
+    let error: any = inserted.error
+    if (lineId && error?.code === '23505') {
+      // The first try saved the line: read it back, never overwrite it.
+      const existing = await supabase.from('fh_quote_items').select('*').eq('id', lineId).eq('user_id', userId).maybeSingle()
+      if (!existing.error && existing.data) { data = existing.data; error = null }
+    }
     if (error) {
       // Roll the optimistic row back out and tell the operator, in words,
       // once the write has answered. The editor keeps what was typed.

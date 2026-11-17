@@ -5,7 +5,7 @@
 // description at the job title. With no job it bills the client directly
 // through fh_invoices.client_id.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Field, formatMoney } from '../../components/fh'
 import ClientField, { fetchClientPick, resolveClientId, type ClientFieldValue, type ClientPick } from '../../components/ClientField.tsx'
@@ -14,6 +14,7 @@ import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useMembership } from '../../contexts/MembershipContext.tsx'
 import { supabase } from '../../lib/supabase.ts'
 import { createInvoice } from '../../lib/invoices.ts'
+import { createUuid } from '../../lib/uuid.ts'
 import { fetchInvoiceReviewContext } from '../../lib/invoiceReviewContext.ts'
 import { reviewInvoice } from '../../lib/invoiceReview.js'
 import { JOB_STAGES } from '../../lib/stages.ts'
@@ -23,6 +24,8 @@ import { hapticMedium } from '../../lib/haptics.ts'
 type Job = { id: string; job_title: string | null; name: string | null; amount: number | null; client_id: string | null; stage: string | null }
 
 type Form = {
+  /** The invoice's id, minted once per form so a retried save is the same invoice (DATA-12). */
+  requestId: string
   client: string
   clientId: string
   jobId: string
@@ -32,7 +35,7 @@ type Form = {
   instructions: string
 }
 
-const EMPTY: Form = { client: '', clientId: '', jobId: '', amount: '', description: '', due: '', instructions: '' }
+const EMPTY: Form = { requestId: '', client: '', clientId: '', jobId: '', amount: '', description: '', due: '', instructions: '' }
 
 const DUE = [
   { value: '0', label: 'On receipt' },
@@ -64,7 +67,10 @@ export default function InvoiceNew() {
   const clientParam = params.get('client')
   const jobParam = params.get('job')
   const text = params.get('text')
-  const { form, set, patch, done } = useDraft<Form>('invoice', EMPTY, text ? { description: text } : null)
+  const [requestId] = useState(createUuid)
+  const { form, set, patch, done } = useDraft<Form>('invoice', { ...EMPTY, requestId }, text ? { description: text } : null)
+  const invoiceId = form.requestId || requestId
+  const savingRef = useRef(false)
   const [client, setClient] = useState<ClientFieldValue>({ text: form.client, picked: null })
   const [jobs, setJobs] = useState<Job[]>([])
   const [saving, setSaving] = useState(false)
@@ -135,21 +141,24 @@ export default function InvoiceNew() {
   }
 
   async function save() {
-    if (!user) return
+    if (!user || savingRef.current) return
     const next: typeof errors = {}
     if (!client.text.trim()) next.client = 'Enter a client.'
     const amount = Number(form.amount)
     if (!form.amount.trim() || !Number.isFinite(amount) || amount <= 0) next.amount = 'Enter an amount, such as 1240.00.'
     if (next.client || next.amount) { setErrors(next); return }
+    savingRef.current = true
     setSaving(true)
     setErrors({})
     try {
       const picked = await resolveClientId(client, { userId: user.id, orgId })
       if (!picked) throw new Error('Enter a client.')
       const context = await fetchInvoiceReviewContext(form.jobId || null, picked.id)
-      const review = reviewInvoice({ invoice: { id: 'new', contact_id: form.jobId || null, client_id: picked.id, amount, title: form.description, due_at: dueAt(form.due), status: 'draft' }, ...context })
+      // Under its own id, so a first try that saved is not counted against this one.
+      const review = reviewInvoice({ invoice: { id: invoiceId, contact_id: form.jobId || null, client_id: picked.id, amount, title: form.description, due_at: dueAt(form.due), status: 'draft' }, ...context })
       if (review.excess > 0) throw new Error(`Only ${formatMoney(review.available ?? 0)} remains unreserved on this contract. Review existing drafts or approve added scope before billing more.`)
       const { data, error } = await createInvoice({
+        id: invoiceId,
         contact: form.jobId ? { id: form.jobId } : null,
         clientId: picked.id,
         userId: user.id,
@@ -164,6 +173,7 @@ export default function InvoiceNew() {
       hapticMedium()
       navigate(recordRoute('invoice', data.id), { replace: true })
     } catch (e) {
+      savingRef.current = false
       setSaving(false)
       setErrors({ save: e instanceof Error && e.message ? e.message : 'Could not save this invoice. Check your connection and try again.' })
     }

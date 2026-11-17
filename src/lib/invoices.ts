@@ -135,7 +135,12 @@ export async function fetchInvoicesForContact(contactId: string) {
 
 // An invoice bills a job (contact or contactId) or, with no job, the client
 // directly through client_id (D62). Pass clientId with or without a job.
-export async function createInvoice({ contact = null, contactId = null, clientId = null, userId, title, amount, status = 'draft', due_at = null, notes = null, description = null }: {
+// New invoice mints `id` once per form, so a save whose answer was lost and
+// is tapped again addresses the same invoice: a duplicate key answer means
+// the first try saved, and that invoice is read back instead (DATA-12).
+export async function createInvoice({ id, contact = null, contactId = null, clientId = null, userId, title, amount, status = 'draft', due_at = null, notes = null, description = null }: {
+  /** The invoice's id, minted once per form; a retry sends the same one. */
+  id?: string
   /** The job it bills, when there is one (D54); null for an invoice against the client alone. */
   contact?: Pick<Contact, 'id'> | null
   /** The job's id, for callers that have no row. */
@@ -153,6 +158,7 @@ export async function createInvoice({ contact = null, contactId = null, clientId
   const { data, error } = await supabase
     .from('fh_invoices')
     .insert({
+      ...(id ? { id } : {}),
       client_id: clientId || null,
       contact_id: contact?.id || contactId || null,
       user_id: userId,
@@ -166,6 +172,11 @@ export async function createInvoice({ contact = null, contactId = null, clientId
     } as any)
     .select('*')
     .single()
+  if (id && (error as { code?: string } | null)?.code === '23505') {
+    // Only this person's invoice with that id, never one to overwrite.
+    const existing = await supabase.from('fh_invoices').select('*').eq('id', id).eq('user_id', userId).maybeSingle()
+    if (!existing.error && existing.data) return { data: existing.data as InvoiceRow, error: null }
+  }
   return { data: data as InvoiceRow | null, error }
 }
 

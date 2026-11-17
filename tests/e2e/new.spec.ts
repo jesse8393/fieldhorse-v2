@@ -292,6 +292,21 @@ test('a client save whose answer was lost is retried on the same row (DATA-12)',
   expect(rowId(bodies[1])).toBe(rowId(bodies[0]))
 })
 
+test('an invoice save whose answer was lost is retried on the same invoice (DATA-12)', async ({ context, page }) => {
+  await signIn(context)
+  const bodies = await loseFirstAnswer(page, 'fh_invoices')
+  await open(page, '/invoices/new?client=cl-1')
+  await expect(page.getByLabel('Client')).toHaveValue('Jeff Roy', { timeout: 30_000 })
+  await page.getByLabel('Amount').fill('1240')
+  await page.getByRole('button', { name: 'Save invoice' }).click()
+  await expect(page.locator('.fhnew-error')).toBeVisible()
+  await page.getByRole('button', { name: 'Save invoice' }).click()
+  await expect(page).toHaveURL(/\/invoices\/inv0$/, { timeout: 30_000 })
+  expect(bodies).toHaveLength(2)
+  expect(rowId(bodies[0])).toBeTruthy()
+  expect(rowId(bodies[1])).toBe(rowId(bodies[0]))
+})
+
 test('a lost connection on New lead and New client reads as a plain sentence (DATA-22)', async ({ context, page }) => {
   await signIn(context)
   await page.route(/\/rest\/v1\/fh_(leads|clients)(\?|$)/, (route) => route.request().method() === 'POST' ? route.abort('failed') : route.fallback())
