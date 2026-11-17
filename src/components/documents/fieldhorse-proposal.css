@@ -194,15 +194,17 @@
   color: var(--fh-ink-3);
 }
 
+/* One line, never broken inside the number: a total too wide for the card
+   is scaled down to fit it by useFitWidth (the --fh-fit factor). */
 .fhp-total__amount {
   margin: 4px 0 8px;
   font-family: var(--fh-font-display);
-  font-size: 52px;
-  line-height: 54px;
+  font-size: calc(52px * var(--fh-fit, 1));
+  line-height: calc(54px * var(--fh-fit, 1));
   font-weight: 600;
   letter-spacing: 0;
   color: var(--fh-ink);
-  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
 
 .fhp-total__note {

@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 import { nothingRunsOffTheSide } from './helpers/overflow.ts'
+import { ink, openBigPortal, textSize } from './helpers/bigText.ts'
 
 const selectionFixture = {
   id: 'selection-ui', user_id: 'qa-user-1', contact_id: 'c-job1', title: 'Bathroom floor',
@@ -431,4 +432,39 @@ test('refused task completion restores the row without a success message', async
   await expect(page.getByText("Couldn't complete", { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Complete Check delivery access' })).toBeVisible()
   await expect(page.getByText('Task completed', { exact: true })).toHaveCount(0)
+})
+
+// Large text and zoom (sign "the app falls apart at a bigger text size"):
+// long names and six or seven figure amounts on a Pixel 7 and a 360 px
+// phone, at the usual text size, with the phone's text at 150 percent, and
+// zoomed to 200 percent where a screen is used that way.
+test.describe('large text and zoom', () => {
+  test.skip(({ isMobile }) => !isMobile, 'Phone sizes')
+
+  // big-text-1: the Fieldhorse customer quote drew $184,580.00 as
+  // "$184,580.0" over a lone "0" on an ordinary phone.
+  for (const percent of [100, 150]) {
+    test(`the customer quote total stays whole on one line inside its card, text at ${percent} percent`, async ({ context, page }) => {
+      await textSize(context, percent)
+      for (const token of ['six', 'fh'] as const) {
+        await openBigPortal(context, page, token)
+        const total = page.locator('.fhp-total__amount')
+        await expect(total).toBeVisible({ timeout: 20_000 })
+        for (const width of [412, 390, 360, 320]) {
+          await page.setViewportSize({ width, height: 800 })
+          await page.waitForTimeout(150)
+          const drawn = await ink(total)
+          const card = await page.locator('.fhp-total').evaluate((el) => {
+            const r = el.getBoundingClientRect()
+            const s = getComputedStyle(el)
+            return { left: r.left + parseFloat(s.paddingLeft), right: r.right - parseFloat(s.paddingRight) }
+          })
+          const at = `${await total.textContent()} at ${width} px: ${JSON.stringify({ drawn, card })}`
+          expect(drawn.lines, at).toBe(1)
+          expect(drawn.left, at).toBeGreaterThanOrEqual(card.left - 0.5)
+          expect(drawn.right, at).toBeLessThanOrEqual(card.right + 0.5)
+        }
+      }
+    })
+  }
 })
