@@ -810,6 +810,7 @@ export default function ContactDetail() {
           onBack={() => navigate(detailHome)}
           onMore={() => navigate(`${home}/more`)}
           onOpenPhotos={() => openSection('files')}
+          editHref={canMoveMoney ? `${home}?edit=1` : undefined}
         />
 
         {actionIntentMeta && (

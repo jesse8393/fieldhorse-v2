@@ -346,6 +346,37 @@ test.describe('job page on a phone', () => {
     await expect(page.getByRole('dialog')).toHaveCount(0)
   })
 
+  // dead-ends-8: a walk up customer's job with no phone and no address. The
+  // tiles say what is missing in words, and open the job's details to add
+  // it. Crew, who cannot edit the job, read the same reason on a still tile.
+  const BARE_JOB = {
+    id: 'c-bare', user_id: 'qa-user-1', client_id: null, stage: 'job', name: 'Walk Up Customer', job_title: 'Stoop repair',
+    amount: 2400, phone: null, email: null, address: null, notes: null, scope_text: null, milestones: [],
+    created_at: '2026-10-01T15:00:00.000Z', updated_at: '2026-10-09T15:00:00.000Z', proposal_status: null,
+    follow_up_on: null, completed_at: null, invoice_no: null, client_name: 'Walk Up Customer'
+  }
+
+  test('with no phone or address, Call and Navigate say so and open the details to add them', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_contacts: [BARE_JOB] } })
+    await open(page, '/jobs/c-bare')
+    const quick = page.getByRole('list', { name: 'Quick actions' })
+    await expect(quick.locator('button:disabled')).toHaveCount(0)
+    const addPhone = quick.getByRole('link', { name: 'Add a phone number for Walk Up Customer' })
+    await expect(addPhone).toHaveText('Add phone')
+    await expect(quick.getByRole('link', { name: 'Add the job site address' })).toHaveText('Add address')
+    await addPhone.click()
+    await expect(page.getByLabel('Phone', { exact: true })).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByLabel('Address', { exact: true })).toBeVisible()
+  })
+
+  test('crew read why Call and Navigate do nothing', async ({ context, page }) => {
+    await signIn(context, { role: 'crew', tables: { fh_contacts: [BARE_JOB] } })
+    await open(page, '/jobs/c-bare')
+    const quick = page.getByRole('list', { name: 'Quick actions' })
+    await expect(quick.getByRole('button', { name: 'Call, no phone on file' })).toHaveText('No phone')
+    await expect(quick.getByRole('button', { name: 'Navigate, no address on file' })).toHaveText('No address')
+  })
+
   // dead-ends-1: a past due link Today wrote before Remind opened the
   // reminder itself lands on the job's invoices, never on a new invoice
   // that could bill the customer twice.
