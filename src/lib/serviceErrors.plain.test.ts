@@ -162,6 +162,12 @@ describe('plainError', () => {
     expect(plainError(Object.assign(new Error('Email not confirmed'), { name: 'AuthApiError', status: 400, code: 'email_not_confirmed' }), FALLBACK)).toBe('Confirm your email first. The link is in your inbox.')
   })
 
+  it('logs nothing for an empty value or a sentence we wrote', () => {
+    plainError(null, FALLBACK)
+    plainError(new Error('Enter a client.'), FALLBACK)
+    expect(console.warn).not.toHaveBeenCalled()
+  })
+
   it('still logs the raw value for us', () => {
     const refusal = { ...PG.rls }
     plainError(refusal, FALLBACK)

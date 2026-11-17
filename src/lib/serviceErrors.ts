@@ -167,14 +167,19 @@ export function errorKind(error: unknown): ErrorKind {
 
 const logged = new WeakSet<object>()
 
-function logRaw(error: unknown, fallback: string) {
-  if (error && typeof error === 'object') {
+function logRaw(error: unknown, f: Fields, fallback: string) {
+  if (error == null) return
+  // A sentence we wrote ourselves is not a failure to look into.
+  if (f.plainError && isPlainSentence(f.message)) return
+  if (typeof error === 'object') {
     if (logged.has(error)) return
     logged.add(error)
   }
   // eslint-disable-next-line no-console
   console.warn('[fieldhorse]', fallback, error)
-  reportClientError('mutation', error)
+  // A function's answer is a plain object: report its code and words.
+  const summary = [f.fnCode || f.code, f.status || '', f.message || f.said].filter(Boolean).join(' ')
+  reportClientError('mutation', error instanceof Error ? error : summary || fallback)
 }
 
 /**
@@ -183,8 +188,8 @@ function logRaw(error: unknown, fallback: string) {
  * below. Pass `kept: true` where what the person typed is still on screen.
  */
 export function plainError(error: unknown, fallback: string, options: { kept?: boolean } = {}): string {
-  logRaw(error, fallback)
   const f = fieldsOf(error)
+  logRaw(error, f, fallback)
   const kind = errorKind(error)
   if (kind === 'offline') return options.kept ? OFFLINE_KEPT : OFFLINE
   if (f.fnCode && !UNTRUSTED_DETAIL.has(f.fnCode) && !f.provider && isPlainSentence(f.said)) return f.said.trim()
