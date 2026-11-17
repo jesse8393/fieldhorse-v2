@@ -204,15 +204,28 @@ async function expectOnyxShell(page: Page) {
 }
 
 test.describe('Welcome and Login', () => {
+  // The owner asked for the old slogan to go: no captain anywhere. The
+  // heading says what the screen is for, in both of its modes.
+  test('says what the screen is for, with no slogan, signing in and creating a workspace', async ({ context, page }) => {
+    await stubSignedOut(context, 'missing')
+    await openLogin(page)
+    await expect(page.getByRole('heading', { level: 1, name: 'Sign in' })).toBeVisible()
+    expect(await page.locator('body').innerText()).not.toMatch(/captain/i)
+    await page.getByRole('button', { name: 'Create a workspace' }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Create a workspace' })).toBeVisible()
+    expect(await page.locator('body').innerText()).not.toMatch(/captain/i)
+    expect(await page.title()).not.toMatch(/captain/i)
+  })
+
   for (const mode of ['day', 'night'] as const) {
-    test(`shows the line and Sign in on onyx with linen labels in ${mode}`, async ({ context, page }) => {
+    test(`shows the heading and Sign in on onyx with linen labels in ${mode}`, async ({ context, page }) => {
       await context.addInitScript((themeMode) => {
         localStorage.setItem('fh:theme-mode', themeMode)
       }, mode)
       const stub = await stubSignedOut(context, 'missing')
       await openLogin(page)
 
-      await expect(page.getByRole('heading', { level: 1, name: 'Run every job like a captain.' })).toBeVisible()
+      await expect(page.getByRole('heading', { level: 1, name: 'Sign in' })).toBeVisible()
       await expect(page.getByRole('img', { name: 'Fieldhorse' })).toBeVisible()
       await expect(page.getByRole('button', { name: 'Create a workspace' })).toBeVisible()
       await expect(page.getByRole('button', { name: 'Forgot password?' })).toBeVisible()
@@ -477,7 +490,7 @@ test.describe('The wordmark on a screen that mounts while Manrope loads', () => 
     await holdScreenCode(context, 'Landing', font.requested)
     await page.goto('/', { waitUntil: 'domcontentloaded' })
     await page.getByRole('link', { name: 'Sign in', exact: true }).first().click()
-    await expect(page.getByRole('heading', { level: 1, name: 'Run every job like a captain.' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Sign in' })).toBeVisible()
     const wordmark = page.getByRole('img', { name: 'Fieldhorse' })
 
     expect(await manropeChecks(page), 'check() answers true, as Safari does').toBe(true)
@@ -512,7 +525,7 @@ test.describe('The wordmark on a screen that mounts while Manrope loads', () => 
 
     // Sign in mounts a new stage after the failure: the fallback again, whole.
     await page.getByRole('link', { name: 'Sign in' }).click()
-    await expect(page.getByRole('heading', { level: 1, name: 'Run every job like a captain.' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Sign in' })).toBeVisible()
     await expect(wordmark).toHaveCSS('opacity', '1')
     expectWholeWord(await wordmarkLayout(wordmark))
   })
@@ -533,7 +546,7 @@ test.describe('The wordmark on a screen that mounts while Manrope loads', () => 
     // Sign in draws a new stage. The wait is over for this visit, so the
     // word shows from the first frame instead of hiding for another wait.
     await page.getByRole('link', { name: 'Sign in' }).click()
-    await expect(page.getByRole('heading', { level: 1, name: 'Run every job like a captain.' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Sign in' })).toBeVisible()
     const atOnce = await wordmarkLayout(wordmark)
     expect(atOnce.opacity, `the wordmark shows at once: ${JSON.stringify(atOnce)}`).toBe(1)
     expectWholeWord(atOnce)

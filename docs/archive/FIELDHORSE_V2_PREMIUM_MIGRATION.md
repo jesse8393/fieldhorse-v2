@@ -1075,7 +1075,7 @@ export default function Login() {
           <h1 className="fh-font-serif" style={{ fontSize: 32, lineHeight: 1.1, letterSpacing: '-0.02em', marginTop: 28, fontWeight: 400 }}>
             Welcome,<br /><em className="fh-font-serif-italic fh-text-gradient-gold">operator.</em>
           </h1>
-          <p style={{ marginTop: 10, color: 'var(--ink-muted)', fontSize: 13 }}>Sign in to run every job like a captain.</p>
+          <p style={{ marginTop: 10, color: 'var(--ink-muted)', fontSize: 13 }}>Sign in to run every job.</p>
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 20, borderRadius: 18, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--rule)', backdropFilter: 'blur(20px)' }}>

@@ -296,7 +296,7 @@ Every screen follows: one onyx stage, one gold action, hairline lists on plaster
 
 * Top 62 percent: a photo of finished work fading into onyx. Use real Parker Construction or Shyld photos, not stock and not AI images. Until real photos exist, show onyx with grain only.
 * FIELDHORSE wordmark, FIELD in brushed gold, HORSE in linen, gold hairline under it.
-* Line: "Run every job like a captain."
+* Heading: "Sign in" (or "Create a workspace" in that mode). No slogan; the screen says what it is for.
 * Brushed gold "Sign in", outlined linen "Create a workspace", small smoke line "Bring your jobs over from Jobber in a few minutes."
 * Existing sign in, reset and invite flows stay as they are.
 
