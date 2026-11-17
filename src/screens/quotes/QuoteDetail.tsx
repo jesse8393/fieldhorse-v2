@@ -47,7 +47,7 @@ import './quotes.css'
 const LINES_FAILED = "We couldn't load the lines."
 const NEEDS_A_LINE = 'Add at least one line.'
 
-type Busy = 'send' | 'mark' | 'share' | 'pdf' | 'download' | 'esign' | 'job' | 'delete' | 'revise' | null
+type Busy = 'send' | 'mark' | 'share' | 'pdf' | 'download' | 'esign' | 'job' | 'delete' | 'revise' | 'lost' | 'reopen' | null
 
 // A confirming tap that lands this soon after the arming one is the same
 // double tap, not a decision, so it is ignored.
@@ -154,6 +154,8 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
   const chip = statusChip(status)
   const approved = status.label === 'Approved'
   const changesRequested = status.label === 'Changes requested'
+  // Closed without a yes: nothing goes out until the quote is reopened (S13).
+  const lost = ['lost', 'rejected'].includes(String(quote.status || '').toLowerCase())
   const client = quote.fh_clients ?? null
   const who = previewAsName(client?.name)
   const company = useMemo(() => companyFromProfile(profile), [profile])
@@ -187,7 +189,9 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
   const waiting = items.loading || busy !== null || lines.switchSaving || lineSaving
   const needsLines = !items.loading && !live.canSend
   const linesLine = linesFailed ? LINES_FAILED : NEEDS_A_LINE
-  const sendHint = lineSaving
+  const sendHint = lost
+    ? 'Reopen the quote to send it'
+    : lineSaving
     ? 'Saving a line'
     : needsLines
     ? (linesFailed ? LINES_FAILED : 'Add at least one line')
@@ -337,6 +341,41 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
     }, "Couldn't revise the quote")
   }
 
+  // Mark as lost and Reopen (S13), each on a second tap of the same button.
+  // The write applies only while the quote still has the status on screen.
+  async function setStatus(from: string | null, to: 'lost' | 'draft') {
+    const { data, error } = await supabase
+      .from('fh_quotes')
+      .update({ status: to })
+      .eq('id', quote.id)
+      .eq('status', String(from || ''))
+      .select('id')
+      .maybeSingle()
+    if (error) throw new Error(error.message)
+    if (!data) {
+      await refresh()
+      throw new Error('This quote changed on another device. Check it and try again.')
+    }
+    await refresh()
+    refreshLists()
+  }
+  const markLost = useConfirmTap()
+  const onMarkLost = () => {
+    if (!markLost.confirm()) return
+    void run('lost', async () => {
+      await setStatus(quote.status, 'lost')
+      toastSuccess('Quote marked as lost', 'Reopen it any time to send it again.')
+    }, "Couldn't mark the quote lost")
+  }
+  const reopen = useConfirmTap()
+  const onReopen = () => {
+    if (!reopen.confirm()) return
+    void run('reopen', async () => {
+      await setStatus(quote.status, 'draft')
+      toastSuccess('Quote reopened', 'It is a draft again.')
+    }, "Couldn't reopen the quote")
+  }
+
   // Delete asks with a second tap on the same button (D57), for four seconds.
   const del = useConfirmTap()
   const armed = del.armed
@@ -445,7 +484,7 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
           variant="primary"
           size="lg"
           block
-          disabled={waiting || !live.canSend || !emailKnown}
+          disabled={waiting || lost || !live.canSend || !emailKnown}
           loading={busy === 'send' || busy === 'share'}
           onClick={hasEmail ? onSend : onShare}
         >
@@ -513,6 +552,20 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
             : 'Makes a job with this client, title, scope, price and terms. The quote stays as it is.'}
         </p>
       </div>
+
+      {!approved && !quote.job_id && (
+        <div className="fhqt-danger">
+          {lost ? (
+            <Button variant="secondary" disabled={busy !== null} loading={busy === 'reopen'} onClick={onReopen}>
+              {reopen.armed ? 'Tap again to reopen' : 'Reopen quote'}
+            </Button>
+          ) : (
+            <Button variant="secondary" disabled={busy !== null} loading={busy === 'lost'} onClick={onMarkLost}>
+              {markLost.armed ? 'Tap again to mark lost' : 'Mark as lost'}
+            </Button>
+          )}
+        </div>
+      )}
 
       {deletable ? (
         <div className="fhqt-danger">

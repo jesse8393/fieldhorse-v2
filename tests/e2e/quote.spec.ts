@@ -900,3 +900,47 @@ test.describe('errors on the quote screens', () => {
   })
 })
 
+// Phone sales audit finding S13, the quote half: a quote can be closed as
+// lost and opened again, and a lost quote does not offer Send.
+test.describe('a lost quote', () => {
+  async function watchQuotePatches(context: BrowserContext) {
+    const patches: { url: string; body: any }[] = []
+    await context.route((url) => url.pathname.endsWith('/rest/v1/fh_quotes'), (route) => {
+      const request = route.request()
+      if (request.method() !== 'PATCH') return route.fallback()
+      patches.push({ url: request.url(), body: request.postDataJSON() })
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 'q-quote' }) })
+    })
+    return patches
+  }
+
+  test('Mark as lost asks with a second tap', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS } })
+    const patches = await watchQuotePatches(context)
+    await openQuote(page)
+    await page.getByRole('button', { name: 'Mark as lost' }).click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    expect(patches).toEqual([])
+    await page.waitForTimeout(600)
+    await page.getByRole('button', { name: 'Tap again to mark lost' }).click()
+    await expect.poll(() => patches.length).toBe(1)
+    expect(patches[0].body).toEqual({ status: 'lost' })
+    expect(patches[0].url).toContain('status=eq.sent')
+  })
+
+  test('a lost quote cannot be sent and can be reopened', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS, fh_quotes: [quoteRow({ status: 'lost' })] } })
+    const patches = await watchQuotePatches(context)
+    await openQuote(page)
+    await expect(total(page).getByRole('button', { name: 'Send for approval' })).toBeDisabled()
+    await expect(total(page).getByText('Reopen the quote to send it')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Mark as lost' })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Reopen quote' }).click()
+    await page.waitForTimeout(600)
+    await page.getByRole('button', { name: 'Tap again to reopen' }).click()
+    await expect.poll(() => patches.length).toBe(1)
+    expect(patches[0].body).toEqual({ status: 'draft' })
+    expect(patches[0].url).toContain('status=eq.lost')
+  })
+})
+
