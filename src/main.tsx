@@ -16,6 +16,7 @@ import { ThemeProvider } from './contexts/ThemeContext.tsx'
 import { queryClient } from './lib/queryClient.ts'
 import { shouldPersistMutation, shouldPersistQuery } from './lib/queryPersistence.ts'
 import { isChunkLoadError, reloadOnceForStaleChunk } from './lib/lazyWithRetry.ts'
+import { installErrorReporting } from './lib/reportClientError.ts'
 // Self hosted variable type remains available in the installed app.
 import './styles/fonts.css'
 import './styles/tokens.css'
@@ -92,6 +93,9 @@ if (typeof window !== 'undefined') {
     }
   } catch { /* storage or service worker access blocked: skip the cleanup */ }
 }
+
+// Errors and rejected promises nothing else caught go to /api/client-error.
+if (typeof window !== 'undefined') installErrorReporting(window)
 
 // A deploy replaced the hashed chunks this page was built against, so a
 // lazy screen or sheet failed to load. Reload once to pick up the new

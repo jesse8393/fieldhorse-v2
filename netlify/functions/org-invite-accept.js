@@ -1,4 +1,5 @@
 import { supabaseServiceConfig } from './lib/serviceConfig.js'
+import { logError, requestId } from './lib/logError.js'
 // Netlify Function — Org invite accept.
 // POST /api/org-invite-accept  { token }
 // Authorization: Bearer <supabase access token>
@@ -115,7 +116,7 @@ export default async (request) => {
       .eq('id', existingMember.id)
       .eq('org_id', invite.org_id)
     if (rejoinErr) {
-      console.error('[org-invite-accept] membership restore failed', rejoinErr)
+      logError('org-invite-accept', 'membership restore failed', rejoinErr, { org_id: invite.org_id, request_id: requestId(request) })
       return json({ error: 'membership_create_failed', message: 'Could not add you to the team. Try again.' }, 500)
     }
   } else {

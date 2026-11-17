@@ -50,13 +50,19 @@ const nullIfBlank = (value: unknown) => String(value ?? '').trim() || null
 /** Only fields belonging to the chosen section may reach the profile write. */
 export function settingsSectionPatch(section: SettingsSection, form: Record<string, unknown>, preferences: unknown): Record<string, unknown> {
   switch (section) {
-    case 'business':
-      return { full_name: nullIfBlank(form.displayName), company_name: String(form.companyName ?? '').trim(), services: form.services }
+    case 'business': {
+      const companyName = String(form.companyName ?? '').trim()
+      // Quotes, invoices and customer links all carry the company name.
+      if (!companyName) throw new Error('Enter your company name. It shows on quotes and invoices.')
+      return { full_name: nullIfBlank(form.displayName), company_name: companyName, services: form.services }
+    }
     case 'documents': {
       const accent = nullIfBlank(form.brandAccentHex)
       if (accent && !/^#[0-9a-fA-F]{6}$/.test(accent)) throw new Error('Enter a six digit brand color, such as #C9963A.')
+      const email = nullIfBlank(form.companyEmail)
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('Enter a company email such as office@yourcompany.com, or leave it blank.')
       return {
-        company_phone: nullIfBlank(form.companyPhone), company_email: nullIfBlank(form.companyEmail),
+        company_phone: nullIfBlank(form.companyPhone), company_email: email,
         company_website: nullIfBlank(form.companyWebsite), company_address: nullIfBlank(form.companyAddress),
         license_number: nullIfBlank(form.licenseNumber), insured_text: nullIfBlank(form.insuredText),
         warranty_default: nullIfBlank(form.warrantyDefault), brand_accent_hex: accent?.toLowerCase() ?? null,

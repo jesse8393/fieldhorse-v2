@@ -85,21 +85,124 @@ live catalog found exactly two gaps: the function above, and the column
 
 ## Still open in production
 
-### Crew assignment on visits does not work
+### Waiting on Jesse's approval
 
-`fh_schedule.assigned_user_ids` does not exist yet, so the crew picker on the
-event screen reports "Crew scheduling unavailable" and nobody can be
-assigned to a visit. Visits without crew save normally. The migration that
-adds the column (`20261027170430_schedule_crew_allocation.sql`) contains
-statements the database tool asks the owner to approve, and the owner was
-not at the screen. It needs Jesse to approve one prompt.
+The database tool asks the owner before running any statement that removes
+something, and these five need it. The full list, with what each does, is
+in `supabase/README.md`.
 
-### Reminder notifications
+1. `20261117120000_public_link_scope`: "Share link" on quotes and on
+   invoices with no job fails in production until this runs.
+2. `20261117100000_follow_ups_in_step`, then the dry run and cleanup in
+   `supabase/manual/20261117_follow_up_cleanup.sql`, then
+   `20261117100100_follow_up_unique_indexes`. This ends the reminder flood
+   (92 unread, 74 of them for reminders that were already closed, 86 held by
+   one person) and keeps it from coming back. The app falls back to the old
+   list until then.
+3. `20261027170430_schedule_crew_allocation`: crew assignment on visits.
+   Until it runs the app hides the crew picker, which only matters once a
+   company has more than one member.
+4. `20261117110200_partner_and_removal_policies`: partners who left a job
+   lose its invoices, and removed members lose their own unapproved punches.
 
-92 reminder notifications were unread, 74 of them pointing at a reminder
-that was already closed, and one person held 86. Cause and fix are in the
-automation section below once verified.
+### Other things only Jesse can do
+
+* Merge #245 (the security fix) first, then this branch.
+* Consider rotating the Supabase service role key, since the #245 hole
+  existed.
+* Attach fieldhorse.io to the Netlify site, or keep using the netlify.app
+  address. Resend lists fieldhorse.io as a verified sending domain, so mail
+  sent from it should still deliver. I could not see which From address the
+  site is set to use.
+* Turn on leaked password protection in Supabase Auth.
+* Add the repository secrets `SUPABASE_URL` and
+  `SUPABASE_SERVICE_ROLE_KEY` so the daily production schema check runs.
+* Check the app on a real phone. Every test here ran in a browser.
 
 ## Findings by area
 
-To be filled in as each auditor's findings are verified.
+Thirteen independent audits, each told to prove a defect before reporting
+it (a failing probe, a reproduced request, or an end to end trace with file
+and line). About 276 findings in all; some appear in two areas, for
+example the client merge, which three auditors found on their own.
+
+| Area | Findings | Serious (P0) | Fix lane |
+| --- | --- | --- | --- |
+| Money | 25 | 10 | money-core, quotes, public-links |
+| Data layer | 25 | 1 | clients, quotes, money-core, ops |
+| Server functions | 25 | 1 | hotfix (#245), team-account, senders, public-links |
+| Phone, sales half | 25 | 2 | quotes, clients |
+| Desktop and tablet | 25 | 0 | desktop, ops |
+| Customer pages and documents | 24 | 3 | public-links, senders, money-core |
+| Native app | 22 | 6 | native |
+| Phone, operations half | 22 | 0 | ops, money-core |
+| Reminders and automation | 18 | 0 | automation |
+| Tests and deploy | 18 | 2 | guards |
+| Live database security | 16 | 3 | db-hardening |
+| Accessibility | 14 | 0 | perf-a11y |
+| Performance | 12 | 0 | perf-a11y |
+
+The full reports are kept with the session's working files, not in this
+repository, because they name customer facing records by id. Each fix
+commit names its finding id.
+
+### The serious ones, in plain words
+
+* **Anyone signed in could read every company's data** through the file
+  path the email senders accept. Fixed in #245, which should merge first.
+  No sign it was used.
+* **One company could change another company's quote totals, calendar and
+  inbox** by writing rows that pointed at the other company's records, given
+  their ids. Closed in production on 2026-11-17 by a database guard on 28
+  tables.
+* **Merging two duplicate clients deleted the duplicate's leads, quotes and
+  approved versions**, and deleting a client did the same with no warning.
+  Fixed in the app and with a database function that moves every record,
+  checked against a real client in production.
+* **The customer invoice link asked for the wrong amount**: "Paid in full"
+  while money was owed, money that was never invoiced, the balance of an
+  earlier invoice, and amounts rounded to whole dollars. Fixed; the page,
+  the PDF and the email now use one calculation in whole cents.
+* **Edits after a customer approved replaced what they approved**, on the
+  customer link and when the quote became a job. Fixed; approved lines are
+  locked until the quote is revised, and the job is built from the approved
+  version (live in production).
+* **A customer could approve a change order at an amount they never saw.**
+  Fixed; the approval carries the amount and version shown.
+* **"Share link" fails in production for quotes and for invoices with no
+  job**, because a database rule from before October still demands a job.
+  The fix is written and waits on Jesse's approval.
+* **Cents went missing**: a line on a half cent, a fully paid job that never
+  closed, an invoice PDF that printed an amount due and PAID together.
+  Fixed with one shared helper that works in whole cents.
+* **The native app, if anyone builds it**, pointed every link at the dead
+  fieldhorse.io, showed old moved rows as live leads and quotes, and wrote
+  quotes where the web app never shows them. Fixed. The app looks
+  unreleased (no build has ever run), which is an inference from its
+  config.
+* **Nothing would have caught a missing database function**: the test mock
+  answered anything with success, and no check compared the code with
+  production. Fixed with a schema check on every CI run, a daily production
+  check (needs two repository secrets), an honest mock, and crash reporting.
+
+### What production looked like, by the numbers that matter
+
+* 12 companies, each with one owner and no other members. That is why
+  several role findings (crew seeing money, crew setting their own pay
+  rate) were real holes but hurt nobody yet.
+* 0 messages sent, 0 customer links ever created, 0 schedule visits with
+  crew. The messaging and portal paths have never carried real traffic, so
+  their defects were caught before customers saw them.
+
+### Left for a later round, deliberately
+
+* Native app: money totals and documents still differ from the web, reads
+  are scoped by creator rather than company, and about 75 pop ups remain.
+* Database: storage paths are not tied to the job folder, and crew can
+  still read job amounts directly from the database (the screens hide
+  them). Both need an owner decision.
+* Several functions run in production with no source in the repository
+  (the automation engine and Jobber sync). They need dumping before they
+  can be tested.
+* One word for the customer record (customer, client or account), and one
+  for subcontractors, is Jesse's call.

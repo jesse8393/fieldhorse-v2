@@ -17,6 +17,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { createHash } from 'node:crypto'
 import { sendPushToUser } from './lib/push.js'
+import { logError, requestId } from './lib/logError.js'
 
 const REQUIRED_FIELDS = ['name']
 const MAX_BODY_BYTES = 64 * 1024
@@ -192,7 +193,7 @@ export default async (request, context) => {
       const prior = await findLeadById(supabase, orgId, keyedLeadId)
       if (prior) return repeatResponse(prior)
     }
-    console.error('[webhook-lead] insert failed', insertErr)
+    logError('webhook-lead', 'insert failed', insertErr, { org_id: orgId, request_id: requestId(request) })
     return json({ error: 'insert_failed', detail: 'Could not save the lead. Try again shortly.' }, 500)
   }
   const newId = inserted[0]?.id

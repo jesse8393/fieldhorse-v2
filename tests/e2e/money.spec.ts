@@ -993,6 +993,28 @@ test.describe('money on a phone', () => {
     await expect(page).toHaveURL(/\/invoices\/inv-1$/)
   })
 
+  test('Record on an invoice with no job sends the payment and marks the invoice paid', async ({ context, page }) => {
+    await openMoney(context, page, { tables: NO_JOB_TABLES })
+    const writes: { method: string; url: string; body: any }[] = []
+    page.on('request', (req) => {
+      const url = req.url()
+      if (req.method() !== 'GET' && /\/rest\/v1\/fh_(payments|invoices)/.test(url)) writes.push({ method: req.method(), url, body: req.postDataJSON() })
+    })
+    await expectInvoiceWithoutAJob(page)
+    await page.getByRole('combobox', { name: 'Method', exact: true }).selectOption('card')
+    await page.getByRole('button', { name: 'Record $1,000.00' }).click()
+    await expect(page).toHaveURL(/\/invoices\/i-solo$/)
+
+    const payment = writes.find((w) => w.method === 'POST' && w.url.includes('/fh_payments'))
+    expect(payment?.url).toContain('on_conflict=id')
+    expect(payment?.body).toMatchObject({ user_id: 'qa-user-1', contact_id: null, invoice_id: 'i-solo', amount: 1000, method: 'card', kind: 'other' })
+    expect(payment?.body.id).toEqual(expect.any(String))
+    // $200 already paid plus $1,000 covers the $1,200 invoice.
+    const paid = writes.find((w) => w.method === 'PATCH' && w.url.includes('/fh_invoices'))
+    expect(paid?.url).toContain('id=eq.i-solo')
+    expect(paid?.body).toEqual({ status: 'paid' })
+  })
+
   test('Remind is a screen', async ({ context, page }) => {
     await openMoney(context, page, { tables: TWO_OVERDUE_TABLES })
     await openRemind(page, 'Rosa Delgado', 'i-rosa')

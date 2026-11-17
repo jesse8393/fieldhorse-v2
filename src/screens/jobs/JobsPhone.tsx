@@ -9,7 +9,9 @@ import WorkspaceHelp from '../../components/experience/WorkspaceHelp.tsx'
 //
 // The list itself comes from buildJobsList (lib/jobsList.ts); this file
 // only owns the view state: the tab (kept in ?stage= so old links land
-// right), the lost switch, the sort and the search field.
+// right), the lost switch (?lost=1), the sort (?sort=amount) and the
+// search field. Keeping them in the address means Back from a job and a
+// reload bring the list back as it was left.
 
 import { useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
@@ -111,14 +113,9 @@ export default function JobsPhone({
   const [searchParams, setSearchParams] = useSearchParams()
   const stageParam = searchParams.get('stage')
 
-  // ?stage=lost turns the switch on; picking a tab afterwards keeps it on.
-  const [showLost, setShowLost] = useState(() => stageParam === 'lost')
-  const [seenStage, setSeenStage] = useState(stageParam)
-  if (seenStage !== stageParam) {
-    setSeenStage(stageParam)
-    if (stageParam === 'lost') setShowLost(true)
-  }
-  const [sort, setSort] = useState<JobsSort>('next')
+  // An old ?stage=lost link turns the switch on too.
+  const showLost = stageParam === 'lost' || searchParams.get('lost') === '1'
+  const sort: JobsSort = searchParams.get('sort') === 'amount' ? 'amount' : 'next'
   const [searchOpen, setSearchOpen] = useState(() => search !== '')
 
   const tabs = useMemo(
@@ -171,23 +168,29 @@ export default function JobsPhone({
     if (quotesFailed) void quotesQuery.refetch()
   }
 
-  const writeStage = (stage: string | null) => {
-    const sp = new URLSearchParams(searchParams)
-    if (stage) sp.set('stage', stage)
-    else sp.delete('stage')
-    setSearchParams(sp, { replace: true })
+  // Each change rewrites only its own keys, on the latest address.
+  const writeParams = (patch: Record<string, string | null>) => {
+    setSearchParams((prev) => {
+      const sp = new URLSearchParams(prev)
+      for (const [key, value] of Object.entries(patch)) {
+        if (value) sp.set(key, value)
+        else sp.delete(key)
+      }
+      return sp
+    }, { replace: true })
   }
 
   const selectTab = (id: JobsTab) => {
     hapticTap()
-    writeStage(id === 'all' ? null : id)
+    // Leaving an old ?stage=lost link for a tab keeps the switch on.
+    writeParams({ stage: id === 'all' ? null : id, ...(stageParam === 'lost' ? { lost: '1' } : {}) })
   }
 
   const changeShowLost = (next: boolean) => {
-    setShowLost(next)
-    // An old ?stage=lost link would switch it back on after a refresh.
-    if (!next && stageParam === 'lost') writeStage(null)
+    writeParams({ lost: next ? '1' : null, ...(!next && stageParam === 'lost' ? { stage: null } : {}) })
   }
+
+  const setSort = (next: JobsSort) => writeParams({ sort: next === 'amount' ? 'amount' : null })
 
   const toggleSearch = () => {
     if (searchOpen) {

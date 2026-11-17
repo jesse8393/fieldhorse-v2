@@ -1,5 +1,6 @@
 import React from 'react'
 import { isChunkLoadError, reloadOnceForStaleChunk } from '../lib/lazyWithRetry.ts'
+import { reportClientError } from '../lib/reportClientError.ts'
 
 /**
  * Screen-level error boundary. Wraps the routed <Outlet /> inside
@@ -13,6 +14,9 @@ import { isChunkLoadError, reloadOnceForStaleChunk } from '../lib/lazyWithRetry.
  * A screen chunk that no longer exists after a deploy triggers one page
  * reload to fetch the new build (lib/lazyWithRetry.ts) instead of the
  * error card; a second failure in the same build shows the card.
+ *
+ * The card shows plain words; the developer message sits behind the
+ * Error details toggle, and the crash is reported to /api/client-error.
  */
 export default class RouteErrorBoundary extends React.Component<{ children?: React.ReactNode; resetKey?: any }, { error: any; reloading: boolean }> {
   constructor(props: any) {
@@ -37,7 +41,10 @@ export default class RouteErrorBoundary extends React.Component<{ children?: Rea
   componentDidCatch(error: any, info: any) {
     // eslint-disable-next-line no-console
     console.error('[fieldhorse] route crash', error, info)
+    // A stale chunk after a deploy reloads once and is not a bug; anything
+    // else is reported so a crash in production is seen.
     if (isChunkLoadError(error) && reloadOnceForStaleChunk()) this.setState({ reloading: true })
+    else reportClientError('route', error)
   }
 
   handleHome = () => {

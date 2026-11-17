@@ -271,6 +271,7 @@
 @media (min-width: 900px) {
   .fhnew {
     max-width: 640px;
+    margin-inline: auto;
     padding-bottom: 32px;
   }
 

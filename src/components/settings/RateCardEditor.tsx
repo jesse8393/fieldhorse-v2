@@ -15,6 +15,7 @@ import { Plus, Save as SaveIcon, RotateCcw, Trash2, Check } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { hapticTap, hapticSuccess, hapticError } from '../../lib/haptics.ts'
 import { toastSuccess, toastError } from '../../lib/toast.ts'
+import { useArmedId } from '../../lib/secondTap.ts'
 import {
   RATE_CARD, TRADE_LABELS, RATE_UNITS,
   loadUserRateCard, upsertRate, resetRate
@@ -37,6 +38,8 @@ export default function RateCardEditor() {
   const [overrides, setOverrides] = useState<any>({})
   const [loading, setLoading] = useState(true)
   const [draft, setDraft] = useState<any>({}) // tradeKey -> { unit, rate_low, rate_high, dirty, saving }
+  // Deleting a custom trade asks with a second tap on the same button (D57).
+  const deleteTap = useArmedId()
   const [adding, setAdding] = useState(false)
   const [newLabel, setNewLabel] = useState('')
 
@@ -133,7 +136,7 @@ export default function RateCardEditor() {
     try {
       await resetRate({ userId: user!.id, tradeKey: row.key })
       hapticSuccess()
-      toastSuccess('Reset to default', row.current?.label || row.key)
+      toastSuccess(row.custom ? 'Trade deleted' : 'Reset to default', row.current?.label || row.key)
       await reload()
       setDraft((dd: any) => {
         const next = { ...dd }
@@ -301,13 +304,22 @@ export default function RateCardEditor() {
                     <motion.button
                       type="button"
                       whileTap={{ scale: 0.95 }}
-                      onClick={() => { hapticTap(); revert(row) }}
+                      onClick={() => {
+                        hapticTap()
+                        if (isCustom) deleteTap.tap(row.key, () => { void revert(row) })
+                        else void revert(row)
+                      }}
                       disabled={d.saving}
-                      aria-label={isCustom ? `Delete ${tradeLabel} trade` : `Reset ${tradeLabel} to default`}
+                      aria-label={isCustom
+                        ? deleteTap.armedId === row.key ? `Tap again to delete ${tradeLabel}` : `Delete ${tradeLabel} trade`
+                        : `Reset ${tradeLabel} to default`}
                       title={isCustom ? `Delete ${tradeLabel} trade` : `Reset ${tradeLabel} to default`}
-                      style={iconBtn('muted', d.saving)}
+                      style={isCustom && deleteTap.armedId === row.key
+                        ? { ...iconBtn('muted', d.saving), width: 'auto', padding: '0 12px', display: 'inline-flex', alignItems: 'center', gap: 8, color: 'var(--v3-danger-text)' }
+                        : iconBtn('muted', d.saving)}
                     >
                       {isCustom ? <Trash2 size={14} /> : <RotateCcw size={14} />}
+                      {isCustom && deleteTap.armedId === row.key && <span style={{ fontSize: 12, fontWeight: 700 }}>Tap again to delete</span>}
                     </motion.button>
                   )}
                 </div>

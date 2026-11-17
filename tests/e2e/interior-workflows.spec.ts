@@ -157,7 +157,7 @@ test('photo batch feedback tracks actual processing and confirmed writes', async
   release()
   await expect.poll(() => rows.length).toBe(2)
   await expect(page.getByRole('progressbar', { name: 'Photo batch progress' })).toHaveCount(0)
-  await expect(panel.getByRole('button', { name: 'Add Photos', exact: true })).toBeEnabled()
+  await expect(panel.getByRole('button', { name: 'Add photos', exact: true })).toBeEnabled()
 })
 
 for (const mode of ['day', 'night'] as const) {

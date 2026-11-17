@@ -18,12 +18,14 @@ vi.mock('./supabase.ts', () => ({ supabase: {} }))
 
 import {
   boardHours,
+  capDayColumns,
   capTray,
   crewHours,
   dayLayout,
   dayLabel,
   dropRefusal,
   eventStatus,
+  eventsOnDay,
   hourLabel,
   jobLabel,
   jobSubline,
@@ -363,7 +365,12 @@ describe('boardHours', () => {
   })
 
   it('stops a visit that runs past midnight at the bottom of its day', () => {
-    expect(boardHours(days, [ev('a', at(22), new Date(2026, 9, 10, 2))])).toEqual({ first: 7, last: 24 })
+    expect(boardHours([days[0]], [ev('a', at(22), new Date(2026, 9, 10, 2))])).toEqual({ first: 7, last: 24 })
+  })
+
+  it('opens the next day at midnight for the rest of a visit that runs past it (D16)', () => {
+    expect(boardHours([days[1]], [ev('a', at(22), new Date(2026, 9, 10, 2))])).toEqual({ first: 0, last: 18 })
+    expect(boardHours(days, [ev('a', at(22), new Date(2026, 9, 10, 2))])).toEqual({ first: 0, last: 24 })
   })
 })
 
@@ -448,5 +455,44 @@ describe('dropRefusal', () => {
     for (const words of [dropRefusal(partner, company, friday, now), dropRefusal(own, company, yesterday, now), dropRefusal(own, null, friday, now)]) {
       expect(words).not.toMatch(/[-\u2013\u2014]/)
     }
+  })
+})
+
+describe('visits past midnight (D16)', () => {
+  const ev = (id: string, s: Date, e: Date | null) => ({ id, start_at: s.toISOString(), end_at: e ? e.toISOString() : null })
+  const pour = ev('pour', at(22), new Date(2026, 9, 10, 2))
+
+  it('lists a visit on every day it touches', () => {
+    expect(eventsOnDay(new Date(2026, 9, 9), [pour]).map((e) => e.id)).toEqual(['pour'])
+    expect(eventsOnDay(new Date(2026, 9, 10), [pour]).map((e) => e.id)).toEqual(['pour'])
+    expect(eventsOnDay(new Date(2026, 9, 11), [pour])).toEqual([])
+    // Ending exactly at midnight does not spill into the next day.
+    expect(eventsOnDay(new Date(2026, 9, 10), [ev('m', at(22), new Date(2026, 9, 10, 0))])).toEqual([])
+  })
+
+  it('draws the rest of the visit from midnight on the next day', () => {
+    const [item] = dayLayout(new Date(2026, 9, 10), [pour], 0, 60)
+    expect(item).toEqual({ id: 'pour', top: 0, height: 120, column: 0, columns: 1 })
+  })
+})
+
+describe('capDayColumns (D15)', () => {
+  const ev = (id: string, s: Date, e: Date) => ({ id, start_at: s.toISOString(), end_at: e.toISOString() })
+
+  it('keeps at most two visits side by side and counts the rest for a more link', () => {
+    const items = dayLayout(new Date(2026, 9, 9), [
+      ev('a', at(8), at(10)), ev('b', at(8), at(10)), ev('c', at(8, 30), at(10)), ev('d', at(9), at(10))
+    ], 7, 60)
+    const { shown, more } = capDayColumns(items, 2)
+    expect(shown.map((i) => i.id)).toEqual(['a', 'b'])
+    expect(shown.every((i) => i.columns === 2)).toBe(true)
+    expect(more).toEqual([{ top: 90, count: 2, ids: ['c', 'd'] }])
+  })
+
+  it('leaves a day with no more than the cap alone', () => {
+    const items = dayLayout(new Date(2026, 9, 9), [ev('a', at(8), at(9)), ev('b', at(8), at(9)), ev('c', at(11), at(12))], 7, 60)
+    const { shown, more } = capDayColumns(items, 2)
+    expect(shown).toEqual(items)
+    expect(more).toEqual([])
   })
 })

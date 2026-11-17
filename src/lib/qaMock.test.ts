@@ -3,19 +3,23 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 // The hermetic Supabase mock behind every e2e spec and screenshot script.
 // These checks pin how it answers PostgREST reads, so a test only sees the
 // rows the real database would return for the same query.
-import { queryRows, restResponse } from '../../scripts/qa-mock.mjs'
+import { apiStatus, queryRows, restResponse, rpcResponse } from '../../scripts/qa-mock.mjs'
 
 const BASE = 'https://qa-mock.supabase.co/rest/v1/'
 
 type Row = Record<string, unknown>
 
-function read(path: string, init: { method?: string; headers?: Record<string, string>; tables?: Record<string, Row[]> } = {}) {
+type Init = { method?: string; headers?: Record<string, string>; tables?: Record<string, Row[]>; body?: unknown; schema?: null }
+
+function read(path: string, init: Init = {}) {
   const res = restResponse(`${BASE}${path}`, init)
   return { ...res, json: res.body ? JSON.parse(res.body) : undefined }
 }
 
+// The filter tests below read made up tables such as `t`, which the schema
+// in database.types.ts does not have, so they turn the schema checks off.
 function ids(path: string, tables?: Record<string, Row[]>) {
-  return (read(path, { tables }).json as Row[]).map((r) => r.id)
+  return (read(path, tables ? { tables, schema: null } : {}).json as Row[]).map((r) => r.id)
 }
 
 describe('qa mock REST reads', () => {
@@ -199,14 +203,88 @@ describe('qa mock REST reads', () => {
     expect(ids('t?at=gte.2026-10-05T05:00:00.000Z', { t: times })).toEqual(['late'])
   })
 
-  it('keeps the older eq and is.null rule for writes', () => {
-    const patched = read('fh_contacts?id=eq.c-job1&stage=in.(lead)', { method: 'PATCH' })
-    expect((patched.json as Row[]).map((r) => r.id)).toEqual(['c-job1'])
+  it('applies every read operator to writes too', () => {
+    // This used to match c-job1: writes applied only eq and is.null, so a
+    // PATCH the database would apply to no row looked like it succeeded.
+    const patched = read('fh_contacts?id=eq.c-job1&stage=in.(lead)', { method: 'PATCH', body: { notes: 'x' } })
+    expect(patched.status).toBe(200)
+    expect(patched.json).toEqual([])
+    const sent = read('fh_invoices?status=neq.sent&select=id', { method: 'PATCH', body: { notes: 'x' } })
+    expect((sent.json as Row[]).map((r) => r.id)).toEqual(['inv0'])
   })
 
   it('exposes the same rules as a pure helper', () => {
     const rows = [{ id: 1, v: 'b' }, { id: 2, v: 'a' }, { id: 3, v: 'c' }]
     expect(queryRows(rows, '?v=neq.c&order=v.asc')).toEqual({ rows: [rows[1], rows[0]], total: 2, offset: 0 })
+  })
+})
+
+describe('qa mock refuses what the database would refuse', () => {
+  // The names come from src/lib/database.types.ts. Before this, an unknown
+  // function, table or column got a 200, so a call production cannot serve
+  // passed every e2e spec.
+  it('answers 404 PGRST202 for a function the schema does not have', () => {
+    const res = rpcResponse('fh_no_such_function', {})
+    expect(res.status).toBe(404)
+    expect(JSON.parse(res.body)).toMatchObject({ code: 'PGRST202' })
+  })
+
+  it('answers 404 PGRST202 for a known function called with arguments it does not take', () => {
+    expect(rpcResponse('fh_money_visible', { org_id: 'org-1' }).status).toBe(404)
+    expect(rpcResponse('fh_money_visible', {}).status).toBe(404)
+    expect(JSON.parse(rpcResponse('fh_money_visible', { p_org_id: 'org-1' }).body)).toBe(true)
+  })
+
+  it('answers whether money is visible from the signed in role, as the database does', () => {
+    const crew = { org_members: [{ org_id: 'org-1', user_id: 'qa-user-1', role: 'crew', revoked_at: null }] }
+    expect(JSON.parse(rpcResponse('fh_money_visible', { p_org_id: 'org-1' }, crew).body)).toBe(false)
+  })
+
+  it('answers 404 42P01 for a table the schema does not have, on reads and writes', () => {
+    for (const method of ['GET', 'POST', 'PATCH', 'DELETE']) {
+      const res = read('fh_no_such_table?select=*', { method, body: {} })
+      expect(res.status, method).toBe(404)
+      expect(res.json, method).toMatchObject({ code: '42P01' })
+    }
+  })
+
+  it('answers 400 PGRST204 for an unknown column in a select', () => {
+    const res = read('fh_invoices?select=id,no_such_column')
+    expect(res.status).toBe(400)
+    expect(res.json).toMatchObject({ code: 'PGRST204' })
+    expect(res.json.message).toContain('no_such_column')
+    expect(read('fh_contacts?select=id,fh_clients(name,no_such_column)').status).toBe(400)
+    expect(read('fh_contacts?select=id,no_such_table(name)').status).toBe(400)
+    // Aliases, casts, json paths, embeds by table or by foreign key column
+    expect(read('fh_contacts?select=id,who:name,amount::text,milestones->0,fh_clients!inner(name),client:client_id(name)').status).toBe(200)
+  })
+
+  it('answers 400 for an unknown column in a filter or an order', () => {
+    expect(read('fh_invoices?no_such_column=eq.1').status).toBe(400)
+    expect(read('fh_invoices?order=no_such_column.desc').status).toBe(400)
+  })
+
+  it('answers 400 PGRST204 for an unknown column in an insert or a patch', () => {
+    const insert = read('fh_payments?select=*', { method: 'POST', body: { amount: 10, invoice_idd: 'inv1' } })
+    expect(insert.status).toBe(400)
+    expect(insert.json).toMatchObject({ code: 'PGRST204' })
+    expect(insert.json.message).toContain('invoice_idd')
+    expect(read('fh_payments', { method: 'POST', body: [{ amount: 1 }, { amount: 2, nope: 1 }] }).status).toBe(400)
+    expect(read('fh_invoices?id=eq.inv1', { method: 'PATCH', body: { status: 'paid', paid: true } }).status).toBe(400)
+    expect(read('fh_payments', { method: 'POST', body: { amount: 10, invoice_id: 'inv1' } }).status).toBe(200)
+  })
+
+  it('answers 501 for a write filter it does not apply, instead of writing every row', () => {
+    for (const filter of ['or=(status.eq.sent,status.eq.paid)', 'title=ilike.*draw*', 'fh_clients.name=eq.Jeff']) {
+      const res = read(`fh_invoices?${filter}`, { method: 'PATCH', body: { notes: 'x' } })
+      expect(res.status, filter).toBe(501)
+    }
+  })
+
+  it('answers 404 for an /api path no Netlify function serves', () => {
+    expect(apiStatus('https://app.local/api/send-invoice')).toBe(200)
+    expect(apiStatus('https://app.local/api/org-members-list?org=1')).toBe(200)
+    expect(apiStatus('https://app.local/api/no-such-function')).toBe(404)
   })
 })
 
