@@ -346,6 +346,19 @@ test.describe('job page on a phone', () => {
     await expect(page.getByRole('dialog')).toHaveCount(0)
   })
 
+  // dead-ends-1: a past due link Today wrote before Remind opened the
+  // reminder itself lands on the job's invoices, never on a new invoice
+  // that could bill the customer twice.
+  test('an old past due link opens the job\'s invoices, not a new invoice', async ({ context, page }) => {
+    await signIn(context)
+    await open(page, '/jobs/c-job2?tab=financials&action=nudge_invoice')
+    const cue = page.getByRole('region', { name: 'Dashboard action cue' })
+    await expect(cue).toBeVisible()
+    await cue.getByRole('button', { name: 'Open invoices' }).click()
+    await expect(page).toHaveURL(/\/jobs\/c-job2\?tab=draws$/)
+    await expect(page.getByRole('combobox', { name: 'Job section', exact: true })).toHaveValue('draws')
+  })
+
   test('lost job', async ({ context, page }) => {
     await signIn(context)
     await open(page, '/jobs/c-lost')

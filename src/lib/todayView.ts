@@ -367,6 +367,16 @@ function sentence(parts: (string | null | false)[]): string {
   return text.charAt(0).toUpperCase() + text.slice(1)
 }
 
+/**
+ * Remind on a past due invoice opens that invoice's reminder screen, as
+ * Money does. A row cached by an older build has the invoice only in its id.
+ */
+export function answerRemindPath(action: HomeNextAction): string | null {
+  if (action.kind !== 'inv-overdue') return null
+  const invoiceId = action.invoiceId || action.id.replace(/^inv-overdue-/, '')
+  return invoiceId ? `/invoices/${encodeURIComponent(invoiceId)}/remind` : null
+}
+
 /** Missing lead contact details open the existing customer editor. */
 export function answerRepairPath(action: HomeNextAction): string | null {
   if (action.kind !== 'followup-due' || action.recordKind !== 'lead' || action.contactPhone?.trim() || !action.clientId) return null

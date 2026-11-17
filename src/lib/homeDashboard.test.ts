@@ -88,6 +88,29 @@ describe('buildHomeDashboardBundle', () => {
     })
     expect(action?.title).toBe('Invoice 8d past due')
     expect(action?.detail).toContain('Final draw')
+    // Remind opens this invoice's reminder, so the row carries its id.
+    expect(action?.invoiceId).toBe('invoice-1')
+  })
+
+  // dead-ends-1: an invoice billed to the client with no job is still owed,
+  // and its row names the client, not the placeholder 'Job'.
+  it('names the client on a past due invoice with no job, and carries the invoice', () => {
+    const bundle = buildHomeDashboardBundle(baseSource({
+      openInvoices: [{
+        id: 'invoice-9',
+        contact_id: null,
+        client_id: 'cl-9',
+        title: 'Sidewalk patch',
+        amount: 1800,
+        due_at: '2026-06-06T12:00:00.000Z',
+        status: 'sent',
+        fh_clients: { name: 'Jeff Roy' },
+      }],
+    }))
+
+    const action = bundle.nextActions.find((row) => row.kind === 'inv-overdue')
+    expect(action).toMatchObject({ invoiceId: 'invoice-9', contactName: 'Jeff Roy', contactId: '' })
+    expect(action?.detail).toBe('Sidewalk patch, $1,800.00 owed, Jeff Roy')
   })
 
   it('dedupes contacts before calculating dashboard totals', () => {
