@@ -60,12 +60,14 @@ export type QuoteLinesProps = {
   focusRef?: React.RefObject<HTMLElement | null>
   /** Start with the add editor open (the create screen lands here with ?lines=new). */
   startAdding?: boolean
+  /** The quote is approved: the lines read, and nothing opens an editor. */
+  locked?: boolean
   onChange?: (change: QuoteLinesChange) => void
 }
 
 type Editing = { key: number; id: string | null }
 
-export default function QuoteLines({ items, userId, who, money, focusRef, startAdding = false, onChange }: QuoteLinesProps) {
+export default function QuoteLines({ items, userId, who, money, focusRef, startAdding = false, locked = false, onChange }: QuoteLinesProps) {
   const { rows, loading, loaded, failed, fetchRows, addItem, updateItem, removeItem, reorderItem } = items
   // No read of the lines has worked yet and the last one failed: the lines
   // are unknown, so nothing may say there are none.
@@ -118,7 +120,7 @@ export default function QuoteLines({ items, userId, who, money, focusRef, startA
   useEffect(() => { onChangeRef.current?.({ effective, switchSaving }) }, [effective, switchSaving])
 
   function toggleOptional(id: string, include: boolean) {
-    if (switchSavesRef.current.has(id)) return
+    if (locked || switchSavesRef.current.has(id)) return
     switchSavesRef.current.add(id)
     setSwitchSaves(new Set(switchSavesRef.current))
     hapticTap()
@@ -140,7 +142,9 @@ export default function QuoteLines({ items, userId, who, money, focusRef, startA
 
   // One editor at a time. It remounts on every opening (a new key), so each
   // starts from what is saved and a cancelled edit never leaks into the next.
-  const [editing, setEditing] = useState<Editing | null>(startAdding ? { key: 0, id: null } : null)
+  const [editing, setEditing] = useState<Editing | null>(startAdding && !locked ? { key: 0, id: null } : null)
+  // An approval that lands while an editor is open closes it.
+  useEffect(() => { if (locked) setEditing(null) }, [locked])
   const editKey = useRef(0)
   const root = useRef<HTMLDivElement>(null)
   const lastSection = useRef('')
@@ -149,6 +153,7 @@ export default function QuoteLines({ items, userId, who, money, focusRef, startA
   // keyboard user lands where they were and not at the top of the page.
   const opener = useRef<HTMLElement | null>(null)
   function open(id: string | null) {
+    if (locked) return
     hapticTap()
     opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
     editKey.current += 1
@@ -186,7 +191,7 @@ export default function QuoteLines({ items, userId, who, money, focusRef, startA
     return ok
   }
 
-  const editor = editing ? (
+  const editor = editing && !locked ? (
     <LineEditor
       key={editing.key}
       row={editRow}
@@ -223,28 +228,32 @@ export default function QuoteLines({ items, userId, who, money, focusRef, startA
         <EmptyState
           icon={Receipt}
           title="No lines yet."
-          action={<Button variant="secondary" icon={Plus} onClick={() => open(null)}>Add a line</Button>}
+          action={locked ? undefined : <Button variant="secondary" icon={Plus} onClick={() => open(null)}>Add a line</Button>}
         />
       ) : (
         <>
           <ul className="fhqt-list" aria-label="Line items">
             {lines.map((line) => (
               editorFor(line.id) ?? (
-                <Row
-                  key={line.id}
-                  as="li"
-                  title={line.title}
-                  subline={line.detail || undefined}
-                  money={line.amount}
-                  next={pending(line.id) ? 'Saving' : undefined}
-                  disabled={pending(line.id)}
-                  onClick={() => open(line.id)}
-                />
+                locked ? (
+                  <Row key={line.id} as="li" title={line.title} subline={line.detail || undefined} money={line.amount} />
+                ) : (
+                  <Row
+                    key={line.id}
+                    as="li"
+                    title={line.title}
+                    subline={line.detail || undefined}
+                    money={line.amount}
+                    next={pending(line.id) ? 'Saving' : undefined}
+                    disabled={pending(line.id)}
+                    onClick={() => open(line.id)}
+                  />
+                )
               )
             ))}
             {adding && editor}
           </ul>
-          {!adding && (
+          {!adding && !locked && (
             <Button variant="quiet" icon={Plus} className="fhqt-add" onClick={() => open(null)}>Add a line</Button>
           )}
         </>
@@ -263,7 +272,7 @@ export default function QuoteLines({ items, userId, who, money, focusRef, startA
               const showDetail = line.detail && line.detail !== formatMoney(line.amount)
               return (
                 <li className="fhqt-opt" key={r.id}>
-                  <button type="button" className="fhqt-opt__main" onClick={() => open(r.id)} disabled={pending(r.id)}>
+                  <button type="button" className="fhqt-opt__main" onClick={() => open(r.id)} disabled={locked || pending(r.id)}>
                     <span className="fhqt-opt__title">{line.title}</span>
                     {showDetail && <span className="fhqt-opt__sub">{line.detail}</span>}
                     <span className="fhqt-opt__sub">Adds {formatMoney(line.amount)}</span>
@@ -271,7 +280,7 @@ export default function QuoteLines({ items, userId, who, money, focusRef, startA
                   <Switch
                     className="fhqt-switch"
                     checked={included}
-                    disabled={pending(r.id)}
+                    disabled={locked || pending(r.id)}
                     aria-disabled={switchSaves.has(r.id) || undefined}
                     aria-label={`Include ${line.title} in the total`}
                     onCheckedChange={(on: boolean) => toggleOptional(r.id, on)}
@@ -289,14 +298,18 @@ export default function QuoteLines({ items, userId, who, money, focusRef, startA
           <ul className="fhqt-list" aria-label="Lines that are not included">
             {live.excluded.map((line) => (
               editorFor(line.id) ?? (
-                <Row
-                  key={line.id}
-                  as="li"
-                  title={line.title}
-                  subline={line.detail || undefined}
-                  money={line.amount}
-                  onClick={() => open(line.id)}
-                />
+                locked ? (
+                  <Row key={line.id} as="li" title={line.title} subline={line.detail || undefined} money={line.amount} />
+                ) : (
+                  <Row
+                    key={line.id}
+                    as="li"
+                    title={line.title}
+                    subline={line.detail || undefined}
+                    money={line.amount}
+                    onClick={() => open(line.id)}
+                  />
+                )
               )
             ))}
           </ul>
@@ -322,7 +335,6 @@ function seedFromRow(row: any): LineDraft {
   const draft = draftFromRow(row)
   return { ...draft, amountOverridden: !amountFollowsRate(row) }
 }
-
 
 const KINDS = [
   { id: 'base', label: 'In the total' },

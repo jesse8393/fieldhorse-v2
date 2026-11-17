@@ -143,6 +143,10 @@
   color: var(--fh-ink-3);
 }
 
+.fhqt-panel__action {
+  margin-top: 12px;
+}
+
 /* ================================================================
    Lines: hairline rows, the plus row, one row opened into the editor
    ================================================================ */

@@ -540,6 +540,11 @@ test.describe('the quote screen', () => {
     await expect(page.getByRole('dialog')).toHaveCount(0)
     await expect(page.getByRole('alertdialog')).toHaveCount(0)
     expect(writes).toEqual([])
+    // A tap that follows the arming one at once is the same double tap, not a decision (S04).
+    await page.getByRole('button', { name: 'Tap again to delete' }).click()
+    await expect(page.getByRole('button', { name: 'Tap again to delete' })).toBeVisible()
+    expect(writes).toEqual([])
+    await page.waitForTimeout(600)
     await page.getByRole('button', { name: 'Tap again to delete' }).click()
     await expect(page).toHaveURL(/\/quotes$/, { timeout: 15_000 })
     expect(writes).toContain('/rest/v1/fh_quote_items')
@@ -553,7 +558,7 @@ test.describe('the quote screen', () => {
       await signIn(approvedContext, { tables: { fh_quote_items: ITEMS, fh_quotes: [quoteRow({ status: 'approved' })] } })
       await openQuote(approved)
       await expect(approved.getByRole('button', { name: 'Delete draft quote' })).toHaveCount(0)
-      await expect(approved.getByText('Approved quotes cannot be deleted. Create a revision instead.')).toBeVisible()
+      await expect(approved.getByText('Approved quotes cannot be deleted.', { exact: true })).toBeVisible()
     } finally {
       await approvedContext.close()
     }
@@ -580,6 +585,54 @@ test.describe('the quote screen', () => {
     await expect(page).toHaveURL(/\/jobs\/job-new$/, { timeout: 30_000 })
     expect(requests).toEqual([{ p_quote_id: 'q-quote' }])
     expect(calls.send).toEqual([])
+  })
+
+  // Audit finding M-03: what the customer approved stays what it was.
+  test('an approved quote keeps its lines locked until Revise quote is tapped twice', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS, fh_quotes: [quoteRow({ status: 'approved' })] } })
+    const patches: { url: string; body: any }[] = []
+    await context.route((url) => url.pathname.endsWith('/rest/v1/fh_quotes'), (route) => {
+      const request = route.request()
+      if (request.method() !== 'PATCH') return route.fallback()
+      patches.push({ url: request.url(), body: request.postDataJSON() })
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 'q-quote' }) })
+    })
+    const lineWrites: string[] = []
+    page.on('request', (req) => {
+      if (req.method() !== 'GET' && req.url().includes('/rest/v1/fh_quote_items')) lineWrites.push(req.method())
+    })
+    await openQuote(page)
+
+    // The lines read, with their money, but none opens an editor and none can be added.
+    await expect(lines(page).getByText('Pump truck')).toBeVisible()
+    await expect(lines(page).getByText('$950.00', { exact: true })).toBeVisible()
+    await expect(lines(page).getByRole('button')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Add a line' })).toHaveCount(0)
+    await expect(page.getByRole('switch', { name: /Include Stamped ashlar/ })).toBeDisabled()
+    await expect(page.getByRole('form', { name: 'Edit line' })).toHaveCount(0)
+    // The screen says what is true, and names the one way to change the quote.
+    const panel = page.locator('.fhqt-panel').filter({ hasText: 'Quote approved' })
+    await expect(panel).toContainText('The lines are locked at what the customer agreed to.')
+    await expect(page.getByText('Later edits to lines, scope or terms do not change what the customer agreed to.')).toHaveCount(0)
+
+    // One tap arms, the second sets the quote back to a draft. No dialog.
+    await panel.getByRole('button', { name: 'Revise quote' }).click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    expect(patches).toEqual([])
+    await page.waitForTimeout(600)
+    await panel.getByRole('button', { name: 'Tap again to revise' }).click()
+    await expect.poll(() => patches.length).toBe(1)
+    expect(patches[0].body).toEqual({ status: 'draft' })
+    expect(patches[0].url).toContain('id=eq.q-quote')
+    expect(patches[0].url).toContain('status=eq.approved')
+    expect(lineWrites).toEqual([])
+  })
+
+  test('a quote set back to draft can be edited again', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS, fh_quotes: [quoteRow({ status: 'draft', approved_version_id: 'v-1' })] } })
+    await openQuote(page)
+    await lines(page).getByRole('button', { name: /Pump truck/ }).click()
+    await expect(page.getByRole('form', { name: 'Edit line' })).toBeVisible()
   })
 
   test('an approved quote still offers Make this a job', async ({ context, page }) => {

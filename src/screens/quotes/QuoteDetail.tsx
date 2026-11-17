@@ -46,7 +46,32 @@ import './quotes.css'
 const LINES_FAILED = "We couldn't load the lines."
 const NEEDS_A_LINE = 'Add at least one line.'
 
-type Busy = 'send' | 'mark' | 'share' | 'pdf' | 'download' | 'esign' | 'job' | 'delete' | null
+type Busy = 'send' | 'mark' | 'share' | 'pdf' | 'download' | 'esign' | 'job' | 'delete' | 'revise' | null
+
+// A confirming tap that lands this soon after the arming one is the same
+// double tap, not a decision, so it is ignored.
+const CONFIRM_AFTER_MS = 500
+// How long an armed button waits for its second tap.
+const ARMED_MS = 4000
+
+/** A button that runs on a second, deliberate tap within four seconds (D57). */
+function useConfirmTap() {
+  const [armed, setArmed] = useState(false)
+  const armedAt = useRef(0)
+  useEffect(() => {
+    if (!armed) return
+    const t = window.setTimeout(() => setArmed(false), ARMED_MS)
+    return () => window.clearTimeout(t)
+  }, [armed])
+  /** True when this tap confirms; the first tap arms and returns false. */
+  function confirm(): boolean {
+    if (!armed) { hapticTap(); armedAt.current = Date.now(); setArmed(true); return false }
+    if (Date.now() - armedAt.current < CONFIRM_AFTER_MS) return false
+    setArmed(false)
+    return true
+  }
+  return { armed, confirm }
+}
 
 export default function QuoteDetail({ fallback }: { fallback?: ReactNode }) {
   const { id = '' } = useParams()
@@ -137,6 +162,8 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
   const sendLabel = emailKnown && !hasEmail ? 'Copy approval link' : approved ? 'Send again' : 'Send for approval'
 
   const [busy, setBusy] = useState<Busy>(null)
+  // The same busy flag, read at once: two taps in one frame both saw null.
+  const busyRef = useRef<Busy>(null)
   const waiting = items.loading || busy !== null || lines.switchSaving
   const needsLines = !items.loading && !live.canSend
   const linesLine = linesFailed ? LINES_FAILED : NEEDS_A_LINE
@@ -154,10 +181,11 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
   }
 
   async function run(kind: Exclude<Busy, null>, work: () => Promise<void>, title: string) {
-    if (!userId || busy) return
+    if (!userId || busyRef.current) return
     hapticTap()
+    busyRef.current = kind
     setBusy(kind)
-    try { await work() } catch (e) { failed(title, e) } finally { setBusy(null) }
+    try { await work() } catch (e) { failed(title, e) } finally { busyRef.current = null; setBusy(null) }
   }
 
   const onSend = () => run('send', async () => {
@@ -255,17 +283,39 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
     navigate(recordRoute('job', jobId))
   }, "Couldn't make the job")
 
+  // Revise quote (M-03): an approved quote's lines are locked at what the
+  // customer agreed to. To change them the quote goes back to a draft, with
+  // a second tap on the same button, and needs a new approval. The approved
+  // version stays on record. Only an approved quote is set back, so a
+  // change made elsewhere meanwhile is not overwritten.
+  const revise = useConfirmTap()
+  const onRevise = () => {
+    if (!revise.confirm()) return
+    void run('revise', async () => {
+      const { data, error } = await supabase
+        .from('fh_quotes')
+        .update({ status: 'draft' })
+        .eq('id', quote.id)
+        .eq('status', 'approved')
+        .select('id')
+        .maybeSingle()
+      if (error) throw new Error(error.message)
+      if (!data) {
+        await refresh()
+        throw new Error('This quote changed on another device. Check it and try again.')
+      }
+      await refresh()
+      toastSuccess('Quote ready to revise', 'Edit the lines, then send it or approve it again.')
+    }, "Couldn't revise the quote")
+  }
+
   // Delete asks with a second tap on the same button (D57), for four seconds.
-  const [armed, setArmed] = useState(false)
-  useEffect(() => {
-    if (!armed) return
-    const t = window.setTimeout(() => setArmed(false), 4000)
-    return () => window.clearTimeout(t)
-  }, [armed])
+  const del = useConfirmTap()
+  const armed = del.armed
   // Approved quotes are the record of what the customer agreed to, so they stay.
   const deletable = !approved
   const onDelete = () => {
-    if (!armed) { hapticTap(); setArmed(true); return }
+    if (!del.confirm()) return
     void run('delete', async () => {
       const lines = await supabase.from('fh_quote_items').delete().eq('quote_id', quote.id)
       if (lines.error) throw new Error(lines.error.message)
@@ -328,14 +378,26 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
         </section>
       )}
 
-      <QuoteLines items={items} userId={userId} who={who} money={terms} focusRef={titleRef} startAdding={startAdding} onChange={setLines} />
+      <QuoteLines items={items} userId={userId} who={who} money={terms} focusRef={titleRef} startAdding={startAdding} locked={approved} onChange={setLines} />
 
       {approved && (
         <section className="fhqt-panel" aria-labelledby="fhqt-approved-title">
           <h2 className="fhqt-panel__title" id="fhqt-approved-title">Quote approved</h2>
           <p className="fhqt-panel__body">
-            Approval saved{quote.updated_at ? `, ${shortDate(quote.updated_at)}` : ''}. Later edits to lines, scope or terms do not change what the customer agreed to.
+            Approval saved{quote.updated_at ? `, ${shortDate(quote.updated_at)}` : ''}. The lines are locked at what the customer agreed to.
           </p>
+          <p className="fhqt-panel__note">
+            {quote.job_id
+              ? 'This quote is already a job. Change the price on the job with a change order.'
+              : 'To change the price, revise the quote. It goes back to a draft and needs a new approval.'}
+          </p>
+          {!quote.job_id && (
+            <div className="fhqt-panel__action">
+              <Button variant="secondary" disabled={busy !== null} loading={busy === 'revise'} onClick={onRevise}>
+                {revise.armed ? 'Tap again to revise' : 'Revise quote'}
+              </Button>
+            </div>
+          )}
         </section>
       )}
 
@@ -425,7 +487,7 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
           </Button>
         </div>
       ) : approved ? (
-        <p className="fhqt-danger-note">Approved quotes cannot be deleted. Create a revision instead.</p>
+        <p className="fhqt-danger-note">Approved quotes cannot be deleted.</p>
       ) : null}
     </div>
   )
