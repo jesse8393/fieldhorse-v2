@@ -96,3 +96,31 @@ test('historical activity keeps the identity of a migrated quote', async ({ cont
     return params.get('id') === 'in.(c-moved)' && params.get('org_id') === 'eq.org-1' && !params.has('stage')
   })).toBe(true)
 })
+
+test('a screen that crashes shows plain words, hides the developer message and reports the crash', async ({ context, page }) => {
+  // A malformed invoice row makes the Money screen throw while rendering.
+  await signIn(context, { tables: {
+    fh_invoices: [null as unknown as object, { id: 'x', amount: {}, title: 7, status: 5, due_at: 'nope', client_id: 'cl-1', notes: 'Gate code 4417' }]
+  } })
+  const reports: Record<string, unknown>[] = []
+  await page.route('**/api/client-error', async (route) => {
+    reports.push(JSON.parse(route.request().postData() || '{}'))
+    await route.fulfill({ status: 204, body: '' })
+  })
+  await page.goto('/invoices')
+  const card = page.getByRole('alert').filter({ hasText: 'Something went wrong' })
+  await expect(card).toBeVisible()
+  await expect(card.getByRole('button', { name: 'Reload', exact: true })).toBeVisible()
+  // The developer message is only behind the toggle.
+  const details = card.locator('pre')
+  await expect(details).toBeHidden()
+  await card.getByText('Error details', { exact: true }).click()
+  await expect(details).toBeVisible()
+
+  await expect.poll(() => reports.find((r) => r.kind === 'route')).toMatchObject({ kind: 'route', route: '/invoices', build: expect.any(String) })
+  const sent = JSON.stringify(reports)
+  expect(sent).not.toContain('4417')
+  expect(sent).not.toContain('Jeff')
+  // The rest of the app is still there.
+  await expect(page.getByRole('navigation').first()).toBeVisible()
+})

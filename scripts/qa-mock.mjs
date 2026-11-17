@@ -3,6 +3,22 @@
 // qa-interact.mjs (sheet/drawer/overlay states). Everything is
 // intercepted at the network layer; zero real network.
 
+import fs from 'node:fs'
+import { parseDatabaseTypes, parseSelect } from './lib/schemaRefs.mjs'
+
+// The schema the mock answers for: every table, view and function in
+// src/lib/database.types.ts. A request for anything else gets the error the
+// real database gives, so a call production cannot serve fails here too.
+export const SCHEMA = parseDatabaseTypes(fs.readFileSync(new URL('../src/lib/database.types.ts', import.meta.url), 'utf8'))
+
+// The /api paths the Netlify functions serve (each file's config.path).
+const API_PATHS = new Set(
+  fs.readdirSync(new URL('../netlify/functions/', import.meta.url))
+    .filter((name) => name.endsWith('.js'))
+    .map((name) => /export const config = \{ path: '([^']+)' \}/.exec(fs.readFileSync(new URL(`../netlify/functions/${name}`, import.meta.url), 'utf8'))?.[1])
+    .filter(Boolean)
+)
+
 export const USER = { id: 'qa-user-1', email: 'qa@fieldhorse.local', aud: 'authenticated', role: 'authenticated', app_metadata: {}, user_metadata: {}, created_at: '2026-01-01T00:00:00Z' }
 // QA_NOW (an ISO time) fixes the clock the mock builds its dates from, so a
 // screenshot run is repeatable. Unset or empty, the mock uses the real time
@@ -152,10 +168,21 @@ for (const rows of Object.values(TABLES)) {
 // when none match or when several do. When the mock ignored part of the
 // query (an unmodeled filter, or an !inner embed) it cannot know how many
 // rows the database would return, so several matches still get the first.
-// Writes (POST, PATCH, PUT, DELETE) keep the older rule: only eq and is.null
-// apply, and their count stays hidden from the page.
+// Writes (POST, PATCH, PUT, DELETE) apply the same operators. A write filter
+// the mock does not model (or=, like, an embedded column) answers 501 rather
+// than touching every row. A write's count stays hidden from the page.
+//
+// Against SCHEMA, as PostgREST would answer:
+//   a table or view it does not have             404 42P01
+//   an unknown column in select, insert or patch 400 PGRST204
+//   an unknown embedded table                    400 PGRST200
+//   an unknown column in a filter or an order    400 42703
+// Pass schema: null to restResponse to skip these checks (the mock's own
+// tests do, for made up tables).
 const RESERVED_PARAMS = new Set(['select', 'order', 'limit', 'offset', 'on_conflict', 'columns'])
 const PLAIN_COLUMN = /^[A-Za-z_][A-Za-z0-9_]*$/
+// or= and and= hold filters rather than name a column.
+const LOGIC_PARAMS = new Set(['or', 'and', 'not.or', 'not.and'])
 const NUMBER_TEXT = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/
 
@@ -373,16 +400,89 @@ export function queryRows(rows, query) {
   return { rows: out, total, offset }
 }
 
-// The rule writes still use: eq. and is.null on any column.
-function applyWriteFilters(rows, url) {
-  const params = new URL(url).searchParams
+// The rows a write's filters select, or the first filter the mock does not
+// apply (as { unsupported }), since guessing would write every row.
+function applyWriteFilters(rows, params) {
   let out = rows
-  for (const [k, v] of params) {
-    if (['select', 'order', 'limit', 'offset', 'on_conflict'].includes(k)) continue
-    if (v.startsWith('eq.')) out = out.filter((r) => String(r[k]) === v.slice(3))
-    else if (v === 'is.null') out = out.filter((r) => r[k] == null)
+  for (const [column, raw] of params) {
+    if (RESERVED_PARAMS.has(column)) continue
+    const test = rowTest(column, raw)
+    if (!test) return { unsupported: `${column}=${raw}` }
+    out = out.filter(test)
   }
-  return out
+  return { rows: out }
+}
+
+const pgError = (status, code, message) => ({ status, body: JSON.stringify({ code, details: null, hint: null, message }), headers: {} })
+
+// Checks a select list against the schema; returns an error answer or null.
+function selectError(table, text) {
+  const walk = (tbl, items) => {
+    const known = SCHEMA_COLUMNS(tbl)
+    for (const item of items) {
+      if (item.kind === 'column') {
+        if (known && !known.has(item.name)) return pgError(400, 'PGRST204', `Could not find the '${item.name}' column of '${tbl}' in the schema cache`)
+        continue
+      }
+      if (activeSchema.tables[item.name]) {
+        const err = walk(item.name, item.children)
+        if (err) return err
+      } else if (!(known && known.has(item.name))) {
+        return pgError(400, 'PGRST200', `Could not find a relationship between '${tbl}' and '${item.name}' in the schema cache`)
+      }
+    }
+    return null
+  }
+  return walk(table, parseSelect(text))
+}
+
+// The schema restResponse checks against for the current call.
+let activeSchema = null
+function SCHEMA_COLUMNS(table) {
+  const t = activeSchema?.tables[table]
+  return t ? new Set(t.columns) : null
+}
+
+// A schema error for this request, or null when the schema has all it names.
+function schemaError(table, params, verb, body) {
+  if (!activeSchema) return null
+  if (!activeSchema.tables[table]) return pgError(404, '42P01', `relation "public.${table}" does not exist`)
+  const columns = SCHEMA_COLUMNS(table)
+  const select = params.get('select')
+  if (select) {
+    const err = selectError(table, select)
+    if (err) return err
+  }
+  for (const [column, raw] of params) {
+    if (column === 'order') {
+      for (const part of raw.split(',')) {
+        const name = part.trim().split('.')[0].split('->')[0]
+        if (PLAIN_COLUMN.test(name) && !columns.has(name)) return pgError(400, '42703', `column ${table}.${name} does not exist`)
+      }
+      continue
+    }
+    if (column === 'columns') {
+      for (const name of raw.split(',').map((c) => c.trim().replace(/^"|"$/g, ''))) {
+        if (name && !columns.has(name)) return pgError(400, 'PGRST204', `Could not find the '${name}' column of '${table}' in the schema cache`)
+      }
+      continue
+    }
+    if (RESERVED_PARAMS.has(column) || LOGIC_PARAMS.has(column)) continue
+    const name = column.split('->')[0]
+    if (PLAIN_COLUMN.test(name) && !columns.has(name)) return pgError(400, '42703', `column ${table}.${name} does not exist`)
+  }
+  if (verb === 'POST' || verb === 'PATCH' || verb === 'PUT') {
+    for (const row of Array.isArray(body) ? body : body && typeof body === 'object' ? [body] : []) {
+      for (const key of Object.keys(row ?? {})) {
+        if (!columns.has(key)) return pgError(400, 'PGRST204', `Could not find the '${key}' column of '${table}' in the schema cache`)
+      }
+    }
+  }
+  return null
+}
+
+function parseJson(text) {
+  try { return JSON.parse(text) } catch { return null }
 }
 
 function contentRange(offset, count, total) {
@@ -393,10 +493,11 @@ function contentRange(offset, count, total) {
 /**
  * The mock's answer to one REST request. Exported for the mock's own tests.
  * @param {string} url
- * @param {{ method?: string, headers?: Record<string, string>, tables?: Record<string, object[]> }} [request]
+ * @param {{ method?: string, headers?: Record<string, string>, tables?: Record<string, object[]>, body?: unknown, schema?: import('./lib/schemaRefs.mjs').Schema | null }} [request]
+ *   body is the write's JSON (text or parsed); schema null skips the schema checks.
  * @returns {{ status: number, body: string, headers: Record<string, string> }}
  */
-export function restResponse(url, { method = 'GET', headers = {}, tables = TABLES } = {}) {
+export function restResponse(url, { method = 'GET', headers = {}, tables = TABLES, body = null, schema = SCHEMA } = {}) {
   const parsed = new URL(url)
   const path = parsed.pathname
   const table = path.split('/rest/v1/')[1]?.split('?')[0] || ''
@@ -407,8 +508,15 @@ export function restResponse(url, { method = 'GET', headers = {}, tables = TABLE
   }
   const wantsObject = header('accept').includes('vnd.pgrst.object')
   const verb = method.toUpperCase()
+  activeSchema = schema
+  const refused = schemaError(table, parsed.searchParams, verb, typeof body === 'string' ? parseJson(body) : body)
+  if (refused) return refused
   if (verb !== 'GET' && verb !== 'HEAD') {
-    const rows = applyWriteFilters(tables[table] ?? [], url)
+    const filtered = applyWriteFilters(tables[table] ?? [], parsed.searchParams)
+    if (filtered.unsupported) {
+      return pgError(501, 'QA501', `The QA mock does not apply ${filtered.unsupported} to a write. Model it in scripts/qa-mock.mjs or stub this request in the spec.`)
+    }
+    const rows = filtered.rows
     const legacy = { 'content-range': '0-9/10' }
     if (wantsObject) {
       if (rows.length === 0) return { status: 406, body: JSON.stringify({ message: 'no rows' }), headers: legacy }
@@ -457,7 +565,10 @@ export function restResponse(url, { method = 'GET', headers = {}, tables = TABLE
 //   fh_agent_run_approve     marks the run approved, adds the sent message
 //                            (the body passed as p_body wins) and returns its id
 //   fh_agent_run_reject      marks the run rejected
-// Nothing is ever really sent. Every other function answers [] as before.
+//   fh_money_visible         true for an owner, admin or manager of the org
+// Nothing is ever really sent. A function SCHEMA does not have, or a call
+// whose arguments no version of it takes, answers 404 PGRST202 as PostgREST
+// does. Every other function answers [] as before.
 const RPC_LOGS = new WeakMap()
 const INBOX_TABLES = ['fh_v_inbox', 'fh_messages', 'fh_agent_runs', 'fh_org_settings']
 
@@ -506,10 +617,41 @@ function addOutbound(tables, message) {
   return row
 }
 
-function rpcResponse(name, body, tables) {
+// True when the body's keys fit one version of the function: every key is a
+// parameter and every parameter without a default is given.
+function argsFit(fn, body) {
+  const keys = Object.keys(body ?? {})
+  return fn.overloads.some((params) => params === null || (
+    keys.every((k) => params.some((p) => p.name === k)) && params.every((p) => p.optional || keys.includes(p.name))
+  ))
+}
+
+/**
+ * @param {string} name
+ * @param {Record<string, any>} body
+ * @param {Record<string, any[]>} [tables]
+ * @param {import('./lib/schemaRefs.mjs').Schema | null} [schema]
+ */
+export function rpcResponse(name, body, tables = TABLES, schema = SCHEMA) {
   const json = (data) => ({ status: 200, body: JSON.stringify(data) })
   const empty = { status: 204, body: '' }
+  const fn = schema ? schema.functions[name] : { overloads: [null] }
+  if (!fn || !argsFit(fn, body)) {
+    const args = Object.keys(body ?? {}).join(', ')
+    return {
+      status: 404,
+      body: JSON.stringify({
+        code: 'PGRST202', details: null, hint: null,
+        message: `Could not find the function public.${name}(${args}) in the schema cache`
+      })
+    }
+  }
   switch (name) {
+    case 'fh_money_visible': {
+      // Owners, admins and managers of the company see money.
+      const member = (tables.org_members ?? []).find((m) => m.org_id === body.p_org_id && m.user_id === USER.id && !m.revoked_at)
+      return json(Boolean(member && ['owner', 'admin', 'manager'].includes(member.role)))
+    }
     case 'fh_send_message': {
       const inbox = tables.fh_v_inbox.find((r) => r.client_id === body.p_client_id)
       const conversationId = inbox?.conversation_id ?? tables.fh_messages.find((m) => m.client_id === body.p_client_id)?.conversation_id ?? null
@@ -596,10 +738,21 @@ export async function installMock(ctx, options = {}) {
       return route.fulfill({ status: r.status, contentType: 'application/json', body: r.body })
     }
     if (url.includes('/rest/v1/')) {
-      const r = restResponse(url, { method: req.method(), headers: req.headers(), tables })
+      const r = restResponse(url, { method: req.method(), headers: req.headers(), tables, body: req.postData() })
       return route.fulfill({ status: r.status, contentType: 'application/json', body: r.body, headers: r.headers })
     }
     return route.fulfill({ status: 200, body: '{}' })
   })
-  await ctx.route('**/api/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{}' }))
+  // A path a Netlify function serves answers {} unless the spec stubs it
+  // (a route registered later wins). Any other /api path is a 404, as on
+  // Netlify, so a call to a function that does not exist fails here too.
+  await ctx.route('**/api/**', (route) => {
+    const status = apiStatus(route.request().url())
+    return route.fulfill({ status, contentType: 'application/json', body: status === 200 ? '{}' : JSON.stringify({ error: 'Not found' }) })
+  })
+}
+
+/** 200 for a path a Netlify function serves, 404 for any other. */
+export function apiStatus(url) {
+  return API_PATHS.has(new URL(url).pathname) ? 200 : 404
 }

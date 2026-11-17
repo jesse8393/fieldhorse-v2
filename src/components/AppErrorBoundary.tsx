@@ -1,9 +1,12 @@
 import React from 'react'
 import { isChunkLoadError, reloadOnceForStaleChunk } from '../lib/lazyWithRetry.ts'
+import { reportClientError } from '../lib/reportClientError.ts'
 
 /**
  * Top-level error boundary. Any render/runtime error below this point
- * surfaces as a visible fallback with the error text + a Reload button.
+ * surfaces as a visible fallback in plain words with a Reload button; the
+ * developer message sits behind an Error details toggle, and the crash is
+ * reported to /api/client-error.
  * Without this, a thrown error anywhere in the tree would unmount the
  * entire app and the user sees a blank white/dark screen.
  *
@@ -25,6 +28,7 @@ export default class AppErrorBoundary extends React.Component<{ children?: React
     // eslint-disable-next-line no-console
     console.error('[fieldhorse] app crash', error, info)
     if (isChunkLoadError(error) && reloadOnceForStaleChunk()) this.setState({ reloading: true })
+    else reportClientError('app', error)
   }
 
   handleReload = () => {
@@ -55,20 +59,24 @@ export default class AppErrorBoundary extends React.Component<{ children?: React
           <div style={{ fontFamily: 'var(--font-wordmark)', fontSize: 24, letterSpacing: 0, marginBottom: 12 }}>
             <span style={{ color: '#C9963A' }}>FIELD</span>HORSE
           </div>
-          <h1 style={{ fontSize: 20, margin: '12px 0', color: '#C9963A' }}>Something broke loading this page.</h1>
-          <pre
-            style={{
-              textAlign: 'left',
-              padding: 12,
-              borderRadius: 10,
-              background: 'rgba(192,57,43,0.12)',
-              border: '1px solid rgba(192,57,43,0.35)',
-              color: '#C9963A',
-              fontSize: 12,
-              whiteSpace: 'pre-wrap',
-              overflowWrap: 'anywhere'
-            }}
-          >{msg}</pre>
+          <h1 style={{ fontSize: 20, margin: '12px 0', color: '#C9963A' }}>Something went wrong loading this page.</h1>
+          <p style={{ fontSize: 14, lineHeight: 1.5, margin: '0 0 12px' }}>Reload to try again. Your saved work is safe.</p>
+          <details style={{ textAlign: 'left', fontSize: 12 }}>
+            <summary style={{ cursor: 'pointer', marginBottom: 6 }}>Error details</summary>
+            <pre
+              style={{
+                textAlign: 'left',
+                padding: 12,
+                borderRadius: 10,
+                background: 'rgba(192,57,43,0.12)',
+                border: '1px solid rgba(192,57,43,0.35)',
+                color: '#C9963A',
+                fontSize: 12,
+                whiteSpace: 'pre-wrap',
+                overflowWrap: 'anywhere'
+              }}
+            >{msg}</pre>
+          </details>
           <button
             onClick={this.handleReload}
             style={{

@@ -9,10 +9,16 @@
 // Adopting Query incrementally, screens migrate off the manual
 // useEffect + fetchAll pattern one at a time. See src/lib/queries.ts
 // for the typed hooks.
+//
+// A query or a save that fails is reported to /api/client-error (see
+// reportClientError.ts), so a failure in production is seen by someone.
 
-import { QueryClient } from '@tanstack/react-query'
+import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query'
+import { reportClientError } from './reportClientError.ts'
 
 export const queryClient = new QueryClient({
+  queryCache: new QueryCache({ onError: (error) => reportClientError('query', error) }),
+  mutationCache: new MutationCache({ onError: (error) => reportClientError('mutation', error) }),
   defaultOptions: {
     queries: {
       staleTime: 30_000,
