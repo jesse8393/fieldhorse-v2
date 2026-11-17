@@ -572,12 +572,15 @@ function drawModernLetterhead(doc, {
     } catch { /* fall through, name-only identity */ }
   }
 
+  const identityW = rightCol - nameX - 60
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(15)
   doc.setTextColor(...ONYX)
-  doc.text(company?.name || 'Contractor', nameX, topY + 5)
-  let ly = topY + 10
-  const identityW = rightCol - nameX - 60
+  // A long name wraps inside the identity column (PT-18) instead of
+  // running under the document label and off the page.
+  const nameLines = doc.splitTextToSize(String(company?.name || 'Contractor'), Math.max(40, identityW))
+  doc.text(nameLines, nameX, topY + 5)
+  let ly = topY + 10 + (nameLines.length - 1) * 6
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
   doc.setTextColor(...INK_MUTED)

@@ -308,3 +308,22 @@ describe('proposal issue date parity', () => {
     expect(text).toContain(result.number)
   })
 })
+
+// PT-18: a long company name wraps instead of running under the document
+// label and off the page.
+describe('a long company name', () => {
+  it('stays left of the estimate label and on the page', async () => {
+    const name = 'Parker Concrete, Masonry, Excavation, Drainage and General Construction Services of Middle Tennessee'
+    const r: any = await generateQuote({ company: { ...company, name }, contact, items: [{ description: 'Pour', qty: 1, rate: 100, amount: 100 }], quoteId: 'q-1' } as any)
+    const doc = r.doc
+    const runs = textRuns(doc).filter((x) => x.page === 1)
+    const label = runs.find((x) => x.text === 'ESTIMATE')!
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(15)
+    const nameRuns = runs.filter((x) => x.y < label.y + 30 && name.includes(x.text.trim()) && x.text.trim().length > 3)
+    expect(squash(nameRuns.map((x) => x.text).join(' '))).toBe(name)
+    for (const x of nameRuns) {
+      expect(x.x + doc.getTextWidth(x.text), `"${x.text}" runs under the label`).toBeLessThan(label.x - 2)
+    }
+  })
+})
