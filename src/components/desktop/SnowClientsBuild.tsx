@@ -20,6 +20,7 @@ import {
   Search,
   Plus,
   AlertTriangle,
+  Briefcase,
 } from 'lucide-react'
 import {
   useReactTable,
@@ -34,6 +35,7 @@ import { buildCsv, downloadCsv } from '../../lib/csv.ts'
 import MiniMetric from '../MiniMetric.tsx'
 import LoadingValue from '../LoadingValue.tsx'
 import TopbarWeather from './TopbarWeather.tsx'
+import { Button, EmptyState } from '../fh'
 
 type Rollup = {
   activeCount: number
@@ -325,7 +327,16 @@ export default function SnowClientsBuild(props: Props) {
             {loading && (
               <div className="fh-build-table__empty">Loading clients…</div>
             )}
-            {!loading && viewRows.length === 0 && (
+            {/* No clients at all is not a filter result: say what goes here. */}
+            {!loading && rows.length === 0 && (
+              <EmptyState
+                icon={Briefcase}
+                title="No clients yet."
+                sub="A client is the person you work for. Bills get sent to them, jobs roll up to them."
+                action={<Button variant="primary" size="md" onClick={onNewClient}>Add your first client</Button>}
+              />
+            )}
+            {!loading && rows.length > 0 && viewRows.length === 0 && (
               <div className="fh-build-table__empty">No clients match. <button type="button" className="fh-build-inline-link" onClick={onNewClient}>+ New client</button>.</div>
             )}
             {!loading && visibleRows.map((tr) => {

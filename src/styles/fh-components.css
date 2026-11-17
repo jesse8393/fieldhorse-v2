@@ -1430,6 +1430,8 @@
   color: var(--fh-ink);
 }
 
+.fhc-empty__sub { max-width: 32ch; margin: 8px auto 0; font-size: 14px; line-height: 1.6; color: var(--fh-ink-2); }
+
 .fhc-empty__action {
   margin-top: 4px;
 }

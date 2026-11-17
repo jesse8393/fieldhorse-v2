@@ -383,6 +383,40 @@ test.describe('the desktop Customers table', () => {
     created_at: iso(NOW - 400 * DAY), last_activity_at: iso(NOW - touchedDaysAgo * DAY)
   })
 
+  // A new company has no clients. The table used to say "No clients
+  // match", which reads as a filter hiding records. It now says what a
+  // client is and offers the first one; "No clients match" is kept for a
+  // search that hides rows.
+  test('an empty book explains what a client is and offers the first one', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_clients: [] } })
+    await open(page, '/clients')
+    const main = page.locator('#fh-main')
+    await expect(main.getByText('No clients yet.', { exact: true })).toBeVisible()
+    await expect(main.getByText('A client is the person you work for. Bills get sent to them, jobs roll up to them.', { exact: true })).toBeVisible()
+    await expect(main).not.toContainText('No clients match')
+    await expect(main.getByRole('button', { name: 'Export CSV' })).toBeDisabled()
+    await main.getByRole('button', { name: 'Add your first client', exact: true }).click()
+    await expect(page).toHaveURL(/\/clients\/new/)
+  })
+
+  test('a search that hides every client says nothing matches', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_clients: [client('c-z', 'Zed Builders', 2)] } })
+    await open(page, '/clients')
+    await page.getByRole('textbox', { name: 'Search clients' }).fill('qqq')
+    await expect(page.locator('#fh-main')).toContainText('No clients match.')
+    await expect(page.getByText('No clients yet.', { exact: true })).toHaveCount(0)
+  })
+
+  test('an empty sub list explains what a sub is and offers the first one', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_subs: [] } })
+    await open(page, '/subs')
+    const main = page.locator('#fh-main')
+    await expect(main.getByText('No subs yet.', { exact: true })).toBeVisible()
+    await expect(main).not.toContainText('No vendors match')
+    await main.getByRole('button', { name: 'Add your first sub', exact: true }).click()
+    await expect(page).toHaveURL(/\/subs\/new$/)
+  })
+
   test('sorts by name ignoring case, keeps the sort while searching, and shows the year of an old touch', async ({ context, page }) => {
     await signIn(context, { tables: { fh_clients: [client('c-z', 'Zed Builders', 2), client('c-a', 'alpha Concrete', 3), client('c-b', 'Bravo Paving', 395)] } })
     await page.setViewportSize({ width: 1440, height: 900 })
