@@ -201,6 +201,8 @@ export function orgPunchApprove(
   skipped_ids?: string[]
   /** The caller's own punches, left for another approver unless the caller is an owner. */
   self_skipped?: string[]
+  /** Punches left pending because neither the punch nor the worker has an hourly rate. */
+  unrated_skipped?: string[]
 }> {
   return callJson('/api/org-punch-approve', withOrg({ punch_ids: punchIds }))
 }

@@ -96,9 +96,10 @@ export async function crewLaborForContact(
     let q = (supabase.from('org_members') as any)
       .select('user_id, default_hourly_rate')
       .in('user_id', needRateFor)
-      // Skip revoked memberships, a stale rate from a since-removed
-      // membership row must not overwrite the active one.
-      .is('revoked_at', null)
+      // Removed members are included: time worked before the removal is
+      // still job cost at the rate the worker had. There is one membership
+      // row per person per company, so the company filter below already
+      // keeps another company's rate out.
     if (punchOrgId) q = q.eq('org_id', punchOrgId)
     const { data: members, error: membersError } = await q
     if (options.requireCompleteRead && (membersError || !members)) {

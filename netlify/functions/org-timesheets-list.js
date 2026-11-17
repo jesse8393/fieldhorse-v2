@@ -109,6 +109,8 @@ export default async (request) => {
   // fallback lib/labor.ts uses to charge these hours to job cost.
   // Without it, unrated crew punches showed cost "—/$0" on the approval
   // screen while the approval itself booked real dollars to the job.
+  // Removed members are included: time they worked before the removal is
+  // still owed at the rate they had.
   let defaultRateByUser = {}
   if (userIds.length > 0) {
     const { data: members } = await admin
@@ -116,7 +118,6 @@ export default async (request) => {
       .select('user_id, default_hourly_rate')
       .eq('org_id', myMember.org_id)
       .in('user_id', userIds)
-      .is('revoked_at', null)
     for (const m of members || []) {
       const r = Number(m.default_hourly_rate)
       if (Number.isFinite(r) && r > 0) defaultRateByUser[m.user_id] = r
