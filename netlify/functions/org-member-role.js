@@ -7,7 +7,9 @@ import { supabaseServiceConfig } from './lib/serviceConfig.js'
 //   - target must be in the caller's org (org_id, see lib/membership.js)
 //   - both the target's CURRENT role and the NEW role must be strictly
 //     below the caller's tier (an admin can't touch an admin/owner, and
-//     can't promote anyone to admin/owner)
+//     can't promote anyone to admin/owner). One exception: an owner may
+//     make another active member an owner, which is how ownership is
+//     handed over before the first owner leaves or deletes their account
 //   - can't demote the last owner
 
 import { createClient } from '@supabase/supabase-js'
@@ -55,7 +57,8 @@ export default async (request) => {
     .is('revoked_at', null).maybeSingle()
   if (!target) return json({ error: 'member_not_found' }, 404)
 
-  if ((ROLE_TIER[target.role] ?? 0) >= myTier || (ROLE_TIER[role] ?? 0) >= myTier) {
+  const handingOverOwnership = myMember.role === 'owner' && role === 'owner'
+  if ((ROLE_TIER[target.role] ?? 0) >= myTier || ((ROLE_TIER[role] ?? 0) >= myTier && !handingOverOwnership)) {
     return json({ error: 'role_exceeds_caller', message: 'You can only manage roles below your own.' }, 403)
   }
   // Demoting the last owner would orphan the org.
