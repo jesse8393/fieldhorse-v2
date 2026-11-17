@@ -150,3 +150,57 @@ test('typing a new name on Quote creates the client', async ({ context, page }) 
   expect(clientInserts).toHaveLength(1)
   expect(clientInserts[0]).toMatchObject({ name: 'Dana Whitfield' })
 })
+
+// Audit finding DATA-12: a save whose answer is lost, tapped again, must
+// address the same quote, so the database cannot hold it twice.
+test('saving a quote again after a lost answer sends the same id', async ({ context, page }) => {
+  await signIn(context)
+  const inserts: Record<string, unknown>[] = []
+  await context.route(/\/rest\/v1\/fh_quotes(\?|$)/, async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback()
+    inserts.push(route.request().postDataJSON())
+    if (inserts.length === 1) return route.abort('connectionreset')
+    return route.fallback()
+  })
+  await open(page, '/quotes/new?client=cl-1')
+  await expect(page.getByRole('heading', { level: 1, name: 'New quote' })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByLabel('Client')).toHaveValue('Jeff Roy')
+  await page.getByRole('button', { name: 'Save quote' }).click()
+  await expect.poll(() => inserts.length).toBe(1)
+  await expect(page).toHaveURL(/\/quotes\/new/)
+  await page.getByRole('button', { name: 'Save quote' }).click()
+  await expect(page).toHaveURL(/\/quotes\/q-quote/, { timeout: 30_000 })
+  expect(inserts).toHaveLength(2)
+  expect(typeof inserts[0].id).toBe('string')
+  expect(inserts[1].id).toBe(inserts[0].id)
+})
+
+const LEAD_WITH_NOTES = {
+  id: 'l-notes', user_id: 'qa-user-1', client_id: 'cl-1', status: 'open', title: 'Backyard drainage', job_type: 'Drainage',
+  notes: 'Husband says no more than 5k. Dog bites. Gate code 4411.', last_contact: null, quote_id: null, follow_up_on: null,
+  source: 'Google', referred_by: null, origin_contact_id: null, created_at: NOW, updated_at: NOW,
+  fh_clients: { id: 'cl-1', name: 'Jeff Roy', phone: '555-0101', email: 'jeff@roy.com' }
+}
+
+// Phone sales audit finding S11: lead notes are internal and never become
+// the scope of work the customer reads.
+test('Quote this keeps the lead notes off the scope of work', async ({ context, page }) => {
+  await signIn(context, { tables: { fh_leads: [LEAD_WITH_NOTES] } })
+  await open(page, '/quotes/new?lead=l-notes')
+  await expect(page.getByLabel('Title')).toHaveValue('Backyard drainage', { timeout: 30_000 })
+  await expect(page.getByLabel('Client')).toHaveValue('Jeff Roy')
+  await expect(page.getByLabel('Scope')).toHaveValue('')
+})
+
+// Phone sales audit finding S21: a Quote this visit never becomes the next
+// New quote's draft.
+test('backing out of Quote this leaves the next New quote blank', async ({ context, page }) => {
+  await signIn(context, { tables: { fh_leads: [LEAD_WITH_NOTES] } })
+  await open(page, '/quotes/new?lead=l-notes')
+  await expect(page.getByLabel('Title')).toHaveValue('Backyard drainage', { timeout: 30_000 })
+  await page.waitForTimeout(800)
+  await open(page, '/quotes/new')
+  await expect(page.getByRole('heading', { level: 1, name: 'New quote' })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByLabel('Title')).toHaveValue('')
+  await expect(page.getByLabel('Client')).toHaveValue('')
+})

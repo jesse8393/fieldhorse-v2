@@ -146,6 +146,10 @@ describe('line detail', () => {
   const detailOf = (row: Partial<QuoteItemRow>) =>
     buildQuoteView([item({ id: 'x', amount: 1, ...row })]).lines[0].detail
 
+  it('prints a stored quantity as it is, 0.333 and not 0.33 (S25)', () => {
+    expect(detailOf({ qty: 0.333, unit: 'cy', rate: 150 })).toBe('0.333 cy at $150.00')
+  })
+
   it('reads quantity with separators, the unit, "at", then the rate with cents', () => {
     expect(detailOf({ qty: 1100, unit: 'sq ft', rate: 2 })).toBe('1,100 sq ft at $2.00')
     expect(detailOf({ qty: 160, unit: 'lf', rate: 4 })).toBe('160 lf at $4.00')

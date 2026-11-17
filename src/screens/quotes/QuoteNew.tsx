@@ -5,7 +5,8 @@
 // client, title and notes are filled and the lead is marked quoted once
 // the quote saves.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Field } from '../../components/fh'
 import ClientField, { fetchClientPick, resolveClientId, restoredClientValue, type ClientFieldValue } from '../../components/ClientField.tsx'
@@ -14,11 +15,14 @@ import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useMembership } from '../../contexts/MembershipContext.tsx'
 import { supabase } from '../../lib/supabase.ts'
 import { leadToQuoteDraft, markLeadQuoted, type LeadRow } from '../../lib/leads.ts'
-import { createQuote } from '../../lib/quotes.ts'
+import { createQuote, invalidateAfterQuoteWrite, plainQuoteError } from '../../lib/quotes.ts'
+import { createUuid } from '../../lib/uuid.ts'
 import { JOB_TYPES } from '../../lib/jobTypes.ts'
 import { hapticMedium } from '../../lib/haptics.ts'
 
 type Form = {
+  /** The quote's id, minted once per form so a retried save is the same quote. */
+  requestId: string
   client: string
   clientId: string
   title: string
@@ -26,7 +30,7 @@ type Form = {
   scope: string
 }
 
-const EMPTY: Form = { client: '', clientId: '', title: '', jobType: '', scope: '' }
+const EMPTY: Form = { requestId: '', client: '', clientId: '', title: '', jobType: '', scope: '' }
 
 export default function QuoteNew() {
   const navigate = useNavigate()
@@ -36,7 +40,15 @@ export default function QuoteNew() {
   const clientParam = params.get('client')
   const leadParam = params.get('lead')
   const text = params.get('text')
-  const { form, set, patch, done } = useDraft<Form>('quote', EMPTY, text ? { scope: text } : null)
+  const queryClient = useQueryClient()
+  const [requestId] = useState(createUuid)
+  // A visit that starts from a lead or a client keeps its draft apart, so
+  // backing out of Quote this never leaves that lead in the next plain New
+  // quote (S21).
+  const draftKind = leadParam ? `quote-lead-${leadParam}` : clientParam ? `quote-client-${clientParam}` : 'quote'
+  const { form, set, patch, done } = useDraft<Form>(draftKind, { ...EMPTY, requestId }, text ? { scope: text } : null)
+  const quoteId = form.requestId || requestId
+  const savingRef = useRef(false)
   const [client, setClient] = useState<ClientFieldValue>(() => restoredClientValue(form.client, form.clientId))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -62,7 +74,9 @@ export default function QuoteNew() {
     void supabase.from('fh_leads').select('*').eq('id', leadParam).maybeSingle().then(({ data }) => {
       if (!alive || !data) return
       const draft = leadToQuoteDraft(data as LeadRow)
-      patch({ title: draft.title || '', jobType: draft.job_type || '', scope: draft.scope_text || '' })
+      // The lead's notes are the office's own (a budget, a gate code), never
+      // the scope of work the customer reads, so they stay on the lead (S11).
+      patch({ title: draft.title || '', jobType: draft.job_type || '' })
       if (draft.client_id) void pickClient(draft.client_id)
     })
     return () => { alive = false }
@@ -75,14 +89,16 @@ export default function QuoteNew() {
   }
 
   async function save() {
-    if (!user) return
+    if (!user || savingRef.current) return
     if (!client.text.trim()) { setError('Enter a client.'); return }
+    savingRef.current = true
     setSaving(true)
     setError('')
     try {
       const picked = await resolveClientId(client, { userId: user.id, orgId })
       if (!picked) throw new Error('Enter a client.')
       const quote = await createQuote({
+        id: quoteId,
         userId: user.id,
         orgId,
         clientId: picked.id,
@@ -95,12 +111,17 @@ export default function QuoteNew() {
         try { await markLeadQuoted(leadParam, quote.id) } catch { /* the quote is saved; the lead keeps its status */ }
       }
       done()
+      invalidateAfterQuoteWrite(queryClient, { quoteId: quote.id, leadId: leadParam, clientId: picked.id })
       hapticMedium()
       // The quote screen opens with its line editor ready for the first line.
       navigate(`/quotes/${quote.id}?lines=new`, { replace: true })
     } catch (e) {
+      savingRef.current = false
       setSaving(false)
-      setError(e instanceof Error && e.message ? e.message : 'Could not save this quote. Check your connection and try again.')
+      const message = plainQuoteError(e, '')
+      setError(message === 'Check your connection and try again.' || !message
+        ? 'Could not save this quote. Check your connection and try again.'
+        : message)
     }
   }
 

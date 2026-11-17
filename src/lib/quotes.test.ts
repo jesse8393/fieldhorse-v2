@@ -26,7 +26,7 @@ function builder(): unknown {
 
 vi.mock('./supabase.ts', () => ({ supabase: { rpc, from: (table: string) => { const b = builder(); builders[builders.length - 1].push(['from', table]); return b } } }))
 
-const { createQuote, makeJobFromQuote, quoteNumber } = await import('./quotes.ts')
+const { createQuote, invalidateAfterQuoteWrite, makeJobFromQuote, quoteNumber } = await import('./quotes.ts')
 
 function callsOf(index: number, method: string) {
   return builders[index].filter((c) => c[0] === method)
@@ -77,6 +77,23 @@ describe('createQuote', () => {
     expect(callsOf(0, 'insert')[0][1]).toMatchObject({ user_id: 'user-1', org_id: 'org-1', client_id: 'client-1', lead_id: 'lead-1', title: 'Deck rebuild', status: 'draft' })
   })
 
+  // Audit finding DATA-12: a save whose answer was lost must not make a second quote.
+  it('sends the id the form minted, so a retry addresses the same quote', async () => {
+    responses.push({ data: { ...quote, id: 'minted-1', status: 'draft' }, error: null })
+    await createQuote({ id: 'minted-1', userId: 'user-1', orgId: 'org-1', clientId: 'client-1' })
+    expect(callsOf(0, 'insert')[0][1]).toMatchObject({ id: 'minted-1' })
+  })
+
+  it('a retry that finds its quote already saved returns that quote, not an error', async () => {
+    responses.push({ data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint' } })
+    responses.push({ data: { ...quote, id: 'minted-1', status: 'draft' }, error: null })
+    const row = await createQuote({ id: 'minted-1', userId: 'user-1', orgId: 'org-1', clientId: 'client-1' })
+    expect(row.id).toBe('minted-1')
+    expect(callsOf(1, 'eq')).toEqual(expect.arrayContaining([['eq', 'id', 'minted-1'], ['eq', 'user_id', 'user-1'], ['eq', 'org_id', 'org-1']]))
+    expect(callsOf(1, 'insert')).toEqual([])
+    expect(callsOf(1, 'update')).toEqual([])
+  })
+
   it('throws when the insert fails', async () => {
     responses.push({ data: null, error: { message: 'boom' } })
     await expect(createQuote({ userId: 'u', orgId: 'o', clientId: 'c' })).rejects.toThrow('boom')
@@ -108,5 +125,24 @@ describe('makeJobFromQuote', () => {
       ['fh_make_job_from_quote', { p_quote_id: 'quote-1' }]
     ])
     expect(builders).toHaveLength(0)
+  })
+})
+
+// Audit finding DATA-13: what refreshes after a quote write.
+describe('invalidateAfterQuoteWrite', () => {
+  function keysAfter(input: Parameters<typeof invalidateAfterQuoteWrite>[1]) {
+    const keys: unknown[] = []
+    invalidateAfterQuoteWrite({ invalidateQueries: (f: { queryKey: unknown }) => { keys.push(f.queryKey); return Promise.resolve() } } as any, input)
+    return keys
+  }
+  it('refreshes the quotes list, the quote, its lead and its client', () => {
+    expect(keysAfter({ quoteId: 'q-1', leadId: 'l-1', clientId: 'c-1' })).toEqual([
+      ['quotes'], ['quote', 'q-1'], ['leads'], ['lead', 'l-1'], ['clientDetail', 'c-1']
+    ])
+  })
+  it('refreshes the jobs list too when a job was made', () => {
+    expect(keysAfter({ quoteId: 'q-1', clientId: 'c-1', jobMade: true })).toEqual([
+      ['quotes'], ['quote', 'q-1'], ['clientDetail', 'c-1'], ['jobs']
+    ])
   })
 })

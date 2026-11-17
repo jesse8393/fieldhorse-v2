@@ -78,6 +78,66 @@ function toCents(value: unknown): number {
   return Math.round(num(value) * 100)
 }
 
+// A decimal number as a whole number and a power of ten, read from the way
+// it is written ("4.33" is 433 and 2), so nothing is lost to binary floats.
+function decimal(value: unknown): { digits: bigint; places: number } | null {
+  const n = Number(typeof value === 'string' ? value.trim() : value)
+  if ((typeof value === 'string' && value.trim() === '') || value == null || !Number.isFinite(n)) return null
+  const text = typeof value === 'string' && /^[+-]?(\d+\.?\d*|\.\d+)$/.test(value.trim()) ? value.trim() : String(n)
+  const m = /^([+-]?)(\d*)(?:\.(\d*))?(?:e([+-]?\d+))?$/i.exec(text)
+  if (!m) return null
+  const [, sign, whole, frac = '', exp = '0'] = m
+  let places = frac.length - Number(exp)
+  let digits = BigInt(`${sign}${whole || '0'}${frac}`)
+  if (places < 0) { digits *= 10n ** BigInt(-places); places = 0 }
+  return { digits, places }
+}
+
+// A whole number of hundredths of `places` decimals, rounded half up (away
+// from zero), as Postgres numeric rounds.
+function centsOf(digits: bigint, places: number): number {
+  if (places <= 2) return Number(digits * 10n ** BigInt(2 - places))
+  const div = 10n ** BigInt(places - 2)
+  const negative = digits < 0n
+  const abs = negative ? -digits : digits
+  const rounded = (abs * 2n + div) / (div * 2n)
+  return Number(negative ? -rounded : rounded)
+}
+
+/**
+ * Quantity times rate in dollars, to the cent, rounded half up. Worked in
+ * whole numbers, so 2.5 at $4.33 is $10.83 (10.825 rounded up) as a
+ * calculator and the database say, not $10.82 from a binary float. The
+ * line editor (QuoteItems.tsx) fills a line's amount with this.
+ */
+export function lineTotal(qty: unknown, rate: unknown): number {
+  const q = decimal(qty)
+  const r = decimal(rate)
+  if (!q || !r) return 0
+  return centsOf(q.digits * r.digits, q.places + r.places) / 100
+}
+
+/** A dollar amount to the cent, rounded half up: 1.005 is 1.01. */
+export function roundCents(value: unknown): number {
+  const d = decimal(value)
+  return d ? centsOf(d.digits, d.places) / 100 : 0
+}
+
+/**
+ * A saved line whose amount is quantity times rate, so an edit to either
+ * should move it: the exact product to the cent, or a rate that is the
+ * amount divided by quantity, rounded to the cent (the estimator saves 3 at
+ * $333.33 for $1,000.00). Any other amount was typed by hand and stays.
+ */
+export function amountFollowsRate(row: { qty?: unknown; rate?: unknown; amount?: unknown }): boolean {
+  const qty = Number(row.qty)
+  const rate = Number(row.rate)
+  const amount = Number(row.amount)
+  if (![qty, rate, amount].every(Number.isFinite)) return false
+  if (roundCents(amount) === lineTotal(row.qty, row.rate)) return true
+  return qty > 0 && roundCents(amount / qty) === roundCents(rate)
+}
+
 /** A line's price: its amount, else quantity times rate. */
 export function lineAmount(item: MoneyItem): number {
   const raw = item.amount != null && item.amount !== ''

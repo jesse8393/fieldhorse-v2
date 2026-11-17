@@ -62,7 +62,8 @@ function cents(value: unknown): number {
 }
 
 function quantity(value: number): string {
-  return value.toLocaleString(undefined, { maximumFractionDigits: 2 })
+  // As stored, to four places: 0.333 cy is not 0.33 cy.
+  return value.toLocaleString(undefined, { maximumFractionDigits: 4 })
 }
 
 function detailFor(row: QuoteItemRow): string {
