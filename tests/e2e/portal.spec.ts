@@ -1605,3 +1605,40 @@ test('the classic approve sentence keeps the cents of the total', async ({ page,
   await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
   await expect(page.getByText('The approved contract total is $18,458.50.')).toBeVisible()
 })
+
+/* ---- The statement link (PT-06, M-13, S05) ---- */
+
+function statementPayload(): Payload {
+  const j = (id: string, title: string, amount: number) => ({ id, name: 'Jeff Roy', job_title: title, stage: 'job', amount, created_at: '2026-09-01T00:00:00.000Z' })
+  const inv = (id: string, contact: string | null, seq: number, amount: number, status: string, extra: Record<string, unknown> = {}) => ({ id, contact_id: contact, client_id: 'cl-1', sequence_number: seq, title: `Draw ${seq}`, amount, status, ...extra })
+  return {
+    ok: true,
+    kind: 'statement',
+    client: { id: 'cl-1', name: 'Jeff Roy', company_name: null, email: 'jeff@roy.com', address: '412 Burkitt Station Rd' },
+    company: { name: 'Parker Construction', phone: '615 555 0100', email: 'office@parker.co', logo_url: null, payment_link: 'https://pay.example.com/parker' },
+    jobs: [j('j-a', 'Front walk', 2499.5), j('j-b', 'Side steps', 100.5), j('j-c', 'Back steps', 100.5), j('j-d', 'Garage slab', 33100)],
+    invoices: [
+      inv('i-a', 'j-a', 1, 2499.5, 'sent', { amount_due: 2499.5 }),
+      inv('i-b', 'j-b', 1, 100.5, 'sent', { amount_due: 100.5 }),
+      inv('i-c', 'j-c', 1, 100.5, 'overdue', { amount_due: 100.5 }),
+      inv('i-d', null, 1, 500.25, 'sent', { amount_due: 400.25, title: 'Sealing' })
+    ],
+    payments: [{ id: 'p-d', contact_id: null, invoice_id: 'i-d', amount: 100 }],
+    changeOrders: []
+  } as unknown as Payload
+}
+
+test('the statement link totals what is owed on sent invoices, to the cent, and keeps the unbilled contract apart', async ({ page, context }) => {
+  await mockPortal(context, statementPayload())
+  await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+
+  await expect(page.getByText('Statement for')).toBeVisible()
+  await expect(page.getByText('$2,499.50', { exact: true })).toBeVisible()
+  await expect(page.getByText('$400.25', { exact: true })).toBeVisible()
+  await expect(page.getByTestId('statement-total-due')).toHaveText('$3,100.75')
+  await expect(page.getByRole('link', { name: 'Pay $3,100.75 now' })).toBeVisible()
+  // Nothing invoiced on the garage slab yet: listed apart, not asked for.
+  const apart = page.getByRole('region', { name: 'Not yet invoiced' })
+  await expect(apart.getByText('Garage slab')).toBeVisible()
+  await expect(apart.getByText('$33,100.00')).toBeVisible()
+})

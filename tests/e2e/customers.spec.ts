@@ -104,6 +104,47 @@ test.describe('the customer page', () => {
     await expect(page).toHaveURL(/\/clients\/cl-1$/)
   })
 
+  // Audit 2026-11-16 (S05, M-13): Total due is what is owed on sent
+  // invoices; a job with nothing invoiced is listed apart, outside it.
+  test('the statement totals what is owed on sent invoices and keeps the unbilled contract apart', async ({ context, page }) => {
+    const job = (id: string, title: string, amount: number) => ({ id, user_id: USER.id, client_id: 'cl-1', name: 'Jeff Roy', job_title: title, stage: 'job', amount, created_at: iso(NOW - 30 * DAY), updated_at: iso(NOW - DAY) })
+    const bill = (id: string, contact: string | null, seq: number, amount: number, status: string, title = `Draw ${seq}`) => ({ id, user_id: USER.id, client_id: 'cl-1', contact_id: contact, sequence_number: seq, title, amount, status, due_at: iso(NOW + 10 * DAY).slice(0, 10), created_at: iso(NOW - 20 * DAY + seq), updated_at: iso(NOW - DAY) })
+    await signIn(context, {
+      tables: {
+        fh_clients: [JEFF],
+        fh_contacts: [job('j-drive', 'Driveway', 12800), job('j-garage', 'Garage slab', 33100)],
+        fh_invoices: [
+          bill('i-1', 'j-drive', 1, 6400, 'paid'),
+          bill('i-2', 'j-drive', 2, 6400, 'sent'),
+          bill('i-d', null, 1, 500.25, 'sent', 'Sealing')
+        ],
+        fh_payments: [{ id: 'p-1', user_id: USER.id, contact_id: 'j-drive', invoice_id: 'i-1', amount: 6400, paid_on: iso(NOW - 10 * DAY).slice(0, 10), created_at: iso(NOW - 10 * DAY) }],
+        fh_change_orders: []
+      }
+    })
+    const posted: Array<Record<string, unknown>> = []
+    // The PDF upload the email step makes first.
+    await context.route('**/storage/v1/object/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"Key":"job-files/statement.pdf"}' }))
+    await context.route('**/api/send-statement', async (route) => {
+      posted.push(route.request().postDataJSON())
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' })
+    })
+    await open(page, '/clients/cl-1/statement')
+
+    const owed = page.getByRole('list', { name: 'Open balances by property' })
+    await expect(owed.getByRole('listitem')).toHaveCount(2)
+    await expect(owed.getByText('Driveway')).toBeVisible()
+    await expect(owed.getByText('Sealing')).toBeVisible()
+    await expect(page.locator('.fhcs-total__amount')).toHaveText('$6,900.25')
+    const apart = page.getByRole('list', { name: 'Not yet invoiced' })
+    await expect(apart.getByText('Garage slab')).toBeVisible()
+    await expect(apart.getByText('$33,100', { exact: true })).toBeVisible()
+
+    await page.getByRole('button', { name: 'Email statement' }).click()
+    await expect.poll(() => posted.length).toBe(1)
+    expect(posted[0].total_due).toBe(6900.25)
+  })
+
   test('Money opens the same statement screen from Who owes you', async ({ context, page }) => {
     await signIn(context)
     await open(page, '/invoices?panel=statements')

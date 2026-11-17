@@ -385,7 +385,7 @@ function ChangeOrderView({ data, token, onApproved }: any) {
   )
 }
 
-function MoneyRow({ label, value, strong, accent }: any) {
+function MoneyRow({ label, value, strong, accent, testId }: any) {
   return (
     <div style={{
       display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12,
@@ -394,7 +394,7 @@ function MoneyRow({ label, value, strong, accent }: any) {
       <span style={{ fontSize: strong ? 13 : 12.5, fontWeight: strong ? 700 : 500, color: strong ? '#141414' : '#5C5C5C' }}>
         {label}
       </span>
-      <span style={{
+      <span data-testid={testId} style={{
         fontFamily: "'Cormorant Garamond', Georgia, serif",
         fontSize: strong ? 22 : 17, fontWeight: 600,
         color: accent || '#141414'
@@ -618,20 +618,25 @@ function InvoiceView({ data }: any) {
   )
 }
 
-/* Customer facing statement, one letterhead page rolling up every
-   open job for this client. Uses the same gatherStatement rollup the
-   in-app sheet + emailed PDF use, so the web view always agrees with
-   what the contractor sent. */
+/* Customer facing statement, one letterhead page rolling up what the
+   client owes on sent invoices. Uses the same gatherStatement rollup the
+   in app statement and the emailed PDF use, so the web view agrees with
+   what the contractor sent. Contract money not yet invoiced is listed
+   apart and is not part of Total due. A payload from before the server
+   sent invoices keeps the older contract less paid rollup. */
 function StatementView({ data }: any) {
   const { client, company, jobs, payments, changeOrders } = data
   const brand = resolveBrandGold(company)
-  const rolled = gatherStatement(jobs || [], payments || [], changeOrders || [])
+  const rolled = gatherStatement(
+    jobs || [], payments || [], changeOrders || [],
+    Array.isArray(data.invoices) ? { invoices: data.invoices } : {}
+  )
   const who = client?.company_name || client?.name || 'Customer'
   const today = new Date().toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
 
   return (
     <>
-      {rolled.totalDue > 0.5 && <PayNowBar company={company} amount={rolled.totalDue} />}
+      {rolled.totalDue > 0 && <PayNowBar company={company} amount={rolled.totalDue} />}
       <div style={{
         maxWidth: 760, margin: '0 auto',
         padding: '32px 24px 24px',
@@ -676,7 +681,7 @@ function StatementView({ data }: any) {
         {/* Per-property lines */}
         {rolled.lines.length === 0 ? (
           <div style={{ marginTop: 20, padding: '24px 0', textAlign: 'center', color: '#5C5C5C', fontSize: 14, borderTop: '1px solid #F2EDE4' }}>
-            Nothing outstanding right now, every project is paid in full. Thank you.
+            Nothing is owed on sent invoices right now. Thank you.
           </div>
         ) : (
           <div style={{ marginTop: 20, borderTop: '1px solid #F2EDE4' }}>
@@ -698,8 +703,22 @@ function StatementView({ data }: any) {
                 </span>
               </div>
             ))}
-            <MoneyRow label="Total due" value={moneyFmt(rolled.totalDue)} strong accent={brand} />
+            <MoneyRow label="Total due" value={moneyFmt(rolled.totalDue)} strong accent={brand} testId="statement-total-due" />
           </div>
+        )}
+
+        {rolled.notInvoiced.length > 0 && (
+          <section aria-labelledby="stmt-not-invoiced" style={{ marginTop: 24 }}>
+            <div id="stmt-not-invoiced" style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0, color: '#5C5C5C' }}>
+              Not yet invoiced
+            </div>
+            <p style={{ margin: '4px 0 0', fontSize: 12, lineHeight: 1.5, color: '#5C5C5C' }}>
+              Contract amounts still to be billed. They are not part of the total due.
+            </p>
+            {rolled.notInvoiced.map((l: any) => (
+              <MoneyRow key={l.contactId} label={l.property} value={moneyFmt(l.balance)} />
+            ))}
+          </section>
         )}
       </div>
     </>

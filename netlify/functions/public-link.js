@@ -30,7 +30,7 @@ import { brandingUserIdFor } from './lib/orgAccess.js'
 import { loadQuoteForLink } from './lib/quoteApproval.js'
 // The one allocator Money, the invoice PDF and the invoice email read, so
 // the customer link asks for the same amount to the cent.
-import { allocateInvoiceDue, isOpenInvoice, knownContractTotal } from '../../src/lib/invoiceSettlement.ts'
+import { allocateInvoiceDue, amountsDueByInvoice, isOpenInvoice, knownContractTotal } from '../../src/lib/invoiceSettlement.ts'
 
 function trimHeader(value, max = 500) {
   const text = String(value || '').trim()
@@ -644,15 +644,26 @@ async function signPhotos(supabase, photoRows) {
 // returns the shape the public StatementView renders.
 async function handleStatement(supabase, req, link) {
   const brandUserId = await brandingUserIdFor(supabase, link)
-  const [{ data: client }, { data: profile }, { data: jobs }] = await Promise.all([
+  const [{ data: client }, { data: profile }, { data: jobs }, { data: directInvoices }] = await Promise.all([
     supabase.from('fh_clients').select('*').eq('id', link.client_id).match(linkScope(link)).maybeSingle(),
     supabase.from('profiles').select('*').eq('user_id', brandUserId).maybeSingle(),
+    // Billing stages only (src/lib/statement.ts BILLING_STAGES): moved,
+    // lost and quote rows never leave the server, with or without amounts.
     supabase
       .from('fh_contacts')
       .select('id, name, job_title, job_type, stage, amount, address, created_at')
       .eq('client_id', link.client_id)
       .match(linkScope(link))
-      .order('created_at', { ascending: true })
+      .in('stage', ['job', 'invoice', 'closed'])
+      .order('created_at', { ascending: true }),
+    // Invoices billed to the client directly, with no job (D62).
+    supabase
+      .from('fh_invoices')
+      .select(PUBLIC_INVOICE_COLUMNS)
+      .eq('client_id', link.client_id)
+      .is('contact_id', null)
+      .match(linkScope(link))
+      .neq('status', 'void')
   ])
 
   if (!client) {
@@ -661,17 +672,42 @@ async function handleStatement(supabase, req, link) {
 
   const jobRows = Array.isArray(jobs) ? jobs : []
   const jobIds = jobRows.map((j) => j.id)
+  const directIds = (directInvoices || []).map((inv) => inv.id)
 
   let payments = []
   let changeOrders = []
+  let jobInvoices = []
+  let directPayments = []
   if (jobIds.length > 0) {
-    const [{ data: pay }, { data: cos }] = await Promise.all([
+    const [{ data: pay }, { data: cos }, { data: inv }] = await Promise.all([
       supabase.from('fh_payments').select(PUBLIC_PAYMENT_COLUMNS).in('contact_id', jobIds).order('paid_on', { ascending: false }),
-      supabase.from('fh_change_orders').select(PUBLIC_CHANGE_ORDER_COLUMNS).in('contact_id', jobIds).eq('status', 'approved')
+      supabase.from('fh_change_orders').select(PUBLIC_CHANGE_ORDER_COLUMNS).in('contact_id', jobIds).eq('status', 'approved'),
+      supabase.from('fh_invoices').select(PUBLIC_INVOICE_COLUMNS).in('contact_id', jobIds).neq('status', 'void')
     ])
     payments = pay || []
     changeOrders = cos || []
+    jobInvoices = inv || []
   }
+  if (directIds.length > 0) {
+    const { data: pay } = await supabase.from('fh_payments').select(PUBLIC_PAYMENT_COLUMNS).in('invoice_id', directIds).order('paid_on', { ascending: false })
+    directPayments = (pay || []).filter((p) => !p.contact_id)
+  }
+  payments = [...payments, ...directPayments]
+
+  // What each issued invoice still owes, by the allocator Money and the
+  // in app statement use, drafts included in the allocation; only issued
+  // rows go to the page (gatherStatement reads their amount_due).
+  const allInvoices = [...jobInvoices, ...(directInvoices || [])]
+  const contractByJob = new Map(jobRows.map((j) => [
+    j.id,
+    knownContractTotal({ amount: j.amount, changeOrders: changeOrders.filter((co) => co.contact_id === j.id) })
+  ]))
+  const due = amountsDueByInvoice({
+    invoices: allInvoices,
+    payments,
+    contractFor: (id) => contractByJob.get(id) ?? null
+  })
+  const invoices = customerRows(allInvoices, due)
 
   const company = buildCompany(profile)
 
@@ -723,7 +759,8 @@ async function handleStatement(supabase, req, link) {
     company,
     jobs: jobRows,
     payments,
-    changeOrders
+    changeOrders,
+    invoices
   })
 }
 

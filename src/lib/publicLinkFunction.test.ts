@@ -121,6 +121,50 @@ describe('the invoice link asks for what the invoice still owes (PT-01, PT-02, M
   })
 })
 
+describe('the statement link (FN-20, M-13, PT-06)', () => {
+  const stmt = (extra: Record<string, Row[]> = {}) => baseTables({
+    fh_public_links: [link({ token: 'stmt', kind: 'statement', client_id: 'cl-1' })],
+    fh_contacts: [
+      job({ id: 'j-drive', job_title: 'Driveway', amount: 12800 }),
+      job({ id: 'j-garage', job_title: 'Garage slab', amount: 33100 }),
+      job({ id: 'old-lead', job_title: 'Pool deck idea', stage: 'moved_lead', amount: 48000 }),
+      job({ id: 'old-quote', job_title: 'Patio, never sent', stage: 'moved_quote', amount: 31500 }),
+      job({ id: 'lost', job_title: 'Retaining wall', stage: 'lost', amount: 15000 })
+    ],
+    fh_invoices: [
+      bill('i-1', 1, 6400, 'paid', { contact_id: 'j-drive' }),
+      bill('i-2', 2, 6400, 'sent', { contact_id: 'j-drive' }),
+      bill('i-x', 3, 999, 'draft', { contact_id: 'j-drive' }),
+      bill('d-1', 1, 800, 'paid', { contact_id: null }),
+      bill('d-2', 2, 500.25, 'overdue', { contact_id: null, title: 'Sealing' }),
+      bill('lost-1', 1, 15000, 'sent', { contact_id: 'lost' })
+    ],
+    fh_payments: [
+      { id: 'p1', org_id: ORG, contact_id: 'j-drive', invoice_id: 'i-1', amount: 6400 },
+      { id: 'p2', org_id: ORG, contact_id: null, invoice_id: 'd-1', amount: 800 },
+      { id: 'p3', org_id: ORG, contact_id: null, invoice_id: 'd-2', amount: 100 },
+      { id: 'p4', org_id: ORG, contact_id: 'old-quote', invoice_id: null, amount: 31500 }
+    ],
+    ...extra
+  })
+
+  it('returns only billing stage jobs, never moved or lost rows and their amounts', async () => {
+    useDb(stmt())
+    const { body } = await getLink('stmt')
+    expect(body.jobs.map((j: Row) => j.id)).toEqual(['j-drive', 'j-garage'])
+    expect(JSON.stringify(body)).not.toContain('48000')
+    expect(JSON.stringify(body)).not.toContain('31500')
+    expect(body.payments.map((p: Row) => p.id).sort()).toEqual(['p1', 'p2', 'p3'])
+  })
+
+  it('carries the issued invoices, direct ones included, each open one with what it still owes, and no drafts', async () => {
+    useDb(stmt())
+    const { body } = await getLink('stmt')
+    const rows = Object.fromEntries(body.invoices.map((i: Row) => [i.id, i.amount_due ?? null]))
+    expect(rows).toEqual({ 'i-1': null, 'i-2': 6400, 'd-1': null, 'd-2': 400.25 })
+  })
+})
+
 describe('public-link function audit helpers', () => {
   it('prefers the first forwarded client IP', () => {
     const req = new Request('https://fieldhorse.test/api/public-link?token=abc', {
