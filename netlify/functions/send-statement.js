@@ -34,7 +34,7 @@ export default async (request) => {
   const SEND_EMAIL_FROM_NAME = process.env.SEND_EMAIL_FROM_NAME || 'Notifications'
 
   if (!SUPABASE_URL || !SERVICE_KEY) {
-    return json({ error: 'server_misconfigured', message: 'Server is missing Supabase credentials.' }, 500)
+    return json({ error: 'server_misconfigured', message: 'Email sending is not available right now. Try again later.' }, 500)
   }
   if (!RESEND_API_KEY || !SEND_EMAIL_FROM) {
     return json({ error: 'sender_not_configured', message: 'Email sender is not configured yet.' }, 503)

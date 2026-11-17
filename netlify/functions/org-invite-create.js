@@ -15,6 +15,8 @@ import { resolveCallerMembership } from './lib/membership.js'
 import { idempotencyKey, sendViaResend, formatFromHeader } from './lib/email.js'
 import { hashIdentifier, checkRateLimit, checkDailySendCap, DAILY_SEND_LIMIT_MESSAGE } from './lib/rateLimit.js'
 
+const INVITE_NOT_SENT = 'The invite email did not go out. Copy the invite link and send it yourself.'
+
 const VALID_ROLES = ['owner', 'admin', 'manager', 'foreman', 'crew']
 
 export default async (request) => {
@@ -178,15 +180,12 @@ export default async (request) => {
       if (res.ok) {
         emailResult = { sent: true, email_id: res.body?.id || null }
       } else {
-        emailResult = {
-          sent: false,
-          reason: res.status ? 'provider_rejected' : 'send_threw',
-          provider_status: res.status || null,
-          detail: res.detail || res.body?.message || res.body?.error || null,
-        }
+        console.error('[org-invite-create] send failed', { status: res.status || null, body: res.body, detail: res.detail || null })
+        emailResult = { sent: false, reason: res.status ? 'provider_rejected' : 'send_threw', detail: INVITE_NOT_SENT }
       }
     } catch (e) {
-      emailResult = { sent: false, reason: 'send_threw', detail: String(e?.message || e) }
+      console.error('[org-invite-create] send failed', { error: e?.message || String(e) })
+      emailResult = { sent: false, reason: 'send_threw', detail: INVITE_NOT_SENT }
     }
   }
 
