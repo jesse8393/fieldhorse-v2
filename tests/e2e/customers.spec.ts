@@ -237,6 +237,33 @@ test.describe('the customer page', () => {
     expect(href).not.toContain('maps.apple.com')
   })
 
+  test('Back on the client page returns where the person came from (S19)', async ({ context, page }) => {
+    // A lead whose client has no phone shows "Add phone", which opens the client page.
+    const noPhone = { ...JEFF, phone: null }
+    await signIn(context, {
+      tables: {
+        fh_clients: [noPhone],
+        fh_leads: [{
+          id: 'l-lead1', user_id: USER.id, client_id: 'cl-1', status: 'open', title: 'Back patio', notes: null, job_type: null,
+          source: null, referred_by: null, follow_up_on: null, last_contact: null, quote_id: null, origin_contact_id: null,
+          created_at: iso(NOW - DAY), updated_at: iso(NOW - DAY), fh_clients: noPhone
+        }]
+      }
+    })
+    await open(page, '/leads/l-lead1')
+    await page.getByRole('link', { name: 'Add phone' }).click()
+    await expect(page).toHaveURL(/\/clients\/cl-1/)
+    await page.getByRole('button', { name: 'Back to clients' }).click()
+    await expect(page).toHaveURL(/\/leads\/l-lead1$/)
+  })
+
+  test('Back on a client page opened directly goes to Customers (S19)', async ({ context, page }) => {
+    await signIn(context)
+    await open(page, '/clients/cl-1')
+    await page.getByRole('button', { name: 'Back to clients' }).click()
+    await expect(page).toHaveURL(/\/clients$/)
+  })
+
   test('a customer with leads, quotes or invoices is not deleted, and the page says what to do instead', async ({ context, page }) => {
     await signIn(context)
     const writes = watchWrites(page)

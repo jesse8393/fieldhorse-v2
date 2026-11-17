@@ -86,6 +86,14 @@ export default function ClientDetail() {
   // Deleting the client takes a second tap on the same button (D57).
   const deleteTap = useSecondTap()
   const [deleting, setDeleting] = useState(false)
+  // Back returns where the person came from (a lead, a quote, Search);
+  // opened from a link with no history, it goes to Customers (S19).
+  function goBack() {
+    hapticTap()
+    const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0
+    if (idx > 0) navigate(-1)
+    else navigate('/clients')
+  }
   // The statement is its own screen, every open invoice in one document.
   const openStatement = () => navigate(`/clients/${id}/statement`)
 
@@ -264,7 +272,7 @@ export default function ClientDetail() {
           tabs={TABS}
           activeTab={tab}
           onTabChange={setTab}
-          onBack={() => navigate('/clients')}
+          onBack={goBack}
           onEdit={() => setIsEditing(!isEditing)}
           onDelete={() => { void requestDelete() }}
           deleteArmed={deleteTap.armed}
@@ -289,7 +297,7 @@ export default function ClientDetail() {
 
       {/* TOP BAR, back chevron + edit + delete in the chrome row */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '8px 24px 12px' }}>
-        <IconBtn onClick={() => navigate('/clients')} ariaLabel="Back to clients">
+        <IconBtn onClick={goBack} ariaLabel="Back to clients">
           <ChevronLeft size={18} />
         </IconBtn>
         <div style={{ display: 'flex', gap: 8 }}>
