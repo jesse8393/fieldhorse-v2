@@ -773,6 +773,36 @@ test.describe('large text and zoom', () => {
       }
     })
   }
+
+  // big-text-10: the Schedule filters shrank below their labels instead of
+  // scrolling, so "Upcoming 3" was drawn over "Done 0".
+  for (const percent of [100, 150]) {
+    test(`the Schedule filters keep their labels apart and scroll sideways, text at ${percent} percent`, async ({ context, page }) => {
+      await textSize(context, percent)
+      await openBig(context, page, '/schedule')
+      const widths = percent === 100 ? [412, 360, 320, 300, 260, 206, 180] : [412, 390, 360]
+      for (const width of widths) {
+        await page.setViewportSize({ width, height: 800 })
+        await page.waitForTimeout(200)
+        const strips = await page.locator('.dispatch-state').evaluateAll((all) => all.map((strip) => {
+          const options = [...strip.querySelectorAll('.dispatch-state__opt')].map((o) => {
+            const r = o.getBoundingClientRect()
+            return { label: (o.textContent || '').trim(), left: r.left, right: r.right, width: Math.round(r.width), needs: o.scrollWidth }
+          })
+          const box = strip.getBoundingClientRect()
+          return { options, right: box.right, window: document.documentElement.clientWidth }
+        }))
+        const at = `${width} px: ${JSON.stringify(strips)}`
+        for (const strip of strips) {
+          expect(strip.right, at).toBeLessThanOrEqual(strip.window)
+          for (const [n, o] of strip.options.entries()) {
+            expect(o.needs, at).toBeLessThanOrEqual(o.width + 1)
+            if (n > 0) expect(o.left, at).toBeGreaterThanOrEqual(strip.options[n - 1].right - 0.5)
+          }
+        }
+      }
+    })
+  }
 })
 
 // big-text-3 on a desktop window at 200 percent zoom (640 px wide).
