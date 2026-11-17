@@ -24,16 +24,12 @@ import { findDuplicateClusters, loadNotDuplicates, rememberNotDuplicates, mergeC
 import { hapticTap, hapticMedium, hapticError } from '../../lib/haptics.ts'
 import { toastSuccess, toastError } from '../../lib/toast.ts'
 import { countNoun } from '../../lib/format.ts'
+import { formatPhone } from '../../lib/utils.ts'
 import { useArmedId } from '../../lib/secondTap.ts'
 import './clients-merge.css'
 
-function fmtPhone(n: any) {
-  if (!n) return ''
-  const digits = String(n).replace(/\D/g, '')
-  if (digits.length === 10) return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
-  if (digits.length === 11 && digits.startsWith('1')) return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`
-  return n
-}
+// The one phone formatter (formats-10).
+const fmtPhone = formatPhone
 
 function fmtDate(s: any) {
   if (!s) return ''

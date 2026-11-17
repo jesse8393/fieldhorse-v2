@@ -18,6 +18,7 @@ import { hapticMedium, hapticSuccess } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { FilterPill, Eyebrow } from '../components/v3'
 import { countNoun } from '../lib/format.ts'
+import { formatPhone } from '../lib/utils.ts'
 import { aiDraftError } from '../lib/serviceErrors.ts'
 
 const CHANNELS = [
@@ -906,7 +907,7 @@ function SmsHero({ draft, contact }: any) {
             {contact?.name || 'New recipient'}
           </div>
           <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--v3-text-muted)', fontVariantNumeric: 'tabular-nums' }}>
-            {contact?.phone || 'No phone on file'}
+            {formatPhone(contact?.phone) || 'No phone on file'}
           </div>
         </div>
       </div>

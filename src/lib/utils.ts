@@ -6,9 +6,10 @@ export function cn(...inputs: ClassValue[]): string {
 }
 
 // Phone formatter, render-time only. Store raw digits in the DB so
-// search + sms/tel: links keep working; format for display only.
+// search + sms/tel: links keep working; format for display only. The one
+// formatter for every screen, customer document and PDF (formats-10).
 //   "5551234567"      -> "(555) 123-4567"
-//   "+15551234567"    -> "+1 (555) 123-4567"
+//   "+15551234567"    -> "(555) 123-4567", the same number, the same way
 //   "555 1234567"     -> "(555) 123-4567"
 //   anything else     -> returned unchanged
 export function formatPhone(raw: string | null | undefined): string {
@@ -19,7 +20,7 @@ export function formatPhone(raw: string | null | undefined): string {
     return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
   }
   if (digits.length === 11 && digits.startsWith('1')) {
-    return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`
+    return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`
   }
   return s
 }

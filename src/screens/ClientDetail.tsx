@@ -32,18 +32,14 @@ import { rollupJobs } from '../lib/rollups.ts'
 import { navigateHrefHere } from '../lib/todayView.ts'
 import { composeClientTimeline, type TimelineEvent } from '../lib/clientTimeline.ts'
 import { moneyCents } from '../lib/format.ts'
+import { formatPhone } from '../lib/utils.ts'
 
 // One customer's money to the cent, the figure Money and the statement
 // show, never "$12K" (formats-4).
 const money = moneyCents
 
-function fmtPhone(n: any) {
-  if (!n) return ''
-  const digits = String(n).replace(/\D/g, '')
-  if (digits.length === 10) return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
-  if (digits.length === 11 && digits.startsWith('1')) return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`
-  return n
-}
+// The one phone formatter (formats-10).
+const fmtPhone = formatPhone
 
 const TABS = [
   { id: 'overview', label: 'Overview' },

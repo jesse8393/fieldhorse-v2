@@ -16,6 +16,7 @@ import type { ReactNode } from 'react'
 import { Plus } from 'lucide-react'
 import { Button, VaultCard } from '../fh/index.ts'
 import type { VaultFact } from '../fh/index.ts'
+import { formatPhone } from '../../lib/utils.ts'
 import { initialsFor } from '../fh/Monogram.tsx'
 import { moneyCents } from '../../lib/format.ts'
 import { navigateHrefHere } from '../../lib/todayView.ts'
@@ -156,7 +157,7 @@ export default function JobFactsPanel({
             ) : (
               <p className="fhd-person__name">{customerName}</p>
             )}
-            {phone && <a className="fhd-link fhd-person__line" href={`tel:${phone}`}>{phone}</a>}
+            {phone && <a className="fhd-link fhd-person__line" href={`tel:${phone}`}>{formatPhone(phone)}</a>}
             {email && <a className="fhd-link fhd-person__line" href={`mailto:${email}`}>{email}</a>}
           </div>
         </div>

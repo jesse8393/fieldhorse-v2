@@ -1859,3 +1859,15 @@ test('whole amounts keep .00 on the invoice link, the way the PDF prints them (f
   const text = await page.locator('body').innerText()
   expect(text).not.toMatch(/\$[\d,]+(?![\d,]*\.\d\d)\b/)
 })
+
+test('phone numbers on the invoice link read the way the app prints them (formats-10)', async ({ page, context }) => {
+  await mockPortal(context, invoicePayload({
+    contact: { phone: '6155550101', email: 'dana@example.com' },
+    company: { phone: '6155550100', email: 'office@parker.co' },
+    invoices: [draw('inv-ph', 1, 5000, 'sent')]
+  }))
+  await openInvoice(page)
+  await expect(page.getByText('(615) 555-0101 · dana@example.com').first()).toBeVisible()
+  await expect(page.getByText(/\(615\) 555-0100/).first()).toBeVisible()
+  expect(await page.locator('body').innerText()).not.toMatch(/615555010[01]/)
+})

@@ -516,3 +516,18 @@ test('the Customers export writes the local day of the last activity', async ({ 
   expect(row).toContain('2026-11-16')
   expect(row).not.toContain('2026-11-17')
 })
+
+// formats-10: the customer's phone reads "(615) 555-0101" on every tab of
+// the customer page and on the job, the way the phone page prints it.
+test('the customer page and the job print the phone formatted', async ({ context, page, isMobile }) => {
+  await signIn(context, { tables: FORMATS_TABLES })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  await open(page, '/clients/cl-h?tab=projects')
+  if (isMobile) await page.goto('/clients/cl-h', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByText(/\(615\) 555-0101/).filter({ visible: true }).first()).toBeVisible({ timeout: 30_000 })
+  expect(await page.locator('main').innerText()).not.toContain('6155550101')
+  await page.goto('/jobs/c-h', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByRole('heading', { name: 'Driveway replacement' }).first()).toBeVisible({ timeout: 30_000 })
+  await page.waitForTimeout(1500)
+  expect(await page.locator('main').innerText()).not.toContain('6155550101')
+})

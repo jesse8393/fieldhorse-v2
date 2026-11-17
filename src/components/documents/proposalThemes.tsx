@@ -31,6 +31,7 @@ import type { ReactNode } from 'react'
 import { Phone } from 'lucide-react'
 import { DOC_COLORS, DOC_FONTS, THEME_PALETTES } from './tokens.ts'
 import { money, longDate } from './format.ts'
+import { formatPhone } from '../../lib/utils.ts'
 import InsuranceModeBlock from './InsuranceModeBlock.tsx'
 import ChangeOrdersBlock from './ChangeOrdersBlock.tsx'
 // The unit price a line prints only when quantity times it is the amount
@@ -586,7 +587,7 @@ function addressLines(party: any): string[] {
   if (!party) return []
   const out: string[] = []
   if (party.address) out.push(party.address)
-  const contact = [party.phone, party.email].filter(Boolean).join(' · ')
+  const contact = [formatPhone(party.phone), party.email].filter(Boolean).join(' · ')
   if (contact) out.push(contact)
   if (party.website) out.push(party.website)
   return out

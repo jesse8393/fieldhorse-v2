@@ -11,6 +11,7 @@ import {
   Phone, Mail, MapPin, ArrowUpRight, Plus, ExternalLink, Receipt,
 } from 'lucide-react'
 import { moneyCents, moneyFull } from '../../lib/format.ts'
+import { formatPhone } from '../../lib/utils.ts'
 import { clientActivity } from '../../lib/clientActivity.ts'
 import MiniMetric from '../MiniMetric.tsx'
 import PaletteKeyCap, { paletteShortcut } from './PaletteKeyCap.tsx'
@@ -215,7 +216,7 @@ export default function SnowClientDetailBuild(props: Props) {
               <div className="fh-build-contact-list">
                 {client?.phone && (
                   <a className="fh-build-contact-row" href={`tel:${client.phone}`}>
-                    <Phone size={12} /> <span>{client.phone}</span>
+                    <Phone size={12} /> <span>{formatPhone(client.phone)}</span>
                     <ChevronRight size={12} className="fh-build-contact-row__chev" />
                   </a>
                 )}
