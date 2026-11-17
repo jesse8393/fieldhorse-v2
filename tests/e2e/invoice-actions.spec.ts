@@ -672,3 +672,29 @@ test('a fast double tap on Void does not void the invoice', async ({ page, conte
   await page.getByRole('button', { name: /tap again/i }).click()
   await expect.poll(() => voids.length).toBe(1)
 })
+
+// OPS-14: on a phone a draw row keeps its title, dates and buttons apart,
+// and Open is a full size target.
+for (const width of [320, 390, 412]) {
+  test(`a draw row fits a ${width} px phone`, async ({ page, context }, testInfo) => {
+    test.skip(!testInfo.project.name.startsWith('mobile'), 'phone layout')
+    await page.setViewportSize({ width, height: 900 })
+    await installShedInvoice(context)
+    await page.goto('/jobs/c-job1?tab=draws', { waitUntil: 'domcontentloaded' })
+    const row = page.locator('.fh-draws-row').first()
+    await expect(row).toBeVisible({ timeout: 30_000 })
+    const title = row.getByText('Deposit', { exact: true })
+    const titleBox = (await title.boundingBox())!
+    for (const name of ['Email draw to client', 'Download draw PDF', 'Edit draw']) {
+      const b = (await row.getByRole('button', { name }).boundingBox())!
+      const overlaps = b.x < titleBox.x + titleBox.width && b.x + b.width > titleBox.x && b.y < titleBox.y + titleBox.height && b.y + b.height > titleBox.y
+      expect(overlaps, `${name} covers the title`).toBe(false)
+    }
+    const due = row.getByText(/^Due /)
+    const dueBox = (await due.boundingBox())!
+    expect(dueBox.height, 'the due date stays on one line').toBeLessThan(24)
+    const open = (await row.getByRole('link', { name: /open invoice/i }).boundingBox())!
+    expect(open.height).toBeGreaterThanOrEqual(44)
+    await nothingRunsOffTheSide(page, `/jobs/c-job1?tab=draws at ${width} px`)
+  })
+}

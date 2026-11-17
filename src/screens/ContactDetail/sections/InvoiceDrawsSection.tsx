@@ -45,6 +45,7 @@ import { quoteMoney } from '../../../lib/quoteMoney.ts'
 import { toCents } from '../../../lib/cents.ts'
 import { useMembership } from '../../../contexts/MembershipContext.tsx'
 import { canEditJobMoney } from '../lib/jobAccess.ts'
+import { useMediaQuery } from '../../../lib/useMediaQuery.ts'
 import { moneyInput } from '../../new/CreateShell.tsx'
 
 
@@ -786,9 +787,48 @@ function Row({ draw, busy, readOnly, onEdit, onDownload, onSend, onMarkPaid, onV
   const isPaid = draw.status === 'paid'
   const isVoid = draw.status === 'void'
   const isOverdue = draw.status === 'overdue'
+  // Below 600 px the buttons take a row of their own (OPS-14): beside the
+  // title they covered it and squeezed the dates to a word per line.
+  const narrow = useMediaQuery('(max-width: 599px)')
+
+  const actions = !readOnly && (
+    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: narrow ? 'flex-start' : 'flex-end', ...(narrow ? { gridColumn: '1 / -1' } : null) }}>
+      {!isVoid && (
+        <IconBtn onClick={onSend} disabled={busy} title="Email to client" aria-label="Email draw to client">
+          <Send size={12} aria-hidden="true" />
+        </IconBtn>
+      )}
+      {!isVoid && (
+        <IconBtn onClick={onDownload} disabled={busy} title="Download PDF" aria-label="Download draw PDF">
+          <Download size={12} aria-hidden="true" />
+        </IconBtn>
+      )}
+      {!isPaid && !isVoid && (
+        <IconBtn onClick={onMarkPaid} disabled={busy} title="Mark paid" aria-label="Mark draw paid">
+          <Check size={12} aria-hidden="true" />
+        </IconBtn>
+      )}
+      {!isVoid && (
+        <IconBtn onClick={onEdit} disabled={busy} title="Edit" aria-label="Edit draw">
+          <FileEdit size={12} aria-hidden="true" />
+        </IconBtn>
+      )}
+      {!isVoid && (
+        <IconBtn onClick={onVoid} disabled={busy} title={voidArmed ? 'Tap again to void. It stops counting toward the unbilled total.' : 'Void'} aria-label={voidArmed ? 'Tap again to void' : 'Void draw'} wide={voidArmed}>
+          {voidArmed ? <span style={{ fontSize: 12, fontWeight: 700, padding: '0 8px', whiteSpace: 'nowrap' }}>Tap again to void</span> : <X size={12} aria-hidden="true" />}
+        </IconBtn>
+      )}
+      {/* Drafts only: a sent or paid draw is voided, never deleted. */}
+      {draw.status === 'draft' && (
+        <IconBtn onClick={onDelete} tone="danger" title={deleteArmed ? 'Tap again to delete. This cannot be undone.' : 'Delete'} aria-label={deleteArmed ? 'Tap again to delete' : 'Delete draw'} wide={deleteArmed}>
+          {deleteArmed ? <span style={{ fontSize: 12, fontWeight: 700, padding: '0 8px', whiteSpace: 'nowrap' }}>Tap again to delete</span> : <Trash2 size={12} aria-hidden="true" />}
+        </IconBtn>
+      )}
+    </div>
+  )
 
   return (
-    <div className="fh-draws-row" style={{ display: 'grid', gridTemplateColumns: '72px 1fr auto', gap: 12, padding: '12px 16px', alignItems: 'flex-start' }}>
+    <div className="fh-draws-row" style={{ display: 'grid', gridTemplateColumns: narrow ? '64px minmax(0, 1fr) auto' : '72px 1fr auto', gap: narrow ? 8 : 12, padding: '12px 16px', alignItems: 'flex-start' }}>
       <div style={{
         fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
         letterSpacing: 0, color: 'var(--v3-primary-text)',
@@ -805,8 +845,8 @@ function Row({ draw, busy, readOnly, onEdit, onDownload, onSend, onMarkPaid, onV
           {draw.title || `Draw ${draw.sequence_number}`}
         </div>
         <div style={{ marginTop: 4, display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 12, color: 'var(--v3-text-muted)' }}>
-          {draw.issued_at && <span>Issued {shortDate(draw.issued_at)}</span>}
-          {draw.due_at && <span>Due {shortDate(draw.due_at)}</span>}
+          {draw.issued_at && <span style={{ whiteSpace: 'nowrap' }}>Issued {shortDate(draw.issued_at)}</span>}
+          {draw.due_at && <span style={{ whiteSpace: 'nowrap' }}>Due {shortDate(draw.due_at)}</span>}
           {draw.notes && <span style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>· {draw.notes}</span>}
         </div>
         <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -820,7 +860,7 @@ function Row({ draw, busy, readOnly, onEdit, onDownload, onSend, onMarkPaid, onV
             to={`/invoices/${draw.id}`}
             aria-label={`Open invoice ${draw.title || draw.sequence_number}`}
             style={{
-              display: 'inline-flex', alignItems: 'center', minHeight: 24, padding: '0 8px',
+              display: 'inline-flex', alignItems: 'center', minHeight: 44, padding: '0 12px',
               borderRadius: 10, border: '1px solid var(--v3-border)',
               fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
               color: 'var(--v3-text)', textDecoration: 'none'
@@ -840,42 +880,9 @@ function Row({ draw, busy, readOnly, onEdit, onDownload, onSend, onMarkPaid, onV
         }}>
           {money(draw.amount)}
         </div>
-        {!readOnly && (
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-            {!isVoid && (
-              <IconBtn onClick={onSend} disabled={busy} title="Email to client" aria-label="Email draw to client">
-                <Send size={12} aria-hidden="true" />
-              </IconBtn>
-            )}
-            {!isVoid && (
-              <IconBtn onClick={onDownload} disabled={busy} title="Download PDF" aria-label="Download draw PDF">
-                <Download size={12} aria-hidden="true" />
-              </IconBtn>
-            )}
-            {!isPaid && !isVoid && (
-              <IconBtn onClick={onMarkPaid} disabled={busy} title="Mark paid" aria-label="Mark draw paid">
-                <Check size={12} aria-hidden="true" />
-              </IconBtn>
-            )}
-            {!isVoid && (
-              <IconBtn onClick={onEdit} disabled={busy} title="Edit" aria-label="Edit draw">
-                <FileEdit size={12} aria-hidden="true" />
-              </IconBtn>
-            )}
-            {!isVoid && (
-              <IconBtn onClick={onVoid} disabled={busy} title={voidArmed ? 'Tap again to void. It stops counting toward the unbilled total.' : 'Void'} aria-label={voidArmed ? 'Tap again to void' : 'Void draw'} wide={voidArmed}>
-                {voidArmed ? <span style={{ fontSize: 12, fontWeight: 700, padding: '0 8px', whiteSpace: 'nowrap' }}>Tap again to void</span> : <X size={12} aria-hidden="true" />}
-              </IconBtn>
-            )}
-            {/* Drafts only: a sent or paid draw is voided, never deleted. */}
-            {draw.status === 'draft' && (
-              <IconBtn onClick={onDelete} tone="danger" title={deleteArmed ? 'Tap again to delete. This cannot be undone.' : 'Delete'} aria-label={deleteArmed ? 'Tap again to delete' : 'Delete draw'} wide={deleteArmed}>
-                {deleteArmed ? <span style={{ fontSize: 12, fontWeight: 700, padding: '0 8px', whiteSpace: 'nowrap' }}>Tap again to delete</span> : <Trash2 size={12} aria-hidden="true" />}
-              </IconBtn>
-            )}
-          </div>
-        )}
+        {!narrow && actions}
       </div>
+      {narrow && actions}
     </div>
   )
 }
