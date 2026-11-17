@@ -137,7 +137,9 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
   const refreshLists = (jobMade = false) =>
     invalidateAfterQuoteWrite(queryClient, { quoteId: quote.id, leadId: quote.lead_id, clientId: quote.client_id, jobMade })
 
-  const items = useQuoteItems({ quoteId: quote.id, userId, onContactRefresh: () => refreshLists() })
+  // A line write changes the quote's amount in the database, which the total
+  // falls back to when no line is priced, so the quote is read again too.
+  const items = useQuoteItems({ quoteId: quote.id, userId, onContactRefresh: () => { refreshLists(); void refresh() } })
 
   // When the line editor closes, the rows below it move up under the thumb.
   // A tap that lands within half a second is the same burst of taps, not a

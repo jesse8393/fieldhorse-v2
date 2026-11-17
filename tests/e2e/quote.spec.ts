@@ -840,6 +840,29 @@ test.describe('taps on the quote screen', () => {
     await expect.poll(() => quoteWrites.length).toBe(1)
   })
 
-
+  test('the total goes to $0.00 after the last line is deleted (S25)', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: [ITEMS[1]] } })
+    // The database keeps the quote amount equal to its lines; the mock does not.
+    let gone = false
+    await context.route((url) => url.pathname.endsWith('/rest/v1/fh_quote_items'), (route) => {
+      if (route.request().method() === 'DELETE') gone = true
+      if (route.request().method() === 'GET' && gone) return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+      return route.fallback()
+    })
+    await context.route((url) => url.pathname.endsWith('/rest/v1/fh_quotes'), (route) => {
+      if (route.request().method() !== 'GET' || !gone) return route.fallback()
+      const row = quoteRow({ amount: 0 })
+      const single = (route.request().headers()['accept'] || '').includes('vnd.pgrst.object')
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(single ? row : [row]) })
+    })
+    await openQuote(page)
+    await expect(total(page).getByText('$950.00', { exact: true })).toBeVisible()
+    await lines(page).getByRole('button', { name: /Pump truck/ }).click()
+    const editor = page.getByRole('form', { name: 'Edit line' })
+    await editor.getByRole('button', { name: 'Delete line' }).click()
+    await page.waitForTimeout(600)
+    await editor.getByRole('button', { name: 'Tap again to delete line' }).click()
+    await expect(total(page).getByText('$0.00', { exact: true })).toBeVisible()
+  })
 })
 
