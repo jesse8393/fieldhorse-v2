@@ -31,7 +31,8 @@
 // live login over an emptied account. Storage objects are purged last.
 //
 // Personal records go with the person in every case: time punches, push
-// subscriptions, notifications, the profile, and webhook rate limit rows.
+// subscriptions, notifications, the profile, webhook rate limit rows, and
+// the person's own rate cards and integration connections.
 //
 // Env vars required:
 //   SUPABASE_URL                — same origin as VITE_SUPABASE_URL
@@ -51,9 +52,13 @@ export const TEAM_TABLES = [
   'fh_esign_envelopes', 'fh_public_links', 'fh_public_link_events',
   'fh_job_files', 'fh_job_todos', 'fh_notes', 'fh_schedule', 'fh_subs',
   'fh_sub_profiles', 'fh_selections', 'fh_materials', 'fh_daily_logs',
-  'fh_stage_transitions', 'fh_estimate_templates', 'fh_rate_cards',
-  'fh_integrations'
+  'fh_stage_transitions', 'fh_estimate_templates'
 ]
+// Not in the list on purpose: fh_rate_cards and fh_integrations. Each person
+// keeps their own (unique per user and trade, per user and provider), so
+// moving the leaver's rows onto a successor who already has the same trade
+// or provider broke the unique rule and stopped the deletion on every try.
+// They go with the account.
 
 // Storage buckets the app writes to. Every object is stored under a
 // `${userId}/...` path prefix (job-files: `${userId}/${jobId}/…`, job-photos

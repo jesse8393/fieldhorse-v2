@@ -1,5 +1,10 @@
-import { describe, expect, it, vi } from 'vitest'
-import { planAccountDeletion, retainedPathsForSharedOrgs, listAllObjects, TEAM_TABLES } from '../../netlify/functions/delete-account.js'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { fakeClient, newState, type FakeState } from './teamAccountFakeSupabase'
+
+let state: FakeState
+vi.mock('@supabase/supabase-js', () => ({ createClient: () => fakeClient(state) }))
+
+import deleteAccount, { planAccountDeletion, retainedPathsForSharedOrgs, listAllObjects, TEAM_TABLES } from '../../netlify/functions/delete-account.js'
 
 const ORG_A = 'org-a'
 const ORG_B = 'org-b'
@@ -118,5 +123,58 @@ describe('shared file preservation during account deletion', () => {
     const objects = await listAllObjects({ storage: { from: () => ({ list }) } }, 'job-files', 'departing')
     expect(objects).toHaveLength(1001)
     expect(list).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('account deletion end to end', () => {
+  const ORG = '0b0b0b0b-0000-4000-8000-000000000001'
+  const OWNER = 'user-owner'
+  const ADMIN = 'user-admin'
+
+  beforeEach(() => {
+    state = newState({
+      organizations: [{ id: ORG, name: 'Parker Concrete', created_by: OWNER }],
+      org_members: [
+        { id: 'm1', org_id: ORG, user_id: OWNER, role: 'owner', joined_at: '2026-01-01T00:00:00Z', revoked_at: null },
+        { id: 'm2', org_id: ORG, user_id: ADMIN, role: 'admin', joined_at: '2026-02-01T00:00:00Z', revoked_at: null },
+      ],
+      fh_contacts: [{ id: 'job-1', org_id: ORG, user_id: ADMIN, name: 'Dana Smith' }],
+    })
+    state.users = { 'tok-admin': { id: ADMIN, email: 'office@example.test' } }
+    vi.stubEnv('SUPABASE_URL', 'https://db.example.test')
+    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'test-service')
+  })
+  afterEach(() => { vi.unstubAllEnvs() })
+
+  const post = (token: string) => new Request('https://app.example.test/api/delete-account', {
+    method: 'POST', headers: { authorization: `Bearer ${token}` },
+  })
+
+  it('goes through when the leaver and the successor both saved a rate for the same trade', async () => {
+    state.tables.fh_rate_cards = [
+      { id: 'rc-owner', org_id: ORG, user_id: OWNER, trade_key: 'concrete', rate_low: 8, rate_high: 12 },
+      { id: 'rc-admin', org_id: ORG, user_id: ADMIN, trade_key: 'concrete', rate_low: 9, rate_high: 13 },
+    ]
+    state.tables.fh_integrations = [
+      { id: 'in-owner', org_id: ORG, user_id: OWNER, provider: 'quickbooks' },
+      { id: 'in-admin', org_id: ORG, user_id: ADMIN, provider: 'quickbooks' },
+    ]
+    // What Postgres answers when a row is moved onto a person who already
+    // has one: unique (user_id, trade_key) and unique (user_id, provider).
+    state.failWrites = {
+      fh_rate_cards: 'duplicate key value violates unique constraint "fh_rate_cards_user_id_trade_key_key"',
+      fh_integrations: 'duplicate key value violates unique constraint "fh_integrations_user_id_provider_key"',
+    }
+
+    const res = await deleteAccount(post('tok-admin'))
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ ok: true, handed_off_orgs: 1 })
+    expect(state.deletedUsers).toEqual([ADMIN])
+    // The job went to the owner; the leaver's own rates and connections were
+    // never moved, so they go with the account.
+    expect(state.tables.fh_contacts[0].user_id).toBe(OWNER)
+    expect(state.log.some((l) => ['fh_rate_cards', 'fh_integrations'].includes(l.table || ''))).toBe(false)
+    expect(TEAM_TABLES).not.toContain('fh_rate_cards')
+    expect(TEAM_TABLES).not.toContain('fh_integrations')
   })
 })
