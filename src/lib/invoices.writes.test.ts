@@ -148,3 +148,23 @@ describe('status writes after a payment or a send', () => {
   })
 })
 
+
+// OPS-16: with Paid on cleared, the payment is dated today on the local
+// calendar, not the UTC day (tomorrow in a Chicago evening).
+describe('a client invoice payment with no date', () => {
+  it('is dated the local day', async () => {
+    const tz = process.env.TZ
+    process.env.TZ = 'America/Chicago'
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-12-01T02:30:00Z')) // 8:30 pm Nov 30 in Chicago
+    try {
+      fake.state.tables.fh_invoices = [{ id: 'i', user_id: 'u', amount: 500, status: 'sent' }]
+      await logInvoicePayment({ id: 'i', user_id: 'u', amount: 500, status: 'sent' } as any, { amount: 100, paid_on: '' })
+      expect(fake.state.tables.fh_payments[0].paid_on).toBe('2026-11-30')
+    } finally {
+      vi.useRealTimers()
+      if (tz === undefined) delete process.env.TZ
+      else process.env.TZ = tz
+    }
+  })
+})

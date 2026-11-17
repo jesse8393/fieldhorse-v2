@@ -8,6 +8,7 @@ import { createUuid } from './uuid.ts'
 import { supabase, authHeaders } from './supabase.ts'
 import { allocateInvoiceDue, invoicesPaidInFull, knownContractTotal, type DueInvoice } from './invoiceSettlement.ts'
 import { toCents, sumCents } from './cents.ts'
+import { todayYmd } from './dates.ts'
 import type { Database } from './database.types.ts'
 
 // pdf.js pulls in jspdf (~390KB). Load it lazily at call time so merely
@@ -230,7 +231,8 @@ export async function logInvoicePayment(invoice: Pick<InvoiceRow, 'id' | 'user_i
     method: input.method || 'check',
     kind,
     reference: input.reference || null,
-    paid_on: input.paid_on || new Date().toISOString().slice(0, 10)
+    // The local calendar day (OPS-16): the UTC day is tomorrow in an evening.
+    paid_on: input.paid_on || todayYmd()
   }
   const { error } = await supabase.from('fh_payments').upsert(payload as any, { onConflict: 'id' })
   if (error) return { error, paid: false }
