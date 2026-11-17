@@ -11,6 +11,7 @@ import { loadUserRateCard } from '../../../lib/rateCard.ts'
 import { Eyebrow } from '../../../components/v3'
 import { planReorder } from './quoteItemOrder.ts'
 import { keepFocusOnRetry } from '../../../lib/retryFocus.ts'
+import { lineTotal } from '../../../lib/quoteMoney.ts'
 
 /**
  * Quote items section, fh_quote_items CRUD editor.
@@ -240,7 +241,7 @@ export function patchDraft(setter: any, key: any, value: any) {
         const qty = Number(key === 'qty' ? value : d.qty)
         const rate = Number(key === 'rate' ? value : d.rate)
         if (Number.isFinite(qty) && Number.isFinite(rate)) {
-          next.amount = String(+(qty * rate).toFixed(2))
+          next.amount = String(lineTotal(key === 'qty' ? value : d.qty, key === 'rate' ? value : d.rate))
         }
       }
     }
@@ -272,7 +273,7 @@ export function applySuggestion(setter: any, s: ItemSuggestion) {
   hapticTap()
   setter((d: any) => {
     const qty = Number(d.qty)
-    const amount = Number.isFinite(qty) ? +(qty * s.rate).toFixed(2) : s.rate
+    const amount = Number.isFinite(qty) ? lineTotal(d.qty, s.rate) : s.rate
     return {
       ...d,
       description: s.description,
