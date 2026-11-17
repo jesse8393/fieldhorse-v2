@@ -12,7 +12,6 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { countNoun, money } from '../../lib/format.ts'
 import MiniMetric from '../MiniMetric.tsx'
-import PaletteKeyCap from './PaletteKeyCap.tsx'
 
 type Sub = {
   key: string
@@ -113,7 +112,6 @@ export default function SnowSubsBuild(props: Props) {
             aria-label="Search vendors and trades"
             autoComplete="off"
           />
-          <PaletteKeyCap />
         </div>
         <div className="fh-build-topbar__meta">
           <span>{filtered.length.toLocaleString()} {countNoun(filtered.length, 'vendor')} in network</span>
@@ -122,7 +120,7 @@ export default function SnowSubsBuild(props: Props) {
         </div>
         <button className="fh-build-icon-btn" type="button" onClick={() => navigate('/activity')} aria-label="Open activity" title="Activity"><Bell size={16} /></button>
         <button className="fh-build-new-btn" type="button" onClick={onAddSub}>
-          <Plus size={15} /> Add Vendor
+          <Plus size={15} /> Add vendor
         </button>
       </header>
 

@@ -698,3 +698,16 @@ for (const width of [320, 390, 412]) {
     await nothingRunsOffTheSide(page, `/jobs/c-job1?tab=draws at ${width} px`)
   })
 }
+
+// D13: on a wide screen the intro and the To, Invoice and Amount facts
+// sit in the same centred column as the actions, not at the left edge.
+test('the remind screen keeps its intro and facts in the centred column', async ({ page }, testInfo) => {
+  test.skip(!testInfo.project.name.startsWith('desktop'), 'Desktop width')
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/invoices/inv1/remind', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+  await expect(page.locator('.fhinv-facts')).toBeVisible({ timeout: 30_000 })
+  const lefts = await page.evaluate(() => ['.fhinv-intro', '.fhinv-facts', '.fhinv-actions']
+    .map((sel) => Math.round(document.querySelector(sel)!.getBoundingClientRect().left)))
+  expect(lefts[0]).toBe(lefts[2])
+  expect(lefts[1]).toBe(lefts[2])
+})

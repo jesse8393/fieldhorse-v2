@@ -143,3 +143,33 @@ test.describe('job screens a field role cannot open', () => {
     await expect(page).toHaveURL(/\/clients\/cl-1\/statement$/)
   })
 })
+
+// D18: search, sort and the lost switch live in the address, so Back from
+// a job and a reload bring the list back the way it was left.
+test('the Jobs list keeps its search, sort and lost switch on reload and Back', async ({ context, page, isMobile }) => {
+  await signIn(context)
+  await openJobs(page)
+  const chips = page.getByRole('group', { name: 'Filter and sort' })
+  const lost = chips.getByRole('switch', { name: 'Show lost jobs' })
+  const amount = chips.getByRole('radio', { name: 'Amount' })
+  await lost.click()
+  await amount.click()
+  if (isMobile) await page.getByRole('button', { name: 'Search jobs' }).click()
+  const box = page.locator('.fhjl-search input')
+  await box.fill('o')
+  await expect(page).toHaveURL(/[?&]q=o\b/)
+
+  const check = async () => {
+    await expect(lost).toHaveAttribute('aria-checked', 'true')
+    await expect(amount).toHaveAttribute('aria-checked', 'true')
+    await expect(page.locator('.fhjl-search input')).toHaveValue('o')
+  }
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await expect(page.getByRole('heading', { level: 1, name: 'Jobs' })).toBeVisible({ timeout: 30_000 })
+  await check()
+
+  await page.goto('/jobs/c-job1', { waitUntil: 'domcontentloaded' })
+  await page.goBack()
+  await expect(page.getByRole('heading', { level: 1, name: 'Jobs' })).toBeVisible({ timeout: 30_000 })
+  await check()
+})

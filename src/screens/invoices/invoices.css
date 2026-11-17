@@ -135,7 +135,7 @@ a.fhinv-hero__job:focus-visible {
 }
 
 .fhinv-intro {
-  margin: 0;
+  margin-block: 0;
   padding: 0 var(--fh-gutter) 8px;
   font-family: var(--fh-font-body);
   font-size: 15px;
@@ -180,7 +180,7 @@ a.fhinv-hero__job:focus-visible {
 .fhinv-facts {
   display: flex;
   flex-direction: column;
-  margin: 0;
+  margin-block: 0;
   padding: 8px var(--fh-gutter) 0;
 }
 

@@ -367,3 +367,32 @@ test.describe('the customer page', () => {
     await expect.poll(() => writes.filter((w) => w.startsWith('DELETE fh_clients')).length).toBe(1)
   })
 })
+
+// D19: the desktop Customers table sorts names without regard to case,
+// keeps its sort while you search, and says the year of an old touch.
+test.describe('the desktop Customers table', () => {
+  test.skip(({ isMobile }) => isMobile, 'Desktop table')
+
+  const client = (id: string, name: string, touchedDaysAgo: number) => ({
+    id, user_id: USER.id, name, company_name: null, phone: null, email: null, address: null,
+    created_at: iso(NOW - 400 * DAY), last_activity_at: iso(NOW - touchedDaysAgo * DAY)
+  })
+
+  test('sorts by name ignoring case, keeps the sort while searching, and shows the year of an old touch', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_clients: [client('c-z', 'Zed Builders', 2), client('c-a', 'alpha Concrete', 3), client('c-b', 'Bravo Paving', 395)] } })
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await open(page, '/clients')
+    const names = page.locator('.fh-build-table__row.is-clients strong')
+    await expect(names).toHaveCount(3)
+    await page.getByRole('button', { name: 'Sort by Client' }).click()
+    await expect(names).toHaveText(['alpha Concrete', 'Bravo Paving', 'Zed Builders'])
+
+    await page.getByRole('textbox', { name: 'Search clients' }).fill('r')
+    await expect(page).toHaveURL(/[?&]q=r\b/)
+    await expect(page.getByRole('button', { name: 'Sort by Client' })).toContainText('Sorted ascending')
+    await expect(names).toHaveText(['alpha Concrete', 'Bravo Paving', 'Zed Builders'])
+
+    const old = page.locator('.fh-build-table__row.is-clients').filter({ hasText: 'Bravo Paving' }).locator('.fh-build-rel').first()
+    await expect(old).toContainText(String(new Date(NOW - 395 * DAY).getFullYear()))
+  })
+})

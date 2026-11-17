@@ -6,7 +6,7 @@
 // re-checks the role gate; hiding the UI from foreman/crew is a
 // courtesy.
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Bell, Check, CheckCheck, ChevronRight, CircleCheckBig, Search, AlertTriangle, Users } from 'lucide-react'
 import { useMembership } from '../contexts/MembershipContext.tsx'
@@ -15,6 +15,8 @@ import { recalcCost } from '../lib/stages.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { toastSuccess, toastError, toastInfo } from '../lib/toast.ts'
 import MiniMetric from '../components/MiniMetric.tsx'
+import TopbarWeather from '../components/desktop/TopbarWeather.tsx'
+import { startOfWeek, SCHEDULE_WEEK_START } from '../lib/scheduleDates.ts'
 import { Button } from '../ui/index.ts'
 import PaletteKeyCap, { paletteShortcut } from '../components/desktop/PaletteKeyCap.tsx'
 
@@ -42,15 +44,6 @@ function fmtMoney(n: number | null): string {
   return `$${Math.round(n).toLocaleString()}`
 }
 
-function startOfWeek(): Date {
-  const d = new Date()
-  d.setHours(0, 0, 0, 0)
-  // Treat Monday as the start of the week (ISO). Sunday → -6, Mon → 0, etc.
-  const day = d.getDay()
-  const diff = (day === 0 ? -6 : 1) - day
-  d.setDate(d.getDate() + diff)
-  return d
-}
 
 export default function Timesheets() {
   const navigate = useNavigate()
@@ -61,8 +54,10 @@ export default function Timesheets() {
   const [error, setError] = useState<string | null>(null)
   const [punches, setPunches] = useState<PendingPunch[]>([])
   const [approving, setApproving] = useState<Record<string, boolean>>({})
+  // The punch whose flag reason is being typed on its row (no prompt box).
+  const [flagDraft, setFlagDraft] = useState<{ id: string; reason: string } | null>(null)
   // Filter window in the URL (?window=) so it survives refresh and is
-  // shareable (UI audit #30). 'all' or 'thisWeek' (Mon–now).
+  // shareable (UI audit #30). 'all' or 'thisWeek' (Sunday to now).
   const [searchParams, setSearchParams] = useSearchParams()
   const windowMode: 'all' | 'thisWeek' = searchParams.get('window') === 'all' ? 'all' : 'thisWeek'
   const setWindowMode = (next: 'all' | 'thisWeek') => {
@@ -78,7 +73,8 @@ export default function Timesheets() {
     try {
       const opts: { from?: string; to?: string } = {}
       if (windowMode === 'thisWeek') {
-        opts.from = startOfWeek().toISOString()
+        // The same week as Schedule and Money, which start on Sunday.
+        opts.from = startOfWeek(new Date(), SCHEDULE_WEEK_START).toISOString()
       }
       const res = await orgTimesheetsList(opts)
       setPunches(res.punches || [])
@@ -166,12 +162,11 @@ export default function Timesheets() {
     }
   }
 
-  // Flag / reject a punch, prompts for a reason, marks it flagged (and
-  // clears any approval on the server). Keeps the row visible so it can be
-  // resolved; the "Flagged" KPI now reflects reality.
-  async function flag(id: string) {
-    const reason = window.prompt('Reason for flagging this punch? (e.g. GPS mismatch, wrong rate)')
-    if (reason === null) return
+  // Flag / reject a punch with the reason typed on its row, marks it
+  // flagged (and clears any approval on the server). Keeps the row visible
+  // so it can be resolved; the "Flagged" KPI now reflects reality.
+  async function flag(id: string, reason: string) {
+    setFlagDraft(null)
     setApproving((m) => ({ ...m, [id]: true }))
     try {
       await orgPunchFlag([id], true, reason.trim())
@@ -245,7 +240,7 @@ export default function Timesheets() {
         <div className="fh-build-topbar__meta">
           <span>{orgName || 'Your team'}</span>
           <span className="fh-build-vline" />
-          <span style={{ opacity: 0.6 }}>Weather not set</span>
+          <TopbarWeather />
         </div>
         <button
           className="fh-build-icon-btn"
@@ -365,7 +360,8 @@ export default function Timesheets() {
               </div>
 
               {g.rows.map((r) => (
-                <div key={r.id} className="fh-build-table__row is-timesheet">
+                <Fragment key={r.id}>
+                <div className="fh-build-table__row is-timesheet">
                   <span className="fh-build-rel">{fmtDate(r.punch_in_at)}</span>
                   {r.contact_id ? (
                     <button
@@ -396,10 +392,13 @@ export default function Timesheets() {
                     <button
                       type="button"
                       className="fh-build-icon-action"
-                      onClick={() => r.flagged ? clearFlag(r.id) : flag(r.id)}
+                      onClick={() => r.flagged
+                        ? clearFlag(r.id)
+                        : setFlagDraft((d) => d?.id === r.id ? null : { id: r.id, reason: '' })}
                       disabled={!!approving[r.id]}
+                      aria-expanded={r.flagged ? undefined : flagDraft?.id === r.id}
                       aria-label={r.flagged ? 'Clear flag' : 'Flag punch'}
-                      title={r.flagged ? 'Clear flag' : 'Flag / reject'}
+                      title={r.flagged ? 'Clear flag' : 'Flag or reject'}
                       style={{ color: r.flagged ? 'var(--v3-primary-text)' : undefined }}
                     >
                       <AlertTriangle size={14} />
@@ -416,6 +415,27 @@ export default function Timesheets() {
                     </button>
                   </span>
                 </div>
+                {flagDraft?.id === r.id && (
+                  <form
+                    className="fh-build-table__row"
+                    style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}
+                    onSubmit={(e) => { e.preventDefault(); void flag(r.id, flagDraft.reason) }}
+                  >
+                    <input
+                      type="text"
+                      autoFocus
+                      aria-label="Reason for flagging"
+                      placeholder="Reason, such as GPS mismatch or wrong rate"
+                      value={flagDraft.reason}
+                      onChange={(e) => setFlagDraft({ id: r.id, reason: e.target.value })}
+                      onKeyDown={(e) => { if (e.key === 'Escape') setFlagDraft(null) }}
+                      style={{ flex: '1 1 240px', minHeight: 36, padding: '0 12px', borderRadius: 10, border: '1px solid var(--v3-border)', background: 'var(--v3-surface)', color: 'var(--v3-text)', fontFamily: 'inherit', fontSize: 14 }}
+                    />
+                    <Button type="submit" size="sm" disabled={!!approving[r.id]}>Save flag</Button>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => setFlagDraft(null)}>Cancel</Button>
+                  </form>
+                )}
+                </Fragment>
               ))}
             </section>
           )

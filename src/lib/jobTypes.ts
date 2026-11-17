@@ -10,7 +10,7 @@ export const JOB_TYPES: JobType[] = [
   { value: 'Kitchen', label: 'Kitchen' },
   { value: 'Bath', label: 'Bath' },
   { value: 'Concrete', label: 'Concrete' },
-  { value: 'Outdoor Living', label: 'Outdoor Living' },
+  { value: 'Outdoor Living', label: 'Outdoor living' },
   { value: 'Insurance', label: 'Insurance' },
   { value: 'Roofing', label: 'Roofing' }
 ]

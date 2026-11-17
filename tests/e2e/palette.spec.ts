@@ -363,3 +363,31 @@ test.describe('command palette', () => {
     }
   })
 })
+
+// D09: below 900 px the header Search opens the search screen, so the
+// shortcut does the same instead of a palette pop up; and the local
+// filter boxes do not show a key cap that opens something else.
+test.describe('search shortcut and key caps', () => {
+  test.beforeEach(async ({ page: _page }, testInfo) => {
+    test.skip(!testInfo.project.name.startsWith('desktop'), 'Desktop shortcut')
+  })
+
+  test('Control+K below 900 px opens the search screen, not the palette', async ({ context, page }) => {
+    await signIn(context)
+    await page.setViewportSize({ width: 899, height: 900 })
+    await open(page)
+    await page.keyboard.press('Control+k')
+    await expect(page).toHaveURL(/\/search$/)
+    await expect(page.getByRole('dialog', { name: 'Command palette' })).toHaveCount(0)
+  })
+
+  test('the Customers and Subs filter boxes show no palette key cap', async ({ context, page }) => {
+    await signIn(context)
+    for (const [path, label] of [['/clients', 'Search clients'], ['/subs', 'Search vendors and trades']]) {
+      await page.goto(path)
+      const box = page.getByRole('textbox', { name: label })
+      await expect(box).toBeVisible()
+      await expect(page.locator('.fh-build-search').filter({ has: box }).locator('kbd')).toHaveCount(0)
+    }
+  })
+})
