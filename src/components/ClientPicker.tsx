@@ -65,9 +65,15 @@ export default function ClientPicker({ userId, value, onChange, onCreatingChange
     return () => { activeScope.current = null }
   }, [scope])
 
+  // Focus follows the person's own pick or unlink, never a client that
+  // arrives from the server: the linked client loads a moment after the
+  // form opens, and moving focus then took it off the form's heading.
+  const focusAfterChange = useRef(false)
   useEffect(() => {
-    if (previousId.current && !value?.id) inputRef.current?.focus()
-    else if (value?.id && value.id !== previousId.current) unlinkRef.current?.focus({ preventScroll: true })
+    const mine = focusAfterChange.current
+    focusAfterChange.current = false
+    if (mine && previousId.current && !value?.id) inputRef.current?.focus()
+    else if (mine && value?.id && value.id !== previousId.current) unlinkRef.current?.focus({ preventScroll: true })
     previousId.current = value?.id
   }, [value?.id])
 
@@ -145,6 +151,7 @@ export default function ClientPicker({ userId, value, onChange, onCreatingChange
   }, [active, id, open, filtered.length, pending, failed, canCreate])
 
   function pick(client: Client) {
+    focusAfterChange.current = true
     onChange(client)
     setOpen(false)
     setQ('')
@@ -190,7 +197,7 @@ export default function ClientPicker({ userId, value, onChange, onCreatingChange
           <Check size={18} aria-hidden="true" />
           <span>{value.name || 'Linked client'}</span>
           <button ref={unlinkRef} type="button" className="fh-client-picker__unlink" aria-label="Unlink client"
-            onClick={() => { onChange(null); setQ(''); setOpen(true); setActiveIndex(-1) }}>
+            onClick={() => { focusAfterChange.current = true; onChange(null); setQ(''); setOpen(true); setActiveIndex(-1) }}>
             <X size={18} aria-hidden="true" />
           </button>
         </div>
