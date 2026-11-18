@@ -39,6 +39,7 @@ import { composeClientTimeline, type TimelineEvent } from '../lib/clientTimeline
 import { plainError } from '../lib/serviceErrors.ts'
 import { moneyCents } from '../lib/format.ts'
 import { formatPhone } from '../lib/utils.ts'
+import { useFitWidth } from '../lib/useFitWidth.ts'
 
 // One customer's money to the cent, the figure Money and the statement
 // show, never "$12K" (formats-4).
@@ -415,7 +416,7 @@ export default function ClientDetail() {
           </div>
 
           {/* Metrics row, surfaces lifetime / outstanding / active. Equal
-              thirds while each figure fits its third. The amounts carry
+              share of the row while each figure fits. The amounts carry
               cents, so a figure that does not fit beside the others moves
               to the next line instead of running into its neighbour. */}
           {(lifetime > 0 || outstanding > 0 || activeCount > 0) && (
@@ -639,11 +640,22 @@ function ActionTile({ icon: Icon, label, href, external }: any) {
    Job Detail cockpit helper so both detail screens share scale.
    ============================================================ */
 
+// The figure's size in px, the StampNumber scale for the two sizes used here.
+const METRIC_PX: Record<string, number> = { md: 22, lg: 28 }
+
 function CockpitMetric({ label, tone = 'default', size = 'md', children }: any) {
+  // A figure with cents is wide. Each figure takes its own width and moves
+  // to the next line when it does not fit beside the others; a figure too
+  // wide even for a line of its own is scaled down to fit, whole and on
+  // one line, by the same fit to width hook as the money totals.
+  const fitRef = useFitWidth<HTMLDivElement>(String(children ?? ''))
+  const px = METRIC_PX[size] ?? METRIC_PX.md
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 0', minWidth: 'min-content' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 auto', minWidth: 0, maxWidth: '100%' }}>
       <Eyebrow tone={tone === 'gold' ? 'gold' : 'default'}>{label}</Eyebrow>
-      <StampNumber size={size} tone={tone}>{children}</StampNumber>
+      <div ref={fitRef} style={{ whiteSpace: 'nowrap' }}>
+        <StampNumber size={size} tone={tone} style={{ fontSize: `calc(${px}px * var(--fh-fit, 1))` }}>{children}</StampNumber>
+      </div>
     </div>
   )
 }
