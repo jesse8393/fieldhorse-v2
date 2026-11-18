@@ -141,7 +141,7 @@ test('change order and partner notifications open the section they name', async 
   })
   await open(page, '/jobs/c-job1?tab=change_orders', '.fh-app-header')
   await page.getByRole('button', { name: 'Add', exact: true }).click()
-  await page.getByPlaceholder("Rot at SW corner, replace ~8' bottom plate").fill('Extra footing')
+  await page.getByPlaceholder("Rot at SW corner. Replace ~8' bottom plate").fill('Extra footing')
   await page.locator('input[inputmode="decimal"]').first().fill('1800')
   await page.getByRole('button', { name: 'Add change order', exact: true }).click()
   await expect.poll(() => written.length).toBe(1)
