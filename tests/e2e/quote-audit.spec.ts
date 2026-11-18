@@ -23,6 +23,9 @@ for (const template of ['classic', 'mint', 'slate', 'editorial', 'fieldhorse']) 
     await expect(preview.getByText('$7,750.00', { exact: true }).first()).toBeVisible()
     for (const width of [390, 320]) {
       await page.setViewportSize({ width, height: 844 })
+      // Figures that scale to fit refit when the browser delivers its
+      // resize notice, at the next frame; measure what is drawn after it.
+      await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => done(null)))))
       const geometry = await preview.evaluate((root) => {
         const article = root.querySelector('article')!
         const rect = article.getBoundingClientRect()
