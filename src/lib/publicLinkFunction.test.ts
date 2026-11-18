@@ -382,7 +382,7 @@ describe('who hears about a customer on a link (FN-05, FN-06)', () => {
     }))
     await post(coApproveHandler, { token: 'co', signature_name: 'Dana', expected_amount: 1200, expected_updated_at: 'u1' })
     const titles = pushes.map((p) => String(p.payload.title))
-    expect(titles).toEqual(['Customer is viewing your proposal', 'Quote approved · $100', 'Change order signed · +$1,200'])
+    expect(titles).toEqual(['Customer is viewing your proposal', 'Quote approved · $100.00', 'Change order signed · +$1,200.00'])
   })
 
   it('no server function writes an emoji into a message', async () => {
