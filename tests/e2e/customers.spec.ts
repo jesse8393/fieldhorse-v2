@@ -621,3 +621,47 @@ test('the customer page and the job print the phone formatted', async ({ context
   await page.waitForTimeout(1500)
   expect(await page.locator('main').innerText()).not.toContain('6155550101')
 })
+
+// Finding lost-work-12: a customer being edited keeps what was typed through
+// a reload, opened from the Edit control or from a link.
+test('a customer being edited keeps the typed notes through a reload', async ({ context, page }) => {
+  const words = 'Saw cut joints at 10 ft, broom finish, no curing compound'
+  await signIn(context)
+  await open(page, '/clients/cl-1?edit=contact')
+  const notes = () => page.locator('label', { hasText: 'Notes' }).locator('textarea')
+  await expect(notes()).toBeVisible({ timeout: 30_000 })
+  await notes().fill(words)
+  await page.reload()
+  await expect(notes()).toHaveValue(words)
+  await expect(page.getByText('Unsaved changes restored')).toBeVisible()
+})
+
+// Review of lost-work-12: the customer edit opens again only for changes
+// that still match the customer as saved.
+test('a customer edit left with changes opens again, and a stale one does not', async ({ context, page }) => {
+  const words = 'Gate code 4411, dog in the yard'
+  await signIn(context)
+  await open(page, '/clients/cl-1?edit=contact')
+  const notes = () => page.locator('label', { hasText: 'Notes' }).locator('textarea')
+  await expect(notes()).toBeVisible({ timeout: 30_000 })
+  await notes().fill(words)
+  await page.waitForTimeout(600)
+  await open(page, '/clients/cl-1')
+  await expect(notes()).toHaveValue(words, { timeout: 30_000 })
+  await expect(page.getByText('Unsaved changes restored')).toBeVisible()
+  // The customer was saved differently on another device since. Leave the
+  // screen first, so it writes nothing more.
+  await page.waitForTimeout(600)
+  await page.goto('about:blank')
+  await page.goto('/')
+  await page.evaluate(() => {
+    const key = 'fh:draft:edit:client:cl-1'
+    const entry = JSON.parse(localStorage.getItem(key) || '{}')
+    localStorage.setItem(key, JSON.stringify({ ...entry, base: { ...entry.base, name: 'A name saved elsewhere' } }))
+  })
+  await open(page, '/clients/cl-1')
+  await expect(page.getByRole('button', { name: 'Back to clients' }).first()).toBeVisible({ timeout: 30_000 })
+  await page.waitForTimeout(500)
+  await expect(page.getByRole('button', { name: 'Save changes' })).toHaveCount(0)
+  await expect(notes()).toHaveCount(0)
+})

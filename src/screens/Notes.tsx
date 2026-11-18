@@ -25,6 +25,8 @@ import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { useSecondTap } from '../lib/secondTap.ts'
 import { Eyebrow } from '../components/v3'
 import DataErrorState from '../components/DataErrorState.tsx'
+import DraftRestored from '../components/DraftRestored.tsx'
+import { useEditDraft } from '../lib/useEditDraft.ts'
 import { SkeletonRows } from '../components/fh'
 import { keepFocusOnRetry } from '../lib/retryFocus.ts'
 import { filterReports, reportJobLabel, reportStats } from '../lib/reportHistory.ts'
@@ -63,8 +65,13 @@ export default function Notes() {
   const { data: bundle, isPending: loading, isError, refetch, contactsReady, contactsError, retryContacts } = useNotesBundle(user?.id)
   const notes = useMemo(() => bundle?.notes ?? [], [bundle?.notes])
   const contacts = useMemo(() => bundle?.contacts ?? [], [bundle?.contacts])
-  const [draft, setDraft] = useState('')
-  const [contactId, setContactId] = useState('')
+  // The report being written, and the job it is linked to, stay on the
+  // device until it is saved, so a reload keeps them (D23).
+  const report = useEditDraft('field-report', { text: '', contactId: '' }, { from: 'report' })
+  const draft = report.form.text
+  const contactId = report.form.contactId
+  const setDraft = (value: string) => report.set('text', value)
+  const setContactId = (value: string) => report.set('contactId', value)
   const [saving, setSaving] = useState(false)
   const [parsing, setParsing] = useState(false)
   const [parsed, setParsed] = useState<any>(null)
@@ -488,6 +495,7 @@ export default function Notes() {
             : 'var(--v3-section-shadow)'
         }}
       >
+        {report.restored && <DraftRestored onDiscard={report.discard} />}
         <textarea
           aria-label="Field report"
           className="fh-notes-textarea"

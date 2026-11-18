@@ -17,6 +17,8 @@ import {
   Eyebrow
 } from '../../../components/v3'
 import TimeClockCard from '../../../components/TimeClockCard.tsx'
+import DraftRestored from '../../../components/DraftRestored.tsx'
+import { useEditDraft } from '../../../lib/useEditDraft.ts'
 import { computeJobHealth } from '../lib/jobHealth.ts'
 import ActivityLog from '../sections/ActivityLog.tsx'
 import { resolvePrimaryAction, resolveNextAction, type JobNextAction } from '../lib/jobNextAction.ts'
@@ -556,10 +558,13 @@ const EDITABLE_FIELDS = [
 ]
 
 function EditFieldsCard({ contact, patch, onExitEdit, userId, canEditAmount = false }: any) {
-  // Snapshot of the row when editing starts. The parent keys this card by
-  // job id, so another job remounts it with fresh values, and a realtime
-  // refetch mid edit never wipes what the operator typed.
-  const [form, setForm] = useState(() => buildForm(contact))
+  // The row's values until the operator changes one; from then on the
+  // edits are a draft kept on the device per job (D23), so a tap on
+  // another section, a reload or a realtime refetch never wipes them. The
+  // parent keys this card by job id.
+  const draft = useEditDraft<Record<string, any>>(`edit:job-details:${contact?.id}`, buildForm(contact))
+  const form = draft.form
+  const setForm = draft.update
   const [saving, setSaving] = useState(false)
   const [clientCreating, setClientCreating] = useState(false)
   const clientCreatingRef = useRef(false)
@@ -596,6 +601,8 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId, canEditAmount = fa
   useEffect(() => { if (saveError) errorRef.current?.focus() }, [saveError, saveAttempt])
 
   function exitEdit() {
+    // Cancelled, or saved: the edits are no longer needed.
+    draft.done()
     onExitEdit?.()
     requestAnimationFrame(() => {
       const heading = document.querySelector<HTMLElement>('main h1')
@@ -801,6 +808,7 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId, canEditAmount = fa
         </span>
       </div>}
 
+      {draft.restored && <DraftRestored onDiscard={draft.discard} />}
       {saveError && <div ref={errorRef} tabIndex={-1} role="alert" style={{ borderLeft: '3px solid var(--v3-danger)', padding: '8px 12px', scrollMarginTop: 96 }}>{saveError}</div>}
       {clientCreating && <p role="status" style={{ margin: 0 }}>Adding client. Save changes will be available when this finishes.</p>}
 

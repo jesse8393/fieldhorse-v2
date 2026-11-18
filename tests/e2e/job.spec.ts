@@ -1222,3 +1222,207 @@ test('the job Schedule tab writes the visit time as 7:00 am', async ({ context, 
   await expect(page.getByText(/7:00 am/).filter({ visible: true }).first()).toBeVisible()
   await expect(page.locator('main').getByText(/\d:\d\d\s?(AM|PM)\b/)).toHaveCount(0)
 })
+
+// Finding lost-work-2: a half written daily log or job note is not lost to
+// a reload or a tap on another section.
+const TYPED = 'Saw cut joints at 10 ft, broom finish, no curing compound'
+const jobSections = (page: Page) => page.getByRole('combobox', { name: 'Job section', exact: true })
+async function openJob(page: Page, path: string) {
+  await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(jobSections(page)).toBeVisible({ timeout: 30_000 })
+}
+
+test.describe('typed words in the job sections', () => {
+  const WORDS = TYPED
+  const sections = jobSections
+
+  test('a half written daily log survives a tap on another section and a reload', async ({ context, page }) => {
+    await signIn(context)
+    await openJob(page, '/jobs/c-job1?tab=logs')
+    await page.getByRole('button', { name: '+ New log' }).click()
+    await page.getByLabel('Site summary').fill(WORDS)
+    await page.getByLabel('Crew on site (optional)').fill('4')
+    await sections(page).selectOption('tasks')
+    await expect(page.getByLabel('Site summary')).toHaveCount(0)
+    await sections(page).selectOption('logs')
+    await expect(page.getByLabel('Site summary')).toHaveValue(WORDS)
+    await expect(page.getByLabel('Crew on site (optional)')).toHaveValue('4')
+    await page.reload()
+    await expect(page.getByLabel('Site summary')).toHaveValue(WORDS)
+    await expect(page.getByText('Unsaved changes restored')).toBeVisible()
+    // Cancel throws the draft away for good.
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await page.reload()
+    await expect(page.getByRole('button', { name: '+ New log' })).toBeVisible()
+    await expect(page.getByLabel('Site summary')).toHaveCount(0)
+  })
+
+  // Review of lost-work-2: an edit to a saved log is kept against that log,
+  // and only once something in it changed.
+  const SAVED_LOG = {
+    id: 'log-saved-1', user_id: 'qa-user-1', contact_id: 'c-job1', log_date: '2026-10-09', summary: 'Formed and set rebar',
+    next_steps: null, weather_text: null, crew_count: 3, hours_worked: null, photos: [], created_at: '2026-10-09T15:00:00.000Z'
+  }
+
+  test('opening a saved daily log to edit it keeps nothing until something changes', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_daily_logs: [SAVED_LOG] } })
+    await openJob(page, '/jobs/c-job1?tab=logs')
+    await page.getByRole('button', { name: 'Edit log' }).click()
+    await expect(page.getByLabel('Site summary')).toHaveValue(SAVED_LOG.summary)
+    await page.waitForTimeout(600)
+    await page.reload()
+    await expect(page.getByRole('button', { name: '+ New log' })).toBeVisible()
+    await expect(page.getByLabel('Site summary')).toHaveCount(0)
+    await expect(page.getByText('Unsaved changes restored')).toHaveCount(0)
+  })
+
+  test('an edit to a saved daily log comes back after a reload and saves to that log', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_daily_logs: [SAVED_LOG] } })
+    await openJob(page, '/jobs/c-job1?tab=logs')
+    await page.getByRole('button', { name: 'Edit log' }).click()
+    await page.getByLabel('Site summary').fill(WORDS)
+    await page.reload()
+    await expect(page.getByLabel('Site summary')).toHaveValue(WORDS)
+    await expect(page.getByText('Unsaved changes restored')).toBeVisible()
+    const writes: string[] = []
+    page.on('request', (request) => { if (/\/rest\/v1\/fh_daily_logs/.test(request.url()) && request.method() !== 'GET') writes.push(request.method()) })
+    await page.getByRole('button', { name: 'Save changes' }).click()
+    await expect(page.getByLabel('Site summary')).toHaveCount(0)
+    expect(writes).toEqual(['PATCH'])
+  })
+
+  test('an edit to a daily log saved differently since is dropped', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_daily_logs: [SAVED_LOG] } })
+    await context.addInitScript(() => {
+      if (localStorage.getItem('e2e:stale-log')) return
+      localStorage.setItem('e2e:stale-log', '1')
+      const base = { summary: 'An older summary', nextSteps: '', weatherText: '', crewCount: '3', hoursWorked: '', photos: [] }
+      localStorage.setItem('fh:draft:edit:job-log:log-saved-1', JSON.stringify({ form: { summary: 'Edit made before the log changed' }, base, savedAt: Date.now(), userId: 'qa-user-1' }))
+    })
+    await openJob(page, '/jobs/c-job1?tab=logs')
+    await expect(page.getByText(SAVED_LOG.summary)).toBeVisible()
+    await expect(page.getByLabel('Site summary')).toHaveCount(0)
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('fh:draft:edit:job-log:log-saved-1'))).toBeNull()
+    await page.getByRole('button', { name: 'Edit log' }).click()
+    await expect(page.getByLabel('Site summary')).toHaveValue(SAVED_LOG.summary)
+    await expect(page.getByText('Unsaved changes restored')).toHaveCount(0)
+  })
+
+  test('a half written job note survives a tap on another section and a reload', async ({ context, page }) => {
+    await signIn(context)
+    await openJob(page, '/jobs/c-job1?tab=messages')
+    const box = page.getByPlaceholder('Log a note, call, touchpoint…')
+    await box.fill(WORDS)
+    await sections(page).selectOption('tasks')
+    await expect(box).toHaveCount(0)
+    await sections(page).selectOption('messages')
+    await expect(box).toHaveValue(WORDS)
+    await page.reload()
+    await expect(page.getByPlaceholder('Log a note, call, touchpoint…')).toHaveValue(WORDS)
+  })
+})
+
+// Finding lost-work-6: Edit job details keeps its edits through a stray
+// tap on another section and a reload.
+test.describe('typed words in edit job details', () => {
+  const WORDS = TYPED
+  const sections = jobSections
+
+  test('edit job details keeps its edits through a tap on another section and a reload', async ({ context, page }) => {
+    await signIn(context)
+    await openJob(page, '/jobs/c-job1?edit=1')
+    const form = page.getByRole('form', { name: 'Edit job details' })
+    await form.getByLabel('Scope notes').fill(WORDS)
+    await sections(page).selectOption('tasks')
+    await sections(page).selectOption('overview')
+    await expect(page.getByRole('form', { name: 'Edit job details' }).getByLabel('Scope notes')).toHaveValue(WORDS)
+    await page.reload()
+    await expect(page.getByRole('form', { name: 'Edit job details' }).getByLabel('Scope notes')).toHaveValue(WORDS)
+    await expect(page.getByText('Unsaved changes restored')).toBeVisible()
+    // Cancel closes the edit and forgets it.
+    await page.getByRole('form', { name: 'Edit job details' }).getByRole('button', { name: 'Cancel', exact: true }).click()
+    await expect(page.getByRole('form', { name: 'Edit job details' })).toHaveCount(0)
+    await page.reload()
+    await expect(sections(page)).toBeVisible()
+    await expect(page.getByRole('form', { name: 'Edit job details' })).toHaveCount(0)
+  })
+})
+
+// Finding lost-work-8: a milestone the server refuses stays in the box.
+/** Answers one table's writes with a server refusal. */
+async function refuseWrites(context: import('@playwright/test').BrowserContext, table: string) {
+  const hits = { count: 0 }
+  await context.route((url) => url.pathname === `/rest/v1/${table}`, (route) => {
+    if (route.request().method() !== 'PATCH') return route.fallback()
+    hits.count += 1
+    return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ code: '57014', message: 'canceling statement due to statement timeout', details: null, hint: null }) })
+  })
+  return hits
+}
+
+test.describe('a milestone that fails to save', () => {
+  test('a milestone the server refuses stays in the box', async ({ context, page }) => {
+    await signIn(context)
+    const refused = await refuseWrites(context, 'fh_contacts')
+    await openJob(page, '/jobs/c-job1?tab=details')
+    const box = page.getByPlaceholder('Add milestone…')
+    await box.fill('Forms inspected before pour')
+    await page.getByRole('button', { name: 'Add milestone' }).click()
+    await expect.poll(() => refused.count).toBeGreaterThan(0)
+    await expect(page.getByText("Couldn't save", { exact: false }).first()).toBeVisible()
+    await expect(box).toHaveValue('Forms inspected before pour')
+  })
+})
+
+// Finding lost-work-9: a photo caption the server refuses stays in the field.
+test.describe('a photo caption that fails to save', () => {
+  test('a photo caption the server refuses stays in the field', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_job_files: [{
+      id: 'ph-1', user_id: 'qa-user-1', job_id: 'c-job1', contact_id: 'c-job1', kind: 'photo', storage_path: 'qa-user-1/c-job1/a.jpg',
+      filename: 'a.jpg', caption: 'Old caption', section_tag: null, size: 1000, mime_type: 'image/jpeg', uploaded_at: new Date().toISOString(), created_at: new Date().toISOString()
+    }] } })
+    const refused = await refuseWrites(context, 'fh_job_files')
+    await openJob(page, '/jobs/c-job1?tab=files&photo=ph-1')
+    const caption = page.getByRole('textbox', { name: 'Photo caption' })
+    await expect(caption).toHaveValue('Old caption')
+    await caption.fill('Rebar tied at 12 inch centers')
+    await caption.blur()
+    await expect.poll(() => refused.count).toBeGreaterThan(0)
+    await expect(page.getByText("Couldn't save caption")).toBeVisible()
+    await page.waitForTimeout(1500)
+    await expect(caption).toHaveValue('Rebar tied at 12 inch centers')
+  })
+})
+
+// Finding lost-work-12: the closing note on Mark complete survives a reload.
+test.describe('typed words on Mark complete', () => {
+  const WORDS = TYPED
+
+  test('the closing note on Mark complete survives a reload', async ({ context, page }) => {
+    await signIn(context)
+    await page.goto('/jobs/c-job2/complete', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    await page.getByLabel('Closing note').fill(WORDS)
+    await page.reload()
+    await expect(page.getByLabel('Closing note')).toHaveValue(WORDS)
+  })
+
+  // Review of lost-work-12: a closeout that could not be read is not a
+  // reason to throw the closing note away.
+  test('a closing note edit is kept when the closeout cannot be read', async ({ context, page }) => {
+    const closeout = { id: 'co-1', user_id: 'qa-user-1', contact_id: 'c-job2', notes: 'Saved closing note', warranty_months: 12, warranty_start_date: '2026-10-01', signoff_method: 'verbal', signoff_name: 'Dana', created_at: '2026-10-01T15:00:00.000Z' }
+    await signIn(context, { tables: { fh_closeouts: [closeout] } })
+    await page.goto('/jobs/c-job2/complete', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    await expect(page.getByLabel('Closing note')).toHaveValue(closeout.notes)
+    await page.getByLabel('Closing note').fill(WORDS)
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('fh:draft:edit:closeout:c-job2'))).not.toBeNull()
+    const refused = (route: Route) => route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ code: 'XX000', message: 'upstream timeout' }) })
+    await context.route('**/rest/v1/fh_closeouts**', refused)
+    await page.reload()
+    await expect(page.getByLabel('Closing note')).toBeVisible()
+    await page.waitForTimeout(800)
+    expect(await page.evaluate(() => localStorage.getItem('fh:draft:edit:closeout:c-job2'))).not.toBeNull()
+    await context.unroute('**/rest/v1/fh_closeouts**', refused)
+    await page.reload()
+    await expect(page.getByLabel('Closing note')).toHaveValue(WORDS)
+  })
+})

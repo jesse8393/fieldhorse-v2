@@ -17,6 +17,8 @@ import {
   loadCloseout, saveCloseout, clearCloseout, snapshotJobTotals, closeoutBalance
 } from '../../lib/closeout.ts'
 import { toastError, toastSuccess } from '../../lib/toast.ts'
+import { useEditDraft } from '../../lib/useEditDraft.ts'
+import DraftRestored from '../../components/DraftRestored.tsx'
 import { hapticError, hapticSuccess } from '../../lib/haptics.ts'
 import { todayYmd } from '../../lib/dates.ts'
 import { useSecondTap } from '../../lib/secondTap.ts'
@@ -51,7 +53,13 @@ function CompleteForm({ data, userId, goBack, home }: { data: ReturnType<typeof 
   const [warrantyMonths, setWarrantyMonths] = useState('12')
   const [signoffMethod, setSignoffMethod] = useState('verbal')
   const [signoffName, setSignoffName] = useState(contact.name || '')
-  const [notes, setNotes] = useState('')
+  // The closing note stays on the device until the closeout is saved, so a
+  // reload keeps it (D23). It starts from the closeout on file, once read.
+  // When the closeout could not be read, the note on file is not known, so
+  // a kept note is neither compared with a guess nor written over.
+  const [readFailed, setReadFailed] = useState(false)
+  const closing = useEditDraft(loading || readFailed ? null : `edit:closeout:${contact.id}`, { notes: existing?.notes || '' })
+  const notes = closing.form.notes
   const [saving, setSaving] = useState(false)
   const [busy, setBusy] = useState(false)
   // The certificate email is kept app wide (lib/invoiceSends), not in this
@@ -64,11 +72,16 @@ function CompleteForm({ data, userId, goBack, home }: { data: ReturnType<typeof 
   useEffect(() => {
     let alive = true
     setLoading(true)
+    setReadFailed(false)
     void Promise.all([
-      loadCloseout({ userId, contactId: contact.id }),
+      loadCloseout({ userId, contactId: contact.id }).then(
+        (row) => ({ row, failed: false }),
+        () => ({ row: null, failed: true }),
+      ),
       snapshotJobTotals({ userId, contactId: contact.id })
-    ]).then(([row, snap]) => {
+    ]).then(([{ row, failed }, snap]) => {
       if (!alive) return
+      setReadFailed(failed)
       setExisting(row || null)
       setTotals(snap)
       if (row) {
@@ -76,7 +89,6 @@ function CompleteForm({ data, userId, goBack, home }: { data: ReturnType<typeof 
         setWarrantyMonths(String(row.warranty_months ?? 12))
         setSignoffMethod(row.signoff_method || 'verbal')
         setSignoffName(row.signoff_name || '')
-        setNotes(row.notes || '')
       }
       setLoading(false)
     }).catch(() => { if (alive) setLoading(false) })
@@ -110,6 +122,7 @@ function CompleteForm({ data, userId, goBack, home }: { data: ReturnType<typeof 
         }
       })
       hapticSuccess()
+      closing.done()
       toastSuccess(onFile ? 'Closeout updated' : 'Job marked complete', signoffName ? `Signed off by ${signoffName.trim()}` : 'Closeout recorded')
       await data.fetchAll()
       goBack()
@@ -286,7 +299,8 @@ function CompleteForm({ data, userId, goBack, home }: { data: ReturnType<typeof 
         error={error && signoffMethod === 'signature_typed' && !signoffName.trim() ? error : undefined}
         onChange={(e) => { setSignoffName(e.target.value); setError(undefined) }}
       />
-      <Field label="Closing note" multiline rows={3} value={notes} placeholder="Punch list done, keys handed over" onChange={(e) => setNotes(e.target.value)} />
+      {closing.restored && <DraftRestored onDiscard={closing.discard} />}
+      <Field label="Closing note" multiline rows={3} value={notes} placeholder="Punch list done, keys handed over" onChange={(e) => closing.set('notes', e.target.value)} />
       {onFile && (
         <>
           <div className="fhja-pair">

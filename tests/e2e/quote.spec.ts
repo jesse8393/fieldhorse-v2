@@ -1119,3 +1119,105 @@ test('leaving the quote while it sends and coming back does not send it twice', 
   expect(sends.length, 'one quote, one email').toBe(1)
   expect(busy, 'Send shows the email going out').toBe('true')
 })
+
+// Finding lost-work-1: what is typed on Scope and terms stays through
+// Back, a reload and the phone's Back until it is saved or discarded.
+const TYPED = 'Saw cut joints at 10 ft, broom finish, no curing compound'
+
+test.describe('typed words on the quote screens', () => {
+  const WORDS = TYPED
+
+  test('scope and terms keep what was typed through a reload and Back, until discarded', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS } })
+    await openQuote(page)
+    await page.getByRole('link', { name: /Scope and terms/ }).click()
+    await page.getByLabel('Scope of work').fill(WORDS)
+    await page.getByLabel('Payment terms').fill('Half down, half on completion')
+    await page.reload()
+    await expect(page.getByLabel('Scope of work')).toHaveValue(WORDS)
+    await expect(page.getByLabel('Payment terms')).toHaveValue('Half down, half on completion')
+    await expect(page.getByText('Unsaved changes restored')).toBeVisible()
+
+    await page.getByRole('button', { name: 'Back' }).click()
+    await expect(page).toHaveURL(/\/quotes\/q-quote$/)
+    await page.getByRole('link', { name: /Scope and terms/ }).click()
+    await expect(page.getByLabel('Scope of work')).toHaveValue(WORDS)
+
+    // Discard takes a second tap on the same button, then the saved text is back.
+    await page.getByRole('button', { name: 'Discard' }).click()
+    await expect(page.getByLabel('Scope of work')).toHaveValue(WORDS)
+    await page.waitForTimeout(600)
+    await page.getByRole('button', { name: 'Tap again to discard' }).click()
+    await expect(page.getByLabel('Scope of work')).toHaveValue('')
+    await expect(page.getByText('Unsaved changes restored')).toHaveCount(0)
+    await page.reload()
+    await expect(page.getByLabel('Scope of work')).toHaveValue('')
+  })
+
+  test('scope and terms drop a draft once the quote was saved differently elsewhere', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS } })
+    let savedElsewhere = false
+    await context.route((url) => url.pathname.endsWith('/rest/v1/fh_quotes'), (route) => {
+      if (route.request().method() === 'GET' && savedElsewhere) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([quoteRow({ scope_text: 'Saved on the office computer' })]) })
+      }
+      return route.fallback()
+    })
+    await openQuote(page, '/quotes/q-quote/terms')
+    await page.getByLabel('Scope of work').fill(WORDS)
+    await page.waitForTimeout(600)
+    savedElsewhere = true
+    await page.reload()
+    await expect(page.getByLabel('Scope of work')).toHaveValue('Saved on the office computer')
+    await expect(page.getByText('Unsaved changes restored')).toHaveCount(0)
+  })
+
+  test('saved terms leave no draft behind', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS } })
+    await openQuote(page, '/quotes/q-quote/terms')
+    await page.getByLabel('Scope of work').fill(WORDS)
+    const saved = page.waitForRequest((r) => r.method() === 'PATCH' && r.url().includes('/rest/v1/fh_quotes'))
+    await page.getByRole('button', { name: 'Save terms' }).click()
+    await saved
+    await expect(page).toHaveURL(/\/quotes\/q-quote$/)
+    await expect.poll(() => page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('fh:draft:edit:')))).toEqual([])
+  })
+})
+
+// Finding lost-work-12: the line editor and the in person approval keep
+// what was typed through a reload too.
+test.describe('typed words on the quote line and approval screens', () => {
+  const WORDS = TYPED
+
+  test('a line being edited stays open with what was typed through a reload', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS } })
+    await openQuote(page)
+    await lines(page).getByRole('button', { name: /Pump truck/ }).click()
+    const editor = page.getByRole('form', { name: 'Edit line' })
+    await editor.getByLabel('Description').fill('Pump truck, 52 meter boom')
+    await editor.getByLabel('Rate').fill('1150')
+    await page.reload()
+    const back = page.getByRole('form', { name: 'Edit line' })
+    await expect(back.getByLabel('Description')).toHaveValue('Pump truck, 52 meter boom')
+    await expect(back.getByLabel('Rate')).toHaveValue('1150')
+  })
+
+  test('a new line being added stays open with what was typed through a reload', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS } })
+    await openQuote(page)
+    await page.getByRole('button', { name: 'Add a line' }).click()
+    await page.getByRole('form', { name: 'Add a line' }).getByLabel('Description').fill(WORDS)
+    await page.reload()
+    await expect(page.getByRole('form', { name: 'Add a line' }).getByLabel('Description')).toHaveValue(WORDS)
+  })
+
+  test('the in person approval keeps the approver and the note through a reload', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS } })
+    await openQuote(page, '/quotes/q-quote/approve')
+    await page.getByLabel('Approved by').fill('Dana Roy')
+    await page.getByLabel('Note (optional)').fill(WORDS)
+    await page.reload()
+    await expect(page.getByLabel('Approved by')).toHaveValue('Dana Roy')
+    await expect(page.getByLabel('Note (optional)')).toHaveValue(WORDS)
+  })
+})

@@ -89,3 +89,16 @@ test('field roles cannot navigate to money sections through the section selector
   await expect(select.locator('option[value="insurance"]')).toHaveCount(0)
   await expect(select.locator('option[value="financials"]')).toHaveText('Expenses')
 })
+
+// Finding lost-work-12: the estimate scope being written stays through a
+// reload until the estimate becomes a quote.
+test('the estimate scope being written survives a reload', async ({ context, page }) => {
+  const words = 'Saw cut joints at 10 ft, broom finish, no curing compound'
+  await signIn(context)
+  await page.goto('/bid?view=builder')
+  const box = page.getByRole('textbox', { name: 'Estimate scope' })
+  await expect(box).toBeVisible({ timeout: 30_000 })
+  await box.fill(words)
+  await page.reload()
+  await expect(page.getByRole('textbox', { name: 'Estimate scope' })).toHaveValue(words)
+})

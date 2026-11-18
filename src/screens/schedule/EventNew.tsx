@@ -13,6 +13,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Field, SkeletonRows } from '../../components/fh'
 import CreateShell, { Choices } from '../new/CreateShell.tsx'
 import DataErrorState from '../../components/DataErrorState.tsx'
+import DraftRestored from '../../components/DraftRestored.tsx'
 import RecordPicker from '../../components/RecordPicker.tsx'
 import CrewAllocation from './CrewAllocation.tsx'
 import { useMembership } from '../../contexts/MembershipContext.tsx'
@@ -30,11 +31,27 @@ import { jobLabel } from '../../lib/scheduleBoard.ts'
 import { leadName, leadNeed } from '../../lib/leadsView.ts'
 import { hapticMedium } from '../../lib/haptics.ts'
 import { countNoun } from '../../lib/format.ts'
+import { useEditDraft } from '../../lib/useEditDraft.ts'
 import './schedule-event.css'
 import { plainError } from '../../lib/serviceErrors.ts'
 
 type Kind = 'job' | 'lead' | 'quote'
 type Link = { kind: Kind; id: string } | null
+
+type EventDraft = {
+  title: string
+  titleTyped: boolean
+  where: string
+  whereTyped: boolean
+  date: string
+  time: string
+  link: Link
+  repeat: 'once' | 'series'
+  every: string
+  occurrences: string
+  duration: string
+  assignedIds: string[]
+}
 
 type EventRow = {
   id: string
@@ -193,33 +210,40 @@ function EventForm({ event }: { event: EventRow | null }) {
   }, [event, params])
 
   const start = event?.start_at ? new Date(event.start_at) : null
-  const [title, setTitle] = useState(() => event?.title || params.get('title') || (presetLink?.kind === 'lead' ? 'Estimate' : ''))
-  // A title the person typed, or one that came with the event or the link,
-  // is never replaced by the linked job's name.
-  const [titleTyped, setTitleTyped] = useState(() => !!(event?.title || params.get('title')))
-  const [where, setWhere] = useState(event?.description || '')
   // A new visit starts on the day picked on the Schedule (?date=), and on
   // today at the next whole hour rather than a time already gone (OPS-10).
   const [initialWhen] = useState(() => start ? { date: toYmd(start), time: start.toTimeString().slice(0, 5) } : newVisitStart(params.get('date')))
-  const [date, setDate] = useState(initialWhen.date)
-  const [time, setTime] = useState(initialWhen.time)
-  const [link, setLink] = useState<Link>(presetLink)
-  const [repeat, setRepeat] = useState<'once' | 'series'>('once')
-  const [every, setEvery] = useState('7')
-  const [occurrences, setOccurrences] = useState('5')
-  const [duration, setDuration] = useState(() => String(eventDurationMs(event) / 60_000))
-  const [assignedIds, setAssignedIds] = useState(() => eventAssignees(event))
+  // The form is kept on the device until it is saved (D23), like every
+  // other create screen: a new visit per record it was opened for, an edit
+  // per event, dropped when the event was saved differently since.
+  const form = useEditDraft<EventDraft>(event ? `edit:event:${event.id}` : `event:${linkValue(presetLink) || 'new'}`, {
+    title: event?.title || params.get('title') || (presetLink?.kind === 'lead' ? 'Estimate' : ''),
+    // A title the person typed, or one that came with the event or the
+    // link, is never replaced by the linked job's name.
+    titleTyped: !!(event?.title || params.get('title')),
+    where: event?.description || '',
+    // The where line follows the linked record until the person types one.
+    whereTyped: !!event?.description,
+    date: initialWhen.date,
+    time: initialWhen.time,
+    link: presetLink,
+    repeat: 'once',
+    every: '7',
+    occurrences: '5',
+    duration: String(eventDurationMs(event) / 60_000),
+    assignedIds: eventAssignees(event)
+  }, event ? {} : { from: 'new' })
+  const { title, titleTyped, where, whereTyped, date, time, link, repeat, every, occurrences, duration, assignedIds } = form.form
+  const { set, follow } = form
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<{ title?: string; when?: string; duration?: string; recurrence?: string; save?: string }>({})
-  // The where line follows the linked record until the person types one.
-  const [whereTyped, setWhereTyped] = useState(!!event?.description)
 
   // A visit linked to a job is named after the job until a title is typed.
   useEffect(() => {
     if (titleTyped || link?.kind !== 'job') return
     const job = jobs.find((j) => j.id === link.id)
-    if (job) setTitle(jobLabel(job))
-  }, [link, jobs, titleTyped])
+    if (job) follow({ title: jobLabel(job) })
+  }, [link, jobs, titleTyped, follow])
 
   // A lead's estimate carries the client's name and address (D60); a job
   // or a quote fills the same line from its client when nothing is typed.
@@ -236,8 +260,8 @@ function EventForm({ event }: { event: EventRow | null }) {
       const job = jobs.find((j) => j.id === link.id)
       line = job ? [job.name?.trim() || job.fh_clients?.name?.trim(), job.address?.trim()].filter(Boolean).join(', ') : ''
     }
-    if (line) setWhere(line)
-  }, [link, leads, quotes, jobs, whereTyped])
+    if (line) follow({ where: line })
+  }, [link, leads, quotes, jobs, whereTyped, follow])
 
   const listsLoading = jobsQuery.isPending || (membership.canSeeFinancials && (leadsQuery.isPending || quotesQuery.isPending))
 
@@ -284,6 +308,7 @@ function EventForm({ event }: { event: EventRow | null }) {
         }).eq('id', event.id).select('id')
         if (error) throw new Error(allocationWriteError(error))
         if (!updated?.length) throw new Error('The event was not changed. Refresh and try again.')
+        form.done()
         invalidateSchedule()
         hapticMedium()
         toastSuccess('Event saved', title.trim())
@@ -310,6 +335,7 @@ function EventForm({ event }: { event: EventRow | null }) {
       const rows = visitPreview.map(row)
       const result = await createScheduleEvents(rows)
       if ('error' in result) throw new Error(result.error)
+      form.done()
       invalidateSchedule()
       hapticMedium()
       toastSuccess('Event scheduled', 'Added to schedule')
@@ -346,21 +372,22 @@ function EventForm({ event }: { event: EventRow | null }) {
       backTo="/schedule"
       onSave={save}
     >
+      {form.restored && <DraftRestored onDiscard={form.discard} />}
       <Field
         label="Title"
         value={title}
         placeholder="Pour foundation, inspection, estimate"
         autoComplete="off"
         error={errors.title}
-        onChange={(e) => { setTitle(e.target.value); setTitleTyped(true); if (errors.title) setErrors({ ...errors, title: undefined }) }}
+        onChange={(e) => { form.patch({ title: e.target.value, titleTyped: true }); if (errors.title) setErrors({ ...errors, title: undefined }) }}
       />
       <div className="fhev-when">
-        <Field label="Date" type="date" value={date} error={errors.when ? ' ' : undefined} onChange={(e) => setDate(e.target.value)} />
-        <Field label="Time" type="time" value={time} error={errors.when} onChange={(e) => setTime(e.target.value)} />
+        <Field label="Date" type="date" value={date} error={errors.when ? ' ' : undefined} onChange={(e) => set('date', e.target.value)} />
+        <Field label="Time" type="time" value={time} error={errors.when} onChange={(e) => set('time', e.target.value)} />
       </div>
-      <Field label="Duration in minutes" type="number" inputMode="numeric" min={1} value={duration} error={errors.duration} onChange={(e) => setDuration(e.target.value)} />
+      <Field label="Duration in minutes" type="number" inputMode="numeric" min={1} value={duration} error={errors.duration} onChange={(e) => set('duration', e.target.value)} />
       {visitPreview[0] && <p className="fhev-pick__helper">Ends {dateAndTime(visitPreview[0].end_at)}</p>}
-      <RecordPicker id="fhev-link" label="Link to" value={linkValue(link)} onChange={(value) => setLink(parseLink(value))}
+      <RecordPicker id="fhev-link" label="Link to" value={linkValue(link)} onChange={(value) => set('link', parseLink(value))}
         disabled={saving} loading={listsLoading} clearLabel="None" placeholder="Search customer, project or address"
         error={jobsQuery.isError || (membership.canSeeFinancials && (leadsQuery.isError || quotesQuery.isError)) ? 'Some records could not load. Existing links remain selected.' : undefined}
         options={[
@@ -374,17 +401,17 @@ function EventForm({ event }: { event: EventRow | null }) {
         value={where}
         placeholder="Client and address"
         autoComplete="off"
-        onChange={(e) => { setWhere(e.target.value); setWhereTyped(true) }}
+        onChange={(e) => form.patch({ where: e.target.value, whereTyped: true })}
       />
-      {orgScope && <CrewAllocation orgId={orgScope} visits={visitPreview} assignedIds={assignedIds} onChange={setAssignedIds} editingId={event?.id} disabled={saving} readOnly={!mayAllocate} />}
+      {orgScope && <CrewAllocation orgId={orgScope} visits={visitPreview} assignedIds={assignedIds} onChange={(ids) => set('assignedIds', ids)} editingId={event?.id} disabled={saving} readOnly={!mayAllocate} />}
       {!editing && (
         <>
-          <Choices label="Repeat" options={REPEAT} value={repeat} onChange={(v) => setRepeat(v === 'series' ? 'series' : 'once')} />
+          <Choices label="Repeat" options={REPEAT} value={repeat} onChange={(v) => set('repeat', v === 'series' ? 'series' : 'once')} />
           {repeat === 'series' && (
             <>
               <div className="fhev-when">
-                <Field label="Repeat every days" type="number" inputMode="numeric" min={1} step={1} value={every} onChange={(e) => setEvery(e.target.value)} />
-                <Field label="Total visits" type="number" inputMode="numeric" min={2} max={52} step={1} value={occurrences} error={errors.recurrence} onChange={(e) => setOccurrences(e.target.value)} />
+                <Field label="Repeat every days" type="number" inputMode="numeric" min={1} step={1} value={every} onChange={(e) => set('every', e.target.value)} />
+                <Field label="Total visits" type="number" inputMode="numeric" min={2} max={52} step={1} value={occurrences} error={errors.recurrence} onChange={(e) => set('occurrences', e.target.value)} />
               </div>
               <section className="fhev-preview" aria-label="Recurring visit preview">
                 <p>{visitPreview.length} {countNoun(visitPreview.length, 'visit')} in all, including this date. Every {every || '?'} days.</p>

@@ -446,3 +446,42 @@ test.describe('desktop capture', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'New lead', exact: true })).toBeVisible()
   })
 })
+
+// Finding lost-work-3: capture never loses words, so a reload or the
+// phone's Back (which skips the on screen guard) keeps what was typed.
+test.describe('capture keeps its words', () => {
+  const WORDS = 'Saw cut joints at 10 ft, broom finish, no curing compound'
+
+  test('a reload keeps what was typed', async ({ context, page }) => {
+    await signIn(context)
+    await open(page, '/capture')
+    await captureScreen(page).getByRole('textbox', { name: 'Or type it' }).fill(WORDS)
+    await page.reload()
+    await expect(captureScreen(page).getByRole('textbox', { name: 'Or type it' })).toHaveValue(WORDS)
+    await expect(captureScreen(page).getByText('Unsaved changes restored')).toBeVisible()
+  })
+
+  test("the phone's Back and Forward keep what was typed", async ({ context, page }) => {
+    await signIn(context)
+    await open(page, '/jobs/c-job1')
+    await page.goto('/capture?job=c-job1', { waitUntil: 'domcontentloaded' })
+    await captureScreen(page).getByRole('textbox', { name: 'Or type it' }).fill(WORDS)
+    await page.goBack()
+    await expect(page).toHaveURL(/\/jobs\/c-job1$/)
+    await page.goForward()
+    await expect(captureScreen(page).getByRole('textbox', { name: 'Or type it' })).toHaveValue(WORDS)
+  })
+
+  test('discarding with the second tap forgets the words', async ({ context, page }) => {
+    await signIn(context)
+    await open(page, '/capture')
+    const screen = captureScreen(page)
+    await screen.getByRole('textbox', { name: 'Or type it' }).fill(WORDS)
+    await screen.getByRole('button', { name: 'Done' }).click()
+    await page.waitForTimeout(600)
+    await screen.getByRole('button', { name: 'Tap again to discard' }).click()
+    await expect(page).not.toHaveURL(/\/capture/)
+    await page.goto('/capture', { waitUntil: 'domcontentloaded' })
+    await expect(captureScreen(page).getByRole('textbox', { name: 'Or type it' })).toHaveValue('')
+  })
+})

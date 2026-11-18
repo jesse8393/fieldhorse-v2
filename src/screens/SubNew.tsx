@@ -10,7 +10,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Field } from '../components/fh'
-import CreateShell from './new/CreateShell.tsx'
+import CreateShell, { useDraft } from './new/CreateShell.tsx'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { supabase } from '../lib/supabase.ts'
@@ -25,9 +25,12 @@ export default function SubNew() {
   const navigate = useNavigate()
   const scopeOrgId = membership.loading ? undefined : membership.orgId
   const refresh = useInvalidateSubs(user?.id, scopeOrgId)
-  const [name, setName] = useState('')
-  const [trade, setTrade] = useState('')
-  const [phone, setPhone] = useState('')
+  // What is typed stays on the device until the save lands (D23).
+  const { form, set, done } = useDraft('sub', { name: '', trade: '', phone: '' })
+  const { name, trade, phone } = form
+  const setName = (value: string) => set('name', value)
+  const setTrade = (value: string) => set('trade', value)
+  const setPhone = (value: string) => set('phone', value)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | undefined>()
   // A missing name is the name field's error, so the field says it (A11Y-08).
@@ -56,6 +59,7 @@ export default function SubNew() {
       toastError("Couldn't add sub", plainError(err, 'Try again.'))
       return
     }
+    done()
     hapticSuccess()
     toastSuccess('Sub added', trimmed)
     await refresh()

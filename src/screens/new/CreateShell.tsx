@@ -6,6 +6,7 @@
 // The draft hook keeps a half typed form in localStorage under
 // fh:draft:<kind> for 24 hours, as the old lead sheet did, so a pocket tap
 // or a dead battery loses nothing. It is cleared the moment a save lands.
+// The storage, and who each draft belongs to, is lib/drafts.ts.
 
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
@@ -13,41 +14,10 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
 import { Button, IconButton } from '../../components/fh'
 import { hapticTap } from '../../lib/haptics.ts'
+import { clearDraft, readDraft, writeDraft } from '../../lib/drafts.ts'
 import './new.css'
 
-const DRAFT_TTL_MS = 24 * 60 * 60 * 1000
-
-export function draftKey(kind: string) {
-  return `fh:draft:${kind}`
-}
-
-export function readDraft<T extends Record<string, unknown>>(kind: string): T | null {
-  if (typeof window === 'undefined') return null
-  try {
-    const raw = window.localStorage.getItem(draftKey(kind))
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as { form?: T; savedAt?: number }
-    if (!parsed?.form || Date.now() - (parsed.savedAt || 0) > DRAFT_TTL_MS) return null
-    return parsed.form
-  } catch { return null }
-}
-
-function hasContent(form: Record<string, unknown>) {
-  return Object.values(form).some((v) => typeof v === 'string' ? v.trim() !== '' : v != null && v !== false)
-}
-
-export function writeDraft(kind: string, form: Record<string, unknown>) {
-  if (typeof window === 'undefined') return
-  try {
-    if (hasContent(form)) window.localStorage.setItem(draftKey(kind), JSON.stringify({ form, savedAt: Date.now() }))
-    else window.localStorage.removeItem(draftKey(kind))
-  } catch { /* quota or private mode: drafts are best effort */ }
-}
-
-export function clearDraft(kind: string) {
-  if (typeof window === 'undefined') return
-  try { window.localStorage.removeItem(draftKey(kind)) } catch { /* ignore */ }
-}
+export { draftKey, readDraft, writeDraft, clearDraft } from '../../lib/drafts.ts'
 
 /**
  * Form state that survives leaving the screen. `initial` is the empty form;

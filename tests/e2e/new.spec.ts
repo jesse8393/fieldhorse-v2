@@ -659,3 +659,33 @@ test('New lead marks its name as required', async ({ context, page }) => {
   // The optional fields stay optional.
   expect(await required(page.getByRole('textbox', { name: /^Phone/ }))).toBe(false)
 })
+
+// Review of lost-work-4: Log miles and New sub keep what was typed through
+// a reload, as the other create screens do, until the save lands.
+test('Log miles keeps the miles and purpose through a reload', async ({ context, page }) => {
+  await signIn(context)
+  await page.goto('/miles/new')
+  await page.getByLabel('Miles', { exact: true }).fill('42')
+  await page.getByLabel('Purpose', { exact: true }).fill('Supplier run for rebar')
+  await page.reload()
+  await expect(page.getByLabel('Miles', { exact: true })).toHaveValue('42')
+  await expect(page.getByLabel('Purpose', { exact: true })).toHaveValue('Supplier run for rebar')
+})
+
+test('Log miles with nothing typed keeps no draft, so the date stays today', async ({ context, page }) => {
+  await signIn(context)
+  await page.goto('/miles/new')
+  await expect(page.getByLabel('Miles', { exact: true })).toBeVisible()
+  await page.waitForTimeout(600)
+  expect(await page.evaluate(() => localStorage.getItem('fh:draft:miles'))).toBeNull()
+})
+
+test('New sub keeps the name and trade through a reload', async ({ context, page }) => {
+  await signIn(context)
+  await page.goto('/subs/new')
+  await page.getByLabel('Name', { exact: true }).fill('Ridge Line Framing')
+  await page.getByLabel('Trade', { exact: true }).fill('Framer')
+  await page.reload()
+  await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Ridge Line Framing')
+  await expect(page.getByLabel('Trade', { exact: true })).toHaveValue('Framer')
+})

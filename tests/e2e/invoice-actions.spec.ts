@@ -1142,3 +1142,22 @@ test('the customer page names an untitled invoice by its printed number', async 
   await expect(page.getByText('PCC-2D3E-01', { exact: true }).filter({ visible: true }).first()).toBeVisible({ timeout: 30_000 })
   await expect(page.getByText(/^Invoice 1$/)).toHaveCount(0)
 })
+
+// Finding lost-work-5: Edit invoice keeps what was typed through a reload
+// and Back, and restores it over the saved invoice.
+test('Edit invoice keeps a typed description through a reload and notes through Back', async ({ page }) => {
+  const words = 'Saw cut joints at 10 ft, broom finish, no curing compound'
+  await page.goto('/invoices/inv1/edit', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+  await page.getByLabel('Description, shows on the invoice').fill(words)
+  await page.reload()
+  await expect(page.getByLabel('Description, shows on the invoice')).toHaveValue(words)
+  await expect(page.getByText('Unsaved changes restored')).toBeVisible()
+
+  await openInvoice(page)
+  await page.getByRole('link', { name: 'Edit', exact: true }).click()
+  await page.getByLabel('Notes').fill('Net 15, thank you')
+  await page.getByRole('button', { name: 'Back' }).click()
+  await page.getByRole('link', { name: 'Edit', exact: true }).click()
+  await expect(page.getByLabel('Notes')).toHaveValue('Net 15, thank you')
+  await expect(page.getByLabel('Description, shows on the invoice')).toHaveValue(words)
+})

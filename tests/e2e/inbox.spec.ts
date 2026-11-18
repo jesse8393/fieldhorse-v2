@@ -883,3 +883,49 @@ test.describe('sending exactly once, only when tapped and online', () => {
     await expect(replyField(page)).toBeFocused()
   })
 })
+
+// Finding lost-work-7: a reply typed in a thread, and an edit to the
+// agent's draft, stay through Back to inbox and a reload until sent.
+test.describe('typed words in a thread', () => {
+  const WORDS = 'Saw cut joints at 10 ft, broom finish, no curing compound'
+
+  test('a typed reply stays through a reload', async ({ context, page }) => {
+    await openThread(context, page, { ...THREAD, fh_agent_runs: [] })
+    await page.getByRole('textbox', { name: 'Write a reply' }).fill(WORDS)
+    await page.reload()
+    await expect(page.getByRole('textbox', { name: 'Write a reply' })).toHaveValue(WORDS)
+  })
+
+  test('a typed reply stays through Back to inbox on a phone', async ({ context, page, isMobile }) => {
+    test.skip(!isMobile, 'The phone thread has its own Back')
+    await openThread(context, page, { ...THREAD, fh_agent_runs: [] })
+    await page.getByRole('textbox', { name: 'Write a reply' }).fill(WORDS)
+    await page.getByRole('link', { name: 'Back to inbox' }).first().click()
+    await page.locator('.fhi-rows > li').filter({ hasText: 'Priya' }).first().getByRole('link').click()
+    await expect(page.getByRole('textbox', { name: 'Write a reply' })).toHaveValue(WORDS)
+  })
+
+  test("an edit to the agent's draft stays through a reload", async ({ context, page }) => {
+    await openThread(context, page)
+    await draftBox(page).fill('Of course, 11:30 works. See you then.')
+    await page.reload()
+    await expect(draftBox(page)).toHaveValue('Of course, 11:30 works. See you then.')
+  })
+
+  test("a restored edit to the agent's draft says so and can be discarded with a second tap", async ({ context, page }) => {
+    await openThread(context, page)
+    const original = await draftBox(page).inputValue()
+    await draftBox(page).fill('Of course, 11:30 works. See you then.')
+    await page.reload()
+    const card = page.getByRole('region', { name: 'Draft reply' })
+    await expect(card.getByText('Unsaved changes restored', { exact: true })).toBeVisible()
+    // The card's own Discard throws the agent's draft away; this one only
+    // forgets the edit.
+    await card.getByRole('button', { name: 'Discard changes', exact: true }).click()
+    await expect(draftBox(page)).toHaveValue('Of course, 11:30 works. See you then.')
+    await page.waitForTimeout(600)
+    await card.getByRole('button', { name: 'Tap again to discard', exact: true }).click()
+    await expect(draftBox(page)).toHaveValue(original)
+    await expect(card.getByText('Unsaved changes restored', { exact: true })).toHaveCount(0)
+  })
+})

@@ -57,6 +57,8 @@ import { toastSuccess, toastError, toastInfo } from '../lib/toast.ts'
 import { ACTIVE_STAGES } from '../lib/stages.ts'
 import { useNavAccess } from '../lib/useNavAccess.ts'
 import { useSecondTap } from '../lib/secondTap.ts'
+import { useEditDraft } from '../lib/useEditDraft.ts'
+import DraftRestored from '../components/DraftRestored.tsx'
 import {
   routeCapture, normalizeIntent, CAPTURE_KIND_META,
   EXPENSE_CATEGORIES, PAYMENT_KINDS,
@@ -104,14 +106,20 @@ export default function Capture() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const [phase, setPhase] = useState<Phase>('input')
-  const [text, setText] = useState('')
   const [intent, setIntent] = useState<CaptureIntent | null>(null)
   const [accessNotice, setAccessNotice] = useState('')
   const [contacts, setContacts] = useState<CaptureContact[]>([])
   // The job the screen was opened on (?job=, from openCapture({ jobId })),
   // and its row once loaded. Work past the roster's 100 most recent rows,
-  // and closed or lost work, is not in `contacts`, so the row is fetched by id.
+  // and closed or lost work, is not in `contacts`, so the row is fetched by
+  // id.
   const attachedJobId = params.get('job') || null
+  // The words are kept on the device until they are filed or discarded, so
+  // a reload or the phone's Back, which skips the second tap below, never
+  // loses them (D23).
+  const words = useEditDraft(`capture:${attachedJobId || 'any'}`, { text: '' }, { from: 'capture' })
+  const text = words.form.text
+  const setText = (value: string) => words.set('text', value)
   const [attachedJob, setAttachedJob] = useState<CaptureContact | null>(null)
   const [listening, setListening] = useState(false)
   const [source, setSource] = useState<Source>('text')
@@ -223,6 +231,8 @@ export default function Capture() {
     hapticTap()
     runRef.current += 1
     stopVoice()
+    // Filed, queued, or discarded with the second tap: nothing to keep.
+    words.done()
     const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0
     if (idx > 0) navigate(-1)
     else navigate('/', { replace: true })
@@ -480,6 +490,7 @@ export default function Capture() {
               {listening && <span className="fh-capture__time">{clock(elapsedMs)}</span>}
             </div>
 
+            {words.restored && <DraftRestored onDiscard={words.discard} />}
             <Field
               multiline
               label="Or type it"

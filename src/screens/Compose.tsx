@@ -24,6 +24,9 @@ import { countNoun } from '../lib/format.ts'
 import { formatPhone } from '../lib/utils.ts'
 import { aiDraftError, plainError } from '../lib/serviceErrors.ts'
 import { timeOfDay } from '../lib/dates.ts'
+import { useEditDraft } from '../lib/useEditDraft.ts'
+import { clearDraft } from '../lib/drafts.ts'
+import DraftRestored from '../components/DraftRestored.tsx'
 
 const CHANNELS = [
   { id: 'sms', label: 'SMS', tone: 'Keep it under 160 chars. Tight. No emoji. Punctuation minimal.', Icon: MessageSquare },
@@ -69,10 +72,33 @@ export default function Compose() {
   const [handoff, setHandoff] = useState<{ contactId: string; channel: string; body: string; subject?: string; to: string } | null>(null)
   const [loggingHandoff, setLoggingHandoff] = useState(false)
   const sendLock = useRef(false)
-  const [context, setContext] = useState('')
-  const [draft, setDraft] = useState('')
-  // Writing is always available, whether or not AI is configured.
-  const [manual, setManual] = useState(false)
+  // The message and its context stay on the device until the message is
+  // sent or recorded, so a reload or Back keeps them (D23). Each customer
+  // has their own, so a message written for one never comes back when
+  // Compose opens for another.
+  const words = useEditDraft(`compose:${contactId || 'none'}`, { context: '', draft: '' }, { from: 'compose' })
+  const { context, draft } = words.form
+  const setContext = (value: string) => words.set('context', value)
+  const setDraft = (value: string) => words.set('draft', value)
+  // Words typed before any customer was chosen go with the customer chosen
+  // next, unless that customer already has a message waiting.
+  const carry = useRef<{ context: string; draft: string } | null>(null)
+  useEffect(() => {
+    const typed = carry.current
+    carry.current = null
+    if (!typed || !contactId || words.dirty) return
+    words.patch(typed)
+    clearDraft('compose:none')
+  }, [contactId]) // eslint-disable-line react-hooks/exhaustive-deps
+  // The one message kept before messages were kept per customer: nobody
+  // can tell whose it was, so it is not shown.
+  useEffect(() => { clearDraft('compose') }, [])
+  // Writing is always available, whether or not AI is configured. A
+  // message brought back from the device opens where it can be edited.
+  const [manual, setManual] = useState(() => words.restored && draft.trim() !== '')
+  useEffect(() => {
+    if (words.restored && draft.trim()) setManual(true)
+  }, [contactId, words.restored]) // eslint-disable-line react-hooks/exhaustive-deps
   const [loading, setLoading] = useState(false)
   const [aiReadiness, setAiReadiness] = useState<'configured' | 'unavailable' | 'unknown'>('unknown')
   const [readinessAttempt, setReadinessAttempt] = useState(0)
@@ -127,6 +153,7 @@ export default function Compose() {
   }, [params])
 
   function chooseContact(value: string) {
+    if (!contactId && value && words.dirty) carry.current = { context, draft }
     setContactId(value)
     setHandoff(null)
     setSent(false)
@@ -207,6 +234,7 @@ export default function Compose() {
       })
       if (error) throw error
       setHandoff(null)
+      words.done({ keep: true })
       setHistoryVersion((value) => value + 1)
       toastSuccess('Communication recorded', 'Delivery and replies stay in your messaging app.')
     } catch {
@@ -260,6 +288,7 @@ export default function Compose() {
 
       hapticSuccess()
       setSent(true)
+      words.done({ keep: true })
       setHistoryVersion((value) => value + 1)
       if (data.history_saved === false) toastError('Email sent, history unavailable', 'Do not send again. The email provider accepted this message, but its history could not be saved.')
       toastSuccess(
@@ -424,6 +453,8 @@ export default function Compose() {
                 <p>This customer has no {channel === 'email' ? 'email address' : 'phone number'} saved. You can still draft and copy a message.</p>
                 <Link className="fh-build-outline-btn" to={contact.client_id ? `/clients/${contact.client_id}?edit=contact` : `/jobs/${contact.id}`} style={{ minHeight: 44 }}>Add contact details</Link>
               </div>}
+
+              {words.restored && <DraftRestored onDiscard={words.discard} />}
 
               <Field label="Extra context">
                 <textarea
