@@ -13,8 +13,9 @@ type Row = Record<string, any>
 
 // A small in memory database with the query shapes the seed and the
 // removal use: insert then select, select with eq, is and in filters,
-// maybeSingle, and delete with a count.
-function fakeDb(initial: Record<string, Row[]> = {}) {
+// maybeSingle, and delete with a count. failDelete makes a table's
+// delete fail with that message.
+function fakeDb(initial: Record<string, Row[]> = {}, failDelete: Record<string, string> = {}) {
   const tables: Record<string, Row[]> = {}
   for (const [name, rows] of Object.entries(initial)) tables[name] = rows.map((r) => ({ ...r }))
   let next = 0
@@ -43,6 +44,7 @@ function fakeDb(initial: Record<string, Row[]> = {}) {
         }
         const hit = rows.filter((r) => filters.every((f) => f(r)))
         if (op === 'delete') {
+          if (failDelete[table]) return { data: null, error: { message: failDelete[table] }, count: null }
           tables[table] = rows.filter((r) => !hit.includes(r))
           return { data: null, error: null, count: hit.length }
         }
@@ -56,7 +58,8 @@ function fakeDb(initial: Record<string, Row[]> = {}) {
 
 const USER = 'user-1'
 const ORG = 'org-1'
-const owner = () => fakeDb({ org_members: [{ org_id: ORG, user_id: USER, role: 'owner', revoked_at: null }] })
+const owner = (failDelete: Record<string, string> = {}) =>
+  fakeDb({ org_members: [{ org_id: ORG, user_id: USER, role: 'owner', revoked_at: null }] }, failDelete)
 
 describe('seedDemoData', () => {
   it('puts the sample lead on fh_leads and the sample quote with its lines on fh_quotes', async () => {
@@ -138,6 +141,17 @@ describe('removeDemoData', () => {
       'fh_clients:real-client', 'fh_contacts:real-job', 'fh_leads:real-lead',
       'fh_quote_items:real-line', 'fh_quotes:real-quote', 'fh_schedule:real-visit'
     ])
+  })
+
+  // Settings shows "Couldn't remove sample data: <message>". The jobs and
+  // clients deletes have always passed the bare message through; only the
+  // child tables name themselves. The errors lane owns that wording.
+  it('keeps the bare message when the jobs or clients delete fails', async () => {
+    for (const table of ['fh_contacts', 'fh_clients']) {
+      const db = owner({ [table]: 'permission denied' })
+      await seedDemoData(db.client, USER, ORG)
+      await expect(removeDemoData(db.client, USER)).rejects.toThrow(/^permission denied$/)
+    }
   })
 
   it('says nothing was removed when there is no sample data', async () => {

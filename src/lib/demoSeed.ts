@@ -396,7 +396,10 @@ export async function removeDemoData(supabase: any, userId: string): Promise<num
   const quoteIds = clientIds.length ? await ids('fh_quotes', (q) => q.in('client_id', clientIds)) : []
 
   let total = 0
-  const remove = async (table: string, column: string, values: string[]) => {
+  // Child tables name themselves in a failure. The jobs delete passes the
+  // bare message through, as it always has: that wording is shown in
+  // Settings and belongs to the errors lane.
+  const remove = async (table: string, column: string, values: string[], named = true) => {
     if (!values.length) return
     const { error, count } = await supabase
       .from(table)
@@ -404,7 +407,7 @@ export async function removeDemoData(supabase: any, userId: string): Promise<num
       .eq('user_id', userId)
       .in(column, values)
     // Surface a real failure instead of quietly under-counting.
-    if (error) throw new Error(`${table}: ${error.message}`)
+    if (error) throw new Error(named ? `${table}: ${error.message}` : error.message)
     total += count ?? 0
   }
 
@@ -416,7 +419,7 @@ export async function removeDemoData(supabase: any, userId: string): Promise<num
   await remove('fh_quote_items', 'quote_id', quoteIds)
   await remove('fh_quotes', 'id', quoteIds)
   await remove('fh_leads', 'id', leadIds)
-  await remove('fh_contacts', 'id', jobIds)
+  await remove('fh_contacts', 'id', jobIds, false)
   const { error: clientsErr, count: clientsCount } = await supabase
     .from('fh_clients')
     .delete({ count: 'exact' })
