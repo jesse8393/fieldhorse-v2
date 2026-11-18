@@ -7,7 +7,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Field } from '../components/fh'
-import CreateShell from './new/CreateShell.tsx'
+import CreateShell, { useDraft } from './new/CreateShell.tsx'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { supabase } from '../lib/supabase.ts'
 import { MOVED_STAGE_FILTER } from '../lib/stages.ts'
@@ -28,10 +28,15 @@ export default function MilesNew() {
   const navigate = useNavigate()
   const refresh = useInvalidateAnalytics()
   const today = useMemo(() => todayYmd(), [])
-  const [droveOn, setDroveOn] = useState(today)
-  const [miles, setMiles] = useState('')
-  const [purpose, setPurpose] = useState('')
-  const [contactId, setContactId] = useState('')
+  // What is typed stays on the device until the save lands (D23). An
+  // empty date means today, so a draft never pins an old day.
+  const { form, set, done } = useDraft('miles', { droveOn: '', miles: '', purpose: '', contactId: '' })
+  const droveOn = form.droveOn || today
+  const { miles, purpose, contactId } = form
+  const setDroveOn = (value: string) => set('droveOn', value)
+  const setMiles = (value: string) => set('miles', value)
+  const setPurpose = (value: string) => set('purpose', value)
+  const setContactId = (value: string) => set('contactId', value)
   const [contacts, setContacts] = useState<{ id: string; name: string | null }[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | undefined>()
@@ -77,6 +82,7 @@ export default function MilesNew() {
       toastError("Couldn't log miles", err.message || 'Try again in a moment.')
       return
     }
+    done()
     hapticMedium()
     toastSuccess('Miles logged', 'Deduction updated')
     refresh()
