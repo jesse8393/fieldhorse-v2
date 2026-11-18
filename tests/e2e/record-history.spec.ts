@@ -64,7 +64,8 @@ test('phone note actions fit, support keyboard archive and confirm both delete p
   const archiveRow = history.getByRole('article').filter({ hasText: 'Keyboard archive' })
   await archiveRow.getByRole('button', { name: 'Archive note', exact: true }).press('Enter')
   await expect(archiveRow).toHaveCount(0)
-  expect(archived).toEqual([{ done: true }])
+  // The row leaves at once and the write follows it, so wait for the write.
+  await expect.poll(() => archived).toEqual([{ done: true }])
 })
 
 test('desktop customer directory reaches every record while preserving search and filter', async ({ context, page }, testInfo) => {
