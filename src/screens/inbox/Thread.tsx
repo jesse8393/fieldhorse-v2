@@ -168,10 +168,12 @@ type DraftPanelProps = {
   /** An older draft starts folded; this opens it. */
   open: boolean
   onToggle: () => void
+  /** The edit shown came back from the device; this forgets it. */
+  onForgetRestored?: () => void
 }
 
 /** The agent's proposed reply. Draft mode only: editable, and nothing goes without Send. */
-function DraftPanel({ item, name, text, sendsLine, onChange, onSend, onDiscard, sending, discarding, ready, open, onToggle }: DraftPanelProps) {
+function DraftPanel({ item, name, text, sendsLine, onChange, onSend, onDiscard, sending, discarding, ready, open, onToggle, onForgetRestored }: DraftPanelProps) {
   const areaRef = useRef<HTMLTextAreaElement>(null)
   const folded = item.older && !open
   useAutosize(areaRef, text, 10, !folded)
@@ -207,6 +209,7 @@ function DraftPanel({ item, name, text, sendsLine, onChange, onSend, onDiscard, 
       {item.older && <p className="fhi-draft__note">Written before {name} last wrote.</p>}
       {!folded && (
         <>
+          {onForgetRestored && <DraftRestored onDiscard={onForgetRestored} discardLabel="Discard changes" />}
           <textarea
             ref={areaRef}
             className="fhi-draft__text"
@@ -527,6 +530,7 @@ export default function Thread({ conversationId, row: listRow, embedded = false 
                       ready={runsFresh}
                       open={openOlder[item.id] === true}
                       onToggle={() => setOpenOlder((prev) => ({ ...prev, [item.id]: !prev[item.id] }))}
+                      onForgetRestored={editDraft.restored && edits[item.id] != null ? () => forgetEdit(item.id) : undefined}
                     />
                   )
                 )}

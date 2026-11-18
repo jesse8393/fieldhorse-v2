@@ -894,4 +894,21 @@ test.describe('typed words in a thread', () => {
     await page.reload()
     await expect(draftBox(page)).toHaveValue('Of course, 11:30 works. See you then.')
   })
+
+  test("a restored edit to the agent's draft says so and can be discarded with a second tap", async ({ context, page }) => {
+    await openThread(context, page)
+    const original = await draftBox(page).inputValue()
+    await draftBox(page).fill('Of course, 11:30 works. See you then.')
+    await page.reload()
+    const card = page.getByRole('region', { name: 'Draft reply' })
+    await expect(card.getByText('Unsaved changes restored', { exact: true })).toBeVisible()
+    // The card's own Discard throws the agent's draft away; this one only
+    // forgets the edit.
+    await card.getByRole('button', { name: 'Discard changes', exact: true }).click()
+    await expect(draftBox(page)).toHaveValue('Of course, 11:30 works. See you then.')
+    await page.waitForTimeout(600)
+    await card.getByRole('button', { name: 'Tap again to discard', exact: true }).click()
+    await expect(draftBox(page)).toHaveValue(original)
+    await expect(card.getByText('Unsaved changes restored', { exact: true })).toHaveCount(0)
+  })
 })
