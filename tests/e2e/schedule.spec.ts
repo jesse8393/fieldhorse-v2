@@ -701,6 +701,8 @@ test.describe('typed words on the event screen', () => {
     await signIn(context)
     await page.goto('/jobs/c-job1/more', { waitUntil: 'domcontentloaded', timeout: 60_000 })
     await page.getByRole('link', { name: /Schedule an event/ }).click()
+    // The where line fills in from the job first; a person types over it.
+    await expect(page.getByLabel('Where')).not.toHaveValue('')
     await page.getByLabel('Where').fill(WORDS)
     await page.getByRole('button', { name: 'Back' }).click()
     await page.getByRole('link', { name: /Schedule an event/ }).click()

@@ -15,6 +15,9 @@ export type ErrorKind = 'route' | 'app' | 'window' | 'promise' | 'query' | 'muta
 const ENDPOINT = '/api/client-error'
 const MAX_REPORTS = 10
 const NETWORK_FAILURE = /failed to fetch|networkerror|load failed|network request failed/i
+// The browser raises this when a size changes inside a ResizeObserver
+// callback, as a figure fitting itself to its box does. It is not a bug.
+const RESIZE_LOOP = /ResizeObserver loop/i
 const sent = new Set<string>()
 
 function messageOf(error: unknown): string {
@@ -32,7 +35,7 @@ export function reportClientError(kind: ErrorKind, error: unknown): void {
     if (typeof location === 'undefined') return
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return
     const message = messageOf(error)
-    if (NETWORK_FAILURE.test(message)) return
+    if (NETWORK_FAILURE.test(message) || RESIZE_LOOP.test(message)) return
     const key = `${kind} ${message}`
     if (sent.has(key) || sent.size >= MAX_REPORTS) return
     sent.add(key)

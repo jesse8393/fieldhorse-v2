@@ -49,6 +49,13 @@ describe('reportClientError', () => {
     expect(beacons).toHaveLength(10)
   })
 
+  it("skips the browser's ResizeObserver loop notice, which a figure fitting itself to its box raises and which is not a bug", async () => {
+    const { reportClientError } = await load()
+    reportClientError('window', 'ResizeObserver loop completed with undelivered notifications.')
+    reportClientError('window', 'ResizeObserver loop limit exceeded')
+    expect(beacons).toHaveLength(0)
+  })
+
   it('skips network failures and anything while offline, since they cannot be sent and are not bugs', async () => {
     const { reportClientError } = await load()
     reportClientError('query', new TypeError('Failed to fetch'))
