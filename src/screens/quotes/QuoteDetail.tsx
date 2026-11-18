@@ -31,6 +31,7 @@ import { recordRoute } from '../../lib/records.ts'
 import { buildQuoteView, previewAsLabel, previewAsName, quoteCapsule } from '../../lib/quoteView.ts'
 import { hapticTap } from '../../lib/haptics.ts'
 import { sendKey, startSend, useSendInFlight } from '../../lib/invoiceSends.ts'
+import { useFitWidth } from '../../lib/useFitWidth.ts'
 import { toastError, toastSuccess } from '../../lib/toast.ts'
 import { useQuoteItems } from '../ContactDetail/sections/QuoteItems.tsx'
 import { shortDate, statusChip } from '../ContactDetail/lib/quoteStatus.ts'
@@ -197,6 +198,7 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
   const live = useMemo(() => buildQuoteView(lines.effective, terms), [lines.effective, terms])
   const loadingMoney = useMemo(() => buildQuoteView([], terms).money, [terms])
   const capsule = quoteCapsule(items.loading ? loadingMoney : live.money)
+  const totalRef = useFitWidth<HTMLSpanElement>(capsule.amount)
 
   // The customer's email, read fresh from the client each time the screen
   // opens (lib/customerEmail.ts), never a copy from before: the address may
@@ -527,7 +529,7 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
       <section className="fhqt-total" aria-label="Total">
         <div className="fhqt-total__row">
           <span className="fhqt-total__label">Total</span>
-          <span className="fhqt-total__amount">{capsule.amount}</span>
+          <span className="fhqt-total__amount" ref={totalRef}>{capsule.amount}</span>
         </div>
         <p className="fhqt-total__note">{capsule.note}</p>
         <Button

@@ -134,19 +134,34 @@
 .fhc-btn:active::after { opacity: 0.12; }
 .fhc-btn:active { transform: translateY(1px); }
 
-/* Sizes */
+/* Sizes. A main action (lg or md) keeps every word of its label: when the
+   label is wider than the room it has (zoom, or the phone's text made
+   bigger) it wraps onto another line and the button grows to hold it.
+   One line keeps the usual height. Mini buttons stay on one line. */
 .fhc-btn--lg {
   --fhc-radius: 14px;
-  height: 56px;
-  padding: 0 24px;
+  height: auto;
+  min-height: 56px;
+  padding: 8px 24px;
   font-family: var(--fh-font-display);
   font-size: 20px;
   line-height: 24px;
+  white-space: normal;
 }
 
 .fhc-btn--md {
   --fhc-radius: 12px;
-  height: 48px;
+  height: auto;
+  min-height: 48px;
+  padding-block: 8px;
+  white-space: normal;
+}
+
+/* A phone zoomed to 150 percent or more: slimmer sides leave a long word
+   such as "approval" room inside the button. */
+@media (max-width: 239px) {
+  .fhc-btn--lg { padding-inline: 8px; }
+  .fhc-btn--md { padding-inline: 12px; }
 }
 
 .fhc-btn--mini {
@@ -683,6 +698,10 @@
   flex: 1;
   min-width: 0;
   display: flex;
+  /* The amount and status move under the name when the row is too narrow
+     to hold both (zoom, or the phone's text made bigger), rather than
+     squeezing the name or running off the edge. */
+  flex-wrap: wrap;
   align-items: flex-start;
   gap: 12px;
   min-height: 64px;
@@ -751,8 +770,9 @@
 .fhc-row__dot--danger { --fhc-dot: var(--fh-danger); }
 
 .fhc-row__body {
+  /* Never narrower than the name's longest word. */
   flex: 1;
-  min-width: 0;
+  max-width: 100%;
   display: grid;
   align-content: start;
   gap: 4px;
@@ -764,7 +784,7 @@
   line-height: 22px;
   font-weight: 600;
   color: var(--fh-ink);
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .fhc-row__sub {
@@ -779,6 +799,10 @@
 .fhc-row__end {
   flex: none;
   max-width: 50%;
+  /* The amount and a status chip stay whole; on a line of their own they
+     sit at the right. */
+  min-width: min-content;
+  margin-left: auto;
   display: grid;
   justify-items: end;
   gap: 4px;
@@ -1176,8 +1200,10 @@
   margin: 8px 0 0;
   font-family: var(--fh-font-display);
   /* Scale complete amounts to the available card width. Exact cents
-     must stay attached to the total, even for seven digit receipts. */
-  font-size: min(var(--fhc-amount-max, 52px), calc((100cqi - 2 * var(--fhc-vault-padding)) / (var(--fhc-amount-characters, 12) * 0.67)));
+     must stay attached to the total, even for seven digit receipts.
+     Chrome on Android scales container units up again with the phone's
+     text size, so useFitWidth (the --fh-fit factor) finishes the fit. */
+  font-size: calc(min(var(--fhc-amount-max, 52px), calc((100cqi - 2 * var(--fhc-vault-padding)) / (var(--fhc-amount-characters, 12) * 0.67))) * var(--fh-fit, 1));
   line-height: 1.04;
   font-weight: 600;
   letter-spacing: 0;

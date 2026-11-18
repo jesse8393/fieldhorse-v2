@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useLocation } from 'react-router-dom'
 import { Moon, Plus } from 'lucide-react'
@@ -43,6 +44,42 @@ function DockItem({ item, pathname, night }: { item: NavItem; pathname: string; 
   )
 }
 
+// The labels give way first. When one no longer fits beside its
+// neighbours (zoom, or the phone's text made bigger) the dock shows its
+// icons alone, so no tab is pushed off the screen. Each label stays in the
+// page as its tab's name. A label is measured at its own width, centered
+// on its tab, whether it is showing or not, so the choice never flips.
+function labelsCollide(nav: HTMLElement) {
+  const box = nav.getBoundingClientRect()
+  const spans = Array.from(nav.querySelectorAll<HTMLElement>('.fhs-dock__label'), (label) => {
+    const holder = (label.parentElement ?? label).getBoundingClientRect()
+    const middle = holder.left + holder.width / 2
+    return { left: middle - label.scrollWidth / 2, right: middle + label.scrollWidth / 2 }
+  }).sort((a, b) => a.left - b.left)
+  // Closer than 6 px, two labels read as one ("MoneySchedule").
+  return spans.some((span, i) => span.left < box.left + 2 || span.right > box.right - 2 || (i > 0 && span.left < spans[i - 1].right + 6))
+}
+
+// `tabs` names the tabs shown: the labels are watched again only when
+// that set changes, not on every render. Size, zoom and text size changes
+// reach the watcher on their own.
+function useIconsOnly(tabs: string) {
+  const ref = useRef<HTMLElement | null>(null)
+  const [iconsOnly, setIconsOnly] = useState(false)
+  useLayoutEffect(() => {
+    const nav = ref.current
+    if (!nav) return
+    const check = () => setIconsOnly(labelsCollide(nav))
+    check()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(check)
+    observer.observe(nav)
+    nav.querySelectorAll('.fhs-dock__label').forEach((label) => observer.observe(label))
+    return () => observer.disconnect()
+  }, [tabs])
+  return { ref, iconsOnly }
+}
+
 export default function Dock() {
   const { pathname } = useLocation()
   const { canSee } = useNavAccess()
@@ -50,12 +87,13 @@ export default function Dock() {
   const hiddenByScreen = useDockHidden()
   const keyboardOpen = useKeyboardOpen()
   const engineEnabled = useEngineEnabled()
-
-  if (typeof document === 'undefined') return null
-
   const left = DOCK_LEFT.filter((it) => canSee(it.to))
   // A role that cannot open the Inbox keeps Schedule in the fifth slot.
   const right = dockRight(engineEnabled && canSee(INBOX.to)).filter((it) => canSee(it.to))
+  const { ref, iconsOnly } = useIconsOnly([...left, ...right].map((it) => it.to).join(' '))
+
+  if (typeof document === 'undefined') return null
+
   const hidden = hiddenByScreen || keyboardOpen
   const night = theme === 'dark'
   const captureShortcut = desktopShortcut('J', browserEnv())
@@ -65,7 +103,8 @@ export default function Dock() {
 
   const dock = (
     <nav
-      className={`fhs-dock${hidden ? ' is-hidden' : ''}`}
+      ref={ref}
+      className={`fhs-dock${hidden ? ' is-hidden' : ''}${iconsOnly ? ' is-icons-only' : ''}`}
       aria-label="Primary"
     >
       <div className="fhs-dock__side">

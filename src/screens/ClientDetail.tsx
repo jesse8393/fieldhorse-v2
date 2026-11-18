@@ -392,12 +392,15 @@ export default function ClientDetail() {
             </div>
           </div>
 
-          {/* Metrics row, surfaces lifetime / outstanding / active */}
+          {/* Metrics row, surfaces lifetime / outstanding / active. Equal
+              thirds while each figure fits its third; a figure that does
+              not moves to the next line instead of running into its
+              neighbour. */}
           {(lifetime > 0 || outstanding > 0 || activeCount > 0) && (
             <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr 1fr',
-              alignItems: 'end',
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'flex-end',
               gap: 12,
               marginTop: 12,
               paddingTop: 12,
@@ -614,7 +617,7 @@ function ActionTile({ icon: Icon, label, href, external }: any) {
 
 function CockpitMetric({ label, tone = 'default', size = 'md', children }: any) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 0', minWidth: 'min-content' }}>
       <Eyebrow tone={tone === 'gold' ? 'gold' : 'default'}>{label}</Eyebrow>
       <StampNumber size={size} tone={tone}>{children}</StampNumber>
     </div>

@@ -438,7 +438,9 @@ function Detail({ label, children }: any) {
 function TotalsBlock({ subtotal, discount, tax, taxRate, coAdjustment, grandTotal, brand }: any) {
   return (
     <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
-      <div style={{ minWidth: 300 }}>
+      {/* 300 wide on a page with room, the page's width on a narrow phone,
+          so the labels are never pushed off its left edge. */}
+      <div style={{ width: '100%', maxWidth: 300 }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <tbody>
             <Row label="Subtotal" value={money(subtotal, { cents: true })} />

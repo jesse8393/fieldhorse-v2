@@ -409,6 +409,10 @@
 .fht-visit__wherein {
   grid-column: 2;
   display: flex;
+  /* Navigate moves under the address when both no longer fit on one line
+     (a narrow phone, zoom, or the phone's text made bigger), rather than
+     squeezing the address until words break. */
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   min-width: 0;
@@ -421,18 +425,25 @@
 }
 
 .fht-visit__address {
-  flex: 1;
-  min-width: 0;
+  flex: 1 1 0;
+  max-width: calc(100% - 26px);
   font-family: var(--fh-font-body);
   font-size: 15px;
   line-height: 20px;
   color: var(--fh-ink-2);
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .fht-visit__wherein .fhc-btn--quiet {
   flex: none;
+  margin-left: auto;
   margin-right: -12px;
+}
+
+/* A phone zoomed to about 125 percent or more: the address takes the
+   whole row, under the time as well as the job. */
+@media (max-width: 299px) {
+  .fht-visit__wherein { grid-column: 1 / -1; }
 }
 
 /* ---- The stage runs under the header on a phone ---- */

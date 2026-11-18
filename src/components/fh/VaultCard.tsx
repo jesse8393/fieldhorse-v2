@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { formatMoney } from './money.ts'
 import { cx } from './cx.ts'
+import { useFitWidth } from '../../lib/useFitWidth.ts'
 
 // The vault card (spec 7, 9.7 and 9.11): an onyx card, radius 22, inside
 // a paper tray, with the raised shadow. A label, the big number in
@@ -48,6 +49,7 @@ export default function VaultCard({
   className
 }: VaultCardProps) {
   const amountText = show(amount)
+  const amountRef = useFitWidth<HTMLParagraphElement>(amountText)
   return (
     <Tag className={cx('fhc-vault', tone === 'paper' && 'fhc-vault--paper', className)} aria-label={ariaLabel}>
       <div className={cx('fhc-vault__card', tone === 'paper' ? 'fhc-vault__card--paper' : 'fh-onyx-scope fh-grain')}>
@@ -55,7 +57,7 @@ export default function VaultCard({
           <p className="fhc-vault__label">{label}</p>
           {corner != null && <div className="fhc-vault__corner">{corner}</div>}
         </div>
-        <p className="fhc-vault__amount" style={{ '--fhc-amount-characters': Math.max(1, amountText.length) } as CSSProperties}>{amountText}</p>
+        <p className="fhc-vault__amount" ref={amountRef} style={{ '--fhc-amount-characters': Math.max(1, amountText.length) } as CSSProperties}>{amountText}</p>
         {facts && facts.length > 0 && (
           <>
             <span className="fhc-vault__rule" aria-hidden="true" />

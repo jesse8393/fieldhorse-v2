@@ -78,11 +78,13 @@
   overflow-wrap: anywhere;
 }
 
-/* A 44 px target for a thumb; the negative margin keeps the line where it was. */
+/* A 44 px target for a thumb: the padding adds the height around the text
+   and the negative margin takes it back, so the line stays where it was and
+   a job title on two lines keeps its own height. */
 a.fhinv-hero__job {
   display: inline-flex;
   align-items: center;
-  min-height: 44px;
+  padding-block: 12px;
   margin-block: -12px;
 }
 
@@ -96,8 +98,10 @@ a.fhinv-hero__job:focus-visible {
 .fhinv-hero__amount {
   margin: 8px 0 0;
   font-family: var(--fh-font-display);
-  font-size: 38px;
-  line-height: 44px;
+  /* One line, scaled down to fit by useFitWidth (the --fh-fit factor). */
+  font-size: calc(38px * var(--fh-fit, 1));
+  line-height: calc(44px * var(--fh-fit, 1));
+  white-space: nowrap;
   font-weight: 600;
   letter-spacing: 0;
   font-variant-numeric: tabular-nums;

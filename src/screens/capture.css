@@ -363,6 +363,12 @@
   align-items: center;
 }
 
+/* The label may break to keep the hint in its column; it never moves the
+   hint under the label as a list row does. */
+.fh-capture__starts .fhc-row__title {
+  overflow-wrap: anywhere;
+}
+
 .fh-capture__starts .fhc-row__end {
   width: 55%;
   max-width: none;

@@ -20,6 +20,7 @@ import { toastSuccess, toastError } from '../lib/toast.ts'
 import MiniMetric from '../components/MiniMetric.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
+import { isEnterToSave, useKeyboardInset } from '../lib/useKeyboardOpen.ts'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { EmptyState } from '../ui/index.ts'
 import { parseDateOnly } from '../lib/dates.ts'
@@ -807,6 +808,9 @@ function ProfileEditor({ profile, onSaved }: any) {
   }))
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
+  // With a phone keyboard up, Save rides above it instead of staying at
+  // the dock's height under it.
+  const keyboardInset = useKeyboardInset()
 
   const setField = (k: any, v: any) => {
     setForm((prev) => ({ ...prev, [k]: v }))
@@ -863,6 +867,15 @@ function ProfileEditor({ profile, onSaved }: any) {
 
   return (
     <>
+      {/* Enter in one of these fields saves, so the keyboard can stay up. */}
+      <div
+        style={{ display: 'contents' }}
+        onKeyDown={(event) => {
+          if (!isEnterToSave(event) || !dirty || saving || !form.name.trim()) return
+          event.preventDefault()
+          void save()
+        }}
+      >
       {/* CONTACT */}
       <Section icon={<Hammer size={11} />} label="Contact">
         <Field label="Name" value={form.name} onChange={(v: any) => setField('name', v)} required />
@@ -917,6 +930,7 @@ function ProfileEditor({ profile, onSaved }: any) {
           Lightweight only, never store full account or routing numbers here.
         </Eyebrow>
       </Section>
+      </div>
 
       {/* DOCUMENTS */}
       <DocumentsSection profile={profile} onChanged={onSaved} />
@@ -942,7 +956,7 @@ function ProfileEditor({ profile, onSaved }: any) {
       {/* STICKY SAVE */}
       <div className="fh-subdetail-savebar" style={{
         position: 'sticky',
-        bottom: 'calc(var(--fh-mobile-dock-height) + 16px)',
+        bottom: keyboardInset ? keyboardInset + 16 : 'calc(var(--fh-mobile-dock-height) + 16px)',
         margin: '0 20px',
         zIndex: 5
       }}>

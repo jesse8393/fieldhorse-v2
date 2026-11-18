@@ -40,6 +40,7 @@ import { Button, Chip, Icon, OnyxStage, Row, formatMoney } from '../fh'
 import Monogram from '../fh/Monogram.tsx'
 import DocumentLogo, { useDocumentLogo } from './DocumentLogo.tsx'
 import { cx } from '../fh/cx.ts'
+import { useFitWidth } from '../../lib/useFitWidth.ts'
 import { approvalNote, buildPortalView, depositNote, type PortalView, type PublicDocPayload, type PublicDocPayment } from '../../lib/portalView.ts'
 import './fieldhorse-proposal.css'
 
@@ -835,6 +836,8 @@ export function FieldhorseProposal({ view }: { view: ProposalView }) {
   const includedId = useId()
   const optionalId = useId()
   const stepsId = useId()
+  const totalText = formatMoney(pv.total)
+  const totalRef = useFitWidth<HTMLParagraphElement>(totalText)
 
   // A cover that fails to load leaves onyx alone, never a broken image.
   const cover = pv.coverUrl && pv.coverUrl !== failedCover ? pv.coverUrl : null
@@ -907,7 +910,7 @@ export function FieldhorseProposal({ view }: { view: ProposalView }) {
       <div className="fhp-col fhp-body">
         <section className="fhp-total" aria-label="Total">
           <p className="fhp-total__label">Total</p>
-          <p className="fhp-total__amount">{formatMoney(pv.total)}</p>
+          <p className="fhp-total__amount" ref={totalRef}>{totalText}</p>
           {sentence && <p className="fhp-total__note">{sentence}</p>}
         </section>
 

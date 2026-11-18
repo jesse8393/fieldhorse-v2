@@ -251,13 +251,13 @@ export default function QuoteLines({ items, userId, who, money, focusRef, startA
             {lines.map((line) => (
               editorFor(line.id) ?? (
                 locked ? (
-                  <Row key={line.id} as="li" title={line.title} subline={line.detail || undefined} money={line.amount} />
+                  <Row key={line.id} as="li" title={line.title} subline={wholeFigures(line.detail)} money={line.amount} />
                 ) : (
                   <Row
                     key={line.id}
                     as="li"
                     title={line.title}
-                    subline={line.detail || undefined}
+                    subline={wholeFigures(line.detail)}
                     money={line.amount}
                     next={pending(line.id) ? 'Saving' : undefined}
                     disabled={pending(line.id)}
@@ -289,8 +289,8 @@ export default function QuoteLines({ items, userId, who, money, focusRef, startA
                 <li className="fhqt-opt" key={r.id}>
                   <button type="button" className="fhqt-opt__main" onClick={() => open(r.id)} disabled={locked || pending(r.id)}>
                     <span className="fhqt-opt__title">{line.title}</span>
-                    {showDetail && <span className="fhqt-opt__sub">{line.detail}</span>}
-                    <span className="fhqt-opt__sub">Adds {formatMoney(line.amount)}</span>
+                    {showDetail && <span className="fhqt-opt__sub">{wholeFigures(line.detail)}</span>}
+                    <span className="fhqt-opt__sub">{wholeFigures(`Adds ${formatMoney(line.amount)}`)}</span>
                   </button>
                   <Switch
                     className="fhqt-switch"
@@ -314,13 +314,13 @@ export default function QuoteLines({ items, userId, who, money, focusRef, startA
             {live.excluded.map((line) => (
               editorFor(line.id) ?? (
                 locked ? (
-                  <Row key={line.id} as="li" title={line.title} subline={line.detail || undefined} money={line.amount} />
+                  <Row key={line.id} as="li" title={line.title} subline={wholeFigures(line.detail)} money={line.amount} />
                 ) : (
                   <Row
                     key={line.id}
                     as="li"
                     title={line.title}
-                    subline={line.detail || undefined}
+                    subline={wholeFigures(line.detail)}
                     money={line.amount}
                     onClick={() => open(line.id)}
                   />
@@ -346,6 +346,15 @@ type LineErrors = Partial<Record<'description' | 'qty' | 'rate' | 'amount', stri
 // rate), and otherwise lets the amount follow quantity and rate. A rate
 // rounded to the cent still counts as quantity times rate: the estimator
 // saves 3 at $333.33 for $1,000.00 (M-09).
+// A line's detail ("1 at $1,234,567.89") may wrap between words, but a
+// money figure in it never breaks inside the number. The word before the
+// figure stays with it ("at $950.00"), so the figure alone never repeats
+// the line's amount as a separate piece of text.
+function wholeFigures(text: string) {
+  if (!text) return undefined
+  return text.split(/((?:\S+ )?-?\$[\d,]+(?:\.\d+)?)/).map((part, i) => (i % 2 ? <span key={i} className="fhqt-figure">{part}</span> : part))
+}
+
 function seedFromRow(row: any): LineDraft {
   const draft = draftFromRow(row)
   return { ...draft, amountOverridden: !amountFollowsRate(row) }

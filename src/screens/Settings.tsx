@@ -8,6 +8,7 @@ import RateCardEditor from '../components/settings/RateCardEditor.tsx'
 import '../styles/settings.css'
 const SnowSettingsBuild = lazy(() => import('../components/desktop/SnowSettingsBuild.tsx'))
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
+import { isEnterToSave, useKeyboardInset } from '../lib/useKeyboardOpen.ts'
 import { supabase } from '../lib/supabase.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
@@ -382,6 +383,9 @@ export default function Settings() {
 
   const { stagger, item } = useFhMotion()
   const isDesktop = useIsDesktop()
+  // With a phone keyboard up, Save rides above it instead of staying at
+  // the dock's height under it.
+  const keyboardInset = useKeyboardInset()
 
   // Sidebar "Templates" item routes to /settings#templates and the
   // anchor lives on the Estimate-template picker further down the
@@ -460,7 +464,7 @@ export default function Settings() {
   const hasLocation = !!(profile?.location_lat && profile?.location_lon)
 
   const saveAction = (
-      <div className="fh-settings-save-bar">
+      <div className="fh-settings-save-bar" style={keyboardInset ? { bottom: keyboardInset + 16 } : undefined}>
         <motion.button
           type="button"
           whileTap={{ scale: 0.97 }}
@@ -974,7 +978,15 @@ export default function Settings() {
   }
 
   return (
-    <motion.div className="fh-screen fh-settings" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: hasUnsavedChanges || saving || saved ? 56 : 0, position: 'relative' }}>
+    <motion.div
+      className="fh-screen fh-settings" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: hasUnsavedChanges || saving || saved ? 56 : 0, position: 'relative' }}
+      onKeyDown={(event) => {
+        // Enter in a field saves the section, so the keyboard can stay up.
+        if (!isEnterToSave(event) || !sectionHasProfileFields || !sectionHasChanges || saving) return
+        event.preventDefault()
+        void save()
+      }}
+    >
       {/* HEADER */}
       <motion.div variants={item} style={{ padding: '12px 24px 12px' }}>
         <Eyebrow>
