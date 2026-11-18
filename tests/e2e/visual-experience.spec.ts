@@ -103,5 +103,6 @@ test('phone contact actions stay visible with details closed and financial acces
   await page.locator('.fh-job-contact-actions').getByRole('button', { name: 'Open photos', exact: true }).click()
   await expect(page.getByRole('region', { name: 'Photos workspace', exact: true })).toBeVisible()
   await expect(page.getByRole('combobox', { name: 'Job section' }).getByRole('option', { name: 'Contract balance', exact: true })).toHaveCount(0)
-  await expect(page.getByText('$33,100', { exact: true })).toHaveCount(0)
+  // Any form of the contract amount, $33,100 or $33,100.00, stays hidden.
+  await expect(page.getByText(/\$33,100/)).toHaveCount(0)
 })
