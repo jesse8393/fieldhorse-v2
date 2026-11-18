@@ -926,3 +926,14 @@ test('the job prints sub rates, insurance figures and the rail amount to the cen
     await expect(rail.getByText(/\$\d+(\.\d)?K\b/)).toHaveCount(0)
   }
 })
+
+// formats-12: the job's own Schedule tab writes the visit time as 7:00 am,
+// the way the spine and Today write it, never "7:00 AM".
+test('the job Schedule tab writes the visit time as 7:00 am', async ({ context, page }) => {
+  await signIn(context, { tables: FORMATS_TABLES })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  await page.goto('/jobs/c-h?tab=schedule', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText('Pour driveway').filter({ visible: true }).first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText(/7:00 am/).filter({ visible: true }).first()).toBeVisible()
+  await expect(page.locator('main').getByText(/\d:\d\d\s?(AM|PM)\b/)).toHaveCount(0)
+})

@@ -2,6 +2,7 @@ import { motion } from 'framer-motion'
 import { Calendar } from 'lucide-react'
 import { hapticTap } from '../../lib/haptics.ts'
 import { dueStatus } from '../../lib/dueDate.ts'
+import { timeOfDay } from '../../lib/dates.ts'
 
 /**
  * Next Action card, the most important thing on the Job Detail Overview.
@@ -10,7 +11,7 @@ import { dueStatus } from '../../lib/dueDate.ts'
  *   │ NEXT ACTION                                    │
  *   │                                                │
  *   │ Schedule final walkthrough with client         │
- *   │  📅 Apr 30, 2026 at 10:00 AM                   │
+ *   │  📅 Apr 30, 2026 at 10:00 am                   │
  *   │                                                │
  *   │ ┌──────────────────────────────────────────┐   │
  *   │ │           Mark Complete                  │   │
@@ -205,9 +206,7 @@ function formatDate(d: string | Date) {
     if (isNaN(date.getTime())) return String(d)
     return date.toLocaleDateString(undefined, {
       month: 'short', day: 'numeric', year: 'numeric'
-    }) + ' at ' + date.toLocaleTimeString(undefined, {
-      hour: 'numeric', minute: '2-digit'
-    })
+    }) + ' at ' + timeOfDay(date)
   } catch {
     return String(d)
   }

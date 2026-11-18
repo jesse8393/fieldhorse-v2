@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  buildLeadRows, buildQuoteRows, followUpLine, leadChip, listedLeads, nextVisitByLead, sortLeads, visitDay
+  buildLeadRows, buildQuoteRows, followUpLine, leadChip, listedLeads, nextVisitByLead, sortLeads, visitDay, visitTime
 } from './leadsView.ts'
 import type { LeadRow, QuoteRow } from './queries.ts'
 
@@ -87,5 +87,14 @@ describe('buildLeadRows and buildQuoteRows', () => {
     expect(shown).toHaveLength(1)
     expect(shown[0]).toMatchObject({ to: '/quotes/a', money: '$46,200.00', chip: { label: 'Sent', tone: 'info' } })
     expect(buildQuoteRows(quotes, { showMoney: false })[0].money).toBeNull()
+  })
+})
+
+// formats-12: a lead's site visit time reads "9:00 am", the way every
+// other screen prints a time.
+describe('visitTime', () => {
+  it('writes the time with am or pm in lower case', () => {
+    expect(visitTime(new Date(2026, 10, 18, 9, 0))).toBe('9:00 am')
+    expect(visitTime(new Date(2026, 10, 18, 16, 30))).toBe('4:30 pm')
   })
 })

@@ -883,8 +883,8 @@ const PILL_FOR_STATUS: Record<string, any> = {
   'Done':        { variant: 'done',    label: 'Done' }
 }
 
-// Split "8:15 AM" into ["8:15", "AM"] for the dispatch-card time
-// column (HR stamp above, AM/PM small caption below). Falls back to
+// Split "8:15 am" into ["8:15", "am"] for the dispatch card time
+// column (hour stamp above, am or pm small caption below). Falls back to
 // the full string if no space is present.
 function splitTime(s: any) {
   if (!s) return ['\u2003', '']

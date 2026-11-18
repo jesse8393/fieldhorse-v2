@@ -29,6 +29,7 @@ import type { PaletteJob } from './paletteActions.ts'
 import { canSeeFinancials, canViewRoute, type OrgRole } from './permissions.ts'
 import { moneyCents } from './format.ts'
 import { invoiceReference, parseInvoiceReference } from './invoiceReference.ts'
+import { timeOfDay } from './dates.ts'
 
 const PER_KIND = 6
 
@@ -93,7 +94,7 @@ function mergeRows(...lists: unknown[]): any[] {
 function fmtDateTime(iso: string | null | undefined) {
   if (!iso) return ''
   const d = new Date(iso)
-  return `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · ${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
+  return `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · ${timeOfDay(d)}`
 }
 
 // Canonical stage→URL mapping lives in stages.ts (audit: 5 copies drifted).

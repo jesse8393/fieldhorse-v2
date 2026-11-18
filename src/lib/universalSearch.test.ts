@@ -6,6 +6,7 @@ const db = vi.hoisted(() => ({
   reads: [] as { table: string; columns: string; filters: [string, string][] }[],
   failedTable: '',
   amount: 12345 as number,
+  startAt: null as string | null,
 }))
 
 vi.mock('./orgScope.ts', () => ({ lastKnownOrg: () => 'org-1' }))
@@ -23,7 +24,7 @@ vi.mock('./supabase.ts', () => ({ supabase: { from: (table: string) => {
       // Deliberately include amount even when omitted from select, proving
       // display filtering as well as the actual requested columns.
       return {
-        data: [{ id: 'record-1', name: 'Assigned job', title: 'Site work', stage: 'job', amount: db.amount, text: 'Site note', filename: 'Plan.pdf' }],
+        data: [{ id: 'record-1', name: 'Assigned job', title: 'Site work', stage: 'job', amount: db.amount, text: 'Site note', filename: 'Plan.pdf', start_at: db.startAt }],
         error: table === db.failedTable ? { message: 'Read refused' } : null,
       }
     },
@@ -31,7 +32,7 @@ vi.mock('./supabase.ts', () => ({ supabase: { from: (table: string) => {
   return builder
 } } }))
 
-beforeEach(() => { db.reads = []; db.failedTable = ''; db.amount = 12345 })
+beforeEach(() => { db.reads = []; db.failedTable = ''; db.amount = 12345; db.startAt = null })
 
 describe('search role boundaries', () => {
   it.each<OrgRole>(['crew', 'foreman'])('keeps %s search useful without requesting restricted records or amounts', async role => {
@@ -111,5 +112,16 @@ describe('search by invoice number', () => {
   it('a text that is not a number reads no invoice by sequence', async () => {
     await universalSearch('Harold', 'user-1', 'org-1', 'owner', 'Parker Construction Company')
     expect(db.reads.some((r) => r.filters.some(([column]) => column === 'sequence_number'))).toBe(false)
+  })
+})
+
+// formats-12: an event's time in Search reads the way every screen prints
+// a time, "7:00 am", with am or pm in lower case.
+describe('search event times', () => {
+  it('writes the event time as 7:00 am', async () => {
+    db.startAt = new Date(2026, 10, 18, 7, 0).toISOString()
+    const result = await universalSearch('Site', 'user-1', 'org-1', 'owner')
+    expect(result.events[0].sub).toContain('Nov 18 · 7:00 am')
+    expect(result.events[0].sub).not.toMatch(/AM|PM/)
   })
 })

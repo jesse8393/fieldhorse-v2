@@ -13,7 +13,7 @@
 // Sorted most-recent first; events at the exact same timestamp keep
 // insertion order (kind precedence).
 
-import { parseDateOnly, todayYmd } from '../../../lib/dates.ts'
+import { parseDateOnly, todayYmd, dateAndTime } from '../../../lib/dates.ts'
 import { moneyCents } from '../../../lib/format.ts'
 
 export type ActivityEvent = {
@@ -198,7 +198,7 @@ export function composeActivityEvents({
       kind: 'schedule',
       title: s.title || 'Scheduled event',
       sub: s.start_at
-        ? new Date(s.start_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+        ? dateAndTime(s.start_at)
         : null,
       tone: 'neutral'
     })

@@ -74,3 +74,14 @@ describe('composeActivityEvents money', () => {
     expect(events[0].title).toBe('$6,400.00 received')
   })
 })
+
+// formats-12: a visit in the job activity reads "Nov 18, 7:00 am", the
+// time written the way every screen writes it.
+describe('composeActivityEvents schedule time', () => {
+  it('writes the visit time with am or pm in lower case', () => {
+    const events = composeActivityEvents({
+      scheduleItems: [{ id: 's1', title: 'Pour driveway', start_at: '2026-11-18T13:00:00Z', created_at: '2026-11-10T12:00:00Z' }]
+    })
+    expect(events[0].sub).toBe('Nov 18, 7:00 am')
+  })
+})

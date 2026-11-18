@@ -19,7 +19,7 @@ import { hapticTap } from '../../../lib/haptics.ts'
 import { SkeletonList } from '../../../components/Skeleton.tsx'
 import { useArmedId } from '../../../lib/secondTap.ts'
 import { compressImageToBlob } from '../../../lib/docIntelligence.ts'
-import { todayYmd } from '../../../lib/dates.ts'
+import { todayYmd, timeOfDay } from '../../../lib/dates.ts'
 import { Eyebrow } from '../../../components/v3'
 import Field from '../../../components/fh/Field.tsx'
 
@@ -66,7 +66,7 @@ function fmtDay(iso: string): string {
 
 function fmtTime(iso: string): string {
   try {
-    return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+    return timeOfDay(iso)
   } catch { return '' }
 }
 

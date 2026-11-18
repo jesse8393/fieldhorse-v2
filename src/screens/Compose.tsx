@@ -20,6 +20,7 @@ import { FilterPill, Eyebrow } from '../components/v3'
 import { countNoun } from '../lib/format.ts'
 import { formatPhone } from '../lib/utils.ts'
 import { aiDraftError } from '../lib/serviceErrors.ts'
+import { timeOfDay } from '../lib/dates.ts'
 
 const CHANNELS = [
   { id: 'sms', label: 'SMS', tone: 'Keep it under 160 chars. Tight. No emoji. Punctuation minimal.', Icon: MessageSquare },
@@ -856,7 +857,7 @@ function DraftHero({ channel, draft, contact, profile, intent }: any) {
 function SmsHero({ draft, contact }: any) {
   const initials = (contact?.name || '·').trim().split(/\s+/).slice(0, 2).map((s: any) => s.charAt(0).toUpperCase()).join('') || '·'
   const now = new Date()
-  const timeStr = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+  const timeStr = timeOfDay(now)
   const dayStr = now.toLocaleDateString([], { weekday: 'short' })
   return (
     <div style={{

@@ -2,12 +2,13 @@ import { useNow } from '../lib/useNow.ts'
 import { WEATHER_FRESH_MS } from '../lib/weather.ts'
 import { tradeRuleBasis } from '../lib/forecastAssessment.ts'
 import '../styles/forecast-audit.css'
+import { timeOfDay } from '../lib/dates.ts'
 
 export default function ForecastBasis({ weather, receivedAt, trades, generalOutlook = false }: { weather: any; receivedAt: number | null; trades: string[]; generalOutlook?: boolean }) {
   const now = useNow()
   const outdated = receivedAt != null && now.getTime() - receivedAt >= WEATHER_FRESH_MS
   return <section className="fh-forecast-basis" aria-label="Forecast source and decision basis">
-    <p>Open Meteo · {receivedAt ? `updated ${new Date(receivedAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}` : 'retrieval time unavailable'}</p>
+    <p>Open Meteo · {receivedAt ? `updated ${timeOfDay(new Date(receivedAt))}` : 'retrieval time unavailable'}</p>
     {outdated && <p role="status">Forecast retrieval exceeds 30 minutes. Refresh before planning work.</p>}
     <p>Check onsite conditions and material requirements before work.</p>
     <details><summary>Source details &amp; weather limits</summary>
