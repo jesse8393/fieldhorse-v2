@@ -19,6 +19,7 @@ import { pushSupport, pushEnabled, enablePush, disablePush } from '../lib/push.t
 import { hapticMedium, hapticSuccess } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { countNoun } from '../lib/format.ts'
+import { removeDemoData } from '../lib/demoSeed.ts'
 import { Switch } from '@/components/ui/switch'
 import { Eyebrow } from '../components/v3'
 import {
@@ -33,21 +34,6 @@ import { plainError } from '../lib/serviceErrors.ts'
 const SettingsSectionContext = createContext<SettingsSection>('business')
 
 const SERVICES = ['Concrete', 'Framing', 'Roofing', 'Electrical', 'Plumbing', 'HVAC', 'Drywall', 'Paint', 'Tile', 'Landscaping', 'Excavation', 'Insulation']
-
-// Child tables the demo seed writes keyed by contact_id, deleted first
-// (scoped to the demo contact ids) before the contacts, in case a child FK
-// isn't ON DELETE CASCADE. Mirrors what seedDemoData() inserts.
-// Each child table plus the column that foreign-keys back to the demo
-// contact. Most use `contact_id`; fh_job_todos keys on `job_id` (its FK
-// column name, see migration 006). Using the wrong column silently
-// deletes nothing and, since we only read { count }, swallows the
-// "column does not exist" error.
-const DEMO_CHILD_TABLES: { table: string; fk: string }[] = [
-  { table: 'fh_expenses',  fk: 'contact_id' },
-  { table: 'fh_schedule',  fk: 'contact_id' },
-  { table: 'fh_notes',     fk: 'contact_id' },
-  { table: 'fh_job_todos', fk: 'job_id' }
-]
 
 function canonicalServices(services: unknown): string[] {
   const canonical = new Set(SERVICES)
@@ -159,45 +145,7 @@ export default function Settings() {
     setWiping(true)
     setWipeResult('')
     try {
-      // Resolve the demo contacts, delete their children explicitly (in case
-      // a child FK isn't ON DELETE CASCADE), then the contacts, then the
-      // demo clients. Everything is scoped to source='demo' + this user.
-      const { data: demoContacts, error: dcErr } = await supabase
-        .from('fh_contacts')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('source' as any, 'demo')
-      if (dcErr) throw new Error(dcErr.message)
-      const ids = (demoContacts || []).map((c: any) => c.id)
-
-      let total = 0
-      if (ids.length) {
-        for (const { table, fk } of DEMO_CHILD_TABLES) {
-          const { error: childErr, count } = await supabase
-            .from(table as any)
-            .delete({ count: 'exact' })
-            .eq('user_id', user.id)
-            .in(fk, ids)
-          // Surface a real failure instead of quietly under-counting.
-          if (childErr) throw new Error(`${table}: ${childErr.message}`)
-          total += count ?? 0
-        }
-        const { error: cErr, count: cCount } = await supabase
-          .from('fh_contacts')
-          .delete({ count: 'exact' })
-          .eq('user_id', user.id)
-          .in('id', ids)
-        if (cErr) throw new Error(cErr.message)
-        total += cCount ?? 0
-      }
-
-      const { error: clErr, count: clCount } = await supabase
-        .from('fh_clients')
-        .delete({ count: 'exact' })
-        .eq('user_id', user.id)
-        .eq('source' as any, 'demo')
-      if (clErr) throw new Error(clErr.message)
-      total += clCount ?? 0
+      const total = await removeDemoData(supabase, user.id)
 
       setWipeResult(total > 0 ? `Removed ${total} sample ${countNoun(total, 'row')}.` : 'No sample data to remove.')
       toastSuccess('Sample data removed', total > 0 ? `${total} demo ${countNoun(total, 'row')} cleared` : 'Nothing to remove')

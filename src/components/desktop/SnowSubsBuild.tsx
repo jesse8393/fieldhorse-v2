@@ -8,10 +8,12 @@ import {
   ChevronRight,
   Search,
   Plus,
+  Hammer,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { countNoun, money, moneyCents } from '../../lib/format.ts'
 import MiniMetric from '../MiniMetric.tsx'
+import { Button, EmptyState } from '../fh'
 
 type Sub = {
   key: string
@@ -32,6 +34,8 @@ type Sub = {
 
 type Props = {
   filtered: Sub[]
+  /** How many subs there are before the search and trade filter. */
+  total: number
   loading: boolean
   q: string
   setQ: (s: string) => void
@@ -75,7 +79,7 @@ function insuranceStatus(
 export default function SnowSubsBuild(props: Props) {
   const navigate = useNavigate()
   const {
-    filtered, loading, q, setQ, tradeFilter, setTradeFilter, allTrades, screenStats,
+    filtered, total, loading, q, setQ, tradeFilter, setTradeFilter, allTrades, screenStats,
     onAddSub, onOpenSub,
   } = props
 
@@ -182,7 +186,16 @@ export default function SnowSubsBuild(props: Props) {
             {loading && (
               <div className="fh-build-table__empty">Loading vendor network...</div>
             )}
-            {!loading && filtered.length === 0 && (
+            {/* No subs at all is not a filter result: say what goes here. */}
+            {!loading && total === 0 && (
+              <EmptyState
+                icon={Hammer}
+                title="No subs yet."
+                sub="A sub is a crew or vendor you hire for part of a job. Add one once and pick them on any job."
+                action={<Button variant="primary" size="md" onClick={onAddSub}>Add your first sub</Button>}
+              />
+            )}
+            {!loading && total > 0 && filtered.length === 0 && (
               <div className="fh-build-table__empty">No vendors match this view. <button type="button" className="fh-build-inline-link" onClick={onAddSub}>Add vendor</button>.</div>
             )}
             {!loading && filtered.slice(0, 60).map((s: any) => {

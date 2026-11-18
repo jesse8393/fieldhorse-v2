@@ -64,6 +64,8 @@ type Props = {
   byStage: StageRow[]
   revenueByMonth: RevenueRow[]
   topClients: TopClient[]
+  /** A company with no work yet: shown in place of the numbers, which would all be $0. */
+  empty?: ReactNode
 }
 
 function pct(n: number | null | undefined) {
@@ -83,7 +85,7 @@ function revenueValue(row: RevenueRow) {
 }
 
 export default function SnowAnalyticsBuild(props: Props) {
-  const { loading, stats, byStage, revenueByMonth, topClients } = props
+  const { loading, stats, byStage, revenueByMonth, topClients, empty } = props
 
   const maxStage = Math.max(...byStage.map((b) => b.value), 1)
   const maxRev = Math.max(...revenueByMonth.map(revenueValue), 1)
@@ -100,16 +102,31 @@ export default function SnowAnalyticsBuild(props: Props) {
   const pending = (label: string, width = 72) => <LoadingValue label={label} width={width} height={20} />
   const railPending = <strong>{pending('Loading', 96)}</strong>
 
+  const header = (
+    <header className="fh-reports__header">
+      <div>
+        <h1 className="fh-build-title">Reports</h1>
+        <p>Cash, contracts and the work ahead.</p>
+      </div>
+      <p>As of {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+    </header>
+  )
+
+  if (empty) {
+    return (
+      <div className="fh-build-page fh-reports" data-build-screen="SnowAnalyticsBuild">
+        <div className="fh-build-main">
+          {header}
+          {empty}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="fh-build-page fh-reports" data-build-screen="SnowAnalyticsBuild">
       <div className="fh-build-main">
-        <header className="fh-reports__header">
-          <div>
-            <h1 className="fh-build-title">Reports</h1>
-            <p>Cash, contracts and the work ahead.</p>
-          </div>
-          <p>As of {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
-        </header>
+        {header}
         <section className="fh-reports__summary" aria-label="Financial overview">
           <KpiCell label="Collected YTD" value={loading ? pending('Loading collected this year') : stats.collected == null ? 'Not connected' : moneyFull(stats.collected)} />
           <KpiCell label="Issued invoices YTD" value={loading ? pending('Loading invoiced this year') : stats.invoiced == null ? 'Not connected' : moneyFull(stats.invoiced)} />

@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ChevronLeft, MapPin, Wind, Droplets, CloudSun, AlertTriangle, Check, X } from 'lucide-react'
 import { useProfile } from '../contexts/ProfileContext.tsx'
-import { getWeather, weatherLabel, reverseGeocode, MURFREESBORO, WEATHER_FRESH_MS } from '../lib/weather.ts'
+import { useMembership } from '../contexts/MembershipContext.tsx'
+import { getWeather, weatherLabel, reverseGeocode, WEATHER_FRESH_MS } from '../lib/weather.ts'
 import { assessWorkWindow, assessTrade, assessedHourlyStrip } from '../lib/forecastAssessment.ts'
 import ForecastBasis from '../components/ForecastBasis.tsx'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
@@ -11,6 +12,7 @@ import { useFhMotion } from '../lib/motion.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { Eyebrow } from '../components/v3'
 import LoadingValue from '../components/LoadingValue.tsx'
+import { Button, EmptyState } from '../components/fh'
 const SnowForecast = lazy(() => import('../components/desktop/SnowForecastBuild.tsx'))
 
 // Status token → brand palette mapping used across the whole screen.
@@ -71,7 +73,8 @@ function fmtDate(iso: any) {
 }
 
 export default function PourWindow() {
-  const { profile, upsertProfile, refresh } = useProfile()
+  const { profile, loading: profileLoading, upsertProfile, refresh } = useProfile()
+  const { canEditSettings } = useMembership()
   const navigate = useNavigate()
   const [weather, setWeather] = useState<any>(null)
   const [receivedAt, setReceivedAt] = useState<number | null>(null)
@@ -84,13 +87,19 @@ export default function PourWindow() {
   const [cityName, setCityName] = useState('')
 
   const hasCoords = profile?.location_lat != null && profile?.location_lon != null
+  // The forecast is only ever for the pinned spot. With none there is
+  // nothing to forecast: the screen asks for the location and never shows
+  // another town's weather as if it were theirs.
+  const noLocation = !profileLoading && !hasCoords
   const services = profile?.services || EMPTY_SERVICES
 
   useEffect(() => {
     let cancelled = false
-    const lat = profile?.location_lat ?? MURFREESBORO.lat
-    const lon = profile?.location_lon ?? MURFREESBORO.lon
-    setLoading(true); setErr(''); setForecastFailed(false); setWeather(null); setReceivedAt(null)
+    const lat = profile?.location_lat
+    const lon = profile?.location_lon
+    setErr(''); setForecastFailed(false); setWeather(null); setReceivedAt(null)
+    if (lat == null || lon == null) { setLoading(false); return }
+    setLoading(true)
     getWeather(lat, lon)
       .then((d) => { if (!cancelled) { setWeather(d); setReceivedAt(Date.now()) } })
       .catch(() => {
@@ -109,8 +118,10 @@ export default function PourWindow() {
   }, [])
 useEffect(() => {
     let cancelled = false
-    const lat = profile?.location_lat ?? MURFREESBORO.lat
-    const lon = profile?.location_lon ?? MURFREESBORO.lon
+    const lat = profile?.location_lat
+    const lon = profile?.location_lon
+    setCityName('')
+    if (lat == null || lon == null) return
     reverseGeocode(lat, lon).then((name) => {
       if (!cancelled && name) setCityName(name)
     })
@@ -184,6 +195,24 @@ useEffect(() => {
   const { stagger, item } = useFhMotion()
   const isDesktop = useIsDesktop()
 
+  // The location is on each person's own profile, so anyone can pin it
+  // here. Settings holds the same control for those who can open it.
+  const askForLocation = noLocation ? (
+    <EmptyState
+      icon={MapPin}
+      title="Pin your location to see the forecast."
+      // A refused pin has to say why here: the strip that shows errors
+      // once a location is set is not on screen yet.
+      sub={err ? <span role="alert" style={{ color: 'var(--v3-danger-text)' }}>{err}</span> : undefined}
+      action={
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+          <Button variant="primary" size="md" onClick={() => { hapticMedium(); pinLocation() }}>Pin location</Button>
+          {canEditSettings && <Button variant="secondary" size="md" to="/settings#location">Set location</Button>}
+        </div>
+      }
+    />
+  ) : null
+
   if (isDesktop) {
     return (
       <Suspense fallback={null}>
@@ -200,6 +229,7 @@ useEffect(() => {
           onPinLocation={pinLocation}
           onRetry={forecastFailed ? retryForecast : undefined}
           onGoToSchedule={() => navigate('/schedule')}
+          empty={askForLocation}
         />
       </Suspense>
     )
@@ -245,13 +275,16 @@ useEffect(() => {
         </motion.button>
       </motion.div>
 
+      {askForLocation && <motion.div variants={item} style={{ padding: '0 24px' }}>{askForLocation}</motion.div>}
+
+      {!askForLocation && <>
       {/* LOCATION / ERROR STRIP */}
       <motion.div variants={item} style={{ padding: '0 24px 12px' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontSize: 14 }}>
           <MapPin size={11} color="var(--field-gold-bright)" />
           {hasCoords
             ? (cityName || `${(profile.location_lat as any).toFixed(2)}, ${(profile.location_lon as any).toFixed(2)}`)
-            : (cityName || 'Murfreesboro, TN')}
+            : ''}
         </div>
         {err && (
           <div role="alert" style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', fontSize: 12, color: 'var(--v3-danger-text)', fontFamily: 'var(--font-body)' }}>
@@ -545,6 +578,7 @@ useEffect(() => {
           })}
         </div>
       </motion.section>
+      </>}
     </motion.div>
   )
 }

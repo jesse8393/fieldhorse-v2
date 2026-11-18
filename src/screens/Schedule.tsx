@@ -1062,12 +1062,16 @@ function MobileUnscheduledJobs({ onSchedule }: { onSchedule: (job: import('../li
   const booked = useBookedVisits(user?.id, from)
   const available = jobs.data && booked.data ? trayJobs(jobs.data, booked.data.map((row) => row.contact_id), new Set()) : null
   const failed = jobs.isError || booked.isError
+  // A company with no jobs at all is not one whose jobs all have dates.
+  const hasAnyJob = (jobs.data ?? []).some((job) => ['job', 'invoice', 'closed', 'lost'].includes(job.stage || ''))
   return (
     <section className="fhev-unscheduled" aria-label="Unscheduled jobs">
       <h2>Unscheduled jobs</h2>
       {jobs.isPending || booked.isPending ? <SkeletonList rows={2} card={false} /> : <>
         {failed && <div role="alert"><p>Could not refresh unscheduled jobs.</p><Button variant="secondary" size="mini" onClick={() => { void jobs.refetch(); void booked.refetch() }}>Try again</Button></div>}
-        {available && available.length === 0 && <p>Every active job has a date.</p>}
+        {available && available.length === 0 && (hasAnyJob
+          ? <p>Every active job has a date.</p>
+          : <div><p>No jobs yet.</p><Button variant="primary" size="mini" to="/jobs/new">New job</Button></div>)}
         {available && available.length > 0 && <details><summary>Show {available.length} unscheduled jobs</summary><ul>{available.map((job) => <li key={job.id}><div><strong>{jobLabel(job)}</strong>{job.address && <p>{job.address}</p>}</div><Button variant="secondary" size="mini" aria-label={`Schedule ${jobLabel(job)}`} onClick={() => onSchedule(job)}>Schedule</Button></li>)}</ul></details>}
       </>}
     </section>

@@ -186,6 +186,7 @@ export default function Subs() {
         <Suspense fallback={null}>
           <SnowSubs
             filtered={filtered}
+            total={grouped.length}
             loading={loading}
             q={q}
             setQ={setQ}

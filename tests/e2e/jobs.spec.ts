@@ -3,6 +3,7 @@
 // rows, Lost behind the filter sheet, and no money for field roles.
 import { expect, test, type Page } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
+import { seedDemoData } from '../../src/lib/demoSeed.ts'
 
 async function openJobs(page: Page, path = '/work') {
   await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 60_000 })
@@ -239,4 +240,74 @@ test('a sort and the lost switch tapped just before a search stay on', async ({ 
   await expect(amount).toHaveAttribute('aria-checked', 'true')
   const address = new URL(page.url()).searchParams
   expect([address.get('lost'), address.get('sort'), address.get('q')]).toEqual(['1', 'amount', 'o'])
+})
+
+// An empty tab offers the create action that fills it, not only Show all,
+// which on a new company opens another empty list. Show all stays beside
+// it when other tabs have rows.
+test.describe('an empty Jobs tab offers what fills it', () => {
+  const EMPTY = { fh_contacts: [], fh_leads: [], fh_quotes: [], fh_invoices: [], fh_schedule: [] }
+  for (const [stage, label, href] of [['leads', 'New lead', '/leads/new'], ['quotes', 'New quote', '/quotes/new'], ['jobs', 'New job', '/jobs/new'], ['done', 'New job', '/jobs/new']]) {
+    test(`the ${stage} tab on a new company offers ${label}`, async ({ context, page }) => {
+      await signIn(context, { tables: EMPTY })
+      await openJobs(page, `/jobs?stage=${stage}`)
+      const empty = page.locator('#fh-main .fhc-empty')
+      await expect(empty.getByRole('link', { name: label, exact: true })).toHaveAttribute('href', href)
+      await expect(empty.getByRole('button', { name: 'Show all', exact: true })).toHaveCount(0)
+    })
+  }
+
+  test('an empty tab keeps Show all when other tabs have rows', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quotes: [] } })
+    await openJobs(page, '/jobs?stage=quotes')
+    const empty = page.locator('#fh-main .fhc-empty')
+    await expect(empty.getByRole('link', { name: 'New quote', exact: true })).toBeVisible()
+    await expect(empty.getByRole('button', { name: 'Show all', exact: true })).toBeVisible()
+  })
+})
+
+// Start with sample data on onboarding. The mock keeps no inserts, so the
+// test runs the real seed against a recorder and loads what it wrote into
+// the mock tables. Each sample then shows where its screen reads it.
+async function sampleTables() {
+  const tables: Record<string, Record<string, unknown>[]> = {}
+  let next = 0
+  const stamp = new Date().toISOString()
+  const from = (table: string) => {
+    let rows: Record<string, unknown>[] = []
+    const b: any = {
+      insert: (input: Record<string, unknown>[]) => {
+        rows = input.map((r) => ({ id: `${table}-${++next}`, created_at: stamp, updated_at: stamp, ...r }))
+        ;(tables[table] ??= []).push(...rows)
+        return b
+      },
+      select: () => b, eq: () => b, is: () => b,
+      maybeSingle: () => { rows = [{ role: 'owner' }]; return b },
+      then: (resolve: any) => resolve({ data: table === 'org_members' ? rows[0] : rows, error: null })
+    }
+    return b
+  }
+  await seedDemoData({ from }, 'qa-user-1', 'org-1')
+  const client = (id: unknown) => tables.fh_clients.find((c) => c.id === id) ?? null
+  for (const t of ['fh_leads', 'fh_quotes']) for (const r of tables[t] ?? []) r.fh_clients = client(r.client_id)
+  return { fh_invoices: [], fh_payments: [], fh_contacts: [], fh_leads: [], fh_quotes: [], ...tables }
+}
+
+test.describe('sample data from onboarding', () => {
+  test('Leads, Quotes and Jobs each show the samples', async ({ context, page, isMobile }) => {
+    const tables = await sampleTables()
+    await signIn(context, { tables })
+    await page.goto('/leads', { waitUntil: 'domcontentloaded' })
+    await expect(page.locator('#fh-main')).toContainText('Front yard redesign')
+    await page.goto('/quotes', { waitUntil: 'domcontentloaded' })
+    await expect(page.locator('#fh-main')).toContainText('Primary bath refresh')
+    await openJobs(page, '/jobs')
+    for (const title of ['Kitchen remodel, full gut', 'Office tenant build out', 'Driveway pour + apron', 'Detached 2-car garage']) {
+      await expect(page.locator('#fh-main').getByText(title).first()).toBeVisible()
+    }
+    if (isMobile) {
+      // All counts the four jobs, the lead and the quote.
+      await expect(page.getByRole('tablist', { name: 'Job stages' }).getByRole('tab', { name: /^All\b/ })).toContainText('6')
+    }
+  })
 })
