@@ -369,6 +369,32 @@ describe('who hears about a customer on a link (FN-05, FN-06)', () => {
     expect(bell(db, 'quote_approved')).toEqual([`${OWNER}:${ORG}`])
   })
 
+  // ai-copy-7: a lock screen push reads like the bell row beside it, with
+  // no emoji tacked on.
+  it('sends push titles with no emoji', async () => {
+    seedDb(quoteDb(OWNER))
+    await getLink('q')
+    await post(approveHandler, { token: 'q', signature_name: 'Dana', expected_total: 100, expected_updated_at: 'u1' })
+    seedDb(baseTables({
+      fh_public_links: [link({ token: 'co', kind: 'change_order', contact_id: 'job-1', change_order_id: 'co-1' })],
+      fh_contacts: [job()],
+      fh_change_orders: [{ id: 'co-1', org_id: ORG, user_id: OWNER, contact_id: 'job-1', sequence_number: 1, title: 'Footing', amount: 1200, status: 'sent', updated_at: 'u1' }]
+    }))
+    await post(coApproveHandler, { token: 'co', signature_name: 'Dana', expected_amount: 1200, expected_updated_at: 'u1' })
+    const titles = pushes.map((p) => String(p.payload.title))
+    expect(titles).toEqual(['Customer is viewing your proposal', 'Quote approved · $100', 'Change order signed · +$1,200'])
+  })
+
+  it('no server function writes an emoji into a message', async () => {
+    const { readdirSync, readFileSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const dir = join(process.cwd(), 'netlify', 'functions')
+    const files = readdirSync(dir, { recursive: true }).map(String).filter((f) => f.endsWith('.js'))
+    expect(files).toContain('public-link.js')
+    const hits = files.filter((f) => /\p{Extended_Pictographic}/u.test(readFileSync(join(dir, f), 'utf8')))
+    expect(hits).toEqual([])
+  })
+
   it('a DocuSign signature writes a readable bell row and sends a push', async () => {
     const { createHmac } = await import('node:crypto')
     vi.stubEnv('DOCUSIGN_CONNECT_HMAC_KEY', 'test-hmac')

@@ -273,7 +273,7 @@ export default function Tasks() {
             </div>
           </section>
           <div className="fh-build-table__empty">
-            Your role ({role || 'unknown'}) can't see every task. Open <button type="button" className="fh-build-inline-link" onClick={() => navigate('/crew')}>your crew home</button> instead, that's your own task list.
+            Your role ({role || 'unknown'}) can't see every task. Open <button type="button" className="fh-build-inline-link" onClick={() => navigate('/crew')}>your crew home</button> instead. That's your own task list.
           </div>
         </div>
       </div>

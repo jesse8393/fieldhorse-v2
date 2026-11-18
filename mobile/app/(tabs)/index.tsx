@@ -240,7 +240,7 @@ export default function HomeScreen() {
             <Card glow style={{ marginBottom: 22 }}>
               <View style={{ padding: 24 }}>
                 {showMoney ? (<>
-                <SectionLabel>Today's revenue opportunity</SectionLabel>
+                <SectionLabel>Pipeline</SectionLabel>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
                     <Text style={{ color: theme.gold, fontSize: 20, fontWeight: '700', marginTop: 4 }}>$</Text>
@@ -249,7 +249,7 @@ export default function HomeScreen() {
                   <View style={{ flex: 1 }} />
                   <TrendChip pct={stats.trend} />
                 </View>
-                <Text style={{ color: theme.inkMuted, fontSize: 14, marginTop: 2 }}>Total Pipeline</Text>
+                <Text style={{ color: theme.inkMuted, fontSize: 14, marginTop: 2 }}>Open leads, quotes and jobs</Text>
 
                 {/* sparkline */}
                 <View style={{ marginTop: 14 }}>
@@ -284,7 +284,7 @@ export default function HomeScreen() {
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 24 }}>
               <QuickAction icon={<Plus color={theme.onGold} size={20} strokeWidth={2.6} />} label="New lead" primary onPress={() => setLeadOpen(true)} />
               {showMoney ? <QuickAction icon={<Sparkles color={theme.goldBright} size={20} />} label="Estimate" onPress={() => router.push('/bid')} /> : null}
-              <QuickAction icon={<MessageSquare color={theme.goldBright} size={20} />} label="AI Compose" onPress={() => router.push('/compose')} />
+              <QuickAction icon={<MessageSquare color={theme.goldBright} size={20} />} label="Compose" onPress={() => router.push('/compose')} />
               <QuickAction icon={<Calendar color={theme.goldBright} size={20} />} label="Schedule" onPress={() => router.push('/schedule')} />
             </View>
 

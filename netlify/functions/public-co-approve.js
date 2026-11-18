@@ -168,7 +168,7 @@ export default async function handler(req) {
       link: `/jobs/${co.contact_id}?tab=change_orders`
     },
     push: {
-      title: `${title} ✍️`,
+      title,
       body: `${who} signed CO #${co.sequence_number}. It's on the next invoice automatically.`,
       link: `/jobs/${co.contact_id}?tab=change_orders`,
       tag: `co-signed-${co.id}`

@@ -191,7 +191,7 @@ export default function ChangeOrdersSection({ contact, userId, changeOrders = []
         }
       }
       const sign = Number(co.amount) >= 0 ? '+' : '−'
-      const shareText = `Change order #${co.sequence_number}, ${co.title} (${sign}${money(Math.abs(Number(co.amount) || 0))}). Review and sign here: ${link.url}`
+      const shareText = `Change order #${co.sequence_number}: ${co.title} (${sign}${money(Math.abs(Number(co.amount) || 0))}). Review and sign here: ${link.url}`
       if (navigator.share) {
         try {
           await navigator.share({ title: `Change order #${co.sequence_number}`, text: shareText })
@@ -201,7 +201,7 @@ export default function ChangeOrdersSection({ contact, userId, changeOrders = []
         }
       }
       await navigator.clipboard.writeText(link.url)
-      toastSuccess('Approval link copied', 'Text it to the customer, they sign right on the page')
+      toastSuccess('Approval link copied', 'Text it to the customer. They sign right on the page.')
     } catch (e: any) {
       toastError("Couldn't create approval link", plainError(e, 'Try again.'))
     } finally {
@@ -503,7 +503,7 @@ function Editor({ initial, isNew, onSave, onCancel }: any) {
             value={form.title}
             onChange={(e) => set('title', e.target.value)}
             disabled={locked}
-            placeholder="Rot at SW corner, replace ~8' bottom plate"
+            placeholder="Rot at SW corner. Replace ~8' bottom plate"
             style={{ ...inputStyle, ...(locked ? lockedInputStyle : null) }}
           />
         </label>

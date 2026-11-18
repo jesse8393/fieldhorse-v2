@@ -1,7 +1,7 @@
 // mobile/app/settings.tsx, business profile.
 // Pushed from More. Edits the profiles row (brand, customer facing details,
 // trades, brand accent, service area, session) that brands quotes/invoices
-// and powers the Home weather pill + Pour Window. Saves via useUpdateProfile.
+// and powers the Home weather pill and the pour window. Saves via useUpdateProfile.
 import { useEffect, useState } from 'react'
 import { View, Text, ScrollView, TextInput, ActivityIndicator, Pressable, Alert, Linking, Switch } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -328,7 +328,7 @@ export default function SettingsScreen() {
                 )
               })}
             </View>
-            <Text style={{ color: theme.inkFaint, fontSize: 12, marginTop: 10 }}>Drives your AI estimates and the Pour Window work window.</Text>
+            <Text style={{ color: theme.inkFaint, fontSize: 12, marginTop: 10 }}>Drives your AI estimates and the pour window.</Text>
 
             <SectionTitle>Where you work</SectionTitle>
             <Pressable
@@ -343,10 +343,10 @@ export default function SettingsScreen() {
                 <Text style={{ color: theme.inkMuted, fontSize: 12, marginTop: 1 }}>{cityName ? 'Tap to pin again to your current location' : 'Tap to use your current location'}</Text>
               </View>
             </Pressable>
-            <Text style={{ color: theme.inkFaint, fontSize: 12, marginTop: 10 }}>Powers your Home weather pill and the Pour Window forecast.</Text>
+            <Text style={{ color: theme.inkFaint, fontSize: 12, marginTop: 10 }}>Powers your Home weather pill and the pour window forecast.</Text>
 
             <View style={{ marginTop: 28 }}>
-              <GoldButton label={saved ? 'Saved ✓' : 'Save changes'} onPress={save} loading={saving} />
+              <GoldButton label={saved ? 'Saved' : 'Save changes'} onPress={save} loading={saving} />
             </View>
 
             <SectionTitle>Your session</SectionTitle>
@@ -365,10 +365,10 @@ export default function SettingsScreen() {
             <SectionTitle>Legal</SectionTitle>
             <View style={{ flexDirection: 'row', gap: 16 }}>
               <Pressable onPress={() => Linking.openURL(`${API_BASE}/privacy`)} hitSlop={8}>
-                <Text style={{ color: theme.goldBright, fontSize: 14, fontWeight: '700' }}>Privacy Policy</Text>
+                <Text style={{ color: theme.goldBright, fontSize: 14, fontWeight: '700' }}>Privacy policy</Text>
               </Pressable>
               <Pressable onPress={() => Linking.openURL(`${API_BASE}/terms`)} hitSlop={8}>
-                <Text style={{ color: theme.goldBright, fontSize: 14, fontWeight: '700' }}>Terms of Service</Text>
+                <Text style={{ color: theme.goldBright, fontSize: 14, fontWeight: '700' }}>Terms of service</Text>
               </Pressable>
             </View>
 

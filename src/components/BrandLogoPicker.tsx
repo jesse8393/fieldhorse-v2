@@ -93,7 +93,7 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
       return
     }
     if (file.size > MAX_BYTES) {
-      toastError('Logo too large, keep it under 1 MB')
+      toastError('Logo too large. Keep it under 1 MB.')
       if (inputRef.current) inputRef.current.value = ''
       return
     }
@@ -108,7 +108,7 @@ export default function BrandLogoPicker({ logoUrl, companyName, fullName, onSave
       }
       probe.onerror = () => {
         URL.revokeObjectURL(probeUrl)
-        toastError("Couldn't read image, try another file")
+        toastError("Couldn't read that image. Try another file.")
       }
       probe.src = probeUrl
     } else {

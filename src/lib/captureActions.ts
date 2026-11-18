@@ -57,7 +57,7 @@ export async function commitCapture({ intent, userId, contacts, paymentId }: {
       if (error) throw error
       return {
         link: job ? `/jobs/${job.id}` : '/notes',
-        toast: queued ? 'Note saved, will sync when back online' : 'Note saved'
+        toast: queued ? 'Note saved. It will sync when you are back online.' : 'Note saved'
       }
     }
 
@@ -85,7 +85,7 @@ export async function commitCapture({ intent, userId, contacts, paymentId }: {
         due_at: intent.due_at ? new Date(`${intent.due_at}T12:00:00`).toISOString() : null
       })
       if (error) throw error
-      return { link: `/jobs/${job.id}`, toast: queued ? 'Task saved, will sync' : 'Task added' }
+      return { link: `/jobs/${job.id}`, toast: queued ? 'Task saved. It will sync when you are back online.' : 'Task added' }
     }
 
     case 'payment': {
@@ -128,7 +128,7 @@ export async function commitCapture({ intent, userId, contacts, paymentId }: {
         end_at: intent.end_at
       })
       if (error) throw error
-      return { link: '/schedule', toast: queued ? 'Saved, will sync' : 'Added to schedule' }
+      return { link: '/schedule', toast: queued ? 'Saved. It will sync when you are back online.' : 'Added to schedule' }
     }
 
     case 'lead': {

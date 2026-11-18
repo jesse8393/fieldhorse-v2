@@ -1107,7 +1107,7 @@ test.describe('Field reports', () => {
       await expect(page.getByText(line)).toHaveCount(0)
     }
     await composer.fill('Rebar delivery moved to Thursday.')
-    await page.getByRole('button', { name: phone ? 'Save Note' : 'Save report', exact: true }).click()
+    await page.getByRole('button', { name: phone ? 'Save note' : 'Save report', exact: true }).click()
     await expect(page.getByText('Note saved')).toBeVisible({ timeout: 15_000 })
     expect(saved).toEqual([expect.objectContaining({ text: 'Rebar delivery moved to Thursday.' })])
     await expect(error).toBeVisible()

@@ -225,7 +225,7 @@ export default function Invoices() {
       <div className="v3-screen" style={{ padding: '24px 24px' }}>
         <DataErrorState
           title="Couldn't load invoices & payments"
-          message="We couldn't reach your billing data. Check your connection and retry, your numbers are safe."
+          message="We couldn't reach your billing data. Check your connection and try again. Your numbers are safe."
           onRetry={() => refresh()}
         />
       </div>

@@ -21,7 +21,7 @@ export default function NotFound() {
             anything in FieldHorse. The link may be stale or mistyped.
           </p>
           <Link to="/" className="v3-btn v3-btn--primary v3-btn--sm" style={{ textDecoration: 'none', display: 'inline-flex' }}>
-            Back to Home
+            Back to home
           </Link>
         </section>
       </div>

@@ -79,7 +79,7 @@ export default function SubsScreen() {
     <View style={{ flex: 1 }}>
       <ScreenBackground />
       <ScrollView contentContainerStyle={{ paddingTop: insets.top + 10, paddingBottom: insets.bottom + 24, paddingHorizontal: 24 }} keyboardShouldPersistTaps="handled">
-        <ScreenHeader backLabel="More" onBack={() => router.back()} eyebrow="Sub Directory" title="Subs"
+        <ScreenHeader backLabel="More" onBack={() => router.back()} eyebrow="Sub directory" title="Subs"
           right={<Pressable onPress={() => setAddOpen(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: theme.goldBright }}><Plus color={theme.onGold} size={14} strokeWidth={2.6} /><Text style={{ color: theme.onGold, fontWeight: '800', fontSize: 12, letterSpacing: 0 }}>ADD</Text></Pressable>} />
 
         <Card glow style={{ marginTop: 16, marginBottom: 16 }}>
@@ -112,7 +112,7 @@ export default function SubsScreen() {
         {isLoading ? (
           <ActivityIndicator color={theme.goldBright} style={{ marginTop: 16 }} />
         ) : grouped.length === 0 ? (
-          <Text style={{ color: theme.inkMuted, fontSize: 14, marginTop: 8 }}>No subs yet. Add one, or assign subs from a job's Subs section, they show up here automatically.</Text>
+          <Text style={{ color: theme.inkMuted, fontSize: 14, marginTop: 8 }}>No subs yet. Add one, or assign subs from a job's Subs section. They show up here automatically.</Text>
         ) : filtered.length === 0 ? (
           <Text style={{ color: theme.inkMuted, fontSize: 14, marginTop: 8 }}>No subs match that filter.</Text>
         ) : (

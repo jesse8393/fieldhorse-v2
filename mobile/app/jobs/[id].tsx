@@ -1033,7 +1033,7 @@ export default function JobDetailScreen() {
             return (
               <Pressable onPress={openQuoteTerms} className="bg-[rgba(20, 20, 20,0.6)] rounded-[10px] p-4 border border-[rgba(201, 150, 58,0.12)] flex-row items-center" style={{ gap: 12 }}>
                 <FileText color="#C9963A" size={16} />
-                <Text className="text-ink-muted text-sm flex-1">Add scope, exclusions & payment terms, they flow onto every proposal.</Text>
+                <Text className="text-ink-muted text-sm flex-1">Add scope, exclusions and payment terms. They flow onto every proposal.</Text>
               </Pressable>
             )
           }
@@ -1094,7 +1094,7 @@ export default function JobDetailScreen() {
         {!insurance ? (
           <Pressable onPress={openInsurance} className="bg-[rgba(20, 20, 20,0.6)] rounded-[10px] p-4 border border-[rgba(201, 150, 58,0.12)] flex-row items-center" style={{ gap: 12 }}>
             <ShieldCheck color="#C9963A" size={16} />
-            <Text className="text-ink-muted text-sm flex-1">Track a carrier claim, surfaces RCV / ACV, deductible & supplement.</Text>
+            <Text className="text-ink-muted text-sm flex-1">Track a carrier claim with its RCV, ACV, deductible and supplement.</Text>
           </Pressable>
         ) : (
           <Pressable onPress={openInsurance} className="bg-[rgba(20, 20, 20,0.6)] rounded-[10px] p-4 border border-[rgba(201, 150, 58,0.12)]">
@@ -1378,7 +1378,7 @@ export default function JobDetailScreen() {
                 )
               })}
               {clients.length === 0 ? (
-                <Text className="text-ink-muted text-sm mt-2">No clients yet, create one from the Clients tab.</Text>
+                <Text className="text-ink-muted text-sm mt-2">No clients yet. Create one from the Clients tab.</Text>
               ) : null}
             </ScrollView>
           </View>

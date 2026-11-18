@@ -580,7 +580,7 @@ export default function Notes() {
               cursor: !draft.trim() || saving ? 'default' : 'pointer'
             }}
           >
-            {saving ? 'Saving…' : 'Save Note'}
+            {saving ? 'Saving…' : 'Save note'}
           </motion.button>
         </div>
 

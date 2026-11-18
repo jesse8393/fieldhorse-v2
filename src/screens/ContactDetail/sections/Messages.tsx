@@ -139,7 +139,7 @@ export default function MessagesSection({ contactId, userId, notes = [], fetchAl
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12
         }}>
           <FileText size={28} aria-hidden="true" color="var(--v3-text-muted)" />
-          <div>No communications logged. Every touchpoint, call, text, onsite, captured in order.</div>
+          <div>No communications logged. Every call, text and site visit shows here in order.</div>
         </div>
       ) : (
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>

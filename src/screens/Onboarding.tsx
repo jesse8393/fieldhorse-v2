@@ -535,7 +535,7 @@ export default function Onboarding() {
               type="submit"
               className="fh-btn fh-btn--primary fh-onb__submit"
               disabled={!canSubmit || busy}
-              title="Recommended, seeds demo clients, jobs, and a schedule so you can see the whole app working"
+              title="Recommended. Adds demo clients, jobs and a schedule so you can see the whole app working."
             >
               {busy ? 'Saving…' : 'Start with sample data'}
             </button>
@@ -563,7 +563,7 @@ export default function Onboarding() {
                 textUnderlineOffset: 3
               }}
             >
-              Skip, start fresh
+              Skip and start empty
             </button>
           </div>
           <p className="fh-onb__meta" style={{ marginTop: 14 }}>

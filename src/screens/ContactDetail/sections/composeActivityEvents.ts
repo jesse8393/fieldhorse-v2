@@ -171,7 +171,7 @@ export function composeActivityEvents({
       id: `co:${co.id}`,
       when: new Date(co.created_at),
       kind: 'change_order',
-      title: `CO #${co.sequence_number} added, ${co.title || 'Change order'}`,
+      title: `CO #${co.sequence_number} added: ${co.title || 'Change order'}`,
       sub: `${co.amount >= 0 ? '+' : ''}${money(co.amount)}`,
       amount: Number(co.amount || 0),
       tone: 'neutral'

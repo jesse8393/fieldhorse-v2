@@ -511,7 +511,7 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
       dueIso: new Date(sentAt).toISOString(),
       dueKind: 'waited',
       title: `CO #${changeOrder.sequence_number} unsigned`,
-      detail: `Sent ${Math.round(days)}d ago - nudge ${contactName(contact, 'the customer')}`,
+      detail: `Sent ${Math.round(days)}d ago. Nudge ${contactName(contact, 'the customer')}.`,
       urgencyLabel: 'Unsigned',
       urgencyTone: 'warn',
       urgency: 100 + days,

@@ -363,7 +363,7 @@ function MemberActions({ member, callerRole, canManage, onChanged }: any) {
 
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', gridColumn: '1 / -1', justifyContent: 'flex-end' }}>
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }} title="Crew hourly rate, feeds job labor cost">
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }} title="Crew hourly rate, used for job labor cost">
         <span style={{ color: 'var(--v3-text-muted, rgba(242, 237, 228,.5))', fontSize: 14 }}>$</span>
         <input
           type="number"

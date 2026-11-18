@@ -403,7 +403,7 @@ export function invoicePdfInput({ invoice, contact, client = null, company, paym
       job_title: `${title}, ${recipient.job_title || 'Construction services'}`
     },
     // pdf.js maps line item `description` → the narrow bold
-    // Product/Service column and `notes` → the wide Description column.
+    // Item column and `notes` → the wide Description column.
     // Title goes narrow, the human-readable description goes wide so it
     // only wraps when it actually runs out of room.
     lineItems: [{ description: title, notes: description, qty: 1, rate: invoice.amount, amount: invoice.amount }],

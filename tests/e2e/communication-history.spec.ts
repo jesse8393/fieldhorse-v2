@@ -113,3 +113,25 @@ test('unconfigured AI opens manual writing without a generation attempt', async 
   await expect(draft).toHaveValue('Manual writing stays available.')
   expect(generated).toBe(0)
 })
+
+// ai-copy-2: a drafted customer message carries no dash used as
+// punctuation. The prompt asks the model for plain punctuation, and a dash
+// it writes anyway is rewritten before the draft is shown, copied or sent.
+// The model reply is stubbed; no real AI is called.
+test('a drafted message asks for and shows plain punctuation', async ({ context, page }) => {
+  await signIn(context, { tables: { fh_contacts: [job], fh_notes: [], fh_messages: [] } })
+  let prompt = ''
+  const modelText = 'Subject: Gate access Friday\n\nHi \u2014 quick heads up: the crew arrives Friday at 7 am. Please leave the west gate open \u2014 thanks.\n\nParker Construction'
+  await page.route('**/api/claude', (route) => {
+    if (route.request().method() === 'GET') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ configured: true }) })
+    prompt = route.request().postData() || ''
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [{ type: 'text', text: modelText }] }) })
+  })
+  await page.goto(`/compose?contact=${job.id}&channel=email`)
+  await page.getByRole('button', { name: 'Generate draft', exact: true }).click()
+  await expect(page.getByText('Gate access Friday').first()).toBeVisible({ timeout: 15000 })
+  expect(prompt).toContain('no em dashes')
+  const shown = (await page.locator('body').innerText()).replace(/\s+/g, ' ')
+  expect(shown).toContain('Hi, quick heads up: the crew arrives Friday at 7 am. Please leave the west gate open, thanks.')
+  expect(shown).not.toMatch(/[\u2013\u2014]/)
+})

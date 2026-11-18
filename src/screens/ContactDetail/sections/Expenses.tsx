@@ -145,7 +145,7 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
             <div style={{ fontSize: 12, color: 'var(--v3-text-muted)', marginTop: 2 }}>
               {crewLabor.punches} clock in{crewLabor.punches === 1 ? '' : 's'}
               {crewLabor.unratedHours > 0.05
-                ? ` · ${crewLabor.unratedHours.toFixed(1)}h missing a rate, set rates in Timesheets`
+                ? ` · ${crewLabor.unratedHours.toFixed(1)}h missing a rate. Set rates in Timesheets`
                 : ' · counted in job cost'}
             </div>
           </div>
@@ -202,7 +202,7 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
           color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)',
           fontSize: 14, textAlign: 'center', lineHeight: 1.5
         }}>
-          No expenses yet. Materials, fuel, permits, log as you go so margin stays real.
+          No expenses yet. Log materials, fuel and permits as you go so the margin stays real.
         </div>
       ) : (
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>

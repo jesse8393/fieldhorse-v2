@@ -239,6 +239,28 @@ describe('pdf engine smoke', () => {
     }
   })
 
+  // ai-copy-8: the headings a customer reads on every PDF use sentence case.
+  it('prints its headings in sentence case', async () => {
+    const quote = (estimate_template: string) => generateQuote({
+      company: { ...company, estimate_template }, contact,
+      items: [{ description: 'Pour slab', section: 'Concrete', qty: 1, rate: 4000, amount: 4000 }],
+      quoteId: 'q-1'
+    } as any)
+    const docs = [
+      await generateInvoice({ company, contact, lineItems: [{ description: 'Final balance', qty: 1, rate: 1380, amount: 1380 }], invoiceId: contact.id } as any),
+      await quote('classic'),
+      await quote('slate'),
+      await quote('editorial'),
+      await generateStatement({ company, client: { name: 'Jordan Pell' }, lines: [{ property: '12 Oak St', contract: 2500, paid: 0, balance: 2500 }], statementId: 's-1' } as any),
+      await generateCertificate({ company, contact, closeout: { id: contact.id, closed_at: '2026-06-10T12:00:00Z' } } as any)
+    ]
+    const text = docs.map((d) => pdfText(d).join(' | ')).join(' | ')
+    for (const heading of ['Item', 'Unit price', 'Balance due', 'Property or project', 'Estimated total', 'Certificate of completion']) {
+      expect(text, heading).toContain(heading)
+    }
+    expect(text).not.toMatch(/Scope of Work|Unit Price|Balance Due|Product\/Service|Property \/ Project|Est\. Total|Certificate of Completion/)
+  })
+
   it('never prints a late fee the contractor did not set', async () => {
     const result = await generateInvoice({
       company, contact,

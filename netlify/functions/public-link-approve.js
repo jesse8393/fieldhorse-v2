@@ -336,7 +336,7 @@ export default async function handler(req) {
       link: `/jobs/${contact.id}`
     },
     push: {
-      title: `Quote approved · ${moneyFmt(baseTotal)} 🎉`,
+      title: `Quote approved · ${moneyFmt(baseTotal)}`,
       body: `${signatureName} signed${contact.name ? ` for ${contact.name}` : ''}`,
       link: `/jobs/${contact.id}`,
       tag: `quote-approved-${contact.id}`
@@ -444,7 +444,7 @@ async function approveQuote(supabase, req, link, { signatureName, approvalNote, 
       link: `/quotes/${quote.id}`
     },
     push: {
-      title: `Quote approved · ${moneyFmt(snap.baseTotal)} 🎉`,
+      title: `Quote approved · ${moneyFmt(snap.baseTotal)}`,
       body: `${signatureName} signed${who ? ` for ${who}` : ''}`,
       link: `/quotes/${quote.id}`,
       tag: `quote-approved-${quote.id}`

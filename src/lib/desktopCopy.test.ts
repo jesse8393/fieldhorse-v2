@@ -18,6 +18,17 @@ const BANNED: [string, string][] = [
   ['src/screens/Importer.tsx', ': not mapped :'],
   ['src/screens/Tasks.tsx', "error ? '—'"],
   ['src/screens/Importer.tsx', '{m.amount || 0}'],
+  // ai-copy-4: buttons and labels in sentence case.
+  ['src/screens/NotFound.tsx', 'Back to Home'],
+  ['src/components/RouteErrorBoundary.tsx', 'Go Home'],
+  ['src/screens/Notes.tsx', "'Save Note'"],
+  ['src/screens/ContactDetail/sections/Files.tsx', "'Add Files'"],
+  ['src/screens/ContactDetail/tabs/Overview.tsx', 'label="Job Progress"'],
+  ['src/screens/SubDetail.tsx', 'Sub Directory'],
+  // ai-copy-8: customer documents use sentence case headings.
+  ['src/components/documents/proposalThemes.tsx', '>Unit Price<'],
+  ['src/components/documents/proposalThemes.tsx', 'label="Est. Total"'],
+  ['src/screens/Settings.tsx', 'Scope of Work and Cost Breakdown'],
 ]
 
 describe('desktop copy (D25)', () => {

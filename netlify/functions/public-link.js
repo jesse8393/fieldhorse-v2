@@ -313,7 +313,7 @@ export default async function handler(req) {
           link: detailLink
         },
         push: {
-          title: `Customer is viewing your ${kindLabel} 👀`,
+          title: `Customer is viewing your ${kindLabel}`,
           body: contact.name ? `${contact.name}${contact.job_title ? ` · ${contact.job_title}` : ''}` : `Tap to open the ${kindLabel}`,
           link: detailLink,
           tag: `link-viewed-${link.id}`
@@ -583,7 +583,7 @@ async function handleQuote(supabase, req, link) {
           link: detailLink
         },
         push: {
-          title: `Customer is viewing your ${kindLabel} 👀`,
+          title: `Customer is viewing your ${kindLabel}`,
           body: who ? `${who}${quote.title ? ` · ${quote.title}` : ''}` : `Tap to open the ${kindLabel}`,
           link: detailLink,
           tag: `link-viewed-${link.id}`
@@ -777,7 +777,7 @@ async function handleStatement(supabase, req, link) {
           link: `/clients/${link.client_id}`
         },
         push: {
-          title: 'Customer is viewing your statement 👀',
+          title: 'Customer is viewing your statement',
           body: who,
           link: `/clients/${link.client_id}`,
           tag: `link-viewed-${link.id}`

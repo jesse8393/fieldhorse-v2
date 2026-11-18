@@ -37,3 +37,23 @@ test('shows an honest forecast failure state and recovers on retry', async ({ co
   await expect(failure).toHaveCount(0, { timeout: 15_000 })
   await expect(page.getByText('Within configured weather limits', { exact: true }).first()).toBeVisible()
 })
+
+// ai-copy-5: with no reading, the phone screen says so in words. A big
+// dash where the temperature goes read as a glitch, not as no reading.
+test('says there is no reading instead of printing a dash', async ({ context, page }, testInfo) => {
+  test.skip(!testInfo.project.name.startsWith('mobile'), 'The phone layout shows the current conditions block')
+  await installMock(context)
+  await context.addInitScript((savedSession) => {
+    localStorage.setItem('sb-qa-mock-auth-token', JSON.stringify(savedSession))
+    localStorage.setItem('fh-onboarding-seen', '1')
+  }, session)
+  await context.route('https://api.open-meteo.com/**', (route) => route.fulfill({ status: 503, body: 'unavailable' }))
+
+  await page.goto('/pour-window', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+  await expect(page.getByText("Couldn't load the forecast", { exact: false })).toBeVisible({ timeout: 15_000 })
+  const now = page.getByRole('region', { name: 'Current conditions' })
+  await expect(now).toContainText('No reading')
+  const shown = await now.innerText()
+  expect(shown).not.toMatch(/[\u2013\u2014]/)
+  expect(shown).not.toMatch(/°F|mph|in\/h/)
+})

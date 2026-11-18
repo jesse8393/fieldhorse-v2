@@ -102,7 +102,7 @@ export default function Partners() {
       if (body.sent) {
         toastSuccess('Invite sent again', `${partner.email} got a fresh link.`)
       } else {
-        toastInfo('Link refreshed', 'Email sender skipped, share manually from the job sheet.')
+        toastInfo('Link refreshed', 'The email was not sent. Share the link from the job instead.')
       }
     } catch (err: any) {
       hapticError()

@@ -30,7 +30,7 @@ export default function SignaturePad({
   label = 'Draw signature',
   height = 100,
   className,
-  hint = 'Optional, hand the phone to the customer to sign.'
+  hint = 'Optional. Hand the phone to the customer to sign.'
 }: any) {
   const canvasRef = useRef<any>(null)
   const isDrawing = useRef(false)

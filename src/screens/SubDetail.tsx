@@ -214,7 +214,7 @@ export default function SubDetail() {
           <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
             {error}
           </div>
-          <div style={{ fontSize: 12 }}>Try again, or check the Sub Directory.</div>
+          <div style={{ fontSize: 12 }}>Try again, or go back to Subs.</div>
         </div>
       </div>
     )
@@ -702,7 +702,7 @@ function SubDetailDesktop({
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Trades</div>
-              <strong>{totals.trades.length || '-'}</strong>
+              <strong>{totals.trades.length}</strong>
               <span>{totals.trades.length ? totals.trades.join(', ') : 'No trade tags yet'}</span>
             </section>
 
@@ -715,9 +715,7 @@ function SubDetailDesktop({
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Documents</div>
               <strong>
-                {profile
-                  ? [profile.w9_path, profile.coi_path, profile.license_path].filter(Boolean).length
-                  : '-'} / 3
+                {[profile?.w9_path, profile?.coi_path, profile?.license_path].filter(Boolean).length} of 3
               </strong>
               <span>W9, COI, and license tracked in the editor.</span>
             </section>
@@ -928,7 +926,7 @@ function ProfileEditor({ profile, onSaved }: any) {
           />
         </Row>
         <Eyebrow as="div" style={{ marginTop: 4, color: 'var(--v3-text-muted)' }}>
-          Lightweight only, never store full account or routing numbers here.
+          Keep it short. Never store full account or routing numbers here.
         </Eyebrow>
       </Section>
       </div>
@@ -941,7 +939,7 @@ function ProfileEditor({ profile, onSaved }: any) {
         <textarea
           value={form.notes}
           onChange={(e) => setField('notes', e.target.value)}
-          placeholder="Anything to remember, scheduling quirks, crew sizes, preferred suppliers…"
+          placeholder="Anything to remember: scheduling quirks, crew sizes, preferred suppliers…"
           rows={4}
           style={{
             width: '100%', boxSizing: 'border-box',
@@ -1199,7 +1197,7 @@ function BackButton({ onClick }: any) {
       }}
     >
       <ChevronLeft size={16} aria-hidden="true" />
-      Sub Directory
+      Subs
     </button>
   )
 }

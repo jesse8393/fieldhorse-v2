@@ -154,13 +154,13 @@ export default function Compose() {
         // phrasing in the system prompt, the recipient never knows a
         // platform exists. Sender identity comes from the contractor's
         // profile.company_name with a neutral fallback.
-        system: `You are a messaging assistant for a contractor's business. Write a ${ch?.label} message on behalf of ${profile?.company_name || 'the contractor'}. ${ch?.tone} Brand voice: jobsite-direct, no buzzwords, no "captain" or naval metaphors ever, no "circle back". Sign off as ${profile?.company_name || 'the contractor'}; never mention any platform, app, or tool by name.`,
+        system: `You are a messaging assistant for a contractor's business. Write a ${ch?.label} message on behalf of ${profile?.company_name || 'the contractor'}. ${ch?.tone} Brand voice: jobsite-direct, no buzzwords, no "captain" or naval metaphors ever, no "circle back". Plain punctuation: no em dashes, no en dashes, no hyphens used as dashes, and no exclamation marks. Sign off as ${profile?.company_name || 'the contractor'}; never mention any platform, app, or tool by name.`,
         messages: [{ role: 'user', content: `Intent: ${intent}\n${contactLine}\nExtra context: ${context || 'none'}\n\nReturn only the message text, no preamble.` }],
         maxTokens: 500
       })
       const text = res?.content?.[0]?.text || ''
       if (!text) throw new Error('Empty response from AI')
-      hapticSuccess(); setDraft(text); setManual(false)
+      hapticSuccess(); setDraft(stripMarkdown(text)); setManual(false)
       toastSuccess('Draft ready', 'Copy, send, or edit')
     } catch (e: any) {
       console.error('[compose] generate failed:', e)
@@ -430,7 +430,7 @@ export default function Compose() {
                   rows={3}
                   value={context}
                   onChange={(e) => setContext(e.target.value)}
-                  placeholder="Anything to highlight, price change, delay reason, specific material…"
+                  placeholder="Anything to highlight: a price change, a delay, a specific material…"
                   style={{ ...selectStyle, resize: 'vertical', minHeight: 72, fontFamily: 'var(--font-body)' }}
                 />
               </Field>

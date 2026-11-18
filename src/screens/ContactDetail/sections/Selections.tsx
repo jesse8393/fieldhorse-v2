@@ -234,7 +234,7 @@ export default function SelectionsSection({ jobId, userId, clientId }: any) {
           border: '1px dashed var(--v3-border)', borderRadius: 10,
         }}>
           <Palette size={18} aria-hidden="true" style={{ display: 'block', margin: '0 auto 8px', color: 'var(--v3-primary-text)' }} />
-          No selections yet. Add one for every finish the client needs to pick, tile, paint, fixtures, hardware.
+          No selections yet. Add one for every finish the client needs to pick: tile, paint, fixtures, hardware.
         </div>
       ) : (
         <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -324,7 +324,7 @@ function SelectionCard({
           {(row.due_at || overdue) && (
             <div style={{ marginTop: 6, fontSize: 12, color: overdue ? 'var(--v3-danger-text)' : 'var(--v3-text-muted)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
               {overdue && <AlertTriangle size={11} />}
-              Due {fmtDate(row.due_at)} {overdue ? ': overdue' : ''}
+              Due {fmtDate(row.due_at)}{overdue ? ' (overdue)' : ''}
             </div>
           )}
         </div>
