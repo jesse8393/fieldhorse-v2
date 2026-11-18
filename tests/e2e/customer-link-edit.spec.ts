@@ -316,3 +316,20 @@ test('new job client suggestions recover without claiming an unread customer is 
   await page.getByRole('option', { name: /Jordan Reed/ }).click()
   await expect(page.getByText('Saves to Jordan Reed.')).toBeVisible()
 })
+
+test('a reload right after Save shows what was saved, not the copy the device kept from before', async ({ context, page }) => {
+  await signIn(context, { tables: { fh_clients: [original, replacement] } })
+  const { writes } = await savedJob(context)
+  let form = await edit(page)
+  // The device writes its offline copy at most every two seconds: let the
+  // copy from before the save land first, as it does for anyone who looks
+  // at a job before editing it.
+  await page.waitForTimeout(2_500)
+  await form.getByLabel('Name', { exact: true }).fill('Saved just now')
+  await form.getByRole('button', { name: 'Save changes', exact: true }).click()
+  await expect(form).toHaveCount(0)
+  expect(writes).toEqual([{ name: 'Saved just now' }])
+  // Reload before the next offline copy is written.
+  form = await edit(page)
+  await expect(form.getByLabel('Name', { exact: true })).toHaveValue('Saved just now')
+})

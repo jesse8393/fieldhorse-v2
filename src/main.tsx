@@ -154,6 +154,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       >
         <PersistQueryClientProvider
           client={queryClient}
+          // The saved copy is written at most every two seconds, so a reload
+          // right after a save can bring back rows from before it. Restored
+          // rows show at once but count as old: every screen reads again on
+          // open instead of trusting them for the usual 30 seconds.
+          onSuccess={() => { void queryClient.invalidateQueries({ refetchType: 'none' }) }}
           persistOptions={{
             persister: queryPersister,
             maxAge: 7 * 24 * 60 * 60 * 1000,
