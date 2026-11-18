@@ -20,6 +20,24 @@ export function fitScale(room: number, need: number): number {
   return Math.floor((room / need) * 1000) / 1000
 }
 
+type Fittable = Pick<HTMLElement, 'clientWidth' | 'scrollWidth'> & { style: Pick<CSSStyleDeclaration, 'setProperty' | 'removeProperty'> }
+
+/**
+ * Scales the figure down until what is drawn fits its box. Text does not
+ * shrink exactly in step with its font (letter spacing, rounding, a
+ * browser's own text drawing), so it measures again after each step.
+ */
+export function fitElement(el: Fittable): void {
+  el.style.removeProperty('--fh-fit')
+  let scale = fitScale(el.clientWidth, el.scrollWidth)
+  for (let step = 0; step < 4 && scale < 1; step++) {
+    el.style.setProperty('--fh-fit', String(scale))
+    const next = fitScale(el.clientWidth, el.scrollWidth)
+    if (next >= 1) break
+    scale = Math.floor(scale * next * 1000) / 1000
+  }
+}
+
 export function useFitWidth<T extends HTMLElement>(text: string) {
   const ref = useRef<T | null>(null)
   useIsomorphicLayoutEffect(() => {
@@ -27,9 +45,7 @@ export function useFitWidth<T extends HTMLElement>(text: string) {
     if (!el) return
     let settled = { width: -1, height: -1 }
     const fit = () => {
-      el.style.removeProperty('--fh-fit')
-      const scale = fitScale(el.clientWidth, el.scrollWidth)
-      if (scale < 1) el.style.setProperty('--fh-fit', String(scale))
+      fitElement(el)
       settled = { width: el.clientWidth, height: el.clientHeight }
     }
     fit()
@@ -48,11 +64,15 @@ export function useFitWidth<T extends HTMLElement>(text: string) {
       observer.observe(el)
       stop = () => observer.disconnect()
     }
-    // The display font can arrive after the first measure.
+    // The display font can arrive after the first measure, and a font that
+    // loads later widens the text without changing the box's size.
     let live = true
     void document.fonts?.ready.then(() => { if (live) fit() })
+    const onFont = () => { if (live) fit() }
+    document.fonts?.addEventListener?.('loadingdone', onFont)
     return () => {
       live = false
+      document.fonts?.removeEventListener?.('loadingdone', onFont)
       stop()
     }
   }, [text])
