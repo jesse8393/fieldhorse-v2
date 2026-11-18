@@ -89,7 +89,7 @@ function fmtMinutes(min: number): string {
 
 export default function Crew() {
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, session } = useAuth()
   const { orgId, orgName, role, canApproveTimesheets, loading: memLoading } = useMembership()
 
   // The active punch is undefined until a read of it works, and it takes
@@ -190,7 +190,11 @@ export default function Crew() {
     }
   }, [user, orgId])
 
-  useEffect(() => { if (!memLoading) load() }, [memLoading, load])
+  // The clock reads again whenever the session is published again (a token
+  // refresh, or a sign in from another tab), so a shift started or ended
+  // elsewhere shows here. The user object itself stays the same across a
+  // refresh, so the session is what marks it.
+  useEffect(() => { if (!memLoading) load() }, [memLoading, load, session])
 
   // A load where every read worked has brought the lists in.
   const listsLoaded = schedule !== null
