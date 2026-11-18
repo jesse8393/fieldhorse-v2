@@ -649,7 +649,7 @@ test.describe('job page on a desktop, redesigned', () => {
   test('an invoice in Documents opens the invoice', async ({ context, page }) => {
     await signIn(context)
     await openDesktop(page, '/jobs/c-job2?tab=financials')
-    const invoice = page.getByRole('complementary', { name: 'Job facts' }).getByRole('link', { name: /^Invoice 2, Progress draw 1/ })
+    const invoice = page.getByRole('complementary', { name: 'Job facts' }).getByRole('link', { name: /^PCC-JOB2-02, Progress draw 1/ })
     await expect(invoice).toHaveAttribute('href', '/invoices/inv1')
     await invoice.click()
     await expect(page).toHaveURL(/\/invoices\/inv1$/)
