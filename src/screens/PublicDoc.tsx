@@ -39,6 +39,7 @@ import { buildPortalView, portalStatus, quoteFingerprint, type PublicDocPayload 
 import { gatherStatement } from '../lib/statement.ts'
 import { publicInvoiceView } from '../components/public/invoiceView.ts'
 import { money } from '../components/documents/format.ts'
+import { formatPhone } from '../lib/utils.ts'
 
 // `error` is what the customer reads when there is no document to show;
 // `retry` is set when the read failed (no answer, a server error) rather
@@ -388,7 +389,7 @@ function ChangeOrderView({ data, token, onApproved }: any) {
             </div>
             {(company?.phone || company?.email) && (
               <div style={{ fontSize: 12, color: '#5C5C5C', marginTop: 2 }}>
-                {[company.phone, company.email].filter(Boolean).join(' · ')}
+                {[formatPhone(company.phone), company.email].filter(Boolean).join(' · ')}
               </div>
             )}
           </div>
@@ -801,7 +802,7 @@ function StatementView({ data }: any) {
             </div>
             {(company?.phone || company?.email) && (
               <div style={{ fontSize: 12, color: '#5C5C5C', marginTop: 2 }}>
-                {[company.phone, company.email].filter(Boolean).join(' · ')}
+                {[formatPhone(company.phone), company.email].filter(Boolean).join(' · ')}
               </div>
             )}
           </div>

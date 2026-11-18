@@ -27,7 +27,7 @@ type Form = { title: string; amount: string; description: string; due: string; n
 export default function InvoiceEdit() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { query, record, figures, refresh, patchInvoice } = useInvoiceScreen(id)
+  const { query, record, figures, companyName, refresh, patchInvoice } = useInvoiceScreen(id)
   const titleRef = useRef<HTMLHeadingElement>(null)
   useEffect(() => { titleRef.current?.focus({ preventScroll: true }) }, [])
 
@@ -125,7 +125,7 @@ export default function InvoiceEdit() {
     <div className="v3-screen fhinv" data-build-screen="InvoiceEdit">
       {header}
       <p className="fhinv-intro">{`${figures.to.name || 'Customer'}${record.job?.job_title ? `, ${record.job.job_title}` : ''}`}</p>
-      <InvoiceBillingReview review={reviewInvoice({ invoice: { ...invoice, amount: Number(shown.amount), title: shown.title }, invoices: record.jobInvoices, contractTotal: record.job ? knownContractTotal({ amount: record.job.amount, changeOrders: record.changeOrders }) : null })} />
+      <InvoiceBillingReview review={reviewInvoice({ invoice: { ...invoice, amount: Number(shown.amount), title: shown.title }, invoices: record.jobInvoices, contractTotal: record.job ? knownContractTotal({ amount: record.job.amount, changeOrders: record.changeOrders }) : null })} companyName={companyName} />
       <form className="fhinv-form" onSubmit={(e) => void submit(e)}>
         <Field label="Title" value={shown.title} disabled={saving} placeholder="Deposit, Progress draw 2, Final balance" onChange={(e) => set({ title: e.target.value })} />
         <Field

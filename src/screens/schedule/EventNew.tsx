@@ -23,7 +23,7 @@ import { useOrgScope } from '../../lib/orgScope.ts'
 import { useCompanyJobs, useLeads, useQuotes, type JobRow, type LeadRow, type QuoteRow } from '../../lib/queries.ts'
 import { createScheduleEvents, invalidateVisitReads } from '../../lib/scheduleWrite.ts'
 import { toastError, toastSuccess } from '../../lib/toast.ts'
-import { todayYmd, toYmd } from '../../lib/dates.ts'
+import { todayYmd, toYmd, dateAndTime, timeOfDay } from '../../lib/dates.ts'
 import { localDateTimeMs, eventDurationMs, scheduleOccurrences } from '../../lib/scheduleDates.ts'
 import { isMovedStage } from '../../lib/stages.ts'
 import { jobLabel } from '../../lib/scheduleBoard.ts'
@@ -359,7 +359,7 @@ function EventForm({ event }: { event: EventRow | null }) {
         <Field label="Time" type="time" value={time} error={errors.when} onChange={(e) => setTime(e.target.value)} />
       </div>
       <Field label="Duration in minutes" type="number" inputMode="numeric" min={1} value={duration} error={errors.duration} onChange={(e) => setDuration(e.target.value)} />
-      {visitPreview[0] && <p className="fhev-pick__helper">Ends {new Date(visitPreview[0].end_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</p>}
+      {visitPreview[0] && <p className="fhev-pick__helper">Ends {dateAndTime(visitPreview[0].end_at)}</p>}
       <RecordPicker id="fhev-link" label="Link to" value={linkValue(link)} onChange={(value) => setLink(parseLink(value))}
         disabled={saving} loading={listsLoading} clearLabel="None" placeholder="Search customer, project or address"
         error={jobsQuery.isError || (membership.canSeeFinancials && (leadsQuery.isError || quotesQuery.isError)) ? 'Some records could not load. Existing links remain selected.' : undefined}
@@ -388,7 +388,7 @@ function EventForm({ event }: { event: EventRow | null }) {
               </div>
               <section className="fhev-preview" aria-label="Recurring visit preview">
                 <p>{visitPreview.length} {countNoun(visitPreview.length, 'visit')} in all, including this date. Every {every || '?'} days.</p>
-                <ol>{visitPreview.map((visit) => <li key={visit.start_at}>{new Date(visit.start_at).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} until {new Date(visit.end_at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</li>)}</ol>
+                <ol>{visitPreview.map((visit) => <li key={visit.start_at}>{dateAndTime(visit.start_at, { weekday: true })} until {timeOfDay(visit.end_at)}</li>)}</ol>
               </section>
             </>
           )}

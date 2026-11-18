@@ -4,38 +4,54 @@
 // here (not in lib/) so document concerns stay co-located.
 
 import { parseDateOnly } from '../../lib/dates.ts'
+import { moneyCents } from '../../lib/format.ts'
 
-export function money(n: number | string | null | undefined, { cents = false }: { cents?: boolean } = {}) {
-  const v = Number(n || 0)
-  // Whole-dollar display is a STYLE choice for heroes/summary chips,
-  // but it must never change the number: a $12,499.50 total shown as
-  // "$12,500" next to a cent-precise line item table reads as two
-  // different figures on one document. When the value carries cents,
-  // show them regardless of the requested style.
-  const hasCents = Math.abs(v - Math.round(v)) >= 0.005
-  const showCents = cents || hasCents
-  return v.toLocaleString(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: showCents ? 2 : 0,
-    maximumFractionDigits: showCents ? 2 : 0
-  })
+// Every amount on a customer document prints dollars and cents, the way
+// the PDF prints it: "$6,400.00 of $12,800.00 collected", never "$6,400"
+// under "AMOUNT DUE $6,400.00" (formats-6). The cents option is kept so
+// callers need no change; it no longer alters the output.
+export function money(n: number | string | null | undefined, _options: { cents?: boolean } = {}) {
+  return moneyCents(n)
 }
 
 // Date-only columns (paid_on, due_at-as-date, warranty dates) must be
 // parsed as LOCAL calendar dates, not UTC, otherwise a payment dated
 // "2026-06-01" prints as "May 31" on the customer's invoice in every US
 // timezone. parseDateOnly handles both bare dates and full timestamps.
-export function longDate(iso: string | Date | null | undefined) {
-  const d = parseDateOnly(iso)
-  if (!d) return ''
-  return d.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
+//
+// A timestamp (an issue date, a due date stored at the end of the company's
+// day) prints in the company's time zone when the document knows it, so a
+// customer on Eastern time reads the day the company set, the day the PDF
+// and the app print, not the next one (formats-2). A bare date keeps its
+// calendar day in any zone.
+function documentDate(iso: string | Date | null | undefined, month: 'long' | 'short', timeZone?: string | null) {
+  return zonedDocumentDate(iso, { month, day: 'numeric', year: 'numeric' }, timeZone)
 }
 
-export function shortDate(iso: string | Date | null | undefined) {
+/**
+ * A document date in any layout (the estimate themes print "11/09/2026"),
+ * with the same company zone rule as longDate and shortDate.
+ */
+export function zonedDocumentDate(iso: string | Date | null | undefined, options: Intl.DateTimeFormatOptions, timeZone?: string | null) {
   const d = parseDateOnly(iso)
   if (!d) return ''
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+  const bareDate = typeof iso === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(iso)
+  if (timeZone && !bareDate) {
+    try {
+      return d.toLocaleDateString(undefined, { ...options, timeZone })
+    } catch {
+      // An unknown zone name: print in the viewer's zone as before.
+    }
+  }
+  return d.toLocaleDateString(undefined, options)
+}
+
+export function longDate(iso: string | Date | null | undefined, timeZone?: string | null) {
+  return documentDate(iso, 'long', timeZone)
+}
+
+export function shortDate(iso: string | Date | null | undefined, timeZone?: string | null) {
+  return documentDate(iso, 'short', timeZone)
 }
 
 /**

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Calendar, Clock, ArrowRight, Plus } from 'lucide-react'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { Eyebrow } from '../../../components/v3'
+import { timeOfDay } from '../../../lib/dates.ts'
 
 /**
  * Scheduled section, read-only display of fh_schedule entries for this job.
@@ -64,7 +65,7 @@ export default function ScheduledSection({ scheduleItems = [], onOpenAddEvent }:
           {scheduleItems.map((e: any) => {
             const d = new Date(e.start_at)
             const dateStr = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
-            const timeStr = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+            const timeStr = timeOfDay(d)
             const isPast = d.getTime() < Date.now()
             return (
               <li key={e.id}>

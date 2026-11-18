@@ -21,6 +21,7 @@ import { clientIp, hashIdentifier, checkRateLimit } from './lib/rateLimit.js'
 import { alertLinkRecipients } from './lib/linkAlerts.js'
 import { linkScope } from './lib/linkScope.js'
 import { documentChanged, matchesWhatWasShown } from './lib/quoteApproval.js'
+import { moneyCents } from './lib/money.js'
 
 function corsHeaders() {
   return {
@@ -37,11 +38,9 @@ function json(obj, status = 200) {
   })
 }
 
-function moneyFmt(n) {
-  return Number(n || 0).toLocaleString(undefined, {
-    style: 'currency', currency: 'USD', maximumFractionDigits: 0
-  })
-}
+// The amount the customer signed, to the cent, the way the quote, the
+// job and the PDF print it (formats-8).
+const moneyFmt = moneyCents
 
 export default async function handler(req) {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders() })

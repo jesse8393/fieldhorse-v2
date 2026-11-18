@@ -1861,3 +1861,67 @@ test('the editorial theme prints the scope of work once', async ({ page, context
   await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
   await expect(page.getByText('Pour a 4 inch slab with a broom finish.')).toHaveCount(1)
 })
+
+/* ---- One record reads the same on the link as on the PDF (formats) ---- */
+
+test('whole amounts keep .00 on the invoice link, the way the PDF prints them (formats-6)', async ({ page, context }) => {
+  await mockPortal(context, invoicePayload({
+    contact: { amount: 12800 },
+    invoices: [draw('inv-w1', 1, 6400, 'paid'), draw('inv-w2', 2, 6400, 'sent')],
+    payments: [{ id: 'pay-w1', contact_id: 'job-linked-0003', invoice_id: 'inv-w1', amount: 6400, paid_on: '2026-11-11', method: 'check', kind: 'deposit' }]
+  }))
+  await openInvoice(page)
+  await expect(page.getByTestId('invoice-amount-due')).toHaveText('$6,400.00')
+  await expect(page.getByText('$6,400.00 of $12,800.00 collected')).toBeVisible()
+  const text = await page.locator('body').innerText()
+  expect(text).not.toMatch(/\$[\d,]+(?![\d,]*\.\d\d)\b/)
+})
+
+test('phone numbers on the invoice link read the way the app prints them (formats-10)', async ({ page, context }) => {
+  await mockPortal(context, invoicePayload({
+    contact: { phone: '6155550101', email: 'dana@example.com' },
+    company: { phone: '6155550100', email: 'office@parker.co' },
+    invoices: [draw('inv-ph', 1, 5000, 'sent')]
+  }))
+  await openInvoice(page)
+  await expect(page.getByText('(615) 555-0101 · dana@example.com').first()).toBeVisible()
+  await expect(page.getByText(/\(615\) 555-0100/).first()).toBeVisible()
+  expect(await page.locator('body').innerText()).not.toMatch(/615555010[01]/)
+})
+
+test.describe('a customer on Eastern time (formats-2)', () => {
+  test.use({ timezoneId: 'America/New_York' })
+  test('the invoice link shows the due and issue dates the company set', async ({ page, context }) => {
+    // Sent Mon Nov 9 at 11:30 pm Central; due Tue Nov 24, stored at the end
+    // of that day in Central time, the way the job's Invoices tab stores it.
+    await mockPortal(context, invoicePayload({
+      company: { timezone: 'America/Chicago' },
+      invoices: [draw('inv-tz', 1, 5000, 'sent', { issued_at: '2026-11-10T05:30:00Z', due_at: '2026-11-25T05:59:59.999Z' })]
+    }))
+    await openInvoice(page)
+    const text = await page.locator('body').innerText()
+    expect(text).toContain('Due November 24, 2026')
+    expect(text).toContain('November 9, 2026')
+    expect(text).not.toContain('November 25, 2026')
+    expect(text).not.toContain('November 10, 2026')
+  })
+
+  for (const template of ['fieldhorse', 'classic']) {
+    test(`the ${template} quote link shows the issue and expiry days the company set`, async ({ page, context }) => {
+      await page.clock.setFixedTime(new Date('2026-11-17T16:00:00Z'))
+      // Made Mon Nov 9 at 11:30 pm Central; valid through Dec 9, stored at
+      // the end of that day in Central time.
+      await mockPortal(context, proposalPayload({
+        company: { timezone: 'America/Chicago', estimate_template: template },
+        contact: { created_at: '2026-11-10T05:30:00Z', quote_sent_at: '2026-11-10T05:30:00Z', quote_expires_at: '2026-12-10T05:59:59.999Z' }
+      }))
+      await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+      await expect(page.getByText('Pool deck pour').first()).toBeVisible()
+      const text = await page.locator('body').innerText()
+      expect(text).toMatch(/November 9\b/)
+      expect(text).toMatch(/December 9\b/)
+      expect(text).not.toMatch(/November 10\b/)
+      expect(text).not.toMatch(/December 10\b/)
+    })
+  }
+})

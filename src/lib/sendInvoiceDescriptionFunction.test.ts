@@ -78,16 +78,16 @@ describe('the invoice email subject and body', () => {
 
   it('names the invoice by its number when it has no title, then by the job', async () => {
     seed({ title: null })
-    expect((await send()).subject).toBe('Invoice 2 for Smith driveway ($5,000)')
+    expect((await send()).subject).toBe('Invoice 2 for Smith driveway ($5,000.00)')
     seed({ title: '  ', sequence_number: null })
     outbound.length = 0
-    expect((await send()).subject).toBe('Invoice for Smith driveway ($5,000)')
+    expect((await send()).subject).toBe('Invoice for Smith driveway ($5,000.00)')
   })
 
   it('prints the whole Description as its own paragraph, line breaks kept and markup escaped', async () => {
     seed({ description: `${LONG}\n<b>5 > 3</b>` })
     const mail = await send()
-    expect(mail.text).toContain('Your invoice for Smith driveway is attached. Amount due: $5,000.')
+    expect(mail.text).toContain('Your invoice for Smith driveway is attached. Amount due: $5,000.00.')
     expect(mail.text).toContain(`\n\n${LONG}\n<b>5 > 3</b>\n\n`)
     expect(mail.html).toContain('once the old slab is hauled away.<br>&lt;b&gt;5 &gt; 3&lt;/b&gt;</p>')
     expect(mail.html).toContain('Second draw for the driveway.<br>Covers forming')

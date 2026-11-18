@@ -29,16 +29,16 @@ import { Eyebrow } from '../components/v3'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { activityBucketLabel, paymentEventTime } from '../lib/activityTime.ts'
 import SnowActivityBuild from '../components/desktop/SnowActivityBuild.tsx'
+import { moneyCents } from '../lib/format.ts'
+import { invoiceReference } from '../lib/invoiceReference.ts'
+import { useDocumentCompanyName } from '../lib/companyBranding.ts'
+import { useOrgScope } from '../lib/orgScope.ts'
+import { timeOfDay } from '../lib/dates.ts'
 
 const PAGE_SIZE = 60
 
-function money(n: any) {
-  const v = Number(n || 0)
-  return v.toLocaleString(undefined, {
-    style: 'currency', currency: 'USD',
-    minimumFractionDigits: 0, maximumFractionDigits: 0
-  })
-}
+// A record's amount to the cent, the figure the invoice shows (formats-3).
+const money = moneyCents
 
 function capitalize(s: any) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : '' }
 
@@ -55,7 +55,7 @@ const STAGE_TONE: Record<string, any> = {
 // timeline of "today / yesterday / this week / older" sections.
 function timeAt(d: any) {
   if (!d) return ''
-  return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+  return timeOfDay(d)
 }
 
 export default function Activity() {
@@ -63,6 +63,7 @@ export default function Activity() {
   const isDesktop = useIsDesktop()
   const [pageSize, setPageSize] = useState(PAGE_SIZE)
   const { data: bundle, isError, refetch, isFetching } = useActivityFeed(user?.id, pageSize)
+  const companyName = useDocumentCompanyName(useOrgScope(user?.id))
   const { stagger, item } = useFhMotion()
 
   // Map the raw datasets into display events. Kept in the component
@@ -147,7 +148,8 @@ export default function Activity() {
           kind: 'invoice',
           icon: Receipt,
           tone: inv.status === 'paid' ? 'green' : 'gold',
-          title: `Draw #${inv.sequence_number} ${inv.status === 'paid' ? 'paid' : inv.status}${inv.title ? `, ${inv.title}` : ''}`,
+          // The number the invoice's PDF and customer link print (formats-1).
+          title: `${invoiceReference(inv, companyName)} ${inv.status === 'paid' ? 'paid' : inv.status}${inv.title ? `, ${inv.title}` : ''}`,
           sub: money(inv.amount),
           amount: Number(inv.amount || 0)
         })
@@ -156,7 +158,7 @@ export default function Activity() {
     return out
       .filter((e) => e.when instanceof Date && !Number.isNaN(e.when.getTime()))
       .sort((a: any, b: any) => b.when.getTime() - a.when.getTime())
-  }, [bundle])
+  }, [bundle, companyName])
 
   // Group by date bucket for the section headers.
   const grouped = useMemo(() => {

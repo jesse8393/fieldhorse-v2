@@ -108,8 +108,8 @@ export default function InvoiceTemplate({
       docType="Invoice"
       number={number}
       metaRows={[
-        { label: 'Issued', value: longDate(issuedAt) || '\u2003' },
-        dueDate && { label: 'Due', value: longDate(dueDate), strong: true }
+        { label: 'Issued', value: longDate(issuedAt, company?.timezone) || '\u2003' },
+        dueDate && { label: 'Due', value: longDate(dueDate, company?.timezone), strong: true }
       ].filter(Boolean)}
       status={statusToChip(status, isOverdue)}
       recipient={contact}
@@ -120,6 +120,7 @@ export default function InvoiceTemplate({
           brand={brand}
           amountDue={amountDue}
           dueDate={dueDate}
+          timeZone={company?.timezone}
           isPaid={isPaid}
           isOverdue={isOverdue}
           paid={paid}
@@ -235,7 +236,7 @@ export default function InvoiceTemplate({
 
 /* ─── Internal blocks ─── */
 
-function HeroBand({ brand, amountDue, dueDate, isPaid, isOverdue, paid, contractTotal, balance }: any) {
+function HeroBand({ brand, amountDue, dueDate, timeZone, isPaid, isOverdue, paid, contractTotal, balance }: any) {
   const pct = contractTotal > 0 ? Math.max(0, Math.min(1, paid / contractTotal)) : 0
   return (
     <section
@@ -271,7 +272,7 @@ function HeroBand({ brand, amountDue, dueDate, isPaid, isOverdue, paid, contract
         <div style={{ textAlign: 'right', fontSize: 12, color: DOC_COLORS.inkMuted, lineHeight: 1.6 }}>
           {!isPaid && dueDate && (
             <div>
-              Due <span style={{ color: isOverdue ? DOC_COLORS.alertRed : DOC_COLORS.ink, fontWeight: 700 }}>{longDate(dueDate)}</span>
+              Due <span style={{ color: isOverdue ? DOC_COLORS.alertRed : DOC_COLORS.ink, fontWeight: 700 }}>{longDate(dueDate, timeZone)}</span>
               {isOverdue ? <span style={{ color: DOC_COLORS.alertRed, fontWeight: 700 }}> · past due</span> : null}
             </div>
           )}
@@ -346,8 +347,8 @@ function BillingSchedule({ invoices, currentId, company, brand, jobSeed }: any) 
                   </span>
                 )}
               </td>
-              <td data-label="Issued" style={{ ...cell(), color: DOC_COLORS.inkMuted, whiteSpace: 'nowrap' }}>{shortDate(inv.issued_at || inv.created_at)}</td>
-              <td data-label="Due" style={{ ...cell(), color: DOC_COLORS.inkMuted, whiteSpace: 'nowrap' }}>{paid ? '\u2003' : shortDate(inv.due_at) || '\u2003'}</td>
+              <td data-label="Issued" style={{ ...cell(), color: DOC_COLORS.inkMuted, whiteSpace: 'nowrap' }}>{shortDate(inv.issued_at || inv.created_at, company?.timezone)}</td>
+              <td data-label="Due" style={{ ...cell(), color: DOC_COLORS.inkMuted, whiteSpace: 'nowrap' }}>{paid ? '\u2003' : shortDate(inv.due_at, company?.timezone) || '\u2003'}</td>
               <td data-label="Amount" style={{ ...cell(), textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
                 {money(Number(inv.amount || 0), { cents: true })}
               </td>

@@ -4,12 +4,15 @@
 // /clients/:id/statement (also where Money's Who owes you goes), and
 // deleting a customer confirms with a second tap on the same button.
 // Nothing here mounts a dialog.
+import { readFileSync } from 'node:fs'
 import { expect, test, type Page } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 import { isReadOnlyRpc } from './helpers/readRpc.ts'
 import { contrastOf, textContrastAgainst } from './helpers/contrast.ts'
 import { USER } from '../../scripts/qa-mock.mjs'
 import { goInApp, holdPosts, postsTo } from './helpers/doubleTap.ts'
+import { nothingRunsOffTheSide } from './helpers/overflow.ts'
+import { NOW as FORMATS_NOW, TABLES as FORMATS_TABLES } from './helpers/formatsSeed.ts'
 
 const NOW = Date.now()
 const DAY = 86400000
@@ -216,7 +219,7 @@ test.describe('the customer page', () => {
     await expect(page.locator('.fhcs-total__amount')).toHaveText('$6,900.25')
     const apart = page.getByRole('list', { name: 'Not yet invoiced' })
     await expect(apart.getByText('Garage slab')).toBeVisible()
-    await expect(apart.getByText('$33,100', { exact: true })).toBeVisible()
+    await expect(apart.getByText('$33,100.00', { exact: true })).toBeVisible()
 
     await page.getByRole('button', { name: 'Email statement' }).click()
     await expect.poll(() => posted.length).toBe(1)
@@ -278,11 +281,12 @@ test.describe('the customer page', () => {
       }
     })
     await open(page, '/clients/cl-direct')
-    // Phone: "Lifetime $1.3K", "Contract balance $500". Desktop: "$1K
-    // Lifetime value", "$500 Remaining contract value". Both read $0 before.
+    // Phone: "Lifetime $1,300.00", "Contract balance $500.00". Desktop:
+    // "$1,300.00 Lifetime value", "$500.00 Remaining contract value". Both
+    // read $0 before, and a rounded "$1.3K" until formats-4.
     const main = page.locator('main')
-    await expect(main).toContainText(/Lifetime\s*\$1\.3K|\$1(\.3)?K\s*Lifetime value/, { timeout: 30_000 })
-    await expect(main).toContainText(/Contract balance\s*\$500|\$500\s*Remaining contract value/)
+    await expect(main).toContainText(/Lifetime\s*\$1,300\.00|\$1,300\.00\s*Lifetime value/, { timeout: 30_000 })
+    await expect(main).toContainText(/Contract balance\s*\$500\.00|\$500\.00\s*Remaining contract value/)
   })
 
   test('Map opens the map app for this device, not Apple Maps on Android (S25)', async ({ context, page }) => {
@@ -471,4 +475,118 @@ test('leaving the statement while it emails and coming back does not email it tw
   await page.waitForTimeout(1500)
   expect(sends.length, 'one statement, one email').toBe(1)
   expect(busy, 'Email statement shows the email going out').toBe('true')
+})
+
+// formats-4: one customer's money reads to the cent, the figure Money and
+// the statement show, never "$12K" or "$11K".
+test('the customer page and Customers show a customer\'s money to the cent', async ({ context, page }) => {
+  await signIn(context, { tables: FORMATS_TABLES })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  await open(page, '/clients/cl-h')
+  await expect(page.getByText(/\$12,345\.50/).first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText(/\$11,345\.00/).first()).toBeVisible()
+  expect(await page.locator('main').innerText()).not.toMatch(/\$\d+(\.\d)?K\b/)
+  await nothingRunsOffTheSide(page, 'customer page')
+  // The longer figures sit side by side without drawing over each other.
+  // Measure the drawn text, not the box: a number wider than its column
+  // spills past a box clipped to the column.
+  const drawn = (text: string) => page.getByText(text, { exact: true }).first().evaluate((el) => {
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    const r = range.getBoundingClientRect()
+    return { x: r.x, y: r.y, width: r.width, height: r.height }
+  })
+  const lifetime = await drawn('$12,345.50')
+  const balance = await drawn('$11,345.00')
+  const apart = lifetime.x + lifetime.width <= balance.x || balance.x + balance.width <= lifetime.x ||
+    lifetime.y + lifetime.height <= balance.y || balance.y + balance.height <= lifetime.y
+  expect(apart, 'Lifetime and Contract balance do not overlap').toBe(true)
+  await open(page, '/clients')
+  await expect(page.getByText(/\$11,345\.00/).filter({ visible: true }).first()).toBeVisible({ timeout: 30_000 })
+  expect(await page.locator('main').innerText()).not.toMatch(/\$\d+(\.\d)?K\b/)
+  await nothingRunsOffTheSide(page, 'Customers')
+})
+
+// formats-5: the Statement button on the customer page names the total the
+// statement it opens shows: what is owed on sent invoices, not the contract
+// less what was paid.
+test('the Statement button names the total the statement shows', async ({ context, page, isMobile }) => {
+  test.skip(!isMobile, 'the phone customer page names the total on its Statement button')
+  await signIn(context, { tables: FORMATS_TABLES })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  await open(page, '/clients/cl-h')
+  const button = page.getByRole('button', { name: /^Statement · / })
+  await expect(button).toHaveText(/Statement · \$3,114\.67 across 1 property/, { timeout: 30_000 })
+  await button.click()
+  await expect(page).toHaveURL(/\/clients\/cl-h\/statement$/)
+  await expect(page.locator('.fhcs-total__amount')).toHaveText('$3,114.67')
+})
+
+// formats-5: the Statement control stays one tap away while its total is
+// still loading or could not be read, and for a customer whose only balance
+// is work not yet invoiced. It names a figure only once the read is in.
+test('the Statement control stays one tap away without its total', async ({ context, page, isMobile }) => {
+  await signIn(context, { tables: { ...FORMATS_TABLES, fh_invoices: [], fh_payments: [] } })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  // The statement's own read of invoices fails; the rest of the page loads.
+  await page.route(/\/rest\/v1\/fh_invoices\?.*status=neq\.void/, (route) => route.fulfill({ status: 500, contentType: 'application/json', body: '{"message":"down"}' }))
+  await open(page, '/clients/cl-h')
+  const control = isMobile
+    ? page.getByRole('button', { name: /^Statement/ })
+    : page.locator('.fh-build-tabs__cta').filter({ hasText: /Statement/ })
+  await expect(control.first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('button', { name: /^Statement · \$/ })).toHaveCount(0)
+  await control.first().click()
+  await expect(page).toHaveURL(/\/clients\/cl-h\/statement$/)
+})
+
+test('the Statement control shows for work not yet invoiced', async ({ context, page, isMobile }) => {
+  await signIn(context, { tables: { ...FORMATS_TABLES, fh_invoices: [], fh_payments: [] } })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  await open(page, '/clients/cl-h')
+  const control = isMobile
+    ? page.getByRole('button', { name: /^Statement/ })
+    : page.locator('.fh-build-tabs__cta').filter({ hasText: /Statement/ })
+  await expect(control.first()).toBeVisible({ timeout: 30_000 })
+  await control.first().click()
+  await expect(page).toHaveURL(/\/clients\/cl-h\/statement$/)
+})
+
+// formats-14: the Customers export writes each customer's last activity as
+// the local day the app shows, not the UTC day, which is already tomorrow
+// after 6 pm Central.
+test('the Customers export writes the local day of the last activity', async ({ context, page, isMobile }) => {
+  test.skip(isMobile, 'the export is on the desktop Customers table')
+  // Mon Nov 16, 7:30 pm Central, which is Nov 17 in UTC.
+  const evening = '2026-11-17T01:30:00Z'
+  await signIn(context, { tables: {
+    fh_clients: [{ ...JEFF, created_at: evening, updated_at: evening, last_activity_at: evening }],
+    fh_contacts: [{ id: 'j-csv', user_id: USER.id, client_id: 'cl-1', name: 'Jeff Roy', job_title: 'Driveway', stage: 'job', amount: 1000, created_at: evening, updated_at: evening }],
+    fh_invoices: [], fh_payments: [], fh_leads: [], fh_quotes: []
+  } })
+  await page.clock.setFixedTime(new Date('2026-11-17T02:00:00Z'))
+  await open(page, '/clients')
+  const [download] = await Promise.all([
+    page.waitForEvent('download', { timeout: 30_000 }),
+    page.getByRole('button', { name: /Export CSV/ }).click()
+  ])
+  const csv = readFileSync(await download.path(), 'utf8')
+  const row = csv.split(/\r?\n/).find((line) => line.startsWith('Jeff Roy'))!
+  expect(row).toContain('2026-11-16')
+  expect(row).not.toContain('2026-11-17')
+})
+
+// formats-10: the customer's phone reads "(615) 555-0101" on every tab of
+// the customer page and on the job, the way the phone page prints it.
+test('the customer page and the job print the phone formatted', async ({ context, page, isMobile }) => {
+  await signIn(context, { tables: FORMATS_TABLES })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  await open(page, '/clients/cl-h?tab=projects')
+  if (isMobile) await page.goto('/clients/cl-h', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByText(/\(615\) 555-0101/).filter({ visible: true }).first()).toBeVisible({ timeout: 30_000 })
+  expect(await page.locator('main').innerText()).not.toContain('6155550101')
+  await page.goto('/jobs/c-h', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByRole('heading', { name: 'Driveway replacement' }).first()).toBeVisible({ timeout: 30_000 })
+  await page.waitForTimeout(1500)
+  expect(await page.locator('main').innerText()).not.toContain('6155550101')
 })

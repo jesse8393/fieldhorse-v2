@@ -8,6 +8,7 @@ import { signIn } from './helpers/signIn.ts'
 import { contrastOf } from './helpers/contrast.ts'
 import { FAIL, expectPlain } from './helpers/rawErrors.ts'
 import { goInApp, holdPosts, postsTo, twoTaps } from './helpers/doubleTap.ts'
+import { NOW as FORMATS_NOW, TABLES as FORMATS_TABLES } from './helpers/formatsSeed.ts'
 
 async function open(page: Page, path: string) {
   await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 60_000 })
@@ -966,7 +967,7 @@ test('the contract card shows cents', async ({ context, page }) => {
   await openMoreAboutJob(page)
   const card = page.locator('.cockpit-headline')
   await expect(card).toBeVisible({ timeout: 30_000 })
-  await expect(card.locator('.cockpit-headline__amt')).toHaveText('$10,000')
+  await expect(card.locator('.cockpit-headline__amt')).toHaveText('$10,000.00')
   await expect(card.locator('.cockpit-headline__bar-meta')).toContainText('$5,000.50 collected')
   await expect(card.locator('.cockpit-headline__bar-meta')).toContainText('$4,999.50 remaining')
 })
@@ -1078,4 +1079,78 @@ test('leaving the closeout while the certificate emails and coming back does not
   await page.waitForTimeout(1500)
   expect(sends.length, 'one certificate, one email').toBe(1)
   expect(busy, 'Send certificate shows the email going out').toBe('true')
+})
+
+// formats-6: a whole amount prints .00 on the job the way the invoice page
+// and the PDF print it, so $6,400 never sits next to $6,400.00.
+test('whole amounts keep .00 on Log payment and the Invoices tab', async ({ context, page }) => {
+  await signIn(context)
+  await page.goto('/jobs/c-job2/payment', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText('Balance $6,400.00')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('button', { name: 'Record $6,400.00' })).toBeVisible()
+  await page.goto('/jobs/c-job2?tab=draws', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText(/Unbilled/).first()).toBeVisible({ timeout: 30_000 })
+  const text = await page.locator('main').innerText()
+  expect(text).toContain('$6,400.00')
+  expect(text).not.toMatch(/\$[\d,]+(?![\d,]*\.\d\d)\b/)
+})
+
+// formats-9: an expense date reads like every other date on the job
+// ("Nov 12, 2026"), never as raw "2026-11-12".
+test('the Expenses tab prints the expense date as a date', async ({ context, page }) => {
+  await signIn(context, { tables: { ...FORMATS_TABLES, fh_expenses: [{ id: 'e-h1', user_id: 'qa-user-1', org_id: 'org-1', contact_id: 'c-h', description: 'Rebar and chairs', amount: 412.38, category: 'Materials', expense_date: '2026-11-12', created_at: '2026-11-12T18:00:00Z' }] } })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  await page.goto('/jobs/c-h?tab=expenses', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText('Rebar and chairs')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText('Materials · Nov 12, 2026')).toBeVisible()
+  await expect(page.getByText(/2026-11-12/)).toHaveCount(0)
+})
+
+// formats-12: the job's spine writes a time with its am or pm, so a payment
+// logged at 8:15 pm never reads as "8:15" beside a morning visit.
+test('the job spine writes an evening payment as 8:15 pm', async ({ context, page }, testInfo) => {
+  test.skip(!testInfo.project.name.startsWith('mobile'), 'Phone layout')
+  await signIn(context, { tables: FORMATS_TABLES })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  await open(page, '/jobs/c-h')
+  const spine = page.locator('.fhj-spine')
+  await expect(spine.getByText('8:15 pm', { exact: true }).first()).toBeVisible({ timeout: 30_000 })
+  await expect(spine.getByText('8:15', { exact: true })).toHaveCount(0)
+})
+
+// formats-4: a sub's rate and the insurance claim's figures print to the
+// cent on the job, the way SubDetail and the customer document print them,
+// and the wide desktop job rail names each job's amount in full.
+test('the job prints sub rates, insurance figures and the rail amount to the cent', async ({ context, page }, testInfo) => {
+  await signIn(context, { tables: {
+    ...FORMATS_TABLES,
+    fh_subs: [{ id: 'sub-h1', user_id: 'qa-user-1', org_id: 'org-1', contact_id: 'c-h', name: 'Tri-Star Pumping', trade: 'Pump truck', phone: null, rate: 42.5, status: 'scheduled', created_at: '2026-11-10T12:00:00Z' }],
+    fh_insurance_claims: [{ id: 'ins-h1', user_id: 'qa-user-1', org_id: 'org-1', contact_id: 'c-h', claim_number: 'CL-1', carrier: 'State Farm', adjuster: null, deductible: 1000.5, rcv: 24800, acv: 18200.25, depreciation: 6599.75, supplement_amount: null, mortgage_company: null, created_at: '2026-11-10T12:00:00Z' }]
+  } })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  await page.goto('/jobs/c-h?tab=subs', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText('Tri-Star Pumping').filter({ visible: true }).first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText('$42.50', { exact: true }).filter({ visible: true }).first()).toBeVisible()
+  await expect(page.getByText('$43', { exact: true })).toHaveCount(0)
+  await page.goto('/jobs/c-h?tab=insurance', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText('$1,000.50', { exact: true }).filter({ visible: true }).first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText('$24,800.00', { exact: true }).filter({ visible: true }).first()).toBeVisible()
+  await expect(page.getByText('$1,001', { exact: true })).toHaveCount(0)
+  if (testInfo.project.name.startsWith('desktop')) {
+    await page.setViewportSize({ width: 1720, height: 1000 })
+    const rail = page.locator('.fh-detail-rail')
+    await expect(rail.getByText('$12,345.50', { exact: true })).toBeVisible({ timeout: 30_000 })
+    await expect(rail.getByText(/\$\d+(\.\d)?K\b/)).toHaveCount(0)
+  }
+})
+
+// formats-12: the job's own Schedule tab writes the visit time as 7:00 am,
+// the way the spine and Today write it, never "7:00 AM".
+test('the job Schedule tab writes the visit time as 7:00 am', async ({ context, page }) => {
+  await signIn(context, { tables: FORMATS_TABLES })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  await page.goto('/jobs/c-h?tab=schedule', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText('Pour driveway').filter({ visible: true }).first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText(/7:00 am/).filter({ visible: true }).first()).toBeVisible()
+  await expect(page.locator('main').getByText(/\d:\d\d\s?(AM|PM)\b/)).toHaveCount(0)
 })

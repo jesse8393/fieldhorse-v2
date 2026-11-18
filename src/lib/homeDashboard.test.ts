@@ -307,7 +307,7 @@ describe('buildHomeDashboardBundle', () => {
     }))
     const action = bundle.nextActions.find((row) => row.kind === 'invoice')
     expect(action?.contactAmount).toBe(5000)
-    expect(action?.detail).toBe('$5,000 owed')
+    expect(action?.detail).toBe('$5,000.00 owed')
   })
 
   // M-20: the owed line keeps the cents.

@@ -10,7 +10,8 @@ import {
   Bell, Search, ChevronLeft, ChevronRight, Edit2, Trash2,
   Phone, Mail, MapPin, ArrowUpRight, Plus, ExternalLink, Receipt,
 } from 'lucide-react'
-import { money, moneyFull } from '../../lib/format.ts'
+import { moneyCents, moneyFull } from '../../lib/format.ts'
+import { formatPhone } from '../../lib/utils.ts'
 import { clientActivity } from '../../lib/clientActivity.ts'
 import MiniMetric from '../MiniMetric.tsx'
 import PaletteKeyCap, { paletteShortcut } from './PaletteKeyCap.tsx'
@@ -143,8 +144,8 @@ export default function SnowClientDetailBuild(props: Props) {
           </div>
 
           <div className="fh-build-mini-grid fh-build-mini-grid--detail">
-            <MiniMetric label="Lifetime value" value={money(lifetime)} accent />
-            <MiniMetric label="Open value" value={openValue > 0 ? money(openValue) : '\u2003'} />
+            <MiniMetric label="Lifetime value" value={moneyCents(lifetime)} accent />
+            <MiniMetric label="Open value" value={openValue > 0 ? moneyCents(openValue) : '\u2003'} />
             <MiniMetric label="Active jobs" value={String(activeCount)} />
             <MiniMetric label="Remaining contract value" value={moneyFull(outstanding)} />
           </div>
@@ -215,7 +216,7 @@ export default function SnowClientDetailBuild(props: Props) {
               <div className="fh-build-contact-list">
                 {client?.phone && (
                   <a className="fh-build-contact-row" href={`tel:${client.phone}`}>
-                    <Phone size={12} /> <span>{client.phone}</span>
+                    <Phone size={12} /> <span>{formatPhone(client.phone)}</span>
                     <ChevronRight size={12} className="fh-build-contact-row__chev" />
                   </a>
                 )}

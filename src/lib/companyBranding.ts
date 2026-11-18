@@ -17,6 +17,7 @@ import { useCallback } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from './supabase.ts'
 import { useProfile } from '../contexts/ProfileContext.tsx'
+import { companyFromProfile } from './invoices.ts'
 
 /** The fields of a profile a document's company block is built from. */
 export type CompanyBranding = {
@@ -92,4 +93,14 @@ export function useDocumentProfile(orgId: string | null | undefined) {
     return documentProfile(branding, own)
   }, [orgId, own, queryClient])
   return { profile, load }
+}
+
+/**
+ * The company name a record of company `orgId` is printed under, the name
+ * its invoice numbers are built from (PCC-2D3E-01), so a screen names an
+ * invoice the way its PDF and customer link do (formats-1).
+ */
+export function useDocumentCompanyName(orgId: string | null | undefined): string {
+  const { profile } = useDocumentProfile(orgId)
+  return companyFromProfile(profile).name
 }

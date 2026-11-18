@@ -6,6 +6,7 @@ import { recalcCost } from '../../../lib/stages.ts'
 import { toastError, toastSuccess, toastUndo } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { formatPhone } from '../../../lib/utils.ts'
+import { moneyCents } from '../../../lib/format.ts'
 import { Button, Field } from '../../../components/fh'
 import { Choices } from '../../../screens/new/CreateShell.tsx'
 import { Eyebrow } from '../../../components/v3'
@@ -23,12 +24,6 @@ const STATUS_COLOR: Record<string, string> = {
   onsite:    'var(--v3-success-text)',
   complete:  'var(--v3-primary-text)',
   paid:      'var(--v3-success-text)'
-}
-
-function money(n: any) {
-  return Number(n || 0).toLocaleString(undefined, {
-    style: 'currency', currency: 'USD', maximumFractionDigits: 0
-  })
 }
 
 /**
@@ -112,7 +107,7 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }: an
           color: 'var(--v3-primary-text)', fontVariantNumeric: 'tabular-nums'
         }}>
           {subs.length} {subs.length === 1 ? 'sub' : 'subs'}
-          {totalRate > 0 ? ` · ${money(totalRate)}` : ''}
+          {totalRate > 0 ? ` · ${moneyCents(totalRate)}` : ''}
         </span>
       </div>
 
@@ -218,7 +213,7 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }: an
                     color: 'var(--v3-primary-text)',
                     fontVariantNumeric: 'tabular-nums', minWidth: 60, textAlign: 'right'
                   }}>
-                    {money(s.rate)}
+                    {moneyCents(s.rate)}
                   </span>
                   <button
                     type="button"

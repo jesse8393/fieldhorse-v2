@@ -115,7 +115,7 @@ test('keeps money, schedule, settings, and missing routes usable', async ({ page
   // is a row under Due soon, named for the customer, with the job and the
   // invoice.
   await expect(page.getByRole('heading', { level: 1, name: 'Money' })).toBeVisible()
-  await expect(page.getByText('Driveway replacement, progress draw 1 · Invoice 2 · inv1', { exact: true })).toBeVisible()
+  await expect(page.getByText('Driveway replacement, progress draw 1 · PCC-JOB2-02', { exact: true })).toBeVisible()
   await capture(page, testInfo, 'invoices')
 
   await openRoute(page, '/schedule')

@@ -80,7 +80,7 @@ export default function ChangeOrdersBlock({ changeOrders = [], company }: { chan
                       marginLeft: 8
                     }}
                   >
-                    APPROVED · {shortDate(co.approved_at)}
+                    APPROVED · {shortDate(co.approved_at, company?.timezone)}
                   </span>
                 )}
               </div>

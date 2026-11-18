@@ -12,6 +12,8 @@
 // form lets headless QA scripts (scripts/qa-render-proposal.mjs)
 // render the same code path the browser uses.
 import { proposalIssuedAt } from './proposalDate.ts'
+import { toYmd } from './dates.ts'
+import { formatPhone } from './utils.ts'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { loadLogoForPdf, loadImageForPdf } from './pdfLogo.ts'
@@ -180,7 +182,7 @@ function drawDocParties(doc, opts) {
     leftY += lines.length * 4.5
   }
   if (recipient?.phone || recipient?.email) {
-    const sub = [recipient.phone, recipient.email].filter(Boolean).join(' · ')
+    const sub = [formatPhone(recipient.phone), recipient.email].filter(Boolean).join(' · ')
     const lines = doc.splitTextToSize(sub, colW)
     doc.text(lines, leftX, leftY)
     leftY += lines.length * 4.5
@@ -192,7 +194,7 @@ function drawDocParties(doc, opts) {
     doc.text(lines, rightX, rightY)
     rightY += lines.length * 4.5
   }
-  if (company?.phone)   { doc.text(`Phone: ${company.phone}`, rightX, rightY); rightY += 4.5 }
+  if (company?.phone)   { doc.text(`Phone: ${formatPhone(company.phone)}`, rightX, rightY); rightY += 4.5 }
   if (company?.email)   { doc.text(`Email: ${company.email}`, rightX, rightY); rightY += 4.5 }
   if (company?.website) { doc.text(`Website: ${company.website}`, rightX, rightY); rightY += 4.5 }
 
@@ -590,7 +592,7 @@ function drawModernLetterhead(doc, {
     doc.text(lines, nameX, ly)
     ly += lines.length * 4.2
   }
-  const contactLine = [company?.phone, company?.email, company?.website].filter(Boolean).join('  ·  ')
+  const contactLine = [formatPhone(company?.phone), company?.email, company?.website].filter(Boolean).join('  ·  ')
   if (contactLine) {
     const lines = doc.splitTextToSize(contactLine, Math.max(60, identityW))
     doc.text(lines, nameX, ly)
@@ -1626,7 +1628,7 @@ function themedAddressLines(party) {
   if (!party) return []
   const out = []
   if (party.address) out.push(String(party.address))
-  const c = [party.phone, party.email].filter(Boolean).join(' · ')
+  const c = [formatPhone(party.phone), party.email].filter(Boolean).join(' · ')
   if (c) out.push(c)
   if (party.website) out.push(String(party.website))
   return out
@@ -2054,7 +2056,7 @@ export async function generateCertificate({
   doc.setFontSize(8.5)
   doc.setTextColor(...INK_MUTED)
   if (company.address) { doc.text(String(company.address), margin, leftY); leftY += 4 }
-  const contactLine = [company.phone, company.email, company.website].filter(Boolean).join('  ·  ')
+  const contactLine = [formatPhone(company.phone), company.email, company.website].filter(Boolean).join('  ·  ')
   if (contactLine) { doc.text(contactLine, margin, leftY); leftY += 4 }
 
   // Right-aligned tracked caps: jsPDF's align:'right' ignores
@@ -2229,7 +2231,9 @@ export async function generateCertificate({
   doc.text(discLines, margin, pageHeight - 12 - (discLines.length - 1) * 3.6)
 
   const safeName = (contact.name || 'completion').replace(/[^A-Za-z0-9_-]+/g, '-').slice(0, 40)
-  const stamp = new Date(closedAt).toISOString().slice(0, 10)
+  // The local day the job closed, the day the app shows, never the UTC
+  // day, which is already tomorrow after 6 pm Central (formats-14).
+  const stamp = toYmd(closedAt)
   const filename = options.filename || `Certificate-${safeName}-${stamp}.pdf`
   return { doc, filename }
 }

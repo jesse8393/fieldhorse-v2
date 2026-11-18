@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { orgMembersList, type OrgMember } from '../../lib/orgApi.ts'
 import { allocationConflicts, fetchAllocationEvents, CrewAssignmentUnavailableError, type AllocationEvent, type VisitWindow } from '../../lib/scheduleAllocation.ts'
+import { dateAndTime } from '../../lib/dates.ts'
 
 type Props = { orgId: string; visits: VisitWindow[]; assignedIds: string[]; onChange: (ids: string[]) => void; editingId?: string; disabled?: boolean; readOnly?: boolean }
 
@@ -75,7 +76,7 @@ export default function CrewAllocation({ orgId, visits, assignedIds, onChange, e
       </>}
       {missing.length > 0 && rosterState === 'ready' && <div className="fhev-crew__error"><p>{missing.length} assigned {missing.length === 1 ? 'person is' : 'people are'} absent from the current roster. Check before saving.</p>{!readOnly && <button type="button" disabled={disabled} onClick={() => onChange(assignedIds.filter((id) => !missing.includes(id)))}>Remove unavailable members</button>}</div>}
       {selectedConflicts.length > 0 && availability === 'ready' && <div className="fhev-crew__error" role="alert"><p>Resolve these conflicts before saving.</p><ul>{selectedConflicts.map((conflict, index) => <li key={`${conflict.userId}-${conflict.eventId}-${index}`}>
-        {members.find((member) => member.user_id === conflict.userId)?.name || 'Selected crew'}: {conflict.eventId ? <Link to={`/schedule/${encodeURIComponent(conflict.eventId)}/edit`}>{conflict.title}</Link> : conflict.title}, {new Date(conflict.start_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+        {members.find((member) => member.user_id === conflict.userId)?.name || 'Selected crew'}: {conflict.eventId ? <Link to={`/schedule/${encodeURIComponent(conflict.eventId)}/edit`}>{conflict.title}</Link> : conflict.title}, {dateAndTime(conflict.start_at)}
       </li>)}</ul></div>}
       {availability === 'loading' && visits.length > 0 && <p role="status">Checking all visit dates</p>}
     </section>

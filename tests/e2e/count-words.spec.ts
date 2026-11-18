@@ -240,3 +240,45 @@ test.describe('Settings', () => {
     })
   }
 })
+
+// ---- formats-7: vendors' rates and the importer's amounts read as money ------
+
+test.describe('Money written by hand reads like money (formats-7)', () => {
+  const sub = (id: string, contactId: string, rate: number) => ({
+    id, user_id: 'qa-user-1', contact_id: contactId, name: 'Ace Electric', phone: '615-555-0199', trade: 'Electrical',
+    rate, status: null, created_at: iso(Date.now() - 5 * 24 * HOUR)
+  })
+
+  test('a vendor billed $42.50 and $1,000 reads "$42.50" and "$1,042.50", on the list and its page', async ({ context, page, isMobile }) => {
+    await signIn(context, { tables: { fh_subs: [sub('s1', 'c-job1', 42.5), sub('s2', 'c-job2', 1000)] } })
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.goto('/subs', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    const shown = (re: RegExp) => page.getByText(re).filter({ visible: true }).first()
+    const row = page.getByRole('button', { name: /Ace Electric/ }).first()
+    await expect(row).toBeVisible({ timeout: 30_000 })
+    await expect(row).toContainText('$1,042.50')
+    await row.click()
+    if (isMobile) {
+      // The phone row opens in place with each job's rate, then the profile.
+      await expect(shown(/^\$42\.50$/)).toBeVisible()
+      await expect(shown(/^\$1,000\.00$/)).toBeVisible()
+      await page.getByRole('link', { name: 'View vendor profile' }).click()
+    }
+    await expect(page).toHaveURL(/\/subs\/.+/)
+    await expect(shown(/\$42\.50/)).toBeVisible({ timeout: 30_000 })
+    await expect(shown(/\$1,000\.00/)).toBeVisible()
+    // The phone page leads with what the vendor billed in all.
+    if (isMobile) await expect(shown(/\$1,042\.50/)).toBeVisible()
+    const text = await page.locator('main').innerText()
+    expect(text).not.toMatch(/\$42\.5(?!0)/)
+    expect(text).not.toMatch(/\$1,042\.5(?!0)/)
+  })
+
+  test('the importer previews an amount with cents', async ({ context, page }) => {
+    await signIn(context)
+    await open(page, '/import', 'text=CSV upload')
+    const file = page.locator('input[type="file"][accept=".csv,text/csv"]')
+    await file.setInputFiles({ name: 'jobs.csv', mimeType: 'text/csv', buffer: Buffer.from('Name,Phone,Email,Amount\nAna Ruiz,615-555-0142,ana@ruiz.com,1000.5\n') })
+    await expect(page.getByText('$1,000.50', { exact: true })).toBeVisible({ timeout: 15_000 })
+  })
+})

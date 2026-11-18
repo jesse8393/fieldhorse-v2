@@ -28,9 +28,10 @@ import {
   createColumnHelper,
 } from '@tanstack/react-table'
 import type { SortingState } from '@tanstack/react-table'
-import { countNoun, money, moneyFull } from '../../lib/format.ts'
+import { countNoun, moneyCents, moneyFull } from '../../lib/format.ts'
 import { clientActivity } from '../../lib/clientActivity.ts'
 import { buildCsv, downloadCsv } from '../../lib/csv.ts'
+import { toYmd } from '../../lib/dates.ts'
 import MiniMetric from '../MiniMetric.tsx'
 import LoadingValue from '../LoadingValue.tsx'
 import TopbarWeather from './TopbarWeather.tsx'
@@ -120,7 +121,8 @@ function toCsv(rows: ClientRow[]): string {
     rows.map((r) => [
       r.client.name || 'Unnamed',
       r.status.label,
-      r.lastTouch ? new Date(r.lastTouch).toISOString().slice(0, 10) : '',
+      // The local day the app shows, not the UTC day (formats-14).
+      r.lastTouch ? toYmd(new Date(r.lastTouch)) : '',
       r.outstanding.toFixed(2),
       r.activeCount,
       r.nextAction,
@@ -260,7 +262,7 @@ export default function SnowClientsBuild(props: Props) {
           <div className="fh-build-mini-grid">
             <MiniMetric label="Total clients" value={loading ? pending('Loading total clients') : rows.length.toLocaleString()} />
             <MiniMetric label="Active relationships" value={loading ? pending('Loading active relationships') : String(screenStats.activeAccounts)} accent />
-            <MiniMetric label="Contract balance" value={loading ? pending('Loading outstanding', 72) : money(screenStats.outstanding)} tone={screenStats.outstanding > 0 ? 'warn' : undefined} />
+            <MiniMetric label="Contract balance" value={loading ? pending('Loading outstanding', 72) : moneyCents(screenStats.outstanding)} tone={screenStats.outstanding > 0 ? 'warn' : undefined} />
             <MiniMetric label="Needs follow up" value={loading ? pending('Loading follow ups') : String(needsFollowUp)} tone={needsFollowUp > 0 ? 'warn' : undefined} />
           </div>
         </section>
@@ -396,7 +398,7 @@ export default function SnowClientsBuild(props: Props) {
               <div className="fh-build-eyebrow">Lifetime value</div>
               {loading ? railPending : (
                 <>
-                  <strong>{money(totalLifetime || 0)}</strong>
+                  <strong>{moneyCents(totalLifetime || 0)}</strong>
                   <span>booked revenue all time</span>
                 </>
               )}

@@ -19,6 +19,7 @@ import { renderPayBlock, formatFromHeader, textField, documentSendKey, sendViaRe
 import { loadAccessibleRow, brandingUserIdFor } from './lib/orgAccess.js'
 import { hashIdentifier, checkRateLimit, checkDailySendCap, DAILY_SEND_LIMIT_MESSAGE } from './lib/rateLimit.js'
 import { isOwnedStoragePath } from './lib/storagePath.js'
+import { moneyCents } from './lib/money.js'
 
 export default async (request) => {
   if (request.method === 'OPTIONS') {
@@ -194,10 +195,9 @@ export default async (request) => {
 function formatMoneyLabel(n) {
   const v = Number(n || 0)
   if (!Number.isFinite(v) || v <= 0) return ''
-  // Cents shown when present so the emailed figure matches the PDF's
-  // cent-precise total (see send-invoice.js formatMoneyLabel).
-  const hasCents = Math.abs(v - Math.round(v)) >= 0.005
-  return `$${v.toLocaleString('en-US', { minimumFractionDigits: hasCents ? 2 : 0, maximumFractionDigits: hasCents ? 2 : 0 })}`
+  // Dollars and cents, so the emailed figure matches the PDF's total
+  // (see send-invoice.js formatMoneyLabel).
+  return moneyCents(v)
 }
 
 function renderStatementHtml({ greeting, clientLabel, amountLabel, senderLine, payLink, payInstructions }) {

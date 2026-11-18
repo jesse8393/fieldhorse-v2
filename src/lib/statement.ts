@@ -246,6 +246,18 @@ export async function fetchStatementMoney(clientId: string, jobIds: string[]): P
   return { invoices, payments }
 }
 
+/**
+ * The one read of a customer's statement money, shared by the customer
+ * page's Statement button and the statement screen, so both total the same
+ * invoices and payments through gatherStatement (formats-5).
+ */
+export function statementMoneyQuery(clientId: string | undefined, jobIds: string[]) {
+  return {
+    queryKey: ['clientStatementMoney', clientId, jobIds] as const,
+    queryFn: () => fetchStatementMoney(clientId as string, jobIds)
+  }
+}
+
 function uniqueById<T extends { id: string }>(rows: T[]): T[] {
   const seen = new Map<string, T>()
   for (const r of rows) if (r?.id && !seen.has(r.id)) seen.set(r.id, r)

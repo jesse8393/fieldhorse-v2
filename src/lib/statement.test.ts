@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { gatherStatement } from './statement.ts'
+import { gatherStatement, statementMoneyQuery } from './statement.ts'
 
 const jobs = [
   { id: 'a', job_title: 'Sidewalk', stage: 'job', amount: 1880 },
@@ -136,3 +136,25 @@ describe('gatherStatement with what the server worked out', () => {
   })
 })
 
+
+// formats-5: the customer page's Statement button and the statement screen
+// read one query and total it one way, so the button names the statement's
+// Total due: what is owed on sent invoices, not the contract less payments.
+describe('statementMoneyQuery', () => {
+  it('gives both screens the same cache key for the same customer and jobs', () => {
+    expect(statementMoneyQuery('cl-h', ['c-h']).queryKey).toEqual(['clientStatementMoney', 'cl-h', ['c-h']])
+    expect(statementMoneyQuery('cl-h', ['c-h']).queryKey).toEqual(statementMoneyQuery('cl-h', ['c-h']).queryKey)
+  })
+
+  it('totals the sent invoice, not the contract less what was paid', () => {
+    const jobs = [{ id: 'c-h', stage: 'job', job_title: 'Driveway replacement', amount: 12345.5 }]
+    const payments = [{ contact_id: 'c-h', invoice_id: 'inv-h1', amount: 1000.5 }]
+    const invoices = [
+      { id: 'inv-h1', contact_id: 'c-h', amount: 4115.17, status: 'sent', sequence_number: 1 },
+      { id: 'inv-h2', contact_id: 'c-h', amount: 8230.33, status: 'draft', sequence_number: 2 }
+    ]
+    const withInvoices = gatherStatement(jobs, payments, [], { invoices: invoices as any })
+    expect(withInvoices.totalDue).toBe(3114.67)
+    expect(gatherStatement(jobs, payments, []).totalDue).toBe(11345)
+  })
+})

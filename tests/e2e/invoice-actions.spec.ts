@@ -6,6 +6,7 @@ import { signIn } from './helpers/signIn.ts'
 import { FAIL, expectPlain, failRest } from './helpers/rawErrors.ts'
 import { goInApp, holdPosts, postsTo, twoTaps } from './helpers/doubleTap.ts'
 import { documentSendKey } from '../../netlify/functions/lib/email.js'
+import { NOW as FORMATS_NOW, TABLES as FORMATS_TABLES, contact as formatsContact, invoice as formatsInvoice } from './helpers/formatsSeed.ts'
 
 // The invoice screen's actions (Phase 9, Task 12, decisions D57 and D62):
 // the gold Collect payment, then Resend (Send on a draft), PDF and Share
@@ -1096,4 +1097,48 @@ test('Resend after "the customer will not get a second email" repeats the same s
   const key = (b: Record<string, unknown>) => documentSendKey('send-invoice', `invoice:${b.invoice_id}`, b, String(b.recipient_email).toLowerCase().trim())
   expect(key(retry), 'the retry the message invites carries the same provider key').toBe(key(first))
   expect(retry.storage_path, 'and the same PDF').toBe(first.storage_path)
+})
+
+// formats-1: the app names an invoice by the number its PDF and customer
+// link print, PCC-2D3E-01, on the invoice page, the job's Invoices tab,
+// Activity and Search, and typing that number in Search finds it.
+test('the app names an invoice by the number the customer sees', async ({ context, page, isMobile }) => {
+  const OWING = '1c8d2e3f-4051-4b6c-9d7e-8f9a0b1c2d3e'
+  const INV = '7c9e6679-7425-40de-944b-e07fc1f90ae7'
+  const job = formatsContact({ id: OWING, stage: 'job', name: 'Harold Wickham', job_title: 'Back patio', amount: 4200.75 })
+  const bill = formatsInvoice({ id: INV, contact_id: OWING, title: 'Final', amount: 4200.75, status: 'sent', sequence_number: 1, issued_at: '2026-11-10T05:30:00Z', created_at: '2026-11-10T05:30:00Z', due_at: '2026-11-25T05:59:59.999Z' })
+  await signIn(context, { tables: { ...FORMATS_TABLES, fh_contacts: [job], fh_invoices: [bill], fh_payments: [] } })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  await page.goto(`/invoices/${INV}`, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText('PCC-2D3E-01', { exact: true })).toBeVisible({ timeout: 30_000 })
+  await page.goto(`/jobs/${OWING}?tab=draws`, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText('PCC-2D3E-01', { exact: true }).filter({ visible: true }).first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText(/Draw #1/)).toHaveCount(0)
+  if (!isMobile) {
+    // The desktop job page's documents panel names it the same way.
+    await page.goto(`/jobs/${OWING}`, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    const panel = page.locator('.fhd-sec').filter({ has: page.getByRole('heading', { name: 'Documents' }) })
+    await expect(panel.getByText('PCC-2D3E-01, Final', { exact: true })).toBeVisible({ timeout: 30_000 })
+    await expect(panel.getByText(/Invoice 1/)).toHaveCount(0)
+  }
+  await page.goto('/activity', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText(/PCC-2D3E-01 sent, Final/).first()).toBeVisible({ timeout: 30_000 })
+  await page.goto('/search', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await page.getByPlaceholder(/Jobs, clients/).fill('PCC-2D3E-01')
+  await expect(page.getByText(/PCC-2D3E-01/).first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText('Final', { exact: true }).first()).toBeVisible()
+})
+
+// formats-1: an untitled invoice on the customer page's Projects tab reads
+// by its printed number, not "Invoice 1".
+test('the customer page names an untitled invoice by its printed number', async ({ context, page }) => {
+  const OWING = '1c8d2e3f-4051-4b6c-9d7e-8f9a0b1c2d3e'
+  const job = formatsContact({ id: OWING, stage: 'job', name: 'Harold Wickham', job_title: 'Back patio', amount: 4200.75 })
+  const bill = formatsInvoice({ id: '7c9e6679-7425-40de-944b-e07fc1f90ae7', contact_id: OWING, title: null, amount: 4200.75, status: 'sent', sequence_number: 1 })
+  await signIn(context, { tables: { ...FORMATS_TABLES, fh_contacts: [job], fh_invoices: [bill], fh_payments: [] } })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  await page.goto('/clients/cl-h', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await page.getByRole('tab', { name: /^Projects/ }).or(page.getByRole('button', { name: /^Projects/ })).filter({ visible: true }).first().click({ timeout: 30_000 })
+  await expect(page.getByText('PCC-2D3E-01', { exact: true }).filter({ visible: true }).first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText(/^Invoice 1$/)).toHaveCount(0)
 })

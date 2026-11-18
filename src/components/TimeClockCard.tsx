@@ -8,7 +8,7 @@ import { laborBooksAsExpense } from '../lib/labor.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { hapticTap, hapticSuccess } from '../lib/haptics.ts'
 import { Eyebrow } from './v3'
-import { countNoun } from '../lib/format.ts'
+import { countNoun, moneyCents } from '../lib/format.ts'
 import { plainError } from '../lib/serviceErrors.ts'
 
 // Time clock card, Phase 19 / Upgrade Move #A2.
@@ -216,7 +216,7 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
         const { error } = await supabase.from('fh_expenses').insert({
           user_id: userId,
           contact_id: contact.id,
-          description: note.trim() || `Labor, ${hours.toFixed(2)} ${countNoun(hours, 'hr')} @ $${rate}/hr`,
+          description: note.trim() || `Labor, ${hours.toFixed(2)} ${countNoun(hours, 'hr')} @ ${moneyCents(rate)}/hr`,
           amount: billable,
           category: 'Labor',
           expense_date: todayYmd()
@@ -262,7 +262,7 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
       hapticSuccess()
       toastSuccess(
         'Time logged',
-        `${hours.toFixed(2)} ${countNoun(hours, 'hr')}${bookAsExpense ? ` · $${billable.toLocaleString()}` : ''}`
+        `${hours.toFixed(2)} ${countNoun(hours, 'hr')}${bookAsExpense ? ` · ${moneyCents(billable)}` : ''}`
           + (endedElsewhere ? '. The shift had already been clocked out elsewhere, so its end time stays as it was.' : '')
       )
       // Refresh job cost / margin
@@ -355,7 +355,7 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <Eyebrow style={{ color: 'var(--ink-muted)' }}>Billable</Eyebrow>
               <span style={{ padding: '8px 12px', borderRadius: 10, border: '1px solid var(--rule)', background: 'var(--surface-2)', fontFamily: 'var(--font-display)', fontSize: 14, color: 'var(--v3-primary-text)' }}>
-                ${billablePreview.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                {moneyCents(billablePreview)}
               </span>
             </div>
           </div>}

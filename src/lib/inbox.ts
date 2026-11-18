@@ -23,6 +23,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { onlineManager, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from './supabase.ts'
+import { timeOfDay } from './dates.ts'
 import { useOrgScope, type OrgScope } from './orgScope.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import type { Database, Json } from './database.types.ts'
@@ -309,10 +310,7 @@ function parse(iso: string | null | undefined): Date | null {
 /** "4:48 pm": lower case, one plain space, no leading zero on the hour. */
 export function timeLabel(iso: string | null | undefined): string {
   const d = parse(iso)
-  if (!d) return ''
-  const hours = d.getHours()
-  const minutes = String(d.getMinutes()).padStart(2, '0')
-  return `${hours % 12 || 12}:${minutes} ${hours < 12 ? 'am' : 'pm'}`
+  return d ? timeOfDay(d) : ''
 }
 
 /** The label over a day of messages: Today, Yesterday, "Tue, Oct 6", "Dec 24, 2025". */

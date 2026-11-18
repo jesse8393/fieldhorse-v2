@@ -524,3 +524,66 @@ describe('public-link function audit helpers', () => {
     expect(event.p_metadata.request_id).toBe('req_123')
   })
 })
+
+// formats-8: the alert the owner gets when a customer signs names the
+// amount the customer signed, to the cent, not rounded to the dollar.
+describe('approval alerts name the exact amount', () => {
+  it('a quote approval alert prints dollars and cents', async () => {
+    const db = seedDb(baseTables({
+      fh_public_links: [link({ token: 'q', kind: 'proposal', quote_id: 'quote-1' })],
+      fh_quotes: [{ id: 'quote-1', org_id: ORG, user_id: OWNER, client_id: 'cl-1', title: 'Driveway', status: 'sent', amount: 2949.75, expires_at: null, job_id: null, created_at: '2026-10-20T00:00:00.000Z', updated_at: 'u1' }],
+      fh_quote_items: [{ id: 'it-1', quote_id: 'quote-1', contact_id: null, description: 'Slab', qty: 1, rate: 2949.75, amount: 2949.75, sort_order: 0 }]
+    }))
+    expect((await post(approveHandler, { token: 'q', signature_name: 'Dana', expected_total: 2949.75, expected_updated_at: 'u1' })).status).toBe(200)
+    const row = db.tables.fh_notifications.find((n) => n.kind === 'quote_approved')!
+    expect(row.title).toBe('Quote approved · $2,949.75')
+    expect(String(pushes[0].payload.title)).toContain('$2,949.75')
+  })
+
+  it('a job proposal approval alert prints dollars and cents', async () => {
+    const db = seedDb(baseTables({
+      fh_public_links: [link({ token: 'jp', kind: 'proposal', contact_id: 'job-1' })],
+      fh_contacts: [job({ stage: 'quote', proposal_status: 'sent' })],
+      fh_quote_items: [{ id: 'ji', quote_id: null, contact_id: 'job-1', description: 'Patio', qty: 1, rate: 20000, amount: 20000, sort_order: 0 }]
+    }))
+    expect((await post(approveHandler, { token: 'jp', signature_name: 'Dana', expected_total: 20000 })).status).toBe(200)
+    expect(db.tables.fh_notifications.find((n) => n.kind === 'quote_approved')!.title).toBe('Quote approved · $20,000.00')
+  })
+
+  it('a change order signature alert prints dollars and cents, credits included', async () => {
+    const coDb = (amount: number) => seedDb(baseTables({
+      fh_public_links: [link({ token: 'co', kind: 'change_order', contact_id: 'job-1', change_order_id: 'co-1' })],
+      fh_contacts: [job()],
+      fh_change_orders: [{ id: 'co-1', org_id: ORG, user_id: OWNER, contact_id: 'job-1', sequence_number: 1, title: 'Footing', amount, status: 'sent', updated_at: 'u1' }]
+    }))
+    let db = coDb(1235.5)
+    expect((await post(coApproveHandler, { token: 'co', signature_name: 'Dana', expected_amount: 1235.5, expected_updated_at: 'u1' })).status).toBe(200)
+    expect(db.tables.fh_notifications.find((n) => n.kind === 'change_order_signed')!.title).toBe('Change order signed · +$1,235.50')
+    db = coDb(-400)
+    expect((await post(coApproveHandler, { token: 'co', signature_name: 'Dana', expected_amount: -400, expected_updated_at: 'u1' })).status).toBe(200)
+    expect(db.tables.fh_notifications.find((n) => n.kind === 'change_order_signed')!.title).toBe('Change order signed · −$400.00')
+  })
+})
+
+// formats-2: the link carries the company's time zone, so the customer's
+// phone prints the dates the company set, whatever zone it is in.
+describe('the link carries the company time zone', () => {
+  const invoiceTables = (extra: Record<string, Row[]> = {}) => baseTables({
+    fh_public_links: [link({ token: 'tz', kind: 'invoice', contact_id: 'job-1' })],
+    fh_contacts: [job()],
+    fh_invoices: [bill('inv-tz', 1, 5000, 'sent')],
+    ...extra
+  })
+
+  it('names the zone the company set', async () => {
+    seedDb(invoiceTables({ fh_org_settings: [{ org_id: ORG, timezone: 'America/Denver' }] }))
+    const { body } = await getLink('tz')
+    expect(body.company.timezone).toBe('America/Denver')
+  })
+
+  it('uses Central time when the company has set none, as the server does', async () => {
+    seedDb(invoiceTables())
+    const { body } = await getLink('tz')
+    expect(body.company.timezone).toBe('America/Chicago')
+  })
+})

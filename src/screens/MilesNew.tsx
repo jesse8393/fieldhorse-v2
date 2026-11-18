@@ -17,6 +17,7 @@ import { toastError, toastSuccess } from '../lib/toast.ts'
 import { hapticMedium } from '../lib/haptics.ts'
 import { businessMileageRate, mileageRateNote } from '../lib/mileageRates.ts'
 import { plainError } from '../lib/serviceErrors.ts'
+import { moneyCents } from '../lib/format.ts'
 
 // The IRS rate depends on the date of the drive, from the same table
 // Reports reads, so the screen and the yearly total always agree.
@@ -110,7 +111,7 @@ export default function MilesNew() {
         min="0"
         placeholder="0"
         value={miles}
-        helper={milesNum > 0 && deduction != null ? `Deduction $${deduction.toFixed(2)}` : undefined}
+        helper={milesNum > 0 && deduction != null ? `Deduction ${moneyCents(deduction)}` : undefined}
         error={milesError}
         onChange={(e) => { setMiles(e.target.value); setError(undefined); setMilesError(undefined) }}
       />

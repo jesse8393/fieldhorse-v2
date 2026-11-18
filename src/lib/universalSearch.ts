@@ -27,6 +27,9 @@ import { lastKnownOrg } from './orgScope.ts'
 import { recordRoute } from './records.ts'
 import type { PaletteJob } from './paletteActions.ts'
 import { canSeeFinancials, canViewRoute, type OrgRole } from './permissions.ts'
+import { moneyCents } from './format.ts'
+import { invoiceReference, parseInvoiceReference } from './invoiceReference.ts'
+import { timeOfDay } from './dates.ts'
 
 const PER_KIND = 6
 
@@ -59,9 +62,10 @@ function fmtDateShort(iso: string | null | undefined) {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
+// A record's amount to the cent, the figure the record shows (formats-3).
 function fmtMoney(amount: unknown) {
   const n = Number(amount || 0)
-  return n ? `$${Math.round(n).toLocaleString()}` : null
+  return n ? moneyCents(n) : null
 }
 
 /** 'changes_requested' as 'Changes requested'. */
@@ -74,10 +78,10 @@ const NO_RESULTS: SearchResults = { leads: [], quotes: [], jobs: [], invoices: [
 
 // Rows from a pair of reads (by title, by client name) as one list, in
 // the order they came, each row once.
-function mergeRows(a: unknown, b: unknown): any[] {
+function mergeRows(...lists: unknown[]): any[] {
   const rows: any[] = []
   const seen = new Set<string>()
-  for (const list of [a, b]) {
+  for (const list of lists) {
     for (const row of Array.isArray(list) ? list : []) {
       if (!row?.id || seen.has(row.id)) continue
       seen.add(row.id)
@@ -90,7 +94,7 @@ function mergeRows(a: unknown, b: unknown): any[] {
 function fmtDateTime(iso: string | null | undefined) {
   if (!iso) return ''
   const d = new Date(iso)
-  return `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · ${d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
+  return `${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · ${timeOfDay(d)}`
 }
 
 // Canonical stage→URL mapping lives in stages.ts (audit: 5 copies drifted).
@@ -101,6 +105,8 @@ export async function universalSearch(
   userId: string | undefined,
   orgId?: string | null,
   role: OrgRole | null = null,
+  /** The company the invoices are printed under, for their numbers (formats-1). */
+  companyName: string | null = null,
 ): Promise<SearchResults> {
   const q = String(query || '').trim()
   if (!q || !userId || !role) return NO_RESULTS
@@ -138,7 +144,16 @@ export async function universalSearch(
       .limit(PER_KIND)
   const LEAD_COLUMNS = 'id, title, status, job_type, follow_up_on, client_id'
   const QUOTE_COLUMNS = 'id, title, status, amount, client_id'
-  const INVOICE_COLUMNS = 'id, title, status, amount, sequence_number, client_id'
+  const INVOICE_COLUMNS = 'id, title, status, amount, sequence_number, client_id, contact_id'
+  // A typed invoice number (PCC-2D3E-01) finds the invoice it names: the
+  // invoices with that sequence, kept when their number matches (formats-1).
+  const typedNumber = parseInvoiceReference(q)
+  const byNumber = typedNumber
+    ? scoped(supabase.from('fh_invoices').select(`${INVOICE_COLUMNS}, fh_clients!fh_invoices_client_id_fkey(name)`))
+      .eq('sequence_number', typedNumber.sequence)
+      .order('updated_at', { ascending: false })
+      .limit(50)
+    : skipped
 
   // Parallel, independent queries, no transactional concern.
   // Each .or() searches the most useful columns for that table.
@@ -146,7 +161,7 @@ export async function universalSearch(
   // in depth alongside RLS.
   const [
     jobsRes, clientsRes, notesRes, eventsRes, filesRes,
-    leadsByTitle, leadsByClient, quotesByTitle, quotesByClient, invoicesByTitle, invoicesByClient
+    leadsByTitle, leadsByClient, quotesByTitle, quotesByClient, invoicesByTitle, invoicesByClient, invoicesByNumber
   ] = await Promise.all([
     scoped(supabase
       .from('fh_contacts')
@@ -190,7 +205,8 @@ export async function universalSearch(
     canViewRoute(role, '/quotes') ? byTitle('fh_quotes', QUOTE_COLUMNS) : skipped,
     canViewRoute(role, '/quotes') ? byClient('fh_quotes', QUOTE_COLUMNS) : skipped,
     canViewRoute(role, '/invoices') ? byTitle('fh_invoices', INVOICE_COLUMNS) : skipped,
-    canViewRoute(role, '/invoices') ? byClient('fh_invoices', INVOICE_COLUMNS) : skipped
+    canViewRoute(role, '/invoices') ? byClient('fh_invoices', INVOICE_COLUMNS) : skipped,
+    canViewRoute(role, '/invoices') ? byNumber : skipped
   ])
 
   // A failed group used to come back as an empty list, so a broken query
@@ -198,7 +214,7 @@ export async function universalSearch(
   // palette show its error state.
   const failed = [
     jobsRes, clientsRes, notesRes, eventsRes, filesRes,
-    leadsByTitle, leadsByClient, quotesByTitle, quotesByClient, invoicesByTitle, invoicesByClient
+    leadsByTitle, leadsByClient, quotesByTitle, quotesByClient, invoicesByTitle, invoicesByClient, invoicesByNumber
   ].find((r) => r.error)
   if (failed?.error) {
     console.warn('[fieldhorse] universal search failed', failed.error)
@@ -224,11 +240,13 @@ export async function universalSearch(
     sub: [qt.fh_clients?.name ? qt.title : null, 'Quote', statusWord(qt.status), fmtMoney(qt.amount)].filter(Boolean).join(' · '),
     to: recordRoute('quote', String(qt.id))
   }))
-  const invoices: SearchResult[] = mergeRows(invoicesByTitle.data, invoicesByClient.data).map((inv) => ({
+  const numbered = asRows(invoicesByNumber.data)
+    .filter((inv) => invoiceReference(inv, companyName).toUpperCase() === q.toUpperCase())
+  const invoices: SearchResult[] = mergeRows(numbered, invoicesByTitle.data, invoicesByClient.data).map((inv) => ({
     id: `invoice:${inv.id}`,
     kind: 'invoice',
-    title: inv.title || (inv.sequence_number ? `Invoice ${inv.sequence_number}` : 'Invoice'),
-    sub: [inv.fh_clients?.name, statusWord(inv.status), fmtMoney(inv.amount)].filter(Boolean).join(' · '),
+    title: inv.title || invoiceReference(inv, companyName),
+    sub: [inv.fh_clients?.name, inv.title ? invoiceReference(inv, companyName) : null, statusWord(inv.status), fmtMoney(inv.amount)].filter(Boolean).join(' · '),
     to: recordRoute('invoice', String(inv.id))
   }))
   const jobs: SearchResult[] = asRows(jobsRes.data).map((j) => ({

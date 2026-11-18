@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useCommunicationHistory } from '../lib/communicationHistory.ts'
 import './communication-history.css'
+import { dateAndTime } from '../lib/dates.ts'
 
 export default function CommunicationHistory({ contactId, clientId, refreshKey = 0 }: { contactId?: string; clientId?: string | null; refreshKey?: number }) {
   const history = useCommunicationHistory(contactId, clientId)
@@ -34,7 +35,7 @@ export default function CommunicationHistory({ contactId, clientId, refreshKey =
             const long = entry.body.length > 360
             return (
               <li key={entry.id}>
-                <div className="fh-communication__meta"><span>{entry.channel === 'sms' ? 'SMS' : entry.channel || 'Activity'} · {entry.status}</span><time dateTime={entry.at}>{entry.at ? new Date(entry.at).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Date unavailable'}</time></div>
+                <div className="fh-communication__meta"><span>{entry.channel === 'sms' ? 'SMS' : entry.channel || 'Activity'} · {entry.status}</span><time dateTime={entry.at}>{entry.at ? dateAndTime(entry.at, { year: true }) : 'Date unavailable'}</time></div>
                 <h3>{entry.title}</h3>
                 {entry.recipient && <p className="fh-communication__recipient">{entry.recipient}</p>}
                 <p className="fh-communication__body">{long && !open ? `${entry.body.slice(0, 360)}…` : entry.body || 'No message text recorded.'}</p>

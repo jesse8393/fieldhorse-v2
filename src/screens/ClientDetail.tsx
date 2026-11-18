@@ -1,6 +1,6 @@
 import { lazy, Suspense, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 const SnowClientDetailBuild = lazy(() => import('../components/desktop/SnowClientDetailBuild.tsx'))
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
@@ -20,34 +20,29 @@ import { supabase } from '../lib/supabase.ts'
 import { useClientDetail, useInvalidateClientDetail, useInvalidateClients } from '../lib/queries.ts'
 import { homeDashboardKey } from '../lib/homeDashboard.ts'
 import { useOrgScope } from '../lib/orgScope.ts'
+import { useDocumentCompanyName } from '../lib/companyBranding.ts'
+import { invoiceReference } from '../lib/invoiceReference.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { toastError, toastInfo } from '../lib/toast.ts'
 import { stageColor, stageLabel } from '../lib/stages.ts'
 import { recordRoute, type RecordKind } from '../lib/records.ts'
 import { useSecondTap } from '../lib/secondTap.ts'
 import { clientDeleteBlockers, describeDeleteBlockers } from '../lib/clients.ts'
-import { gatherStatement } from '../lib/statement.ts'
+import { gatherStatement, statementMoneyQuery } from '../lib/statement.ts'
 import { rollupJobs } from '../lib/rollups.ts'
 // Apple Maps on iPhone and iPad, Google Maps everywhere else (S25).
 import { navigateHrefHere } from '../lib/todayView.ts'
 import { composeClientTimeline, type TimelineEvent } from '../lib/clientTimeline.ts'
 import { plainError } from '../lib/serviceErrors.ts'
+import { moneyCents } from '../lib/format.ts'
+import { formatPhone } from '../lib/utils.ts'
 
-function money(n: any) {
-  const v = Number(n || 0)
-  if (!v) return '$0'
-  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(v >= 10_000_000 ? 1 : 2)}M`
-  if (v >= 1_000) return `$${(v / 1_000).toFixed(v >= 10_000 ? 0 : 1)}K`
-  return `$${Math.round(v).toLocaleString()}`
-}
+// One customer's money to the cent, the figure Money and the statement
+// show, never "$12K" (formats-4).
+const money = moneyCents
 
-function fmtPhone(n: any) {
-  if (!n) return ''
-  const digits = String(n).replace(/\D/g, '')
-  if (digits.length === 10) return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
-  if (digits.length === 11 && digits.startsWith('1')) return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`
-  return n
-}
+// The one phone formatter (formats-10).
+const fmtPhone = formatPhone
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
@@ -62,6 +57,7 @@ export default function ClientDetail() {
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const orgId = useOrgScope(user?.id)
+  const companyName = useDocumentCompanyName(orgId)
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
 
@@ -116,10 +112,27 @@ export default function ClientDetail() {
   // so the "Statement · $X across N properties" button always agrees
   // with the document it opens (previously the button showed
   // `outstanding`/`activeCount`, which use different stage sets and could
-  // disagree with the generated statement).
+  // disagree with the generated statement). It reads the statement's own
+  // invoices and payments through the same query, so the total is what is
+  // owed on sent invoices, never the contract less what was paid
+  // (formats-5). Until that read is in, the button waits.
+  const statementJobIds = useMemo(() => jobs.map((j: any) => j.id as string), [jobs])
+  const statementMoney = useQuery({
+    ...statementMoneyQuery(id, statementJobIds),
+    enabled: !!id && !!client
+  })
   const statementSummary = useMemo(
-    () => gatherStatement(jobs as any, payments as any, changeOrders as any),
-    [jobs, payments, changeOrders]
+    () => statementMoney.data
+      ? gatherStatement(jobs as any, statementMoney.data.payments, changeOrders as any, { invoices: statementMoney.data.invoices })
+      : { lines: [], totalDue: 0, notInvoiced: [], notInvoicedTotal: 0 },
+    [jobs, changeOrders, statementMoney.data]
+  )
+  // The control stays one tap away while the total loads or if it cannot be
+  // read, and for work not yet invoiced; it names a figure only once the
+  // read is in and something is owed on sent invoices.
+  const statementTotalKnown = !!statementMoney.data && statementSummary.totalDue > 0
+  const showStatement = jobs.length > 0 && (
+    !statementMoney.data || statementSummary.totalDue > 0 || statementSummary.notInvoicedTotal > 0
   )
 
   // The first tap checks what would be lost and arms the button, the
@@ -253,7 +266,7 @@ export default function ClientDetail() {
         <ClientTimeline jobs={jobs} payments={payments} notes={notes} files={files} onOpen={(jobId: any) => jobId && navigate(`/jobs/${jobId}`)} />
       )}
       {tab === 'projects' && (
-        <ProjectsList jobs={jobs} leads={leads} quotes={quotes} invoices={invoices} payments={payments} changeOrders={changeOrders} onOpen={openRecord} />
+        <ProjectsList jobs={jobs} leads={leads} quotes={quotes} invoices={invoices} payments={payments} changeOrders={changeOrders} clientId={client?.id} companyName={companyName} onOpen={openRecord} />
       )}
       {tab === 'files' && <FilesList rows={files} />}
       {tab === 'notes' && <NotesList notes={notes} />}
@@ -278,7 +291,7 @@ export default function ClientDetail() {
           onDelete={() => { void requestDelete() }}
           deleteArmed={deleteTap.armed}
           onNewDeal={openNew}
-          onStatement={statementSummary.totalDue > 0 ? openStatement : undefined}
+          onStatement={showStatement ? openStatement : undefined}
           isEditing={isEditing}
         >
           {tabBody}
@@ -393,15 +406,15 @@ export default function ClientDetail() {
           </div>
 
           {/* Metrics row, surfaces lifetime / outstanding / active. Equal
-              thirds while each figure fits its third; a figure that does
-              not moves to the next line instead of running into its
-              neighbour. */}
+              thirds while each figure fits its third. The amounts carry
+              cents, so a figure that does not fit beside the others moves
+              to the next line instead of running into its neighbour. */}
           {(lifetime > 0 || outstanding > 0 || activeCount > 0) && (
             <div style={{
               display: 'flex',
               flexWrap: 'wrap',
               alignItems: 'flex-end',
-              gap: 12,
+              gap: '12px 24px',
               marginTop: 12,
               paddingTop: 12,
               borderTop: '1px solid var(--v3-border)'
@@ -472,7 +485,7 @@ export default function ClientDetail() {
         {/* STATEMENT, roll every open invoice across all this client's
             properties into one document. Only meaningful when there's a
             balance, so it stays hidden otherwise. */}
-        {statementSummary.totalDue > 0 && (
+        {showStatement && (
           <motion.button
             type="button"
             whileTap={{ scale: 0.99 }}
@@ -488,7 +501,9 @@ export default function ClientDetail() {
             }}
           >
             <Receipt size={16} strokeWidth={2.2} aria-hidden="true" />
-            Statement · {money(statementSummary.totalDue)} across {statementSummary.lines.length} {statementSummary.lines.length === 1 ? 'property' : 'properties'}
+            {statementTotalKnown
+              ? `Statement · ${money(statementSummary.totalDue)} across ${statementSummary.lines.length} ${statementSummary.lines.length === 1 ? 'property' : 'properties'}`
+              : 'Statement'}
           </motion.button>
         )}
       </div>
@@ -513,7 +528,7 @@ export default function ClientDetail() {
           <ClientTimeline jobs={jobs} payments={payments} notes={notes} files={files} onOpen={(jobId: any) => jobId && navigate(`/jobs/${jobId}`)} />
         )}
         {tab === 'projects' && (
-          <ProjectsList jobs={jobs} leads={leads} quotes={quotes} invoices={invoices} payments={payments} changeOrders={changeOrders} onOpen={openRecord} />
+          <ProjectsList jobs={jobs} leads={leads} quotes={quotes} invoices={invoices} payments={payments} changeOrders={changeOrders} clientId={client?.id} companyName={companyName} onOpen={openRecord} />
         )}
         {tab === 'files' && <FilesList rows={files} />}
         {tab === 'notes' && <NotesList notes={notes} />}
@@ -1201,7 +1216,7 @@ function RecordRow({ color, title, detail, figure, word, stamp, onOpen }: any) {
    ProjectsList: the client's four kinds of record (D53), Leads,
    Quotes, Jobs and Invoices, each row opening its own screen.
    ============================================================ */
-function ProjectsList({ jobs, leads = [], quotes = [], invoices = [], payments = [], changeOrders = [], onOpen }: any) {
+function ProjectsList({ jobs, leads = [], quotes = [], invoices = [], payments = [], changeOrders = [], clientId, companyName, onOpen }: any) {
   const paidByJob = useMemo(() => {
     const m = new Map()
     for (const p of payments || []) {
@@ -1354,7 +1369,7 @@ function ProjectsList({ jobs, leads = [], quotes = [], invoices = [], payments =
           <RecordRow
             key={inv.id}
             color={stageColor('invoice')}
-            title={inv.title || `Invoice ${inv.sequence_number || ''}`.trim()}
+            title={inv.title || invoiceReference({ ...inv, client_id: inv.client_id || clientId }, companyName)}
             detail={inv.due_at ? `Due ${new Date(inv.due_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : null}
             figure={money(inv.amount)}
             word={statusWord(inv.status)}

@@ -23,6 +23,7 @@ import { supabase } from './supabase.ts'
 import { createUuid } from './uuid.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { toastSuccess } from './toast.ts'
+import { dateAndTime } from './dates.ts'
 
 const KEY = 'fh:capture-outbox'
 const MAX_ITEMS = 100
@@ -159,7 +160,7 @@ export async function flushOutbox(userId: string): Promise<number> {
       const when = new Date(item.captured_at)
       const stamp = Number.isNaN(when.getTime())
         ? ''
-        : ` (captured offline ${when.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })})`
+        : ` (captured offline ${dateAndTime(when)})`
       const note = { id: item.id, user_id: userId, contact_id: jobOf(item), text: `${item.text}${stamp}`, category: 'note' }
       let landed = false
       try {

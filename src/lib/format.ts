@@ -7,15 +7,13 @@
 //                 "$84K", 1_240_000 → "$1.24M". Sub-thousand values
 //                 render with comma grouping, e.g. 742 → "$742".
 //
-//   moneyFull(n)  Full currency, no fractional digits. For invoices,
-//                 payment confirmations, totals, anywhere the
-//                 operator needs the exact dollar amount. Example:
-//                 1_240_000 → "$1,240,000".
+//   moneyFull(n)  The same as moneyCents: full currency with cents, for
+//                 totals and report figures where the operator needs the
+//                 exact amount. Example: 1_240_000 → "$1,240,000.00".
 //
-//   moneyExact(n) Exact to the cent: whole amounts print without
-//                 decimals, amounts with cents print both digits.
-//                 For a single payment or bill where rounding would
-//                 change the number. Example: 1_234.5 → "$1,234.50".
+//   moneyExact(n) The same as moneyCents: always dollars and cents, the
+//                 way the PDF prints money. For a single payment or bill.
+//                 Example: 1_234.5 → "$1,234.50", 6_400 → "$6,400.00".
 //
 // Negative values keep the sign in front of the currency symbol
 // ("-$1,200", never "$-1,200"), and the compact forms pick their unit
@@ -40,19 +38,16 @@ export function money(n: number | null | undefined): string {
   return `${whole ? sign : ''}$${whole.toLocaleString()}`
 }
 
+// Exact figures follow the PDF's rule, so a customer's balance or a
+// client's payments never read rounded to the dollar (formats-4).
 export function moneyFull(n: number | null | undefined): string {
-  return `$${Math.round(Number(n || 0)).toLocaleString()}`
+  return moneyCents(n)
 }
 
+// One record's amount prints the way the PDF and the customer documents
+// print it, so a whole amount reads "$6,400.00" here too (formats-6).
 export function moneyExact(n: number | string | null | undefined): string {
-  const v = toNumber(n)
-  const hasCents = Math.abs(v - Math.round(v)) >= 0.005
-  return v.toLocaleString(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: hasCents ? 2 : 0,
-    maximumFractionDigits: hasCents ? 2 : 0
-  })
+  return moneyCents(n)
 }
 
 // Compact K-notation for list cards ($24.4K / $135K / $840). Extracted
@@ -83,6 +78,13 @@ export function moneyK(n: number | string | null | undefined): string | null {
   const wholeK = (a / 1_000).toFixed(0)
   if (Number(wholeK) < 1_000) return `${sign}$${wholeK}K`
   return `${sign}$${(a / 1_000_000).toFixed(1)}M`
+}
+
+// A margin as a percent with one decimal, the way Money prints Tracked
+// margin: 35.2%, never 35% on one screen and 35.2% on another (formats-4).
+export function marginPercent(n: number | string | null | undefined): string {
+  const v = Number(n ?? 0)
+  return `${(Number.isFinite(v) ? v : 0).toFixed(1)}%`
 }
 
 export function countNoun(

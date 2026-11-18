@@ -10,7 +10,7 @@ import {
 import { supabase } from '../lib/supabase.ts'
 import { useSubDetail, subDetailKey } from '../lib/queries.ts'
 import { formatPhone } from '../lib/utils.ts'
-import { countNoun } from '../lib/format.ts'
+import { countNoun, moneyCents } from '../lib/format.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { hapticTap, hapticSuccess } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
@@ -331,25 +331,26 @@ export default function SubDetail() {
             </div>
           )}
 
-          {/* KPI strip */}
+          {/* KPI strip. Billed carries cents, so when it does not fit
+              beside Trades, Trades moves to the next line instead of
+              being drawn over. */}
           <div style={{
             marginTop: 14,
-            display: 'grid',
-            gridTemplateColumns: '1fr 1px 1fr',
-            alignItems: 'end',
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'flex-end',
             gap: 12
           }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0, flex: '1 1 auto' }}>
               <Eyebrow tone="gold">Billed</Eyebrow>
               <StampNumber size="2xl" tone="gold" style={{ display: 'block', lineHeight: 0.95 }}>
-                ${totals.billed.toLocaleString()}
+                {moneyCents(totals.billed)}
               </StampNumber>
               <Eyebrow as="div" style={{ marginTop: 2 }}>
                 Across {subRows.length} {subRows.length === 1 ? 'job' : 'jobs'}
               </Eyebrow>
             </div>
-            <span aria-hidden="true" style={{ background: 'var(--v3-border)', alignSelf: 'stretch' }} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0, flex: '1 1 auto', paddingLeft: 12, borderLeft: '1px solid var(--v3-border)' }}>
               <Eyebrow>Trades</Eyebrow>
               <StampNumber size="xl" style={{ display: 'block', lineHeight: 0.95 }}>
                 {totals.trades.length || '\u2003'}
@@ -470,7 +471,7 @@ export default function SubDetail() {
                     color: 'var(--v3-text)',
                     fontVariantNumeric: 'tabular-nums'
                   }}>
-                    {Number(r.rate || 0) > 0 ? `$${Number(r.rate).toLocaleString()}` : '\u2003'}
+                    {Number(r.rate || 0) > 0 ? moneyCents(r.rate) : '\u2003'}
                   </span>
                 </li>
               )
@@ -604,7 +605,7 @@ function SubDetailDesktop({
           </div>
 
           <div className="fh-build-mini-grid">
-            <MiniMetric label="Billed" value={`$${totals.billed.toLocaleString()}`} accent />
+            <MiniMetric label="Billed" value={moneyCents(totals.billed)} accent />
             <MiniMetric label="Job history" value={String(subRows.length)} />
             <MiniMetric label="Trades" value={String(totals.trades.length || 0)} />
             <MiniMetric label="Insurance" value={insuranceLabel} tone={insuranceTone} />
@@ -673,7 +674,7 @@ function SubDetailDesktop({
                         <strong className="fh-build-truncate" title={c?.name || ''}>{c?.name || 'Job not found'}</strong>
                         <span className="fh-build-rel">{r.trade || '\u2003'}</span>
                         <span className="fh-build-rel">{r.created_at ? fmtRelativeDate(new Date(r.created_at)) : '\u2003'}</span>
-                        <span className="fh-build-num">{Number(r.rate || 0) > 0 ? `$${Number(r.rate).toLocaleString()}` : '\u2003'}</span>
+                        <span className="fh-build-num">{Number(r.rate || 0) > 0 ? moneyCents(r.rate) : '\u2003'}</span>
                         <ChevronRight size={13} aria-hidden="true" />
                       </Link>
                     )

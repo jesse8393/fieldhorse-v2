@@ -42,6 +42,7 @@ import LoadingValue from '../components/LoadingValue.tsx'
 import { SkeletonRows } from '../components/fh'
 import { eventAssignees } from '../lib/scheduleAllocation.ts'
 import { keepFocusOnRetry } from '../lib/retryFocus.ts'
+import { timeOfDay } from '../lib/dates.ts'
 
 type ScheduleRow = {
   id: string
@@ -67,7 +68,7 @@ type TodoRow = {
 function fmtTime(iso: string | null): string {
   if (!iso) return '\u2003'
   try {
-    return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+    return timeOfDay(iso)
   } catch { return '\u2003' }
 }
 

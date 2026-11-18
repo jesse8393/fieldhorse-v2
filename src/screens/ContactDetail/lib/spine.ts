@@ -25,6 +25,7 @@
 import type { ActivityEvent } from '../sections/composeActivityEvents.ts'
 import { marginTier } from '../../../lib/stages.ts'
 import { moneyCents } from '../../../lib/format.ts'
+import { timeOfDay } from '../../../lib/dates.ts'
 
 export type SpinePhoto = { src: string; alt: string }
 
@@ -74,10 +75,9 @@ function startOfDay(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate())
 }
 
-/** "7:12", on a 12 hour clock. */
+/** "7:12 am", on a 12 hour clock with its am or pm (formats-12). */
 export function spineTime(at: Date): string {
-  const h = at.getHours() % 12 || 12
-  return `${h}:${String(at.getMinutes()).padStart(2, '0')}`
+  return timeOfDay(at)
 }
 
 /** "today", "tomorrow", "Wed" inside a week either side, otherwise "Sep 30". */

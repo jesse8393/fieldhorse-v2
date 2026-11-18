@@ -30,6 +30,7 @@ import { keepFocusOnRetry } from '../lib/retryFocus.ts'
 import { filterReports, reportJobLabel, reportStats } from '../lib/reportHistory.ts'
 import ReportDetails from '../components/ReportDetails.tsx'
 import { plainError } from '../lib/serviceErrors.ts'
+import { formatDate } from '../lib/dates.ts'
 const SnowNotes = lazy(() => import('../components/desktop/SnowNotesBuild.tsx'))
 
 const SYSTEM = `You are Fieldhorse, a construction operations AI. You receive rough field notes dictated or typed by a contractor from a jobsite. Parse them into structured JSON with fields: summary (one sentence), action_items (array of strings with owners if mentioned), risks (array), materials_needed (array), follow_up_date (ISO date if mentioned or null). Return ONLY JSON, no prose.`
@@ -633,7 +634,7 @@ export default function Notes() {
               {parsed.follow_up_date && (
                 <p style={{ margin: '10px 0 0', fontSize: 14, fontFamily: 'var(--font-body)', color: 'var(--v3-text-muted)', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                   <Calendar size={12} />
-                  Follow up: <strong style={{ color: 'var(--v3-primary-text)' }}>{parsed.follow_up_date}</strong>
+                  Follow up: <strong style={{ color: 'var(--v3-primary-text)' }}>{formatDate(parsed.follow_up_date) || parsed.follow_up_date}</strong>
                 </p>
               )}
             </motion.div>

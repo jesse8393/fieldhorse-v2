@@ -13,7 +13,7 @@ import { toastSuccess, toastError } from '../lib/toast.ts'
 import { hapticMedium, hapticSuccess } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { Eyebrow } from '../components/v3'
-import { countNoun } from '../lib/format.ts'
+import { countNoun, moneyCents } from '../lib/format.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import BuildTopbar from '../components/desktop/BuildTopbar.tsx'
 import MiniMetric from '../components/MiniMetric.tsx'
@@ -535,7 +535,7 @@ export default function Importer() {
                     </div>
                   </div>
                   <div style={{ fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: 0, color: 'var(--field-gold-bright)' }}>
-                    {m.amount ? `$${m.amount.toLocaleString('en-US', { maximumFractionDigits: 2 })}` : ''}
+                    {m.amount ? moneyCents(m.amount) : ''}
                   </div>
                 </div>
               ))}

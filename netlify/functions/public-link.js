@@ -282,7 +282,7 @@ export default async function handler(req) {
 
   // 3. Build the company branding payload (matches what the in-app
   //    surfaces pass to ProposalTemplate / InvoiceTemplate).
-  const company = buildCompany(profile)
+  const company = { ...buildCompany(profile), timezone: await companyTimeZone(supabase, link.org_id || contact.org_id) }
 
   // 4. Bump view counter + maybe write a contractor notification —
   //    both best-effort, neither blocks the response.
@@ -431,7 +431,7 @@ async function handleClientInvoice(supabase, req, link) {
     kind: 'invoice',
     change_order_id: null,
     contact,
-    company: buildCompany(profile),
+    company: { ...buildCompany(profile), timezone: await companyTimeZone(supabase, link.org_id) },
     items: [],
     payments: payments || [],
     changeOrders: [],
@@ -454,6 +454,21 @@ async function refusedLinkCompany(supabase, link) {
     return undefined
   }
 }
+
+// The company's time zone (fh_org_settings.timezone), so the customer's
+// phone prints the dates the company set, not the next day for a customer
+// east of it (formats-2). Central time when the company set none, the
+// default the server uses for the company's other times. Never throws.
+async function companyTimeZone(supabase, orgId) {
+  if (!orgId) return DEFAULT_TIME_ZONE
+  try {
+    const { data } = await supabase.from('fh_org_settings').select('timezone').eq('org_id', orgId).maybeSingle()
+    return (typeof data?.timezone === 'string' && data.timezone.trim()) || DEFAULT_TIME_ZONE
+  } catch {
+    return DEFAULT_TIME_ZONE
+  }
+}
+const DEFAULT_TIME_ZONE = 'America/Chicago'
 
 // Company branding block shared by every document kind. Mirrors what
 // the in-app surfaces pass to the templates so the customer sees the
@@ -539,7 +554,7 @@ async function handleQuote(supabase, req, link) {
   }
 
   const approvedVersion = Array.isArray(versions) && versions.length > 0 ? versions[0] : null
-  const company = buildCompany(profile)
+  const company = { ...buildCompany(profile), timezone: await companyTimeZone(supabase, link.org_id || quote.org_id) }
   const status = String(quote.status || 'draft').toLowerCase()
   // An approved quote shows what the customer approved: the approved
   // version's lines, scope, terms and total. Lines edited afterwards are
@@ -738,7 +753,7 @@ async function handleStatement(supabase, req, link) {
   })
   const invoices = customerRows(allInvoices, due)
 
-  const company = buildCompany(profile)
+  const company = { ...buildCompany(profile), timezone: await companyTimeZone(supabase, link.org_id || client.org_id) }
 
   // View audit + debounced contractor notification, same policy as the
   // job-scoped path. Awaited: Netlify freezes the function once the

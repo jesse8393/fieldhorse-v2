@@ -9,6 +9,7 @@ import { canHover } from '../../../lib/hover.ts'
 import { PostedByChip, Eyebrow } from '../../../components/v3'
 import { useArmedId } from '../../../lib/secondTap.ts'
 import { plainError } from '../../../lib/serviceErrors.ts'
+import { dateAndTime } from '../../../lib/dates.ts'
 
 /**
  * Messages section, communication log (fh_notes) tied to this job.
@@ -170,10 +171,7 @@ export default function MessagesSection({ contactId, userId, notes = [], fetchAl
                     color: 'var(--v3-text-muted)',
                     fontVariantNumeric: 'tabular-nums'
                   }}>
-                    {n.category || 'note'} · {new Date(n.created_at).toLocaleString(undefined, {
-                      month: 'short', day: 'numeric',
-                      hour: 'numeric', minute: '2-digit'
-                    })}
+                    {n.category || 'note'} · {dateAndTime(n.created_at)}
                   </div>
                   {n.user_id && <PostedByChip userId={n.user_id} verb="posted" style={{ marginTop: 2 }} />}
                 </div>

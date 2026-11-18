@@ -60,7 +60,7 @@ export default function ApprovalBlock({
           name={clientName}
           dataUrl={stamped ? clientSignatureDataUrl : null}
           dateLabel="Date"
-          date={stamped ? longDate(clientApprovedAt) : ''}
+          date={stamped ? longDate(clientApprovedAt, company?.timezone) : ''}
           gold={gold}
         />
         <SignatureField
@@ -68,7 +68,7 @@ export default function ApprovalBlock({
           name={contractorName || company?.name}
           dataUrl={stamped ? contractorSignatureDataUrl : null}
           dateLabel="Date"
-          date={stamped ? longDate(contractorApprovedAt) : ''}
+          date={stamped ? longDate(contractorApprovedAt, company?.timezone) : ''}
           gold={gold}
         />
       </div>

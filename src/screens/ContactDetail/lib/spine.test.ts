@@ -143,7 +143,9 @@ describe('buildSpine', () => {
     expect(items[1]).toMatchObject({ title: 'Inspection failed', subline: 'Plumbing', tone: 'neutral' })
   })
 
-  it('writes the time as 7:12 and the day as today, a weekday inside a week, or the date beyond', () => {
+  // formats-12: the time keeps its am or pm, so an 8:15 pm payment never
+  // reads as morning.
+  it('writes the time as 7:12 am and the day as today, a weekday inside a week, or the date beyond', () => {
     const items = buildSpine({
       events: [
         note('a', at(9, 10, 7, 12), 'This morning'),
@@ -156,9 +158,9 @@ describe('buildSpine', () => {
       now: NOW
     })
     const byTitle = Object.fromEntries(items.map((i) => [i.title, i]))
-    expect(byTitle['This morning']).toMatchObject({ time: '7:12', day: 'today' })
-    expect(byTitle['Wednesday']).toMatchObject({ time: '4:05', day: 'Wed' })
-    expect(byTitle['Yesterday']).toMatchObject({ time: '12:00', day: 'Fri' })
+    expect(byTitle['This morning']).toMatchObject({ time: '7:12 am', day: 'today' })
+    expect(byTitle['Wednesday']).toMatchObject({ time: '4:05 pm', day: 'Wed' })
+    expect(byTitle['Yesterday']).toMatchObject({ time: '12:00 pm', day: 'Fri' })
     expect(byTitle['Beyond a week'].day).toBe('Sep 30')
   })
 
@@ -169,7 +171,7 @@ describe('buildSpine', () => {
       inspections: [],
       now: NOW
     })
-    expect(items[0]).toMatchObject({ time: '9:00', day: 'tomorrow' })
+    expect(items[0]).toMatchObject({ time: '9:00 am', day: 'tomorrow' })
   })
 
   it('never writes a dash in titles it makes itself, and leaves typed note text untouched', () => {
@@ -203,7 +205,7 @@ describe('buildSpine', () => {
       scheduleItems: [{ id: 's1', title: 'Pour slab, crew A', start_at: at(9, 10, 11, 0).toISOString(), created_at: at(9, 9, 9, 0).toISOString() }]
     })
     const [item] = buildSpine({ events, photos: [], inspections: [], now: NOW })
-    expect(item).toMatchObject({ title: 'Pour slab, crew A', subline: 'On the schedule', time: '11:00', day: 'today' })
+    expect(item).toMatchObject({ title: 'Pour slab, crew A', subline: 'On the schedule', time: '11:00 am', day: 'today' })
   })
 
   it('reads a stage marker as a sentence', () => {

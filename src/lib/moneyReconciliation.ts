@@ -10,7 +10,7 @@ export type ReconciliationGroup = { id: string; label: string; explanation: stri
 const cents = (value: number) => Math.round(value * 100)
 
 /** Buckets sum the exact rows they open. Contract balances and receivables overlap and are never added together. */
-export function buildMoneyReconciliation(bundle: InvoicesBundle, balances: JobBalanceRow[], now: Date): ReconciliationGroup[] {
+export function buildMoneyReconciliation(bundle: InvoicesBundle, balances: JobBalanceRow[], now: Date, companyName?: string | null): ReconciliationGroup[] {
   const groups: ReconciliationGroup[] = [
     { id: 'receivables', label: 'Issued invoice balance', explanation: 'Issued invoices less allocated payments. Drafts, paid and void invoices excluded. Includes invoices billed directly to customers.', rows: [], total: 0 },
     { id: 'overdue', label: 'Overdue invoice balance', explanation: 'The part of issued invoice balance whose due day has ended. Due today is not overdue.', rows: [], total: 0 },
@@ -31,7 +31,7 @@ export function buildMoneyReconciliation(bundle: InvoicesBundle, balances: JobBa
     const full = bundle.invoices.find(i => i.id === invoice.id) ?? bundle.openInvoices?.find(i => i.id === invoice.id)
     const job = invoice.contact_id ? jobs.get(invoice.contact_id) : undefined
     const standing = classifyInvoice(invoice, due.get(invoice.id), now)
-    const row: ReconciliationRow = { id: invoice.id, title: job?.name || full?.fh_clients?.name || 'Customer invoice', detail: [invoiceReference(invoice), full?.title || job?.job_title].filter(Boolean).join(' · '), amount: standing.owed, to: `/invoices/${invoice.id}` }
+    const row: ReconciliationRow = { id: invoice.id, title: job?.name || full?.fh_clients?.name || 'Customer invoice', detail: [invoiceReference(invoice, companyName), full?.title || job?.job_title].filter(Boolean).join(' · '), amount: standing.owed, to: `/invoices/${invoice.id}` }
     if (standing.issued && standing.owed > 0) {
       byId.get('receivables')!.rows.push(row)
       if (standing.status === 'overdue') byId.get('overdue')!.rows.push(row)

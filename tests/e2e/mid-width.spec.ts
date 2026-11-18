@@ -304,8 +304,8 @@ test.describe(`a desktop ${WIDTH} px wide`, () => {
     // own column, or under the customer's name once that column is gone.
     const rosa = overdue.getByRole('row', { name: /Rosa Delgado/ })
     const nameCell = rosa.getByRole('cell').first()
-    await expect(rosa.getByText('Concrete steps, final · Invoice 2 · i-rosa', { exact: true })).toBeVisible()
-    await expect(nameCell.getByText('Concrete steps, final · Invoice 2 · i-rosa', { exact: true })).toHaveCount(WIDTH < 1100 ? 1 : 0)
+    await expect(rosa.getByText('Concrete steps, final · PCC-ROSA-02', { exact: true })).toBeVisible()
+    await expect(nameCell.getByText('Concrete steps, final · PCC-ROSA-02', { exact: true })).toHaveCount(WIDTH < 1100 ? 1 : 0)
   })
 
   test('Money pages: All invoices and Who owes you keep their buttons whole', async ({ context, page }) => {

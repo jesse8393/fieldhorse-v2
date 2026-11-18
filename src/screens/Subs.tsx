@@ -17,6 +17,7 @@ import SectionHeader from '../components/v3/SectionHeader.tsx'
 import { FilterPill, Eyebrow, StampNumber } from '../components/v3'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { useMembership } from '../contexts/MembershipContext.tsx'
+import { moneyCents } from '../lib/format.ts'
 
 // Subs directory, v3 rebuild. Aggregates fh_subs rows by (name + phone)
 // so the same sub appearing on 5 jobs shows as ONE entry with 5-job
@@ -549,7 +550,7 @@ function SubCard({ g, contacts, isTop }: any) {
               {g.totalRate > 0 && (
                 <span style={{ fontVariantNumeric: 'tabular-nums' }}>
                   <strong style={{ color: 'var(--v3-text)', fontWeight: 700 }}>
-                    ${g.totalRate.toLocaleString()}
+                    {moneyCents(g.totalRate)}
                   </strong> billed
                 </span>
               )}
@@ -670,7 +671,7 @@ function SubCard({ g, contacts, isTop }: any) {
                     color: 'var(--v3-text)',
                     fontVariantNumeric: 'tabular-nums'
                   }}>
-                    {Number(r.rate || 0) > 0 ? `$${Number(r.rate).toLocaleString()}` : '\u2003'}
+                    {Number(r.rate || 0) > 0 ? moneyCents(r.rate) : '\u2003'}
                   </span>
                   <Eyebrow style={{ flexShrink: 0, padding: '4px 8px', borderRadius: 10, background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border)' }}>
                     {SUB_STATUS_LABEL[r.status || 'scheduled'] || r.status}

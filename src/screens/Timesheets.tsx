@@ -20,6 +20,7 @@ import { startOfWeek, SCHEDULE_WEEK_START } from '../lib/scheduleDates.ts'
 import { Button } from '../ui/index.ts'
 import PaletteKeyCap, { paletteShortcut } from '../components/desktop/PaletteKeyCap.tsx'
 import { plainError } from '../lib/serviceErrors.ts'
+import { timeOfDay } from '../lib/dates.ts'
 
 // HH:MM format, see comment in screens/Crew.tsx. Bebas Neue
 // (the display font on duration metrics) is uppercase-only, so
@@ -37,7 +38,7 @@ function fmtDate(iso: string): string {
 }
 function fmtTime(iso: string): string {
   try {
-    return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+    return timeOfDay(iso)
   } catch { return '\u2003' }
 }
 function fmtMoney(n: number | null): string {

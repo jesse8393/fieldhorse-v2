@@ -25,6 +25,7 @@ import { companyShortName } from '../../lib/quoteMoney.ts'
 import { personFirstName } from '../../lib/quoteView.ts'
 import '../documents/fieldhorse-proposal.css'
 import { errorKind, plainError } from '../../lib/serviceErrors.ts'
+import { dateAndTime } from '../../lib/dates.ts'
 
 /**
  * What the page found when it read the quote again just before posting an
@@ -690,11 +691,7 @@ function moneyFmt(n: any) {
 
 function formatStamp(iso: any) {
   try {
-    const d = new Date(iso)
-    return d.toLocaleString(undefined, {
-      month: 'short', day: 'numeric', year: 'numeric',
-      hour: 'numeric', minute: '2-digit'
-    })
+    return dateAndTime(iso, { year: true })
   } catch { return '' }
 }
 

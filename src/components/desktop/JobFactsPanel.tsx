@@ -17,11 +17,13 @@ import { Link } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import { Button, VaultCard } from '../fh/index.ts'
 import type { VaultFact } from '../fh/index.ts'
+import { formatPhone } from '../../lib/utils.ts'
 import { initialsFor } from '../fh/Monogram.tsx'
 import { moneyCents } from '../../lib/format.ts'
 import { navigateHrefHere } from '../../lib/todayView.ts'
 import type { JobMoney } from '../../screens/ContactDetail/lib/spine.ts'
 import { documentRows, MAX_FILE_ROWS } from '../../screens/ContactDetail/lib/jobDesktop.ts'
+import { useDocumentCompanyName } from '../../lib/companyBranding.ts'
 import type { DocumentRow } from '../../screens/ContactDetail/lib/jobDesktop.ts'
 import { useJobCrew, useJobDocumentSources, useJobPartners } from '../../screens/ContactDetail/hooks/useJobFacts.ts'
 import './job-desktop.css'
@@ -94,8 +96,10 @@ export default function JobFactsPanel({
   const sources = useJobDocumentSources(jobId, canSeeMoney)
   const crew = useJobCrew(crewIds)
 
+  const companyName = useDocumentCompanyName(contact?.org_id)
   const documents = documentRows({
     contact,
+    companyName,
     invoices: sources.invoices,
     files: sources.files,
     canSeeMoney,
@@ -165,7 +169,7 @@ export default function JobFactsPanel({
             ) : (
               <p className="fhd-person__name">{customerName}</p>
             )}
-            {phone && <a className="fhd-link fhd-person__line" href={`tel:${phone}`}>{phone}</a>}
+            {phone && <a className="fhd-link fhd-person__line" href={`tel:${phone}`}>{formatPhone(phone)}</a>}
             {email && <a className="fhd-link fhd-person__line" href={`mailto:${email}`}>{email}</a>}
           </div>
         </div>

@@ -1,4 +1,5 @@
 import type { ReportRecord } from '../lib/reportHistory.ts'
+import { formatDate } from '../lib/dates.ts'
 
 /** Native disclosure keeps long reports and parsed details readable with keyboard or touch. */
 export default function ReportDetails({ report }: { report: ReportRecord }) {
@@ -21,7 +22,7 @@ export default function ReportDetails({ report }: { report: ReportRecord }) {
           <ul>{items.filter(item => typeof item === 'string').map((item, index) => <li key={index}>{item}</li>)}</ul>
         </div>
       })}
-      {typeof parsed.follow_up_date === 'string' && <p>Follow up: {parsed.follow_up_date}</p>}
+      {typeof parsed.follow_up_date === 'string' && <p>Follow up: {formatDate(parsed.follow_up_date) || parsed.follow_up_date}</p>}
     </details>
   )
 }
