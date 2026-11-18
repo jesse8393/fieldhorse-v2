@@ -17,6 +17,7 @@
 
 import type { RailSegmentId } from '../../../lib/stageRail.ts'
 import { moneyCents } from '../../../lib/format.ts'
+import { invoiceReference } from '../../../lib/invoiceReference.ts'
 import { spineDay } from './spine.ts'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -148,6 +149,7 @@ export type DocumentRow = {
 }
 
 export type DocumentContact = {
+  id?: string | null
   stage?: string | null
   amount?: number | null
   proposal_status?: string | null
@@ -161,6 +163,7 @@ export type DocumentInvoice = {
   title?: string | null
   status?: string | null
   issued_at?: string | null
+  created_at?: string | null
   due_at?: string | null
 }
 
@@ -189,8 +192,10 @@ function statusWord(status: string | null | undefined): string | null {
  * roles only) and the files people uploaded, newest first. Photos live
  * in the Spine and the Files tab, not here.
  */
-export function documentRows({ contact, invoices, files, canSeeMoney, now }: {
+export function documentRows({ contact, invoices, files, canSeeMoney, now, companyName }: {
   contact: DocumentContact | null | undefined
+  /** The company the invoices are printed for, so each reads by its printed number. */
+  companyName?: string | null
   invoices?: DocumentInvoice[] | null
   files?: DocumentFile[] | null
   canSeeMoney: boolean
@@ -214,7 +219,7 @@ export function documentRows({ contact, invoices, files, canSeeMoney, now }: {
       .sort((a, b) => Number(a.sequence_number ?? 0) - Number(b.sequence_number ?? 0))
     for (const inv of ordered) {
       const title = clean(inv.title)
-      const number = inv.sequence_number == null ? 'Invoice' : `Invoice ${inv.sequence_number}`
+      const number = invoiceReference({ ...inv, contact_id: contact?.id }, companyName)
       const label = title ? `${number}, ${title}` : number
       const word = statusWord(inv.status)
       const due = shortDate(inv.due_at, now)

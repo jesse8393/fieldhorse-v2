@@ -1147,7 +1147,7 @@ async function fetchClientDetail(id: string, userId: string, orgId?: string | nu
       .order('updated_at', { ascending: false }),
     scoped(supabase
       .from('fh_invoices')
-      .select('id, contact_id, title, amount, status, due_at, sequence_number, updated_at, created_at'), userId, orgId)
+      .select('id, contact_id, title, amount, status, due_at, sequence_number, issued_at, updated_at, created_at'), userId, orgId)
       .eq('client_id', client.id)
       .order('updated_at', { ascending: false })
   ])

@@ -20,6 +20,8 @@ import { supabase } from '../lib/supabase.ts'
 import { useClientDetail, useInvalidateClientDetail, useInvalidateClients } from '../lib/queries.ts'
 import { homeDashboardKey } from '../lib/homeDashboard.ts'
 import { useOrgScope } from '../lib/orgScope.ts'
+import { useDocumentCompanyName } from '../lib/companyBranding.ts'
+import { invoiceReference } from '../lib/invoiceReference.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { toastError, toastInfo } from '../lib/toast.ts'
 import { stageColor, stageLabel } from '../lib/stages.ts'
@@ -54,6 +56,7 @@ export default function ClientDetail() {
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const orgId = useOrgScope(user?.id)
+  const companyName = useDocumentCompanyName(orgId)
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
 
@@ -255,7 +258,7 @@ export default function ClientDetail() {
         <ClientTimeline jobs={jobs} payments={payments} notes={notes} files={files} onOpen={(jobId: any) => jobId && navigate(`/jobs/${jobId}`)} />
       )}
       {tab === 'projects' && (
-        <ProjectsList jobs={jobs} leads={leads} quotes={quotes} invoices={invoices} payments={payments} changeOrders={changeOrders} onOpen={openRecord} />
+        <ProjectsList jobs={jobs} leads={leads} quotes={quotes} invoices={invoices} payments={payments} changeOrders={changeOrders} clientId={client?.id} companyName={companyName} onOpen={openRecord} />
       )}
       {tab === 'files' && <FilesList rows={files} />}
       {tab === 'notes' && <NotesList notes={notes} />}
@@ -514,7 +517,7 @@ export default function ClientDetail() {
           <ClientTimeline jobs={jobs} payments={payments} notes={notes} files={files} onOpen={(jobId: any) => jobId && navigate(`/jobs/${jobId}`)} />
         )}
         {tab === 'projects' && (
-          <ProjectsList jobs={jobs} leads={leads} quotes={quotes} invoices={invoices} payments={payments} changeOrders={changeOrders} onOpen={openRecord} />
+          <ProjectsList jobs={jobs} leads={leads} quotes={quotes} invoices={invoices} payments={payments} changeOrders={changeOrders} clientId={client?.id} companyName={companyName} onOpen={openRecord} />
         )}
         {tab === 'files' && <FilesList rows={files} />}
         {tab === 'notes' && <NotesList notes={notes} />}
@@ -1202,7 +1205,7 @@ function RecordRow({ color, title, detail, figure, word, stamp, onOpen }: any) {
    ProjectsList: the client's four kinds of record (D53), Leads,
    Quotes, Jobs and Invoices, each row opening its own screen.
    ============================================================ */
-function ProjectsList({ jobs, leads = [], quotes = [], invoices = [], payments = [], changeOrders = [], onOpen }: any) {
+function ProjectsList({ jobs, leads = [], quotes = [], invoices = [], payments = [], changeOrders = [], clientId, companyName, onOpen }: any) {
   const paidByJob = useMemo(() => {
     const m = new Map()
     for (const p of payments || []) {
@@ -1355,7 +1358,7 @@ function ProjectsList({ jobs, leads = [], quotes = [], invoices = [], payments =
           <RecordRow
             key={inv.id}
             color={stageColor('invoice')}
-            title={inv.title || `Invoice ${inv.sequence_number || ''}`.trim()}
+            title={inv.title || invoiceReference({ ...inv, client_id: inv.client_id || clientId }, companyName)}
             detail={inv.due_at ? `Due ${new Date(inv.due_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : null}
             figure={money(inv.amount)}
             word={statusWord(inv.status)}

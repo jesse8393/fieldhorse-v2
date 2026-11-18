@@ -22,4 +22,13 @@ describe('invoiceReference', () => {
   it('keeps a stored document number', () => {
     expect(invoiceReference({ id: 'x', sequence_number: 3, doc_number: ' A-100 ', contact_id: JOB }, 'Parker Construction Company')).toBe('A-100')
   })
+
+  // Two invoices on one job with no sequence yet still read apart, so a
+  // duplicate check can tell them from each other.
+  it('tells two unsequenced invoices on one job apart', () => {
+    const a = invoiceReference({ id: 'aaaaaaaa-0001', contact_id: JOB, issued_at: '2026-11-10T12:00:00Z' }, 'Parker Construction Company')
+    const b = invoiceReference({ id: 'bbbbbbbb-0002', contact_id: JOB, issued_at: '2026-11-10T12:00:00Z' }, 'Parker Construction Company')
+    expect(a).not.toBe(b)
+    expect(a).toMatch(/^PCC-/)
+  })
 })

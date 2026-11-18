@@ -22,6 +22,7 @@ import { moneyCents } from '../../lib/format.ts'
 import { navigateHrefHere } from '../../lib/todayView.ts'
 import type { JobMoney } from '../../screens/ContactDetail/lib/spine.ts'
 import { documentRows, MAX_FILE_ROWS } from '../../screens/ContactDetail/lib/jobDesktop.ts'
+import { useDocumentCompanyName } from '../../lib/companyBranding.ts'
 import type { DocumentRow } from '../../screens/ContactDetail/lib/jobDesktop.ts'
 import { useJobCrew, useJobDocumentSources, useJobPartners } from '../../screens/ContactDetail/hooks/useJobFacts.ts'
 import './job-desktop.css'
@@ -94,8 +95,10 @@ export default function JobFactsPanel({
   const sources = useJobDocumentSources(jobId, canSeeMoney)
   const crew = useJobCrew(crewIds)
 
+  const companyName = useDocumentCompanyName(contact?.org_id)
   const documents = documentRows({
     contact,
+    companyName,
     invoices: sources.invoices,
     files: sources.files,
     canSeeMoney,

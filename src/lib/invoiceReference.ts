@@ -20,9 +20,10 @@ type ReferencedInvoice = {
 export function invoiceReference(invoice: ReferencedInvoice, companyName?: string | null): string {
   if (invoice.doc_number?.trim()) return invoice.doc_number.trim()
   const seed = invoice.contact_id || invoice.client_id || invoice.id
-  return invoice.sequence_number
-    ? invoiceNumberFromSequence(companyName, invoice.sequence_number, seed)
-    : invoiceNumber(companyName, seed, invoice.issued_at || invoice.created_at)
+  if (invoice.sequence_number) return invoiceNumberFromSequence(companyName, invoice.sequence_number, seed)
+  // With no sequence the printed number is the same for every invoice on
+  // the job, so the short id tells two of them apart.
+  return `${invoiceNumber(companyName, seed, invoice.issued_at || invoice.created_at)} · ${String(invoice.id).slice(0, 8)}`
 }
 
 /**
