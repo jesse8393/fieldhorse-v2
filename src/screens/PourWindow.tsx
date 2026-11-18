@@ -86,9 +86,9 @@ export default function PourWindow() {
   const [cityName, setCityName] = useState('')
 
   const hasCoords = profile?.location_lat != null && profile?.location_lon != null
-  // The forecast is only ever for the company's own pinned spot. With none
-  // there is nothing to forecast: the screen asks for the location and
-  // never shows another town's weather as if it were theirs.
+  // The forecast is only ever for the pinned spot. With none there is
+  // nothing to forecast: the screen asks for the location and never shows
+  // another town's weather as if it were theirs.
   const noLocation = !profileLoading && !hasCoords
   const services = profile?.services || EMPTY_SERVICES
 
@@ -194,11 +194,18 @@ useEffect(() => {
   const { stagger, item } = useFhMotion()
   const isDesktop = useIsDesktop()
 
+  // The location is on each person's own profile, so anyone can pin it
+  // here. Settings holds the same control for those who can open it.
   const askForLocation = noLocation ? (
     <EmptyState
       icon={MapPin}
-      title={canEditSettings ? 'Set your company location to see its forecast.' : 'Your company has no location set yet, so there is no forecast to show.'}
-      action={canEditSettings ? <Button variant="primary" size="md" to="/settings#location">Set location</Button> : undefined}
+      title="Pin your location to see the forecast."
+      action={
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+          <Button variant="primary" size="md" onClick={() => { hapticMedium(); pinLocation() }}>Pin location</Button>
+          {canEditSettings && <Button variant="secondary" size="md" to="/settings#location">Set location</Button>}
+        </div>
+      }
     />
   ) : null
 
