@@ -1122,7 +1122,7 @@ test('the app names an invoice by the number the customer sees', async ({ contex
     await expect(panel.getByText(/Invoice 1/)).toHaveCount(0)
   }
   await page.goto('/activity', { waitUntil: 'domcontentloaded', timeout: 60_000 })
-  await expect(page.getByText(/PCC-2D3E-01 sent, Final/).first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText(/PCC-2D3E-01 sent: Final/).first()).toBeVisible({ timeout: 30_000 })
   await page.goto('/search', { waitUntil: 'domcontentloaded', timeout: 60_000 })
   await page.getByPlaceholder(/Jobs, clients/).fill('PCC-2D3E-01')
   await expect(page.getByText(/PCC-2D3E-01/).first()).toBeVisible({ timeout: 30_000 })

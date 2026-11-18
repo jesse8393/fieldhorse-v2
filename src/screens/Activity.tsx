@@ -149,7 +149,7 @@ export default function Activity() {
           icon: Receipt,
           tone: inv.status === 'paid' ? 'green' : 'gold',
           // The number the invoice's PDF and customer link print (formats-1).
-          title: `${invoiceReference(inv, companyName)} ${inv.status === 'paid' ? 'paid' : inv.status}${inv.title ? `, ${inv.title}` : ''}`,
+          title: `${invoiceReference(inv, companyName)} ${inv.status === 'paid' ? 'paid' : inv.status}${inv.title ? `: ${inv.title}` : ''}`,
           sub: money(inv.amount),
           amount: Number(inv.amount || 0)
         })
