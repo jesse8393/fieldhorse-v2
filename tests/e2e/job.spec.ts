@@ -900,3 +900,29 @@ test('the job spine writes an evening payment as 8:15 pm', async ({ context, pag
   await expect(spine.getByText('8:15 pm', { exact: true }).first()).toBeVisible({ timeout: 30_000 })
   await expect(spine.getByText('8:15', { exact: true })).toHaveCount(0)
 })
+
+// formats-4: a sub's rate and the insurance claim's figures print to the
+// cent on the job, the way SubDetail and the customer document print them,
+// and the wide desktop job rail names each job's amount in full.
+test('the job prints sub rates, insurance figures and the rail amount to the cent', async ({ context, page }, testInfo) => {
+  await signIn(context, { tables: {
+    ...FORMATS_TABLES,
+    fh_subs: [{ id: 'sub-h1', user_id: 'qa-user-1', org_id: 'org-1', contact_id: 'c-h', name: 'Tri-Star Pumping', trade: 'Pump truck', phone: null, rate: 42.5, status: 'scheduled', created_at: '2026-11-10T12:00:00Z' }],
+    fh_insurance_claims: [{ id: 'ins-h1', user_id: 'qa-user-1', org_id: 'org-1', contact_id: 'c-h', claim_number: 'CL-1', carrier: 'State Farm', adjuster: null, deductible: 1000.5, rcv: 24800, acv: 18200.25, depreciation: 6599.75, supplement_amount: null, mortgage_company: null, created_at: '2026-11-10T12:00:00Z' }]
+  } })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  await page.goto('/jobs/c-h?tab=subs', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText('Tri-Star Pumping').filter({ visible: true }).first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText('$42.50', { exact: true }).filter({ visible: true }).first()).toBeVisible()
+  await expect(page.getByText('$43', { exact: true })).toHaveCount(0)
+  await page.goto('/jobs/c-h?tab=insurance', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText('$1,000.50', { exact: true }).filter({ visible: true }).first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText('$24,800.00', { exact: true }).filter({ visible: true }).first()).toBeVisible()
+  await expect(page.getByText('$1,001', { exact: true })).toHaveCount(0)
+  if (testInfo.project.name.startsWith('desktop')) {
+    await page.setViewportSize({ width: 1720, height: 1000 })
+    const rail = page.locator('.fh-detail-rail')
+    await expect(rail.getByText('$12,345.50', { exact: true })).toBeVisible({ timeout: 30_000 })
+    await expect(rail.getByText(/\$\d+(\.\d)?K\b/)).toHaveCount(0)
+  }
+})

@@ -21,7 +21,7 @@ import { useJobs, useJobsRealtime } from '../../lib/queries.ts'
 import { useInfiniteRender } from '../../lib/useInfiniteRender.ts'
 import { hapticTap } from '../../lib/haptics.ts'
 import { detailRoute, LIST_STAGE_META as STAGE_META } from '../../lib/stages.ts'
-import { moneyK as money } from '../../lib/format.ts'
+import { moneyCents } from '../../lib/format.ts'
 import { prefetchJobDetail } from '../../screens/ContactDetail/hooks/useJobData.ts'
 
 
@@ -110,7 +110,8 @@ export default function DetailListRail() {
       <ul className="fh-detail-rail__list">
         {visible.map((c: any) => {
           const meta = STAGE_META[c.stage] || STAGE_META.job
-          const amt = money(c.amount)
+          // A job with no amount shows none, as before.
+          const amt = Number(c.amount) ? moneyCents(c.amount) : null
           const isActive = c.id === currentId
           return (
             <li key={c.id}>
