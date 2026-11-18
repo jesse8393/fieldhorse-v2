@@ -11,6 +11,7 @@ import { disablePush, unsubscribePushLocally } from '../lib/push.ts'
 import { toastError } from '../lib/toast.ts'
 import { createAuthSessionBoundary } from '../lib/authSessionBoundary.ts'
 import { clearDrafts, setDraftOwner } from '../lib/drafts.ts'
+import { clearTimeClock, setTimeClockOwner } from '../lib/timeClockStorage.ts'
 import type { CacheOwnerStore, PurgeScope } from '../lib/authSessionBoundary.ts'
 
 // How long sign out waits for queued offline work to sync, and for this
@@ -29,13 +30,13 @@ function settleWithin<T>(work: Promise<T>, ms: number): Promise<T | undefined> {
 }
 
 // Per user keys in localStorage: the lead draft, the running time punch,
-// the time clock state (fh:timeclock:<job>:start, hourly rate), each
-// user's last resolved org (fh:orgScope:<user>, lib/orgScope.ts) and
+// each user's last resolved org (fh:orgScope:<user>, lib/orgScope.ts) and
 // their saved profile and workspace (fh:identity:, lib/identityCache.ts).
-// Half typed drafts (fh:draft:) are tagged with their owner and cleared
-// by lib/drafts.ts.
+// Half typed drafts (fh:draft:) and the time clock state
+// (fh:timeclock:<job>:start, hourly rate) are tied to their owner and
+// cleared by lib/drafts.ts and lib/timeClockStorage.ts.
 const USER_STORAGE_KEYS = ['fh:leadDraft', 'fh:timepunch:activeId']
-const USER_STORAGE_PREFIXES = ['fh:timeclock:', 'fh:orgScope:', 'fh:identity:']
+const USER_STORAGE_PREFIXES = ['fh:orgScope:', 'fh:identity:']
 
 function clearUserStorage() {
   try {
@@ -56,11 +57,12 @@ function clearUserStorage() {
 // TanStack cache (IndexedDB, jobs/leads/clients with names, phones,
 // amounts), the per user keys above, and this device's push
 // subscription. Both offline outboxes (queued rows, photos and captured
-// notes) and the half typed drafts are cleared only when the person chose
-// to sign out; when the session ended on its own or another account
-// arrived, they stay tagged with their owner and come back when that
-// person signs in again (see PurgeScope). A draft is never read by anyone
-// else, and the next account's session removes it (setDraftOwner).
+// notes), the half typed drafts and the time clock values are cleared
+// only when the person chose to sign out; when the session ended on its
+// own or another account arrived, they stay tied to their owner and come
+// back when that person signs in again (see PurgeScope). A draft is never
+// read by anyone else, and the next account's session removes drafts and
+// time clock values left by someone else (setDraftOwner, setTimeClockOwner).
 // Best-effort: storage failures must never block the sign-out itself.
 async function purgeLocalData({ queuedWork }: PurgeScope) {
   // Forget the workspace first (synchronously, before any await) so no
@@ -75,6 +77,7 @@ async function purgeLocalData({ queuedWork }: PurgeScope) {
   }
   clearUserStorage()
   clearDrafts({ keepOwned: !queuedWork })
+  clearTimeClock({ keepOwned: !queuedWork })
   await settleWithin(unsubscribePushLocally(), SIGN_OUT_PUSH_MS)
 }
 
@@ -126,7 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const boundary = createAuthSessionBoundary<Session>({
       purge: purgeLocalData,
       hold: () => { setSession(null); setLoading(true) },
-      publish: (next) => { setDraftOwner(next?.user.id ?? null); setSession(next); setLoading(false); markSessionSettled() },
+      publish: (next) => { setDraftOwner(next?.user.id ?? null); setTimeClockOwner(next?.user.id ?? null); setSession(next); setLoading(false); markSessionSettled() },
       owner: cacheOwner,
     })
     boundaryRef.current = boundary

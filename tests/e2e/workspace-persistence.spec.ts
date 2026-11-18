@@ -145,6 +145,55 @@ test('a session that ends on its own keeps the half typed quote for the same per
   await expect(page.getByLabel('Title', { exact: true })).toHaveValue('Hughes driveway, 6 inch, fiber mesh')
 })
 
+// settings-wiped-3 (review): the person's hourly rate and running clock
+// on this device are kept the same way, and never shown to anyone else.
+test('a session that ends on its own keeps the time clock rate for the same person', async ({ context, page }) => {
+  await signIn(context)
+  await expireOnNextLoad(context)
+  await page.goto('/workspace')
+  await expect(page.getByRole('button', { name: 'Sign out', exact: true }).last()).toBeVisible()
+  await page.evaluate(() => {
+    localStorage.setItem('fh:timeclock:hourlyRate', '85')
+    localStorage.setItem('fh:timeclock:c-job1:start', '1700000000000')
+  })
+  const refused = (route: Route) => route.fulfill({ status: 400, json: { code: 'refresh_token_not_found', error: 'invalid_grant', error_description: 'Invalid Refresh Token: Refresh Token Not Found' } })
+  await context.route('**/auth/v1/token**', refused)
+  await page.evaluate(() => sessionStorage.setItem('e2e:expire', '1'))
+  await page.reload()
+  await expect(page).toHaveURL(/\/login/)
+  expect(await page.evaluate(() => localStorage.getItem('fh:timeclock:hourlyRate'))).toBe('85')
+  await context.unroute('**/auth/v1/token**', refused)
+  await page.evaluate(() => sessionStorage.removeItem('e2e:expire'))
+  await page.goto('/workspace')
+  await expect(page.getByRole('button', { name: 'Sign out', exact: true }).last()).toBeVisible()
+  expect(await page.evaluate(() => localStorage.getItem('fh:timeclock:hourlyRate'))).toBe('85')
+  expect(await page.evaluate(() => localStorage.getItem('fh:timeclock:c-job1:start'))).toBe('1700000000000')
+})
+
+test('time clock values another person left on this device are removed', async ({ context, page }) => {
+  await signIn(context)
+  await context.addInitScript(() => {
+    if (localStorage.getItem('e2e:other-clock')) return
+    localStorage.setItem('e2e:other-clock', '1')
+    localStorage.setItem('fh:timeclockOwner', 'qa-user-2')
+    localStorage.setItem('fh:timeclock:hourlyRate', '140')
+  })
+  await page.goto('/workspace')
+  await expect(page.getByRole('button', { name: 'Sign out', exact: true }).last()).toBeVisible()
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('fh:timeclock:hourlyRate'))).toBeNull()
+})
+
+test('a chosen Sign out clears the time clock values', async ({ context, page }) => {
+  await signIn(context)
+  await page.goto('/workspace')
+  const signOut = page.getByRole('button', { name: 'Sign out', exact: true }).last()
+  await expect(signOut).toBeVisible()
+  await page.evaluate(() => localStorage.setItem('fh:timeclock:hourlyRate', '85'))
+  await signOut.click()
+  await expect(page).toHaveURL(/\/login$/)
+  await expect.poll(() => page.evaluate(() => Object.keys(localStorage).filter(key => key.startsWith('fh:timeclock')))).toEqual([])
+})
+
 test('a draft another person typed on this device is never shown and is removed', async ({ context, page }) => {
   await signIn(context)
   await context.addInitScript(() => {
