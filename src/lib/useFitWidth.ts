@@ -37,23 +37,16 @@ export function useFitWidth<T extends HTMLElement>(text: string) {
     if (typeof ResizeObserver !== 'undefined') {
       // Fitting changes the height, so only a size the fit did not make
       // (a new width, or text drawn bigger) measures again.
-      // The refit waits for the next frame: changing the size inside the
-      // observer's own callback makes the browser report a ResizeObserver
-      // loop error on every refit.
-      let frame = 0
+      // The refit happens in the same frame, so the figure never shows
+      // wider than its box. The browser notes a ResizeObserver loop when
+      // the fit changes the size; that notice is harmless and is not sent
+      // as an error (lib/reportClientError.ts).
       const observer = new ResizeObserver(() => {
-        if (frame) return
-        frame = requestAnimationFrame(() => {
-          frame = 0
-          if (el.clientWidth === settled.width && el.clientHeight === settled.height) return
-          fit()
-        })
+        if (el.clientWidth === settled.width && el.clientHeight === settled.height) return
+        fit()
       })
       observer.observe(el)
-      stop = () => {
-        observer.disconnect()
-        if (frame) cancelAnimationFrame(frame)
-      }
+      stop = () => observer.disconnect()
     }
     // The display font can arrive after the first measure.
     let live = true
